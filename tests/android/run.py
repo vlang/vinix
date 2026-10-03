@@ -184,19 +184,22 @@ def prepare(args: argparse.Namespace) -> Path | None:
         subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                         str(ROOT / "tests/android/text-observer.c"), "-ldl",
                         "-o", str(test / "text-observer.so")], check=True)
-    if args.runtime_arch == "x86_64":
-        subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror",
-                        str(ROOT / "tests/android/runtime-stack-probe.c"), "-pthread",
-                        "-o", str(test / "runtime-stack-probe")], check=True)
-        subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror",
-                        str(ROOT / "tests/android/memory-probe.c"),
-                        "-o", str(test / "runtime-memory-probe")], check=True)
+    subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                    str(ROOT / "tests/android/runtime-stack-probe.c"), "-pthread",
+                    "-o", str(test / "runtime-stack-probe")], check=True)
+    subprocess.run([observer_compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                    str(ROOT / "tests/android/memory-probe.c"),
+                    "-o", str(test / "runtime-memory-probe")], check=True)
+    if args.runtime_arch == "aarch64":
+        subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                        str(ROOT / "tests/android/atfork-test.c"), "-ldl", "-pthread",
+                        "-o", str(test / "runtime-atfork-probe")], check=True)
     subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-static",
                     str(ROOT / "tests/android/memory-probe.c"),
                     "-o", str(test / "memory-probe")], check=True)
     # Test the input bridge built with the compositor under test.
     subprocess.run([compiler, "-O2", "-w", "-D__vinix__", f"-I{x11}/usr/include",
-                    str(args.repo / "build-support/xorg-server/vinix-wine-host.c"),
+                    str(ROOT / "build-support/xorg-server/vinix-wine-host.c"),
                     f"-L{x11}/usr/lib", f"-L{x11}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(overlay / "usr/bin/vinix-wine-host")], check=True)
@@ -211,8 +214,12 @@ def prepare(args: argparse.Namespace) -> Path | None:
         shutil.copy2(icon, icons / icon.name)
     apk = overlay / "opt/android-test/application.apk"
     shutil.copy2(args.apk, apk)
+    if args.boot_probe:
+        shutil.copy2(args.boot_probe, test / "art-boot-probe.jar")
+        args.boot_probe_sha256 = hashlib.sha256((test / "art-boot-probe.jar").read_bytes()).hexdigest()
     configuration = {
         "TEST_APK": "/opt/android-test/application.apk", "TEST_MODE": args.mode,
+        "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
         "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
         "TEST_TIMEOUT": str(args.startup_timeout), "VINIX_ANDROID_EXPECTED_RESULT": args.expect,
         "TEST_RUNTIME_ARCH": args.runtime_arch, "TEST_STRACE": "1" if args.strace else "0",
@@ -229,7 +236,8 @@ def prepare(args: argparse.Namespace) -> Path | None:
         + ("export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n" if not args.observe else "")
         + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" and not args.observe else "")
         +
-        f"exec /usr/bin/run-android \"$TEST_APK\" -l {shlex.quote(args.activity)} -w 480 -h 640\n")
+        f"exec /usr/bin/run-android \"$TEST_APK\" -l {shlex.quote(args.activity)} -w 480 -h 640"
+        + "".join(" " + shlex.quote(argument) for argument in args.runtime_arg) + "\n")
     (test / "launch").chmod(0o755)
     launcher = overlay / "usr/bin/run-android-calculator"
     if launcher.exists() or launcher.is_symlink():
@@ -496,6 +504,19 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             reader.join(timeout=2)
             os.close(master)
             socket_path.unlink(missing_ok=True)
+    boot_probe_passed = None
+    guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
+                      for line in bytes(transcript).replace(b"\r", b"").splitlines()
+                      if b"ANDROID-FAIL " in line]
+    if guest_failures and not passed and not observed:
+        failure = guest_failures[0]
+    if args.boot_probe:
+        boot_probe_passed = any(line == b"ANDROID-BOOTCLASSPATH-VERIFIED"
+                                for line in bytes(transcript).replace(b"\r", b"").splitlines())
+        if not boot_probe_passed:
+            if passed or observed:
+                failure = "native Java bootclasspath probe did not pass"
+            passed = observed = False
     result = {"passed": None if args.observe and observed else passed,
               "observed": observed, "check": "window-observation" if args.observe else "calculator",
               "failure": None if passed or observed else failure,
@@ -506,6 +527,10 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "keys": None if args.observe else args.keys,
               "expected": None if args.observe else args.expect, "screenshot": str(args.screenshot),
               "key_retries": input_retries[0] if input_retries else None,
+              "runtime_arguments": args.runtime_arg,
+              "boot_probe": str(args.boot_probe) if args.boot_probe else None,
+              "boot_probe_sha256": args.boot_probe_sha256 if args.boot_probe else None,
+              "boot_probe_passed": boot_probe_passed,
               "serial_log": str(state / "serial.log")}
     (state / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     if not passed and not observed:
@@ -527,7 +552,11 @@ def main() -> int:
     parser.add_argument("--kernel-dir", type=Path)
     parser.add_argument("--initramfs", type=Path)
     parser.add_argument("--apk", type=Path)
+    parser.add_argument("--boot-probe", type=Path,
+                        help="DEX JAR containing ArtBootProbe; require native Java preflight before the APK")
     parser.add_argument("--activity", default="calculator/Calculator")
+    parser.add_argument("--runtime-arg", action="append", default=[],
+                        help="extra ATL argument, repeatable; use = for values beginning with -")
     parser.add_argument("--title", default="", help="optional substring of the real X11 APK window title")
     parser.add_argument("--mode", choices=("desktop", "direct"), default="desktop")
     parser.add_argument("--input", choices=("qmp", "xtest"))
@@ -559,20 +588,25 @@ def main() -> int:
             raise SystemExit("Python Pillow is required to save the APK screenshot")
     args.repo = args.repo.resolve()
     args.state_dir = args.state_dir.resolve()
-    args.runtime = (args.runtime or args.repo / "build-aarch64-android/x86_64/staging").resolve()
+    args.runtime = (args.runtime or args.repo / "build-aarch64-android/aarch64/staging").resolve()
     if args.runtime_arch is None:
         architectures = {marker.read_text().strip() for marker in args.runtime.glob("opt/vinix-android*/architecture")}
         args.runtime_arch = "x86_64" if "x86_64" in architectures else "aarch64"
+    if args.boot_probe and args.runtime_arch != "aarch64":
+        parser.error("--boot-probe requires a native aarch64 runtime")
     args.desktop = (args.desktop or args.repo / "build/vinix-desktop").resolve()
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     args.initramfs = args.initramfs.resolve() if args.initramfs else None
     args.apk = (args.apk or args.runtime / "usr/share/vinix/android/Arity-1.1.apk").resolve()
+    args.boot_probe = args.boot_probe.resolve() if args.boot_probe else None
     args.screenshot = (args.screenshot or args.state_dir / ("application.png" if args.observe else "calculator.png")).resolve()
     args.input = args.input or ("xtest" if args.mode == "direct" else "qmp")
     base = args.initramfs or args.repo / "build-aarch64-userland/downloads/alpine-minirootfs-3.21.7-aarch64.tar.gz"
     for path in (args.runtime / "usr/bin/run-android", args.desktop, args.kernel_dir / "bin/vinix", base, args.apk):
         if not path.is_file():
             raise SystemExit(f"Missing Android smoke test input: {path}")
+    if args.boot_probe and not args.boot_probe.is_file():
+        raise SystemExit(f"Missing native Java bootclasspath probe: {args.boot_probe}")
     args.state_dir.mkdir(parents=True, exist_ok=True)
     args.screenshot.parent.mkdir(parents=True, exist_ok=True)
     overlay = prepare(args)

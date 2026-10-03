@@ -136,6 +136,9 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     roblox_staging = resolved_env_path(
         env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/x86_64/staging"
     )
+    android_staging = resolved_env_path(
+        env, "VINIX_ANDROID_STAGING", root / "build-aarch64-android/aarch64/staging"
+    )
     gpu_sysroot = resolved_env_path(
         env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
     )
@@ -179,6 +182,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/chromium",
         root / "build-support/hyprland",
         root / "build-support/roblox",
+        root / "build-support/android",
         root / "gl-triangle/run-m1-agx-smoke",
         root / "gl-triangle/egl_triangle.c",
         root / "tests/browsers/firefox-smoke.html",
@@ -207,6 +211,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         blender_staging,
         x86_staging,
         roblox_staging,
+        android_staging,
     ]
 
     llvm_bin = Path(os.path.expanduser(env.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin")))

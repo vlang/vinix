@@ -1,0 +1,173 @@
+--- a/art/libartbase/base/globals.h
++++ b/art/libartbase/base/globals.h
+@@ -36,7 +36,12 @@
+
+ // System page size. We check this against sysconf(_SC_PAGE_SIZE) at runtime, but use a simple
+ // compile-time constant so the compiler can generate better code.
+-static constexpr int kPageSize = 4096;
++#ifndef ART_PAGE_SIZE
++#define ART_PAGE_SIZE 4096
++#endif
++static constexpr int kPageSize = ART_PAGE_SIZE;
++static_assert(kPageSize >= 4096 && (kPageSize & (kPageSize - 1)) == 0,
++              "ART_PAGE_SIZE must be a power of two of at least 4096 bytes");
+
+ // Clion, clang analyzer, etc can falsely believe that "if (kIsDebugBuild)" always
+ // returns the same value. By wrapping into a call to another constexpr function, we force it
+--- a/art/libartbase/base/safe_copy.cc
++++ b/art/libartbase/base/safe_copy.cc
+@@ -27,10 +27,7 @@
+ #include <android-base/macros.h>
+
+ #include "bit_utils.h"
+-
+-#ifndef PAGE_SIZE
+-#define PAGE_SIZE 4096
+-#endif
++#include "globals.h"
+
+ namespace art {
+
+@@ -60,10 +57,10 @@
+     }
+
+     src_iovs[iovecs_used].iov_base = const_cast<char*>(cur);
+-    if (!IsAlignedParam(cur, PAGE_SIZE)) {
+-      src_iovs[iovecs_used].iov_len = AlignUp(cur, PAGE_SIZE) - cur;
++    if (!IsAlignedParam(cur, kPageSize)) {
++      src_iovs[iovecs_used].iov_len = AlignUp(cur, kPageSize) - cur;
+     } else {
+-      src_iovs[iovecs_used].iov_len = PAGE_SIZE;
++      src_iovs[iovecs_used].iov_len = kPageSize;
+     }
+
+     src_iovs[iovecs_used].iov_len = std::min(src_iovs[iovecs_used].iov_len, len);
+--- a/art/runtime/thread.cc
++++ b/art/runtime/thread.cc
+@@ -138,7 +138,7 @@
+ // of the stack (lowest memory).  The higher portion of the memory
+ // is protected against reads and the lower is available for use while
+ // throwing the StackOverflow exception.
+-constexpr size_t kStackOverflowProtectedSize = 4 * kMemoryToolStackGuardSizeScale * KB;
++constexpr size_t kStackOverflowProtectedSize = kPageSize * kMemoryToolStackGuardSizeScale;
+
+ static const char* kThreadNameDuringStartup = "<native thread without managed peer>";
+
+@@ -697,8 +697,7 @@
+   } else {
+     // If we are going to use implicit stack checks, allocate space for the protected
+     // region at the bottom of the stack.
+-    stack_size += Thread::kStackOverflowImplicitCheckSize +
+-        GetStackOverflowReservedBytes(kRuntimeISA);
++    stack_size += kStackOverflowProtectedSize + GetStackOverflowReservedBytes(kRuntimeISA);
+   }
+
+   // Some systems require the stack size to be a multiple of the system page size, so round up.
+@@ -1282,12 +1281,10 @@
+   tlsPtr_.stack_begin = reinterpret_cast<uint8_t*>(read_stack_base);
+   tlsPtr_.stack_size = read_stack_size;
+
+-  // The minimum stack size we can cope with is the overflow reserved bytes (typically
+-  // 8K) + the protected region size (4K) + another page (4K).  Typically this will
+-  // be 8+4+4 = 16K.  The thread won't be able to do much with this stack even the GC takes
+-  // between 8K and 12K.
++  // Reserve room for overflow handling, the protected region, and one usable native page.
++  // The thread won't be able to do much with this stack; even the GC takes 8K to 12K.
+   uint32_t min_stack = GetStackOverflowReservedBytes(kRuntimeISA) + kStackOverflowProtectedSize
+-    + 4 * KB;
++    + kPageSize;
+   if (read_stack_size <= min_stack) {
+     // Note, as we know the stack is small, avoid operations that could use a lot of stack.
+     LogHelper::LogLineLowStack(__PRETTY_FUNCTION__,
+--- a/art/runtime/monitor_pool.h
++++ b/art/runtime/monitor_pool.h
+@@ -200,7 +200,10 @@
+   // should be large enough that we don't run out. We run out of address bits if it's > 512.
+   // Currently we set it a bit smaller, to save half a page per process.  We make it tiny in
+   // debug builds to catch growth errors. The only value we really expect to tune.
+-  static constexpr size_t kInitialChunkStorage = kIsDebugBuild ? 1U : 256U;
++  // Keep the monitor-id address budget unchanged when native pages grow.
++  // One MiB of initial chunks is 256 entries for 4 KiB pages and 64 for 16 KiB.
++  static constexpr size_t kInitialChunkStorage =
++      kIsDebugBuild ? 1U : (1U << 20) / kPageSize;
+   static_assert(IsPowerOfTwo(kInitialChunkStorage), "kInitialChunkStorage must be power of 2");
+   // The number of lists, each containing pointers to storage chunks.
+   static constexpr size_t kMaxChunkLists = 8;  //  Dictated by 3 bit index. Don't increase above 8.
+@@ -217,12 +220,10 @@
+   // Each subsequent list as twice as large as the preceding one.
+   // Monitor Ids are interpreted as follows:
+   //     Top 3 bits (of 28): index into monitor_chunks_.
+-  //     Next 16 bits: index into the chunk list, i.e. monitor_chunks_[i].
+-  //     Last 9 bits: offset within chunk, expressed as multiple of kMonitorAlignment.
+-  // If we set kInitialChunkStorage to 512, this would allow us to use roughly 128K chunks of
+-  // monitors, which is 0.5GB of monitors.  With this maximum setting, the largest chunk list
+-  // contains 64K entries, and we make full use of the available index space. With a
+-  // kInitialChunkStorage value of 256, this is proportionately reduced to 0.25GB of monitors.
++  //     Remaining bits: chunk-list index and offset in kMonitorAlignment units.
++  // The split depends on kPageSize. Normalizing the initial chunk count preserves
++  // the same top-index byte stride and approximately 0.25 GiB backing capacity
++  // for every supported native page size.
+   // Updates to monitor_chunks_ are guarded by allocated_monitor_ids_lock_ .
+   // No field in this entire data structure is ever updated once a monitor id whose lookup
+   // requires it has been made visible to another thread.  Thus readers never race with
+--- a/art/libartbase/arch/instruction_set.h
++++ b/art/libartbase/arch/instruction_set.h
+@@ -22,6 +22,7 @@
+ #include <cstdint>
+
+ #include "base/enums.h"
++#include "base/globals.h"
+ #include "base/macros.h"
+
+ namespace art {
+@@ -235,12 +236,18 @@
+ #error "Missing defines for stack overflow gap"
+ #endif
+
+-static constexpr size_t kArmStackOverflowReservedBytes    = ART_STACK_OVERFLOW_GAP_arm;
+-static constexpr size_t kArm64StackOverflowReservedBytes  = ART_STACK_OVERFLOW_GAP_arm64;
+-static constexpr size_t kMipsStackOverflowReservedBytes   = ART_STACK_OVERFLOW_GAP_mips;
+-static constexpr size_t kMips64StackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_mips64;
+-static constexpr size_t kX86StackOverflowReservedBytes    = ART_STACK_OVERFLOW_GAP_x86;
+-static constexpr size_t kX86_64StackOverflowReservedBytes = ART_STACK_OVERFLOW_GAP_x86_64;
++// The compiler probe and fault handler share these page-aligned reserves.
++// Retain architecture-specific minima while respecting larger native pages.
++constexpr size_t RoundStackOverflowGap(size_t bytes) {
++  return (bytes + kPageSize - 1) / kPageSize * kPageSize;
++}
++
++static constexpr size_t kArmStackOverflowReservedBytes    = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_arm);
++static constexpr size_t kArm64StackOverflowReservedBytes  = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_arm64);
++static constexpr size_t kMipsStackOverflowReservedBytes   = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_mips);
++static constexpr size_t kMips64StackOverflowReservedBytes = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_mips64);
++static constexpr size_t kX86StackOverflowReservedBytes    = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_x86);
++static constexpr size_t kX86_64StackOverflowReservedBytes = RoundStackOverflowGap(ART_STACK_OVERFLOW_GAP_x86_64);
+
+ NO_RETURN void GetStackOverflowReservedBytesFailure(const char* error_msg);
+
+--- a/libcore/luni/src/main/native/Register.cpp
++++ b/libcore/luni/src/main/native/Register.cpp
+@@ -56,17 +56,12 @@
+
+ // DalvikVM calls this on shutdown, do any global cleanup here.
+ // -- Very important if we restart multiple DalvikVMs in the same process to reset the state.
+-void JNI_OnUnload(JavaVM* vm, void*) {
+-    JNIEnv* env;
+-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+-        ALOGE("JavaVM::GetEnv() failed");
+-        abort();
+-    }
++void JNI_OnUnload(JavaVM*, void*) {
+     ALOGV("libjavacore JNI_OnUnload");
+
+-    ScopedLocalFrame localFrame(env);
+-
+-#define UNREGISTER(FN) extern void FN(JNIEnv*); FN(env)
+-    UNREGISTER(unregister_libcore_icu_ICU);
+-#undef UNREGISTER
++    // ART unloads boot native libraries after the JNI thread and managed heap
++    // have been destroyed. ICU cleanup owns only native state and mappings;
++    // it neither needs nor can obtain a JNIEnv during this shutdown phase.
++    extern void unregister_libcore_icu_ICU(JNIEnv*);
++    unregister_libcore_icu_ICU(nullptr);
+ }

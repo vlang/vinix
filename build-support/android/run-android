@@ -2,10 +2,9 @@
 # Run an APK through Android Translation Layer on Vinix's hosted X11 display.
 set -eu
 
-runtime=/opt/vinix-android-x86_64
-loader="$runtime/lib/ld-musl-x86_64.so.1"
+runtime=${VINIX_ANDROID_ROOT:-/opt/vinix-android-aarch64}
+loader="$runtime/lib/ld-musl-aarch64.so.1"
 binary="$runtime/usr/bin/android-translation-layer"
-emulator=${VINIX_ANDROID_EMULATOR:-/usr/bin/qemu-x86_64}
 guest_preload="$runtime/usr/lib/libvinix-android-compat.so"
 extra_preload=${VINIX_ANDROID_TEST_PRELOAD:-}
 if [ -n "$extra_preload" ]; then
@@ -27,14 +26,14 @@ if [ ! -x "$loader" ] || [ ! -x "$binary" ]; then
     echo "run-android: Android runtime is not installed; build the Android layer first" >&2
     exit 127
 fi
-if [ ! -x "$emulator" ]; then
-    echo "run-android: x86-64 translator is missing: $emulator" >&2
-    exit 127
-fi
 if [ ! -r "$1" ]; then
     echo "run-android: cannot read APK: $1" >&2
     exit 2
 fi
+
+# ART reserves several MiB of the main stack before entering Java. The
+# compatibility library caps its reported bounds to this finite soft limit.
+ulimit -s "${VINIX_ANDROID_STACK_KB:-32768}"
 
 export ANDROID_APP_DATA_DIR="${ANDROID_APP_DATA_DIR:-${XDG_DATA_HOME:-${HOME:-/root}/.local/share}/vinix/android}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
@@ -69,20 +68,15 @@ done
 # ART loads additional native libraries after startup, so retain the same
 # private lookup path for its dlopen calls.
 library_path="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/android_translation_layer/natives:$runtime/usr/lib/libproxy"
-# QEMU's translator creates executable code mappings for the x86 runtime.
-# Opt in for this runtime process so the compositor keeps its normal policy.
+# ART executes Android bytecode and JNI libraries on Vinix's ARM64 CPU.
+# Its executable mappings use the runtime's own process policy.
 export VINIX_ALLOW_WX=1
 unset RUN_FROM_BUILDDIR BIONIC_LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV QEMU_RESERVED_VA
-# QEMU is an ARM executable. Its own loader must see ARM libraries; only
-# the emulated Android process receives x86 libraries and instrumentation.
-unset LD_LIBRARY_PATH LD_PRELOAD
+unset LD_LIBRARY_PATH LD_PRELOAD VINIX_X86_64_ROOT VINIX_X86_MULTIARCH
+export LD_LIBRARY_PATH="$library_path" LD_PRELOAD="$guest_preload"
 
 runtime_command() {
-    set -- "$emulator" -s "${VINIX_ANDROID_STACK_SIZE:-33554432}" \
-        -B "${VINIX_ANDROID_GUEST_BASE:-0x100000000}" \
-        -L "$runtime" -E "LD_LIBRARY_PATH=$library_path" \
-        -E "LD_PRELOAD=$guest_preload" "$loader" \
-        --library-path "$library_path" "$@"
+    set -- "$loader" --library-path "$library_path" "$@"
     if [ "$final_command" -eq 1 ]; then
         exec "$@"
     fi

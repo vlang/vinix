@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// musl discovers the initial thread's stack with 4 KiB mremap probes. QEMU
-// forwards those probes to Vinix, whose native mappings use 16 KiB pages.
-// Read QEMU's target /proc/self/maps instead: it describes the actual mapped
-// x86 stack. This library is preloaded only into the private Android runtime.
-// QEMU also discards x86 MAP_32BIT on ARM. Honor that flag using genuine low
-// target mappings, which ART requires for its compressed object references.
+// Vinix reserves room for the main stack to grow beyond its current limit.
+// Report its mapped bounds and usable finite limit to the private ARM runtime.
+// The legacy x86 runtime also needs mapped bounds because its musl uses 4 KiB
+// mremap probes on Vinix's 16 KiB ARM mappings. Its QEMU host discards x86
+// MAP_32BIT, so honor that flag with genuine low target mappings for ART's
+// compressed references. Native ARM ART already uses its own low allocator.
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
@@ -13,7 +13,184 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 
+static pthread_t initial_thread;
+static uintptr_t initial_stack_anchor;
+static int (*next_pthread_getattr_np)(pthread_t, pthread_attr_t *);
+
+#if defined(__aarch64__)
+// Android's four-argument registration associates callbacks with the DSO's
+// __cxa_finalize handle. musl has no atfork unregister operation. One fixed
+// thunk per registration lets the host preserve ordering with its own ART
+// callbacks while finalized DSOs leave inert thunks. Registered slots cannot
+// be reused; exhausting this bounded table returns ENOMEM.
+#define ANDROID_FORK_SLOTS(M) \
+    M(0) M(1) M(2) M(3) M(4) M(5) M(6) M(7) \
+    M(8) M(9) M(10) M(11) M(12) M(13) M(14) M(15) \
+    M(16) M(17) M(18) M(19) M(20) M(21) M(22) M(23) \
+    M(24) M(25) M(26) M(27) M(28) M(29) M(30) M(31) \
+    M(32) M(33) M(34) M(35) M(36) M(37) M(38) M(39) \
+    M(40) M(41) M(42) M(43) M(44) M(45) M(46) M(47) \
+    M(48) M(49) M(50) M(51) M(52) M(53) M(54) M(55) \
+    M(56) M(57) M(58) M(59) M(60) M(61) M(62) M(63) \
+    M(64) M(65) M(66) M(67) M(68) M(69) M(70) M(71) \
+    M(72) M(73) M(74) M(75) M(76) M(77) M(78) M(79) \
+    M(80) M(81) M(82) M(83) M(84) M(85) M(86) M(87) \
+    M(88) M(89) M(90) M(91) M(92) M(93) M(94) M(95) \
+    M(96) M(97) M(98) M(99) M(100) M(101) M(102) M(103) \
+    M(104) M(105) M(106) M(107) M(108) M(109) M(110) M(111) \
+    M(112) M(113) M(114) M(115) M(116) M(117) M(118) M(119) \
+    M(120) M(121) M(122) M(123) M(124) M(125) M(126) M(127)
+
+struct android_fork_handler {
+    pthread_mutex_t lock;
+    void (*prepare)(void);
+    void (*parent)(void);
+    void (*child)(void);
+    void *dso;
+    unsigned used;
+};
+
+#define ANDROID_FORK_INITIALIZER(index) { .lock = PTHREAD_MUTEX_INITIALIZER },
+static struct android_fork_handler android_fork_handlers[] = {
+    ANDROID_FORK_SLOTS(ANDROID_FORK_INITIALIZER)
+};
+#undef ANDROID_FORK_INITIALIZER
+static pthread_mutex_t android_fork_registration_lock = PTHREAD_MUTEX_INITIALIZER;
+static int android_fork_guard_error;
+
+static void prepare_android_fork_registry(void)
+{
+    pthread_mutex_lock(&android_fork_registration_lock);
+}
+
+static void release_android_fork_registry(void)
+{
+    pthread_mutex_unlock(&android_fork_registration_lock);
+}
+
+static void android_fork_prepare(unsigned index)
+{
+    struct android_fork_handler *handler = &android_fork_handlers[index];
+    // Keep each slot locked until its parent/child callback finishes so a
+    // concurrent DSO finalizer cannot unload a callback being executed.
+    pthread_mutex_lock(&handler->lock);
+    if (handler->prepare != NULL) {
+        handler->prepare();
+    }
+}
+
+static void android_fork_finish(unsigned index, int child)
+{
+    struct android_fork_handler *handler = &android_fork_handlers[index];
+    void (*callback)(void) = child ? handler->child : handler->parent;
+    if (callback != NULL) {
+        callback();
+    }
+    pthread_mutex_unlock(&handler->lock);
+}
+
+#define ANDROID_FORK_THUNKS(index) \
+    static void android_prepare_##index(void) { android_fork_prepare(index); } \
+    static void android_parent_##index(void) { android_fork_finish(index, 0); } \
+    static void android_child_##index(void) { android_fork_finish(index, 1); }
+ANDROID_FORK_SLOTS(ANDROID_FORK_THUNKS)
+#undef ANDROID_FORK_THUNKS
+#define ANDROID_FORK_FUNCTIONS(index) \
+    { android_prepare_##index, android_parent_##index, android_child_##index },
+static void (*const android_fork_thunks[][3])(void) = {
+    ANDROID_FORK_SLOTS(ANDROID_FORK_FUNCTIONS)
+};
+#undef ANDROID_FORK_FUNCTIONS
+#undef ANDROID_FORK_SLOTS
+
+int bionic___register_atfork(void (*prepare)(void), void (*parent)(void),
+                            void (*child)(void), void *dso)
+{
+    if (android_fork_guard_error != 0) {
+        return android_fork_guard_error;
+    }
+    const unsigned count = sizeof(android_fork_handlers) / sizeof(android_fork_handlers[0]);
+    pthread_mutex_lock(&android_fork_registration_lock);
+    unsigned index;
+    for (index = 0; index < count && android_fork_handlers[index].used; ++index) {}
+    if (index == count) {
+        pthread_mutex_unlock(&android_fork_registration_lock);
+        return ENOMEM;
+    }
+    struct android_fork_handler *handler = &android_fork_handlers[index];
+    handler->used = 1;
+    pthread_mutex_lock(&handler->lock);
+    handler->prepare = prepare;
+    handler->parent = parent;
+    handler->child = child;
+    handler->dso = dso;
+    pthread_mutex_unlock(&handler->lock);
+    pthread_mutex_unlock(&android_fork_registration_lock);
+
+    // The host also locks its atfork list. Hold neither registry lock while
+    // registering, since a concurrent fork can already be inside our thunk.
+    int result = pthread_atfork(android_fork_thunks[index][0],
+                               android_fork_thunks[index][1], android_fork_thunks[index][2]);
+    if (result != 0) {
+        // No host callback references a failed registration, so this slot can
+        // be reused. Successful registrations stay reserved after finalizing.
+        pthread_mutex_lock(&android_fork_registration_lock);
+        pthread_mutex_lock(&handler->lock);
+        handler->prepare = handler->parent = handler->child = NULL;
+        handler->dso = NULL;
+        handler->used = 0;
+        pthread_mutex_unlock(&handler->lock);
+        pthread_mutex_unlock(&android_fork_registration_lock);
+    }
+    return result;
+}
+
+int bionic_pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))
+{
+    return bionic___register_atfork(prepare, parent, child, NULL);
+}
+
+void bionic___cxa_finalize(void *dso)
+{
+    extern void __cxa_finalize(void *);
+    if (android_fork_guard_error != 0) {
+        // No Android registration can have succeeded without the fork guard.
+        __cxa_finalize(dso);
+        return;
+    }
+    for (unsigned index = 0; index < sizeof(android_fork_handlers) / sizeof(android_fork_handlers[0]); ++index) {
+        struct android_fork_handler *handler = &android_fork_handlers[index];
+        // Unpublished slots need the registry guard across their critical
+        // section, since they have no prepare/child thunk to release a lock
+        // inherited during fork. A busy slot can only be a published thunk
+        // or a finalizer already waiting on one: registration/failure cleanup
+        // always holds the registry while owning an unpublished slot.
+        pthread_mutex_lock(&android_fork_registration_lock);
+        int guarded = pthread_mutex_trylock(&handler->lock) == 0;
+        if (!guarded) {
+            // Never wait on a fork-held slot while owning the registry: its
+            // prepare guard acquires the registry after all later thunks.
+            pthread_mutex_unlock(&android_fork_registration_lock);
+            pthread_mutex_lock(&handler->lock);
+        }
+        if (dso == NULL || handler->dso == dso) {
+            handler->prepare = handler->parent = handler->child = NULL;
+            handler->dso = NULL;
+        }
+        pthread_mutex_unlock(&handler->lock);
+        if (guarded) {
+            pthread_mutex_unlock(&android_fork_registration_lock);
+        }
+    }
+    // Preserve the host's existing C++ finalization behavior. Only Android
+    // relocations bind this bionic_ wrapper; native host DSOs are unaffected.
+    __cxa_finalize(dso);
+}
+#endif
+
+#if defined(__x86_64__)
 #ifndef MAP_FIXED_NOREPLACE
 #define MAP_FIXED_NOREPLACE 0x100000
 #endif
@@ -23,9 +200,6 @@
 #define LOW_MAP_BEGIN UINT64_C(0x10000)
 #define LOW_MAP_END UINT64_C(0x80000000)
 
-static pthread_t initial_thread;
-static uintptr_t initial_stack_anchor;
-static int (*next_pthread_getattr_np)(pthread_t, pthread_attr_t *);
 static void *(*next_mmap)(void *, size_t, int, int, int, off_t);
 static int (*next_munmap)(void *, size_t);
 static pthread_once_t mapping_symbols_once = PTHREAD_ONCE_INIT;
@@ -47,6 +221,7 @@ static void resolve_mapping_symbols(void)
     next_mmap = dlsym(RTLD_NEXT, "mmap");
     next_munmap = dlsym(RTLD_NEXT, "munmap");
 }
+#endif
 
 __attribute__((constructor)) static void initialize_stack_compat(void)
 {
@@ -56,12 +231,23 @@ __attribute__((constructor)) static void initialize_stack_compat(void)
     uintptr_t stack_local;
     initial_stack_anchor = (uintptr_t)&stack_local;
     next_pthread_getattr_np = dlsym(RTLD_NEXT, "pthread_getattr_np");
+#if defined(__aarch64__)
+    // Register before any Android thunk: prepare takes the registry after
+    // later slot locks, and parent/child releases it before their callbacks.
+    // A failed guard registration must fail subsequent Android registrations.
+    android_fork_guard_error = pthread_atfork(prepare_android_fork_registry,
+                                             release_android_fork_registry,
+                                             release_android_fork_registry);
+#endif
+#if defined(__x86_64__)
     pthread_once(&mapping_symbols_once, resolve_mapping_symbols);
     // Fork from a different thread must not leave the child holding a mutex
     // whose owner exists only in the parent process.
     pthread_atfork(prepare_low_mapping_fork, release_low_mapping_fork, release_low_mapping_fork);
+#endif
 }
 
+#if defined(__x86_64__)
 static uintptr_t align_low_hint(uintptr_t address)
 {
     return (address + LOW_MAP_ALIGNMENT - 1) & ~(LOW_MAP_ALIGNMENT - 1);
@@ -200,6 +386,7 @@ void *mmap64(void *address, size_t length, int protection, int flags, int fd, of
 {
     return mmap(address, length, protection, flags, fd, offset);
 }
+#endif
 
 static int mapped_stack_bounds(uintptr_t anchor, uintptr_t *base, size_t *size)
 {
@@ -229,6 +416,32 @@ static int mapped_stack_bounds(uintptr_t anchor, uintptr_t *base, size_t *size)
     return result;
 }
 
+static int initial_stack_bounds(uintptr_t *base, size_t *size)
+{
+    int result = mapped_stack_bounds(initial_stack_anchor, base, size);
+#if defined(__aarch64__)
+    if (result == 0) {
+        struct rlimit limit;
+        if (getrlimit(RLIMIT_STACK, &limit) != 0) {
+            return errno;
+        }
+        // Vinix reserves space for the main stack to grow when its limit is
+        // raised. Report the usable finite limit within that reservation so
+        // ART installs its guard at the actual stack boundary. Preserve the
+        // high address, rounding the bottom to a native 16 KiB page.
+        if (limit.rlim_cur != RLIM_INFINITY && limit.rlim_cur < *size) {
+            size_t usable = (size_t)limit.rlim_cur & ~((size_t)16384 - 1);
+            if (usable == 0) {
+                return EINVAL;
+            }
+            *base += *size - usable;
+            *size = usable;
+        }
+    }
+#endif
+    return result;
+}
+
 int pthread_getattr_np(pthread_t thread, pthread_attr_t *attributes)
 {
     if (next_pthread_getattr_np == NULL) {
@@ -244,16 +457,16 @@ int pthread_getattr_np(pthread_t thread, pthread_attr_t *attributes)
         errno = saved_errno;
         return result;
     }
-    // Preserve musl's detach state and every other reported attribute. Its
-    // initial-stack probe returns successfully with a one-page size on Vinix;
-    // only the stack bounds need to come from QEMU's mapped target ranges.
+    // Preserve musl's detach state and every other reported attribute. Older
+    // x86 musl reports one page; native musl reports the growth reservation.
+    // Supply the usable initial bounds within the process's mapped ranges.
     uintptr_t base = 0;
     size_t size = 0;
-    result = mapped_stack_bounds(initial_stack_anchor, &base, &size);
+    result = initial_stack_bounds(&base, &size);
     if (result == 0) {
         result = pthread_attr_setstack(attributes, (void *)base, size);
         if (result == 0) {
-            // QEMU's mapped initial stack has no pthread-created guard.
+            // The mapped initial stack has no pthread-created guard.
             result = pthread_attr_setguardsize(attributes, 0);
         }
     }

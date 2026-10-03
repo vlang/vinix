@@ -1,4 +1,4 @@
-/* Exercise the page contract used by ART and its QEMU host. */
+/* Exercise the page contract used by native or translated ART. */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -17,7 +17,11 @@ static void require(int condition, const char *operation) {
 
 int main(void) {
     size_t page = (size_t)sysconf(_SC_PAGESIZE);
-    require(page == 4096 || page == 16384, "page size");
+#if defined(__aarch64__)
+    require(page == 16384, "native Vinix ARM page size");
+#else
+    require(page == 4096, "x86 ART page size");
+#endif
 #if defined(__x86_64__)
     void *compressed = mmap(NULL, 64 * 1024 * 1024, PROT_READ | PROT_WRITE,
                             MAP_PRIVATE | MAP_ANONYMOUS | MAP_32BIT, -1, 0);
@@ -32,11 +36,26 @@ int main(void) {
                 "compressed reference arena contents");
     require(munmap(compressed, 64 * 1024 * 1024) == 0, "release compressed reference arena");
 #endif
-    void *space = mmap((void *)(uintptr_t)0x20000000, 64 * 1024 * 1024,
-                       PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    void *space = MAP_FAILED;
+    // ASLR can place the executable or loader over any one low hint. ART
+    // searches for a free arena too; a hint is not a fixed-address contract.
+    for (uintptr_t hint = 0x10000000; hint <= 0xf0000000; hint += 0x10000000) {
+        void *candidate = mmap((void *)hint, 64 * 1024 * 1024,
+                               PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (candidate == MAP_FAILED) {
+            continue;
+        }
+        printf("ANDROID-MEMORY-LOW hint=%p address=%p\n", (void *)hint, candidate);
+        if ((uintptr_t)candidate <= UINT64_C(0x100000000) - 64 * 1024 * 1024) {
+            space = candidate;
+            break;
+        }
+        require(munmap(candidate, 64 * 1024 * 1024) == 0, "release rejected low-address hint");
+    }
     require(space != MAP_FAILED, "reserve ART-style low-address arena");
     require((uintptr_t)space % page == 0, "page-aligned reservation");
     require((uintptr_t)space + 64 * 1024 * 1024 <= UINT64_C(0x100000000), "low-address arena");
+    require(msync(space, page, 0) == 0, "ART low allocator recognizes reserved pages");
     require(mprotect(space, 2 * page, PROT_READ | PROT_WRITE) == 0, "commit two pages");
     ((volatile unsigned char *)space)[0] = 0x12;
     ((volatile unsigned char *)space)[page] = 0x34;
@@ -48,6 +67,9 @@ int main(void) {
     require(((volatile unsigned char *)space)[0] == 0x12 &&
             ((volatile unsigned char *)space)[page] == 0x34, "retain page contents");
     require(munmap(space, 64 * 1024 * 1024) == 0, "release sparse reservation");
+    errno = 0;
+    require(msync(space, page, 0) == -1 && errno == ENOMEM,
+            "ART low allocator recognizes unmapped pages");
 
     space = mmap(NULL, page, PROT_READ | PROT_WRITE | PROT_EXEC,
                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

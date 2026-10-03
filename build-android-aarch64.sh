@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stage Android Translation Layer for Vinix/aarch64 using its x86 translator.
+# Stage native ARM64 Android Translation Layer and ART for Vinix.
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)

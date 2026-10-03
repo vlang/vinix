@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/resource.h>
 
 static pthread_t initial_thread;
 static void *initial_base;
@@ -61,7 +62,22 @@ static int check_mapped_initial_stack(void)
         }
         if (begin <= anchor && anchor < end && permissions[0] == 'r'
             && permissions[1] == 'w') {
-            if ((uintptr_t)initial_base == begin && initial_size == end - begin) {
+            uintptr_t expected_base = begin;
+            size_t expected_size = end - begin;
+#if defined(__aarch64__)
+            struct rlimit limit;
+            if (getrlimit(RLIMIT_STACK, &limit) != 0) {
+                puts("ANDROID-STACK-FAIL cannot read initial stack limit");
+                break;
+            }
+            if (limit.rlim_cur != RLIM_INFINITY && limit.rlim_cur < expected_size) {
+                expected_size = (size_t)limit.rlim_cur & ~((size_t)16384 - 1);
+                expected_base = end - expected_size;
+            }
+            printf("ANDROID-STACK-MAPPING begin=%lx end=%lx reserved=%lu soft_limit=%lu\n",
+                   begin, end, end - begin, (unsigned long)limit.rlim_cur);
+#endif
+            if ((uintptr_t)initial_base == expected_base && initial_size == expected_size) {
                 result = 0;
             } else {
                 printf("ANDROID-STACK-FAIL metadata=%p/%zu mapping=%lx-%lx\n",

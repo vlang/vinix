@@ -107,3 +107,12 @@ by `run-roblox` on every supplied file. Authentication and gameplay have not bee
 verified on Vinix. Support is experimental; the pinned
 [upstream release notes](https://github.com/luohoa97/cordial/releases/tag/v0.23.2)
 also list a signed-in startup freeze and intermittent movement input issues.
+
+The native ARM64 ATL/ART path is still being brought up separately. The coherent
+framework and private fork callbacks fix the earlier missing
+`Build.SUPPORTED_64_BIT_ABIS` API and `__register_atfork` dependency. Launching
+the same unchanged APK through its Java splash activity now reaches the ARM64
+engine load, which fails at `AConfiguration_getScreenWidthDp` in ATL's unimplemented configuration
+API. This path has not displayed a Roblox application frame. The desktop entry
+continues to use the tested Cordial path above; see the
+[Android guest harness](../tests/android/README.md) for native APK diagnostics.

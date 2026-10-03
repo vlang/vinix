@@ -1,0 +1,23 @@
+diff --git a/linker/linker.h b/linker/linker.h
+--- a/linker/linker.h
++++ b/linker/linker.h
+@@ -47,2 +47,8 @@
+-#define PAGE_SIZE 4096
+-#define PAGE_MASK 4095
++#ifndef BIONIC_PAGE_SIZE
++#define BIONIC_PAGE_SIZE 4096
++#endif
++#if BIONIC_PAGE_SIZE < 4096 || (BIONIC_PAGE_SIZE & (BIONIC_PAGE_SIZE - 1))
++#error BIONIC_PAGE_SIZE must be a power of two of at least 4096
++#endif
++#define PAGE_SIZE BIONIC_PAGE_SIZE
++#define PAGE_MASK (PAGE_SIZE - 1)
+diff --git a/libc/libc.c b/libc/libc.c
+--- a/libc/libc.c
++++ b/libc/libc.c
+@@ -23 +23,4 @@
+-#ifndef PAGE_SIZE
++#ifdef BIONIC_PAGE_SIZE
++#undef PAGE_SIZE
++#define PAGE_SIZE BIONIC_PAGE_SIZE
++#elif !defined(PAGE_SIZE)

@@ -17,6 +17,16 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).resolve().parent
 PREFIX = "/opt/vinix-roblox-x86_64"
+# Cordial retains its pinned CPU translator independently of native Android.
+TRANSLATOR = {
+    "filename": "aarch64_qemu-x86_64-9.1.2-r1.apk",
+    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/aarch64/qemu-x86_64-9.1.2-r1.apk",
+    "sha256": "061a147c9603fdb511b22d4945935cf9fcde29359ee264026956fb16990630d5",
+    "binary_sha256": "9025933dcbd195d6fe2fbaaa2dd697173befd8379a10ff1df9040e6a8c941671",
+    "version": "9.1.2-r1",
+    "architecture": "aarch64",
+    "license": "GPL-2.0-or-later",
+}
 RUNTIME = {
     "version": "0.23.2",
     "license": "GPL-3.0-or-later",
@@ -92,7 +102,7 @@ def main() -> int:
     downloads.mkdir(parents=True, exist_ok=True)
     staging = build / "staging"
     fingerprint = hashlib.sha256()
-    fingerprint.update(json.dumps((RUNTIME, GLIBC, FONT, android.TRANSLATOR), sort_keys=True).encode())
+    fingerprint.update(json.dumps((RUNTIME, GLIBC, FONT, TRANSLATOR), sort_keys=True).encode())
     for path in (Path(__file__), SUPPORT / "run-roblox", SUPPORT / "run-roblox-client", SUPPORT / "graphics.py", graphics.LOCK,
                  SUPPORT / "wayland.py", wayland.LOCK,
                  ROOT / "build-support/android/build.py", ROOT / "build-support/debian-root.py"):
@@ -109,7 +119,7 @@ def main() -> int:
         if manifest.get("build_fingerprint") == key and all(path.is_file() for path in required):
             print(f"Roblox runtime cache is current: {staging}")
             return 0
-    for record in (RUNTIME, GLIBC, FONT, android.TRANSLATOR):
+    for record in (RUNTIME, GLIBC, FONT, TRANSLATOR):
         android.download(record["url"], downloads / record["filename"], record["sha256"])
     with tempfile.TemporaryDirectory(prefix="roblox-stage-", dir=build) as directory:
         temporary = Path(directory)
@@ -150,19 +160,19 @@ def main() -> int:
         for name in ("run-roblox", "run-roblox-client"):
             shutil.copy2(SUPPORT / name, commands / name)
             (commands / name).chmod(0o755)
-        translator = downloads / android.TRANSLATOR["filename"]
+        translator = downloads / TRANSLATOR["filename"]
         with tarfile.open(translator, "r:gz", ignore_zeros=True) as archive:
             stream = archive.extractfile("usr/bin/qemu-x86_64")
             assert stream is not None
             payload = stream.read()
-        if hashlib.sha256(payload).hexdigest() != android.TRANSLATOR["binary_sha256"]:
+        if hashlib.sha256(payload).hexdigest() != TRANSLATOR["binary_sha256"]:
             raise RuntimeError("translator binary checksum mismatch")
         (commands / "qemu-x86_64").write_bytes(payload)
         (commands / "qemu-x86_64").chmod(0o755)
         (prefix / "architecture").write_text("x86_64\n")
         manifest = {"format": 1, "architecture": "x86_64", "runtime_prefix": PREFIX,
                     "build_fingerprint": key, "runtime": RUNTIME, "glibc": GLIBC,
-                    "font": FONT, "translator": android.TRANSLATOR,
+                    "font": FONT, "translator": TRANSLATOR,
                     "graphics": json.loads(graphics.LOCK.read_text()), "native_wayland": native_wayland}
         (prefix / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
         previous = build / "staging.previous"

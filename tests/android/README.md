@@ -1,6 +1,8 @@
 # Android calculator smoke test
 
-Build the Android runtime and sample APK, then build the desktop and kernel:
+Build the native 16 KiB ART, bionic and coherent ATL overlays as described in
+[Android APKs](../../docs/android.md),
+then build the Android runtime and sample APK, desktop and kernel:
 
 ```sh
 ./build-android-aarch64.sh --with-calculator
@@ -35,6 +37,8 @@ python3 tests/android/run.py --apk /path/to/calculator.apk \
 ./build-desktop-aarch64.sh --compact-initramfs --with-android
 python3 tests/android/run.py --initramfs build-support/init-aarch64/initramfs-desktop.tar \
     --memory 12288
+python3 tests/android/run.py --boot-probe build/android-native-java/probe/ArtBootProbe.jar \
+    --memory 12288
 ```
 
 `--initramfs` selects another base image, with the test files added as a boot
@@ -45,12 +49,31 @@ x86_64` compiles the result observer for an x86 runtime translated by QEMU.
 desktop integration, sends XTEST keyboard input, and displays its real pixels
 on fbdev for a QMP screenshot. The normal desktop test exercises compositor
 keyboard forwarding. The host needs `aarch64-linux-musl-gcc` and Python Pillow.
-The default translated runtime also needs `x86_64-linux-musl-gcc` for its
-test-only observers. Before launching the APK, the test checks mapped stack
-bounds, worker stack guards and ART's memory mapping prerequisites in the real
-guest. `--strace` adds translated runtime syscall diagnostics.
+The default runtime is native ARM64; no CPU translator is installed or invoked.
+Before launching the APK, the test checks mapped stack bounds, the finite stack
+limit, worker stack guards and ART's memory mapping prerequisites in the real
+guest. The native fork probe checks Android and host callback ordering, DSO
+finalization, child registration and the bounded callback table against the
+actual compatibility library. The legacy `--runtime-arch x86_64` diagnostic option requires
+`x86_64-linux-musl-gcc`; `--strace` applies to that translated diagnostic path.
 `--click X Y` changes the desktop screen position clicked before typing;
 `--focus X Y` changes the APK window position clicked in direct mode.
+
+`--boot-probe JAR` adds an optional Java platform preflight before opening the
+APK. Supply a DEX JAR containing [ArtBootProbe](ArtBootProbe.java). The guest
+runs it with the private native ARM64 `dalvikvm`, the runtime's stack correction
+and ART's interpreter options. The probe requires correct date parsing,
+UTC formatting and stream ordering from the real boot libraries. Both a zero
+exit status and its `ANDROID-BOOTCLASSPATH-PASS` assertion marker are required.
+`serial.log` retains its output; `result.json` records the probe hash and verdict.
+Build this fixture with the pinned bootclasspath tools and a JDK on the host:
+
+```sh
+python3 build-support/android/art-bootclasspath.py \
+    --build-dir build/android-native-java \
+    --art-runtime build-aarch64-android/aarch64/art-runtime \
+    --build-probe build/android-native-java/probe/ArtBootProbe.jar
+```
 
 For bring-up of another APK, capture its actual window and startup diagnostics
 without the calculator observer or simulated input:
@@ -59,6 +82,10 @@ without the calculator observer or simulated input:
 python3 tests/android/run.py --apk /path/to/application.apk \
     --activity package/Activity --title package --observe \
     --mode direct --state-dir /tmp/vinix-apk-observation
+python3 tests/android/run.py --apk /path/to/Roblox.apk \
+    --activity com/roblox/client/startup/ActivitySplash --observe \
+    --mode direct --runtime-arg=-X --runtime-arg=-verbose:jni \
+    --state-dir /tmp/vinix-roblox-observation
 ```
 
 `--observe` requires a painted APK window to remain visible for 30 seconds
@@ -68,3 +95,13 @@ establishes that a window was observed, not that the application's functionality
 works. Startup failures retain a screenshot where possible, diagnostic logs
 and an explicit failure reason. A proprietary APK must be supplied locally;
 the harness does not modify or redistribute it.
+
+`--runtime-arg` passes an additional argument to ATL and can be repeated.
+Use `=` for arguments beginning with a hyphen. The JNI verbosity example
+records the original native-library load error before a later unresolved JNI
+method obscures it. Failure diagnostics retain the first 256 KiB of each
+application log, its final 40 lines and the last 80 native-load/exception lines.
+
+The Roblox observation command exercises its Java activity through native
+ATL/ART. The regular Roblox desktop entry uses the separate Cordial runtime
+described in [Roblox APK](../../docs/roblox.md).

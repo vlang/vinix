@@ -8,13 +8,23 @@ export XDG_RUNTIME_DIR=/run/user/0
 export VINIX_ANDROID_EXPECTED_RESULT
 
 application_logs() {
-    for log in /tmp/android-launch.log /tmp/android-desktop.log /tmp/android-text.log \
+    for log in /tmp/android-boot-probe.log /tmp/android-launch.log /tmp/android-desktop.log /tmp/android-text.log \
         /tmp/vinix-android-*.log /run/vinix-hosted-x11/vinix-android-*.log; do
         [ -f "$log" ] || continue
         echo "ANDROID-LOG $log"
-        head -100 "$log"
+        if [ "${1:-}" = full ]; then
+            # Native-library load errors can sit between the progress head
+            # and abort tail. Keep the complete bounded startup on failure.
+            head -c 262144 "$log"
+        else
+            head -100 "$log"
+        fi
         echo "ANDROID-LOG-TAIL $log"
         tail -40 "$log"
+        if [ "${1:-}" = full ]; then
+            echo "ANDROID-NATIVE-LOAD-DIAGNOSTICS $log"
+            grep -E 'LoadNativeLibrary|JNI_OnLoad|dlopen|UnsatisfiedLinkError|Exception' "$log" | tail -80
+        fi
         if [ "$TEST_STRACE" = 1 ]; then
             echo "ANDROID-MAPPING-TRACE $log"
             grep -E 'mmap\(|mremap\(|mprotect\(|madvise\(' "$log" | tail -120
@@ -26,7 +36,7 @@ diagnostics() {
     uname -a
     ps
     cat /proc/meminfo
-    application_logs
+    application_logs full
     echo ANDROID-DIAGNOSTICS-END
 }
 fail() {
@@ -54,6 +64,47 @@ if [ "$TEST_RUNTIME_ARCH" = x86_64 ]; then
                 "$runtime/lib/ld-musl-x86_64.so.1" "/opt/android-test/$probe" || exit 1
         done
     ) || fail "translated ART stack or memory prerequisites failed"
+else
+    runtime=/opt/vinix-android-aarch64
+    (
+        unset LD_LIBRARY_PATH LD_PRELOAD
+        export VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"
+        loader="$runtime/lib/ld-musl-aarch64.so.1"
+        # Record musl's original initial-stack metadata before requiring the
+        # runtime's correction against this same process mapping contract.
+        "$loader" --library-path "$LD_LIBRARY_PATH" /opt/android-test/runtime-stack-probe
+        echo "ANDROID-STACK-RAW status=$?"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        for probe in runtime-stack-probe runtime-memory-probe runtime-atfork-probe; do
+            "$loader" --library-path "$LD_LIBRARY_PATH" "/opt/android-test/$probe" || exit 1
+        done
+    ) || fail "native ART stack, memory or fork callback prerequisites failed"
+fi
+if [ -n "${TEST_ART_BOOT_PROBE:-}" ]; then
+    [ "$TEST_RUNTIME_ARCH" = aarch64 ] || fail "Java bootclasspath probe requires native ARM64 ART"
+    [ -f "$TEST_ART_BOOT_PROBE" ] || fail "Java bootclasspath probe is missing"
+    echo ANDROID-BOOTCLASSPATH-START
+    (
+        runtime=/opt/vinix-android-aarch64
+        loader="$runtime/lib/ld-musl-aarch64.so.1"
+        unset ANDROID_ROOT ANDROID_DATA LD_LIBRARY_PATH LD_PRELOAD
+        export VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/art/natives"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        for icu_data_file in "$runtime"/usr/share/icu/*/icudt*l.dat; do
+            if [ -f "$icu_data_file" ]; then
+                export ICU_DATA="${icu_data_file%/*}"
+                break
+            fi
+        done
+        exec "$loader" --library-path "$LD_LIBRARY_PATH" "$runtime/usr/bin/dalvikvm" \
+            -Xnoimage-dex2oat -Xusejit:false -cp "$TEST_ART_BOOT_PROBE" ArtBootProbe
+    ) >/tmp/android-boot-probe.log 2>&1 || fail "native Java bootclasspath probe failed"
+    cat /tmp/android-boot-probe.log
+    grep -q '^ANDROID-BOOTCLASSPATH-PASS ' /tmp/android-boot-probe.log \
+        || fail "native Java bootclasspath probe did not report its assertions passing"
+    echo ANDROID-BOOTCLASSPATH-VERIFIED
 fi
 [ -x /usr/bin/run-android ] || fail "run-android is missing"
 [ -f "$TEST_APK" ] || fail "APK is missing: $TEST_APK"

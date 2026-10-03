@@ -1,29 +1,98 @@
 # Android APKs on Vinix
 
-The ARM64 desktop can run APKs with the open source
-[Android Translation Layer](https://gitlab.com/android_translation_layer/android_translation_layer).
-It uses ART to execute DEX bytecode and translates Android framework calls
-into GTK widgets. The x86-64 runtime runs through Vinix's existing QEMU user
-translation support in a normal desktop window, with input and pixels carried
-by the existing X11 bridge. This gives ART the 4 KiB memory ABI it requires
-while the ARM64 kernel continues to use 16 KiB pages.
+Vinix's ARM64 desktop runs Android APKs with
+[Android Translation Layer](https://gitlab.com/android_translation_layer/android_translation_layer)
+and ART. ART executes the application's DEX bytecode; ATL implements Android
+framework calls using native Linux libraries and GTK. The runtime, its helpers
+and ARM64 JNI libraries execute directly on the ARM64 CPU. Java bytecode
+interpretation is provided by ART with its JIT disabled.
 
-Stage the runtime and the optional open source Arity calculator, then include
-them in an image. The host needs Python 3, curl and `x86_64-linux-musl-gcc`
-in addition to the desktop's ARM64 build tools:
+Vinix uses 16 KiB memory pages. The standard Alpine ART package assumes 4 KiB,
+so the builder requires a source-built ART overlay adapted for 16 KiB pages.
+The APK native-library linker also needs matching 16 KiB page rounding.
+The source-built ATL overlay supplies matching native helpers, framework DEX,
+Android resources and fonts from one pinned upstream commit. The Alpine
+package's framework is replaced as a unit so its Java and JNI APIs stay in sync.
+It verifies the pinned source, checked-in patch, compiler flag and every output
+file's hash, architecture and load-segment alignment before staging it. A
+missing or incompatible overlay fails the build.
+
+First build ART on a native ARM64 Alpine Linux host. On an ARM64 Mac, an ARM64
+Linux VM using hardware virtualization is suitable for building the runtime.
+ART's build generates and executes native host tools, so a macOS cross compiler
+alone cannot build it. Enable Alpine's `edge/main`, `edge/community` and
+`edge/testing` repositories and install its ART build dependencies:
 
 ```sh
-./build-android-aarch64.sh --with-calculator
-./build-desktop-aarch64.sh --compact-initramfs --with-android
-./run-desktop-aarch64.sh --no-build --mem=8192
+apk add --upgrade build-base bash python3 zip curl pkgconf patch \
+  bionic_translation-dev bsd-compat-headers expat-dev icu-dev java-common \
+  libbsd-dev libcap-dev libpng-dev libselinux-dev libunwind-dev lz4-dev meson \
+  openjdk8-jdk openssl-dev valgrind-dev wolfssl-jni-dev xz-dev zlib-dev vixl-dev
+ln -sf python3 /usr/bin/python
 ```
+
+The tested runtime ABI uses musl `1.2.6-r4`, GCC/libstdc++ `15.2.0-r9`,
+ICU `78.1-r0` and VIXL `8.0.0-r0`. Match the package lock when rebuilding;
+the build script and manifest record the exact source, patch, compiler and
+dependency packages. `--dependency-cache DIR` records available package
+archive checksums for reproducing that build:
+
+```sh
+build-support/android/build-art.sh --output /path/to/art-runtime
+build-support/android/build-bionic.sh --output /path/to/bionic-runtime
+```
+
+Build ATL on the same native ARM64 Alpine host with its framework dependencies.
+The build uses OpenJDK 8 for Java compilation and Java 17 or newer for the
+checksum-pinned D8 compiler:
+
+```sh
+apk add android-build-tools art_standalone-dev libandroidfw-dev \
+  gtk4.0-dev libgudev-dev libsecret-dev libdrm-dev libportal-dev \
+  ffmpeg-dev mesa-dev openxr-dev sqlite-dev vulkan-loader-dev \
+  wayland-dev wayland-protocols webkit2gtk-6.0-dev openjdk17-jre-headless
+build-support/android/build-atl.sh --output /path/to/atl-runtime \
+  --java /usr/lib/jvm/java-17-openjdk/bin/java
+```
+
+Copy all three resulting directories to the build host. Desugar ART's own Java
+boot libraries using the pinned D8 compiler; this removes unresolved Java
+lambda bootstrap calls while retaining the classes and resources. Application
+APKs remain unchanged. This host step requires Java 17 or newer. Then stage
+the native runtime and optional calculator APK. The staging host also needs
+Python 3, curl and `aarch64-linux-musl-gcc`:
+
+```sh
+python3 build-support/android/art-bootclasspath.py \
+  --build-dir build-aarch64-android/aarch64/java-build --art-runtime /path/to/art-runtime
+./build-android-aarch64.sh --art-runtime /path/to/art-runtime \
+  --bionic-runtime /path/to/bionic-runtime --atl-runtime /path/to/atl-runtime \
+  --with-calculator
+./build-desktop-aarch64.sh --compact-initramfs --with-android
+./run-desktop-aarch64.sh --no-build --mem=12288
+```
+
+The default ART overlay location is
+`build-aarch64-android/aarch64/art-runtime`; the native-library linker defaults
+to `build-aarch64-android/aarch64/bionic-runtime`, and ATL defaults to
+`build-aarch64-android/aarch64/atl-runtime`. `VINIX_ANDROID_ART_RUNTIME`,
+`VINIX_ANDROID_BIONIC_RUNTIME` and `VINIX_ANDROID_ATL_RUNTIME` override those
+locations. The runtime builder installs the
+checksum-pinned Alpine ARM64 dependency closure and patched ART under
+`/opt/vinix-android-aarch64`. Its musl loader, GTK and libraries remain private
+to APK processes. It installs no CPU translator. `packages.lock.json`,
+`runtime-manifest.json`, `art-runtime-manifest.json`,
+`bionic-runtime-manifest.json` and `atl-runtime-manifest.json` preserve provenance.
+`--update-lock` explicitly regenerates the Alpine package selection.
 
 Open **Android Calculator** from Start or Quick Launch. The sample is the
 developer's unchanged Arity 1.1 APK, extracted from its
 [official source archive](https://code.google.com/archive/p/arity-calculator/).
-Both the archive and the APK are checked against recorded SHA256 hashes.
+The archive and APK are verified against recorded SHA256 hashes. Click the
+input field above the history list before typing; this version uses keyboard
+input.
 
-On an existing X11 display (including a session started with `startx`), launch
+On an existing X11 display, including a session started with `startx`, launch
 another APK with:
 
 ```sh
@@ -32,44 +101,56 @@ run-android /root/example.apk -l com/example/MainActivity -w 480 -h 640
 ```
 
 `-l` selects an activity using slash-separated names. Other arguments are
-passed to Android Translation Layer. App data is stored under
-`$XDG_DATA_HOME/vinix/android` (normally `$HOME/.local/share/vinix/android`);
-set `ANDROID_APP_DATA_DIR` to choose another directory.
+passed to ATL. App data is stored under `$XDG_DATA_HOME/vinix/android`, normally
+`$HOME/.local/share/vinix/android`. `ANDROID_APP_DATA_DIR` selects another root.
+The launcher supplies a finite 32 MiB stack limit; `VINIX_ANDROID_STACK_KB`
+overrides it. The compatibility library reports the usable initial stack
+within both Vinix's mapped reservation and that limit. Worker stack metadata
+remains supplied by musl. ARM ART uses its own low-address allocator for
+compressed object references.
 
-The builder installs a complete, checksum-pinned Alpine x86-64 runtime under
-`/opt/vinix-android-x86_64` and a static ARM64 QEMU translator at
-`/usr/bin/qemu-x86_64`. Its musl loader, GTK, ART and dependencies stay private
-to the APK process. `/usr/share/atl` contains the runtime's Android font map.
-`build-support/android/packages.lock.json` records every Alpine package
-version and hash; `runtime-manifest.json` preserves provenance.
-`--update-lock` explicitly regenerates the package selection from Alpine edge.
+The private compatibility library also implements Android's DSO-associated
+fork callbacks through real host callbacks. It preserves their order with
+ART's callbacks and removes them when the Android library finalizes. Since
+musl cannot unregister a host callback, the process retains an inert thunk
+after finalization. The table supports 128 successful Android registrations
+per process; further registrations return `ENOMEM`. Registering or finalizing
+handlers from inside a running fork callback is unsupported.
 
-A small runtime compatibility library obtains the initial thread's stack
-bounds from QEMU's actual target memory mappings. musl's normal 4 KiB `mremap`
-probe cannot discover that stack through a 16 KiB host. Worker thread attributes
-remain supplied by musl. The library also implements `MAP_32BIT` using real
-mappings below 2 GiB, which QEMU's ARM host otherwise does not honor. This
-keeps ART's compressed object references valid. ART runs in interpreter mode,
-with image compilation and its JIT disabled; QEMU still needs
-`VINIX_ALLOW_WX=1` for its translator.
+Compatibility follows ATL's implemented Android API subset. APKs containing
+native libraries need `arm64-v8a` libraries. Pure Java/DEX APKs do not require
+an architecture-specific native payload. Modern Android APIs, services and
+resource qualifiers can require additional ATL implementation; the presence
+of an APK launcher does not establish compatibility with every application.
+The coherent overlay fixes the earlier Roblox startup failure at
+`android.os.Build.SUPPORTED_64_BIT_ABIS`. The unchanged Roblox 2.738.1397 APK
+now initializes its content providers and reaches its engine load through
+native ATL/ART. The fork callback implementation resolves its missing
+`__register_atfork` dependency; the next measured load failure is
+`AConfiguration_getScreenWidthDp`. ATL's configuration API is currently a
+stub implementation, so supplying that symbol alone would not provide the
+configuration behavior the engine needs. No native Roblox application frame,
+authentication or gameplay has been verified. The regular desktop Roblox
+entry uses the separate [Cordial runtime](roblox.md).
 
-Support is experimental and follows Android Translation Layer's implemented
-API subset. Google Play Services, a full Android system image and general APK
-compatibility are outside this implementation. Native libraries in an APK must
-target `x86_64`. Arity contains only Java/DEX code. Version 1.1 uses the keyboard
-for input; click its input field above the history list before typing. Newer
-Arity versions use Android APIs and resource qualifiers that this runtime does
-not yet implement.
-
-Run the isolated QEMU test after staging the runtime and building the desktop:
+Run the real guest test after building the runtime, desktop and kernel:
 
 ```sh
-python3 tests/android/run.py
+python3 tests/android/launcher-test.py
+python3 tests/android/art-runtime-test.py
+python3 tests/android/bootclasspath-test.py
+python3 tests/android/run.py --memory 12288
 ```
 
-The test boots Vinix with private VM state, opens the unchanged APK in the
-native desktop, types an expression through QEMU's keyboard, verifies the text
-drawn by the Android app, and captures the actual guest framebuffer. Test-only
-text observation is supplied through `LD_PRELOAD`; it does not calculate the
-answer or change the APK. Logs and the screenshot are retained in
-`build/android-smoke`. `--mode=direct` tests ART and X11 without the compositor.
+The guest test opens the unchanged calculator APK in the Vinix desktop,
+checks native stack and memory prerequisites, types `123+456` through the
+guest keyboard, verifies that the APK draws `579`, and captures the actual
+framebuffer. Its test-only text observer does not calculate the result or
+modify the APK. Logs and screenshots are retained in `build/android-smoke`.
+The native runtime passed this test on 3 October 2026 in both the minimal
+test image and the built compact desktop image with 12 GiB RAM: the unchanged
+APK displayed `579` with zero key retries. The Java boot probe also passed
+date parsing, UTC formatting and stream ordering against the desugared boot
+libraries. These results cover that APK and those Java platform calls.
+`--observe --apk /path/to/app.apk` captures another APK's real window and logs
+without claiming a functional pass. See [the harness instructions](../tests/android/README.md).

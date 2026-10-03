@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -19,19 +20,10 @@ ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).resolve().parent
 LOCK = SUPPORT / "packages.lock.json"
 MIRROR = "https://dl-cdn.alpinelinux.org/alpine/edge"
-PREFIX = "/opt/vinix-android-x86_64"
-ARCHITECTURE = "x86_64"
+PREFIX = "/opt/vinix-android-aarch64"
+ARCHITECTURE = "aarch64"
 REPOSITORIES = ("main", "community", "testing")
 ROOT_PACKAGES = ("android-translation-layer", "font-dejavu", "font-noto", "ca-certificates-bundle")
-TRANSLATOR = {
-    "filename": "aarch64_qemu-x86_64-9.1.2-r1.apk",
-    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/aarch64/qemu-x86_64-9.1.2-r1.apk",
-    "sha256": "061a147c9603fdb511b22d4945935cf9fcde29359ee264026956fb16990630d5",
-    "binary_sha256": "9025933dcbd195d6fe2fbaaa2dd697173befd8379a10ff1df9040e6a8c941671",
-    "version": "9.1.2-r1",
-    "architecture": "aarch64",
-    "license": "GPL-2.0-or-later",
-}
 CALCULATOR = {
     "filename": "Arity-1.1.apk",
     "url": "https://storage.googleapis.com/google-code-archive-source/v2/code.google.com/arity-calculator/source-archive.zip",
@@ -42,11 +34,21 @@ CALCULATOR = {
     "license": "Apache-2.0",
     "activity": "calculator/Calculator",
 }
-REQUIRED = ("lib/ld-musl-x86_64.so.1", "usr/bin/android-translation-layer",
+REQUIRED = ("lib/ld-musl-aarch64.so.1", "usr/bin/android-translation-layer",
             "usr/lib/art/libart.so", "usr/lib/java/dex/android_translation_layer/api-impl.jar",
             "usr/lib/java/dex/android_translation_layer/framework-res.apk",
             "usr/lib/java/dex/android_translation_layer/natives/libtranslation_layer_main.so",
-            "usr/lib/libvinix-android-compat.so")
+            "usr/lib/libvinix-android-compat.so", "art-runtime-manifest.json",
+            "bionic-runtime-manifest.json", "atl-runtime-manifest.json",
+            "runtime-manifest.json", "architecture")
+
+
+def art_tools():
+    spec = importlib.util.spec_from_file_location("vinix_art_runtime", SUPPORT / "art-runtime.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def sha256(path: Path) -> str:
@@ -203,8 +205,31 @@ def calculator_apk(downloads: Path) -> Path:
 def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     staging = args.build_dir / "staging"
     runtime = staging / PREFIX.lstrip("/")
+    art = art_tools()
+    if not args.art_runtime.is_dir():
+        raise RuntimeError(f"missing native 16 KiB ART overlay: {args.art_runtime}; "
+                           "run build-support/android/build-art.sh on ARM64 Alpine Linux first")
+    art_manifest = art.read_manifest(args.art_runtime)
+    if not art_manifest.get("bootclasspath"):
+        raise RuntimeError("ART's Java boot libraries must be desugared first; run "
+                           "build-support/android/art-bootclasspath.py --build-dir "
+                           f"{args.build_dir / 'java-build'} --art-runtime {args.art_runtime}")
+    if not args.bionic_runtime.is_dir():
+        raise RuntimeError(f"missing native 16 KiB APK library loader: {args.bionic_runtime}; "
+                           "run build-support/android/build-bionic.sh on ARM64 Alpine Linux first")
+    bionic_manifest = art.read_bionic_manifest(args.bionic_runtime)
+    if not args.atl_runtime.is_dir():
+        raise RuntimeError(f"missing coherent native ATL overlay: {args.atl_runtime}; "
+                           "run build-support/android/build-atl.sh on ARM64 Alpine Linux first")
+    atl_manifest = art.read_atl_manifest(args.atl_runtime)
     inputs = json.dumps(lock, sort_keys=True).encode() + str(args.with_calculator).encode()
+    inputs += json.dumps(art_manifest, sort_keys=True).encode()
+    inputs += json.dumps(bionic_manifest, sort_keys=True).encode()
+    inputs += json.dumps(atl_manifest, sort_keys=True).encode()
     for source in (Path(__file__), SUPPORT / "run-android", SUPPORT / "runtime-compat.c",
+                   SUPPORT / "art-runtime.py", SUPPORT / "art16k.patch", SUPPORT / "build-art.sh",
+                   SUPPORT / "art-bootclasspath.py", SUPPORT / "bionic16k.patch", SUPPORT / "build-bionic.sh",
+                   SUPPORT / "build-atl.sh", SUPPORT / "atl-dex.py",
                    ROOT / "build-support/java-cacerts.py"):
         inputs += source.read_bytes()
     cache_key = hashlib.sha256(inputs).hexdigest()
@@ -212,13 +237,36 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     if (cache.exists() and cache.read_text().strip() == cache_key and
         all((runtime / name).is_file() for name in REQUIRED) and
         (staging / "usr/bin/run-android").is_file() and
-        (staging / "usr/bin/qemu-x86_64").is_file() and
         (not args.with_calculator or (staging / "usr/bin/run-android-calculator").is_file())):
-        print(f"Reusing pinned Android runtime in {staging}", flush=True)
-        return staging
-    compiler = shutil.which("x86_64-linux-musl-gcc")
+        try:
+            cached_art = art.read_manifest(runtime)
+            cached_bionic = art.read_bionic_manifest(runtime)
+            cached_atl = art.read_atl_manifest(runtime)
+            cached_runtime = json.loads((runtime / "runtime-manifest.json").read_text())
+            metadata_matches = (
+                isinstance(cached_runtime, dict) and
+                cached_runtime.get("architecture") == ARCHITECTURE and
+                (runtime / "architecture").read_text().strip() == ARCHITECTURE and
+                cached_runtime.get("execution") == "native" and
+                cached_runtime.get("page_size") == 16384 and
+                cached_runtime.get("runtime_prefix") == PREFIX and
+                cached_runtime.get("packages") == lock["packages"] and
+                cached_runtime.get("art") == art_manifest and
+                cached_runtime.get("bionic") == bionic_manifest and
+                cached_runtime.get("atl") == atl_manifest
+            )
+        except (RuntimeError, OSError, ValueError):
+            cached_art = None
+            cached_bionic = None
+            cached_atl = None
+            metadata_matches = False
+        if (cached_art == art_manifest and cached_bionic == bionic_manifest and
+                cached_atl == atl_manifest and metadata_matches):
+            print(f"Reusing pinned native Android runtime in {staging}", flush=True)
+            return staging
+    compiler = shutil.which("aarch64-linux-musl-gcc")
     if compiler is None:
-        raise RuntimeError("x86_64-linux-musl-gcc is required to build the Android compatibility library")
+        raise RuntimeError("aarch64-linux-musl-gcc is required to build the Android compatibility library")
     cache.unlink(missing_ok=True)
     if staging.exists():
         shutil.rmtree(staging)
@@ -233,6 +281,16 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     for archive in archives:
         extract_apk(archive, runtime)
     materialize_library_links(runtime)
+    # Alpine's ART assumes 4 KiB pages. Replace it with the verified native
+    # source build before launching anything on Vinix's 16 KiB kernel.
+    art.apply(args.art_runtime, runtime, art_manifest)
+    (runtime / art.MANIFEST).write_text(json.dumps(art_manifest, indent=2) + "\n")
+    art.apply_bionic(args.bionic_runtime, runtime, bionic_manifest)
+    (runtime / art.BIONIC_MANIFEST).write_text(json.dumps(bionic_manifest, indent=2) + "\n")
+    # Native helpers, framework DEX and resources must come from one source
+    # build. Replacing only a JAR can leave JNI registration out of sync.
+    art.apply_atl(args.atl_runtime, runtime, atl_manifest)
+    (runtime / art.ATL_MANIFEST).write_text(json.dumps(atl_manifest, indent=2) + "\n")
     relocate_configuration(runtime)
     subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
                     str(SUPPORT / "runtime-compat.c"), "-ldl",
@@ -253,6 +311,11 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     (commands / "run-android").chmod(0o755)
     manifest = dict(lock)
     manifest["runtime_prefix"] = PREFIX
+    manifest["execution"] = "native"
+    manifest["page_size"] = 16384
+    manifest["art"] = art_manifest
+    manifest["bionic"] = bionic_manifest
+    manifest["atl"] = atl_manifest
     manifest["upstream"] = "https://gitlab.com/android_translation_layer/android_translation_layer"
     if args.with_calculator:
         apk = calculator_apk(downloads)
@@ -267,22 +330,6 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
         manifest["calculator"] = CALCULATOR
     (runtime / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (runtime / "architecture").write_text(lock["architecture"] + "\n")
-    if lock["architecture"] == "x86_64":
-        archive = downloads / TRANSLATOR["filename"]
-        download(TRANSLATOR["url"], archive, TRANSLATOR["sha256"])
-        with tarfile.open(archive, mode="r:gz", ignore_zeros=True) as source:
-            contents = source.extractfile("usr/bin/qemu-x86_64")
-            if contents is None:
-                raise RuntimeError("translator missing from pinned Alpine package")
-            payload = contents.read()
-        if hashlib.sha256(payload).hexdigest() != TRANSLATOR["binary_sha256"]:
-            raise RuntimeError("translator binary checksum mismatch")
-        emulator = commands / "qemu-x86_64"
-        emulator.parent.mkdir(exist_ok=True)
-        emulator.write_bytes(payload)
-        emulator.chmod(0o755)
-        manifest["translator"] = TRANSLATOR
-        (runtime / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     for name in REQUIRED:
         if not (runtime / name).is_file():
             raise RuntimeError(f"missing staged Android runtime file: {name}")
@@ -296,13 +343,22 @@ def main() -> int:
     parser.add_argument("--build-dir", type=Path,
                         default=os.environ.get("VINIX_ANDROID_BUILD_DIR"))
     parser.add_argument("--with-calculator", action="store_true", help="include the verified Arity calculator APK")
+    parser.add_argument("--art-runtime", type=Path, default=os.environ.get("VINIX_ANDROID_ART_RUNTIME"),
+                        help="verified ARM64 ART overlay built for Vinix's 16 KiB pages")
+    parser.add_argument("--bionic-runtime", type=Path, default=os.environ.get("VINIX_ANDROID_BIONIC_RUNTIME"),
+                        help="verified ARM64 APK native-library loader built for 16 KiB pages")
+    parser.add_argument("--atl-runtime", type=Path, default=os.environ.get("VINIX_ANDROID_ATL_RUNTIME"),
+                        help="verified coherent ARM64 ATL native/framework/resource overlay")
     parser.add_argument("--update-lock", action="store_true", help="resolve current Alpine indexes and pin their closure")
     parser.add_argument("--mirror", default=os.environ.get("ALPINE_MIRROR", MIRROR),
                         help="Alpine edge mirror used when updating the package lock")
     args = parser.parse_args()
     if args.build_dir is None:
-        args.build_dir = ROOT / "build-aarch64-android/x86_64"
+        args.build_dir = ROOT / "build-aarch64-android/aarch64"
     args.build_dir = args.build_dir.expanduser().resolve()
+    args.art_runtime = (args.art_runtime or args.build_dir / "art-runtime").expanduser().resolve()
+    args.bionic_runtime = (args.bionic_runtime or args.build_dir / "bionic-runtime").expanduser().resolve()
+    args.atl_runtime = (args.atl_runtime or args.build_dir / "atl-runtime").expanduser().resolve()
     downloads = args.build_dir / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     if args.update_lock:

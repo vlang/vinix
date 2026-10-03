@@ -69,7 +69,7 @@ X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarc
 STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
-ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/x86_64/staging}"
+ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/x86_64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
@@ -694,13 +694,40 @@ fi
 
 if [ "$WITH_ANDROID" -eq 1 ] &&
    { [ ! -x "$ANDROID_STAGING/usr/bin/run-android" ] ||
-     [ ! -x "$ANDROID_STAGING/usr/bin/qemu-x86_64" ] ||
-     [ ! -f "$ANDROID_STAGING/opt/vinix-android-x86_64/architecture" ] ||
-     [ ! -f "$ANDROID_STAGING/opt/vinix-android-x86_64/usr/lib/libvinix-android-compat.so" ] ||
-     [ ! -x "$ANDROID_STAGING/opt/vinix-android-x86_64/usr/bin/android-translation-layer" ]; }; then
+     [ ! -x "$ANDROID_STAGING/opt/vinix-android-aarch64/lib/ld-musl-aarch64.so.1" ] ||
+     [ ! -f "$ANDROID_STAGING/opt/vinix-android-aarch64/art-runtime-manifest.json" ] ||
+     [ ! -f "$ANDROID_STAGING/opt/vinix-android-aarch64/bionic-runtime-manifest.json" ] ||
+     [ ! -f "$ANDROID_STAGING/opt/vinix-android-aarch64/atl-runtime-manifest.json" ] ||
+     [ ! -f "$ANDROID_STAGING/opt/vinix-android-aarch64/usr/lib/libvinix-android-compat.so" ] ||
+     [ ! -x "$ANDROID_STAGING/opt/vinix-android-aarch64/usr/bin/android-translation-layer" ]; }; then
     echo "ERROR: --with-android needs $ANDROID_STAGING" >&2
     echo "Run ./build-android-aarch64.sh --with-calculator first." >&2
     exit 1
+fi
+
+if [ "$WITH_ANDROID" -eq 1 ]; then
+    python3 - "$SCRIPT_DIR/build-support/android" "$ANDROID_STAGING" <<'PY'
+import importlib.util
+import json
+from pathlib import Path
+import sys
+
+support, staging = map(Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("vinix_art_runtime", support / "art-runtime.py")
+assert spec and spec.loader
+art = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(art)
+runtime = staging / "opt/vinix-android-aarch64"
+verified = art.read_manifest(runtime)
+bionic = art.read_bionic_manifest(runtime)
+atl = art.read_atl_manifest(runtime)
+manifest = json.loads((runtime / "runtime-manifest.json").read_text())
+if (manifest.get("architecture") != "aarch64" or manifest.get("execution") != "native"
+        or manifest.get("page_size") != 16384 or manifest.get("art") != verified
+        or not verified.get("bootclasspath") or manifest.get("bionic") != bionic
+        or manifest.get("atl") != atl):
+    raise SystemExit("--with-android requires the verified native ARM64 Android runtime")
+PY
 fi
 
 if [ "$WITH_ROBLOX" -eq 1 ] &&
