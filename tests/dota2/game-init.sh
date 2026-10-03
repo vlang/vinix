@@ -24,6 +24,11 @@ mount -t qemu-persist -o remount,ro /root /root
 mount --move /root /usr/share/games/dota2
 [ -s /usr/share/games/dota2/game/dota/pak01_dir.vpk ]
 echo VINIX-DOTA2-GAME-MOUNTED
+report_memory() {
+    echo VINIX-DOTA2-MEMINFO
+    cat /proc/meminfo || :
+}
+report_memory
 mkdir -p /root /root/vm /root/.config
 printf '%s\n' 'version=1' 'name=564d' 'kdf=scrypt' 'n=16384' 'r=8' 'p=1' \
     'salt=00000000000000000000000000000000' \
@@ -48,9 +53,15 @@ done
 echo "VINIX-DOTA2-HOST-LOG: $log"
 tail -f "$log" &
 seen=0
+memory_tick=0
 while :; do
     sleep 5
     kill -0 "$desktop_pid" || exit 1
+    memory_tick=$((memory_tick + 1))
+    if [ "$memory_tick" -ge 6 ]; then
+        report_memory
+        memory_tick=0
+    fi
     if [ -s /run/dota2-game.pid ]; then
         game_pid=$(cat /run/dota2-game.pid)
         if kill -0 "$game_pid"; then
