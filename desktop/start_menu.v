@@ -33,7 +33,7 @@ const app_start_jump_actions = ['start.jump.0', 'start.jump.1', 'start.jump.2', 
 	'start.jump.10', 'start.jump.11', 'start.jump.12', 'start.jump.13', 'start.jump.14',
 	'start.jump.15', 'start.jump.16', 'start.jump.17', 'start.jump.18', 'start.jump.19',
 	'start.jump.20', 'start.jump.21', 'start.jump.22', 'start.jump.23', 'start.jump.24',
-	'start.jump.25', 'start.jump.26', 'start.jump.27']
+	'start.jump.25', 'start.jump.26', 'start.jump.27', 'start.jump.28']
 const start_recent_item_actions = ['start.recent.0', 'start.recent.1', 'start.recent.2',
 	'start.recent.3', 'start.recent.4', 'start.recent.5', 'start.recent.6', 'start.recent.7',
 	'start.recent.8', 'start.recent.9', 'start.recent.10', 'start.recent.11']

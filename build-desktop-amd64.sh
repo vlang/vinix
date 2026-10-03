@@ -261,7 +261,7 @@ done
 
 # One immutable multicall image, with the same per-application process names as
 # the aarch64 desktop image.
-for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
+for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-dota2 \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-disk-usage \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice \

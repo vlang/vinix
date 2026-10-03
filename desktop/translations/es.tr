@@ -1660,6 +1660,15 @@ Chromium no está instalado. Ejecuta pkg install chromium en Terminal.
 wine.chromium.starting
 Iniciando Chromium…
 -----
+wine.dota2.exited
+Dota 2 se ha cerrado.
+-----
+wine.dota2.missing
+Dota 2 no está instalado.
+-----
+wine.dota2.starting
+Iniciando Dota 2…
+-----
 wine.doom.exited
 DOOM se ha cerrado.
 -----

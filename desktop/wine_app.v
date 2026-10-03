@@ -170,6 +170,9 @@ enum HostedText {
 	roblox_missing
 	roblox_apk_missing
 	roblox_exited
+	dota2_starting
+	dota2_missing
+	dota2_exited
 	xvfb_missing
 	host_failed
 }
@@ -225,6 +228,9 @@ fn (t HostedText) text() string {
 		.roblox_missing { tr('roblox.missing') }
 		.roblox_apk_missing { tr('roblox.apk_missing') }
 		.roblox_exited { tr('roblox.exited') }
+		.dota2_starting { tr('wine.dota2.starting') }
+		.dota2_missing { tr('wine.dota2.missing') }
+		.dota2_exited { tr('wine.dota2.exited') }
 		.xvfb_missing { tr('wine.xvfb_missing') }
 		.host_failed { tr('wine.host_failed') }
 	}
@@ -447,7 +453,7 @@ fn open_hosted_x11_app(name string, command string, surface_width int, surface_h
 	// never leave a smaller GLFW window floating in a white root surface.
 	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
 		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic'
-		|| name == 'roblox', name == 'obs') or {
+		|| name == 'roblox' || name == 'dota2', name == 'obs') or {
 		app.failed = true
 		app.failure = .host_failed
 		return app

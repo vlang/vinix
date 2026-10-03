@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 28
+	assert available_apps.len == 29
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -716,12 +716,50 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[27].height == roblox_surface_height + default_title_height
 	assert available_apps[27].keyboard && available_apps[27].pointer
 	assert available_apps[27].polling && available_apps[27].us_keys
+	assert available_apps[28].title == 'Dota 2'
+	assert available_apps[28].process_name == 'vinix-dota2'
+	assert available_apps[28].icon == 'builtin:gamepad'
+	assert available_apps[28].width == dota2_surface_width
+	assert available_apps[28].height == dota2_surface_height + default_title_height
+	assert available_apps[28].keyboard && available_apps[28].pointer
+	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
+	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
+	assert available_apps.len == 29
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
 	assert taskbar_pin_actions.len == available_apps.len
 	assert shortcut_rows_for_height(720) == 8
 	assert shortcut_rows_for_height(600) == 6
+}
+
+fn test_dota2_search_and_taskbar_pin_preserve_app_identity() {
+	home := os.join_path(os.temp_dir(), 'vinix-dota2-pin-test-${os.getpid()}')
+	os.mkdir_all(home) or { panic(err) }
+	defer { os.rmdir_all(home) or {} }
+	mut desktop := Desktop{
+		canvas: Canvas{
+			width: 1280
+			height: 720
+		}
+	}
+	assert desktop.pin_taskbar_app_in(home, 28)
+	assert load_taskbar_pins(home) == [28]
+	entries := desktop.taskbar_entries()
+	assert entries.len == 1
+	assert entries[0].id == 'taskpin.28'
+	assert entries[0].label == 'Dota 2'
+	unsafe { entries.free() }
+	desktop.toggle_start_menu()
+	desktop.start_menu_key_input('dota')
+	root := desktop.build_tree()
+	dota := utility_element_named(root, 'start.launch.28') or { panic('missing Dota search result') }
+	assert dota.text == 'Dota 2'
+	assert utility_element_named(root, 'start.launch.27') == none
+	free_tree(root)
+	desktop.close_start_menu()
+	assert desktop.unpin_taskbar_app_in(home, 28)
+	assert load_taskbar_pins(home).len == 0
 }
 
 fn test_roblox_apk_override_survives_app_exec() {

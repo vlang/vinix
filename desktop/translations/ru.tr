@@ -1660,6 +1660,15 @@ Chromium не установлен. Выполните pkg install chromium в �
 wine.chromium.starting
 Запуск Chromium…
 -----
+wine.dota2.exited
+Dota 2 завершила работу.
+-----
+wine.dota2.missing
+Dota 2 не установлена.
+-----
+wine.dota2.starting
+Запуск Dota 2…
+-----
 wine.doom.exited
 DOOM завершил работу.
 -----

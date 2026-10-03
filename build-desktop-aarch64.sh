@@ -3,7 +3,7 @@
 # initramfs that boots straight into it.
 #
 # Usage: ./build-desktop-aarch64.sh [--no-initramfs] [--compact-initramfs]
-#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
+#        [--without-firefox] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-roblox] [--wifi-bundle=DIR]
 # Set V or VINIX_V_COMPILER to a V executable or checkout directory to select
 # a compiler explicitly (for example V=~/code/v/v).
 #
@@ -67,6 +67,7 @@ HYPRLAND_STAGING="${VINIX_HYPRLAND_STAGING:-$SCRIPT_DIR/build-aarch64-hyprland/s
 BLENDER_NATIVE_STAGING="${VINIX_BLENDER_NATIVE_STAGING:-$SCRIPT_DIR/build-aarch64-blender-native/staging}"
 X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarch64-x86-translation/staging}"
 STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
+DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/x86_64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/x86_64/staging}"
@@ -95,7 +96,7 @@ path_generation() {
         return 0
     fi
     if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ] ||
-       [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$OPENGOTHIC_STAGING" ] || [ "$path" = "$STEAM_STAGING" ]; then
+       [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$OPENGOTHIC_STAGING" ] || [ "$path" = "$STEAM_STAGING" ] || [ "$path" = "$DOTA2_STAGING" ]; then
         python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
         return 0
     fi
@@ -111,7 +112,7 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=5\n'
+    printf 'version=7\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
     printf 'without_firefox=%s\n' "$WITHOUT_FIREFOX"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
@@ -121,6 +122,7 @@ write_staging_cache_manifest() {
     printf 'asahi=%s\n' "$WITH_ASAHI_GPU"
     printf 'x86=%s\n' "$WITH_X86_TRANSLATION"
     printf 'steam=%s\n' "$WITH_STEAM"
+    printf 'dota2=%s\n' "$WITH_DOTA2"
     printf 'qemu_system=%s\n' "$WITH_QEMU_SYSTEM"
     printf 'android=%s\n' "$WITH_ANDROID"
     printf 'roblox=%s\n' "$WITH_ROBLOX"
@@ -131,7 +133,7 @@ write_staging_cache_manifest() {
         "$FIREFOX_STAGING" "$CHROMIUM_STAGING" "$LIBREOFFICE_STAGING" \
         "$MINECRAFT_STAGING" "$ASAHI_STAGING" "$HYPRLAND_STAGING" \
         "$DOOM_STAGING" "$OPENGOTHIC_STAGING" \
-        "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" "$STEAM_STAGING" \
+        "$BLENDER_NATIVE_STAGING" "$X86_TRANSLATION_STAGING" "$STEAM_STAGING" "$DOTA2_STAGING" \
         "$QEMU_SYSTEM_STAGING" "$ANDROID_STAGING" "$ROBLOX_STAGING" \
         "$GPU_SYSROOT"; do
         printf '%s=%s\n' "$input" "$(path_generation "$input")"
@@ -161,6 +163,7 @@ MAKE_INITRAMFS=1
 COMPACT_INITRAMFS=0
 WITH_X86_TRANSLATION=0
 WITH_STEAM=0
+WITH_DOTA2=0
 WITH_QEMU_SYSTEM=0
 WITH_ANDROID=0
 WITH_ROBLOX=0
@@ -180,6 +183,7 @@ for arg in "$@"; do
         --compact-initramfs) COMPACT_INITRAMFS=1 ;;
         --with-x86-translation) WITH_X86_TRANSLATION=1 ;;
         --with-steam) WITH_STEAM=1 ;;
+        --with-dota2) WITH_DOTA2=1 ;;
         --with-qemu-system) WITH_QEMU_SYSTEM=1 ;;
         --with-android) WITH_ANDROID=1 ;;
         --with-roblox) WITH_ROBLOX=1 ;;
@@ -191,7 +195,7 @@ for arg in "$@"; do
         --with-asahi-gpu) WITH_ASAHI_GPU=1 ;;
         --wifi-bundle=*) WIFI_BUNDLE="${arg#*=}" ;;
         --help|-h)
-            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
+            echo "usage: $0 [--no-initramfs] [--compact-initramfs] [--without-firefox] [--with-chromium] [--with-libreoffice] [--with-minecraft] [--with-opengothic] [--with-dota2] [--with-asahi-gpu] [--with-x86-translation] [--with-steam] [--with-qemu-system] [--with-android] [--with-roblox] [--wifi-bundle=DIR]"
             echo "  --compact-initramfs stages the desktop, core developer tools and Firefox"
             echo "  --without-firefox leaves the browser out of a compact image, keeping its"
             echo "      GTK/media runtime; the first-run app page offers it through pkg"
@@ -202,6 +206,7 @@ for arg in "$@"; do
             echo "  --with-asahi-gpu overlays the Apple GPU Mesa; only correct for an M1 image"
             echo "  --with-x86-translation adds a previously built x86/Wine runtime"
             echo "  --with-steam adds a previously staged Steam client and its x86 glibc runtime"
+            echo "  --with-dota2 adds the Linux Dota 2 runtime; game files are installed separately"
             echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --with-android adds Android Translation Layer and any staged APKs"
             echo "  --with-roblox adds a previously staged Cordial runtime; supply your own APK"
@@ -231,8 +236,8 @@ case "$REFRESH_STAGING" in
 esac
 
 if [ "$MAKE_INITRAMFS" -eq 0 ] &&
-   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ] || [ "$WITH_ANDROID" -eq 1 ] || [ "$WITH_ROBLOX" -eq 1 ]; }; then
-    echo "ERROR: --wifi-bundle, --with-x86-translation, --with-steam, --with-qemu-system, --with-android and --with-roblox require initramfs generation" >&2
+   { [ -n "$WIFI_BUNDLE" ] || [ "$WITH_X86_TRANSLATION" -eq 1 ] || [ "$WITH_STEAM" -eq 1 ] || [ "$WITH_DOTA2" -eq 1 ] || [ "$WITH_QEMU_SYSTEM" -eq 1 ] || [ "$WITH_ANDROID" -eq 1 ] || [ "$WITH_ROBLOX" -eq 1 ]; }; then
+    echo "ERROR: --wifi-bundle, --with-x86-translation, --with-steam, --with-dota2, --with-qemu-system, --with-android and --with-roblox require initramfs generation" >&2
     exit 1
 fi
 
@@ -636,6 +641,34 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ] &&
     echo "Run ./build-x86-translation-aarch64.sh first." >&2
     exit 1
 fi
+if [ "$WITH_DOTA2" -eq 1 ]; then
+    DOTA2_REQUIRED_PATHS=(
+        usr/bin/qemu-x86_64
+        usr/bin/run-dota2
+        usr/libexec/vinix-dota2/root/lib64/ld-linux-x86-64.so.2
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvulkan.so.1
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libmpg123.so.0
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libfreetype.so.6
+        usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so
+        usr/libexec/vinix-dota2/root/usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+    )
+    for required in "${DOTA2_REQUIRED_PATHS[@]}"; do
+        if [ ! -e "$DOTA2_STAGING/$required" ]; then
+            echo "ERROR: --with-dota2 needs $DOTA2_STAGING/$required" >&2
+            echo "Run ./build-dota2-aarch64.sh first." >&2
+            exit 1
+        fi
+    done
+    for command_path in usr/bin/qemu-x86_64 usr/bin/run-dota2; do
+        if [ ! -x "$DOTA2_STAGING/$command_path" ]; then
+            echo "ERROR: --with-dota2 needs $DOTA2_STAGING/$command_path" >&2
+            echo "Run ./build-dota2-aarch64.sh first." >&2
+            exit 1
+        fi
+    done
+fi
 if [ "$WITH_STEAM" -eq 1 ] &&
    { [ ! -x "$STEAM_STAGING/usr/bin/steam" ] ||
      [ ! -x "$STEAM_STAGING/usr/libexec/vinix-steam/root/usr/bin/bash" ]; }; then
@@ -1020,6 +1053,14 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         merge_staging_tree "$ROBLOX_STAGING"
     fi
 
+    if [ "$WITH_DOTA2" -eq 1 ]; then
+        # This self-contained layer supplies the patched native translator at
+        # the kernel's standard helper path and its private glibc game root.
+        # Apply it after other layers that also supply the x86-64 translator.
+        echo "==> Staging the Linux Dota 2 runtime"
+        merge_staging_tree "$DOTA2_STAGING"
+    fi
+
     # Hyprland is an optional build layer because its patched Aquamarine library
     # is produced in the native ARM64 build VM. Its dedicated launcher selects it
     # at boot; simply having the layer installed leaves the native desktop first.
@@ -1397,6 +1438,20 @@ if [ "$WITH_STEAM" -eq 1 ]; then
         exit 1
     fi
 fi
+if [ "$WITH_DOTA2" -eq 1 ]; then
+    for required in "${DOTA2_REQUIRED_PATHS[@]}"; do
+        if [ ! -e "$STAGING/$required" ]; then
+            echo "ERROR: Dota 2 desktop is missing /$required" >&2
+            exit 1
+        fi
+    done
+    for command_path in usr/bin/qemu-x86_64 usr/bin/run-dota2; do
+        if [ ! -x "$STAGING/$command_path" ]; then
+            echo "ERROR: Dota 2 desktop is missing /$command_path" >&2
+            exit 1
+        fi
+    done
+fi
 
 if [ "$COMPACT_INITRAMFS" -eq 0 ] && [ -x "$HYPRLAND_STAGING/usr/bin/start-hyprland-vinix" ]; then
     for runtime_path in usr/bin/Hyprland usr/bin/start-hyprland-vinix usr/bin/foot usr/lib/libaquamarine.so.11 root/.config/hypr/hyprland.conf; do
@@ -1439,7 +1494,7 @@ chmod +x "$STAGING/sbin/init" "$STAGING/usr/bin/vinix-desktop" \
 # distinct names and truthful per-app accounting without storing a copy of the
 # same static executable for every native application in the initramfs.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-opengothic vinix-android-calculator vinix-roblox \
+    vinix-opengothic vinix-android-calculator vinix-roblox vinix-dota2 \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-disk-usage \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
@@ -1587,6 +1642,10 @@ python3 "$SCRIPT_DIR/build-support/content-key.py" \
     "${CONTENT_KEY_INPUTS[@]}" > "$CONTENT_KEY_EXPECTED"
 if [ "$WITH_STEAM" -eq 1 ]; then
     printf 'steam-layer=%s\n' "$(path_generation "$STEAM_STAGING")" \
+        >> "$CONTENT_KEY_EXPECTED"
+fi
+if [ "$WITH_DOTA2" -eq 1 ]; then
+    printf 'dota2-layer=%s\n' "$(path_generation "$DOTA2_STAGING")" \
         >> "$CONTENT_KEY_EXPECTED"
 fi
 printf 'release=%s\n' "${VINIX_RELEASE:-}" >> "$CONTENT_KEY_EXPECTED"
