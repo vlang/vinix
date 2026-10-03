@@ -159,6 +159,18 @@ class ExportTests(unittest.TestCase):
                 server.shutdown()
                 thread.join()
 
+    def test_remounted_volume_keeps_the_export_valid(self):
+        # A restart renumbered the host volume of the game files; their
+        # contents and other identity fields were unchanged.
+        for entry in self.export.files:
+            entry["identity"][0] += 1
+        block = self.bmap("nested/package.vpk", 0)
+        self.assertEqual(self.export.read(block * 4096, 16), bytes([0xA5]) * 16)
+        with self.package.open("r+b") as output:
+            output.write(b"changed")
+        with self.assertRaises(OSError):
+            self.export.read(block * 4096, 16)
+
     def test_idle_transmission_survives_negotiation_timeout(self):
         # Use real sockets and the real protocol, shortening only the initial
         # negotiation deadline so a long shader compilation needs no slow test.

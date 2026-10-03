@@ -39,6 +39,12 @@ def identity(info: os.stat_result) -> list[int]:
     return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
 
 
+def same_source(info: os.stat_result, recorded: list[int]) -> bool:
+    # macOS can number a volume differently after a restart. The inode, size
+    # and both timestamps still identify an unchanged file on that volume.
+    return identity(info)[1:] == recorded[1:]
+
+
 @dataclass
 class Node:
     path: Path
@@ -367,12 +373,12 @@ class Export:
             while len(self.open_files) > 64:
                 _, expired = self.open_files.popitem(last=False)
                 os.close(expired)
-            if identity(os.fstat(fd)) != entry["identity"]:
+            if not same_source(os.fstat(fd), entry["identity"]):
                 raise OSError(errno.EIO, f"Source changed; rebuild the export: {entry['path']}")
             size = entry["identity"][2]
             wanted = max(0, min(count, size - offset))
             result = os.pread(fd, wanted, offset)
-            if len(result) != wanted or identity(os.fstat(fd)) != entry["identity"]:
+            if len(result) != wanted or not same_source(os.fstat(fd), entry["identity"]):
                 raise OSError(errno.EIO, f"Source changed while reading: {entry['path']}")
             return result + bytes(count - wanted)
 
