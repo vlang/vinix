@@ -198,6 +198,34 @@ if [ -n "${TEST_LIFECYCLE_PROBE:-}" ]; then
         || fail "native framework activity lifecycle probe did not report its assertions passing"
     echo ANDROID-ACTIVITY-LIFECYCLE-VERIFIED
 fi
+if [ -n "${TEST_COOKIE_PROBE:-}" ]; then
+    echo ANDROID-COOKIE-START
+    for cookie_phase in cookie cookie-reload; do
+        cookie_log="/tmp/android-$cookie_phase-probe.log"
+        rm -f "/tmp/android-$cookie_phase-status"
+        mkfifo /tmp/android-cookie-events
+        (while :; do sleep 30; done) >/tmp/android-cookie-events &
+        cookie_input_pid=$!
+        /usr/bin/vinix-wine-host :97 "/tmp/android-$cookie_phase-probe" 128x128x24 \
+            "/opt/android-test/$cookie_phase-launch" --fill \
+            </tmp/android-cookie-events >"$cookie_log" 2>&1 || {
+            kill "$cookie_input_pid" 2>/dev/null || true
+            cat "$cookie_log"
+            fail "native framework cookie probe failed"
+        }
+        kill "$cookie_input_pid" 2>/dev/null || true
+        wait "$cookie_input_pid" 2>/dev/null || true
+        rm -f /tmp/android-cookie-events
+        cat "$cookie_log"
+        [ "$(cat "/tmp/android-$cookie_phase-status" 2>/dev/null)" = 0 ] \
+            || fail "native framework cookie probe did not exit successfully"
+        if [ "$cookie_phase" = cookie ]; then cookie_marker=ANDROID-COOKIE-PASS
+        else cookie_marker=ANDROID-COOKIE-RELOAD-PASS; fi
+        grep -q "^$cookie_marker " "$cookie_log" \
+            || fail "native framework cookie probe did not report its assertions passing"
+    done
+    echo ANDROID-COOKIE-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64

@@ -11,9 +11,10 @@ capture and the virtual display's supported refresh-rate query. Activity and
 fragment callbacks now follow the framework lifecycle boundaries. The latest
 launch reaches native shell startup, creates the rendering surface and starts
 Roblox's Lua app. `android.webkit.ValueCallback` now has Android's interface
-contract; the latest launch aborts on the missing three-argument
-`CookieManager.setCookie(String, String, ValueCallback)` API.
-A usable Roblox screen, authentication and gameplay remain unverified.
+contract, and `CookieManager` supplies real cookie storage, caller-Looper
+callbacks and checked persistence. The latest launch draws Roblox's upgrade
+dialog: its version service requires an update for the tested APK.
+Authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
 then stage the Roblox launchers and include both layers in the desktop:
@@ -114,9 +115,17 @@ The real EGL fixture also reads green pixels through ES2, an exported EGLImage
 and a GTK texture on Vinix. The actual Roblox run reaches `surfaceCreated` and
 `Start the lua app`. The source-built framework now declares `ValueCallback<T>`
 as an interface with `onReceiveValue(T)`; its class and DEX method descriptors
-match the unchanged APK. The next actual launch passes that class resolution
-and the strengthened lifecycle fixture, then throws `NoSuchMethodError` for
-`CookieManager.setCookie(String, String, ValueCallback)`. No usable client screen
-or gameplay has been verified.
+match the unchanged APK. The cookie implementation accepts both setter forms,
+returns actual HTTP cookie headers including HttpOnly cookies, and posts the
+three-argument setter's Boolean result on the caller's Looper. Its private
+libsoup jar validates domains, paths, Secure transport, expiry and prefixes.
+A checked SQLite snapshot preserves persistent and session cookies, including
+distinct paths for the same name. This manual store supports Roblox's own
+HTTP cookie bridge; sharing with an enabled WebKit WebView is not implemented.
+The separate cookie fixture passes both public-API checks and reload in a
+fresh process on Vinix. The unchanged Roblox APK now passes the cookie API,
+draws its own "Roblox Upgrade" dialog and reports `upgradeStatus = 2`.
+The real version-service request for `AppAndroidV2.738.1397` independently
+returns `UpgradeAction: Required`. Login and gameplay remain unverified.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.

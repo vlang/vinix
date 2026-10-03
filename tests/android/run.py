@@ -250,6 +250,9 @@ def prepare(args: argparse.Namespace) -> Path | None:
     if args.lifecycle_probe:
         shutil.copy2(args.lifecycle_probe, test / "android-activity-lifecycle-probe.apk")
         args.lifecycle_probe_sha256 = hashlib.sha256((test / "android-activity-lifecycle-probe.apk").read_bytes()).hexdigest()
+    if args.cookie_probe:
+        shutil.copy2(args.cookie_probe, test / "android-cookie-probe.apk")
+        args.cookie_probe_sha256 = hashlib.sha256((test / "android-cookie-probe.apk").read_bytes()).hexdigest()
     if args.egl_probe:
         shutil.copy2(args.egl_probe, test / "egl-interop-test")
         (test / "egl-interop-test").chmod(0o755)
@@ -271,6 +274,7 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_LAYOUT_PROBE": "/opt/android-test/android-layout-focus-probe.jar" if args.layout_probe else "",
         "TEST_POINTER_PROBE": "/opt/android-test/android-pointer-capture-probe.jar" if args.pointer_probe else "",
         "TEST_LIFECYCLE_PROBE": "/opt/android-test/android-activity-lifecycle-probe.apk" if args.lifecycle_probe else "",
+        "TEST_COOKIE_PROBE": "/opt/android-test/android-cookie-probe.apk" if args.cookie_probe else "",
         "TEST_EGL_PROBE": "/opt/android-test/egl-interop-test" if args.egl_probe else "",
         "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
         "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
@@ -294,6 +298,16 @@ def prepare(args: argparse.Namespace) -> Path | None:
             'lifecycle_status=$?\nprintf \'%s\\n\' "$lifecycle_status" >/tmp/android-lifecycle-status\n'
             'exit "$lifecycle_status"\n')
         (test / "lifecycle-launch").chmod(0o755)
+    if args.cookie_probe:
+        for phase, activity in (("cookie", "BootstrapActivity"), ("cookie-reload", "PersistenceActivity")):
+            launcher = test / f"{phase}-launch"
+            launcher.write_text(
+                "#!/bin/sh\n. /opt/android-test/config.sh\n"
+                '/usr/bin/run-android "$TEST_COOKIE_PROBE" '
+                f"-l 'org/vinix/tests/AndroidCookieProbe${activity}' -w 128 -h 128\n"
+                f'cookie_status=$?\nprintf \'%s\\n\' "$cookie_status" >/tmp/android-{phase}-status\n'
+                'exit "$cookie_status"\n')
+            launcher.chmod(0o755)
     (test / "launch").write_text(
         "#!/bin/sh\n. /opt/android-test/config.sh\n"
         "export VINIX_ANDROID_EXPECTED_RESULT\n"
@@ -597,6 +611,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     layout_probe_passed = None
     pointer_probe_passed = None
     lifecycle_probe_passed = None
+    cookie_probe_passed = None
     egl_probe_passed = None
     guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
                       for line in bytes(transcript).replace(b"\r", b"").splitlines()
@@ -646,6 +661,12 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if passed or observed:
                 failure = "native EGL and GTK texture probe did not pass"
             passed = observed = False
+    if args.cookie_probe:
+        cookie_probe_passed = b"ANDROID-COOKIE-VERIFIED" in transcript
+        if not cookie_probe_passed:
+            if passed or observed:
+                failure = "native framework cookie probe did not pass"
+            passed = observed = False
     result = {"passed": None if args.interactive or (args.observe and observed) else passed,
               "observed": observed,
               "check": ("interactive-observation" if args.interactive else
@@ -669,6 +690,9 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "lifecycle_probe": str(args.lifecycle_probe) if args.lifecycle_probe else None,
               "lifecycle_probe_sha256": args.lifecycle_probe_sha256 if args.lifecycle_probe else None,
               "lifecycle_probe_passed": lifecycle_probe_passed,
+              "cookie_probe": str(args.cookie_probe) if args.cookie_probe else None,
+              "cookie_probe_sha256": args.cookie_probe_sha256 if args.cookie_probe else None,
+              "cookie_probe_passed": cookie_probe_passed,
               "egl_probe": str(args.egl_probe) if args.egl_probe else None,
               "egl_probe_sha256": args.egl_probe_sha256 if args.egl_probe else None,
               "egl_probe_passed": egl_probe_passed,
@@ -725,6 +749,8 @@ def main() -> int:
                         help="DEX JAR containing android.view.AndroidPointerCaptureProbe; require real event dispatch and snapshot assertions")
     parser.add_argument("--lifecycle-probe", type=Path,
                         help="lifecycle fixture APK; require production activity and fragment ordering assertions through ATL's real application bootstrap")
+    parser.add_argument("--cookie-probe", type=Path,
+                        help="cookie fixture APK; require production cookie storage and caller-Looper callback assertions")
     parser.add_argument("--egl-probe", type=Path,
                         help="native ARM64 egl-interop-test executable; require GLES2 readback and EGLImage sharing with GTK")
     parser.add_argument("--tls-probe", type=Path,
@@ -790,6 +816,8 @@ def main() -> int:
         parser.error("--pointer-probe requires a native aarch64 runtime")
     if args.lifecycle_probe and args.runtime_arch != "aarch64":
         parser.error("--lifecycle-probe requires a native aarch64 runtime")
+    if args.cookie_probe and args.runtime_arch != "aarch64":
+        parser.error("--cookie-probe requires a native aarch64 runtime")
     if args.egl_probe and args.runtime_arch != "aarch64":
         parser.error("--egl-probe requires a native aarch64 runtime")
     if args.tls_probe and args.runtime_arch != "aarch64":
@@ -812,6 +840,7 @@ def main() -> int:
     args.layout_probe = args.layout_probe.resolve() if args.layout_probe else None
     args.pointer_probe = args.pointer_probe.resolve() if args.pointer_probe else None
     args.lifecycle_probe = args.lifecycle_probe.resolve() if args.lifecycle_probe else None
+    args.cookie_probe = args.cookie_probe.resolve() if args.cookie_probe else None
     args.egl_probe = args.egl_probe.resolve() if args.egl_probe else None
     args.tls_probe = args.tls_probe.resolve() if args.tls_probe else None
     args.loader_probe = args.loader_probe.resolve() if args.loader_probe else None
@@ -829,6 +858,8 @@ def main() -> int:
         raise SystemExit(f"Missing native framework pointer capture probe: {args.pointer_probe}")
     if args.lifecycle_probe and not args.lifecycle_probe.is_file():
         raise SystemExit(f"Missing native framework activity lifecycle probe: {args.lifecycle_probe}")
+    if args.cookie_probe and not args.cookie_probe.is_file():
+        raise SystemExit(f"Missing native framework cookie probe: {args.cookie_probe}")
     if args.egl_probe and not args.egl_probe.is_file():
         raise SystemExit(f"Missing native EGL and GTK texture probe: {args.egl_probe}")
     if args.tls_probe and not args.tls_probe.is_file():

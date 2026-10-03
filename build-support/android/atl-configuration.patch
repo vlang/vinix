@@ -1766,3 +1766,463 @@ diff --git a/src/api-impl/android/webkit/ValueCallback.java b/src/api-impl/andro
 +public interface ValueCallback<T> {
 +	void onReceiveValue(T value);
 +}
+diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/android/webkit/CookieManager.java
+--- a/src/api-impl/android/webkit/CookieManager.java
++++ b/src/api-impl/android/webkit/CookieManager.java
+@@ -4 +4 @@
+-import android.content.Context;
++import android.os.Handler;
+@@ -7,0 +8,2 @@
++	private static final CookieManager INSTANCE = new CookieManager();
++	private volatile boolean acceptCookies = true;
+@@ -20 +22 @@
+-		return new CookieManager();
++		return INSTANCE;
+@@ -33 +35,3 @@
+-	public void flush() {}
++	public void flush() {
++		if (!nativeFlush()) throw new IllegalStateException("Unable to persist cookies");
++	}
+@@ -36 +40 @@
+-		return "";
++		return nativeGetCookie(url);
+@@ -39 +43,3 @@
+-	public void setCookie(String url, String value) {}
++	public void setCookie(String url, String value) {
++		nativeSetCookie(url, value);
++	}
+@@ -41 +47,10 @@
+-	public void setAcceptCookie(boolean accept) {}
++	public void setCookie(String url, String value, final ValueCallback<Boolean> callback) {
++		// A nonnull callback requires the caller's Looper before the store changes.
++		final Handler handler = callback == null ? null : new Handler();
++		final boolean accepted = nativeSetCookie(url, value);
++		if (handler != null) {
++			handler.post(new Runnable() {
++				@Override public void run() { callback.onReceiveValue(accepted); }
++			});
++		}
++	}
+@@ -42,0 +58,8 @@
++	public void setAcceptCookie(boolean accept) { acceptCookies = accept; }
++
++	public boolean acceptCookie() { return acceptCookies; }
++
++	private static native boolean nativeSetCookie(String url, String value);
++	private static native String nativeGetCookie(String url);
++	private static native boolean nativeFlush();
++
+--- a/meson.build
++++ b/meson.build
+@@ -156,0 +157 @@
++                                                                        'src/api-impl-jni/widgets/android_webkit_CookieManager.c',
+@@ -188 +189 @@
+-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
++                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libsoup-3.0'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
+--- /dev/null
++++ b/src/api-impl-jni/widgets/android_webkit_CookieManager.c
+@@ -0,0 +1,404 @@
++#define _GNU_SOURCE
++#include <errno.h>
++#include <fcntl.h>
++#include <limits.h>
++#include <libsoup/soup.h>
++#include <sqlite3.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++#include "../generated_headers/android_webkit_CookieManager.h"
++
++/* The launcher's app directory remains owned by the launcher. */
++extern char *get_app_data_dir(void);
++
++typedef struct {
++	SoupCookieJar *jar;
++	sqlite3 *database;
++} AtlCookieStore;
++
++/* No jar or SQLite operation, including lazy initialization, escapes this lock.
++ * This is the manual CookieManager store. Enabled WebViews use a separate
++ * WebKit network process; their cookie sharing is not implemented here. */
++static GMutex cookie_store_mutex;
++static AtlCookieStore cookie_store;
++
++static const char cookie_schema[] =
++	"CREATE TABLE IF NOT EXISTS atl_cookies_v1 ("
++	"name TEXT NOT NULL, value TEXT NOT NULL, domain TEXT NOT NULL,"
++	"path TEXT NOT NULL, expires INTEGER, secure INTEGER NOT NULL,"
++	"http_only INTEGER NOT NULL, same_site INTEGER NOT NULL,"
++	"PRIMARY KEY (name, domain, path))";
++
++static void cookie_changed(SoupCookieJar *jar, SoupCookie *old_cookie,
++		SoupCookie *new_cookie, gpointer changed)
++{
++	/* Soup emits this synchronously under its own mutex. Do not reenter it,
++	 * invoke Java, or query any jar state from this observer. */
++	(void)jar;
++	(void)old_cookie;
++	(void)new_cookie;
++	*(gboolean *)changed = TRUE;
++}
++
++static gboolean cookie_is_expired(SoupCookie *cookie)
++{
++	GDateTime *expires = soup_cookie_get_expires(cookie);
++	return expires && g_date_time_to_unix(expires) <= g_get_real_time() / G_USEC_PER_SEC;
++}
++
++static gboolean jar_add_checked(SoupCookieJar *jar, SoupCookie *cookie, GUri *uri)
++{
++	gboolean changed = FALSE;
++	gulong observer = g_signal_connect(jar, "changed", G_CALLBACK(cookie_changed), &changed);
++	/* This call consumes cookie on both acceptance and rejection. */
++	soup_cookie_jar_add_cookie_full(jar, cookie, uri, NULL);
++	g_signal_handler_disconnect(jar, observer);
++	return changed;
++}
++
++static gboolean valid_expired_deletion(SoupCookieJar *jar, SoupCookie *cookie, GUri *uri)
++{
++	/* An already absent cookie has no changed signal when deleted. Check its
++	 * acceptance in an isolated copy of the actual jar with expiration moved
++	 * forward. Retain all dated existing cookies: they still protect their
++	 * identities from insecure overwrite until the real jar removes them.
++	 * Soup performs the same public suffix, prefix, SameSite and origin checks. */
++	SoupCookieJar *validation = soup_cookie_jar_new();
++	GSList *cookies = soup_cookie_jar_all_cookies(jar);
++	for (GSList *item = cookies; item; item = item->next) {
++		SoupCookie *existing = item->data;
++		if (soup_cookie_get_expires(existing))
++			soup_cookie_set_max_age(existing, SOUP_COOKIE_MAX_AGE_ONE_DAY);
++		soup_cookie_jar_add_cookie(validation, existing);
++	}
++	/* Ownership of each copied cookie moved into validation. */
++	g_slist_free(cookies);
++	SoupCookie *candidate = soup_cookie_copy(cookie);
++	soup_cookie_set_max_age(candidate, SOUP_COOKIE_MAX_AGE_ONE_DAY);
++	gboolean accepted = jar_add_checked(validation, candidate, uri);
++	g_object_unref(validation);
++	return accepted;
++}
++
++static const char *sqlite_text(sqlite3_stmt *statement, int column)
++{
++	if (sqlite3_column_type(statement, column) != SQLITE_TEXT)
++		return NULL;
++	const char *value = (const char *)sqlite3_column_text(statement, column);
++	int length = sqlite3_column_bytes(statement, column);
++	if (!value || strlen(value) != (size_t)length || !g_utf8_validate(value, length, NULL))
++		return NULL;
++	return value;
++}
++
++static gboolean load_cookie_store(AtlCookieStore *store)
++{
++	sqlite3_stmt *statement = NULL;
++	gboolean loaded = FALSE;
++	if (sqlite3_prepare_v2(store->database,
++			"SELECT name,value,domain,path,expires,secure,http_only,same_site "
++			"FROM atl_cookies_v1 ORDER BY rowid", -1, &statement, NULL) != SQLITE_OK)
++		goto done;
++	int result;
++	while ((result = sqlite3_step(statement)) == SQLITE_ROW) {
++		const char *name = sqlite_text(statement, 0);
++		const char *value = sqlite_text(statement, 1);
++		const char *domain = sqlite_text(statement, 2);
++		const char *path = sqlite_text(statement, 3);
++		if (!name || !value || !domain || !*domain || !path || *path != '/')
++			goto done;
++		for (int column = 5; column <= 7; column++)
++			if (sqlite3_column_type(statement, column) != SQLITE_INTEGER)
++				goto done;
++		gint64 secure = sqlite3_column_int64(statement, 5);
++		gint64 http_only = sqlite3_column_int64(statement, 6);
++		gint64 same_site = sqlite3_column_int64(statement, 7);
++		if ((secure != 0 && secure != 1) || (http_only != 0 && http_only != 1) ||
++				same_site < SOUP_SAME_SITE_POLICY_NONE || same_site > SOUP_SAME_SITE_POLICY_STRICT)
++			goto done;
++		GDateTime *expires = NULL;
++		if (sqlite3_column_type(statement, 4) != SQLITE_NULL) {
++			if (sqlite3_column_type(statement, 4) != SQLITE_INTEGER)
++				goto done;
++			gint64 timestamp = sqlite3_column_int64(statement, 4);
++			if (timestamp <= g_get_real_time() / G_USEC_PER_SEC)
++				continue;
++			expires = g_date_time_new_from_unix_utc(timestamp);
++			if (!expires)
++				goto done;
++		}
++		SoupCookie *cookie = soup_cookie_new(name, value, domain, path, -1);
++		soup_cookie_set_secure(cookie, secure);
++		soup_cookie_set_http_only(cookie, http_only);
++		soup_cookie_set_same_site_policy(cookie, same_site);
++		if (expires) {
++			soup_cookie_set_expires(cookie, expires);
++			g_date_time_unref(expires);
++		}
++		if (!jar_add_checked(store->jar, cookie, NULL))
++			goto done;
++	}
++	loaded = result == SQLITE_DONE;
++done:
++	if (statement && sqlite3_finalize(statement) != SQLITE_OK)
++		loaded = FALSE;
++	return loaded;
++}
++
++static gboolean initialize_cookie_store_locked(void)
++{
++	if (cookie_store.jar)
++		return TRUE;
++	const char *directory = get_app_data_dir();
++	if (!directory || !*directory)
++		return FALSE;
++	char *filename = g_build_filename(directory, "cookies.sqlite", NULL);
++	int fd = open(filename, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
++	struct stat status;
++	if (fd < 0) {
++		g_free(filename);
++		return FALSE;
++	}
++	gboolean owned = fstat(fd, &status) == 0 && S_ISREG(status.st_mode) &&
++		status.st_uid == geteuid() && fchmod(fd, 0600) == 0;
++	if (close(fd) != 0)
++		owned = FALSE;
++	if (!owned) {
++		g_free(filename);
++		return FALSE;
++	}
++	AtlCookieStore next = {0};
++	int opened = sqlite3_open_v2(filename, &next.database,
++		SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_NOFOLLOW, NULL);
++	g_free(filename);
++	if (opened != SQLITE_OK)
++		goto failed;
++	if (sqlite3_busy_timeout(next.database, 3000) != SQLITE_OK ||
++			sqlite3_exec(next.database, "PRAGMA synchronous=FULL", NULL, NULL, NULL) != SQLITE_OK ||
++			sqlite3_exec(next.database, cookie_schema, NULL, NULL, NULL) != SQLITE_OK)
++		goto failed;
++	next.jar = soup_cookie_jar_new();
++	if (!load_cookie_store(&next))
++		goto failed;
++	/* Publish only after a complete successful load. A corrupt/unreadable
++	 * store never becomes an empty jar that can overwrite old disk state. */
++	cookie_store = next;
++	return TRUE;
++failed:
++	if (next.jar)
++		g_object_unref(next.jar);
++	if (next.database)
++		sqlite3_close(next.database);
++	return FALSE;
++}
++
++static GUri *cookie_uri(const char *url)
++{
++	/* Android accepts a bare hostname here and fixes it up to HTTP. Restrict
++	 * this compatibility case to a bounded host (no path, userinfo or query);
++	 * callers needing a Secure cookie must supply an explicit HTTPS URL. */
++	const char *scheme_hint = g_uri_peek_scheme(url);
++	char *fixed_url = NULL;
++	if (!scheme_hint) {
++		if (!*url || strlen(url) > 1024 || strpbrk(url, "/?#@"))
++			return NULL;
++		for (const unsigned char *cursor = (const unsigned char *)url; *cursor; cursor++)
++			if (*cursor <= 0x20 || *cursor == 0x7f)
++				return NULL;
++		fixed_url = g_strdup_printf("http://%s/", url);
++	}
++	GUri *uri = g_uri_parse(fixed_url ? fixed_url : url, SOUP_HTTP_URI_FLAGS, NULL);
++	g_free(fixed_url);
++	if (!uri)
++		return NULL;
++	const char *scheme = g_uri_get_scheme(uri);
++	const char *host = g_uri_get_host(uri);
++	if (!scheme || (g_ascii_strcasecmp(scheme, "http") && g_ascii_strcasecmp(scheme, "https")) ||
++			!host || !*host) {
++		g_uri_unref(uri);
++		return NULL;
++	}
++	return uri;
++}
++
++static gboolean set_cookie_locked(const char *url, const char *header)
++{
++	GUri *uri = cookie_uri(url);
++	if (!uri)
++		return FALSE;
++	SoupCookie *cookie = soup_cookie_parse(header, uri);
++	if (!cookie) {
++		g_uri_unref(uri);
++		return FALSE;
++	}
++	gboolean no_op_deletion = cookie_is_expired(cookie) &&
++		valid_expired_deletion(cookie_store.jar, cookie, uri);
++	gboolean changed = jar_add_checked(cookie_store.jar, cookie, uri);
++	g_uri_unref(uri);
++	return changed || no_op_deletion;
++}
++
++static char *get_cookie_locked(const char *url)
++{
++	GUri *uri = cookie_uri(url);
++	if (!uri)
++		return NULL;
++	/* Android's manual getCookie supplies HTTP callers, including HttpOnly. */
++	char *header = soup_cookie_jar_get_cookies(cookie_store.jar, uri, TRUE);
++	g_uri_unref(uri);
++	return header;
++}
++
++static gboolean flush_cookie_store_locked(void)
++{
++	GSList *cookies = soup_cookie_jar_all_cookies(cookie_store.jar);
++	sqlite3_stmt *statement = NULL;
++	gboolean committed = FALSE;
++	if (sqlite3_exec(cookie_store.database, "BEGIN IMMEDIATE", NULL, NULL, NULL) != SQLITE_OK)
++		goto done;
++	if (sqlite3_exec(cookie_store.database, "DELETE FROM atl_cookies_v1", NULL, NULL, NULL) != SQLITE_OK ||
++			sqlite3_prepare_v2(cookie_store.database,
++				"INSERT INTO atl_cookies_v1(name,value,domain,path,expires,secure,http_only,same_site) "
++				"VALUES(?,?,?,?,?,?,?,?)", -1, &statement, NULL) != SQLITE_OK)
++		goto rollback;
++	for (GSList *item = cookies; item; item = item->next) {
++		SoupCookie *cookie = item->data;
++		if (cookie_is_expired(cookie))
++			continue;
++		const char *strings[] = {soup_cookie_get_name(cookie), soup_cookie_get_value(cookie),
++			soup_cookie_get_domain(cookie), soup_cookie_get_path(cookie)};
++		for (int index = 0; index < 4; index++)
++			if (sqlite3_bind_text(statement, index + 1, strings[index], -1, SQLITE_TRANSIENT) != SQLITE_OK)
++				goto rollback;
++		GDateTime *expires = soup_cookie_get_expires(cookie);
++		int result = expires ? sqlite3_bind_int64(statement, 5, g_date_time_to_unix(expires)) :
++			sqlite3_bind_null(statement, 5);
++		if (result != SQLITE_OK ||
++				sqlite3_bind_int(statement, 6, soup_cookie_get_secure(cookie)) != SQLITE_OK ||
++				sqlite3_bind_int(statement, 7, soup_cookie_get_http_only(cookie)) != SQLITE_OK ||
++				sqlite3_bind_int(statement, 8, soup_cookie_get_same_site_policy(cookie)) != SQLITE_OK ||
++				sqlite3_step(statement) != SQLITE_DONE || sqlite3_reset(statement) != SQLITE_OK ||
++				sqlite3_clear_bindings(statement) != SQLITE_OK)
++			goto rollback;
++	}
++	if (sqlite3_finalize(statement) != SQLITE_OK) {
++		statement = NULL;
++		goto rollback;
++	}
++	statement = NULL;
++	if (sqlite3_exec(cookie_store.database, "COMMIT", NULL, NULL, NULL) != SQLITE_OK)
++		goto rollback;
++	committed = TRUE;
++	goto done;
++rollback:
++	if (statement) {
++		sqlite3_finalize(statement);
++		statement = NULL;
++	}
++	if (sqlite3_exec(cookie_store.database, "ROLLBACK", NULL, NULL, NULL) != SQLITE_OK &&
++			!sqlite3_get_autocommit(cookie_store.database)) {
++		/* A connection still inside a failed transaction is unusable. Drop
++		 * the private state so the next call must reload the actual disk store. */
++		sqlite3_close_v2(cookie_store.database);
++		g_object_unref(cookie_store.jar);
++		cookie_store = (AtlCookieStore){0};
++	}
++done:
++	g_slist_free_full(cookies, (GDestroyNotify)soup_cookie_free);
++	return committed;
++}
++
++static void cookie_store_exception(JNIEnv *env)
++{
++	if ((*env)->ExceptionCheck(env))
++		return;
++	jclass type = (*env)->FindClass(env, "java/lang/IllegalStateException");
++	if (type) {
++		(*env)->ThrowNew(env, type, "Unable to access cookie store");
++		(*env)->DeleteLocalRef(env, type);
++	}
++}
++
++static char *cookie_string_utf8(JNIEnv *env, jstring value)
++{
++	if (!value || (*env)->ExceptionCheck(env))
++		return NULL;
++	jsize length = (*env)->GetStringLength(env, value);
++	const jchar *characters = (*env)->GetStringChars(env, value, NULL);
++	if (!characters)
++		return NULL;
++	char *result = NULL;
++	for (jsize index = 0; index < length; index++)
++		if (!characters[index])
++			goto done;
++	result = g_utf16_to_utf8((const gunichar2 *)characters, length, NULL, NULL, NULL);
++done:
++	(*env)->ReleaseStringChars(env, value, characters);
++	return result;
++}
++
++JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_nativeSetCookie(
++		JNIEnv *env, jclass type, jstring url, jstring value)
++{
++	(void)type;
++	char *url_utf8 = cookie_string_utf8(env, url);
++	char *value_utf8 = cookie_string_utf8(env, value);
++	gboolean accepted = FALSE;
++	gboolean initialized = TRUE;
++	if (url_utf8 && value_utf8) {
++		g_mutex_lock(&cookie_store_mutex);
++		initialized = initialize_cookie_store_locked();
++		if (initialized)
++			accepted = set_cookie_locked(url_utf8, value_utf8);
++		g_mutex_unlock(&cookie_store_mutex);
++	}
++	g_free(url_utf8);
++	g_free(value_utf8);
++	if (!initialized)
++		cookie_store_exception(env);
++	return accepted;
++}
++
++JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_nativeGetCookie(
++		JNIEnv *env, jclass type, jstring url)
++{
++	(void)type;
++	char *url_utf8 = cookie_string_utf8(env, url);
++	if (!url_utf8)
++		return NULL;
++	g_mutex_lock(&cookie_store_mutex);
++	gboolean initialized = initialize_cookie_store_locked();
++	char *header = initialized ? get_cookie_locked(url_utf8) : NULL;
++	g_mutex_unlock(&cookie_store_mutex);
++	g_free(url_utf8);
++	if (!initialized) {
++		cookie_store_exception(env);
++		return NULL;
++	}
++	if (!header)
++		return NULL;
++	glong length;
++	gunichar2 *characters = g_utf8_to_utf16(header, -1, NULL, &length, NULL);
++	g_free(header);
++	if (!characters || length > INT_MAX) {
++		g_free(characters);
++		cookie_store_exception(env);
++		return NULL;
++	}
++	jstring result = (*env)->NewString(env, (const jchar *)characters, (jsize)length);
++	g_free(characters);
++	return result;
++}
++
++JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_nativeFlush(JNIEnv *env, jclass type)
++{
++	(void)type;
++	if ((*env)->ExceptionCheck(env))
++		return FALSE;
++	g_mutex_lock(&cookie_store_mutex);
++	gboolean flushed = initialize_cookie_store_locked() && flush_cookie_store_locked();
++	g_mutex_unlock(&cookie_store_mutex);
++	return flushed;
++}

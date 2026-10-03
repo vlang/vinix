@@ -208,6 +208,56 @@ handles and mismatched local/global deletion. The `pins=0` verdict counts explic
 dispatcher pins; class locals released by JNI at native return are excluded.
 This C test does not run ART or establish application gameplay.
 
+`--cookie-probe /path/to/android-cookie-probe.apk` runs
+[AndroidCookieProbe.java](AndroidCookieProbe.java) through the normal ATL
+application loader in two separate processes. The bootstrap activity checks the
+installed public cookie APIs, then flushes test cookies. The persistence activity
+reloads the same APK's private cookie store and checks session cookies, secure
+and HttpOnly cookies, domain matching, and distinct paths for the same name.
+Both processes must exit zero and print their respective `ANDROID-COOKIE-PASS`
+and `ANDROID-COOKIE-RELOAD-PASS` markers.
+
+Build it against the coherently built production framework and resources:
+
+```sh
+python3 tests/android/cookie-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
+    --core-classes /path/to/core-all_classes.jar \
+    --r8 /path/to/r8-8.3.37.jar --output /path/to/cookie-probe
+```
+
+The builder pins core classes and D8, packages only probe classes and their own
+manifest, and records input/output hashes in `cookie-probe-build.json`.
+Callbacks must be deferred, run exactly once on the caller's main or worker
+Looper, and report unchanged valid cookies as accepted. A plain worker without
+a Looper can use a null callback; a nonnull callback must be rejected before
+mutating the store. Matching checks cover host-only cookies, domains, paths,
+secure transport, HttpOnly visibility, expiry, deletion, public suffix rejection,
+and cookie prefixes. A supplementary Unicode value must survive the Java/native
+boundary and reload. Test names use `vinix_test_`; host fixtures use `.invalid`
+and the public-suffix check uses `co.uk`. No network request is made.
+The fixture APK never changes application APKs, framework providers, or real
+authentication cookies. It does not establish WebView sharing or gameplay.
+
+[run-cookie-store-test.sh](run-cookie-store-test.sh) separately compiles the
+verified production cookie backend with real libsoup and SQLite on ARM64 Linux:
+
+```sh
+tests/android/run-cookie-store-test.sh \
+    /path/to/atl/src/api-impl-jni/widgets/android_webkit_CookieManager.c
+```
+
+It requires libsoup 3 and SQLite development packages and JDK JNI headers
+(`ATL_COOKIE_JNI_ROOT` may select the header directory). The fixture checks
+provider acceptance and matching, session and persistent-cookie reload,
+independent paths, saved security and expiry attributes, and checked rollback
+when a real second SQLite connection blocks commit. A delayed insertion still
+calls real libsoup and checks expiry at the acceptance snapshot boundary.
+Corrupt rows must reject initialization without publishing an empty store.
+The fixture uses a temporary private directory and does not run ART or
+establish gameplay.
+
 `--egl-probe /path/to/egl-interop-test` runs
 [egl-interop-test.c](egl-interop-test.c) on the APK's actual X11 display, using
 the installed private Mesa and GTK libraries. Build the executable on ARM64
