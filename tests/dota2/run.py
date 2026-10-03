@@ -45,6 +45,46 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+class ExportReads:
+    """Record actual disk read failures without changing the NBD response."""
+
+    def __init__(self, export):
+        self.read = export.read
+        self.started = time.monotonic()
+        self.lock = threading.Lock()
+        self.requests = 0
+        self.bytes = 0
+        self.errors = 0
+        self.failures = []
+        export.read = self.observe
+
+    def observe(self, offset: int, count: int) -> bytes:
+        with self.lock:
+            self.requests += 1
+        try:
+            data = self.read(offset, count)
+        except OSError as error:
+            record = {"elapsed_seconds": round(time.monotonic() - self.started, 3),
+                      "offset": offset, "length": count, "errno": error.errno,
+                      "message": str(error)}
+            with self.lock:
+                self.errors += 1
+                saved = len(self.failures) < 32
+                if saved:
+                    self.failures.append(record)
+            if saved:
+                print("DOTA2-EXPORT-READ-ERROR: " + json.dumps(record), flush=True)
+            raise
+        with self.lock:
+            self.bytes += len(data)
+        return data
+
+    def report(self) -> dict:
+        with self.lock:
+            return {"requests": self.requests, "bytes": self.bytes,
+                    "error_count": self.errors, "failures": list(self.failures)}
+
+
 def install(source: Path, target: Path) -> None:
     if source.resolve() == target.resolve():
         return
@@ -406,6 +446,7 @@ def main() -> None:
     captures = []
     failure = None
     with exporter.Server(args.export_state, 0) as server:
+        reads = ExportReads(server.export)
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         try:
@@ -503,6 +544,7 @@ def main() -> None:
             sha256(query) if (query := root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery").is_file()
             else None),
         "export_manifest_sha256": sha256(args.export_state / "manifest.json"),
+        "export_reads": reads.report(),
         "captures": captures, "log": str(work / "vinix.log"),
     }
     (work / "results.json").write_text(json.dumps(report, indent=2) + "\n")

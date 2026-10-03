@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Host regressions for preparing the real-game capture fixture."""
 import importlib.util
+import errno
+import io
 from pathlib import Path
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from types import SimpleNamespace
 
 
 spec = importlib.util.spec_from_file_location("dota2_run", Path(__file__).with_name("run.py"))
@@ -50,6 +54,40 @@ class InstallTests(unittest.TestCase):
             source.chmod(0o444)
             runner.install(source, source)
             self.assertEqual(source.read_bytes(), b"keep")
+
+
+class ExportReadTests(unittest.TestCase):
+    def test_success_preserves_real_bytes_and_range(self):
+        calls = []
+        def read(offset, count):
+            calls.append((offset, count))
+            return b"actual bytes"
+        export = SimpleNamespace(read=read)
+        observer = runner.ExportReads(export)
+        self.assertEqual(export.read(4096, 12), b"actual bytes")
+        self.assertEqual(calls, [(4096, 12)])
+        self.assertEqual(observer.report(), {"requests": 1, "bytes": 12,
+                                            "error_count": 0, "failures": []})
+
+    def test_error_is_preserved_and_diagnostics_are_bounded(self):
+        error = OSError(errno.EIO, "source changed")
+        def read(offset, count):
+            raise error
+        export = SimpleNamespace(read=read)
+        observer = runner.ExportReads(export)
+        with redirect_stdout(io.StringIO()) as output:
+            for index in range(40):
+                with self.assertRaises(OSError) as raised:
+                    export.read(index * 4096, 4096)
+                self.assertIs(raised.exception, error)
+        report = observer.report()
+        self.assertEqual(report["requests"], 40)
+        self.assertEqual(report["bytes"], 0)
+        self.assertEqual(report["error_count"], 40)
+        self.assertEqual(len(report["failures"]), 32)
+        self.assertEqual(report["failures"][0]["offset"], 0)
+        self.assertEqual(report["failures"][0]["errno"], errno.EIO)
+        self.assertEqual(len(output.getvalue().splitlines()), 32)
 
 
 if __name__ == "__main__":
