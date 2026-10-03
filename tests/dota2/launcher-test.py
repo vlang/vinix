@@ -69,6 +69,7 @@ class LauncherTest(unittest.TestCase):
             "VINIX_DOTA2_WIDTH", "VINIX_DOTA2_HEIGHT", "VINIX_X86_64_GUEST_BASE",
             "VINIX_DOTA2_ROOT", "SDL_VIDEO_DRIVER", "VINIX_DOTA_TEST_STATUS",
             "VINIX_DOTA2_STEAMCLIENT", "VINIX_DOTA2_EARLY_STEAMCLIENT",
+            "VINIX_DOTA2_ASSERTS",
         ):
             self.env.pop(key, None)
         self.env.update(
@@ -122,7 +123,7 @@ class LauncherTest(unittest.TestCase):
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libfreetype.so.6:"
                    f"{self.runtime}/usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"),
             str(self.game), "-windowed", "-w", "1280", "-h", "720",
-            "-vulkan_allow_cpu", "+map", "path with spaces", "-w", "960",
+            "-noassert", "-vulkan_allow_cpu", "+map", "path with spaces", "-w", "960",
         ])
         self.assertEqual(launch["cwd"], str(self.game_root))
         self.assertEqual(launch["nofile"], 2048)
@@ -154,6 +155,19 @@ class LauncherTest(unittest.TestCase):
                 if key != "VK_ICD_FILENAMES":
                     self.assertNotIn("VK_ICD_FILENAMES", launch["env"])
                 del self.env[key]
+
+    def test_assertions_can_be_enabled(self):
+        self.env["VINIX_DOTA2_ASSERTS"] = "1"
+        launch = self.run_launcher("+map", "path with spaces")
+        self.assertNotIn("-noassert", launch["args"])
+        self.assertEqual(launch["args"][-2:], ["+map", "path with spaces"])
+
+    def test_help_describes_assertion_default_and_override(self):
+        result = self.run_launcher("--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("VINIX_DOTA2_ASSERTS=1", result.stdout)
+        self.assertIn("default: -noassert", result.stdout)
+        self.assertFalse(self.output.exists())
 
     def test_explicit_empty_vulkan_selection_is_preserved(self):
         self.icd.unlink()
