@@ -7,9 +7,10 @@ not needed for the Linux client.
 
 The native Linux client now renders its main menu inside a Vinix desktop
 window. In the verified run, mouse input opened the Hotkeys settings and
-closed them to return to the menu. Keyboard input, gameplay and online
-matches have not been verified. The game probe saves the actual guest
-framebuffer for inspection.
+closed them to return to the menu. A subsequent normal-launch run verified
+keyboard input by opening the engine console and typing commands. In-match
+controls, gameplay and online matches have not been verified. The game probe
+saves the actual guest framebuffer for inspection.
 
 ![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
 
@@ -156,7 +157,9 @@ callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
 milestone. The main-menu image above is a later, genuine QEMU framebuffer
 capture from the full game, including its menu artwork and 3D character.
 It was copied without image edits or overlays. Mouse clicks opened and closed
-the game's settings; keyboard input and a playable match remain untested.
+the game's settings in that run. A later run opened the engine console with
+the backslash key and accepted typed console commands. This verifies those
+keyboard paths; in-match controls and a playable match remain untested.
 
 The host export previously disconnected after 120 seconds without a request,
 which can occur during shader compilation. It now keeps a negotiated disk
@@ -178,12 +181,20 @@ reproduces the old cache and inode failure, verifies full cache churn and cold
 reads with the fix, checks mount aliases and raw writes, and confirms that the
 host files remain unchanged.
 
-The successful main-menu run used four ARM64 guest CPUs, 8 GiB of guest RAM,
-Mesa 22/LLVM 15 Lavapipe, the `Haswell` translated CPU and Valve's anonymous
-engine mode. It also passed `-noassert` and `-nobreakpad` and loaded a diagnostic
+The earlier main-menu run shown above used four ARM64 guest CPUs, 8 GiB of
+guest RAM, Mesa 22/LLVM 15 Lavapipe, the `Haswell` translated CPU and Valve's
+anonymous engine mode. It also passed `-noassert` and `-nobreakpad` and loaded a diagnostic
 signal observer. It reached the fully drawn menu and accepted the settings
-mouse interaction. The menu still reported that it was searching for the
-Dota 2 game coordinator, so this is not an authenticated online-match result.
+mouse interaction.
+
+The subsequent normal-launch run also rendered the menu, with 16 GiB of guest
+RAM and the same four CPUs, kernel, desktop, translator and runtime. It used
+the default launcher, without extra diagnostic preloads or `-nobreakpad`;
+the only additional game argument was `-console`. The harness still selected
+Valve's anonymous engine mode. Keyboard input opened the actual console and
+typed commands, as recorded in `console-history-check.png`. The menu reported
+that it was searching for the Dota 2 game coordinator, so this is not an
+authenticated online-match result.
 
 The tested artifacts are recorded below. The runtime value is its build-input
 generation fingerprint; the other values are SHA-256 hashes of the binaries.
@@ -194,12 +205,14 @@ generation fingerprint; the other values are SHA-256 hashes of the binaries.
 | Vinix desktop | `140ce22b1f6a4ffe4399e7b7fe8905558efb2553f2d512defce67e6f87ace79e` |
 | Native QEMU translator | `d41f4ed1eb30cd11ced87c436502852df1c1762b9049c1b771a7105e4613e54b` |
 | Private Dota runtime generation | `58be6e668672138ad07cd3e67104019473a6a5eef62734daf09d697641c0ed52` |
+| Normal-run launcher | `4dfeee16e0e8f83d0df1f40cd2d41bae1771cb3889dbaf2aeaecec86d7f92f21` |
 
 The 8 GiB run encountered guest memory pressure while loading the menu.
-For further testing, 16 GiB is recommended if the host has enough memory;
-that larger configuration has not yet been verified. Software translation
-and Lavapipe make startup and interaction slow. A rendered menu does not
-establish playable frame rates, keyboard input or online support.
+The verified 16 GiB run had about 8 GiB available when the menu appeared and
+reported `VinixMemoryPressure: 0`. Use 16 GiB if the host has enough memory.
+Software translation and Lavapipe make startup and interaction slow. A
+rendered menu and working console do not establish playable frame rates,
+in-match controls or online support.
 
 After the file and graphics probes, capture the real game:
 
@@ -211,8 +224,8 @@ python3 tests/dota2/run.py \
     --export-state build/dota2/game-export \
     --steamclient /path/to/Steam/steamrt64 \
     --gldriverquery /path/to/Steam/ubuntu12_64/gldriverquery \
-    --memory-mib=8192 --timeout=1500 \
-    --extra-game-arg=-noassert
+    --memory-mib=16384 --timeout=1200 \
+    --extra-game-arg=-console
 ```
 
 `--steamclient` supplies Valve's Linux `steamclient.so`, `libtier0_s.so`,
@@ -226,13 +239,18 @@ serial output are saved under `build/dota2/game-test`. The report requires
 visual review: an engine crash or the desktop's launch/error placeholder is
 not evidence that the game rendered.
 
-The verified run's logs and separate visual review are under
-`build/dota2/game-ro-fixed-test`. Its immutable kernel is under
+The earlier run's logs and separate visual review are under
+`build/dota2/game-ro-fixed-test`. The normal-launch run's captures and
+`visual-review.json` are under `build/dota2/game-normal-launch-test`;
+`results.json` is written there when the probe finishes. The keyboard proof
+is `console-history-check.png`, with input actions in `interaction-log.jsonl`.
+The immutable kernel is under
 `build/dota2-virtio-ro/kernel-aarch64-smp`, its desktop is under
 `build/dota2-ui-integration/pins/140ce22b1f6a4ffe4399e7b7fe8905558efb2553f2d512defce67e6f87ace79e`,
 and its translator staging is `build/dota2-qemu/staging`. Supply those paths
 with `--kernel-dir`, `--desktop` and `--translator-staging` to use the tested
 artifacts locally; `--host-source` should select `vinix-wine-host.c` from the
 same desktop pin. The probe's automatic report deliberately leaves
-`rendering_verified` false until a human reviews the captures; this run's
-`visual-review.json` records the confirmed menu and mouse interaction.
+`rendering_verified` false until a human reviews the captures. The separate
+visual reviews record the confirmed menu, settings mouse interaction and
+limited console keyboard evidence.
