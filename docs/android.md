@@ -49,7 +49,7 @@ The build uses OpenJDK 8 for Java compilation and Java 17 or newer for the
 checksum-pinned D8 compiler:
 
 ```sh
-apk add android-build-tools art_standalone-dev libandroidfw-dev \
+apk add alsa-lib-dev android-build-tools art_standalone-dev libandroidfw-dev \
   gtk4.0-dev libgudev-dev libsecret-dev libdrm-dev libportal-dev \
   ffmpeg-dev mesa-dev openxr-dev sqlite-dev vulkan-loader-dev \
   wayland-dev wayland-protocols webkit2gtk-6.0-dev openjdk17-jre-headless
