@@ -1758,3 +1758,11 @@ index ad4f35e..24b06c4 100644
 @@ -175,0 +177,2 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
 +		getFragmentManager().executePendingTransactions();
 +		if (finishing || destroyed) return;
+diff --git a/src/api-impl/android/webkit/ValueCallback.java b/src/api-impl/android/webkit/ValueCallback.java
+--- a/src/api-impl/android/webkit/ValueCallback.java
++++ b/src/api-impl/android/webkit/ValueCallback.java
+@@ -3 +3,3 @@
+-public class ValueCallback {}
++public interface ValueCallback<T> {
++	void onReceiveValue(T value);
++}

@@ -10,8 +10,9 @@ The framework now supplies `View.OnCapturedPointerListener` and native mouse
 capture and the virtual display's supported refresh-rate query. Activity and
 fragment callbacks now follow the framework lifecycle boundaries. The latest
 launch reaches native shell startup, creates the rendering surface and starts
-Roblox's Lua app, then aborts because ATL declares `android.webkit.ValueCallback`
-as a class where the APK requires an interface.
+Roblox's Lua app. `android.webkit.ValueCallback` now has Android's interface
+contract; the latest launch aborts on the missing three-argument
+`CookieManager.setCookie(String, String, ValueCallback)` API.
 A usable Roblox screen, authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
@@ -111,8 +112,11 @@ through the real main-loop handler. The native dispatcher fixture separately
 checks reference ownership, reentrancy and exception propagation with JNI doubles.
 The real EGL fixture also reads green pixels through ES2, an exported EGLImage
 and a GTK texture on Vinix. The actual Roblox run reaches `surfaceCreated` and
-`Start the lua app`, then throws `IncompatibleClassChangeError` because its
-callback implements `android.webkit.ValueCallback`, which ATL supplies as a
-class. No usable client screen or gameplay has been verified.
+`Start the lua app`. The source-built framework now declares `ValueCallback<T>`
+as an interface with `onReceiveValue(T)`; its class and DEX method descriptors
+match the unchanged APK. The next actual launch passes that class resolution
+and the strengthened lifecycle fixture, then throws `NoSuchMethodError` for
+`CookieManager.setCookie(String, String, ValueCallback)`. No usable client screen
+or gameplay has been verified.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.
