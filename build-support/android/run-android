@@ -42,6 +42,9 @@ chmod 700 "$XDG_RUNTIME_DIR"
 
 export DISPLAY="${DISPLAY:-:1}"
 export GDK_BACKEND=x11
+# ATL shares EGL images with GTK's GL contexts; GLX contexts cannot import
+# those images. GTK 4.24 selects this through GDK_DISABLE, not gl-egl debug.
+export GDK_DISABLE="${GDK_DISABLE:+$GDK_DISABLE,}glx"
 export GSK_RENDERER=cairo
 export GTK_A11Y=none
 export NO_AT_BRIDGE=1

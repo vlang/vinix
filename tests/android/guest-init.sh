@@ -147,6 +147,34 @@ if [ -n "${TEST_LAYOUT_PROBE:-}" ]; then
         || fail "native framework layout focus probe did not report its assertions passing"
     echo ANDROID-LAYOUT-FOCUS-VERIFIED
 fi
+if [ -n "${TEST_POINTER_PROBE:-}" ]; then
+    echo ANDROID-POINTER-CAPTURE-START
+    (
+        runtime=/opt/vinix-android-aarch64
+        unset ANDROID_ROOT ANDROID_DATA LD_LIBRARY_PATH LD_PRELOAD
+        export VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art:$runtime/usr/lib/java/dex/art/natives"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        framework="$runtime/usr/lib/java/dex/android_translation_layer"
+        for icu_data_file in "$runtime"/usr/share/icu/*/icudt*l.dat; do
+            if [ -f "$icu_data_file" ]; then
+                export ICU_DATA="${icu_data_file%/*}"
+                break
+            fi
+        done
+        exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" \
+            "$runtime/usr/bin/dalvikvm" -Xnoimage-dex2oat -Xusejit:false \
+            -cp "$TEST_POINTER_PROBE:$framework/api-impl.jar:$framework/gstub.jar:$framework/ghax.jar" \
+            android.view.AndroidPointerCaptureProbe
+    ) >/tmp/android-pointer-capture-probe.log 2>&1 || {
+        cat /tmp/android-pointer-capture-probe.log
+        fail "native framework pointer capture probe failed"
+    }
+    cat /tmp/android-pointer-capture-probe.log
+    grep -q '^ANDROID-POINTER-CAPTURE-PASS ' /tmp/android-pointer-capture-probe.log \
+        || fail "native framework pointer capture probe did not report its assertions passing"
+    echo ANDROID-POINTER-CAPTURE-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64

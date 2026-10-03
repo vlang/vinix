@@ -166,6 +166,38 @@ Fixture classes are used only in a separate preflight VM; they never enter the
 runtime overlay or APK. A zero exit status and assertion marker are required,
 and `result.json` records its hash and verdict.
 
+## Pointer capture preflights
+
+`--pointer-probe /path/to/android-pointer-capture-probe.jar` runs
+[AndroidPointerCaptureProbe.java](AndroidPointerCaptureProbe.java) in a separate
+Vinix ART VM against the installed production framework. Build the probe on the
+native framework host with [pointer-capture-test.py](pointer-capture-test.py),
+using the same `--framework-classes`, `--stub-classes` and `--r8` inputs as the
+layout probe above. It checks listener ordering, fallback, exception propagation,
+relative axes, button metadata, copied event ownership and pooled event reset.
+Only capture state is a test double; actual capture is checked separately.
+The guest requires zero exit status and its assertion marker, and records the
+probe hash and verdict. Fixture classes never enter the runtime overlay or APK.
+
+[atl-pointer-capture-test.c](atl-pointer-capture-test.c) links the patched native
+helper and drives a real X11 server using XTest:
+
+```sh
+gcc -O2 -Wall -Wextra -Werror -Wno-deprecated-declarations \
+    -I/path/to/atl/src/api-impl-jni/views \
+    tests/android/atl-pointer-capture-test.c \
+    /path/to/atl/src/api-impl-jni/views/PointerCapture.c \
+    $(pkg-config --cflags --libs gtk4 x11 xi xtst) -lm -o /tmp/atl-pointer-test
+DISPLAY=:99 GDK_BACKEND=x11 GSK_RENDERER=cairo /tmp/atl-pointer-test
+```
+
+Use a dedicated X server, such as Xvfb, at the selected display. The fixture
+checks unheld capture, refusal during an ordinary held click, motion beyond
+screen edges, button/wheel state, focused-view routing, requester removal,
+reentrant release/reacquire, focus loss, cursor restoration and subsequent
+normal clicks. It exercises a relative XTest device; absolute-device recentering
+and real gameplay require separate checks in Vinix.
+
 ## Interactive Roblox session
 
 After staging the native Android runtime and Roblox launcher, keep the real

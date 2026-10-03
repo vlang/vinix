@@ -525,3 +525,823 @@
 +	public boolean restoreDefaultFocus() {
 +		return requestFocus(View.FOCUS_DOWN);
 +	}
+diff --git a/meson.build b/meson.build
+index bb13f5f..8b5e6c2 100644
+--- a/meson.build
++++ b/meson.build
+@@ -89,0 +90 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
++                                                                        'src/api-impl-jni/views/PointerCapture.c',
+@@ -186 +187 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
+-                                                                  	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
++                                                                        dependency('gtk4', version: '>=4.14'), dependency('x11'), dependency('xi'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
+diff --git a/src/api-impl-jni/views/PointerCapture.c b/src/api-impl-jni/views/PointerCapture.c
+new file mode 100644
+index 0000000..6389010
+--- /dev/null
++++ b/src/api-impl-jni/views/PointerCapture.c
+@@ -0,0 +1,395 @@
++#include "PointerCapture.h"
++#include <glib-unix.h>
++#include <string.h>
++#ifdef GDK_WINDOWING_X11
++#include <gdk/x11/gdkx.h>
++#include <X11/Xlib.h>
++#include <X11/extensions/XInput2.h>
++#endif
++
++/* Pointer capture belongs to the attached window, as on Android. */
++#define CAPTURE_KEY "atl-pointer-capture"
++#ifdef GDK_WINDOWING_X11
++typedef struct {
++	grefcount refs;
++	GtkWidget *root; /* root owns this state */
++	gboolean active;
++	Display *display;
++	Window window;
++	Cursor cursor;
++	int device_id, opcode, source_id;
++	gboolean relative_source;
++	guint64 generation;
++	guint source;
++	unsigned long warp_serial;
++	gboolean warp_pending;
++	double last_x, last_y, center_x, center_y;
++	double entry_root_x, entry_root_y;
++	int buttons;
++	AtlCapturedEvent event;
++	AtlCaptureChanged changed;
++	gpointer data;
++	GDestroyNotify destroy;
++} Capture;
++
++static Capture *capture_ref(Capture *s) { g_ref_count_inc(&s->refs); return s; }
++static void capture_unref(Capture *s) { if (g_ref_count_dec(&s->refs)) g_free(s); }
++
++static void release(Capture *s, gboolean notify)
++{
++	if (!s->active) return;
++	Display *display = s->display;
++	gpointer data = s->data;
++	GDestroyNotify destroy = s->destroy;
++	AtlCaptureChanged changed = s->changed;
++	/* Clear and dispose the old acquisition before calling Java: a callback
++	 * may immediately request a new grab, even on another window. */
++	s->generation++;
++	s->active = FALSE;
++	s->display = NULL;
++	s->data = NULL;
++	if (s->source) { g_source_remove(s->source); s->source = 0; }
++	/* The hidden pointer returns to its entry position before becoming
++	 * visible. Root coordinates avoid a destroyed application-window XID. */
++	XIWarpPointer(display, s->device_id, None, DefaultRootWindow(display),
++	              0, 0, 0, 0, s->entry_root_x, s->entry_root_y);
++	XIUngrabDevice(display, s->device_id, CurrentTime);
++	XFreeCursor(display, s->cursor);
++	XSync(display, False);
++	XCloseDisplay(display);
++	if (notify && changed) changed(s->root, FALSE, data);
++	if (destroy) destroy(data);
++}
++
++static void capture_destroy(gpointer data)
++{
++	Capture *s = data;
++	release(s, FALSE);
++	capture_unref(s);
++}
++
++static void on_unmap(GtkWidget *widget, Capture *s) { (void)widget; release(s, TRUE); }
++static void on_active(GObject *root, GParamSpec *param, Capture *s)
++{
++	(void)param;
++	if (!gtk_window_is_active(GTK_WINDOW(root))) release(s, TRUE);
++}
++
++static void on_device_added(GtkWidget *root, GdkDevice *device)
++{
++	GdkInputSource source = gdk_device_get_source(device);
++	if (source != GDK_SOURCE_MOUSE && source != GDK_SOURCE_KEYBOARD) {
++		Capture *s = g_object_get_data(G_OBJECT(root), CAPTURE_KEY);
++		if (s) release(s, TRUE);
++	}
++}
++
++static gboolean suppress_normal_mouse(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer data)
++{
++	(void)controller;
++	Capture *s = data;
++	if (!s->active) return FALSE;
++	GdkDevice *device = gdk_event_get_device(event);
++	if (!device || gdk_device_get_source(device) != GDK_SOURCE_MOUSE
++	    || gdk_event_get_pointer_emulated(event) || gdk_event_get_device_tool(event)) return FALSE;
++	switch (gdk_event_get_event_type(event)) {
++	case GDK_MOTION_NOTIFY: case GDK_BUTTON_PRESS: case GDK_BUTTON_RELEASE:
++	case GDK_SCROLL: case GDK_ENTER_NOTIFY: case GDK_LEAVE_NOTIFY:
++		return TRUE;
++	default: return FALSE;
++	}
++}
++
++static int android_button(int button)
++{
++	switch (button) {
++	case 1: return 1; /* primary */
++	case 3: return 2; /* secondary */
++	case 2: return 4; /* tertiary */
++	case 8: return 8; /* back */
++	case 9: return 16; /* forward */
++	default: return 0;
++	}
++}
++
++static void emit(Capture *s, int action, int action_button, double dx, double dy,
++                 double scroll_x, double scroll_y, Time time)
++{
++	GtkWidget *root = g_object_ref(s->root);
++	GtkWidget *focused = gtk_root_get_focus(GTK_ROOT(root));
++	if (!focused) { g_object_unref(root); return; }
++	GtkWidget *owner = g_object_ref(focused);
++	double scale = gtk_widget_get_scale_factor(root);
++	/* The callback may release capture/remove the view. It receives only
++	 * numeric copies; both native objects stay alive until it returns. */
++	s->event(owner, action, s->buttons, action_button, dx / scale, dy / scale,
++	         s->last_x / scale, s->last_y / scale, scroll_x, scroll_y,
++	         (guint32)time, s->data);
++	g_object_unref(owner);
++	g_object_unref(root);
++}
++
++static void source_changed(Capture *s, int source_id)
++{
++	if (source_id == s->source_id) return;
++	s->source_id = source_id;
++	s->relative_source = FALSE;
++	int count;
++	XIDeviceInfo *info = XIQueryDevice(s->display, source_id, &count);
++	gboolean relative_x = FALSE, relative_y = FALSE;
++	if (info && count) {
++		for (int i = 0; i < info[0].num_classes; i++) {
++			if (info[0].classes[i]->type != XIValuatorClass) continue;
++			XIValuatorClassInfo *v = (XIValuatorClassInfo *)info[0].classes[i];
++			if (v->number == 0) relative_x = v->mode == XIModeRelative;
++			if (v->number == 1) relative_y = v->mode == XIModeRelative;
++		}
++	}
++	if (info) XIFreeDeviceInfo(info);
++	s->relative_source = relative_x && relative_y;
++}
++
++static gboolean input_ready(gint fd, GIOCondition condition, gpointer data)
++{
++	(void)fd;
++	Capture *s = capture_ref(data);
++	if (condition & (G_IO_HUP | G_IO_ERR)) { release(s, TRUE); capture_unref(s); return G_SOURCE_REMOVE; }
++	/* Keep the window alive if a listener closes it while this source runs. */
++	GtkWidget *root = g_object_ref(s->root);
++	Display *display = s->display;
++	guint64 generation = s->generation;
++	while (s->generation == generation && s->display == display && XPending(display)) {
++		XEvent event;
++		XNextEvent(display, &event);
++		/* GDK may retain is-active during an external XI2 pointer grab.
++		 * Observe real X focus/unmap events on this connection too. Ignore
++		 * grab pseudo-focus and transitions into this window's descendants. */
++		if ((event.type == FocusOut && event.xfocus.mode != NotifyGrab
++		     && event.xfocus.mode != NotifyUngrab && event.xfocus.detail != NotifyInferior)
++		    || event.type == UnmapNotify || event.type == DestroyNotify) {
++			release(s, TRUE);
++			break;
++		}
++		if (event.type != GenericEvent || event.xcookie.extension != s->opcode
++		    || !XGetEventData(display, &event.xcookie)) continue;
++		/* Copy cookie data before calling Java, which may close this Display. */
++		int type = event.xcookie.evtype;
++		Time time = 0;
++		int action = -1, button = 0, before = -1, after = -1;
++		double dx = 0, dy = 0, sx = 0, sy = 0;
++		if (type == XI_RawMotion) {
++			XIRawEvent *e = event.xcookie.data;
++			if (e->deviceid != s->device_id) { XFreeEventData(display, &event.xcookie); continue; }
++			source_changed(s, e->sourceid);
++			time = e->time;
++			if (s->relative_source) {
++				double *v = e->raw_values;
++				for (int axis = 0; axis < e->valuators.mask_len * 8; axis++) {
++					if (!XIMaskIsSet(e->valuators.mask, axis)) continue;
++					if (axis == 0) dx = *v;
++					if (axis == 1) dy = *v;
++					v++;
++				}
++				if (dx || dy) action = 2; /* ACTION_MOVE */
++			}
++		} else if (type == XI_Motion || type == XI_ButtonPress || type == XI_ButtonRelease) {
++			XIDeviceEvent *e = event.xcookie.data;
++			source_changed(s, e->sourceid);
++			time = e->time;
++			if (type == XI_Motion) {
++				if (!s->relative_source) {
++					/* Absolute devices/XTEST need recentering. Xlib exposes the
++					 * request serial, so queued pre-warp input is never mistaken
++					 * for the synthetic recenter motion. */
++					gboolean warp = s->warp_pending && e->serial >= s->warp_serial
++					    && e->event_x == s->center_x && e->event_y == s->center_y;
++					if (warp) s->warp_pending = FALSE;
++					else { dx = e->event_x - s->last_x; dy = e->event_y - s->last_y; if (dx || dy) action = 2; }
++				}
++				s->last_x = e->event_x;
++				s->last_y = e->event_y;
++				int width = gtk_widget_get_width(root) * gtk_widget_get_scale_factor(root);
++				int height = gtk_widget_get_height(root) * gtk_widget_get_scale_factor(root);
++				if (!s->relative_source && !s->warp_pending && width > 4 && height > 4
++				    && (s->last_x < 2 || s->last_y < 2 || s->last_x >= width - 2 || s->last_y >= height - 2)) {
++					s->center_x = width / 2;
++					s->center_y = height / 2;
++					s->warp_serial = NextRequest(display);
++					s->warp_pending = TRUE;
++					XIWarpPointer(display, s->device_id, None, s->window, 0, 0, 0, 0, s->center_x, s->center_y);
++					XFlush(display);
++				}
++			} else {
++				button = android_button(e->detail);
++				if (button) {
++					int previous = s->buttons;
++					if (type == XI_ButtonPress) {
++						s->buttons |= button; action = 11;
++						before = (!(previous & 7) && (s->buttons & 7)) ? 0 : 2;
++					} else {
++						s->buttons &= ~button; action = 12;
++						after = ((previous & 7) && !(s->buttons & 7)) ? 1 : 2;
++					}
++				} else if (type == XI_ButtonPress && e->detail >= 4 && e->detail <= 7) {
++					before = 2; action = 8;
++					if (e->detail == 4) sy = 1;
++					if (e->detail == 5) sy = -1;
++					if (e->detail == 6) sx = -1;
++					if (e->detail == 7) sx = 1;
++				}
++			}
++		}
++		XFreeEventData(display, &event.xcookie);
++		if (before >= 0 && s->active) emit(s, before, 0, 0, 0, 0, 0, time);
++		if (s->generation == generation && action >= 0 && s->active)
++			emit(s, action, button, dx, dy, sx, sy, time);
++		if (s->generation == generation && after >= 0 && s->active)
++			emit(s, after, 0, 0, 0, 0, 0, time);
++	}
++	gboolean alive = s->generation == generation && s->display == display;
++	g_object_unref(root);
++	capture_unref(s);
++	return alive ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
++}
++#endif
++
++gboolean atl_pointer_capture_has(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	return s && s->active;
++#else
++	(void)widget;
++	return FALSE;
++#endif
++}
++
++guint64 atl_pointer_capture_epoch(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	return s ? s->generation : 0;
++#else
++	(void)widget;
++	return 0;
++#endif
++}
++
++void atl_pointer_capture_release(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	if (s) release(s, TRUE);
++#else
++	(void)widget;
++#endif
++}
++
++gboolean atl_pointer_capture_request(GtkWidget *owner, AtlCapturedEvent event,
++                                     AtlCaptureChanged changed, gpointer data,
++                                     GDestroyNotify destroy)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(owner);
++	if (!root || !GTK_IS_WINDOW(root) || !gtk_widget_get_mapped(GTK_WIDGET(root))
++	    || !gtk_window_is_active(GTK_WINDOW(root))) return FALSE;
++	GdkDisplay *gdk_display = gtk_widget_get_display(owner);
++	if (!GDK_IS_X11_DISPLAY(gdk_display)) return FALSE;
++	Capture *s = g_object_get_data(G_OBJECT(root), CAPTURE_KEY);
++	if (s && s->active) return FALSE;
++	Display *display = XOpenDisplay(gdk_display_get_name(gdk_display));
++	if (!display) return FALSE;
++	int opcode, base_event, base_error, major = 2, minor = 1;
++	if (!XQueryExtension(display, "XInputExtension", &opcode, &base_event, &base_error)
++	    || XIQueryVersion(display, &major, &minor) != Success
++	    || major < 2 || (major == 2 && minor < 1)) { XCloseDisplay(display); return FALSE; }
++	GdkSeat *seat = gdk_display_get_default_seat(gdk_display);
++	/* A master grab includes its attached pointing devices. Until separate
++	 * tablet/touch grab routing exists, refuse capture on mixed seats rather
++	 * than stealing input from other devices. The production X11 seat is a
++	 * mouse plus keyboard. Unsupported backends/seats retain normal input. */
++	GList *devices = gdk_seat_get_devices(seat, GDK_SEAT_CAPABILITY_ALL_POINTING);
++	gboolean mouse_only = TRUE;
++	for (GList *it = devices; it; it = it->next)
++		if (gdk_device_get_source(it->data) != GDK_SOURCE_MOUSE) mouse_only = FALSE;
++	g_list_free(devices);
++	if (!mouse_only) { XCloseDisplay(display); return FALSE; }
++	GdkDevice *pointer = gdk_seat_get_pointer(seat);
++	if (!pointer) { XCloseDisplay(display); return FALSE; }
++	int device_id = gdk_x11_device_get_id(pointer);
++	Window window = gdk_x11_surface_get_xid(gtk_native_get_surface(GTK_NATIVE(root)));
++	char empty[] = {0};
++	Pixmap bitmap = XCreateBitmapFromData(display, window, empty, 1, 1);
++	XColor color = {0};
++	Cursor cursor = XCreatePixmapCursor(display, bitmap, bitmap, &color, &color, 0, 0);
++	XFreePixmap(display, bitmap);
++	unsigned char mask[XIMaskLen(XI_LASTEVENT)] = {0};
++	XISetMask(mask, XI_Motion); XISetMask(mask, XI_ButtonPress); XISetMask(mask, XI_ButtonRelease);
++	XIEventMask events = { device_id, sizeof(mask), mask };
++	int status = XIGrabDevice(display, device_id, window, CurrentTime, cursor,
++	                          XIGrabModeAsync, XIGrabModeAsync, False, &events);
++	/* Do not steal GDK's implicit/explicit grab: its old normal touch/click
++	 * stream must receive its release/cancel. A request may be retried after
++	 * that stream ends. Other clients' grabs are preserved too. */
++	if (status != GrabSuccess) { XFreeCursor(display, cursor); XCloseDisplay(display); return FALSE; }
++	/* XI2.1 provides a defined sourceid. Selecting raw events only on the
++	 * root avoids duplicate delivery through the grab mask. Relative
++	 * valuator deltas continue even at screen/window edges. */
++	memset(mask, 0, sizeof(mask)); XISetMask(mask, XI_RawMotion);
++	XIEventMask raw_events = { XIAllMasterDevices, sizeof(mask), mask };
++	XISelectEvents(display, DefaultRootWindow(display), &raw_events, 1);
++	XSelectInput(display, window, FocusChangeMask | StructureNotifyMask);
++	XSync(display, False);
++	Window query_root = None, query_child = None; double root_x = 0, root_y = 0;
++	XIButtonState buttons = {0}; XIModifierState mods = {0}; XIGroupState group = {0};
++	double last_x = 0, last_y = 0;
++	int initial_buttons = 0;
++	Bool queried = XIQueryPointer(display, device_id, window, &query_root, &query_child,
++	               &root_x, &root_y, &last_x, &last_y, &buttons, &mods, &group);
++	if (buttons.mask) {
++		for (int i = 1; i < buttons.mask_len * 8; i++)
++			if (XIMaskIsSet(buttons.mask, i)) initial_buttons |= android_button(i);
++		XFree(buttons.mask);
++	}
++	if (!queried) {
++		XIUngrabDevice(display, device_id, CurrentTime);
++		XFreeCursor(display, cursor); XCloseDisplay(display); return FALSE;
++	}
++	if (!s) {
++		s = g_new0(Capture, 1); g_ref_count_init(&s->refs); s->root = GTK_WIDGET(root);
++		g_object_set_data_full(G_OBJECT(root), CAPTURE_KEY, s, capture_destroy);
++		GtkEventController *controller = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
++		g_signal_connect(controller, "event", G_CALLBACK(suppress_normal_mouse), s);
++		gtk_widget_add_controller(GTK_WIDGET(root), controller);
++		g_signal_connect(root, "unmap", G_CALLBACK(on_unmap), s);
++		g_signal_connect(root, "notify::is-active", G_CALLBACK(on_active), s);
++		g_signal_connect_object(seat, "device-added", G_CALLBACK(on_device_added), root, G_CONNECT_SWAPPED);
++	}
++	s->generation++;
++	s->active = TRUE; s->display = display; s->window = window;
++	s->cursor = cursor; s->device_id = device_id; s->opcode = opcode;
++	s->source_id = -1; s->buttons = initial_buttons; s->warp_pending = FALSE;
++	s->last_x = last_x; s->last_y = last_y;
++	s->entry_root_x = root_x; s->entry_root_y = root_y;
++	s->event = event; s->changed = changed; s->data = data; s->destroy = destroy;
++	s->source = g_unix_fd_add(ConnectionNumber(display), G_IO_IN | G_IO_HUP | G_IO_ERR, input_ready, s);
++	/* Notify before any input callback; notification may release/reacquire. */
++	guint64 generation = s->generation;
++	capture_ref(s);
++	g_object_ref(root);
++	if (s->generation == generation && changed) changed(GTK_WIDGET(root), TRUE, data);
++	/* XIQueryPointer may already have queued input in Xlib's private buffer. */
++	if (s->generation == generation && s->display == display && XPending(display))
++		input_ready(ConnectionNumber(display), G_IO_IN, s);
++	g_object_unref(root);
++	capture_unref(s);
++	return TRUE;
++#else
++	(void)owner; (void)event; (void)changed; (void)data; (void)destroy;
++	return FALSE;
++#endif
++}
+diff --git a/src/api-impl-jni/views/PointerCapture.h b/src/api-impl-jni/views/PointerCapture.h
+new file mode 100644
+index 0000000..9d8b58a
+--- /dev/null
++++ b/src/api-impl-jni/views/PointerCapture.h
+@@ -0,0 +1,18 @@
++#ifndef ATL_POINTER_CAPTURE_H
++#define ATL_POINTER_CAPTURE_H
++#include <gtk/gtk.h>
++/* GTK-main-thread API. A successful request owns data until release and takes
++ * window-scoped capture; failed requests leave data with the caller. Events are
++ * scalar snapshots, never pointers into Xlib/GDK event storage. */
++typedef void (*AtlCapturedEvent)(GtkWidget *owner, int action, int buttons,
++                               int action_button, double dx, double dy,
++                               double raw_x, double raw_y, double scroll_x,
++                               double scroll_y, guint32 time, gpointer data);
++typedef void (*AtlCaptureChanged)(GtkWidget *root, gboolean captured, gpointer data);
++gboolean atl_pointer_capture_request(GtkWidget *owner, AtlCapturedEvent event,
++                                     AtlCaptureChanged changed, gpointer data,
++                                     GDestroyNotify destroy);
++void atl_pointer_capture_release(GtkWidget *widget);
++gboolean atl_pointer_capture_has(GtkWidget *widget);
++guint64 atl_pointer_capture_epoch(GtkWidget *widget);
++#endif
+diff --git a/src/api-impl-jni/views/android_view_View.c b/src/api-impl-jni/views/android_view_View.c
+index 8d66547..3e665f2 100644
+--- a/src/api-impl-jni/views/android_view_View.c
++++ b/src/api-impl-jni/views/android_view_View.c
+@@ -9,0 +10 @@
++#include "PointerCapture.h"
+@@ -101,0 +103,4 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
++static jobject new_mouse_event(JNIEnv *, int, int, guint32, float, float, float, float,
++                               float, float, int, int, float, float);
++static int mouse_buttons(GdkModifierType);
++
+@@ -117 +122,24 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
+-	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor, SOURCE_TOUCHSCREEN, action, timestamp, ids, coords);
++	GdkDevice *device = gdk_event_get_device(event);
++	gboolean mouse = device && gdk_device_get_source(device) == GDK_SOURCE_MOUSE
++	    && !gdk_event_get_pointer_emulated(event) && !gdk_event_get_device_tool(event);
++	jobject motion_event;
++	if (mouse && num_pointers == 1
++	    && ((struct pointer *)g_ptr_array_index(pointer_indices, 0))->id == 1) {
++		struct pointer *p = g_ptr_array_index(pointer_indices, 0);
++		int buttons = mouse_buttons(gdk_event_get_modifier_state(event));
++		GdkEventType type = gdk_event_get_event_type(event);
++		if (type == GDK_BUTTON_PRESS || type == GDK_BUTTON_RELEASE) {
++			guint button = gdk_button_event_get_button(event);
++			int bit = button == 1 ? 1 : button == 2 ? 4 : button == 3 ? 2 : button == 8 ? 8 : button == 9 ? 16 : 0;
++			if (type == GDK_BUTTON_PRESS) buttons |= bit;
++			else buttons &= ~bit;
++		}
++		int mouse_action = action & 0xff;
++		if (mouse_action == ACTION_POINTER_DOWN) mouse_action = ACTION_DOWN;
++		if (mouse_action == ACTION_POINTER_UP) mouse_action = ACTION_UP;
++		motion_event = new_mouse_event(env, 0x2002, mouse_action, timestamp,
++		    p->coord_x, p->coord_y, p->raw_x, p->raw_y, 0, 0, buttons, 0, 0, 0);
++	} else {
++		motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor,
++		    SOURCE_TOUCHSCREEN, action, (jlong)timestamp, ids, coords);
++	}
+@@ -119 +147 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
+-	ret = view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action);
++	ret = motion_event ? view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action) : false;
+@@ -121,0 +150,2 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
++	(*env)->DeleteLocalRef(env, ids);
++	(*env)->DeleteLocalRef(env, coords);
+@@ -206 +236 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
+-			if (!(gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK))
++			if (!(gdk_event_get_modifier_state(event) & (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK)))
+@@ -318,5 +347,0 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	double x;
+-	double y;
+-	double raw_x;
+-	double raw_y;
+-
+@@ -324,2 +349 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	GdkScrollUnit scroll_unit = gtk_event_controller_scroll_get_unit(controller);
+-	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
++	if ((*env)->PushLocalFrame(env, 8) < 0) return FALSE;
+@@ -327 +351,4 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
++	WrapperWidget *wrapper = g_object_ref(WRAPPER_WIDGET(widget));
++	jobject view = (*env)->NewLocalRef(env, this);
++	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
++	double raw_x = 0, raw_y = 0;
+@@ -329 +356 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	x = raw_x, y = raw_y;
++	double x = raw_x, y = raw_y;
+@@ -331,2 +358 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-
+-	if (scroll_unit == GDK_SCROLL_UNIT_SURFACE) {
++	if (gtk_event_controller_scroll_get_unit(controller) == GDK_SCROLL_UNIT_SURFACE) {
+@@ -336,4 +362,16 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class,
+-	                                         handle_cache.motion_event.constructor_scroll,
+-	                                         SOURCE_CLASS_POINTER, ACTION_SCROLL,
+-	                                         gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
++	jobject motion = new_mouse_event(env, 0x2002, ACTION_SCROLL,
++	    gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy,
++	    mouse_buttons(gdk_event_get_modifier_state(event)), 0, 0, 0);
++	gboolean ret = FALSE;
++	if (view && motion)
++		ret = (*env)->CallBooleanMethod(env, view, handle_cache.view.dispatchGenericMotionEvent, motion);
++	gboolean failed = (*env)->ExceptionCheck(env);
++	if (failed) (*env)->ExceptionDescribe(env);
++	/* Preserve the Compose hover workaround only while the callback's view
++	 * remains attached. Native and Java references protect reentrant removal. */
++	if (!failed && view && gtk_widget_get_root(widget) && wrapper->hover_x && wrapper->hover_y)
++		call_hover_callback(view, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
++	g_object_unref(wrapper);
++	(*env)->PopLocalFrame(env, NULL);
++	return ret;
++}
+@@ -341,3 +379,13 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	gboolean ret = (*env)->CallBooleanMethod(env, this, handle_cache.view.dispatchGenericMotionEvent, motion_event);
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++/* Captured input targets the view currently focused in the window. */
++static jobject new_mouse_event(JNIEnv *env, int source, int action, guint32 time,
++                               float x, float y, float raw_x, float raw_y,
++                               float scroll_x, float scroll_y, int buttons,
++                               int action_button, float relative_x, float relative_y)
++{
++	jmethodID constructor = (*env)->GetMethodID(env, handle_cache.motion_event.class,
++	    "<init>", "(IIJFFFFFFIIFF)V");
++	if (!constructor) return NULL;
++	return (*env)->NewObject(env, handle_cache.motion_event.class, constructor,
++	    source, action, (jlong)time, x, y, raw_x, raw_y, scroll_x, scroll_y,
++	    buttons, action_button, relative_x, relative_y);
++}
+@@ -345,3 +393,22 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	// HACK: replay last hover event to work around scrolling issues in composeUI apps
+-	if (wrapper->hover_x && wrapper->hover_y)
+-		call_hover_callback(this, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
++static void captured_event(GtkWidget *focused, int action, int buttons, int button,
++                           double dx, double dy, double raw_x, double raw_y,
++                           double scroll_x, double scroll_y, guint32 time, gpointer data)
++{
++	(void)data; (void)raw_x; (void)raw_y;
++	while (focused && !WRAPPER_IS_WIDGET(focused)) focused = gtk_widget_get_parent(focused);
++	if (!focused) return;
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return;
++	jobject view = (*env)->NewLocalRef(env, WRAPPER_WIDGET(focused)->jobj);
++	if (view) {
++		jobject event = new_mouse_event(env, 0x20004, action, time,
++		    dx, dy, dx, dy, scroll_x, scroll_y, buttons, button, dx, dy);
++		if (event) {
++			jmethodID dispatch = (*env)->GetMethodID(env, handle_cache.view.class,
++			    "dispatchCapturedPointerEvent", "(Landroid/view/MotionEvent;)Z");
++			if (dispatch) (*env)->CallBooleanMethod(env, view, dispatch, event);
++		}
++	}
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++}
+@@ -349 +416,134 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	return ret;
++static void collect_capture_views(GtkWidget *widget, GPtrArray *views)
++{
++	if (WRAPPER_IS_WIDGET(widget)) g_ptr_array_add(views, g_object_ref(widget));
++	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child))
++		collect_capture_views(child, views);
++}
++
++static void capture_changed(GtkWidget *root, gboolean captured, gpointer data)
++{
++	(void)data;
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return;
++	jmethodID dispatch = (*env)->GetMethodID(env, handle_cache.view.class,
++	    "dispatchPointerCaptureChanged", "(Z)V");
++	g_object_ref(root);
++	guint64 epoch = atl_pointer_capture_epoch(root);
++	GPtrArray *views = g_ptr_array_new_with_free_func(g_object_unref);
++	/* Snapshot before callbacks: a callback may detach/destroy descendants. */
++	collect_capture_views(root, views);
++	for (guint i = 0; dispatch && i < views->len; i++) {
++		if (atl_pointer_capture_epoch(root) != epoch) break;
++		WrapperWidget *wrapper = g_ptr_array_index(views, i);
++		jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
++		if (view) {
++			(*env)->CallVoidMethod(env, view, dispatch, (jboolean)captured);
++			(*env)->DeleteLocalRef(env, view);
++			if ((*env)->ExceptionCheck(env)) break;
++		}
++	}
++	g_ptr_array_unref(views);
++	g_object_unref(root);
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++}
++
++JNIEXPORT void JNICALL Java_android_view_View_nativeRequestPointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
++	/* Even if the server already released its implicit grab, an ordinary
++	 * Java touch sequence may still await its queued UP/CANCEL. Preserve
++	 * that stream before switching event ownership. */
++	if (pointer_indices && pointer_indices->len) return;
++	atl_pointer_capture_request(wrapper, captured_event, capture_changed, NULL, NULL);
++}
++JNIEXPORT void JNICALL Java_android_view_View_nativeReleasePointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	atl_pointer_capture_release(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
++}
++JNIEXPORT jboolean JNICALL Java_android_view_View_nativeHasPointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	return atl_pointer_capture_has(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
++}
++
++static int mouse_buttons(GdkModifierType state)
++{
++	return ((state & GDK_BUTTON1_MASK) ? 1 : 0)
++	     | ((state & GDK_BUTTON3_MASK) ? 2 : 0)
++	     | ((state & GDK_BUTTON2_MASK) ? 4 : 0);
++}
++
++static gboolean generic_mouse_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer data)
++{
++	(void)controller;
++	WrapperWidget *wrapper = data;
++	GdkEventType type = gdk_event_get_event_type(event);
++	if (type != GDK_MOTION_NOTIFY && type != GDK_BUTTON_PRESS && type != GDK_BUTTON_RELEASE) return FALSE;
++	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(controller));
++	if (type == GDK_MOTION_NOTIFY && phase != GTK_PHASE_BUBBLE) return FALSE;
++	if (type != GDK_MOTION_NOTIFY && phase != GTK_PHASE_CAPTURE) return FALSE;
++	GdkDevice *device = gdk_event_get_device(event);
++	if (!device || gdk_device_get_source(device) != GDK_SOURCE_MOUSE
++	    || gdk_event_get_pointer_emulated(event) || gdk_event_get_device_tool(event)) return FALSE;
++	if (atl_pointer_capture_has(GTK_WIDGET(wrapper))) return TRUE;
++	double raw_x, raw_y;
++	if (!gdk_event_get_position(event, &raw_x, &raw_y)) return FALSE;
++	double x = raw_x, y = raw_y;
++	transform_coords_to_widget_relative(GTK_WIDGET(wrapper), &x, &y);
++	int buttons = mouse_buttons(gdk_event_get_modifier_state(event));
++	int button = 0;
++	/* Ordinary mouse drag MOVE belongs to the touch path. Generic mouse
++	 * motion is hover; button transitions and scroll use the generic path. */
++	if (type == GDK_MOTION_NOTIFY && buttons) return FALSE;
++	int action = ACTION_HOVER_MOVE;
++	if (type != GDK_MOTION_NOTIFY) {
++		switch (gdk_button_event_get_button(event)) {
++		case 1: button = 1; break;
++		case 2: button = 4; break;
++		case 3: button = 2; break;
++		case 8: button = 8; break;
++		case 9: button = 16; break;
++		default: return FALSE;
++		}
++		if (type == GDK_BUTTON_PRESS) { buttons |= button; action = 11; }
++		else { buttons &= ~button; action = 12; }
++	}
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return FALSE;
++	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
++	jobject motion = new_mouse_event(env, 0x2002, action, gdk_event_get_time(event),
++	    x, y, raw_x, raw_y, 0, 0, buttons, button, 0, 0);
++	gboolean handled = FALSE;
++	if (view && motion) handled = (*env)->CallBooleanMethod(env, view, handle_cache.view.dispatchGenericMotionEvent, motion);
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++	/* Mouse DOWN/UP must also complete the ordinary touch sequence. */
++	return type == GDK_MOTION_NOTIFY ? handled : FALSE;
++}
++
++JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnGenericMotionListener(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
++	if (!g_object_get_data(G_OBJECT(wrapper), "atl-generic-mouse")) {
++		GtkEventController *controller = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
++		g_signal_connect(controller, "event", G_CALLBACK(generic_mouse_event), wrapper);
++		gtk_widget_add_controller(wrapper, controller);
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-mouse", controller);
++		/* Hover bubbles from the target, so an ancestor listener cannot
++		 * preempt the child's normal generic-pointer delivery. */
++		GtkEventController *hover = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(hover, GTK_PHASE_BUBBLE);
++		g_signal_connect(hover, "event", G_CALLBACK(generic_mouse_event), wrapper);
++		gtk_widget_add_controller(wrapper, hover);
++	}
++	if (!g_object_get_data(G_OBJECT(wrapper), "atl-generic-scroll")) {
++		GtkEventController *controller = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES);
++		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), WRAPPER_WIDGET(wrapper)->jobj);
++		gtk_widget_add_controller(wrapper, controller);
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-scroll", controller);
++	}
+@@ -631,0 +832 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env,
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-scroll", controller);
+diff --git a/src/api-impl/android/view/InputDevice.java b/src/api-impl/android/view/InputDevice.java
+index 535d3b1..66852a6 100644
+--- a/src/api-impl/android/view/InputDevice.java
++++ b/src/api-impl/android/view/InputDevice.java
+@@ -6,0 +7,4 @@ public class InputDevice {
++	public static final int SOURCE_CLASS_TRACKBALL = 0x00000004;
++	public static final int SOURCE_MOUSE = 0x00002002;
++	public static final int SOURCE_MOUSE_RELATIVE = 0x00020004;
++
+diff --git a/src/api-impl/android/view/MotionEvent.java b/src/api-impl/android/view/MotionEvent.java
+index e3aa0c8..836f6ef 100644
+--- a/src/api-impl/android/view/MotionEvent.java
++++ b/src/api-impl/android/view/MotionEvent.java
+@@ -1372,0 +1373,11 @@ public final class MotionEvent extends InputEvent {
++	public static final int AXIS_RELATIVE_X = 27;
++	public static final int AXIS_RELATIVE_Y = 28;
++	public static final int ACTION_BUTTON_PRESS = 11;
++	public static final int ACTION_BUTTON_RELEASE = 12;
++
++	private boolean mouseMetadata;
++	private int buttonState;
++	private int actionButton;
++	private float relativeX;
++	private float relativeY;
++
+@@ -1395,0 +1407,13 @@ public final class MotionEvent extends InputEvent {
++	/* Snapshot constructor used by the GTK/X11 mouse bridge. No native event
++	 * memory is retained by Java or by an event copied with obtain(). */
++	public MotionEvent(int source, int action, long eventTime, float x, float y,
++	                   float rawX, float rawY, float scrollX, float scrollY,
++	                   int buttonState, int actionButton, float relativeX, float relativeY) {
++		this(source, action, eventTime, x, y, rawX, rawY, scrollX, scrollY);
++		this.mouseMetadata = true;
++		this.buttonState = buttonState;
++		this.actionButton = actionButton;
++		this.relativeX = relativeX;
++		this.relativeY = relativeY;
++	}
++
+@@ -1428,0 +1453,4 @@ public final class MotionEvent extends InputEvent {
++		ev.source = 0;
++		ev.mouseMetadata = false;
++		ev.buttonState = ev.actionButton = 0;
++		ev.relativeX = ev.relativeY = ev.scroll_dx = ev.scroll_dy = 0;
+@@ -1668,0 +1697,7 @@ public final class MotionEvent extends InputEvent {
++		ev.mouseMetadata = other.mouseMetadata;
++		ev.buttonState = other.buttonState;
++		ev.actionButton = other.actionButton;
++		ev.relativeX = other.relativeX;
++		ev.relativeY = other.relativeY;
++		ev.scroll_dx = other.scroll_dx;
++		ev.scroll_dy = other.scroll_dy;
+@@ -1981,0 +2017,4 @@ public final class MotionEvent extends InputEvent {
++		if (axis == AXIS_X) return getX();
++		if (axis == AXIS_Y) return getY();
++		if (axis == AXIS_RELATIVE_X) return relativeX;
++		if (axis == AXIS_RELATIVE_Y) return relativeY;
+@@ -2024 +2063 @@ public final class MotionEvent extends InputEvent {
+-		return 0x1; // TOOL_TYPE_FINGER
++		return mouseMetadata ? TOOL_TYPE_MOUSE : TOOL_TYPE_FINGER; // GTK event tool
+@@ -2209,0 +2249 @@ public final class MotionEvent extends InputEvent {
++		if (pointerIndex == 0) return getAxisValue(axis);
+@@ -2271,0 +2312,2 @@ public final class MotionEvent extends InputEvent {
++	public final int getActionButton() { return actionButton; }
++
+@@ -2272,0 +2315 @@ public final class MotionEvent extends InputEvent {
++		if (mouseMetadata) return buttonState;
+diff --git a/src/api-impl/android/view/View.java b/src/api-impl/android/view/View.java
+index 8e9679a..50721d2 100644
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -699 +699,5 @@ public class View implements Drawable.Callback {
+-		// TODO
++		boolean onGenericMotion(View v, MotionEvent event);
++	}
++
++	public interface OnCapturedPointerListener {
++		boolean onCapturedPointer(View v, MotionEvent event);
+@@ -1509 +1513,32 @@ public class View implements Drawable.Callback {
+-	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {}
++	private OnGenericMotionListener on_generic_motion_listener;
++	private OnCapturedPointerListener on_captured_pointer_listener;
++
++	public void setOnGenericMotionListener(OnGenericMotionListener l) {
++		on_generic_motion_listener = l;
++		nativeSetOnGenericMotionListener(widget);
++	}
++	private native void nativeSetOnGenericMotionListener(long widget);
++
++	public void setOnCapturedPointerListener(OnCapturedPointerListener l) {
++		on_captured_pointer_listener = l;
++	}
++
++	public void requestPointerCapture() { nativeRequestPointerCapture(widget); }
++	public void releasePointerCapture() { nativeReleasePointerCapture(widget); }
++	public boolean hasPointerCapture() { return nativeHasPointerCapture(widget); }
++	private native void nativeRequestPointerCapture(long widget);
++	private native void nativeReleasePointerCapture(long widget);
++	private native boolean nativeHasPointerCapture(long widget);
++
++	public void onPointerCaptureChange(boolean hasCapture) {}
++	public void dispatchPointerCaptureChanged(boolean hasCapture) {
++		onPointerCaptureChange(hasCapture);
++	}
++
++	public boolean onCapturedPointerEvent(MotionEvent event) { return false; }
++	public boolean dispatchCapturedPointerEvent(MotionEvent event) {
++		if (!hasPointerCapture()) return false;
++		if (on_captured_pointer_listener != null
++		    && on_captured_pointer_listener.onCapturedPointer(this, event)) return true;
++		return onCapturedPointerEvent(event);
++	}
+@@ -1880,0 +1916,2 @@ public class View implements Drawable.Callback {
++		if (isEnabled() && on_generic_motion_listener != null
++		    && on_generic_motion_listener.onGenericMotion(this, event)) return true;

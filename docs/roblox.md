@@ -6,7 +6,8 @@ ART executes its Java/DEX splash activity, and the Android native-library
 loader loads the APK's ARM64 engine and completes `JNI_OnLoad` on Vinix.
 Roblox compatibility is still being implemented. HTTPS startup requests now
 pass certificate verification and layout inflation handles `<requestFocus />`.
-The latest launch aborts at the missing `View.OnCapturedPointerListener` API.
+The framework now supplies `View.OnCapturedPointerListener` and native mouse
+capture. The latest launch aborts at the missing `Display.getSupportedRefreshRates()` API.
 A usable Roblox screen, authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
@@ -82,6 +83,18 @@ native Vinix HTTPS fixture verifies a genuine Roblox CDN certificate chain and
 rejects a local self-signed certificate, with 121 default trusted issuers. The
 actual client now passes layout inflation: focus tags restore focus after
 child attachment and before `onFinishInflate`, without focusing hidden views.
-It then aborts at the missing `View.OnCapturedPointerListener` API.
+The captured-pointer listener and window-scoped capture APIs now supply owned
+relative motion and button events to the focused view. The real ARM64/Xvfb
+fixture checks relative motion beyond screen edges, button/wheel state, focus
+loss, reentrant release/reacquire and subsequent normal clicks. Native capture
+requires an active X11 window, XI2.1 and a mouse-only seat; unsupported seats and
+requests during an existing ordinary input stream safely retain normal input.
+Absolute-device recentering and actual Roblox camera input remain unverified.
+The production-framework Java event probe passes on Vinix's 16 KiB ART, and
+the desktop calculator still displays `579` after `123+456`, with zero retries.
+The launcher prevents GTK's GLX fallback with `GDK_DISABLE=glx`, preserving
+caller feature flags, so GTK can share ATL's EGL images. The latest real APK
+run passes the pointer class resolution and aborts at the missing
+`Display.getSupportedRefreshRates()` method before a usable client screen.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.

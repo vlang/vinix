@@ -142,6 +142,7 @@ class NativeLauncherTest(unittest.TestCase):
             self.assertEqual(env["VINIX_ALLOW_WX"], "1")
             self.assertEqual(env["DISPLAY"], ":1")
             self.assertEqual(env["GDK_BACKEND"], "x11")
+            self.assertEqual(env["GDK_DISABLE"], "glx")
             self.assertEqual(env["GSK_RENDERER"], "cairo")
             self.assertEqual(env["ICU_DATA"], str(self.runtime / "usr/share/icu/76.1"))
             self.assertEqual(env["ANDROID_APP_DATA_DIR"],
@@ -190,12 +191,13 @@ class NativeLauncherTest(unittest.TestCase):
         explicit = self.directory / "application data"
         result = self.launch(str(self.apk), ANDROID_APP_DATA_DIR=str(explicit),
                              XDG_DATA_HOME=str(data_home), DISPLAY=":17",
-                             XDG_DATA_DIRS="/caller/share")
+                             XDG_DATA_DIRS="/caller/share", GDK_DISABLE="dmabuf,threads")
         self.assertEqual(result.returncode, 0, result.stderr)
         env = self.executions()[-1]["environment"]
         self.assertEqual(env["ANDROID_APP_DATA_DIR"], str(explicit))
         self.assertTrue(explicit.is_dir())
         self.assertEqual(env["DISPLAY"], ":17")
+        self.assertEqual(env["GDK_DISABLE"], "dmabuf,threads,glx")
         self.assertEqual(env["XDG_DATA_DIRS"], str(self.runtime / "usr/share") + ":/caller/share")
 
     def test_helper_failure_stops_before_apk_execution(self) -> None:
