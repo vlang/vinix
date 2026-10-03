@@ -8,9 +8,10 @@ not needed for the Linux client.
 The native Linux client now renders its main menu inside a Vinix desktop
 window. In the verified run, mouse input opened the Hotkeys settings and
 closed them to return to the menu. A subsequent normal-launch run verified
-keyboard input by opening the engine console and typing commands. In-match
-controls, gameplay and online matches have not been verified. The game probe
-saves the actual guest framebuffer for inspection.
+keyboard input by opening the engine console and typing commands. Loading a
+local map then crashed, so gameplay is currently blocked. In-match controls
+and online matches have not been verified. The game probe saves the actual
+guest framebuffer for inspection.
 
 ![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
 
@@ -159,7 +160,7 @@ capture from the full game, including its menu artwork and 3D character.
 It was copied without image edits or overlays. Mouse clicks opened and closed
 the game's settings in that run. A later run opened the engine console with
 the backslash key and accepted typed console commands. This verifies those
-keyboard paths; in-match controls and a playable match remain untested.
+keyboard paths; the subsequent local-map attempt crashed before gameplay.
 
 The host export previously disconnected after 120 seconds without a request,
 which can occur during shader compilation. It now keeps a negotiated disk
@@ -195,6 +196,15 @@ Valve's anonymous engine mode. Keyboard input opened the actual console and
 typed commands, as recorded in `console-history-check.png`. The menu reported
 that it was searching for the Dota 2 game coordinator, so this is not an
 authenticated online-match result.
+
+After `sv_lan 1` and `map dota` were entered into the console, the local-map
+attempt exited with status 139 about 650 seconds into the run. No fault
+instruction address was captured, so the crash site remains unattributed
+pending a diagnostic run. The host exporter served 5,006,002,176 bytes across
+290,620 read requests with zero reported read errors. The last guest memory
+sample still had more than 5 GiB available and `VinixMemoryPressure: 0`.
+The completed harness report is therefore failed despite the separately
+verified menu and console input; gameplay is currently blocked by this crash.
 
 The tested artifacts are recorded below. The runtime value is its build-input
 generation fingerprint; the other values are SHA-256 hashes of the binaries.
@@ -242,7 +252,7 @@ not evidence that the game rendered.
 The earlier run's logs and separate visual review are under
 `build/dota2/game-ro-fixed-test`. The normal-launch run's captures and
 `visual-review.json` are under `build/dota2/game-normal-launch-test`;
-`results.json` is written there when the probe finishes. The keyboard proof
+`results.json` records its failed local-map attempt. The keyboard proof
 is `console-history-check.png`, with input actions in `interaction-log.jsonl`.
 The immutable kernel is under
 `build/dota2-virtio-ro/kernel-aarch64-smp`, its desktop is under
