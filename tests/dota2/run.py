@@ -45,6 +45,14 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def game_start_observed(transcript: bytes) -> bool:
+    # Kernel messages from another CPU can split the launcher's first echo.
+    # PID 1 emits ALIVE only after reading the saved game PID and kill -0
+    # succeeds, so that later heartbeat also proves the process was launched.
+    return any(marker in transcript for marker in (
+        b"VINIX-DOTA2-GAME-STARTED:", b"VINIX-DOTA2-GAME-ALIVE"))
+
+
 class ExportReads:
     """Record actual disk read failures without changing the NBD response."""
 
@@ -528,7 +536,7 @@ def main() -> None:
         "status": "failed" if failure else "captured_for_review",
         "guest_memory_mib": args.memory_mib,
         "failure": failure, "rendering_verified": False,
-        "game_started": b"VINIX-DOTA2-GAME-STARTED:" in transcript,
+        "game_started": game_start_observed(transcript),
         "anonymous_steam_initialized": b"initialized steam in anonymous user mode" in transcript,
         "game_exit_status": (int(match[1]) if (match := re.search(
             rb"VINIX-DOTA2-GAME-EXIT:\s*(\d+)", transcript)) else None),

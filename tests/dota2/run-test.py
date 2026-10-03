@@ -105,5 +105,20 @@ class ArgumentTests(unittest.TestCase):
                 self.assertFalse(work.exists())
 
 
+class LaunchEvidenceTests(unittest.TestCase):
+    def test_interleaved_launch_echo_with_later_live_pid(self):
+        # The actual startup fault capture had this split launch echo, then
+        # several successful PID checks before its SIGSEGV/exit status 139.
+        transcript = (b"VINIX-DOTexec: syscall handler entered\r\n"
+                      b"A2-GAME-STARELF auxval: base=0x44200000\r\n"
+                      b"TED: 28801\r\nVINIX-DOTA2-GAME-ALIVE\r\n"
+                      b"VINIX-DOTA2-GAME-EXIT: 139\r\n")
+        self.assertTrue(runner.game_start_observed(transcript))
+
+    def test_boot_and_window_alone_do_not_prove_game_launch(self):
+        self.assertFalse(runner.game_start_observed(
+            b"VINIX-DOTA2-PROBE-START\nVINIX-DOTA2-DESKTOP-STARTED\n"))
+
+
 if __name__ == "__main__":
     unittest.main()
