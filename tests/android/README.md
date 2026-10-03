@@ -295,6 +295,35 @@ the application. The guest requires zero exit status plus `ANDROID-EGL-PASS`;
 results record the executable hash and verdict. This checks the rendering
 dependency path, and does not establish that Roblox draws or accepts input.
 
+## Disabled Autofill preflight
+
+`--autofill-probe /path/to/android-autofill-probe.apk` runs
+[AndroidAutofillProbe.java](AndroidAutofillProbe.java) through the normal ATL
+application loader with the production typed system service. The fixture checks
+that the platform reports no Autofill feature, focuses a real EditText, and calls
+`cancel()`, `requestAutofill(View)` and `notifyValueChanged(View)` repeatedly on
+the main thread and a worker without a Looper. A later main Handler callback
+checks that input text is preserved and the feature remains disabled.
+
+Build the fixture on the native framework host with the coherent production
+class archive and resource APK:
+
+```sh
+python3 tests/android/autofill-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
+    --core-classes /path/to/core-all_classes.jar --r8 /path/to/r8-8.3.37.jar \
+    --output /tmp/android-autofill-probe
+```
+
+The helper pins the core and R8 inputs and packages only fixture classes in the
+normal APK. It adds no framework providers. The guest runs this preflight on
+private display `:94` before starting the application and requires the actual
+APK child to exit zero plus an anchored `ANDROID-AUTOFILL-PASS` marker. Results
+record the fixture hash and preflight verdict separately from application
+functionality. This verifies Android's no-service behavior; an enabled Autofill
+service and Roblox gameplay require separate support and checks.
+
 ## Pointer capture preflights
 
 `--pointer-probe /path/to/android-pointer-capture-probe.jar` runs

@@ -46,7 +46,8 @@ class InteractiveTest(unittest.TestCase):
             timeout=0, screenshot=self.root / "session/application.png",
             runtime_arg=[], split_apk=[], split_apk_sha256=[],
             boot_probe=None, loader_probe=None, linker_diagnostics=False,
-            tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, cookie_probe=None, split_probe=None, egl_probe=None,
+            tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, cookie_probe=None,
+            autofill_probe=None, split_probe=None, egl_probe=None,
         )
         self.args.state_dir.mkdir()
 
@@ -97,6 +98,28 @@ class InteractiveTest(unittest.TestCase):
         self.assertIsNone(result["passed"])
         self.assertEqual(result["functionality"], "unchecked")
         self.assertIn("before observing a window", result["failure"])
+
+    def test_optional_autofill_requires_its_verified_preflight(self):
+        self.args.autofill_probe = self.args.apk
+        self.args.autofill_probe_sha256 = "fixture identity"
+        status, result, _output = self.run_session(
+            b"ANDROID-READY\nANDROID-OBSERVED seconds=30 functionality=unchecked\n"
+            b"diagnostic ANDROID-AUTOFILL-VERIFIED was not reached\n")
+        self.assertEqual(status, 1)
+        self.assertFalse(result["observed"])
+        self.assertFalse(result["autofill_probe_passed"])
+        self.assertIn("autofill probe did not pass", result["failure"])
+
+    def test_optional_autofill_preserves_unchecked_gameplay(self):
+        self.args.autofill_probe = self.args.apk
+        self.args.autofill_probe_sha256 = "fixture identity"
+        status, result, _output = self.run_session(
+            b"ANDROID-AUTOFILL-VERIFIED\r\r\nANDROID-READY\n")
+        self.assertEqual(status, 0)
+        self.assertTrue(result["autofill_probe_passed"])
+        self.assertEqual(result["autofill_probe_sha256"], "fixture identity")
+        self.assertIsNone(result["passed"])
+        self.assertEqual(result["functionality"], "unchecked")
 
     def test_interactive_launch_requests_visible_cocoa(self):
         class ExecIntercept(Exception):

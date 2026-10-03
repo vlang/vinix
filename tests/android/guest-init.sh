@@ -265,6 +265,31 @@ if [ -n "${TEST_SPLIT_PROBE:-}" ]; then
         || fail "configuration split fixture did not run its positive and rejection cases"
     echo ANDROID-SPLIT-VERIFIED
 fi
+if [ -n "${TEST_AUTOFILL_PROBE:-}" ]; then
+    echo ANDROID-AUTOFILL-START
+    rm -f /tmp/android-autofill-status
+    mkfifo /tmp/android-autofill-events
+    (while :; do sleep 30; done) >/tmp/android-autofill-events &
+    autofill_input_pid=$!
+    /usr/bin/vinix-wine-host :94 /tmp/android-autofill-probe 128x128x24 \
+        /opt/android-test/autofill-launch --fill \
+        </tmp/android-autofill-events >/tmp/android-autofill-probe.log 2>&1 || {
+        kill "$autofill_input_pid" 2>/dev/null || true
+        wait "$autofill_input_pid" 2>/dev/null || true
+        rm -f /tmp/android-autofill-events
+        cat /tmp/android-autofill-probe.log
+        fail "native framework disabled autofill probe failed"
+    }
+    kill "$autofill_input_pid" 2>/dev/null || true
+    wait "$autofill_input_pid" 2>/dev/null || true
+    rm -f /tmp/android-autofill-events
+    cat /tmp/android-autofill-probe.log
+    [ "$(cat /tmp/android-autofill-status 2>/dev/null)" = 0 ] \
+        || fail "native framework disabled autofill probe did not exit successfully"
+    grep -q '^ANDROID-AUTOFILL-PASS ' /tmp/android-autofill-probe.log \
+        || fail "native framework disabled autofill probe did not report its assertions passing"
+    echo ANDROID-AUTOFILL-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64

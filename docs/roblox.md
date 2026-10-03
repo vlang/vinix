@@ -18,9 +18,11 @@ configuration APKs. The current release draws Roblox's welcome screen with
 Direct and desktop ATL runs have kept that screen drawing for 60 seconds.
 The desktop uses Xvfb-glx for Roblox: the lean server crashes while drawing
 the welcome screen, including when MIT-SHM is disabled. Maximizing the
-window and opening Sign In work. Activating the username field currently
-hits a missing `AutofillManager.cancel()` API. Authentication and gameplay
-remain unverified.
+window and opening Sign In work. The autofill APIs used by Roblox now follow
+Android's behavior when no service is available; a normal fixture verifies
+focus, all three APIs and input preservation on Vinix. The real username-field
+interaction still exits and is under investigation. Authentication and
+gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
 then stage the Roblox launchers and include both layers in the desktop:

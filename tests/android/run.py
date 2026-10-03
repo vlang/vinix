@@ -305,6 +305,9 @@ def prepare(args: argparse.Namespace) -> Path | None:
     if args.cookie_probe:
         shutil.copy2(args.cookie_probe, test / "android-cookie-probe.apk")
         args.cookie_probe_sha256 = hashlib.sha256((test / "android-cookie-probe.apk").read_bytes()).hexdigest()
+    if args.autofill_probe:
+        shutil.copy2(args.autofill_probe, test / "android-autofill-probe.apk")
+        args.autofill_probe_sha256 = hashlib.sha256((test / "android-autofill-probe.apk").read_bytes()).hexdigest()
     if args.split_probe:
         args.split_probe_sha256 = prepare_split_probe(args.split_probe, test / "split-probe")
     if args.egl_probe:
@@ -330,6 +333,7 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_POINTER_PROBE": "/opt/android-test/android-pointer-capture-probe.jar" if args.pointer_probe else "",
         "TEST_LIFECYCLE_PROBE": "/opt/android-test/android-activity-lifecycle-probe.apk" if args.lifecycle_probe else "",
         "TEST_COOKIE_PROBE": "/opt/android-test/android-cookie-probe.apk" if args.cookie_probe else "",
+        "TEST_AUTOFILL_PROBE": "/opt/android-test/android-autofill-probe.apk" if args.autofill_probe else "",
         "TEST_SPLIT_PROBE": "/opt/android-test/split-probe" if args.split_probe else "",
         "TEST_EGL_PROBE": "/opt/android-test/egl-interop-test" if args.egl_probe else "",
         "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
@@ -364,6 +368,15 @@ def prepare(args: argparse.Namespace) -> Path | None:
                 f'cookie_status=$?\nprintf \'%s\\n\' "$cookie_status" >/tmp/android-{phase}-status\n'
                 'exit "$cookie_status"\n')
             launcher.chmod(0o755)
+    if args.autofill_probe:
+        launcher = test / "autofill-launch"
+        launcher.write_text(
+            "#!/bin/sh\n. /opt/android-test/config.sh\n"
+            '/usr/bin/run-android "$TEST_AUTOFILL_PROBE" '
+            "-l 'org/vinix/tests/AndroidAutofillProbe$BootstrapActivity' -w 128 -h 128\n"
+            'autofill_status=$?\nprintf \'%s\\n\' "$autofill_status" >/tmp/android-autofill-status\n'
+            'exit "$autofill_status"\n')
+        launcher.chmod(0o755)
     if args.egl_probe:
         launcher = test / "egl-launch"
         launcher.write_text(
@@ -686,6 +699,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     pointer_probe_passed = None
     lifecycle_probe_passed = None
     cookie_probe_passed = None
+    autofill_probe_passed = None
     split_probe_passed = None
     egl_probe_passed = None
     guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
@@ -742,6 +756,13 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if passed or observed:
                 failure = "native framework cookie probe did not pass"
             passed = observed = False
+    if args.autofill_probe:
+        autofill_probe_passed = any(line == b"ANDROID-AUTOFILL-VERIFIED"
+                                   for line in bytes(transcript).replace(b"\r", b"").splitlines())
+        if not autofill_probe_passed:
+            if passed or observed:
+                failure = "native framework disabled autofill probe did not pass"
+            passed = observed = False
     if args.split_probe:
         split_probe_passed = b"ANDROID-SPLIT-VERIFIED" in transcript
         if not split_probe_passed:
@@ -776,6 +797,9 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "cookie_probe": str(args.cookie_probe) if args.cookie_probe else None,
               "cookie_probe_sha256": args.cookie_probe_sha256 if args.cookie_probe else None,
               "cookie_probe_passed": cookie_probe_passed,
+              "autofill_probe": str(args.autofill_probe) if args.autofill_probe else None,
+              "autofill_probe_sha256": args.autofill_probe_sha256 if args.autofill_probe else None,
+              "autofill_probe_passed": autofill_probe_passed,
               "split_probe": str(args.split_probe) if args.split_probe else None,
               "split_probe_sha256": args.split_probe_sha256 if args.split_probe else None,
               "split_probe_passed": split_probe_passed,
@@ -839,6 +863,8 @@ def main() -> int:
                         help="lifecycle fixture APK; require production activity and fragment ordering assertions through ATL's real application bootstrap")
     parser.add_argument("--cookie-probe", type=Path,
                         help="cookie fixture APK; require production cookie storage and caller-Looper callback assertions")
+    parser.add_argument("--autofill-probe", type=Path,
+                        help="autofill fixture APK; require disabled production service, input preservation and main/worker API assertions")
     parser.add_argument("--split-probe", type=Path,
                         help="split fixture directory; require base metadata, split assets/JNI and explicit invalid archive rejection")
     parser.add_argument("--egl-probe", type=Path,
@@ -908,6 +934,8 @@ def main() -> int:
         parser.error("--lifecycle-probe requires a native aarch64 runtime")
     if args.cookie_probe and args.runtime_arch != "aarch64":
         parser.error("--cookie-probe requires a native aarch64 runtime")
+    if args.autofill_probe and args.runtime_arch != "aarch64":
+        parser.error("--autofill-probe requires a native aarch64 runtime")
     if args.split_probe and args.runtime_arch != "aarch64":
         parser.error("--split-probe requires a native aarch64 runtime")
     if args.split_apk and args.runtime_arch != "aarch64":
@@ -936,6 +964,7 @@ def main() -> int:
     args.pointer_probe = args.pointer_probe.resolve() if args.pointer_probe else None
     args.lifecycle_probe = args.lifecycle_probe.resolve() if args.lifecycle_probe else None
     args.cookie_probe = args.cookie_probe.resolve() if args.cookie_probe else None
+    args.autofill_probe = args.autofill_probe.resolve() if args.autofill_probe else None
     args.split_probe = args.split_probe.resolve() if args.split_probe else None
     args.egl_probe = args.egl_probe.resolve() if args.egl_probe else None
     args.tls_probe = args.tls_probe.resolve() if args.tls_probe else None
@@ -959,6 +988,8 @@ def main() -> int:
         raise SystemExit(f"Missing native framework activity lifecycle probe: {args.lifecycle_probe}")
     if args.cookie_probe and not args.cookie_probe.is_file():
         raise SystemExit(f"Missing native framework cookie probe: {args.cookie_probe}")
+    if args.autofill_probe and not args.autofill_probe.is_file():
+        raise SystemExit(f"Missing native framework disabled autofill probe: {args.autofill_probe}")
     if args.split_probe:
         for name in ("android-split-probe.apk", "config.arm64_v8a.apk", "test-cases.json"):
             if not (args.split_probe / name).is_file():

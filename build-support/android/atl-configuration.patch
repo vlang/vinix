@@ -2566,3 +2566,30 @@ diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/andro
  		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
  		fprintf(stderr, "error: failed to initialize application package\n");
  		exit(1);
+--- a/src/api-impl/android/view/autofill/AutofillManager.java
++++ b/src/api-impl/android/view/autofill/AutofillManager.java
+@@ -1,4 +1,6 @@
+ package android.view.autofill;
++
++import android.view.View;
+ 
+ public class AutofillManager {
+ 
+@@ -6,6 +8,17 @@
+ 
+ 	public interface AutofillClient {}
+ 
++	/** Cancel the current context; ATL has no autofill service or session. */
++	public void cancel() {
++		// Android also returns silently when no autofill service is available.
++	}
++
++	/** There is no enabled service to receive an autofill request. */
++	public void requestAutofill(View view) {}
++
++	/** There is no enabled service to receive a value change. */
++	public void notifyValueChanged(View view) {}
++
+ 	public void registerCallback(AutofillCallback callback) {}
+ 
+ 	public void unregisterCallback(AutofillCallback callback) {}
