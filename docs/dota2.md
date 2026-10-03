@@ -136,6 +136,32 @@ and unaligned operands retain their errors; write-only secondary memory
 remains supported. This verifies the focused translator fix, without
 certifying the separate full futex contract or changing the game-test kernel.
 
+## Host GPU on KekVM (experimental; has crashed the Mac)
+
+On KekVM's GPU-enabled QEMU (`run-aarch64.sh --venus`), the translated game
+can render on the Mac's GPU through Mesa's Venus driver. The native ARM64
+Venus driver cannot load into the x86-64 process. The runtime therefore
+stages an x86-64 build ([`build-support/dota2/venus`](../build-support/dota2/venus/README.md)),
+and the translator passes the virtio-gpu ioctls through
+([`drm-passthrough.patch`](../build-support/dota2/qemu/README.md)). `run-dota2`
+selects it when the native `venus-available` probe finds a Venus GPU. Pass
+`--venus` to `tests/dota2/run.py` or `tests/dota2/vulkan-run.py` to test it.
+
+On Vinix in KekVM, translated `vulkaninfo` reports
+`Virtio-GPU Venus (Apple M5 Max)`, vkcube renders, and Dota draws its startup
+logo and main menu on the host GPU at roughly 5 to 10 frames per second, against
+seconds to minutes per frame with Lavapipe. Dota maps more Vulkan memory than
+QEMU/Hypervisor.framework has memory slots for when every blob is mapped at
+creation; QEMU then aborts with `No free slots`. A kernel that maps blobs on
+first use is needed (being reviewed separately).
+
+**Caution:** both Dota runs that got past the menu on the host GPU were
+followed by a restart of the Mac. The first was a macOS watchdog panic,
+"userspace watchdog timeout: no successful checkins from WindowServer ... in
+137 seconds", raised two minutes after QEMU lost its WindowServer connection.
+Dota's Vulkan work through KosmicKrisp and Metal most likely stalled the host
+GPU. Do not run Dota on the host GPU until that is understood.
+
 ## Reuse an existing installation without another full data copy
 
 Steam's macOS installation supplies the common assets, but its executable is
