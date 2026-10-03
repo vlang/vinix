@@ -101,10 +101,21 @@ class StageTests(unittest.TestCase):
             library = self.base / "lavapipe/libvulkan_lvp.so"
             self.write(library, b"patched Lavapipe")
             return library
+        self.venus_bases = []
+        def build_venus(base, work):
+            self.venus_bases.append((base / "lib/x86_64-linux-gnu/libc.so.6").read_bytes())
+            self.assertEqual(work, (self.build / "venus").resolve())
+            library, manifest = self.base / "venus/libvulkan_virtio.so", self.base / "venus/virtio_icd.json"
+            self.write(library, b"x86-64 Venus")
+            self.write(manifest, json.dumps({"file_format_version": "1.0.0", "ICD": {
+                "library_path": "/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so",
+                "api_version": "1.3.305"}}).encode())
+            return library, manifest
         arguments = [str(stage.__file__), "--steam-build", str(self.steam), "--build", str(self.build), *extra]
         with patch.object(sys, "argv", arguments), patch.object(stage, "load_glibc_pin", return_value=self.pin), \
                 patch.object(stage.subprocess, "run", side_effect=compile_library), \
                 patch.object(stage, "build_lavapipe", side_effect=build_lavapipe), \
+                patch.object(stage, "build_venus", side_effect=build_venus), \
                 patch.object(stage.sys, "platform", "linux"), redirect_stdout(io.StringIO()):
             stage.main()
         self.assertEqual(stage.package_files(self.source), self.before)
@@ -216,6 +227,28 @@ class StageTests(unittest.TestCase):
                 self.assertRaisesRegex(SystemExit, "pinned to 22.3.6-1\\+deb12u3"):
             self.run_stage()
         self.assertFalse(self.root.exists())
+
+    def test_venus_is_staged_for_the_guest_root_with_bookworm_libc(self):
+        self.run_stage()
+        self.assertEqual(self.venus_bases, [b"old libc.so.6"])
+        self.assertEqual((self.root / stage.VENUS_LIBRARY).read_bytes(), b"x86-64 Venus")
+        icd = json.loads((self.root / stage.VENUS_ICD).read_text())
+        self.assertEqual(icd["ICD"]["library_path"],
+                         "/usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so")
+        self.assertTrue(stage.venus_valid(self.root, stage.venus_inputs()))
+
+    def test_replaced_venus_is_not_a_cache_hit(self):
+        self.run_stage()
+        (self.root / stage.VENUS_LIBRARY).write_bytes(b"other driver")
+        self.assertFalse(stage.venus_valid(self.root, stage.venus_inputs()))
+        self.run_stage()
+        self.assertEqual((self.root / stage.VENUS_LIBRARY).read_bytes(), b"x86-64 Venus")
+
+    def test_option_omits_venus(self):
+        self.run_stage(["--no-venus"])
+        self.assertEqual(self.venus_bases, [])
+        self.assertFalse((self.root / stage.VENUS_LIBRARY).exists())
+        self.assertFalse((self.root / stage.VENUS_ICD).exists())
 
     def test_corrupt_cached_package_fails_before_cloning_payload_into_root(self):
         spec = importlib.util.spec_from_file_location("test_debian_root", REPO / "build-support/debian-root.py")

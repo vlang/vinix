@@ -26,14 +26,25 @@ export VINIX_ALLOW_WX=1
 # with the SSE4 baseline used by Valve's current binaries.
 export QEMU_CPU=Haswell
 export LP_NUM_THREADS=2
-export VK_ICD_FILENAMES="$root/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+if [ "$(cat /etc/vinix-dota2-vulkan-driver 2>/dev/null)" = venus ]; then
+    # Host GPU through Vinix's virtio-gpu render node on KekVM.
+    export VK_ICD_FILENAMES="$root/usr/share/vulkan/icd.d/virtio_icd.x86_64.json"
+    if [ -x /opt/venus/bin/venus-available ]; then
+        /opt/venus/bin/venus-available && echo VINIX-DOTA2-VENUS-NATIVE-READY ||
+            echo VINIX-DOTA2-VENUS-NATIVE-UNAVAILABLE
+    fi
+    # Report Venus initialisation and any ioctl the translator cannot pass.
+    export VN_DEBUG=init,result QEMU_LOG=unimp
+else
+    export VK_ICD_FILENAMES="$root/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+fi
 export MESA_SHADER_CACHE_DISABLE=true
 "$root/usr/bin/vulkaninfo" --summary >/tmp/vulkaninfo.log 2>&1 || {
     cat /tmp/vulkaninfo.log /tmp/xvfb.log
     exit 1
 }
 cat /tmp/vulkaninfo.log
-grep -q llvmpipe /tmp/vulkaninfo.log
+grep -q -E 'llvmpipe|Venus' /tmp/vulkaninfo.log
 echo VINIX-DOTA2-VULKAN-ENUMERATE-PASS
 
 "$root/usr/bin/vkcube" --width 320 --height 240 --c 3000 >/tmp/vkcube.log 2>&1 &

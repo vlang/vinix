@@ -14,6 +14,8 @@ if [ "${1:-}" = --help ]; then
     echo 'VINIX_DOTA2_ROOT selects its private glibc runtime.'
     echo "VINIX_DOTA2_STEAMCLIENT selects Steam's Linux64 steamclient.so."
     echo 'VINIX_DOTA2_ASSERTS=1 enables Valve assertions (default: -noassert).'
+    echo 'Vulkan uses the host GPU through Venus on KekVM, otherwise Lavapipe;'
+    echo 'VK_ICD_FILENAMES selects a driver explicitly.'
     exit 0
 fi
 
@@ -67,16 +69,24 @@ done
 
 # Native AArch64 ICDs cannot be loaded into this translated glibc process.
 # An explicit caller selection takes priority, including an intentionally
-# empty selection. Otherwise use only the staged amd64 software Vulkan driver.
+# empty selection. Otherwise use the staged amd64 Venus driver when the
+# native probe finds KekVM's Venus GPU, and the software driver elsewhere.
 software_vulkan=0
 if [ "${VK_DRIVER_FILES+x}" != x ] && [ "${VK_ICD_FILENAMES+x}" != x ] &&
    [ "${VK_LOADER_DRIVERS_SELECT+x}" != x ]; then
-    icd="$runtime/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
-    [ -s "$icd" ] || fail "the x86-64 Lavapipe ICD is missing: $icd"
-    [ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so" ] ||
-        fail "the x86-64 Lavapipe driver is missing from $runtime"
-    export VK_ICD_FILENAMES="$icd"
-    software_vulkan=1
+    venus_icd="$runtime/usr/share/vulkan/icd.d/virtio_icd.x86_64.json"
+    venus_probe="${VINIX_DOTA2_VENUS_PROBE:-/opt/venus/bin/venus-available}"
+    if [ -s "$venus_icd" ] && [ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan_virtio.so" ] &&
+       [ -x "$venus_probe" ] && "$venus_probe"; then
+        export VK_ICD_FILENAMES="$venus_icd"
+    else
+        icd="$runtime/usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
+        [ -s "$icd" ] || fail "the x86-64 Lavapipe ICD is missing: $icd"
+        [ -e "$runtime/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so" ] ||
+            fail "the x86-64 Lavapipe driver is missing from $runtime"
+        export VK_ICD_FILENAMES="$icd"
+        software_vulkan=1
+    fi
 fi
 
 export VINIX_I386_ROOT="$runtime"

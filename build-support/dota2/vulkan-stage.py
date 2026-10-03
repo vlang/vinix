@@ -32,6 +32,10 @@ EARLY_CLIENT_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared"
 MESA_BUILDER = REPO / "build-support/dota2/mesa-build.py"
 LAVAPIPE_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
 LAVAPIPE_MARKER = ".vinix-dota2-lavapipe.json"
+VENUS_BUILDER = REPO / "build-support/dota2/venus-build.py"
+VENUS_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_virtio.so"
+VENUS_ICD = "usr/share/vulkan/icd.d/virtio_icd.x86_64.json"
+VENUS_MARKER = ".vinix-dota2-venus.json"
 
 
 def clone_tree(source: Path, destination: Path) -> None:
@@ -208,6 +212,49 @@ def lavapipe_valid(root: Path, expected: dict) -> bool:
         return False
 
 
+def load_venus_builder():
+    spec = importlib.util.spec_from_file_location("vinix_dota2_venus_build", VENUS_BUILDER)
+    builder = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = builder
+    spec.loader.exec_module(builder)
+    return builder
+
+
+def venus_inputs() -> dict:
+    builder = load_venus_builder()
+    return {"version": builder.VERSION, "source": builder.SOURCE_SHA256,
+            "builder": file_sha256(VENUS_BUILDER),
+            "patches": {patch.name: file_sha256(patch) for patch in builder.PATCHES}}
+
+
+def build_venus(base: Path, work: Path) -> tuple[Path, Path]:
+    return load_venus_builder().build(base, work)
+
+
+def stage_venus(root: Path, work: Path, guest_root: str, expected: dict) -> None:
+    # The translated game cannot load the native ARM64 Venus driver. Its own
+    # x86-64 build reaches the host GPU through Vinix's virtio-gpu node on
+    # KekVM; run-dota2 selects it only when that GPU is present.
+    library, manifest = build_venus(root, work)
+    destination = root / VENUS_LIBRARY
+    shutil.copy2(library, destination)
+    destination.chmod(0o644)
+    data = json.loads(manifest.read_text())
+    data["ICD"]["library_path"] = guest_root.rstrip("/") + "/" + VENUS_LIBRARY
+    (root / VENUS_ICD).write_text(json.dumps(data, indent=2) + "\n")
+    marker = {"inputs": expected, "sha256": file_sha256(destination)}
+    (root / VENUS_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+
+
+def venus_valid(root: Path, expected: dict) -> bool:
+    try:
+        marker = json.loads((root / VENUS_MARKER).read_text())
+        return (marker["inputs"] == expected and (root / VENUS_ICD).is_file() and
+                file_sha256(root / VENUS_LIBRARY) == marker["sha256"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--steam-build", type=Path, default=REPO / "build-aarch64-steam")
@@ -221,6 +268,8 @@ def main() -> None:
                         help="retain Steam's original libc for baseline reproductions")
     parser.add_argument("--debian-lavapipe", action="store_true",
                         help="retain Debian's unpatched Lavapipe for baseline reproductions")
+    parser.add_argument("--no-venus", action="store_true",
+                        help="omit the x86-64 Venus driver for KekVM's GPU")
     args = parser.parse_args()
     steam = args.steam_build.resolve()
     build = args.build.resolve()
@@ -254,12 +303,14 @@ def main() -> None:
              "sha256": p.sha256} for p in selected]
     glibc_pin = None if args.keep_steam_libc else load_glibc_pin()
     lavapipe = None if args.debian_lavapipe else lavapipe_inputs()
+    venus = None if args.no_venus else venus_inputs()
     inputs = {"format": 5, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "builder_sha256": file_sha256(Path(__file__)),
               "glibc_package": glibc_pin,
               "glibc_alias_policy": GLIBC_ALIAS_POLICY,
               "lavapipe": lavapipe,
+              "venus": venus,
               "amd64": manifest.read_text(),
               "i386": (steam / "i386-packages").read_text(),
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
@@ -281,7 +332,8 @@ def main() -> None:
     if (stamp.exists() and stamp.read_text().strip() == generation and
             all((root / p).exists() for p in required) and
             (glibc_pin is None or glibc_package_valid(root, glibc_pin)) and
-            (lavapipe is None or lavapipe_valid(root, lavapipe))):
+            (lavapipe is None or lavapipe_valid(root, lavapipe)) and
+            (venus is None or venus_valid(root, venus))):
         print(root)
         return
     pending = root.with_name(root.name + f".vulkan-stage-{os.getpid()}")
@@ -291,9 +343,11 @@ def main() -> None:
     for package in selected:
         archive = resolver.download(args.mirror, package, cache)
         resolver.extract_deb(archive, pending)
+    # Both drivers link against Bookworm's libc, before Dota's newer libc replaces it.
     if lavapipe is not None:
-        # Link against Bookworm's libc, before Dota's newer libc replaces it.
         stage_lavapipe(selected, pending, build / "mesa", lavapipe)
+    if venus is not None:
+        stage_venus(pending, build / "venus", args.guest_root, venus)
     if glibc_pin is not None:
         stage_glibc_package(resolver, glibc_pin, cache, pending)
     # Resolve libc symbols only inside the translated process. No native
@@ -318,6 +372,8 @@ def main() -> None:
         raise SystemExit("staged Dota libc6 package or loader aliases do not match the pin")
     if lavapipe is not None and not lavapipe_valid(pending, lavapipe):
         raise SystemExit("staged Lavapipe does not match its patched build")
+    if venus is not None and not venus_valid(pending, venus):
+        raise SystemExit("staged Venus driver does not match its build")
     (pending / stamp.name).write_text(generation + "\n")
     if root.exists():
         old = root.with_name(root.name + f".vulkan-old-{os.getpid()}")

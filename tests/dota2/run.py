@@ -432,6 +432,8 @@ def main() -> None:
     parser.add_argument("--memory-mib", type=int, default=8192,
                         help="Guest RAM in MiB; translated software rendering can need more than 8 GiB")
     parser.add_argument("--capture-interval", type=int, default=60)
+    parser.add_argument("--venus", action="store_true",
+                        help="boot on KekVM's GPU so the game can render with the x86-64 Venus driver")
     parser.add_argument("--prepare-only", action="store_true")
     args = parser.parse_args()
     if args.timeout <= 0 or args.capture_interval <= 0 or args.memory_mib <= 0:
@@ -478,8 +480,9 @@ def main() -> None:
                 environment.update(VINIX_OVMF_CODE=str(firmware), VINIX_QEMU_RESOLUTION="2048x1536x32")
             if platform.system() != "Darwin":
                 environment.setdefault("USE_TCG", "1")
-            command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial",
-                       f"--mem={args.memory_mib}"]
+            # KekVM's GPU needs a GL display; its serial console still uses stdio.
+            command = [str(REPO / "run-aarch64.sh"), "--no-build",
+                       "--venus" if args.venus else "--serial", f"--mem={args.memory_mib}"]
             print(f"Real game probe artifacts: {work}; read-only game disk: {uri}", flush=True)
             pid, master = pty.fork()
             if pid == 0:
@@ -534,7 +537,7 @@ def main() -> None:
             thread.join()
     report = {
         "status": "failed" if failure else "captured_for_review",
-        "guest_memory_mib": args.memory_mib,
+        "guest_memory_mib": args.memory_mib, "gpu": "venus" if args.venus else "software",
         "failure": failure, "rendering_verified": False,
         "game_started": game_start_observed(transcript),
         "anonymous_steam_initialized": b"initialized steam in anonymous user mode" in transcript,

@@ -69,7 +69,7 @@ class LauncherTest(unittest.TestCase):
             "VINIX_DOTA2_WIDTH", "VINIX_DOTA2_HEIGHT", "VINIX_X86_64_GUEST_BASE",
             "VINIX_DOTA2_ROOT", "SDL_VIDEO_DRIVER", "VINIX_DOTA_TEST_STATUS",
             "VINIX_DOTA2_STEAMCLIENT", "VINIX_DOTA2_EARLY_STEAMCLIENT",
-            "VINIX_DOTA2_ASSERTS",
+            "VINIX_DOTA2_ASSERTS", "VINIX_DOTA2_VENUS_PROBE",
         ):
             self.env.pop(key, None)
         self.env.update(
@@ -79,6 +79,8 @@ class LauncherTest(unittest.TestCase):
             VINIX_STEAM_ROOT=str(self.runtime),
             VINIX_X86_64_EMULATOR=str(self.emulator),
             VINIX_DOTA_TEST_LOG=str(self.output),
+            # A host's own /opt/venus must not change the default selection.
+            VINIX_DOTA2_VENUS_PROBE=str(self.base / "no venus probe"),
         )
 
     def run_launcher(self, *arguments):
@@ -175,6 +177,35 @@ class LauncherTest(unittest.TestCase):
         launch = self.run_launcher()
         self.assertEqual(launch["env"]["VK_DRIVER_FILES"], "")
         self.assertNotIn("VK_ICD_FILENAMES", launch["env"])
+        self.assertNotIn("-vulkan_allow_cpu", launch["args"])
+
+    def stage_venus(self, probe_status):
+        venus_icd = self.runtime / "usr/share/vulkan/icd.d/virtio_icd.x86_64.json"
+        venus_icd.write_text("fixture\n")
+        (self.runtime / "usr/lib/x86_64-linux-gnu/libvulkan_virtio.so").write_text("fixture\n")
+        probe = self.base / "venus-available"
+        probe.write_text(f"#!/bin/sh\nexit {probe_status}\n")
+        probe.chmod(0o755)
+        self.env["VINIX_DOTA2_VENUS_PROBE"] = str(probe)
+        return venus_icd
+
+    def test_venus_gpu_is_selected_when_the_probe_finds_it(self):
+        venus_icd = self.stage_venus(0)
+        launch = self.run_launcher()
+        self.assertEqual(launch["env"]["VK_ICD_FILENAMES"], str(venus_icd))
+        self.assertNotIn("-vulkan_allow_cpu", launch["args"])
+
+    def test_lavapipe_is_kept_without_a_venus_gpu(self):
+        self.stage_venus(1)
+        launch = self.run_launcher()
+        self.assertEqual(launch["env"]["VK_ICD_FILENAMES"], str(self.icd))
+        self.assertIn("-vulkan_allow_cpu", launch["args"])
+
+    def test_explicit_selection_overrides_a_venus_gpu(self):
+        self.stage_venus(0)
+        self.env["VK_ICD_FILENAMES"] = str(self.icd)
+        launch = self.run_launcher()
+        self.assertEqual(launch["env"]["VK_ICD_FILENAMES"], str(self.icd))
         self.assertNotIn("-vulkan_allow_cpu", launch["args"])
 
     def test_dedicated_runtime_override_takes_priority(self):

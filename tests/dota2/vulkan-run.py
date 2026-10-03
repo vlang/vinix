@@ -197,12 +197,16 @@ def main() -> None:
     parser.add_argument("--work", type=Path, default=REPO / "build/dota2-vulkan/test")
     parser.add_argument("--kernel-dir", type=Path, default=REPO / "kernel")
     parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--venus", action="store_true",
+                        help="boot on KekVM's GPU and render with the staged x86-64 Venus driver")
     args = parser.parse_args()
     args.staging = args.staging.resolve()
     args.kernel_dir = args.kernel_dir.resolve()
     work = args.work.resolve()
     work.mkdir(parents=True, exist_ok=True)
     root = prepare(args, work)
+    driver = "venus" if args.venus else "lavapipe"
+    (root / "etc/vinix-dota2-vulkan-driver").write_text(driver + "\n")
     archive = work / "initramfs.tar.gz"
     with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
         tar.add(root, arcname=".")
@@ -221,7 +225,14 @@ def main() -> None:
         "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4", "VINIX_KEEP_TEMP_BOOT_DISK": "1",
         "VINIX_QEMU_EXTRA": f"-qmp unix:{socket_path},server=on,wait=off",
     }
-    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=8192"]
+    firmware = REPO / "boot-image/edk2-aarch64-code-2048x1536.fd"
+    if args.venus and firmware.exists():
+        # Vinix's own firmware build, as for OpenGothic's Venus boots; the
+        # stock firmware stopped at its splash with the Venus GPU attached.
+        environment.update({"VINIX_QEMU_RESOLUTION": "2048x1536x32", "VINIX_OVMF_CODE": str(firmware)})
+    # Accelerated QEMU needs a GL display; its serial console still uses stdio.
+    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--no-persist", "--mem=8192",
+               *(["--venus"] if args.venus else ["--serial"])]
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(REPO)
@@ -289,7 +300,9 @@ def main() -> None:
     report = {"passed": passed, "requested_frames": 3000, "cpu": "Haswell",
         "kernel_sha256": hashlib.sha256((pinned_kernel / "vinix").read_bytes()).hexdigest(),
         "translator_sha256": hashlib.sha256((root / "usr/bin/qemu-x86_64").read_bytes()).hexdigest(),
-        "icd_sha256": hashlib.sha256((root / "usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so").read_bytes()).hexdigest(),
+        "driver": driver,
+        "icd_sha256": hashlib.sha256((root / "usr/libexec/vinix-dota2/root/usr/lib/x86_64-linux-gnu" /
+                                      ("libvulkan_virtio.so" if args.venus else "libvulkan_lvp.so")).read_bytes()).hexdigest(),
         "enumerated": b"VINIX-DOTA2-VULKAN-ENUMERATE-PASS" in normalized,
         "captured_colors": colors,
         "log": str(work / "vinix.log")}

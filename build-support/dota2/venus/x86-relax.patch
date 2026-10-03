@@ -1,0 +1,14 @@
+--- a/src/virtio/vulkan/vn_common.c
++++ b/src/virtio/vulkan/vn_common.c
+@@ -259,7 +259,11 @@
+    /* A short host-GPU wait should not surrender a whole guest timeslice.
+     * Bound polling by wall time, then retain the normal sleeping/watchdog path. */
+    if (os_time_get_nano() < state->spin_deadline) {
++#if defined(__x86_64__)
++      __builtin_ia32_pause(); /* a translated Dota 2 process on Vinix */
++#else
+       __asm__ volatile("yield" ::: "memory");
++#endif
+       return;
+    }
+ #endif
