@@ -1,194 +1,157 @@
 #!/usr/bin/env python3
-"""Stage a private, checksum-pinned Cordial runtime for Vinix's ARM64 desktop."""
+"""Stage Roblox APK launchers using Vinix's native Android Translation Layer."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import importlib.util
-import io
 import json
 import os
 from pathlib import Path
 import shutil
-import subprocess
-import tarfile
+import stat
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).resolve().parent
-PREFIX = "/opt/vinix-roblox-x86_64"
-# Cordial retains its pinned CPU translator independently of native Android.
-TRANSLATOR = {
-    "filename": "aarch64_qemu-x86_64-9.1.2-r1.apk",
-    "url": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/aarch64/qemu-x86_64-9.1.2-r1.apk",
-    "sha256": "061a147c9603fdb511b22d4945935cf9fcde29359ee264026956fb16990630d5",
-    "binary_sha256": "9025933dcbd195d6fe2fbaaa2dd697173befd8379a10ff1df9040e6a8c941671",
-    "version": "9.1.2-r1",
-    "architecture": "aarch64",
-    "license": "GPL-2.0-or-later",
-}
-RUNTIME = {
-    "version": "0.23.2",
-    "license": "GPL-3.0-or-later",
-    "upstream": "https://github.com/luohoa97/cordial",
-    "source": "https://github.com/luohoa97/cordial/tree/v0.23.2",
-    "filename": "Cordial-0.23.2-0-g53b44b5-x86_64.AppImage",
-    "url": "https://github.com/luohoa97/cordial/releases/download/v0.23.2/Cordial-0.23.2-0-g53b44b5-x86_64.AppImage",
-    "sha256": "4571384a87cb2cb7965da790e881f08444ae7bff76df8469c3cd7a7677496286",
-    "squashfs_offset": 944632,
-}
-GLIBC = {
-    "filename": "libc6_2.39-0ubuntu8.9_amd64.deb",
-    "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.39-0ubuntu8.9_amd64.deb",
-    "sha256": "ff5557d99b51f761c4b7c92368b9cc45565eda17df9bf9eb4b134d09825008be",
-}
-FONT = {
-    "filename": "fonts-noto-cjk_20230817+repack1-3_all.deb",
-    "url": "https://archive.ubuntu.com/ubuntu/pool/main/f/fonts-noto-cjk/fonts-noto-cjk_20230817+repack1-3_all.deb",
-    "sha256": "7d64b985f6fe128c99eae5610d5c047338e572bdcfb2bb09736be01b824a7f6c",
-    "license": "OFL-1.1",
-}
+PREFIX = "opt/vinix-android-aarch64"
+RECEIPT = "usr/share/vinix/roblox/runtime-manifest.json"
+COMMANDS = ("run-roblox", "run-roblox-client")
 
 
-def module(name: str, path: Path):
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec and spec.loader
-    result = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(result)
-    return result
+def digest(path: Path) -> str:
+    result = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            result.update(block)
+    return result.hexdigest()
 
 
-def extract_font(archive: Path, prefix: Path, debian) -> None:
-    selected = {
-        "usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-        "usr/share/doc/fonts-noto-cjk/copyright",
+def art_tools():
+    specification = importlib.util.spec_from_file_location(
+        "vinix_roblox_art_runtime", ROOT / "build-support/android/art-runtime.py")
+    assert specification and specification.loader
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+def provenance(android_stage: Path) -> dict:
+    """Require the same verified native Android layer used by other APKs."""
+    android_stage = Path(android_stage)
+    runtime = android_stage / PREFIX
+    android_launcher = android_stage / "usr/bin/run-android"
+    if not android_launcher.is_file() or not os.access(android_launcher, os.X_OK):
+        raise RuntimeError("Build the native Android runtime with ./build-android-aarch64.sh first")
+    if digest(android_launcher) != digest(ROOT / "build-support/android/run-android"):
+        raise RuntimeError("Android runtime has a stale launcher; rebuild the Android layer")
+    art = art_tools()
+    art_manifest = art.read_manifest(runtime)
+    bionic_manifest = art.read_bionic_manifest(runtime)
+    atl_manifest = art.read_atl_manifest(runtime)
+    art.validate_atl_art_pair(art_manifest, atl_manifest)
+    receipt = runtime / "runtime-manifest.json"
+    manifest = json.loads(receipt.read_text())
+    if (not isinstance(manifest, dict) or manifest.get("architecture") != "aarch64"
+            or manifest.get("execution") != "native" or manifest.get("page_size") != 16384
+            or manifest.get("runtime_prefix") != "/" + PREFIX
+            or (runtime / "architecture").read_text().strip() != "aarch64"
+            or manifest.get("art") != art_manifest or not art_manifest.get("bootclasspath")
+            or manifest.get("bionic") != bionic_manifest or manifest.get("atl") != atl_manifest):
+        raise RuntimeError("Roblox requires the verified native ARM64 Android runtime")
+    compatibility = runtime / "usr/lib/libvinix-android-compat.so"
+    if not compatibility.is_file():
+        raise RuntimeError("Android runtime is missing its native compatibility library")
+    art._elf(runtime / "lib/ld-musl-aarch64.so.1", required=True)
+    art._elf(compatibility, required=True)
+    return {
+        "format": 1, "architecture": "aarch64", "execution": "native", "page_size": 16384,
+        "runtime": "Android Translation Layer / ART", "runtime_prefix": "/" + PREFIX,
+        "android_runtime_manifest_sha256": digest(receipt),
+        "android_launcher_sha256": digest(android_launcher),
+        "android_compatibility_sha256": digest(compatibility),
+        "art_source_commit": art_manifest["source_commit"],
+        "art_patch_sha256": art_manifest["patch_sha256"],
+        "bionic_source_commit": bionic_manifest["source_commit"],
+        "bionic_patch_sha256": bionic_manifest["patch_sha256"],
+        "atl_source_commit": atl_manifest["source_commit"],
+        "atl_builder_sha256": atl_manifest["builder_sha256"],
+        "files": {"usr/bin/" + name: digest(SUPPORT / name) for name in COMMANDS},
+        "apk_bundled": False,
     }
-    for name, payload in debian.ar_members(archive.read_bytes()):
-        if not name.startswith("data.tar"):
-            continue
-        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as contents:
-            for member in contents:
-                relative = member.name.removeprefix("./")
-                if relative not in selected:
-                    continue
-                if not member.isfile():
-                    raise RuntimeError(f"font package has a non-file member: {relative}")
-                destination = prefix / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                stream = contents.extractfile(member)
-                assert stream is not None
-                with stream, destination.open("wb") as output:
-                    shutil.copyfileobj(stream, output)
-                destination.chmod(member.mode & 0o777)
-                selected.remove(relative)
-        break
-    if selected:
-        raise RuntimeError(f"font package is missing {sorted(selected)}")
+
+
+def validate_stage(stage: Path, android_stage: Path) -> dict:
+    """Check the launcher layer against current sources and its shared runtime."""
+    stage = Path(stage)
+    if stage.is_symlink() or not stage.is_dir():
+        raise RuntimeError(f"Roblox staging must be a directory: {stage}")
+    expected = provenance(android_stage)
+    required = set(expected["files"]) | {RECEIPT}
+    actual = set()
+    for path in stage.rglob("*"):
+        if path.is_symlink():
+            raise RuntimeError(f"Roblox staging contains a symlink: {path}")
+        if path.is_file():
+            actual.add(path.relative_to(stage).as_posix())
+    if actual != required:
+        raise RuntimeError("Roblox staging must contain only its native APK launchers and manifest")
+    try:
+        manifest = json.loads((stage / RECEIPT).read_text())
+    except (OSError, ValueError, UnicodeError) as error:
+        raise RuntimeError("Roblox staging has an invalid manifest") from error
+    if manifest != expected:
+        raise RuntimeError("Roblox staging does not match its native Android runtime; rebuild the Roblox layer")
+    for name, checksum in expected["files"].items():
+        path = stage / name
+        if not stat.S_ISREG(path.stat().st_mode) or not os.access(path, os.X_OK) or digest(path) != checksum:
+            raise RuntimeError(f"Roblox launcher is stale or not executable: {path}")
+    return manifest
+
+
+def stage_launchers(build: Path, android_stage: Path) -> Path:
+    manifest = provenance(android_stage)
+    build, android_stage = Path(build).resolve(), Path(android_stage).resolve()
+    staging = build / "staging"
+    if staging == android_stage or staging in android_stage.parents or android_stage in staging.parents:
+        raise RuntimeError("Roblox launcher staging must be separate from the shared Android runtime")
+    build.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="roblox-stage-", dir=build) as directory:
+        output = Path(directory) / "staging"
+        commands = output / "usr/bin"
+        commands.mkdir(parents=True)
+        for name in COMMANDS:
+            shutil.copy2(SUPPORT / name, commands / name)
+            (commands / name).chmod(0o755)
+        receipt = output / RECEIPT
+        receipt.parent.mkdir(parents=True)
+        receipt.write_text(json.dumps(manifest, indent=2) + "\n")
+        # Recheck payloads and source provenance before replacing an old stage.
+        validate_stage(output, android_stage)
+        previous = Path(directory) / "previous"
+        if staging.exists() or staging.is_symlink():
+            staging.rename(previous)
+        try:
+            output.replace(staging)
+        except BaseException:
+            if previous.exists() or previous.is_symlink():
+                previous.rename(staging)
+            raise
+    return staging
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--build-dir", type=Path, default=ROOT / "build-aarch64-roblox/x86_64")
+    parser.add_argument("--build-dir", type=Path, default=ROOT / "build-aarch64-roblox/aarch64")
+    parser.add_argument("--android-staging", type=Path,
+                        default=os.environ.get("VINIX_ANDROID_STAGING",
+                                               ROOT / "build-aarch64-android/aarch64/staging"))
     args = parser.parse_args()
-    for tool in ("curl", "unsquashfs", "zstd"):
-        if shutil.which(tool) is None:
-            raise SystemExit(f"Roblox staging requires {tool} on the build host")
-    android = module("vinix_android_builder", ROOT / "build-support/android/build.py")
-    graphics = module("vinix_roblox_graphics", SUPPORT / "graphics.py")
-    wayland = module("vinix_roblox_wayland", SUPPORT / "wayland.py")
-    debian = graphics.load_debian_tools()
-    build = args.build_dir.resolve()
-    downloads = build / "downloads"
-    downloads.mkdir(parents=True, exist_ok=True)
-    staging = build / "staging"
-    fingerprint = hashlib.sha256()
-    fingerprint.update(json.dumps((RUNTIME, GLIBC, FONT, TRANSLATOR), sort_keys=True).encode())
-    for path in (Path(__file__), SUPPORT / "run-roblox", SUPPORT / "run-roblox-client", SUPPORT / "graphics.py", graphics.LOCK,
-                 SUPPORT / "wayland.py", wayland.LOCK,
-                 ROOT / "build-support/android/build.py", ROOT / "build-support/debian-root.py"):
-        fingerprint.update(path.read_bytes())
-    key = fingerprint.hexdigest()
-    manifest_path = staging / PREFIX.lstrip("/") / "runtime-manifest.json"
-    if manifest_path.exists():
-        manifest = json.loads(manifest_path.read_text())
-        required = (staging / "usr/bin/qemu-x86_64", staging / "usr/bin/run-roblox",
-                    staging / "usr/bin/run-roblox-client",
-                    manifest_path.parent / "usr/bin/cordial-run",
-                    manifest_path.parent / "usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
-                    *(staging / wayland.PREFIX.lstrip("/") / name for name in wayland.REQUIRED))
-        if manifest.get("build_fingerprint") == key and all(path.is_file() for path in required):
-            print(f"Roblox runtime cache is current: {staging}")
-            return 0
-    for record in (RUNTIME, GLIBC, FONT, TRANSLATOR):
-        android.download(record["url"], downloads / record["filename"], record["sha256"])
-    with tempfile.TemporaryDirectory(prefix="roblox-stage-", dir=build) as directory:
-        temporary = Path(directory)
-        output = temporary / "staging"
-        prefix = output / PREFIX.lstrip("/")
-        prefix.parent.mkdir(parents=True)
-        subprocess.run(["unsquashfs", "-no-progress", "-o", str(RUNTIME["squashfs_offset"]),
-                        "-d", str(prefix), str(downloads / RUNTIME["filename"])], check=True)
-        glibc = temporary / "glibc"
-        glibc.mkdir()
-        debian.extract_deb(downloads / GLIBC["filename"], glibc)
-        graphics.overlay(glibc.resolve(), prefix.resolve())
-        subprocess.run(["python3", str(SUPPORT / "graphics.py"), "--output", str(prefix),
-                        "--cache", str(downloads)], check=True)
-        extract_font(downloads / FONT["filename"], prefix, debian)
-        native_wayland = wayland.stage(output / wayland.PREFIX.lstrip("/"), downloads, android)
-        # Ubuntu WebKit embeds this absolute helper path. QEMU's -L lookup
-        # redirects it to the private root, and the kernel translates the
-        # helper executable using the same inherited runtime configuration.
-        helpers = prefix / "usr/lib/x86_64-linux-gnu/webkitgtk-6.0"
-        helpers.mkdir(exist_ok=True)
-        for source in (prefix / "usr/libexec/webkitgtk-6.0").glob("*"):
-            if source.is_file():
-                os.link(source, helpers / source.name)
-        injected = helpers / "injected-bundle"
-        injected.mkdir(exist_ok=True)
-        for source in (prefix / "usr/lib/webkitgtk-6.0/injected-bundle").glob("*"):
-            if source.is_file():
-                os.link(source, injected / source.name)
-        loader = prefix / "usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
-        # Executables spawned by WebKit carry the normal /lib64 interpreter.
-        # The kernel's VINIX_X86_64_ROOT lookup must find a real private ELF.
-        for libdir in (prefix / "lib", prefix / "lib64"):
-            libdir.mkdir(exist_ok=True)
-            os.link(loader, libdir / loader.name)
-        commands = output / "usr/bin"
-        commands.mkdir(parents=True)
-        for name in ("run-roblox", "run-roblox-client"):
-            shutil.copy2(SUPPORT / name, commands / name)
-            (commands / name).chmod(0o755)
-        translator = downloads / TRANSLATOR["filename"]
-        with tarfile.open(translator, "r:gz", ignore_zeros=True) as archive:
-            stream = archive.extractfile("usr/bin/qemu-x86_64")
-            assert stream is not None
-            payload = stream.read()
-        if hashlib.sha256(payload).hexdigest() != TRANSLATOR["binary_sha256"]:
-            raise RuntimeError("translator binary checksum mismatch")
-        (commands / "qemu-x86_64").write_bytes(payload)
-        (commands / "qemu-x86_64").chmod(0o755)
-        (prefix / "architecture").write_text("x86_64\n")
-        manifest = {"format": 1, "architecture": "x86_64", "runtime_prefix": PREFIX,
-                    "build_fingerprint": key, "runtime": RUNTIME, "glibc": GLIBC,
-                    "font": FONT, "translator": TRANSLATOR,
-                    "graphics": json.loads(graphics.LOCK.read_text()), "native_wayland": native_wayland}
-        (prefix / "runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-        previous = build / "staging.previous"
-        if previous.exists():
-            shutil.rmtree(previous)
-        if staging.exists():
-            staging.rename(previous)
-        try:
-            output.rename(staging)
-        except BaseException:
-            if previous.exists():
-                previous.rename(staging)
-            raise
-        if previous.exists():
-            shutil.rmtree(previous)
-    print(f"Roblox runtime staged: {staging}")
+    try:
+        staging = stage_launchers(args.build_dir.expanduser(), args.android_staging.expanduser())
+    except (RuntimeError, OSError, ValueError) as error:
+        raise SystemExit(str(error)) from error
+    print(f"Staged native ATL/ART Roblox launchers in {staging}")
     return 0
 
 

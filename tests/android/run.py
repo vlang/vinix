@@ -165,6 +165,13 @@ def prepare(args: argparse.Namespace) -> Path | None:
                 if str(path.parent) in ("lib", "usr/lib", "usr/lib/xorg/legacy-glx"):
                     base_libraries.add(path.name)
     copy_layer(args.runtime, overlay)
+    if args.launcher == "roblox":
+        spec = importlib.util.spec_from_file_location("vinix_roblox_builder", ROOT / "build-support/roblox/build.py")
+        assert spec and spec.loader
+        roblox = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(roblox)
+        roblox.validate_stage(args.roblox_staging, args.runtime)
+        copy_layer(args.roblox_staging, overlay)
     test = overlay / "opt/android-test"
     test.mkdir(parents=True, exist_ok=True)
     x11 = args.repo / "build-aarch64-x11/sysroot"
@@ -194,6 +201,10 @@ def prepare(args: argparse.Namespace) -> Path | None:
         subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
                         str(ROOT / "tests/android/atfork-test.c"), "-ldl", "-pthread",
                         "-o", str(test / "runtime-atfork-probe")], check=True)
+    if args.runtime_arch == "aarch64":
+        subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror",
+                        str(ROOT / "tests/android/fortify-test.c"), "-ldl",
+                        "-o", str(test / "runtime-fortify-probe")], check=True)
     subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-static",
                     str(ROOT / "tests/android/memory-probe.c"),
                     "-o", str(test / "memory-probe")], check=True)
@@ -204,7 +215,7 @@ def prepare(args: argparse.Namespace) -> Path | None:
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(overlay / "usr/bin/vinix-wine-host")], check=True)
     shutil.copy2(args.desktop, overlay / "usr/bin/vinix-desktop")
-    app = overlay / "usr/bin/vinix-android-calculator"
+    app = overlay / "usr/bin" / ("vinix-roblox" if args.launcher == "roblox" else "vinix-android-calculator")
     if app.exists() or app.is_symlink():
         app.unlink()
     app.symlink_to("vinix-desktop")
@@ -219,6 +230,10 @@ def prepare(args: argparse.Namespace) -> Path | None:
         args.boot_probe_sha256 = hashlib.sha256((test / "art-boot-probe.jar").read_bytes()).hexdigest()
     configuration = {
         "TEST_APK": "/opt/android-test/application.apk", "TEST_MODE": args.mode,
+        "TEST_DESKTOP_APP": "Roblox" if args.launcher == "roblox" else "Android Calculator",
+        "TEST_HOSTED_NAME": "roblox" if args.launcher == "roblox" and args.mode == "desktop" else "android",
+        "TEST_GEOMETRY": "1280x720x24" if args.launcher == "roblox" else "480x640x24",
+        "VINIX_ROBLOX_APK": "/opt/android-test/application.apk",
         "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
         "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
         "TEST_TIMEOUT": str(args.startup_timeout), "VINIX_ANDROID_EXPECTED_RESULT": args.expect,
@@ -236,16 +251,18 @@ def prepare(args: argparse.Namespace) -> Path | None:
         + ("export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n" if not args.observe else "")
         + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" and not args.observe else "")
         +
-        f"exec /usr/bin/run-android \"$TEST_APK\" -l {shlex.quote(args.activity)} -w 480 -h 640"
+        (f'exec /usr/bin/run-android "$TEST_APK" -l {shlex.quote(args.activity)} -w 480 -h 640'
+         if args.launcher == "android" else 'exec /usr/bin/run-roblox "$TEST_APK"')
         + "".join(" " + shlex.quote(argument) for argument in args.runtime_arg) + "\n")
     (test / "launch").chmod(0o755)
-    launcher = overlay / "usr/bin/run-android-calculator"
-    if launcher.exists() or launcher.is_symlink():
-        launcher.unlink()
-    # A later initramfs module can replace a regular base file with another
-    # regular file, but a symlink entry leaves the base launcher in place.
-    launcher.write_text("#!/bin/sh\nexec /opt/android-test/launch \"$@\"\n")
-    launcher.chmod(0o755)
+    if args.launcher == "android":
+        launcher = overlay / "usr/bin/run-android-calculator"
+        if launcher.exists() or launcher.is_symlink():
+            launcher.unlink()
+        # A later initramfs module can replace a regular base file with another
+        # regular file, but a symlink entry leaves the base launcher in place.
+        launcher.write_text("#!/bin/sh\nexec /opt/android-test/launch \"$@\"\n")
+        launcher.chmod(0o755)
     supply_host_libraries(args.repo, overlay, base_libraries)
     if args.initramfs is None:
         for directory in ("sbin", "proc", "dev", "sys", "tmp", "root", "run"):
@@ -520,7 +537,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     result = {"passed": None if args.observe and observed else passed,
               "observed": observed, "check": "window-observation" if args.observe else "calculator",
               "failure": None if passed or observed else failure,
-              "mode": args.mode, "apk": str(args.apk),
+              "mode": args.mode, "launcher": args.launcher, "apk": str(args.apk),
               "apk_sha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
               "initramfs": str(args.initramfs), "runtime_arch": args.runtime_arch,
               "memory_mb": args.memory, "desktop": str(args.desktop), "kernel_dir": str(args.kernel_dir),
@@ -531,6 +548,10 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "boot_probe": str(args.boot_probe) if args.boot_probe else None,
               "boot_probe_sha256": args.boot_probe_sha256 if args.boot_probe else None,
               "boot_probe_passed": boot_probe_passed,
+              "configuration_probe_passed": (b"ATL-CONFIGURATION-PASS " in transcript
+                                               if args.runtime_arch == "aarch64" else None),
+              "fortify_probe_passed": (b"ANDROID-FORTIFY-PASS " in transcript
+                                         if args.runtime_arch == "aarch64" else None),
               "serial_log": str(state / "serial.log")}
     (state / "result.json").write_text(json.dumps(result, indent=2) + "\n")
     if not passed and not observed:
@@ -554,6 +575,10 @@ def main() -> int:
     parser.add_argument("--apk", type=Path)
     parser.add_argument("--boot-probe", type=Path,
                         help="DEX JAR containing ArtBootProbe; require native Java preflight before the APK")
+    parser.add_argument("--launcher", choices=("android", "roblox"), default="android",
+                        help="exercise run-android or the production native Roblox launcher")
+    parser.add_argument("--roblox-staging", type=Path,
+                        help="verified Roblox launcher stage, used with --launcher roblox")
     parser.add_argument("--activity", default="calculator/Calculator")
     parser.add_argument("--runtime-arg", action="append", default=[],
                         help="extra ATL argument, repeatable; use = for values beginning with -")
@@ -594,6 +619,14 @@ def main() -> int:
         args.runtime_arch = "x86_64" if "x86_64" in architectures else "aarch64"
     if args.boot_probe and args.runtime_arch != "aarch64":
         parser.error("--boot-probe requires a native aarch64 runtime")
+    if args.launcher == "roblox":
+        if args.runtime_arch != "aarch64" or not args.observe or args.apk is None:
+            parser.error("--launcher roblox requires --runtime-arch aarch64, --observe and --apk")
+        if args.strace:
+            parser.error("--strace applies to translated runtime diagnostics")
+        if args.mode == "desktop" and args.runtime_arg:
+            parser.error("--runtime-arg is supported by the Roblox launcher in --mode direct")
+        args.roblox_staging = (args.roblox_staging or args.repo / "build-aarch64-roblox/aarch64/staging").resolve()
     args.desktop = (args.desktop or args.repo / "build/vinix-desktop").resolve()
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     args.initramfs = args.initramfs.resolve() if args.initramfs else None

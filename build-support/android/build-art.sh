@@ -111,7 +111,9 @@ for library in $JNI_LIBRARIES; do
 done
 cp "$SOURCE_DIR/out/host/linux-x86/bin/dalvikvm" "$NEXT_OUTPUT/usr/bin/"
 cp "$SOURCE_DIR/out/host/linux-x86/bin/dex2oat" "$NEXT_OUTPUT/usr/bin/"
-find "$NEXT_OUTPUT/usr" -type f -exec strip --strip-unneeded '{}' \;
+find "$NEXT_OUTPUT/usr/bin" "$NEXT_OUTPUT/usr/lib" -type f -exec strip --strip-unneeded '{}' \;
+mkdir -p "$NEXT_OUTPUT/usr/include/androidfw"
+cp "$SOURCE_DIR/libandroidfw/include/androidfw/androidfw_c_api.h" "$NEXT_OUTPUT/usr/include/androidfw/"
 python3 - "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" \
     "$SCRIPT_DIR/art16k.patch" "$DEPENDENCY_CACHE" <<'PY'
 import hashlib, json, pathlib, struct, subprocess, sys
@@ -122,6 +124,10 @@ for path in sorted((root / "usr").rglob("*")):
     if not path.is_file():
         continue
     data = path.read_bytes()
+    if path.relative_to(root).as_posix() == "usr/include/androidfw/androidfw_c_api.h":
+        files.append({"path": str(path.relative_to(root)), "size": len(data),
+                      "sha256": hashlib.sha256(data).hexdigest()})
+        continue
     if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
         raise SystemExit(f"build-art: output is not an ARM64 ELF: {path}")
     offset = struct.unpack_from("<Q", data, 32)[0]
@@ -160,6 +166,7 @@ manifest = {"format": 1, "architecture": "aarch64", "page_size": 16384,
             "source_sha512": hashlib.sha512(source).hexdigest(),
             "source_sha256": hashlib.sha256(source).hexdigest(),
             "patch_sha256": hashlib.sha256(pathlib.Path(patch).read_bytes()).hexdigest(),
+            "androidfw_configuration_api": 1,
             "build_flags": ["-DART_PAGE_SIZE=16384", "ART_BUILD_HOST_DEBUG=false"],
             "compiler": subprocess.check_output(["gcc", "--version"], text=True).splitlines()[0],
             "compiler_target": subprocess.check_output(["gcc", "-dumpmachine"], text=True).strip(),

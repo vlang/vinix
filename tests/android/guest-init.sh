@@ -5,11 +5,11 @@ export HOME=/root USER=root LOGNAME=root SHELL=/bin/sh TERM=linux
 export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export XDG_RUNTIME_DIR=/run/user/0
 . /opt/android-test/config.sh
-export VINIX_ANDROID_EXPECTED_RESULT
+export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_APK
 
 application_logs() {
     for log in /tmp/android-boot-probe.log /tmp/android-launch.log /tmp/android-desktop.log /tmp/android-text.log \
-        /tmp/vinix-android-*.log /run/vinix-hosted-x11/vinix-android-*.log; do
+        /tmp/vinix-"$TEST_HOSTED_NAME"-*.log /run/vinix-hosted-x11/vinix-"$TEST_HOSTED_NAME"-*.log; do
         [ -f "$log" ] || continue
         echo "ANDROID-LOG $log"
         if [ "${1:-}" = full ]; then
@@ -79,7 +79,11 @@ else
         for probe in runtime-stack-probe runtime-memory-probe runtime-atfork-probe; do
             "$loader" --library-path "$LD_LIBRARY_PATH" "/opt/android-test/$probe" || exit 1
         done
-    ) || fail "native ART stack, memory or fork callback prerequisites failed"
+        "$loader" --library-path "$runtime/lib:$runtime/usr/lib:$runtime/usr/lib/art" \
+            "$runtime/usr/libexec/vinix-android/atl-configuration-test" || exit 1
+        "$loader" --library-path "$LD_LIBRARY_PATH" /opt/android-test/runtime-fortify-probe \
+            "$runtime/usr/lib/libvinix-android-compat.so" "$runtime/usr/lib/libc_bio.so.0" || exit 1
+    ) || fail "native ART stack, memory, fork callback, configuration or fortified I/O prerequisites failed"
 fi
 if [ -n "${TEST_ART_BOOT_PROBE:-}" ]; then
     [ "$TEST_RUNTIME_ARCH" = aarch64 ] || fail "Java bootclasspath probe requires native ARM64 ART"
@@ -113,7 +117,7 @@ if [ "$TEST_MODE" = direct ]; then
     mkfifo /tmp/android-events
     # Keep the bridge input pipe alive without sending invented events.
     (while :; do sleep 30; done) >/tmp/android-events &
-    /usr/bin/vinix-wine-host :99 /tmp/vinix-android-direct 480x640x24 \
+    /usr/bin/vinix-wine-host :99 /tmp/vinix-android-direct "$TEST_GEOMETRY" \
         /opt/android-test/launch --fill </tmp/android-events >/tmp/android-launch.log 2>&1 &
     app_pid=$!
 else
@@ -122,7 +126,7 @@ else
         hash=0000000000000000000000000000000000000000000000000000000000000000 \
         >/root/.vinix-user
     chmod 600 /root/.vinix-user
-    /usr/bin/vinix-desktop --open='Android Calculator' </dev/console >/tmp/android-desktop.log 2>&1 &
+    /usr/bin/vinix-desktop --open="$TEST_DESKTOP_APP" </dev/console >/tmp/android-desktop.log 2>&1 &
     app_pid=$!
 fi
 
@@ -133,7 +137,7 @@ resumed=0
 i=0
 while [ "$i" -lt "$TEST_TIMEOUT" ]; do
     kill -0 "$app_pid" 2>/dev/null || fail "application host exited"
-    for candidate in /tmp/vinix-android-* /run/vinix-hosted-x11/vinix-android-*; do
+    for candidate in /tmp/vinix-"$TEST_HOSTED_NAME"-* /run/vinix-hosted-x11/vinix-"$TEST_HOSTED_NAME"-*; do
         [ -f "$candidate/Xvfb_screen0" ] && surface="$candidate"
     done
     for socket in /tmp/.X11-unix/X*; do
@@ -145,8 +149,8 @@ while [ "$i" -lt "$TEST_TIMEOUT" ]; do
         fi
     done
     if [ "$resumed" = 0 ]; then
-        for log in /tmp/android-launch.log /tmp/vinix-android-*.log \
-            /run/vinix-hosted-x11/vinix-android-*.log; do
+        for log in /tmp/android-launch.log /tmp/vinix-"$TEST_HOSTED_NAME"-*.log \
+            /run/vinix-hosted-x11/vinix-"$TEST_HOSTED_NAME"-*.log; do
             [ -f "$log" ] || continue
             if grep -q 'onPostResume - yay!' "$log"; then
                 echo ANDROID-ACTIVITY-RESUMED

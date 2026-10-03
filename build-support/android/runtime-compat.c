@@ -8,12 +8,98 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#if defined(__aarch64__) && defined(__linux__)
+#include <stdio_ext.h>
+
+// The Bionic linker prefers bionic_ names for Android relocations. These
+// checks keep the NDK calling conventions while doing the actual I/O through
+// the private musl runtime; native Linux callers retain their libc symbols.
+__attribute__((noreturn))
+static void android_buffer_overflow(const char *function, const char *action,
+                                    size_t requested, size_t available)
+{
+    fprintf(stderr, "FORTIFY: %s: prevented %zu-byte %s %zu-byte buffer\n",
+            function, requested, action, available);
+    abort();
+}
+
+__attribute__((noreturn))
+void bionic___assert(const char *file, int line, const char *expression)
+{
+    fprintf(stderr, "%s:%d: assertion \"%s\" failed\n", file, line, expression);
+    abort();
+}
+
+static FILE *android_host_stream(FILE *stream)
+{
+    // Pinned bionic_translation's LP64 libc-stdio.h exposes three opaque
+    // 152-byte __sF entries for the standard streams. Every other FILE comes
+    // directly from musl. Resolve the facade at use time, since the Bionic
+    // library may be loaded after this preload library's constructor.
+    int saved_errno = errno;
+    const unsigned char *standard = dlsym(RTLD_DEFAULT, "bionic___sF");
+    errno = saved_errno;
+    if (standard != NULL) {
+        if ((void *)stream == (void *)standard) return stdin;
+        if ((void *)stream == (void *)(standard + 152)) return stdout;
+        if ((void *)stream == (void *)(standard + 304)) return stderr;
+    }
+    return stream;
+}
+
+size_t bionic___fread_chk(void *buffer, size_t size, size_t count, FILE *stream,
+                         size_t buffer_size)
+{
+    size_t total;
+    if (__builtin_mul_overflow(size, count, &total)) {
+        // Bionic fread reports EOVERFLOW and marks the stream on overflow.
+        // musl fread multiplies unchecked, so do not delegate this case.
+        FILE *host_stream = android_host_stream(stream);
+        flockfile(host_stream);
+        __fseterr(host_stream);
+        funlockfile(host_stream);
+        errno = EOVERFLOW;
+        return 0;
+    }
+    if (total > buffer_size) {
+        android_buffer_overflow("fread", "write into", total, buffer_size);
+    }
+    return fread(buffer, size, count, android_host_stream(stream));
+}
+
+ssize_t bionic___readlink_chk(const char *path, char *buffer, size_t size,
+                             size_t buffer_size)
+{
+    if (size > SSIZE_MAX) {
+        fprintf(stderr, "FORTIFY: readlink: size %zu > SSIZE_MAX\n", size);
+        abort();
+    }
+    if (size > buffer_size) {
+        android_buffer_overflow("readlink", "write into", size, buffer_size);
+    }
+    return readlink(path, buffer, size);
+}
+
+ssize_t bionic___sendto_chk(int socket, const void *buffer, size_t size,
+                           size_t buffer_size, int flags,
+                           const struct sockaddr *address, socklen_t address_size)
+{
+    if (size > buffer_size) {
+        android_buffer_overflow("sendto", "read from", size, buffer_size);
+    }
+    return sendto(socket, buffer, size, flags, address, address_size);
+}
+#endif
 
 static pthread_t initial_thread;
 static uintptr_t initial_stack_anchor;

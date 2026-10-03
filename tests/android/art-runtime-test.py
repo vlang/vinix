@@ -72,11 +72,13 @@ class RuntimeTests(unittest.TestCase):
             "source_commit": art.SOURCE_COMMIT, "source_sha512": art.SOURCE_SHA512,
             "source_sha256": art.SOURCE_SHA256,
             "patch_sha256": hashlib.sha256(art.PATCH.read_bytes()).hexdigest(),
+            "androidfw_configuration_api": 1,
             "build_flags": ["-DART_PAGE_SIZE=16384"], "files": [],
         }
         self.payload(art.LIBART, elf())
         for name in sorted(art.ART_ELFS - {art.LIBART}):
             self.payload(name, elf())
+        self.payload(art.ANDROIDFW_HEADER, b"/* pinned androidfw C API */\n", 0o644)
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
@@ -146,7 +148,7 @@ class RuntimeTests(unittest.TestCase):
         old = self.runtime / art.LIBART
         old.parent.mkdir(parents=True)
         old.write_bytes(b"existing 4 KiB package runtime")
-        for name in sorted(art.ART_ELFS):
+        for name in sorted(art.ART_ELFS | art.ART_HEADERS):
             with self.subTest(name=name):
                 # The physical overlay file remains present. Its omitted
                 # manifest record must not permit a partial replacement.
@@ -338,6 +340,12 @@ class AtlTests(unittest.TestCase):
             "format": 1, "architecture": "aarch64", "page_size": 16384,
             "source_commit": art.ATL_SOURCE_COMMIT, "source_sha256": art.ATL_SOURCE_SHA256,
             "source_sha512": art.ATL_SOURCE_SHA512,
+            "patch_sha256": art._digest(art.ATL_PATCH),
+            "androidfw_patch_sha256": art._digest(art.PATCH),
+            "androidfw_configuration_api": 1,
+            "androidfw_header_sha256": "a" * 64,
+            "androidfw_library_sha256": "c" * 64,
+            "configuration_probe_sha256": art._digest(support / "atl-configuration-test.c"),
             "build_flags": ["--buildtype=release", "-Wl,-z,max-page-size=65536"],
             "builder_sha256": art._digest(support / "build-atl.sh"),
             "dex_adapter_sha256": art._digest(support / "atl-dex.py"),
@@ -386,10 +394,29 @@ class AtlTests(unittest.TestCase):
         for record in verified["files"]:
             self.assertEqual((self.runtime / record["path"]).read_bytes(), (self.overlay / record["path"]).read_bytes())
 
+    def test_androidfw_pair_requires_exact_header_library_patch_and_api(self) -> None:
+        dependency = {"androidfw_configuration_api": 1, "patch_sha256": art._digest(art.PATCH),
+                      "files": [{"path": art.ANDROIDFW_HEADER, "sha256": "a" * 64},
+                                {"path": art.ANDROIDFW_LIBRARY, "sha256": "c" * 64}]}
+        art.validate_atl_art_pair(dependency, self.manifest)
+        for key in ("androidfw_configuration_api", "patch_sha256"):
+            changed = {**dependency, key: "changed"}
+            with self.assertRaises(RuntimeError):
+                art.validate_atl_art_pair(changed, self.manifest)
+        for index in range(2):
+            changed = {**dependency, "files": [record.copy() for record in dependency["files"]]}
+            changed["files"][index]["sha256"] = "b" * 64
+            with self.assertRaises(RuntimeError):
+                art.validate_atl_art_pair(changed, self.manifest)
+
     def test_rejects_wrong_source_builder_compiler_flags_or_inputs(self) -> None:
         for key, value in (("page_size", 4096), ("architecture", "x86_64"),
                            ("source_commit", "b" * 40), ("source_sha256", "b" * 64),
                            ("source_sha512", "b" * 128), ("builder_sha256", "b" * 64),
+                           ("patch_sha256", "b" * 64), ("androidfw_patch_sha256", "b" * 64),
+                           ("androidfw_configuration_api", 0),
+                           ("androidfw_header_sha256", "invalid"), ("androidfw_library_sha256", "invalid"),
+                           ("configuration_probe_sha256", "b" * 64),
                            ("dex_adapter_sha256", "b" * 64), ("dex_compiler_sha256", "b" * 64),
                            ("java_core_classes_sha256", "b" * 64), ("dex_compiler_arguments", []),
                            ("build_flags", []), ("dex_compiler", "D8 other")):
@@ -461,7 +488,8 @@ class AtlTests(unittest.TestCase):
             MANIFEST=art.MANIFEST, BIONIC_MANIFEST=art.BIONIC_MANIFEST, ATL_MANIFEST=art.ATL_MANIFEST,
             read_manifest=lambda root: art_manifest,
             read_bionic_manifest=lambda root: bionic_manifest,
-            read_atl_manifest=art.read_atl_manifest,
+            read_atl_manifest=lambda root: art._read_manifest(root, atl=True),
+            validate_atl_art_pair=lambda *arguments: None,
             apply=install_art, apply_bionic=lambda *arguments: None, apply_atl=art.apply_atl,
         )
         lock = {"architecture": "aarch64", "mirror": "https://example.invalid", "packages": []}
@@ -481,7 +509,7 @@ class AtlTests(unittest.TestCase):
         self.assertEqual(self.stage_android()[1], 0)
         (runtime / art.ATL_DEX_DIRECTORY / "api-impl.jar").write_bytes(b"stale framework")
         self.assertGreater(self.stage_android()[1], 0)
-        self.assertEqual(art.read_atl_manifest(runtime), art.read_atl_manifest(self.overlay))
+        self.assertEqual(art._read_manifest(runtime, atl=True), art.read_atl_manifest(self.overlay))
         self.payload(art.ATL_FONTS, b"<familyset><family><font>NewFont.ttf</font></family></familyset>")
         self.assertGreater(self.stage_android()[1], 0)
         receipt = json.loads((runtime / "runtime-manifest.json").read_text())
@@ -496,7 +524,7 @@ class AtlTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             self.stage_android()
         self.assertEqual(sentinel.read_text(), "retain on invalid source")
-        self.assertEqual(art.read_atl_manifest(runtime), self.manifest)
+        self.assertEqual(art._read_manifest(runtime, atl=True), self.manifest)
 
 
 if __name__ == "__main__":

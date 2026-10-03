@@ -15,7 +15,9 @@ Android resources and fonts from one pinned upstream commit. The Alpine
 package's framework is replaced as a unit so its Java and JNI APIs stay in sync.
 It verifies the pinned source, checked-in patch, compiler flag and every output
 file's hash, architecture and load-segment alignment before staging it. A
-missing or incompatible overlay fails the build.
+missing or incompatible overlay fails the build. ART's androidfw library and
+ATL are patched together to expose real NDK configuration snapshots and
+qualifiers; rebuild both overlays when their checked-in patches change.
 
 First build ART on a native ARM64 Alpine Linux host. On an ARM64 Mac, an ARM64
 Linux VM using hardware virtualization is suitable for building the runtime.
@@ -51,8 +53,9 @@ apk add android-build-tools art_standalone-dev libandroidfw-dev \
   gtk4.0-dev libgudev-dev libsecret-dev libdrm-dev libportal-dev \
   ffmpeg-dev mesa-dev openxr-dev sqlite-dev vulkan-loader-dev \
   wayland-dev wayland-protocols webkit2gtk-6.0-dev openjdk17-jre-headless
-build-support/android/build-atl.sh --output /path/to/atl-runtime \
-  --java /usr/lib/jvm/java-17-openjdk/bin/java
+PATH=/usr/lib/jvm/java-8-openjdk/bin:$PATH \
+  build-support/android/build-atl.sh --output /path/to/atl-runtime \
+  --art-runtime /path/to/art-runtime --java /usr/lib/jvm/java-17-openjdk/bin/java
 ```
 
 Copy all three resulting directories to the build host. Desugar ART's own Java
@@ -122,16 +125,15 @@ native libraries need `arm64-v8a` libraries. Pure Java/DEX APKs do not require
 an architecture-specific native payload. Modern Android APIs, services and
 resource qualifiers can require additional ATL implementation; the presence
 of an APK launcher does not establish compatibility with every application.
-The coherent overlay fixes the earlier Roblox startup failure at
-`android.os.Build.SUPPORTED_64_BIT_ABIS`. The unchanged Roblox 2.738.1397 APK
-now initializes its content providers and reaches its engine load through
-native ATL/ART. The fork callback implementation resolves its missing
-`__register_atfork` dependency; the next measured load failure is
-`AConfiguration_getScreenWidthDp`. ATL's configuration API is currently a
-stub implementation, so supplying that symbol alone would not provide the
-configuration behavior the engine needs. No native Roblox application frame,
-authentication or gameplay has been verified. The regular desktop Roblox
-entry uses the separate [Cordial runtime](roblox.md).
+The unchanged Roblox 2.738.1397 APK initializes its content providers and
+reaches its ARM64 engine load through native ATL/ART. The coherent framework,
+fork callbacks, real NDK configuration API and fortified I/O wrappers resolve
+its earlier startup dependencies. The measured native guest launch now stops
+at the missing `mallinfo` allocator statistics API. The engine consumes its
+live, free and high-water allocation fields; musl has no public implementation
+of that Android ABI. No native Roblox application frame, authentication or
+gameplay has been verified. The [Roblox desktop entry](roblox.md) uses this
+same native ATL/ART runtime.
 
 Run the real guest test after building the runtime, desktop and kernel:
 

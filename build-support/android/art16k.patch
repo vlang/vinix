@@ -171,3 +171,63 @@
 +    extern void unregister_libcore_icu_ICU(JNIEnv*);
 +    unregister_libcore_icu_ICU(nullptr);
  }
+--- a/libandroidfw/androidfw_c_api.cpp
++++ b/libandroidfw/androidfw_c_api.cpp
+@@ -0,0 +1,2 @@
++#include <cstring>
++#include <type_traits>
+@@ -53,0 +56,45 @@
++}
++
++// The C facade follows the same caller-lock convention as its setter.
++extern "C" bool AssetManager_getConfiguration(struct AssetManager *asset_manager,
++                                               struct ResTable_config *out_config)
++{
++  GuardedAssetManager2 *assetManager = reinterpret_cast<GuardedAssetManager2 *>(asset_manager);
++  const auto& configurations = assetManager->GetConfigurations();
++  if (configurations.empty())
++    return false;
++  static_assert(sizeof(::ResTable_config) == sizeof(android::ResTable_config));
++  std::memcpy(out_config, &configurations.front(), sizeof(*out_config));
++  return true;
++}
++
++static android::ResTable_config nativeConfiguration(const ::ResTable_config *config)
++{
++  static_assert(sizeof(::ResTable_config) == sizeof(android::ResTable_config));
++  static_assert(std::is_trivially_copyable_v<android::ResTable_config>);
++  android::ResTable_config native;
++  std::memcpy(&native, config, sizeof(native));
++  return native;
++}
++
++extern "C" int32_t ResTable_config_diff(const ::ResTable_config *a, const ::ResTable_config *b)
++{
++  return nativeConfiguration(a).diff(nativeConfiguration(b));
++}
++
++extern "C" bool ResTable_config_match(const ::ResTable_config *base,
++                                      const ::ResTable_config *requested)
++{
++  return nativeConfiguration(base).match(nativeConfiguration(requested));
++}
++
++extern "C" bool ResTable_config_isBetterThan(const ::ResTable_config *base,
++                                             const ::ResTable_config *test,
++                                             const ::ResTable_config *requested)
++{
++  const auto nativeBase = nativeConfiguration(base);
++  const auto nativeTest = nativeConfiguration(test);
++  if (requested == nullptr)
++    return nativeTest.isBetterThan(nativeBase, nullptr);
++  const auto nativeRequested = nativeConfiguration(requested);
++  return nativeTest.isBetterThan(nativeBase, &nativeRequested);
+--- a/libandroidfw/include/androidfw/androidfw_c_api.h
++++ b/libandroidfw/include/androidfw/androidfw_c_api.h
+@@ -491,0 +492,6 @@
++// Hold AssetManager_lock while taking the snapshot, as with setConfiguration.
++bool AssetManager_getConfiguration(struct AssetManager *asset_manager, struct ResTable_config *out_config);
++int32_t ResTable_config_diff(const struct ResTable_config *a, const struct ResTable_config *b);
++bool ResTable_config_match(const struct ResTable_config *base, const struct ResTable_config *requested);
++bool ResTable_config_isBetterThan(const struct ResTable_config *base, const struct ResTable_config *test,
++                                 const struct ResTable_config *requested);

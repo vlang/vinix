@@ -222,6 +222,7 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
         raise RuntimeError(f"missing coherent native ATL overlay: {args.atl_runtime}; "
                            "run build-support/android/build-atl.sh on ARM64 Alpine Linux first")
     atl_manifest = art.read_atl_manifest(args.atl_runtime)
+    art.validate_atl_art_pair(art_manifest, atl_manifest)
     inputs = json.dumps(lock, sort_keys=True).encode() + str(args.with_calculator).encode()
     inputs += json.dumps(art_manifest, sort_keys=True).encode()
     inputs += json.dumps(bionic_manifest, sort_keys=True).encode()
@@ -242,6 +243,7 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
             cached_art = art.read_manifest(runtime)
             cached_bionic = art.read_bionic_manifest(runtime)
             cached_atl = art.read_atl_manifest(runtime)
+            art.validate_atl_art_pair(cached_art, cached_atl)
             cached_runtime = json.loads((runtime / "runtime-manifest.json").read_text())
             metadata_matches = (
                 isinstance(cached_runtime, dict) and

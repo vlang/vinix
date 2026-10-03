@@ -1,118 +1,75 @@
 # Roblox APK on Vinix
 
-The ARM64 desktop can launch Roblox's unchanged Android native engine with
-[Cordial 0.23.2](https://github.com/luohoa97/cordial/releases/tag/v0.23.2).
-Cordial supplies an Android linker, JNI and framework bridge for the APK's
-`libroblox.so`. The x86-64 runtime runs through QEMU user translation and uses
-Mesa's software GLES renderer. A native Weston 14 host runs its X11 backend
-with Pixman inside the desktop's private Xvfb display, giving Cordial a Wayland
-surface for the engine and its embedded web pages in a normal Vinix window.
-This path is separate from the ART/DEX runtime described
-in [Android APKs on Vinix](android.md).
+The Roblox desktop entry launches the unchanged Android APK through Vinix's
+native ARM64 [Android Translation Layer and ART runtime](android.md).
+ART executes its Java/DEX splash activity, and the Android native-library
+loader attempts to load the APK's ARM64 engine. Roblox compatibility is still
+being implemented: the latest actual APK test stops during engine loading at the
+missing `mallinfo` allocator statistics API. No Roblox application frame,
+authentication or gameplay has been verified on this path.
 
-Stage the runtime, then include it in an ARM64 desktop image. In addition to
-the normal desktop build tools, the host needs Python 3, curl, zstd and
-`unsquashfs` from squashfs-tools:
+Build the coherent native Android runtime described in [Android APKs](android.md),
+then stage the Roblox launchers and include both layers in the desktop:
 
 ```sh
+./build-android-aarch64.sh --art-runtime /path/to/desugared-art-runtime \
+    --bionic-runtime /path/to/bionic-runtime --atl-runtime /path/to/atl-runtime
 ./build-roblox-aarch64.sh
 ./build-desktop-aarch64.sh --compact-initramfs --with-roblox
-make -C kernel ARCH=aarch64 CC=clang LIMINE_MP=1
-./run-desktop-aarch64.sh --no-build --mem=8192
 ```
 
-The proprietary APK is not bundled or downloaded by the builder. Supply a
-genuine Roblox Android APK containing `lib/x86_64/libroblox.so`, and copy it to
-`$HOME/Roblox.apk` inside Vinix (`/root/Roblox.apk` for the default user). Open
-**Roblox** from the desktop's Start menu or Quick Launch. Its
-`run-roblox-client` command uses that path, or `VINIX_ROBLOX_APK` when set.
-The launcher owns a private compositor and socket for each application, and
-stops that compositor when Roblox exits or its window closes. Weston uses
-Vinix's SysV shared memory through the app's Xvfb MIT-SHM extension.
+`--with-roblox` includes the shared native Android layer. The Roblox builder
+verifies the staged ART, native-library loader and coherent framework receipts,
+including their payload hashes, native architecture and 16 KiB page contract.
+It stages two small launchers and a manifest which records their hashes and the
+shared Android runtime's provenance. The default output is
+`build-aarch64-roblox/aarch64/staging`. `VINIX_ANDROID_STAGING` selects the shared
+Android layer; `VINIX_ROBLOX_STAGING` selects the Roblox launcher layer when
+building the desktop. The builder's `--android-staging` and `--build-dir`
+options select those paths explicitly.
 
-The native launcher defaults Cordial's supported `CORDIAL_STACKING_GATE` to
-`off`. Weston withholds frame callbacks from a GTK surface fully covered by
-the engine canvas, so waiting for that callback before revealing an editor
-would leave both waiting. This uses Cordial's earlier stacking order for this
-compositor. An explicit caller value is preserved; `run-roblox` itself keeps
-Cordial's default. The earlier order can expose a stale GTK buffer if GTK
-fails to paint.
-
-From an existing X11 session, launch the complete desktop path at another local path:
+Supply a complete genuine Roblox APK containing `lib/arm64-v8a/libroblox.so`
+at `$HOME/Roblox.apk` in Vinix, normally `/root/Roblox.apk`. The builder does
+not download or bundle the proprietary APK. Open **Roblox** from Start or
+Quick Launch, or launch it on an existing X11 display:
 
 ```sh
-VINIX_ROBLOX_APK=/root/Roblox-2.738.1397.apk run-roblox-client
+VINIX_ROBLOX_APK=/root/Roblox.apk run-roblox-client
+run-roblox /root/Roblox.apk
 ```
 
-From an existing Wayland session, `run-roblox /root/Roblox.apk` uses that
-compositor. Its X11 fallback can render the landing screen, but Cordial cannot
-attach its embedded Sign In, Join or Robux web pages to an X11 host. Use the
-Wayland path to open those pages.
+The launcher selects `com/roblox/client/startup/ActivitySplash` and a 1280×720
+window. Additional arguments are passed to ATL. App data uses the same
+`ANDROID_APP_DATA_DIR` setting as other Android APKs, normally
+`$HOME/.local/share/vinix/android`. The APK and its native engine are unchanged.
 
-A split installation needs both the base APK containing assets and its
-matching x86-64 native split:
+The tested APK is Roblox **2.738.1397**, `com.roblox.client`, version code 3092,
+with SHA256 `bbe00ae306cc251c4ea55b7a932d9c524ecb0d6d9203c2a6161bcf0fae792742`.
+The coherent framework supplies `Build.SUPPORTED_64_BIT_ABIS`; the private
+native-library loader's fork callbacks resolve its earlier `__register_atfork`
+dependency. The real configuration implementation supplies asset-manager
+snapshots and screen qualifiers, and checked I/O wrappers supply its fortified Android APIs.
+The native engine now requires `mallinfo`, whose live, free and high-water
+allocation fields lack a musl implementation. That missing provider prevents
+the engine from loading completely. A successful Android calculator test does
+not establish Roblox compatibility.
+
+Run the [Android observation harness](../tests/android/README.md) with the actual
+APK to retain startup diagnostics and its framebuffer:
 
 ```sh
-VINIX_ROBLOX_APK=/root/base.apk run-roblox-client --native-apk /root/split_config.x86_64.apk
+python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+    --observe --mode direct --runtime-arg=-X --runtime-arg=-verbose:jni \
+    --state-dir /tmp/vinix-roblox-observation
+python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+    --observe --mode desktop --state-dir /tmp/vinix-roblox-desktop-observation
 ```
 
-Additional arguments after these paths go to `cordial-run`; for example,
-`--profile alternate` selects another Cordial profile. An ARM-only APK cannot
-run with this staged x86-64 engine bridge.
-
-The launcher extracts native libraries without changing them into
-`$XDG_DATA_HOME/vinix/roblox/libraries/<native-apk-sha256>`, normally beneath
-`$HOME/.local/share`. A completed extraction is published atomically and reused
-for that exact APK build. `VINIX_ROBLOX_DATA_DIR` overrides this cache root and
-the default profile root, which is `<data-root>/profiles`. Set
-`CORDIAL_PROFILE_ROOT` to move profiles independently. Cordial's extracted
-assets use `$XDG_CACHE_HOME/cordial/assets`, normally
-`$HOME/.cache/cordial/assets`. With no desktop D-Bus session, the launcher
-defaults to Cordial's file session store within the profile; these files use
-owner-only permissions. An explicit
-`CORDIAL_SECRET_STORE` value is preserved.
-
-All downloaded runtime artifacts are pinned by SHA256. The private prefix
-`/opt/vinix-roblox-x86_64` contains Cordial, glibc, its graphics and GUI
-dependencies, and a genuine Noto CJK font. Native commands are installed at
-`/usr/bin/run-roblox` and `/usr/bin/qemu-x86_64`. The builder retains upstream
-license notices; Cordial is GPL-3.0-or-later and its
-[matching source](https://github.com/luohoa97/cordial/tree/v0.23.2) is recorded
-in `runtime-manifest.json`. `build-support/roblox/graphics.lock.json` records
-the exact graphics package closure. `build-support/roblox/wayland.lock.json`
-pins the native Weston package closure at `/opt/vinix-roblox-wayland`.
-The default staging output is
-`build-aarch64-roblox/x86_64/staging`; use the runtime builder's `--build-dir`
-and the desktop builder's `VINIX_ROBLOX_STAGING` for another location.
-
-The measured Vinix test launched the unchanged Roblox **2.738.1397** APK
-(`com.roblox.client`, version code 3092) in a native Vinix desktop window. It
-rendered the real **Create Account / Sign In** landing screen, and clicking
-**Sign In** opened the form with **Username/Email/Phone** and **Password**
-fields. Repeated characters entered through the keyboard remained in the
-APK's username field after it lost focus. No password was entered or
-authentication attempted. The tested guest had 8 GiB of RAM. Cold software
-rendering can take several minutes before the first application frame appears.
-
-The APK's signature and complete contents digest were verified separately
-with Cordial's upstream APK verifier:
-
-```text
-APK SHA256: bbe00ae306cc251c4ea55b7a932d9c524ecb0d6d9203c2a6161bcf0fae792742
-Signing certificate SHA256: 44932ea35a17a267372d71b54d1a0cb3da0dca5113e94406ae2fe18090ba1477
-```
-
-These hashes identify the tested APK, rather than a signature check performed
-by `run-roblox` on every supplied file. Authentication and gameplay have not been
-verified on Vinix. Support is experimental; the pinned
-[upstream release notes](https://github.com/luohoa97/cordial/releases/tag/v0.23.2)
-also list a signed-in startup freeze and intermittent movement input issues.
-
-The native ARM64 ATL/ART path is still being brought up separately. The coherent
-framework and private fork callbacks fix the earlier missing
-`Build.SUPPORTED_64_BIT_ABIS` API and `__register_atfork` dependency. Launching
-the same unchanged APK through its Java splash activity now reaches the ARM64
-engine load, which fails at `AConfiguration_getScreenWidthDp` in ATL's unimplemented configuration
-API. This path has not displayed a Roblox application frame. The desktop entry
-continues to use the tested Cordial path above; see the
-[Android guest harness](../tests/android/README.md) for native APK diagnostics.
+Observation requires an application window to draw and remain visible; a
+startup failure is retained as a failed result. Both paths were tested on
+3 October 2026 with the APK hash above: Java, configuration and fortified I/O
+preflights passed, and the engine startup failed without a painted application
+frame. The direct JNI log identifies `mallinfo` as the load failure; the desktop
+entry reaches the same later unresolved JNI initialization. Host launcher and
+shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
+`tests/roblox/build-test.py`.

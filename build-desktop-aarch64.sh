@@ -55,7 +55,6 @@ PYTHON_STAGING="${VINIX_PYTHON_STAGING:-$SCRIPT_DIR/build-aarch64-python/staging
 NETWORK_TOOLS_STAGING="${VINIX_NETWORK_TOOLS_STAGING:-$SCRIPT_DIR/build-aarch64-network-tools/staging}"
 VLANG_STAGING="${VINIX_VLANG_STAGING:-$SCRIPT_DIR/build-aarch64-v/staging}"
 X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
-X11_SYSROOT="${VINIX_X11_SYSROOT:-${X11_STAGING%/staging}/sysroot}"
 FIREFOX_STAGING="${VINIX_FIREFOX_STAGING:-$SCRIPT_DIR/build-aarch64-firefox/staging}"
 CHROMIUM_STAGING="${VINIX_CHROMIUM_STAGING:-$SCRIPT_DIR/build-aarch64-chromium/staging}"
 LIBREOFFICE_STAGING="${VINIX_LIBREOFFICE_STAGING:-$SCRIPT_DIR/build-aarch64-libreoffice/staging}"
@@ -70,7 +69,7 @@ STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
-ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/x86_64/staging}"
+ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 
 file_size() {
@@ -112,7 +111,7 @@ write_staging_cache_manifest() {
 
     # Change this when the immutable-layer assembly logic changes. Desktop
     # source and launcher edits are refreshed below without restaging 6+ GiB.
-    printf 'version=7\n'
+    printf 'version=8\n'
     printf 'compact=%s\n' "$COMPACT_INITRAMFS"
     printf 'without_firefox=%s\n' "$WITHOUT_FIREFOX"
     printf 'chromium=%s\n' "$WITH_CHROMIUM"
@@ -186,7 +185,7 @@ for arg in "$@"; do
         --with-dota2) WITH_DOTA2=1 ;;
         --with-qemu-system) WITH_QEMU_SYSTEM=1 ;;
         --with-android) WITH_ANDROID=1 ;;
-        --with-roblox) WITH_ROBLOX=1 ;;
+        --with-roblox) WITH_ROBLOX=1; WITH_ANDROID=1 ;;
         --with-chromium) WITH_CHROMIUM=1 ;;
         --with-libreoffice) WITH_LIBREOFFICE=1 ;;
         --with-minecraft) WITH_MINECRAFT=1 ;;
@@ -209,7 +208,7 @@ for arg in "$@"; do
             echo "  --with-dota2 adds the Linux Dota 2 runtime; game files are installed separately"
             echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --with-android adds Android Translation Layer and any staged APKs"
-            echo "  --with-roblox adds a previously staged Cordial runtime; supply your own APK"
+            echo "  --with-roblox adds native ATL/ART and the Roblox launchers; supply your own ARM64 APK"
             echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
             echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop binary cache"
@@ -721,6 +720,7 @@ runtime = staging / "opt/vinix-android-aarch64"
 verified = art.read_manifest(runtime)
 bionic = art.read_bionic_manifest(runtime)
 atl = art.read_atl_manifest(runtime)
+art.validate_atl_art_pair(verified, atl)
 manifest = json.loads((runtime / "runtime-manifest.json").read_text())
 if (manifest.get("architecture") != "aarch64" or manifest.get("execution") != "native"
         or manifest.get("page_size") != 16384 or manifest.get("art") != verified
@@ -730,17 +730,23 @@ if (manifest.get("architecture") != "aarch64" or manifest.get("execution") != "n
 PY
 fi
 
-if [ "$WITH_ROBLOX" -eq 1 ] &&
-   { [ ! -x "$ROBLOX_STAGING/usr/bin/run-roblox" ] ||
-     [ ! -x "$ROBLOX_STAGING/usr/bin/run-roblox-client" ] ||
-     [ ! -x "$ROBLOX_STAGING/usr/bin/qemu-x86_64" ] ||
-     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-x86_64/usr/bin/cordial-run" ] ||
-     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-x86_64/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2" ] ||
-     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-wayland/lib/ld-musl-aarch64.so.1" ] ||
-     [ ! -x "$ROBLOX_STAGING/opt/vinix-roblox-wayland/usr/bin/weston" ]; }; then
-    echo "ERROR: --with-roblox needs $ROBLOX_STAGING" >&2
-    echo "Run ./build-roblox-aarch64.sh first." >&2
-    exit 1
+if [ "$WITH_ROBLOX" -eq 1 ]; then
+    python3 - "$SCRIPT_DIR/build-support/roblox/build.py" "$ROBLOX_STAGING" "$ANDROID_STAGING" <<'PYROBLOX'
+import importlib.util
+from pathlib import Path
+import sys
+
+builder, staging, android = map(Path, sys.argv[1:])
+spec = importlib.util.spec_from_file_location("vinix_roblox_builder", builder)
+assert spec and spec.loader
+roblox = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(roblox)
+try:
+    roblox.validate_stage(staging, android)
+except (OSError, ValueError, RuntimeError) as error:
+    raise SystemExit(f"--with-roblox requires a verified ATL launcher stage: {error}\n"
+                     "Run ./build-roblox-aarch64.sh first.")
+PYROBLOX
 fi
 
 # `package.py` produces the only supported bundle format. Its manifest binds
@@ -1076,7 +1082,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
     fi
 
     if [ "$WITH_ROBLOX" -eq 1 ]; then
-        echo "==> Staging Roblox's private Cordial runtime"
+        echo "==> Staging Roblox ATL launchers"
         merge_staging_tree "$ROBLOX_STAGING"
     fi
 
@@ -1251,24 +1257,6 @@ install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
-if [ "$WITH_ROBLOX" -eq 1 ]; then
-    # Cached X11 layers can predate the native compositor's MIT-SHM selector.
-    # Refresh this small host without rebuilding the complete Xorg/Mesa layer.
-    if [ ! -f "$X11_SYSROOT/usr/include/X11/Xlib.h" ]; then
-        echo "ERROR: --with-roblox needs the X11 sysroot at $X11_SYSROOT" >&2
-        echo "Run ./build-x11-aarch64.sh or set VINIX_X11_SYSROOT." >&2
-        exit 1
-    fi
-    echo "==> Building Roblox's native X11 host"
-    "$LLVM_BIN/clang" --target=aarch64-linux-musl --sysroot="$X11_SYSROOT" \
-        --gcc-install-dir="$GCCLIB" -static-libgcc -O2 -Wall -Wextra -Werror \
-        -D__vinix__ -I"$X11_SYSROOT/usr/include" \
-        "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
-        -fuse-ld=lld -L"$X11_SYSROOT/usr/lib" -L"$X11_SYSROOT/lib" \
-        -Wl,-rpath-link,"$X11_SYSROOT/usr/lib" -Wl,-rpath-link,"$X11_SYSROOT/lib" \
-        -lXtst -lXdamage -lX11 -lXext -lxcb -o "$BUILD_DIR/vinix-wine-host-roblox"
-    install -m755 "$BUILD_DIR/vinix-wine-host-roblox" "$STAGING/usr/bin/vinix-wine-host"
-fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
 install -m755 "$SCRIPT_DIR/build-support/obs/run-obs" "$STAGING/usr/bin/run-obs"
@@ -1440,11 +1428,9 @@ if [ "$WITH_X86_TRANSLATION" -eq 1 ]; then
     done
 fi
 if [ "$WITH_ROBLOX" -eq 1 ]; then
-    for command_path in usr/bin/qemu-x86_64 usr/bin/run-roblox usr/bin/run-roblox-client \
-        opt/vinix-roblox-x86_64/usr/bin/cordial-run \
-        opt/vinix-roblox-x86_64/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
-        opt/vinix-roblox-wayland/lib/ld-musl-aarch64.so.1 \
-        opt/vinix-roblox-wayland/usr/bin/weston; do
+    for command_path in usr/bin/run-roblox usr/bin/run-roblox-client usr/bin/run-android \
+        opt/vinix-android-aarch64/lib/ld-musl-aarch64.so.1 \
+        opt/vinix-android-aarch64/usr/bin/android-translation-layer; do
         if [ ! -x "$STAGING/$command_path" ]; then
             echo "ERROR: Roblox desktop is missing /$command_path" >&2
             exit 1

@@ -40,6 +40,9 @@ ART_ELFS = frozenset({"usr/lib/art/" + name + ".so" for name in (
 ART_BOOT_JARS = frozenset({"usr/lib/java/dex/art/" + name for name in (
     "core-oj-hostdex.jar", "core-libart-hostdex.jar",
 )})
+ANDROIDFW_HEADER = "usr/include/androidfw/androidfw_c_api.h"
+ANDROIDFW_LIBRARY = "usr/lib/art/libandroidfw.so"
+ART_HEADERS = frozenset({ANDROIDFW_HEADER})
 BIONIC_MANIFEST = "bionic-runtime-manifest.json"
 BIONIC_PATCH = Path(__file__).with_name("bionic16k.patch")
 BIONIC_SOURCE_COMMIT = "ee37eb21c91409fe0eed833d0a5a0aa6b931bb7b"
@@ -55,6 +58,7 @@ BIONIC_LIBRARIES = frozenset({
     "usr/lib/libstdc++_bio.so", "usr/lib/libstdc++_bio.so.0",
 })
 ATL_MANIFEST = "atl-runtime-manifest.json"
+ATL_PATCH = Path(__file__).with_name("atl-configuration.patch")
 ATL_SOURCE_COMMIT = "aa80e7405436fb4b442b7c90abefd2d526f8543a"
 ATL_SOURCE_SHA256 = "20c1ce3890d416099fd446d299eb58069ee41d38c1a412e2e331b91c07aca9f1"
 ATL_SOURCE_SHA512 = (
@@ -66,6 +70,7 @@ ATL_JARS = frozenset({ATL_DEX_DIRECTORY + "/" + name for name in (
     "api-impl.jar", "gstub.jar", "ghax.jar")})
 ATL_ELFS = frozenset({
     "usr/bin/android-translation-layer", "usr/lib/libandroid.so", "usr/lib/libandroid.so.0",
+    "usr/libexec/vinix-android/atl-configuration-test",
     ATL_DEX_DIRECTORY + "/natives/libtranslation_layer_main.so",
 })
 ATL_RESOURCES = ATL_DEX_DIRECTORY + "/framework-res.apk"
@@ -162,7 +167,7 @@ def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = F
     commit = ATL_SOURCE_COMMIT if atl else BIONIC_SOURCE_COMMIT if bionic else SOURCE_COMMIT
     sha256 = ATL_SOURCE_SHA256 if atl else BIONIC_SOURCE_SHA256 if bionic else SOURCE_SHA256
     sha512 = ATL_SOURCE_SHA512 if atl else BIONIC_SOURCE_SHA512 if bionic else SOURCE_SHA512
-    patch = BIONIC_PATCH if bionic else PATCH
+    patch = ATL_PATCH if atl else BIONIC_PATCH if bionic else PATCH
     flag = "-Wl,-z,max-page-size=65536" if atl else "-DBIONIC_PAGE_SIZE=16384" if bionic else "-DART_PAGE_SIZE=16384"
     if not isinstance(manifest, dict):
         raise RuntimeError(f"{label} runtime manifest must be an object")
@@ -174,8 +179,10 @@ def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = F
             or manifest.get("source_sha512") != sha512
             or manifest.get("source_sha256") != sha256):
         raise RuntimeError(f"{label} runtime source does not match the pinned source archive")
-    if not atl and manifest.get("patch_sha256") != _digest(patch):
-        raise RuntimeError(f"{label} runtime was built with a different Vinix 16 KiB patch; rebuild {label}")
+    if manifest.get("patch_sha256") != _digest(patch):
+        raise RuntimeError(f"{label} runtime was built with a different Vinix patch; rebuild {label}")
+    if not bionic and manifest.get("androidfw_configuration_api") != 1:
+        raise RuntimeError(f"{label} runtime lacks the native androidfw configuration API")
     flags = manifest.get("build_flags")
     if (not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags)
             or flag not in flags):
@@ -218,8 +225,8 @@ def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = F
             if any(records[name][key] != records[canonical][key] for key in ("sha256", "size")):
                 raise RuntimeError(f"Bionic SONAME alias differs from its canonical library: {name}")
     else:
-        missing = ART_ELFS - seen
-        unexpected = seen - (ART_ELFS | ART_BOOT_JARS)
+        missing = (ART_ELFS | ART_HEADERS) - seen
+        unexpected = seen - (ART_ELFS | ART_HEADERS | ART_BOOT_JARS)
         if missing:
             raise RuntimeError("ART runtime is missing required native outputs: "
                                + ", ".join(sorted(missing)))
@@ -235,6 +242,11 @@ def _validate_atl_payloads(overlay: Path, manifest: dict, seen: set[str]) -> Non
         raise RuntimeError("ATL runtime is missing part of its coherent native/framework/resource output")
     boot = _boot_tools()
     if ("--buildtype=release" not in manifest["build_flags"]
+            or manifest.get("androidfw_patch_sha256") != _digest(PATCH)
+            or any(not isinstance(manifest.get(key), str)
+                   or re.fullmatch(r"[0-9a-f]{64}", manifest[key]) is None
+                   for key in ("androidfw_header_sha256", "androidfw_library_sha256"))
+            or manifest.get("configuration_probe_sha256") != _digest(Path(__file__).with_name("atl-configuration-test.c"))
             or manifest.get("builder_sha256") != _digest(Path(__file__).with_name("build-atl.sh"))
             or manifest.get("dex_adapter_sha256") != _digest(Path(__file__).with_name("atl-dex.py"))
             or manifest.get("dex_compiler_sha256") != boot.INPUTS[2]["sha256"]
@@ -334,7 +346,22 @@ def apply_bionic(overlay: Path, runtime: Path, manifest: dict) -> dict:
 
 
 def read_atl_manifest(overlay: Path) -> dict:
-    return _read_manifest(overlay, atl=True)
+    manifest = _read_manifest(overlay, atl=True)
+    if (overlay / MANIFEST).exists():
+        validate_atl_art_pair(read_manifest(overlay), manifest)
+    return manifest
+
+
+def validate_atl_art_pair(art_manifest: dict, atl_manifest: dict) -> None:
+    """Require ATL's compile header and linked provider from the selected ART."""
+    records = {record.get("path"): record for record in art_manifest.get("files", [])}
+    if (art_manifest.get("androidfw_configuration_api") != 1
+            or atl_manifest.get("androidfw_configuration_api") != 1
+            or atl_manifest.get("androidfw_patch_sha256") != art_manifest.get("patch_sha256")
+            or any(atl_manifest.get(key) != records.get(name, {}).get("sha256")
+                   for key, name in (("androidfw_header_sha256", ANDROIDFW_HEADER),
+                                     ("androidfw_library_sha256", ANDROIDFW_LIBRARY)))):
+        raise RuntimeError("ATL's androidfw header and linked provider differ from the selected ART; rebuild ATL")
 
 
 def apply_atl(overlay: Path, runtime: Path, manifest: dict) -> dict:

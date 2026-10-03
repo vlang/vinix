@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Cordial hosts the unchanged APK through a nested Wayland compositor on Xvfb.
+// ATL/ART executes the unchanged Android APK in the desktop's X11 window.
 module main
 
 const roblox_surface_width = 1280
@@ -26,7 +26,7 @@ fn open_roblox(mut _ Desktop) !NativeApp {
 	mut failure := HostedText.none_
 	if C.access(c'/usr/bin/run-roblox', C.X_OK) != 0
 		|| C.access(c'/usr/bin/run-roblox-client', C.X_OK) != 0
-		|| C.access(c'/opt/vinix-roblox-wayland/usr/bin/weston', C.X_OK) != 0 {
+		|| C.access(c'/usr/bin/run-android', C.X_OK) != 0 {
 		failure = .roblox_missing
 	} else if !roblox_apk_available() {
 		failure = .roblox_apk_missing

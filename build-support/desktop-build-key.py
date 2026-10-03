@@ -130,11 +130,8 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     x86_staging = resolved_env_path(
         env, "VINIX_X86_TRANSLATION_STAGING", root / "build-aarch64-x86-translation/staging"
     )
-    x11_sysroot = resolved_env_path(
-        env, "VINIX_X11_SYSROOT", x11_staging.parent / "sysroot"
-    )
     roblox_staging = resolved_env_path(
-        env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/x86_64/staging"
+        env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/aarch64/staging"
     )
     android_staging = resolved_env_path(
         env, "VINIX_ANDROID_STAGING", root / "build-aarch64-android/aarch64/staging"
@@ -263,7 +260,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     add_text(
         digest,
         "inplace-layer-generation",
-        tree_key([x11_staging, x11_sysroot, gpu_sysroot, doom_staging], metadata_only=True),
+        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
     )
     for path in layer_roots:
         add_text(digest, f"layer:{path}", root_generation(path))

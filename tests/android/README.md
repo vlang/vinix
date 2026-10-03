@@ -54,7 +54,14 @@ Before launching the APK, the test checks mapped stack bounds, the finite stack
 limit, worker stack guards and ART's memory mapping prerequisites in the real
 guest. The native fork probe checks Android and host callback ordering, DSO
 finalization, child registration and the bounded callback table against the
-actual compatibility library. The legacy `--runtime-arch x86_64` diagnostic option requires
+actual compatibility library. The configuration probe allocates and copies real
+ATL configuration objects from actual asset-manager snapshots, checks their
+density, locale, SDK and screen qualifiers, and verifies that later asset-manager
+updates leave existing snapshots intact. This fixture links the same configuration
+object built for libandroid with the verified androidfw provider. The fortified I/O
+probe checks actual file, symlink and socket transfers, Android standard-stream
+conversion, stream error flags and bounds aborts. Both probe verdicts are
+recorded in `result.json`. The legacy `--runtime-arch x86_64` diagnostic option requires
 `x86_64-linux-musl-gcc`; `--strace` applies to that translated diagnostic path.
 `--click X Y` changes the desktop screen position clicked before typing;
 `--focus X Y` changes the APK window position clicked in direct mode.
@@ -82,8 +89,8 @@ without the calculator observer or simulated input:
 python3 tests/android/run.py --apk /path/to/application.apk \
     --activity package/Activity --title package --observe \
     --mode direct --state-dir /tmp/vinix-apk-observation
-python3 tests/android/run.py --apk /path/to/Roblox.apk \
-    --activity com/roblox/client/startup/ActivitySplash --observe \
+python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+    --observe \
     --mode direct --runtime-arg=-X --runtime-arg=-verbose:jni \
     --state-dir /tmp/vinix-roblox-observation
 ```
@@ -102,6 +109,10 @@ records the original native-library load error before a later unresolved JNI
 method obscures it. Failure diagnostics retain the first 256 KiB of each
 application log, its final 40 lines and the last 80 native-load/exception lines.
 
-The Roblox observation command exercises its Java activity through native
-ATL/ART. The regular Roblox desktop entry uses the separate Cordial runtime
+`--launcher roblox` validates and stages the production Roblox launchers alongside
+its shared native runtime. Direct mode runs `run-roblox`; desktop mode opens the
+real **Roblox** entry and supplies the APK through `VINIX_ROBLOX_APK`. Use
+`--mode desktop` without `--runtime-arg` to exercise that entry. The Roblox
+observation command exercises its Java activity through native ATL/ART. The
+regular Roblox desktop entry uses the same native ATL/ART runtime
 described in [Roblox APK](../../docs/roblox.md).
