@@ -788,15 +788,15 @@ struct SpawnedAppProcess {
 	from_child int
 }
 
-// Copy the configured APK before fork, then keep it alive until exec has
-// received it. Other applications keep the normal isolated environment.
-fn desktop_roblox_apk_environment(enabled bool) string {
+// Copy configured APK paths before fork, then keep each entry alive until exec
+// has received it. Other applications keep the normal isolated environment.
+fn desktop_roblox_environment(enabled bool, name string) string {
 	if enabled {
-		value := C.getenv(c'VINIX_ROBLOX_APK')
+		value := C.getenv(&char(name.str))
 		if value != unsafe { nil } && unsafe { value[0] } != 0 {
 			path := unsafe { cstring_to_vstring(value) }
 			defer { unsafe { path.free() } }
-			return 'VINIX_ROBLOX_APK=${path}'
+			return '${name}=${path}'
 		}
 	}
 	return ''
@@ -852,14 +852,23 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 	home_entry := 'HOME=${desktop_home}'
 	request_env := 'VINIX_REQUEST_FD=${request[0]}'
 	response_env := 'VINIX_RESPONSE_FD=${response[1]}'
-	roblox_apk_env := desktop_roblox_apk_environment(app_name == 'vinix-roblox')
-	defer { unsafe { roblox_apk_env.free() } }
+	roblox_apk_env := desktop_roblox_environment(app_name == 'vinix-roblox', 'VINIX_ROBLOX_APK')
+	roblox_split_env := desktop_roblox_environment(app_name == 'vinix-roblox', 'VINIX_ROBLOX_SPLIT_APKS')
+	defer {
+		unsafe {
+			roblox_apk_env.free()
+			roblox_split_env.free()
+		}
+	}
 	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root',
 		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
 	if roblox_apk_env.len > 0 {
 		envp << &char(roblox_apk_env.str)
+	}
+	if roblox_split_env.len > 0 {
+		envp << &char(roblox_split_env.str)
 	}
 	if standalone {
 		envp << &char(request_env.str)
@@ -1117,13 +1126,22 @@ fn desktop_spawn_wine_host(directory string, width int, height int, command stri
 	argv << &char(unsafe { nil })
 	path_entry := 'PATH=${desktop_command_path}'
 	home_entry := 'HOME=${desktop_home}'
-	roblox_apk_env := desktop_roblox_apk_environment(command == '/usr/bin/run-roblox-client')
-	defer { unsafe { roblox_apk_env.free() } }
+	roblox_apk_env := desktop_roblox_environment(command == '/usr/bin/run-roblox-client', 'VINIX_ROBLOX_APK')
+	roblox_split_env := desktop_roblox_environment(command == '/usr/bin/run-roblox-client', 'VINIX_ROBLOX_SPLIT_APKS')
+	defer {
+		unsafe {
+			roblox_apk_env.free()
+			roblox_split_env.free()
+		}
+	}
 	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root', c'LOGNAME=root',
 		c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri']
 	if roblox_apk_env.len > 0 {
 		envp << &char(roblox_apk_env.str)
+	}
+	if roblox_split_env.len > 0 {
+		envp << &char(roblox_split_env.str)
 	}
 	envp << &char(unsafe { nil })
 

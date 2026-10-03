@@ -2226,3 +2226,343 @@ diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/andro
 +	g_mutex_unlock(&cookie_store_mutex);
 +	return flushed;
 +}
+--- a/src/main-executable/main.c
++++ b/src/main-executable/main.c
+@@ -41,6 +41,41 @@
+ 
+ GtkWidget *window;
+ char *apk_path;
++char *apk_archive_paths;
++
++/* Keep the base first; each archive remains an untouched, separate file. */
++static char *build_apk_archive_paths(const char *base_path, char **split_paths, GError **error)
++{
++	GPtrArray *paths = g_ptr_array_new_with_free_func(free);
++	for (size_t i = 0; i == 0 || (split_paths && split_paths[i - 1]); i++) {
++		const char *input = i == 0 ? base_path : split_paths[i - 1];
++		char *path = realpath(input, NULL);
++		struct stat st;
++		if (!path || strchr(path, ':') || stat(path, &st) || !S_ISREG(st.st_mode) || access(path, R_OK)) {
++			g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
++			            "APK path must be a readable regular file without ':': %s", input);
++			free(path);
++			g_ptr_array_unref(paths);
++			return NULL;
++		}
++		for (guint j = 0; j < paths->len; j++) {
++			if (!strcmp(path, g_ptr_array_index(paths, j))) {
++				g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT, "Repeated APK path: %s", input);
++				free(path);
++				g_ptr_array_unref(paths);
++				return NULL;
++			}
++		}
++		g_ptr_array_add(paths, path);
++	}
++	GString *classpath = g_string_new(NULL);
++	for (guint i = 0; i < paths->len; i++) {
++		if (i) g_string_append_c(classpath, ':');
++		g_string_append(classpath, g_ptr_array_index(paths, i));
++	}
++	g_ptr_array_unref(paths);
++	return g_string_free(classpath, FALSE);
++}
+ 
+ // standard Gtk Application stuff, more or less
+ 
+@@ -231,6 +266,7 @@
+ 	char *prgname;
+ 	char **extra_jvm_options;
+ 	char **extra_string_keys;
++	char **split_apks;
+ 	char *sdk_int;
+ };
+ 
+@@ -337,7 +373,6 @@
+ 
+ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
+ {
+-	// TODO: pass all files to classpath
+ 	/*
+ 	printf("nfiles: %d\n", nfiles);
+ 	for(int i = 0; i < nfiles; i++) {
+@@ -366,18 +401,29 @@
+ 	jobject activity_object;
+ 	jobject application_object;
+ 
+-	char *apk_classpath = g_file_get_path(files[0]);
++	char *base_apk_path = g_file_get_path(files[0]);
+ 	char *apk_name = g_file_get_basename(files[0]);
+ 
+-	if (apk_classpath == NULL) {
++	if (base_apk_path == NULL) {
+ 		fprintf(stderr, "error: the specified file path doesn't seem to be valid\n");
+ 		exit(1);
+ 	}
+ 
+-	if (access(apk_classpath, F_OK) < 0) {
+-		fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_classpath);
++	if (d->split_apks && (d->install || d->install_internal)) {
++		fprintf(stderr, "error: installing split APKs is not supported\n");
+ 		exit(1);
+ 	}
++	GError *archive_error = NULL;
++	char *apk_classpath = build_apk_archive_paths(base_apk_path, d->split_apks, &archive_error);
++	g_free(base_apk_path);
++	if (!apk_classpath) {
++		fprintf(stderr, "error: %s\n", archive_error->message);
++		g_error_free(archive_error);
++		exit(1);
++	}
++	/* Context source APIs must receive the base, never a colon-separated list. */
++	const char *split_separator = strchr(apk_classpath, ':');
++	base_apk_path = split_separator ? g_strndup(apk_classpath, split_separator - apk_classpath) : g_strdup(apk_classpath);
+ 
+ 	Dl_info libart_so_dl_info;
+ 	// JNI_CreateJavaVM chosen arbitrarily, what matters is that it's a symbol exported by by libart.so
+@@ -473,9 +519,19 @@
+ 	(*env)->CallVoidMethod(env, java_runtime, loadLibrary_with_classloader, _JSTRING("translation_layer_main"), class_loader);
+ 
+ 	// some apps need the apk path since they directly read their apk
+-	apk_path = strdup(apk_classpath);
++	apk_path = base_apk_path;
++	apk_archive_paths = strdup(apk_classpath);
+ 
+ 	(*env)->GetJavaVM(env, &jvm);
++	/* Context initializes and validates the primary package. Check before the
++	 * handle cache requests Activity methods or any application engine is loaded. */
++	jclass context_bootstrap = (*env)->FindClass(env, "android/content/Context");
++	if (!context_bootstrap || (*env)->ExceptionCheck(env)) {
++		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++		fprintf(stderr, "error: failed to initialize application package\n");
++		exit(1);
++	}
++	(*env)->DeleteLocalRef(env, context_bootstrap);
+ 	set_up_handle_cache(env);
+ 
+ 	/* -- misc -- */
+@@ -790,6 +846,7 @@
+ 		{ "install-internal",  0 , 0, G_OPTION_ARG_NONE,         &d->install_internal,          "copy an apk to _installed_apks_ but don't create a desktop entry",                             NULL            },
+ 		{ "extra-jvm-option", 'X', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_jvm_options,         "pass an additional option directly to art (e.g -X \"-verbose:jni\")",                          "\"OPTION\""    },
+ 		{ "extra-string-key", 'e', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_string_keys,         "pass a string extra (-e key=value)",                                                           "\"KEY=VALUE\"" },
++		{ "split-apk",         0 , 0, G_OPTION_ARG_FILENAME_ARRAY, &d->split_apks,               "add a split APK to the base application (repeat for each split)",                              "APK_PATH" },
+ 		{ "sdk-int",           0 , 0, G_OPTION_ARG_STRING,       &d->sdk_int,                   "shorthand for -X \"-DBuild.VERSION.SDK_INT=<version>\"",                                                           "SDK_INT" },
+ 		/* long_name | short_name | flags                     | arg                  | arg_data     | description                                                                              | arg_desc */
+ 		{ "uri",              'u', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, option_uri_cb, "open the given URI inside the application",                                               "URI"           },
+@@ -859,6 +916,7 @@
+ 	callback_data->prgname = argv[0];
+ 	callback_data->extra_jvm_options = NULL;
+ 	callback_data->extra_string_keys = NULL;
++	callback_data->split_apks = NULL;
+ 	callback_data->sdk_int = NULL;
+ 
+ 	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
+--- a/src/api-impl-jni/util.c
++++ b/src/api-impl-jni/util.c
+@@ -60,10 +60,11 @@
+ }
+ 
+ extern char *apk_path;
++extern char *apk_archive_paths;
+ void extract_from_apk(const char *path, const char *target)
+ {
+ 	JNIEnv *env = get_jni_env();
+-	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_path), _JSTRING(path), _JSTRING(target));
++	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_archive_paths ? apk_archive_paths : apk_path), _JSTRING(path), _JSTRING(target));
+ }
+ 
+ /* logging with fallback to stderr */
+--- a/src/api-impl/android/atl/ATLLoadedApp.java
++++ b/src/api-impl/android/atl/ATLLoadedApp.java
+@@ -11,6 +11,7 @@
+ import android.content.res.AssetManager;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.content.res.XmlResourceParser;
+ import android.os.Build;
+ import android.os.Handler;
+ import android.os.Looper;
+@@ -22,9 +23,13 @@
+ import java.io.IOException;
+ import java.lang.reflect.Constructor;
+ import java.util.Arrays;
++import java.util.Enumeration;
+ import java.util.HashMap;
+ import java.util.HashSet;
++import java.util.jar.JarFile;
++import java.util.jar.JarEntry;
+ import org.xmlpull.v1.XmlPullParserException;
++import org.xmlpull.v1.XmlPullParser;
+ 
+ /**
+  * Hold ATL Specific application data to load apps
+@@ -100,6 +105,22 @@
+ 
+ 	@NonNull
+ 	public static ATLLoadedApp loadFromPath(String mainApk, String nativePath, String classLoaderPath) throws IOException {
++		String[] archivePaths = classLoaderPath.split(File.pathSeparator, -1);
++		mainApk = new File(mainApk).getCanonicalPath();
++		if (!new File(archivePaths[0]).getCanonicalPath().equals(mainApk)) {
++			throw new IOException("The base APK must be the first application archive");
++		}
++		requireArchiveManifest(mainApk);
++		PackageParser packageParser = new PackageParser(mainApk);
++		// A combined AssetManager searches backwards and can select a split manifest.
++		// Parse metadata with the existing manager that contains only the base APK.
++		PackageParser.Package pkg = packageParser.parsePackage(new File(mainApk), mainApk, new DisplayMetrics(), 0);
++		if (pkg == null || packageParser.getParseError() != PackageManager.INSTALL_SUCCEEDED) {
++			throw new IOException("Failed to parse base APK: " + mainApk);
++		}
++		pkg.applicationInfo.sourceDir = mainApk;
++		pkg.applicationInfo.publicSourceDir = mainApk;
++		validateSplitArchives(archivePaths, pkg);
+ 		if (ATLToggles.ATL_GHAX) {
+ 			// Always load ghax.jar as the first element to override application library classes
+ 			classLoaderPath = ATLPaths.ghax_jar.getPath() + File.pathSeparator + classLoaderPath;
+@@ -107,25 +128,88 @@
+ 		BaseDexClassLoader classLoader = new PathClassLoader(
+ 		    classLoaderPath, nativePath, ATLLoadedApp.class.getClassLoader());
+ 		AssetManager assetManager = new AssetManager(classLoader);
+-		PackageParser packageParser = new PackageParser(mainApk);
+ 		Resources resources = new Resources(assetManager, new DisplayMetrics(), Context.sys_config);
+-		String[] outError = new String[1];
+-		PackageParser.Package pkg;
+-		try {
+-			pkg = packageParser.parsePackage(resources,
+-			                                 assetManager.openXmlResourceParser(1, "AndroidManifest.xml"), 0, outError);
+-		} catch (XmlPullParserException e) {
+-			throw new IOException(outError[0], e);
+-		}
+-		if (packageParser.getParseError() != PackageManager.INSTALL_SUCCEEDED) {
+-			throw new IOException(outError[0]);
+-		}
+ 		packageParser.collectCertificates(pkg, 0);
+ 		// Support for MicroG and other custom GMS implementations.
+ 		if (play_services.contains(pkg.packageName)) {
+ 			ATLSigHelper.addGMSSignatures(pkg);
+ 		}
+ 		return new ATLLoadedApp(resources, classLoader, pkg);
++	}
++
++	private static void validateSplitArchives(String[] archivePaths, PackageParser.Package pkg) throws IOException {
++		if (archivePaths.length == 1) return;
++		String[] splitPaths = new String[archivePaths.length - 1];
++		String[] splitNames = new String[splitPaths.length];
++		HashSet<String> paths = new HashSet<>();
++		HashSet<String> names = new HashSet<>();
++		paths.add(new File(archivePaths[0]).getCanonicalPath());
++		final String androidNamespace = "http://schemas.android.com/apk/res/android";
++		HashSet<String> componentTags = new HashSet<>(Arrays.asList("activity", "activity-alias", "service", "receiver", "provider", "uses-split"));
++		for (int i = 1; i < archivePaths.length; i++) {
++			File file = new File(archivePaths[i]).getCanonicalFile();
++			if (!file.isFile() || !file.canRead() || !paths.add(file.getPath())) {
++				throw new IOException("Unreadable or repeated split APK: " + archivePaths[i]);
++			}
++			requireArchiveManifest(file.getPath());
++			try (JarFile jar = new JarFile(file)) {
++				Enumeration<JarEntry> entries = jar.entries();
++				while (entries.hasMoreElements()) {
++					String name = entries.nextElement().getName();
++					if (name.matches("classes[0-9]*\\.dex")) {
++						throw new IOException("Split APK DEX code is not supported: " + file);
++					}
++				}
++			}
++			AssetManager assets = new AssetManager();
++			XmlResourceParser parser = null;
++			try {
++				assets.addAssetPath(file.getPath());
++				parser = assets.openXmlResourceParser(0, "AndroidManifest.xml");
++				int type;
++				do { type = parser.next(); } while (type != XmlPullParser.START_TAG && type != XmlPullParser.END_DOCUMENT);
++				if (type != XmlPullParser.START_TAG || !"manifest".equals(parser.getName())) {
++					throw new IOException("Split APK has no manifest root: " + file);
++				}
++				String splitName = parser.getAttributeValue(null, "split");
++				String dependency = parser.getAttributeValue(null, "configForSplit");
++				if (dependency == null) dependency = parser.getAttributeValue(androidNamespace, "configForSplit");
++				if (parser.getAttributeBooleanValue(androidNamespace, "isFeatureSplit", false)
++				    || (dependency != null && !dependency.isEmpty())) {
++					throw new IOException("Feature and dependent split APKs are not supported: " + file);
++				}
++				if (!pkg.packageName.equals(parser.getAttributeValue(null, "package"))
++				    || pkg.mVersionCode != parser.getAttributeIntValue(androidNamespace, "versionCode", -1)
++				    || splitName == null || splitName.isEmpty() || !names.add(splitName)) {
++					throw new IOException("Split APK identity does not match the base: " + file);
++				}
++				while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
++					if (type == XmlPullParser.START_TAG && (componentTags.contains(parser.getName())
++					    || ("application".equals(parser.getName()) && parser.getAttributeBooleanValue(androidNamespace, "hasCode", true)))) {
++						throw new IOException("Split APK components or code are not supported: " + file);
++					}
++				}
++				splitPaths[i - 1] = file.getPath();
++				splitNames[i - 1] = splitName;
++			} catch (XmlPullParserException e) {
++				throw new IOException("Failed to parse split APK: " + file, e);
++			} finally {
++				if (parser != null) parser.close();
++				assets.close();
++			}
++		}
++		pkg.applicationInfo.splitSourceDirs = splitPaths;
++		pkg.applicationInfo.splitPublicSourceDirs = splitPaths.clone();
++		pkg.splitNames = splitNames;
++	}
++
++	private static void requireArchiveManifest(String archive) throws IOException {
++		try (JarFile jar = new JarFile(archive)) {
++			JarEntry manifest = jar.getJarEntry("AndroidManifest.xml");
++			if (manifest == null || manifest.isDirectory()) {
++				throw new IOException("APK archive has no AndroidManifest.xml: " + archive);
++			}
++		}
+ 	}
+ 
+ 	public Resources createDefaultResources() {
+--- a/src/api-impl/android/content/pm/PackageParser.java
++++ b/src/api-impl/android/content/pm/PackageParser.java
+@@ -303,6 +303,7 @@
+ 		pi.packageName = p.packageName;
+ 		pi.versionCode = p.mVersionCode;
+ 		pi.versionName = p.mVersionName;
++		pi.splitNames = p.splitNames == null ? null : p.splitNames.clone();
+ 		pi.sharedUserId = p.mSharedUserId;
+ 		pi.sharedUserLabel = p.mSharedUserLabel;
+ 		pi.applicationInfo = generateApplicationInfo(p, flags, state, userId);
+@@ -3261,6 +3262,7 @@
+ 	public final static class Package {
+ 
+ 		public String packageName;
++		public String[] splitNames;
+ 
+ 		// For now we only support one application per package.
+ 		public final ApplicationInfo applicationInfo = new ApplicationInfo();
+--- a/src/api-impl/android/content/pm/ApplicationInfo.java
++++ b/src/api-impl/android/content/pm/ApplicationInfo.java
+@@ -589,6 +589,8 @@
+ 		largestWidthLimitDp = orig.largestWidthLimitDp;
+ 		sourceDir = orig.sourceDir;
+ 		publicSourceDir = orig.publicSourceDir;
++		splitSourceDirs = orig.splitSourceDirs;
++		splitPublicSourceDirs = orig.splitPublicSourceDirs;
+ 		nativeLibraryDir = orig.nativeLibraryDir;
+ 		resourceDirs = orig.resourceDirs;
+ 		seinfo = orig.seinfo;
+--- a/src/main-executable/main.c
++++ b/src/main-executable/main.c
+@@ -527,6 +527,14 @@
+ 	 * handle cache requests Activity methods or any application engine is loaded. */
+ 	jclass context_bootstrap = (*env)->FindClass(env, "android/content/Context");
+ 	if (!context_bootstrap || (*env)->ExceptionCheck(env)) {
++		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++		fprintf(stderr, "error: failed to initialize application package\n");
++		exit(1);
++	}
++	/* FindClass alone does not initialize Context in ART. JNI specifies that
++	 * GetStaticFieldID runs class initialization, including package validation. */
++	jfieldID context_config = (*env)->GetStaticFieldID(env, context_bootstrap, "sys_config", "Landroid/content/res/Configuration;");
++	if (!context_config || (*env)->ExceptionCheck(env)) {
+ 		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
+ 		fprintf(stderr, "error: failed to initialize application package\n");
+ 		exit(1);

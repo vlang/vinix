@@ -5,7 +5,7 @@ export HOME=/root USER=root LOGNAME=root SHELL=/bin/sh TERM=linux
 export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export XDG_RUNTIME_DIR=/run/user/0
 . /opt/android-test/config.sh
-export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_APK VINIX_ANDROID_LINKER_DIAGNOSTICS
+export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_APK VINIX_ROBLOX_SPLIT_APKS VINIX_ANDROID_LINKER_DIAGNOSTICS
 
 application_logs() {
     [ "${TEST_INTERACTIVE:-0}" = 1 ] && return
@@ -226,6 +226,45 @@ if [ -n "${TEST_COOKIE_PROBE:-}" ]; then
     done
     echo ANDROID-COOKIE-VERIFIED
 fi
+if [ -n "${TEST_SPLIT_PROBE:-}" ]; then
+    echo ANDROID-SPLIT-START
+    split_positive=0
+    split_rejected=0
+    for split_launch in "$TEST_SPLIT_PROBE"/launch-*; do
+        [ -x "$split_launch" ] || continue
+        split_name=${split_launch##*/}
+        split_log="/tmp/android-$split_name.log"
+        rm -f /tmp/android-split-status
+        mkfifo /tmp/android-split-events
+        (while :; do sleep 30; done) >/tmp/android-split-events &
+        split_input_pid=$!
+        /usr/bin/vinix-wine-host :96 "/tmp/android-$split_name" 128x128x24 \
+            "$split_launch" --fill </tmp/android-split-events >"$split_log" 2>&1
+        kill "$split_input_pid" 2>/dev/null || true
+        wait "$split_input_pid" 2>/dev/null || true
+        rm -f /tmp/android-split-events
+        cat "$split_log"
+        split_expected=$(cat "$split_launch.expected")
+        [ "$(cat /tmp/android-split-status 2>/dev/null)" = "$split_expected" ] \
+            || fail "configuration split fixture returned an unexpected status: $split_name"
+        if [ "$split_expected" = 0 ]; then
+            grep -q '^ANDROID-SPLIT-PASS ' "$split_log" \
+                || fail "configuration split fixture assertions did not pass"
+            split_positive=$((split_positive + 1))
+        else
+            grep -F -q -f "$split_launch.error" "$split_log" \
+                || fail "configuration split fixture did not reject the expected error: $split_name"
+            if grep -q '^ANDROID-SPLIT-PASS ' "$split_log"; then
+                fail "invalid configuration split reached application code: $split_name"
+            fi
+            echo "ANDROID-SPLIT-REJECTED $split_name"
+            split_rejected=$((split_rejected + 1))
+        fi
+    done
+    [ "$split_positive" = 1 ] && [ "$split_rejected" -gt 0 ] \
+        || fail "configuration split fixture did not run its positive and rejection cases"
+    echo ANDROID-SPLIT-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64
@@ -281,6 +320,30 @@ if [ -n "${TEST_TLS_PROBE:-}" ]; then
     grep -q '^ANDROID-TLS-PASS ' /tmp/android-tls-probe.log \
         || fail "native Java HTTPS trust probe did not report its assertions passing"
     echo ANDROID-TLS-VERIFIED
+fi
+
+if [ -n "${TEST_EGL_PROBE:-}" ]; then
+    echo ANDROID-EGL-START
+    rm -f /tmp/android-egl-status
+    mkfifo /tmp/android-egl-events
+    (while :; do sleep 30; done) >/tmp/android-egl-events &
+    egl_input_pid=$!
+    /usr/bin/vinix-wine-host :95 /tmp/android-egl-probe 128x128x24 \
+        /opt/android-test/egl-launch --fill \
+        </tmp/android-egl-events >/tmp/android-egl-probe.log 2>&1 || {
+        kill "$egl_input_pid" 2>/dev/null || true
+        cat /tmp/android-egl-probe.log
+        fail "native EGL and GTK texture probe failed"
+    }
+    kill "$egl_input_pid" 2>/dev/null || true
+    wait "$egl_input_pid" 2>/dev/null || true
+    rm -f /tmp/android-egl-events
+    cat /tmp/android-egl-probe.log
+    [ "$(cat /tmp/android-egl-status 2>/dev/null)" = 0 ] \
+        || fail "native EGL and GTK texture probe did not exit successfully"
+    grep -q '^ANDROID-EGL-PASS ' /tmp/android-egl-probe.log \
+        || fail "native EGL and GTK texture probe did not report its assertions passing"
+    echo ANDROID-EGL-VERIFIED
 fi
 
 if [ "$TEST_MODE" = direct ]; then
@@ -343,29 +406,6 @@ if [ "$TEST_OBSERVE" = 0 ]; then
     [ -s /tmp/android-text.log ] || fail "test text observer was not loaded"
 fi
 cat /tmp/android-window.log
-if [ -n "${TEST_EGL_PROBE:-}" ]; then
-    echo ANDROID-EGL-START
-    (
-        runtime=/opt/vinix-android-aarch64
-        unset LD_LIBRARY_PATH LD_PRELOAD
-        export DISPLAY="$display" VINIX_ALLOW_WX=1
-        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"
-        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
-        export GDK_BACKEND=x11 GDK_DISABLE="${GDK_DISABLE:+$GDK_DISABLE,}glx" GSK_RENDERER=cairo
-        export GTK_A11Y=none GSETTINGS_BACKEND=memory
-        export FONTCONFIG_PATH="$runtime/etc/fonts" FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
-        export GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"
-        export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
-        exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" "$TEST_EGL_PROBE"
-    ) >/tmp/android-egl-probe.log 2>&1 || {
-        cat /tmp/android-egl-probe.log
-        fail "native EGL and GTK texture probe failed"
-    }
-    cat /tmp/android-egl-probe.log
-    grep -q '^ANDROID-EGL-PASS ' /tmp/android-egl-probe.log \
-        || fail "native EGL and GTK texture probe did not report its assertions passing"
-    echo ANDROID-EGL-VERIFIED
-fi
 echo "ANDROID-SURFACE $surface/Xvfb_screen0"
 echo "ANDROID-DISPLAY $display"
 if [ "$TEST_MODE" = direct ]; then

@@ -762,15 +762,17 @@ fn test_dota2_search_and_taskbar_pin_preserve_app_identity() {
 	assert load_taskbar_pins(home).len == 0
 }
 
-fn test_roblox_apk_override_survives_app_exec() {
-	key := 'VINIX_ROBLOX_APK'
-	had_value := C.getenv(c'VINIX_ROBLOX_APK') != unsafe { nil }
-	previous := os.getenv(key)
+fn test_roblox_apk_paths_survive_app_exec() {
+	keys := ['VINIX_ROBLOX_APK', 'VINIX_ROBLOX_SPLIT_APKS']
+	had_values := keys.map(C.getenv(&char(it.str)) != unsafe { nil })
+	previous := keys.map(os.getenv(it))
 	defer {
-		if had_value {
-			os.setenv(key, previous, true)
-		} else {
-			os.unsetenv(key)
+		for i, key in keys {
+			if had_values[i] {
+				os.setenv(key, previous[i], true)
+			} else {
+				os.unsetenv(key)
+			}
 		}
 	}
 	work := '/tmp/vinix-roblox-env-${C.getpid()}'
@@ -778,12 +780,14 @@ fn test_roblox_apk_override_survives_app_exec() {
 	defer { os.rmdir_all(work) or {} }
 	result := '${work}/result'
 	fixture := '${work}/child'
-	os.write_file(fixture, '#!/bin/sh\nprintf "%s" "\$VINIX_ROBLOX_APK" > "${result}"\n') or {
+	os.write_file(fixture, '#!/bin/sh\nprintf "%s\\n%s" "\$VINIX_ROBLOX_APK" "\$VINIX_ROBLOX_SPLIT_APKS" > "${result}"\n') or {
 		panic(err)
 	}
 	os.chmod(fixture, 0o755) or { panic(err) }
 	apk := '/tmp/Roblox APKs/base.apk'
-	assert os.setenv(key, apk, true) == 0
+	splits := '/tmp/Roblox APKs/config.arm64_v8a.apk:/tmp/Roblox APKs/config.en.apk'
+	assert os.setenv(keys[0], apk, true) == 0
+	assert os.setenv(keys[1], splits, true) == 0
 	for name in ['vinix-roblox', 'vinix-firefox'] {
 		process := desktop_spawn_app(fixture, name, 0, 'en', true, '') or {
 			panic('cannot execute environment fixture')
@@ -792,8 +796,14 @@ fn test_roblox_apk_override_survives_app_exec() {
 		desktop_close(process.from_child)
 		assert desktop_wait_child(process.pid) == 0
 		captured := os.read_file(result) or { panic(err) }
-		expected := if name == 'vinix-roblox' { apk } else { '' }
+		expected := if name == 'vinix-roblox' { '${apk}\n${splits}' } else { '\n' }
 		assert captured == expected
+	}
+	for key in keys {
+		assert os.setenv(key, '', true) == 0
+		entry := desktop_roblox_environment(true, key)
+		assert entry == ''
+		unsafe { entry.free() }
 	}
 }
 

@@ -109,6 +109,25 @@ records the original native-library load error before a later unresolved JNI
 method obscures it. Failure diagnostics retain the first 256 KiB of each
 application log, its final 40 lines and the last 80 native-load/exception lines.
 
+`--split-apk /path/to/config.arm64_v8a.apk` supplies an unchanged configuration
+APK beside `--apk /path/to/base.apk`. Repeat it for additional splits. The
+harness copies each archive separately, records its SHA256 in `result.json`,
+and passes it through the normal ATL split option in direct and desktop mode.
+It does not merge or re-sign archives. Package and version matching is checked
+by the runtime; verify the base and splits' signatures before execution.
+
+`--split-probe /path/to/fixture-directory` first launches a normal fixture APK
+with a separate configuration split. It requires base package/version metadata,
+split paths through copied `ApplicationInfo`, an asset from the split and a
+real JNI library loaded from it. The directory contains
+`android-split-probe.apk`, `config.arm64_v8a.apk` and `test-cases.json`, whose
+`cases` entries name invalid APKs in `splits` and an expected diagnostic in
+`error`. Every rejection must exit with status 1 before application code runs;
+an abort or missing pass marker fails the preflight. The result records all
+fixture archive hashes and `split_probe_passed` separately from window observation.
+The fixture build script is `tests/android/split-test.py`; build it against
+the same genuine ATL hax classes as the runtime under test.
+
 `--launcher roblox` validates and stages the production Roblox launchers alongside
 its shared native runtime. Direct mode runs `run-roblox`; desktop mode opens the
 real **Roblox** entry and supplies the APK through `VINIX_ROBLOX_APK`. Use
@@ -271,7 +290,8 @@ cc -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=65536 \
 
 It requires real green pixel readback from an ES2 framebuffer, transfers an
 EGLImage into a separate GDK GLES context, and verifies the downloaded GTK
-texture pixels. The guest requires zero exit status plus `ANDROID-EGL-PASS`;
+texture pixels. It runs on a separate private X11 display before launching
+the application. The guest requires zero exit status plus `ANDROID-EGL-PASS`;
 results record the executable hash and verdict. This checks the rendering
 dependency path, and does not establish that Roblox draws or accepts input.
 

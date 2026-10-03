@@ -94,6 +94,37 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(self.arguments()[0], str(override))
         self.assertEqual(override.read_bytes(), b"second APK fixture")
 
+    def test_desktop_split_paths_are_separate_unchanged_arguments(self) -> None:
+        first = self.directory / "config arm64.apk"
+        second = self.directory / "config locale.apk"
+        first.write_bytes(b"signed native split fixture")
+        second.write_bytes(b"signed resource split fixture")
+        result = self.launch("-X", "caller option", client=True,
+                             VINIX_ROBLOX_SPLIT_APKS=f"{first}:{second}")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.arguments()[-6:], ["-X", "caller option", "--split-apk", str(first),
+                                               "--split-apk", str(second)])
+        self.assertEqual(first.read_bytes(), b"signed native split fixture")
+        self.assertEqual(second.read_bytes(), b"signed resource split fixture")
+
+    def test_missing_directory_or_empty_split_does_not_start_runtime(self) -> None:
+        split = self.directory / "config.apk"
+        split.write_bytes(b"unchanged split")
+        for value in (str(self.directory / "absent.apk"), str(self.directory),
+                      f":{split}", f"{split}:", f"{split}::{split}"):
+            with self.subTest(value=value):
+                result = self.launch(client=True, VINIX_ROBLOX_SPLIT_APKS=value)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertFalse(self.record.exists())
+
+    def test_explicit_split_option_reaches_atl(self) -> None:
+        split = self.directory / "explicit native.apk"
+        split.write_bytes(b"unchanged split")
+        result = self.launch(self.apk, "--split-apk", split)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.arguments()[-2:], ["--split-apk", str(split)])
+        self.assertEqual(split.read_bytes(), b"unchanged split")
+
 
 if __name__ == "__main__":
     unittest.main()

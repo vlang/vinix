@@ -44,8 +44,9 @@ class InteractiveTest(unittest.TestCase):
             runtime_arch="aarch64", launcher="android", mode="desktop",
             interactive=True, observe=True, input="qmp", keys="123+456", expect="579",
             timeout=0, screenshot=self.root / "session/application.png",
-            runtime_arg=[], boot_probe=None, loader_probe=None, linker_diagnostics=False,
-            tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, cookie_probe=None, egl_probe=None,
+            runtime_arg=[], split_apk=[], split_apk_sha256=[],
+            boot_probe=None, loader_probe=None, linker_diagnostics=False,
+            tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, cookie_probe=None, split_probe=None, egl_probe=None,
         )
         self.args.state_dir.mkdir()
 

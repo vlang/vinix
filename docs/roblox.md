@@ -12,9 +12,12 @@ fragment callbacks now follow the framework lifecycle boundaries. The latest
 launch reaches native shell startup, creates the rendering surface and starts
 Roblox's Lua app. `android.webkit.ValueCallback` now has Android's interface
 contract, and `CookieManager` supplies real cookie storage, caller-Looper
-callbacks and checked persistence. The latest launch draws Roblox's upgrade
-dialog: its version service requires an update for the tested APK.
-Authentication and gameplay remain unverified.
+callbacks and checked persistence. ATL now loads separate base and ARM64
+configuration APKs. The current release draws Roblox's welcome screen with
+**Create Account** and **Sign In** on Vinix.
+Direct ATL runs have kept that screen drawing for 60 seconds. The desktop
+launch still has an Xvfb crash under investigation. Authentication and
+gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
 then stage the Roblox launchers and include both layers in the desktop:
@@ -47,13 +50,35 @@ VINIX_ROBLOX_APK=/root/Roblox.apk run-roblox-client
 run-roblox /root/Roblox.apk
 ```
 
+For a split distribution, supply its unchanged base APK and ARM64
+configuration APK together:
+
+```sh
+run-roblox /root/com.roblox.client.apk --split-apk /root/config.arm64_v8a.apk
+VINIX_ROBLOX_APK=/root/com.roblox.client.apk \
+VINIX_ROBLOX_SPLIT_APKS=/root/config.arm64_v8a.apk run-roblox-client
+```
+
+Repeat `--split-apk` for additional configuration APKs. The desktop setting
+`VINIX_ROBLOX_SPLIT_APKS` accepts a colon-separated list of paths. The base and
+splits must belong to the same package and version; keep their signatures
+intact. Verify both APKs' signatures before using a downloaded bundle.
+This supports configuration splits without DEX code, application components
+or feature dependencies. Feature split installation is not implemented.
+
 The launcher selects `com/roblox/client/startup/ActivitySplash` and a 1280×720
 window. Additional arguments are passed to ATL. App data uses the same
 `ANDROID_APP_DATA_DIR` setting as other Android APKs, normally
 `$HOME/.local/share/vinix/android`. The APK and its native engine are unchanged.
 
-The tested APK is Roblox **2.738.1397**, `com.roblox.client`, version code 3092,
-with SHA256 `bbe00ae306cc251c4ea55b7a932d9c524ecb0d6d9203c2a6161bcf0fae792742`.
+The current tested bundle is Roblox **2.741.1061**, `com.roblox.client`,
+version code 3212. Its unchanged base APK has SHA256
+`3f7c1007663711415aa7eaf40fa2a7ca3cb0c5633c73ecab746de1108d67bb6b`;
+`config.arm64_v8a.apk` has SHA256
+`945dbc5c25c1da5ae2fc5b944878177686947c215115744326386957d98db59b`.
+Both APKs passed AOSP `apksigner` verification with the same Roblox signer.
+The earlier complete APK, **2.738.1397** (version code 3092), has SHA256
+`bbe00ae306cc251c4ea55b7a932d9c524ecb0d6d9203c2a6161bcf0fae792742`.
 The coherent framework supplies `Build.SUPPORTED_64_BIT_ABIS`; the private
 native-library loader's fork callbacks resolve its earlier `__register_atfork`
 dependency. The real configuration implementation supplies asset-manager
@@ -123,9 +148,13 @@ A checked SQLite snapshot preserves persistent and session cookies, including
 distinct paths for the same name. This manual store supports Roblox's own
 HTTP cookie bridge; sharing with an enabled WebKit WebView is not implemented.
 The separate cookie fixture passes both public-API checks and reload in a
-fresh process on Vinix. The unchanged Roblox APK now passes the cookie API,
-draws its own "Roblox Upgrade" dialog and reports `upgradeStatus = 2`.
+fresh process on Vinix. The earlier Roblox APK passed the cookie API,
+drew its own "Roblox Upgrade" dialog and reported `upgradeStatus = 2`.
 The real version-service request for `AppAndroidV2.738.1397` independently
-returns `UpgradeAction: Required`. Login and gameplay remain unverified.
+returns `UpgradeAction: Required`. The current signed base/configuration pair
+reaches Roblox's native welcome screen. Base metadata comes from the base
+manifest; combined resources and native-library extraction read both unchanged
+archives. A normal fixture APK verifies metadata, copied split paths, a split
+asset and a real ARM64 JNI library on Vinix. Login and gameplay remain unverified.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.

@@ -29,6 +29,51 @@ FAILURES = (b"ANDROID-FAIL", b"KERNEL PANIC", b"FATAL EXCEPTION",
             b"JNI DETECTED ERROR IN APPLICATION", b"Fatal signal ")
 
 
+def prepare_split_probe(source: Path, destination: Path) -> dict[str, str]:
+    """Stage normal APK launches and explicit rejection cases without changing archives."""
+    cases = json.loads((source / "test-cases.json").read_text())["cases"]
+    names = {"positive"}
+    files = {"android-split-probe.apk", "config.arm64_v8a.apk", "test-cases.json"}
+    launches = [("positive", ["config.arm64_v8a.apk"], "", [])]
+    for case in cases:
+        name, splits, error = case["name"], case["splits"], case["error"]
+        options = case.get("options", [])
+        if not isinstance(name, str) or not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in name) or name in names:
+            raise ValueError("Invalid or repeated split fixture case name")
+        if not isinstance(splits, list) or not splits or not isinstance(error, str) or not error or "\n" in error:
+            raise ValueError("Invalid split fixture rejection case")
+        if not isinstance(options, list) or any(option not in ("--install", "--install-internal") for option in options):
+            raise ValueError("Invalid split fixture launcher option")
+        for filename in splits:
+            if not isinstance(filename, str) or Path(filename).name != filename or not filename.endswith(".apk"):
+                raise ValueError("Split fixture archive must be a plain APK filename")
+        names.add(name)
+        files.update(splits)
+        launches.append((name, splits, error, options))
+    if not cases:
+        raise ValueError("Split fixture must include rejection cases")
+    destination.mkdir()
+    checksums = {}
+    for filename in sorted(files):
+        shutil.copy2(source / filename, destination / filename)
+        checksums[filename] = hashlib.sha256((destination / filename).read_bytes()).hexdigest()
+    guest = "/opt/android-test/split-probe/"
+    for index, (name, splits, error, options) in enumerate(launches):
+        target = destination / f"launch-{index:02d}-{name}"
+        command = ["/usr/bin/run-android", guest + "android-split-probe.apk",
+                   "-l", "org/vinix/tests/AndroidSplitApkProbe$BootstrapActivity", "-w", "128", "-h", "128"]
+        for split in splits:
+            command.extend(("--split-apk", guest + split))
+        command.extend(options)
+        target.write_text("#!/bin/sh\n" + shlex.join(command) + "\n"
+                          'split_status=$?\nprintf \'%s\\n\' "$split_status" >/tmp/android-split-status\n'
+                          'exit "$split_status"\n')
+        target.chmod(0o755)
+        target.with_name(target.name + ".expected").write_text("1\n" if error else "0\n")
+        target.with_name(target.name + ".error").write_text(error)
+    return checksums
+
+
 def copy_layer(source: Path, destination: Path, inodes: dict | None = None) -> None:
     if inodes is None:
         inodes = {}
@@ -241,6 +286,13 @@ def prepare(args: argparse.Namespace) -> Path | None:
         shutil.copy2(icon, icons / icon.name)
     apk = overlay / "opt/android-test/application.apk"
     shutil.copy2(args.apk, apk)
+    split_paths = []
+    args.split_apk_sha256 = []
+    for index, source in enumerate(args.split_apk):
+        target = test / f"split-{index}.apk"
+        shutil.copy2(source, target)
+        args.split_apk_sha256.append(hashlib.sha256(target.read_bytes()).hexdigest())
+        split_paths.append(f"/opt/android-test/{target.name}")
     if args.layout_probe:
         shutil.copy2(args.layout_probe, test / "android-layout-focus-probe.jar")
         args.layout_probe_sha256 = hashlib.sha256((test / "android-layout-focus-probe.jar").read_bytes()).hexdigest()
@@ -253,6 +305,8 @@ def prepare(args: argparse.Namespace) -> Path | None:
     if args.cookie_probe:
         shutil.copy2(args.cookie_probe, test / "android-cookie-probe.apk")
         args.cookie_probe_sha256 = hashlib.sha256((test / "android-cookie-probe.apk").read_bytes()).hexdigest()
+    if args.split_probe:
+        args.split_probe_sha256 = prepare_split_probe(args.split_probe, test / "split-probe")
     if args.egl_probe:
         shutil.copy2(args.egl_probe, test / "egl-interop-test")
         (test / "egl-interop-test").chmod(0o755)
@@ -269,12 +323,14 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_HOSTED_NAME": "roblox" if args.launcher == "roblox" and args.mode == "desktop" else "android",
         "TEST_GEOMETRY": "1280x720x24" if args.launcher == "roblox" else "480x640x24",
         "VINIX_ROBLOX_APK": "/opt/android-test/application.apk",
+        "VINIX_ROBLOX_SPLIT_APKS": ":".join(split_paths) if args.launcher == "roblox" else "",
         "VINIX_ANDROID_LINKER_DIAGNOSTICS": "1" if args.linker_diagnostics else "0",
         "TEST_BIONIC_LOADER_PROBE": "/opt/android-test/loader" if args.loader_probe else "",
         "TEST_LAYOUT_PROBE": "/opt/android-test/android-layout-focus-probe.jar" if args.layout_probe else "",
         "TEST_POINTER_PROBE": "/opt/android-test/android-pointer-capture-probe.jar" if args.pointer_probe else "",
         "TEST_LIFECYCLE_PROBE": "/opt/android-test/android-activity-lifecycle-probe.apk" if args.lifecycle_probe else "",
         "TEST_COOKIE_PROBE": "/opt/android-test/android-cookie-probe.apk" if args.cookie_probe else "",
+        "TEST_SPLIT_PROBE": "/opt/android-test/split-probe" if args.split_probe else "",
         "TEST_EGL_PROBE": "/opt/android-test/egl-interop-test" if args.egl_probe else "",
         "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
         "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
@@ -308,16 +364,34 @@ def prepare(args: argparse.Namespace) -> Path | None:
                 f'cookie_status=$?\nprintf \'%s\\n\' "$cookie_status" >/tmp/android-{phase}-status\n'
                 'exit "$cookie_status"\n')
             launcher.chmod(0o755)
+    if args.egl_probe:
+        launcher = test / "egl-launch"
+        launcher.write_text(
+            "#!/bin/sh\n. /opt/android-test/config.sh\n"
+            "(\n runtime=/opt/vinix-android-aarch64\n unset LD_LIBRARY_PATH LD_PRELOAD\n"
+            ' export VINIX_ALLOW_WX=1 LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"\n'
+            ' export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"\n'
+            ' export GDK_BACKEND=x11 GDK_DISABLE="${GDK_DISABLE:+$GDK_DISABLE,}glx" GSK_RENDERER=cairo\n'
+            ' export GTK_A11Y=none GSETTINGS_BACKEND=memory\n'
+            ' export FONTCONFIG_PATH="$runtime/etc/fonts" FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"\n'
+            ' export GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"\n'
+            ' export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"\n'
+            ' exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" "$TEST_EGL_PROBE"\n'
+            ')\negl_status=$?\nprintf \'%s\\n\' "$egl_status" >/tmp/android-egl-status\n'
+            'exit "$egl_status"\n')
+        launcher.chmod(0o755)
     (test / "launch").write_text(
         "#!/bin/sh\n. /opt/android-test/config.sh\n"
-        "export VINIX_ANDROID_EXPECTED_RESULT\n"
+        "export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_SPLIT_APKS\n"
         "[ \"$TEST_STRACE\" = 0 ] || export QEMU_STRACE=1\n"
         + ("export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n" if not args.observe else "")
         + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" and not args.observe else "")
         +
         (f'exec /usr/bin/run-android "$TEST_APK" -l {shlex.quote(args.activity)} -w 480 -h 640'
          if args.launcher == "android" else 'exec /usr/bin/run-roblox "$TEST_APK"')
-        + "".join(" " + shlex.quote(argument) for argument in args.runtime_arg) + "\n")
+        + "".join(" " + shlex.quote(argument) for argument in args.runtime_arg)
+        + ("".join(" --split-apk " + shlex.quote(path) for path in split_paths)
+           if args.launcher == "android" else "") + "\n")
     (test / "launch").chmod(0o755)
     if args.launcher == "android":
         launcher = overlay / "usr/bin/run-android-calculator"
@@ -612,6 +686,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     pointer_probe_passed = None
     lifecycle_probe_passed = None
     cookie_probe_passed = None
+    split_probe_passed = None
     egl_probe_passed = None
     guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
                       for line in bytes(transcript).replace(b"\r", b"").splitlines()
@@ -667,6 +742,12 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if passed or observed:
                 failure = "native framework cookie probe did not pass"
             passed = observed = False
+    if args.split_probe:
+        split_probe_passed = b"ANDROID-SPLIT-VERIFIED" in transcript
+        if not split_probe_passed:
+            if passed or observed:
+                failure = "native configuration split APK probe did not pass"
+            passed = observed = False
     result = {"passed": None if args.interactive or (args.observe and observed) else passed,
               "observed": observed,
               "check": ("interactive-observation" if args.interactive else
@@ -674,6 +755,8 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "failure": None if passed or observed else failure,
               "mode": args.mode, "launcher": args.launcher, "apk": str(args.apk),
               "apk_sha256": hashlib.sha256(args.apk.read_bytes()).hexdigest(),
+              "split_apks": [{"path": str(path), "sha256": checksum}
+                             for path, checksum in zip(args.split_apk, args.split_apk_sha256)],
               "initramfs": str(args.initramfs), "runtime_arch": args.runtime_arch,
               "memory_mb": args.memory, "desktop": str(args.desktop), "kernel_dir": str(args.kernel_dir),
               "keys": None if args.observe else args.keys,
@@ -693,6 +776,9 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "cookie_probe": str(args.cookie_probe) if args.cookie_probe else None,
               "cookie_probe_sha256": args.cookie_probe_sha256 if args.cookie_probe else None,
               "cookie_probe_passed": cookie_probe_passed,
+              "split_probe": str(args.split_probe) if args.split_probe else None,
+              "split_probe_sha256": args.split_probe_sha256 if args.split_probe else None,
+              "split_probe_passed": split_probe_passed,
               "egl_probe": str(args.egl_probe) if args.egl_probe else None,
               "egl_probe_sha256": args.egl_probe_sha256 if args.egl_probe else None,
               "egl_probe_passed": egl_probe_passed,
@@ -741,6 +827,8 @@ def main() -> int:
     parser.add_argument("--kernel-dir", type=Path)
     parser.add_argument("--initramfs", type=Path)
     parser.add_argument("--apk", type=Path)
+    parser.add_argument("--split-apk", type=Path, action="append", default=[],
+                        help="unchanged configuration APK accompanying the base APK; repeat for multiple splits")
     parser.add_argument("--boot-probe", type=Path,
                         help="DEX JAR containing ArtBootProbe; require native Java preflight before the APK")
     parser.add_argument("--layout-probe", type=Path,
@@ -751,6 +839,8 @@ def main() -> int:
                         help="lifecycle fixture APK; require production activity and fragment ordering assertions through ATL's real application bootstrap")
     parser.add_argument("--cookie-probe", type=Path,
                         help="cookie fixture APK; require production cookie storage and caller-Looper callback assertions")
+    parser.add_argument("--split-probe", type=Path,
+                        help="split fixture directory; require base metadata, split assets/JNI and explicit invalid archive rejection")
     parser.add_argument("--egl-probe", type=Path,
                         help="native ARM64 egl-interop-test executable; require GLES2 readback and EGLImage sharing with GTK")
     parser.add_argument("--tls-probe", type=Path,
@@ -818,6 +908,10 @@ def main() -> int:
         parser.error("--lifecycle-probe requires a native aarch64 runtime")
     if args.cookie_probe and args.runtime_arch != "aarch64":
         parser.error("--cookie-probe requires a native aarch64 runtime")
+    if args.split_probe and args.runtime_arch != "aarch64":
+        parser.error("--split-probe requires a native aarch64 runtime")
+    if args.split_apk and args.runtime_arch != "aarch64":
+        parser.error("--split-apk requires a native aarch64 runtime")
     if args.egl_probe and args.runtime_arch != "aarch64":
         parser.error("--egl-probe requires a native aarch64 runtime")
     if args.tls_probe and args.runtime_arch != "aarch64":
@@ -836,11 +930,13 @@ def main() -> int:
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     args.initramfs = args.initramfs.resolve() if args.initramfs else None
     args.apk = (args.apk or args.runtime / "usr/share/vinix/android/Arity-1.1.apk").resolve()
+    args.split_apk = [path.resolve() for path in args.split_apk]
     args.boot_probe = args.boot_probe.resolve() if args.boot_probe else None
     args.layout_probe = args.layout_probe.resolve() if args.layout_probe else None
     args.pointer_probe = args.pointer_probe.resolve() if args.pointer_probe else None
     args.lifecycle_probe = args.lifecycle_probe.resolve() if args.lifecycle_probe else None
     args.cookie_probe = args.cookie_probe.resolve() if args.cookie_probe else None
+    args.split_probe = args.split_probe.resolve() if args.split_probe else None
     args.egl_probe = args.egl_probe.resolve() if args.egl_probe else None
     args.tls_probe = args.tls_probe.resolve() if args.tls_probe else None
     args.loader_probe = args.loader_probe.resolve() if args.loader_probe else None
@@ -850,6 +946,9 @@ def main() -> int:
     for path in (args.runtime / "usr/bin/run-android", args.desktop, args.kernel_dir / "bin/vinix", base, args.apk):
         if not path.is_file():
             raise SystemExit(f"Missing Android smoke test input: {path}")
+    for path in args.split_apk:
+        if not path.is_file():
+            raise SystemExit(f"Missing split APK: {path}")
     if args.boot_probe and not args.boot_probe.is_file():
         raise SystemExit(f"Missing native Java bootclasspath probe: {args.boot_probe}")
     if args.layout_probe and not args.layout_probe.is_file():
@@ -860,6 +959,10 @@ def main() -> int:
         raise SystemExit(f"Missing native framework activity lifecycle probe: {args.lifecycle_probe}")
     if args.cookie_probe and not args.cookie_probe.is_file():
         raise SystemExit(f"Missing native framework cookie probe: {args.cookie_probe}")
+    if args.split_probe:
+        for name in ("android-split-probe.apk", "config.arm64_v8a.apk", "test-cases.json"):
+            if not (args.split_probe / name).is_file():
+                raise SystemExit(f"Missing native configuration split fixture: {args.split_probe / name}")
     if args.egl_probe and not args.egl_probe.is_file():
         raise SystemExit(f"Missing native EGL and GTK texture probe: {args.egl_probe}")
     if args.tls_probe and not args.tls_probe.is_file():
