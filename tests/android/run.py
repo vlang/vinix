@@ -247,6 +247,13 @@ def prepare(args: argparse.Namespace) -> Path | None:
     if args.pointer_probe:
         shutil.copy2(args.pointer_probe, test / "android-pointer-capture-probe.jar")
         args.pointer_probe_sha256 = hashlib.sha256((test / "android-pointer-capture-probe.jar").read_bytes()).hexdigest()
+    if args.lifecycle_probe:
+        shutil.copy2(args.lifecycle_probe, test / "android-activity-lifecycle-probe.apk")
+        args.lifecycle_probe_sha256 = hashlib.sha256((test / "android-activity-lifecycle-probe.apk").read_bytes()).hexdigest()
+    if args.egl_probe:
+        shutil.copy2(args.egl_probe, test / "egl-interop-test")
+        (test / "egl-interop-test").chmod(0o755)
+        args.egl_probe_sha256 = hashlib.sha256((test / "egl-interop-test").read_bytes()).hexdigest()
     if args.tls_probe:
         shutil.copy2(args.tls_probe, test / "android-tls-probe.jar")
         args.tls_probe_sha256 = hashlib.sha256((test / "android-tls-probe.jar").read_bytes()).hexdigest()
@@ -263,6 +270,8 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_BIONIC_LOADER_PROBE": "/opt/android-test/loader" if args.loader_probe else "",
         "TEST_LAYOUT_PROBE": "/opt/android-test/android-layout-focus-probe.jar" if args.layout_probe else "",
         "TEST_POINTER_PROBE": "/opt/android-test/android-pointer-capture-probe.jar" if args.pointer_probe else "",
+        "TEST_LIFECYCLE_PROBE": "/opt/android-test/android-activity-lifecycle-probe.apk" if args.lifecycle_probe else "",
+        "TEST_EGL_PROBE": "/opt/android-test/egl-interop-test" if args.egl_probe else "",
         "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
         "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
         "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
@@ -275,6 +284,16 @@ def prepare(args: argparse.Namespace) -> Path | None:
         "TEST_OBSERVATION_SECONDS": str(args.observation_seconds),
     }
     (test / "config.sh").write_text("".join(f"{key}={shlex.quote(value)}\n" for key, value in configuration.items()))
+    if args.lifecycle_probe:
+        (test / "lifecycle-launch").write_text(
+            "#!/bin/sh\n. /opt/android-test/config.sh\n"
+            '/usr/bin/run-android "$TEST_LIFECYCLE_PROBE" '
+            "-l 'android/app/AndroidActivityLifecycleProbe$BootstrapActivity' -w 128 -h 128 "
+            '-X "-Djava.class.path=/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar:'
+            '/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk:$TEST_LIFECYCLE_PROBE"\n'
+            'lifecycle_status=$?\nprintf \'%s\\n\' "$lifecycle_status" >/tmp/android-lifecycle-status\n'
+            'exit "$lifecycle_status"\n')
+        (test / "lifecycle-launch").chmod(0o755)
     (test / "launch").write_text(
         "#!/bin/sh\n. /opt/android-test/config.sh\n"
         "export VINIX_ANDROID_EXPECTED_RESULT\n"
@@ -577,6 +596,8 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
     tls_probe_passed = None
     layout_probe_passed = None
     pointer_probe_passed = None
+    lifecycle_probe_passed = None
+    egl_probe_passed = None
     guest_failures = [line.split(b"ANDROID-FAIL ", 1)[1].strip().decode(errors="replace")
                       for line in bytes(transcript).replace(b"\r", b"").splitlines()
                       if b"ANDROID-FAIL " in line]
@@ -613,6 +634,18 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             if passed or observed:
                 failure = "native framework pointer capture probe did not pass"
             passed = observed = False
+    if args.lifecycle_probe:
+        lifecycle_probe_passed = b"ANDROID-ACTIVITY-LIFECYCLE-VERIFIED" in transcript
+        if not lifecycle_probe_passed:
+            if passed or observed:
+                failure = "native framework activity lifecycle probe did not pass"
+            passed = observed = False
+    if args.egl_probe:
+        egl_probe_passed = b"ANDROID-EGL-VERIFIED" in transcript
+        if not egl_probe_passed:
+            if passed or observed:
+                failure = "native EGL and GTK texture probe did not pass"
+            passed = observed = False
     result = {"passed": None if args.interactive or (args.observe and observed) else passed,
               "observed": observed,
               "check": ("interactive-observation" if args.interactive else
@@ -633,6 +666,12 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
               "pointer_probe": str(args.pointer_probe) if args.pointer_probe else None,
               "pointer_probe_sha256": args.pointer_probe_sha256 if args.pointer_probe else None,
               "pointer_probe_passed": pointer_probe_passed,
+              "lifecycle_probe": str(args.lifecycle_probe) if args.lifecycle_probe else None,
+              "lifecycle_probe_sha256": args.lifecycle_probe_sha256 if args.lifecycle_probe else None,
+              "lifecycle_probe_passed": lifecycle_probe_passed,
+              "egl_probe": str(args.egl_probe) if args.egl_probe else None,
+              "egl_probe_sha256": args.egl_probe_sha256 if args.egl_probe else None,
+              "egl_probe_passed": egl_probe_passed,
               "tls_probe": str(args.tls_probe) if args.tls_probe else None,
               "tls_probe_sha256": args.tls_probe_sha256 if args.tls_probe else None,
               "tls_probe_passed": tls_probe_passed,
@@ -684,6 +723,10 @@ def main() -> int:
                         help="DEX JAR containing android.view.AndroidLayoutFocusProbe; require real inflater focus assertions")
     parser.add_argument("--pointer-probe", type=Path,
                         help="DEX JAR containing android.view.AndroidPointerCaptureProbe; require real event dispatch and snapshot assertions")
+    parser.add_argument("--lifecycle-probe", type=Path,
+                        help="lifecycle fixture APK; require production activity and fragment ordering assertions through ATL's real application bootstrap")
+    parser.add_argument("--egl-probe", type=Path,
+                        help="native ARM64 egl-interop-test executable; require GLES2 readback and EGLImage sharing with GTK")
     parser.add_argument("--tls-probe", type=Path,
                         help="DEX JAR containing AndroidTlsProbe; require public HTTPS and untrusted local rejection")
     parser.add_argument("--loader-probe", type=Path,
@@ -745,6 +788,10 @@ def main() -> int:
         parser.error("--layout-probe requires a native aarch64 runtime")
     if args.pointer_probe and args.runtime_arch != "aarch64":
         parser.error("--pointer-probe requires a native aarch64 runtime")
+    if args.lifecycle_probe and args.runtime_arch != "aarch64":
+        parser.error("--lifecycle-probe requires a native aarch64 runtime")
+    if args.egl_probe and args.runtime_arch != "aarch64":
+        parser.error("--egl-probe requires a native aarch64 runtime")
     if args.tls_probe and args.runtime_arch != "aarch64":
         parser.error("--tls-probe requires a native aarch64 runtime")
     if args.loader_probe and args.runtime_arch != "aarch64":
@@ -764,6 +811,8 @@ def main() -> int:
     args.boot_probe = args.boot_probe.resolve() if args.boot_probe else None
     args.layout_probe = args.layout_probe.resolve() if args.layout_probe else None
     args.pointer_probe = args.pointer_probe.resolve() if args.pointer_probe else None
+    args.lifecycle_probe = args.lifecycle_probe.resolve() if args.lifecycle_probe else None
+    args.egl_probe = args.egl_probe.resolve() if args.egl_probe else None
     args.tls_probe = args.tls_probe.resolve() if args.tls_probe else None
     args.loader_probe = args.loader_probe.resolve() if args.loader_probe else None
     args.screenshot = (args.screenshot or args.state_dir / ("application.png" if args.observe else "calculator.png")).resolve()
@@ -778,6 +827,10 @@ def main() -> int:
         raise SystemExit(f"Missing native framework layout focus probe: {args.layout_probe}")
     if args.pointer_probe and not args.pointer_probe.is_file():
         raise SystemExit(f"Missing native framework pointer capture probe: {args.pointer_probe}")
+    if args.lifecycle_probe and not args.lifecycle_probe.is_file():
+        raise SystemExit(f"Missing native framework activity lifecycle probe: {args.lifecycle_probe}")
+    if args.egl_probe and not args.egl_probe.is_file():
+        raise SystemExit(f"Missing native EGL and GTK texture probe: {args.egl_probe}")
     if args.tls_probe and not args.tls_probe.is_file():
         raise SystemExit(f"Missing native Java HTTPS trust probe: {args.tls_probe}")
     if args.loader_probe:

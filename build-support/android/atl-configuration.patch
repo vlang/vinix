@@ -1355,3 +1355,406 @@ index 01d86ee..c7edae8 100644
 +		return new float[] {getRefreshRate()};
 +	}
 +
+diff --git a/src/api-impl-jni/app/android_app_Activity.c b/src/api-impl-jni/app/android_app_Activity.c
+index 47f7eff..032ab9c 100644
+--- a/src/api-impl-jni/app/android_app_Activity.c
++++ b/src/api-impl-jni/app/android_app_Activity.c
+@@ -14,0 +15 @@ static jobject activity_current = NULL;
++static guint64 activity_revision;
+@@ -18,5 +19,2 @@ static void activity_close(JNIEnv *env, jobject activity)
+-	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
+-	if ((*env)->ExceptionCheck(env)) {
+-		fprintf(stderr, "activity.onDestroy: seems there was a pending exception... :");
+-		(*env)->ExceptionDescribe(env);
+-	}
++	if ((*env)->ExceptionCheck(env))
++		return;
+@@ -27 +25 @@ static void activity_close(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -31,0 +30 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -35 +34 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-			(*env)->ExceptionDescribe(env);
++			return;
+@@ -36,0 +36 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
++	if (_GET_BOOL_FIELD(activity, "destroyed")) return;
+@@ -40 +40,2 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
++	if (_GET_BOOL_FIELD(activity, "destroyed")) return;
+@@ -44 +45 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -48,0 +50,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
++	if ((*env)->ExceptionCheck(env)) return;
++	guint64 revision = activity_revision;
+@@ -53,2 +56,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -59,2 +62,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -65,2 +68,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -71,2 +74,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -77,5 +80,13 @@ static void activity_update_current(JNIEnv *env)
+-	jobject activity_new = activity_backlog ? g_list_first(activity_backlog)->data : NULL;
+-
+-	if (activity_current != activity_new) {
+-		if (activity_current)
+-			activity_unfocus(env, activity_current);
++	if ((*env)->ExceptionCheck(env)) return;
++	jobject head = activity_backlog ? activity_backlog->data : NULL;
++
++	if (activity_current != head) {
++		guint64 revision = activity_revision;
++		jobject previous = activity_current ? (*env)->NewLocalRef(env, activity_current) : NULL;
++		if ((*env)->ExceptionCheck(env)) return;
++		jobject next = head ? (*env)->NewLocalRef(env, head) : NULL;
++		if ((*env)->ExceptionCheck(env)) {
++			if (previous) (*env)->DeleteLocalRef(env, previous);
++			return;
++		}
++		// Callbacks may finish/start activities recursively: detach before calling app code.
+@@ -83,4 +94,4 @@ static void activity_update_current(JNIEnv *env)
+-
+-		if (activity_new)
+-			activity_focus(env, activity_new);
+-		if (activity_new && _GET_BOOL_FIELD(activity_new, "finishing"))
++		if (previous) activity_unfocus(env, previous);
++		if (previous) (*env)->DeleteLocalRef(env, previous);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision || activity_current) {
++			if (next) (*env)->DeleteLocalRef(env, next);
+@@ -87,0 +99 @@ static void activity_update_current(JNIEnv *env)
++		}
+@@ -89 +101,15 @@ static void activity_update_current(JNIEnv *env)
+-		activity_current = activity_new;
++		if (next) activity_focus(env, next);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision || activity_current) {
++			if (next) (*env)->DeleteLocalRef(env, next);
++			return;
++		}
++		if (next && _GET_BOOL_FIELD(next, "finishing")) {
++			(*env)->DeleteLocalRef(env, next);
++			return;
++		}
++		if (next) {
++			// Publish only a still-live backlog reference, never the temporary local pin.
++			if (activity_backlog && (*env)->IsSameObject(env, next, activity_backlog->data))
++				activity_current = activity_backlog->data;
++			(*env)->DeleteLocalRef(env, next);
++		}
+@@ -93,0 +120 @@ static void activity_update_current(JNIEnv *env)
++		if ((*env)->ExceptionCheck(env)) return;
+@@ -95,2 +122,2 @@ static void activity_update_current(JNIEnv *env)
+-		if ((*env)->ExceptionCheck(env))
+-			(*env)->ExceptionDescribe(env);
++		(*env)->DeleteLocalRef(env, current_activity_class);
++		if ((*env)->ExceptionCheck(env)) return;
+@@ -108,0 +136 @@ void activity_window_ready(void)
++	guint64 revision = activity_revision;
+@@ -112,2 +140,2 @@ void activity_window_ready(void)
+-		if ((*env)->ExceptionCheck(env))
+-			(*env)->ExceptionDescribe(env);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++			return;
+@@ -143,0 +172 @@ void activity_close_all(void)
++	activity_revision++;
+@@ -162,2 +191,3 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-	if (activity_current)
+-		activity_unfocus(env, activity_current);
++	if ((*env)->ExceptionCheck(env)) return;
++	jobject previous = activity_current ? (*env)->NewLocalRef(env, activity_current) : NULL;
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -164,0 +195,3 @@ void activity_start(JNIEnv *env, jobject activity_object)
++	if (previous) activity_unfocus(env, previous);
++	if (previous) (*env)->DeleteLocalRef(env, previous);
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -168 +201 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -174,5 +207,4 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-	(*env)->CallVoidMethod(env, activity_object, handle_cache.activity.onPostCreate, NULL);
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
+-
+-	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
++	jobject reference = _REF(activity_object);
++	if ((*env)->ExceptionCheck(env) || !reference) return;
++	activity_backlog = g_list_prepend(activity_backlog, reference);
++	activity_revision++;
+@@ -190,0 +223 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
++			activity_revision++;
+@@ -217,0 +251 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
++				activity_revision++;
+diff --git a/src/api-impl-jni/handle_cache.c b/src/api-impl-jni/handle_cache.c
+index f3534db..1c658c7 100644
+--- a/src/api-impl-jni/handle_cache.c
++++ b/src/api-impl-jni/handle_cache.c
+@@ -10 +10 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onCreate = _METHOD(handle_cache.activity.class, "onCreate", "(Landroid/os/Bundle;)V");
++	handle_cache.activity.onCreate = _METHOD(handle_cache.activity.class, "performCreate", "(Landroid/os/Bundle;)V");
+@@ -12 +12 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onStart = _METHOD(handle_cache.activity.class, "onStart", "()V");
++	handle_cache.activity.onStart = _METHOD(handle_cache.activity.class, "performStart", "()V");
+@@ -14 +14 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onResume = _METHOD(handle_cache.activity.class, "onResume", "()V");
++	handle_cache.activity.onResume = _METHOD(handle_cache.activity.class, "performResume", "()V");
+@@ -16,3 +16,3 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onDestroy = _METHOD(handle_cache.activity.class, "onDestroy", "()V");
+-	handle_cache.activity.onStop = _METHOD(handle_cache.activity.class, "onStop", "()V");
+-	handle_cache.activity.onPause = _METHOD(handle_cache.activity.class, "onPause", "()V");
++	handle_cache.activity.onDestroy = _METHOD(handle_cache.activity.class, "performDestroy", "()V");
++	handle_cache.activity.onStop = _METHOD(handle_cache.activity.class, "performStop", "()V");
++	handle_cache.activity.onPause = _METHOD(handle_cache.activity.class, "performPause", "()V");
+diff --git a/src/api-impl/android/app/Activity.java b/src/api-impl/android/app/Activity.java
+index b613d86..ad4f35e 100644
+--- a/src/api-impl/android/app/Activity.java
++++ b/src/api-impl/android/app/Activity.java
+@@ -54,0 +55,5 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++	List<FragmentTransaction> pendingFragmentTransactions = new ArrayList<>();
++	int fragmentState = 0;
++	private Bundle fragmentSavedState;
++	private boolean postCreated;
++	private boolean fragmentTransactionsScheduled;
+@@ -146,0 +152,81 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++	/* Framework boundaries keep fragment notifications outside app overrides. */
++	final void performCreate(Bundle state) {
++		if (destroyed) return;
++		fragmentSavedState = state;
++		onCreate(state);
++		if (finishing || destroyed) return;
++		dispatchFragmentState(2, state);
++	}
++
++	final void performStart() {
++		if (destroyed) return;
++		getFragmentManager().executePendingTransactions();
++		onStart();
++		if (finishing || destroyed) return;
++		dispatchFragmentState(3, fragmentSavedState);
++		if (finishing || destroyed) return;
++		if (!postCreated) {
++			postCreated = true;
++			onPostCreate(fragmentSavedState);
++		}
++	}
++
++	final void performResume() {
++		if (destroyed) return;
++		onResume();
++		if (finishing || destroyed) return;
++		dispatchFragmentState(4, fragmentSavedState);
++	}
++
++	final void performPause() {
++		if (destroyed) return;
++		dispatchFragmentState(3, fragmentSavedState);
++		if (destroyed) return;
++		onPause();
++	}
++
++	final void performStop() {
++		if (destroyed) return;
++		dispatchFragmentState(2, fragmentSavedState);
++		if (destroyed) return;
++		onStop();
++	}
++
++	final void performDestroy() {
++		if (destroyed) return;
++		destroyed = true;
++		pendingFragmentTransactions.clear();
++		dispatchFragmentState(-1, fragmentSavedState);
++		onDestroy();
++	}
++
++	private void dispatchFragmentState(int state, Bundle savedState) {
++		if (destroyed && state != -1) return;
++		fragmentState = state;
++		fragmentSavedState = savedState;
++		getFragmentManager().executePendingTransactions();
++	}
++
++	void scheduleFragmentTransactions() {
++		if (fragmentTransactionsScheduled) return;
++		fragmentTransactionsScheduled = true;
++		postFragmentTransactionDrain(new Runnable() {
++			@Override public void run() {
++				fragmentTransactionsScheduled = false;
++				if (!destroyed) getFragmentManager().executePendingTransactions();
++			}
++		});
++	}
++
++	void postFragmentTransactionDrain(Runnable drain) {
++		new Handler(Looper.getMainLooper()).post(drain);
++	}
++
++	boolean dispatchFragments() {
++		boolean changed = false;
++		for (Fragment fragment : new ArrayList<>(fragments)) {
++			changed |= fragment.moveToState(fragmentState, fragmentSavedState);
++		}
++		return changed;
++	}
++
+@@ -150,3 +236 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onCreate(savedInstanceState);
+-		}
++		dispatchFragmentState(1, savedInstanceState);
+@@ -167,4 +250,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onStart();
+-		}
+-
+@@ -183,4 +262,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onResume();
+-		}
+-
+@@ -199,4 +274,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onPause();
+-		}
+-
+@@ -210,4 +281,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onStop();
+-		}
+-
+@@ -220,4 +287,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onDestroy();
+-		}
+-
+diff --git a/src/api-impl/android/app/Fragment.java b/src/api-impl/android/app/Fragment.java
+index 2922c10..09c2f6e 100644
+--- a/src/api-impl/android/app/Fragment.java
++++ b/src/api-impl/android/app/Fragment.java
+@@ -7,0 +8,2 @@ public class Fragment {
++	String tag;
++	private int state;
+@@ -11,0 +14,3 @@ public class Fragment {
++	public void onActivityCreated(Bundle savedInstanceState) {
++	}
++
+@@ -26,0 +32,30 @@ public class Fragment {
++	boolean moveToState(int target, Bundle savedState) {
++		boolean changed = false;
++		while (state != -1) {
++			// Reentrant callbacks may change the host state: follow its current state.
++			target = activity.fragmentState;
++			if (state == target || (activity.isFinishing() && target > state)) break;
++			changed = true;
++			if (state < target) {
++				switch (++state) {
++				case 1: onCreate(savedState); break;
++				case 2: onActivityCreated(savedState); break;
++				case 3: onStart(); break;
++				case 4: onResume(); break;
++				default: throw new IllegalStateException("Invalid fragment state");
++				}
++			} else if (state == 4) {
++				state = 3;
++				onPause();
++			} else if (state == 3) {
++				state = 2;
++				onStop();
++			} else {
++				boolean wasCreated = state > 0;
++				state = -1;
++				if (wasCreated) onDestroy();
++			}
++		}
++		return changed;
++	}
++
+diff --git a/src/api-impl/android/app/FragmentManager.java b/src/api-impl/android/app/FragmentManager.java
+index 0a14d3c..a5520b7 100644
+--- a/src/api-impl/android/app/FragmentManager.java
++++ b/src/api-impl/android/app/FragmentManager.java
+@@ -11,0 +12,3 @@ public class FragmentManager {
++		for (Fragment fragment : activity.fragments) {
++			if (tag == null ? fragment.tag == null : tag.equals(fragment.tag)) return fragment;
++		}
+@@ -20 +23,7 @@ public class FragmentManager {
+-		return false;
++		boolean changed = false;
++		while (!activity.pendingFragmentTransactions.isEmpty()) {
++			FragmentTransaction transaction = activity.pendingFragmentTransactions.remove(0);
++			transaction.execute();
++			changed = true;
++		}
++		return activity.dispatchFragments() | changed;
+diff --git a/src/api-impl/android/app/FragmentTransaction.java b/src/api-impl/android/app/FragmentTransaction.java
+index 91d2a62..1e3542e 100644
+--- a/src/api-impl/android/app/FragmentTransaction.java
++++ b/src/api-impl/android/app/FragmentTransaction.java
+@@ -3 +3,2 @@ package android.app;
+-public class FragmentTransaction {
++import java.util.ArrayList;
++import java.util.List;
+@@ -5 +6,5 @@ public class FragmentTransaction {
+-	private Activity activity;
++public class FragmentTransaction {
++	private final Activity activity;
++	private final List<Fragment> additions = new ArrayList<>();
++	private final List<String> tags = new ArrayList<>();
++	private boolean committed;
+@@ -11,3 +16,4 @@ public class FragmentTransaction {
+-	public FragmentTransaction add(Fragment fragment, String string) {
+-		fragment.activity = activity;
+-		activity.fragments.add(fragment);
++	public FragmentTransaction add(Fragment fragment, String tag) {
++		if (committed) throw new IllegalStateException("Transaction already committed");
++		additions.add(fragment);
++		tags.add(tag);
+@@ -17,0 +24,5 @@ public class FragmentTransaction {
++		if (committed) throw new IllegalStateException("Transaction already committed");
++		if (activity.destroyed) throw new IllegalStateException("Activity has been destroyed");
++		committed = true;
++		activity.pendingFragmentTransactions.add(this);
++		activity.scheduleFragmentTransactions();
+@@ -19,0 +31,12 @@ public class FragmentTransaction {
++
++	void execute() {
++		for (int i = 0; i < additions.size(); i++) {
++			Fragment fragment = additions.get(i);
++			if (fragment.activity != null || activity.fragments.contains(fragment)) {
++				throw new IllegalStateException("Fragment already added");
++			}
++			fragment.activity = activity;
++			fragment.tag = tags.get(i);
++			activity.fragments.add(fragment);
++		}
++	}
+diff --git a/src/api-impl/android/app/Instrumentation.java b/src/api-impl/android/app/Instrumentation.java
+index 0f56d07..8f5dd6e 100644
+--- a/src/api-impl/android/app/Instrumentation.java
++++ b/src/api-impl/android/app/Instrumentation.java
+@@ -155 +155 @@ public class Instrumentation {
+-				activity.onCreate(savedState);
++				activity.performCreate(savedState);
+diff --git a/src/api-impl/android/app/Activity.java b/src/api-impl/android/app/Activity.java
+index ad4f35e..24b06c4 100644
+--- a/src/api-impl/android/app/Activity.java
++++ b/src/api-impl/android/app/Activity.java
+@@ -163,0 +164 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++		if (finishing || destroyed) return;
+@@ -175,0 +177,2 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++		getFragmentManager().executePendingTransactions();
++		if (finishing || destroyed) return;

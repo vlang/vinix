@@ -166,6 +166,65 @@ Fixture classes are used only in a separate preflight VM; they never enter the
 runtime overlay or APK. A zero exit status and assertion marker are required,
 and `result.json` records its hash and verdict.
 
+`--lifecycle-probe /path/to/android-activity-lifecycle-probe.apk` runs
+[AndroidActivityLifecycleProbe.java](AndroidActivityLifecycleProbe.java) against
+the production activity and fragment dispatcher through ATL's real application
+bootstrap, on a separate X11 display in Vinix.
+The guest requires zero exit status and its assertion marker, and records the
+probe hash and verdict. The test APK contains only fixture classes and its own
+manifest/resources. It leaves the application's APK and runtime providers intact.
+
+Build the fixture against the same coherently built ATL framework and resources
+using [activity-lifecycle-test.py](activity-lifecycle-test.py):
+
+```sh
+python3 tests/android/activity-lifecycle-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
+    --core-classes /path/to/core-all_classes.jar \
+    --r8 /path/to/r8-8.3.37.jar --output /path/to/lifecycle-probe
+```
+
+The builder pins the core classes and D8 compiler, rejects extra provider
+classes, and records input/output hashes in `lifecycle-probe-build.json`.
+The Java fixture checks lifecycle callbacks after complete activity overrides,
+queued transaction catchup through the real main Handler, reentrant destruction,
+and exception propagation. Its controlled cases bypass activity constructors;
+the late-commit case runs in a normally constructed ATL activity.
+
+[run-activity-dispatch-test.sh](run-activity-dispatch-test.sh) separately compiles
+the verified production C dispatcher unchanged on native Linux:
+
+```sh
+tests/android/run-activity-dispatch-test.sh \
+    /path/to/atl/src/api-impl-jni/app/android_app_Activity.c
+```
+
+It requires GTK 4.10 or newer, libportal development packages, and JDK JNI
+headers (`ATL_JNI_INCLUDE` may select the header directory). Checked JNI doubles
+exercise finishing during start or pause, callback exceptions, reentrant activity starts,
+reference-allocation failures, and method-lookup failure. They reject deleted
+handles and mismatched local/global deletion. The `pins=0` verdict counts explicit
+dispatcher pins; class locals released by JNI at native return are excluded.
+This C test does not run ART or establish application gameplay.
+
+`--egl-probe /path/to/egl-interop-test` runs
+[egl-interop-test.c](egl-interop-test.c) on the APK's actual X11 display, using
+the installed private Mesa and GTK libraries. Build the executable on ARM64
+Linux with the matching development libraries:
+
+```sh
+cc -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=65536 \
+    tests/android/egl-interop-test.c \
+    $(pkg-config --cflags --libs gtk4 egl glesv2) -o /path/to/egl-interop-test
+```
+
+It requires real green pixel readback from an ES2 framebuffer, transfers an
+EGLImage into a separate GDK GLES context, and verifies the downloaded GTK
+texture pixels. The guest requires zero exit status plus `ANDROID-EGL-PASS`;
+results record the executable hash and verdict. This checks the rendering
+dependency path, and does not establish that Roblox draws or accepts input.
+
 ## Pointer capture preflights
 
 `--pointer-probe /path/to/android-pointer-capture-probe.jar` runs

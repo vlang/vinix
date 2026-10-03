@@ -175,6 +175,29 @@ if [ -n "${TEST_POINTER_PROBE:-}" ]; then
         || fail "native framework pointer capture probe did not report its assertions passing"
     echo ANDROID-POINTER-CAPTURE-VERIFIED
 fi
+if [ -n "${TEST_LIFECYCLE_PROBE:-}" ]; then
+    echo ANDROID-ACTIVITY-LIFECYCLE-START
+    rm -f /tmp/android-lifecycle-status
+    mkfifo /tmp/android-lifecycle-events
+    (while :; do sleep 30; done) >/tmp/android-lifecycle-events &
+    lifecycle_input_pid=$!
+    /usr/bin/vinix-wine-host :98 /tmp/android-activity-lifecycle-probe 128x128x24 \
+        /opt/android-test/lifecycle-launch --fill \
+        </tmp/android-lifecycle-events >/tmp/android-activity-lifecycle-probe.log 2>&1 || {
+        kill "$lifecycle_input_pid" 2>/dev/null || true
+        cat /tmp/android-activity-lifecycle-probe.log
+        fail "native framework activity lifecycle probe failed"
+    }
+    kill "$lifecycle_input_pid" 2>/dev/null || true
+    wait "$lifecycle_input_pid" 2>/dev/null || true
+    rm -f /tmp/android-lifecycle-events
+    cat /tmp/android-activity-lifecycle-probe.log
+    [ "$(cat /tmp/android-lifecycle-status 2>/dev/null)" = 0 ] \
+        || fail "native framework activity lifecycle probe did not exit successfully"
+    grep -q '^ANDROID-ACTIVITY-LIFECYCLE-PASS ' /tmp/android-activity-lifecycle-probe.log \
+        || fail "native framework activity lifecycle probe did not report its assertions passing"
+    echo ANDROID-ACTIVITY-LIFECYCLE-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64
@@ -292,6 +315,29 @@ if [ "$TEST_OBSERVE" = 0 ]; then
     [ -s /tmp/android-text.log ] || fail "test text observer was not loaded"
 fi
 cat /tmp/android-window.log
+if [ -n "${TEST_EGL_PROBE:-}" ]; then
+    echo ANDROID-EGL-START
+    (
+        runtime=/opt/vinix-android-aarch64
+        unset LD_LIBRARY_PATH LD_PRELOAD
+        export DISPLAY="$display" VINIX_ALLOW_WX=1
+        export LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"
+        export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"
+        export GDK_BACKEND=x11 GDK_DISABLE="${GDK_DISABLE:+$GDK_DISABLE,}glx" GSK_RENDERER=cairo
+        export GTK_A11Y=none GSETTINGS_BACKEND=memory
+        export FONTCONFIG_PATH="$runtime/etc/fonts" FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"
+        export GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"
+        export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"
+        exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" "$TEST_EGL_PROBE"
+    ) >/tmp/android-egl-probe.log 2>&1 || {
+        cat /tmp/android-egl-probe.log
+        fail "native EGL and GTK texture probe failed"
+    }
+    cat /tmp/android-egl-probe.log
+    grep -q '^ANDROID-EGL-PASS ' /tmp/android-egl-probe.log \
+        || fail "native EGL and GTK texture probe did not report its assertions passing"
+    echo ANDROID-EGL-VERIFIED
+fi
 echo "ANDROID-SURFACE $surface/Xvfb_screen0"
 echo "ANDROID-DISPLAY $display"
 if [ "$TEST_MODE" = direct ]; then

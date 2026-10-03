@@ -7,9 +7,11 @@ loader loads the APK's ARM64 engine and completes `JNI_OnLoad` on Vinix.
 Roblox compatibility is still being implemented. HTTPS startup requests now
 pass certificate verification and layout inflation handles `<requestFocus />`.
 The framework now supplies `View.OnCapturedPointerListener` and native mouse
-capture and the virtual display's supported refresh-rate query. The latest
-launch aborts during main-activity startup because its lifecycle reaches
-`STARTED` before activity-result registration completes.
+capture and the virtual display's supported refresh-rate query. Activity and
+fragment callbacks now follow the framework lifecycle boundaries. The latest
+launch reaches native shell startup, creates the rendering surface and starts
+Roblox's Lua app, then aborts because ATL declares `android.webkit.ValueCallback`
+as a class where the APK requires an interface.
 A usable Roblox screen, authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),
@@ -99,7 +101,18 @@ caller feature flags, so GTK can share ATL's EGL images. The latest real APK
 run passes pointer class resolution and `Display.getSupportedRefreshRates()`.
 That query returns the existing virtual display's nominal refresh rate; it
 does not report a physical monitor mode or prove a rendered frame rate. The
-client then aborts because its main activity reaches `STARTED` before
-activity-result registration completes, before a usable client screen.
+framework now dispatches fragment `onActivityCreated` after the activity's
+full `onCreate` override, then start and resume at their framework boundaries.
+Queued fragment additions retain their tags and catch up to the host lifecycle
+on the real main loop. The native dispatcher pins activity references across
+reentrant app callbacks and preserves pending exceptions. A separate fixture APK
+passes the production lifecycle assertions on Vinix, including late additions
+through the real main-loop handler. The native dispatcher fixture separately
+checks reference ownership, reentrancy and exception propagation with JNI doubles.
+The real EGL fixture also reads green pixels through ES2, an exported EGLImage
+and a GTK texture on Vinix. The actual Roblox run reaches `surfaceCreated` and
+`Start the lua app`, then throws `IncompatibleClassChangeError` because its
+callback implements `android.webkit.ValueCallback`, which ATL supplies as a
+class. No usable client screen or gameplay has been verified.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.

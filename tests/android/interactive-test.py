@@ -45,7 +45,7 @@ class InteractiveTest(unittest.TestCase):
             interactive=True, observe=True, input="qmp", keys="123+456", expect="579",
             timeout=0, screenshot=self.root / "session/application.png",
             runtime_arg=[], boot_probe=None, loader_probe=None, linker_diagnostics=False,
-            tls_probe=None, layout_probe=None, pointer_probe=None,
+            tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, egl_probe=None,
         )
         self.args.state_dir.mkdir()
 
