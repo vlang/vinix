@@ -49,7 +49,9 @@ def install(source: Path, target: Path) -> None:
     if source.resolve() == target.resolve():
         return
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.is_symlink():
+    # Pinned inputs retain their read-only modes in the fixture. Replace the
+    # previous file rather than opening it for writing on a repeated prepare.
+    if target.exists() or target.is_symlink():
         target.unlink()
     shutil.copy2(source, target)
 
