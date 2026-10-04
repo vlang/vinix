@@ -583,4 +583,21 @@ if run_pkg list | grep -qx voffice; then
 	exit 1
 fi
 
+# A root with no room left is not a mirror failure: the install says so once
+# and stops, rather than downloading everything again ten times over.
+full_marker="$work/install-failed-full"
+if VINIX_TEST_INSTALL_RETRY_MARKER="$full_marker" VINIX_PKG_MIN_FREE_KB=999999999999 \
+	VINIX_PKG_NETWORK_RETRY_DELAY=0 run_pkg install gnumeric \
+	>"$work/install-full.log" 2>&1; then
+	echo "ERROR: an install onto a full root reported success" >&2
+	exit 1
+fi
+grep -q "pkg: no space left on $root: " "$work/install-full.log"
+if grep -q 'refreshing downloads' "$work/install-full.log"; then
+	echo "ERROR: an install onto a full root was retried" >&2
+	cat "$work/install-full.log" >&2
+	exit 1
+fi
+unset VINIX_TEST_INSTALL_RETRY_MARKER
+
 echo "VINIX PACKAGE COMMAND TEST: PASS"

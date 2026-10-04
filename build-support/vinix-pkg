@@ -10,6 +10,9 @@ BSDTAR=${VINIX_PKG_BSDTAR:-/usr/bin/bsdtar}
 SHA256SUM=${VINIX_PKG_SHA256SUM:-/bin/busybox sha256sum}
 BUSYBOX=${VINIX_PKG_BUSYBOX-/bin/busybox}
 NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-10}
+# With less room than this on the root, in kilobytes, a failure is put down to
+# the root being full.
+MIN_FREE_KB=${VINIX_PKG_MIN_FREE_KB:-16384}
 NETWORK_RETRY_DELAY=${VINIX_PKG_NETWORK_RETRY_DELAY:-1}
 NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
 
@@ -50,6 +53,27 @@ bb() {
 		"$BUSYBOX" "$@"
 	else
 		"$@"
+	fi
+}
+
+# Whether the root has run out of room. That is not a mirror's failure:
+# downloading again cannot help, and what the commands say about it is a page
+# of "No space left on device" for whichever files came last.
+out_of_space() {
+	free_kb=$(bb df -Pk "${ROOT:-/}" 2>/dev/null | bb awk 'NR == 2 { print $4 }')
+	case "$free_kb" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$free_kb" -lt "$MIN_FREE_KB" ]
+}
+
+# Say so, and what it means here: a system started from the ISO with no disk
+# keeps every file in memory, so what it has run out of is RAM.
+report_out_of_space() {
+	echo "pkg: no space left on ${ROOT:-/}: $((free_kb / 1024)) MiB free" >&2
+	if [ -z "$ROOT" ] && bb awk '$2 == "/" { type = $3 } END { exit type != "tmpfs" }' \
+		/proc/mounts 2>/dev/null; then
+		echo "pkg: this system keeps its files in memory. Give the machine more RAM, or a blank disk of 4 GiB or more to install itself onto at the next boot." >&2
 	fi
 }
 
@@ -175,7 +199,13 @@ apk_install() (
 		# so the final offline transaction still has every selected archive.
 		# shellcheck disable=SC2086
 		apk_network --cache-dir "$cache" --no-progress cache download \
-			"$@" ${VINIX_PKG_CACHE_EXTRAS:-}
+			"$@" ${VINIX_PKG_CACHE_EXTRAS:-} || {
+			download_status=$?
+			if out_of_space; then
+				report_out_of_space
+			fi
+			return "$download_status"
+		}
 		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
 			LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_after"
 			LC_ALL=C comm -13 "$installed_before" "$installed_after" >"$new_packages"
@@ -207,6 +237,10 @@ apk_install() (
 			fi
 			materialize_runtime_library_links "$owned_files"
 			return 0
+		fi
+		if out_of_space; then
+			report_out_of_space
+			return 1
 		fi
 		if [ "$install_attempt" -ge "$NETWORK_RETRIES" ]; then
 			echo "pkg: package installation failed after $install_attempt attempts" >&2
@@ -912,7 +946,13 @@ install_minecraft() {
 	if [ "${VINIX_MINECRAFT_ASSETS:-full}" = none ]; then
 		set -- "$@" --no-assets
 	fi
-	"$python" "$@"
+	"$python" "$@" || {
+		fetch_status=$?
+		if out_of_space; then
+			report_out_of_space
+		fi
+		exit "$fetch_status"
+	}
 
 	game=$(root_path /usr/share/minecraft)
 	launch_env="$game/launch.env"
