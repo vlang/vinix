@@ -1,16 +1,16 @@
 module uacpi
 
 import klock
-import event
-import event.eventstruct
-import time
 import x86.kio
 import memory
 import lib
 import kprint
 import lib.stubs
-import x86.hpet
+// Aliased: the hpet module also has a global named `hpet`, and V3 resolves
+// `hpet.nanoseconds()` against the variable in a -prod build.
+import x86.hpet as hpet_clock
 import pci
+import acpisync
 
 pub enum UACPIStatus {
 	ok                      = 0
@@ -52,6 +52,37 @@ fn C.uacpi_namespace_initialize() UACPIStatus
 fn C.uacpi_set_interrupt_model(InterruptModel) UACPIStatus
 @[c_extern]
 fn C.uacpi_status_to_string(UACPIStatus) charptr
+@[c_extern]
+fn C.uacpi_prepare_for_sleep_state(state int) UACPIStatus
+@[c_extern]
+fn C.uacpi_enter_sleep_state(state int) UACPIStatus
+@[c_extern]
+fn C.uacpi_reboot() UACPIStatus
+
+// UACPI_SLEEP_STATE_S5, soft off.
+const sleep_state_s5 = 5
+
+// Turn the machine off through ACPI's S5 state. Returns only if that failed.
+pub fn power_off() {
+	if C.uacpi_prepare_for_sleep_state(sleep_state_s5) != .ok {
+		return
+	}
+	asm volatile amd64 {
+		cli
+	}
+	C.uacpi_enter_sleep_state(sleep_state_s5)
+	asm volatile amd64 {
+		sti
+	}
+}
+
+// Reset the machine through the FADT reset register, then through the
+// keyboard controller, which every PC and every PC emulator has. Returns only
+// if neither did anything.
+pub fn reboot() {
+	C.uacpi_reboot()
+	kio.port_out[u8](0x64, 0xfe)
+}
 
 @[export: 'uacpi_kernel_log']
 pub fn uacpi_kernel_log(level int, str charptr) {
@@ -96,94 +127,66 @@ pub fn uacpi_kernel_unlock_spinlock(handle voidptr, cpu_flags u64) {
 
 @[export: 'uacpi_kernel_acquire_mutex']
 pub fn uacpi_kernel_acquire_mutex(handle voidptr, timeout u16) UACPIStatus {
-	return UACPIStatus.ok
+	return unsafe { UACPIStatus(acpisync.wait(handle, timeout)) }
 }
 
 @[export: 'uacpi_kernel_release_mutex']
 pub fn uacpi_kernel_release_mutex(handle voidptr) {
+	if !acpisync.signal(handle) {
+		C.kprintf(c'uacpi: rejected mutex release by a non-owner\n')
+	}
 }
 
 @[export: 'uacpi_kernel_create_mutex']
 pub fn uacpi_kernel_create_mutex() voidptr {
-	return unsafe { malloc(1) }
+	return acpisync.create(true)
 }
 
 @[export: 'uacpi_kernel_free_mutex']
 pub fn uacpi_kernel_free_mutex(handle voidptr) {
-	unsafe { free(handle) }
+	if !acpisync.destroy(handle) {
+		C.kprintf(c'uacpi: refused to destroy an active mutex\n')
+	}
 }
 
 @[export: 'uacpi_kernel_create_event']
 pub fn uacpi_kernel_create_event() voidptr {
-	mut e := &eventstruct.Event{}
-	return unsafe { voidptr(e) }
+	return acpisync.create(false)
 }
 
 @[export: 'uacpi_kernel_free_event']
 pub fn uacpi_kernel_free_event(handle voidptr) {
-	mut e := unsafe { &eventstruct.Event(handle) }
-	unsafe {
-		e.free()
-		free(e)
+	if !acpisync.destroy(handle) {
+		C.kprintf(c'uacpi: refused to destroy an active event\n')
 	}
 }
 
 @[export: 'uacpi_kernel_signal_event']
 pub fn uacpi_kernel_signal_event(handle voidptr) {
-	mut e := unsafe { &eventstruct.Event(handle) }
-	event.trigger(mut e, false)
+	acpisync.signal(handle)
 }
 
 @[export: 'uacpi_kernel_wait_for_event']
 pub fn uacpi_kernel_wait_for_event(handle voidptr, timeout u16) bool {
-	target_time := time.TimeSpec{
-		tv_sec:  u64(timeout) / 1000
-		tv_nsec: (u64(timeout) % 1000) * 1000000
-	}
-	mut timer := time.new_timer(target_time)
-	defer {
-		timer.disarm()
-		unsafe {
-			timer.free()
-			free(timer)
-		}
-	}
-	mut events := if timeout == 0xffff {
-		[unsafe { &eventstruct.Event(handle) }]
-	} else {
-		[unsafe { &eventstruct.Event(handle) }, &timer.event]
-	}
-	event.await(mut events, true) or { return false }
-	return true
+	return acpisync.wait(handle, timeout) == 0
 }
 
 @[export: 'uacpi_kernel_reset_event']
 pub fn uacpi_kernel_reset_event(handle voidptr) {
+	acpisync.reset(handle)
 }
 
 @[export: 'uacpi_kernel_stall']
 pub fn uacpi_kernel_stall(usec u8) {
-	for i := 0; i < usec; i++ {
-		kio.port_in[u8](0x80)
+	started := hpet_clock.nanoseconds()
+	for hpet_clock.nanoseconds() - started < u64(usec) * 1000 {
+		klock.spin_hint()
 	}
 }
 
 @[export: 'uacpi_kernel_sleep']
 pub fn uacpi_kernel_sleep(msec u64) {
-	target_time := time.TimeSpec{
-		tv_sec:  u64(msec) / 1000
-		tv_nsec: (u64(msec) % 1000) * 1000000
-	}
-	mut timer := time.new_timer(target_time)
-	defer {
-		timer.disarm()
-		unsafe {
-			timer.free()
-			free(timer)
-		}
-	}
-	mut events := [&timer.event]
-	event.await(mut events, true) or {}
+	acpisync.sleep(msec)
 }
 
 @[export: 'uacpi_kernel_alloc']
@@ -224,9 +227,9 @@ pub fn uacpi_kernel_handle_firmware_request(req voidptr) UACPIStatus {
 
 @[export: 'uacpi_kernel_map']
 pub fn uacpi_kernel_map(phys u64, len u64) voidptr {
-	aligned_len := lib.align_up(len, page_size)
+	aligned_len := lib.align_up(len, memory.kernel_page_size)
 
-	for i := u64(0); i < aligned_len; i += page_size {
+	for i := u64(0); i < aligned_len; i += memory.kernel_page_size {
 		kernel_pagemap.map_page(higher_half + phys + i, phys + i, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
 			panic('uacpi_kernel_map() failure')
 		}
@@ -241,7 +244,7 @@ pub fn uacpi_kernel_unmap(addr voidptr, len u64) {
 
 @[export: 'uacpi_kernel_get_nanoseconds_since_boot']
 pub fn uacpi_kernel_get_nanoseconds_since_boot() u64 {
-	return hpet.read_counter() * (1000000000 / hpet_frequency)
+	return hpet_clock.nanoseconds()
 }
 
 @[export: 'uacpi_kernel_io_map']
@@ -300,7 +303,7 @@ pub fn uacpi_kernel_io_write32(handle voidptr, offset u64, value u32) UACPIStatu
 
 @[export: 'uacpi_kernel_get_thread_id']
 pub fn uacpi_kernel_get_thread_id() voidptr {
-	return unsafe { nil }
+	return voidptr(acpisync.thread_id())
 }
 
 struct UACPIPCIAddress {
@@ -312,6 +315,12 @@ struct UACPIPCIAddress {
 
 @[export: 'uacpi_kernel_pci_device_open']
 pub fn uacpi_kernel_pci_device_open(addr UACPIPCIAddress, out_handle &voidptr) UACPIStatus {
+	if out_handle == unsafe { nil } || addr.device > 31 || addr.function > 7 {
+		return UACPIStatus.invalid_argument
+	}
+	if addr.segment != 0 {
+		return UACPIStatus.not_found
+	}
 	mut pci_device := pci.get_device_by_coordinates(addr.bus, addr.device, addr.function,
 		0) or { return UACPIStatus.not_found }
 	unsafe {
@@ -324,50 +333,79 @@ pub fn uacpi_kernel_pci_device_open(addr UACPIPCIAddress, out_handle &voidptr) U
 pub fn uacpi_kernel_pci_device_close(handle voidptr) {
 }
 
+fn pci_config_status(status int) UACPIStatus {
+	return match status {
+		pci.config_ok { UACPIStatus.ok }
+		pci.config_bad_register { UACPIStatus.invalid_argument }
+		else { UACPIStatus.not_found }
+	}
+}
+
 @[export: 'uacpi_kernel_pci_read8']
 pub fn uacpi_kernel_pci_read8(handle voidptr, offset u64, value &u8) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u8](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 1, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u8(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_read16']
 pub fn uacpi_kernel_pci_read16(handle voidptr, offset u64, value &u16) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u16](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 2, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u16(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_read32']
 pub fn uacpi_kernel_pci_read32(handle voidptr, offset u64, value &u32) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	unsafe {
-		*value = pci_device.read[u32](u32(offset))
+	if handle == unsafe { nil } || value == unsafe { nil } {
+		return UACPIStatus.invalid_argument
 	}
-	return UACPIStatus.ok
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	mut result := u32(0)
+	status := pci_device.config_read(offset, 4, unsafe { &result })
+	if status == pci.config_ok {
+		unsafe { *value = u32(result) }
+	}
+	return pci_config_status(status)
 }
 
 @[export: 'uacpi_kernel_pci_write8']
 pub fn uacpi_kernel_pci_write8(handle voidptr, offset u64, value u8) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u8](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 1, u32(value)))
 }
 
 @[export: 'uacpi_kernel_pci_write16']
 pub fn uacpi_kernel_pci_write16(handle voidptr, offset u64, value u16) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u16](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 2, u32(value)))
 }
 
 @[export: 'uacpi_kernel_pci_write32']
 pub fn uacpi_kernel_pci_write32(handle voidptr, offset u64, value u32) UACPIStatus {
-	mut pci_device := unsafe { &pci.PCIDevice(handle) }
-	pci_device.write[u32](u32(offset), value)
-	return UACPIStatus.ok
+	if handle == unsafe { nil } {
+		return UACPIStatus.invalid_argument
+	}
+	pci_device := unsafe { &pci.PCIDevice(handle) }
+	return pci_config_status(pci_device.config_write(offset, 4, u32(value)))
 }

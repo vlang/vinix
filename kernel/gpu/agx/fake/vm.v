@@ -213,7 +213,8 @@ pub fn (mut vm FakeG17Vm) resolve(address u64, size u64,
 
 pub fn (mut vm FakeG17Vm) address_ranges() []FakeG17AddressRange {
 	vm.lock.acquire()
-	mut ranges := []FakeG17AddressRange{cap: vm.mappings.len}
+	// The caller frees the ranges.
+	mut ranges := []FakeG17AddressRange{cap: vm.mappings.len} @[freed]
 	for mapping in vm.mappings {
 		ranges << FakeG17AddressRange{
 			address: mapping.address
@@ -235,7 +236,7 @@ pub fn (mut vm FakeG17Vm) has_mappings() bool {
 
 pub fn (mut vm FakeG17Vm) destroy() {
 	vm.lock.acquire()
-	mut objects := []&gem.GemObject{cap: vm.mappings.len}
+	mut objects := []&gem.GemObject{cap: vm.mappings.len} @[freed]
 	for mapping in vm.mappings {
 		objects << mapping.object
 	}
@@ -245,4 +246,5 @@ pub fn (mut vm FakeG17Vm) destroy() {
 	for object in objects {
 		gem.unref(object)
 	}
+	unsafe { objects.free() }
 }

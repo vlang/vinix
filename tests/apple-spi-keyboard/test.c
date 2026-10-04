@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <assert.h>
 #include <stdio.h>
@@ -109,6 +113,12 @@ static void test_ascii_controls(void)
         b = encode_key((uint8_t)(30 + i), 2, 1, 0, 0);
         assert(b.len == 1 && b.data[0] == (uint8_t)"!@#$%^&*()"[i]);
     }
+    /* The ISO key is § and ±, after Option's escape; Cmd drops it. */
+    expect_bytes(encode_key(100, 0, 0, 0, 0), (const uint8_t *)"\xc2\xa7", 2);
+    expect_bytes(encode_key(100, 2, 1, 0, 0), (const uint8_t *)"\xc2\xb1", 2);
+    expect_bytes(encode_key(100, 0x40, 0, 0, 0), (const uint8_t *)"\033\xc2\xa7", 3);
+    assert(encode_key(100, 0x08, 0, 0, 0).len == 0);
+    expect_bytes(encode_key(49, 0, 0, 0, 0), (const uint8_t *)"\\", 1);
 }
 static void test_navigation_fn_and_function_keys(void)
 {
@@ -164,6 +174,12 @@ static void test_command_chords(void)
         (const uint8_t *)"\033[13;9u", 7); /* Cmd-Return */
     expect_bytes(encode_key(20, 0x0f, 0, 0, 0),
         (const uint8_t *)"\033[81;16u", 8); /* Shift-Ctrl-Alt-Cmd-Q */
+    expect_bytes(encode_key(80, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[1;9D", 6); /* Cmd-Left */
+    expect_bytes(encode_key(82, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[1;10A", 7); /* Shift-Cmd-Up */
+    expect_bytes(encode_key(31, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[64;10u", 8); /* Shift-Cmd-2 */
 
     assert(single(&d, 100, 0x08, 0, 20, out) == 8
         && !memcmp(out, "\033[113;9u", 8));

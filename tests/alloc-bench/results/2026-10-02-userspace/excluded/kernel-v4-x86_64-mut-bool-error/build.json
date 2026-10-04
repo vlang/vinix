@@ -1,0 +1,48 @@
+{
+  "base_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "architecture": "x86_64",
+  "commands": [
+    [
+      "make",
+      "-C",
+      "kernel",
+      "clean"
+    ],
+    [
+      "make",
+      "-C",
+      "kernel",
+      "-j8",
+      "ARCH=x86_64",
+      "CC=/usr/bin/clang",
+      "V=/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v",
+      "AR=/opt/homebrew/opt/llvm/bin/llvm-ar",
+      "VFLAGS=-d heap_selftest",
+      "LD_X86_64=/opt/homebrew/bin/ld.lld"
+    ]
+  ],
+  "v_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "source_sha256": {
+    "kernel/c/memory.c": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+    "kernel/file/timerfd.v": "ba38d9a723efd67f9d221cb9c3e5961aeb2e8c1b7d603665aeb05abe44482c23",
+    "kernel/katomic/katomic_amd64.v": "6b1ea8b1dabbdc8b43b40306200c83dc0fd01c198edb08242f51347aa7487eea",
+    "kernel/klock/klock_amd64.v": "b5973e7b826b3b82aba260dc6052da66960ae20be8b5c9eb9d1c176a71ba06da",
+    "kernel/memory/mmap/mmap.v": "95788b45183c6eac58f4fa5c01d5e5d3d5672e728d3051ce9d71d89107bf9980",
+    "kernel/memory/mmap/mmap_amd64.v": "69e3648bb5419a1e0e9f06721080deabdb286abc7c0fdae1b6f5c6515bf85c58",
+    "kernel/memory/mmap/mmap_arm64.v": "ba522bfaff83fcf525ed52a34229c013af0ef1c7a27c099adc9089cd45714e4a",
+    "kernel/memory/mmap/page_in.v": "1009d493f1998188f5a24c27e443e53f77506cd432e6241b0831bb785bc6ca8d",
+    "kernel/pipe/pipe.v": "2cb2d4e677ca89a16cb85cfbae4b637df9405d1409ab4b479fa24c987f2da411",
+    "kernel/socket/socket.v": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+    "kernel/socket/unix/unix.v": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6",
+    "kernel/time/sys/linux.v": "3cb9a6f155affa03a968604ef6de60aa263e38d30c67114d84a7607ce25967b2",
+    "kernel/time/sys/syscalls.v": "847e11eef5747b1b63794e27a58321159c9ceead187895449ed710a561650f21",
+    "kernel/time/time.v": "40767795f0d35378b010f9e74423d353f0b8194d130978a5e3bc0b961c20ffc3",
+    "kernel/time/time_amd64.v": "58449cbb9eab4c201074f7563da7e2817fb5221a5beee61e57ba58f7512f5329",
+    "kernel/time/time_arm64.v": "7cc360fd708b13fc67275455dc314d6d64db71769f2f094f5d92b14de0061be5"
+  },
+  "started_utc": "2026-10-02T19:15:31.287752+00:00",
+  "notes": "Private clean v3 baseline plus reviewed x86 MOV atomics and aligned exact-bound C word memory; Apple Clang21, frozen V and 248 standard modules, heap selftest enabled.",
+  "build_exit_code": 2,
+  "standard_modules_match_before_after": true,
+  "finished_utc": "2026-10-02T19:15:52.854412+00:00"
+}

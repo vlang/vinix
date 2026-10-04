@@ -19,6 +19,78 @@
 .macro HVF_SYNC_BARRIER
 .endm
 
+// Current-EL entry normally saves on SP_EL1. Check its whole fixed frame
+// before writing it: stack exhaustion otherwise recursively faults in SAVE.
+// Exception entry masks DAIF, including SError; this kernel enables no NMI.
+// The record and guard bitmap are permanent mapped BSS, so this check cannot
+// itself fault. No TLS or userspace SP register is borrowed. TPIDRRO_EL0 is
+// initialized to zero on each CPU and cannot be written by EL0.
+.macro CHECK_KERNEL_STACK
+    msr tpidrro_el0, x16
+    mrs x16, tpidr_el1
+    str x17, [x16, #24]
+    str x15, [x16, #32]
+    mrs x17, tpidrro_el0
+    str x17, [x16, #16]
+    msr tpidrro_el0, xzr
+
+    mov x16, sp
+    sub x16, x16, #FRAME_SIZE
+    // ARM vmap occupies [0xffff800000000000, +8 GiB).
+    eor x17, x16, #0xffff800000000000
+    lsr x17, x17, #33
+    cbnz x17, .Lstack_end\@
+    eor x16, x16, #0xffff800000000000
+    lsr x16, x16, #14
+    and x17, x16, #63
+    lsr x16, x16, #6
+    adrp x15, vinix_stack_guard_bitmap
+    add x15, x15, :lo12:vinix_stack_guard_bitmap
+    ldr x16, [x15, x16, lsl #3]
+    lsr x16, x16, x17
+    tbnz x16, #0, .Lstack_overflow\@
+.Lstack_end\@:
+    // The frame spans at most two 16 KiB slots. Checking both endpoints
+    // also covers a corrupted SP in the upper guard of an owned stack.
+    mov x16, sp
+    sub x16, x16, #1
+    eor x17, x16, #0xffff800000000000
+    lsr x17, x17, #33
+    cbnz x17, .Lstack_ok\@
+    eor x16, x16, #0xffff800000000000
+    lsr x16, x16, #14
+    and x17, x16, #63
+    lsr x16, x16, #6
+    adrp x15, vinix_stack_guard_bitmap
+    add x15, x15, :lo12:vinix_stack_guard_bitmap
+    ldr x16, [x15, x16, lsl #3]
+    lsr x16, x16, x17
+    tbz x16, #0, .Lstack_ok\@
+
+.Lstack_overflow\@:
+    mrs x16, tpidr_el1
+    ldr x17, [x16, #8]
+    cbz x17, .Lstack_ok\@
+    mov x15, sp
+    str x15, [x16, #40]
+    mov sp, x17
+    ldr x15, [x16, #32]
+    ldr x17, [x16, #24]
+    ldr x16, [x16, #16]
+    b handle_stack_exhausted
+.Lstack_ok\@:
+    mrs x16, tpidr_el1
+    ldr x15, [x16, #16]
+    msr tpidrro_el0, x15
+    ldr x15, [x16, #32]
+    ldr x17, [x16, #24]
+    str xzr, [x16, #16]
+    str xzr, [x16, #24]
+    str xzr, [x16, #32]
+    mrs x16, tpidrro_el0
+    msr tpidrro_el0, xzr
+.endm
+
 .macro SAVE_REGS
     // Make room on stack
     sub sp, sp, #FRAME_SIZE
@@ -214,6 +286,7 @@ exception_vectors:
 // =============================================================================
 
 handle_spx_sync:
+    CHECK_KERNEL_STACK
     SAVE_REGS
     mrs x0, esr_el1        // arg0: ESR
     mrs x1, far_el1        // arg1: FAR
@@ -222,23 +295,44 @@ handle_spx_sync:
     RESTORE_REGS
 
 handle_spx_irq:
+    CHECK_KERNEL_STACK
     SAVE_REGS
     mov x0, sp             // arg0: pointer to GPRState on stack
     bl exception__irq_handler
     RESTORE_REGS
 
 handle_spx_fiq:
+    CHECK_KERNEL_STACK
     SAVE_REGS
     mov x0, sp             // arg0: pointer to GPRState on stack
     bl exception__irq_handler
     RESTORE_REGS
 
 handle_spx_serror:
+    CHECK_KERNEL_STACK
     SAVE_REGS
     mrs x0, esr_el1
     mrs x1, far_el1
     mov x2, sp
     bl exception__sync_handler
+    RESTORE_REGS
+
+// Entered only after an exhausted stack has been abandoned. Restore the
+// original SP in the diagnostic frame, then dispose of scratch ownership
+// before C can ever unmask interrupts or schedule. The report never returns
+// except from one narrowly scoped compile-time probe; that probe restores its
+// original healthy stack in its first resumed instruction.
+handle_stack_exhausted:
+    SAVE_REGS
+    mrs x0, tpidr_el1
+    ldr x1, [x0, #40]
+    str x1, [sp, #248]
+    str xzr, [x0, #16]
+    str xzr, [x0, #24]
+    str xzr, [x0, #32]
+    str xzr, [x0, #40]
+    mov x0, sp
+    bl exception__stack_exhausted
     RESTORE_REGS
 
 handle_lower64_sync:
@@ -247,6 +341,17 @@ handle_lower64_sync:
     // but for lower EL exceptions we need SP_EL0 (user stack).
     mrs x9, SP_EL0
     str x9, [sp, #248]
+
+    // This is the earliest production-visible checkpoint after the exec
+    // handoff's eret. It is deliberately ahead of both SVC decoding and the
+    // generic fault handler so a failure in either path cannot hide which
+    // exception brought us back from EL0.
+    mrs x0, esr_el1
+    mrs x1, far_el1
+    mov x2, sp
+    mov x3, #0                 // lower-EL synchronous exception
+    bl scheduler_gpu_lower_exception_trace
+
     mrs x9, esr_el1
     lsr x10, x9, #26          // EC field (bits [31:26])
     cmp x10, #0x15             // SVC from AArch64?
@@ -257,6 +362,8 @@ handle_lower64_sync:
     mov x2, sp                 // arg2: GPRState pointer
     bl exception__sync_handler
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 handle_svc:
@@ -269,10 +376,12 @@ handle_svc:
     ldp x5, x6, [sp, #32]     // original x4 -> x5, original x5 -> x6
     mov x0, sp                 // first C arg = GPRState pointer
 
-    // Trace syscall entry
+    // Trace syscall entry. It answers the table slot to dispatch: the call
+    // itself, or the one a seccomp filter turned it into.
     stp x9, x30, [sp, #-16]!
     bl syscall_trace
     ldp x9, x30, [sp], #16
+    mov x9, x0
 
     // Reload args (trace clobbered them)
     ldp x1, x2, [sp, #0]
@@ -284,6 +393,7 @@ handle_svc:
     // modules/syscall/table/syscall_table_arm64.v.
     cmp x9, #512
     b.ge .svc_invalid
+
     // Dispatch via syscall_table[x9]
     adrp x10, syscall_table
     add x10, x10, :lo12:syscall_table
@@ -306,36 +416,78 @@ handle_svc:
     mov x0, sp
     bl syscall__leave
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 .svc_invalid:
     movn x0, #37               // x0 = -38 = -ENOSYS
     str x0, [sp, #0]
     HVF_SYNC_BARRIER
+    mov x0, sp
+    bl scheduler_gpu_sync_exit_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_irq:
     SAVE_REGS
     mrs x9, SP_EL0
     str x9, [sp, #248]
+    mov x0, #0
+    mov x1, #0
+    mov x2, sp
+    mov x3, #1                 // lower-EL IRQ
+    bl scheduler_gpu_lower_exception_trace
+    mov x0, sp
+    mov x1, #0
+    bl scheduler_gpu_interrupt_trace
     mov x0, sp
     bl exception__irq_handler
+    // A signal that came while the thread computed is taken now.
+    mov x0, sp
+    bl interrupt__leave
+    mov x0, sp
+    mov x1, #1
+    bl scheduler_gpu_interrupt_trace
     HVF_SYNC_BARRIER
+    mov x0, sp
+    mov x1, #2
+    bl scheduler_gpu_interrupt_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_fiq:
     SAVE_REGS
     mrs x9, SP_EL0
     str x9, [sp, #248]
+    mov x0, #0
+    mov x1, #0
+    mov x2, sp
+    mov x3, #2                 // lower-EL FIQ
+    bl scheduler_gpu_lower_exception_trace
+    mov x0, sp
+    mov x1, #0
+    bl scheduler_gpu_interrupt_trace
     mov x0, sp
     bl exception__irq_handler
+    mov x0, sp
+    bl interrupt__leave
+    mov x0, sp
+    mov x1, #1
+    bl scheduler_gpu_interrupt_trace
     HVF_SYNC_BARRIER
+    mov x0, sp
+    mov x1, #2
+    bl scheduler_gpu_interrupt_trace
     RESTORE_REGS_TO_EL0
 
 handle_lower64_serror:
     SAVE_REGS
     mrs x9, SP_EL0
     str x9, [sp, #248]
+    mrs x0, esr_el1
+    mrs x1, far_el1
+    mov x2, sp
+    mov x3, #3                 // lower-EL SError
+    bl scheduler_gpu_lower_exception_trace
     mrs x0, esr_el1
     mrs x1, far_el1
     mov x2, sp

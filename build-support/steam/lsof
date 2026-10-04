@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+"""Report Vinix TCP sockets in the lsof field format used by Steam.
+
+Steam asks lsof for the owner of each loopback WebSocket connection. BusyBox's
+lsof does not accept the field and TCP filters Steam uses, so report those
+fields from procfs's socket inode and descriptor views.
+"""
+
+import os
+import socket
+import sys
+
+
+def ipv4(hex_address):
+    return socket.inet_ntoa(bytes.fromhex(hex_address)[::-1])
+
+
+def tcp_sockets(host, port):
+    sockets = {}
+    with open("/proc/net/tcp", encoding="ascii") as table:
+        next(table)
+        for line in table:
+            fields = line.split()
+            if len(fields) < 10:
+                continue
+            local_address, local_port = fields[1].split(":")
+            remote_address, remote_port = fields[2].split(":")
+            local = ipv4(local_address)
+            remote = ipv4(remote_address)
+            local_number = int(local_port, 16)
+            remote_number = int(remote_port, 16)
+            if (local, local_number) != (host, port) and (remote, remote_number) != (host, port):
+                continue
+            name = f"{local}:{local_number}"
+            if fields[3] != "0a":  # LISTEN has no peer address.
+                name += f"->{remote}:{remote_number}"
+            sockets[fields[9]] = name
+    return sockets
+
+
+def process_parent(pid):
+    with open(f"/proc/{pid}/stat", encoding="ascii") as stream:
+        return stream.read().rsplit(")", 1)[1].split()[1]
+
+
+def main():
+    if len(sys.argv) != 6 or sys.argv[1:4] != ["-P", "-F", "upnR"] or sys.argv[4] != "-i" or not sys.argv[5].startswith("TCP@"):
+        print("lsof: unsupported arguments", file=sys.stderr)
+        return 1
+    try:
+        host, port_text = sys.argv[5][4:].rsplit(":", 1)
+        port = int(port_text)
+    except ValueError:
+        print("lsof: expected TCP@host:port", file=sys.stderr)
+        return 1
+    sockets = tcp_sockets(host, port)
+    found = False
+    for pid in os.listdir("/proc"):
+        if not pid.isdecimal():
+            continue
+        try:
+            fd_dir = f"/proc/{pid}/fd"
+            matches = []
+            for fd in os.listdir(fd_dir):
+                try:
+                    target = os.readlink(f"{fd_dir}/{fd}")
+                except OSError:
+                    continue
+                if target.startswith("socket:[") and target.endswith("]"):
+                    name = sockets.get(target[8:-1])
+                    if name is not None:
+                        matches.append((fd, name))
+            if not matches:
+                continue
+            parent = process_parent(pid)
+            uid = os.stat(f"/proc/{pid}").st_uid
+        except (OSError, ValueError):
+            continue  # A process or descriptor closed during the scan.
+        print(f"p{pid}\nR{parent}\nu{uid}")
+        for fd, name in matches:
+            print(f"f{fd}\nn{name}")
+        found = True
+    return 0 if found else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -4,6 +4,33 @@ import x86.apic
 import x86.cpu.local as cpulocal
 import x86.cpu
 
+// Walk the frame-pointer chain, printing the return address at each level.
+// The kernel is built with -fno-omit-frame-pointer, so rbp points at the saved
+// {rbp, return address} pair of every frame.
+pub fn print_backtrace() {
+	mut fp := u64(0)
+	asm volatile amd64 {
+		mov fp, rbp
+		; =r (fp)
+		; ; memory
+	}
+	C.printf_panic(c'Backtrace (return addresses):\n')
+	for i := 0; i < 32; i++ {
+		if fp == 0 || fp < 0xffff800000000000 {
+			break
+		}
+		next := unsafe { *(&u64(fp)) }
+		ret := unsafe { *(&u64(fp + 8)) }
+		if ret != 0 {
+			C.printf_panic(c'  #%d  0x%016llx\n', i, ret)
+		}
+		if next <= fp {
+			break
+		}
+		fp = next
+	}
+}
+
 @[noreturn]
 pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 	kpanic_lock.acquire()

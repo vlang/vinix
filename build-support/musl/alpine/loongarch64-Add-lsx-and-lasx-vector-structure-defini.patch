@@ -1,0 +1,34 @@
+From b7dc707babb647d3a4dd5ee3201ae9dd578a071c Mon Sep 17 00:00:00 2001
+From: Xing Li <lixing@loongson.cn>
+Date: Thu, 1 Aug 2024 08:55:54 +0800
+Subject: [PATCH] loongarch64: Add lsx and lasx vector structure definition
+
+The lack of lsx and lasx strucuture define lead to
+the upstream binutils-gdb build error.
+---
+ arch/loongarch64/bits/user.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/loongarch64/bits/user.h b/arch/loongarch64/bits/user.h
+index fd9b7b22..10e1be45 100644
+--- a/arch/loongarch64/bits/user.h
++++ b/arch/loongarch64/bits/user.h
+@@ -22,3 +22,15 @@ typedef union {
+ 	float f;
+ } elf_fpreg_t;
+ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
++
++typedef union
++{
++	double d[2];
++	float f[4];
++} elf_lsxregset_t[32] __attribute__((__aligned__(16)));
++
++typedef union
++{
++	double d[4];
++	float f[8];
++} elf_lasxregset_t[32] __attribute__((__aligned__(32)));
+-- 
+2.27.0
+

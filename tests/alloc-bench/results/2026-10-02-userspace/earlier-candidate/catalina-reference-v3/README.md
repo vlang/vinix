@@ -1,0 +1,1 @@
+These two complete Catalina captures were collected for the preceding v3 candidate. Both are preserved, including the much faster repeat that exposed five regressions. They are reference timings, not members of the newly declared v4 campaign. The complete v3 comparison against Catalina repeat 2 is in ../final-v3-versus-catalina2/.

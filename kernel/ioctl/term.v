@@ -67,3 +67,14 @@ pub const kdsetmode = 0x4b3a
 pub const kd_text = 0
 
 pub const kd_graphics = 1
+
+// KDGETLED answers the keyboard lock state as one byte of these bits. The
+// desktop reads Caps Lock this way to apply it to letters of a layout the
+// console drivers do not know about.
+pub const kdgetled = 0x4b31
+
+pub const led_scr = 0x01
+
+pub const led_num = 0x02
+
+pub const led_cap = 0x04

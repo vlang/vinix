@@ -24,7 +24,6 @@ import resource
 import sched
 import stat
 import time
-import usercopy
 
 #include "apple_display_hotplug.h"
 
@@ -106,10 +105,7 @@ fn (mut controller Controller) read(_handle voidptr, buffer voidptr, offset u64,
 		return 0
 	}
 	amount := if count < u64(word.len) - offset { count } else { u64(word.len) - offset }
-	if !usercopy.copy_to_user(u64(buffer), voidptr(u64(word.str) + offset), amount) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buffer, voidptr(u64(word.str) + offset), amount) }
 	return i64(amount)
 }
 
@@ -441,10 +437,9 @@ fn (mut controller Controller) sample() int {
 fn service() {
 	mut controller := monitor
 	mut poll_timer := time.new_timer(time.TimeSpec{ tv_nsec: poll_interval_ns })
-	mut events := [&poll_timer.event]
 	mut failures := 0
 	for {
-		event.await(mut events, true) or {}
+		event.await_one(mut poll_timer.event, true) or {}
 		poll_timer.disarm()
 		result := controller.sample()
 		if result < 0 {
@@ -478,10 +473,7 @@ fn service() {
 		}
 		poll_timer.arm()
 	}
-	unsafe {
-		events.free()
-		free(poll_timer)
-	}
+	unsafe { free(poll_timer) }
 	sched.dequeue_and_die()
 }
 

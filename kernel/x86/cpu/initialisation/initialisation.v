@@ -1,10 +1,12 @@
+@[has_globals]
 module initialisation
 
 import x86.gdt
 import x86.idt
 import x86.cpu
 import x86.msr
-import syscall
+// The syscall module supplies the C symbols syscall_entry calls into.
+import syscall as _
 import x86.cpu.local as cpulocal
 import limine
 import x86.apic
@@ -13,11 +15,25 @@ import sched
 import memory
 import x86.hypervisor
 
+// asm/x86_64/syscall_entry.S
+fn C.syscall_entry()
+fn C.vinix_x86_mitigations_initialise(number u64) bool
+
+// asm/x86_64/segment.S
+fn C.syscall32_entry()
+
 const cpuid7_ebx_smep = u32(1) << 7
+const cpuid7_ebx_smap = u32(1) << 20
+const cr4_smap = u64(1) << 21
 const cpuid7_ecx_umip = u32(1) << 2
 const cr0_write_protect = u64(1) << 16
 const cr4_umip = u64(1) << 11
 const cr4_smep = u64(1) << 20
+
+// Whether the interrupt thunks execute CLAC. They address it by its linker
+// symbol: see asm/int_thunks_asm.S.
+@[export: 'smap_enabled']
+__global smap_enabled u8
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
@@ -25,16 +41,16 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu_local.lapic_id = smp_info.lapic_id
 
-	gdt.reload()
+	gdt.install(&cpu_local.gdt[0])
+	cpu_local.ldt = unsafe { nil }
+	cpu_local.ldt_process = unsafe { nil }
 	idt.reload()
 
 	// No userspace port I/O: place the bitmap beyond the inclusive TSS limit (0x67).
 	// A zero base would interpret the TSS itself as I/O permission bits.
 	cpu_local.tss.unused3 = 0
 	cpu_local.tss.iopb = u16(sizeof(cpulocal.TSS))
-	gdt.load_tss(voidptr(&cpu_local.tss))
-
-	cpu_local.tss.ist4 = u64(&cpu_local.abort_stack[cpulocal.abort_stack_size - 1])
+	gdt.load_tss(&cpu_local.gdt[0], voidptr(&cpu_local.tss))
 
 	// EFER is per-CPU. APs must enable NXE before switching to Vinix page
 	// tables, just as the BSP does during vmm_init().
@@ -43,14 +59,17 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	unsafe {
 		stack_size := u64(0x200000)
+		cpu_local.tss.rsp0 = cpu_stack_top(stack_size)
+		cpu_local.tss.ist1 = cpu_stack_top(stack_size)
+		// A fault while the page-fault stack itself is exhausted must still
+		// have an independent stack for the fatal double-fault report.
+		cpu_local.tss.ist2 = cpu_stack_top(0x10000)
+		cpu_local.tss.ist4 = cpu_stack_top(0x10000)
 
-		common_int_stack_phys := memory.pmm_alloc(stack_size / page_size)
-		mut common_int_stack := &u64(u64(common_int_stack_phys) + stack_size + higher_half)
-		cpu_local.tss.rsp0 = u64(common_int_stack)
-
-		sched_stack_phys := memory.pmm_alloc(stack_size / page_size)
-		mut sched_stack := &u64(u64(sched_stack_phys) + stack_size + higher_half)
-		cpu_local.tss.ist1 = u64(sched_stack)
+		// Every thread brings its own page fault stack; this one is for the
+		// CPU between threads.
+		cpu_local.idle_pf_stack = cpu_stack_top(stack_size)
+		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
 	}
 	// Enable syscall
 	mut efer := msr.rdmsr(0xc0000080)
@@ -59,7 +78,11 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	msr.wrmsr(0xc0000081, 0x0033002800000000)
 
 	// Entry address
-	msr.wrmsr(0xc0000082, u64(voidptr(syscall.syscall_entry)))
+	msr.wrmsr(0xc0000082, u64(voidptr(C.syscall_entry)))
+	// And from 32-bit code, which an LDT code segment can run: AMD CPUs take
+	// SYSCALL there to CSTAR, which left at zero had the kernel jump to
+	// address 0. Intel ones refuse it with #UD.
+	msr.wrmsr(0xc0000083, u64(voidptr(C.syscall32_entry)))
 
 	// Flags mask
 	msr.wrmsr(0xc0000084, u64(~u32(0x002)))
@@ -95,6 +118,30 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		cpu.write_cr4(cr4)
 		if cpu_number == 0 {
 			println('security: SMEP enabled')
+		}
+	}
+
+	// And SMAP, which OpenBSD has enabled since 5.3: a supervisor-mode access
+	// to a userspace page faults unless EFLAGS.AC is set. The kernel never
+	// sets it. Its copies to and from a process go through the direct map, so
+	// what faults is a path that follows a user pointer as it stands; see
+	// memory/user_guard.v.
+	if memory.user_guard_requested() != memory.user_guard_off {
+		if smep_supported && smep_ebx & cpuid7_ebx_smap != 0 {
+			// The interrupt thunks clear AC from here on.
+			smap_enabled = 1
+			cr4 = cpu.read_cr4()
+			cr4 |= cr4_smap
+			cpu.write_cr4(cr4)
+			if cpu_number == 0 {
+				println(if memory.user_guard_auditing() {
+					'security: SMAP enabled, auditing'
+				} else {
+					'security: SMAP enabled'
+				})
+			}
+		} else {
+			memory.user_guard_unsupported()
 		}
 	}
 
@@ -168,6 +215,11 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 		fpu_restore = cpu.fxrstor
 	}
 
+	// Program this logical CPU before it can run any user instruction.
+	if !C.vinix_x86_mitigations_initialise(cpu_number) {
+		panic('CPU speculation controls did not take effect')
+	}
+
 	// VMXON is local to each logical CPU. Failure is deliberately non-fatal:
 	// Vinix must still boot when firmware disables VT-x or a host does not
 	// expose nested virtualisation.
@@ -177,12 +229,19 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	apic.lapic_timer_calibrate(mut cpu_local)
 
-	print('smp: CPU ${cpu_local.cpu_number} online!\n')
+	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
 
 	katomic.inc(mut &cpu_local.online)
 
 	if cpu_number != 0 {
 		for katomic.load(&scheduler_vector) == 0 {}
-		sched.await()
+		sched.enter_idle()
 	}
+}
+
+// Per-CPU mappings live for the CPU's lifetime, including fatal reporting.
+fn cpu_stack_top(size u64) u64 {
+	base := memory.kernel_stack_alloc(size)
+	if base == unsafe { nil } { panic('Cannot allocate guarded CPU stack') }
+	return u64(base) + size
 }

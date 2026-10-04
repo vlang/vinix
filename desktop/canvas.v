@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The software renderer. Everything the desktop puts on screen goes through
 // these primitives: there is no GPU on the machines Vinix boots on yet, so the
 // compositor owns every pixel it draws.
@@ -45,11 +48,9 @@ mut:
 	clip            Clip
 }
 
-/*
 fn new_canvas(width int, height int) Canvas {
 	return new_scaled_canvas(width, height, width, height, 1)
 }
-*/
 
 fn new_scaled_canvas(width int, height int, physical_width int, physical_height int,
 	scale int) Canvas {
@@ -296,35 +297,82 @@ fn (mut c Canvas) clear(color u32) {
 // grid. Wallpaper generation therefore stays cheap while the text drawn over
 // it can use the full native-resolution canvas.
 fn (mut c Canvas) copy_logical_pixels(source []u32) {
-	if source.len < c.width * c.height {
+	c.copy_logical_patch(source, 0, 0, c.width, c.height)
+}
+
+// copy_logical_patch copies a logical image of w x h pixels whose top-left
+// corner is at (x, y), within the clip.
+fn (mut c Canvas) copy_logical_patch(source []u32, x int, y int, w int, h int) {
+	if source.len < w * h {
 		return
 	}
-	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
-	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
-	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
-	y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	mut x0 := if c.clip.x > x { c.clip.x } else { x }
+	mut y0 := if c.clip.y > y { c.clip.y } else { y }
+	x1 := if c.clip.x + c.clip.w < x + w { c.clip.x + c.clip.w } else { x + w }
+	y1 := if c.clip.y + c.clip.h < y + h { c.clip.y + c.clip.h } else { y + h }
+	if x0 < 0 {
+		x0 = 0
+	}
+	if y0 < 0 {
+		y0 = 0
+	}
 	if x1 <= x0 || y1 <= y0 {
 		return
 	}
-	if c.scale == 1 && c.width == c.physical_width && c.height == c.physical_height {
-		for y := y0; y < y1; y++ {
-			unsafe {
-				C.memcpy(&c.pixels[y * c.stride + x0], &source[y * c.width + x0], usize((x1 - x0) * 4))
-			}
-		}
+	scale := c.scale
+	physical_x0 := x0 * scale
+	physical_x1 := if x1 * scale < c.physical_width { x1 * scale } else { c.physical_width }
+	if physical_x1 <= physical_x0 {
 		return
 	}
-	for y := y0; y < y1; y++ {
-		for x := x0; x < x1; x++ {
-			color := source[y * c.width + x]
-			physical_x := x * c.scale
-			physical_y := y * c.scale
-			for offset_y := 0; offset_y < c.scale
-				&& physical_y + offset_y < c.physical_height; offset_y++ {
-				row := (physical_y + offset_y) * c.stride
-				for offset_x := 0; offset_x < c.scale
-					&& physical_x + offset_x < c.physical_width; offset_x++ {
-					unsafe { c.pixels[row + physical_x + offset_x] = color }
+	for ly := y0; ly < y1; ly++ {
+		physical_y := ly * scale
+		if physical_y >= c.physical_height {
+			break
+		}
+		first := physical_y * c.stride
+		if scale == 1 {
+			unsafe {
+				vmemcpy(&c.pixels[first + physical_x0], &source[(ly - y) * w + x0 - x], usize((physical_x1 - physical_x0) * 4))
+			}
+			continue
+		}
+		// Expand one row, then copy it down for the rest of the logical row.
+		for px := physical_x0; px < physical_x1; px++ {
+			unsafe {
+				c.pixels[first + px] = source[(ly - y) * w + px / scale - x]
+			}
+		}
+		for offset := 1; offset < scale && physical_y + offset < c.physical_height; offset++ {
+			unsafe {
+				vmemcpy(&c.pixels[first + offset * c.stride + physical_x0], &c.pixels[first + physical_x0], usize((physical_x1 - physical_x0) * 4))
+			}
+		}
+	}
+}
+
+// fill_logical_rows paints each logical row of the clip in its own colour,
+// which is all a gradient backdrop is.
+fn (mut c Canvas) fill_logical_rows(colors []u32) {
+	x0 := if c.clip.x > 0 { c.clip.x } else { 0 }
+	y0 := if c.clip.y > 0 { c.clip.y } else { 0 }
+	x1 := if c.clip.x + c.clip.w < c.width { c.clip.x + c.clip.w } else { c.width }
+	mut y1 := if c.clip.y + c.clip.h < c.height { c.clip.y + c.clip.h } else { c.height }
+	if y1 > colors.len {
+		y1 = colors.len
+	}
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	physical_x0 := x0 * c.scale
+	physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
+	for ly := y0; ly < y1; ly++ {
+		color := colors[ly]
+		for py := ly * c.scale; py < (ly + 1) * c.scale && py < c.physical_height; py++ {
+			row := py * c.stride
+			for px := physical_x0; px < physical_x1; px++ {
+				unsafe {
+					c.pixels[row + px] = color
 				}
 			}
 		}
@@ -352,41 +400,79 @@ fn (mut c Canvas) blend_rect(x int, y int, w int, h int, color u32, alpha u32) {
 	if x1 <= x0 || y1 <= y0 {
 		return
 	}
-
-	if c.clip_is_plain(x0, y0, x1 - x0, y1 - y0) {
-		physical_x0 := x0 * c.scale
-		physical_y0 := y0 * c.scale
-		physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
-		physical_y1 := if y1 * c.scale < c.physical_height {
-			y1 * c.scale
-		} else {
-			c.physical_height
-		}
-		if alpha >= 255 {
-			for py := physical_y0; py < physical_y1; py++ {
-				row := py * c.stride
-				for px := physical_x0; px < physical_x1; px++ {
-					unsafe {
-						c.pixels[row + px] = color
-					}
-				}
-			}
-		} else {
-			for py := physical_y0; py < physical_y1; py++ {
-				row := py * c.stride
-				for px := physical_x0; px < physical_x1; px++ {
-					unsafe {
-						c.pixels[row + px] = blend(c.pixels[row + px], color, alpha)
-					}
-				}
-			}
-		}
+	r := c.clip.mask_radius
+	if r == 0 || c.clip_is_plain(x0, y0, x1 - x0, y1 - y0) {
+		c.fill_area(x0, y0, x1, y1, color, alpha)
 		return
 	}
 
+	// A rounded clip differs from its rectangle only in the four corner
+	// squares. Everything else is filled as plain spans, so a window's title
+	// bar or body -- which reach its corners -- is not blended a pixel at a
+	// time through the corner test.
+	top := c.clip.mask_y + r
+	bottom := c.clip.mask_y + c.clip.mask_h - r
+	left := c.clip.mask_x + r
+	right := c.clip.mask_x + c.clip.mask_w - r
+	middle_y0 := if y0 > top { y0 } else { top }
+	middle_y1 := if y1 < bottom { y1 } else { bottom }
+	if middle_y1 > middle_y0 {
+		c.fill_area(x0, middle_y0, x1, middle_y1, color, alpha)
+	}
+	span_x0 := if x0 > left { x0 } else { left }
+	span_x1 := if x1 < right { x1 } else { right }
 	for py := y0; py < y1; py++ {
-		for px := x0; px < x1; px++ {
+		if py >= top && py < bottom {
+			continue
+		}
+		if span_x1 > span_x0 {
+			c.fill_area(span_x0, py, span_x1, py + 1, color, alpha)
+		}
+		corner_x1 := if x1 < left { x1 } else { left }
+		for px := x0; px < corner_x1; px++ {
 			c.blend_pixel(px, py, color, alpha)
+		}
+		// A radius over half the width leaves no middle: the corners meet.
+		mut corner_x0 := if x0 > right { x0 } else { right }
+		if corner_x0 < corner_x1 {
+			corner_x0 = corner_x1
+		}
+		for px := corner_x0; px < x1; px++ {
+			c.blend_pixel(px, py, color, alpha)
+		}
+	}
+}
+
+// fill_area blends a logical rectangle already known to lie inside the clip
+// and clear of any rounded mask, on the physical pixel grid.
+fn (mut c Canvas) fill_area(x0 int, y0 int, x1 int, y1 int, color u32, alpha u32) {
+	physical_x0 := x0 * c.scale
+	physical_y0 := y0 * c.scale
+	physical_x1 := if x1 * c.scale < c.physical_width { x1 * c.scale } else { c.physical_width }
+	physical_y1 := if y1 * c.scale < c.physical_height { y1 * c.scale } else { c.physical_height }
+	if physical_x1 <= physical_x0 {
+		return
+	}
+	// Through a local pointer: stored through `c.pixels`, each pixel could
+	// have changed the field it is stored through, and the loop could not be
+	// vectorised.
+	pixels := c.pixels
+	stride := c.stride
+	span := physical_x1 - physical_x0
+	for py := physical_y0; py < physical_y1; py++ {
+		row := unsafe { &pixels[py * stride + physical_x0] }
+		if alpha >= 255 {
+			for i := 0; i < span; i++ {
+				unsafe {
+					row[i] = color
+				}
+			}
+		} else {
+			for i := 0; i < span; i++ {
+				unsafe {
+					row[i] = blend(row[i], color, alpha)
+				}
+			}
 		}
 	}
 }
@@ -419,10 +505,173 @@ fn (mut c Canvas) vertical_gradient_inclusive(x int, y int, w int, h int, top u3
 	}
 }
 
+// fill_native_vertical_palette_round_rect draws a small control at the backing
+// store's physical resolution. `rows` describes the measured 1x scanlines;
+// denser displays interpolate between them instead of enlarging every source
+// pixel into a square scale-by-scale block. This is the same reason the title
+// bar's traffic lights have a native-resolution path below.
+fn (mut c Canvas) fill_native_vertical_palette_round_rect(x int, y int, w int, h int,
+	radius int, rows []u32) {
+	if w <= 0 || h <= 0 || rows.len == 0 || c.scale <= 0 {
+		return
+	}
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	physical_w := w * c.scale
+	physical_h := h * c.scale
+	mut physical_radius := radius * c.scale
+	half := if physical_w < physical_h { physical_w / 2 } else { physical_h / 2 }
+	if physical_radius > half {
+		physical_radius = half
+	}
+
+	for offset_y := 0; offset_y < physical_h; offset_y++ {
+		mut color := rows[0]
+		if rows.len > 1 && physical_h > 1 {
+			position := offset_y * (rows.len - 1)
+			index := position / (physical_h - 1)
+			if index >= rows.len - 1 {
+				color = rows[rows.len - 1]
+			} else {
+				remainder := position % (physical_h - 1)
+				color = mix(rows[index], rows[index + 1], u32(remainder * 255 / (physical_h - 1)))
+			}
+		}
+		for offset_x := 0; offset_x < physical_w; offset_x++ {
+			mut coverage := u32(255)
+			if physical_radius > 0 {
+				mut center_x := 0
+				mut center_y := 0
+				mut in_corner := true
+				if offset_x < physical_radius {
+					center_x = physical_radius
+				} else if offset_x >= physical_w - physical_radius {
+					center_x = physical_w - physical_radius
+				} else {
+					in_corner = false
+				}
+				if offset_y < physical_radius {
+					center_y = physical_radius
+				} else if offset_y >= physical_h - physical_radius {
+					center_y = physical_h - physical_radius
+				} else {
+					in_corner = false
+				}
+				if in_corner {
+					coverage = corner_coverage(f64(offset_x) + 0.5, f64(offset_y) + 0.5,
+						f64(center_x), f64(center_y), f64(physical_radius))
+				}
+			}
+			c.blend_physical_pixel(physical_x + offset_x, physical_y + offset_y, color,
+				coverage)
+		}
+	}
+}
+
+// round_rect_coverage is how much of the pixel at (px, py) a rounded
+// rectangle covers. Everything is in the same pixels, and the radius is at
+// most half the shorter side.
+@[inline]
+fn round_rect_coverage(px int, py int, x int, y int, w int, h int, radius int) u32 {
+	if w <= 0 || h <= 0 || px < x || py < y || px >= x + w || py >= y + h {
+		return 0
+	}
+	if radius <= 0 {
+		return 255
+	}
+	mut center_x := 0
+	mut center_y := 0
+	if px < x + radius {
+		center_x = x + radius
+	} else if px >= x + w - radius {
+		center_x = x + w - radius
+	} else {
+		return 255
+	}
+	if py < y + radius {
+		center_y = y + radius
+	} else if py >= y + h - radius {
+		center_y = y + h - radius
+	} else {
+		return 255
+	}
+	return corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y),
+		f64(radius))
+}
+
+// blend_native_round_ring blends the band between a rounded rectangle and
+// the same shape inset by `width`, whose radius is smaller by as much. It is
+// computed on the physical pixel grid, so a focus ring's corners stay smooth
+// at HiDPI scale.
+fn (mut c Canvas) blend_native_round_ring(x int, y int, w int, h int, radius int, width int,
+	color u32, alpha u32) {
+	if w <= 0 || h <= 0 || width <= 0 || alpha == 0 || c.scale <= 0 {
+		return
+	}
+	outer_x := x * c.scale
+	outer_y := y * c.scale
+	outer_w := w * c.scale
+	outer_h := h * c.scale
+	half := if outer_w < outer_h { outer_w / 2 } else { outer_h / 2 }
+	mut outer_radius := radius * c.scale
+	if outer_radius > half {
+		outer_radius = half
+	}
+	band := width * c.scale
+	inner_x := outer_x + band
+	inner_y := outer_y + band
+	inner_w := outer_w - 2 * band
+	inner_h := outer_h - 2 * band
+	inner_half := if inner_w < inner_h { inner_w / 2 } else { inner_h / 2 }
+	mut inner_radius := if outer_radius > band { outer_radius - band } else { 0 }
+	if inner_radius > inner_half {
+		inner_radius = if inner_half > 0 { inner_half } else { 0 }
+	}
+	for py := outer_y; py < outer_y + outer_h; py++ {
+		// Between the inner shape's corners a row only crosses the band at
+		// its two ends.
+		straight := inner_w > 0 && py >= inner_y + inner_radius
+			&& py < inner_y + inner_h - inner_radius
+		mut px := outer_x
+		for px < outer_x + outer_w {
+			if straight && px == inner_x {
+				px = inner_x + inner_w
+				continue
+			}
+			outer := round_rect_coverage(px, py, outer_x, outer_y, outer_w, outer_h, outer_radius)
+			inner := round_rect_coverage(px, py, inner_x, inner_y, inner_w, inner_h, inner_radius)
+			if outer > inner {
+				c.blend_physical_pixel(px, py, color, (outer - inner) * alpha / 255)
+			}
+			px++
+		}
+	}
+}
+
 // fill_round_rect draws the body as plain spans and only pays for coverage
 // inside the four corner squares.
 fn (mut c Canvas) fill_round_rect(x int, y int, w int, h int, radius int, color u32) {
 	c.blend_round_rect(x, y, w, h, radius, color, 255)
+}
+
+// fill_round_rect_corners paints only the four corner squares of a rounded
+// rectangle, for a shape whose middle something else covers.
+fn (mut c Canvas) fill_round_rect_corners(x int, y int, w int, h int, radius int, color u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else { radius }
+	if r <= 0 {
+		return
+	}
+	for corner in 0 .. 4 {
+		corner_x := if corner & 1 == 0 { x } else { x + w - r }
+		corner_y := if corner & 2 == 0 { y } else { y + h - r }
+		if !c.clip_touches(corner_x, corner_y, r, r) {
+			continue
+		}
+		saved := c.push_clip_rect(corner_x, corner_y, r, r)
+		c.fill_round_rect(x, y, w, h, radius, color)
+		c.restore_clip(saved)
+	}
 }
 
 fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color u32, alpha u32) {
@@ -443,6 +692,15 @@ fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color
 	c.blend_rect(x + r, y, w - 2 * r, r, color, alpha) // top band
 	c.blend_rect(x + r, y + h - r, w - 2 * r, r, color, alpha) // bottom band
 
+	// Corners outside the clip are skipped whole: a partial frame walks every
+	// rounded shape on the screen, and most of them are nowhere near it.
+	left := c.clip_touches(x, y, r, h)
+	right := c.clip_touches(x + w - r, y, r, h)
+	top := c.clip_touches(x, y, w, r)
+	bottom := c.clip_touches(x, y + h - r, w, r)
+	if !(left || right) || !(top || bottom) {
+		return
+	}
 	rf := f64(r)
 	for cy := 0; cy < r; cy++ {
 		for cx := 0; cx < r; cx++ {
@@ -451,12 +709,27 @@ fn (mut c Canvas) blend_round_rect(x int, y int, w int, h int, radius int, color
 				continue
 			}
 			a := if alpha >= 255 { coverage } else { coverage * alpha / 255 }
-			c.blend_pixel(x + cx, y + cy, color, a)
-			c.blend_pixel(x + w - 1 - cx, y + cy, color, a)
-			c.blend_pixel(x + cx, y + h - 1 - cy, color, a)
-			c.blend_pixel(x + w - 1 - cx, y + h - 1 - cy, color, a)
+			if top && left {
+				c.blend_pixel(x + cx, y + cy, color, a)
+			}
+			if top && right {
+				c.blend_pixel(x + w - 1 - cx, y + cy, color, a)
+			}
+			if bottom && left {
+				c.blend_pixel(x + cx, y + h - 1 - cy, color, a)
+			}
+			if bottom && right {
+				c.blend_pixel(x + w - 1 - cx, y + h - 1 - cy, color, a)
+			}
 		}
 	}
+}
+
+// clip_touches reports whether any of the rectangle can be drawn.
+@[inline]
+fn (c &Canvas) clip_touches(x int, y int, w int, h int) bool {
+	return w > 0 && h > 0 && x < c.clip.x + c.clip.w && x + w > c.clip.x
+		&& y < c.clip.y + c.clip.h && y + h > c.clip.y
 }
 
 // stroke_round_rect outlines a shape with a one pixel edge, taking the ring
@@ -492,6 +765,152 @@ fn (mut c Canvas) stroke_round_rect(x int, y int, w int, h int, radius int, colo
 	}
 }
 
+// fill_stroke_hidpi_circle draws the small circular controls directly on the
+// native pixel grid.  Most chrome is deliberately made from logical pixels so
+// its dimensions remain stable at either display scale.  A 12-point traffic
+// light is different: expanding its 1x edge into 2x2 blocks makes the curve
+// visibly stepped on a HiDPI panel.  Sampling every physical pixel keeps the
+// same logical diameter while giving the disc and its ring a proper smooth
+// edge.
+fn (mut c Canvas) fill_stroke_hidpi_circle(x int, y int, w int, h int, border_width int, fill u32, edge u32) {
+	if c.scale <= 1 || w <= 0 || h <= 0 {
+		return
+	}
+	diameter := if w < h { w } else { h }
+	physical_diameter := diameter * c.scale
+	if physical_diameter <= 0 {
+		return
+	}
+	center_x := x * c.scale + w * c.scale / 2
+	center_y := y * c.scale + h * c.scale / 2
+	radius := f64(physical_diameter) / 2
+	inner_radius := radius - f64(border_width * c.scale)
+	left := center_x - physical_diameter / 2
+	top := center_y - physical_diameter / 2
+
+	for py := top; py < top + physical_diameter; py++ {
+		for px := left; px < left + physical_diameter; px++ {
+			outer := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), radius)
+			if outer == 0 {
+				continue
+			}
+			c.blend_physical_pixel(px, py, fill, outer)
+			if inner_radius > 0 {
+				inner := corner_coverage(f64(px) + 0.5, f64(py) + 0.5, f64(center_x), f64(center_y), inner_radius)
+				if outer > inner {
+					c.blend_physical_pixel(px, py, edge, outer - inner)
+				}
+			}
+		}
+	}
+}
+
+@[inline]
+fn distance_to_segment(px f64, py f64, x0 f64, y0 f64, x1 f64, y1 f64) f64 {
+	dx := x1 - x0
+	dy := y1 - y0
+	length_squared := dx * dx + dy * dy
+	if length_squared <= 0 {
+		return math.sqrt((px - x0) * (px - x0) + (py - y0) * (py - y0))
+	}
+	mut position := ((px - x0) * dx + (py - y0) * dy) / length_squared
+	if position < 0 {
+		position = 0
+	} else if position > 1 {
+		position = 1
+	}
+	nearest_x := x0 + position * dx
+	nearest_y := y0 + position * dy
+	return math.sqrt((px - nearest_x) * (px - nearest_x) + (py - nearest_y) * (py - nearest_y))
+}
+
+// draw_hidpi_checkmark samples Catalina's compact two-segment tick directly
+// on the backing store. Enlarging the 1x DDA version made every diagonal a
+// staircase of square 2x2 blocks on Retina/HiDPI displays.
+fn (mut c Canvas) draw_hidpi_checkmark(x int, y int, size int, color u32) {
+	if c.scale <= 1 || size < 10 {
+		return
+	}
+	scale := f64(c.scale)
+	x0 := (f64(x) + 3.25) * scale
+	y0 := (f64(y) + f64(size) * 0.52) * scale
+	x1 := (f64(x) + 6.0) * scale
+	y1 := (f64(y) + f64(size) - 3.75) * scale
+	x2 := (f64(x) + f64(size) - 2.75) * scale
+	y2 := (f64(y) + 3.25) * scale
+	radius := 0.9 * scale
+	physical_x := x * c.scale
+	physical_y := y * c.scale
+	physical_size := size * c.scale
+	for py := physical_y; py < physical_y + physical_size; py++ {
+		for px := physical_x; px < physical_x + physical_size; px++ {
+			center_x := f64(px) + 0.5
+			center_y := f64(py) + 0.5
+			first := distance_to_segment(center_x, center_y, x0, y0, x1, y1)
+			second := distance_to_segment(center_x, center_y, x1, y1, x2, y2)
+			distance := if first < second { first } else { second }
+			mut coverage := u32(0)
+			if distance <= radius - 0.5 {
+				coverage = 255
+			} else if distance < radius + 0.5 {
+				coverage = u32((radius + 0.5 - distance) * 255)
+			}
+			c.blend_physical_pixel(px, py, color, coverage)
+		}
+	}
+}
+
+// draw_download_icon draws the Downloads mark, an arrow onto a bar inside a
+// ring. Like the checkmark it measures each backing pixel's distance to the
+// strokes, so the ring and the round ends stay smooth at either scale. The
+// proportions are the artwork's, in units of the ring's outer radius.
+fn (mut c Canvas) draw_download_icon(x int, y int, w int, h int, color u32) {
+	size := if w < h { w } else { h }
+	if size <= 0 || c.scale <= 0 {
+		return
+	}
+	scale := f64(c.scale)
+	center_x := (f64(x) + f64(w) / 2) * scale
+	center_y := (f64(y) + f64(h) / 2) * scale
+	outer := f64(size) * 0.47 * scale
+	// Thinner than a logical pixel, a stroke fades rather than thins.
+	ring := if outer * 0.116 > scale { outer * 0.116 } else { scale }
+	arrow := if outer * 0.2 > 1.5 * scale { outer * 0.2 } else { 1.5 * scale }
+	bar := if outer * 0.123 > scale { outer * 0.123 } else { scale }
+	ring_radius := outer - ring / 2
+	tip := outer * 0.3
+	arm := outer * 0.32
+	bar_y := outer * 0.533
+	bar_end := outer * 0.41
+	left := int(center_x - outer) - 1
+	top := int(center_y - outer) - 1
+	right := int(center_x + outer) + 1
+	bottom := int(center_y + outer) + 1
+	for py := top; py <= bottom; py++ {
+		for px := left; px <= right; px++ {
+			sx := f64(px) + 0.5 - center_x
+			sy := f64(py) + 0.5 - center_y
+			// The distance outside the nearest stroke, negative inside it.
+			ring_off := math.sqrt(sx * sx + sy * sy) - ring_radius
+			mut edge := (if ring_off < 0 { -ring_off } else { ring_off }) - ring / 2
+			for part in [
+				distance_to_segment(sx, sy, 0, -outer * 0.5, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, -arm, 0, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, arm, 0, 0, tip) - arrow / 2,
+				distance_to_segment(sx, sy, -bar_end, bar_y, bar_end, bar_y) - bar / 2,
+			]! {
+				if part < edge {
+					edge = part
+				}
+			}
+			if edge < 0.5 {
+				coverage := if edge <= -0.5 { u32(255) } else { u32((0.5 - edge) * 255) }
+				c.blend_physical_pixel(px, py, color, coverage)
+			}
+		}
+	}
+}
+
 // drop_shadow stacks a few translucent rounded rects behind a window.
 // Layering cheap shapes reads as a soft edge without the cost of a real blur.
 fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int, alpha u32) {
@@ -499,6 +918,108 @@ fn (mut c Canvas) drop_shadow(x int, y int, w int, h int, radius int, spread int
 		layer := alpha * u32(spread - i + 1) / u32(spread * 3)
 		c.blend_round_rect(x - i, y - i + 2, w + 2 * i, h + 2 * i, radius + i, 0x000000, layer)
 	}
+}
+
+// The widest shadow drop_shadow_behind blends in one pass.
+const shadow_max_spread = 15
+
+// drop_shadow_behind is drop_shadow for a rounded shape the caller then fills
+// opaquely, drawn only where it shows and, along the straight edges, one
+// blend per pixel. There a pixel's layers depend only on its distance from
+// the shape, so what they stack up to is worked out once per distance. The
+// corners, where the layers curve, are drawn layer by layer as before. The
+// seven layers blended over the whole window were the most expensive thing in
+// a frame.
+fn (mut c Canvas) drop_shadow_behind(x int, y int, w int, h int, radius int, spread int, alpha u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else if radius > 0 { radius } else { 0 }
+	if spread < 3 || spread > shadow_max_spread || c.clip.mask_radius != 0 || w - 2 * r <= 0
+		|| h + 2 - 2 * r <= 2 {
+		c.drop_shadow_banded(x, y, w, h, radius, spread, alpha)
+		return
+	}
+	// Layer i reaches i pixels out from the shape, 2 lower, with a radius of
+	// r + i, so a pixel d out along an edge is under layers d..spread.
+	mut combined := [shadow_max_spread + 1]u32{}
+	mut transmitted := 1.0
+	for d := spread; d >= 1; d-- {
+		layer := alpha * u32(spread - d + 1) / u32(spread * 3)
+		transmitted *= f64(255 - layer) / 255.0
+		combined[d] = u32(255.0 - transmitted * 255.0 + 0.5)
+	}
+	top := y - spread + 2
+	bottom := y + h + spread + 2
+	// Above and below, between the corners. The two rows straight under the
+	// shape are under every layer.
+	for py := top; py < y; py++ {
+		c.darken_rect(x + r, py, x + w - r, py + 1, combined[y + 2 - py])
+	}
+	for py := y + h; py < bottom; py++ {
+		d := py - y - h - 1
+		c.darken_rect(x + r, py, x + w - r, py + 1, combined[if d < 1 { 1 } else { d }])
+	}
+	// Left and right, between the corners.
+	side_top := y + 2 + r
+	side_bottom := y + h + 2 - r
+	for d := 1; d <= spread; d++ {
+		c.darken_rect(x - d, side_top, x - d + 1, side_bottom, combined[d])
+		c.darken_rect(x + w + d - 1, side_top, x + w + d, side_bottom, combined[d])
+	}
+	c.drop_shadow_band(x - spread, top, spread + r, side_top - top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(x + w - r, top, spread + r, side_top - top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(x - spread, side_bottom, spread + r, bottom - side_bottom, x, y, w,
+		h, radius, spread, alpha)
+	c.drop_shadow_band(x + w - r, side_bottom, spread + r, bottom - side_bottom, x, y, w,
+		h, radius, spread, alpha)
+}
+
+// darken_rect blends black at `alpha` over a logical rectangle, within the
+// clip.
+fn (mut c Canvas) darken_rect(x0 int, y0 int, x1 int, y1 int, alpha u32) {
+	left := if x0 > c.clip.x { x0 } else { c.clip.x }
+	top := if y0 > c.clip.y { y0 } else { c.clip.y }
+	right := if x1 < c.clip.x + c.clip.w { x1 } else { c.clip.x + c.clip.w }
+	bottom := if y1 < c.clip.y + c.clip.h { y1 } else { c.clip.y + c.clip.h }
+	if right <= left || bottom <= top || alpha == 0 {
+		return
+	}
+	c.fill_area(left, top, right, bottom, 0x000000, alpha)
+}
+
+// drop_shadow_banded is drop_shadow_behind for any shape: the layers are
+// blended in the bands around the shape's opaque middle, which the caller's
+// fill covers.
+fn (mut c Canvas) drop_shadow_banded(x int, y int, w int, h int, radius int, spread int, alpha u32) {
+	half := if w < h { w / 2 } else { h / 2 }
+	r := if radius > half { half } else if radius > 0 { radius } else { 0 }
+	top := y + r
+	bottom := y + h - r
+	if bottom <= top {
+		c.drop_shadow(x, y, w, h, radius, spread, alpha)
+		return
+	}
+	outer_x := x - spread
+	outer_w := w + 2 * spread
+	outer_top := y - spread + 2
+	outer_bottom := y + h + spread + 2
+	c.drop_shadow_band(outer_x, outer_top, outer_w, top - outer_top, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(outer_x, bottom, outer_w, outer_bottom - bottom, x, y, w, h, radius,
+		spread, alpha)
+	c.drop_shadow_band(outer_x, top, spread, bottom - top, x, y, w, h, radius, spread, alpha)
+	c.drop_shadow_band(x + w, top, spread, bottom - top, x, y, w, h, radius, spread, alpha)
+}
+
+fn (mut c Canvas) drop_shadow_band(band_x int, band_y int, band_w int, band_h int, x int, y int,
+	w int, h int, radius int, spread int, alpha u32) {
+	if !c.clip_touches(band_x, band_y, band_w, band_h) {
+		return
+	}
+	saved := c.push_clip_rect(band_x, band_y, band_w, band_h)
+	c.drop_shadow(x, y, w, h, radius, spread, alpha)
+	c.restore_clip(saved)
 }
 
 fn (mut c Canvas) fill_circle(cx int, cy int, radius int, color u32) {

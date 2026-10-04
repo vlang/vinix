@@ -1,0 +1,59 @@
+==> Creating 64 MiB persistent ext2 volume (one-time)...
+128-byte inodes cannot handle dates beyond 2038 and are deprecated
+==> Persistent /root volume: /Users/alex/code/vinix/build/useralloc-kernel-speed-v4/core-aarch64/vm/root.ext2
+==> Building Limine 12.8.0...
+==> Downloading Limine 12.8.0 source...
+==> 12.8.0-vinix-base-revision-2.patch: already applied
+==> configuring (LLVM toolchain)
+==> building
+error: built loader does not identify itself as Limine 12.8.0 (aarch64, UEFI)
+ERROR: missing expected QEMU result: QEMU CORE PASS: secure getrandom
+ERROR: missing expected QEMU result: QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch
+ERROR: missing expected QEMU result: QEMU CORE PASS: copy-on-write fork
+ERROR: missing expected QEMU result: QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population
+ERROR: missing expected QEMU result: QEMU CORE PASS: syscalls page in untouched buffers
+ERROR: missing expected QEMU result: QEMU CORE PASS: partial unmap reclaims pages and retains forked shares
+ERROR: missing expected QEMU result: QEMU CORE PASS: a range split while a sharer unmaps it keeps its pages
+ERROR: missing expected QEMU result: QEMU CORE PASS: madvise returns anonymous pages to the allocator
+ERROR: missing expected QEMU result: QEMU CORE PASS: exit and exec reclaim process mappings
+ERROR: missing expected QEMU result: QEMU CORE PASS: forked copy-on-write pages are reclaimed
+ERROR: missing expected QEMU result: QEMU CORE PASS: default signal dispositions
+ERROR: missing expected QEMU result: QEMU CORE PASS: signals reach a thread that makes no syscalls
+ERROR: missing expected QEMU result: QEMU CORE PASS: SA_RESTART restarts an interrupted read
+ERROR: missing expected QEMU result: QEMU CORE PASS: exit and exec take down threads blocked in the kernel
+ERROR: missing expected QEMU result: QEMU CORE PASS: interrupted nanosleep returns a relative remainder
+ERROR: missing expected QEMU result: QEMU CORE PASS: anonymous IPC buffers are reclaimed
+ERROR: missing expected QEMU result: QEMU CORE PASS: socket interface boxes are reclaimed
+ERROR: missing expected QEMU result: QEMU CORE PASS: full UNIX stream clears write readiness
+ERROR: missing expected QEMU result: QEMU CORE PASS: futex wake-op updates and compares user words
+ERROR: missing expected QEMU result: QEMU CORE PASS: alarm and ITIMER_REAL fire on time
+ERROR: missing expected QEMU result: QEMU CORE PASS: mprotect and munmap refuse an address inside a page
+ERROR: missing expected QEMU result: QEMU CORE PASS: more waiters than an event holds
+ERROR: missing expected QEMU result: QEMU CORE PASS: fork keeps the program, auxv and directory
+ERROR: missing expected QEMU result: QEMU CORE PASS: /proc/cpuinfo describes the machine
+ERROR: missing expected QEMU result: QEMU CORE PASS: joined threads return their memory
+ERROR: missing expected QEMU result: QEMU CORE PASS: the console controls a session
+ERROR: missing expected QEMU result: QEMU CORE PASS: page table changes reach every CPU
+ERROR: missing expected QEMU result: QEMU CORE PASS: a FIFO thread keeps its CPU
+ERROR: missing expected QEMU result: QEMU CORE PASS: a frozen cgroup stops its threads
+ERROR: missing expected QEMU result: QEMU CORE PASS: a wait ends for a signal already pending
+ERROR: missing expected QEMU result: QEMU CORE PASS: ext2 cache, mmap, sync, namespace, timestamps
+ERROR: missing expected QEMU result: QEMU CORE PASS: a shared mapping is visible to every reader
+ERROR: missing expected QEMU result: QEMU CORE PASS: a released pid stays out of use while its group lives
+ERROR: missing expected QEMU result: QEMU CORE PASS: fcntl and flock exclusion
+ERROR: missing expected QEMU result: QEMU CORE PASS: permissions, umask, and resource limits
+ERROR: missing expected QEMU result: QEMU CORE PASS: inotify events
+ERROR: missing expected QEMU result: QEMU CORE PASS: priority, affinity, and accounting
+ERROR: missing expected QEMU result: QEMU CORE PASS: concurrent wakeups enqueue one thread once
+ERROR: missing expected QEMU result: QEMU CORE PASS: POSIX SIGEV_THREAD timer notification
+ERROR: missing expected QEMU result: QEMU CORE PASS: anonymous descriptors are open both ways
+ERROR: missing expected QEMU result: QEMU CORE PASS: Linux pollfd ABI
+ERROR: missing expected QEMU result: QEMU CORE PASS: large blocking pipe transfer makes progress
+ERROR: missing expected QEMU result: QEMU CORE PASS: empty pipes defer buffers and reclaim first-write storage
+ERROR: missing expected QEMU result: QEMU CORE PASS: Linux epoll ABI and event count
+ERROR: missing expected QEMU result: QEMU CORE PASS: syscall C-int truncation
+ERROR: missing expected QEMU result: QEMU CORE PASS: abstract socket names are released
+ERROR: missing expected QEMU result: QEMU CORE PASS: persistence markers synchronized
+ERROR: missing expected QEMU result: VINIX QEMU CORE: PASS
+ERROR: observed QEMU failure: VM runner exit status 1
+==> Starting AArch64 QEMU core feature boot

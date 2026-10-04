@@ -1,0 +1,56 @@
+[
+  {
+    "mode": "dynamic",
+    "argv": [
+      "/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc",
+      "--sysroot=/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final",
+      "-B/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/lib",
+      "-isystem",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/include",
+      "-L/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/src/internal",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/arch/x86_64",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/arch/generic",
+      "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/sampler.c",
+      "-Wl,-Map=/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/dynamic.map",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/sampler-dynamic"
+    ],
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "mode": "static",
+    "argv": [
+      "/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc",
+      "--sysroot=/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final",
+      "-B/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/lib",
+      "-isystem",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/include",
+      "-L/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/lib",
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/src/internal",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/arch/x86_64",
+      "-I/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/headers/arch/generic",
+      "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/sampler.c",
+      "-Wl,-Map=/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/static.map",
+      "-static",
+      "-DSTATIC_CONTEXT=1",
+      "-o",
+      "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/sampler-static"
+    ],
+    "exit_code": 0,
+    "output": ""
+  }
+]

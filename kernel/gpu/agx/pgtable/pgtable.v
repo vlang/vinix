@@ -47,6 +47,8 @@ pub const uat_attrindex_shift = u64(2)
 pub const uat_memattr_normal_cached = u64(0) << 2 // Index 0: Write-Back cached
 pub const uat_memattr_device = u64(1) << 2 // Index 1: Device-nGnRnE
 pub const uat_memattr_normal_uncached = u64(2) << 2 // Index 2: Normal non-cacheable
+const uat_pte_ap_mask = u64(3) << 6
+const uat_pte_memattr_mask = u64(7) << 2
 
 // Composite mappings used by the AGX driver. These match Asahi's UAT
 // protection encoding rather than the CPU's superficially similar AP bits.
@@ -66,8 +68,21 @@ pub const gpu_prot_fw_mmio_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_de
 pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
 
-// Number of 4KB kernel pages required for one 16KB GPU page table page
-const kernel_pages_per_uat_page = u64(4) // 4 * 4096 = 16384
+// Cached mappings visible to firmware are noncoherent with the ASC. Before
+// their backing can be unmapped, m1n1 and Asahi both replace the cacheable PTE
+// with an uncached one and ask firmware to invalidate the still-valid range.
+// GPU-only mappings use a coherent path and do not need this transition.
+pub fn is_cached_noncoherent(protection u64) bool {
+	return protection & uat_pte_memattr_mask == uat_memattr_normal_cached
+		&& protection & uat_pte_ap_mask != uat_pte_ap_gpu_only
+}
+
+pub fn as_uncached(protection u64) u64 {
+	return (protection & ~uat_pte_memattr_mask) | uat_memattr_normal_uncached
+}
+
+// Number of kernel pages required for one 16 KiB GPU page table page.
+const kernel_pages_per_uat_page = u64(1)
 
 // --- UAT page table structure ---
 
@@ -83,8 +98,7 @@ pub mut:
 }
 
 // Allocate a single 16KB-aligned page table page.
-// The kernel PMM uses 4KB pages, so we allocate 4 contiguous pages
-// and zero them out (pmm_alloc already zeroes memory).
+// pmm_alloc already zeroes the contiguous, aligned memory.
 pub fn alloc_table_page() ?&u64 {
 	ptr := memory.pmm_alloc_aligned(kernel_pages_per_uat_page, kernel_pages_per_uat_page)
 	if ptr == 0 {
@@ -93,7 +107,7 @@ pub fn alloc_table_page() ?&u64 {
 	return ptr
 }
 
-// Free a 16KB page table page (4 contiguous kernel pages).
+// Free a 16 KiB page table page.
 pub fn free_table_page(page &u64) {
 	if page == unsafe { nil } {
 		return
@@ -307,6 +321,48 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 			for j := u64(0); j < i; j++ {
 				pt.unmap_page(iova + j * uat_pgsz)
 			}
+			return false
+		}
+	}
+	return true
+}
+
+// Change only the access/cache attributes of an existing leaf mapping. The
+// physical page and page-table topology stay intact so firmware can evict any
+// cache lines belonging to the old mapping before it is removed.
+fn (mut pt UatPgtable) reprotect_page(iova u64, prot u64) bool {
+	pt.lock.acquire()
+	defer {
+		pt.lock.release()
+	}
+
+	if iova & uat_pg_mask != 0 {
+		return false
+	}
+	pte_ptr := pt.get_pte(iova, false) or { return false }
+	old := unsafe { *pte_ptr }
+	if old & uat_pte_valid == 0 || old & uat_pte_table == 0 {
+		return false
+	}
+	unsafe {
+		mut descriptor := (old & pt.oas_mask & ~uat_pg_mask) | prot | uat_pte_page | uat_pte_af
+		if pt.non_global {
+			descriptor |= uat_pte_ng
+		}
+		*pte_ptr = descriptor
+	}
+	return true
+}
+
+// Reprotect a contiguous mapped range. Callers own the mapping lifetime, so a
+// missing PTE is an error rather than something this routine silently skips.
+pub fn (mut pt UatPgtable) reprotect(iova u64, size u64, prot u64) bool {
+	if size == 0 || iova & uat_pg_mask != 0 {
+		return false
+	}
+	pages := lib.div_roundup(size, uat_pgsz)
+	for page := u64(0); page < pages; page++ {
+		if !pt.reprotect_page(iova + page * uat_pgsz, prot) {
 			return false
 		}
 	}

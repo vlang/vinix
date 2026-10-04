@@ -3,6 +3,34 @@ module lib
 import aarch64.cpu.local as cpulocal
 import aarch64.cpu
 
+// Walk the AArch64 frame-pointer chain, printing the return address at each
+// level. The kernel is built with -fno-omit-frame-pointer, so x29 points at
+// the saved {x29, x30} pair of every frame. Used to localise a V runtime panic
+// (array bounds, option-none) that reaches exit() without a trap frame.
+pub fn print_backtrace() {
+	mut fp := u64(0)
+	asm volatile aarch64 {
+		mov fp, x29
+		; =r (fp)
+		; ; memory
+	}
+	C.printf_panic(c'Backtrace (return addresses):\n')
+	for i := 0; i < 32; i++ {
+		if fp == 0 || fp < 0xffff000000000000 {
+			break
+		}
+		next := unsafe { *(&u64(fp)) }
+		lr := unsafe { *(&u64(fp + 8)) }
+		if lr != 0 {
+			C.printf_panic(c'  #%d  0x%016llx\n', i, lr)
+		}
+		if next <= fp {
+			break
+		}
+		fp = next
+	}
+}
+
 @[noreturn]
 pub fn kpanic(gpr_state &cpulocal.GPRState, message charptr) {
 	kpanic_lock.acquire()

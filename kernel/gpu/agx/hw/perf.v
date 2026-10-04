@@ -54,15 +54,15 @@ pub fn (mut cfg HwConfig) apply_opp_table(entries []OppEntry, min_sram_microvolt
 	base_state u32) bool {
 	count := u32(entries.len)
 	if count < 2 || count > perf_state_capacity {
-		println('agx: unusable operating-point count ${count}')
+		C.kprintf(c'agx: unusable operating-point count %llu\n', u64(count))
 		return false
 	}
 	if min_sram_microvolt < 1000 {
-		println('agx: invalid minimum SRAM voltage ${min_sram_microvolt} uV')
+		C.kprintf(c'agx: invalid minimum SRAM voltage %llu uV\n', u64(min_sram_microvolt))
 		return false
 	}
 	if cfg.num_clusters == 0 || cfg.num_clusters > perf_state_columns {
-		println('agx: unusable cluster count ${cfg.num_clusters}')
+		C.kprintf(c'agx: unusable cluster count %llu\n', u64(cfg.num_clusters))
 		return false
 	}
 	min_sram_mv := min_sram_microvolt / 1000
@@ -75,26 +75,28 @@ pub fn (mut cfg HwConfig) apply_opp_table(entries []OppEntry, min_sram_microvolt
 	for state := u32(0); state < count; state++ {
 		entry := entries[state]
 		if u32(entry.voltage_uv.len) != cfg.num_clusters {
-			println('agx: operating point ${state} has ${entry.voltage_uv.len} voltages for ${cfg.num_clusters} clusters')
+			C.kprintf(c'agx: operating point %llu has %lld voltages for %llu clusters\n', u64(state),
+				i64(entry.voltage_uv.len), u64(cfg.num_clusters))
 			return false
 		}
 		if entry.frequency_hz == 0 {
 			// The off state exists so that firmware state 1 keeps index 1.
 			if state != 0 {
-				println('agx: operating point ${state} is off but is not the first state')
+				C.kprintf(c'agx: operating point %llu is off but is not the first state\n', u64(state))
 				return false
 			}
 			if entry.power_uw != 0 {
-				println('agx: off operating point reports ${entry.power_uw} uW')
+				C.kprintf(c'agx: off operating point reports %llu uW\n', u64(entry.power_uw))
 				return false
 			}
 		} else {
 			if entry.frequency_hz > 0xffff_ffff || entry.power_uw < 1000 {
-				println('agx: operating point ${state} has an out-of-range frequency or power')
+				C.kprintf(c'agx: operating point %llu has an out-of-range frequency or power\n',
+					u64(state))
 				return false
 			}
 			if state > 0 && u32(entry.frequency_hz) <= frequencies[state - 1] {
-				println('agx: operating point ${state} is not frequency ordered')
+				C.kprintf(c'agx: operating point %llu is not frequency ordered\n', u64(state))
 				return false
 			}
 		}
@@ -105,7 +107,8 @@ pub fn (mut cfg HwConfig) apply_opp_table(entries []OppEntry, min_sram_microvolt
 		}
 		for cluster := u32(0); cluster < cfg.num_clusters; cluster++ {
 			if entry.voltage_uv[cluster] < 1000 {
-				println('agx: operating point ${state} cluster ${cluster} has an invalid voltage')
+				C.kprintf(c'agx: operating point %llu cluster %llu has an invalid voltage\n',
+					u64(state), u64(cluster))
 				return false
 			}
 			voltage_mv := entry.voltage_uv[cluster] / 1000
@@ -123,7 +126,8 @@ pub fn (mut cfg HwConfig) apply_opp_table(entries []OppEntry, min_sram_microvolt
 		return false
 	}
 	if base_state + 1 >= count || frequencies[base_state] == 0 {
-		println('agx: base performance state ${base_state} is not an active state below ${count}')
+		C.kprintf(c'agx: base performance state %llu is not an active state below %llu\n',
+			u64(base_state), u64(count))
 		return false
 	}
 

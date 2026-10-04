@@ -14,10 +14,17 @@ mut:
 	mmap_objects []&gem.GemObject
 }
 
+// Nothing slices either list, so one that grows can free the buffer it
+// outgrew. V keeps it otherwise, and every handle a file made lost one.
+fn (mut table Table) push(object &gem.GemObject) {
+	table.objects.flags |= .noslices
+	table.objects << object
+}
+
 // Add the creator's existing reference to this file's handle table.
 pub fn (mut table Table) add_created(object &gem.GemObject) {
 	if object != unsafe { nil } {
-		table.objects << object
+		table.push(object)
 	}
 }
 
@@ -48,7 +55,7 @@ pub fn (mut table Table) import_object(object &gem.GemObject) ?u32 {
 		}
 	}
 	gem.ref_obj(object)
-	table.objects << object
+	table.push(object)
 	return object.handle
 }
 
@@ -60,6 +67,7 @@ pub fn (mut table Table) authorize_mmap(handle u32) ?u64 {
 		}
 	}
 	gem.ref_obj(object)
+	table.mmap_objects.flags |= .noslices
 	table.mmap_objects << object
 	return gem.create_mmap_offset(object)
 }
@@ -98,9 +106,13 @@ pub fn (mut table Table) release_all() {
 	for object in table.mmap_objects {
 		gem.unref(object)
 	}
-	table.mmap_objects.clear()
 	for object in table.objects {
 		gem.unref(object)
 	}
-	table.objects.clear()
+	// Freed rather than cleared: the table goes with its file. Both are empty
+	// and usable again afterwards.
+	unsafe {
+		table.mmap_objects.free()
+		table.objects.free()
+	}
 }

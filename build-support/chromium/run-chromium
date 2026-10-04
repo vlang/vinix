@@ -4,6 +4,7 @@ set -eu
 
 CHROMIUM_DIRECTORY=/usr/lib/chromium
 CHROMIUM_BINARY="$CHROMIUM_DIRECTORY/chrome"
+CHROMIUM_RUNTIME="$CHROMIUM_DIRECTORY/vinix-runtime"
 
 if [ ! -x "$CHROMIUM_BINARY" ]; then
     echo "run-chromium: Chromium is not installed; run 'pkg install chromium'" >&2
@@ -36,6 +37,27 @@ if ! prepare_directories; then
     prepare_directories
 fi
 export VINIX_CHROMIUM_PROFILE
+
+# APK normally generates these through package triggers. A pre-staged image
+# deliberately does not run Alpine maintainer scripts, so generate the two
+# caches Chromium needs on its first launch.
+if [ ! -s /usr/share/glib-2.0/schemas/gschemas.compiled ] \
+   && [ -x /usr/bin/glib-compile-schemas ]; then
+    /usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas || true
+fi
+if [ ! -s /usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache ] \
+   && [ -x /usr/bin/gdk-pixbuf-query-loaders ]; then
+    /usr/bin/gdk-pixbuf-query-loaders --update-cache || true
+fi
+
+# A staged desktop also carries Firefox from a newer Alpine branch. Its global
+# GTK/GLib/NSS libraries are valid for Firefox but make Chromium 136 crash
+# during browser startup. Staged Chromium keeps its package closure here and
+# uses the matching musl interpreter installed by the image builder;
+# package-installed Chromium has already installed a consistent global closure.
+if [ -f "$CHROMIUM_RUNTIME/.complete" ]; then
+    export LD_LIBRARY_PATH="$CHROMIUM_RUNTIME${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 
 # Vinix has no AT-SPI bus, no session D-Bus and no keyring daemon. Each of
 # those otherwise costs a multi-second connection timeout during startup.
@@ -70,15 +92,15 @@ set -- --disable-dev-shm-usage "$@"
 # failure is retried on a timer for the life of the browser.
 set -- --no-first-run --no-default-browser-check --disable-background-networking \
     --disable-component-update --disable-breakpad --disable-crash-reporter \
+    --disable-audio-output \
     --disable-sync --disable-domain-reliability --disable-search-engine-choice-screen \
     --metrics-recording-only --password-store=basic "$@"
 
 set -- --ozone-platform=x11 --user-data-dir="$VINIX_CHROMIUM_PROFILE" "$@"
 
-# The GPU process rasterises through ANGLE when a real DRI device and GBM
-# provider are present. Chromium's bundled SwiftShader Vulkan device still
-# requires XCB features that Vinix's hosted X server does not provide, so the
-# QEMU/simplefb path uses Chromium's CPU compositor without a GPU process.
+# The GPU process rasterises through ANGLE. With a real DRI device and a GBM
+# provider present, ANGLE runs on the Vulkan/GL driver the X11 stack already
+# uses; otherwise it falls back to Chromium's bundled CPU Vulkan device.
 if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
    [ -e /dev/dri/renderD128 ] &&
    [ -e /usr/lib/libgbm.so.1 ] &&
@@ -89,7 +111,15 @@ if [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
     echo "run-chromium: enabling hardware ANGLE/EGL"
 else
     export LIBGL_ALWAYS_SOFTWARE=1
-    set -- --disable-gpu --disable-software-rasterizer "$@"
+    if [ -e /usr/lib/chromium/libvk_swiftshader.so ]; then
+        # Alpine keeps SwiftShader's ICD manifest beside Chromium rather than
+        # in the system Vulkan directories, so point the loader at it.
+        export VK_ICD_FILENAMES=/usr/lib/chromium/vk_swiftshader_icd.json
+        export VK_DRIVER_FILES="$VK_ICD_FILENAMES"
+        set -- --use-gl=angle --use-angle=swiftshader "$@"
+    else
+        set -- --disable-gpu --disable-software-rasterizer "$@"
+    fi
 fi
 
 # Chromium runs one process per renderer, plus network, storage, GPU and utility

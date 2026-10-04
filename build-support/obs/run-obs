@@ -1,0 +1,22 @@
+#!/bin/sh
+# OBS runs on screen 0 of Vinix's private Xvfb. Its second X11 screen receives
+# the native compositor and appears as Display 1 in Display Capture (XSHM).
+set -eu
+
+if [ ! -x /usr/bin/obs ]; then
+	echo "run-obs: OBS Studio is not installed; run 'pkg install obs-studio'" >&2
+	exit 127
+fi
+
+export HOME="${HOME:-/root}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/0}"
+export QT_QPA_PLATFORM=xcb
+export LIBGL_ALWAYS_SOFTWARE=1
+# Adapt Qt and libobs's optional desktop integrations to Vinix's runtime.
+export LD_PRELOAD="/usr/lib/vinix-obs-compat.so${LD_PRELOAD:+:$LD_PRELOAD}"
+mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
+chmod 0700 "$XDG_RUNTIME_DIR"
+
+exec /usr/bin/obs "$@"

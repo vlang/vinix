@@ -22,6 +22,8 @@ int vinix_apple_spi_keyboard_init(uint64_t spi_base, uint64_t enable_reg,
 int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity,
     int application_cursor);
 uint64_t vinix_apple_spi_keyboard_reports(void);
+/* Whether Caps Lock is on; the console answers KDGETLED with it. */
+int vinix_apple_spi_keyboard_caps_lock(void);
 uint64_t vinix_apple_spi_touchpad_reports(void);
 
 /* Request touchpad mode, then snapshot: no SPI access in this function.

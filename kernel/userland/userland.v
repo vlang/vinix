@@ -6,6 +6,7 @@ import memory.mmap
 import elf
 import sched
 import file
+import posixtimer
 import proc
 import x86.cpu.local as cpulocal
 import x86.cpu
@@ -21,104 +22,6 @@ import term
 import usercopy
 import stat
 
-pub const wnohang = 1
-
-pub const sig_block = 1
-
-pub const sig_unblock = 2
-
-pub const sig_setmask = 3
-
-pub const sighup = 1
-
-pub const sigint = 2
-
-pub const sigquit = 3
-
-pub const sigill = 4
-
-pub const sigtrap = 5
-
-pub const sigabrt = 6
-
-pub const sigbus = 7
-
-pub const sigfpe = 8
-
-pub const sigkill = 9
-
-pub const sigusr1 = 10
-
-pub const sigsegv = 11
-
-pub const sigusr2 = 12
-
-pub const sigpipe = 13
-
-pub const sigalrm = 14
-
-pub const sigterm = 15
-
-pub const sigstkflt = 16
-
-pub const sigchld = 17
-
-pub const sigcont = 18
-
-pub const sigstop = 19
-
-pub const sigtstp = 20
-
-pub const sigttin = 21
-
-pub const sigttou = 22
-
-pub const sigurg = 23
-
-pub const sigxcpu = 24
-
-pub const sigxfsz = 25
-
-pub const sigvtalrm = 26
-
-pub const sigprof = 27
-
-pub const sigwinch = 28
-
-pub const sigio = 29
-
-pub const sigpoll = sigio
-
-pub const sigpwr = 30
-
-pub const sigsys = 31
-
-pub const sigrtmin = 32
-
-pub const sigrtmax = 33
-
-pub const sigcancel = 34
-
-pub const sig_err = voidptr(-1)
-
-pub const sig_dfl = voidptr(-2)
-
-pub const sig_ign = voidptr(-3)
-
-pub const sa_nocldstop = 1 << 0
-
-pub const sa_onstack = 1 << 1
-
-pub const sa_resethand = 1 << 2
-
-pub const sa_restart = 1 << 3
-
-pub const sa_siginfo = 1 << 4
-
-pub const sa_nocldwait = 1 << 5
-
-pub const sa_nodefer = 1 << 6
-
 // Only condition/status bits that userspace can normally change may cross the
 // sigreturn boundary. In particular, IOPL, NT, VM, VIF and VIP must never be
 // restored from an untrusted signal frame. IF is forced on so a forged frame
@@ -129,104 +32,29 @@ const amd64_sigreturn_rflags_mask = cpu.rflags_cf | cpu.rflags_pf | cpu.rflags_a
 
 const amd64_sigreturn_rflags_fixed = cpu.rflags_fixed | cpu.rflags_if
 
-union SigVal {
-	sival_int i32
-	sival_ptr voidptr
-}
-
-pub struct SigInfo {
-pub mut:
-	si_signo  i32
-	si_code   i32
-	si_errno  i32
-	si_pid    i32
-	si_uid    i32
-	si_addr   voidptr
-	si_status i32
-	si_value  SigVal
-}
-
-pub fn syscall_getpid(_ voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getpid()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.pid), 0
-}
-
-pub fn syscall_getppid(_ voidptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getppid()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := unsafe { proc.current_thread() }
-
-	return u64(t.process.ppid), 0
-}
-
-pub fn syscall_getgroups(_ voidptr, size int, list &u32) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: getgroups(%d, 0x%llx)\n', process.name.str, size, voidptr(list))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	return 0, 0
-}
-
-// Become the leader of a new session and process group. The desktop terminal
-// uses this before claiming its PTY slave as the controlling terminal.
-pub fn syscall_setsid(_ voidptr) (u64, u64) {
-	mut process := proc.current_thread().process
-	if process.pgid == process.pid {
-		return errno.err, errno.eperm
-	}
-
-	process.sid = process.pid
-	process.pgid = process.pid
-	process.tty_session = 0
-	return u64(process.pid), 0
-}
-
-pub fn syscall_sigentry(_ voidptr, sigentry u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigentry(0x%llx)\n', process.name.str, sigentry)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	mut t := proc.current_thread()
-
-	t.sigentry = sigentry
-
-	return 0, 0
-}
-
 fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 	user_limit := memory.user_address_limit()
 	return context.rip != 0 && context.rip < user_limit && context.rsp != 0
 		&& context.rsp < user_limit
 }
 
-fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {
-	context.cs = u64(gdt.user_code_selector)
-	context.ss = u64(gdt.user_data_selector)
-	context.ds = u64(gdt.user_data_selector)
-	context.es = u64(gdt.user_data_selector)
+// `cs` and `ss` are the frame's; `live` is the rt_sigreturn syscall's own
+// frame. As on Linux, the code and stack segments come from the signal frame,
+// so that a handler that interrupted 32-bit code goes back to it, with
+// privilege 3 whatever the frame says: one this CPU's GDT or LDT does not
+// have is refused on the way back, with a SIGSEGV (see interrupt_return()).
+// 64-bit code gets the usual stack segment for one that is no use, as Linux's
+// force_valid_ss() gives it. DS and ES are not in the frame and stay as they
+// are.
+fn sanitize_sigreturn_context(mut context cpulocal.GPRState, cs u16, ss u16, live &cpulocal.GPRState) {
+	context.cs = u64(cs | 3)
+	context.ss = u64(ss | 3)
+	if context.cs == u64(gdt.user_code_selector) && context.ss != u64(gdt.user_data_selector)
+		&& !sched.user_frame_segments_ok(&context) {
+		context.ss = u64(gdt.user_data_selector)
+	}
+	context.ds = live.ds
+	context.es = live.es
 	context.rflags = (context.rflags & amd64_sigreturn_rflags_mask) | amd64_sigreturn_rflags_fixed
 }
 
@@ -239,175 +67,133 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 	}
 
 	t.gpr_state = context
-	// Vinix's amd64 signal bitmap uses the signal number as its bit index.
-	t.masked_signals = old_mask & ~((u64(1) << sigkill) | (u64(1) << sigstop))
+	t.masked_signals = old_mask & ~unblockable_mask()
 
-	sched.yield(false)
+	// A signal the restored mask lets through runs now, as on arm64, whose
+	// rt_sigreturn goes back through the syscall exit: one that had waited
+	// for the handler to finish was otherwise left for the next syscall.
+	mut resumed := context
+	dispatch_signal(&resumed, 0, 0, 0)
+
+	sched.resume_saved_context()
 
 	for {}
 }
 
-pub fn syscall_sigreturn(_ voidptr, context_ptr u64, old_mask u64) (u64, u64) {
-	// Signal frames live in userspace and are attacker-controlled. Resolve the
-	// whole frame through the process pagemap before trusting any of it; a bad
-	// pointer must not turn into a kernel-mode page fault.
-	mut context := cpulocal.GPRState{}
-	if !usercopy.copy_from_user(voidptr(&context), context_ptr, sizeof(cpulocal.GPRState)) {
-		return errno.err, errno.efault
-	}
-	if !valid_sigreturn_context(&context) {
-		return errno.err, errno.einval
-	}
-	sanitize_sigreturn_context(mut context)
-
-	resume_sigreturn(context, old_mask)
+// A syscall that a signal interrupted before it had done anything returns
+// ERESTARTSYS. Rewind to the SYSCALL so that it runs again once the signal
+// has been dealt with, as Linux and arm64 do: Go relies on SA_RESTART for
+// calls it does not retry itself, while its runtime preempts goroutines with
+// SIGURG. The signal dispatched next takes the rewind back if its handler was
+// installed without SA_RESTART.
+pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
+	mut ctx := unsafe { context }
+	mut t := proc.current_thread()
+	job_ipc := ctx.rax == u64(-i64(errno.eintr)) && (t.restart_nr == 69 || t.restart_nr == 70)
+		&& job_wake_restarts_syscall(t)
+	if ctx.rax != u64(-i64(proc.interrupted_errno)) && !job_ipc { return }
+	ctx.rax = t.restart_nr
+	// SYSCALL is two bytes long, and SYSRET returns to rcx.
+	ctx.rip -= 2
+	ctx.rcx = ctx.rip
+	t.restarting_syscall = true
 }
 
-pub fn syscall_sigaction(_ voidptr, signum int, act &proc.SigAction, oldact &proc.SigAction) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigaction(%d, 0x%llx, 0x%llx)\n', process.name.str, signum,
-		voidptr(act), voidptr(oldact))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+// An interrupt returning to userspace sends `t` into the kernel for an
+// unblocked signal, a pending exit, or a process stop that must park it.
+fn owes_async_work(t &proc.Thread) bool {
+	if katomic.load(&t.must_exit) || owes_job_stop(t) {
+		return true
 	}
-
-	if signum < 0 || signum > 34 || signum == sigkill || signum == sigstop {
-		return errno.err, errno.einval
-	}
-
-	mut t := proc.current_thread()
-
-	if oldact != unsafe { nil } {
-		unsafe {
-			*oldact = t.sigactions[signum]
-		}
-	}
-
-	if act != unsafe { nil } {
-		// Dispositions belong to the process; masks and pending signals remain
-		// per-thread. Keep existing helpers synchronized with the caller.
-		mut target_process := t.process
-		target_process.threads_lock.acquire()
-		for mut target_thread in target_process.threads {
-			target_thread.sigactions[signum] = *act
-		}
-		target_process.threads_lock.release()
-	}
-
-	return 0, 0
+	pending := katomic.load(&t.pending_signals)
+	return pending & ~t.masked_signals != 0 || pending & unblockable_mask() != 0
 }
 
-pub fn syscall_sigprocmask(_ voidptr, how int, set &u64, oldset &u64) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: sigprocmask(%d, 0x%llx, 0x%llx)\n', process.name.str, how,
-		voidptr(set), voidptr(oldset))
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+// An interrupt, the scheduler's included, is about to return to `frame`, the
+// thread in userspace. A signal that is pending for it now, or an exit a
+// sibling asked for, has to be dealt with there and then, as on arm64: a loop
+// that makes no syscalls is otherwise never interrupted, and cannot even be
+// killed. That cannot be done on the stack interrupts run on, which belongs
+// to the CPU and must not block; so the frame is pointed at
+// async_signal_entry() on the thread's own kernel stack, which is idle while
+// the thread is in userspace, and the thread goes on from there.
+//
+// So is a thread whose code or stack segment its LDT no longer describes --
+// another thread took the entry away -- or whose instruction pointer is past
+// the end of its code segment: the IRETQ would fault in the kernel. It is
+// sent to take the SIGSEGV Linux gives it for that.
+//
+// `thread` is the one `frame` belongs to: the scheduler calls this before GS
+// finds it.
+pub fn interrupt_return(thr &proc.Thread, frame &cpulocal.GPRState) {
+	mut t := unsafe { thr }
+	if !sched.user_frame_segments_ok(frame) {
+		enter_kernel(mut t, frame, voidptr(bad_segment_entry))
+		return
 	}
+	if t.process == unsafe { nil } || !owes_async_work(t) {
+		return
+	}
+	enter_kernel(mut t, frame, voidptr(async_signal_entry))
+}
 
+// Point `frame`, the thread `t` in userspace, at `entry` in the kernel, on
+// the thread's own stack, with what it interrupted in async_context.
+fn enter_kernel(mut t proc.Thread, frame &cpulocal.GPRState, entry voidptr) {
+	mut f := unsafe { frame }
+	t.async_context = *f
+	f.rip = u64(entry)
+	f.cs = u64(gdt.kernel_code_selector)
+	f.ss = u64(gdt.kernel_data_selector)
+	f.ds = u64(gdt.kernel_data_selector)
+	f.es = u64(gdt.kernel_data_selector)
+	// As if called: the return address slot a function expects to find.
+	f.rsp = t.kernel_stack - 8
+	f.rflags = cpu.rflags_fixed
+}
+
+// Where interrupt_return() sends a thread whose code or stack segment is gone,
+// with the frame it could not go back to in async_context: a SIGSEGV, as for
+// any other fault, which kills it when nothing handles it.
+@[noreturn]
+fn bad_segment_entry() {
 	mut t := proc.current_thread()
+	mut context := t.async_context
+	sendsig(t, u8(sigsegv))
+	dispatch_a_signal_info(&context, sigsegv, 128, 0) // SI_KERNEL
+	exit_with_fatal_signal(u8(sigsegv))
+}
 
-	if oldset != unsafe { nil } {
-		unsafe {
-			*oldset = t.masked_signals
-		}
-	}
-
-	if set != unsafe { nil } {
-		match how {
-			sig_block {
-				t.masked_signals |= *set
-			}
-			sig_unblock {
-				t.masked_signals &= ~*set
-			}
-			sig_setmask {
-				t.masked_signals = *set
-			}
-			else {}
-		}
-	}
-
-	return 0, 0
+// Where interrupt_return() sends a thread, in the kernel on its own stack,
+// with what it interrupted in async_context.
+@[noreturn]
+fn async_signal_entry() {
+	mut t := proc.current_thread()
+	mut context := t.async_context
+	exit_if_told_to()
+	// A stopped thread can finish an IRQ's kernel frame. Park on its own
+	// stack before that frame can return to userspace again.
+	sched.park_for_cgroup()
+	exit_if_told_to()
+	dispatch_signal(&context, 0, 0, 0)
+	// Nothing was delivered after all: go back where the thread was.
+	t.gpr_state = context
+	sched.resume_saved_context()
+	for {}
 }
 
 fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, info_addr u64) {
+	job_boundary()
 	mut t := unsafe { proc.current_thread() }
-
-	if t.sigentry == 0 {
-		return
-	}
-
-	mut which := -1
-
-	for i := u8(0); i < 64; i++ {
-		if t.masked_signals & (u64(1) << i) != 0 {
-			continue
-		}
-		if katomic.btr(mut &t.pending_signals, i) == true {
-			which = i
-			break
-		}
-	}
+	restarting := t.restarting_syscall
+	t.restarting_syscall = false
+	which := take_pending_signal(mut t)
 
 	if which == -1 {
 		return
 	}
 
-	sigaction := t.sigactions[which]
-
-	previous_mask := t.masked_signals
-
-	t.masked_signals |= sigaction.sa_mask
-	if sigaction.sa_flags & sa_nodefer == 0 {
-		t.masked_signals |= u64(1) << which
-	}
-
-	// Work from the live syscall/interrupt frame. t.gpr_state is only updated
-	// by the scheduler and can otherwise describe an older timeslice.
-	t.gpr_state = *context
-
-	// Respect the redzone
-	t.gpr_state.rsp -= 128
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-
-	// Return context
-	t.gpr_state.rsp -= sizeof(cpulocal.GPRState)
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut return_context := unsafe { &cpulocal.GPRState(t.gpr_state.rsp) }
-
-	unsafe {
-		*return_context = *context
-	}
-	// Siginfo
-	t.gpr_state.rsp -= sizeof(SigInfo)
-	t.gpr_state.rsp = lib.align_down(t.gpr_state.rsp, 16)
-	mut siginfo := unsafe { &SigInfo(t.gpr_state.rsp) }
-
-	unsafe { C.memset(voidptr(siginfo), 0, sizeof(SigInfo)) }
-	siginfo.si_signo = i32(which)
-	if info_signum == which {
-		siginfo.si_code = i32(info_code)
-		siginfo.si_addr = voidptr(info_addr)
-	}
-
-	// Alignment
-	t.gpr_state.rsp -= 8
-
-	// Common handler will take (which, siginfo, sigaction, ret_context, prev_mask)
-	t.gpr_state.rip = t.sigentry
-
-	t.gpr_state.rdi = u64(which)
-	t.gpr_state.rsi = u64(siginfo)
-	t.gpr_state.rdx = u64(sigaction.sa_sigaction)
-	t.gpr_state.rcx = u64(return_context)
-	t.gpr_state.r8 = previous_mask
-
-	sched.yield(false)
+	dispatch_linux_signal(context, which, info_signum, info_code, info_addr, restarting)
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the
@@ -422,297 +208,189 @@ pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, 
 	dispatch_signal(context, signal, code, addr)
 }
 
-pub fn sendsig(_thread &proc.Thread, signal u8) {
-	mut t := unsafe { _thread }
-
-	katomic.bts(mut &t.pending_signals, signal)
-
-	// Try to stop an event_await()
-	sched.enqueue_thread(t, true)
-}
-
-pub fn syscall_kill(_ voidptr, pid int, signal int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: kill(%d, %d)\n', process.name.str, pid, signal)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	if signal > 0 {
-		sendsig(processes[pid].threads[0], u8(signal))
-	} else {
-		panic('sendsig: Values of signal <= 0 not supported')
-	}
-
-	return 0, 0
-}
-
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: execve(%s, [omit], [omit])\n', process.name.str, _path)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { path.free() }
+		return errno.err, errno.get()
+	}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { path.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
 	}
 
-	path := unsafe { cstring_to_vstring(_path) }
-	mut argv := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _argv[i] == nil {
-				break
-			}
-			argv << cstring_to_vstring(_argv[i])
-		}
-	}
-	mut envp := []string{}
-	for i := 0; true; i++ {
-		unsafe {
-			if _envp[i] == nil {
-				break
-			}
-			envp << cstring_to_vstring(_envp[i])
-		}
-	}
-
-	start_program(true, proc.current_thread().process.current_directory, path, argv, envp,
-		'', '', '') or { return errno.err, errno.get() }
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not. A failed exec is common: execvp() tries every directory in PATH.
+	start_program(true, proc.current_directory_of(proc.current_thread().process), path, argv,
+		envp, '', '', '') or { return errno.err, errno.get() }
 
 	return errno.err, errno.get()
 }
 
-pub fn syscall_waitpid(_ voidptr, pid int, _status &i32, options int) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: waitpid(%d, 0x%llx, %d)\n', current_process.name.str, pid,
-		_status, options)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
-	}
-
-	mut status := unsafe { _status }
-
-	mut events := []&eventstruct.Event{}
-	defer {
-		unsafe { events.free() }
-	}
-	mut child := &proc.Process(unsafe { nil })
-
-	if pid == -1 {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		for c in current_process.children {
-			events << &c.event
-		}
-	} else if pid < -1 || pid == 0 {
-		print('\nwaitpid: value of pid not supported\n')
-		return errno.err, errno.einval
-	} else {
-		if current_process.children.len == 0 {
-			return errno.err, errno.echild
-		}
-		child = processes[pid]
-		if child == unsafe { nil } || child.ppid != current_process.pid {
-			return errno.err, errno.echild
-		}
-		events << &child.event
-	}
-
-	block := options & wnohang == 0
-	which := event.await(mut events, block) or { return errno.err, errno.eintr }
-
-	if child == unsafe { nil } {
-		child = current_process.children[which]
-	}
-
-	unsafe {
-		*status = i32(child.status)
-	}
-	ret := child.pid
-
-	proc.account_reaped_child(mut current_process, child)
-	proc.free_pid(ret)
-
-	current_process.children.delete(current_process.children.index(child))
-
-	return u64(ret), 0
-}
-
-@[noreturn]
-pub fn syscall_exit(_ voidptr, status int) {
-	mut current_thread := proc.current_thread()
-	mut current_process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: exit(%d)\n', current_process.name.str, status)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', current_process.name.str)
-	}
-
-	// A framebuffer owner can exit without issuing a console ioctl. Restore
-	// the saved text console before its address space and descriptors vanish.
-	term.leave_graphics_mode_if_owner(current_process.pid)
-
-	mut old_pagemap := current_process.pagemap
-
-	kernel_pagemap.switch_to()
-	current_thread.process = kernel_process
-
-	// Close all FDs
-	for i := 0; i < proc.max_fds; i++ {
-		if current_process.fds[i] == unsafe { nil } {
-			continue
-		}
-
-		file.fdnum_close(current_process, i, true) or {}
-	}
-
-	// PID 1 inherits children
-	if current_process.pid != 1 {
-		for child in current_process.children {
-			processes[1].children << child
-		}
-	}
-
-	mmap.delete_pagemap(mut old_pagemap) or {}
-
-	katomic.store(mut &current_process.status, int(u32(status) << 8))
-	event.trigger(mut &current_process.event, false)
-
-	sched.dequeue_and_die()
-}
-
-pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
-	mut current_thread := proc.current_thread()
-	mut process := current_thread.process
-
-	C.printf(c'\n\e[32m%s\e[m: fork()\n', process.name.str)
-	defer {
-		C.printf(c'\e[32m%s\e[m: returning\n', process.name.str)
-	}
-
-	old_thread := proc.current_thread()
-	mut old_process := old_thread.process
-
-	mut new_process := sched.new_process(old_process, unsafe { nil }) or {
-		return errno.err, errno.get()
-	}
-
-	new_process.name = '${old_process.name}[${new_process.pid}]'
-
-	// Dup all FDs
-	for i := 0; i < proc.max_fds; i++ {
-		if old_process.fds[i] == unsafe { nil } {
-			continue
-		}
-
-		file.fdnum_dup(old_process, i, new_process, i, 0, true, false) or { panic('') }
-	}
-
-	stack_size := u64(0x200000)
-
-	mut stacks := []voidptr{}
-
-	kernel_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << kernel_stack_phys
-	kernel_stack := u64(kernel_stack_phys) + stack_size + higher_half
-
-	pf_stack_phys := memory.pmm_alloc(stack_size / page_size)
-	stacks << pf_stack_phys
-	pf_stack := u64(pf_stack_phys) + stack_size + higher_half
-
-	mut new_thread := &proc.Thread{
-		gpr_state:      gpr_state
-		process:        new_process
-		timeslice:      old_thread.timeslice
-		gs_base:        cpu.get_kernel_gs_base()
-		fs_base:        cpu.get_fs_base()
-		kernel_stack:   kernel_stack
-		pf_stack:       pf_stack
-		running_on:     u64(-1)
-		cr3:            u64(new_process.pagemap.top_level)
-		sigentry:       old_thread.sigentry
-		sigactions:     old_thread.sigactions
-		masked_signals: old_thread.masked_signals
-		affinity_mask:  old_thread.affinity_mask
-		stacks:         stacks
-		fpu_storage:    unsafe { malloc(fpu_storage_size) }
-	}
-
-	unsafe { stacks.free() }
-
-	new_thread.self = voidptr(new_thread)
-
-	unsafe { C.memcpy(new_thread.fpu_storage, old_thread.fpu_storage, fpu_storage_size) }
-
-	new_thread.gpr_state.rax = u64(0)
-	new_thread.gpr_state.rdx = u64(0)
-
-	old_process.children << new_process
-	new_process.threads << new_thread
-
-	sched.enqueue_thread(new_thread, false)
-
-	return u64(new_process.pid), u64(0)
-}
-
+// With `execve` set, the exec owns `_path`, `argv` and `envp` and frees them
+// whether it works or not; one that works never returns. The boot path that
+// starts init passes `execve` unset and keeps them.
 pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	if execve { mac_thread.mac_loading = true }
+	defer { mac_thread.mac_loading = mac_previous }
 	// Chromium starts every child process by executing /proc/self/exe. The VFS
 	// resolves that to this process's program, but the new process must record
 	// where the program really is: keeping the literal path would make the
 	// child's own /proc/self/exe point back at itself forever.
+	prog_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	parent := if execve {
+		fs.parent_and_mount_for(fs.at_fdcwd, _path, prog_mount) or { free_exec_arguments(_path, argv, envp); return none }
+	} else { unsafe { dir } }
+	prog_node := if execve { fs.get_node_on_mount(parent, _path, true, prog_mount) }
+		else { fs.get_node_and_mount(parent, _path, true, prog_mount) } or {
+		if execve { free_exec_arguments(_path, argv, envp) }
+		return none
+	}
 	path := fs.resolve_self_reference(_path)
-	prog_node := fs.get_node(dir, path, true)?
+	if execve && path.str != _path.str && !argv.any(it.str == _path.str) {
+		unsafe { _path.free() }
+	}
+	return start_program_node(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
+		stdout_path, stderr_path)
+}
+
+// The part of exec that follows finding the program. execveat(2) on a
+// descriptor comes here directly: a memfd has no name to be found by. What an
+// exec was handed is freed here when it fails, unless load_program_image()
+// has handed it on to a script interpreter's exec, which frees it.
+pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string) ?&proc.Process {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	if execve { mac_thread.mac_loading = true }
+	defer { mac_thread.mac_loading = mac_previous }
+	handed_on := unsafe { &bool(C.vinix_stack_alloc(sizeof(bool))) }
+	unsafe { *handed_on = false }
+	process := load_program_image(execve, dir, prog_node, prog_mount, path, argv, envp, stdin_path,
+		stdout_path, stderr_path, handed_on) or {
+		if execve && !unsafe { *handed_on } {
+			free_exec_arguments(path, argv, envp)
+		}
+		return none
+	}
+	return process
+}
+
+fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+	// The program, or a script's interpreter, is subject to pledge(2) and
+	// unveil(2); the ELF interpreter the kernel loads for it is not.
+	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
+		return none
+	}
 	if !stat.isreg(prog_node.resource.stat.mode)
-		|| !fs.check_access(prog_node, fs.access_exec, true) {
+		|| fs.mount_flags(prog_mount) & fs.ms_noexec != 0 {
 		errno.set(errno.eacces)
 		return none
 	}
+	fs.check_access(prog_node, fs.access_exec, true)?
 	mut prog := prog_node.resource
-
-	mut new_pagemap := memory.new_pagemap()
+	allow_wx := envp.contains('VINIX_ALLOW_WX=1')
+	if allow_wx && !fs.wx_exec_allowed(prog_mount) {
+		errno.set(errno.eperm)
+		return none
+	}
 
 	// Check for shebang before proceeding as if it was an ELF.
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
 		real_path, arg := parse_shebang(mut prog)?
-		mut final_argv := [real_path]
+		// Room for the interpreter, its argument and the script. `<<` copies
+		// a string, so the list owns all of its strings.
+		mut final_argv := []string{cap: argv.len + 2} @[freed]
+		final_argv << real_path
 		if arg != '' {
 			final_argv << arg
 		}
 		final_argv << path
-		final_argv << argv[1..]
+		for i := 1; i < argv.len; i++ {
+			final_argv << argv[i]
+		}
+		unsafe {
+			real_path.free()
+			arg.free()
+		}
 
-		return start_program(execve, dir, real_path, final_argv, envp, stdin_path, stdout_path,
-			stderr_path)
+		if execve {
+			// The interpreter's exec frees final_argv and envp; the rest of
+			// what this exec was handed goes now.
+			unsafe {
+				*handed_on = true
+			}
+			path_in_argv := argv.any(it.str == path.str)
+			unsafe {
+				if !path_in_argv {
+					path.free()
+				}
+				argv.free()
+			}
+			return start_program(true, dir, final_argv[0], final_argv, envp, stdin_path,
+				stdout_path, stderr_path)
+		}
+		// Starting init, which keeps what it gave.
+		process := start_program(false, dir, final_argv[0], final_argv, envp, stdin_path,
+			stdout_path, stderr_path) or {
+			unsafe { final_argv.free() }
+			return none
+		}
+		unsafe { final_argv.free() }
+		return process
 	}
 
-	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return none }
-	// Vinix's mlibc toolchain uses /usr/lib/ld.so. Everything else accepted by
-	// the amd64 ELF loader follows the Linux syscall ABI; this includes Alpine's
-	// /lib/ld-musl-x86_64.so.1 and static Linux executables.
-	linux_abi := ld_path != '/usr/lib/ld.so'
+	// Only x86-64 programs run here. arm64 hands x86 programs to a
+	// translator; there is none for the other way round, and no 32-bit
+	// support, so anything else is not an executable to this machine.
+	architecture := elf.architecture(prog) or { return exec_format_error(err) }
+	if architecture != elf.arch_x86_64 {
+		errno.set(errno.enoexec)
+		return none
+	}
+
+	// Made after the shebang check: a script never used it, and lost it.
+	mut new_pagemap := memory.new_pagemap()
+
+	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
 
 	mut entry_point := unsafe { nil }
 
 	if ld_path == '' {
 		entry_point = voidptr(auxval.at_entry)
 	} else {
-		ld_node := fs.get_node(vfs_root, ld_path, true)?
+		// Found from the root of the process that runs it -- a container's,
+		// after pivot_root -- as on arm64.
+		ld_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+		ld_node := fs.get_node_and_mount(fs.process_root(proc.current_thread().process), ld_path, true, ld_mount) or {
+			failure := errno.get()
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
+			errno.set(failure)
+			return none
+		}
 		if !stat.isreg(ld_node.resource.stat.mode)
-			|| !fs.check_access(ld_node, fs.access_exec, true) {
+			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0 {
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
 			errno.set(errno.eacces)
+			return none
+		}
+		fs.check_access(ld_node, fs.access_exec, true) or {
+			failure := errno.get()
+			unsafe { ld_path.free() }
+			mmap.delete_pagemap(mut new_pagemap) or {}
+			errno.set(failure)
 			return none
 		}
 		ld := ld_node.resource
 
 		ld_auxval, interp := elf.load(new_pagemap, ld, elf.interpreter_load_base()) or {
-			return none
+			return exec_format_error(err)
 		}
 
 		if interp != '' {
@@ -728,9 +406,11 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
 
-		new_process.name = '${path}[${new_process.pid}]'
-		new_process.executable_path = path.clone()
-		new_process.linux_abi = linux_abi
+		new_process.name = proc.process_name(path, new_process.pid)
+		new_process.executable_path = fs.program_path(prog_node, path)
+		proc.set_executable_fs(mut new_process, voidptr(prog_node), prog_mount)
+		new_process.allow_wx = allow_wx
+		new_process.sigcookie = proc.new_sigcookie()
 
 		stdin_node := fs.get_node(vfs_root, stdin_path, true)?
 		stdin_handle := &file.Handle{
@@ -766,42 +446,147 @@ pub fn start_program(execve bool, dir &fs.VFSNode, _path string, argv []string, 
 			handle: stderr_handle
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
+		proc.set_command_line(mut new_process, argv)
+		mut started := false
+		defer { if !started { proc.clear_command_line(mut new_process) } }
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			envp, auxval, true)?
+		started = true
 
 		return new_process
 	} else {
 		mut t := proc.current_thread()
 		mut process := t.process
+		// Named before the close-on-exec descriptors go: fexecve() runs one.
+		program_path := fs.program_path(prog_node, path)
 
+		// Every other thread has to be gone before the address space it runs
+		// in is replaced, and before the close-on-exec descriptors go. POSIX
+		// timers do not survive an exec either.
+		kill_sibling_threads(mut process, t)
+		begin_exec_signals(mut process, t)
+		posixtimer.remove_process_timers(process)
+
+		// Close the O_CLOEXEC descriptors, as execve(2) promises. A pipe end
+		// that survived the exec would keep its reader from ever seeing end
+		// of file: posix_spawn() and Python's subprocess learn that the
+		// child's exec worked from exactly that end of file. The table stops
+		// growing with the other threads gone.
+		for i := 0; i < process.fds.len; i++ {
+			fd_ptr := unsafe { &file.FD(process.fds[i]) }
+			if fd_ptr == unsafe { nil } {
+				continue
+			}
+			if fd_ptr.flags & resource.o_cloexec != 0 {
+				file.fdnum_close(process, i, true) or {}
+			}
+		}
+		// This thread never returns to userspace to pay for what those closes
+		// changed; the new program's thread starts there.
+		flush_owed_sync()
+
+		// Swapped under the process table lock, which cgroup memory accounting
+		// and /proc hold while they walk a process' page map: the old one is
+		// freed below.
+		proc.lock_table()
 		mut old_pagemap := process.pagemap
-
+		proc.preserve_peak_rss(process, old_pagemap)
 		process.pagemap = new_pagemap
+		proc.dumpability_after_exec(mut process)
+		proc.unlock_table()
+		// The LDT goes with the program, as on Linux; the new thread's TLS
+		// descriptors start empty.
+		sched.drop_ldt(mut process)
 
-		process.name = '${path}[${process.pid}]'
-		process.executable_path = path.clone()
-		process.linux_abi = linux_abi
+		// The copies fork made are replaced, not kept alongside.
+		unsafe {
+			process.name.free()
+			process.executable_path.free()
+		}
+		process.name = proc.process_name(path, process.pid)
+		// /proc/self/exe leads to the program's node, as on arm64, so that it
+		// names the file wherever the exec found it -- by a relative path, or
+		// through a descriptor.
+		process.executable_path = program_path
+		proc.set_command_line(mut process, argv)
+		proc.set_executable_fs(mut process, voidptr(prog_node), prog_mount)
+		// The replacement mappings now own their inode references, and the
+		// executable node is recorded before its final descriptor goes.
+		release_exec_descriptor(mut t)
+		process.allow_wx = allow_wx
+		// execve recomputes the capability sets from the new credentials and
+		// the bounding set, which is how a container's root ends up with only
+		// the capabilities its runtime left it.
+		proc.capabilities_after_exec(mut process)
+		proc.mac_after_exec(mut process)
+		// The new program runs under the execpromises, or unpledged.
+		proc.pledge_after_exec(mut process)
+		// Frames the old program was given must not return into the new one.
+		process.sigcookie = proc.new_sigcookie()
 
 		kernel_pagemap.switch_to()
+		// Exec retains the calling task's accounting even though Vinix builds
+		// a replacement Thread. Finish its old-process CPU turn before detach.
+		proc.charge_cpu_time(mut t, proc.cpu_time_now_ns())
+		inherited_usage := t.usage
+		inherited_user_ns := t.cpu_user_ns
+		inherited_system_ns := t.cpu_system_ns
 		t.process = kernel_process
 
-		mmap.delete_pagemap(mut old_pagemap)?
+		mmap.delete_pagemap(mut old_pagemap) or {
+			free_exec_arguments(path, argv, envp)
+			abort_exec(mut process, mut t)
+		}
 
 		process.thread_stack_top = elf.initial_stack_top()
 		process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
+		// The old program's break went with its page map; the new one
+		// reserves its own arena on its first brk().
+		process.brk_base = 0
+		process.brk_current = 0
 
-		// TODO: Kill old threads
-		// old_threads := process.threads
-		process.threads = []&proc.Thread{}
+		// Same lock new_user_thread's append holds: without it, a concurrent
+		// reader of process.threads (syscall_kill's broadcast path) could
+		// observe this array mid-replacement.
+		// Emptied, not replaced: a new empty list lost the old one's buffer.
+		process.threads_lock.acquire()
+		process.threads.clear()
+		process.threads_lock.release()
 
-		sched.new_user_thread(process, true, entry_point, unsafe { nil }, 0, argv, envp,
-			auxval, true)?
-
-		unsafe {
-			argv.free()
-			envp.free()
+		// The program that comes out of exec has one thread, the group leader,
+		// which takes the pid as its tid. A thread other than the leader that
+		// called execve gives its own number back.
+		// The program keeps the scheduling policy of the thread that execs it,
+		// installed before the thread is enqueued: `chrt -f 50 ./program`.
+		inherited_sched := t.sched
+		mut new_thread := sched.new_user_thread(process, true, entry_point, unsafe { nil },
+			0, argv, envp, auxval, false) or {
+			free_exec_arguments(path, argv, envp)
+			abort_exec(mut process, mut t)
 		}
+		if t.tid != process.pid {
+			proc.free_tid(t.tid)
+		}
+		new_thread.usage = inherited_usage
+		new_thread.cpu_user_ns = inherited_user_ns
+		new_thread.cpu_system_ns = inherited_system_ns
+		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
+		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
+
+		// execve keeps the signal mask and what was ignored; only handlers,
+		// which pointed into the old program, go back to the default.
+		new_thread.masked_signals = t.masked_signals
+		for i := 0; i < t.sigactions.len; i++ {
+			if u64(t.sigactions[i].sa_sigaction) == linux_sig_ign {
+				new_thread.sigactions[i].sa_sigaction = voidptr(linux_sig_ign)
+			}
+		}
+		finish_exec_signals(mut process, mut new_thread, t, false)
+
+		// This never returns, so the caller cannot free what the exec was
+		// handed; the path was lost with every exec.
+		free_exec_arguments(path, argv, envp)
 		sched.dequeue_and_die()
 	}
 }
@@ -850,4 +635,85 @@ pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
 		build_arg.free()
 	}
 	return final_path, final_arg
+}
+
+// execveat(dirfd, path, argv, envp, flags): execve relative to a directory
+// descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
+// which is what fexecve(3) is built from.
+pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _envp &charptr, flags int) (u64, u64) {
+	mut mac_thread := proc.current_thread()
+	mac_previous := mac_thread.mac_loading
+	mac_thread.mac_loading = true
+	defer { mac_thread.mac_loading = mac_previous }
+	defer { release_exec_descriptor(mut mac_thread) }
+	mut process := proc.current_thread().process
+
+	path := fs.user_path(_path) or { return errno.err, errno.get() }
+
+	mut directory := &fs.VFSNode(unsafe { nil })
+	mut target := path
+
+	mut direct_node := &fs.VFSNode(unsafe { nil })
+	direct_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	lib.copy_mount_context(direct_mount, unsafe { nil })
+	if path.len == 0 {
+		// The descriptor's name below takes the empty path's place.
+		unsafe { path.free() }
+		if flags & fs.at_empty_path == 0 {
+			return errno.err, errno.enoent
+		}
+		// Run the descriptor's image with its actual mount route. A relative
+		// shebang interpreter is resolved from cwd, as for ordinary execve.
+		mut fd := file.fd_from_fdnum(process, dirfd) or { return errno.err, errno.ebadf }
+		mac_thread.exec_descriptor = voidptr(fd)
+		fd.handle.mac_check(proc.mac_execute) or { return errno.err, errno.get() }
+		node := unsafe { &fs.VFSNode(fd.handle.node) }
+		lib.copy_mount_context(direct_mount, &fd.handle.mount)
+		if node == unsafe { nil } {
+			return errno.err, errno.eacces
+		}
+		direct_node = node
+		directory = if node.parent != unsafe { nil } {
+			node.parent
+		} else {
+			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
+		}
+		mut name := lib.new_text(32)
+		name.add('/proc/self/fd/')
+		name.add_decimal(i64(dirfd))
+		target = name.str()
+	} else {
+		directory = fs.parent_and_mount_for(dirfd, path, direct_mount) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
+		direct_node = fs.get_node_on_mount(directory, path, flags & fs.at_symlink_nofollow == 0, direct_mount) or {
+			unsafe { path.free() }
+			return errno.err, errno.get()
+		}
+	}
+
+	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+		unsafe { target.free() }
+		return errno.err, errno.get()
+	}
+	envp := exec_strings_from_user(u64(_envp), exec_total_max - exec_strings_size(argv)) or {
+		unsafe { target.free() }
+		free_exec_strings(mut argv)
+		return errno.err, errno.get()
+	}
+
+	// The path and both vectors are the exec's now, freed whether it works or
+	// not.
+	if direct_node != unsafe { nil } {
+		start_program_node(true, directory, direct_node, direct_mount, target, argv, envp, '', '', '') or {
+			return errno.err, errno.get()
+		}
+		return errno.err, errno.get()
+	}
+	start_program(true, directory, target, argv, envp, '', '', '') or {
+		return errno.err, errno.get()
+	}
+
+	return errno.err, errno.get()
 }

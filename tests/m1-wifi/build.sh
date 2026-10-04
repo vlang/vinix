@@ -1,5 +1,6 @@
 #!/bin/sh
-# Run from any directory. Dependencies: ./kernel/get-deps and a V1 compiler.
+# Run from any directory. Dependencies: ./kernel/get-deps and a V compiler
+# (get-v.sh bootstraps a pinned, known-working one).
 # Clean builds avoid stale objects from other architectures or VFLAGS/PROD modes.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -8,7 +9,9 @@ CC=${CC:-clang}
 LD_AARCH64=${LD_AARCH64:-ld.lld}
 JOBS=${JOBS:-2}
 OUT=${OUT:-"$ROOT/tests/m1-wifi/out"}
-VFLAGS=${VFLAGS:--old-compiler}
+# -old-compiler was only needed for the V1-era pin get-v.sh used to bootstrap;
+# a current V neither needs nor accepts it as a build-time VFLAGS value here.
+VFLAGS=${VFLAGS:-}
 case "$JOBS" in ''|0|*[!0-9]*) echo 'JOBS must be a positive integer' >&2; exit 2;; esac
 mkdir -p "$OUT"
 OUT=$(CDPATH= cd -- "$OUT" && pwd)

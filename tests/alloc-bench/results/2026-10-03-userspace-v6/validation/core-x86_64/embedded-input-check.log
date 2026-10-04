@@ -1,0 +1,16 @@
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Copying of file objects from ISO image to disk filesystem is: Enabled
+xorriso : NOTE : Loading ISO image tree from LBA 0
+xorriso : UPDATE :      11 nodes read in 1 seconds
+xorriso : NOTE : Detected El-Torito boot information which currently is set to be discarded
+Drive current: -indev '/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso'
+Media current: stdio file, overwriteable
+Media status : is written , is appendable
+Boot record  : El Torito , MBR cyl-align-off
+Media summary: 1 session, 5661 data blocks, 11.1m data, 19.6g free
+Volume id    : 'ISOIMAGE'
+xorriso : UPDATE :       1 files restored (7369.6k) in 1 seconds = 5.4xD
+Extracted from ISO image: file '/boot/vinix'='/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/embedded-kernel'
+xorriso : UPDATE :       1 files restored ( 190.0k) in 1 seconds = 0.1xD
+Extracted from ISO image: file '/boot/initramfs.tar'='/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/embedded-initramfs.tar'

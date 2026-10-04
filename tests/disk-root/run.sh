@@ -42,7 +42,15 @@ chmod +x "$work/system/sbin/init"
 # the host rather than by the kernel, so what is under test is reading back
 # somebody else's block layout. The guest recomputes every byte from its offset.
 python3 "$repo/tests/disk-root/make-large-file.py" "$work/system/usr/share/vinix-large"
+ln -s vinix-large "$work/system/usr/share/vinix-large-link"
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/system.tar" -C "$work/system" .
+
+# A saved package overlay predating the disk-root layout is folded into the
+# volume by the host. It must not become another Limine module in guest RAM.
+mkdir -p "$work/package-overlay/etc" "$work/vm"
+printf '%s\n' disk-overlay > "$work/package-overlay/etc/vinix-package-overlay"
+COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/vm/packages.tar" \
+	-C "$work/package-overlay" .
 
 python3 "$repo/tests/disk-root/run_vm.py" \
 	--image "$work/system.tar" \

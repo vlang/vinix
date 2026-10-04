@@ -1,0 +1,116 @@
+#!/usr/bin/python3
+"""Extract Steam archives without GNU tar's chmod of symlinks on Vinix.
+
+Valve's launcher uses only a small part of GNU tar's extraction interface.
+Other modes are delegated to the glibc root's tar.
+"""
+
+import os
+from pathlib import Path
+import sys
+import tarfile
+
+
+def extraction_args(args):
+    extract = False
+    archive = None
+    directory = Path.cwd()
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        # GNU tar also accepts its traditional first argument without '-'.
+        if index == 0 and arg and arg[0] == "x" and all(c in "xzJvf" for c in arg):
+            arg = "-" + arg
+        if arg in ("-C", "--directory"):
+            index += 1
+            if index == len(args):
+                return None
+            directory = Path(args[index])
+        elif arg.startswith("--directory="):
+            directory = Path(arg.split("=", 1)[1])
+        elif arg in ("--no-same-permissions", "--no-same-owner", "--numeric-owner"):
+            pass
+        elif arg.startswith(("--blocking-factor=", "--checkpoint=",
+                             "--checkpoint-action=")):
+            pass
+        elif arg in ("--blocking-factor", "--checkpoint", "--checkpoint-action"):
+            index += 1
+            if index == len(args):
+                return None
+        elif arg.startswith("-") and not arg.startswith("--"):
+            letters = arg[1:]
+            position = 0
+            while position < len(letters):
+                letter = letters[position]
+                if letter == "x":
+                    extract = True
+                elif letter in "zJv":
+                    pass
+                elif letter == "f":
+                    if position + 1 < len(letters):
+                        archive = letters[position + 1:]
+                    else:
+                        index += 1
+                        if index == len(args):
+                            return None
+                        archive = args[index]
+                    break
+                else:
+                    return None
+                position += 1
+        else:
+            return None
+        index += 1
+    if not extract or not archive or archive == "-":
+        return None
+    return archive, directory
+
+
+def inside(root, path):
+    return path == root or root in path.parents
+
+
+def extract(archive_path, directory):
+    root = directory.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive_path, "r:*") as archive:
+        for member in archive:
+            target = root / member.name
+            # Resolve each entry against what has already been extracted. This
+            # also catches a prior symlink that points outside the destination.
+            if not inside(root, target.resolve(strict=False)):
+                raise ValueError(f"archive path leaves destination: {member.name}")
+            if member.issym():
+                linked = (target.parent / member.linkname).resolve(strict=False)
+                if not inside(root, linked):
+                    raise ValueError(f"archive link leaves destination: {member.name}")
+            if member.islnk():
+                linked = (root / member.linkname).resolve(strict=False)
+                if not inside(root, linked):
+                    raise ValueError(f"archive hard link leaves destination: {member.name}")
+            if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
+                raise ValueError(f"unsupported archive member: {member.name}")
+            if sys.version_info >= (3, 12):
+                archive.extract(member, root, set_attrs=False, filter="fully_trusted")
+            else:
+                archive.extract(member, root, set_attrs=False)
+            if member.isfile():
+                target.chmod(member.mode & 0o777)
+
+
+def main():
+    parsed = extraction_args(sys.argv[1:])
+    if parsed is None:
+        root = os.environ.get("VINIX_STEAM_ROOT", "/usr/libexec/vinix-steam/root")
+        native_tar = f"{root}/usr/bin/tar"
+        os.execv(native_tar, [native_tar, *sys.argv[1:]])
+    try:
+        extract(*parsed)
+    except (OSError, tarfile.TarError, ValueError) as error:
+        print(f"steam tar: {error}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

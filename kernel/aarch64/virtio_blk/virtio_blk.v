@@ -8,16 +8,18 @@ module virtio_blk
 // volume is attached by run-aarch64.sh when --persist is requested.
 import aarch64.cpu
 import aarch64.uart
+import aarch64.timer
 import errno
 import event.eventstruct
 import fs
 import fs.ext2
 import klock
+import lib
 import limine
 import memory
+import proc
 import resource
 import stat
-import time
 
 const reg_magic = u64(0x000)
 const reg_device_id = u64(0x008)
@@ -43,13 +45,19 @@ const status_driver_ok = u32(4)
 const status_failed = u32(128)
 const descriptor_next = u16(1)
 const descriptor_write = u16(2)
+const feature_read_only = u32(1 << 5)
+const feature_flush = u32(1 << 9)
+const request_flush = u32(4)
 
 const mmio_base = u64(0x0a000000)
 const mmio_slot_size = u64(0x200)
 const mmio_slot_count = u64(32)
 const queue_align = u64(4096)
 const max_transfer = u64(128 * 1024)
-const request_timeout_ns = u64(5_000_000_000)
+// A loaded host can pause the VM for several seconds while large Steam and
+// browser libraries fault in from the disk image. Keep an outstanding request
+// alive across those pauses instead of reporting a spurious I/O failure.
+const request_timeout_ns = u64(30_000_000_000)
 
 @[packed]
 struct RequestHeader {
@@ -68,20 +76,22 @@ pub mut:
 	status   int
 	can_mmap bool
 
-	base           u64
-	hhdm           u64
-	queue_size     u16
-	desc           u64
-	avail          u64
-	used           u64
-	last_used      u16
-	next_available u16
-	request_phys   u64
-	request_virt   u64
-	data_phys      u64
-	data_virt      u64
-	ready          bool
-	name           string
+	base            u64
+	hhdm            u64
+	queue_size      u16
+	desc            u64
+	avail           u64
+	used            u64
+	last_used       u16
+	next_available  u16
+	request_phys    u64
+	request_virt    u64
+	data_phys       u64
+	data_virt       u64
+	ready           bool
+	read_only       bool
+	flush_supported bool
+	name            string
 }
 
 __global (
@@ -126,7 +136,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 	avail_offset := u64(device.queue_size) * 16
 	used_offset := align_up(avail_offset + 4 + 2 * u64(device.queue_size) + 2, queue_align)
 	queue_bytes := used_offset + 4 + 8 * u64(device.queue_size) + 2
-	queue_pages := (queue_bytes + 4095) / 4096
+	queue_pages := (queue_bytes + memory.page_size - 1) / memory.page_size
 	queue_phys := u64(memory.pmm_alloc(queue_pages))
 	if queue_phys == 0 {
 		return false
@@ -134,10 +144,10 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 	device.desc = queue_phys + device.hhdm
 	device.avail = device.desc + avail_offset
 	device.used = device.desc + used_offset
-	unsafe { C.memset(voidptr(device.desc), 0, queue_pages * 4096) }
+	unsafe { C.memset(voidptr(device.desc), 0, queue_pages * memory.page_size) }
 
 	request_phys := u64(memory.pmm_alloc(1))
-	data_phys := u64(memory.pmm_alloc(max_transfer / 4096))
+	data_phys := u64(memory.pmm_alloc(max_transfer / memory.page_size))
 	if request_phys == 0 || data_phys == 0 {
 		return false
 	}
@@ -150,7 +160,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 		C.memset(voidptr(device.data_virt), 0, max_transfer)
 	}
 	cpu.dmb_ish()
-	mmio_w32(device.base + reg_queue_pfn, u32(queue_phys / 4096))
+	mmio_w32(device.base + reg_queue_pfn, u32(queue_phys / memory.page_size))
 	return true
 }
 
@@ -158,7 +168,7 @@ fn setup_queue(mut device VirtioBlockDevice) bool {
 // polled rather than waited on, and `last_used` counts what this driver has
 // collected; the caller submits at most one at a time.
 fn (mut device VirtioBlockDevice) collect_one() bool {
-	deadline := time.monotonic_ns() + request_timeout_ns
+	deadline := timer.get_ns() + request_timeout_ns
 	mut spins := u64(0)
 	for {
 		cpu.dmb_ish()
@@ -166,7 +176,8 @@ fn (mut device VirtioBlockDevice) collect_one() bool {
 			break
 		}
 		spins++
-		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
+		if spins > 1_000_000_000 || timer.get_ns() >= deadline {
+			uart.puts(c'virtio-blk: request timed out\n')
 			return false
 		}
 	}
@@ -233,7 +244,49 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 	if read {
 		unsafe { C.memcpy(buffer, voidptr(device.data_virt), count) }
 	}
+	proc.account_disk_io(count, !read)
 	return true
+}
+
+fn (mut device VirtioBlockDevice) sync(_handle voidptr) ? {
+	device.l.acquire()
+	defer { device.l.release() }
+	if !device.ready {
+		errno.set(errno.eio)
+		return none
+	}
+	// A device that did not offer FLUSH may complete volatile writes. The
+	// specification does not guarantee persistence in that case.
+	if !device.flush_supported {
+		errno.set(errno.eio)
+		return none
+	}
+	for device.last_used != device.next_available {
+		if !device.collect_one() {
+			errno.set(errno.eio)
+			return none
+		}
+	}
+	mut header := unsafe { &RequestHeader(device.request_virt) }
+	header.type_ = request_flush
+	header.reserved = 0
+	header.sector = 0
+	unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) = 0xff }
+	// FLUSH has only a header and status, with no data descriptor.
+	write_descriptor(device, 0, device.request_phys, sizeof(RequestHeader), descriptor_next, 2)
+	write_descriptor(device, 2, device.request_phys + sizeof(RequestHeader), 1, descriptor_write, 0)
+	position := u64(device.next_available % device.queue_size)
+	unsafe { *&u16(device.avail + 4 + position * 2) = 0 }
+	device.next_available++
+	cpu.dmb_ish()
+	unsafe { *&u16(device.avail + 2) = device.next_available }
+	mmio_w32(device.base + reg_queue_notify, 0)
+	// A timeout keeps these permanent buffers outstanding; the next caller
+	// collects the late completion before overwriting either descriptor.
+	if !device.collect_one() || unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) } != 0 {
+		errno.set(errno.eio)
+		return none
+	}
 }
 
 fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
@@ -248,12 +301,17 @@ fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64,
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, false)
 		done += chunk
 	}
 	return i64(count)
 }
 
 fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if device.read_only {
+		errno.set(errno.erofs)
+		return none
+	}
 	if loc % 512 != 0 || count % 512 != 0 || loc + count > u64(device.stat.size) {
 		errno.set(errno.eio)
 		return none
@@ -265,9 +323,18 @@ fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64
 			errno.set(errno.eio)
 			return none
 		}
+		proc.account_disk_transfer(chunk, true)
 		done += chunk
 	}
 	return i64(count)
+}
+
+fn (device &VirtioBlockDevice) block_identity() resource.BlockIdentity {
+	return resource.BlockIdentity{is_block: true, disk_id: device.stat.rdev, length: u64(device.stat.size)}
+}
+
+fn (device &VirtioBlockDevice) read_only_backend() bool {
+	return device.read_only
 }
 
 fn (mut device VirtioBlockDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -302,19 +369,24 @@ pub fn initialise(hhdm u64) {
 		if mmio_r32(base + reg_magic) != virtio_magic || mmio_r32(base + reg_device_id) != virtio_id_block {
 			continue
 		}
+		mut name := lib.new_text(3)
+		name.add('vd')
+		name.add_byte(u8(`a` + index))
 		mut device := &VirtioBlockDevice{
 			base: base
 			hhdm: hhdm
-			name: 'vd' + rune(`a` + index).str()
+			name: name.str()
 		}
 		mmio_w32(base + reg_status, 0)
 		mmio_w32(base + reg_status, status_acknowledge)
 		mmio_w32(base + reg_status, status_acknowledge | status_driver)
-		// This legacy transport accepts feature bit zero as a direct 32-bit mask.
-		// No block features are required for the synchronous request path.
-		_ = mmio_r32(base + reg_host_features)
-		mmio_w32(base + reg_guest_features, 0)
-		mmio_w32(base + reg_guest_page_size, 4096)
+		// Accept the backend's immutable write protection before filesystems
+		// inspect it, independently of support for cache flush commands.
+		features := mmio_r32(base + reg_host_features) & (feature_read_only | feature_flush)
+		device.read_only = features & feature_read_only != 0
+		device.flush_supported = features & feature_flush != 0
+		mmio_w32(base + reg_guest_features, features)
+		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if !setup_queue(mut device) {
 			mmio_w32(base + reg_status, status_acknowledge | status_driver | status_failed)
 			uart.puts(c'virtio-blk: queue unavailable\n')
@@ -374,23 +446,31 @@ pub fn mount_persistent_root() bool {
 		return false
 	}
 	for device in devices {
-		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
+		path := '/dev/${device.name}' @[freed]
+		node := fs.get_node(vfs_root, path, true) or {
+			unsafe { path.free() }
+			continue
+		}
+		unsafe { path.free() }
+		name_len, name := i32(device.name.len), device.name.str
 		mut filesystem, ok := ext2.ext2_init(node)
 		if !ok {
-			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
+			C.kprintf(c'virtio-blk: /dev/%.*s is not a readable ext2 volume\n', name_len, name)
 			continue
 		}
 		// Not attached anywhere: install_disk_root is what publishes it, and
 		// only once it has checked that the volume really carries a system.
 		mut root := ext2.ext2_root(mut filesystem) or {
-			println('virtio-blk: ext2 volume /dev/${device.name} has no readable root')
+			C.kprintf(c'virtio-blk: ext2 volume /dev/%.*s has no readable root\n', name_len,
+				name)
 			continue
 		}
 		if !fs.install_disk_root(mut root) {
-			println('virtio-blk: /dev/${device.name} does not carry a bootable system')
+			C.kprintf(c'virtio-blk: /dev/%.*s does not carry a bootable system\n', name_len,
+				name)
 			continue
 		}
-		println('virtio-blk: persistent ext2 root mounted from /dev/${device.name}')
+		C.kprintf(c'virtio-blk: persistent ext2 root mounted from /dev/%.*s\n', name_len, name)
 		return true
 	}
 	println('virtio-blk: no ext2 volume carried a system; using the initramfs root')
@@ -405,18 +485,29 @@ pub fn mount_persistent_home() bool {
 		return true
 	}
 	for device in devices {
-		node := fs.get_node(vfs_root, '/dev/${device.name}', true) or { continue }
+		// The mount table keeps a copy of its own.
+		path := '/dev/${device.name}' @[freed]
+		node := fs.get_node(vfs_root, path, true) or {
+			unsafe { path.free() }
+			continue
+		}
+		name_len, name := i32(device.name.len), device.name.str
 		filesystem, ok := ext2.ext2_init(node)
 		if !ok {
-			println('virtio-blk: /dev/${device.name} is not a readable ext2 volume')
+			C.kprintf(c'virtio-blk: /dev/%.*s is not a readable ext2 volume\n', name_len, name)
+			unsafe { path.free() }
 			continue
 		}
 		fs.add_filesystem(filesystem, 'qemu-persist')
-		fs.mount_at_root('/dev/${device.name}', '/root', 'qemu-persist') or {
-			println('virtio-blk: ext2 volume /dev/${device.name} could not mount at /root')
+		fs.mount_at_root(path, '/root', 'qemu-persist') or {
+			C.kprintf(c'virtio-blk: ext2 volume /dev/%.*s could not mount at /root\n', name_len,
+				name)
+			unsafe { path.free() }
 			return false
 		}
-		println('virtio-blk: persistent ext2 mounted at /root from /dev/${device.name}')
+		unsafe { path.free() }
+		C.kprintf(c'virtio-blk: persistent ext2 mounted at /root from /dev/%.*s\n', name_len,
+			name)
 		return true
 	}
 	println('virtio-blk: requested persistent ext2 volume was not found')

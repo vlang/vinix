@@ -18,7 +18,6 @@ import resource
 import sched
 import stat
 import time
-import usercopy
 
 #include "apple_smc.h"
 
@@ -30,13 +29,16 @@ fn C.vinix_smc_boot(state voidptr, context voidptr,
 fn C.vinix_smc_poll(state voidptr, budget u32) int
 fn C.vinix_smc_refresh(state voidptr) int
 fn C.vinix_smc_sample_time(state voidptr) u64
+fn C.vinix_smc_refresh_power(state voidptr, flags &u32, voltage &int, current &int, power &int) int
+fn C.vinix_smc_power_time(state voidptr) u64
+fn C.vinix_smc_format_power(flags u32, voltage int, current int, power int, output &u8) int
 fn C.vinix_smc_format_capacity(percent int, output &u8) int
 fn C.vinix_smc_error(result int) &char
 fn C.vinix_smc_counter() u64
 
 struct Snapshot {
 mut:
-	bytes  [4]u8
+	bytes  [128]u8
 	length int
 }
 
@@ -57,10 +59,16 @@ mut:
 	sampled_at u64
 	frequency u64
 	snapshots map[u64]Snapshot
+	power_only bool
+	power_flags u32
+	voltage_mv int
+	current_ma int
+	power_mw int
 }
 
 __global (
 	battery_device = &Battery(unsafe { nil })
+	battery_power_device = &Battery(unsafe { nil })
 )
 
 fn send(context voidptr, word u64, endpoint u8) int {
@@ -127,6 +135,7 @@ pub fn initialise() {
 		println('apple-smc: SMC node has no mboxes property')
 		return
 	}
+	defer { unsafe { channels.free() } }
 	if channels.len != 1 {
 		println('apple-smc: expected one zero-argument mailbox')
 		return
@@ -147,6 +156,7 @@ pub fn initialise() {
 		println('apple-smc: mailbox provider has no compatible property')
 		return
 	}
+	defer { unsafe { compatible.free() } }
 	if cells != 0 || 'apple,asc-mailbox-v4' !in compatible {
 		println('apple-smc: unsupported mailbox provider')
 		return
@@ -155,6 +165,7 @@ pub fn initialise() {
 		println('apple-smc: mailbox registers do not translate to an address')
 		return
 	}
+	defer { unsafe { regs.free() } }
 	if regs.len != 1 || regs[0].base == 0 || regs[0].size < 0x1000
 		|| regs[0].base > ~u64(0) - 0xfff {
 		println('apple-smc: invalid mailbox register range')
@@ -195,6 +206,16 @@ pub fn initialise() {
 	dev.stat.mode = 0o444 | stat.ifchr
 	dev.status = file.pollin
 	fs.devtmpfs_add_device(dev, 'battery')
+	mut power := &Battery{
+		power_only: true
+		frequency: dev.frequency
+	}
+	power.stat.blksize = 128
+	power.stat.rdev = resource.create_dev_id()
+	power.stat.mode = 0o444 | stat.ifchr
+	power.status = file.pollin
+	battery_power_device = power
+	fs.devtmpfs_add_device(power, 'battery-power')
 	// Publish all Resource fields before starting the polling worker.
 	// System endpoint traffic must be serviced even without userspace readers.
 	spawn service()
@@ -207,12 +228,11 @@ pub fn initialise() {
 
 fn service() {
 	mut dev := battery_device
-	// Reuse both the timer and its listener array rather than allocating ten
-	// times per second. event.await consumes a pending timer event before sleep.
+	// Reuse the timer rather than allocating one ten times per second.
+	// event.await consumes a pending timer event before sleep.
 	mut timer := time.new_timer(time.TimeSpec{tv_nsec: 100_000_000})
-	mut events := [&timer.event]
 	for {
-		event.await(mut events, true) or {}
+		event.await_one(mut timer.event, true) or {}
 		timer.disarm()
 		// No Resource spinlock during firmware waits: Vinix spinlocks mask
 		// interrupts. This worker alone owns the mutable protocol state.
@@ -223,6 +243,23 @@ fn service() {
 		dev.sample = capacity
 		dev.sampled_at = sampled_at
 		dev.l.release()
+		if battery_power_device != unsafe { nil } && result >= 0 {
+			mut flags := u32(0)
+			mut voltage := 0
+			mut current := 0
+			mut watts := 0
+			power_result := C.vinix_smc_refresh_power(dev.state, &flags, &voltage, &current, &watts)
+			power_at := C.vinix_smc_power_time(dev.state)
+			mut power := battery_power_device
+			power.l.acquire()
+			power.sample = power_result
+			power.sampled_at = power_at
+			power.power_flags = flags
+			power.voltage_mv = voltage
+			power.current_ma = current
+			power.power_mw = watts
+			power.l.release()
+		}
 		if result < 0 {
 			C.printf(c'apple-smc: battery service stopped: %s\n', C.vinix_smc_error(result))
 			break
@@ -230,15 +267,12 @@ fn service() {
 		timer.when = time.TimeSpec{tv_nsec: 100_000_000}
 		timer.arm()
 	}
-	unsafe {
-		events.free()
-		free(timer)
-	}
+	unsafe { free(timer) }
 	sched.dequeue_and_die()
 }
 
 fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	if count == 0 || loc >= 4 {
+	if count == 0 || loc >= u64(if this.power_only { 128 } else { 4 }) {
 		return 0
 	}
 	if handle == unsafe { nil } {
@@ -259,7 +293,11 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 			return none
 		}
 		mut value := Snapshot{}
-		value.length = C.vinix_smc_format_capacity(percent, &value.bytes[0])
+		value.length = if this.power_only {
+			C.vinix_smc_format_power(this.power_flags, this.voltage_mv, this.current_ma, this.power_mw, &value.bytes[0])
+		} else {
+			C.vinix_smc_format_capacity(percent, &value.bytes[0])
+		}
 		if value.length < 0 {
 			errno.set(errno.eio)
 			return none
@@ -272,10 +310,7 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 	}
 	remaining := u64(sample.length) - loc
 	n := if count < remaining { count } else { remaining }
-	if !usercopy.copy_to_user(u64(buf), voidptr(&sample.bytes[int(loc)]), n) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, voidptr(&sample.bytes[int(loc)]), n) }
 	return i64(n)
 }
 

@@ -1,0 +1,75 @@
+{
+  "base_commit": "f4ea2e4d9a7ad28a1d57f8702a618d2a01350d4a",
+  "worktree": "/Users/alex/code/vinix/third_party/alloc-bench-integration",
+  "patch_sha256": "c91b5db8e5ce1708064aa5234afb0d50cdf7f208d8e20dfe57e56049ca037696",
+  "changed_paths": [
+    "kernel/memory/physical.v",
+    "kernel/memory/physical_numa.v",
+    "kernel/memory/slab.v"
+  ],
+  "dependency_symlinks": [
+    "kernel/freestnd-c-hdrs",
+    "kernel/cc-runtime",
+    "kernel/c/flanterm",
+    "kernel/c/nanoprintf.h",
+    "kernel/c/uacpi",
+    "kernel/c/lwip"
+  ],
+  "builds": [
+    {
+      "arch": "x86_64",
+      "command": [
+        "make",
+        "-C",
+        "/Users/alex/code/vinix/third_party/alloc-bench-integration/kernel",
+        "-j4",
+        "ARCH=x86_64",
+        "CC=/usr/bin/clang",
+        "V=/Users/alex/code/v/v",
+        "AR=/opt/homebrew/opt/llvm/bin/llvm-ar",
+        "LD_X86_64=/opt/homebrew/bin/ld.lld",
+        "LD_AARCH64=/opt/homebrew/bin/ld.lld"
+      ],
+      "returncode": 0,
+      "duration_seconds": 105.719,
+      "log": "x86_64.log",
+      "binary": "vinix-x86_64",
+      "binary_sha256": "3f95dfaa7925c7a5bb3e0ae8286123704f671cca76b23c972090e4efe0bf4868",
+      "binary_format": "/Users/alex/code/vinix/build/alloc-bench-integration/vinix-x86_64: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked, with debug_info, not stripped"
+    },
+    {
+      "arch": "aarch64",
+      "command": [
+        "make",
+        "-C",
+        "/Users/alex/code/vinix/third_party/alloc-bench-integration/kernel",
+        "-j4",
+        "ARCH=aarch64",
+        "CC=/usr/bin/clang",
+        "V=/Users/alex/code/v/v",
+        "AR=/opt/homebrew/opt/llvm/bin/llvm-ar",
+        "LD_X86_64=/opt/homebrew/bin/ld.lld",
+        "LD_AARCH64=/opt/homebrew/bin/ld.lld"
+      ],
+      "returncode": 0,
+      "duration_seconds": 107.441,
+      "log": "aarch64.log",
+      "binary": "vinix-aarch64",
+      "binary_sha256": "876f9d5947f7031aeed2f0364dbea37d7392b8677b3c05342c69a8a121536f35",
+      "binary_format": "/Users/alex/code/vinix/build/alloc-bench-integration/vinix-aarch64: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, with debug_info, not stripped"
+    }
+  ],
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "v_compiler": "V 0.5.2 0dc6a69",
+  "clean_command": [
+    "make",
+    "-C",
+    "/Users/alex/code/vinix/third_party/alloc-bench-integration/kernel",
+    "clean",
+    "CC=/usr/bin/clang",
+    "V=/Users/alex/code/v/v",
+    "AR=/opt/homebrew/opt/llvm/bin/llvm-ar",
+    "LD_X86_64=/opt/homebrew/bin/ld.lld",
+    "LD_AARCH64=/opt/homebrew/bin/ld.lld"
+  ]
+}

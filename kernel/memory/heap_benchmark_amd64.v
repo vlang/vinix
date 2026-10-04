@@ -1,7 +1,21 @@
 @[manualfree]
 module memory
 
-fn C.printf_benchmark(charptr, ...voidptr)
+import lib
+
+#include <stdio.h>
+#include "heap_benchmark.h"
+
+fn C.printf_benchmark(charptr, ...voidptr) i32
+fn C.alloc_kernel_bench() int
+
+// The same freestanding C workload is compiled with GCC for both real kernels.
+// It is opt-in; its implementation is in c/heap_benchmark.c.
+pub fn heap_c_benchmark() {
+	if C.alloc_kernel_bench() != 0 {
+		lib.kpanic(unsafe { nil }, c'C kernel heap benchmark failed')
+	}
+}
 
 // Opt-in, serial-console microbenchmark of the real kernel heap. It runs on
 // the BSP after SMP has published CPU-cache readiness, so -d xnu_zone measures

@@ -1,6 +1,6 @@
 #!/bin/bash
-# Build the aarch64 Alpine userland, Vinix kernel, and UEFI ISO without a
-# source-built libc, command suite, or target GCC.
+# Build the aarch64 Alpine userland, optimized musl, Vinix kernel, and UEFI ISO.
+# The command suite and guest GCC remain Alpine's packaged binaries.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -33,6 +33,7 @@ case "$BUILD_DIR" in
         exit 1
         ;;
 esac
+python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
 for command_name in clang ld.lld make rsync; do
     command -v "$command_name" >/dev/null 2>&1 || {
         echo "ERROR: required command not found: $command_name" >&2

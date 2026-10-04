@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Filesystem operations shared by the desktop and Files context menus.
 module main
 
@@ -9,7 +12,8 @@ fn C.mkdir(path &char, mode u32) i32
 fn C.rename(old_filename &char, new_filename &char) i32
 fn C.rmdir(path &char) i32
 
-const desktop_directory = '${desktop_home}/Desktop'
+// The user's Desktop folder, /home/<user>/Desktop: see desktop_use_user_home.
+__global desktop_directory = ''
 const file_context_clipboard_path = '/tmp/.vinix-file-clipboard'
 const file_context_copy_buffer_size = 64 * 1024
 const file_context_max_depth = 64
@@ -46,10 +50,11 @@ fn ensure_desktop_directory() ! {
 	ensure_directory(desktop_directory)!
 }
 
+// A new item is named in the desktop's language, as it would be typed.
 fn create_item_base_name(kind CreateItemKind) string {
 	return match kind {
-		.file { 'New File' }
-		.folder { 'New Folder' }
+		.file { tr('files.new_file') }
+		.folder { tr('files.new_folder') }
 	}
 }
 
@@ -363,9 +368,12 @@ fn file_context_unique_copy_destination(directory string, source string) !string
 		name := if attempt == 0 {
 			base
 		} else if attempt == 1 {
-			'${base} copy'
+			tr_fill('files.copy_name', base)
 		} else {
-			'${base} copy (${attempt})'
+			number := attempt.str()
+			numbered := tr_fill2('files.copy_name_numbered', base, number)
+			unsafe { number.free() }
+			numbered
 		}
 		path := create_item_path(directory, name)
 		if desktop_lstat(path) == none {

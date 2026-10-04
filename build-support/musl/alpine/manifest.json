@@ -1,0 +1,52 @@
+[
+  {
+    "name": "handle-aux-at_base.patch",
+    "sha512": "a76f79b801497ad994746cf82bb6eaf86f9e1ae646e6819fbae8532a7f4eee53a96ac1d4e789ec8f66aea2a68027b0597f7a579b3369e01258da8accfce41370",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/handle-aux-at_base.patch"
+  },
+  {
+    "name": "isatty-glibc-align.patch",
+    "sha512": "4fe4309d9e5eb12f3aaf9dac300c7bf1a9e104d9b0e7754353314f4b6507de68d8d5bf0ac45164d7e2ab4d71728b5ef8b302f8ee7a6b548f54e022218031e2cf",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/isatty-glibc-align.patch"
+  },
+  {
+    "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+    "sha512": "1b85079c706b017106ecbf4afbc65b4a2171297a673035645e4c3ddb7e2aae0549b04932df83778323b7329ae8d32160a89e0c1b2534c278708c61b1f40a1ed8",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch"
+  },
+  {
+    "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+    "sha512": "b4d95231944fd236827a62343bbce74b20a56739e2b8937bda69bfc7b53f2ce5bd709459ee61615bd10d2839f43311eced9344ee8185701fd38ec0de0d43c6ae",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch"
+  },
+  {
+    "name": "loongarch64-add-TLSDESC-support.patch",
+    "sha512": "363d0cbfe11f024b120b6d54e909c038cd5b37f1f195048ddb29591191a1288ff50842ccd14e0cab80359e5b46c0e02d2b5af3016bd1507c1d269e590690a3fe",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/loongarch64-add-TLSDESC-support.patch"
+  },
+  {
+    "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+    "sha512": "b0f93f8868caf15d436ebe81088f4914cac3e21cc5b86cb0d5f40092edc6e29909188a14cde0c69ab86b51631aa34a4b8136a515f2a1b53c424c8b251c5ea689",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/loongarch64-add-fpu-and-simd-context-to-signal.h.patch"
+  },
+  {
+    "name": "loongarch64-add-bits-hwcap.h.patch",
+    "sha512": "70003d89e31b1c83274d1e850f86d8a54f30c1d5e22f769ae229d30d2bbdc095dbf4c262fb55079aaf8bfdf9a213f9468150b50c000b6596b051729a0d25f913",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/loongarch64-add-bits-hwcap.h.patch"
+  },
+  {
+    "name": "CVE-2025-26519.patch",
+    "sha512": "7a6a9836d2de91afc1115868e68f347bd2365fa48188e65938cfa654ae9bafdbb3a56bf12d3185a96800a85198378c8dbf9c25d977ca0e318220529fa4458123",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/CVE-2025-26519.patch"
+  },
+  {
+    "name": "CVE-2026-6042.patch",
+    "sha512": "f7849abeab0e4eab992a80464afa07b9c8aae5cee76040523b9dbc0931435f28ea8f5792b8a4a0cd6d608ac2f37e3225e89afcb3171a0a6df44450ed57cee83b",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/CVE-2026-6042.patch"
+  },
+  {
+    "name": "CVE-2026-40200.patch",
+    "sha512": "a64ab7688d1a85e560b5687783df482d2467a79a74400da5a1601382847d6b4e6a79b7529a8dc80c46ddda8dc2a812f2261557fc8ee98dc3bdf7322761bd6d9c",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.21-stable/main/musl/CVE-2026-40200.patch"
+  }
+]

@@ -1,0 +1,39 @@
+{
+  "reviewed_utc": "2026-10-02T21:33:05.827270+00:00",
+  "passed": true,
+  "scope": "Independent source, emitted C and actual object review of final v5 allocator framing and isolated x86 page-table teardown. No builds or VMs run by this reviewer. Runtime records remain independently owned validation inputs.",
+  "inputs": {
+    "allocator_patch_sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86",
+    "frozen_virtual_amd64_sha256": "718daf59003f9d992237fd41e26cea4de97600afaf874e24359118f6df70430a",
+    "x86_kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+    "arm_kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7"
+  },
+  "allocator_findings": [
+    "For slack==0, upstream offset clamping always yields zero. The new branch skips only old offset reads/cycling arithmetic; the prior p[-4] assertion remains before the branch. All positive-slack rotation and old-header shadow writes remain.",
+    "enframe supplies its already known slot index0..31 to set_size_at. Existing set_size callers preserve the header low5bits through the wrapper. For valid size/end ranges, all redzone writes address p+n or later, so extracting the index before those writes is equivalent.",
+    "Read exact patched meta.h/malloc.c/free.c/realloc.c from all four configured musl sources; all four meta.h hashes agree. Reproduced all24 .o/.lo malloc/free/realloc disassemblies byte-for-byte with the actual GNU cross objdump.",
+    "Verified all12 mallocng static object members byte-for-byte in their actual libc.a. Archives contain wrapper free/realloc members sharing basenames, so checks enumerate every member and require exactly one matching mallocng object.",
+    "All8 emitted static/PIC free instruction sequences are identical to v4. Existing metadata-secret, bounds, live-mask, nominal/redzone, invalidation and thread-state checks remain.",
+    "Actual x86 PIC malloc at3c4 traps nonzero p[-4],3ca/3ce branches around old-offset reads for residual<=15, and47c stamps final header once after unchanged size redzones. ARM PIC268/26c check p[-4],270/274 skip positive-slack path,324 stamps header once. Actual realloc preserves old low5bits and all validations."
+  ],
+  "kernel_findings": [
+    "Read the actual isolated virtual_amd64.v, not shared main source. Only frozen v4 plus reviewed teardown is reconstructed; another session main NX changes are excluded.",
+    "Successor test is bounded at index511 and accepts every nonzero entry, including software-only flags. If absent, complete scan covers all512 entries starting at zero. An earlier entry or sparse hole cannot be mistaken for emptiness.",
+    "A surviving child proves all ancestors nonempty; early return avoids needless higher scans without freeing anything. If a child empties, its parent edge is cleared before considering that parent for reclamation.",
+    "All reclaimed parent edges are detached before unconditional invalidate and any pmm_free. Local INVLPG uses a compiler memory barrier; remote invalidation follows MFENCE and waits for acknowledgments. CPUs switched away have already flushed the map; dying maps preserve the existing no-active-CPU teardown precondition.",
+    "Four-level root is never freed. Five-level PML4 is freed only when its complete scan is empty after removing PML3, with the PML5 edge cleared before shootdown; PML5 remains owned by the page map.",
+    "Read actual generated unmap/helper C and full relocation-bearing x86 object disassembly. Successor bounds and complete512 loops lower directly with no hidden V allocations. All four physical frees follow the completed shootdown callback. Kernel_pagemap and callback/free relocations resolve to intended symbols.",
+    "Independently reconstructed full18file saved patch from recorded e29 base, verified every file against both actual build manifests and isolated sources; both full architecture builds exit0 and each248standard module snapshot matches before/after."
+  ],
+  "architecture_reference": {
+    "title": "Intel64 and IA32 Architectures SDM Volume3A, section4.10.4.1",
+    "url": "https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3a-part-1-manual.pdf",
+    "support": "INVLPG invalidates paging-structure caches for the current PCID as well as the selected page translation. This supports invalidating once after empty ancestors are detached, including when the cleared leaf was absent."
+  },
+  "supplement_review": "Reviewed pagetable.c sparse earlier-entry/index511, sibling survival across2MiB/1GiB/512GiB boundaries, absent-page faults, fork COW and zeroed address reuse. LA57 coverage must be reported separately from optional skip on a four-level CPU. Guest runs are pending at review time.",
+  "blockers": [],
+  "supplement_final_review": {
+    "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+    "findings": "Final helper retries waitpid EINTR and checks x86 CPUID leaf7 ECX.LA57 before optional256TiB mapping; absence explicitly skips only that boundary. Allocation failure is never treated as a successful supported mapping. Same final source hash appears in actual five-level/four-level x86 and ARM exit-zero run manifests; five-level raw data exercises boundary and four-level raw data explicitly skips."
+  }
+}

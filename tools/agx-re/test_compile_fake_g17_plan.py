@@ -463,5 +463,177 @@ class FakeG17PlanTests(unittest.TestCase):
             self.assertEqual(json.loads(output_path.read_text())["schema"], fake.PLAN_SCHEMA)
 
 
+def accelerator_pointer(offset=0):
+    pointer = {
+        "kind": "object_load",
+        "member": 0x10,
+        "bytes": 8,
+        "signed": False,
+        "base": {"kind": "argument", "register": 0, "name": "channel"},
+    }
+    if not offset:
+        return pointer
+    return {
+        "kind": "stack_reload",
+        "source": {
+            "kind": "expression",
+            "operation": "add",
+            "bytes": 8,
+            "first": pointer,
+            "second": {"kind": "constant", "value": offset},
+        },
+    }
+
+
+def accelerator_load(member, width, offset=0):
+    return {
+        "kind": "object_load",
+        "member": member,
+        "bytes": width,
+        "signed": False,
+        "base": accelerator_pointer(offset),
+    }
+
+
+def folding_abi():
+    flags = accelerator_load(0x6D0, 8)
+    entries = [
+        {
+            "producer_offset": 0x10,
+            "value_source": {
+                "kind": "expression", "operation": "and", "bytes": 8,
+                "source": flags, "immediate": 1 << 20,
+            },
+        },
+        {
+            "producer_offset": 0x20,
+            "value_source": {
+                "kind": "expression", "operation": "and", "bytes": 8,
+                "source": flags, "immediate": 1,
+            },
+        },
+        {
+            "producer_offset": 0x30,
+            "value_source": {
+                "kind": "expression", "operation": "csel", "bytes": 8,
+                "condition": "ls",
+                "predicate": {
+                    "kind": "condition", "operation": "cmp", "bytes": 4,
+                    "source": accelerator_load(0x4E4, 4), "immediate": 4,
+                },
+                "first": {"kind": "constant", "value": 7},
+                "second": {"kind": "constant", "value": 9},
+            },
+        },
+        {
+            "producer_offset": 0x40,
+            "value_source": {
+                "kind": "expression", "operation": "orr", "bytes": 8,
+                "first": accelerator_load(8, 8, 0xF7EC),
+                "second": accelerator_load(0, 8, 0xF7EC),
+                "shift": "lsr", "amount": 32,
+            },
+        },
+    ]
+    decisions = [
+        {
+            "producer_offset": 0x50,
+            "condition": "bit_clear",
+            "predicate": {
+                "kind": "condition", "operation": "test_bit", "bytes": 4, "bit": 5,
+                "source": accelerator_load(0x6D3, 1),
+            },
+            "taken": {"next": [0x60]},
+            "fallthrough": {"next": [0x70]},
+        },
+        {
+            "producer_offset": 0x58,
+            "condition": "bit_set",
+            "predicate": {
+                "kind": "condition", "operation": "test_bit", "bytes": 4, "bit": 0,
+                "source": {"kind": "descriptor_load", "member": 0, "bytes": 1},
+            },
+            "taken": {"next": [0x60]},
+            "fallthrough": {"next": [0x70]},
+        },
+    ]
+    return {
+        "channels": {
+            "register_selectors": {"producers": {"3D": {"encoder_entries": entries}}},
+            "register_emission_cfg": {"producers": {"3D": {"decisions": decisions}}},
+            "accelerator_inputs": {
+                "power_column_count": {
+                    "member": 0x4E4, "bytes": 4, "hardware_input": "column_count",
+                },
+                "feature_flags": {
+                    "member": 0x6D0, "bytes": 8,
+                    "never_set_mask": fake.UINT64_MASK & ~1,
+                },
+                "chip_information": {
+                    "override_member": 0xF7F0,
+                    "override_bytes": 16,
+                    "override_value": (bytes(8) + (1 << 32).to_bytes(8, "little")).hex(),
+                },
+            },
+        }
+    }
+
+
+class AcceleratorFoldingTests(unittest.TestCase):
+    def values(self, abi):
+        entries = abi["channels"]["register_selectors"]["producers"]["3D"]["encoder_entries"]
+        return {entry["producer_offset"]: entry["value_source"] for entry in entries}
+
+    def evaluate(self, node):
+        return fake._evaluate(node, bytes(0x10), bytes(0x10))
+
+    def test_folds_proven_accelerator_bits_and_leaves_the_rest(self):
+        abi = folding_abi()
+        folded = fake.fold_accelerator_inputs(abi)
+        values = self.values(folded)
+
+        self.assertEqual(values[0x10]["kind"], "constant")
+        self.assertEqual(self.evaluate(values[0x10]), 0)
+        with self.assertRaises(fake.UnresolvedValue):
+            self.evaluate(values[0x20])
+        with self.assertRaisesRegex(fake.UnresolvedValue, "column_count"):
+            self.evaluate(values[0x30])
+        # Only the literal's bytes survive the shift, and they are zero.
+        self.assertEqual(self.evaluate(values[0x40]), 0)
+
+        decisions = folded["channels"]["register_emission_cfg"]["producers"]["3D"]["decisions"]
+        self.assertEqual(decisions[0]["condition"], "eq")
+        self.assertTrue(fake._condition(decisions[0]["predicate"], "eq", b"", b""))
+        self.assertIn("folded_from", decisions[0])
+        self.assertEqual(decisions[1], abi["channels"]["register_emission_cfg"]["producers"]["3D"]["decisions"][1])
+        # The input ABI is not modified.
+        self.assertEqual(self.values(abi)[0x10]["kind"], "expression")
+
+    def test_hardware_inputs_select_the_topology_branch(self):
+        narrow = self.values(fake.fold_accelerator_inputs(folding_abi(), {"column_count": 4}))
+        wide = self.values(fake.fold_accelerator_inputs(folding_abi(), {"column_count": 8}))
+        self.assertEqual(self.evaluate(narrow[0x30]), 7)
+        self.assertEqual(self.evaluate(wide[0x30]), 9)
+
+    def test_register_comparisons_use_first_and_shifted_second(self):
+        predicate = {
+            "kind": "condition", "operation": "cmp", "bytes": 4,
+            "first": {"kind": "descriptor_load", "member": 0, "bytes": 4},
+            "second": {"kind": "constant", "value": 1},
+            "modifier": "lsl", "amount": 4,
+        }
+        descriptor = (15).to_bytes(4, "little")
+        self.assertTrue(fake._condition(predicate, "cc", descriptor, b""))
+        self.assertFalse(fake._condition(predicate, "cs", descriptor, b""))
+        descriptor = (16).to_bytes(4, "little")
+        self.assertTrue(fake._condition(predicate, "hs", descriptor, b""))
+        self.assertIn("source", fake.normalize_predicate(predicate))
+
+    def test_abi_without_accelerator_inputs_is_unchanged(self):
+        abi = folding_abi()
+        del abi["channels"]["accelerator_inputs"]
+        self.assertIs(fake.fold_accelerator_inputs(abi), abi)
+
+
 if __name__ == "__main__":
     unittest.main()

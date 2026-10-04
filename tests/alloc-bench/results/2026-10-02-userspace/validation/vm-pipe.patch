@@ -1,0 +1,778 @@
+diff --git a/kernel/memory/mmap/mmap.v b/kernel/memory/mmap/mmap.v
+index 13ce1817..8c468da7 100644
+--- a/kernel/memory/mmap/mmap.v
++++ b/kernel/memory/mmap/mmap.v
+@@ -1,6 +1,7 @@
+ module mmap
+ 
+ import klock
++import katomic
+ import memory
+ import numa
+ import resource
+@@ -17,6 +18,7 @@ pub const map_private = 0x02
+ pub const map_shared = 0x01
+ pub const map_fixed = 0x10
+ pub const map_fixed_noreplace = 0x100000
++pub const map_populate = 0x8000
+ pub const map_anon = 0x20
+ pub const map_anonymous = 0x20
+ 
+@@ -65,6 +67,8 @@ __global (
+ 	// exec reallocated the list under the delete and corrupted the heap. Taken
+ 	// inside a page map's lock, and only for the change itself.
+ 	range_locals_lock klock.Lock
++	// Identifies an insertion even when a slab reuses a removed local pointer.
++	next_range_generation = u64(1)
+ )
+ 
+ // Resources that need uncached page table mappings (e.g., framebuffers).
+@@ -117,10 +121,13 @@ pub mut:
+ 	tree_right &MmapRangeLocal = unsafe { nil }
+ 	tree_priority u64
+ 	list_index int
++	generation u64
+ }
+ 
+ pub struct MmapRangeGlobal {
+ pub mut:
++	// A reservation needs no physical page tables until its first page is
++	// installed. top_level is created under shadow_pagemap.l at that point.
+ 	shadow_pagemap    memory.Pagemap
+ 	locals            []&MmapRangeLocal
+ 	resource          &resource.Resource = unsafe { nil }
+@@ -281,6 +288,7 @@ fn range_lower_bound(pagemap &memory.Pagemap, base u64) &MmapRangeLocal {
+ 
+ fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
+ 	mut local := unsafe { _local }
++	local.generation = katomic.inc(mut &next_range_generation)
+ 	local.tree_left = unsafe { nil }
+ 	local.tree_right = unsafe { nil }
+ 	local.tree_priority = range_priority(local.base)
+@@ -771,19 +779,24 @@ fn range_page_has_file_data(global &MmapRangeGlobal, virt u64) bool {
+ 	return relative < data_end && relative + page_size > global.file_data_start
+ }
+ 
++// This does not follow a local/global range pointer: the caller may have
++// dropped pagemap.l while acquiring memory and the range may have vanished.
++fn acquire_anonymous_page() ?voidptr {
++	// First touch decides where anonymous memory lives, respecting the
++	// faulting thread's set_mempolicy/mbind policy. The allocator zeros it.
++	page := numa.alloc_user_page()
++	if page == unsafe { nil } {
++		errno.set(errno.enomem)
++		return none
++	}
++	return page
++}
++
+ fn acquire_range_page(local &MmapRangeLocal, virt u64, file_page u64) ?voidptr {
+ 	global := local.global
+ 	if local.flags & map_anonymous != 0
+ 		|| (global.segmented_file && !range_page_has_file_data(global, virt)) {
+-		// First touch decides where anonymous memory lives: the page comes from
+-		// the node running the thread that faulted, unless set_mempolicy(2) or
+-		// mbind(2) named somewhere else.
+-		page := numa.alloc_user_page()
+-		if page == unsafe { nil } {
+-			errno.set(errno.enomem)
+-			return none
+-		}
+-		return page
++		return acquire_anonymous_page()
+ 	}
+ 
+ 	mut res := global.resource
+@@ -899,16 +912,17 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
+ //
+ // Nothing is left for the caller to release: a page that loses is released
+ // here, and one that wins belongs to the range.
+-pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, virt u64, file_page u64, page voidptr, flags int) ? {
++pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, generation u64, virt u64, file_page u64, page voidptr, flags int) ? {
+ 	pagemap.l.acquire()
+ 	current, _, _ := addr2range(pagemap, virt) or {
+ 		pagemap.l.release()
+ 		drop_unmapped_page(page, flags)
+ 		return none
+ 	}
+-	// Split since, by an mprotect(): the address is still mapped, so the access
+-	// is only retried, and faults again against the range as it is now.
+-	if voidptr(current) != voidptr(local) {
++	// A split or replacement changed the range while the page was acquired.
++	// A pointer match alone is insufficient: slab reuse can give a replacement
++	// the old pointer. Retry against the range which now covers the address.
++	if voidptr(current) != voidptr(local) || current.generation != generation {
+ 		pagemap.l.release()
+ 		drop_unmapped_page(page, flags)
+ 		return
+@@ -927,6 +941,9 @@ pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, vir
+ 	mut phys := u64(page)
+ 	mut surplus := false
+ 	g.shadow_pagemap.l.acquire()
++	if g.shadow_pagemap.top_level == unsafe { nil } {
++		g.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
++	}
+ 	if existing := g.shadow_pagemap.virt2phys(virt) {
+ 		// Another thread got the page in first; ours goes back.
+ 		phys = existing
+@@ -1304,7 +1321,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	range_local.global = range_global
+ 
+ 	range_global.add_local(range_local)
+-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+ 
+ 	// Choose and claim the virtual span as one locked operation. Wine first
+ 	// probes preferred PE addresses with MAP_FIXED_NOREPLACE, while POSIX mmap
+@@ -1315,7 +1331,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		base = hint
+ 		if !range_is_free_unlocked(pagemap, base, length) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1327,7 +1342,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		if voidptr(pagemap) == voidptr(process.pagemap)
+ 			&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1341,7 +1355,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		if voidptr(pagemap) == voidptr(process.pagemap)
+ 			&& !mapping_fits_address_limit(pagemap, process, base, length, true, charged_length, limit_credit) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1352,7 +1365,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		}
+ 		munmap_unlocked(mut pagemap, addr, length) or {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1365,7 +1377,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	} else {
+ 		base = find_free_base_unlocked(pagemap, process.mmap_anon_non_fixed_base, length) or {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1378,7 +1389,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	if !fixed && voidptr(pagemap) == voidptr(process.pagemap)
+ 		&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
+ 		pagemap.l.release()
+-		memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 		unsafe {
+ 			range_global.locals.free()
+ 			free(range_global)
+@@ -1391,37 +1401,20 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	range_global.base = base
+ 	published = true
+ 	insert_range_unlocked(mut pagemap, range_local)
++	range_generation := range_local.generation
+ 	pagemap.l.release()
+ 
+-	// PROT_NONE and large anonymous mappings are address-space reservations, not
+-	// committed memory. Large runtimes reserve far more virtual memory than they
+-	// will ever touch, so let the page-fault path commit accessible pages on
+-	// demand. mprotect() commits a PROT_NONE subset before making it accessible.
+-	//
+-	// Pre-fault smaller and file-backed mappings to avoid demand-paging faults.
+-	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
+-	// without ISV bit set, which crashes HVF.
+-	//
+-	// A process in a cgroup gets all its private anonymous memory on demand,
+-	// so the group is charged for the pages it touches and not for ones a
+-	// runtime set aside and never used (see page_in). Large mappings show
+-	// that faulting such pages in is safe on HVF.
+-	//
+-	// A private file mapping is filled in on demand too, as the ELF loader's
+-	// segments always were. Each of its pages is a copy of the file's, and
+-	// copying every page up front cost a process the whole of every library
+-	// it loaded: musl maps an object's whole span before placing its segments,
+-	// so Firefox's 130 MB libxul was copied in full by every one of its
+-	// processes, and a 4 GiB machine ran out of memory while it started.
+-	//
+-	// A private file mapping is filled in on demand too, as the ELF loader's
+-	// segments always were. Each of its pages is a copy of the file's, and
+-	// copying every page up front cost a process the whole of every library
+-	// it loaded: musl maps an object's whole span before placing its segments,
+-	// so Firefox's 130 MB libxul was copied in full by every one of its
+-	// processes, and a 4 GiB machine ran out of memory while it started.
+-	lazy_anonymous := flags & map_anonymous != 0 && (length >= lazy_anonymous_threshold
+-		|| (flags & map_shared == 0 && memory_accounted(process, pagemap)))
++	// Private anonymous x86 mappings are committed on first touch. Reserving
++	// a short-lived span which is never touched then needs neither data pages
++	// nor a separate shadow page-table hierarchy. Shared small mappings keep
++	// their existing eager policy, and MAP_POPULATE explicitly commits pages.
++	// ARM keeps small mappings eager: HVF cannot handle every LDP/STP data
++	// abort on an absent page, so changing that policy needs separate testing.
++	// Large reservations and cgroup-accounted mappings were already sparse.
++	lazy_anonymous := flags & map_anonymous != 0 && flags & map_populate == 0
++		&& (length >= lazy_anonymous_threshold
++			|| (flags & map_shared == 0
++				&& (demand_private_anonymous() || memory_accounted(process, pagemap))))
+ 	lazy_private_file := flags & map_anonymous == 0 && flags & map_shared == 0
+ 	// Convert movable shared-file storage before any page can be handed out,
+ 	// including when the mapping itself will be populated on demand.
+@@ -1452,7 +1445,11 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
+ 				continue
+ 			}
+-			page := acquire_range_page(range_local, base + i, file_page) or {
++			page := if flags & map_anonymous != 0 {
++				acquire_anonymous_page()
++			} else {
++				acquire_range_page(range_local, base + i, file_page)
++			} or {
+ 				munmap(mut pagemap, voidptr(base), length) or {}
+ 				errno.set(errno.einval)
+ 				return none
+@@ -1468,7 +1465,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 			if page != unsafe { nil } {
+ 				// The range is already visible to the process' other threads,
+ 				// which may fault on this very page while it is pre-faulted.
+-				install_range_page(mut pagemap, range_local, base + i, file_page, page, flags) or {
++				install_range_page(mut pagemap, range_local, range_generation, base + i, file_page, page, flags) or {
+ 					munmap(mut pagemap, voidptr(base), length) or {}
+ 					errno.set(errno.enomem)
+ 					return none
+@@ -1631,17 +1628,22 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64,
+ 		}
+ 
+ 		flags := local_range.flags
+-		global_range := local_range.global
++		generation := local_range.generation
++		lazy_shared := skip_lazy_shared && flags & map_shared != 0 && local_range.global.lazy_file
+ 		pagemap.l.release()
+-		if skip_lazy_shared && flags & map_shared != 0 && global_range.lazy_file {
++		if lazy_shared {
+ 			continue
+ 		}
+ 
+-		page := acquire_range_page(local_range, virt, file_page) or {
++		page := if flags & map_anonymous != 0 {
++			acquire_anonymous_page()
++		} else {
++			acquire_range_page(local_range, virt, file_page)
++		} or {
+ 			errno.set(errno.enomem)
+ 			return none
+ 		}
+-		install_range_page(mut pagemap, local_range, virt, file_page, page, flags) or {
++		install_range_page(mut pagemap, local_range, generation, virt, file_page, page, flags) or {
+ 			errno.set(errno.enomem)
+ 			return none
+ 		}
+@@ -1870,6 +1872,14 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ?
+ // the last local (and destroy the global) in the middle of the walk.
+ fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin u64, end u64,
+ 	flags int) {
++	// There are no pages to reclaim from a reservation never touched. The
++	// shadow lock also serializes a sharer installing its very first page.
++	global_range.shadow_pagemap.l.acquire()
++	empty := global_range.shadow_pagemap.top_level == unsafe { nil }
++	global_range.shadow_pagemap.l.release()
++	if empty {
++		return
++	}
+ 	mut cursor := begin
+ 	for cursor < end {
+ 		global_range.shadow_pagemap.l.acquire()
+@@ -1977,8 +1987,11 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
+ 			range_locals_lock.release()
+ 			if last {
+ 				global_end := global_range.base + global_range.length
+-				mut next_shadow := global_range.shadow_pagemap.next_present(global_range.base,
+-					global_end)
++				mut next_shadow := if global_range.shadow_pagemap.top_level == unsafe { nil } {
++					global_end
++				} else {
++					global_range.shadow_pagemap.next_present(global_range.base, global_end)
++				}
+ 				for next_shadow < global_end {
+ 					j := next_shadow
+ 					next_shadow = global_range.shadow_pagemap.next_present(j + page_size, global_end)
+@@ -1990,7 +2003,9 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
+ 					file_page := u64(global_range.offset) / page_size + (j - global_range.base) / page_size
+ 					release_range_page(global_range, j, file_page, voidptr(phys), local_range.flags)
+ 				}
+-				memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
++				if global_range.shadow_pagemap.top_level != unsafe { nil } {
++					memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
++				}
+ 				if global_range.owns_mapping_ref {
+ 					mut retained := global_range.resource
+ 					resource.release_mapping_range(mut retained, global_range.handle,
+diff --git a/kernel/memory/mmap/mmap_amd64.v b/kernel/memory/mmap/mmap_amd64.v
+index 616c952e..78bbbba8 100644
+--- a/kernel/memory/mmap/mmap_amd64.v
++++ b/kernel/memory/mmap/mmap_amd64.v
+@@ -172,3 +172,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+ 
+ // x86 keeps the instruction cache coherent with stores.
+ fn sync_new_code_page(_page voidptr) {}
++
++// Small private anonymous mappings may wait until their first access.
++fn demand_private_anonymous() bool {
++	return true
++}
+diff --git a/kernel/memory/mmap/mmap_arm64.v b/kernel/memory/mmap/mmap_arm64.v
+index 11786aa5..a0e3fc8d 100644
+--- a/kernel/memory/mmap/mmap_arm64.v
++++ b/kernel/memory/mmap/mmap_arm64.v
+@@ -124,3 +124,8 @@ fn report_direct_access(gpr_state &cpulocal.GPRState, addr u64, write bool, curr
+ fn sync_new_code_page(page voidptr) {
+ 	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
+ }
++
++// Small private anonymous mappings may wait until their first access.
++fn demand_private_anonymous() bool {
++	return false
++}
+diff --git a/kernel/memory/mmap/page_in.v b/kernel/memory/mmap/page_in.v
+index 9ffe2941..c84d6d8a 100644
+--- a/kernel/memory/mmap/page_in.v
++++ b/kernel/memory/mmap/page_in.v
+@@ -21,19 +21,24 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
+ 		}
+ 	}
+ 	flags := range_local.flags
++	generation := range_local.generation
+ 	executable := range_local.prot & prot_exec != 0
+ 
+ 	pagemap.l.release()
+ 
+ 	virt := memory_page * page_size
+-	page := acquire_range_page(range_local, virt, file_page) or {
++	page := if flags & map_anonymous != 0 {
++		acquire_anonymous_page()
++	} else {
++		acquire_range_page(range_local, virt, file_page)
++	} or {
+ 		return none
+ 	}
+ 	if executable {
+ 		sync_new_code_page(page)
+ 	}
+ 
+-	install_range_page(mut pagemap, range_local, virt, file_page, page, flags)?
++	install_range_page(mut pagemap, range_local, generation, virt, file_page, page, flags)?
+ 	note_anonymous_fault(pagemap, flags)
+ }
+ 
+diff --git a/kernel/pipe/pipe.v b/kernel/pipe/pipe.v
+index 49619797..f0e50cdb 100644
+--- a/kernel/pipe/pipe.v
++++ b/kernel/pipe/pipe.v
+@@ -10,6 +10,7 @@ import file
+ import katomic
+ import proc
+ import time
++import memory
+ 
+ // Keep POSIX's atomic-write guarantee at one page, but give the circular
+ // buffer enough room for ordinary protocol messages. A page-sized capacity
+@@ -51,7 +52,10 @@ pub fn initialise() {}
+ 
+ pub fn create() ?&Pipe {
+ 	mut p := &Pipe{
+-		data:     unsafe { malloc(pipe_capacity) }
++		// The capacity and readiness of an empty pipe do not need backing
++		// storage. Allocate the ring on its first nonempty write; shells and
++		// runtimes often create pipes that close without carrying any bytes.
++		data:     unsafe { nil }
+ 		capacity: pipe_capacity
+ 		// A pipe starts with one read-side and one write-side open-file
+ 		// description. dup() and fork() share those descriptions, so their
+@@ -334,6 +338,15 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
+ 		errno.set(errno.epipe)
+ 		return none
+ 	}
++	if this.data == unsafe { nil } {
++		// The pipe lock also serializes first writers. A failed allocation
++		// leaves an empty, writable pipe so a later write can try again.
++		this.data = memory.malloc_packed_fallible(this.capacity)
++		if this.data == unsafe { nil } {
++			errno.set(errno.enomem)
++			return none
++		}
++	}
+ 
+ 	mut written := u64(0)
+ 	atomic_write := _count <= pipe_buf
+@@ -567,6 +580,15 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
+ 		errno.set(errno.ebusy)
+ 		return none
+ 	}
++	if this.data == unsafe { nil } {
++		// A ring with no storage is empty. Resizing changes its promised
++		// capacity without allocating bytes that no writer has supplied.
++		this.capacity = new_capacity
++		this.status |= file.pollout
++		this.l.release()
++		event.trigger(mut this.event, false)
++		return new_capacity
++	}
+ 
+ 	new_data := unsafe { malloc(new_capacity) }
+ 	if new_data == unsafe { nil } {
+diff --git a/tests/qemu-core/run.sh b/tests/qemu-core/run.sh
+index 8d269ce6..95bc8b3c 100755
+--- a/tests/qemu-core/run.sh
++++ b/tests/qemu-core/run.sh
+@@ -27,7 +27,8 @@ if [ "${1:-}" = amd64 ]; then
+ 	qemu=$(command -v "${VINIX_QEMU_X86_64:-qemu-system-x86_64}")
+ 	firmware=${VINIX_OVMF_CODE:-"$(cd "$(dirname "$qemu")/.." && pwd)/share/qemu/edk2-x86_64-code.fd"}
+ 	python3 "$repo/tests/qemu-core/run_vm.py" --arch amd64 --iso "$work/test.iso" \
+-		--qemu "$qemu" --firmware "$firmware" --timeout "${VINIX_QEMU_TIMEOUT:-900}"
++		--qemu "$qemu" --firmware "$firmware" --timeout "${VINIX_QEMU_TIMEOUT:-900}" \
++		--cpus "${VINIX_QEMU_CORE_CPUS:-4}"
+ 	exit
+ fi
+ 
+diff --git a/tests/qemu-core/run_vm.py b/tests/qemu-core/run_vm.py
+index b90c9cdb..54967ebe 100755
+--- a/tests/qemu-core/run_vm.py
++++ b/tests/qemu-core/run_vm.py
+@@ -28,6 +28,7 @@ FEATURE_MARKERS = (
+     b"QEMU CORE PASS: secure getrandom",
+     b"QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch",
+     b"QEMU CORE PASS: copy-on-write fork",
++    b"QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population",
+     b"QEMU CORE PASS: syscalls page in untouched buffers",
+     b"QEMU CORE PASS: partial unmap reclaims pages and retains forked shares",
+     b"QEMU CORE PASS: a range split while a sharer unmaps it keeps its pages",
+@@ -66,6 +67,7 @@ FEATURE_MARKERS = (
+     b"QEMU CORE PASS: anonymous descriptors are open both ways",
+     b"QEMU CORE PASS: Linux pollfd ABI",
+     b"QEMU CORE PASS: large blocking pipe transfer makes progress",
++    b"QEMU CORE PASS: empty pipes defer buffers and reclaim first-write storage",
+     b"QEMU CORE PASS: Linux epoll ABI and event count",
+     b"QEMU CORE PASS: syscall C-int truncation",
+     b"QEMU CORE PASS: abstract socket names are released",
+@@ -251,7 +253,7 @@ def run_vm(
+     return result
+ 
+ 
+-def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int) -> int:
++def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int, cpus: int = 4) -> int:
+     """One boot of an amd64 ISO whose init is the test. amd64 has no persistent
+     volume for the second boot to check, so only the first runs."""
+     command = [
+@@ -260,8 +262,8 @@ def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int) -> int:
+         "-accel", os.environ.get("VINIX_QEMU_ACCEL", "tcg"),
+         "-cpu", "max",
+         "-m", "2048",
+-        # The concurrent-wakeup case pins a worker to each of four CPUs.
+-        "-smp", "4",
++        # The concurrent-wakeup case pins workers to the available CPUs.
++        "-smp", str(cpus),
+         "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}",
+         "-cdrom", str(iso),
+         "-display", "none",
+@@ -338,12 +340,16 @@ def main() -> int:
+     parser.add_argument("--qemu", default="qemu-system-x86_64")
+     parser.add_argument("--firmware", type=Path)
+     parser.add_argument("--timeout", type=int, default=300)
++    parser.add_argument("--cpus", type=int, default=4,
++                        help="amd64 boot vCPU count (default: 4)")
+     arguments = parser.parse_args()
+     if arguments.timeout <= 0:
+         parser.error("--timeout must be positive")
++    if not 1 <= arguments.cpus <= 64:
++        parser.error("--cpus must be 1..64")
+     if arguments.arch == "amd64":
+         return run_amd64(arguments.iso.resolve(), arguments.qemu, arguments.firmware,
+-                         arguments.timeout)
++                         arguments.timeout, arguments.cpus)
+     root = Path(__file__).resolve().parents[2]
+     return run_vm(root, arguments.init.resolve(), arguments.initramfs.resolve(),
+                   arguments.state_dir.resolve(), arguments.timeout)
+diff --git a/tests/qemu-core/test.c b/tests/qemu-core/test.c
+index a4ec80b5..4fdcefed 100644
+--- a/tests/qemu-core/test.c
++++ b/tests/qemu-core/test.c
+@@ -167,6 +167,118 @@ static int test_cow(void)
+ 	return 0;
+ }
+ 
++/* A fault may acquire a zeroed anonymous page while another thread faults on
++ * the same page. Losing that race must retain the first writer's bytes. */
++struct anonymous_touch_worker {
++	volatile unsigned long *slots;
++	pthread_barrier_t *barrier;
++	unsigned int index;
++};
++
++static void *anonymous_touch(void *argument)
++{
++	struct anonymous_touch_worker *worker = argument;
++	pthread_barrier_wait(worker->barrier);
++	worker->slots[worker->index] = 0x56490000UL + worker->index;
++	return NULL;
++}
++
++static int test_anonymous_first_touch(void)
++{
++	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
++	const size_t span = 4UL * 1024 * 1024;
++	struct sysinfo before, reserved, committed;
++	CHECK(sysinfo(&before) == 0);
++	unsigned char *area = mmap(NULL, span, PROT_READ | PROT_WRITE,
++	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++	CHECK(area != MAP_FAILED);
++	CHECK(sysinfo(&reserved) == 0);
++#if defined(__x86_64__)
++	/* Metadata and normal kernel activity fit in this margin. The entire
++	 * untouched reservation would consume four MiB if it were pre-faulted. */
++	CHECK(reserved.freeram + 1024UL * 1024 >= before.freeram);
++#endif
++	/* Splitting an untouched mapping must not walk an absent shadow root. */
++	CHECK(munmap(area + page, page) == 0);
++	CHECK(area[0] == 0 && area[2 * page] == 0 && area[span - 1] == 0);
++	CHECK(munmap(area, page) == 0);
++	CHECK(munmap(area + 2 * page, span - 2 * page) == 0);
++
++	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
++	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++	CHECK(area != MAP_FAILED);
++	pid_t child = fork();
++	CHECK(child >= 0);
++	if (child == 0) {
++		for (size_t i = 0; i < page; ++i)
++			if (area[i] != 0)
++				_exit(1);
++		memset(area, 0x42, page);
++		_exit(area[page - 1] == 0x42 ? 0 : 1);
++	}
++	CHECK(reap_ok(child) == 0);
++	for (size_t i = 0; i < page; ++i)
++		CHECK(area[i] == 0);
++	CHECK(munmap(area, page) == 0);
++
++	/* A syscall may write the first byte of an absent private page. */
++	area = mmap(NULL, 3 * page, PROT_READ | PROT_WRITE,
++	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++	CHECK(area != MAP_FAILED);
++	int endpoints[2];
++	const unsigned char payload = 0x73;
++	CHECK(pipe(endpoints) == 0);
++	CHECK(write(endpoints[1], &payload, 1) == 1);
++	CHECK(read(endpoints[0], area + page, 1) == 1);
++	CHECK(area[page] == payload && area[page + 1] == 0);
++	CHECK(close(endpoints[0]) == 0 && close(endpoints[1]) == 0);
++	CHECK(mprotect(area, page, PROT_READ) == 0);
++	CHECK(area[0] == 0 && area[page - 1] == 0);
++	CHECK(mprotect(area, page, PROT_READ | PROT_WRITE) == 0);
++	area[0] = 0x24;
++	CHECK(area[0] == 0x24);
++	CHECK(munmap(area, 3 * page) == 0);
++
++	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
++	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++	CHECK(area != MAP_FAILED);
++	enum { workers = 2 };
++	pthread_t threads[workers];
++	struct anonymous_touch_worker arguments[workers];
++	pthread_barrier_t barrier;
++	CHECK(pthread_barrier_init(&barrier, NULL, workers + 1) == 0);
++	alarm(30);
++	for (unsigned int i = 0; i < workers; ++i) {
++		arguments[i] = (struct anonymous_touch_worker){
++			.slots = (volatile unsigned long *)area,
++			.barrier = &barrier, .index = i,
++		};
++		CHECK(pthread_create(&threads[i], NULL, anonymous_touch, &arguments[i]) == 0);
++	}
++	int barrier_result = pthread_barrier_wait(&barrier);
++	CHECK(barrier_result == 0 || barrier_result == PTHREAD_BARRIER_SERIAL_THREAD);
++	for (unsigned int i = 0; i < workers; ++i) {
++		CHECK(pthread_join(threads[i], NULL) == 0);
++		CHECK(((volatile unsigned long *)area)[i] == 0x56490000UL + i);
++	}
++	alarm(0);
++	CHECK(pthread_barrier_destroy(&barrier) == 0);
++	CHECK(area[page - 1] == 0);
++	CHECK(munmap(area, page) == 0);
++
++	/* MAP_POPULATE explicitly requests physical commitment on both targets. */
++	CHECK(sysinfo(&before) == 0);
++	area = mmap(NULL, span, PROT_READ | PROT_WRITE,
++	    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
++	CHECK(area != MAP_FAILED);
++	CHECK(sysinfo(&committed) == 0);
++	CHECK(committed.freeram + span - 1024UL * 1024 <= before.freeram);
++	CHECK(area[0] == 0 && area[span - 1] == 0);
++	CHECK(munmap(area, span) == 0);
++	puts("QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population");
++	return 0;
++}
++
+ static int test_sparse_tmpfs_shared_mapping(void)
+ {
+ 	const char *path = "/dev/shm/vinix-qemu-core-sparse";
+@@ -215,13 +327,14 @@ static int test_sparse_tmpfs_shared_mapping(void)
+ static int test_partial_munmap_reclaims_pages(void)
+ {
+ 	const size_t size = 32UL * 1024 * 1024;
++	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+ 	const size_t hole = 16UL * 1024 * 1024;
+ 	struct sysinfo before, populated, after_hole, after_all;
+ 	CHECK(sysinfo(&before) == 0);
+ 	unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+ 	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+ 	CHECK(area != MAP_FAILED);
+-	for (size_t offset = 0; offset < size; offset += 16384)
++	for (size_t offset = 0; offset < size; offset += page)
+ 		area[offset] = 0x5a;
+ 	CHECK(sysinfo(&populated) == 0);
+ 	CHECK(populated.freeram + 24UL * 1024 * 1024 <= before.freeram);
+@@ -337,11 +450,12 @@ static int test_split_keeps_pages_a_sharer_unmaps(void)
+ static int test_madvise_reclaims_anonymous_pages(void)
+ {
+ 	const size_t size = 32UL * 1024 * 1024;
++	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+ 	struct sysinfo populated, discarded;
+ 	volatile unsigned char *area = mmap(NULL, size, PROT_READ | PROT_WRITE,
+ 	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+ 	CHECK(area != MAP_FAILED);
+-	for (size_t offset = 0; offset < size; offset += 16384)
++	for (size_t offset = 0; offset < size; offset += page)
+ 		area[offset] = 0x5a;
+ 	CHECK(sysinfo(&populated) == 0);
+ 	CHECK(madvise((void *)area, size, MADV_DONTNEED) == 0);
+@@ -1116,10 +1230,14 @@ struct concurrent_wakeup_state {
+  */
+ static int run_concurrent_wakeup_race(void)
+ {
+-	enum { workers = 4, rounds = 512 };
+-	int channels[workers][2];
+-	pid_t children[workers];
+-	struct pollfd descriptors[workers];
++	enum { max_workers = 4, rounds = 512 };
++	int workers = (int)sysconf(_SC_NPROCESSORS_ONLN);
++	CHECK(workers >= 1);
++	if (workers > max_workers)
++		workers = max_workers;
++	int channels[max_workers][2];
++	pid_t children[max_workers];
++	struct pollfd descriptors[max_workers];
+ 	struct concurrent_wakeup_state *state = mmap(NULL, sizeof(*state),
+ 	    PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+ 	CHECK(state != MAP_FAILED);
+@@ -1164,7 +1282,7 @@ static int run_concurrent_wakeup_race(void)
+ 		descriptors[i].revents = 0;
+ 	}
+ 	alarm(60);
+-	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != workers)
++	while (__atomic_load_n(&state->ready, __ATOMIC_ACQUIRE) != (unsigned int)workers)
+ 		sched_yield();
+ 	for (unsigned round = 1; round <= rounds; ++round) {
+ 		__atomic_store_n(&state->generation, round, __ATOMIC_RELEASE);
+@@ -1320,6 +1438,88 @@ static int test_anonymous_ipc_memory_reclamation(void)
+ 	return 0;
+ }
+ 
++/* Empty pipes promise a capacity, but do not need a ring until a writer puts
++ * bytes in them. Hold enough live pipes to distinguish demand allocation
++ * from allocating and then reclaiming every ring during create/close. */
++static int test_empty_pipe_buffers(void)
++{
++	enum { count = 256 };
++	int pairs[count][2];
++	struct sysinfo before, empty, resized, written, closed;
++	CHECK(sysinfo(&before) == 0);
++	for (int i = 0; i < count; ++i) {
++		CHECK(pipe(pairs[i]) == 0);
++		CHECK(fcntl(pairs[i][0], F_GETPIPE_SZ) == 64 * 1024);
++	}
++	CHECK(sysinfo(&empty) == 0);
++	/* Descriptor objects may grow slab pools. Eager 64 KiB rings retain
++	 * over 16 MiB here; four MiB leaves room for ordinary kernel services. */
++	CHECK(empty.freeram + 4UL * 1024 * 1024 >= before.freeram);
++
++	struct pollfd readiness[2] = {
++		{.fd = pairs[0][0], .events = POLLIN},
++		{.fd = pairs[0][1], .events = POLLOUT},
++	};
++	CHECK(poll(readiness, 2, 0) == 1);
++	CHECK(readiness[0].revents == 0);
++	CHECK((readiness[1].revents & POLLOUT) != 0);
++	int queued = -1;
++	CHECK(ioctl(pairs[0][0], FIONREAD, &queued) == 0 && queued == 0);
++	CHECK(fcntl(pairs[0][0], F_SETFL, O_NONBLOCK) == 0);
++	unsigned char observed = 0;
++	errno = 0;
++	CHECK(read(pairs[0][0], &observed, 1) == -1 && errno == EAGAIN);
++	CHECK(write(pairs[0][1], &observed, 0) == 0);
++	CHECK(fcntl(pairs[0][0], F_SETPIPE_SZ, 1024 * 1024) == 1024 * 1024);
++	CHECK(fcntl(pairs[1][0], F_SETPIPE_SZ, 4096) == 4096);
++	CHECK(sysinfo(&resized) == 0);
++	CHECK(resized.freeram + 4UL * 1024 * 1024 >= before.freeram);
++
++	for (int i = 0; i < count; ++i) {
++		unsigned char payload = (unsigned char)(i ^ 0xa5);
++		CHECK(write(pairs[i][1], &payload, 1) == 1);
++		CHECK(read(pairs[i][0], &observed, 1) == 1 && observed == payload);
++	}
++	CHECK(sysinfo(&written) == 0);
++	/* The first write really acquired backing storage; all live rings must
++	 * retain it even after their readers have drained the byte. */
++	CHECK(written.freeram + 8UL * 1024 * 1024 < resized.freeram);
++	for (int i = 0; i < count; ++i) {
++		CHECK(close(pairs[i][1]) == 0);
++		CHECK(read(pairs[i][0], &observed, 1) == 0);
++		CHECK(close(pairs[i][0]) == 0);
++	}
++	CHECK(sysinfo(&closed) == 0);
++	CHECK(closed.freeram + 4UL * 1024 * 1024 >= before.freeram);
++	printf("QEMU CORE PIPE free bytes: before=%lu empty=%lu resized=%lu written=%lu closed=%lu\n",
++	    before.freeram, empty.freeram, resized.freeram, written.freeram,
++	    closed.freeram);
++	/* The child inherits the same empty resource. A parent already asleep
++	 * reading it must see the child's first write and then the final EOF. */
++	int shared[2];
++	CHECK(pipe(shared) == 0);
++	pid_t child = fork();
++	CHECK(child >= 0);
++	if (child == 0) {
++		close(shared[0]);
++		usleep(20000);
++		ssize_t sent = write(shared[1], "fork", 4);
++		close(shared[1]);
++		_exit(sent == 4 ? 0 : 1);
++	}
++	CHECK(close(shared[1]) == 0);
++	char message[4] = {0};
++	alarm(5);
++	CHECK(read(shared[0], message, sizeof(message)) == (ssize_t)sizeof(message));
++	CHECK(memcmp(message, "fork", sizeof(message)) == 0);
++	CHECK(read(shared[0], message, sizeof(message)) == 0);
++	alarm(0);
++	CHECK(close(shared[0]) == 0);
++	CHECK(reap_ok(child) == 0);
++	puts("QEMU CORE PASS: empty pipes defer buffers and reclaim first-write storage");
++	return 0;
++}
++
+ /* A socket syscall boxes the V Socket interface for dispatch. Repeated empty
+  * receives used to retain each box, consuming one 16 KiB slab page for every
+  * few dozen calls while a busy X11 client polled its sockets. */
+@@ -3044,8 +3244,10 @@ static int run_tests(void)
+ 	 * cases so a failure there cannot prevent this foundational hand-off from
+ 	 * being exercised. */
+ 	CHECK(test_large_pipe_progress() == 0);
++	CHECK(test_empty_pipe_buffers() == 0);
+ 	CHECK(test_sparse_tmpfs_shared_mapping() == 0);
+ 	CHECK(test_cow() == 0);
++	CHECK(test_anonymous_first_touch() == 0);
+ 	CHECK(test_syscall_buffers_in_untouched_pages() == 0);
+ 	CHECK(test_partial_munmap_reclaims_pages() == 0);
+ 	CHECK(test_split_keeps_pages_a_sharer_unmaps() == 0);

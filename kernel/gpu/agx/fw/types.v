@@ -1,5 +1,27 @@
 module fw
 
+// Copy between packed firmware objects without imposing host alignment. The
+// caller supplies bounds established by the corresponding ABI layout.
+fn g13_copy_bytes(destination voidptr, destination_offset u32, source voidptr,
+	source_offset u32, length u32) {
+	unsafe {
+		mut dst := &u8(destination)
+		src := &u8(source)
+		for index := u32(0); index < length; index++ {
+			dst[destination_offset + index] = src[source_offset + index]
+		}
+	}
+}
+
+fn g13_put_u64(destination voidptr, offset u32, value u64) {
+	unsafe {
+		mut dst := &u8(destination)
+		for index := u32(0); index < 8; index++ {
+			dst[offset + index] = u8(value >> (index * 8))
+		}
+	}
+}
+
 // Small common types shared by the byte-validated G13 v12.3 implementation.
 
 // GPU firmware version

@@ -5,6 +5,7 @@ fn xnu_heap_cpu_number() u64 {
 	mut number := u64(0)
 	asm volatile aarch64 {
 		mrs number, tpidr_el1
+		ldr number, [number]
 		; =r (number)
 		; ; memory
 	}

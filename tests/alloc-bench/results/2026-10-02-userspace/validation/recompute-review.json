@@ -1,0 +1,865 @@
+{
+  "passed": true,
+  "check_count": 170,
+  "method": "Only temporary fixtures: duplicate preserved actual v3 serial captures, substitute synthetic v4 config/timestamps to exercise final validation, then reject one integrity violation per case. Fixture measurements are never saved or published as v4 timings.",
+  "source_captures": {
+    "vinix": "0cb09983fcba8417e4bce4cbc65cdf0a418d073f5ea40e86e930506422dff17f",
+    "catalina": "bcdd215ab5ae1ab65c3d11735f45661c220e5a49ecb0603e8c083618e73b1ed3"
+  },
+  "scripts_sha256": {
+    "recompute.py": "8969275b61451a7bf942f4d86b7445b65bd1bbbdc2380f0b79ef5db38fd5d286",
+    "compare.py": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+    "check-recompute.py": "c9a4dccbe8a0021deb9357b1e5984486f878114c5152b8f0629bdbe55c39a430"
+  },
+  "checks": [
+    {
+      "test": "positive old-data fixture retains all 14 observations and reports failed parity",
+      "passed": true
+    },
+    {
+      "test": "missing final capture",
+      "passed": true,
+      "rejection": "Cannot recompute: exactly the declared vinix-1/2 and catalina-1/2 final captures are required"
+    },
+    {
+      "test": "extra complete capture",
+      "passed": true,
+      "rejection": "Cannot recompute: exactly the declared vinix-1/2 and catalina-1/2 final captures are required"
+    },
+    {
+      "test": "changed plan order",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan source_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan iterations",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan samples",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan warmup",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan common_qemu",
+      "passed": true,
+      "rejection": "Cannot recompute: campaign plan differs from the predeclared four-capture configuration"
+    },
+    {
+      "test": "changed plan declared_utc",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: driver order, declaration time or nonoverlap check failed"
+    },
+    {
+      "test": "driver exit_code=1",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: actual driver exit zero required"
+    },
+    {
+      "test": "driver exit_code=False",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: actual driver exit zero required"
+    },
+    {
+      "test": "driver argv=[]",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: complete driver argv required"
+    },
+    {
+      "test": "driver started_utc=2026-10-02T19:18:38",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 start: timestamp must explicitly use UTC"
+    },
+    {
+      "test": "driver finished_utc=bad",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 finish: invalid timestamp"
+    },
+    {
+      "test": "driver finished_utc=2026-10-02T00:00:00+00:00",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: driver order, declaration time or nonoverlap check failed"
+    },
+    {
+      "test": "overlapping drivers",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: driver order, declaration time or nonoverlap check failed"
+    },
+    {
+      "test": "missing driver",
+      "passed": true,
+      "rejection": "Cannot recompute: [Errno 2] No such file or directory: '/private/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/vinix-report-integrity-kq18etvd/case-16/vinix-1/driver-exit.json'"
+    },
+    {
+      "test": "changed preserved bench.c",
+      "passed": true,
+      "rejection": "Cannot recompute: preserved bench.c differs from source-snapshots.json"
+    },
+    {
+      "test": "changed snapshot bench.c",
+      "passed": true,
+      "rejection": "Cannot recompute: preserved bench.c differs from source-snapshots.json"
+    },
+    {
+      "test": "changed preserved compare.py",
+      "passed": true,
+      "rejection": "Cannot load saved strict validator: preserved compare.py differs from source-snapshots.json"
+    },
+    {
+      "test": "changed snapshot compare.py",
+      "passed": true,
+      "rejection": "Cannot load saved strict validator: preserved compare.py differs from source-snapshots.json"
+    },
+    {
+      "test": "old kernel provenance",
+      "passed": true,
+      "rejection": "Cannot recompute: saved final kernel provenance must match the approved v4 kernel"
+    },
+    {
+      "test": "missing v4 libc manifest",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final libc build manifest required"
+    },
+    {
+      "test": "changed saved libc libc_so_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc libc_a_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc retention",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc arch",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc version",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc patches",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed saved libc patch",
+      "passed": true,
+      "rejection": "Cannot recompute: saved optimized-v4-final provenance differs from final ff14 libc artifacts"
+    },
+    {
+      "test": "changed run kernel_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: kernel hash differs from saved final validation provenance"
+    },
+    {
+      "test": "invalid run kernel_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: valid kernel_sha256 required"
+    },
+    {
+      "test": "changed run source_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config source_sha256: Vinix='0000000000000000000000000000000000000000000000000000000000000000', macOS='bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9'"
+    },
+    {
+      "test": "invalid run source_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: valid benchmark source_sha256 required; QEMU config source_sha256: Vinix='invalid', macOS='bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9'"
+    },
+    {
+      "test": "changed run libc_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: libc file hashes disagree with build manifest"
+    },
+    {
+      "test": "invalid run libc_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: valid libc_sha256 required"
+    },
+    {
+      "test": "changed run libc_a_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: libc file hashes disagree with build manifest"
+    },
+    {
+      "test": "invalid run libc_a_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: valid libc_a_sha256 required"
+    },
+    {
+      "test": "libc manifest type",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: libc build manifest must be a JSON object"
+    },
+    {
+      "test": "libc manifest artifact mismatch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: libc file hashes disagree with build manifest"
+    },
+    {
+      "test": "libc manifest flags mismatch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: libc build differs from saved optimized-v4-final validation provenance"
+    },
+    {
+      "test": "run config iterations",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config iterations disagrees with benchmark metadata"
+    },
+    {
+      "test": "run config samples",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config samples disagrees with benchmark metadata"
+    },
+    {
+      "test": "run config argv",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: complete QEMU argv required"
+    },
+    {
+      "test": "run config compile_flags",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: compile_flags must be -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin"
+    },
+    {
+      "test": "unequal QEMU qemu_version",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config qemu_version: Vinix='changed', macOS='QEMU emulator version 11.1.1'"
+    },
+    {
+      "test": "equally changed QEMU qemu_version",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config qemu_version differs from declared campaign"
+    },
+    {
+      "test": "unequal QEMU machine",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config machine: Vinix='changed', macOS='q35,vmport=off'"
+    },
+    {
+      "test": "equally changed QEMU machine",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config machine differs from declared campaign"
+    },
+    {
+      "test": "unequal QEMU accelerator",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: QEMU TCG acceleration required; QEMU config accelerator: Vinix='changed', macOS='tcg,thread=single,tb-size=1024'"
+    },
+    {
+      "test": "equally changed QEMU accelerator",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: QEMU TCG acceleration required; catalina-1: QEMU TCG acceleration required"
+    },
+    {
+      "test": "unequal QEMU cpu",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config cpu: Vinix='changed', macOS='Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt'"
+    },
+    {
+      "test": "equally changed QEMU cpu",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config cpu differs from declared campaign"
+    },
+    {
+      "test": "unequal QEMU smp",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config smp: Vinix='changed', macOS='2,sockets=1,cores=2,threads=1'"
+    },
+    {
+      "test": "equally changed QEMU smp",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config smp differs from declared campaign"
+    },
+    {
+      "test": "unequal QEMU memory_mb",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: QEMU config memory_mb: Vinix=1, macOS=4096"
+    },
+    {
+      "test": "equally changed QEMU memory_mb",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: config memory_mb differs from declared campaign"
+    },
+    {
+      "test": "actual QEMU argv differs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: actual QEMU -m disagrees with config memory_mb"
+    },
+    {
+      "test": "duplicate actual QEMU option",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: actual QEMU -m disagrees with config memory_mb"
+    },
+    {
+      "test": "invalid Catalina assembly_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: valid assembly_sha256 required"
+    },
+    {
+      "test": "changed Catalina assembly_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: freshly generated guest assembly differs from linked assembly"
+    },
+    {
+      "test": "invalid Catalina binary_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: valid binary_sha256 required"
+    },
+    {
+      "test": "changed Catalina binary_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in binary_sha256: catalina-1, catalina-2"
+    },
+    {
+      "test": "invalid Catalina freshly_verified_assembly_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: valid freshly_verified_assembly_sha256 required"
+    },
+    {
+      "test": "changed Catalina freshly_verified_assembly_sha256",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-1: freshly generated guest assembly differs from linked assembly"
+    },
+    {
+      "test": "different Catalina cohorts guest_compile_command",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in guest_compile_command: catalina-1, catalina-2"
+    },
+    {
+      "test": "different Catalina cohorts host_link_command",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in host_link_command: catalina-1, catalina-2"
+    },
+    {
+      "test": "different Catalina cohorts sdk",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in sdk: catalina-1, catalina-2"
+    },
+    {
+      "test": "different Catalina cohorts build_method",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in build_method: catalina-1, catalina-2"
+    },
+    {
+      "test": "different Catalina cohorts build_mode",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in build_mode: catalina-1, catalina-2"
+    },
+    {
+      "test": "different Catalina cohorts guest_version",
+      "passed": true,
+      "rejection": "Cannot recompute: final cohorts differ in guest_version: catalina-1, catalina-2"
+    },
+    {
+      "test": "missing ALLOC-META",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:45 ALLOC-SAMPLE: metadata must precede measurements"
+    },
+    {
+      "test": "duplicate ALLOC-META",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:46 ALLOC-META: duplicate or misplaced metadata"
+    },
+    {
+      "test": "missing ALLOC-DONE",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: complete ALLOC-META and ALLOC-DONE required"
+    },
+    {
+      "test": "duplicate ALLOC-DONE",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:95 ALLOC-DONE: benchmark record after ALLOC-DONE"
+    },
+    {
+      "test": "missing ALLOC-SAMPLE",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: expected 7 samples, found 6"
+    },
+    {
+      "test": "duplicate ALLOC-SAMPLE",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: expected 7 samples, found 8"
+    },
+    {
+      "test": "missing ALLOC-RESULT",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing workloads malloc_hot_64"
+    },
+    {
+      "test": "duplicate ALLOC-RESULT",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:54 ALLOC-RESULT: duplicate result or sample after result"
+    },
+    {
+      "test": "missing metadata schema",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields schema"
+    },
+    {
+      "test": "missing metadata arch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields arch"
+    },
+    {
+      "test": "missing metadata pointer_bits",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields pointer_bits"
+    },
+    {
+      "test": "missing metadata page_size",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields page_size"
+    },
+    {
+      "test": "missing metadata clock",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields clock"
+    },
+    {
+      "test": "missing metadata threads",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields threads"
+    },
+    {
+      "test": "missing metadata iterations",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields iterations"
+    },
+    {
+      "test": "missing metadata samples",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields samples"
+    },
+    {
+      "test": "missing metadata touch_stride",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields touch_stride"
+    },
+    {
+      "test": "missing metadata large_bytes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields large_bytes"
+    },
+    {
+      "test": "missing metadata mixed_sizes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields mixed_sizes"
+    },
+    {
+      "test": "missing metadata label",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields label"
+    },
+    {
+      "test": "missing metadata platform",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields platform"
+    },
+    {
+      "test": "missing metadata release",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields release"
+    },
+    {
+      "test": "missing metadata compiler",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields compiler"
+    },
+    {
+      "test": "missing metadata compiler_major",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields compiler_major"
+    },
+    {
+      "test": "missing metadata compiler_minor",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields compiler_minor"
+    },
+    {
+      "test": "missing metadata compiler_patch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields compiler_patch"
+    },
+    {
+      "test": "missing metadata compiler_version",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields compiler_version"
+    },
+    {
+      "test": "missing metadata clock_resolution_ns",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields clock_resolution_ns"
+    },
+    {
+      "test": "invalid metadata schema",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported schema '2'"
+    },
+    {
+      "test": "invalid metadata arch",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: expected guest arch x86_64, found 'aarch64'; benchmark arch: Vinix='aarch64', macOS='x86_64'"
+    },
+    {
+      "test": "invalid metadata pointer_bits",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported pointer_bits='32'"
+    },
+    {
+      "test": "invalid metadata threads",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported threads='2'"
+    },
+    {
+      "test": "invalid metadata clock",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported clock='CLOCK_REALTIME'"
+    },
+    {
+      "test": "invalid metadata page_size",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: page_size is outside 1..18446744073709551615"
+    },
+    {
+      "test": "invalid metadata clock_resolution_ns",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: clock_resolution_ns is outside 1..18446744073709551615"
+    },
+    {
+      "test": "invalid metadata samples",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: samples is outside 5..31"
+    },
+    {
+      "test": "invalid metadata iterations",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: iterations is outside 1..1000000000"
+    },
+    {
+      "test": "invalid metadata touch_stride",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported touch_stride='8'"
+    },
+    {
+      "test": "invalid metadata large_bytes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported large_bytes='1'"
+    },
+    {
+      "test": "invalid metadata mixed_sizes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: unsupported mixed_sizes='16'"
+    },
+    {
+      "test": "invalid metadata compiler",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: actual GCC required, found 'clang'"
+    },
+    {
+      "test": "invalid metadata compiler_major",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: GCC major versions differ: 13 versus 14"
+    },
+    {
+      "test": "invalid metadata platform",
+      "passed": true,
+      "rejection": "Cannot recompute: cohort 1: vinix-1: platform 'Darwin'; expected Vinix or Linux"
+    },
+    {
+      "test": "different guest compiler metadata between cohorts",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-2: compiler_minor differs between final cohorts"
+    },
+    {
+      "test": "different Vinix platform between cohorts",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-2: platform differs between final cohorts"
+    },
+    {
+      "test": "different vinix-2 release between cohorts",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-2: release differs between final cohorts"
+    },
+    {
+      "test": "different catalina-2 release between cohorts",
+      "passed": true,
+      "rejection": "Cannot recompute: catalina-2: release differs between final cohorts"
+    },
+    {
+      "test": "result specification category",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent category='999', expected 'userspace'"
+    },
+    {
+      "test": "result specification operation",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent operation='999', expected 'alloc_free_pair'"
+    },
+    {
+      "test": "result specification pairs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent pairs='999', expected '200000'"
+    },
+    {
+      "test": "result specification samples",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent samples='999', expected '7'"
+    },
+    {
+      "test": "result specification warmup_pairs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent warmup_pairs='999', expected '200000'"
+    },
+    {
+      "test": "result specification bytes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent bytes='999', expected '64'"
+    },
+    {
+      "test": "result specification batch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent batch='999', expected '1'"
+    },
+    {
+      "test": "result specification touch_stride",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: inconsistent touch_stride='999', expected '0'"
+    },
+    {
+      "test": "missing result label",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:53 ALLOC-RESULT: missing fields label"
+    },
+    {
+      "test": "missing result category",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields category"
+    },
+    {
+      "test": "missing result operation",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields operation"
+    },
+    {
+      "test": "missing result pairs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields pairs"
+    },
+    {
+      "test": "missing result samples",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields samples"
+    },
+    {
+      "test": "missing result warmup_pairs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields warmup_pairs"
+    },
+    {
+      "test": "missing result bytes",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields bytes"
+    },
+    {
+      "test": "missing result batch",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields batch"
+    },
+    {
+      "test": "missing result touch_stride",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields touch_stride"
+    },
+    {
+      "test": "missing result median_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields median_ns_per_pair"
+    },
+    {
+      "test": "missing result min_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields min_ns_per_pair"
+    },
+    {
+      "test": "missing result max_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields max_ns_per_pair"
+    },
+    {
+      "test": "missing sample label",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:46 ALLOC-SAMPLE: missing fields label"
+    },
+    {
+      "test": "missing sample sample",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields sample"
+    },
+    {
+      "test": "missing sample pairs",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields pairs"
+    },
+    {
+      "test": "missing sample elapsed_ns",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields elapsed_ns"
+    },
+    {
+      "test": "missing sample ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields ns_per_pair"
+    },
+    {
+      "test": "missing sample checksum",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: missing fields checksum"
+    },
+    {
+      "test": "invalid sample workload=unknown",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:46 ALLOC-SAMPLE: unknown workload 'unknown'"
+    },
+    {
+      "test": "invalid sample label=other",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: sample label or pair count differs"
+    },
+    {
+      "test": "invalid sample sample=0",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: sample is outside 1..7"
+    },
+    {
+      "test": "invalid sample sample=8",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: sample is outside 1..7"
+    },
+    {
+      "test": "invalid sample sample=-1",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: sample must be an unsigned integer"
+    },
+    {
+      "test": "invalid sample pairs=1",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: sample label or pair count differs"
+    },
+    {
+      "test": "invalid sample elapsed_ns=0",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: elapsed_ns is outside 1..18446744073709551615"
+    },
+    {
+      "test": "invalid sample elapsed_ns=18446744073709551616",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: elapsed_ns is outside 1..18446744073709551615"
+    },
+    {
+      "test": "invalid sample elapsed_ns=-1",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: elapsed_ns must be an unsigned integer"
+    },
+    {
+      "test": "invalid sample ns_per_pair=nan",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: ns_per_pair disagrees with raw samples"
+    },
+    {
+      "test": "invalid sample ns_per_pair=0",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: ns_per_pair disagrees with raw samples"
+    },
+    {
+      "test": "invalid sample checksum=0",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: checksum differs between repeated samples"
+    },
+    {
+      "test": "duplicate sample index",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: duplicate sample 1"
+    },
+    {
+      "test": "result summary differs median_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: median_ns_per_pair disagrees with raw samples"
+    },
+    {
+      "test": "result summary differs min_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: min_ns_per_pair disagrees with raw samples"
+    },
+    {
+      "test": "result summary differs max_ns_per_pair",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1 malloc_hot_64: max_ns_per_pair disagrees with raw samples"
+    },
+    {
+      "test": "missing footer label",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields label"
+    },
+    {
+      "test": "incorrect footer label",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: ALLOC-DONE label or workload count differs"
+    },
+    {
+      "test": "missing footer workloads",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields workloads"
+    },
+    {
+      "test": "incorrect footer workloads",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: ALLOC-DONE label or workload count differs"
+    },
+    {
+      "test": "missing footer checksum",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: missing fields checksum"
+    },
+    {
+      "test": "incorrect footer checksum",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1: ALLOC-DONE checksum differs"
+    },
+    {
+      "test": "record after footer",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:96 ALLOC-SAMPLE: benchmark record after ALLOC-DONE"
+    },
+    {
+      "test": "reported benchmark error",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:96 ALLOC-ERROR: benchmark record after ALLOC-DONE"
+    },
+    {
+      "test": "duplicate field",
+      "passed": true,
+      "rejection": "Cannot recompute: vinix-1:46 ALLOC-SAMPLE: empty or duplicate field 'label'"
+    }
+  ]
+}

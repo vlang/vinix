@@ -1,0 +1,27 @@
+{
+  "compile_command": [
+    "/opt/homebrew/opt/musl-cross/bin/aarch64-linux-musl-gcc",
+    "-static",
+    "-fuse-ld=lld",
+    "--sysroot=/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final",
+    "-B/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final/usr/lib",
+    "-isystem",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final/usr/include",
+    "-L/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final/usr/lib",
+    "-std=gnu11",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "-pthread",
+    "-mno-outline-atomics",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/test.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/init-exact-flags"
+  ],
+  "exit_code": 0,
+  "init_sha256": "6ce0f9054cb4bdc3111f758393065e97c0d15e318d2da8e2120e99b2a6991d41",
+  "diagnostic_and_exact_flags_binary_identical": true,
+  "validated_utc": "2026-10-02T22:54:00.104332+00:00"
+}

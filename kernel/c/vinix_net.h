@@ -6,6 +6,8 @@
 
 struct vinix_socket;
 
+#include "vinix_inet6.h"
+
 enum {
     VINIX_NET_STREAM = 1,
     VINIX_NET_DGRAM = 2,
@@ -25,9 +27,12 @@ void vinix_net_detach(void);
 int vinix_net_input(const void *frame, size_t length);
 int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
                      uint32_t dns[3]);
+int vinix_net_link(uint8_t mac[6], uint32_t *mtu);
 
 struct vinix_socket *vinix_socket_new(int type, int protocol);
 void vinix_socket_free(struct vinix_socket *socket);
+int vinix_socket_pending(struct vinix_socket *socket);
+void vinix_socket_abort_close(struct vinix_socket *socket);
 int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t port);
 int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t port);
 int vinix_socket_listen(struct vinix_socket *socket, int backlog);

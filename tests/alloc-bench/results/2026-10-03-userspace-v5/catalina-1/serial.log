@@ -1,0 +1,52 @@
+/tmp/alloc-bench-native --label macos --iterations 200000 --samples 7
+ALLOC-META schema=1 label=macos platform=Darwin release=19.6.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=3 compiler_patch=0 compiler_version=14.3.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=1000 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=1 pairs=200000 elapsed_ns=99201000 ns_per_pair=496.005 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=2 pairs=200000 elapsed_ns=108516000 ns_per_pair=542.580 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=3 pairs=200000 elapsed_ns=107670000 ns_per_pair=538.350 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=4 pairs=200000 elapsed_ns=111610000 ns_per_pair=558.050 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=5 pairs=200000 elapsed_ns=107155000 ns_per_pair=535.775 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=6 pairs=200000 elapsed_ns=98938000 ns_per_pair=494.690 checksum=51000000
+ALLOC-SAMPLE label=macos workload=malloc_hot_64 sample=7 pairs=200000 elapsed_ns=98720000 ns_per_pair=493.600 checksum=51000000
+ALLOC-RESULT label=macos workload=malloc_hot_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=64 batch=1 touch_stride=0 median_ns_per_pair=535.775 min_ns_per_pair=493.600 max_ns_per_pair=558.050
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=1 pairs=200000 elapsed_ns=184308000 ns_per_pair=921.540 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=2 pairs=200000 elapsed_ns=176316000 ns_per_pair=881.580 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=3 pairs=200000 elapsed_ns=172387000 ns_per_pair=861.935 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=4 pairs=200000 elapsed_ns=166552000 ns_per_pair=832.760 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=5 pairs=200000 elapsed_ns=155619000 ns_per_pair=778.095 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=6 pairs=200000 elapsed_ns=158127000 ns_per_pair=790.635 checksum=51000560
+ALLOC-SAMPLE label=macos workload=malloc_mixed_batch_64 sample=7 pairs=200000 elapsed_ns=157584000 ns_per_pair=787.920 checksum=51000560
+ALLOC-RESULT label=macos workload=malloc_mixed_batch_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=0 batch=64 touch_stride=0 median_ns_per_pair=832.760 min_ns_per_pair=778.095 max_ns_per_pair=921.540
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=1 pairs=10000 elapsed_ns=190780000 ns_per_pair=19078.000 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=2 pairs=10000 elapsed_ns=177533000 ns_per_pair=17753.300 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=3 pairs=10000 elapsed_ns=178950000 ns_per_pair=17895.000 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=4 pairs=10000 elapsed_ns=175478000 ns_per_pair=17547.800 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=5 pairs=10000 elapsed_ns=172971000 ns_per_pair=17297.100 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=6 pairs=10000 elapsed_ns=161242000 ns_per_pair=16124.200 checksum=81593856
+ALLOC-SAMPLE label=macos workload=malloc_touch_262144 sample=7 pairs=10000 elapsed_ns=156406000 ns_per_pair=15640.600 checksum=81593856
+ALLOC-RESULT label=macos workload=malloc_touch_262144 category=userspace operation=alloc_free_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=17547.800 min_ns_per_pair=15640.600 max_ns_per_pair=19078.000
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=1 pairs=10000 elapsed_ns=276523000 ns_per_pair=27652.300 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=2 pairs=10000 elapsed_ns=272645000 ns_per_pair=27264.500 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=3 pairs=10000 elapsed_ns=262679000 ns_per_pair=26267.900 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=4 pairs=10000 elapsed_ns=258690000 ns_per_pair=25869.000 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=5 pairs=10000 elapsed_ns=250815000 ns_per_pair=25081.500 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=6 pairs=10000 elapsed_ns=273994000 ns_per_pair=27399.400 checksum=0
+ALLOC-SAMPLE label=macos workload=mmap_anon_4096 sample=7 pairs=10000 elapsed_ns=289051000 ns_per_pair=28905.100 checksum=0
+ALLOC-RESULT label=macos workload=mmap_anon_4096 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=4096 batch=1 touch_stride=0 median_ns_per_pair=27264.500 min_ns_per_pair=25081.500 max_ns_per_pair=28905.100
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=1 pairs=10000 elapsed_ns=15374512000 ns_per_pair=1537451.200 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=2 pairs=10000 elapsed_ns=16163079000 ns_per_pair=1616307.900 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=3 pairs=10000 elapsed_ns=16417102000 ns_per_pair=1641710.200 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=4 pairs=10000 elapsed_ns=22569499000 ns_per_pair=2256949.900 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=5 pairs=10000 elapsed_ns=22435095000 ns_per_pair=2243509.500 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=6 pairs=10000 elapsed_ns=16943426000 ns_per_pair=1694342.600 checksum=81593856
+ALLOC-SAMPLE label=macos workload=mmap_touch_262144 sample=7 pairs=10000 elapsed_ns=14391333000 ns_per_pair=1439133.300 checksum=81593856
+ALLOC-RESULT label=macos workload=mmap_touch_262144 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=1641710.200 min_ns_per_pair=1439133.300 max_ns_per_pair=2256949.900
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=1 pairs=10000 elapsed_ns=480426000 ns_per_pair=48042.600 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=2 pairs=10000 elapsed_ns=496110000 ns_per_pair=49611.000 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=3 pairs=10000 elapsed_ns=488994000 ns_per_pair=48899.400 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=4 pairs=10000 elapsed_ns=467808000 ns_per_pair=46780.800 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=5 pairs=10000 elapsed_ns=479060000 ns_per_pair=47906.000 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=6 pairs=10000 elapsed_ns=519292000 ns_per_pair=51929.200 checksum=0
+ALLOC-SAMPLE label=macos workload=pipe_create_close sample=7 pairs=10000 elapsed_ns=559005000 ns_per_pair=55900.500 checksum=0
+ALLOC-RESULT label=macos workload=pipe_create_close category=kernel_syscall operation=create_close_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=0 batch=1 touch_stride=0 median_ns_per_pair=48899.400 min_ns_per_pair=46780.800 max_ns_per_pair=55900.500
+ALLOC-DONE label=macos workloads=6 checksum=0
+localhost:/ root# 

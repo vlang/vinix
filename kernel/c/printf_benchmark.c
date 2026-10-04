@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -7,7 +11,7 @@
 #ifdef __AARCH64__
 void aarch64__uart__putc(uint8_t c);
 #else
-void dev__serial__panic_out(char c);
+void serial__panic_out(char c);
 #endif
 
 // The opt-in allocator benchmark runs before the scheduler and needs the same
@@ -18,7 +22,7 @@ static void _putchar_benchmark(int character, void *extra_arg) {
 #ifdef __AARCH64__
     aarch64__uart__putc((uint8_t)character);
 #else
-    dev__serial__panic_out((char)character);
+    serial__panic_out((char)character);
 #endif
 }
 

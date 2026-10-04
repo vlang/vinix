@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Settings application: categories down the left, the chosen category's
 // settings on the right.
 //
@@ -15,25 +18,29 @@ import ui2
 enum SettingsCategory {
 	appearance
 	date_time
+	language
 	theme
 	wallpaper
 	wifi
 	display
 	battery
+	keyboard
 }
 
-const settings_categories = [SettingsCategory.appearance, .date_time, .theme, .wallpaper, .wifi,
-	.display, .battery]
+const settings_categories = [SettingsCategory.appearance, .date_time, .language, .theme, .wallpaper,
+	.wifi, .display, .battery, .keyboard]
 
 fn (c SettingsCategory) title() string {
 	return match c {
-		.appearance { 'Appearance' }
-		.date_time { 'Date & Time' }
-		.theme { 'Theme' }
-		.wallpaper { 'Wallpaper' }
-		.wifi { 'Wi-Fi' }
-		.display { 'Display' }
-		.battery { 'Battery' }
+		.appearance { tr('settings.category.appearance') }
+		.date_time { tr('settings.category.date_time') }
+		.language { tr('settings.category.language') }
+		.theme { tr('settings.category.theme') }
+		.wallpaper { tr('settings.category.wallpaper') }
+		.wifi { tr('settings.category.wifi') }
+		.display { tr('settings.category.display') }
+		.battery { tr('settings.category.battery') }
+		.keyboard { tr('settings.category.keyboard') }
 	}
 }
 
@@ -44,6 +51,7 @@ const settings_action_clock_format = 'settings.clock.format.'
 const settings_action_clock_seconds = 'settings.clock.seconds.'
 const settings_action_clock_date = 'settings.clock.date.'
 const settings_action_clock_weekday = 'settings.clock.weekday.'
+const settings_action_language = 'settings.language.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
@@ -90,6 +98,10 @@ mut:
 	requested_text string
 	actual_text    string
 	range_text     string
+	// The languages the labels above and wifi_names/wifi_details were made
+	// in. When desktop_language differs they are remade before being shown.
+	labels_language      DesktopLanguage
+	wifi_labels_language DesktopLanguage
 }
 
 fn (mut d Desktop) open_settings() !NativeApp {
@@ -163,8 +175,10 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	return match a.category {
 		.appearance { a.appearance_pane(width) }
 		.date_time { a.date_time_pane(width) }
+		.language { a.language_pane(width) }
 		.theme { a.theme_pane(width) }
 		.wallpaper { a.wallpaper_pane(width) }
+		.keyboard { a.keyboard_pane(width) }
 		else { []ui2.Element{} }
 	}
 }
@@ -174,11 +188,10 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 	for index, category in settings_categories {
 		selected := category == a.category
 		y := settings_padding + index * 32
-		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(6, f64(y), f64(settings_sidebar_width - 12), 28), ui2.BoxStyle{
+		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
 			bg: settings_category_selected
-			radius: 6
 			transparent: !selected
-		}, frame_child(ui2.label('', category.title(), ui2.rect(12, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
+		}, frame_child(ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
 			color: if selected { body_heading } else { body_text }
 			size: 13
 			bold: selected
@@ -204,17 +217,30 @@ fn settings_note(text string, y int, width int) ui2.Element {
 	})
 }
 
-// choice draws one option as a radio-style pill: filled when it is the current
-// setting, outlined when it is not.
+// A choice carries radio state but asks for a native button bezel. The Vinix
+// renderer therefore keeps the existing flat control in the default theme and
+// uses a compact Catalina push-button face in the macOS theme.
 fn settings_choice(id string, label string, x int, y int, width int, selected bool) ui2.Element {
-	return ui2.button(id, label, ui2.rect(f64(x), f64(y), f64(width), 28), ui2.BoxStyle{
-		bg: if selected { app_accent } else { settings_choice_bg }
-		radius: 6
-	}, ui2.TextStyle{
-		color: if selected { app_on_accent } else { body_text }
-		size: 12
-		align: .center
-	})
+	return ui2.Element{
+		kind:                .button
+		id:                  id
+		text:                label
+		frame:               ui2.rect(f64(x), f64(y), f64(width), 28)
+		box:                 ui2.BoxStyle{
+			bg:     if selected { app_accent } else { settings_choice_bg }
+			radius: 6
+		}
+		text_style:          ui2.TextStyle{
+			color: if selected { app_on_accent } else { body_text }
+			size:  12
+			align: .center
+		}
+		native_style:        true
+		checked:             selected
+		accessibility_role:  'radio'
+		accessibility_label: label
+		accessibility_value: if selected { tr('settings.choice.selected') } else { tr('settings.choice.not_selected') }
+	}
 }
 
 fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
@@ -225,25 +251,25 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	mut out := frame_elements(12)
 	mut y := settings_padding
 
-	out << settings_heading('Window buttons', y, width)
+	out << settings_heading(tr('settings.appearance.buttons'), y, width)
 	y += 22
-	out << settings_note('Which end of the title bar close and zoom sit at.', y, width)
+	out << settings_note(tr('settings.appearance.buttons_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_side}0', 'Right', settings_padding, y, half, settings.button_side == .right)
-	out << settings_choice('${settings_action_side}1', 'Left (macOS)', settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
+	out << settings_choice('${settings_action_side}0', tr('settings.appearance.right'), settings_padding, y, half, settings.button_side == .right)
+	out << settings_choice('${settings_action_side}1', tr('settings.appearance.left'), settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
 	y += 28 + 22
 
-	out << settings_heading('Taskbar', y, width)
+	out << settings_heading(tr('settings.appearance.taskbar'), y, width)
 	y += 22
-	out << settings_note('One entry per window, or one per application.', y, width)
+	out << settings_note(tr('settings.appearance.taskbar_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_taskbar}0', 'Standard', settings_padding, y, half, settings.taskbar_mode == .standard)
-	out << settings_choice('${settings_action_taskbar}1', 'Combined', settings_padding + half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
+	out << settings_choice('${settings_action_taskbar}0', tr('settings.appearance.standard'), settings_padding, y, half, settings.taskbar_mode == .standard)
+	out << settings_choice('${settings_action_taskbar}1', tr('settings.appearance.combined'), settings_padding + half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
 	y += 28 + 6
 	out << settings_note(if settings.taskbar_mode == .combined {
-		'Windows 7 style: one button per application.'
+		tr('settings.appearance.combined_note')
 	} else {
-		'Windows XP style: one button per window.'
+		tr('settings.appearance.standard_note')
 	}, y, width)
 
 	return out
@@ -257,31 +283,31 @@ fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
 	mut out := frame_elements(16)
 	mut y := settings_padding
 
-	out << settings_heading('Time format', y, width)
+	out << settings_heading(tr('settings.date_time.format'), y, width)
 	y += 22
-	out << settings_note('Choose 24-hour time or a 12-hour clock with AM/PM.', y, width)
+	out << settings_note(tr('settings.date_time.format_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_format}0', '24-hour', settings_padding, y, half, settings.clock_24_hour)
-	out << settings_choice('${settings_action_clock_format}1', '12-hour', settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
+	out << settings_choice('${settings_action_clock_format}0', tr('settings.date_time.24_hour'), settings_padding, y, half, settings.clock_24_hour)
+	out << settings_choice('${settings_action_clock_format}1', tr('settings.date_time.12_hour'), settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
 	y += 28 + 22
 
-	out << settings_heading('Seconds', y, width)
+	out << settings_heading(tr('settings.date_time.seconds'), y, width)
 	y += 22
-	out << settings_note('Show seconds in the taskbar clock.', y, width)
+	out << settings_note(tr('settings.date_time.seconds_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_seconds}0', 'Show', settings_padding, y, half, settings.clock_show_seconds)
-	out << settings_choice('${settings_action_clock_seconds}1', 'Hide', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
+	out << settings_choice('${settings_action_clock_seconds}0', tr('settings.date_time.show'), settings_padding, y, half, settings.clock_show_seconds)
+	out << settings_choice('${settings_action_clock_seconds}1', tr('settings.date_time.hide'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
 	y += 28 + 22
 
-	out << settings_heading('Date line', y, width)
+	out << settings_heading(tr('settings.date_time.date_line'), y, width)
 	y += 22
-	out << settings_note('Choose what appears underneath the taskbar time.', y, width)
+	out << settings_note(tr('settings.date_time.date_line_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_date}0', 'Show date', settings_padding, y, half, settings.clock_show_date)
-	out << settings_choice('${settings_action_clock_date}1', 'Hide date', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
+	out << settings_choice('${settings_action_clock_date}0', tr('settings.date_time.show_date'), settings_padding, y, half, settings.clock_show_date)
+	out << settings_choice('${settings_action_clock_date}1', tr('settings.date_time.hide_date'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
 	y += 28 + settings_row_gap
-	out << settings_choice('${settings_action_clock_weekday}0', 'Show weekday', settings_padding, y, half, settings.clock_show_weekday)
-	out << settings_choice('${settings_action_clock_weekday}1', 'Hide weekday', settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
+	out << settings_choice('${settings_action_clock_weekday}0', tr('settings.date_time.show_weekday'), settings_padding, y, half, settings.clock_show_weekday)
+	out << settings_choice('${settings_action_clock_weekday}1', tr('settings.date_time.hide_weekday'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
 
 	return out
 }
@@ -294,23 +320,52 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	mut out := frame_elements(8)
 	mut y := settings_padding
 
-	out << settings_heading('Theme', y, width)
+	out << settings_heading(tr('settings.theme.heading'), y, width)
 	y += 22
-	out << settings_note('How windows and the taskbar are drawn.', y, width)
+	out << settings_note(tr('settings.theme.note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_theme}0', 'Default', settings_padding, y, half, settings.theme == .default_)
-	out << settings_choice('${settings_action_theme}1', 'macOS', settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
+	out << settings_choice('${settings_action_theme}0', tr('settings.theme.default'), settings_padding, y, half, settings.theme == .default_)
+	out << settings_choice('${settings_action_theme}1', tr('settings.theme.macos'), settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
 	y += 28 + 10
 
+	// Each description is two lines, broken where the translation breaks it.
 	if settings.theme == .macos {
-		out << settings_note('Light grey windows with the title centred, three', y, width)
+		out << settings_note(tr('settings.theme.macos_note_1'), y, width)
 		y += 16
-		out << settings_note('coloured discs at the leading edge, and a dock.', y, width)
+		out << settings_note(tr('settings.theme.macos_note_2'), y, width)
 	} else {
-		out << settings_note('Rounded windows with shadows and flat colour,', y, width)
+		out << settings_note(tr('settings.theme.default_note_1'), y, width)
 		y += 16
-		out << settings_note('and a taskbar across the bottom.', y, width)
+		out << settings_note(tr('settings.theme.default_note_2'), y, width)
 	}
+
+	return out
+}
+
+// Each language is offered in its own name, three to a row.
+fn (a &SettingsApp) language_pane(width int) []ui2.Element {
+	settings := a.desktop.settings
+	inner := width - 2 * settings_padding
+	columns := 3
+	choice_width := (inner - (columns - 1) * settings_row_gap) / columns
+
+	mut out := frame_elements(desktop_languages.len + 3)
+	mut y := settings_padding
+
+	out << settings_heading(tr('settings.language.heading'), y, width)
+	y += 22
+	out << settings_note(tr('settings.language.note'), y, width)
+	y += 22
+	for index, language in desktop_languages {
+		column := index % columns
+		row := index / columns
+		out << settings_choice('${settings_action_language}${index}', language.native_name(),
+			settings_padding + column * (choice_width + settings_row_gap), y + row * (28 +
+			settings_row_gap), choice_width, settings.language == language)
+	}
+	rows := (desktop_languages.len + columns - 1) / columns
+	y += rows * (28 + settings_row_gap) + 6
+	out << settings_note(tr('settings.language.apps_note'), y, width)
 
 	return out
 }
@@ -322,7 +377,7 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 	mut out := frame_elements(wallpaper_colors.len + a.images.len + 4)
 	mut y := settings_padding
 
-	out << settings_heading('Colour', y, width)
+	out << settings_heading(tr('settings.wallpaper.colour'), y, width)
 	y += 24
 
 	// Colour swatches, four to a row.
@@ -345,13 +400,13 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 	rows := (wallpaper_colors.len + columns - 1) / columns
 	y += rows * (swatch + settings_row_gap) + 6
 
-	out << settings_heading('Photo', y, width)
+	out << settings_heading(tr('settings.wallpaper.photo'), y, width)
 	y += 24
 
 	if a.images.len == 0 {
-		out << settings_note('No photographs on this image. The build downloads', y, width)
+		out << settings_note(tr('settings.wallpaper.no_photos_1'), y, width)
 		y += 16
-		out << settings_note('them; it had neither network nor cache.', y, width)
+		out << settings_note(tr('settings.wallpaper.no_photos_2'), y, width)
 		return out
 	}
 
@@ -412,6 +467,9 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	if a.desktop == unsafe { nil } {
 		return
 	}
+	if a.handle_keyboard(event_id) {
+		return
+	}
 	if event_id.starts_with(settings_action_side) {
 		a.desktop.settings.button_side = if event_id.ends_with('1') {
 			ButtonSide.left
@@ -442,6 +500,16 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	if event_id.starts_with(settings_action_clock_weekday) {
 		a.desktop.settings.clock_show_weekday = !event_id.ends_with('1')
+		return
+	}
+	if event_id.starts_with(settings_action_language) {
+		index := event_id[settings_action_language.len..].int()
+		if index >= 0 && index < desktop_languages.len {
+			a.desktop.settings.language = desktop_languages[index]
+			// This window answers in the new language on its very next
+			// frame; the compositor follows when it receives the settings.
+			set_desktop_language(a.desktop.settings.language)
+		}
 		return
 	}
 	if event_id.starts_with(settings_action_theme) {

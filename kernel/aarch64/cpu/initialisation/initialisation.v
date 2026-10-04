@@ -9,6 +9,39 @@ import memory
 import katomic
 import sched
 
+// Turn PAN on for this CPU, where the command line and the CPU allow it: see
+// memory/user_guard.v.
+pub fn enable_user_guard(announce bool) {
+	if memory.user_guard_requested() == memory.user_guard_off {
+		memory.disable_execute_only()
+		return
+	}
+	if !cpu.has_pan() {
+		memory.disable_execute_only()
+		memory.user_guard_unsupported()
+		return
+	}
+	// Apple hardware runs the kernel at EL2. PAN works the same way there, but
+	// it has only been run at EL1, under QEMU: at EL2 it is for the command
+	// line to turn on.
+	if cpu.read_currentel() == 2 {
+		memory.user_guard_untested()
+		if memory.user_guard_requested() == memory.user_guard_off {
+			memory.disable_execute_only()
+			return
+		}
+	}
+	cpu.enable_pan()
+	if !cpu.has_epan() { memory.disable_execute_only() }
+	if announce {
+		println(if memory.user_guard_auditing() {
+			'security: PAN enabled, auditing'
+		} else {
+			'security: PAN enabled'
+		})
+	}
+}
+
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
 	cpu_number := cpu_local.cpu_number
@@ -30,6 +63,10 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// that only switched TTBR0 kept translating the higher half through the
 	// bootloader's tables.
 	memory.vmm_activate_on_cpu()
+	exception.install_guarded_stack(cpu_number)
+	sched.prepare_cpu_stacks(cpu_number)
+
+	enable_user_guard(cpu_number == 0)
 
 	// This CPU's own half of the interrupt controller. Without it the CPU takes
 	// no interrupts at all, which means its scheduler timer never fires, which
@@ -51,7 +88,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// architectural thread state and must be switched on every CPU.
 	cpu.init_fpu_globals()
 
-	print('smp: CPU ${cpu_local.cpu_number} online!\n')
+	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
 
 	katomic.inc(mut &cpu_local.online)
 
@@ -66,6 +103,6 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 				; ; ; memory
 			}
 		}
-		sched.await()
+		sched.enter_idle()
 	}
 }

@@ -1,0 +1,18 @@
+{
+  "base_commit": "173788fad5c06be8e8ad2d950b58cc540621166f",
+  "x86_benchmark_snapshot_sha256": "f52a38f7cffddae8f21491f5944a3fa90f95e9475efe3f0400487749be6e9aad",
+  "command": [
+    "make",
+    "-C",
+    "/Users/alex/code/vinix/third_party/alloc-bench-candidate/kernel",
+    "-j8",
+    "ARCH=aarch64",
+    "CC=clang",
+    "V=/Users/alex/code/v/v",
+    "AR=/opt/homebrew/opt/llvm/bin/llvm-ar",
+    "LD_AARCH64=/opt/homebrew/bin/ld.lld",
+    "LIMINE_MP=1",
+    "VFLAGS=-d heap_selftest"
+  ],
+  "arm_kernel_sha256": "ba8f0bd77b58f0797a2a2ad84d59f173e6bd19f7ec7e87f802535a82a68cf61f"
+}

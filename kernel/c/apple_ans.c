@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Base-M1 ANS2: bounded, polled NVMe transport with partition-scoped writes.
@@ -11,6 +15,13 @@
 #include "apple_ans.h"
 #include "apple_ans_ext2.h"
 #if defined(__AARCH64__) || defined(VINIX_ANS_TEST)
+
+#if defined(VINIX_ANS_TEST)
+#define ANS_ACCOUNT_TRANSFER(bytes, write) ((void)0)
+#else
+extern void vinix_account_disk_transfer(uint64_t bytes, int write);
+#define ANS_ACCOUNT_TRANSFER(bytes, write) vinix_account_disk_transfer(bytes, write)
+#endif
 
 #define A_CAP 0x0000u
 #define A_INTMS 0x000cu
@@ -479,6 +490,7 @@ static int a_read_bytes(struct ans *a, unsigned index, void *buffer, uint64_t of
         a_sync(a, BOUNCE, bytes, 0);
         int rc = a_submit(a, 1, c, NULL);
         if (rc) return rc;
+        ANS_ACCOUNT_TRANSFER(bytes, 0);
         a_sync(a, BOUNCE, bytes, 1);
         a_copy(out, a->dma + BOUNCE + within, n);
         offset += n; out += n; count -= n;

@@ -3,7 +3,7 @@
 #
 # The build host has already resolved the version manifest into launch.env, so
 # this script only has to expand Mojang's argument templates, apply the musl
-# and software-OpenGL settings Vinix needs, and exec the JVM.
+# and OpenGL settings Vinix needs, and exec the JVM.
 #
 # Mojang publishes no musl natives. LWJGL's own AArch64 natives are glibc
 # builds that load through gcompat, but not all of them survive that: OpenAL
@@ -21,8 +21,6 @@ set -eu
 
 game_root=${VINIX_MINECRAFT_ROOT:-/usr/share/minecraft}
 launch_env=$game_root/launch.env
-java_home=${JAVA_HOME:-/usr/lib/jvm/java-25-openjdk}
-java_bin=${VINIX_MINECRAFT_JAVA:-$java_home/bin/java}
 startx=${VINIX_MINECRAFT_STARTX:-/usr/bin/startx}
 xinitrc=${VINIX_MINECRAFT_XINITRC:-/usr/share/vinix/minecraft-xinitrc}
 login_helper=${VINIX_MINECRAFT_LOGIN:-/usr/bin/minecraft-login}
@@ -71,8 +69,10 @@ if [ ! -f "$launch_env" ]; then
 fi
 # shellcheck source=/dev/null
 . "$launch_env"
+java_home=${JAVA_HOME:-/usr/lib/jvm/java-${MC_JAVA_MAJOR:-21}-openjdk}
+java_bin=${VINIX_MINECRAFT_JAVA:-$java_home/bin/java}
 if [ ! -x "$java_bin" ]; then
-	echo "minecraft: no Java runtime at $java_bin; build the Java layer first" >&2
+	echo "minecraft: no Java ${MC_JAVA_MAJOR:-compatible} runtime at $java_bin; run 'pkg install minecraft' first" >&2
 	exit 1
 fi
 
@@ -98,8 +98,13 @@ logout)
 	exit 0
 	;;
 check)
+	if ! runtime_output=$("$java_bin" -version 2>&1); then
+		echo "minecraft: Java failed to start: $runtime_output" >&2
+		exit 1
+	fi
+	runtime=$(printf '%s\n' "$runtime_output" | sed -n '1p')
 	echo "minecraft: Minecraft $MC_VERSION ($MC_VERSION_TYPE), assets $MC_ASSET_INDEX"
-	echo "minecraft: runtime $("$java_bin" -version 2>&1 | head -n 1)"
+	echo "minecraft: runtime $runtime"
 	if [ "$signed_in" = yes ]; then
 		echo "minecraft: signed in as ${MC_PLAYER_NAME:-unknown}"
 	else
@@ -118,10 +123,41 @@ if [ "$mode" = auto ]; then
 	if [ "$signed_in" = yes ]; then mode=play; else mode=demo; fi
 fi
 
-# Rendering happens in the game's own process: Mesa's software rasteriser
-# presents through Xorg without GPU support, while indirect GLX would run the
-# renderer inside the X server, which Vinix does not support.
-if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
+# The direct Xorg launcher marks a GPU-backed DRI3 display. Its Mesa runtime
+# must also include a matching DRI GLX client, since GLFW uses GLX rather than
+# EGL. A desktop-hosted Xvfb session remains on its software path.
+hardware_gl=0
+if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" = 1 ]; then
+	hardware_gl=1
+elif [ "${VINIX_MINECRAFT_HARDWARE_GL:-auto}" = auto ] &&
+     [ "${VINIX_XORG_ACCELERATED:-0}" = 1 ] &&
+     [ "${VINIX_FORCE_SOFTWARE_GL:-0}" != 1 ] &&
+     [ "${LIBGL_ALWAYS_SOFTWARE:-0}" != 1 ] &&
+     [ -e /dev/dri/renderD128 ] &&
+     { grep -q 'glx=dri' /usr/share/vinix/mesa-x11-egl 2>/dev/null ||
+       grep -q 'glx=dri' /usr/share/vinix/asahi-x11-egl 2>/dev/null; }; then
+	hardware_gl=1
+fi
+unset LIBGL_ALWAYS_INDIRECT
+if [ "$hardware_gl" = 1 ]; then
+	unset LIBGL_ALWAYS_SOFTWARE GALLIUM_DRIVER MESA_LOADER_DRIVER_OVERRIDE
+	# Mesa may silently select llvmpipe when DRI3 or the matching driver is
+	# unavailable. Reject that before starting a very slow JVM/game session.
+	if [ -n "${DISPLAY:-}" ]; then
+		if ! glx_output=$(glxinfo -B 2>&1); then
+			echo "minecraft: hardware GLX is unavailable: $glx_output" >&2
+			exit 1
+		fi
+		renderer=$(printf '%s\n' "$glx_output" | sed -n 's/^OpenGL renderer string: //p' | head -n 1)
+		case "$renderer" in
+			*virgl*|*VirGL*|*Asahi*|*AGX*|*Apple*)
+				echo "minecraft: hardware OpenGL renderer: $renderer" ;;
+			*)
+				echo "minecraft: expected hardware OpenGL, got ${renderer:-no GLX renderer}" >&2
+				exit 1 ;;
+		esac
+	fi
+else
 	export LIBGL_ALWAYS_SOFTWARE=1
 	# Mesa's on-disk shader cache never completes here: with it enabled
 	# eglCreateContext does not return, and the process sits at full CPU
@@ -133,7 +169,6 @@ if [ "${VINIX_MINECRAFT_HARDWARE_GL:-0}" != 1 ]; then
 	# loader turns into gallium-pipe/pipe_llvmpipe.so, and the only pipe driver
 	# staged is pipe_swrast.so, so asking for it fails EGL outright. Leaving it
 	# unset lets Mesa pick the software renderer it actually has.
-	unset LIBGL_ALWAYS_INDIRECT
 fi
 
 if [ -z "${DISPLAY:-}" ]; then
@@ -166,6 +201,24 @@ else
 	game_args_template=$MC_GAME_ARGS_FULL
 fi
 
+resolution_width=${VINIX_MINECRAFT_WIDTH:-1280}
+resolution_height=${VINIX_MINECRAFT_HEIGHT:-720}
+
+# launch.env is persistent game data and may have been generated before the
+# fetcher advertised Mojang's has_custom_resolution feature. Keep those
+# existing installations working too: supply whichever dimension is absent
+# from their saved argument template. New descriptions already contain these
+# options, so do not append duplicate jopt-simple arguments.
+host_resolution_args=
+case " $game_args_template " in
+	*' --width '*) ;;
+	*) host_resolution_args="--width $resolution_width" ;;
+esac
+case " $game_args_template " in
+	*' --height '*) ;;
+	*) host_resolution_args="$host_resolution_args --height $resolution_height" ;;
+esac
+
 expand() {
 	# Mojang's templates use ${name}; substitute the ones a launcher supplies.
 	printf '%s' "$1" | sed \
@@ -182,8 +235,8 @@ expand() {
 		-e "s|\${auth_xuid}|$player_xuid|g" \
 		-e "s|\${clientid}|vinix|g" \
 		-e "s|\${version_type}|$MC_VERSION_TYPE|g" \
-		-e "s|\${resolution_width}|${VINIX_MINECRAFT_WIDTH:-1280}|g" \
-		-e "s|\${resolution_height}|${VINIX_MINECRAFT_HEIGHT:-720}|g"
+		-e "s|\${resolution_width}|$resolution_width|g" \
+		-e "s|\${resolution_height}|$resolution_height|g"
 }
 
 glfw_override=
@@ -199,9 +252,23 @@ fi
 # with "Unknown platform: Vinix" before a window is ever created. The natives
 # being loaded are Linux builds running on Vinix's Linux-compatible ABI, so
 # name that ABI for the libraries that ask.
+#
+# HotSpot's Linux port probes an RWX page during startup. Vinix keeps W^X as
+# the default for every other process; this exec-scoped opt-in enables only
+# this JVM and the children it deliberately starts. Generated HotSpot code is
+# not reliable on Vinix yet, so use the interpreter; Minecraft is slower to
+# start, but the official client and renderer run correctly.
+#
+# Alpine's jspawnhelper uses a private pipe handshake that Vinix does not yet
+# implement. Force Java's direct fork path so Minecraft's host probes and
+# integrated-server helpers can start reliably.
+export VINIX_ALLOW_WX=1
 exec "$java_bin" \
+	-Xint \
+	-XX:ActiveProcessorCount=1 \
 	"-Xmx$memory" \
 	-XX:+UseSerialGC \
+	-Djdk.lang.Process.launchMechanism=FORK \
 	-Dos.name=Linux \
 	-Dorg.lwjgl.system.allocator=system \
 	-Dorg.lwjgl.openal.libname=/usr/lib/libopenal.so.1 \
@@ -211,4 +278,5 @@ exec "$java_bin" \
 	$(expand "$MC_JVM_ARGS") \
 	-cp "$MC_CLASSPATH" \
 	"$MC_MAIN_CLASS" \
-	$(expand "$game_args_template")
+	$(expand "$game_args_template") \
+	$host_resolution_args

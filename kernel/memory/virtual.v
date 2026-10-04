@@ -4,6 +4,8 @@ module memory
 import lib
 import limine
 import klock
+import event.eventstruct
+import katomic
 
 fn C.text_start()
 
@@ -24,13 +26,27 @@ pub const pte_writable = u64(1) << 1
 pub const pte_user = u64(1) << 2
 pub const pte_device = u64(1) << 3 // ARM64: use Device-nGnRnE memory type for MMIO
 pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for framebuffers
+pub const pte_execute_only = u64(1) << 5 // ARM64: EL0 instruction fetch without data access
 pub const pte_noexec = u64(1) << 63
+pub const kernel_page_size = u64(0x1000)
 
-__global (
-	page_size       = u64(0x1000)
-	kernel_pagemap  Pagemap
-	vmm_initialised = bool(false)
-	cow_resolver    fn (&Pagemap, u64) bool
+// What of a range of an address space is resident, in bytes: all of it, the
+// part fork left shared with another process until one of them writes it,
+// and every page counted as its share, as resident_share() counts it.
+pub struct Residency {
+pub mut:
+	resident u64
+	shared   u64
+	share    u64
+}
+
+pub __global (
+	page_size        = u64(0x1000)
+	kernel_pagemap   Pagemap
+	vmm_initialised  = bool(false)
+	cow_resolver     fn (&Pagemap, u64) bool
+	page_in_resolver fn (&Pagemap, u64) bool
+	locked_bytes_resolver fn (&Pagemap) u64
 )
 
 pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
@@ -44,11 +60,53 @@ pub fn resolve_cow(pagemap &Pagemap, address u64) bool {
 	return cow_resolver(pagemap, address)
 }
 
+// Registered by mmap, which knows what a mapping is backed by, as the COW
+// resolver above is: this module cannot import it.
+pub fn register_page_in_resolver(resolver fn (&Pagemap, u64) bool) {
+	page_in_resolver = resolver
+}
+
+// Page in the page of a user mapping that holds `address`, as a fault on it
+// would. True once the page is present, whoever put it there.
+pub fn resolve_missing_page(pagemap &Pagemap, address u64) bool {
+	if page_in_resolver == unsafe { nil } {
+		return false
+	}
+	return page_in_resolver(pagemap, address)
+}
+
+pub fn register_locked_bytes_resolver(resolver fn (&Pagemap) u64) {
+	locked_bytes_resolver = resolver
+}
+
+pub fn locked_bytes(pagemap &Pagemap) u64 {
+	if pagemap == unsafe { nil } || locked_bytes_resolver == unsafe { nil } { return 0 }
+	return locked_bytes_resolver(pagemap)
+}
+
 pub struct Pagemap {
 pub mut:
 	l           klock.Lock
+	// MCL_FUTURE belongs to the address space shared by CLONE_VM threads.
+	lock_future bool
+	// Resident user-address leaf mappings only; writers hold l, observers use atomics.
+	track_residency bool
+	resident_bytes u64
+	peak_resident_bytes u64
 	top_level   &u64 = unsafe { nil }
 	mmap_ranges []voidptr
+	// Search tree for mmap ranges; its nodes are owned by mmap_ranges.
+	mmap_root   voidptr
+	// Being torn down: no CPU runs it any more, retained translations were
+	// invalidated before its pages/tables are returned to the allocator.
+	dying bool
+	// Address-space inspection survives exec/exit detaching this map from
+	// its process. The counter and final wake are protected by l.
+	inspection_refs int
+	inspection_drained eventstruct.Event
+	// ARM64: exclusive ownership of a nonzero 8-bit ASID until destruction.
+	// Zero uses the conservative flush-on-switch path; x86 does not use it.
+	tlb_tag u16
 }
 
 fn C.get_kernel_end_addr() u64
@@ -64,12 +122,48 @@ __global (
 	}
 )
 
+// The direct map covers every physical page, the kernel's own among them, and
+// mapped them all writable: the kernel's text and read-only data were W^X at
+// their own addresses and writable through their alias, so anything able to
+// write kernel memory at a chosen address could patch the kernel's code. As
+// OpenBSD and Linux keep them, the alias of both is read-only here, and not
+// executable. `phys` and `len` cover text through rodata, which the linker
+// scripts align to pages.
+fn protect_kernel_image_alias(phys u64, len u64) {
+	for i := u64(0); i < lib.align_up(len, kernel_page_size); i += kernel_page_size {
+		kernel_pagemap.map_page(phys + i + higher_half, phys + i, pte_present | pte_noexec) or {
+			panic('vmm init failure: kernel image alias')
+		}
+	}
+	C.kprintf(c'vmm: kernel text and rodata read-only in the direct map (0x%llx +0x%llx)\n',
+		phys, len)
+}
+
 fn map_kernel_span(virt u64, phys u64, len u64, flags u64) {
-	aligned_len := lib.align_up(len, page_size)
+	aligned_len := lib.align_up(len, kernel_page_size)
 
-	print('vmm: Kernel: Mapping 0x${phys:x} to 0x${virt:x}, length: 0x${aligned_len:x}\n')
+	C.kprintf(c'vmm: Kernel: Mapping 0x%llx to 0x%llx, length: 0x%llx\n', u64(phys), u64(virt),
+		u64(aligned_len))
 
-	for i := u64(0); i < aligned_len; i += page_size {
+	for i := u64(0); i < aligned_len; i += kernel_page_size {
 		kernel_pagemap.map_page(virt + i, phys + i, flags) or { panic('vmm init failure') }
+	}
+}
+
+// Called under pagemap.l, or while constructing an unpublished fork map,
+// after a successful leaf descriptor update. Shadow
+// backing maps do not track residency; kernel addresses are excluded. A
+// PROT_NONE page still consumes resident memory until actually unmapped.
+pub fn (mut pagemap Pagemap) account_resident(virt u64, was_present bool, is_present bool) {
+	if !pagemap.track_residency || virt >= user_address_limit() || was_present == is_present { return }
+	old := pagemap.resident_bytes
+	if is_present {
+		next := old + page_size
+		katomic.store(mut &pagemap.resident_bytes, next)
+		if next > pagemap.peak_resident_bytes {
+			katomic.store(mut &pagemap.peak_resident_bytes, next)
+		}
+	} else if old >= page_size {
+		katomic.store(mut &pagemap.resident_bytes, old - page_size)
 	}
 }

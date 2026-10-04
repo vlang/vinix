@@ -1,0 +1,2992 @@
+{
+  "cohort_count": 2,
+  "campaign_drivers": [
+    {
+      "capture": "vinix-1",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py",
+        "--kernel",
+        "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/x86_64/vinix-x86_64",
+        "--sysroot",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final",
+        "--state-dir",
+        "/Users/alex/code/vinix/build/useralloc-vinix-v6-final-1",
+        "--iterations",
+        "200000",
+        "--samples",
+        "7",
+        "--timeout",
+        "3600"
+      ],
+      "started_utc": "2026-10-02T22:57:36.946548+00:00",
+      "finished_utc": "2026-10-02T22:58:45.963017+00:00",
+      "exit_code": 0
+    },
+    {
+      "capture": "catalina-1",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/build/useralloc-macos-runtime/measure.py",
+        "/Users/alex/code/vinix/build/useralloc-macos-v6-final-1"
+      ],
+      "started_utc": "2026-10-02T22:58:46.052416+00:00",
+      "finished_utc": "2026-10-02T23:02:43.794368+00:00",
+      "exit_code": 0
+    },
+    {
+      "capture": "catalina-2",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/build/useralloc-macos-runtime/measure.py",
+        "/Users/alex/code/vinix/build/useralloc-macos-v6-final-2"
+      ],
+      "started_utc": "2026-10-02T23:02:43.923351+00:00",
+      "finished_utc": "2026-10-02T23:07:28.120711+00:00",
+      "exit_code": 0
+    },
+    {
+      "capture": "vinix-2",
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py",
+        "--kernel",
+        "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/x86_64/vinix-x86_64",
+        "--sysroot",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v6-final",
+        "--state-dir",
+        "/Users/alex/code/vinix/build/useralloc-vinix-v6-final-2",
+        "--iterations",
+        "200000",
+        "--samples",
+        "7",
+        "--timeout",
+        "3600"
+      ],
+      "started_utc": "2026-10-02T23:07:28.277321+00:00",
+      "finished_utc": "2026-10-02T23:09:12.410334+00:00",
+      "exit_code": 0
+    }
+  ],
+  "cohorts": [
+    {
+      "cohort": 1,
+      "vinix_meta": {
+        "schema": "1",
+        "label": "vinix",
+        "platform": "Vinix",
+        "release": "0.1.0",
+        "arch": "x86_64",
+        "compiler": "gcc",
+        "compiler_major": "14",
+        "compiler_minor": "2",
+        "compiler_patch": "0",
+        "compiler_version": "14.2.0",
+        "pointer_bits": "64",
+        "page_size": "4096",
+        "clock": "CLOCK_MONOTONIC",
+        "clock_resolution_ns": "10",
+        "threads": "1",
+        "iterations": "200000",
+        "samples": "7",
+        "touch_stride": "4096",
+        "large_bytes": "262144",
+        "mixed_sizes": "16,32,64,96,128,256,512,1024,2048,4096,8192,16384"
+      },
+      "catalina_meta": {
+        "schema": "1",
+        "label": "macos",
+        "platform": "Darwin",
+        "release": "19.6.0",
+        "arch": "x86_64",
+        "compiler": "gcc",
+        "compiler_major": "14",
+        "compiler_minor": "3",
+        "compiler_patch": "0",
+        "compiler_version": "14.3.0",
+        "pointer_bits": "64",
+        "page_size": "4096",
+        "clock": "CLOCK_MONOTONIC",
+        "clock_resolution_ns": "1000",
+        "threads": "1",
+        "iterations": "200000",
+        "samples": "7",
+        "touch_stride": "4096",
+        "large_bytes": "262144",
+        "mixed_sizes": "16,32,64,96,128,256,512,1024,2048,4096,8192,16384"
+      },
+      "notes": [
+        "GCC minor/patch versions differ; this can affect generated code and the measured ratio."
+      ],
+      "workloads": [
+        {
+          "workload": "malloc_hot_64",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 234.2,
+            "min_ns_per_pair": 218.445,
+            "max_ns_per_pair": 252.4,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 48018000,
+                "ns_per_pair": 240.09
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 43689000,
+                "ns_per_pair": 218.445
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 45545000,
+                "ns_per_pair": 227.725
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 44175000,
+                "ns_per_pair": 220.875
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 47416000,
+                "ns_per_pair": 237.08
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 46840000,
+                "ns_per_pair": 234.2
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 50480000,
+                "ns_per_pair": 252.4
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 330.59,
+            "min_ns_per_pair": 323.305,
+            "max_ns_per_pair": 344.795,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 64661000,
+                "ns_per_pair": 323.305
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 65324000,
+                "ns_per_pair": 326.62
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 66446000,
+                "ns_per_pair": 332.23
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 64908000,
+                "ns_per_pair": 324.54
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 68546000,
+                "ns_per_pair": 342.73
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 66118000,
+                "ns_per_pair": 330.59
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 68959000,
+                "ns_per_pair": 344.795
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.7084303820442239,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "malloc_mixed_batch_64",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 315.79,
+            "min_ns_per_pair": 300.475,
+            "max_ns_per_pair": 344.53,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 67007000,
+                "ns_per_pair": 335.035
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 62202000,
+                "ns_per_pair": 311.01
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 63509000,
+                "ns_per_pair": 317.545
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 60095000,
+                "ns_per_pair": 300.475
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 61834000,
+                "ns_per_pair": 309.17
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 63158000,
+                "ns_per_pair": 315.79
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 68906000,
+                "ns_per_pair": 344.53
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 679.12,
+            "min_ns_per_pair": 633.06,
+            "max_ns_per_pair": 692.985,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 126612000,
+                "ns_per_pair": 633.06
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 134252000,
+                "ns_per_pair": 671.26
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 138597000,
+                "ns_per_pair": 692.985
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 135824000,
+                "ns_per_pair": 679.12
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 135542000,
+                "ns_per_pair": 677.71
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 135934000,
+                "ns_per_pair": 679.67
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 137507000,
+                "ns_per_pair": 687.535
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.46499882200494763,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "malloc_touch_262144",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 1663.4,
+            "min_ns_per_pair": 1355.5,
+            "max_ns_per_pair": 1854.6,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 18546000,
+                "ns_per_pair": 1854.6
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 15264000,
+                "ns_per_pair": 1526.4
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 18105000,
+                "ns_per_pair": 1810.5
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 16634000,
+                "ns_per_pair": 1663.4
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 15378000,
+                "ns_per_pair": 1537.8
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 13555000,
+                "ns_per_pair": 1355.5
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 18138000,
+                "ns_per_pair": 1813.8
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 17006.6,
+            "min_ns_per_pair": 16088.3,
+            "max_ns_per_pair": 17533.4,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 171982000,
+                "ns_per_pair": 17198.2
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 170066000,
+                "ns_per_pair": 17006.6
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 170703000,
+                "ns_per_pair": 17070.3
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 175334000,
+                "ns_per_pair": 17533.4
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 167388000,
+                "ns_per_pair": 16738.8
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 164159000,
+                "ns_per_pair": 16415.9
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 160883000,
+                "ns_per_pair": 16088.3
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.09780908588430376,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "mmap_anon_4096",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 11555.8,
+            "min_ns_per_pair": 11172.5,
+            "max_ns_per_pair": 13118.6,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 131186000,
+                "ns_per_pair": 13118.6
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 117989000,
+                "ns_per_pair": 11798.9
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 118931000,
+                "ns_per_pair": 11893.1
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 111725000,
+                "ns_per_pair": 11172.5
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 112881000,
+                "ns_per_pair": 11288.1
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 115558000,
+                "ns_per_pair": 11555.8
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 115124000,
+                "ns_per_pair": 11512.4
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 23311.2,
+            "min_ns_per_pair": 22371.1,
+            "max_ns_per_pair": 24925.5,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 245125000,
+                "ns_per_pair": 24512.5
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 249255000,
+                "ns_per_pair": 24925.5
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 233112000,
+                "ns_per_pair": 23311.2
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 230750000,
+                "ns_per_pair": 23075.0
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 234457000,
+                "ns_per_pair": 23445.7
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 224544000,
+                "ns_per_pair": 22454.4
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 223711000,
+                "ns_per_pair": 22371.1
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.49571879611517206,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "mmap_touch_262144",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 553381.2,
+            "min_ns_per_pair": 539175.6,
+            "max_ns_per_pair": 627959.0,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 5755973000,
+                "ns_per_pair": 575597.3
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 6279590000,
+                "ns_per_pair": 627959.0
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 5459176000,
+                "ns_per_pair": 545917.6
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 5522577000,
+                "ns_per_pair": 552257.7
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 5391756000,
+                "ns_per_pair": 539175.6
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 5533812000,
+                "ns_per_pair": 553381.2
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 6029587000,
+                "ns_per_pair": 602958.7
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 1706616.2,
+            "min_ns_per_pair": 1347432.5,
+            "max_ns_per_pair": 2000620.3,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 13751742000,
+                "ns_per_pair": 1375174.2
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 13474325000,
+                "ns_per_pair": 1347432.5
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 14437905000,
+                "ns_per_pair": 1443790.5
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 17066162000,
+                "ns_per_pair": 1706616.2
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 19156825000,
+                "ns_per_pair": 1915682.5
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 20006203000,
+                "ns_per_pair": 2000620.3
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 19951457000,
+                "ns_per_pair": 1995145.7
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.32425638523764155,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "pipe_create_close",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 24061.7,
+            "min_ns_per_pair": 23355.3,
+            "max_ns_per_pair": 26417.1,
+            "observations": [
+              {
+                "cohort": "vinix-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 247774000,
+                "ns_per_pair": 24777.4
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 264171000,
+                "ns_per_pair": 26417.1
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 240617000,
+                "ns_per_pair": 24061.7
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 243883000,
+                "ns_per_pair": 24388.3
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 236129000,
+                "ns_per_pair": 23612.9
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 233553000,
+                "ns_per_pair": 23355.3
+              },
+              {
+                "cohort": "vinix-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 239921000,
+                "ns_per_pair": 23992.1
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 70689.4,
+            "min_ns_per_pair": 69228.0,
+            "max_ns_per_pair": 74200.6,
+            "observations": [
+              {
+                "cohort": "catalina-1",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 694019000,
+                "ns_per_pair": 69401.9
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 697223000,
+                "ns_per_pair": 69722.3
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 706894000,
+                "ns_per_pair": 70689.4
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 710326000,
+                "ns_per_pair": 71032.6
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 712651000,
+                "ns_per_pair": 71265.1
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 692280000,
+                "ns_per_pair": 69228.0
+              },
+              {
+                "cohort": "catalina-1",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 742006000,
+                "ns_per_pair": 74200.6
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.3403862531015966,
+          "vinix_at_or_faster": true
+        }
+      ],
+      "all_workloads_at_or_faster": true
+    },
+    {
+      "cohort": 2,
+      "vinix_meta": {
+        "schema": "1",
+        "label": "vinix",
+        "platform": "Vinix",
+        "release": "0.1.0",
+        "arch": "x86_64",
+        "compiler": "gcc",
+        "compiler_major": "14",
+        "compiler_minor": "2",
+        "compiler_patch": "0",
+        "compiler_version": "14.2.0",
+        "pointer_bits": "64",
+        "page_size": "4096",
+        "clock": "CLOCK_MONOTONIC",
+        "clock_resolution_ns": "10",
+        "threads": "1",
+        "iterations": "200000",
+        "samples": "7",
+        "touch_stride": "4096",
+        "large_bytes": "262144",
+        "mixed_sizes": "16,32,64,96,128,256,512,1024,2048,4096,8192,16384"
+      },
+      "catalina_meta": {
+        "schema": "1",
+        "label": "macos",
+        "platform": "Darwin",
+        "release": "19.6.0",
+        "arch": "x86_64",
+        "compiler": "gcc",
+        "compiler_major": "14",
+        "compiler_minor": "3",
+        "compiler_patch": "0",
+        "compiler_version": "14.3.0",
+        "pointer_bits": "64",
+        "page_size": "4096",
+        "clock": "CLOCK_MONOTONIC",
+        "clock_resolution_ns": "1000",
+        "threads": "1",
+        "iterations": "200000",
+        "samples": "7",
+        "touch_stride": "4096",
+        "large_bytes": "262144",
+        "mixed_sizes": "16,32,64,96,128,256,512,1024,2048,4096,8192,16384"
+      },
+      "notes": [
+        "GCC minor/patch versions differ; this can affect generated code and the measured ratio."
+      ],
+      "workloads": [
+        {
+          "workload": "malloc_hot_64",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 226.72,
+            "min_ns_per_pair": 224.81,
+            "max_ns_per_pair": 230.445,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 45194000,
+                "ns_per_pair": 225.97
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 46023000,
+                "ns_per_pair": 230.115
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 46089000,
+                "ns_per_pair": 230.445
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 44962000,
+                "ns_per_pair": 224.81
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 45080000,
+                "ns_per_pair": 225.4
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 45995000,
+                "ns_per_pair": 229.975
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 45344000,
+                "ns_per_pair": 226.72
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 461.75,
+            "min_ns_per_pair": 430.51,
+            "max_ns_per_pair": 465.785,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 92883000,
+                "ns_per_pair": 464.415
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 92440000,
+                "ns_per_pair": 462.2
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 92350000,
+                "ns_per_pair": 461.75
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 91520000,
+                "ns_per_pair": 457.6
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 93157000,
+                "ns_per_pair": 465.785
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 89371000,
+                "ns_per_pair": 446.855
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 86102000,
+                "ns_per_pair": 430.51
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.49100162425554955,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "malloc_mixed_batch_64",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 313.02,
+            "min_ns_per_pair": 309.265,
+            "max_ns_per_pair": 347.33,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 62238000,
+                "ns_per_pair": 311.19
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 63217000,
+                "ns_per_pair": 316.085
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 61853000,
+                "ns_per_pair": 309.265
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 62087000,
+                "ns_per_pair": 310.435
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 62917000,
+                "ns_per_pair": 314.585
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 62604000,
+                "ns_per_pair": 313.02
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 69466000,
+                "ns_per_pair": 347.33
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 877.995,
+            "min_ns_per_pair": 862.995,
+            "max_ns_per_pair": 907.555,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 200000,
+                "elapsed_ns": 181511000,
+                "ns_per_pair": 907.555
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 200000,
+                "elapsed_ns": 174789000,
+                "ns_per_pair": 873.945
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 200000,
+                "elapsed_ns": 181480000,
+                "ns_per_pair": 907.4
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 200000,
+                "elapsed_ns": 176625000,
+                "ns_per_pair": 883.125
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 200000,
+                "elapsed_ns": 175356000,
+                "ns_per_pair": 876.78
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 200000,
+                "elapsed_ns": 175599000,
+                "ns_per_pair": 877.995
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 200000,
+                "elapsed_ns": 172599000,
+                "ns_per_pair": 862.995
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.3565168366562452,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "malloc_touch_262144",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 1520.3,
+            "min_ns_per_pair": 1375.2,
+            "max_ns_per_pair": 1637.7,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 15124000,
+                "ns_per_pair": 1512.4
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 16218000,
+                "ns_per_pair": 1621.8
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 15368000,
+                "ns_per_pair": 1536.8
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 16377000,
+                "ns_per_pair": 1637.7
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 15100000,
+                "ns_per_pair": 1510.0
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 13752000,
+                "ns_per_pair": 1375.2
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 15203000,
+                "ns_per_pair": 1520.3
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 19674.1,
+            "min_ns_per_pair": 19384.2,
+            "max_ns_per_pair": 20167.6,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 197034000,
+                "ns_per_pair": 19703.4
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 201676000,
+                "ns_per_pair": 20167.6
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 196741000,
+                "ns_per_pair": 19674.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 200729000,
+                "ns_per_pair": 20072.9
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 193842000,
+                "ns_per_pair": 19384.2
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 193963000,
+                "ns_per_pair": 19396.3
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 196203000,
+                "ns_per_pair": 19620.3
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.07727418280887055,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "mmap_anon_4096",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 11223.0,
+            "min_ns_per_pair": 10741.1,
+            "max_ns_per_pair": 11664.0,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 114853000,
+                "ns_per_pair": 11485.3
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 113803000,
+                "ns_per_pair": 11380.3
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 116640000,
+                "ns_per_pair": 11664.0
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 112230000,
+                "ns_per_pair": 11223.0
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 107411000,
+                "ns_per_pair": 10741.1
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 111353000,
+                "ns_per_pair": 11135.3
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 108795000,
+                "ns_per_pair": 10879.5
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 30022.1,
+            "min_ns_per_pair": 29927.5,
+            "max_ns_per_pair": 31802.1,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 299900000,
+                "ns_per_pair": 29990.0
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 300221000,
+                "ns_per_pair": 30022.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 318021000,
+                "ns_per_pair": 31802.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 301742000,
+                "ns_per_pair": 30174.2
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 299461000,
+                "ns_per_pair": 29946.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 299275000,
+                "ns_per_pair": 29927.5
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 311006000,
+                "ns_per_pair": 31100.6
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.3738246158663118,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "mmap_touch_262144",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 739101.5,
+            "min_ns_per_pair": 711936.5,
+            "max_ns_per_pair": 1587843.7,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 7171444000,
+                "ns_per_pair": 717144.4
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 15878437000,
+                "ns_per_pair": 1587843.7
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 14517150000,
+                "ns_per_pair": 1451715.0
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 7119365000,
+                "ns_per_pair": 711936.5
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 7316742000,
+                "ns_per_pair": 731674.2
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 7391015000,
+                "ns_per_pair": 739101.5
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 10772940000,
+                "ns_per_pair": 1077294.0
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 1969034.1,
+            "min_ns_per_pair": 1826536.8,
+            "max_ns_per_pair": 2075983.7,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 20233649000,
+                "ns_per_pair": 2023364.9
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 20590916000,
+                "ns_per_pair": 2059091.6
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 20759837000,
+                "ns_per_pair": 2075983.7
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 19690341000,
+                "ns_per_pair": 1969034.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 19338492000,
+                "ns_per_pair": 1933849.2
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 18816980000,
+                "ns_per_pair": 1881698.0
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 18265368000,
+                "ns_per_pair": 1826536.8
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.3753624683290147,
+          "vinix_at_or_faster": true
+        },
+        {
+          "workload": "pipe_create_close",
+          "vinix": {
+            "sample_count": 7,
+            "median_ns_per_pair": 35396.8,
+            "min_ns_per_pair": 33361.6,
+            "max_ns_per_pair": 38081.1,
+            "observations": [
+              {
+                "cohort": "vinix-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 380811000,
+                "ns_per_pair": 38081.1
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 375427000,
+                "ns_per_pair": 37542.7
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 380117000,
+                "ns_per_pair": 38011.7
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 353968000,
+                "ns_per_pair": 35396.8
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 350162000,
+                "ns_per_pair": 35016.2
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 339340000,
+                "ns_per_pair": 33934.0
+              },
+              {
+                "cohort": "vinix-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 333616000,
+                "ns_per_pair": 33361.6
+              }
+            ]
+          },
+          "catalina": {
+            "sample_count": 7,
+            "median_ns_per_pair": 66476.4,
+            "min_ns_per_pair": 63699.7,
+            "max_ns_per_pair": 77728.8,
+            "observations": [
+              {
+                "cohort": "catalina-2",
+                "sample": 1,
+                "pairs": 10000,
+                "elapsed_ns": 756391000,
+                "ns_per_pair": 75639.1
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 2,
+                "pairs": 10000,
+                "elapsed_ns": 777288000,
+                "ns_per_pair": 77728.8
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 3,
+                "pairs": 10000,
+                "elapsed_ns": 749674000,
+                "ns_per_pair": 74967.4
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 4,
+                "pairs": 10000,
+                "elapsed_ns": 636997000,
+                "ns_per_pair": 63699.7
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 5,
+                "pairs": 10000,
+                "elapsed_ns": 643346000,
+                "ns_per_pair": 64334.6
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 6,
+                "pairs": 10000,
+                "elapsed_ns": 664764000,
+                "ns_per_pair": 66476.4
+              },
+              {
+                "cohort": "catalina-2",
+                "sample": 7,
+                "pairs": 10000,
+                "elapsed_ns": 661860000,
+                "ns_per_pair": 66186.0
+              }
+            ]
+          },
+          "vinix_over_catalina": 0.5324716741580472,
+          "vinix_at_or_faster": true
+        }
+      ],
+      "all_workloads_at_or_faster": true
+    }
+  ],
+  "pooled_workloads": [
+    {
+      "workload": "malloc_hot_64",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 228.85,
+        "min_ns_per_pair": 218.445,
+        "max_ns_per_pair": 252.4,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 48018000,
+            "ns_per_pair": 240.09
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 43689000,
+            "ns_per_pair": 218.445
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 45545000,
+            "ns_per_pair": 227.725
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 44175000,
+            "ns_per_pair": 220.875
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 47416000,
+            "ns_per_pair": 237.08
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 46840000,
+            "ns_per_pair": 234.2
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 50480000,
+            "ns_per_pair": 252.4
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 45194000,
+            "ns_per_pair": 225.97
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 46023000,
+            "ns_per_pair": 230.115
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 46089000,
+            "ns_per_pair": 230.445
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 44962000,
+            "ns_per_pair": 224.81
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 45080000,
+            "ns_per_pair": 225.4
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 45995000,
+            "ns_per_pair": 229.975
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 45344000,
+            "ns_per_pair": 226.72
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 387.65250000000003,
+        "min_ns_per_pair": 323.305,
+        "max_ns_per_pair": 465.785,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 64661000,
+            "ns_per_pair": 323.305
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 65324000,
+            "ns_per_pair": 326.62
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 66446000,
+            "ns_per_pair": 332.23
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 64908000,
+            "ns_per_pair": 324.54
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 68546000,
+            "ns_per_pair": 342.73
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 66118000,
+            "ns_per_pair": 330.59
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 68959000,
+            "ns_per_pair": 344.795
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 92883000,
+            "ns_per_pair": 464.415
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 92440000,
+            "ns_per_pair": 462.2
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 92350000,
+            "ns_per_pair": 461.75
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 91520000,
+            "ns_per_pair": 457.6
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 93157000,
+            "ns_per_pair": 465.785
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 89371000,
+            "ns_per_pair": 446.855
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 86102000,
+            "ns_per_pair": 430.51
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.59034831453428,
+      "vinix_at_or_faster": true
+    },
+    {
+      "workload": "malloc_mixed_batch_64",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 313.8025,
+        "min_ns_per_pair": 300.475,
+        "max_ns_per_pair": 347.33,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 67007000,
+            "ns_per_pair": 335.035
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 62202000,
+            "ns_per_pair": 311.01
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 63509000,
+            "ns_per_pair": 317.545
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 60095000,
+            "ns_per_pair": 300.475
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 61834000,
+            "ns_per_pair": 309.17
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 63158000,
+            "ns_per_pair": 315.79
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 68906000,
+            "ns_per_pair": 344.53
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 62238000,
+            "ns_per_pair": 311.19
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 63217000,
+            "ns_per_pair": 316.085
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 61853000,
+            "ns_per_pair": 309.265
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 62087000,
+            "ns_per_pair": 310.435
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 62917000,
+            "ns_per_pair": 314.585
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 62604000,
+            "ns_per_pair": 313.02
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 69466000,
+            "ns_per_pair": 347.33
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 777.99,
+        "min_ns_per_pair": 633.06,
+        "max_ns_per_pair": 907.555,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 126612000,
+            "ns_per_pair": 633.06
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 134252000,
+            "ns_per_pair": 671.26
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 138597000,
+            "ns_per_pair": 692.985
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 135824000,
+            "ns_per_pair": 679.12
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 135542000,
+            "ns_per_pair": 677.71
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 135934000,
+            "ns_per_pair": 679.67
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 137507000,
+            "ns_per_pair": 687.535
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 200000,
+            "elapsed_ns": 181511000,
+            "ns_per_pair": 907.555
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 200000,
+            "elapsed_ns": 174789000,
+            "ns_per_pair": 873.945
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 200000,
+            "elapsed_ns": 181480000,
+            "ns_per_pair": 907.4
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 200000,
+            "elapsed_ns": 176625000,
+            "ns_per_pair": 883.125
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 200000,
+            "elapsed_ns": 175356000,
+            "ns_per_pair": 876.78
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 200000,
+            "elapsed_ns": 175599000,
+            "ns_per_pair": 877.995
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 200000,
+            "elapsed_ns": 172599000,
+            "ns_per_pair": 862.995
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.4033503001323925,
+      "vinix_at_or_faster": true
+    },
+    {
+      "workload": "malloc_touch_262144",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 1537.3,
+        "min_ns_per_pair": 1355.5,
+        "max_ns_per_pair": 1854.6,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 18546000,
+            "ns_per_pair": 1854.6
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 15264000,
+            "ns_per_pair": 1526.4
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 18105000,
+            "ns_per_pair": 1810.5
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 16634000,
+            "ns_per_pair": 1663.4
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 15378000,
+            "ns_per_pair": 1537.8
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 13555000,
+            "ns_per_pair": 1355.5
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 18138000,
+            "ns_per_pair": 1813.8
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 15124000,
+            "ns_per_pair": 1512.4
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 16218000,
+            "ns_per_pair": 1621.8
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 15368000,
+            "ns_per_pair": 1536.8
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 16377000,
+            "ns_per_pair": 1637.7
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 15100000,
+            "ns_per_pair": 1510.0
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 13752000,
+            "ns_per_pair": 1375.2
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 15203000,
+            "ns_per_pair": 1520.3
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 18458.800000000003,
+        "min_ns_per_pair": 16088.3,
+        "max_ns_per_pair": 20167.6,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 171982000,
+            "ns_per_pair": 17198.2
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 170066000,
+            "ns_per_pair": 17006.6
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 170703000,
+            "ns_per_pair": 17070.3
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 175334000,
+            "ns_per_pair": 17533.4
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 167388000,
+            "ns_per_pair": 16738.8
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 164159000,
+            "ns_per_pair": 16415.9
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 160883000,
+            "ns_per_pair": 16088.3
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 197034000,
+            "ns_per_pair": 19703.4
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 201676000,
+            "ns_per_pair": 20167.6
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 196741000,
+            "ns_per_pair": 19674.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 200729000,
+            "ns_per_pair": 20072.9
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 193842000,
+            "ns_per_pair": 19384.2
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 193963000,
+            "ns_per_pair": 19396.3
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 196203000,
+            "ns_per_pair": 19620.3
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.08328277027759116,
+      "vinix_at_or_faster": true
+    },
+    {
+      "workload": "mmap_anon_4096",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 11432.8,
+        "min_ns_per_pair": 10741.1,
+        "max_ns_per_pair": 13118.6,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 131186000,
+            "ns_per_pair": 13118.6
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 117989000,
+            "ns_per_pair": 11798.9
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 118931000,
+            "ns_per_pair": 11893.1
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 111725000,
+            "ns_per_pair": 11172.5
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 112881000,
+            "ns_per_pair": 11288.1
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 115558000,
+            "ns_per_pair": 11555.8
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 115124000,
+            "ns_per_pair": 11512.4
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 114853000,
+            "ns_per_pair": 11485.3
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 113803000,
+            "ns_per_pair": 11380.3
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 116640000,
+            "ns_per_pair": 11664.0
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 112230000,
+            "ns_per_pair": 11223.0
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 107411000,
+            "ns_per_pair": 10741.1
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 111353000,
+            "ns_per_pair": 11135.3
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 108795000,
+            "ns_per_pair": 10879.5
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 27426.5,
+        "min_ns_per_pair": 22371.1,
+        "max_ns_per_pair": 31802.1,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 245125000,
+            "ns_per_pair": 24512.5
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 249255000,
+            "ns_per_pair": 24925.5
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 233112000,
+            "ns_per_pair": 23311.2
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 230750000,
+            "ns_per_pair": 23075.0
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 234457000,
+            "ns_per_pair": 23445.7
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 224544000,
+            "ns_per_pair": 22454.4
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 223711000,
+            "ns_per_pair": 22371.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 299900000,
+            "ns_per_pair": 29990.0
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 300221000,
+            "ns_per_pair": 30022.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 318021000,
+            "ns_per_pair": 31802.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 301742000,
+            "ns_per_pair": 30174.2
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 299461000,
+            "ns_per_pair": 29946.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 299275000,
+            "ns_per_pair": 29927.5
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 311006000,
+            "ns_per_pair": 31100.6
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.41685231436749126,
+      "vinix_at_or_faster": true
+    },
+    {
+      "workload": "mmap_touch_262144",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 669947.75,
+        "min_ns_per_pair": 539175.6,
+        "max_ns_per_pair": 1587843.7,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 5755973000,
+            "ns_per_pair": 575597.3
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 6279590000,
+            "ns_per_pair": 627959.0
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 5459176000,
+            "ns_per_pair": 545917.6
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 5522577000,
+            "ns_per_pair": 552257.7
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 5391756000,
+            "ns_per_pair": 539175.6
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 5533812000,
+            "ns_per_pair": 553381.2
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 6029587000,
+            "ns_per_pair": 602958.7
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 7171444000,
+            "ns_per_pair": 717144.4
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 15878437000,
+            "ns_per_pair": 1587843.7
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 14517150000,
+            "ns_per_pair": 1451715.0
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 7119365000,
+            "ns_per_pair": 711936.5
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 7316742000,
+            "ns_per_pair": 731674.2
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 7391015000,
+            "ns_per_pair": 739101.5
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 10772940000,
+            "ns_per_pair": 1077294.0
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 1924765.85,
+        "min_ns_per_pair": 1347432.5,
+        "max_ns_per_pair": 2075983.7,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 13751742000,
+            "ns_per_pair": 1375174.2
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 13474325000,
+            "ns_per_pair": 1347432.5
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 14437905000,
+            "ns_per_pair": 1443790.5
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 17066162000,
+            "ns_per_pair": 1706616.2
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 19156825000,
+            "ns_per_pair": 1915682.5
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 20006203000,
+            "ns_per_pair": 2000620.3
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 19951457000,
+            "ns_per_pair": 1995145.7
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 20233649000,
+            "ns_per_pair": 2023364.9
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 20590916000,
+            "ns_per_pair": 2059091.6
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 20759837000,
+            "ns_per_pair": 2075983.7
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 19690341000,
+            "ns_per_pair": 1969034.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 19338492000,
+            "ns_per_pair": 1933849.2
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 18816980000,
+            "ns_per_pair": 1881698.0
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 18265368000,
+            "ns_per_pair": 1826536.8
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.34806714281635864,
+      "vinix_at_or_faster": true
+    },
+    {
+      "workload": "pipe_create_close",
+      "vinix": {
+        "sample_count": 14,
+        "median_ns_per_pair": 29889.35,
+        "min_ns_per_pair": 23355.3,
+        "max_ns_per_pair": 38081.1,
+        "observations": [
+          {
+            "cohort": "vinix-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 247774000,
+            "ns_per_pair": 24777.4
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 264171000,
+            "ns_per_pair": 26417.1
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 240617000,
+            "ns_per_pair": 24061.7
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 243883000,
+            "ns_per_pair": 24388.3
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 236129000,
+            "ns_per_pair": 23612.9
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 233553000,
+            "ns_per_pair": 23355.3
+          },
+          {
+            "cohort": "vinix-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 239921000,
+            "ns_per_pair": 23992.1
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 380811000,
+            "ns_per_pair": 38081.1
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 375427000,
+            "ns_per_pair": 37542.7
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 380117000,
+            "ns_per_pair": 38011.7
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 353968000,
+            "ns_per_pair": 35396.8
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 350162000,
+            "ns_per_pair": 35016.2
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 339340000,
+            "ns_per_pair": 33934.0
+          },
+          {
+            "cohort": "vinix-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 333616000,
+            "ns_per_pair": 33361.6
+          }
+        ]
+      },
+      "catalina": {
+        "sample_count": 14,
+        "median_ns_per_pair": 70205.85,
+        "min_ns_per_pair": 63699.7,
+        "max_ns_per_pair": 77728.8,
+        "observations": [
+          {
+            "cohort": "catalina-1",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 694019000,
+            "ns_per_pair": 69401.9
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 697223000,
+            "ns_per_pair": 69722.3
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 706894000,
+            "ns_per_pair": 70689.4
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 710326000,
+            "ns_per_pair": 71032.6
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 712651000,
+            "ns_per_pair": 71265.1
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 692280000,
+            "ns_per_pair": 69228.0
+          },
+          {
+            "cohort": "catalina-1",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 742006000,
+            "ns_per_pair": 74200.6
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 1,
+            "pairs": 10000,
+            "elapsed_ns": 756391000,
+            "ns_per_pair": 75639.1
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 2,
+            "pairs": 10000,
+            "elapsed_ns": 777288000,
+            "ns_per_pair": 77728.8
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 3,
+            "pairs": 10000,
+            "elapsed_ns": 749674000,
+            "ns_per_pair": 74967.4
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 4,
+            "pairs": 10000,
+            "elapsed_ns": 636997000,
+            "ns_per_pair": 63699.7
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 5,
+            "pairs": 10000,
+            "elapsed_ns": 643346000,
+            "ns_per_pair": 64334.6
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 6,
+            "pairs": 10000,
+            "elapsed_ns": 664764000,
+            "ns_per_pair": 66476.4
+          },
+          {
+            "cohort": "catalina-2",
+            "sample": 7,
+            "pairs": 10000,
+            "elapsed_ns": 661860000,
+            "ns_per_pair": 66186.0
+          }
+        ]
+      },
+      "vinix_over_catalina": 0.42573873829602515,
+      "vinix_at_or_faster": true
+    }
+  ],
+  "all_cohorts_at_or_faster": true,
+  "all_pooled_workloads_at_or_faster": true,
+  "method": "All recorded raw samples participate, including outliers; no filtering or selection.",
+  "vinix_provenance": {
+    "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+    "source_sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+    "libc_sha256": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+    "libc_a_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+    "libc_build": {
+      "version": "1.2.5",
+      "alpine_package": "musl-1.2.5-r11",
+      "arch": "x86_64",
+      "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+      "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+      "patches": [
+        {
+          "name": "handle-aux-at_base.patch",
+          "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+        },
+        {
+          "name": "isatty-glibc-align.patch",
+          "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+        },
+        {
+          "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+          "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+        },
+        {
+          "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+          "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+        },
+        {
+          "name": "loongarch64-add-TLSDESC-support.patch",
+          "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+        },
+        {
+          "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+          "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+        },
+        {
+          "name": "loongarch64-add-bits-hwcap.h.patch",
+          "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+        },
+        {
+          "name": "CVE-2025-26519.patch",
+          "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+        },
+        {
+          "name": "CVE-2026-6042.patch",
+          "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+        },
+        {
+          "name": "CVE-2026-40200.patch",
+          "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+        },
+        {
+          "name": "malloc-retain.patch",
+          "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+        }
+      ],
+      "cc": [
+        "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc"
+      ],
+      "compiler_version": "x86_64-linux-musl-gcc (GCC) 14.2.0",
+      "compiler_target": "x86_64-linux-musl",
+      "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+      "ldflags": "-Wl,-soname,libc.musl-x86_64.so.1",
+      "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+      "retention": 1,
+      "configure_argv": [
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/musl-1.2.5/configure",
+        "--target=x86_64-linux-musl",
+        "--prefix=/usr",
+        "--syslibdir=/lib",
+        "--disable-wrapper",
+        "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+      ],
+      "libc_so_sha256": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+      "libc_a_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace"
+    }
+  }
+}

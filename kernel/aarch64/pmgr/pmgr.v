@@ -22,6 +22,10 @@ const pmgr_was_power_gated = u32(1) << 8
 const pmgr_was_clock_gated = u32(1) << 9
 const pmgr_auto_enable = u32(1) << 28
 const pmgr_transient_flags = pmgr_was_power_gated | pmgr_was_clock_gated
+const pmgr_reset = u32(1) << 31
+const pmgr_ps_reset = u32(1) << 12
+const pmgr_dev_disable = u32(1) << 10
+const pmgr_ps_actual_clock_gated = u32(0x4) << 4
 
 __global (
 	pmgr_base = u64(0)
@@ -33,7 +37,7 @@ pub fn initialise(base u64) {
 	// should come from the device-tree reg entry; map a conservative window
 	// until that is plumbed through.
 	pmgr_base = memory.map_mmio(base, 0x10000)
-	println('pmgr: Apple Power Manager at 0x${base:x}')
+	C.kprintf(c'pmgr: Apple Power Manager at 0x%llx\n', u64(base))
 }
 
 fn enable_mapped(base u64, offset u32) bool {
@@ -78,6 +82,100 @@ pub fn enable_region(physical_base u64, region_size u64, offset u32) bool {
 		pmgr_lock.release()
 	}
 	return enable_mapped(mapped, offset)
+}
+
+// Enable a domain marked "apple,externally-clocked" in the device tree, such
+// as an MCA cluster, whose clock comes from outside the PMGR. It reports
+// clock-gated until that clock runs, which counts as on (as in Linux's
+// apple_pmgr_ps_set).
+pub fn enable_region_externally_clocked(physical_base u64, region_size u64, offset u32) bool {
+	if physical_base == 0 || region_size < 4 || u64(offset) > region_size - 4 {
+		return false
+	}
+	mapped := memory.map_mmio(physical_base, region_size)
+	if mapped == 0 {
+		return false
+	}
+	pmgr_lock.acquire()
+	defer {
+		pmgr_lock.release()
+	}
+	addr := unsafe { &u32(mapped + offset) }
+	mut val := kio.mmin32(addr)
+	val &= ~(pmgr_auto_enable | pmgr_transient_flags | pmgr_ps_target_mask | pmgr_dev_disable | pmgr_ps_reset)
+	val |= pmgr_ps_target_active
+	kio.mmout32(addr, val)
+	for _ in 0 .. 10000 {
+		if kio.mmin32(addr) & pmgr_ps_actual_mask >= pmgr_ps_actual_clock_gated {
+			kio.mmout32(addr, val | pmgr_auto_enable)
+			return true
+		}
+		timer.busywait_us(10)
+	}
+	C.kprintf(c'pmgr: Timeout enabling externally clocked domain at offset 0x%x\n', offset)
+	return false
+}
+
+// Power a domain down in an explicitly identified PMGR aperture, as Linux's
+// apple_pmgr_ps_power_off: target the power-gated state, without auto-enable,
+// and wait for it. An externally clocked domain gets there only while its
+// clock still runs.
+pub fn disable_region(physical_base u64, region_size u64, offset u32) bool {
+	if physical_base == 0 || region_size < 4 || u64(offset) > region_size - 4 {
+		return false
+	}
+	mapped := memory.map_mmio(physical_base, region_size)
+	if mapped == 0 {
+		return false
+	}
+	pmgr_lock.acquire()
+	defer {
+		pmgr_lock.release()
+	}
+	addr := unsafe { &u32(mapped + offset) }
+	mut val := kio.mmin32(addr)
+	val &= ~(pmgr_auto_enable | pmgr_transient_flags | pmgr_ps_target_mask | pmgr_dev_disable | pmgr_ps_reset)
+	kio.mmout32(addr, val)
+	for _ in 0 .. 10000 {
+		if kio.mmin32(addr) & pmgr_ps_actual_mask == 0 {
+			return true
+		}
+		timer.busywait_us(10)
+	}
+	C.kprintf(c'pmgr: Timeout disabling domain at offset 0x%x (state 0x%x)\n', offset,
+		kio.mmin32(addr))
+	return false
+}
+
+// Pulse the reset of a powered domain, as Linux's apple_pmgr_reset_reset:
+// quiesce the device, assert reset, then release both.
+pub fn reset_region(physical_base u64, region_size u64, offset u32) bool {
+	if physical_base == 0 || region_size < 4 || u64(offset) > region_size - 4 {
+		return false
+	}
+	mapped := memory.map_mmio(physical_base, region_size)
+	if mapped == 0 {
+		return false
+	}
+	pmgr_lock.acquire()
+	defer {
+		pmgr_lock.release()
+	}
+	addr := unsafe { &u32(mapped + offset) }
+	mut val := kio.mmin32(addr) & ~pmgr_transient_flags
+	if val & pmgr_ps_actual_mask == 0 {
+		return false
+	}
+	val |= pmgr_dev_disable
+	kio.mmout32(addr, val)
+	val |= pmgr_reset
+	kio.mmout32(addr, val)
+	timer.busywait_us(2)
+	val &= ~pmgr_reset
+	kio.mmout32(addr, val)
+	val &= ~pmgr_dev_disable
+	kio.mmout32(addr, val)
+	return true
 }
 
 // Enable a power domain at the given register offset

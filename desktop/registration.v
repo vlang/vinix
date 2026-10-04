@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // First-launch user registration. This runs before ordinary desktop windows are
 // created, so there is no taskbar, shortcut, or closable window to get around.
 module main
@@ -34,8 +37,10 @@ mut:
 	password_mask []u8
 	confirm       []u8
 	confirm_mask  []u8
-	error         string
-	complete      bool
+	// The translation table's text, never freed. Nothing can change the
+	// language while setup runs, so it need not be looked up again.
+	error    string
+	complete bool
 }
 
 fn new_registration_state() RegistrationState {
@@ -131,21 +136,26 @@ fn (mut r RegistrationState) submit(home string) {
 	defer { unsafe { name.free() } }
 	if !registration_valid_name(name) {
 		r.focus(.name)
-		r.error = 'Enter a name.'
+		r.error = tr('registration.error.no_name')
 		return
 	}
 	if r.password.len == 0 {
 		r.focus(.password)
-		r.error = 'Enter a password.'
+		r.error = tr('registration.error.no_password')
 		return
 	}
 	if !registration_bytes_equal(r.password, r.confirm) {
 		r.focus(.confirm)
-		r.error = 'Passwords do not match.'
+		r.error = tr('registration.error.mismatch')
 		return
 	}
+	// The app picker follows user creation. Mark it first so it still appears
+	// if the machine restarts right after the user record becomes durable.
+	if !desktop_mark_app_selection_pending(home) {
+		eprintln('vinix-desktop: could not mark the first-run app choice as pending')
+	}
 	if !desktop_save_user(home, name, r.password) {
-		r.error = 'Could not save the user. Try again.'
+		r.error = tr('registration.error.save_failed')
 		return
 	}
 	r.error = ''
@@ -320,44 +330,44 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 	field_width := card_width - 64
 
 	mut card_children := frame_elements(12)
-	card_children << ui2.label('registration.title', 'Create your user', ui2.rect(32, 28,
+	card_children << ui2.label('registration.title', tr('registration.heading'), ui2.rect(32, 28,
 		f64(field_width), 34), ui2.TextStyle{
 		color: body_heading
 		size:  24
 		bold:  true
 	})
-	card_children << ui2.label('registration.subtitle', 'Finish setup to use Vinix.', ui2.rect(32,
+	card_children << ui2.label('registration.subtitle', tr('registration.intro'), ui2.rect(32,
 		67, f64(field_width), 24), ui2.TextStyle{
 		color: body_muted
 		size:  12
 	})
 
-	card_children << ui2.label('', 'Name', ui2.rect(32, 104, f64(field_width), 18), ui2.TextStyle{
+	card_children << ui2.label('', tr('registration.field.name'), ui2.rect(32, 104, f64(field_width), 18), ui2.TextStyle{
 		color: body_text
 		size:  11
 		bold:  true
 	})
 	card_children << registration_field_element(action_registration_name, r.name_display,
-		'Enter your name', r.field == .name, d.hover == action_registration_name, field_x, 124,
+		tr('registration.placeholder.name'), r.field == .name, d.hover == action_registration_name, field_x, 124,
 		field_width)
 
-	card_children << ui2.label('', 'Password', ui2.rect(32, 176, f64(field_width), 18), ui2.TextStyle{
+	card_children << ui2.label('', tr('registration.field.password'), ui2.rect(32, 176, f64(field_width), 18), ui2.TextStyle{
 		color: body_text
 		size:  11
 		bold:  true
 	})
 	card_children << registration_field_element(action_registration_password, r.password_mask,
-		'Enter a password', r.field == .password, d.hover == action_registration_password, field_x,
+		tr('registration.placeholder.password'), r.field == .password, d.hover == action_registration_password, field_x,
 		196, field_width)
 
-	card_children << ui2.label('', 'Confirm password', ui2.rect(32, 248, f64(field_width), 18),
+	card_children << ui2.label('', tr('registration.field.confirm'), ui2.rect(32, 248, f64(field_width), 18),
 		ui2.TextStyle{
 			color: body_text
 			size:  11
 			bold:  true
 		})
 	card_children << registration_field_element(action_registration_confirm, r.confirm_mask,
-		'Repeat the password', r.field == .confirm, d.hover == action_registration_confirm, field_x,
+		tr('registration.placeholder.confirm'), r.field == .confirm, d.hover == action_registration_confirm, field_x,
 		268, field_width)
 
 	card_children << ui2.label('registration.error', r.error, ui2.rect(32, 316, f64(field_width),
@@ -365,7 +375,7 @@ fn (r &RegistrationState) element(d &Desktop) ui2.Element {
 		color: registration_error
 		size:  11
 	})
-	card_children << ui2.button(action_registration_create, 'Create user', ui2.rect(32, 350,
+	card_children << ui2.button(action_registration_create, tr('registration.button.create'), ui2.rect(32, 350,
 		f64(field_width), 40), ui2.BoxStyle{
 		bg:     if d.hover == action_registration_create { u32(0x4a8ee7) } else { app_accent }
 		radius: 6
@@ -450,9 +460,13 @@ fn (mut d Desktop) ensure_registered_user(mut fb Framebuffer, mut pointer Pointe
 		dirty = false
 		sleep_to_next_frame(frame_started, frame_interval)
 	}
-	// Do not let the first ordinary input sample see setup hit targets or a
-	// button level left over from pressing Create user.
-	d.targets.clear()
+	d.reset_setup_input()
+}
+
+// Do not let the next screen's first input sample see setup hit targets or a
+// button level left over from pressing the setup button that finished it.
+fn (mut d Desktop) reset_setup_input() {
+	d.clear_hit_targets()
 	d.set_hover('')
 	d.buttons = 0
 	d.drag = Drag{}

@@ -1,0 +1,15 @@
+test_all_classes_multi_page_lifecycle (__main__.HeapModelTests) ... ok
+test_arithmetic_guards (__main__.HeapModelTests) ... ok
+test_bit_search_all_positions_and_random_words (__main__.HeapModelTests) ... ok
+test_invalid_and_double_free_on_resident_page (__main__.HeapModelTests) ... ok
+test_irq_snapshot_source_order (__main__.HeapModelTests) ... ok
+test_partial_preferred_to_spare (__main__.HeapModelTests) ... ok
+test_payload_poison_and_zero_on_reuse (__main__.HeapModelTests) ... ok
+test_random_mixed_size_churn (__main__.HeapModelTests) ... ok
+test_single_slot_full_to_empty (__main__.HeapModelTests) ... ok
+test_source_geometry_and_classes (__main__.HeapModelTests) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 32.133s
+
+OK

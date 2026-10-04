@@ -51,11 +51,12 @@ pub fn initialise(base u64) {
 	bite1 := rd(wd1_bite_time)
 	cur1 := rd(wd1_cur_time)
 	ctrl0 := rd(wd0_ctrl)
-	println('wdt: Apple watchdog at 0x${base:x}: wd1 ctrl=0x${ctrl1:x} bite=${bite1} cur=${cur1} (24 MHz ticks), wd0 ctrl=0x${ctrl0:x}')
+	C.kprintf(c'wdt: Apple watchdog at 0x%llx: wd1 ctrl=0x%llx bite=%llu cur=%llu (24 MHz ticks), wd0 ctrl=0x%llx\n',
+		u64(base), u64(ctrl1), u64(bite1), u64(cur1), u64(ctrl0))
 
 	if ctrl1 & ctrl_reset_en != 0 {
 		secs := (bite1 - cur1) / 24000000
-		println('wdt: firmware left wd1 armed to reset in ~${secs} s; disarming')
+		C.kprintf(c'wdt: firmware left wd1 armed to reset in ~%llu s; disarming\n', u64(secs))
 	}
 
 	// Clearing RESET_EN (and the IRQ enable) stops the countdown from having
@@ -66,7 +67,7 @@ pub fn initialise(base u64) {
 	wr(wd0_ctrl, 0)
 	wr(wd0_cur_time, 0)
 
-	println('wdt: disarmed (wd1 ctrl now 0x${rd(wd1_ctrl):x})')
+	C.kprintf(c'wdt: disarmed (wd1 ctrl now 0x%llx)\n', u64(rd(wd1_ctrl)))
 }
 
 // Service the watchdog (for a future periodic task); a no-op while disarmed.

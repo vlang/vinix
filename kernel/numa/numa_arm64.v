@@ -12,26 +12,15 @@
 module numa
 
 import devicetree
-import limine
+import aarch64.firmware
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 
 // A machine booted through UEFI has ACPI tables and no device tree, which is
-// what the aarch64 QEMU machine is. The amd64 build reuses the acpi module's
-// request instead of asking for a second copy of the same pointer.
-@[_linker_section: '.requests']
-@[cinit]
-__global (
-	volatile numa_rsdp_req = limine.LimineRSDPRequest{
-		response: unsafe { nil }
-	}
-)
-
+// what the aarch64 QEMU machine is. Limine answers each request ID once, so the
+// RSDP request lives with the rest of the arm64 ACPI code in aarch64.firmware.
 fn acpi_rsdp_address() u64 {
-	if numa_rsdp_req.response == unsafe { nil } {
-		return 0
-	}
-	return u64(numa_rsdp_req.response.address)
+	return firmware.rsdp_address()
 }
 
 // Read /cpus and the memory nodes. Returns the number of nodes found, or zero

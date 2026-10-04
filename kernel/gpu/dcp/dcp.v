@@ -13,6 +13,7 @@ import apple.rtkit
 import apple.dart
 import drm.mode
 import klock
+import lib
 import memory
 
 // Default shared memory region size for DCP communication
@@ -72,7 +73,7 @@ pub fn (mut dcp AppleDCP) initialise() bool {
 	dcp.disp_dart.init()
 
 	// Step 2: Allocate shared memory and map it through DART
-	shmem_pages := dcp.shmem_size / u64(0x1000)
+	shmem_pages := dcp.shmem_size / memory.page_size
 	shmem_phys := u64(memory.pmm_alloc(shmem_pages))
 	if shmem_phys == 0 {
 		C.printf(c'dcp: Failed to allocate shared memory\n')
@@ -183,7 +184,7 @@ pub fn (mut dcp AppleDCP) set_mode(m &mode.DrmDisplayMode) bool {
 	dcp.crtc.mode = unsafe { *m }
 	dcp.crtc.enabled = true
 
-	println('dcp: Set mode ${m.name}')
+	C.kprintf(c'dcp: Set mode %.*s\n', i32(m.name.len), m.name.str)
 	return true
 }
 
@@ -257,6 +258,13 @@ fn get_modes_internal(mut dcp AppleDCP) []mode.DrmDisplayMode {
 			// Convert fixed-point 16.16 refresh rate to integer Hz
 			refresh_hz := tm.refresh_rate_fp >> 16
 			clock := tm.width * tm.height * refresh_hz / 1000
+			// The mode keeps its name, e.g. 2560x1600@60.
+			mut name := lib.new_text(24)
+			name.add_unsigned(u64(tm.width))
+			name.add_byte(`x`)
+			name.add_unsigned(u64(tm.height))
+			name.add_byte(`@`)
+			name.add_unsigned(u64(refresh_hz))
 
 			modes << mode.DrmDisplayMode{
 				hdisplay:    tm.width
@@ -269,7 +277,7 @@ fn get_modes_internal(mut dcp AppleDCP) []mode.DrmDisplayMode {
 				vtotal:      tm.height
 				clock:       clock
 				flags:       tm.flags
-				name:        '${tm.width}x${tm.height}@${refresh_hz}'
+				name:        name.str()
 			}
 		}
 	} else {
@@ -287,6 +295,7 @@ fn get_modes_internal(mut dcp AppleDCP) []mode.DrmDisplayMode {
 			name:        '2560x1600@60'
 		}
 	}
+	unsafe { timing_modes.free() }
 
 	return modes
 }

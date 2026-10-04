@@ -4,8 +4,8 @@
 
 All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
 window-button side, taskbar grouping, taskbar clock format, seconds, date and
-weekday, theme, wallpaper colour and image, and scale. It is a versioned,
-human-readable snapshot, for example:
+weekday, theme, system language, wallpaper colour and image, keyboard layouts,
+and scale. It is a versioned, human-readable snapshot, for example:
 
 ```ini
 version=1
@@ -13,21 +13,29 @@ scale=2
 button_side=left
 taskbar_mode=combined
 theme=macos
+language=ru
 clock_24_hour=false
 clock_show_seconds=false
 clock_show_date=false
 clock_show_weekday=false
 wallpaper_color=4
 wallpaper_image=2
+keyboard_layouts=us,ru
+keyboard_layout=ru
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
-`standard`/`combined` and `default`/`macos`. Clock choices are `true`/`false`;
+`standard`/`combined` and `default`/`macos`. `language` is `en` (the default),
+`ru` or `es`; see [the system language](#system-language) below. Clock choices are `true`/`false`;
 all four default to `true`, preserving the historical 24-hour clock with
 seconds, date and weekday when an older version-1 snapshot omits the new keys.
 Wallpaper values are the same zero-based catalogue indices used by Settings;
 image `-1` selects the colour. If an image is not available in the current
-build, the renderer uses the saved colour instead.
+build, the renderer uses the saved colour instead. `keyboard_layouts` lists the
+enabled input sources in Settings' order, using `us`, `ru`, `es`, `fr`, `de`
+and `pt`, and `keyboard_layout` is the one typing uses; it must be among them.
+A record with only `keyboard_layout` enables that layout beside `us`, and one
+with only `keyboard_layouts` types with the first listed. Both default to `us`.
 
 The compositor loads the snapshot before allocating its canvas or launching
 applications. After accepting Settings changes and applying any scale change,
@@ -104,6 +112,72 @@ cached taskbar clock text and the next frame uses the new format. The choices
 are part of the same atomic preference snapshot described above, so they
 survive restart and older version-1 files continue to use the old full clock
 default.
+
+## Keyboard
+
+Select **Keyboard** to choose input sources. **Input sources** turns layouts on
+and off: English (US), Russian, Spanish, French, German and Portuguese
+(Portugal). At least one stays on; turning off the current one moves typing to
+the first still on. The current one is picked from the taskbar's input menu
+beside the clock, described below. **Ctrl-Space** moves to the next input
+source that is on and briefly shows its name in the middle of the screen; with
+a single source, it reaches applications as NUL (Ctrl-@) as before. The current
+source is saved like every other preference, so a switch survives a restart.
+
+While more than one input source is on, the taskbar shows the current one's
+short name (`EN`, `RU`, ...) just left of the clock, as Windows' language bar
+and the Mac input menu do. Clicking it lists the sources that are on, with a
+tick beside the current one; picking one switches to it. **Keyboard settings**
+at the bottom opens this pane. The badge sits against the clock's text in the
+room its box leaves free, so the window buttons lose width only for a clock
+wide enough to fill it, such as a 12-hour clock with seconds.
+
+The layouts are the standard PC ones (xkb `ru`, `es`, `fr`, `de`, `pt`):
+ЙЦУКЕН, QWERTZ, AZERTY and the Spanish and Portuguese QWERTY layouts, with
+their dead accent keys. An accent key waits for the next letter (`´` then `e`
+types `é`); Space or the same accent key again types the accent itself, and
+Backspace cancels it. **Option (Alt)** types the characters printed on the
+right of the keycaps, which PC keyboards type with AltGr: `@ € { [ ] } \ ~ | µ
+² ³` on German, `` ~ # { [ | ` \ ^ @ ] } € ¤ `` on French, `\ | @ # ~ ¬ € [ ] { }` on
+Spanish and `@ £ § { [ ] } € ¨ \` on Portuguese. The ISO key between left
+Shift and Z types `<` and `>` (and `|` with Option on German).
+
+Shortcuts do not move with the layout. Ctrl, Cmd and Option chords a layout has
+no character for still name the key printed on a US keyboard, so Ctrl-C,
+Cmd-W, Cmd-Tab and Alt-b keep working while typing Russian. DOOM and the nested
+Vinix in QEMU receive the US keys whatever the input source, because game
+controls and a virtual machine's own keyboard layout are positional.
+
+### How it works
+
+The console keyboard drivers still speak the US layout. `keyboard_layout.v`
+re-types each read before anything else in the compositor sees it, the way an
+X server's keymap turns keycodes into characters: every printable US byte names
+a key and a Shift level, and the layout's table says what that key types. The
+result reaches the Start menu, Quick Launch and applications as UTF-8. Escape
+sequences pass through untouched, including one a short read split in two.
+`ESC [` is both Option-`[` and the start of every CSI, so for Spanish and
+Portuguese it is decided by the byte that follows, waiting at most one frame.
+
+The kernel gives the desktop what the US byte stream would otherwise lose:
+Option as an escape before the key on every keyboard (the Apple SPI keyboard
+already sent it), Ctrl-Space as NUL, and the ISO key as `§` and `±`, which is
+what Apple's US layout prints on it. It also answers the Linux `KDGETLED`
+ioctl on the console. The US drivers apply Caps Lock only to US letters, so the
+desktop asks for Caps Lock when a key is a letter in just one of the two
+layouts, such as `ж` on the US `;` key or `,` on the French US-`m` key.
+
+The desktop font carries the Latin-1 and Russian letters, `€`, `№` and `Œ œ Ÿ`
+(`desktop/tools/genfont.py`). Terminal keeps one Unicode character per cell,
+the editor edits UTF-8 by character, and hosted X11 applications receive
+non-ASCII characters through a keysym borrowed for them.
+
+Two limits remain. Apple's ISO keyboards report the key left of 1 and the key
+left of Z the other way round from PC keyboards, as Linux `hid_apple` does
+without `iso_layout`, so on those keyboards the two keys' characters are
+swapped. And because Option and Alt are the same byte, Option chords that a
+layout gives a character no longer reach applications as Meta (Alt-q, for
+example, types `@` in German).
 
 ## Wi-Fi
 
@@ -195,6 +269,10 @@ positive short write is an error and its suffix is never retried as a command.
 
 ## Implementation and tests
 
+`keyboard_layout.v` owns the layout tables, dead keys, the typing
+translation and the taskbar's input menu, and `settings_keyboard.v` the
+Keyboard pane; the input-source names and preference codes are in
+`settings_model.v`.
 `settings_app.v` implements `NativeApp`; its categories and controls are ui2
 elements (`ui2.view`, `ui2.label`, `ui2.button` and friends). `app.v` registers
 the launcher, and `settings_model.v` holds the shared preference data while
@@ -252,3 +330,23 @@ compositor scale application before saving and restoring the complete snapshot.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.
+
+## System language
+
+Settings → Language chooses the language of the desktop and of the Vinix
+applications it runs: English, Russian (Русский) or Spanish (Español). Each is
+listed in its own name. The choice takes effect on the next frame everywhere,
+including windows that are already open, and is saved as `language=` above.
+Applications that are not part of Vinix (Firefox, LibreOffice, Wine...) choose
+their language themselves.
+
+Every string the desktop shows is looked up by key with `tr()`
+([translations.v](translations.v)) from `translations/<code>.tr`, in the
+format of V's `i18n` module. See [translations/README.md](translations/README.md)
+for the format and for adding a language. Window and application titles stay
+English internally, since the window manager identifies windows by them, and
+are translated only where they are shown.
+
+The native applications run as separate processes, so the language is part of
+the settings every application request carries (`app_process.v`), the same way
+the clock and theme preferences are.

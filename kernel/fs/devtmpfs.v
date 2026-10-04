@@ -9,6 +9,7 @@ import resource
 import lib
 import event.eventstruct
 import katomic
+import security
 
 @[heap]
 struct DevTmpFSResource {
@@ -22,6 +23,16 @@ pub mut:
 
 	storage  &u8
 	capacity u64
+	// The interface box its nodes and descriptors hold, freed with it; see
+	// TmpFSResource.box.
+	box &resource.Resource = unsafe { nil }
+}
+
+fn (mut this DevTmpFSResource) boxed() &resource.Resource {
+	if this.box == unsafe { nil } {
+		this.box = &resource.Resource(this) @[freed]
+	}
+	return this.box
 }
 
 fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
@@ -32,7 +43,7 @@ fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidpt
 
 	if flags & mmap.map_shared != 0 {
 		unsafe {
-			return voidptr(u64(&this.storage[page * page_size]) - higher_half)
+			return voidptr(memory.kernel_virt2phys(u64(&this.storage[page * page_size])))
 		}
 	}
 
@@ -128,7 +139,10 @@ fn (mut this DevTmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 
-	unsafe { free(this) }
+	unsafe {
+		free(voidptr(this.box))
+		free(this)
+	}
 }
 
 fn (mut this DevTmpFSResource) link(_handle voidptr) ? {
@@ -163,7 +177,18 @@ fn (mut this DevTmpFSResource) grow(_handle voidptr, new_size u64) ? {
 	this.stat.blocks = lib.div_roundup(new_size, u64(this.stat.blksize))
 }
 
-struct DevTmpFS {}
+struct DevTmpFS {
+mut:
+	// See TmpFS.as_filesystem().
+	box &FileSystem = unsafe { nil }
+}
+
+fn (mut this DevTmpFS) as_filesystem() &FileSystem {
+	if this.box == unsafe { nil } {
+		this.box = &FileSystem(this)
+	}
+	return this.box
+}
 
 __global (
 	devtmpfs_dev_id        u64
@@ -172,8 +197,8 @@ __global (
 )
 
 fn (this DevTmpFS) instantiate() &FileSystem {
-	new := &DevTmpFS{}
-	return new
+	mut new := &DevTmpFS{}
+	return new.as_filesystem()
 }
 
 fn (this DevTmpFS) populate(_node &VFSNode) {}
@@ -191,7 +216,7 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&V
 
 // TODO	should it be maybe `mut parent`? doesn't `create_node` mutate `parent` in `unsafe`(passing it to `mut` field)?
 fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
-	mut new_node := create_node(this, parent, name, stat.isdir(mode))
+	mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
 
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
@@ -216,13 +241,13 @@ fn (mut this DevTmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
 	return new_node
 }
 
 fn (mut this DevTmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) ?&VFSNode {
-	mut new_node := create_node(this, parent, path, false)
+	mut new_node := create_node(this.as_filesystem(), parent, path, false)
 
 	katomic.inc(mut &old_node.resource.refcount)
 	katomic.inc(mut &old_node.resource.stat.nlink)
@@ -237,7 +262,7 @@ fn (mut this DevTmpFS) rename(_old_parent &VFSNode, _old_name string,
 	_new_parent &VFSNode, _new_name string, _flags int) ? {}
 
 fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
-	mut new_node := create_node(this, parent, target, false)
+	mut new_node := create_node(this.as_filesystem(), parent, target, false)
 
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
@@ -256,9 +281,11 @@ fn (mut this DevTmpFS) symlink(parent &VFSNode, dest string, target string) &VFS
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 
-	new_node.symlink_target = dest
+	// A copy of its own, as every filesystem keeps: symlinkat(2) frees the
+	// text it was given.
+	new_node.symlink_target = dest.clone()
 
 	return new_node
 }
@@ -268,7 +295,8 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 		return unsafe { parent.children[name] or { panic('devtmpfs: missing child ${name}') } }
 	}
 
-	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name, true)
+	// `name` may point into a longer path; the node keeps a copy.
+	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name.clone(), true)
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
 		refcount: 1
@@ -285,7 +313,7 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	new_resource.stat.ctim = realtime_clock
 	new_resource.stat.mtim = realtime_clock
 
-	new_node.resource = new_resource
+	new_node.resource = new_resource.boxed()
 	new_node.create_dotentries(parent)
 	mut p := unsafe { parent }
 	unsafe {
@@ -295,6 +323,10 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 }
 
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
+	if stat.isblk(device.stat.mode) {
+		mut actual_device := unsafe { device }
+		security.register_block_device(resource.block_identity(mut actual_device))
+	}
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()
@@ -304,24 +336,27 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	mut leaf := name
 
 	if name.contains('/') {
-		parts := name.split('/')
-		mut path_parts := []string{}
-		for part in parts {
-			if part.len > 0 {
-				path_parts << part
+		// Every pty's pts/N comes and goes through here. The components are
+		// views into `name`, where split() made copies nothing freed, and the
+		// node is given a copy of its own name.
+		mut last := ''
+		mut start := 0
+		for end := 0; end <= name.len; end++ {
+			if end < name.len && name[end] != `/` {
+				continue
 			}
+			if end > start {
+				if last.len > 0 {
+					parent = ensure_devtmpfs_dir(parent, last)
+				}
+				last = unsafe { tos(name.str + start, end - start) }
+			}
+			start = end + 1
 		}
-		if path_parts.len == 0 {
+		if last.len == 0 {
 			return
 		}
-
-		for i, part in path_parts {
-			if i == path_parts.len - 1 {
-				leaf = part
-				break
-			}
-			parent = ensure_devtmpfs_dir(parent, part)
-		}
+		leaf = last.clone()
 	}
 
 	if leaf.len == 0 {
@@ -346,7 +381,25 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 // Remove a dynamically-created device node. The resource held one reference
 // on behalf of the node; open file descriptions keep their own references and
 // can therefore drain normally after the pathname disappears.
+//
+// The node itself goes the way an unlinked file's does (see removed.v), once
+// the last description that leads to it has: they count themselves in it, and
+// a shell whose terminal window closed first still had its /dev/pts/N open.
+// Freed here at once, it was then written to as each of those closed -- the
+// last one's close is what removes a pty's node -- and the kernel heap
+// reported a 192-byte object written after it was freed.
 pub fn devtmpfs_remove_device(name string) bool {
+	mut node := detach_device_node(name) or { return false }
+	node.orphan = true
+	if katomic.load(&node.handles) == 0 {
+		retire_node(mut node)
+	}
+	return true
+}
+
+// Take a device node out of devtmpfs, and its name's reference to its
+// resource; the node, for the caller to retire.
+fn detach_device_node(name string) ?&VFSNode {
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()
@@ -355,47 +408,39 @@ pub fn devtmpfs_remove_device(name string) bool {
 	mut parent := devtmpfs_root
 	mut leaf := name
 	if name.contains('/') {
-		parts := name.split('/')
-		mut path_parts := []string{}
-		defer {
-			unsafe { path_parts.free() }
-		}
-		for part in parts {
-			if part.len > 0 {
-				path_parts << part
+		// Views into `name`, as in devtmpfs_add_device().
+		mut last := ''
+		mut start := 0
+		for end := 0; end <= name.len; end++ {
+			if end < name.len && name[end] != `/` {
+				continue
 			}
-		}
-		if path_parts.len == 0 {
-			return false
-		}
-
-		for i, part in path_parts {
-			if i == path_parts.len - 1 {
-				leaf = part
-				break
+			if end > start {
+				if last.len > 0 {
+					if parent.children == unsafe { nil } || last !in parent.children {
+						return none
+					}
+					parent = unsafe { parent.children[last] }
+				}
+				last = unsafe { tos(name.str + start, end - start) }
 			}
-			if parent.children == unsafe { nil } || part !in parent.children {
-				return false
-			}
-			parent = unsafe { parent.children[part] }
+			start = end + 1
 		}
+		if last.len == 0 {
+			return none
+		}
+		leaf = last
 	}
 
 	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {
-		return false
+		return none
 	}
 	mut node := unsafe { parent.children[leaf] }
 	parent.children.delete(leaf)
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource
 	removed_resource.unref(unsafe { nil }) or {}
-	unsafe {
-		if node.name.len > 0 {
-			node.name.free()
-		}
-		free(node)
-	}
-	return true
+	return node
 }
 
 pub fn devtmpfs_get_root() &VFSNode {

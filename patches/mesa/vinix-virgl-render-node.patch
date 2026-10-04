@@ -1,0 +1,7 @@
+diff --git a/src/loader/loader.c b/src/loader/loader.c
+--- a/src/loader/loader.c
++++ b/src/loader/loader.c
+@@ -269 +269,2 @@ loader_is_device_render_capable(int fd)
+-   bool ret = strcmp(version->name, "asahi") == 0;
++   bool ret = strcmp(version->name, "asahi") == 0 ||
++              strcmp(version->name, "virtio_gpu") == 0;

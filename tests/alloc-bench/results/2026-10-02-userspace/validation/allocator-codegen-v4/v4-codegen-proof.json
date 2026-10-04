@@ -1,0 +1,50 @@
+{
+  "optimized-v4-final": {
+    "assembly_and_compile_proof_sha256": {
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4-final-malloc-o.asm": "5d7d2152c53f46295335c1983fdb0e361bf05ba3618a6f6e33851d1f88386369",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4-final-malloc-lo.asm": "baa7ff5e9773258fbade25b06c84d7c3e44a59e118009eeb1b9e2a5f86b5a2b1",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4-final-free-o.asm": "298d20523200ea0ad7da6a9f30cd13861b9e2ce1b77622ae0231005eafb3c17f",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4-final-free-lo.asm": "c9277407bb69588460d286093da8e06bf043608182e9bbed71988175d01f4ca5",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4-final-mallocng-compile.txt": "1e6f5d7b9aed9b47125e7283ff54bdd46f7eff5ecf200898a4f3b41753d7ddb7"
+    },
+    "patch_sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+    "libc_so_sha256": "21258229461f6415812edc34ae2fb83525b9caeba863287a7bc37acac60baef4",
+    "libc_a_sha256": "0f6227b80a608e4f487c554f1ed263f911223e0acf2e5be5ee1e67671fc5cd7c"
+  },
+  "disabled-v4-final": {
+    "assembly_and_compile_proof_sha256": {
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-v4-final-malloc-o.asm": "557003f381f2d0f004ffe36c7191ee6f69958faef8d4f4e995c3841753b2e59d",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-v4-final-malloc-lo.asm": "e26254be19a2531d32ed864653da0bb65c58ce3d93525bb3a691a56a66a79efe",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-v4-final-free-o.asm": "68ec273c6cd326266fedc8f00982fb9f67479d2794782bb548fa06696b2c992c",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-v4-final-free-lo.asm": "8646eadde99642ea33bc753007ed0e3cf6676f70de110232c5ef1088981a1ad1",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-v4-final-mallocng-compile.txt": "0b1551acc15d93c83aee208219cf8011258d17659ee8d4e201464ecc967b4130"
+    },
+    "patch_sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+    "libc_so_sha256": "24914ea57c753a71f81ef6c58f6292fe0d8807ff8e22a3f892cce632cfab22ea",
+    "libc_a_sha256": "b873e28f306e9768d10be8bd77f54a467445b88867e35a7afcf3099336e86e33"
+  },
+  "optimized-arm126-v4-final": {
+    "assembly_and_compile_proof_sha256": {
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v4-final-malloc-o.asm": "8031ef19a7b25692eaa3806fbfd48aace7e18762a0cfc4478b47e23cf0502b3d",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v4-final-malloc-lo.asm": "7efe0a50fb28789c40c5d641705fcd32cb7db1d27844ca6c7fbaf18352809b01",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v4-final-free-o.asm": "30d12ad85a42a18229d316a2ea59866bbe5546bf7a602567affd58b9796fcc36",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v4-final-free-lo.asm": "371c7738a0b5e6397965c7cab1ba56bf0043986c7065e0cb4814ad1562a7b9bf",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-arm126-v4-final-mallocng-compile.txt": "a7b88f1ed94fa8779cb21e4a4ed09308c711c5d5dd458689d2d850c9182abb58"
+    },
+    "patch_sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+    "libc_so_sha256": "62788e183d49d8cb64ee2f91c8f7269b530f2eb04415243271d6601394119138",
+    "libc_a_sha256": "9d5a7236b1d10bbb3f1e37bcb886ffb1421ff3d1a24e22ef51b625b3c53d9bed"
+  },
+  "disabled-arm126-v4-final": {
+    "assembly_and_compile_proof_sha256": {
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-arm126-v4-final-malloc-o.asm": "e2883deb4f1e1a15da3598e6519a5e49ba9d98d4078c771654bbaf1693ee9865",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-arm126-v4-final-malloc-lo.asm": "cef7a8bcf3c0da810808d3515eac1b164d8526733fa41653f36ece2c12509093",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-arm126-v4-final-free-o.asm": "903ff7349fe73795e6b2fd65691190e5648cc980a0ec67b3282fccf8b7456793",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-arm126-v4-final-free-lo.asm": "dc56881eb29e56b1573dbae3bc22329d50d811efb652d1d8bef89dceab9c3b22",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/disabled-arm126-v4-final-mallocng-compile.txt": "3499f4435819b7088c4e65a8862cf9970dbc4cc40c0b1bdb3ca059a6596e9b3f"
+    },
+    "patch_sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+    "libc_so_sha256": "9ae001b36f67895a18665dc7ca1b308f30a805bd7d2bd9b63b7bcee39c24b41a",
+    "libc_a_sha256": "9fc45a4630027492d35b5eb7ae4f0b6df0d535343b2752708e788642853e317e"
+  }
+}

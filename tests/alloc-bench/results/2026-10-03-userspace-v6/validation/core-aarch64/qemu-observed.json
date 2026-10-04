@@ -1,0 +1,13 @@
+{
+  "provenance": "Live ps capture during the actual frozen harness execution",
+  "observations": [
+    {
+      "captured_utc": "2026-10-02T22:52:29.852009+00:00",
+      "ps": "60629 60492 qemu-system-aarch64 -machine virt,gic-version=3 -accel hvf -cpu host -m 2048 -smp 2 -object rng-random,filename=/dev/urandom,id=vinix-rng -device virtio-rng-device,rng=vinix-rng -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-aarch64-code.fd -drive if=pflash,format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/efivars.fd -drive format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/boot.img -drive if=none,format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/root.ext2,id=vinix-persist -device virtio-blk-device,drive=vinix-persist -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -device ramfb -display none -serial mon:stdio"
+    },
+    {
+      "captured_utc": "2026-10-02T22:53:06.181633+00:00",
+      "ps": "61127 60845 qemu-system-aarch64 -machine virt,gic-version=3 -accel hvf -cpu host -m 2048 -smp 2 -object rng-random,filename=/dev/urandom,id=vinix-rng -device virtio-rng-device,rng=vinix-rng -drive if=pflash,format=raw,readonly=on,file=/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-aarch64-code.fd -drive if=pflash,format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/efivars.fd -drive format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/boot.img -drive if=none,format=raw,file=/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm/root.ext2,id=vinix-persist -device virtio-blk-device,drive=vinix-persist -device virtio-keyboard-device -device virtio-tablet-device -netdev user,id=net0 -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 -device ramfb -display none -serial mon:stdio"
+    }
+  ]
+}

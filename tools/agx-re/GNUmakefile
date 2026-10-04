@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
+.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -56,6 +56,11 @@ generate-g13-initdata-layout:
 check-g13-initdata-layout:
 	./generate_g13_initdata_layout.py --check
 
+# Compare the contracts that have caused hardware-only failures against the
+# reverse-engineered m1n1 source. Set ASAHI_LINUX to include its MMU ordering.
+check-g13-reference: check-g13-initdata-layout
+	./check_g13_reference_contract.py $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
+
 report-g13-initdata-layout:
 	./generate_g13_initdata_layout.py --report
 
@@ -75,6 +80,7 @@ test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
 		test_extract_pmp_firmware.py test_extract_fileset.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
+		test_check_g13_reference_contract.py \
 		test_generate_g13_initdata_layout.py \
 		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \

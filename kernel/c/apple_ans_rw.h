@@ -60,6 +60,7 @@ static int a_write_partition(struct ans *a, unsigned index, unsigned part,
             a->write_fault = 1; return a_fail(a, -rc);
         }
         ++a->writes_completed;
+        ANS_ACCOUNT_TRANSFER(transfer, 1);
         absolute += bytes; in += bytes; count -= bytes;
     }
     return a_flush_ns(a, index); /* no success before persistence barrier */

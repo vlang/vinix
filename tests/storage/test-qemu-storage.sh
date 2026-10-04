@@ -32,15 +32,46 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 [ -n "$seed" ]
-[ "$(cat "$seed/.wine/state")" = office ]
+if [ -n "${VINIX_STORAGE_EXPECT_SYSTEM:-}" ]; then
+    [ "$(cat "$seed/root/desktop/main.v")" = edited ]
+    [ "$(cat "$seed/root/vmodules/ui2/v.mod")" = packaged-module ]
+    [ "$(cat "$seed/root/notes.txt")" = preserved ]
+    [ "$(cat "$seed/usr/bin/saved-package")" = overlay ]
+    [ "$(cat "$seed/etc/package-state")" = overlay-wins ]
+    [ ! -e "$seed/root/.vinix-desktop-dev-version" ]
+    [ "$(cat "$seed/.vinix-image-id")" = next-image ]
+else
+    [ "$(cat "$seed/.wine/state")" = office ]
+fi
 EOF
 chmod +x "$work/fake-mke2fs"
 
 VINIX_MKE2FS="$work/fake-mke2fs"
-export VINIX_MKE2FS
+VINIX_EXT2_ROOT_OWNER_TOOL=/usr/bin/true
+export VINIX_MKE2FS VINIX_EXT2_ROOT_OWNER_TOOL
 vinix_storage_create_ext2 "$work/root.ext2" 8 "$work/seed.tar.gz"
 [ -f "$work/root.ext2" ]
 [ "$(vinix_storage_file_size "$work/root.ext2")" = 8388608 ]
+
+mkdir -p "$work/system-seed/root/desktop" "$work/system-seed/etc" \
+    "$work/system-seed/root/vmodules/ui2" "$work/carried/desktop"
+printf '%s\n' packaged > "$work/system-seed/root/desktop/main.v"
+printf '%s\n' packaged-module > "$work/system-seed/root/vmodules/ui2/v.mod"
+printf '%s\n' current-generation > "$work/system-seed/root/.vinix-desktop-dev-version"
+printf '%s\n' base > "$work/system-seed/etc/package-state"
+printf '%s\n' edited > "$work/carried/desktop/main.v"
+printf '%s\n' preserved > "$work/carried/notes.txt"
+tar -czf "$work/system-seed.tar.gz" -C "$work/system-seed" .
+mkdir -p "$work/package-overlay/usr/bin" "$work/package-overlay/etc"
+printf '%s\n' overlay > "$work/package-overlay/usr/bin/saved-package"
+printf '%s\n' overlay-wins > "$work/package-overlay/etc/package-state"
+tar -cf "$work/package-overlay.tar" -C "$work/package-overlay" .
+VINIX_STORAGE_EXPECT_SYSTEM=1
+export VINIX_STORAGE_EXPECT_SYSTEM
+vinix_storage_create_ext2 "$work/system.ext2" 8 "$work/system-seed.tar.gz" \
+    next-image "$work/carried" "$work/package-overlay.tar"
+[ -f "$work/system.ext2" ]
+unset VINIX_STORAGE_EXPECT_SYSTEM
 
 VINIX_MKE2FS=/usr/bin/false
 export VINIX_MKE2FS

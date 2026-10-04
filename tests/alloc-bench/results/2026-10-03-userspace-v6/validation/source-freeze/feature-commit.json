@@ -1,0 +1,10 @@
+{
+  "commit": "ba930704134ba6ea1d44bc2b19e9e72b3b5b1cb3",
+  "subject": "musl: streamline ordinary single-thread allocation",
+  "paths": [
+    "build-support/musl/malloc-retain.patch",
+    "tests/user-alloc/README.md",
+    "tests/user-alloc/verify-all-classes.c"
+  ],
+  "patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+}

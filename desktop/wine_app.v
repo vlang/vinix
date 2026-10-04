@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // X11 applications embedded in native Vinix windows. Xvfb owns the upstream
 // application's display while the Vinix compositor maps its live XWD surface.
 module main
@@ -24,6 +27,10 @@ const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
 const gimp_window_height = 900
+const obs_surface_width = 1280
+const obs_surface_height = 900
+const obs_window_width = 1280
+const obs_window_height = 900
 // Writer lays a page out for the width it is given. 1280x900 is the same
 // surface the browsers use, and wide enough for a document page beside the
 // sidebar without the toolbars wrapping onto a third row.
@@ -44,8 +51,26 @@ const wine_word2013_window_width = 680
 const wine_word2013_window_height = 510
 const minecraft_surface_width = 1280
 const minecraft_surface_height = 720
-const minecraft_window_width = 760
-const minecraft_window_height = 428
+// Keep Minecraft windowed, but give its 16:9 game surface enough desktop
+// space to be comfortably playable. This is 30% larger than the previous
+// 1520x856 frame and still fits the standard 2048x1536 QEMU desktop with its
+// title bar and the Vinix taskbar visible.
+const minecraft_window_width = 1976
+const minecraft_window_height = 1113
+// Steam's sign-in window is 700x440. Match its private X11 root and native
+// frame so the root background does not surround the client window.
+const steam_surface_width = 700
+const steam_surface_height = 440
+const steam_window_width = 700
+const steam_window_height = 440
+const qemu_surface_width = 1024
+const qemu_surface_height = 768
+const qemu_window_width = 1024
+const qemu_window_height = 768
+const doom_surface_width = 720
+const doom_surface_height = 540
+const doom_window_width = 720
+const doom_window_height = 540
 const wine_host_event_magic = u32(0x56574831) // VWH1
 
 enum WineHostEventKind as u32 {
@@ -53,6 +78,12 @@ enum WineHostEventKind as u32 {
 	button_down
 	button_up
 	keys
+	middle_down
+	middle_up
+	right_down
+	right_up
+	wheel_up
+	wheel_down
 }
 
 struct WineHostEvent {
@@ -75,19 +106,153 @@ mut:
 	surface_width   int
 	surface_height  int
 	icon            string
-	starting_text   string
-	exited_text     string
+	starting        HostedText
+	exited          HostedText
 	ready           bool
 	damage_counter  &u32 = unsafe { nil }
 	damage_attempts int
 	damage_sequence u32
 	last_blit_ms    i64
 	failed          bool
-	error_message   string
+	failure         HostedText
 }
 
+// HostedText is what a hosted window says in place of its surface. The window
+// keeps which message it is showing rather than the words, so a message still
+// on screen when the language changes is shown in the new one.
+enum HostedText {
+	none_
+	firefox_starting
+	firefox_missing
+	firefox_exited
+	chromium_starting
+	chromium_missing
+	chromium_exited
+	gimp_starting
+	gimp_missing
+	gimp_exited
+	obs_starting
+	obs_missing
+	obs_exited
+	libreoffice_starting
+	libreoffice_missing
+	libreoffice_exited
+	windows_starting
+	wine_missing
+	windows_exited
+	word_starting
+	win64_wine_missing
+	word_exited
+	word_setup_starting
+	word_setup_closed
+	word_media_missing
+	steam_installing
+	steam_missing
+	steam_exited
+	qemu_starting
+	qemu_missing
+	qemu_exited
+	minecraft_starting
+	minecraft_missing
+	minecraft_exited
+	doom_starting
+	doom_missing
+	doom_wad_missing
+	doom_exited
+	gothic_starting
+	gothic_missing
+	gothic_data_missing
+	gothic_exited
+	android_starting
+	android_missing
+	android_exited
+	roblox_starting
+	roblox_missing
+	roblox_apk_missing
+	roblox_exited
+	dota2_starting
+	dota2_missing
+	dota2_exited
+	xvfb_missing
+	host_failed
+}
+
+fn (t HostedText) text() string {
+	return match t {
+		.none_ { '' }
+		.firefox_starting { tr('wine.firefox.starting') }
+		.firefox_missing { tr('wine.firefox.missing') }
+		.firefox_exited { tr('wine.firefox.exited') }
+		.chromium_starting { tr('wine.chromium.starting') }
+		.chromium_missing { tr('wine.chromium.missing') }
+		.chromium_exited { tr('wine.chromium.exited') }
+		.gimp_starting { tr('wine.gimp.starting') }
+		.gimp_missing { tr('wine.gimp.missing') }
+		.gimp_exited { tr('wine.gimp.exited') }
+		.obs_starting { tr('wine.obs.starting') }
+		.obs_missing { tr('wine.obs.missing') }
+		.obs_exited { tr('wine.obs.exited') }
+		.libreoffice_starting { tr('wine.libreoffice.starting') }
+		.libreoffice_missing { tr('wine.libreoffice.missing') }
+		.libreoffice_exited { tr('wine.libreoffice.exited') }
+		.windows_starting { tr('wine.windows.starting') }
+		.wine_missing { tr('wine.windows.missing') }
+		.windows_exited { tr('wine.windows.exited') }
+		.word_starting { tr('wine.word.starting') }
+		.win64_wine_missing { tr('wine.word.missing') }
+		.word_exited { tr('wine.word.exited') }
+		.word_setup_starting { tr('wine.word.setup_starting') }
+		.word_setup_closed { tr('wine.word.setup_closed') }
+		.word_media_missing { tr('wine.word.media_missing') }
+		.steam_installing { tr('wine.steam.installing') }
+		.steam_missing { tr('wine.steam.missing') }
+		.steam_exited { tr('wine.steam.exited') }
+		.qemu_starting { tr('wine.qemu.starting') }
+		.qemu_missing { tr('wine.qemu.missing') }
+		.qemu_exited { tr('wine.qemu.exited') }
+		.minecraft_starting { tr('wine.minecraft.starting') }
+		.minecraft_missing { tr('wine.minecraft.missing') }
+		.minecraft_exited { tr('wine.minecraft.exited') }
+		.doom_starting { tr('wine.doom.starting') }
+		.doom_missing { tr('wine.doom.missing') }
+		.doom_wad_missing { tr('wine.doom.wad_missing') }
+		.doom_exited { tr('wine.doom.exited') }
+		.gothic_starting { tr('wine.gothic.starting') }
+		.gothic_missing { tr('wine.gothic.missing') }
+		.gothic_data_missing { tr('wine.gothic.data_missing') }
+		.gothic_exited { tr('wine.gothic.exited') }
+		.android_starting { tr('android.starting') }
+		.android_missing { tr('android.missing') }
+		.android_exited { tr('android.exited') }
+		.roblox_starting { tr('roblox.starting') }
+		.roblox_missing { tr('roblox.missing') }
+		.roblox_apk_missing { tr('roblox.apk_missing') }
+		.roblox_exited { tr('roblox.exited') }
+		.dota2_starting { tr('wine.dota2.starting') }
+		.dota2_missing { tr('wine.dota2.missing') }
+		.dota2_exited { tr('wine.dota2.exited') }
+		.xvfb_missing { tr('wine.xvfb_missing') }
+		.host_failed { tr('wine.host_failed') }
+	}
+}
+
+// Release images leave Firefox out: the first-run app page and
+// `pkg install firefox` fetch it from Alpine. Report that from the window
+// rather than starting a private X server for a browser that is not there.
 fn open_firefox(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width, firefox_surface_height, 'builtin:browser', 'Starting Firefox…', 'Firefox is not installed in this desktop image.', 'Firefox exited.')
+	if C.access(c'/usr/lib/firefox-esr/firefox-esr', C.X_OK) != 0
+		&& C.access(c'/usr/lib/firefox/firefox', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: firefox_surface_width
+			surface_height: firefox_surface_height
+			icon: 'asset:firefox'
+			failed: true
+			failure: .firefox_missing
+		}
+	}
+	return open_hosted_x11_app('firefox', '/usr/bin/run-firefox', firefox_surface_width,
+		firefox_surface_height, 'asset:firefox', .firefox_starting, .firefox_missing,
+		.firefox_exited)
 }
 
 // Chromium is not in the image: `pkg install chromium` fetches it from Alpine.
@@ -98,14 +263,14 @@ fn open_chromium(mut _ Desktop) !NativeApp {
 		return &HostedX11App{
 			surface_width: chromium_surface_width
 			surface_height: chromium_surface_height
-			icon: 'builtin:browser'
+			icon: 'asset:chromium'
 			failed: true
-			error_message: 'Chromium is not installed. Run pkg install chromium in Terminal.'
+			failure: .chromium_missing
 		}
 	}
 	return open_hosted_x11_app('chromium', '/usr/bin/run-chromium', chromium_surface_width,
-		chromium_surface_height, 'builtin:browser', 'Starting Chromium…', 'Chromium is not installed. Run pkg install chromium in Terminal.',
-		'Chromium exited.')
+		chromium_surface_height, 'asset:chromium', .chromium_starting, .chromium_missing,
+		.chromium_exited)
 }
 
 fn open_gimp(mut _ Desktop) !NativeApp {
@@ -115,10 +280,24 @@ fn open_gimp(mut _ Desktop) !NativeApp {
 			surface_height: gimp_surface_height
 			icon: 'builtin:editor'
 			failed: true
-			error_message: 'GIMP is not installed. Run pkg install gimp in Terminal.'
+			failure: .gimp_missing
 		}
 	}
-	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', 'Starting GIMP…', 'GIMP is not installed. Run pkg install gimp in Terminal.', 'GIMP exited.')
+	return open_hosted_x11_app('gimp', '/usr/bin/run-gimp', gimp_surface_width, gimp_surface_height, 'builtin:editor', .gimp_starting, .gimp_missing, .gimp_exited)
+}
+
+fn open_obs(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/obs', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: obs_surface_width
+			surface_height: obs_surface_height
+			icon: 'asset:capture'
+			failed: true
+			failure: .obs_missing
+		}
+	}
+	return open_hosted_x11_app('obs', '/usr/bin/run-obs', obs_surface_width,
+		obs_surface_height, 'asset:capture', .obs_starting, .obs_missing, .obs_exited)
 }
 
 // LibreOffice is a 900 MiB closure that an image can reasonably be built
@@ -131,20 +310,20 @@ fn open_libreoffice(mut _ Desktop) !NativeApp {
 			surface_height: libreoffice_surface_height
 			icon: 'builtin:editor'
 			failed: true
-			error_message: 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.'
+			failure: .libreoffice_missing
 		}
 	}
 	return open_hosted_x11_app('libreoffice', '/usr/bin/run-libreoffice', libreoffice_surface_width,
-		libreoffice_surface_height, 'builtin:editor', 'Starting LibreOffice…', 'LibreOffice is not installed. Run pkg install libreoffice-writer in Terminal.',
-		'LibreOffice exited.')
+		libreoffice_surface_height, 'builtin:editor', .libreoffice_starting, .libreoffice_missing,
+		.libreoffice_exited)
 }
 
 fn open_wine_calculator(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+	return open_hosted_x11_app('wine', '/usr/bin/calculator', wine_surface_width, wine_surface_height, 'builtin:calculator', .windows_starting, .wine_missing, .windows_exited)
 }
 
 fn open_wine_notepad(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', 'Starting Windows application…', 'The translated Wine runtime is not installed.', 'The Windows application exited.')
+	return open_hosted_x11_app('wine-notepad', '/usr/bin/notepad', wine_notepad_surface_width, wine_notepad_surface_height, 'builtin:editor', .windows_starting, .wine_missing, .windows_exited)
 }
 
 fn open_wine_word2013(mut _ Desktop) !NativeApp {
@@ -153,7 +332,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		'/root/.wine-word2013-x86_64/drive_c/Program Files/Microsoft Office/Office15/WINWORD.EXE',
 	] {
 		if C.access(&char(word.str), 0) == 0 {
-			mut app := open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting Microsoft Word 2013…', 'The translated Win64 Wine runtime is not installed.', 'Microsoft Word 2013 exited.')
+			mut app := open_hosted_x11_app('wine-word2013', '/usr/bin/word2013', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', .word_starting, .win64_wine_missing, .word_exited)
 			app.image_path = '${office_xwd_image_prefix}${app.xwd_path}'
 			return app
 		}
@@ -161,7 +340,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 	for setup in ['/root/word2013-media/office/setup64.exe', '/root/word2013-media/office/SETUP64.EXE',
 		'/root/word2013-media/setup.exe', '/root/word2013-media/SETUP.EXE'] {
 		if C.access(&char(setup.str), 0) == 0 {
-			return open_hosted_x11_app('wine-word2013-setup', '/usr/bin/word2013-setup', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', 'Starting 64-bit Word 2013 setup…', 'The translated Win64 Wine runtime is not installed.', 'Word 2013 setup closed. Launch Word again after installation.')
+			return open_hosted_x11_app('wine-word2013-setup', '/usr/bin/word2013-setup', wine_word2013_surface_width, wine_word2013_surface_height, 'builtin:editor', .word_setup_starting, .win64_wine_missing, .word_setup_closed)
 		}
 	}
 	return &HostedX11App{
@@ -169,42 +348,114 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 		surface_height: wine_word2013_surface_height
 		icon: 'builtin:editor'
 		failed: true
-		error_message: 'Stage licensed Word 2013 x64 media, then launch Word again.'
+		failure: .word_media_missing
 	}
 }
 
+// Steam is Valve's x86 Linux client on the translators, staged by
+// build-steam-aarch64.sh. It is not in the default image.
+fn open_steam(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/steam', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: steam_surface_width
+			surface_height: steam_surface_height
+			icon: 'asset:steam'
+			failed: true
+			failure: .steam_missing
+		}
+	}
+	return open_hosted_x11_app('steam', '/usr/bin/steam-hosted', steam_surface_width,
+		steam_surface_height, 'asset:steam', .steam_installing, .steam_missing, .steam_exited)
+}
+
+fn open_qemu_desktop(mut _ Desktop) !NativeApp {
+	return open_hosted_x11_app('qemu', '/usr/bin/vinix-qemu-desktop', qemu_surface_width,
+		qemu_surface_height, 'asset:terminal', .qemu_starting, .qemu_missing, .qemu_exited)
+}
+
 fn open_minecraft(mut _ Desktop) !NativeApp {
-	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width, minecraft_surface_height, 'builtin:block', 'Starting Minecraft…', 'Minecraft is not installed. Build its AArch64 runtime first.', 'Minecraft exited.')
+	if C.access(c'/usr/bin/minecraft', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width:  minecraft_surface_width
+			surface_height: minecraft_surface_height
+			icon:           'asset:minecraft'
+			failed:         true
+			failure:        .minecraft_missing
+		}
+	}
+	return open_hosted_x11_app('minecraft', '/usr/bin/minecraft', minecraft_surface_width,
+		minecraft_surface_height, 'asset:minecraft', .minecraft_starting, .minecraft_missing,
+		.minecraft_exited)
+}
+
+fn open_doom(mut _ Desktop) !NativeApp {
+	if C.access(c'/usr/bin/chocolate-doom', C.X_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'asset:doom'
+			failed: true
+			failure: .doom_missing
+		}
+	}
+	if C.access(c'/usr/share/games/doom/doom1.wad', C.R_OK) != 0 {
+		return &HostedX11App{
+			surface_width: doom_surface_width
+			surface_height: doom_surface_height
+			icon: 'asset:doom'
+			failed: true
+			failure: .doom_wad_missing
+		}
+	}
+	return open_hosted_x11_app('doom', '/usr/bin/run-doom', doom_surface_width,
+		doom_surface_height, 'asset:doom', .doom_starting, .doom_missing, .doom_exited)
 }
 
 fn open_hosted_x11_app(name string, command string, surface_width int, surface_height int,
-	icon string, starting_text string, missing_text string, exited_text string) &HostedX11App {
+	icon string, starting HostedText, missing HostedText, exited HostedText) &HostedX11App {
 	mut app := &HostedX11App{
 		surface_width: surface_width
 		surface_height: surface_height
 		icon: icon
-		starting_text: starting_text
-		exited_text: exited_text
+		starting: starting
+		exited: exited
 	}
 	process_id := C.getpid()
-	app.directory = '/tmp/vinix-${name}-${process_id}'
+	// Xvfb writes its framebuffer through a shared mmap. Use the per-boot
+	// scratch mount when init provided it, keeping constant frame updates off
+	// the persistent root filesystem.
+	base := if C.access(c'/run/vinix-hosted-x11/.tmpfs-ready', C.R_OK) == 0 {
+		'/run/vinix-hosted-x11'
+	} else {
+		'/tmp'
+	}
+	// PIDs can be reused while the compositor still has the previous XWD file
+	// mapped. Give each launch a new path so its surface cannot resolve to a
+	// cached frame from an earlier X server.
+	app.directory = '${base}/vinix-${name}-${process_id}-${monotonic_millis()}'
 	app.xwd_path = '${app.directory}/Xvfb_screen0'
 	app.damage_path = '${app.directory}/damage'
 	app.image_path = '${xwd_image_prefix}${app.xwd_path}'
 
 	if C.access(c'/usr/bin/Xvfb', C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = 'Xvfb is not installed. Rebuild the Vinix X11 layer.'
+		app.failure = .xvfb_missing
 		return app
 	}
 	if C.access(&char(command.str), C.X_OK) != 0 {
 		app.failed = true
-		app.error_message = missing_text
+		app.failure = missing
 		return app
 	}
-	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command) or {
+	// Minecraft's saved launch description can outlive the package that
+	// generated it. Ask the host to enforce the Xvfb dimensions as well as
+	// passing them to the launcher, so an old or ignored game-size option can
+	// never leave a smaller GLFW window floating in a white root surface.
+	host := desktop_spawn_wine_host(app.directory, surface_width, surface_height, command,
+		name == 'minecraft', name == 'doom' || name == 'qemu' || name == 'opengothic'
+		|| name == 'roblox' || name == 'dota2', name == 'obs') or {
 		app.failed = true
-		app.error_message = 'Vinix could not start the embedded X11 host.'
+		app.failure = .host_failed
 		return app
 	}
 	app.host_pid = host.pid
@@ -219,7 +470,7 @@ fn (mut app HostedX11App) build(size ui2.Rect) !ui2.Element {
 	if app.ready {
 		children << ui2.image('', app.image_path, ui2.rect(0, 0, f64(width), f64(height)))
 	} else {
-		message := if app.failed { app.error_message } else { app.starting_text }
+		message := if app.failed { app.failure.text() } else { app.starting.text() }
 		children << ui2.button_with_image('', '', app.icon, ui2.rect(f64((width - 48) / 2), f64((height - 82) / 2), 48, 48), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: app_accent })
 		children << ui2.label('', message, ui2.rect(16, f64((height - 82) / 2 + 58), f64(width - 32), 20), ui2.TextStyle{
 			color: if app.failed { u32(0xb42318) } else { body_muted }
@@ -241,7 +492,7 @@ fn (mut app HostedX11App) poll() bool {
 		}
 		app.ready = false
 		app.failed = true
-		app.error_message = app.exited_text
+		app.failure = app.exited
 		return true
 	}
 	if !app.ready {
@@ -333,13 +584,8 @@ fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, 
 	}
 }
 
-fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, _ int, x int, y int, width int, height int) {
+fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
 	if !app.pointer_input_enabled() || width <= 0 || height <= 0 {
-		return
-	}
-	// The legacy X host protocol only describes its original left button. The
-	// native Vinix protocol below carries all buttons and wheel input.
-	if phase == .scroll || (phase != .move && button != .left) {
 		return
 	}
 	mut surface_x := x * app.surface_width / width
@@ -358,9 +604,31 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 	}
 	kind := match phase {
 		.move { WineHostEventKind.motion }
-		.down { WineHostEventKind.button_down }
-		.up { WineHostEventKind.button_up }
+		.down {
+			match button {
+				.left { WineHostEventKind.button_down }
+				.middle { WineHostEventKind.middle_down }
+				.right { WineHostEventKind.right_down }
+				else { return }
+			}
+		}
+		.up {
+			match button {
+				.left { WineHostEventKind.button_up }
+				.middle { WineHostEventKind.middle_up }
+				.right { WineHostEventKind.right_up }
+				else { return }
+			}
+		}
 		.scroll {
+			if scroll == 0 {
+				return
+			}
+			count := if scroll < -4 || scroll > 4 { 4 } else if scroll < 0 { -scroll } else { scroll }
+			for _ in 0 .. count {
+				app.send_host_event(if scroll > 0 { WineHostEventKind.wheel_up } else { WineHostEventKind.wheel_down },
+					surface_x, surface_y, '')
+			}
 			return
 		}
 	}

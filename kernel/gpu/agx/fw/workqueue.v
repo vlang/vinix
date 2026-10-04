@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Firmware workqueue structures recovered from the v12.3 Asahi ABI.
 
 // G13 v12.3 firmware work-command discriminants. Blitter occupies slot 2;
@@ -86,6 +88,53 @@ pub mut:
 }
 
 @[packed]
+pub struct G13WorkQueueInfoV135 {
+pub mut:
+	bytes [0xb8]u8
+}
+
+pub fn g13_workqueue_info_active_size(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { u64(sizeof(G13WorkQueueInfo)) }
+		.v13_5_partial { u64(sizeof(G13WorkQueueInfoV135)) }
+		else { none }
+	}
+}
+
+pub fn initialize_g13_workqueue_info(data voidptr, size u64, abi hw.FirmwareAbi,
+	state u64, ring u64, notifier_list u64, gpu_buffer u64, event_id i32,
+	priority G13WorkQueuePriority, uuid u32, gpu_context u64) bool {
+	required := g13_workqueue_info_active_size(abi) or { return false }
+	if data == unsafe { nil } || size < required || state == 0 || ring == 0
+		|| notifier_list == 0 || gpu_buffer == 0 || gpu_context == 0 {
+		return false
+	}
+	mut legacy := G13WorkQueueInfo{
+		state: state
+		ring: ring
+		notifier_list: notifier_list
+		gpu_buffer: gpu_buffer
+		event_id: event_id
+		priority: priority
+		unk_4c: -1
+		uuid: uuid
+		unk_54: -1
+		gpu_context: gpu_context
+	}
+	unsafe {
+		if abi == .v13_5_partial {
+			// Ventura inserts unk_a0_0 before gpu_context_addr and appends
+			// unk_b0. Both new words are zero in the reference builder.
+			C.memcpy(data, &legacy, 0xa0)
+			C.memcpy(voidptr(u64(data) + 0xa4), voidptr(u64(&legacy) + 0xa0), 0x10)
+		} else {
+			C.memcpy(data, &legacy, sizeof(G13WorkQueueInfo))
+		}
+	}
+	return true
+}
+
+@[packed]
 pub struct G13GpuContextData {
 pub mut:
 	data [0x40]u8
@@ -163,6 +212,7 @@ pub fn validate_g13_workqueue_layouts() bool {
 	return sizeof(G13WorkQueueRingState) == 0x70
 		&& sizeof(G13WorkQueuePriority) == 0x1c
 		&& sizeof(G13WorkQueueInfo) == 0xb0
+		&& sizeof(G13WorkQueueInfoV135) == 0xb8
 		&& sizeof(G13GpuContextData) == 0x40
 		&& sizeof(G13BarrierCommand) == 0x40
 }

@@ -14,6 +14,7 @@ import memory
 fn C.vinix_apple_spi_keyboard_init(spi u64, enable u64, enable_low int, ready u64, ready_low int, input_hz u32, maximum_hz u32) int
 fn C.vinix_apple_spi_keyboard_poll(output &u8, capacity u64, application_cursor int) int
 fn C.vinix_apple_spi_keyboard_reports() u64
+fn C.vinix_apple_spi_keyboard_caps_lock() int
 fn C.vinix_apple_spi_touchpad_reports() u64
 fn C.vinix_call_void_fn(callback voidptr)
 
@@ -354,7 +355,7 @@ fn initialise_hardware() {
 		}
 		ready_reg = base + u64(plan.ready.pin) * 4
 	}
-	mut pin_registers := []u64{cap: plan.pins.len}
+	mut pin_registers := []u64{cap: plan.pins.len} @[freed]
 	defer { unsafe { pin_registers.free() } }
 	for pin in plan.pins {
 		base := memory.map_mmio(pin.region.base, pin.region.size)
@@ -393,6 +394,11 @@ fn initialise_hardware() {
 	apple_spi_keyboard_enabled = true
 	C.printf(c'apple-spi-kbd: SPI at 0x%llx, input %u Hz, limit %u Hz; awaiting reports\n',
 		plan.spi.base, plan.input_hz, plan.maximum_hz)
+}
+
+// Caps Lock is the decoder's own state, a single byte read without the lock.
+pub fn caps_lock() bool {
+	return apple_spi_keyboard_probed && C.vinix_apple_spi_keyboard_caps_lock() != 0
 }
 
 // Called by the existing ARM64 console idle-poll path, never from an IRQ.

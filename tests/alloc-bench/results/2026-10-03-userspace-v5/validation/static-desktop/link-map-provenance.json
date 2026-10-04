@@ -1,0 +1,7 @@
+{
+  "full_link_map_sha256": "94aa3008b65377c6e4a772d07a3b75e91f58ead735089d1514969f54543d9a5b",
+  "full_link_map_bytes": 731625,
+  "excerpt": "All full map lines containing mallocng/ or malloc_trim, without other unrelated link-map rows. Full map remains in private build directory.",
+  "source_path": "build/useralloc-pipe/static-desktop-v5/link.map",
+  "excerpt_sha256": "84acc9ec72643d1d1f89feb51c656ebfa3be88563c9414fdf2616534d51b30f5"
+}

@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Wi-Fi Settings pane over the bounded /dev/wlan0 ioctl interface.
 module main
 
@@ -43,7 +46,7 @@ fn wifi_same_state(a &WifiState, b &WifiState) bool {
 
 fn wifi_network_name(network &WifiNetwork) string {
 	if network.ssid_len == 0 {
-		return '<Hidden network>'.clone()
+		return tr('settings.wifi.hidden_network').clone()
 	}
 	mut printable := []u8{cap: network.ssid_len}
 	for i in 0 .. network.ssid_len {
@@ -53,9 +56,18 @@ fn wifi_network_name(network &WifiNetwork) string {
 	return printable.bytestr()
 }
 
+// The detail is three separate facts rather than a sentence, so each is worded
+// by the language and the separators between them are the desktop's own.
 fn wifi_network_detail(network &WifiNetwork) string {
-	security := if network.secure { 'Secured' } else { 'Open' }
-	return '${security}  |  ch ${network.channel}  |  ${network.rssi} dBm'
+	security := if network.secure { tr('settings.wifi.secured') } else { tr('settings.wifi.open') }
+	channel := settings_fill_numbers(tr('settings.wifi.channel'), network.channel, 0, 0)
+	signal := settings_fill_numbers(tr('settings.wifi.signal'), network.rssi, 0, 0)
+	detail := '${security}  |  ${channel}  |  ${signal}'
+	unsafe {
+		channel.free()
+		signal.free()
+	}
+	return detail
 }
 
 fn sort_wifi_networks(mut state WifiState) {
@@ -72,10 +84,32 @@ fn sort_wifi_networks(mut state WifiState) {
 	}
 }
 
+// replace_wifi_labels makes the cached labels of the networks last read, in
+// the desktop's language. The slots must hold no labels when it is called.
 fn (mut a SettingsApp) replace_wifi_labels() {
+	a.wifi_labels_language = desktop_language
+	if a.wifi_read_result != .ok {
+		return
+	}
 	for i in 0 .. a.wifi_state.count {
 		a.wifi_names[i] = wifi_network_name(&a.wifi_state.networks[i])
 		a.wifi_details[i] = wifi_network_detail(&a.wifi_state.networks[i])
+	}
+}
+
+// free_wifi_labels releases the cached labels of the networks last read and
+// clears their slots.
+fn (mut a SettingsApp) free_wifi_labels() {
+	if !a.wifi_initialized {
+		return
+	}
+	for i in 0 .. a.wifi_state.count {
+		unsafe {
+			a.wifi_names[i].free()
+			a.wifi_details[i].free()
+		}
+		a.wifi_names[i] = ''
+		a.wifi_details[i] = ''
 	}
 }
 
@@ -86,43 +120,42 @@ fn (mut a SettingsApp) refresh_wifi() {
 		sort_wifi_networks(mut next)
 	}
 	a.wifi_last_poll_ms = desktop_monotonic_ms()
-	if a.wifi_initialized && result == a.wifi_read_result && wifi_same_state(&a.wifi_state, &next) {
+	if a.wifi_initialized && result == a.wifi_read_result && wifi_same_state(&a.wifi_state, &next)
+		&& a.wifi_labels_language == desktop_language {
 		return
 	}
-	old_count := a.wifi_state.count
-	if a.wifi_initialized {
-		for i in 0 .. old_count {
-			unsafe {
-				a.wifi_names[i].free()
-				a.wifi_details[i].free()
-			}
-		}
-	}
+	a.free_wifi_labels()
 	a.wifi_initialized = true
 	a.wifi_read_result = result
 	a.wifi_state = next
 	if a.wifi_offset >= a.wifi_state.count {
 		a.wifi_offset = if a.wifi_state.count > 0 { a.wifi_state.count - 1 } else { 0 }
 	}
-	// Clear the slots whose old strings were released before assigning fresh
-	// cached labels for this snapshot.
-	for i in 0 .. a.wifi_state.count {
-		a.wifi_names[i] = ''
-		a.wifi_details[i] = ''
+	a.replace_wifi_labels()
+}
+
+// follow_wifi_language remakes the cached network labels when the language
+// has changed since they were made. The pane draws through an immutable
+// receiver, and build polls the device only once a second, so without this a
+// language chosen elsewhere would leave the list in the old one until the next
+// readback. It changes nothing but this application's own label cache.
+fn (a &SettingsApp) follow_wifi_language() {
+	if !a.wifi_initialized || a.wifi_labels_language == desktop_language {
+		return
 	}
-	if result == .ok {
-		a.replace_wifi_labels()
-	}
+	mut app := unsafe { &SettingsApp(a) }
+	app.free_wifi_labels()
+	app.replace_wifi_labels()
 }
 
 fn wifi_result_text(result WifiResult) string {
 	return match result {
-		.unavailable { 'Wi-Fi device not available. Boot with vinix.apple_wifi=1.' }
-		.permission { 'Permission denied. Wi-Fi controls require write access.' }
-		.not_ready { 'Load the matching BCM4378 firmware before turning Wi-Fi on.' }
-		.disabled { 'Turn Wi-Fi on before scanning.' }
-		.invalid { 'Invalid Wi-Fi driver response.' }
-		.io { 'Wi-Fi I/O failed. Refresh to try again.' }
+		.unavailable { tr('settings.wifi.error.unavailable') }
+		.permission { tr('settings.wifi.error.permission') }
+		.not_ready { tr('settings.wifi.error.not_ready') }
+		.disabled { tr('settings.wifi.error.disabled') }
+		.invalid { tr('settings.wifi.error.invalid') }
+		.io { tr('settings.wifi.error.io') }
 		else { '' }
 	}
 }
@@ -135,21 +168,27 @@ fn (a &SettingsApp) wifi_status_text() string {
 		return wifi_result_text(a.wifi_action_result)
 	}
 	if a.wifi_state.driver_state >= 3 && !a.wifi_state.writable {
-		return 'Read-only access; Wi-Fi controls are disabled.'
+		return tr('settings.wifi.read_only')
 	}
 	if a.wifi_state.scan_error != 0 {
-		return 'The last network scan failed (${a.wifi_state.scan_error}).'
+		return settings_fill_numbers(tr('settings.wifi.scan_failed'), a.wifi_state.scan_error,
+			0, 0)
 	}
 	return match a.wifi_state.driver_state {
-		0 { 'Wi-Fi hardware is off.' }
-		1 { 'BCM4378 detected; load its matching firmware with wifi-ctl.' }
-		2 { 'Wi-Fi firmware is starting.' }
+		0 { tr('settings.wifi.state.hardware_off') }
+		1 { tr('settings.wifi.state.detected') }
+		2 { tr('settings.wifi.state.starting') }
 		3 {
-			if a.wifi_state.radio_on { 'Wi-Fi is on.' } else { 'Wi-Fi is off.' }
+			if a.wifi_state.radio_on {
+				tr('settings.wifi.state.on')
+			} else {
+				tr('settings.wifi.state.off')
+			}
 		}
-		4 { 'Connecting to a Wi-Fi network...' }
-		5 { 'Wi-Fi link authenticated.' }
-		else { 'Wi-Fi stopped after a driver error (${a.wifi_state.driver_error}).' }
+		4 { tr('settings.wifi.state.connecting') }
+		5 { tr('settings.wifi.state.authenticated') }
+		else { settings_fill_numbers(tr('settings.wifi.state.driver_error'), a.wifi_state.driver_error,
+				0, 0) }
 	}
 }
 
@@ -168,28 +207,29 @@ fn (a &SettingsApp) wifi_pane(width int, height int) []ui2.Element {
 	inner := width - 2 * settings_padding
 	if inner < 300 || height < 266 {
 		mut narrow := frame_elements(1)
-		narrow << settings_label('Enlarge Settings to show its controls.', x, settings_padding, if inner > 0 {
+		narrow << settings_label(tr('settings.wifi.enlarge'), x, settings_padding, if inner > 0 {
 			inner
 		} else {
 			1
 		}, body_text)
 		return narrow
 	}
+	a.follow_wifi_language()
 	mut out := frame_elements(12 + a.wifi_state.count * 3)
-	out << ui2.label('', 'Wi-Fi', ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
+	out << ui2.label('', tr('settings.category.wifi'), ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{
 		color: body_heading
 		size: 20
 		bold: true
 	})
-	out << settings_label('Broadcom BCM4378 wireless', x, 46, inner, body_muted)
+	out << settings_label(tr('settings.wifi.subtitle'), x, 46, inner, body_muted)
 	out << ui2.view('', ui2.rect(f64(x), 76, f64(inner), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
-	out << settings_label('Wi-Fi', x, 92, inner - 100, body_heading)
+	out << settings_label(tr('settings.wifi.radio'), x, 92, inner - 100, body_heading)
 	out << settings_button(settings_wifi_toggle, if a.wifi_state.radio_on {
-		'Turn off'
+		tr('settings.wifi.turn_off')
 	} else {
-		'Turn on'
+		tr('settings.wifi.turn_on')
 	}, ui2.rect(f64(x + inner - 86), 86, 86, 30), a.wifi_can_toggle())
 	out << settings_label(a.wifi_status_text(), x, 126, inner, if a.wifi_read_result != .ok
 		|| a.wifi_action_result != .ok || a.wifi_state.scan_error != 0 {
@@ -197,26 +237,26 @@ fn (a &SettingsApp) wifi_pane(width int, height int) []ui2.Element {
 	} else {
 		body_muted
 	})
-	out << settings_label('Available networks', x, 164, inner - 180, body_heading)
-	out << settings_button(settings_wifi_refresh, 'Refresh', ui2.rect(f64(x + inner - 158), 158, 72, 30), true)
+	out << settings_label(tr('settings.wifi.available'), x, 164, inner - 180, body_heading)
+	out << settings_button(settings_wifi_refresh, tr('settings.wifi.refresh_button'), ui2.rect(f64(x + inner - 158), 158, 72, 30), true)
 	out << settings_button(settings_wifi_scan, if a.wifi_state.scanning {
-		'Scanning...'
+		tr('settings.wifi.scanning_button')
 	} else {
-		'Scan'
+		tr('settings.wifi.scan_button')
 	}, ui2.rect(f64(x + inner - 80), 158, 80, 30), a.wifi_can_scan())
 	if a.wifi_read_result != .ok || a.wifi_state.count == 0 {
 		message := if a.wifi_read_result != .ok {
-			'Network scanning is unavailable until the Wi-Fi device is present.'
+			tr('settings.wifi.list.no_device')
 		} else if a.wifi_state.driver_state < 3 {
-			'Load the matching Wi-Fi firmware to scan for networks.'
+			tr('settings.wifi.list.no_firmware')
 		} else if a.wifi_state.driver_state > 5 {
-			'Wi-Fi stopped after a driver error; reboot to retry.'
+			tr('settings.wifi.list.driver_error')
 		} else if a.wifi_state.scanning {
-			'Searching for wireless networks...'
+			tr('settings.wifi.list.searching')
 		} else if !a.wifi_state.radio_on {
-			'Turn Wi-Fi on to scan for networks.'
+			tr('settings.wifi.list.turn_on')
 		} else {
-			'No wireless networks found. Select Scan to search.'
+			tr('settings.wifi.list.none_found')
 		}
 		out << settings_label(message, x, 204, inner, body_muted)
 		return out
@@ -254,9 +294,9 @@ fn (a &SettingsApp) wifi_pane(width int, height int) []ui2.Element {
 	}
 	if paged {
 		footer_y := height - 30
-		out << settings_button(settings_wifi_previous, 'Previous', ui2.rect(f64(x), f64(footer_y), 80, 28), offset > 0)
-		out << settings_label('${offset + 1}-${offset + shown} of ${a.wifi_state.count}', x + 88, footer_y + 3, inner - 176, body_muted)
-		out << settings_button(settings_wifi_next, 'Next', ui2.rect(f64(x + inner - 80), f64(footer_y), 80, 28), offset < max_offset)
+		out << settings_button(settings_wifi_previous, tr('settings.wifi.previous_button'), ui2.rect(f64(x), f64(footer_y), 80, 28), offset > 0)
+		out << settings_label(settings_fill_numbers(tr('settings.wifi.page'), offset + 1, offset + shown, a.wifi_state.count), x + 88, footer_y + 3, inner - 176, body_muted)
+		out << settings_button(settings_wifi_next, tr('settings.wifi.next_button'), ui2.rect(f64(x + inner - 80), f64(footer_y), 80, 28), offset < max_offset)
 	}
 	return out
 }

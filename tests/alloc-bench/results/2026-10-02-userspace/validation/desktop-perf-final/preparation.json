@@ -1,0 +1,12 @@
+{
+  "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "loader_sha256": "c2261960691912280b2a33c53577a4d18bbc829e19c7cef2a554de052ff781ec",
+  "static_libc_sha256": "2d7538f2fc2ca2c94493fc3d34cbc6bed5cf942063e7ccd365e922156ffdc0d9",
+  "harness_sha256": "91a6af9223d5bd292445de4ac40cf12fc817cc572dbda5a6073f6acb931c346f",
+  "original_harness_sha256": "1bba23e2255cba05d889e2a7196c8d4891b4ce6790d065b213d7caf4810825df",
+  "notes": "Unmodified perf workload sources. Private harness copies final production loader into existing ephemeral overlay and links measure against final libc.a before base sysroot libraries. Frozen final isolated-build kernel.",
+  "desktop_initramfs_sha256": "a0eb49a43cdcac3a0b86298e5c80e9b0b0290a808e0875ef8b77c0668118b38b",
+  "desktop_initramfs_size_bytes": 7043137024,
+  "rounds": 1,
+  "prepared_module_iso": "build/desktop-perf/initramfs-desktop-frozen-d16f001e9f1d.iso"
+}

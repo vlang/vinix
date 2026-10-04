@@ -1,6 +1,7 @@
 #!/bin/bash
 # Build the amd64 Alpine userland, Vinix kernel, and bootable UEFI ISO. The
-# userland is prebuilt Alpine; the kernel uses the host clang directly.
+# commands and GCC come from Alpine; musl includes Vinix heap reuse and the
+# kernel uses the host clang directly.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,6 +33,7 @@ case "$BUILD_DIR" in
         exit 1
         ;;
 esac
+python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
 for command_name in clang ld.lld make rsync; do
     command -v "$command_name" >/dev/null 2>&1 || {
         echo "ERROR: required command not found: $command_name" >&2

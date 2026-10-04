@@ -1,0 +1,2232 @@
+activity.column.cpu
+% CPU
+-----
+activity.column.memory
+MB
+-----
+activity.column.name
+Nombre
+-----
+activity.column.pid
+PID
+-----
+activity.cpu.decimal
+{0},{1}
+-----
+activity.error.kill
+No se pudo terminar el proceso seleccionado.
+-----
+activity.error.missing
+{0} no existe.
+-----
+activity.error.missing_note
+Este núcleo no informa de los procesos.
+-----
+activity.error.read
+No se pudo leer {0}.
+-----
+activity.error.version
+{0} usa la versión {1}, no la {2}.
+-----
+activity.kill
+Terminar proceso
+-----
+activity.memory.mb
+{0} MB
+-----
+activity.memory.mb_decimal
+{0},{1} MB
+-----
+activity.sort_by.cpu
+Ordenar por CPU
+-----
+activity.sort_by.memory
+Ordenar por memoria
+-----
+activity.sort_by.name
+Ordenar por nombre
+-----
+activity.sort_by.pid
+Ordenar por PID
+-----
+activity.summary
+{0} proceso   {1} de {2} en uso|{0} procesos   {1} de {2} en uso
+-----
+activity.cached
+{0} en caché de archivos
+-----
+activity.unnamed
+(sin nombre)
+-----
+app.activity_monitor
+Monitor de Actividad
+-----
+app.calculator
+Calculadora
+-----
+app.calendar
+Calendario
+-----
+app.capture
+Captura
+-----
+app.clock
+Reloj
+-----
+app.files
+Archivos
+-----
+app.files_settings
+Ajustes de Archivos
+-----
+app.qemu
+Vinix en QEMU
+-----
+app.settings
+Ajustes
+-----
+app.terminal
+Terminal
+-----
+app.text_editor
+Editor de texto
+-----
+app.wine_calculator
+Calculadora de Wine
+-----
+app.wine_notepad
+Bloc de notas de Wine
+-----
+app_selection.chromium.detail
+La versión de código abierto de Chrome
+-----
+app_selection.continue
+Continuar
+-----
+app_selection.firefox.detail
+Navegador web de Mozilla
+-----
+app_selection.heading
+Elige tus aplicaciones
+-----
+app_selection.install.done
+Las aplicaciones seleccionadas están instaladas. Ábrelas desde el escritorio o el menú Inicio.
+-----
+app_selection.install.failed
+No se instalaron:{0}. Para volver a intentarlo, ejecuta pkg install{0}.
+-----
+app_selection.install.started
+Instalando las aplicaciones elegidas durante la configuración: {0}
+-----
+app_selection.install_1
+Instalar 1 aplicación
+-----
+app_selection.install_2
+Instalar 2 aplicaciones
+-----
+app_selection.install_3
+Instalar 3 aplicaciones
+-----
+app_selection.install_4
+Instalar 4 aplicaciones
+-----
+app_selection.installed
+Instalada
+-----
+app_selection.intro
+Marca las que quieres descargar e instalar ahora.
+-----
+app_selection.minecraft.detail
+Java Edition, con una cuenta de Microsoft
+-----
+app_selection.note
+Puedes instalar más adelante con pkg install en Terminal.
+-----
+app_selection.voffice.detail
+Documentos de Writer y hojas de cálculo de Calc
+-----
+battery.remaining.about_hours
+Cerca de {0} hora|Cerca de {0} horas
+-----
+battery.remaining.calculating
+Calculando…
+-----
+battery.remaining.charging
+Cargando
+-----
+battery.remaining.full
+Carga completa
+-----
+battery.remaining.less_than_hour
+Menos de una hora
+-----
+battery.remaining.unavailable
+No disponible
+-----
+battery.status.failed
+La lectura de la batería falló o el dato está obsoleto.
+-----
+battery.status.invalid
+Respuesta de batería no válida.
+-----
+battery.status.permission
+Permiso denegado al leer la batería.
+-----
+battery.status.reported
+Porcentaje indicado por el controlador de la batería.
+-----
+battery.status.unavailable
+El controlador de la batería no está disponible.
+-----
+calendar.heading
+{0} de {1}
+-----
+calendar.heading.month.apr
+abril
+-----
+calendar.heading.month.aug
+agosto
+-----
+calendar.heading.month.dec
+diciembre
+-----
+calendar.heading.month.feb
+febrero
+-----
+calendar.heading.month.jan
+enero
+-----
+calendar.heading.month.jul
+julio
+-----
+calendar.heading.month.jun
+junio
+-----
+calendar.heading.month.mar
+marzo
+-----
+calendar.heading.month.may
+mayo
+-----
+calendar.heading.month.nov
+noviembre
+-----
+calendar.heading.month.oct
+octubre
+-----
+calendar.heading.month.sep
+septiembre
+-----
+calendar.today
+Hoy
+-----
+capture.cancel
+Cancelar
+-----
+capture.delay.five_seconds
+5 segundos
+-----
+capture.delay.none
+Sin retardo
+-----
+capture.delay.three_seconds
+3 segundos
+-----
+capture.eyebrow
+CAPTURA
+-----
+capture.heading
+Capturas y grabaciones de pantalla
+-----
+capture.page.screenshot
+Captura de pantalla
+-----
+capture.page.video
+Vídeo
+-----
+capture.screenshot.delay
+Retardo
+-----
+capture.screenshot.facts
+PNG{0}todo el escritorio{0}incluye el puntero
+-----
+capture.screenshot.heading
+Captura de todo el escritorio
+-----
+capture.screenshot.take
+Hacer captura
+-----
+capture.status.cancel_hint
+Restaura esta ventana para cancelar.
+-----
+capture.status.cancelled
+Captura cancelada
+-----
+capture.status.cancelled_detail
+No se ha guardado nada.
+-----
+capture.status.failed
+Error en la captura
+-----
+capture.status.failed_detail
+No se pudo escribir el archivo en /root.
+-----
+capture.status.fps
+{0} fps
+-----
+capture.status.frames
+{0} fotograma|{0} fotogramas
+-----
+capture.status.ready
+Listo para capturar
+-----
+capture.status.ready_detail
+Los archivos se guardan en /root.
+-----
+capture.status.recording
+Grabando  {0}
+-----
+capture.status.recording_in
+Grabación en {0} segundo|Grabación en {0} segundos
+-----
+capture.status.recording_saved
+Grabación guardada  {0}
+-----
+capture.status.screenshot_in
+Captura en {0} segundo|Captura en {0} segundos
+-----
+capture.status.screenshot_saved
+Captura guardada  {0}
+-----
+capture.stop_recording
+Detener grabación
+-----
+capture.video.compact
+Compacto  5 fps
+-----
+capture.video.facts
+Vídeo AVI{0}hasta 640 x 480{0}con puntero{0}sin audio
+-----
+capture.video.frame_rate
+Fotogramas/s
+-----
+capture.video.heading
+Grabar el escritorio
+-----
+capture.video.smooth
+Fluido  10 fps
+-----
+capture.video.start
+Iniciar grabación
+-----
+clock.built
+Compilado {0}
+-----
+clock.date_unavailable
+Fecha no disponible
+-----
+clock.reset
+Restablecer
+-----
+clock.start
+Iniciar
+-----
+clock.stop
+Detener
+-----
+clock.stopwatch
+CRONÓMETRO
+-----
+clock.unavailable
+Reloj no disponible
+-----
+date.day_month
+{0} {1}
+-----
+date.long
+{0}, {1}
+-----
+date.long.day_month_year
+{0} de {1} de {2}
+-----
+date.long.month.apr
+abril
+-----
+date.long.month.aug
+agosto
+-----
+date.long.month.dec
+diciembre
+-----
+date.long.month.feb
+febrero
+-----
+date.long.month.jan
+enero
+-----
+date.long.month.jul
+julio
+-----
+date.long.month.jun
+junio
+-----
+date.long.month.mar
+marzo
+-----
+date.long.month.may
+mayo
+-----
+date.long.month.nov
+noviembre
+-----
+date.long.month.oct
+octubre
+-----
+date.long.month.sep
+septiembre
+-----
+date.long.weekday.fri
+viernes
+-----
+date.long.weekday.mon
+lunes
+-----
+date.long.weekday.sat
+sábado
+-----
+date.long.weekday.sun
+domingo
+-----
+date.long.weekday.thu
+jueves
+-----
+date.long.weekday.tue
+martes
+-----
+date.long.weekday.wed
+miércoles
+-----
+date.month.short.apr
+abr
+-----
+date.month.short.aug
+ago
+-----
+date.month.short.dec
+dic
+-----
+date.month.short.feb
+feb
+-----
+date.month.short.jan
+ene
+-----
+date.month.short.jul
+jul
+-----
+date.month.short.jun
+jun
+-----
+date.month.short.mar
+mar
+-----
+date.month.short.may
+may
+-----
+date.month.short.nov
+nov
+-----
+date.month.short.oct
+oct
+-----
+date.month.short.sep
+sept
+-----
+date.time_am
+{0} a. m.
+-----
+date.time_pm
+{0} p. m.
+-----
+date.weekday.short.fri
+vie
+-----
+date.weekday.short.mon
+lun
+-----
+date.weekday.short.sat
+sáb
+-----
+date.weekday.short.sun
+dom
+-----
+date.weekday.short.thu
+jue
+-----
+date.weekday.short.tue
+mar
+-----
+date.weekday.short.wed
+mié
+-----
+date.weekday_day_month
+{0} {1} {2}
+-----
+desktop_menu.copy
+Copiar
+-----
+desktop_menu.cut
+Cortar
+-----
+desktop_menu.delete
+Eliminar
+-----
+desktop_menu.new_file
+Nuevo archivo
+-----
+desktop_menu.new_folder
+Nueva carpeta
+-----
+desktop_menu.paste
+Pegar
+-----
+desktop_menu.rename
+Cambiar nombre
+-----
+desktop_menu.tags
+Etiquetas…
+-----
+editor.new
+Nuevo
+-----
+editor.open
+Abrir
+-----
+editor.save
+Guardar
+-----
+editor.status.cannot_open
+No se puede abrir
+-----
+editor.status.cannot_read
+No se puede leer
+-----
+editor.status.cannot_save
+No se puede guardar
+-----
+editor.status.enter_path
+Escribe primero una ruta
+-----
+editor.status.is_directory
+La ruta es una carpeta:
+-----
+editor.status.limit
+El límite del documento es de 64 KB
+-----
+editor.status.new_document
+Documento nuevo
+-----
+editor.status.opened
+Abierto
+-----
+editor.status.saved
+Guardado
+-----
+editor.status.too_large
+El archivo ocupa más de 64 KB
+-----
+editor.status.unsaved
+Cambios sin guardar
+-----
+files.cannot_open
+No se puede abrir {0}
+-----
+files.column.empty
+Vacía
+-----
+files.copy_name
+{0} copia
+-----
+files.copy_name_numbered
+{0} copia ({1})
+-----
+files.empty_directory
+Esta carpeta está vacía.
+-----
+files.kind.bmp
+Imagen BMP
+-----
+files.kind.c_header
+Encabezado C
+-----
+files.kind.c_source
+Código fuente C
+-----
+files.kind.document
+Documento
+-----
+files.kind.extension_file
+Archivo {0}
+-----
+files.kind.folder
+Carpeta
+-----
+files.kind.gif
+Imagen GIF
+-----
+files.kind.jpeg
+Imagen JPEG
+-----
+files.kind.json
+Archivo JSON
+-----
+files.kind.log
+Registro
+-----
+files.kind.plain_text
+Texto plano
+-----
+files.kind.png
+Imagen PNG
+-----
+files.kind.python
+Script Python
+-----
+files.kind.tar
+Archivo tar
+-----
+files.kind.v_source
+Código fuente V
+-----
+files.list.ascending
+ascendente
+-----
+files.list.descending
+descendente
+-----
+files.list.kind
+Tipo
+-----
+files.list.modified
+Fecha de modificación
+-----
+files.list.name
+Nombre
+-----
+files.list.size
+Tamaño
+-----
+files.list.sort_by_kind
+Ordenar por tipo
+-----
+files.list.sort_by_modified
+Ordenar por fecha de modificación
+-----
+files.list.sort_by_name
+Ordenar por nombre
+-----
+files.list.sort_by_size
+Ordenar por tamaño
+-----
+files.location.computer
+Equipo
+-----
+files.location.desktop
+Escritorio
+-----
+files.location.documents
+Documentos
+-----
+files.location.downloads
+Descargas
+-----
+files.location.home
+Carpeta personal
+-----
+files.location.music
+Música
+-----
+files.location.pictures
+Imágenes
+-----
+files.new_file
+Nuevo archivo
+-----
+files.new_folder
+Nueva carpeta
+-----
+files.quicklook.cannot_preview
+No se puede previsualizar este archivo.
+-----
+files.quicklook.truncated
+Se muestra el principio del archivo
+-----
+files.settings.done
+Listo
+-----
+files.settings.favorite_tags
+Etiquetas favoritas (haz clic para activar o desactivar):
+-----
+files.settings.file_visibility
+Visibilidad de archivos
+-----
+files.settings.general
+General
+-----
+files.settings.new_tag
+Nueva etiqueta
+-----
+files.settings.rename
+Renombrar
+-----
+files.settings.show_hidden
+Mostrar archivos y carpetas ocultos
+-----
+files.settings.show_hidden_note
+Incluye los nombres que empiezan por un punto, como .local.
+-----
+files.settings.show_tag_in_sidebar
+Mostrar «{0}» en la barra lateral
+-----
+files.settings.sidebar_tags
+Mostrar estas etiquetas en la barra lateral:
+-----
+files.settings.tags
+Etiquetas
+-----
+files.settings.tint_folders
+Colorear las carpetas según sus etiquetas
+-----
+files.sidebar.favorites
+Favoritos
+-----
+files.sidebar.locations
+Ubicaciones
+-----
+files.size.bytes
+{0} B
+-----
+files.size.decimal
+{0},{1} {2}
+-----
+files.size.whole
+{0} {1}
+-----
+files.tag.blue
+Azul
+-----
+files.tag.gray
+Gris
+-----
+files.tag.green
+Verde
+-----
+files.tag.home
+Casa
+-----
+files.tag.important
+Importante
+-----
+files.tag.orange
+Naranja
+-----
+files.tag.purple
+Morado
+-----
+files.tag.red
+Rojo
+-----
+files.tag.work
+Trabajo
+-----
+files.tag.yellow
+Amarillo
+-----
+files.tag_results.empty
+Ningún archivo tiene esta etiqueta.
+-----
+files.toolbar.back
+Atrás
+-----
+files.toolbar.columns
+Ver en columnas
+-----
+files.toolbar.commander
+Ver en dos paneles
+-----
+files.toolbar.forward
+Adelante
+-----
+files.toolbar.list
+Ver como lista
+-----
+files.toolbar.search
+Buscar
+-----
+files.toolbar.settings
+Ajustes de Archivos (Cmd+,)
+-----
+files.toolbar.tags
+Editar etiquetas
+-----
+files.toolbar.up
+Subir
+-----
+files.unit.gb
+GB
+-----
+files.unit.kb
+KB
+-----
+files.unit.mb
+MB
+-----
+files.unit.tb
+TB
+-----
+jump.close_all
+Cerrar todas las ventanas
+-----
+jump.close_window
+Cerrar ventana
+-----
+jump.computer
+Equipo
+-----
+jump.documents
+Documentos
+-----
+jump.downloads
+Descargas
+-----
+jump.home
+Carpeta personal
+-----
+jump.new_document
+Nuevo documento
+-----
+jump.new_window
+Nueva ventana
+-----
+jump.pin
+Anclar a la barra de tareas
+-----
+jump.recent
+Recientes
+-----
+jump.take_screenshot
+Hacer captura de pantalla
+-----
+jump.tasks
+Tareas
+-----
+jump.unpin
+Desanclar de la barra de tareas
+-----
+quick_launch.empty
+No se encontraron aplicaciones
+-----
+quick_launch.search
+Buscar aplicaciones
+-----
+registration.button.create
+Crear usuario
+-----
+registration.error.mismatch
+Las contraseñas no coinciden.
+-----
+registration.error.no_name
+Escribe un nombre.
+-----
+registration.error.no_password
+Escribe una contraseña.
+-----
+registration.error.save_failed
+No se pudo guardar el usuario. Inténtalo de nuevo.
+-----
+registration.field.confirm
+Confirmar contraseña
+-----
+registration.field.name
+Nombre
+-----
+registration.field.password
+Contraseña
+-----
+registration.heading
+Crea tu usuario
+-----
+registration.intro
+Completa la configuración para usar Vinix.
+-----
+registration.placeholder.confirm
+Repite la contraseña
+-----
+registration.placeholder.name
+Escribe tu nombre
+-----
+registration.placeholder.password
+Escribe una contraseña
+-----
+settings.appearance.buttons
+Botones de ventana
+-----
+settings.appearance.buttons_note
+En qué extremo de la barra de título están cerrar y zoom.
+-----
+settings.appearance.combined
+Agrupada
+-----
+settings.appearance.combined_note
+Estilo Windows 7: un botón por aplicación.
+-----
+settings.appearance.left
+Izquierda (macOS)
+-----
+settings.appearance.right
+Derecha
+-----
+settings.appearance.standard
+Estándar
+-----
+settings.appearance.standard_note
+Estilo Windows XP: un botón por ventana.
+-----
+settings.appearance.taskbar
+Barra de tareas
+-----
+settings.appearance.taskbar_note
+Un botón por ventana o uno por aplicación.
+-----
+settings.battery.built_in
+Batería integrada
+-----
+settings.battery.check_smc
+Revisa el diagnóstico de arranque de apple-smc.
+-----
+settings.battery.current_charge
+Carga actual
+-----
+settings.battery.day_ago
+Hace 24 horas
+-----
+settings.battery.enlarge
+Amplía Ajustes para ver sus controles.
+-----
+settings.battery.estimated_remaining
+Tiempo restante estimado
+-----
+settings.battery.footer
+Solo lectura · /dev/battery · se actualiza cada 5 segundos.
+-----
+settings.battery.history
+Nivel de batería — últimas 24 horas
+-----
+settings.battery.now
+Ahora
+-----
+settings.battery.refresh
+Actualizar
+-----
+settings.battery.unavailable
+No disponible
+-----
+settings.category.appearance
+Apariencia
+-----
+settings.category.battery
+Batería
+-----
+settings.category.date_time
+Fecha y hora
+-----
+settings.category.display
+Pantalla
+-----
+settings.category.keyboard
+Teclado
+-----
+settings.category.language
+Idioma
+-----
+settings.category.theme
+Tema
+-----
+settings.category.wallpaper
+Fondo
+-----
+settings.category.wifi
+Wi-Fi
+-----
+settings.choice.not_selected
+no seleccionado
+-----
+settings.choice.selected
+seleccionado
+-----
+settings.date_time.12_hour
+12 horas
+-----
+settings.date_time.24_hour
+24 horas
+-----
+settings.date_time.date_line
+Línea de fecha
+-----
+settings.date_time.date_line_note
+Qué se muestra debajo de la hora en la barra de tareas.
+-----
+settings.date_time.format
+Formato de hora
+-----
+settings.date_time.format_note
+Formato de 24 horas o reloj de 12 horas con a. m./p. m.
+-----
+settings.date_time.hide
+Ocultar
+-----
+settings.date_time.hide_date
+Ocultar fecha
+-----
+settings.date_time.hide_weekday
+Ocultar día de la semana
+-----
+settings.date_time.seconds
+Segundos
+-----
+settings.date_time.seconds_note
+Mostrar los segundos en el reloj de la barra de tareas.
+-----
+settings.date_time.show
+Mostrar
+-----
+settings.date_time.show_date
+Mostrar fecha
+-----
+settings.date_time.show_weekday
+Mostrar día de la semana
+-----
+settings.display.actual_nits
+Real: {0} nits (según el controlador)
+-----
+settings.display.actual_unknown
+Real: desconocido
+-----
+settings.display.actual_waiting
+Real: esperando datos del controlador
+-----
+settings.display.bar_hint
+Haz clic en la barra para ajustar el brillo en pasos del 5%.
+-----
+settings.display.brightness
+Brillo
+-----
+settings.display.built_in
+Pantalla integrada
+-----
+settings.display.dcp_required
+Aún falta la integración con el backend DCP.
+-----
+settings.display.enlarge
+Amplía Ajustes para ver sus controles.
+-----
+settings.display.error.invalid
+Respuesta de brillo no válida.
+-----
+settings.display.error.io
+Error de E/S del brillo. Actualiza para volver a intentarlo.
+-----
+settings.display.error.offline
+El dispositivo de brillo de la pantalla está desconectado.
+-----
+settings.display.error.permission
+Permiso denegado. Controlar el brillo requiere acceso de escritura.
+-----
+settings.display.error.unavailable
+El controlador de brillo no está disponible.
+-----
+settings.display.pending
+Solicitud de brillo pendiente en el controlador de pantalla.
+-----
+settings.display.range
+{0} - {1} nits; con 0% la pantalla sigue encendida.
+-----
+settings.display.range_unavailable
+El rango de brillo del panel no está disponible.
+-----
+settings.display.read_from
+Brillo leído de /dev/apple-panel-bl.
+-----
+settings.display.read_only
+Acceso de solo lectura; los controles de brillo están desactivados.
+-----
+settings.display.refresh
+Actualizar
+-----
+settings.display.requested_nits
+Solicitado: {0} nits
+-----
+settings.display.requested_unchanged
+Solicitado: sin cambios desde el arranque
+-----
+settings.display.requested_unknown
+Solicitado: desconocido
+-----
+settings.display.scale
+Escala
+-----
+settings.display.unavailable
+No disponible
+-----
+settings.display.unknown
+Desconocido
+-----
+settings.keyboard.layout.french
+Francés
+-----
+settings.keyboard.layout.german
+Alemán
+-----
+settings.keyboard.layout.portuguese
+Portugués
+-----
+settings.keyboard.layout.russian
+Ruso
+-----
+settings.keyboard.layout.spanish
+Español
+-----
+settings.keyboard.layout.us
+Inglés (EE. UU.)
+-----
+settings.keyboard.menu_hint
+Ctrl-Espacio: siguiente distribución
+-----
+settings.keyboard.menu_settings
+Ajustes de teclado
+-----
+settings.keyboard.off
+desactivado
+-----
+settings.keyboard.on
+activado
+-----
+settings.keyboard.sources
+Fuentes de entrada
+-----
+settings.keyboard.sources_note
+Ctrl-Espacio alterna entre las distribuciones activadas aquí.
+-----
+settings.language.apps_note
+Las demás aplicaciones eligen su idioma por su cuenta.
+-----
+settings.language.heading
+Idioma del sistema
+-----
+settings.language.note
+El idioma de los menús, las ventanas y las aplicaciones de Vinix.
+-----
+settings.theme.default
+Predeterminado
+-----
+settings.theme.default_note_1
+Ventanas redondeadas con sombras y color plano,
+-----
+settings.theme.default_note_2
+y una barra de tareas a lo largo de la parte inferior.
+-----
+settings.theme.heading
+Tema
+-----
+settings.theme.macos
+macOS
+-----
+settings.theme.macos_note_1
+Ventanas gris claro con el título centrado, tres
+-----
+settings.theme.macos_note_2
+discos de color en el borde inicial y un dock.
+-----
+settings.theme.note
+Cómo se dibujan las ventanas y la barra de tareas.
+-----
+settings.wallpaper.colour
+Color
+-----
+settings.wallpaper.no_photos_1
+Esta imagen no tiene fotografías. La compilación las
+-----
+settings.wallpaper.no_photos_2
+descarga, pero no tenía ni red ni caché.
+-----
+settings.wallpaper.photo
+Foto
+-----
+settings.wifi.available
+Redes disponibles
+-----
+settings.wifi.channel
+canal {0}
+-----
+settings.wifi.enlarge
+Amplía Ajustes para ver sus controles.
+-----
+settings.wifi.error.disabled
+Activa el Wi-Fi antes de buscar redes.
+-----
+settings.wifi.error.invalid
+Respuesta no válida del controlador Wi-Fi.
+-----
+settings.wifi.error.io
+Error de E/S de Wi-Fi. Actualiza para volver a intentarlo.
+-----
+settings.wifi.error.not_ready
+Carga el firmware BCM4378 adecuado antes de activar el Wi-Fi.
+-----
+settings.wifi.error.permission
+Permiso denegado. Controlar el Wi-Fi requiere acceso de escritura.
+-----
+settings.wifi.error.unavailable
+Dispositivo Wi-Fi no disponible. Arranca con vinix.apple_wifi=1.
+-----
+settings.wifi.hidden_network
+<Red oculta>
+-----
+settings.wifi.list.driver_error
+El Wi-Fi se detuvo por un error del controlador; reinicia para reintentar.
+-----
+settings.wifi.list.no_device
+La búsqueda de redes no está disponible sin un dispositivo Wi-Fi.
+-----
+settings.wifi.list.no_firmware
+Carga el firmware Wi-Fi adecuado para buscar redes.
+-----
+settings.wifi.list.none_found
+No se encontraron redes inalámbricas. Selecciona «Buscar».
+-----
+settings.wifi.list.searching
+Buscando redes inalámbricas...
+-----
+settings.wifi.list.turn_on
+Activa el Wi-Fi para buscar redes.
+-----
+settings.wifi.next_button
+Siguiente
+-----
+settings.wifi.open
+Abierta
+-----
+settings.wifi.page
+{0}-{1} de {2}
+-----
+settings.wifi.previous_button
+Anterior
+-----
+settings.wifi.radio
+Wi-Fi
+-----
+settings.wifi.read_only
+Acceso de solo lectura; los controles de Wi-Fi están desactivados.
+-----
+settings.wifi.refresh_button
+Actualizar
+-----
+settings.wifi.scan_button
+Buscar
+-----
+settings.wifi.scan_failed
+La última búsqueda de redes falló ({0}).
+-----
+settings.wifi.scanning_button
+Buscando...
+-----
+settings.wifi.secured
+Protegida
+-----
+settings.wifi.signal
+{0} dBm
+-----
+settings.wifi.state.authenticated
+Enlace Wi-Fi autenticado.
+-----
+settings.wifi.state.connecting
+Conectando a una red Wi-Fi...
+-----
+settings.wifi.state.detected
+BCM4378 detectado; carga su firmware con wifi-ctl.
+-----
+settings.wifi.state.driver_error
+El Wi-Fi se detuvo por un error del controlador ({0}).
+-----
+settings.wifi.state.hardware_off
+El hardware Wi-Fi está apagado.
+-----
+settings.wifi.state.off
+El Wi-Fi está desactivado.
+-----
+settings.wifi.state.on
+El Wi-Fi está activado.
+-----
+settings.wifi.state.starting
+El firmware Wi-Fi se está iniciando.
+-----
+settings.wifi.subtitle
+Adaptador inalámbrico Broadcom BCM4378
+-----
+settings.wifi.turn_off
+Desactivar
+-----
+settings.wifi.turn_on
+Activar
+-----
+start.all_programs
+Todos los programas  >
+-----
+start.back
+<  Atrás
+-----
+start.context.forget
+Quitar de esta lista
+-----
+start.context.open
+Abrir
+-----
+start.context.pin_start
+Anclar al menú Inicio
+-----
+start.context.pin_taskbar
+Anclar a la barra de tareas
+-----
+start.context.unpin_start
+Desanclar del menú Inicio
+-----
+start.context.unpin_taskbar
+Desanclar de la barra de tareas
+-----
+start.documents
+Documentos
+-----
+start.help
+Ayuda
+-----
+start.no_results
+No se encontraron programas
+-----
+start.recent_empty
+Todavía no se ha abierto nada
+-----
+start.recent_items
+Elementos recientes
+-----
+start.search
+Buscar programas y archivos
+-----
+start.shut_down
+Apagar
+-----
+surface.blender.client_failed
+Vinix no pudo iniciar el cliente nativo de Blender.
+-----
+surface.blender.data_missing
+Los datos de Blender no están instalados. Ejecuta pkg install blender en Terminal.
+-----
+surface.blender.exited
+Blender se ha cerrado.
+-----
+surface.blender.not_staged
+Blender nativo no está preparado. Ejecuta build-blender-native-aarch64.sh.
+-----
+surface.blender.starting
+Iniciando Blender nativo…
+-----
+terminal.cannot_start
+no se puede iniciar {0}
+-----
+tray.battery.charging
+Cargando
+-----
+tray.battery.heading
+Batería
+-----
+tray.battery.settings
+Ajustes de energía
+-----
+tray.battery.tip_charging
+Batería: {0}, cargando
+-----
+tray.battery.tip_remaining
+Batería: {0} restante
+-----
+tray.capture.note
+Capturas y grabaciones de pantalla
+-----
+tray.capture.open
+Abrir Captura
+-----
+tray.capture.recording
+Grabando la pantalla
+-----
+tray.capture.screenshot
+Hacer captura de pantalla
+-----
+tray.capture.tip_recording
+Captura: grabando
+-----
+tray.display.brighter
+Más brillante
+-----
+tray.display.brightness
+Brillo {0}%
+-----
+tray.display.dimmer
+Más oscuro
+-----
+tray.display.heading
+Pantalla
+-----
+tray.display.no_backlight
+El brillo de esta pantalla no es ajustable.
+-----
+tray.display.settings
+Ajustes de pantalla
+-----
+tray.display.tip_brightness
+Brillo: {0}%
+-----
+tray.ethernet.acquiring
+Ethernet: obteniendo dirección
+-----
+tray.ethernet.checking
+Ethernet: comprobando
+-----
+tray.ethernet.connected
+Ethernet: conectado
+-----
+tray.ethernet.no_adapter
+Ethernet: sin adaptador
+-----
+tray.menu.hide
+Ocultar icono
+-----
+tray.menu.show
+Mostrar icono
+-----
+tray.network.ethernet_address
+Ethernet: {0}
+-----
+tray.network.heading
+Red
+-----
+tray.network.ipv4_address
+Dirección IPv4 {0}
+-----
+tray.network.no_ipv4
+Sin dirección IPv4
+-----
+tray.network.not_connected
+Sin conexión
+-----
+tray.network.settings
+Ajustes de red
+-----
+tray.overflow.hint
+Clic derecho para mover
+-----
+tray.show_desktop
+Mostrar escritorio
+-----
+tray.show_hidden_icons
+Mostrar iconos ocultos
+-----
+tray.wifi.networks_nearby
+Wi-Fi: activado, {0} red cercana|Wi-Fi: activado, {0} redes cercanas
+-----
+tray.wifi.no_adapter
+Wi-Fi: sin adaptador
+-----
+tray.wifi.not_connected
+Wi-Fi: sin conexión
+-----
+tray.wifi.off
+Wi-Fi: desactivado
+-----
+disk_usage.button.rescan
+Actualizar
+-----
+disk_usage.button.stop
+Detener
+-----
+disk_usage.button.up
+Subir
+-----
+disk_usage.duration.milliseconds
+{0} ms
+-----
+disk_usage.duration.minutes
+{0} min {1} s
+-----
+disk_usage.duration.seconds
+{0},{1} s
+-----
+disk_usage.error.cannot_open
+No se puede abrir {0}
+-----
+disk_usage.metric.files
+ARCHIVOS
+-----
+disk_usage.metric.folders
+CARPETAS
+-----
+disk_usage.metric.size
+TAMAÑO INDEXADO
+-----
+disk_usage.metric.skipped
+OMITIDOS
+-----
+disk_usage.panel.empty
+Los resultados aparecen aquí mientras se recorre el disco.
+-----
+disk_usage.panel.files
+Archivos más grandes
+-----
+disk_usage.panel.folders
+Carpetas más grandes
+-----
+disk_usage.panel.nothing_yet
+nada todavía
+-----
+disk_usage.panel.ranked
+{0} en la lista|{0} en la lista
+-----
+disk_usage.phase.complete
+COMPLETADO
+-----
+disk_usage.phase.scanning
+ANALIZANDO
+-----
+disk_usage.phase.stopped
+DETENIDO
+-----
+disk_usage.phase.unreadable
+SIN ACCESO
+-----
+disk_usage.scope.home
+Personal
+-----
+disk_usage.scope.system
+Sistema
+-----
+disk_usage.scope.whole_disk
+Todo el disco
+-----
+disk_usage.size.bytes
+{0} B
+-----
+disk_usage.size.decimal
+{0},{1} {2}
+-----
+disk_usage.size.whole
+{0} {1}
+-----
+disk_usage.status.scanned
+Se analizó {0} en {1}.
+-----
+disk_usage.status.scanned_skipped
+Se analizó {1} en {2}. Se omitió {0} elemento protegido o ilegible.|Se analizó {1} en {2}. Se omitieron {0} elementos protegidos o ilegibles.
+-----
+disk_usage.status.stopped
+Detenido. Las listas de abajo muestran lo contado hasta entonces.
+-----
+disk_usage.status.walking
+Recorriendo {0}
+-----
+disk_usage.subtitle
+Inventario del disco
+-----
+disk_usage.unit.gb
+GB
+-----
+disk_usage.unit.kb
+KB
+-----
+disk_usage.unit.mb
+MB
+-----
+disk_usage.unit.pb
+PB
+-----
+disk_usage.unit.tb
+TB
+-----
+window.external_app
+Aplicación externa
+-----
+window.notes
+Notas
+-----
+window.notes.line_1
+El compositor controla cada píxel:
+-----
+window.notes.line_2
+fondo, marcos, texto y cursor.
+-----
+window.notes.line_3
+La disposición y la detección de clics
+-----
+window.notes.line_4
+vienen de un árbol ui2 rehecho en cada fotograma.
+-----
+window.outdated
+Actualización de Vinix
+-----
+window.outdated.heading
+Tu Vinix está desactualizado
+-----
+window.outdated.line_1
+Lo sentimos, esta versión de Vinix está desactualizada.
+-----
+window.outdated.line_2
+Vinix se actualiza muy a menudo: cada versión trae muchas
+-----
+window.outdated.line_3
+funciones nuevas y corrige muchos errores.
+-----
+window.outdated.line_4
+Ve a vinix-os.org y descarga la ISO más reciente.
+-----
+window.outdated.versions
+Instalada: {0}    Más reciente: {1}
+-----
+window.palette
+Paleta
+-----
+window.system
+Sistema
+-----
+window.system.backlight_absent
+Luz de fondo   ausente (el controlador no la registró)
+-----
+window.system.backlight_present
+Luz de fondo   presente en {0}
+-----
+window.system.battery_absent
+Batería   ausente (el controlador no la registró)
+-----
+window.system.battery_present
+Batería   presente en {0}
+-----
+window.system.display
+Pantalla   {0} x {1}
+-----
+window.system.frames
+Fotogramas   {0}
+-----
+window.system.no_pointer
+no disponible
+-----
+window.system.pointer
+Puntero   {0}
+-----
+window.system.shortcuts
+Super+flechas: ventanas; Super+1..4: escritorios.
+-----
+window.system.windows
+Ventanas   {0} abiertas, {1} en pantalla
+-----
+window.welcome
+Bienvenida
+-----
+window.welcome.heading
+Bienvenido a Vinix
+-----
+window.welcome.hint_1
+Arrastra la barra de título para mover una ventana.
+-----
+window.welcome.hint_2
+La barra de tareas muestra todo lo que está abierto.
+-----
+window.welcome.line_1
+Un escritorio escrito desde cero en V,
+-----
+window.welcome.line_2
+que dibuja directamente en el framebuffer.
+-----
+wine.chromium.exited
+Chromium se ha cerrado.
+-----
+wine.chromium.missing
+Chromium no está instalado. Ejecuta pkg install chromium en Terminal.
+-----
+wine.chromium.starting
+Iniciando Chromium…
+-----
+wine.dota2.exited
+Dota 2 se ha cerrado.
+-----
+wine.dota2.missing
+Dota 2 no está instalado.
+-----
+wine.dota2.starting
+Iniciando Dota 2…
+-----
+wine.doom.exited
+DOOM se ha cerrado.
+-----
+wine.doom.missing
+DOOM no está instalado. Ejecuta build-doom-aarch64.sh.
+-----
+wine.doom.starting
+Iniciando DOOM…
+-----
+wine.doom.wad_missing
+Falta el archivo WAD de DOOM. Define VINIX_DOOM_WAD y vuelve a compilar la imagen.
+-----
+wine.firefox.exited
+Firefox se ha cerrado.
+-----
+wine.firefox.missing
+Firefox no está instalado. Ejecuta pkg install firefox en Terminal.
+-----
+wine.firefox.starting
+Iniciando Firefox…
+-----
+wine.gimp.exited
+GIMP se ha cerrado.
+-----
+wine.gimp.missing
+GIMP no está instalado. Ejecuta pkg install gimp en Terminal.
+-----
+wine.gimp.starting
+Iniciando GIMP…
+-----
+wine.gothic.data_missing
+Faltan los datos de Gothic II. Copia Data, _work y System en /usr/share/games/gothic2.
+-----
+wine.gothic.exited
+Gothic II se ha cerrado.
+-----
+wine.gothic.missing
+Gothic II no está instalado. Ejecuta build-opengothic-aarch64.sh.
+-----
+wine.gothic.starting
+Iniciando Gothic II…
+-----
+wine.host_failed
+Vinix no pudo iniciar el host X11 integrado.
+-----
+wine.libreoffice.exited
+LibreOffice se ha cerrado.
+-----
+wine.libreoffice.missing
+LibreOffice no está instalado. Ejecuta pkg install libreoffice-writer en Terminal.
+-----
+wine.libreoffice.starting
+Iniciando LibreOffice…
+-----
+wine.minecraft.exited
+Minecraft se ha cerrado.
+-----
+wine.minecraft.missing
+Minecraft no está instalado. Ejecuta pkg install minecraft en Terminal.
+-----
+wine.minecraft.starting
+Iniciando Minecraft…
+-----
+wine.obs.exited
+OBS Studio se ha cerrado.
+-----
+wine.obs.missing
+OBS Studio no está instalado. Ejecuta pkg install obs-studio en Terminal.
+-----
+wine.obs.starting
+Iniciando OBS Studio…
+-----
+wine.qemu.exited
+QEMU se ha cerrado.
+-----
+wine.qemu.missing
+QEMU no está instalado. Compila el escritorio con --with-qemu-system.
+-----
+wine.qemu.starting
+Iniciando Vinix en QEMU…
+-----
+wine.steam.exited
+Steam se ha cerrado.
+-----
+wine.steam.installing
+Instalando el cliente de Steam…
+-----
+wine.steam.missing
+Steam no está instalado en esta imagen del escritorio.
+-----
+wine.windows.exited
+La aplicación de Windows se ha cerrado.
+-----
+wine.windows.missing
+El entorno de Wine traducido no está instalado.
+-----
+wine.windows.starting
+Iniciando la aplicación de Windows…
+-----
+wine.word.exited
+Microsoft Word 2013 se ha cerrado.
+-----
+wine.word.media_missing
+Prepara el soporte con licencia de Word 2013 x64 y vuelve a abrir Word.
+-----
+wine.word.missing
+El entorno de Wine Win64 traducido no está instalado.
+-----
+wine.word.setup_closed
+Se ha cerrado la instalación de Word 2013. Vuelve a abrir Word cuando termine.
+-----
+wine.word.setup_starting
+Iniciando la instalación de Word 2013 de 64 bits…
+-----
+wine.word.starting
+Iniciando Microsoft Word 2013…
+-----
+wine.xvfb_missing
+Xvfb no está instalado. Recompila la capa X11.
+-----
+wm.app_failed
+Esta aplicación no pudo dibujarse:
+-----
+wm.external.failed
+{0} o Xorg terminaron con un error.
+-----
+wm.external.hint
+Compila Firefox/Xorg y vuelve a compilar el userland y la imagen del escritorio.
+-----
+wm.external.note
+{0} se ejecuta en una sesión X11 exclusiva; el escritorio vuelve cuando termina.
+-----
+wm.external.spawn_failed
+Vinix no pudo crear el proceso de inicio de {0}.
+-----
+wm.external.title
+No se pudo iniciar {0}
+-----
+wm.external.unavailable
+{0} no está instalado en esta imagen del escritorio.
+-----
+wm.external.wait_failed
+Vinix perdió el rastro del proceso de inicio de {0}.
+-----
+wm.not_installed.command
+Ejecuta pkg install {0} en Terminal para instalarlo.
+-----
+wm.not_installed.hint
+Cuando termine la instalación, vuelve a abrirlo desde aquí.
+-----
+wm.not_installed.note
+La imagen de Vinix no incluye esta aplicación.
+-----
+wm.not_installed.title
+{0} no está instalado
+-----
+wm.taskbar.group
+{0}  ({1})
+
+-----
+app.android_calculator
+Calculadora Android
+-----
+android.starting
+Iniciando el APK de Android…
+-----
+android.missing
+Falta el entorno Android o el APK de la calculadora en esta imagen.
+-----
+android.exited
+El APK de Android ha terminado.
+-----
+activity.column.cpu_time
+Tiempo CPU (s)
+-----
+activity.column.ppid
+PID padre
+-----
+activity.column.state
+Estado
+-----
+activity.column.threads
+Hilos
+-----
+activity.column.user
+ID de usuario
+-----
+activity.columns
+Columnas
+-----
+activity.control.continue
+Reanudar
+-----
+activity.control.failed
+Error de acción
+-----
+activity.control.gone
+Proceso finalizado
+-----
+activity.control.kill_tree
+Finalizar árbol
+-----
+activity.control.nice
+Nice
+-----
+activity.control.permission
+Permiso denegado
+-----
+activity.control.priority_down
+Menos prioridad
+-----
+activity.control.priority_up
+Más prioridad
+-----
+activity.control.quit
+Salir
+-----
+activity.control.sent
+Solicitado
+-----
+activity.control.suspend
+Suspender
+-----
+activity.energy.application_note
+El impacto energético por aplicación no está disponible. El historial de batería cubre 24 horas.
+-----
+activity.energy.battery
+Carga de batería: {0}
+-----
+activity.energy.current
+Corriente: {0} A
+-----
+activity.energy.power
+Potencia de batería: {0} W
+-----
+activity.energy.sign_note
+El controlador de batería informa valores con signo. El gráfico se centra en cero.
+-----
+activity.energy.voltage
+Voltaje: {0} V
+-----
+activity.filter.active
+Procesos activos
+-----
+activity.filter.all
+Todos los procesos
+-----
+activity.filter.applications
+Aplicaciones
+-----
+activity.filter.user
+Mis procesos
+-----
+activity.gpu.drivers
+Controladores GPU: {0}
+-----
+activity.gpu.rate
+Envíos por segundo: {0}
+-----
+activity.gpu.sensors_unavailable
+Los sensores de uso, memoria dedicada y energía GPU no están disponibles. El gráfico muestra envíos aceptados.
+-----
+activity.gpu.submissions
+Envíos aceptados: {0}
+-----
+activity.gpu.unavailable
+La actividad GPU no está disponible en este sistema.
+-----
+activity.inspect
+Inspeccionar proceso seleccionado
+-----
+activity.inspector.close
+Cerrar inspector
+-----
+activity.inspector.command
+Comando y argumentos:
+-----
+activity.inspector.executable
+Ejecutable:
+-----
+activity.inspector.export
+Guardar informe
+-----
+activity.inspector.export_failed
+No se pudo guardar el informe.
+-----
+activity.inspector.exported
+Guardado en {0}
+-----
+activity.inspector.fd_unavailable
+No disponible (cerrado o permiso denegado)
+-----
+activity.inspector.files
+Archivos / Sockets
+-----
+activity.inspector.files_unavailable
+Archivos no disponibles (proceso finalizado o permiso denegado).
+-----
+activity.inspector.maps
+Mapas de memoria:
+-----
+activity.inspector.memory
+Memoria
+-----
+activity.inspector.memory_unavailable
+Mapas no disponibles (proceso finalizado o permiso denegado).
+-----
+activity.inspector.no_files
+No hay descriptores abiertos
+-----
+activity.inspector.not_available
+No disponible
+-----
+activity.inspector.overview
+Resumen
+-----
+activity.inspector.smaps
+Detalles de memoria (kB):
+-----
+activity.inspector.socket
+socket
+-----
+activity.inspector.status_unavailable
+Estado del proceso no disponible.
+-----
+activity.inspector.title
+Inspector de procesos
+-----
+activity.inspector.truncated
+La captura es limitada; se omitieron algunos detalles.
+-----
+activity.inspector.unavailable
+El proceso terminó o no hay permiso.
+-----
+activity.interval.fast
+0,5 s
+-----
+activity.interval.normal
+1 s
+-----
+activity.interval.slow
+2 s
+-----
+activity.interval.slowest
+5 s
+-----
+activity.no_matches
+No hay procesos coincidentes
+-----
+activity.pause_refresh
+Pausar
+-----
+activity.resources.cached
+Caché de archivos: {0}
+-----
+activity.resources.core
+CPU {0} · {1}
+-----
+activity.resources.cpu
+CPU
+-----
+activity.resources.disk
+Disco
+-----
+activity.resources.disk.note
+Bytes transferidos en discos físicos. La caché y los archivos en memoria no acceden al disco.
+-----
+activity.resources.free
+Libre: {0}
+-----
+activity.resources.io_totals
+Totales desde el arranque: {0} entrada · {1} salida
+-----
+activity.resources.memory
+Memoria
+-----
+activity.resources.memory.note
+El núcleo informa de la presión de memoria. No se admiten swap ni compresión.
+-----
+activity.resources.network
+Red
+-----
+activity.resources.network.note
+Datos IPv4/IPv6, incluido loopback; sin sockets Unix ni cabeceras de protocolo.
+-----
+activity.resources.pressure
+Presión: {0}
+-----
+activity.resources.pressure.critical
+Crítica
+-----
+activity.resources.pressure.high
+Alta
+-----
+activity.resources.pressure.normal
+Normal
+-----
+activity.resources.rate
+{0}/s
+-----
+activity.resources.read
+Lectura: {0}
+-----
+activity.resources.received
+Recibidos: {0}
+-----
+activity.resources.sent
+Enviados: {0}
+-----
+activity.resources.slab
+Memoria del núcleo: {0}
+-----
+activity.resources.total
+Memoria física: {0}
+-----
+activity.resources.unavailable
+No disponible
+-----
+activity.resources.used
+Usada: {0}
+-----
+activity.resources.written
+Escritura: {0}
+-----
+activity.resume_refresh
+Continuar
+-----
+activity.search
+Buscar nombre o PID
+-----
+activity.sort_by.cpu_time
+Ordenar por tiempo CPU
+-----
+activity.sort_by.ppid
+Ordenar por PID padre
+-----
+activity.sort_by.state
+Ordenar por estado
+-----
+activity.sort_by.threads
+Ordenar por número de hilos
+-----
+activity.sort_by.user
+Ordenar por ID de usuario
+-----
+activity.startup.description
+Elige las apps que se abrirán al iniciar sesión. Los cambios se aplican a la próxima sesión.
+-----
+activity.startup.disabled
+Desactivado
+-----
+activity.startup.enabled
+Activado
+-----
+activity.startup.impact_unavailable
+No se ha medido el impacto del inicio en CPU.
+-----
+activity.startup.save_failed
+No se pudo guardar la configuración de inicio.
+-----
+activity.state.exited
+Finalizado
+-----
+activity.state.running
+En ejecución
+-----
+activity.state.sleeping
+En espera
+-----
+activity.state.stopped
+Detenido
+-----
+activity.state.zombie
+Zombi
+-----
+activity.tree
+Árbol de procesos
+-----
+activity.view.energy
+Energía
+-----
+activity.view.gpu
+GPU
+-----
+activity.view.processes
+Procesos
+-----
+activity.view.resources
+Recursos
+-----
+activity.view.startup
+Inicio
+-----
+activity.startup.launch_ms
+{0} ms
+-----
+activity.startup.launch_note
+Tiempo del último inicio correcto, incluida la primera respuesta de la ventana. El impacto de CPU no está disponible.
+-----
+activity.startup.not_measured
+Sin medir
+-----
+activity.filter.system
+Sistema (root)
+-----
+activity.scroll_down
+Desplazar abajo
+-----
+activity.scroll_up
+Desplazar arriba
+-----
+activity.view.next
+Cambiar vista
+-----
+activity.inspector.io
+E/S
+-----
+activity.inspector.io.counter
+{0}: {1} bytes en total, {2}
+-----
+activity.inspector.io.disk_read
+Lecturas de disco
+-----
+activity.inspector.io.disk_write
+Escrituras de disco
+-----
+activity.inspector.io.logical_read
+Lecturas de archivo
+-----
+activity.inspector.io.logical_write
+Escrituras de archivo
+-----
+activity.inspector.io.net_recv
+Recibido
+-----
+activity.inspector.io.net_send
+Enviado
+-----
+activity.inspector.io.scope
+Las tasas requieren dos muestras. Los totales de archivos incluyen caché y archivos en memoria; los de disco cuentan almacenamiento físico. La red cuenta datos INET, incluido loopback. La escritura en segundo plano se atribuye al hilo que la envía.
+-----
+activity.inspector.io.unavailable
+Los contadores de E/S del proceso no están disponibles.
+-----
+activity.inspector.io.unknown
+Desconocido
+-----
+activity.search.done
+Cerrar búsqueda
+-----
+roblox.starting
+Iniciando Roblox…
+-----
+roblox.missing
+Falta el entorno de Roblox. Reconstruye el escritorio con --with-roblox.
+-----
+roblox.apk_missing
+Copia tu APK de Roblox a ~/Roblox.apk o indica su ruta en VINIX_ROBLOX_APK.
+-----
+roblox.exited
+Roblox se ha cerrado. Consulta el registro de la aplicación.

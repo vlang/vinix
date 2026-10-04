@@ -6,6 +6,7 @@ module devicetree
 // Follows the DTSpec (devicetree.org) binary format
 import lib as _
 import memory as _
+import fdtstrings
 
 // FDT header magic
 const fdt_magic = u32(0xd00dfeed)
@@ -55,9 +56,10 @@ pub mut:
 }
 
 __global (
-	dt_root    &DTNode
-	dt_strings voidptr
-	dt_struct  voidptr
+	dt_root      &DTNode
+	dt_strings   voidptr
+	dt_struct    voidptr
+	dt_apple_adt bool
 )
 
 // Returns true if the device tree was successfully parsed.
@@ -125,7 +127,7 @@ pub fn parse(dtb_addr voidptr) bool {
 	version := be32(voidptr(&header.version))
 	totalsize := be32(voidptr(&header.totalsize))
 
-	println('devicetree: FDT version ${version}, size ${totalsize} bytes')
+	C.kprintf(c'devicetree: FDT version %llu, size %llu bytes\n', u64(version), u64(totalsize))
 
 	dt_strings = unsafe { voidptr(u64(dtb_addr) + be32(voidptr(&header.off_dt_strings))) }
 	dt_struct = unsafe { voidptr(u64(dtb_addr) + be32(voidptr(&header.off_dt_struct))) }
@@ -134,7 +136,11 @@ pub fn parse(dtb_addr voidptr) bool {
 	dt_root = parse_node(mut &offset, unsafe { nil })
 
 	if dt_root != unsafe { nil } {
+		dt_apple_adt = has_property(dt_root, 'vinix,apple-adt')
 		println('devicetree: Parsed root node successfully')
+		if dt_apple_adt {
+			println("devicetree: iBoot's Apple device tree, converted by the Apple loader")
+		}
 		return true
 	}
 
@@ -162,7 +168,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 				}
 
 				mut node := &DTNode{
-					name: name
+					name:   name
 					parent: unsafe { parent }
 				}
 
@@ -203,7 +209,7 @@ fn parse_node(mut offset &u32, parent &DTNode) &DTNode {
 						prop := DTProperty{
 							name: get_string(name_off)
 							data: prop_data
-							len: prop_len
+							len:  prop_len
 						}
 						node.properties << prop
 					} else if next == fdt_nop {
@@ -304,6 +310,22 @@ fn find_compatible_in(node &DTNode, compat string) ?&DTNode {
 	return none
 }
 
+// A tree apple-boot/ converted from the ADT iBoot handed over, rather than
+// one m1n1 wrote for Linux. Nodes keep Apple's names, compatibles and
+// little-endian vendor values; only the cell properties are big-endian.
+pub fn is_apple_adt() bool {
+	return dt_apple_adt
+}
+
+fn has_property(node &DTNode, name string) bool {
+	for prop in node.properties {
+		if prop.name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // Get a property from a node
 pub fn get_property(node &DTNode, name string) ?DTProperty {
 	for prop in node.properties {
@@ -389,26 +411,11 @@ pub fn get_u32_array(node &DTNode, name string) ?[]u32 {
 	return result
 }
 
-// Get a NUL-separated string list from a property.
+// Get a NUL-separated string list from a property. The caller owns the
+// returned array and its strings.
 pub fn get_string_list(node &DTNode, name string) ?[]string {
 	prop := get_property(node, name) or { return none }
-	if prop.len == 0 {
-		return none
-	}
-	mut result := []string{}
-	mut offset := u32(0)
-	for offset < prop.len {
-		value := unsafe { &u8(u64(prop.data) + offset) }
-		mut length := 0
-		for offset + u32(length) < prop.len && unsafe { value[length] } != 0 {
-			length++
-		}
-		if length > 0 {
-			result << unsafe { tos(value, length) }
-		}
-		offset += u32(length) + 1
-	}
-	return result
+	return fdtstrings.clone_nul_list(prop.data, prop.len)
 }
 
 fn find_phandle_in(node &DTNode, phandle u32) ?&DTNode {
@@ -434,6 +441,7 @@ pub fn find_phandle(phandle u32) ?&DTNode {
 // memory-region and mailbox providers with zero argument cells.
 pub fn get_phandle_node(node &DTNode, property string, index u32) ?&DTNode {
 	values := get_u32_array(node, property) or { return none }
+	defer { unsafe { values.free() } }
 	if index >= u32(values.len) {
 		return none
 	}
@@ -442,6 +450,7 @@ pub fn get_phandle_node(node &DTNode, property string, index u32) ?&DTNode {
 
 pub fn get_named_phandle_node(node &DTNode, property string, names_property string, name string) ?&DTNode {
 	names := get_string_list(node, names_property) or { return none }
+	defer { unsafe { names.free() } }
 	for index, candidate in names {
 		if candidate == name {
 			return get_phandle_node(node, property, u32(index))
@@ -492,6 +501,13 @@ fn translate_address(node &DTNode, input u64) ?u64 {
 	mut address := input
 	mut bus := node.parent
 	for bus != unsafe { nil } {
+		// In Apple's tree a bus without ranges ends the walk, as it does in
+		// XNU's IODTResolveAddressCell: DMA controllers and the like below
+		// such a bus already give CPU addresses, and the ranges of the bus
+		// above would move them somewhere else.
+		if dt_apple_adt && bus.parent != unsafe { nil } && !has_property(bus, 'ranges') {
+			break
+		}
 		address = translate_one_bus(bus, address) or { return none }
 		bus = bus.parent
 	}
@@ -543,7 +559,7 @@ pub fn get_named_reg(node &DTNode, name string) ?DTReg {
 
 // Get reg property (base, size pairs)
 // Returns array of (base, size) tuples
-pub fn get_reg(node &DTNode) ?([]u64) {
+pub fn get_reg(node &DTNode) ?[]u64 {
 	prop := get_property(node, 'reg') or { return none }
 
 	// Determine address/size cells from parent

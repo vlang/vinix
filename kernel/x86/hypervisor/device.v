@@ -63,6 +63,8 @@ mut:
 	status   int
 	can_mmap bool
 	vm       &Vm = unsafe { nil }
+	// The interface box its descriptors share, freed with the session.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -87,7 +89,10 @@ fn (mut device HypervisorDevice) open(_flags int) ?&resource.Resource {
 	// though the factory node itself is a character device.
 	session.stat.mode = stat.ifblk | 0o600
 	session.stat.blksize = int(page_size)
-	return &resource.Resource(*session)
+	// Box the session itself, not a copy of it, which left this allocation
+	// behind. unref() frees both.
+	session.box = &resource.Resource(unsafe { session }) @[freed]
+	return session.box
 }
 
 fn (mut device HypervisorDevice) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -134,10 +139,7 @@ fn (mut session HypervisorSession) read(_handle voidptr, buf voidptr, loc u64, c
 	remaining := session.vm.memory_size() - loc
 	actual := if count < remaining { count } else { remaining }
 	source := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_to_user(u64(buf), source, actual) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, source, actual) }
 	return i64(actual)
 }
 
@@ -151,10 +153,7 @@ fn (mut session HypervisorSession) write(_handle voidptr, buf voidptr, loc u64, 
 		return 0
 	}
 	destination := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	if !usercopy.copy_from_user(destination, u64(buf), count) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(destination, buf, count) }
 	return i64(count)
 }
 
@@ -315,7 +314,10 @@ fn (mut session HypervisorSession) unref(_handle voidptr) ? {
 }
 
 fn destroy_session(session &HypervisorSession) {
-	unsafe { free(session) }
+	unsafe {
+		free(voidptr(session.box))
+		free(session)
+	}
 }
 
 fn (mut session HypervisorSession) link(_handle voidptr) ? {
@@ -333,7 +335,7 @@ fn smoke_test() bool {
 		unsafe { free(vm) }
 	}
 	// mov dx, 0xe9; mov al, 'V'; out dx, al; hlt
-	code := [u8(0xba), 0xe9, 0x00, 0xb0, 0x56, 0xee, 0xf4]
+	code := [u8(0xba), 0xe9, 0x00, 0xb0, 0x56, 0xee, 0xf4]!
 	if !vm.copy_to_guest(0x1000, unsafe { &code[0] }, u64(code.len))
 		|| !vm.set_entry(0x1000, 0x8000, 2) {
 		return false

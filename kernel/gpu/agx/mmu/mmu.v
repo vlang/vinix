@@ -95,9 +95,13 @@ pub:
 	phys    u64
 	size    u64
 	private bool
+pub mut:
+	// The mmu module makes a mapping uncached; the GPU driver does too.
+	protection u64
 mut:
-	mapped   bool
-	released bool
+	mapped              bool
+	released            bool
+	cache_flush_pending bool
 }
 
 pub struct UatManager {
@@ -176,7 +180,8 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 	}
 	uat_mgr = mgr
 
-	println('uat mmu: attached IAS=${ias} OAS=${oas} TTBs=0x${ttbs_base:x} handoff=0x${handoff_base:x} TTBR1=0x${pagetables_base:x}')
+	C.kprintf(c'uat mmu: attached IAS=%llu OAS=%llu TTBs=0x%llx handoff=0x%llx TTBR1=0x%llx\n',
+		u64(ias), u64(oas), u64(ttbs_base), u64(handoff_base), u64(pagetables_base))
 	return mgr
 }
 
@@ -352,7 +357,7 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				pgtable.destroy(pt)
 				return none
 			}
-			ctx := &UatContext{
+			mut ctx := &UatContext{
 				id: i
 				pgtable: pt
 				active: true
@@ -363,6 +368,8 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', kernel_start, kernel_midpoint)
 				driver_private: gpu_alloc.new_heap('uat-user-private', kernel_midpoint, kernel_end)
 			}
+			// Nothing slices the list, so growing it can free the old buffer.
+			ctx.driver_buffers.flags |= .noslices
 			mgr.contexts[i] = ctx
 			return ctx
 		}
@@ -414,7 +421,7 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		return none
 	}
 	aligned_size := (size + alignment - 1) & ~(alignment - 1)
-	pages := aligned_size / u64(4096)
+	pages := aligned_size / memory.page_size
 
 	ctx.lock.acquire()
 	defer {
@@ -424,7 +431,7 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		return none
 	}
 
-	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, pgtable.uat_pgsz / memory.page_size))
 	if phys == 0 {
 		return none
 	}
@@ -466,10 +473,79 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		phys: phys
 		size: aligned_size
 		private: private
+		protection: protection
 		mapped: true
+		cache_flush_pending: pgtable.is_cached_noncoherent(protection)
 	}
 	ctx.driver_buffers << buffer
 	return buffer
+}
+
+// Convert a cached driver allocation to the corresponding uncached mapping
+// while its PTEs and physical backing are still valid. The caller must next
+// issue a firmware invalidation, unmap it, and issue the final translation
+// invalidation; see m1n1 GPUAllocator.free and Asahi KernelMapping::drop.
+pub fn (mut ctx UatContext) reprotect_driver_buffer_uncached(buffer &UatBuffer) bool {
+	if buffer == unsafe { nil } {
+		return false
+	}
+	ctx.lock.acquire()
+	defer {
+		ctx.lock.release()
+	}
+	for candidate in ctx.driver_buffers {
+		if voidptr(candidate) != voidptr(buffer) {
+			continue
+		}
+		mut owned := unsafe { candidate }
+		if owned.released {
+			return false
+		}
+		if !owned.mapped || !pgtable.is_cached_noncoherent(owned.protection) {
+			return true
+		}
+		if ctx.pgtable == unsafe { nil } || owned.va == 0 || owned.size == 0 {
+			return false
+		}
+		protection := pgtable.as_uncached(owned.protection)
+		mut pt := unsafe { ctx.pgtable }
+		if !pt.reprotect(owned.va, owned.size, protection) {
+			return false
+		}
+		owned.protection = protection
+		return true
+	}
+	return false
+}
+
+// Keep the cache-flush obligation separate from the current PTE attributes.
+// A failed, unpublished firmware request leaves an uncached PTE behind, but
+// teardown must retry the flush before it is allowed to remove that PTE.
+pub fn (buffer &UatBuffer) needs_cache_flush() bool {
+	return buffer != unsafe { nil } && buffer.cache_flush_pending
+}
+
+pub fn (mut ctx UatContext) complete_driver_buffer_cache_flush(buffer &UatBuffer) bool {
+	if buffer == unsafe { nil } {
+		return false
+	}
+	ctx.lock.acquire()
+	defer {
+		ctx.lock.release()
+	}
+	for candidate in ctx.driver_buffers {
+		if voidptr(candidate) != voidptr(buffer) {
+			continue
+		}
+		mut owned := unsafe { candidate }
+		if owned.released || !owned.mapped
+			|| pgtable.is_cached_noncoherent(owned.protection) {
+			return false
+		}
+		owned.cache_flush_pending = false
+		return true
+	}
+	return false
 }
 
 fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
@@ -487,7 +563,7 @@ fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
 		owned.mapped = false
 	}
 	if owned.phys != 0 && owned.size != 0 {
-		memory.pmm_free(voidptr(owned.phys), owned.size / u64(4096))
+		memory.pmm_free(voidptr(owned.phys), owned.size / memory.page_size)
 	}
 	if owned.private {
 		ctx.driver_private.release(owned.va)
@@ -534,6 +610,11 @@ pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {
 		if voidptr(candidate) == voidptr(buffer) {
 			ctx.release_driver_buffer_locked(candidate)
 			ctx.driver_buffers.delete(index)
+			// Its owner lets go of it here, so the record goes as well. Jobs
+			// and render buffers allocate these for every frame.
+			// release_all_driver_buffers() keeps its records, which owners
+			// may still hold.
+			unsafe { free(candidate) }
 			break
 		}
 	}
@@ -603,6 +684,18 @@ pub fn (mgr &UatManager) map_kernel(iova u64, phys u64, size u64, prot u64) bool
 	}
 	mut pt := unsafe { mgr.kernel_pgtable }
 	return pt.map(iova, phys, size, prot)
+}
+
+// Reprotect an existing context-zero mapping without changing its physical
+// backing. This is the first phase of cache-safe teardown for private firmware
+// allocations.
+pub fn (mgr &UatManager) reprotect_kernel(iova u64, size u64, prot u64) bool {
+	if iova < (u64(1) << mgr.ias) {
+		mut pt := unsafe { mgr.kernel_lower_pgtable }
+		return pt.reprotect(iova, size, prot)
+	}
+	mut pt := unsafe { mgr.kernel_pgtable }
+	return pt.reprotect(iova, size, prot)
 }
 
 // Remove a driver-owned context-zero mapping. This is primarily used to

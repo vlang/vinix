@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module fw
 
+import gpu.agx.hw
+
 // Exact outer layouts for the macOS 12.3 G13 firmware object graph. Opaque
 // regions retain their byte-exact ABI extent while their host-owned fields are
 // populated by the dedicated Globals and HwData builders.
@@ -9,8 +11,7 @@ module fw
 pub const g13_runtime_pointers_size = u64(0x6bc0)
 pub const g13_globals_size = u64(0x11d40)
 pub const g13_initdata_size = u64(0xb4)
-pub const g13_fwlog_subchannels = u32(6)
-pub const g13_fwlog_payload_count = u32(0x100)
+pub const g13_initdata_v13_5_size = u64(0xbc)
 
 @[packed]
 pub struct G13GlobalStatsVertex {
@@ -123,6 +124,12 @@ pub mut:
 	unk_0b0                    u32
 }
 
+@[packed]
+pub struct G13InitDataBlob {
+pub mut:
+	bytes [0xbc]u8
+}
+
 pub fn make_g13_ring_pointers(state u64, ring u64) ChannelRingPointers {
 	return ChannelRingPointers{
 		state: state
@@ -165,11 +172,99 @@ pub fn build_g13_initdata(unk_buffer u64, runtime_pointers u64, globals u64,
 	}
 }
 
+pub fn g13_initdata_active_size(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { g13_initdata_size }
+		.v13_5_partial { g13_initdata_v13_5_size }
+		else { none }
+	}
+}
+
+fn g13_initdata_blob_put_u16(mut data G13InitDataBlob, abi hw.FirmwareAbi,
+	offset u32, value u16) bool {
+	active := g13_initdata_active_size(abi) or { return false }
+	if offset > u32(active) - 2 {
+		return false
+	}
+	index := int(offset)
+	data.bytes[index] = u8(value)
+	data.bytes[index + 1] = u8(value >> 8)
+	return true
+}
+
+fn g13_initdata_blob_put_u32(mut data G13InitDataBlob, abi hw.FirmwareAbi,
+	offset u32, value u32) bool {
+	return g13_initdata_blob_put_u16(mut data, abi, offset, u16(value))
+		&& g13_initdata_blob_put_u16(mut data, abi, offset + 2, u16(value >> 16))
+}
+
+fn g13_initdata_blob_put_u64(mut data G13InitDataBlob, abi hw.FirmwareAbi,
+	offset u32, value u64) bool {
+	return g13_initdata_blob_put_u32(mut data, abi, offset, u32(value))
+		&& g13_initdata_blob_put_u32(mut data, abi, offset + 4, u32(value >> 32))
+}
+
+fn g13_initdata_blob_put_uat_level(mut data G13InitDataBlob, abi hw.FirmwareAbi,
+	offset u32, level G13UatLevelInfo) bool {
+	active := g13_initdata_active_size(abi) or { return false }
+	if offset > u32(active) - u32(sizeof(G13UatLevelInfo)) {
+		return false
+	}
+	data.bytes[int(offset)] = level.unk_3
+	data.bytes[int(offset + 1)] = level.unk_1
+	data.bytes[int(offset + 2)] = level.unk_2
+	data.bytes[int(offset + 3)] = level.index_shift
+	return g13_initdata_blob_put_u16(mut data, abi, offset + 4, level.num_entries)
+		&& g13_initdata_blob_put_u16(mut data, abi, offset + 6, level.unk_4)
+		&& g13_initdata_blob_put_u64(mut data, abi, offset + 8, level.unk_8)
+		&& g13_initdata_blob_put_u64(mut data, abi, offset + 0x10, level.unk_10)
+		&& g13_initdata_blob_put_u64(mut data, abi, offset + 0x18, level.index_mask)
+}
+
+// Build the outer InitData at either G13 ABI. 13.5 prepends four version words
+// and therefore moves every 12.3 field by eight bytes.
+pub fn build_g13_initdata_blob(mut data G13InitDataBlob, abi hw.FirmwareAbi,
+	unk_buffer u64, runtime_pointers u64, globals u64, fw_status u64, oas u32) bool {
+	if !g13_initdata_abi_supported(abi) || unk_buffer == 0 || runtime_pointers == 0
+		|| globals == 0 || fw_status == 0 || oas < 14 || oas > 48 {
+		return false
+	}
+	base := if abi == .v13_5_partial { u32(8) } else { u32(0) }
+	if abi == .v13_5_partial {
+		// G13 13.3+ tuple from m1n1's InitData builder.
+		ver_info := [u16(0x6ba0), 0x1f28, 0x0601, 0x00b0]!
+		for index, value in ver_info {
+			if !g13_initdata_blob_put_u16(mut data, abi, u32(index * 2), value) {
+				return false
+			}
+		}
+	}
+	if !g13_initdata_blob_put_u64(mut data, abi, base, unk_buffer)
+		|| !g13_initdata_blob_put_u64(mut data, abi, base + 0x10, runtime_pointers)
+		|| !g13_initdata_blob_put_u64(mut data, abi, base + 0x18, globals)
+		|| !g13_initdata_blob_put_u64(mut data, abi, base + 0x20, fw_status)
+		|| !g13_initdata_blob_put_u16(mut data, abi, base + 0x28, 0x4000) {
+		return false
+	}
+	data.bytes[int(base + 0x2a)] = 14
+	data.bytes[int(base + 0x2b)] = 3
+	levels := [make_g13_uat_level_info(oas, 36, 8), make_g13_uat_level_info(oas, 25, 2048),
+		make_g13_uat_level_info(oas, 14, 2048)]!
+	for index, level in levels {
+		if !g13_initdata_blob_put_uat_level(mut data, abi, base + 0x2c + u32(index * 0x20),
+			level) {
+			return false
+		}
+	}
+	return g13_initdata_blob_put_u32(mut data, abi, base + 0xa0, 1)
+}
+
 pub fn validate_g13_initdata_layouts() bool {
 	return sizeof(G13PipeChannels) == 0x30
 		&& sizeof(G13RuntimePointers) == g13_runtime_pointers_size
 		&& sizeof(G13Globals) == g13_v13_5_globals_size && sizeof(G13FwStatus) == 0x80
 		&& sizeof(G13UatLevelInfo) == 0x20 && sizeof(G13InitData) == g13_initdata_size
+		&& sizeof(G13InitDataBlob) == g13_initdata_v13_5_size
 		&& sizeof(G13GlobalStatsVertex) == 0x3004
 		&& sizeof(G13GlobalStatsFragment) == 0x1124
 		&& sizeof(G13GlobalStatsCompute) == 0x3000

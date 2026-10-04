@@ -16,7 +16,9 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import memory
+import memory.mmap
 import usercopy
+import lib
 
 // DRM driver feature flags
 pub const driver_gem = u32(0x1)
@@ -47,7 +49,10 @@ pub mut:
 	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
+	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
+	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
+	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -94,6 +99,7 @@ pub mut:
 	status   int
 	can_mmap bool
 	fence    &syncobj.DmaFence = unsafe { nil }
+	box &resource.Resource = unsafe { nil }
 }
 
 // A PRIME fd keeps one GEM object alive while it is passed to another DRM
@@ -109,10 +115,12 @@ pub mut:
 	can_mmap bool
 	dev      &DrmDevice = unsafe { nil }
 	obj      &gem.GemObject = unsafe { nil }
+	box &resource.Resource = unsafe { nil }
 }
 
-fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, _flags int) voidptr {
-	if this.obj == unsafe { nil } || page > u64(-1) / page_size {
+fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidptr {
+	if this.obj == unsafe { nil } || page > u64(-1) / page_size
+		|| (this.obj.external && (this.obj.phys_addr == 0 || flags & mmap.map_shared == 0)) {
 		return unsafe { nil }
 	}
 	offset := page * page_size
@@ -120,6 +128,10 @@ fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, _flags int) voidp
 		return unsafe { nil }
 	}
 	return voidptr(this.obj.phys_addr + offset)
+}
+
+fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) u64 {
+	return if this.obj != unsafe { nil } { this.obj.pte_extra } else { 0 }
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -148,7 +160,10 @@ fn (mut this GemPrimeResource) unref(_handle voidptr) ? {
 			gem.unref(this.obj)
 		}
 	}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this GemPrimeResource) link(_handle voidptr) ? {
@@ -182,7 +197,10 @@ fn (mut this SyncFileResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
-	unsafe { free(voidptr(this)) }
+	unsafe {
+		free(voidptr(this.box))
+		free(voidptr(this))
+	}
 }
 
 fn (mut this SyncFileResource) link(_handle voidptr) ? {
@@ -440,7 +458,8 @@ fn ioctl_layout(dev &DrmDevice, cmd u32) ?DrmIoctlLayout {
 	return common_ioctl_layout(cmd)
 }
 
-fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
+// The node is /dev/dri/<prefix><number>.
+fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&DrmNode {
 	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
 
 	mut node := &DrmNode{
@@ -457,8 +476,21 @@ fn create_device_node(dev &DrmDevice, name string, render bool) ?&DrmNode {
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	fs.devtmpfs_add_device(node, 'dri/${name}')
+	mut path := lib.new_text(32)
+	path.add('dri/')
+	path.add(prefix)
+	path.add_unsigned(number)
+	name := path.str() @[freed]
+	// devtmpfs keeps its own copy of the last path component.
+	fs.devtmpfs_add_device(node, name)
+	unsafe { name.free() }
 	return node
+}
+
+fn (mut this DrmNode) mapping_attributes(handle voidptr, offset u64) u64 {
+	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil }
+		|| this.dev.driver.mmap_attributes == unsafe { nil } { return 0 }
+	return this.dev.driver.mmap_attributes(this.dev, handle, offset)
 }
 
 fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
@@ -467,6 +499,25 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 		return unsafe { nil }
 	}
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
+}
+
+fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64, _flags int) bool {
+	if handle == unsafe { nil } || this.dev == unsafe { nil }
+		|| this.dev.driver == unsafe { nil } {
+		return false
+	}
+	if this.dev.driver.mmap_retain == unsafe { nil } {
+		return true
+	}
+	return this.dev.driver.mmap_retain(this.dev, handle, offset, length)
+}
+
+fn (mut this DrmNode) release_mapping_range(handle voidptr, offset u64, length u64, _flags int) {
+	if handle != unsafe { nil } && this.dev != unsafe { nil }
+		&& this.dev.driver != unsafe { nil }
+		&& this.dev.driver.mmap_release != unsafe { nil } {
+		this.dev.driver.mmap_release(this.dev, handle, offset, length)
+	}
 }
 
 fn (mut this DrmNode) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -517,6 +568,7 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		errno.set(u64(-ret))
 		return none
 	}
+	account_activity(this.dev, cmd)
 	if layout.direction & ioctl_read != 0
 		&& !usercopy.copy_to_user(u64(argp), buffer, u64(layout.size)) {
 		errno.set(errno.efault)
@@ -569,16 +621,19 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 		registered: true
 	}
 
-	dev.node = create_device_node(dev, 'card${id}', false) or { return none }
+	dev.node = create_device_node(dev, 'card', u64(id), false) or { return none }
 	if driver.features & driver_render != 0 {
-		dev.render_node = create_device_node(dev, 'renderD${128 + id}', true) or { return none }
+		dev.render_node = create_device_node(dev, 'renderD', u64(128 + id), true) or {
+			return none
+		}
 	}
 	registered_devices[id] = dev
 
-	println('drm: Registered driver ${driver.name} as card${id}')
-	println('drm: created device node /dev/dri/card${id}')
+	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,
+		u64(id))
+	C.kprintf(c'drm: created device node /dev/dri/card%llu\n', u64(id))
 	if dev.render_node != unsafe { nil } {
-		println('drm: created device node /dev/dri/renderD${128 + id}')
+		C.kprintf(c'drm: created device node /dev/dri/renderD%llu\n', u64(128 + id))
 	}
 	return dev
 }
@@ -594,7 +649,7 @@ pub fn unregister_device(dev &DrmDevice) {
 		mut d := unsafe { dev }
 		d.registered = false
 		registered_devices[dev.dev_id] = unsafe { nil }
-		println('drm: Unregistered card${dev.dev_id}')
+		C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 	}
 }
 
@@ -725,18 +780,22 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 	if flags & ioctl.drm_rdwr != 0 {
 		fd_flags |= resource.o_rdwr
 	}
-	mut fd := file.fd_create_from_resource(mut wrapper, fd_flags) or {
+	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
+	mut res := wrapper.box
+	mut fd := file.fd_create_from_resource(mut res, fd_flags) or {
 		if dev.driver.gem_export_put != unsafe { nil } {
 			dev.driver.gem_export_put(dev, obj)
 		} else {
 			gem.unref(obj)
 		}
-		unsafe { free(voidptr(wrapper)) }
+		unsafe {
+			free(voidptr(wrapper.box))
+			free(voidptr(wrapper))
+		}
 		return none
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 		return none
 	}
 	return fdnum
@@ -802,20 +861,25 @@ fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {
 	return if syncobj.destroy(u64(handle), request.handle) { 0 } else { -22 }
 }
 
-fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
+pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 	if fence == unsafe { nil } {
 		return none
 	}
 	mut wrapper := &SyncFileResource{
 		fence: unsafe { fence }
+		status: if syncobj.is_signaled(fence) { file.pollin } else { 0 }
 	}
-	mut fd := file.fd_create_from_resource(mut wrapper, resource.o_cloexec) or {
-		unsafe { free(voidptr(wrapper)) }
+	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
+	mut res := wrapper.box
+	mut fd := file.fd_create_from_resource(mut res, resource.o_cloexec) or {
+		unsafe {
+			free(voidptr(wrapper.box))
+			free(voidptr(wrapper))
+		}
 		return none
 	}
 	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
 		fd.unref()
-		unsafe { free(voidptr(fd)) }
 		return none
 	}
 	return fdnum
@@ -823,7 +887,7 @@ fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 
 // Resolve only fds created by create_sync_file_fd. The interface type check
 // rejects arbitrary user-provided descriptors before accessing fence state.
-fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
+pub fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return none }
 	defer {
 		fd.unref()

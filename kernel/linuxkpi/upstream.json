@@ -1,0 +1,25 @@
+{
+  "version": "6.6.157",
+  "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.6.157.tar.xz",
+  "sha256": "b74a43d0630809b7871cc906ac155e956cbc0b2e78a7451f5e6c8bfcb1208c30",
+  "directories": [
+    "drivers/gpu/drm/i915/",
+    "include/",
+    "lib/",
+    "arch/x86/include/",
+    "LICENSES/"
+  ],
+  "files": [
+    "COPYING",
+    "Makefile"
+  ],
+  "excluded_directories": [
+    "include/uapi/linux/netfilter"
+  ],
+  "helpers": [
+    "lib/list_sort.c",
+    "lib/sort.c",
+    "lib/rbtree.c"
+  ],
+  "manifest_sha256": "973e6873ba669336d7ec89cb5df6d4d30dd52e927a424213ee53fe868e2af26f"
+}

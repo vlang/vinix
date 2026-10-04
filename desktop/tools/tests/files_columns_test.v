@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
@@ -16,6 +20,29 @@ fn files_columns_tree_has_text(element ui2.Element, text string) bool {
 	return false
 }
 
+fn files_columns_tree_has_view_button(element ui2.Element, action string, icon string, selected bool) bool {
+	for child in element.children {
+		if child.id == action {
+			return child.image_path == icon && child.text == ''
+				&& child.accessibility_label != ''
+				&& (child.accessibility_value == 'selected') == selected
+		}
+	}
+	return false
+}
+
+fn files_columns_tree_path_view(element ui2.Element, path string) ?ui2.Element {
+	if element.tooltip == path && element.kind == .view {
+		return element
+	}
+	for child in element.children {
+		if found := files_columns_tree_path_view(child, path) {
+			return found
+		}
+	}
+	return none
+}
+
 fn files_columns_entry_index(column &MillerColumn, name string) int {
 	for index, entry in column.browser.entries {
 		if entry.name == name {
@@ -31,6 +58,9 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	os.mkdir_all(os.join_path(root, 'alpha', 'nested')) or { panic(err) }
 	os.mkdir_all(os.join_path(root, 'beta')) or { panic(err) }
 	os.write_file(os.join_path(root, 'alpha', 'readme.txt'), 'hello') or { panic(err) }
+	for index in 0 .. 20 {
+		os.write_file(os.join_path(root, 'alpha', 'item-${index}.txt'), 'hello') or { panic(err) }
+	}
 	defer { os.rmdir_all(root) or {} }
 
 	mut app := FileBrowserApp{}
@@ -38,7 +68,9 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert app.browser.error == ''
 	app.set_view_mode(.columns)
 	assert app.view_mode == .columns
-	assert app.columns.len == 2
+	base_columns := app.columns.len
+	assert base_columns > 2
+	assert app.columns[0].browser.path == '/'
 	assert app.columns.last().browser.path == root
 
 	alpha_column := app.columns.len - 1
@@ -46,7 +78,7 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert alpha >= 0
 	alpha_action := app.columns.last().browser.entries[alpha].row_action
 	app.handle(alpha_action)!
-	assert app.columns.len == 3
+	assert app.columns.len == base_columns + 1
 	assert app.columns[app.columns.len - 2].selected_row == alpha
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha')
 
@@ -55,23 +87,74 @@ fn test_file_browser_miller_columns_follow_directory_selection() {
 	assert nested >= 0
 	nested_action := app.columns.last().browser.entries[nested].row_action
 	app.handle(nested_action)!
-	assert app.columns.len == 4
+	assert app.columns.len == base_columns + 2
 	assert app.columns.last().browser.path == os.join_path(root, 'alpha', 'nested')
 
-	// The default 460-pixel Files window has room for two Miller columns. At
-	// the deepest point those are alpha and nested, with List offered as the
-	// way back to the ordinary single-directory view.
+	// The full path stays in the toolbar, and the columns begin below it.
 	tree := app.build(ui2.rect(0, 0, 460, 330))!
-	assert files_columns_tree_has_text(tree, 'alpha')
-	assert files_columns_tree_has_text(tree, 'nested')
-	assert files_columns_tree_has_text(tree, 'List')
+	selected_path := os.join_path(root, 'alpha', 'nested')
+	assert files_columns_tree_has_text(tree, selected_path)
+	path_view := files_columns_tree_path_view(tree, selected_path) or { panic('missing path') }
+	assert int(path_view.frame.x) == files_path_left
+	assert int(path_view.frame.y) == files_path_top
+	assert app.rows_top == files_header_height()
+	assert app.column_offset == app.max_column_offset()
+	assert app.max_column_offset() > 0
+	assert files_columns_tree_has_view_button(tree, files_action_view_list, 'builtin:list_view',
+		false)
+	assert files_columns_tree_has_view_button(tree, files_action_view_columns, 'builtin:column_view',
+		true)
+	assert !files_columns_tree_has_text(tree, '-')
+	assert !files_columns_tree_has_text(tree, '+')
 	free_tree(tree)
+	content_left := files_content_left(460)
+	assert app.path_offset == app.max_path_offset()
+	assert app.path_offset > 0
+	path_x := files_path_left + 20
+	path_y := files_path_top + 10
+	app.pointer_event(.down, .left, 0, path_x, path_y, 460, 330)
+	app.pointer_event(.move, .no_button, 0, path_x + 200, path_y, 460, 330)
+	app.pointer_event(.up, .left, 0, path_x + 200, path_y, 460, 330)
+	assert app.path_offset < app.max_path_offset()
+	app.column_offset = files_clamp((app.columns.len - 2) * app.column_width,
+		app.max_column_offset())
+	app.pointer_event(.scroll, .no_button, -1, content_left + 10, app.rows_top + 10, 460, 330)
+	assert app.columns[app.columns.len - 2].browser.scroll == 2
+	bar_x := content_left + app.column_width - files_scrollbar_width - 2
+	bar_position, _ := files_scroll_thumb(app.rows_height, app.visible_rows,
+		app.columns[app.columns.len - 2].browser.entries.len, 2)
+	app.pointer_event(.down, .left, 0, bar_x + 2, app.rows_top + bar_position + 1, 460, 330)
+	app.pointer_event(.move, .no_button, 0, bar_x + 2, app.rows_top + app.rows_height + 10, 460, 330)
+	app.pointer_event(.up, .left, 0, bar_x + 2, app.rows_top + app.rows_height + 10, 460, 330)
+	assert app.columns[app.columns.len - 2].browser.scroll == app.columns[app.columns.len - 2].browser.entries.len - app.visible_rows
+	app.column_offset = app.max_column_offset()
+	track := app.viewport_width - 2 * files_padding
+	thumb_x, _ := files_scroll_thumb(track, app.viewport_width, app.columns.len * app.column_width,
+		app.column_offset)
+	bar_y := 330 - files_horizontal_bar_height + 8
+	app.pointer_event(.down, .left, 0, content_left + files_padding + thumb_x + 1, bar_y, 460, 330)
+	app.pointer_event(.move, .no_button, 0, content_left + files_padding + 1, bar_y, 460, 330)
+	app.pointer_event(.up, .left, 0, content_left + files_padding + 1, bar_y, 460, 330)
+	assert app.column_offset == 0
+	app.pointer_event(.down, .left, 0, 460 - files_padding - 2, bar_y, 460, 330)
+	app.pointer_event(.up, .left, 0, 460 - files_padding - 2, bar_y, 460, 330)
+	assert app.column_offset == app.max_column_offset()
 
-	app.handle(files_action_view_toggle)!
+	app.handle(files_action_view_columns)!
+	assert app.columns.len == base_columns + 2
+	app.handle(files_action_view_list)!
 	assert app.view_mode == .list
 	assert app.columns.len == 0
 	assert app.browser.path == os.join_path(root, 'alpha', 'nested')
 	assert app.browser.entries.len == 0
+	list_tree := app.build(ui2.rect(0, 0, 460, 330))!
+	assert files_columns_tree_has_view_button(list_tree, files_action_view_list,
+		'builtin:list_view', true)
+	assert files_columns_tree_has_view_button(list_tree, files_action_view_columns,
+		'builtin:column_view', false)
+	free_tree(list_tree)
+	app.handle(files_action_view_list)!
+	assert app.view_mode == .list
 	app.browser.free_entries()
 }
 

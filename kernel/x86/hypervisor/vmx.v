@@ -8,6 +8,8 @@ import klock
 import memory
 import x86.cpu
 import x86.cpu.local as cpulocal
+// Aliased: `gdt` names a descriptor below.
+import x86.gdt as x86gdt
 import x86.msr
 
 #include "vmx.h"
@@ -476,22 +478,22 @@ fn (mut vm Vm) configure_vmcs() bool {
 
 	for field in [vmcs_guest_es_selector, vmcs_guest_cs_selector, vmcs_guest_ss_selector,
 		vmcs_guest_ds_selector, vmcs_guest_fs_selector, vmcs_guest_gs_selector,
-		vmcs_guest_ldtr_selector, vmcs_guest_tr_selector] {
+		vmcs_guest_ldtr_selector, vmcs_guest_tr_selector]! {
 		ok = ok && vmwrite(field, 0)
 	}
 	for field in [vmcs_guest_es_base, vmcs_guest_cs_base, vmcs_guest_ss_base, vmcs_guest_ds_base,
 		vmcs_guest_fs_base, vmcs_guest_gs_base, vmcs_guest_ldtr_base, vmcs_guest_tr_base,
-		vmcs_guest_gdtr_base, vmcs_guest_idtr_base] {
+		vmcs_guest_gdtr_base, vmcs_guest_idtr_base]! {
 		ok = ok && vmwrite(field, 0)
 	}
 	for field in [vmcs_guest_es_limit, vmcs_guest_cs_limit, vmcs_guest_ss_limit, vmcs_guest_ds_limit,
 		vmcs_guest_fs_limit, vmcs_guest_gs_limit, vmcs_guest_ldtr_limit, vmcs_guest_tr_limit,
-		vmcs_guest_gdtr_limit, vmcs_guest_idtr_limit] {
+		vmcs_guest_gdtr_limit, vmcs_guest_idtr_limit]! {
 		ok = ok && vmwrite(field, 0xffff)
 	}
 	ok = ok && vmwrite(vmcs_guest_cs_access, 0x9b)
 	for field in [vmcs_guest_es_access, vmcs_guest_ss_access, vmcs_guest_ds_access,
-		vmcs_guest_fs_access, vmcs_guest_gs_access] {
+		vmcs_guest_fs_access, vmcs_guest_gs_access]! {
 		ok = ok && vmwrite(field, 0x93)
 	}
 	ok = ok && vmwrite(vmcs_guest_ldtr_access, 0x10000)
@@ -660,12 +662,15 @@ fn write_host_state() bool {
 	ok = ok && vmwrite(vmcs_host_cr0, cpu.read_cr0())
 	ok = ok && vmwrite(vmcs_host_cr3, cpu.read_cr3())
 	ok = ok && vmwrite(vmcs_host_cr4, cpu.read_cr4())
-	ok = ok && vmwrite(vmcs_host_es_selector, C.vinix_vmx_read_es() & ~u16(7))
+	// Null data segments, as KVM has them: a host selector may not name the
+	// LDT, and a user's LDT or TLS selector with that bit taken off would
+	// name another descriptor. run() puts the thread's FS and GS back.
+	ok = ok && vmwrite(vmcs_host_es_selector, 0)
 	ok = ok && vmwrite(vmcs_host_cs_selector, C.vinix_vmx_read_cs() & ~u16(7))
 	ok = ok && vmwrite(vmcs_host_ss_selector, C.vinix_vmx_read_ss() & ~u16(7))
-	ok = ok && vmwrite(vmcs_host_ds_selector, C.vinix_vmx_read_ds() & ~u16(7))
-	ok = ok && vmwrite(vmcs_host_fs_selector, C.vinix_vmx_read_fs() & ~u16(7))
-	ok = ok && vmwrite(vmcs_host_gs_selector, C.vinix_vmx_read_gs() & ~u16(7))
+	ok = ok && vmwrite(vmcs_host_ds_selector, 0)
+	ok = ok && vmwrite(vmcs_host_fs_selector, 0)
+	ok = ok && vmwrite(vmcs_host_gs_selector, 0)
 	ok = ok && vmwrite(vmcs_host_tr_selector, tr & ~u16(7))
 	ok = ok && vmwrite(vmcs_host_fs_base, msr.rdmsr(ia32_fs_base))
 	ok = ok && vmwrite(vmcs_host_gs_base, msr.rdmsr(ia32_gs_base))
@@ -767,7 +772,24 @@ pub fn (mut vm Vm) run() ?VmExit {
 	guest_fpu := voidptr(vm.guest_fpu + memory.get_hhdm_offset())
 	C.vinix_vmx_fxsave(host_fpu)
 	C.vinix_vmx_fxrstor(guest_fpu)
+	fs_selector := cpu.fs_selector()
+	gs_selector := cpu.gs_selector()
 	entry_result := C.vinix_vmx_enter(&vm.registers)
+	// A VM exit sets the GDT limit to 0xffff and leaves no LDT: this CPU's
+	// own go back, the LDT's descriptor still in the GDT. Then the FS and GS
+	// selectors the thread had, which loaded a moment ago from the same
+	// tables, with the bases they give, as the scheduler loads them. A null
+	// one is null already, and its base the one host state gave back.
+	x86gdt.reload_table(&current.gdt[0])
+	if current.ldt != unsafe { nil } {
+		cpu.load_ldt(x86gdt.ldt_selector)
+	}
+	if fs_selector & 0xfffc != 0 {
+		cpu.load_fs_selector(fs_selector)
+	}
+	if gs_selector & 0xfffc != 0 {
+		cpu.load_user_gs_selector(gs_selector)
+	}
 	C.vinix_vmx_fxsave(guest_fpu)
 	C.vinix_vmx_fxrstor(host_fpu)
 	if entry_result != 0 {

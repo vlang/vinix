@@ -17,23 +17,38 @@ MC_GAME_ROOT='$work/game'
 MC_JAVA_MAJOR='25'
 MC_CLASSPATH='$work/game/libraries/org/lwjgl/lwjgl/3.4.1/lwjgl-3.4.1-natives-linux-arm64.jar:$work/game/versions/26.2/26.2.jar'
 MC_JVM_ARGS='-Dorg.lwjgl.system.SharedLibraryExtractPath=\${natives_directory}/lwjgl -Dminecraft.launcher.brand=\${launcher_name}'
+# Model both persistent states: demo arguments from an installation staged
+# before custom-resolution support, and current full-game arguments.
 MC_GAME_ARGS_DEMO='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --demo'
-MC_GAME_ARGS_FULL='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type}'
+MC_GAME_ARGS_FULL='--username \${auth_player_name} --version \${version_name} --gameDir \${game_directory} --assetsDir \${assets_root} --assetIndex \${assets_index_name} --uuid \${auth_uuid} --accessToken \${auth_access_token} --versionType \${version_type} --width \${resolution_width} --height \${resolution_height}'
 EOF
 
 cat > "$work/bin/java" <<'EOF'
 #!/bin/sh
 if [ "${1:-}" = -version ]; then
+	if [ "${VINIX_TEST_JAVA_FAIL:-0}" = 1 ]; then
+		echo 'cannot load libjvm.so' >&2
+		exit 127
+	fi
     echo 'openjdk version "25" 2026-09-16'
     exit 0
 fi
 printf 'display=%s\n' "${DISPLAY:-}"
 printf 'software=%s\n' "${LIBGL_ALWAYS_SOFTWARE:-}"
 printf 'gallium=%s\n' "${GALLIUM_DRIVER:-}"
+printf 'driver_override=%s\n' "${MESA_LOADER_DRIVER_OVERRIDE:-}"
 printf 'indirect=%s\n' "${LIBGL_ALWAYS_INDIRECT:-}"
+printf 'allow_wx=%s\n' "${VINIX_ALLOW_WX:-}"
 printf 'args=%s\n' "$*"
 EOF
 chmod +x "$work/bin/java"
+cat > "$work/bin/glxinfo" <<'EOF'
+#!/bin/sh
+printf 'OpenGL renderer string: %s\n' "${VINIX_TEST_GLX_RENDERER:-virgl (Apple M5 Max)}"
+EOF
+chmod +x "$work/bin/glxinfo"
+PATH="$work/bin:$PATH"
+export PATH
 
 launcher="$root/build-support/minecraft/run-minecraft"
 common_env="VINIX_MINECRAFT_ROOT=$work/game VINIX_MINECRAFT_JAVA=$work/bin/java VINIX_MINECRAFT_USER_DIR=$work/user"
@@ -44,6 +59,12 @@ case "$output" in
     *'Minecraft 26.2 (release)'*'no account signed in'*'ready'*) ;;
     *) echo "check failed: $output" >&2; exit 1 ;;
 esac
+if VINIX_TEST_JAVA_FAIL=1 env $common_env "$launcher" --check \
+	>"$work/java-failure.log" 2>&1; then
+	echo "check accepted a Java runtime that could not execute" >&2
+	exit 1
+fi
+grep -q 'Java failed to start: cannot load libjvm.so' "$work/java-failure.log"
 
 # With no account, the launcher starts Mojang's free demo and expands every
 # placeholder Mojang's template uses.
@@ -60,14 +81,43 @@ printf '%s\n' "$output" | grep -q '^indirect=$'
 # GALLIUM_DRIVER=llvmpipe names gallium-pipe/pipe_llvmpipe.so, which is not
 # staged; asking for it fails EGL outright. It has to stay unset.
 printf '%s\n' "$output" | grep -q '^gallium=$'
+# A hardware request must clear every inherited software/indirect override.
+hardware_output=$(env $common_env DISPLAY=:7 VINIX_MINECRAFT_HARDWARE_GL=1 \
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+    MESA_LOADER_DRIVER_OVERRIDE=swrast LIBGL_ALWAYS_INDIRECT=1 "$launcher")
+printf '%s\n' "$hardware_output" | grep -q 'hardware OpenGL renderer: virgl (Apple M5 Max)'
+printf '%s\n' "$hardware_output" | grep -q '^software=$'
+printf '%s\n' "$hardware_output" | grep -q '^gallium=$'
+printf '%s\n' "$hardware_output" | grep -q '^driver_override=$'
+printf '%s\n' "$hardware_output" | grep -q '^indirect=$'
+if env $common_env DISPLAY=:7 VINIX_MINECRAFT_HARDWARE_GL=1 \
+    VINIX_TEST_GLX_RENDERER='llvmpipe (LLVM 19)' "$launcher" \
+    >"$work/software-fallback.log" 2>&1; then
+    echo 'hardware launch accepted a software GLX renderer' >&2
+    exit 1
+fi
+grep -q 'expected hardware OpenGL, got llvmpipe' "$work/software-fallback.log"
 printf '%s' "$output" | grep -q 'net.minecraft.client.main.Main'
 printf '%s' "$output" | grep -q 'natives-linux-arm64'
+printf '%s' "$output" | grep -q -- '--width 1280 --height 720'
+# A custom hosted surface can override the defaults without regenerating the
+# Mojang launch description.
+output=$(env $common_env DISPLAY=:7 VINIX_MINECRAFT_WIDTH=1600 VINIX_MINECRAFT_HEIGHT=900 "$launcher")
+printf '%s' "$output" | grep -q -- '--width 1600 --height 900'
 # musl needs Alpine's OpenAL and jemalloc instead of LWJGL's bundled copies.
 printf '%s' "$output" | grep -q 'org.lwjgl.openal.libname=/usr/lib/libopenal.so.1'
 # LWJGL's own jemalloc cannot be loaded here at all; use the libc allocator.
 printf '%s' "$output" | grep -q 'org.lwjgl.system.allocator=system'
 # LWJGL aborts with "Unknown platform: Vinix" unless it is told the ABI name.
 printf '%s' "$output" | grep -q '\-Dos.name=Linux'
+# HotSpot must use its stable interpreter and explicitly request Vinix's
+# process-scoped compatibility exception for the JVM's RWX startup probe.
+printf '%s' "$output" | grep -q '\-Xint'
+printf '%s' "$output" | grep -q '\-XX:ActiveProcessorCount=1'
+# Alpine's jspawnhelper pipe protocol is not implemented on Vinix. Java must
+# use its direct fork path for Minecraft's system probes and helper commands.
+printf '%s' "$output" | grep -q '\-Djdk.lang.Process.launchMechanism=FORK'
+printf '%s\n' "$output" | grep -q '^allow_wx=1$'
 
 # The full game requires a real session; refuse rather than fabricate one.
 if env $common_env DISPLAY=:7 "$launcher" --play >/dev/null 2>&1; then
@@ -86,6 +136,16 @@ output=$(env $common_env DISPLAY=:7 "$launcher" --play)
 case "$output" in
     *'--username Steve'*'--accessToken test.access.token'*) ;;
     *) echo "full launch failed: $output" >&2; exit 1 ;;
+esac
+case "$output" in
+    *'--width 1280 --height 720'*) ;;
+    *) echo "current launch description lost its resolution: $output" >&2; exit 1 ;;
+esac
+case "$output" in
+    *'--width '*'--width '* | *'--height '*'--height '*)
+        echo "resolution argument was duplicated: $output" >&2
+        exit 1
+        ;;
 esac
 case "$output" in
     *--demo*) echo "full launch unexpectedly entered the demo" >&2; exit 1 ;;

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/third_party/useralloc-speed-v5-audit-base/tests/kernel-allocs/run.sh"
+  ],
+  "environment": {
+    "V": "/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v"
+  },
+  "exit_code": 1,
+  "compiler_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "allowed_sha256": "5292f32c5efc75689d7c74401afe28833270108cee70cd82af6048ed66999a8c",
+  "finished_utc": "2026-10-02T21:33:10.112524+00:00",
+  "notes": "Exact frozen v4 kernel sources with same fixed checker/full literal allowlist as v5. No allowlist edits."
+}

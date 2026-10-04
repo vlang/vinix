@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module fw
 
+import gpu.agx.hw
+
 // G13 v12.3 notifier objects shared by all native subqueues belonging to one
 // DRM queue. The linked-list head is self-linked through `next`, matching the
 // reference firmware builder; `prev` remains null until firmware links it.
@@ -45,6 +47,35 @@ pub mut:
 	cur_count  u32
 	unk_10     u32
 	state      G13NotifierState
+}
+
+pub fn g13_notifier_active_size(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { u64(sizeof(G13Notifier)) }
+		.v13_5_partial { u64(0xb0) }
+		else { none }
+	}
+}
+
+pub fn initialize_g13_notifier(data voidptr, size u64, abi hw.FirmwareAbi,
+	threshold u64, generation u32) bool {
+	required := g13_notifier_active_size(abi) or { return false }
+	if data == unsafe { nil } || size < required || threshold == 0 {
+		return false
+	}
+	unsafe {
+		mut notifier := &G13Notifier(data)
+		notifier.threshold = threshold
+		notifier.generation = generation
+		notifier.unk_10 = 0x50
+		if abi == .v13_5_partial {
+			mut bytes := &u8(data)
+			for offset := u32(0xa8); offset < 0xb0; offset++ {
+				bytes[offset] = 0xff
+			}
+		}
+	}
+	return true
 }
 
 pub fn validate_g13_event_layouts() bool {

@@ -1,0 +1,50 @@
+{
+  "argv": [
+    "/opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64",
+    "-name",
+    "Vinix private hot v5 diagnostic 2",
+    "-machine",
+    "q35,vmport=off",
+    "-accel",
+    "tcg,thread=single,tb-size=1024",
+    "-cpu",
+    "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt",
+    "-smp",
+    "2,sockets=1,cores=2,threads=1",
+    "-m",
+    "4096",
+    "-display",
+    "none",
+    "-monitor",
+    "none",
+    "-drive",
+    "if=pflash,format=raw,readonly=on,file=/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+    "-cdrom",
+    "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/vinix.iso",
+    "-serial",
+    "file:/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/serial.log",
+    "-no-reboot"
+  ],
+  "qemu_version": "QEMU emulator version 11.1.1",
+  "machine": "q35,vmport=off",
+  "accelerator": "tcg,thread=single,tb-size=1024",
+  "cpu": "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt",
+  "smp": "2,sockets=1,cores=2,threads=1",
+  "memory_mb": 4096,
+  "input_sha256": {
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/x86_64/vinix-x86_64": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/lib/ld-musl-x86_64.so.1": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v5-final/usr/lib/libc.a": "eb50810aa7d3583f6469e23fce4c2f464a86197cfb2a0cdf5293b75baaedd90c",
+    "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/bench.c": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9"
+  },
+  "sampler_sha256": "584543c2a4175cd1d7c990baef765c1c88e453946ef053a714bf9c9a62e34e7a",
+  "executables_sha256": {
+    "dynamic": "beb19f360103ab67ac20904c1dcf1ca7141444c78425951b3c5378468d8d2eba",
+    "static": "e6d21c6fc502d95383bd557eebdfb9bdde7e69c640a1b38838f5a8272a9066ed"
+  },
+  "kernel_verification": "Extracted completed ISO kernel hash equals immutable v5 kernel.",
+  "iterations": 200000,
+  "samples": 7,
+  "fresh_execs_per_mode": 3,
+  "limits": "Private state probes run outside unchanged hot loops. Cross GCC executable differs from canonical guest GCC executable. CPU time is kernel accounting, not host process time."
+}

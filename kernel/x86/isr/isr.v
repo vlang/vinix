@@ -8,6 +8,7 @@ import x86.apic
 import x86.cpu
 import x86.cpu.local as cpulocal
 import memory.mmap
+import memory
 import katomic
 import lib
 import userland
@@ -54,10 +55,22 @@ const exception_names = [
 	c'???',
 	c'???',
 	c'Security',
-]
+]!
 
 fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
-	mmap.pf_handler(gpr_state) or { exception_handler(num, mut gpr_state) }
+	// Read while interrupts are still off: see mmap.pf_handler().
+	fault_addr := cpu.read_cr2()
+	if gpr_state.cs & 3 == 0 {
+		resume := memory.stack_guard_probe_fixup(gpr_state.rip, fault_addr)
+		if resume != 0 { gpr_state.rip = resume; return }
+		if memory.kernel_stack_guard(fault_addr) {
+			C.vinix_stack_guard_diagnostic(gpr_state.rsp, gpr_state.rip, fault_addr)
+			C.vinix_stack_guard_message(c'STACK-GUARD FATAL kernel-stack exhaustion\n')
+			C.printf_panic(c'kernel stack guard: address=0x%llx sp=0x%llx\n', fault_addr, gpr_state.rsp)
+			lib.kpanic(gpr_state, c'Kernel stack guard')
+		}
+	}
+	mmap.pf_handler(gpr_state) or { exception_handler_at(num, mut gpr_state, fault_addr) }
 }
 
 fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
@@ -70,8 +83,42 @@ fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 	}
 }
 
+// asm/int_thunks_asm.S and asm/x86_64/syscall_entry.S: where the way back to
+// a thread reloads the DS and ES it had.
+fn C.interrupt_exit_load_ds()
+fn C.interrupt_exit_load_es()
+fn C.syscall_exit_load_ds()
+fn C.syscall_exit_load_es()
+
+// A data segment the way back to a thread reloads, which its LDT or TLS
+// descriptors no longer describe -- another thread took the entry away, or
+// the thread came back on a CPU with a newer LDT -- is loaded null instead,
+// as Linux's exception fixup has it. Whether the fault was one of those.
+fn fix_segment_reload(num u32, mut gpr_state cpulocal.GPRState) bool {
+	// #NP for a descriptor that is not present, #GP for any other.
+	if num != 11 && num != 13 {
+		return false
+	}
+	rip := gpr_state.rip
+	if rip != u64(voidptr(C.interrupt_exit_load_ds)) && rip != u64(voidptr(C.interrupt_exit_load_es))
+		&& rip != u64(voidptr(C.syscall_exit_load_ds))
+		&& rip != u64(voidptr(C.syscall_exit_load_es)) {
+		return false
+	}
+	// Each loads the segment from eax: it runs again, with null.
+	gpr_state.rax = 0
+	return true
+}
+
 fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
-	if gpr_state.cs == user_code_seg {
+	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) })
+}
+
+// `cr2` is the faulting address of a page fault, read on entry.
+fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
+	// Userspace is any code segment of privilege 3: an LDT can give a process
+	// others than the GDT's.
+	if gpr_state.cs & 3 == 3 {
 		mut signal := u8(0)
 
 		match num {
@@ -96,10 +143,11 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		}
 
 		// Preserve both pieces of x86 exception state in the existing frame.
-		// Hardware error codes occupy the low bits; mlibc exposes the vector in
-		// the high half as uc_mcontext.gregs[REG_TRAPNO].
+		// Hardware error codes occupy the low bits and the vector the high half;
+		// the signal frame hands them out as uc_mcontext's REG_ERR and
+		// REG_TRAPNO.
 		gpr_state.err = (gpr_state.err & u64(0xffffffff)) | (u64(num) << 32)
-		fault_addr := if num == 14 { cpu.read_cr2() } else { u64(0) }
+		fault_addr := if num == 14 { cr2 } else { u64(0) }
 		fault_code := match num {
 			0 { 1 } // FPE_INTDIV
 			1 { 2 } // TRAP_TRACE
@@ -130,11 +178,14 @@ fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 		}
 		userland.sendsig(proc.current_thread(), signal)
 		userland.dispatch_a_signal_info(gpr_state, int(signal), fault_code, fault_addr)
-		// dispatch_a_signal() switches away when it delivered the exception. If
-		// no userspace signal entry exists (or SIGSEGV was blocked), do not retry
-		// the same fault forever.
-		userland.syscall_exit(unsafe { nil }, 128 + signal)
+		// dispatch_a_signal() switches away when it delivered the exception. A
+		// fault nothing handles -- no handler, or the signal blocked -- cannot
+		// be retried: the process dies of the signal, as on arm64 and Linux.
+		userland.exit_with_fatal_signal(signal)
 	} else {
+		if fix_segment_reload(num, mut gpr_state) {
+			return
+		}
 		lib.kpanic(gpr_state, exception_names[num])
 	}
 }
@@ -150,6 +201,10 @@ pub fn initialise() {
 
 	for i := u16(0); i < 32; i++ {
 		match i {
+			8 { // Dedicated double-fault stack, independent of IST3.
+				unsafe { idt.register_handler(i, voidptr(thunks[i]), 2, 0x8e) }
+				interrupt_table[i] = voidptr(exception_handler)
+			}
 			14 { // Page fault
 				unsafe { idt.register_handler(i, voidptr(thunks[i]), 3, 0x8e) }
 				interrupt_table[i] = voidptr(pf_handler)

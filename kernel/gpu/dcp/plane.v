@@ -24,7 +24,7 @@ const supported_formats = [
 	dcp_format_xrgb8888,
 	dcp_format_argb8888,
 	dcp_format_xbgr8888,
-]
+]!
 
 // Plane state for atomic commit. Describes the source region within the
 // framebuffer and the destination region on the CRTC. Source coordinates

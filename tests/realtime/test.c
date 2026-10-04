@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 //
 // Guest side of the AArch64 real-time scheduling regression. Runs as PID 1 and
 // checks that the scheduling policies are real: that the syscalls carry them,

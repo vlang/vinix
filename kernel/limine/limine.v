@@ -187,6 +187,10 @@ pub mut:
 // Memory map
 
 pub const limine_memmap_usable = 0
+pub const limine_memmap_reserved = 1
+pub const limine_memmap_acpi_reclaimable = 2
+pub const limine_memmap_acpi_nvs = 3
+pub const limine_memmap_bad_memory = 4
 pub const limine_memmap_bootloader_reclaimable = 5
 pub const limine_memmap_kernel_and_modules = 6
 pub const limine_memmap_framebuffer = 7

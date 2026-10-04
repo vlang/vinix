@@ -10,9 +10,9 @@ import event.eventstruct
 import dev.fbdev.api
 import katomic
 import errno
+import lib
 import memory.mmap
-import proc
-import term
+import usercopy
 
 pub struct FramebufferNode {
 pub mut:
@@ -41,12 +41,6 @@ fn (mut this FramebufferNode) mmap(_handle voidptr, page u64, _flags int) voidpt
 	if offset >= this.info.size {
 		return unsafe { nil }
 	}
-
-	// A program mapping the framebuffer is about to draw the whole screen
-	// itself. Silence the kernel terminal until that program exits, exactly as
-	// KDSETMODE KD_GRAPHICS would; a program that never asks still gets a
-	// display it owns.
-	term.enter_graphics_mode(proc.current_thread().process.pid)
 
 	phys := u64(this.info.base) + offset - higher_half
 
@@ -92,15 +86,26 @@ fn (mut this FramebufferNode) write(_handle voidptr, buf voidptr, loc u64, count
 fn (mut this FramebufferNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	match request {
 		ioctl.fbioget_vscreeninfo {
-			unsafe { C.memcpy(argp, &this.info.variable, sizeof(api.FBVarScreenInfo)) }
+			if !usercopy.copy_to_user(u64(argp), voidptr(&this.info.variable), sizeof(api.FBVarScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
 			return 0
 		}
 		ioctl.fbioput_vscreeninfo {
-			unsafe { C.memcpy(&this.info.variable, argp, sizeof(api.FBVarScreenInfo)) }
+			mut variable := api.FBVarScreenInfo{}
+			if !usercopy.copy_from_user(voidptr(&variable), u64(argp), sizeof(api.FBVarScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
+			this.info.variable = variable
 			return 0
 		}
 		ioctl.fbioget_fscreeninfo {
-			unsafe { C.memcpy(argp, &this.info.fixed, sizeof(api.FBFixScreenInfo)) }
+			if !usercopy.copy_to_user(u64(argp), voidptr(&this.info.fixed), sizeof(api.FBFixScreenInfo)) {
+				errno.set(errno.efault)
+				return none
+			}
 			return 0
 		}
 		ioctl.fbioblank {
@@ -157,8 +162,12 @@ fn create_device_node(index u64) ? {
 	node.node_created = true
 
 	mmap.register_uncached_resource(voidptr(node))
-	fs.devtmpfs_add_device(node, 'fb${index}')
-	println('fbdev: created device node /dev/fb${index}')
+	// The device node keeps the name.
+	mut name := lib.new_text(8)
+	name.add('fb')
+	name.add_unsigned(index)
+	fs.devtmpfs_add_device(node, name.str())
+	C.kprintf(c'fbdev: created device node /dev/fb%llu\n', u64(index))
 }
 
 pub fn register_device(info api.FramebufferInfo) ? {
@@ -185,7 +194,9 @@ pub fn register_device(info api.FramebufferInfo) ? {
 		return none
 	}
 
-	println('fbdev: registered new framebuffer device (using driver ${info.driver.name} and mode ${info.variable.xres}x${info.variable.yres}x${info.variable.bits_per_pixel})')
+	C.kprintf(c'fbdev: registered new framebuffer device (using driver %.*s and mode %llux%llux%llu)\n',
+		i32(info.driver.name.len), info.driver.name.str, u64(info.variable.xres),
+		u64(info.variable.yres), u64(info.variable.bits_per_pixel))
 
 	return create_device_node(index)
 }

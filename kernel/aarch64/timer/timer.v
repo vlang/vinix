@@ -15,7 +15,7 @@ __global (
 
 pub fn initialise() {
 	timer_freq = cpu.read_cntfrq_el0()
-	println('timer: ARM Generic Timer frequency: ${timer_freq} Hz')
+	C.kprintf(c'timer: ARM Generic Timer frequency: %llu Hz\n', u64(timer_freq))
 	// Optimized native libraries use the architectural virtual counter for
 	// cheap timing. Linux exposes CNTVCT_EL0 to userspace, so do the same while
 	// leaving the virtual timer control registers privileged.
@@ -59,6 +59,11 @@ pub fn get_ns() u64 {
 	secs := count / timer_freq
 	frac := count % timer_freq
 	return secs * 1000000000 + frac * 1000000000 / timer_freq
+}
+
+// The smallest positive interval representable by the architectural counter.
+pub fn resolution_ns() u64 {
+	return (1000000000 + timer_freq - 1) / timer_freq
 }
 
 // Get current time in microseconds

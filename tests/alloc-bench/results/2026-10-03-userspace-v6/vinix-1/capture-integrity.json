@@ -1,0 +1,12 @@
+{
+  "files_sha256": {
+    "config.json": "cdfa3c804e262376265d39e16c22912bd4e307f4fbf44bb08dbfeca6d805a332",
+    "serial.log": "354b6baa649156c1f57cb68f5d8909cd974d36248778fae5f9d96a5452882e45",
+    "driver-exit.json": "a55c7af95358698a0112daa835b77c473932741a770c9242102ec29677b10d5f",
+    "runner.log": "f62b3ab0d7de8bd55dac7b97a2ffecf92454980d7529b9d485b1039cb7db34c5",
+    "coordinator-record.json": "fb9150af6afb0366b32ce3a76c42119c074bdbba83658ea11e4ce5ce9324b2db"
+  },
+  "capture": "vinix-1",
+  "source": "actual complete predeclared v6 capture",
+  "actual_driver_exit_zero": true
+}

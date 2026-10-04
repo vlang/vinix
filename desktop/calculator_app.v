@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The built-in calculator's compile-time VML desktop adapter.
 //
 // The model comes from ui2's calculator example. The view is parsed and
@@ -96,7 +99,15 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut app CalculatorApp) handle(event_id string) ! {
-	app.calculator.press(event_id)
+	// The protocol request owns event_id and frees it after this call. The
+	// example model keeps digit/operator strings, so give it the matching key
+	// stored for the model's lifetime instead of that transient request.
+	for key in app.calculator.keys {
+		if key.text == event_id {
+			app.calculator.press(key.text)
+			return
+		}
+	}
 }
 
 fn (mut app CalculatorApp) close_app() {

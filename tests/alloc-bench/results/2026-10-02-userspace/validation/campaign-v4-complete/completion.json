@@ -1,0 +1,40 @@
+{
+  "campaign_complete": true,
+  "declared_utc": "2026-10-02T19:18:38.051711+00:00",
+  "ordered_captures": [
+    {
+      "capture": "vinix-1",
+      "exit_code": 0,
+      "started_utc": "2026-10-02T19:48:58.296879+00:00",
+      "finished_utc": "2026-10-02T19:52:34.989507+00:00"
+    },
+    {
+      "capture": "catalina-1",
+      "exit_code": 0,
+      "started_utc": "2026-10-02T19:57:03.520336+00:00",
+      "finished_utc": "2026-10-02T20:01:58.561140+00:00"
+    },
+    {
+      "capture": "catalina-2",
+      "exit_code": 0,
+      "started_utc": "2026-10-02T20:01:58.575051+00:00",
+      "finished_utc": "2026-10-02T20:06:46.514398+00:00"
+    },
+    {
+      "capture": "vinix-2",
+      "exit_code": 0,
+      "started_utc": "2026-10-02T20:06:46.534240+00:00",
+      "finished_utc": "2026-10-02T20:11:00.244311+00:00"
+    }
+  ],
+  "all_cohorts_at_or_faster": false,
+  "all_pooled_workloads_at_or_faster": false,
+  "all_samples_included": true,
+  "files_sha256": {
+    "useralloc-v4-final-cohorts.driver.log": "43159944ab14938a40aa85dc505fb3673659bc5b39ebee3d7909b04c9d6c381b",
+    "useralloc-macos-final-driver.py": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+    "useralloc-v4-final-cohorts.py": "9ed7765e4fa5b5f58f2ef988f9b355515f30ec5d206c5f07ac8b6d270a858729",
+    "useralloc-v4-final-cohorts.json": "e497ee87874acc813f9b251897e8ab2a0bfc8ad07c0fc2f224f66f6f90bd2c56",
+    "useralloc-final-driver.py": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+  }
+}

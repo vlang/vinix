@@ -1,0 +1,17 @@
+{
+  "builder": "/Users/alex/code/vinix/build-userland-aarch64.sh",
+  "builder_sha256": "672d3f1ad239342e97c0d6d3482a3de5ece3db06ce3741c057c5479d4503312d",
+  "stage_helper_sha256": "0a15d3ca7562d3fbf1fc66df570d8516cdde39e52343116ebf8f4a795e90084d",
+  "settings": {
+    "VINIX_AARCH64_USERLAND_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v3/aarch64",
+    "VINIX_AARCH64_INITRAMFS": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v3/aarch64/initramfs.tar",
+    "VINIX_MUSL_BUILD_DIR": "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl",
+    "VINIX_MUSL_RETAIN": "1",
+    "VINIX_OPTIMIZED_MUSL": "1",
+    "VINIX_ALPINE_DEVTOOLS": "1",
+    "VINIX_ALPINE_BASE_ONLY": "1",
+    "NPROC": "2",
+    "ALPINE_VERSION": "3.21.7",
+    "ALPINE_BRANCH": "v3.21"
+  }
+}

@@ -215,8 +215,8 @@ pub fn (mut ctx AfkEpContext) recv() ?(u32, u32, []u8) {
 	op := entry.op
 	data_size := entry.data_size
 
-	// Copy payload out
-	mut data := []u8{len: int(data_size)}
+	// Copy payload out. The caller frees it.
+	mut data := []u8{len: int(data_size)} @[freed]
 	if data_size > 0 {
 		payload_ptr := entry_ptr + u64(entry.data_offset)
 		unsafe {
@@ -272,11 +272,12 @@ pub fn (mut ctx AfkEpContext) handshake() bool {
 	// Step 2: Wait for HELLO_ACK
 	mut got_hello_ack := false
 	for _ in 0 .. 10000000 {
-		channel, op, _ := ctx.recv() or {
+		channel, op, data := ctx.recv() or {
 			cpu.wfe()
 			continue
 		}
 		_ = channel
+		unsafe { data.free() }
 		if op == afk_op_hello_ack {
 			got_hello_ack = true
 			break
@@ -300,11 +301,12 @@ pub fn (mut ctx AfkEpContext) handshake() bool {
 	// Step 4: Wait for INIT_ACK
 	mut got_init_ack := false
 	for _ in 0 .. 10000000 {
-		channel, op, _ := ctx.recv() or {
+		channel, op, data := ctx.recv() or {
 			cpu.wfe()
 			continue
 		}
 		_ = channel
+		unsafe { data.free() }
 		if op == afk_op_init_ack {
 			got_init_ack = true
 			break

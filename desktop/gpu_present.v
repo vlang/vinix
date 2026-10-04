@@ -1,16 +1,31 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 #flag -I @VMODROOT
 
 #include "gpu_present.h"
 
+fn C.vinix_gpu_present_startup_stage(stage &char)
+
 fn C.vinix_gpu_present_create(width int, height int) voidptr
 
 fn C.vinix_gpu_present_frame(handle voidptr, source &u32, source_width int, source_height int, source_stride int, destination &u32, destination_width int, destination_height int, destination_stride int) int
 
 fn C.vinix_gpu_present_destroy(handle voidptr)
+
+fn C.vinix_desktop_set_console_mode(graphics int)
+
+fn gpu_present_startup_stage(stage &char) {
+	C.vinix_gpu_present_startup_stage(stage)
+}
+
+fn desktop_set_console_graphics(graphics bool) {
+	C.vinix_desktop_set_console_mode(if graphics { 1 } else { 0 })
+}
 
 struct GpuPresenter {
 mut:
@@ -25,15 +40,19 @@ fn (mut presenter GpuPresenter) present(source &Canvas, destination &u32, width 
 	}
 	if !presenter.attempted {
 		presenter.attempted = true
+		gpu_present_startup_stage(c'calling presenter creation')
 		presenter.handle = C.vinix_gpu_present_create(width, height)
 		if presenter.handle == unsafe { nil } {
+			gpu_present_startup_stage(c'presenter creation failed; using software copy')
 			presenter.failed = true
 			return false
 		}
+		gpu_present_startup_stage(c'presenter creation returned successfully')
 	}
 	if C.vinix_gpu_present_frame(presenter.handle, source.pixels, source.physical_width, source.physical_height, source.stride, destination, width, height, stride) != 0 {
 		return true
 	}
+	gpu_present_startup_stage(c'GPU frame failed; disabling GPU presentation')
 	C.vinix_gpu_present_destroy(presenter.handle)
 	presenter.handle = unsafe { nil }
 	presenter.failed = true

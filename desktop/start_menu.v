@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Start menu. Its two-column layout follows Windows 7: frequently used
 // programs on a light pane, system destinations on the tinted pane, an All
 // Programs view, search at the bottom and a session button in the lower right.
@@ -20,6 +23,23 @@ const action_start_system = 'start.system'
 const action_start_welcome = 'start.welcome'
 const action_start_shutdown = 'start.shutdown'
 const action_start_launch_prefix = 'start.launch.'
+const action_start_documents = 'start.documents'
+const action_start_recent = 'start.recent'
+const action_start_recent_back = 'start.recent.back'
+const action_start_recent_prefix = 'start.recent.'
+const action_start_jump_prefix = 'start.jump.'
+const app_start_jump_actions = ['start.jump.0', 'start.jump.1', 'start.jump.2', 'start.jump.3',
+	'start.jump.4', 'start.jump.5', 'start.jump.6', 'start.jump.7', 'start.jump.8', 'start.jump.9',
+	'start.jump.10', 'start.jump.11', 'start.jump.12', 'start.jump.13', 'start.jump.14',
+	'start.jump.15', 'start.jump.16', 'start.jump.17', 'start.jump.18', 'start.jump.19',
+	'start.jump.20', 'start.jump.21', 'start.jump.22', 'start.jump.23', 'start.jump.24',
+	'start.jump.25', 'start.jump.26', 'start.jump.27', 'start.jump.28']
+const start_recent_item_actions = ['start.recent.0', 'start.recent.1', 'start.recent.2',
+	'start.recent.3', 'start.recent.4', 'start.recent.5', 'start.recent.6', 'start.recent.7',
+	'start.recent.8', 'start.recent.9', 'start.recent.10', 'start.recent.11']
+// The Recent Items pane lists every program's history rather than one's.
+const start_recent_all = -2
+const start_recent_none = -1
 
 const start_button_width = 42
 const start_menu_preferred_width = 460
@@ -30,8 +50,8 @@ const start_menu_row_height = 34
 const start_menu_search_height = 32
 const start_menu_max_query = 48
 
-// The opening page is deliberately short, like Windows 7's recent-programs
-// list. All Programs and search both expose every installed application.
+// A new profile has no history yet. Windows 7 seeded its recent-programs list
+// the same way; the first launches replace these.
 const start_menu_favorites = [0, 3, 1, 2, 6, 7, 8, 9, 10, 11]
 
 // This blue-grey shell remains recognizable against every wallpaper and both
@@ -84,9 +104,12 @@ fn (mut d Desktop) toggle_start_menu() {
 		d.close_start_menu()
 		return
 	}
+	d.close_taskbar_preview()
+	d.close_tray_flyout()
 	d.start_menu_open = true
 	d.start_menu_all_apps = false
 	d.start_menu_searching = false
+	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
 	d.start_menu_query = []u8{cap: start_menu_max_query}
 	// Search only appends and removes bytes; no slices escape from this buffer.
@@ -102,6 +125,7 @@ fn (mut d Desktop) close_start_menu() {
 	d.start_menu_open = false
 	d.start_menu_all_apps = false
 	d.start_menu_searching = false
+	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
 	d.set_hover('')
 	d.dirty = true
@@ -155,24 +179,35 @@ fn (d &Desktop) start_menu_element() ui2.Element {
 		bold: true
 	})
 
-	mut right_y := 82
-	children << d.start_menu_right_button(action_start_files, 'Files', 'builtin:folder', right_x, right_y, right_width)
-	right_y += 39
-	children << d.start_menu_right_button(action_start_system, 'System', 'builtin:window', right_x, right_y, right_width)
-	right_y += 39
-	children << d.start_menu_right_button(action_start_settings, 'Settings', 'builtin:settings', right_x, right_y, right_width)
-	right_y += 47
-	children << ui2.view('start.right.rule', ui2.rect(f64(right_x + 8), f64(right_y - 5), f64(right_width - 16), 1), ui2.BoxStyle{
-		bg: 0x6c86a5
-	}, [])
-	children << d.start_menu_right_button(action_start_terminal, 'Terminal', 'builtin:terminal', right_x, right_y, right_width)
-	right_y += 39
-	children << d.start_menu_right_button(action_start_activity, 'Activity Monitor', 'builtin:activity', right_x, right_y, right_width)
-	right_y += 39
-	children << d.start_menu_right_button(action_start_welcome, 'Help', 'builtin:window', right_x, right_y, right_width)
+	if d.start_menu_recent_app != start_recent_none {
+		d.start_menu_recent_pane(mut children, right_x, 76, right_width, height - 62 - 76)
+	} else {
+		mut right_y := 76
+		children << d.start_menu_right_button(action_start_files, tr('app.files'), 'builtin:folder', right_x, right_y, right_width)
+		right_y += 37
+		children << d.start_menu_right_button(action_start_documents, tr('start.documents'), 'builtin:documents', right_x, right_y, right_width)
+		right_y += 37
+		children << d.start_menu_right_button(action_start_recent, tr('start.recent_items'), 'builtin:clock', right_x, right_y, right_width)
+		right_y += 45
+		children << ui2.view('start.right.rule', ui2.rect(f64(right_x + 8), f64(right_y - 5), f64(right_width - 16), 1), ui2.BoxStyle{
+			bg: 0x6c86a5
+		}, [])
+		children << d.start_menu_right_button(action_start_settings, tr('app.settings'), 'builtin:settings', right_x, right_y, right_width)
+		right_y += 37
+		children << d.start_menu_right_button(action_start_system, tr('window.system'), 'builtin:window', right_x, right_y, right_width)
+		right_y += 45
+		children << ui2.view('start.right.rule2', ui2.rect(f64(right_x + 8), f64(right_y - 5), f64(right_width - 16), 1), ui2.BoxStyle{
+			bg: 0x6c86a5
+		}, [])
+		children << d.start_menu_right_button(action_start_terminal, tr('app.terminal'), 'builtin:terminal', right_x, right_y, right_width)
+		right_y += 37
+		children << d.start_menu_right_button(action_start_activity, tr('app.activity_monitor'), 'builtin:activity', right_x, right_y, right_width)
+		right_y += 37
+		children << d.start_menu_right_button(action_start_welcome, tr('start.help'), 'builtin:window', right_x, right_y, right_width)
+	}
 
 	power_width := if right_width > 138 { 128 } else { right_width - 8 }
-	children << ui2.button(action_start_shutdown, 'Shut down', ui2.rect(f64(right_x + right_width - power_width), f64(height - 49), f64(power_width), 34), ui2.BoxStyle{
+	children << ui2.button(action_start_shutdown, tr('start.shut_down'), ui2.rect(f64(right_x + right_width - power_width), f64(height - 49), f64(power_width), 34), ui2.BoxStyle{
 		bg: if d.hover == action_start_shutdown { start_menu_power_hover } else { start_menu_power }
 		radius: 5
 	}, ui2.TextStyle{
@@ -196,7 +231,7 @@ fn (d &Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2
 	if d.start_menu_query.len > 0 {
 		d.start_menu_filtered_programs(mut children, 8, search_y - 5, width)
 	} else if d.start_menu_all_apps {
-		children << ui2.button(action_start_back, '<  Back', ui2.rect(7, 7, f64(width - 14), 30), ui2.BoxStyle{
+		children << ui2.button(action_start_back, tr('start.back'), ui2.rect(7, 7, f64(width - 14), 30), ui2.BoxStyle{
 			bg: if d.hover == action_start_back { start_menu_item_hover } else { start_menu_left }
 			radius: 4
 		}, ui2.TextStyle{
@@ -207,19 +242,39 @@ fn (d &Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2
 		})
 		d.start_menu_all_programs(mut children, 40, search_y - 5, width)
 	} else {
+		// Pinned programs first, then the recently used ones below a rule, as
+		// Windows 7 arranged its left column.
 		mut row_y := 9
-		for index in start_menu_favorites {
-			if index >= available_apps.len || row_y + 38 > search_y - 39 {
+		limit := search_y - 39
+		for index in d.start_pins {
+			if index < 0 || index >= available_apps.len || row_y + 38 > limit {
+				continue
+			}
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38)
+			row_y += 38
+		}
+		if d.start_pins.len > 0 && row_y + 8 < limit {
+			children << ui2.view('start.pins.rule', ui2.rect(12, f64(row_y + 3), f64(width - 24), 1), ui2.BoxStyle{
+				bg: start_menu_separator
+			}, [])
+			row_y += 8
+		}
+		recent := if d.recent_programs.len > 0 { d.recent_programs } else { start_menu_favorites }
+		for index in recent {
+			if index < 0 || index >= available_apps.len || d.start_is_pinned(index) {
+				continue
+			}
+			if row_y + 38 > limit {
 				break
 			}
-			children << d.start_menu_app_button(index, 7, row_y, width - 14, 38)
+			d.start_menu_app_row(mut children, index, 7, row_y, width - 14, 38)
 			row_y += 38
 		}
 		all_y := search_y - 39
 		children << ui2.view('start.programs.rule', ui2.rect(12, f64(all_y - 2), f64(width - 24), 1), ui2.BoxStyle{
 			bg: start_menu_separator
 		}, [])
-		children << ui2.button(action_start_all, 'All Programs  >', ui2.rect(7, f64(all_y + 2), f64(width - 14), 33), ui2.BoxStyle{
+		children << ui2.button(action_start_all, tr('start.all_programs'), ui2.rect(7, f64(all_y + 2), f64(width - 14), 33), ui2.BoxStyle{
 			bg: if d.hover == action_start_all { start_menu_item_hover } else { start_menu_left }
 			radius: 4
 		}, ui2.TextStyle{
@@ -233,7 +288,7 @@ fn (d &Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2
 	search_text := if d.start_menu_query.len > 0 {
 		d.start_menu_query_text()
 	} else {
-		'Search programs and files'
+		tr('start.search')
 	}
 	children << ui2.button_with_image(action_start_search, search_text, 'builtin:search', ui2.rect(7, f64(search_y), f64(width - 14), f64(start_menu_search_height)), ui2.BoxStyle{
 		bg: if d.start_menu_searching { u32(0xffffff) } else { start_menu_search_bg }
@@ -273,12 +328,12 @@ fn (d &Desktop) start_menu_filtered_programs(mut children []ui2.Element, top int
 	width int) {
 	mut count := 0
 	for factory in available_apps {
-		if start_menu_matches(factory.title, d.start_menu_query_text()) {
+		if app_matches(factory.title, d.start_menu_query_text()) {
 			count++
 		}
 	}
 	if count == 0 {
-		children << ui2.label('start.no_results', 'No programs found', ui2.rect(18, f64(top + 12), f64(width - 36), 24), ui2.TextStyle{
+		children << ui2.label('start.no_results', tr('start.no_results'), ui2.rect(18, f64(top + 12), f64(width - 36), 24), ui2.TextStyle{
 			color: start_menu_muted
 			size: 12
 		})
@@ -293,7 +348,7 @@ fn (d &Desktop) start_menu_filtered_programs(mut children []ui2.Element, top int
 	}
 	mut row_y := top
 	for index, factory in available_apps {
-		if !start_menu_matches(factory.title, d.start_menu_query_text()) {
+		if !app_matches(factory.title, d.start_menu_query_text()) {
 			continue
 		}
 		children << d.start_menu_app_button(index, 7, row_y, width - 14, row_height)
@@ -304,7 +359,7 @@ fn (d &Desktop) start_menu_filtered_programs(mut children []ui2.Element, top int
 fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height int) ui2.Element {
 	factory := &available_apps[index]
 	id := app_start_actions[index]
-	return ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{
+	return ui2.button_with_image(id, app_title_text(factory.title), factory.icon, ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{
 		bg: if d.hover == id { start_menu_item_hover } else { start_menu_left }
 		radius: 4
 	}, ui2.TextStyle{
@@ -312,6 +367,181 @@ fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height
 		size: 12
 		align: .left
 	})
+}
+
+// start_menu_app_row is a program's row with, for a program that keeps a
+// history, the arrow that shows its recent items in the right column.
+fn (d &Desktop) start_menu_app_row(mut children []ui2.Element, index int, x int, y int, width int,
+	height int) {
+	children << d.start_menu_app_button(index, x, y, width, height)
+	if !jump_list_has_recent(available_apps[index].process_name) {
+		return
+	}
+	id := app_start_jump_actions[index]
+	open := d.start_menu_recent_app == index
+	children << ui2.button_with_image(id, '', 'builtin:arrow_right', ui2.rect(f64(x + width - 30),
+		f64(y + 4), 26, f64(height - 8)), ui2.BoxStyle{
+		bg:          start_menu_item_hover
+		radius:      4
+		transparent: !open && d.hover != id
+	}, ui2.TextStyle{
+		color: start_menu_muted
+	})
+}
+
+// start_menu_recent_pane replaces the system links with a program's recent
+// items, or with every program's for Recent Items.
+fn (d &Desktop) start_menu_recent_pane(mut children []ui2.Element, x int, y int, width int,
+	height int) {
+	title := if d.start_menu_recent_app >= 0 && d.start_menu_recent_app < available_apps.len {
+		app_title_text(available_apps[d.start_menu_recent_app].title)
+	} else {
+		tr('start.recent_items')
+	}
+	children << ui2.button_with_image(action_start_recent_back, title, 'builtin:arrow_left', ui2.rect(f64(x),
+		f64(y), f64(width), 30), ui2.BoxStyle{
+		bg:     if d.hover == action_start_recent_back { start_menu_right_hover } else { start_menu_shell }
+		radius: 4
+	}, ui2.TextStyle{
+		color: start_menu_right_text
+		size:  12
+		bold:  true
+		align: .left
+	})
+	children << ui2.view('start.recent.rule', ui2.rect(f64(x + 8), f64(y + 35), f64(width - 16), 1), ui2.BoxStyle{
+		bg: 0x6c86a5
+	}, [])
+	if d.start_menu_recent_items.len == 0 {
+		children << ui2.label('start.recent.empty', tr('start.recent_empty'), ui2.rect(f64(x + 10),
+			f64(y + 44), f64(width - 20), 22), ui2.TextStyle{
+			color: 0xb9c7d9
+			size:  12
+		})
+		return
+	}
+	mut row_y := y + 42
+	for slot in 0 .. d.start_menu_recent_items.len {
+		if slot >= start_recent_item_actions.len || slot >= d.start_menu_recent_titles.len
+			|| row_y + 32 > y + height {
+			break
+		}
+		children << d.start_menu_right_button(start_recent_item_actions[slot], d.start_menu_recent_titles[slot],
+			if d.start_menu_recent_dirs[slot] { 'builtin:folder' } else { 'builtin:file' }, x,
+			row_y, width)
+		row_y += 34
+	}
+}
+
+// set_start_menu_recent reads the history once when the pane opens, rather
+// than from disk on every redraw.
+fn (mut d Desktop) set_start_menu_recent(app int) {
+	if app == d.start_menu_recent_app {
+		return
+	}
+	free_recent_items(d.start_menu_recent_items)
+	unsafe {
+		// []string.free releases every title as well as the array.
+		d.start_menu_recent_titles.free()
+		d.start_menu_recent_dirs.free()
+	}
+	d.start_menu_recent_items = []RecentItem{}
+	d.start_menu_recent_titles = []string{}
+	d.start_menu_recent_dirs = []bool{}
+	d.start_menu_recent_app = app
+	d.dirty = true
+	if app == start_recent_none {
+		return
+	}
+	name := if app >= 0 && app < available_apps.len { available_apps[app].process_name } else { '' }
+	d.start_menu_recent_items = recent_items_for(d.home, name, start_recent_item_actions.len)
+	for item in d.start_menu_recent_items {
+		d.start_menu_recent_titles << recent_item_title(item.path)
+		d.start_menu_recent_dirs << if info := desktop_stat(item.path) { info.is_dir } else { false }
+	}
+}
+
+// Resting on a program's arrow shows its recent items; moving to another
+// program puts the system links back, as the Windows 7 menu did.
+fn (mut d Desktop) update_start_menu_hover() {
+	if !d.start_menu_open {
+		return
+	}
+	if d.hover.starts_with(action_start_jump_prefix) {
+		d.set_start_menu_recent(d.hover[action_start_jump_prefix.len..].int())
+		return
+	}
+	if d.start_menu_recent_app >= 0 && d.hover.starts_with(action_start_launch_prefix) {
+		index := d.hover[action_start_launch_prefix.len..].int()
+		if index != d.start_menu_recent_app {
+			d.set_start_menu_recent(start_recent_none)
+		}
+	}
+}
+
+fn (d &Desktop) start_context_entries(index int) []ui2.MenuEntry {
+	mut entries := []ui2.MenuEntry{cap: 4}
+	entries << ui2.MenuEntry{
+		id:    start_context_open
+		title: tr('start.context.open')
+	}
+	entries << if d.start_is_pinned(index) {
+		ui2.MenuEntry{
+			id:    start_context_unpin_start
+			title: tr('start.context.unpin_start')
+		}
+	} else {
+		ui2.MenuEntry{
+			id:    start_context_pin_start
+			title: tr('start.context.pin_start')
+		}
+	}
+	entries << if d.taskbar_is_pinned(index) {
+		ui2.MenuEntry{
+			id:    start_context_unpin_taskbar
+			title: tr('start.context.unpin_taskbar')
+		}
+	} else {
+		ui2.MenuEntry{
+			id:    start_context_pin_taskbar
+			title: tr('start.context.pin_taskbar')
+		}
+	}
+	if shortcut_order_contains(d.recent_programs, index) && !d.start_is_pinned(index) {
+		entries << ui2.MenuEntry{
+			id:    start_context_forget
+			title: tr('start.context.forget')
+		}
+	}
+	return entries
+}
+
+fn (mut d Desktop) start_context_action(action string, index int) {
+	if index < 0 || index >= available_apps.len {
+		return
+	}
+	match action {
+		start_context_open {
+			d.close_start_menu()
+			d.launch_index(index)
+		}
+		start_context_pin_start {
+			d.pin_start_app_in(d.home, index)
+		}
+		start_context_unpin_start {
+			d.unpin_start_app_in(d.home, index)
+		}
+		start_context_pin_taskbar {
+			d.pin_taskbar_app_in(d.home, index)
+		}
+		start_context_unpin_taskbar {
+			d.unpin_taskbar_app_in(d.home, index)
+		}
+		start_context_forget {
+			d.forget_recent_program_in(d.home, index)
+		}
+		else {}
+	}
+	d.dirty = true
 }
 
 fn (d &Desktop) start_menu_right_button(id string, title string, icon string, x int, y int,
@@ -329,31 +559,69 @@ fn (d &Desktop) start_menu_right_button(id string, title string, icon string, x 
 // Windows' Start search is ASCII here because the desktop's baked font is
 // ASCII. Comparing folded bytes avoids allocating lowercase copies every time
 // the element tree is rebuilt.
+// app_matches finds a program by what it is called in either the desktop's
+// language or English, so a Russian user can type «каль» or «calc».
+fn app_matches(title string, query string) bool {
+	return start_menu_matches(title, query) || start_menu_matches(app_title_text(title), query)
+}
+
+// start_menu_matches is a substring search that ignores case and accents,
+// rune by rune and without allocating: «ТЕРМ» finds Терминал, and
+// «configuracion» finds Configuración.
 fn start_menu_matches(title string, query string) bool {
 	if query.len == 0 {
 		return true
 	}
-	if query.len > title.len {
-		return false
-	}
-	for start in 0 .. title.len - query.len + 1 {
-		mut equal := true
-		for i in 0 .. query.len {
-			if start_menu_lower(title[start + i]) != start_menu_lower(query[i]) {
-				equal = false
+	mut start := 0
+	for start < title.len {
+		mut t := start
+		mut q := 0
+		for q < query.len && t < title.len {
+			title_rune, title_size := next_rune(title, t)
+			query_rune, query_size := next_rune(query, q)
+			if start_menu_fold(title_rune) != start_menu_fold(query_rune) {
 				break
 			}
+			t += title_size
+			q += query_size
 		}
-		if equal {
+		if q >= query.len {
 			return true
 		}
+		_, size := next_rune(title, start)
+		start += size
 	}
 	return false
 }
 
+// start_menu_fold maps a letter to its lower-case, unaccented form for the
+// scripts the desktop's languages use.
 @[inline]
-fn start_menu_lower(ch u8) u8 {
-	return if ch >= `A` && ch <= `Z` { ch + 32 } else { ch }
+fn start_menu_fold(r u32) u32 {
+	if r < 0x80 {
+		return if r >= `A` && r <= `Z` { r + 32 } else { r }
+	}
+	if r >= 0x400 && r <= 0x45f {
+		// Ё and ё search as Е and е.
+		if r == 0x401 || r == 0x451 {
+			return 0x435
+		}
+		if r >= 0x410 && r <= 0x42f {
+			return r + 0x20
+		}
+		return if r < 0x410 { r + 0x50 } else { r }
+	}
+	return match r {
+		0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5 { u32(`a`) }
+		0xc7, 0xe7 { u32(`c`) }
+		0xc8, 0xc9, 0xca, 0xcb, 0xe8, 0xe9, 0xea, 0xeb { u32(`e`) }
+		0xcc, 0xcd, 0xce, 0xcf, 0xec, 0xed, 0xee, 0xef { u32(`i`) }
+		0xd1, 0xf1 { u32(`n`) }
+		0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6 { u32(`o`) }
+		0xd9, 0xda, 0xdb, 0xdc, 0xf9, 0xfa, 0xfb, 0xfc { u32(`u`) }
+		0xdd, 0xfd, 0xff { u32(`y`) }
+		else { r }
+	}
 }
 
 // While the menu is open, typing searches immediately, Backspace edits the
@@ -378,7 +646,7 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 					continue
 				}
 				for index, factory in available_apps {
-					if start_menu_matches(factory.title, d.start_menu_query_text()) {
+					if app_matches(factory.title, d.start_menu_query_text()) {
 						d.close_start_menu()
 						d.launch_index(index)
 						return
@@ -418,6 +686,20 @@ fn (mut d Desktop) handle_start_action(action string) {
 			index := d.window_index(id) or { return }
 			d.clamp_to_screen(index)
 		}
+		action_start_recent {
+			d.set_start_menu_recent(start_recent_all)
+		}
+		action_start_recent_back {
+			d.set_start_menu_recent(start_recent_none)
+		}
+		action_start_documents {
+			d.close_start_menu()
+			files_index := shortcut_app_index_named('vinix-files')
+			documents := user_folder_path('Documents')
+			ensure_directory(documents) or {}
+			d.open_path_in_app(files_index, documents)
+			unsafe { documents.free() }
+		}
 		action_start_files, action_start_settings, action_start_terminal, action_start_activity {
 			index := match action {
 				action_start_files { 0 }
@@ -444,7 +726,28 @@ fn (mut d Desktop) handle_start_action(action string) {
 				index := action[action_start_launch_prefix.len..].int()
 				d.close_start_menu()
 				d.launch_index(index)
+			} else if action.starts_with(action_start_jump_prefix) {
+				// A click on the arrow does what resting on it does.
+				d.set_start_menu_recent(action[action_start_jump_prefix.len..].int())
+			} else if action.starts_with(action_start_recent_prefix) {
+				d.open_start_recent_item(action[action_start_recent_prefix.len..].int())
 			}
 		}
 	}
+}
+
+// open_start_recent_item opens a history entry with the program that
+// recorded it, in a new window of that program.
+fn (mut d Desktop) open_start_recent_item(slot int) {
+	if slot < 0 || slot >= d.start_menu_recent_items.len {
+		return
+	}
+	item := d.start_menu_recent_items[slot]
+	app := shortcut_app_index_named(item.app)
+	path := item.path.clone()
+	d.close_start_menu()
+	if app >= 0 {
+		d.open_path_in_app(app, path)
+	}
+	unsafe { path.free() }
 }

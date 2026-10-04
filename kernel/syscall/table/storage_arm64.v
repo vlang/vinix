@@ -3,13 +3,13 @@
 module table
 
 import apple.ans
-import file
+import fs
 import pagecache
 import pipe
-import proc
 import errno
 import aarch64.cpu
 import memory.mmap
+import security
 
 // kernel/memory/mmap uses this bit only for the reserved brk arena. It is not a
 // Linux mmap flag implemented by Vinix and must never reach VM accounting from
@@ -31,6 +31,11 @@ pub fn init_storage_syscalls() {
 	// 245/246 for native arm64 extensions; keep mimmutable in that reserved
 	// block rather than stealing a Linux ABI syscall number.
 	syscall_table[247] = voidptr(mmap.syscall_mimmutable)
+	// OpenBSD's pledge(2) and unveil(2), next to mimmutable in the same block.
+	syscall_table[248] = voidptr(fs.syscall_pledge)
+	syscall_table[249] = voidptr(fs.syscall_unveil)
+	// And OpenBSD's minherit(2).
+	syscall_table[250] = voidptr(mmap.syscall_minherit)
 }
 
 fn security_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64,
@@ -52,37 +57,15 @@ fn storage_flush_everything() bool {
 	return ans.flush() && caches_flushed
 }
 
-fn storage_sync(_ voidptr) (u64, u64) {
-	if !storage_flush_everything() { return errno.err, errno.eio }
-	return 0, 0
-}
-
-fn storage_fsync(_ voidptr, fdnum int) (u64, u64) {
-	// The descriptor's own sync is what folds a shared file mapping back into
-	// the inode; a flush driven from the cache registry cannot find those pages.
-	// It also performs the EBADF and EINVAL checks fsync(2) owes its caller.
-	ret, code := file.syscall_fsync(unsafe { nil }, fdnum)
-	if ret != 0 { return ret, code }
-	return storage_sync(unsafe { nil })
-}
-
-fn storage_syncfs(_ voidptr, fdnum int) (u64, u64) {
-	mut fd := file.fd_from_fdnum(proc.current_thread().process, fdnum) or { return errno.err, errno.get() }
-	defer { fd.unref() }
-	return storage_sync(unsafe { nil })
-}
-
 fn storage_reboot(_ voidptr, magic1 u32, magic2 u32, command u32, _arg voidptr) (u64, u64) {
+	if !security.permitted(security.system_reboot) { return errno.err, errno.eperm }
 	if magic1 != 0xfee1dead || (magic2 != 0x28121969 && magic2 != 0x05121996
 		&& magic2 != 0x16041998 && magic2 != 0x20112000) { return errno.err, errno.einval }
 	if command != 0x01234567 && command != 0xcdef0123 && command != 0x4321fedc {
 		return errno.err, errno.einval
 	}
-	// Linux gates this on CAP_SYS_BOOT. Vinix has no credential model, so every
-	// process already holds the privilege such a check would look for, and
-	// demanding PID 1 instead only made reboot(2) unreachable: on the desktop
-	// image init execs the compositor, so nothing a terminal runs is ever pid 1.
-	// The magic numbers above remain the guard against a stray call.
+	// The caller must hold the named reboot permission, and Linux's magic
+	// numbers still guard against an accidental call by a privileged process.
 	//
 	// Nothing restarts a machine with unwritten data. A reset that dropped the
 	// page cache is exactly the reboot that loses the file just created, so a

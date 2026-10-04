@@ -49,7 +49,7 @@ pub fn register_reclaimer(reclaimer fn (u64) u64) bool {
 		return false
 	}
 	reclaimers[reclaimers_len] = reclaimer
-	reclaimers_len++
+	katomic.store(mut &reclaimers_len, reclaimers_len + 1)
 	return true
 }
 
@@ -61,10 +61,15 @@ fn reclaim_pages(wanted u64) u64 {
 	}
 	defer { katomic.store(mut &reclaim_inflight, u32(0)) }
 
+	katomic.inc(mut &pressure_reclaim_runs)
 	mut reclaimed := u64(0)
-	count := reclaimers_len
+	count := katomic.load(&reclaimers_len)
 	for i := 0; i < count && reclaimed < wanted; i++ {
 		reclaimed += reclaimers[i](wanted - reclaimed)
+	}
+	mut previous := katomic.load(&pressure_reclaimed_pages)
+	for !katomic.cas(mut &pressure_reclaimed_pages, previous, previous + reclaimed) {
+		previous = katomic.load(&pressure_reclaimed_pages)
 	}
 	return reclaimed
 }
@@ -79,6 +84,15 @@ __global (
 
 pub fn get_hhdm_offset() u64 {
 	return higher_half
+}
+
+// The HHDM offset straight from Limine's response, for code that runs before
+// pmm_init() has copied it into higher_half. 0 if Limine gave none.
+pub fn bootloader_hhdm_offset() u64 {
+	if hhdm_req.response == unsafe { nil } {
+		return 0
+	}
+	return hhdm_req.response.offset
 }
 
 // total_bytes and free_bytes report the machine's usable RAM and how much of
@@ -166,8 +180,10 @@ pub fn pmm_init() {
 			if entries[i].@type != u32(limine.limine_memmap_usable) {
 				continue
 			}
-			if entries[i].length >= metadata_size {
-				pmm_bitmap_phys = entries[i].base
+			aligned_base := lib.align_up(entries[i].base, page_size)
+			if aligned_base < entries[i].base + entries[i].length
+				&& entries[i].base + entries[i].length - aligned_base >= metadata_size {
+				pmm_bitmap_phys = aligned_base
 				pmm_bitmap_size = bitmap_size
 				pmm_bitmap = voidptr(pmm_bitmap_phys + higher_half)
 				pmm_refcounts_phys = pmm_bitmap_phys + bitmap_size
@@ -191,9 +207,11 @@ pub fn pmm_init() {
 				continue
 			}
 
-			for j := u64(0); j < entries[i].length; j += page_size {
+			base := lib.align_up(entries[i].base, page_size)
+			top := lib.align_down(entries[i].base + entries[i].length, page_size)
+			for addr := base; addr < top; addr += page_size {
 				free_pages++
-				lib.bitreset(pmm_bitmap, (entries[i].base + j) / page_size)
+				lib.bitreset(pmm_bitmap, addr / page_size)
 			}
 		}
 
@@ -234,6 +252,7 @@ pub fn pmm_init() {
 	slabs[11].init(1024)
 	slabs[12].init(1536)
 	slabs[13].init(2048)
+	init_medium_slabs()
 
 	$if xnu_zone ? {
 		xnu_heap_init()
@@ -307,6 +326,7 @@ fn try_alloc_nozero(count u64) voidptr {
 
 		ret = inner_alloc(count, last)
 		if ret == 0 {
+			katomic.inc(mut &pressure_allocation_failures)
 			return unsafe { nil }
 		}
 	}
@@ -316,11 +336,25 @@ fn try_alloc_nozero(count u64) voidptr {
 	return ret
 }
 
+// How many pages pmm_alloc_nozero() has the reclaimers give back at a time
+// while it looks for a run: each batch is freed with a cache's lock held.
+const reclaim_batch = u64(4096)
+
 pub fn pmm_alloc_nozero(count u64) voidptr {
 	mut ret := try_alloc_nozero(count)
 	if ret == unsafe { nil } {
 		reclaim_pages(count)
 		ret = try_alloc_nozero(count)
+		// The reclaimers give back what was least recently used, wherever
+		// it lies, so `count` pages back need not make a run of `count`:
+		// after an install onto a disk had filled the page cache, a
+		// multi-page allocation on amd64 found no run with 2 GiB free. Rather
+		// than stop the kernel, go on giving back, a batch at a time, until a
+		// run turns up or nothing is left to give. Fallible callers have
+		// other ways out and keep the cache.
+		for count > 1 && ret == unsafe { nil } && reclaim_pages(reclaim_batch) > 0 {
+			ret = try_alloc_nozero(count)
+		}
 		if ret == unsafe { nil } {
 			lib.kpanic(unsafe { nil }, c'Out of memory after reclaim')
 		}
@@ -332,9 +366,10 @@ pub fn pmm_alloc(count u64) voidptr {
 	ret := pmm_alloc_nozero(count)
 
 	// We always zero out memory for security reasons
+	word_count := (count * page_size) / 8
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < word_count; i++ {
 			ptr[i] = 0
 		}
 	}
@@ -345,6 +380,11 @@ pub fn pmm_alloc(count u64) voidptr {
 // (e.g. user-controlled GEM/driver allocations). Unlike pmm_alloc these return
 // nil on out-of-memory instead of panicking, so resource pressure cannot be
 // turned into a kernel panic by a userspace request.
+// IRQ/atomic callers cannot run reclaimers, which can enter filesystem code.
+pub fn pmm_alloc_nozero_nowait(count u64) voidptr {
+	return try_alloc_nozero(count)
+}
+
 pub fn pmm_alloc_nozero_fallible(count u64) voidptr {
 	mut ret := try_alloc_nozero(count)
 	if ret == unsafe { nil } {
@@ -361,9 +401,10 @@ pub fn pmm_alloc_fallible(count u64) voidptr {
 	}
 
 	// We always zero out memory for security reasons
+	word_count := (count * page_size) / 8
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < word_count; i++ {
 			ptr[i] = 0
 		}
 	}
@@ -371,7 +412,7 @@ pub fn pmm_alloc_fallible(count u64) voidptr {
 }
 
 // Allocate `count` contiguous pages whose physical base is aligned to
-// `alignment_pages`. The PMM is 4 KiB-granular, so this over-allocates and
+// `alignment_pages`. The PMM is page-granular, so this over-allocates and
 // returns the unused prefix and suffix before exposing the aligned range.
 fn pmm_alloc_aligned_inner(count u64, alignment_pages u64, fallible bool) voidptr {
 	if count == 0 || alignment_pages == 0 || alignment_pages & (alignment_pages - 1) != 0
@@ -432,6 +473,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 	defer {
 		pmm_lock.release()
 	}
+	words_per_page := page_size / 8
 	for i := page; i < page + count; i++ {
 		mut refs := unsafe { &u32(pmm_refcounts) }
 		if unsafe { refs[i] } > 1 {
@@ -443,7 +485,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
 		}
 		unsafe {
 			mut words := &u64(i * page_size + higher_half)
-			for word := u64(0); word < page_size / 8; word++ {
+			for word := u64(0); word < words_per_page; word++ {
 				words[word] = 0xaaaaaaaaaaaaaaaa
 			}
 			refs[i] = 0
@@ -477,6 +519,22 @@ pub fn pmm_retain(ptr voidptr, count u64) bool {
 	return true
 }
 
+// The same without the lock, for accounting that can live with a count that
+// is a moment out of date.
+pub fn pmm_refcount_unlocked(ptr voidptr) u32 {
+	page := u64(ptr) / page_size
+	if page >= pmm_avl_page_count {
+		return 0
+	}
+	// The count's address is worked out by hand. Taking the address of the
+	// indexed element had the compiler copy the element into a temporary and
+	// load from where that temporary had been, once it was gone: the counts
+	// read were whatever the stack held there, 0x80000000 or 0xffff0000 for a
+	// page two processes shared after fork.
+	count := unsafe { &u32(u64(pmm_refcounts) + page * sizeof(u32)) }
+	return katomic.load(count)
+}
+
 pub fn pmm_refcount(ptr voidptr) u32 {
 	page := u64(ptr) / page_size
 	if page >= pmm_avl_page_count {
@@ -487,9 +545,31 @@ pub fn pmm_refcount(ptr voidptr) u32 {
 	return unsafe { (&u32(pmm_refcounts))[page] }
 }
 
+// The fourteen fixed classes, and up to four medium ones where a page is large
+// enough for them; see init_medium_slabs. A class that was never initialised
+// has an ent_size of 0 and is skipped.
 __global (
-	slabs [14]Slab
+	slabs [18]Slab
 )
+
+// Objects over 2 KiB and up to half a page are given whole pages by big_alloc,
+// plus a page for its metadata. On a 16 KiB-page machine a 4 KiB page-cache
+// block took 32 KiB that way. These classes split a page evenly into 6, 4, 3
+// and 2 instead, for malloc_packed(); a page-cache block now shares its page
+// with two others. A 4 KiB page fits none of them, so an amd64 kernel has
+// only the fourteen.
+fn init_medium_slabs() {
+	divisors := [u64(6), 4, 3, 2]!
+	mut next := 14
+	for divisor in divisors {
+		size := ((page_size - slab_data_offset()) / divisor) & ~(slab_alignment - 1)
+		if size <= 2048 || size > page_size / 2 || next >= slabs.len {
+			continue
+		}
+		slabs[next].init(size)
+		next++
+	}
+}
 
 struct MallocMetadata {
 mut:
@@ -523,15 +603,54 @@ pub fn free(ptr voidptr) {
 }
 
 fn big_free(ptr voidptr) {
+	if vmap_contains(u64(ptr)) {
+		pages := vmap_free(u64(ptr) - page_size)
+		adjust_big_alloc_pages(-i64(pages))
+		return
+	}
+
 	metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
 
+	// A metadata page that has already been freed reads as pmm_free()'s
+	// poison, so a second free of the same allocation finds an impossible page
+	// count here, which pmm_free() refuses. Something in the kernel does free
+	// one twice; keep it out of the count as well.
+	if metadata.pages == 0 || metadata.pages >= pmm_avl_page_count {
+		return
+	}
+	adjust_big_alloc_pages(-i64(metadata.pages + 1))
 	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
 }
 
-fn slab_for(size u64) ?&Slab {
-	for mut s in slabs {
+// Pages held by allocations too large for a slab class, their metadata pages
+// included; see heap_big_pages. Zeroed storage rather than an initialiser,
+// which would run after the first allocations had already been counted.
+__global (
+	big_alloc_pages u64
+)
+
+pub fn heap_big_pages() u64 {
+	return katomic.load(&big_alloc_pages)
+}
+
+fn adjust_big_alloc_pages(delta i64) {
+	for {
+		total := katomic.load(&big_alloc_pages)
+		if katomic.cas(mut &big_alloc_pages, total, u64(i64(total) + delta)) {
+			return
+		}
+	}
+}
+
+// The fourteen fixed classes serve malloc(); the medium ones only
+// malloc_packed(), see there.
+const general_slab_classes = 14
+
+fn slab_for(size u64, classes int) ?&Slab {
+	for i in 0 .. classes {
+		mut s := unsafe { &slabs[i] }
 		if s.ent_size >= size {
-			return unsafe { s }
+			return s
 		}
 	}
 
@@ -543,30 +662,82 @@ pub fn malloc(size u64) voidptr {
 	$if xnu_zone ? {
 		return xnu_heap_alloc(size)
 	}
-	mut slab := slab_for(size) or { return big_alloc(size) }
+	mut slab := slab_for(size, general_slab_classes) or { return big_alloc(size) }
+
+	return slab.alloc()
+}
+
+// malloc_packed is malloc for an object that needs no more than 16-byte
+// alignment. Anything over 2 KiB that malloc() hands out comes whole pages at
+// a time and page-aligned, and callers have come to rely on that; this one may
+// instead come from a medium class that shares a page with others of its size.
+// free() and realloc() take either.
+// malloc_packed(), but nil rather than a stopped kernel when memory has run
+// out, for a caller with something else to fall back on.
+pub fn malloc_packed_fallible(size u64) voidptr {
+	$if xnu_zone ? {
+		return xnu_heap_alloc_fallible(size)
+	}
+	mut slab := slab_for(size, slabs.len) or { return big_alloc_inner(size, false) }
+
+	return slab.alloc_fallible()
+}
+
+pub fn malloc_packed(size u64) voidptr {
+	$if xnu_zone ? {
+		return xnu_heap_alloc(size)
+	}
+	mut slab := slab_for(size, slabs.len) or { return big_alloc(size) }
 
 	return slab.alloc()
 }
 
 fn big_alloc(size u64) voidptr {
+	return big_alloc_inner(size, true)
+}
+
+fn big_alloc_inner(size u64, panic_oom bool) voidptr {
 	// Include the metadata page without overflowing rounding or byte counts.
 	if size > (u64(-1) / page_size - 1) * page_size {
 		return unsafe { nil }
 	}
 	page_count := lib.div_roundup(size, page_size)
 
-	ptr := pmm_alloc(page_count + 1)
-
-	if ptr == 0 {
-		return 0
+	mut base := u64(0)
+	$if vmap_always ? {
+		// Testing only: every allocation that can, takes the fallback below.
+		if panic_oom {
+			base = u64(vmap_alloc(page_count + 1))
+		}
+	}
+	if base == 0 {
+		ptr := pmm_alloc_fallible(page_count + 1)
+		if ptr != 0 {
+			base = u64(ptr) + higher_half
+		}
+	}
+	if base == 0 {
+		// Mapping the fragmented fallback can retain new shared page tables
+		// even when allocation fails. Checked callers require full rollback,
+		// so this path may return nil when no contiguous run is available.
+		if !panic_oom {
+			return unsafe { nil }
+		}
+		// No free run is that long, which says little about how much memory is
+		// free. Take the pages one at a time and map them side by side.
+		base = u64(vmap_alloc(page_count + 1))
+		if base == 0 {
+			lib.kpanic(unsafe { nil }, c'Out of memory after reclaim')
+		}
 	}
 
-	mut metadata := unsafe { &MallocMetadata(u64(ptr) + higher_half) }
+	mut metadata := unsafe { &MallocMetadata(base) }
 
 	metadata.pages = page_count
 	metadata.size = size
+	adjust_big_alloc_pages(i64(page_count + 1))
 
-	return voidptr(u64(ptr) + higher_half + page_size)
+	return voidptr(base + page_size)
 }
 
 @[export: 'realloc']

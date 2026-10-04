@@ -1,0 +1,179 @@
+{
+  "results": {
+    "settlement-candidate": {
+      "passed": true,
+      "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+      "source_sha256": "12c0390e8e3442792eda99caea3311910e64af9de2de74c8b2d2d96f415f91f6",
+      "serial_sha256": "223136100e6a49024ac886b3ebccf8a7dc455602ca9443c38578572495915d89",
+      "rows": [
+        {
+          "operation": 11,
+          "name": "stream_read_discards_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 4325376,
+          "settled_retained_bytes": 4325376,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "512": 8196
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 12,
+          "name": "datagram_read_discards_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 4325376,
+          "settled_retained_bytes": 4341760,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "512": 8196
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 13,
+          "name": "stream_close_queued_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 34816000,
+          "settled_retained_bytes": 34816000,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "384": 16384,
+            "512": 4,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 14,
+          "name": "datagram_close_queued_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 34799616,
+          "settled_retained_bytes": 34799616,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "384": 16384,
+            "512": 4,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 15,
+          "name": "closed_stream_send",
+          "calls": 8192,
+          "immediate_retained_bytes": 33243136,
+          "settled_retained_bytes": 33243136,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "384": 16384,
+            "512": 4,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        }
+      ]
+    },
+    "settlement-baseline": {
+      "passed": true,
+      "kernel_sha256": "1268f7348d4074767657395989e7cecfa100cc61a7e279592bab77d0222a889f",
+      "source_sha256": "12c0390e8e3442792eda99caea3311910e64af9de2de74c8b2d2d96f415f91f6",
+      "serial_sha256": "e87cd2a028c5aae5417a49fd400f3d80dfad5c8c7a993c374af7f9b247d82654",
+      "rows": [
+        {
+          "operation": 11,
+          "name": "stream_read_discards_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 11173888,
+          "settled_retained_bytes": 11173888,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "512": 16388
+          },
+          "owned48byte_metadata_delta": 8192,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 12,
+          "name": "datagram_read_discards_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 11190272,
+          "settled_retained_bytes": 11190272,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "512": 16388
+          },
+          "owned48byte_metadata_delta": 8192,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 13,
+          "name": "stream_close_queued_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 41680896,
+          "settled_retained_bytes": 41680896,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "384": 16384,
+            "512": 8196,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 8192,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 14,
+          "name": "datagram_close_queued_rights",
+          "calls": 8192,
+          "immediate_retained_bytes": 41664512,
+          "settled_retained_bytes": 41664512,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "384": 16384,
+            "512": 8196,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 8192,
+          "written_after_free_constant": 1
+        },
+        {
+          "operation": 15,
+          "name": "closed_stream_send",
+          "calls": 8192,
+          "immediate_retained_bytes": 39174144,
+          "settled_retained_bytes": 39174144,
+          "settlement_seconds": 1,
+          "settled_live_objects_delta": {
+            "64": 8192,
+            "128": 8192,
+            "384": 16384,
+            "512": 8196,
+            "1536": 16384
+          },
+          "owned48byte_metadata_delta": 0,
+          "written_after_free_constant": 1
+        }
+      ]
+    }
+  },
+  "introduced_retention_regression": false,
+  "owned_fd_metadata_flat": true,
+  "notes": "After1second, batch retainedbytes do not fall in these5cases (minor16384byte slab-page increases appear in some snapshots); equivalent baseline retains at least as much in all5cases. These are preserved broader current-V read/create/close diagnostics beyond the15scratch/header and2queueownership fix. Both baseline/candidate completedall5semanticschecks; no assertion or threshold weakened. Allwritten-after-free counters remain1, the expected intentionalheap_selftest corruption counter."
+}

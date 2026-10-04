@@ -1,0 +1,696 @@
+{
+  "phase": "complete",
+  "status": "PASS",
+  "updated_utc": "2026-10-02T23:17:24.493077+00:00",
+  "scope": "Read-only final campaign/report audit; own only this ignored checkpoint, no source/report mutations, builds or VMs.",
+  "plan_sha256": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+  "coordinator_record_sha256": "70231196439a208579ba1a36aae5da7e5a7ea6aef4a51c38f25dc00a3733d65c",
+  "coordinator_exit_sha256": "c35c81bf4a1563021fd8c83d5ff6d799b7f2bfcabf676ce8b72774f6bb58c19d",
+  "root_outcome_sha256": "bcfbaeaedc4460827eff937558852e6f17c72ee389eed345e014122ed8460e9a",
+  "raw_samples_checked": 168,
+  "captures": [
+    {
+      "capture": "vinix-1",
+      "state_dir": "/Users/alex/code/vinix/build/useralloc-vinix-v6-final-1",
+      "serial_sha256": "354b6baa649156c1f57cb68f5d8909cd974d36248778fae5f9d96a5452882e45",
+      "config_sha256": "cdfa3c804e262376265d39e16c22912bd4e307f4fbf44bb08dbfeca6d805a332",
+      "driver_exit_sha256": "a55c7af95358698a0112daa835b77c473932741a770c9242102ec29677b10d5f",
+      "samples": 42,
+      "started_utc": "2026-10-02T22:57:36.870456+00:00",
+      "finished_utc": "2026-10-02T22:58:45.965918+00:00"
+    },
+    {
+      "capture": "catalina-1",
+      "state_dir": "/Users/alex/code/vinix/build/useralloc-macos-v6-final-1",
+      "serial_sha256": "6fdf0c2affde5e1781bcc7bf514f871975835b3f3b2fe75c00172d9c17ebd69c",
+      "config_sha256": "66a2d425f4858f70ad576b0968275407fe68eb457b45335d06adba3e22c68005",
+      "driver_exit_sha256": "32cbfebc4a0145b8033c891d14a2f3a03d88a0904de739a74ebee75231c12fff",
+      "samples": 42,
+      "started_utc": "2026-10-02T22:58:45.986400+00:00",
+      "finished_utc": "2026-10-02T23:02:43.799253+00:00"
+    },
+    {
+      "capture": "catalina-2",
+      "state_dir": "/Users/alex/code/vinix/build/useralloc-macos-v6-final-2",
+      "serial_sha256": "0a33b479fbef39ba66ec580c4efe19db2c376ee107ea08f9cddfd35334ebcb0e",
+      "config_sha256": "c4b618a03b5811cb1527f552350fb4114618673c220752a381e8b0f18fb92eec",
+      "driver_exit_sha256": "91fbe27c658398ed0f678cfc843306e4154e560589aeec4f06566a553cea3fc0",
+      "samples": 42,
+      "started_utc": "2026-10-02T23:02:43.837380+00:00",
+      "finished_utc": "2026-10-02T23:07:28.127648+00:00"
+    },
+    {
+      "capture": "vinix-2",
+      "state_dir": "/Users/alex/code/vinix/build/useralloc-vinix-v6-final-2",
+      "serial_sha256": "344cfca15e1b29020b86ca8889d1e65de3bbbb95678f2788c76b5bc1840af8ed",
+      "config_sha256": "a87c45d904c204e88f6c55f05ed884a5215885e2cb8be5982878039dda63968e",
+      "driver_exit_sha256": "b5679ec3d0def06ca344e8ba55f8a1afc83d849ec7216578d2caf41915749528",
+      "samples": 42,
+      "started_utc": "2026-10-02T23:07:28.174460+00:00",
+      "finished_utc": "2026-10-02T23:09:12.415535+00:00"
+    }
+  ],
+  "rows": {
+    "malloc_hot_64": {
+      "cohorts": [
+        {
+          "vinix": 234.2,
+          "catalina": 330.59,
+          "ratio": 0.7084303820442239
+        },
+        {
+          "vinix": 226.72,
+          "catalina": 461.75,
+          "ratio": 0.49100162425554955
+        }
+      ],
+      "pooled": {
+        "vinix": 228.85,
+        "catalina": 387.65250000000003,
+        "ratio": 0.59034831453428
+      }
+    },
+    "malloc_mixed_batch_64": {
+      "cohorts": [
+        {
+          "vinix": 315.79,
+          "catalina": 679.12,
+          "ratio": 0.46499882200494763
+        },
+        {
+          "vinix": 313.02,
+          "catalina": 877.995,
+          "ratio": 0.3565168366562452
+        }
+      ],
+      "pooled": {
+        "vinix": 313.8025,
+        "catalina": 777.99,
+        "ratio": 0.4033503001323925
+      }
+    },
+    "malloc_touch_262144": {
+      "cohorts": [
+        {
+          "vinix": 1663.4,
+          "catalina": 17006.6,
+          "ratio": 0.09780908588430376
+        },
+        {
+          "vinix": 1520.3,
+          "catalina": 19674.1,
+          "ratio": 0.07727418280887055
+        }
+      ],
+      "pooled": {
+        "vinix": 1537.3,
+        "catalina": 18458.800000000003,
+        "ratio": 0.08328277027759116
+      }
+    },
+    "mmap_anon_4096": {
+      "cohorts": [
+        {
+          "vinix": 11555.8,
+          "catalina": 23311.2,
+          "ratio": 0.49571879611517206
+        },
+        {
+          "vinix": 11223.0,
+          "catalina": 30022.1,
+          "ratio": 0.3738246158663118
+        }
+      ],
+      "pooled": {
+        "vinix": 11432.8,
+        "catalina": 27426.5,
+        "ratio": 0.41685231436749126
+      }
+    },
+    "mmap_touch_262144": {
+      "cohorts": [
+        {
+          "vinix": 553381.2,
+          "catalina": 1706616.2,
+          "ratio": 0.32425638523764155
+        },
+        {
+          "vinix": 739101.5,
+          "catalina": 1969034.1,
+          "ratio": 0.3753624683290147
+        }
+      ],
+      "pooled": {
+        "vinix": 669947.75,
+        "catalina": 1924765.85,
+        "ratio": 0.34806714281635864
+      }
+    },
+    "pipe_create_close": {
+      "cohorts": [
+        {
+          "vinix": 24061.7,
+          "catalina": 70689.4,
+          "ratio": 0.3403862531015966
+        },
+        {
+          "vinix": 35396.8,
+          "catalina": 66476.4,
+          "ratio": 0.5324716741580472
+        }
+      ],
+      "pooled": {
+        "vinix": 29889.35,
+        "catalina": 70205.85,
+        "ratio": 0.42573873829602515
+      }
+    }
+  },
+  "all_six_targets_both_cohorts_and_pooled": true,
+  "guard_inputs_match": 34,
+  "pending": [],
+  "archived_capture_exact_matches": [
+    {
+      "name": "vinix-1",
+      "files": {
+        "serial.log": "354b6baa649156c1f57cb68f5d8909cd974d36248778fae5f9d96a5452882e45",
+        "config.json": "cdfa3c804e262376265d39e16c22912bd4e307f4fbf44bb08dbfeca6d805a332",
+        "driver-exit.json": "a55c7af95358698a0112daa835b77c473932741a770c9242102ec29677b10d5f",
+        "coordinator-record.json": "fb9150af6afb0366b32ce3a76c42119c074bdbba83658ea11e4ce5ce9324b2db",
+        "capture-integrity.json": "3912b189a2c59aec40485977d8cf64edc8f3fd56582ed617f8cc4b7cdbe4a8f0"
+      }
+    },
+    {
+      "name": "catalina-1",
+      "files": {
+        "serial.log": "6fdf0c2affde5e1781bcc7bf514f871975835b3f3b2fe75c00172d9c17ebd69c",
+        "config.json": "66a2d425f4858f70ad576b0968275407fe68eb457b45335d06adba3e22c68005",
+        "driver-exit.json": "32cbfebc4a0145b8033c891d14a2f3a03d88a0904de739a74ebee75231c12fff",
+        "coordinator-record.json": "a790818d63981f9c2bfbc6fdea1b28a8729689b12c217d0a08cebba416d56e17",
+        "capture-integrity.json": "513a7bbf39bfe51d40a6e28133546f8b839140c404a82b2fae39bef620655e57"
+      }
+    },
+    {
+      "name": "catalina-2",
+      "files": {
+        "serial.log": "0a33b479fbef39ba66ec580c4efe19db2c376ee107ea08f9cddfd35334ebcb0e",
+        "config.json": "c4b618a03b5811cb1527f552350fb4114618673c220752a381e8b0f18fb92eec",
+        "driver-exit.json": "91fbe27c658398ed0f678cfc843306e4154e560589aeec4f06566a553cea3fc0",
+        "coordinator-record.json": "0519e1329ed3b0c7e85c3a5e7857d8d703c8b553009839aede153a64018c749b",
+        "capture-integrity.json": "3207516fed3a23c651a02f73f3bdeb20453ec9a5486c60c86dc1b197e4090d82"
+      }
+    },
+    {
+      "name": "vinix-2",
+      "files": {
+        "serial.log": "344cfca15e1b29020b86ca8889d1e65de3bbbb95678f2788c76b5bc1840af8ed",
+        "config.json": "a87c45d904c204e88f6c55f05ed884a5215885e2cb8be5982878039dda63968e",
+        "driver-exit.json": "b5679ec3d0def06ca344e8ba55f8a1afc83d849ec7216578d2caf41915749528",
+        "coordinator-record.json": "5a34f5ea505d1cf84928c556c8d137fcba162af8742f6c0818dc728f8dedb0e0",
+        "capture-integrity.json": "2b5f256c5ad8d894e8160cda48a3be0ea5557613cf51d71509e57076ebd4b719"
+      }
+    }
+  ],
+  "recomputed_json_and_markdown_exactly_match": true,
+  "recompute_review_170_saved_checks_valid": true,
+  "completed_readiness_pins_unchanged": true,
+  "readiness_completed_before_first_capture": true,
+  "actual_archived_perf43_rows_valid": true,
+  "report_artifact_sha256": {
+    "campaign-plan.json": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+    "recompute.py": "d4a0697f5ff063f30e35ed86ed31fe0f55e98f119476877e01a174207492392f",
+    "compare.py": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+    "bench.c": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+    "check-recompute.py": "fdc1b46bc4704796143a6fb6b94f48afa8cc95e48ed69822119a291aa94eb1fc",
+    "comparison.json": "60607e8095b4de29439e242a185a0d0ec26cf8f46cb0c58b1dfb6b76931c8f63",
+    "comparison.md": "12b0787c238aface3f5beee43cb0cc1ac76235ef7b4e7c190487a0eb75141592",
+    "source-snapshots.json": "a4c33a06ed249ffe76020baba021e283cb4ed1a7273feed0ee853ac242a5474b"
+  },
+  "readme_sha256": "3bcb431af490cc445ba7dcff9c53a0c2a6b5d7de2e7b6defc74d4abbd11a8d7f",
+  "readme_all_links_exist": [
+    {
+      "target": "../2026-10-03-userspace-v5/README.md",
+      "exists": true
+    },
+    {
+      "target": "comparison.md",
+      "exists": true
+    },
+    {
+      "target": "comparison.json",
+      "exists": true
+    },
+    {
+      "target": "campaign-plan.json",
+      "exists": true
+    },
+    {
+      "target": "validation/campaign-complete/useralloc-v6-final-cohorts.json",
+      "exists": true
+    },
+    {
+      "target": "validation/campaign-complete/useralloc-v6-final-cohorts.exit.json",
+      "exists": true
+    },
+    {
+      "target": "validation/campaign-complete/useralloc-v6-final-readiness.json",
+      "exists": true
+    },
+    {
+      "target": "validation/campaign-complete/useralloc-v6-root-glue-review.json",
+      "exists": true
+    },
+    {
+      "target": "recompute.py",
+      "exists": true
+    },
+    {
+      "target": "compare.py",
+      "exists": true
+    },
+    {
+      "target": "bench.c",
+      "exists": true
+    },
+    {
+      "target": "source-snapshots.json",
+      "exists": true
+    },
+    {
+      "target": "validation/kernel-x86_64.json",
+      "exists": true
+    },
+    {
+      "target": "validation/libc-builds.json",
+      "exists": true
+    },
+    {
+      "target": "validation/recompute-review.json",
+      "exists": true
+    },
+    {
+      "target": "../2026-10-02-userspace/catalina-reproduction/README.md",
+      "exists": true
+    },
+    {
+      "target": "validation/libc.patch",
+      "exists": true
+    },
+    {
+      "target": "validation/independent-review/review.json",
+      "exists": true
+    },
+    {
+      "target": "../2026-10-03-userspace-v5/README.md",
+      "exists": true
+    },
+    {
+      "target": "validation/v6-verification-summary.json",
+      "exists": true
+    },
+    {
+      "target": "validation/allocator-x86_64/results.json",
+      "exists": true
+    },
+    {
+      "target": "validation/allocator-aarch64/results.json",
+      "exists": true
+    },
+    {
+      "target": "validation/production-packaging/amd64/root-review.json",
+      "exists": true
+    },
+    {
+      "target": "validation/production-packaging/aarch64/root-review.json",
+      "exists": true
+    },
+    {
+      "target": "validation/static-desktop/build.json",
+      "exists": true
+    },
+    {
+      "target": "validation/core/final-gates.json",
+      "exists": true
+    },
+    {
+      "target": "validation/core/evidence-audit.json",
+      "exists": true
+    },
+    {
+      "target": "validation/core-x86_64/run.json",
+      "exists": true
+    },
+    {
+      "target": "validation/core-x86_64-four-level/run.json",
+      "exists": true
+    },
+    {
+      "target": "validation/core-aarch64/run.json",
+      "exists": true
+    },
+    {
+      "target": "validation/desktop-perf/validation.json",
+      "exists": true
+    },
+    {
+      "target": "validation/desktop-perf/preparation/driver.exit.json",
+      "exists": true
+    },
+    {
+      "target": "validation/desktop-perf/results.json",
+      "exists": true
+    },
+    {
+      "target": "excluded/desktop-perf-controller/pipeline.log",
+      "exists": true
+    },
+    {
+      "target": "excluded/desktop-perf-controller/validate-completed.py",
+      "exists": true
+    },
+    {
+      "target": "excluded/desktop-perf-controller/recovery.json",
+      "exists": true
+    },
+    {
+      "target": "../2026-10-03-userspace-v5/README.md",
+      "exists": true
+    },
+    {
+      "target": "validation/v5-hot-diagnostic/summary.json",
+      "exists": true
+    },
+    {
+      "target": "excluded/v5-diagnostic-preflight/",
+      "exists": true
+    },
+    {
+      "target": "validation/source-freeze/source-object-manifest-sha256.json",
+      "exists": true
+    },
+    {
+      "target": "validation/source-freeze/evidence/v6-checkpoint.json",
+      "exists": true
+    },
+    {
+      "target": "../2026-10-02-userspace/README.md",
+      "exists": true
+    }
+  ],
+  "readme_pooled_table_all_six_matches": true,
+  "readme_caveats_match_evidence": true,
+  "core_counts_valid": {
+    "x86_64": 53,
+    "x86_64-four-level": 53,
+    "aarch64": 51
+  },
+  "resident_controller_traceback_preserved": true,
+  "passed": true,
+  "findings": [],
+  "final_integrity_review_sha256": "07937dd228200922e9af7729db9184223ed390de85738ddd2932d6ea3665cc60",
+  "protocol_check_count": 170,
+  "report_archive_fingerprints": {
+    "README.md": "3bcb431af490cc445ba7dcff9c53a0c2a6b5d7de2e7b6defc74d4abbd11a8d7f",
+    "bench.c": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+    "campaign-plan.json": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+    "catalina-1/capture-integrity.json": "513a7bbf39bfe51d40a6e28133546f8b839140c404a82b2fae39bef620655e57",
+    "catalina-1/config.json": "66a2d425f4858f70ad576b0968275407fe68eb457b45335d06adba3e22c68005",
+    "catalina-1/coordinator-record.json": "a790818d63981f9c2bfbc6fdea1b28a8729689b12c217d0a08cebba416d56e17",
+    "catalina-1/driver-exit.json": "32cbfebc4a0145b8033c891d14a2f3a03d88a0904de739a74ebee75231c12fff",
+    "catalina-1/runner.log": "0f474c53f0c3fd7a92aabcfb55ebea4554f19f7f7d7296f443d14e381247b603",
+    "catalina-1/serial.log": "6fdf0c2affde5e1781bcc7bf514f871975835b3f3b2fe75c00172d9c17ebd69c",
+    "catalina-2/capture-integrity.json": "3207516fed3a23c651a02f73f3bdeb20453ec9a5486c60c86dc1b197e4090d82",
+    "catalina-2/config.json": "c4b618a03b5811cb1527f552350fb4114618673c220752a381e8b0f18fb92eec",
+    "catalina-2/coordinator-record.json": "0519e1329ed3b0c7e85c3a5e7857d8d703c8b553009839aede153a64018c749b",
+    "catalina-2/driver-exit.json": "91fbe27c658398ed0f678cfc843306e4154e560589aeec4f06566a553cea3fc0",
+    "catalina-2/runner.log": "80ee5bc1f5939d92e47ca3a4e7dfaf4528c9cf661048dbdf93382718bb496472",
+    "catalina-2/serial.log": "0a33b479fbef39ba66ec580c4efe19db2c376ee107ea08f9cddfd35334ebcb0e",
+    "check-recompute.py": "fdc1b46bc4704796143a6fb6b94f48afa8cc95e48ed69822119a291aa94eb1fc",
+    "compare.py": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+    "comparison.json": "60607e8095b4de29439e242a185a0d0ec26cf8f46cb0c58b1dfb6b76931c8f63",
+    "comparison.md": "12b0787c238aface3f5beee43cb0cc1ac76235ef7b4e7c190487a0eb75141592",
+    "excluded/desktop-perf-controller/pipeline.log": "5d92b63dad2b9df17d3d4c451fe4e0d3c05225b45fcdd72999949d832d1e6578",
+    "excluded/desktop-perf-controller/recovery.json": "f68d6987cac623fdfe94fd157f7cd3a89849166baf91be14cec2e9cbfd60f485",
+    "excluded/desktop-perf-controller/validate-completed.py": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9",
+    "excluded/v5-diagnostic-preflight/boot-1/config.json": "643c76bc30c1113321f0a5a7bbe0d0df9b84d806009828cf034d83223fc1b829",
+    "excluded/v5-diagnostic-preflight/boot-1/image-build.log": "c4d78c6be95b862ae3d1bb4a933bd2df08246eaf10f170be158fc45486d09742",
+    "excluded/v5-diagnostic-preflight/boot-1/qemu.log": "6ae82e7b1c35a9c49c11cd87d2c11cec34a44579d79fa98b56217e31698b3c68",
+    "excluded/v5-diagnostic-preflight/boot-1/serial.log": "cbe98c56ec62e52d56649083560952b201592e6580d792746990caa90e493fdb",
+    "excluded/v5-diagnostic-preflight/checkpoint.json": "3fc684e1f48a856d4cdef3c157e33b63ffefbf76a1e013335452bdc9f9b3868c",
+    "excluded/v5-diagnostic-preflight/compile-before-hidden-and-header-warning-fix.json": "60b529ff12ade175059cb6e02481cb0f956b702c8414ab4223619f455160d902",
+    "excluded/v5-diagnostic-preflight/driver.exit.json": "09f2a8add9181d9e35cbc124818fb602620fea925326c559e82274501ac06b98",
+    "excluded/v5-diagnostic-preflight/driver.log": "6b15b22d503ddec6671b2cb915285d0285a640a68642172197199f7256e3a561",
+    "excluded/v5-diagnostic-preflight/sampler-before-hidden-and-header-warning-fix.c": "3b01d77b2ddeb708888a3cfc7c8e02130d29b451e3effed4dfa293dee9ce5df9",
+    "recompute.py": "d4a0697f5ff063f30e35ed86ed31fe0f55e98f119476877e01a174207492392f",
+    "source-snapshots.json": "a4c33a06ed249ffe76020baba021e283cb4ed1a7273feed0ee853ac242a5474b",
+    "validation/allocator-aarch64/build.json": "0f3613f71dc699cd10c651565b9429eb85f2f4212c981f01ed484ee814d6b5a6",
+    "validation/allocator-aarch64/embedded-input-check.json": "c941db71e081cc56384cdddeaa00fd2bd3b480587af13cd30794c62682efb6be",
+    "validation/allocator-aarch64/musl-disabled.json": "ae39cc32810d60a98c6cedb786dfddea15182a42396e0597301a3fabd2495098",
+    "validation/allocator-aarch64/musl-optimized.json": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656",
+    "validation/allocator-aarch64/results.json": "b06672113226a49a31ea8fe89ea77881f26cce63d88678405d6f61e9c34d6bfb",
+    "validation/allocator-aarch64/run.json": "8931f588aaf4eafd060c30c2e1b33b64145914bb322019062fedb40aec922e11",
+    "validation/allocator-aarch64/serial.log": "fed22d27c5c6ff89ebebaaadf8037701436b78c6a8a8ea07620eb588362d0985",
+    "validation/allocator-aarch64/verify-all-classes.c": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+    "validation/allocator-aarch64/verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "validation/allocator-x86_64/config.json": "020341d2066011e61f3191613f5ed28058d0054d1d880f12f88d19e45ffa7577",
+    "validation/allocator-x86_64/embedded-input-check.json": "21b7e1a12bfe14dc7b4bf92c404cc31095e1c102655f8585915c04fc4091c199",
+    "validation/allocator-x86_64/results.json": "f8831fe51d157e535b2be439a01d7ef3a2c94fcd43b7b541f56e1dd5ece89aaf",
+    "validation/allocator-x86_64/serial.log": "d2d7b7785513a626fc8f18dac52f6db06365e03eefd57e1b93994cf04100d1f1",
+    "validation/allocator-x86_64/verify-all-classes.c": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+    "validation/allocator-x86_64/verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "validation/campaign-complete/catalina-measure.py": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+    "validation/campaign-complete/run-vinix.py": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c",
+    "validation/campaign-complete/shutdown-v6.json": "913091ca705aa439a655cc09ac1641459511a5eff2fe4373e336fb3b564ce3f4",
+    "validation/campaign-complete/shutdown-v6.serial.log": "ca36ccaa5b8f443613d71b03957fdb74724ca5a03cb87f09bae6909aeffc1541",
+    "validation/campaign-complete/useralloc-final-driver.py": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8",
+    "validation/campaign-complete/useralloc-macos-final-driver.py": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+    "validation/campaign-complete/useralloc-v6-coordinator-preparation.json": "3c9f2f2a328a3200cf6c517a5c31e66fab95daa2b4428973d39fc45218da8c4c",
+    "validation/campaign-complete/useralloc-v6-final-cohorts.driver.log": "c570c5b947027c87d02e7801d58176d4756d4edfcb73ed5be33e60cf0ea69f29",
+    "validation/campaign-complete/useralloc-v6-final-cohorts.exit.json": "c35c81bf4a1563021fd8c83d5ff6d799b7f2bfcabf676ce8b72774f6bb58c19d",
+    "validation/campaign-complete/useralloc-v6-final-cohorts.json": "70231196439a208579ba1a36aae5da7e5a7ea6aef4a51c38f25dc00a3733d65c",
+    "validation/campaign-complete/useralloc-v6-final-cohorts.py": "568d515c6843cc20b5e5042de2e086798cccd41cafb8b13779177dacfb36a8bd",
+    "validation/campaign-complete/useralloc-v6-final-controller.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/campaign-complete/useralloc-v6-final-controller.py": "1cf252bdef2e20adadf302f4cda383da35324ee5bc9d50f2265adb1ec78f6a91",
+    "validation/campaign-complete/useralloc-v6-final-readiness.json": "3afb2b6816d8415a92744a5f564662a3609a162132e61191320467dc3724fb08",
+    "validation/campaign-complete/useralloc-v6-root-glue-review.json": "2b8fcce79e17c9bbdbde87db4a89b8ab1f363e3923f59c83eb41b618f16ace65",
+    "validation/campaign-complete/useralloc-v6-root-outcome.json": "bcfbaeaedc4460827eff937558852e6f17c72ee389eed345e014122ed8460e9a",
+    "validation/campaign-complete/useralloc-v6-verify-readiness.py": "83c7e7ae12d9b09f390d9a79cbc5a3389710e981c87f0b142db7983c68018cee",
+    "validation/core/checkpoint.json": "eb4f77b8f5ed868d88f8e0f79e42c31c7e203672bebc48385d8b0b95c8405db2",
+    "validation/core/driver.log": "48e7ceda35e95c806740dc97e1e297fe45ff4834561414bb82510bf6d0ef73dd",
+    "validation/core/driver.py": "d9542c99bc2fbce40479776e9244ef92e72007effd8772dfa23e001c8711beba",
+    "validation/core/evidence-audit.json": "b0d5fab923522a72d5391085227a230973d88a825ac8817b6acca8130b854f6a",
+    "validation/core/evidence-audit.py": "b8b20bd5f82eae7d65465d4d24dafcb96acc35eef178835bbe2fe514b443638d",
+    "validation/core/exit.json": "3cf312895d034556a6492f4ac9b8b99c122868deba65eb7e2410ce6c5ad8b11d",
+    "validation/core/final-gates.json": "29a1a09b85dbb5cb01541628cb68a1f5f6a4e4f40ba4bbe2ab239c7cacff84cb",
+    "validation/core/quiescence.json": "cbea65c0568da62fa428778be76bf81d205abffe108c3fb04a4e150e8ebb2e77",
+    "validation/core/run.py": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14",
+    "validation/core-aarch64/compile-exact-flags.json": "ca8f34eeefde08b2941b34ce71b6cf25e9f66fa55d81c5df73e1c191b14807af",
+    "validation/core-aarch64/compile-exact-flags.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/core-aarch64/compile.json": "a83d47e837572be3297733096e0fc4f676f3a8b6adeeef40ab4fcf481e3d6776",
+    "validation/core-aarch64/compile.log": "5c51b106b7b217786a613f1b5f49c07857f3b8edb1274ad539217fd4d9fa27f3",
+    "validation/core-aarch64/elf.log": "78e6b60f6dbcd7d255db47f7321f8a6b9ed2ae3a7b080a7bea15805a23ae6396",
+    "validation/core-aarch64/embedded-arm-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/core-aarch64/embedded-arm-runtime-check.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/core-aarch64/embedded-input-check.json": "4f582663e735a651b4e24e745b44f3b2347e9ba632bc132c6670d1cd0b51b7e0",
+    "validation/core-aarch64/exit.json": "e82b9b41d84aa7cfaba70af39ea1b7d2ed2e92c7bf04c36c763eb1b90940bffc",
+    "validation/core-aarch64/harness-process.json": "a22a98f90e48b134b6b5dda3420ad4df114f7f0abbeca24328953f3602bebbd8",
+    "validation/core-aarch64/link.map": "753834e69f37f5181eb6b9cf809eaed4776b56e1096479a402762a860c0cf8d4",
+    "validation/core-aarch64/musl-build.json": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656",
+    "validation/core-aarch64/pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+    "validation/core-aarch64/qemu-observed.json": "dfca59ee122a2636deeb8b7f4c2c3aec0467c6725c993041f89ca4826ebd9952",
+    "validation/core-aarch64/run.json": "b86766a22688b34c922ac72b837f5ed58eaa07534530adf61ac72b5227330448",
+    "validation/core-aarch64/run.py": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14",
+    "validation/core-aarch64/serial.log": "bec27b80377ff3a771b799737fca1bac8370336605c83cb859f2fc04a252b432",
+    "validation/core-aarch64/test.c": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+    "validation/core-x86_64/compile-exact-flags.json": "1ffc2965aa39a01f9c02048683aca626d09f4d4180d0845aa7cdfd29216d2cb6",
+    "validation/core-x86_64/compile-exact-flags.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation/core-x86_64/compile.json": "05d4b7df720d16e1552e28a626edd8b4fe187fb2f47f11d53718579f4da6a1ac",
+    "validation/core-x86_64/compile.log": "96f79fd0279b4f3a92f9e0f3d57bbe01c3fdb7b51f157ab8f1953f07046662ef",
+    "validation/core-x86_64/elf.log": "111e88d721fd1103fdbfba95e7b6cb8d01dad91d0a3c88258989d8b53d0eef40",
+    "validation/core-x86_64/embedded-input-check.json": "549ec9eeaa51f9b18c8b62e7a78bc8a3eaa0c1b5bc30bb88364e50ffdd3157dd",
+    "validation/core-x86_64/embedded-input-check.log": "898dac38f41a9ebac68829b85fbb9e3761465bed918ee85df8ff004f9a06a9a9",
+    "validation/core-x86_64/exit.json": "1f7386020cc807c983f206be2ec57b837dd2c1814cc36b3696eb8f1dbf000dc9",
+    "validation/core-x86_64/harness-process.json": "0a6ad16c37c30fcf77bfd7bbbde479c81084cfcc4fba11c5afbaf9fe5a8ffaab",
+    "validation/core-x86_64/image-build.json": "b3af2e7dfda1db7c6ced0f1a43766a40bb172bf7aa84af34e3d114550ef23284",
+    "validation/core-x86_64/image-build.log": "57cbd784d516d75f76c6cd5b1d0fdc5b73cad64042e1baf1c11f354c38e2c262",
+    "validation/core-x86_64/link.map": "876e0c7ae075d5735b1fade376a4e2abb135a5f16f39643ac52340b1e2cfe990",
+    "validation/core-x86_64/musl-build.json": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686",
+    "validation/core-x86_64/pagetable.c": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+    "validation/core-x86_64/qemu-observed.json": "e7aded382a6fd15616a0b7c34e04cf56d59d32f73f0206256b9cbe554769e21c",
+    "validation/core-x86_64/run.json": "0d36696a03b212b75e84f1bf3dacc06ec09259f2d630c518311ce914f60d8565",
+    "validation/core-x86_64/run.py": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14",
+    "validation/core-x86_64/serial.log": "3635a64075d6e16f58b060d38a982f202f70df35378802969504d2bbc6b5a461",
+    "validation/core-x86_64/test.c": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+    "validation/core-x86_64-four-level/exit.json": "66770555f977641251cca7312d63efb3d9f56f671e301b0b7b98643e19669a98",
+    "validation/core-x86_64-four-level/harness-process.json": "d99e1a451ab9c4a970f519394987538362132bf79a8e1a3e0459bf47d9630d45",
+    "validation/core-x86_64-four-level/qemu-observed.json": "f20acb5c1f331072b08be0228ae7f0ad910853e0ec79b7938423db5efeceacb9",
+    "validation/core-x86_64-four-level/run.json": "bc8e5eb2f9e766d03232ca18addf7ff27d4696489fde69f6fbc6eb632b221c87",
+    "validation/core-x86_64-four-level/run.py": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14",
+    "validation/core-x86_64-four-level/run_vm.py": "5f3c543bffefc67219a30d5837042ef6a2a34f9850c0588132878d205792a797",
+    "validation/core-x86_64-four-level/serial.log": "60ea36d2437ac8d8b64c397ab94c86964b41c300cdf18ad39bb84b37f21eb1c7",
+    "validation/desktop-perf/driver.log": "4cf6683508425ea76b2985f6c74df45a3921168622c9e69c79a29ba6dbc33e5a",
+    "validation/desktop-perf/preparation/driver.exit.json": "41bc44bc6ce580d5eb1ad44dc26662c734e95c96161eda84ca903b694fdefab8",
+    "validation/desktop-perf/preparation/measure.c": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+    "validation/desktop-perf/preparation/perf-init.sh": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+    "validation/desktop-perf/preparation/pipeline-checkpoint.json": "ee2f14ffc36e6067f1e26ba1f4792860ae8820c89502d584cedc0bae31e9437b",
+    "validation/desktop-perf/preparation/pipeline.log": "5d92b63dad2b9df17d3d4c451fe4e0d3c05225b45fcdd72999949d832d1e6578",
+    "validation/desktop-perf/preparation/pipeline.py": "93b904de36ec6b7a6ee2c2f34aa8f53432fb0b3a91cde2b4ac07ea76ec21b283",
+    "validation/desktop-perf/preparation/preparation.json": "6bc2d8ea2b3d666f57997f2653bf562518dd6b3fbfa8552aa264a026e342a041",
+    "validation/desktop-perf/preparation/recovery.json": "f68d6987cac623fdfe94fd157f7cd3a89849166baf91be14cec2e9cbfd60f485",
+    "validation/desktop-perf/preparation/run-driver.py": "45f886f4273c208cfbb36819c302ffe27a49900476f1c0bc7bf6d66b36e8061d",
+    "validation/desktop-perf/preparation/run.py": "6c064e8740d79012c583b856426a56b00a68e87cf97732c53559bda5a39665cd",
+    "validation/desktop-perf/preparation/validate-completed.py": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9",
+    "validation/desktop-perf/results.json": "ce5715648583074c91da4a6710f948e65cc9ea5d093dc2468d9e79c17092b64e",
+    "validation/desktop-perf/run.json": "e3f76e62864152f6313f34822c1f49d4524afae882af2f02e8980acf5334051f",
+    "validation/desktop-perf/serial.log": "c058525bc813d2493002a0c2039cd5d88890bda114dbf8708140f555fa40f8e8",
+    "validation/desktop-perf/validation.json": "22b95485fce140104367f2a006f6ee670cc959d6913d9c953e99dd99064818d5",
+    "validation/final-copy-provenance.json": "bf6890af53b15881d0ae412fb8af2225285558d807895c7df26e0490780f6741",
+    "validation/independent-review/checkpoint.json": "4676a55e3ff8e3814b235faf716d668c5fe9f9ac2c361e5ea7deed0dd7ed22ec",
+    "validation/independent-review/collect.py": "6d98b34918d246ce32a651f1818091e9d75b7db457d04e2eba0eb0a5d42fb2f9",
+    "validation/independent-review/disabled-arm126-v6-final-free-lo.asm": "e8140f4a2c4042fffdf877b62ddbc300870319bf5498f309d014053a2a2316af",
+    "validation/independent-review/disabled-arm126-v6-final-free-o.asm": "9ff601812e49f3e23700ca404221ceb9c97a405451473b5f4216f0bd1059bf61",
+    "validation/independent-review/disabled-arm126-v6-final-malloc-lo.asm": "db4a00f0d7bdbcfc039cf354e0b1382d53bf6c1d66f5baa30bac8027470740ba",
+    "validation/independent-review/disabled-arm126-v6-final-malloc-o.asm": "aeedae158ec2ff5fc0035711484e1b0d7cfba24790fb58fa686dd79de880eb65",
+    "validation/independent-review/disabled-arm126-v6-final-realloc-lo.asm": "9a429503e5a684a44265a6e4e864efad6da10db8521f53db7527438cdbbd3064",
+    "validation/independent-review/disabled-arm126-v6-final-realloc-o.asm": "f118e72a74e742d2eae1b23eb601509a363bc7fbc48cce77605453adce7d4387",
+    "validation/independent-review/disabled-arm126-v6-final-symbols.txt": "1700d2adc993568a61eed1d49e83a053ad36c7d9e9a9f6457a730e4c0e656194",
+    "validation/independent-review/disabled-v6-final-free-lo.asm": "fbd060cfe5610d36ef0bddad1d07aa8f27c2203cbc2294555ee59bf3612fb240",
+    "validation/independent-review/disabled-v6-final-free-o.asm": "9aabbd4b9c58e66596a75c0ab6fb9f586bd7f86769b82448030f45d2d6bc75a5",
+    "validation/independent-review/disabled-v6-final-malloc-lo.asm": "4eac41fbea65fc55b07844dfa7d1911fdaa8e9b1c3a7f854a9d6de47897fd071",
+    "validation/independent-review/disabled-v6-final-malloc-o.asm": "dc4d7180f855b53adaeafc147ebad3fce4199c250bf11c0a687f1ee3f7f08c6b",
+    "validation/independent-review/disabled-v6-final-realloc-lo.asm": "f837cdaecc7f994755d44fd79718c338e0e66af6173ce98479873750df4baa76",
+    "validation/independent-review/disabled-v6-final-realloc-o.asm": "87b777673806cad1cfa8c990673ca7a68043a4e1dc8a32e197446d1bdce73fbd",
+    "validation/independent-review/disabled-v6-final-symbols.txt": "874ff61e93cefa321d02b08bac7d3580b3e302c7ede214dda440e9470b657646",
+    "validation/independent-review/object-proof.json": "49854c2ccd88af311d00ccc209c3235714ffaf374a121edf1d754019295239f1",
+    "validation/independent-review/optimized-arm126-v6-final-free-lo.asm": "9014b8c3ed1f117c01ef9268d5304ae0d53413f6e81fc75631f676119175b380",
+    "validation/independent-review/optimized-arm126-v6-final-free-o.asm": "f99e84da1379627e6f08768d8568c3bd16c32a35111d8dbc9ba69cea976712b2",
+    "validation/independent-review/optimized-arm126-v6-final-malloc-lo.asm": "2025e490c967cc8efed572fcf082799bc581a58e70eda970afe71d7527b2e698",
+    "validation/independent-review/optimized-arm126-v6-final-malloc-o.asm": "c2f4a30e6548d9b67096f4be8b9f238882760eebe697c1025b613d54cd5baf31",
+    "validation/independent-review/optimized-arm126-v6-final-realloc-lo.asm": "70e9d6d7dd31fe72d0addff981e90b810ae4ec1b05ae8bda47912b1a6f0de6d8",
+    "validation/independent-review/optimized-arm126-v6-final-realloc-o.asm": "5a17123dfc3fa08f995fb278326b1122f46bc48e308517557d4532d15cb6db1f",
+    "validation/independent-review/optimized-arm126-v6-final-symbols.txt": "fc02e125ecf9fde41762aaade4e581947209547477fd721e501d40dece1e4802",
+    "validation/independent-review/optimized-v6-final-free-lo.asm": "4568bf88635a577dcb7c382d3ac8448cfb06d59d00bb262e4679a699fb1c9481",
+    "validation/independent-review/optimized-v6-final-free-o.asm": "af70297f0be9cdfbc505ff69b23bc8d422bc6b498d4eb696b47f5507416bac75",
+    "validation/independent-review/optimized-v6-final-malloc-lo.asm": "873da86a4626604a1872ff4663700a3c60281c65f9cef51a7c0765b2edfdaf0b",
+    "validation/independent-review/optimized-v6-final-malloc-o.asm": "fb2f71ed004c292bcc5876fc163e9c741fb9eb657d96cd1514ce33a5854b4b91",
+    "validation/independent-review/optimized-v6-final-realloc-lo.asm": "44e369a60dce4f03c2e2294f676c8171de917a4e8f39f9fbff110a9d56149d85",
+    "validation/independent-review/optimized-v6-final-realloc-o.asm": "8f1d0fc62dffd1daee344141c592ffd6f89307077f49d91bdcafad49941ac84e",
+    "validation/independent-review/optimized-v6-final-symbols.txt": "f3c7f78c5c90bcb994b69cc7ad6366cf7b1af4a8591534c43779b74aae78c5ba",
+    "validation/independent-review/review.json": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8",
+    "validation/independent-review/source-checks.json": "79ac66ec1b2a4d9c541c0757de3cb08d47eb2297db10cd12b9becd5304c40cd5",
+    "validation/independent-review/sources/aarch64/aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348",
+    "validation/independent-review/sources/aarch64/free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+    "validation/independent-review/sources/aarch64/glue.h": "99aab3632bed29fb76467b443847775b99e762fddd127fd20b5f130da484353c",
+    "validation/independent-review/sources/aarch64/malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+    "validation/independent-review/sources/aarch64/meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+    "validation/independent-review/sources/aarch64/realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+    "validation/independent-review/sources/x86_64/aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348",
+    "validation/independent-review/sources/x86_64/free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+    "validation/independent-review/sources/x86_64/glue.h": "292c97bdb158e5cce1d05b084c55963e19c8ed9bb11f01ad4526b1441cc55d70",
+    "validation/independent-review/sources/x86_64/malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+    "validation/independent-review/sources/x86_64/meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+    "validation/independent-review/sources/x86_64/realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+    "validation/kernel-aarch64.json": "a19cef5cc77637c98938237aa936718ad9eaadb2a939bda7e3bbd82c47567919",
+    "validation/kernel-x86_64.json": "22587cccbed17d10eba667d748d08ce40f893392a1b0c0f5ce35ba11cc4f4c8a",
+    "validation/libc-builds.json": "a9c79f5a342dd19ceab78bcb8f7a0ab2d758c202bf074b37702ba92c40fd2904",
+    "validation/libc.patch": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+    "validation/production-packaging/aarch64/builder.log": "a47cc315f2f53e506b496244d4aec0385919980943709b6b0ca57ded92f81d10",
+    "validation/production-packaging/aarch64/inputs.json": "7c5370f186f834b054ef4e2d276690df7d2e23efb582547b521f249ef3327074",
+    "validation/production-packaging/aarch64/malloc.h": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "validation/production-packaging/aarch64/musl-build.json": "27092fb71fae915dce451a7bdc97fb9ecd3517089a3d1837b8c67610f2c61ed1",
+    "validation/production-packaging/aarch64/results.json": "0902d3ceb7b32d199f434e1d82e101941e248eac5df24fd1f008150b9befcb5b",
+    "validation/production-packaging/aarch64/root-review.json": "82a624b1bc9d32cedc4fcf639f8a37c82f10d1a5b5be26bb96c90f9c7c35b7a6",
+    "validation/production-packaging/amd64/builder.log": "f66c527ee11f258baa6071cd79fa3bee2936aeb3a635f58bd47b78ba9655dba9",
+    "validation/production-packaging/amd64/inputs.json": "df9aa015e55e4f7cf7697bb199bb0c4a2be5373c9103c37a24dbee9adeb46744",
+    "validation/production-packaging/amd64/malloc.h": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "validation/production-packaging/amd64/musl-build.json": "fceb26b5c9be5f72a5aed24895ad2154be1a9a4d9acb01f2038162682fd4d9cf",
+    "validation/production-packaging/amd64/results.json": "6e0d87516f25a443e38b56b5abf5c8d4a852d7cd67e6ddcc2a28c3c6c5a0a5a8",
+    "validation/production-packaging/amd64/root-review.json": "f8c03fc2adac74a33acd0bdd0b433b21a9c5a8e706d55a9d07847b3f8dc5eb0d",
+    "validation/recompute-review.json": "07937dd228200922e9af7729db9184223ed390de85738ddd2932d6ea3665cc60",
+    "validation/source-freeze/evidence/collect-v6-verification.py": "566538c067b7d255de97112a7b51208d8d18c091793df697b3ca71b8d906533f",
+    "validation/source-freeze/evidence/correctness-v6-arm-driver.py": "1e610f4410fe09a3adb72690e3aac7cde22aa73e4bbf60b0d9530c155a3edb8a",
+    "validation/source-freeze/evidence/correctness-v6-x86-driver.py": "b5e55d720dc344c2b93881393d5b7acc1b5f0c77208dd6862629b502b3153128",
+    "validation/source-freeze/evidence/v6-checkpoint.json": "caf558a137b10d99de4b247f1a61e58af4342c387dc8c9cc512f79b3cb32b254",
+    "validation/source-freeze/evidence/v6-verification-summary.json": "2a1cdb85207a3fea7d45556b49a9d79647429889b27c7ad8b3066dfcccc1b05a",
+    "validation/source-freeze/feature-commit.json": "aa8bc44d8d7d6c54166039512a104b33284863ad3e09c7cd736af345824a36a9",
+    "validation/source-freeze/independent-review.json": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8",
+    "validation/source-freeze/malloc-retain.patch": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+    "validation/source-freeze/owned-diff.patch": "085ac8ad7fc3c90648368c4e2d55c5c5c33092b1d6a991b3f6f115bdd1cf1742",
+    "validation/source-freeze/source-object-manifest-sha256.json": "5c314da81798eb0ed98992537c9ef342039954b1f134ed9ea14a0a63842bca1c",
+    "validation/source-freeze/stages/disabled-arm126-v6-final/allocator-build-excerpt.log": "f14df31526b57791a4fa47f6da04920b344b87fc4391a88edec1d37f4e8ee26d",
+    "validation/source-freeze/stages/disabled-arm126-v6-final/build-log-provenance.json": "405dfd8a7fb9addc2f5f29b22ef728aeec7e535c70454aefe52818d199ba5808",
+    "validation/source-freeze/stages/disabled-arm126-v6-final/config.mak": "d348733ffb6d40163b8af5a5d314aba22f8f0ed1eba6f52ede452ed322e195b3",
+    "validation/source-freeze/stages/disabled-arm126-v6-final/musl-build.json": "ae39cc32810d60a98c6cedb786dfddea15182a42396e0597301a3fabd2495098",
+    "validation/source-freeze/stages/disabled-v6-final/allocator-build-excerpt.log": "5a2e51a4ad88d9a87dd8af2e8e0cca8856b54678c43bacb237cf4b95d219df89",
+    "validation/source-freeze/stages/disabled-v6-final/build-log-provenance.json": "6904bbfcd5ea6303629ba4fcf51e1aaf620b35e3776c5814f4bed665bba66fb9",
+    "validation/source-freeze/stages/disabled-v6-final/config.mak": "34087fb7940b4422911315a2b9b75eef3d94e270ee42fc1af765ca9d0d8a0bca",
+    "validation/source-freeze/stages/disabled-v6-final/musl-build.json": "2a4e8b096711797d0f0d4e205914e590ad13cebad70a84309c7f923e8f94620d",
+    "validation/source-freeze/stages/optimized-arm126-v6-final/allocator-build-excerpt.log": "b03e32beed591a73362d6c309e1224387b12cecb3a757fd3a853e636c31e1c6f",
+    "validation/source-freeze/stages/optimized-arm126-v6-final/build-log-provenance.json": "82b6a8cd0fd757c1eb2e4e147142e37b6852882325d56c918dccf773c3e156c1",
+    "validation/source-freeze/stages/optimized-arm126-v6-final/config.mak": "2fa1c6dbb6350ec9bc76337ce7ba44eb30be5bd7dc0f39ccc5cb3b7ef81043cd",
+    "validation/source-freeze/stages/optimized-arm126-v6-final/musl-build.json": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656",
+    "validation/source-freeze/stages/optimized-v6-final/allocator-build-excerpt.log": "137c155e943c3f34adb3d22c4bd933c3fcada9d58d8d30e96954576b71302bbb",
+    "validation/source-freeze/stages/optimized-v6-final/build-log-provenance.json": "d9ffec87923886e796289cd35e6c5ecbdf6528ae2d2f725d73ef5be77356a27f",
+    "validation/source-freeze/stages/optimized-v6-final/config.mak": "d85a54b254992f6d45f5853178ada344a72985d5bd768afc9faee223be35937f",
+    "validation/source-freeze/stages/optimized-v6-final/musl-build.json": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686",
+    "validation/source-freeze/tests/user-alloc/README.md": "eb820769baa40323147476fa4d974e382c9e7aab125c0552ba34ed068edfe021",
+    "validation/source-freeze/tests/user-alloc/clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+    "validation/source-freeze/tests/user-alloc/verify-all-classes.c": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+    "validation/source-freeze/tests/user-alloc/verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "validation/static-desktop/build.json": "34ee21ab4fcfdbbaefbf79d635183af0f603da7ab27a3082dbe43221783ff508",
+    "validation/static-desktop/build.log": "874b5b3d75336e447cfc9a3a94ea7d429d9cd639047a1f046eb7dfbec381df3e",
+    "validation/static-desktop/clang-command.json": "1afe8c8b53439ad941bc4ea803f67ab98cccef32e8de4dde6f6a8c711d7789e9",
+    "validation/static-desktop/driver.exit.json": "6292ab9138461c2b154282125a0b51e38529a33cee476b4b75442ee5817f4477",
+    "validation/static-desktop/driver.log": "34ee21ab4fcfdbbaefbf79d635183af0f603da7ab27a3082dbe43221783ff508",
+    "validation/static-desktop/link-map-provenance.json": "cf4af113b66ecf598e326e18d56441a8235154f1299bbed785e23ec13cc2fbe0",
+    "validation/static-desktop/link.map": "f6192aeff975f1d35e14c507d3667542f6651a356bdb726562fd3732c2bcf59b",
+    "validation/static-desktop/linked-libc.sha256": "498c689fc4ed5c24fc8de5e25c3d96b92e1465d240d4efa7d4f054684258207c",
+    "validation/static-desktop/linked-symbols.txt": "1d361a1dcc5faf503038fe493ed756f5a2c0d737ac0bc3e51617f3e04c378b9c",
+    "validation/static-desktop/mallocng-link-map.txt": "1596e8028284a990f9da0b18bf8cb58276930fbd3fbc22db7aa1ad211237710c",
+    "validation/static-desktop/preparation.json": "878a9e840d88cfb1aee7517865635acbf4824ac466f8ca210b9042682969fd55",
+    "validation/v5-hot-diagnostic/bench.c": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+    "validation/v5-hot-diagnostic/boot-1/config.json": "99478523eb6059292d17371d81407297b32435f82c37f231586cf6c48c82fbe0",
+    "validation/v5-hot-diagnostic/boot-1/image-build.log": "89bacd1c811e495cae1452a41193d3a94f38146e42684a6f9d31a7ffd6ef1621",
+    "validation/v5-hot-diagnostic/boot-1/qemu.log": "74b4d02a36861dc660177d81cf4553ba138be122cc41938f6ce122e0d9d553af",
+    "validation/v5-hot-diagnostic/boot-1/serial.log": "6b3c7784fca067c3f721da3ecd56fce559c73ccaeee7a9965fd84653e3820926",
+    "validation/v5-hot-diagnostic/boot-2/config.json": "89db9979d5e65da13eb5a30c3ac99a17c047e12ee23f55e06afb2655b4dfc9d8",
+    "validation/v5-hot-diagnostic/boot-2/image-build.log": "bea4b87aec92e72fab0dff35f96fce0eb03a22b66be1314f6eb5d6ae653616e1",
+    "validation/v5-hot-diagnostic/boot-2/qemu.log": "74b4d02a36861dc660177d81cf4553ba138be122cc41938f6ce122e0d9d553af",
+    "validation/v5-hot-diagnostic/boot-2/serial.log": "fd5c001892626d336b4723b994443bd68331d632d8c0802a0eb5137569846b29",
+    "validation/v5-hot-diagnostic/compilation.json": "fba8fa752cdd9bea1b043343aadbc1aa5e8a8794cf23ad20f907052bed8055bc",
+    "validation/v5-hot-diagnostic/driver.exit.json": "89444e4cff71d10a35076a8876df6fd1caa17c25480dd11ca6bae6a2188bf430",
+    "validation/v5-hot-diagnostic/driver.log": "7805df8cf3c81823633eb01eb36324f0ddafecea89d52905326727595bb088c6",
+    "validation/v5-hot-diagnostic/dynamic-nm.txt": "ca11317ec8b395b332ef95b9e8ef145a585e05e0df6f014b9dfefa3ec8e1b465",
+    "validation/v5-hot-diagnostic/dynamic-readelf.txt": "4128fffae88e5a12c50b7faec4b685459a8b17f9c1d54a4e4ea5e50721999dbc",
+    "validation/v5-hot-diagnostic/inputs.json": "9f9730d6bb729a9ccbd831f795db3699a5f108abbd34c9afd178692704e4b74e",
+    "validation/v5-hot-diagnostic/loader-symbols.json": "5f03208267a531d42f7c4fe76f052689fa992eb4a30de496ecdaee68c5acb6a0",
+    "validation/v5-hot-diagnostic/run.py": "72a32126185473e7424e87a6d9156331662d36b76fd99a2406250b844bfeefc6",
+    "validation/v5-hot-diagnostic/sampler.c": "584543c2a4175cd1d7c990baef765c1c88e453946ef053a714bf9c9a62e34e7a",
+    "validation/v5-hot-diagnostic/static-nm.txt": "4c65ab70aa49077abc13d1b02022bbcd746ba4203b08be9dcdbf86a2376dfd09",
+    "validation/v5-hot-diagnostic/static-readelf.txt": "68fa3100f90b7134e493cf4c535ffd34b7d15b73f41842175cfe5493e00e3dba",
+    "validation/v5-hot-diagnostic/summarize.py": "cf8a6aaba1c1ddf41325f862f1297fa5e9eed49aa84f2413d669df77473a9f4d",
+    "validation/v5-hot-diagnostic/summary.json": "31d6c85142ea1cb3bd5879d6b52fdf9722eaaa71d2013ff69d45fae10a82d88c",
+    "validation/v6-verification-summary.json": "2a1cdb85207a3fea7d45556b49a9d79647429889b27c7ad8b3066dfcccc1b05a",
+    "vinix-1/capture-integrity.json": "3912b189a2c59aec40485977d8cf64edc8f3fd56582ed617f8cc4b7cdbe4a8f0",
+    "vinix-1/config.json": "cdfa3c804e262376265d39e16c22912bd4e307f4fbf44bb08dbfeca6d805a332",
+    "vinix-1/coordinator-record.json": "fb9150af6afb0366b32ce3a76c42119c074bdbba83658ea11e4ce5ce9324b2db",
+    "vinix-1/driver-exit.json": "a55c7af95358698a0112daa835b77c473932741a770c9242102ec29677b10d5f",
+    "vinix-1/image-build.log": "317540ed7d1393ccdd98b49242a87e5b4b8f9f753c7976466180d775cc3d8cf9",
+    "vinix-1/qemu.log": "014eca1217db44bca5d4df8795331990fd779bb6bda99132a145be13ba1e1cbe",
+    "vinix-1/runner.log": "f62b3ab0d7de8bd55dac7b97a2ffecf92454980d7529b9d485b1039cb7db34c5",
+    "vinix-1/serial.log": "354b6baa649156c1f57cb68f5d8909cd974d36248778fae5f9d96a5452882e45",
+    "vinix-2/capture-integrity.json": "2b5f256c5ad8d894e8160cda48a3be0ea5557613cf51d71509e57076ebd4b719",
+    "vinix-2/config.json": "a87c45d904c204e88f6c55f05ed884a5215885e2cb8be5982878039dda63968e",
+    "vinix-2/coordinator-record.json": "5a34f5ea505d1cf84928c556c8d137fcba162af8742f6c0818dc728f8dedb0e0",
+    "vinix-2/driver-exit.json": "b5679ec3d0def06ca344e8ba55f8a1afc83d849ec7216578d2caf41915749528",
+    "vinix-2/image-build.log": "0610592bc505c766425d0744a66acebb77b6ea58a202dff45529a96afcff22a2",
+    "vinix-2/qemu.log": "7d7bdb6d6b8a9ec7baaa1d5ba524747dbe94a83e1f420120799164b980b7a628",
+    "vinix-2/runner.log": "b3ca574bceaa7e5f7a2cc526334654595537d27818d2f7a5ed229709b8d6b616",
+    "vinix-2/serial.log": "344cfca15e1b29020b86ca8889d1e65de3bbbb95678f2788c76b5bc1840af8ed"
+  },
+  "review_scope_limits": [
+    "Review validates actual selected QEMU captures and reported finite-workload evidence, not native hardware or causal timing attribution.",
+    "170 protocol checks use historical raw captures only in temporary integrity fixtures; none are campaign data.",
+    "No source/report edits, commits, builds or VMs were run by this independent auditor."
+  ]
+}

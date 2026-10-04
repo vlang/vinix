@@ -1,0 +1,371 @@
+
+build/useralloc-kernel-speed-v4/x86_64/memory.c.o:	file format elf64-x86-64
+
+Disassembly of section .text.memcpy:
+
+0000000000000000 <memcpy>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 48 89 f8                     	movq	%rdi, %rax
+       7: 89 f1                        	movl	%esi, %ecx
+       9: 31 c1                        	xorl	%eax, %ecx
+       b: f6 c1 07                     	testb	$0x7, %cl
+       e: 74 0b                        	je	0x1b <memcpy+0x1b>
+      10: 48 89 d7                     	movq	%rdx, %rdi
+      13: 48 89 c1                     	movq	%rax, %rcx
+      16: e9 0d 02 00 00               	jmp	0x228 <memcpy+0x228>
+      1b: 48 85 d2                     	testq	%rdx, %rdx
+      1e: 0f 94 c1                     	sete	%cl
+      21: a8 07                        	testb	$0x7, %al
+      23: 40 0f 94 c7                  	sete	%dil
+      27: 40 08 cf                     	orb	%cl, %dil
+      2a: 0f 85 3b 01 00 00            	jne	0x16b <memcpy+0x16b>
+      30: 0f b6 3e                     	movzbl	(%rsi), %edi
+      33: 48 8d 48 01                  	leaq	0x1(%rax), %rcx
+      37: 40 88 38                     	movb	%dil, (%rax)
+      3a: 48 89 d7                     	movq	%rdx, %rdi
+      3d: 48 ff cf                     	decq	%rdi
+      40: 41 0f 95 c0                  	setne	%r8b
+      44: f6 c1 07                     	testb	$0x7, %cl
+      47: 41 0f 95 c1                  	setne	%r9b
+      4b: 45 20 c1                     	andb	%r8b, %r9b
+      4e: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      52: 0f 85 1b 01 00 00            	jne	0x173 <memcpy+0x173>
+      58: 0f b6 7e 01                  	movzbl	0x1(%rsi), %edi
+      5c: 48 8d 48 02                  	leaq	0x2(%rax), %rcx
+      60: 40 88 78 01                  	movb	%dil, 0x1(%rax)
+      64: 48 89 d7                     	movq	%rdx, %rdi
+      67: 48 83 c7 fe                  	addq	$-0x2, %rdi
+      6b: 41 0f 95 c0                  	setne	%r8b
+      6f: f6 c1 07                     	testb	$0x7, %cl
+      72: 41 0f 95 c1                  	setne	%r9b
+      76: 45 20 c1                     	andb	%r8b, %r9b
+      79: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      7d: 0f 85 f5 00 00 00            	jne	0x178 <memcpy+0x178>
+      83: 0f b6 7e 02                  	movzbl	0x2(%rsi), %edi
+      87: 48 8d 48 03                  	leaq	0x3(%rax), %rcx
+      8b: 40 88 78 02                  	movb	%dil, 0x2(%rax)
+      8f: 48 89 d7                     	movq	%rdx, %rdi
+      92: 48 83 c7 fd                  	addq	$-0x3, %rdi
+      96: 41 0f 95 c0                  	setne	%r8b
+      9a: f6 c1 07                     	testb	$0x7, %cl
+      9d: 41 0f 95 c1                  	setne	%r9b
+      a1: 45 20 c1                     	andb	%r8b, %r9b
+      a4: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      a8: 0f 85 d0 00 00 00            	jne	0x17e <memcpy+0x17e>
+      ae: 0f b6 7e 03                  	movzbl	0x3(%rsi), %edi
+      b2: 48 8d 48 04                  	leaq	0x4(%rax), %rcx
+      b6: 40 88 78 03                  	movb	%dil, 0x3(%rax)
+      ba: 48 89 d7                     	movq	%rdx, %rdi
+      bd: 48 83 c7 fc                  	addq	$-0x4, %rdi
+      c1: 41 0f 95 c0                  	setne	%r8b
+      c5: f6 c1 07                     	testb	$0x7, %cl
+      c8: 41 0f 95 c1                  	setne	%r9b
+      cc: 45 20 c1                     	andb	%r8b, %r9b
+      cf: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      d3: 0f 85 ab 00 00 00            	jne	0x184 <memcpy+0x184>
+      d9: 0f b6 7e 04                  	movzbl	0x4(%rsi), %edi
+      dd: 48 8d 48 05                  	leaq	0x5(%rax), %rcx
+      e1: 40 88 78 04                  	movb	%dil, 0x4(%rax)
+      e5: 48 89 d7                     	movq	%rdx, %rdi
+      e8: 48 83 c7 fb                  	addq	$-0x5, %rdi
+      ec: 41 0f 95 c0                  	setne	%r8b
+      f0: f6 c1 07                     	testb	$0x7, %cl
+      f3: 41 0f 95 c1                  	setne	%r9b
+      f7: 45 20 c1                     	andb	%r8b, %r9b
+      fa: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      fe: 0f 85 86 00 00 00            	jne	0x18a <memcpy+0x18a>
+     104: 0f b6 7e 05                  	movzbl	0x5(%rsi), %edi
+     108: 48 8d 48 06                  	leaq	0x6(%rax), %rcx
+     10c: 40 88 78 05                  	movb	%dil, 0x5(%rax)
+     110: 48 89 d7                     	movq	%rdx, %rdi
+     113: 48 83 c7 fa                  	addq	$-0x6, %rdi
+     117: 41 0f 95 c0                  	setne	%r8b
+     11b: f6 c1 07                     	testb	$0x7, %cl
+     11e: 41 0f 95 c1                  	setne	%r9b
+     122: 45 20 c1                     	andb	%r8b, %r9b
+     125: 41 80 f9 01                  	cmpb	$0x1, %r9b
+     129: 75 65                        	jne	0x190 <memcpy+0x190>
+     12b: 0f b6 7e 06                  	movzbl	0x6(%rsi), %edi
+     12f: 48 8d 48 07                  	leaq	0x7(%rax), %rcx
+     133: 40 88 78 06                  	movb	%dil, 0x6(%rax)
+     137: 48 89 d7                     	movq	%rdx, %rdi
+     13a: 48 83 c7 f9                  	addq	$-0x7, %rdi
+     13e: 41 0f 95 c0                  	setne	%r8b
+     142: f6 c1 07                     	testb	$0x7, %cl
+     145: 41 0f 95 c1                  	setne	%r9b
+     149: 45 20 c1                     	andb	%r8b, %r9b
+     14c: 41 80 f9 01                  	cmpb	$0x1, %r9b
+     150: 75 44                        	jne	0x196 <memcpy+0x196>
+     152: 0f b6 7e 07                  	movzbl	0x7(%rsi), %edi
+     156: 48 83 c6 08                  	addq	$0x8, %rsi
+     15a: 48 8d 48 08                  	leaq	0x8(%rax), %rcx
+     15e: 40 88 78 07                  	movb	%dil, 0x7(%rax)
+     162: 48 83 c2 f8                  	addq	$-0x8, %rdx
+     166: 48 89 d7                     	movq	%rdx, %rdi
+     169: eb 2f                        	jmp	0x19a <memcpy+0x19a>
+     16b: 48 89 d7                     	movq	%rdx, %rdi
+     16e: 48 89 c1                     	movq	%rax, %rcx
+     171: eb 27                        	jmp	0x19a <memcpy+0x19a>
+     173: 48 ff c6                     	incq	%rsi
+     176: eb 22                        	jmp	0x19a <memcpy+0x19a>
+     178: 48 83 c6 02                  	addq	$0x2, %rsi
+     17c: eb 1c                        	jmp	0x19a <memcpy+0x19a>
+     17e: 48 83 c6 03                  	addq	$0x3, %rsi
+     182: eb 16                        	jmp	0x19a <memcpy+0x19a>
+     184: 48 83 c6 04                  	addq	$0x4, %rsi
+     188: eb 10                        	jmp	0x19a <memcpy+0x19a>
+     18a: 48 83 c6 05                  	addq	$0x5, %rsi
+     18e: eb 0a                        	jmp	0x19a <memcpy+0x19a>
+     190: 48 83 c6 06                  	addq	$0x6, %rsi
+     194: eb 04                        	jmp	0x19a <memcpy+0x19a>
+     196: 48 83 c6 07                  	addq	$0x7, %rsi
+     19a: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     19e: 0f 82 84 00 00 00            	jb	0x228 <memcpy+0x228>
+     1a4: 48 83 ff 40                  	cmpq	$0x40, %rdi
+     1a8: 72 66                        	jb	0x210 <memcpy+0x210>
+     1aa: 66 0f 1f 44 00 00            	nopw	(%rax,%rax)
+     1b0: 48 8b 16                     	movq	(%rsi), %rdx
+     1b3: 48 89 11                     	movq	%rdx, (%rcx)
+     1b6: 48 8b 56 08                  	movq	0x8(%rsi), %rdx
+     1ba: 48 89 51 08                  	movq	%rdx, 0x8(%rcx)
+     1be: 48 8b 56 10                  	movq	0x10(%rsi), %rdx
+     1c2: 48 89 51 10                  	movq	%rdx, 0x10(%rcx)
+     1c6: 48 8b 56 18                  	movq	0x18(%rsi), %rdx
+     1ca: 48 89 51 18                  	movq	%rdx, 0x18(%rcx)
+     1ce: 48 8b 56 20                  	movq	0x20(%rsi), %rdx
+     1d2: 48 89 51 20                  	movq	%rdx, 0x20(%rcx)
+     1d6: 48 8b 56 28                  	movq	0x28(%rsi), %rdx
+     1da: 48 89 51 28                  	movq	%rdx, 0x28(%rcx)
+     1de: 48 8b 56 30                  	movq	0x30(%rsi), %rdx
+     1e2: 48 89 51 30                  	movq	%rdx, 0x30(%rcx)
+     1e6: 48 8b 56 38                  	movq	0x38(%rsi), %rdx
+     1ea: 48 89 51 38                  	movq	%rdx, 0x38(%rcx)
+     1ee: 48 83 c1 40                  	addq	$0x40, %rcx
+     1f2: 48 83 c6 40                  	addq	$0x40, %rsi
+     1f6: 48 83 c7 c0                  	addq	$-0x40, %rdi
+     1fa: 48 83 ff 3f                  	cmpq	$0x3f, %rdi
+     1fe: 77 b0                        	ja	0x1b0 <memcpy+0x1b0>
+     200: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     204: 72 22                        	jb	0x228 <memcpy+0x228>
+     206: 66 2e 0f 1f 84 00 00 00 00 00	nopw	%cs:(%rax,%rax)
+     210: 48 8b 16                     	movq	(%rsi), %rdx
+     213: 48 83 c6 08                  	addq	$0x8, %rsi
+     217: 48 89 11                     	movq	%rdx, (%rcx)
+     21a: 48 83 c1 08                  	addq	$0x8, %rcx
+     21e: 48 83 c7 f8                  	addq	$-0x8, %rdi
+     222: 48 83 ff 07                  	cmpq	$0x7, %rdi
+     226: 77 e8                        	ja	0x210 <memcpy+0x210>
+     228: 48 85 ff                     	testq	%rdi, %rdi
+     22b: 0f 84 9e 00 00 00            	je	0x2cf <memcpy+0x2cf>
+     231: 48 89 fa                     	movq	%rdi, %rdx
+     234: 48 83 e2 07                  	andq	$0x7, %rdx
+     238: 74 2b                        	je	0x265 <memcpy+0x265>
+     23a: 45 31 c0                     	xorl	%r8d, %r8d
+     23d: 0f 1f 00                     	nopl	(%rax)
+     240: 46 0f b6 0c 06               	movzbl	(%rsi,%r8), %r9d
+     245: 46 88 0c 01                  	movb	%r9b, (%rcx,%r8)
+     249: 49 ff c0                     	incq	%r8
+     24c: 4c 39 c2                     	cmpq	%r8, %rdx
+     24f: 75 ef                        	jne	0x240 <memcpy+0x240>
+     251: 4c 01 c6                     	addq	%r8, %rsi
+     254: 4c 01 c1                     	addq	%r8, %rcx
+     257: 48 89 fa                     	movq	%rdi, %rdx
+     25a: 4c 29 c2                     	subq	%r8, %rdx
+     25d: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     261: 73 0b                        	jae	0x26e <memcpy+0x26e>
+     263: eb 6a                        	jmp	0x2cf <memcpy+0x2cf>
+     265: 48 89 fa                     	movq	%rdi, %rdx
+     268: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     26c: 72 61                        	jb	0x2cf <memcpy+0x2cf>
+     26e: 31 ff                        	xorl	%edi, %edi
+     270: 44 0f b6 04 3e               	movzbl	(%rsi,%rdi), %r8d
+     275: 44 88 04 39                  	movb	%r8b, (%rcx,%rdi)
+     279: 44 0f b6 44 3e 01            	movzbl	0x1(%rsi,%rdi), %r8d
+     27f: 44 88 44 39 01               	movb	%r8b, 0x1(%rcx,%rdi)
+     284: 44 0f b6 44 3e 02            	movzbl	0x2(%rsi,%rdi), %r8d
+     28a: 44 88 44 39 02               	movb	%r8b, 0x2(%rcx,%rdi)
+     28f: 44 0f b6 44 3e 03            	movzbl	0x3(%rsi,%rdi), %r8d
+     295: 44 88 44 39 03               	movb	%r8b, 0x3(%rcx,%rdi)
+     29a: 44 0f b6 44 3e 04            	movzbl	0x4(%rsi,%rdi), %r8d
+     2a0: 44 88 44 39 04               	movb	%r8b, 0x4(%rcx,%rdi)
+     2a5: 44 0f b6 44 3e 05            	movzbl	0x5(%rsi,%rdi), %r8d
+     2ab: 44 88 44 39 05               	movb	%r8b, 0x5(%rcx,%rdi)
+     2b0: 44 0f b6 44 3e 06            	movzbl	0x6(%rsi,%rdi), %r8d
+     2b6: 44 88 44 39 06               	movb	%r8b, 0x6(%rcx,%rdi)
+     2bb: 44 0f b6 44 3e 07            	movzbl	0x7(%rsi,%rdi), %r8d
+     2c1: 44 88 44 39 07               	movb	%r8b, 0x7(%rcx,%rdi)
+     2c6: 48 83 c7 08                  	addq	$0x8, %rdi
+     2ca: 48 39 fa                     	cmpq	%rdi, %rdx
+     2cd: 75 a1                        	jne	0x270 <memcpy+0x270>
+     2cf: 5d                           	popq	%rbp
+     2d0: c3                           	retq
+
+Disassembly of section .text.memset:
+
+0000000000000000 <memset>:
+       0: 48 89 f8                     	movq	%rdi, %rax
+       3: 48 85 d2                     	testq	%rdx, %rdx
+       6: 0f 94 c1                     	sete	%cl
+       9: a8 07                        	testb	$0x7, %al
+       b: 40 0f 94 c7                  	sete	%dil
+       f: 40 08 cf                     	orb	%cl, %dil
+      12: 0f 85 0d 01 00 00            	jne	0x125 <memset+0x125>
+      18: 48 8d 48 01                  	leaq	0x1(%rax), %rcx
+      1c: 40 88 30                     	movb	%sil, (%rax)
+      1f: 48 89 d7                     	movq	%rdx, %rdi
+      22: 48 ff cf                     	decq	%rdi
+      25: 41 0f 95 c0                  	setne	%r8b
+      29: f6 c1 07                     	testb	$0x7, %cl
+      2c: 41 0f 95 c1                  	setne	%r9b
+      30: 45 20 c1                     	andb	%r8b, %r9b
+      33: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      37: 0f 85 ee 00 00 00            	jne	0x12b <memset+0x12b>
+      3d: 48 8d 48 02                  	leaq	0x2(%rax), %rcx
+      41: 40 88 70 01                  	movb	%sil, 0x1(%rax)
+      45: 48 89 d7                     	movq	%rdx, %rdi
+      48: 48 83 c7 fe                  	addq	$-0x2, %rdi
+      4c: 41 0f 95 c0                  	setne	%r8b
+      50: f6 c1 07                     	testb	$0x7, %cl
+      53: 41 0f 95 c1                  	setne	%r9b
+      57: 45 20 c1                     	andb	%r8b, %r9b
+      5a: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      5e: 0f 85 c7 00 00 00            	jne	0x12b <memset+0x12b>
+      64: 48 8d 48 03                  	leaq	0x3(%rax), %rcx
+      68: 40 88 70 02                  	movb	%sil, 0x2(%rax)
+      6c: 48 89 d7                     	movq	%rdx, %rdi
+      6f: 48 83 c7 fd                  	addq	$-0x3, %rdi
+      73: 41 0f 95 c0                  	setne	%r8b
+      77: f6 c1 07                     	testb	$0x7, %cl
+      7a: 41 0f 95 c1                  	setne	%r9b
+      7e: 45 20 c1                     	andb	%r8b, %r9b
+      81: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      85: 0f 85 a0 00 00 00            	jne	0x12b <memset+0x12b>
+      8b: 48 8d 48 04                  	leaq	0x4(%rax), %rcx
+      8f: 40 88 70 03                  	movb	%sil, 0x3(%rax)
+      93: 48 89 d7                     	movq	%rdx, %rdi
+      96: 48 83 c7 fc                  	addq	$-0x4, %rdi
+      9a: 41 0f 95 c0                  	setne	%r8b
+      9e: f6 c1 07                     	testb	$0x7, %cl
+      a1: 41 0f 95 c1                  	setne	%r9b
+      a5: 45 20 c1                     	andb	%r8b, %r9b
+      a8: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      ac: 75 7d                        	jne	0x12b <memset+0x12b>
+      ae: 48 8d 48 05                  	leaq	0x5(%rax), %rcx
+      b2: 40 88 70 04                  	movb	%sil, 0x4(%rax)
+      b6: 48 89 d7                     	movq	%rdx, %rdi
+      b9: 48 83 c7 fb                  	addq	$-0x5, %rdi
+      bd: 41 0f 95 c0                  	setne	%r8b
+      c1: f6 c1 07                     	testb	$0x7, %cl
+      c4: 41 0f 95 c1                  	setne	%r9b
+      c8: 45 20 c1                     	andb	%r8b, %r9b
+      cb: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      cf: 75 5a                        	jne	0x12b <memset+0x12b>
+      d1: 48 8d 48 06                  	leaq	0x6(%rax), %rcx
+      d5: 40 88 70 05                  	movb	%sil, 0x5(%rax)
+      d9: 48 89 d7                     	movq	%rdx, %rdi
+      dc: 48 83 c7 fa                  	addq	$-0x6, %rdi
+      e0: 41 0f 95 c0                  	setne	%r8b
+      e4: f6 c1 07                     	testb	$0x7, %cl
+      e7: 41 0f 95 c1                  	setne	%r9b
+      eb: 45 20 c1                     	andb	%r8b, %r9b
+      ee: 41 80 f9 01                  	cmpb	$0x1, %r9b
+      f2: 75 37                        	jne	0x12b <memset+0x12b>
+      f4: 48 8d 48 07                  	leaq	0x7(%rax), %rcx
+      f8: 40 88 70 06                  	movb	%sil, 0x6(%rax)
+      fc: 48 89 d7                     	movq	%rdx, %rdi
+      ff: 48 83 c7 f9                  	addq	$-0x7, %rdi
+     103: 41 0f 95 c0                  	setne	%r8b
+     107: f6 c1 07                     	testb	$0x7, %cl
+     10a: 41 0f 95 c1                  	setne	%r9b
+     10e: 45 20 c1                     	andb	%r8b, %r9b
+     111: 41 80 f9 01                  	cmpb	$0x1, %r9b
+     115: 75 14                        	jne	0x12b <memset+0x12b>
+     117: 48 8d 48 08                  	leaq	0x8(%rax), %rcx
+     11b: 40 88 70 07                  	movb	%sil, 0x7(%rax)
+     11f: 48 83 c2 f8                  	addq	$-0x8, %rdx
+     123: eb 03                        	jmp	0x128 <memset+0x128>
+     125: 48 89 c1                     	movq	%rax, %rcx
+     128: 48 89 d7                     	movq	%rdx, %rdi
+     12b: 55                           	pushq	%rbp
+     12c: 48 89 e5                     	movq	%rsp, %rbp
+     12f: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     133: 0f 82 c8 00 00 00            	jb	0x201 <memset+0x201>
+     139: 44 0f b6 c6                  	movzbl	%sil, %r8d
+     13d: 48 ba 01 01 01 01 01 01 01 01	movabsq	$0x101010101010101, %rdx # imm = 0x101010101010101
+     147: 49 0f af d0                  	imulq	%r8, %rdx
+     14b: 48 83 ff 40                  	cmpq	$0x40, %rdi
+     14f: 0f 82 9b 00 00 00            	jb	0x1f0 <memset+0x1f0>
+     155: 4c 8d 47 c0                  	leaq	-0x40(%rdi), %r8
+     159: 41 f6 c0 40                  	testb	$0x40, %r8b
+     15d: 75 26                        	jne	0x185 <memset+0x185>
+     15f: 48 89 11                     	movq	%rdx, (%rcx)
+     162: 48 89 51 08                  	movq	%rdx, 0x8(%rcx)
+     166: 48 89 51 10                  	movq	%rdx, 0x10(%rcx)
+     16a: 48 89 51 18                  	movq	%rdx, 0x18(%rcx)
+     16e: 48 89 51 20                  	movq	%rdx, 0x20(%rcx)
+     172: 48 89 51 28                  	movq	%rdx, 0x28(%rcx)
+     176: 48 89 51 30                  	movq	%rdx, 0x30(%rcx)
+     17a: 48 89 51 38                  	movq	%rdx, 0x38(%rcx)
+     17e: 48 83 c1 40                  	addq	$0x40, %rcx
+     182: 4c 89 c7                     	movq	%r8, %rdi
+     185: 49 83 f8 40                  	cmpq	$0x40, %r8
+     189: 72 52                        	jb	0x1dd <memset+0x1dd>
+     18b: 49 89 f8                     	movq	%rdi, %r8
+     18e: 66 90                        	nop
+     190: 48 89 11                     	movq	%rdx, (%rcx)
+     193: 48 89 51 08                  	movq	%rdx, 0x8(%rcx)
+     197: 48 89 51 10                  	movq	%rdx, 0x10(%rcx)
+     19b: 48 89 51 18                  	movq	%rdx, 0x18(%rcx)
+     19f: 48 89 51 20                  	movq	%rdx, 0x20(%rcx)
+     1a3: 48 89 51 28                  	movq	%rdx, 0x28(%rcx)
+     1a7: 48 89 51 30                  	movq	%rdx, 0x30(%rcx)
+     1ab: 48 89 51 38                  	movq	%rdx, 0x38(%rcx)
+     1af: 48 89 51 40                  	movq	%rdx, 0x40(%rcx)
+     1b3: 48 89 51 48                  	movq	%rdx, 0x48(%rcx)
+     1b7: 48 89 51 50                  	movq	%rdx, 0x50(%rcx)
+     1bb: 48 89 51 58                  	movq	%rdx, 0x58(%rcx)
+     1bf: 48 89 51 60                  	movq	%rdx, 0x60(%rcx)
+     1c3: 48 89 51 68                  	movq	%rdx, 0x68(%rcx)
+     1c7: 48 89 51 70                  	movq	%rdx, 0x70(%rcx)
+     1cb: 48 89 51 78                  	movq	%rdx, 0x78(%rcx)
+     1cf: 48 83 e9 80                  	subq	$-0x80, %rcx
+     1d3: 49 83 c0 80                  	addq	$-0x80, %r8
+     1d7: 49 83 f8 3f                  	cmpq	$0x3f, %r8
+     1db: 77 b3                        	ja	0x190 <memset+0x190>
+     1dd: 4c 89 c7                     	movq	%r8, %rdi
+     1e0: 49 83 f8 08                  	cmpq	$0x8, %r8
+     1e4: 72 1b                        	jb	0x201 <memset+0x201>
+     1e6: 66 2e 0f 1f 84 00 00 00 00 00	nopw	%cs:(%rax,%rax)
+     1f0: 48 89 11                     	movq	%rdx, (%rcx)
+     1f3: 48 83 c1 08                  	addq	$0x8, %rcx
+     1f7: 48 83 c7 f8                  	addq	$-0x8, %rdi
+     1fb: 48 83 ff 07                  	cmpq	$0x7, %rdi
+     1ff: 77 ef                        	ja	0x1f0 <memset+0x1f0>
+     201: 48 85 ff                     	testq	%rdi, %rdi
+     204: 74 5e                        	je	0x264 <memset+0x264>
+     206: 31 d2                        	xorl	%edx, %edx
+     208: 0f 1f 84 00 00 00 00 00      	nopl	(%rax,%rax)
+     210: 40 88 34 11                  	movb	%sil, (%rcx,%rdx)
+     214: 48 ff c2                     	incq	%rdx
+     217: 49 89 f8                     	movq	%rdi, %r8
+     21a: 49 29 d0                     	subq	%rdx, %r8
+     21d: 75 f1                        	jne	0x210 <memset+0x210>
+     21f: 48 83 ff 08                  	cmpq	$0x8, %rdi
+     223: 72 3f                        	jb	0x264 <memset+0x264>
+     225: 31 ff                        	xorl	%edi, %edi
+     227: 66 0f 1f 84 00 00 00 00 00   	nopw	(%rax,%rax)
+     230: 4c 8d 0c 39                  	leaq	(%rcx,%rdi), %r9
+     234: 42 88 34 0a                  	movb	%sil, (%rdx,%r9)
+     238: 42 88 74 0a 01               	movb	%sil, 0x1(%rdx,%r9)
+     23d: 42 88 74 0a 02               	movb	%sil, 0x2(%rdx,%r9)
+     242: 42 88 74 0a 03               	movb	%sil, 0x3(%rdx,%r9)
+     247: 42 88 74 0a 04               	movb	%sil, 0x4(%rdx,%r9)
+     24c: 42 88 74 0a 05               	movb	%sil, 0x5(%rdx,%r9)
+     251: 42 88 74 0a 06               	movb	%sil, 0x6(%rdx,%r9)
+     256: 42 88 74 0a 07               	movb	%sil, 0x7(%rdx,%r9)
+     25b: 48 83 c7 08                  	addq	$0x8, %rdi
+     25f: 49 39 f8                     	cmpq	%rdi, %r8
+     262: 75 cc                        	jne	0x230 <memset+0x230>
+     264: 5d                           	popq	%rbp
+     265: c3                           	retq

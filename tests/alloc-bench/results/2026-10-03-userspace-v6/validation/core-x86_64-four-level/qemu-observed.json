@@ -1,0 +1,13 @@
+{
+  "provenance": "Live ps capture during the actual frozen harness execution",
+  "observations": [
+    {
+      "captured_utc": "2026-10-02T22:51:32.285474+00:00",
+      "ps": "58841 50085 /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python /Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64-four-level/run_vm.py --arch amd64 --iso /Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso --qemu /opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64 --firmware /opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd --timeout 900 --cpus 2"
+    },
+    {
+      "captured_utc": "2026-10-02T22:51:32.845277+00:00",
+      "ps": "58843 58841 /opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64 -machine q35,smm=off -accel tcg -cpu max,-la57 -m 2048 -smp 2 -drive if=pflash,format=raw,unit=0,readonly=on,file=/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd -cdrom /Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso -display none -monitor none -serial stdio -no-reboot"
+    }
+  ]
+}

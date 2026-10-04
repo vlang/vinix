@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Apple SPI shared keyboard/touchpad transport and console decoder.
@@ -177,6 +181,15 @@ static void csi_u(struct key_bytes *out, unsigned codepoint,
     sequence(out, "u");
 }
 
+static void modified_arrow(struct key_bytes *out, char final,
+    unsigned modifiers)
+{
+    sequence(out, "\033[1;");
+    decimal(out, 1 + modifiers);
+    if (out->len < sizeof(out->data))
+        out->data[out->len++] = (uint8_t)final;
+}
+
 static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int caps, int fn, int application_cursor)
 {
@@ -207,6 +220,14 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         return out;
     }
 
+    if (gui && key >= 79 && key <= 82) {
+        static const char finals[] = {'C', 'D', 'B', 'A'};
+        unsigned mods = 8u | (unsigned)shift | ((unsigned)alt << 1) |
+            ((unsigned)ctrl << 2);
+        modified_arrow(&out, finals[key - 79], mods);
+        return out;
+    }
+
     if (key >= 4 && key <= 29) {
         c = (uint8_t)((shift ^ !!caps ? 'A' : 'a') + key - 4);
         printable = 1;
@@ -224,7 +245,15 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 46: c = shift ? '+' : '='; printable = 1; break;
         case 47: c = shift ? '{' : '['; printable = 1; break;
         case 48: c = shift ? '}' : ']'; printable = 1; break;
-        case 49: case 100: c = shift ? '|' : '\\'; printable = 1; break;
+        case 49: c = shift ? '|' : '\\'; printable = 1; break;
+        /* The ISO key has no US character. It types the § and ± Apple's US
+         * layout prints on it, which name it uniquely for the desktop's
+         * keyboard layouts to put their own characters on. */
+        case 100:
+            if (gui)
+                return out;
+            s = shift ? "\xc2\xb1" : "\xc2\xa7";
+            break;
         case 50: c = shift ? '~' : '#'; printable = 1; break;
         case 51: c = shift ? ':' : ';'; printable = 1; break;
         case 52: c = shift ? '"' : '\''; printable = 1; break;
@@ -722,6 +751,11 @@ int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity, int app)
 uint64_t vinix_apple_spi_keyboard_reports(void)
 {
     return keyboard.decoder.reports;
+}
+
+int vinix_apple_spi_keyboard_caps_lock(void)
+{
+    return keyboard.decoder.caps;
 }
 
 uint64_t vinix_apple_spi_touchpad_reports(void)

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 typedef void (*void_function)(void);
 typedef void (*one_pointer_function)(void *);
 typedef void *(*workbook_function)(int);

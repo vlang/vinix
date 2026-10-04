@@ -1,0 +1,98 @@
+{
+  "passed": true,
+  "base_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "changed_file_count": 17,
+  "combined_patch_sha256": "1d60ede65b0ae20a153ebcb9226c5a1cba6f0f62a3180b88fae3fab3b22a4398",
+  "method": "In a temporary directory, git show each of 17 files from the recorded base; git apply --check and git apply the preserved patch; hash every reconstructed file against combined-source.json and both final build manifests. No compiler or guest run.",
+  "files": {
+    "kernel/c/memory.c": {
+      "expected": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+      "reconstructed": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/file/locks.v": {
+      "expected": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+      "reconstructed": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/file/timerfd.v": {
+      "expected": "ba38d9a723efd67f9d221cb9c3e5961aeb2e8c1b7d603665aeb05abe44482c23",
+      "reconstructed": "ba38d9a723efd67f9d221cb9c3e5961aeb2e8c1b7d603665aeb05abe44482c23",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/katomic/katomic_amd64.v": {
+      "expected": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+      "reconstructed": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/klock/klock_amd64.v": {
+      "expected": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+      "reconstructed": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/memory/mmap/mmap.v": {
+      "expected": "95788b45183c6eac58f4fa5c01d5e5d3d5672e728d3051ce9d71d89107bf9980",
+      "reconstructed": "95788b45183c6eac58f4fa5c01d5e5d3d5672e728d3051ce9d71d89107bf9980",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/memory/mmap/mmap_amd64.v": {
+      "expected": "69e3648bb5419a1e0e9f06721080deabdb286abc7c0fdae1b6f5c6515bf85c58",
+      "reconstructed": "69e3648bb5419a1e0e9f06721080deabdb286abc7c0fdae1b6f5c6515bf85c58",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/memory/mmap/mmap_arm64.v": {
+      "expected": "ba522bfaff83fcf525ed52a34229c013af0ef1c7a27c099adc9089cd45714e4a",
+      "reconstructed": "ba522bfaff83fcf525ed52a34229c013af0ef1c7a27c099adc9089cd45714e4a",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/memory/mmap/page_in.v": {
+      "expected": "1009d493f1998188f5a24c27e443e53f77506cd432e6241b0831bb785bc6ca8d",
+      "reconstructed": "1009d493f1998188f5a24c27e443e53f77506cd432e6241b0831bb785bc6ca8d",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/pipe/pipe.v": {
+      "expected": "2cb2d4e677ca89a16cb85cfbae4b637df9405d1409ab4b479fa24c987f2da411",
+      "reconstructed": "2cb2d4e677ca89a16cb85cfbae4b637df9405d1409ab4b479fa24c987f2da411",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/socket/socket.v": {
+      "expected": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+      "reconstructed": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/socket/unix/unix.v": {
+      "expected": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6",
+      "reconstructed": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/time/sys/linux.v": {
+      "expected": "3cb9a6f155affa03a968604ef6de60aa263e38d30c67114d84a7607ce25967b2",
+      "reconstructed": "3cb9a6f155affa03a968604ef6de60aa263e38d30c67114d84a7607ce25967b2",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/time/sys/syscalls.v": {
+      "expected": "847e11eef5747b1b63794e27a58321159c9ceead187895449ed710a561650f21",
+      "reconstructed": "847e11eef5747b1b63794e27a58321159c9ceead187895449ed710a561650f21",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/time/time.v": {
+      "expected": "40767795f0d35378b010f9e74423d353f0b8194d130978a5e3bc0b961c20ffc3",
+      "reconstructed": "40767795f0d35378b010f9e74423d353f0b8194d130978a5e3bc0b961c20ffc3",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/time/time_amd64.v": {
+      "expected": "58449cbb9eab4c201074f7563da7e2817fb5221a5beee61e57ba58f7512f5329",
+      "reconstructed": "58449cbb9eab4c201074f7563da7e2817fb5221a5beee61e57ba58f7512f5329",
+      "both_architecture_manifests_match": true
+    },
+    "kernel/time/time_arm64.v": {
+      "expected": "7cc360fd708b13fc67275455dc314d6d64db71769f2f094f5d92b14de0061be5",
+      "reconstructed": "7cc360fd708b13fc67275455dc314d6d64db71769f2f094f5d92b14de0061be5",
+      "both_architecture_manifests_match": true
+    }
+  },
+  "kernel_sha256": {
+    "x86_64": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+    "aarch64": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9"
+  }
+}

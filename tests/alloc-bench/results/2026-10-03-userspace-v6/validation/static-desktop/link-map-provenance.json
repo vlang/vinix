@@ -1,0 +1,7 @@
+{
+  "link_map_sha256": "f6192aeff975f1d35e14c507d3667542f6651a356bdb726562fd3732c2bcf59b",
+  "saved_full_map": "link.map",
+  "saved_mallocng_excerpt": "mallocng-link-map.txt",
+  "desktop_sha256": "f921ddf580e1056a0e58b42af6b08c4588c69d36350e6ef2f07b6a006180910d",
+  "binary_not_copied": true
+}

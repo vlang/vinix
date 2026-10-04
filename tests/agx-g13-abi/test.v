@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 module main
 
 // Build the two offset-addressed InitData blobs at both firmware ABIs and check
@@ -102,6 +105,10 @@ fn config_for(abi hw.FirmwareAbi) hw.HwConfig {
 fn read_u32(bytes []u8, offset u32) u32 {
 	index := int(offset)
 	return u32(bytes[index]) | (u32(bytes[index + 1]) << 8) | (u32(bytes[index + 2]) << 16) | (u32(bytes[index + 3]) << 24)
+}
+
+fn read_u64(bytes []u8, offset u32) u64 {
+	return u64(read_u32(bytes, offset)) | (u64(read_u32(bytes, offset + 4)) << 32)
 }
 
 fn hwdata_a_for(abi hw.FirmwareAbi) []u8 {
@@ -221,6 +228,7 @@ fn check_globals() {
 
 	// Fields 13.5 adds.
 	assert read_u32(new, fw.g13_v13_5_globals_unk_24_0_offset) == 3000
+	assert read_u32(new, fw.g13_v13_5_globals_unk_2c_0_offset) == 0
 	assert read_u32(new, fw.g13_v13_5_globals_unk_1102c_8_offset) == 100
 	assert read_u32(new, fw.g13_v13_5_globals_cl_kill_timeout_ms_offset) == 50
 
@@ -231,6 +239,74 @@ fn check_globals() {
 	for index in 0 .. 16 {
 		assert read_u32(old, old_hws1 + u32(index * 4)) == read_u32(new, new_hws1 + u32(index * 4))
 	}
+	new_hws2 := fw.g13_globals_offset(.v13_5_partial, 0x8aa0) or { 0 }
+	for index in 0 .. 16 {
+		assert new[int(new_hws2) + 0x28 + index] == 0xff
+	}
+}
+
+fn check_hwdata_b() {
+	cfg := config_for(.v13_5_partial)
+	mut data := fw.G13HwDataBBlob{}
+	assert fw.populate_g13_hwdata_b_blob(mut data, &cfg, 0x1234_0000,
+		0xffff_ffa0_1100_0000, 0xffff_ffae_1000_0000)
+	assert fw.read_g13_hwdata_b_blob_u32(&data, 0x968) or { 0 } == 0x8103
+	mut bytes := []u8{len: data.bytes.len}
+	for index in 0 .. data.bytes.len {
+		bytes[index] = data.bytes[index]
+	}
+	// HwDataB.timestamp_area_base moves with the expanded YUV table at 13.5,
+	// but must still name the aperture used by the runtime timestamp allocator.
+	assert read_u64(bytes, 0x28) == 0xffff_ffae_1000_0000
+	for index := u32(0); index < 16; index++ {
+		assert fw.read_g13_hwdata_b_blob_u32(&data,
+			fw.g13_v13_5_hwdata_b_unk_arr_0_offset + index * 4) or { 0xffff_ffff } == index
+	}
+	assert fw.read_g13_hwdata_b_blob_u32(&data,
+		fw.g13_v13_5_hwdata_b_unk_b38_0_offset) or { 0 } == 1
+	assert fw.read_g13_hwdata_b_blob_u32(&data,
+		fw.g13_v13_5_hwdata_b_unk_b38_4_offset) or { 0 } == 1
+	assert fw.read_g13_hwdata_b_blob_u32(&data,
+		fw.g13_v13_5_hwdata_b_unk_c3c_offset) or { 0 } == 0x1a
+	for index, expected in [u32(0), 3, 7, 7] {
+		assert fw.read_g13_hwdata_b_blob_u32(&data, 0x16ec + u32(index * 4)) or {
+			0xffff_ffff
+		} == expected
+	}
+	assert fw.set_g13_hwdata_b_io_mapping(mut data, .v13_5_partial, 0,
+		fw.G13IoMapping{
+			physical_address: 0x1111_2222_3333_4444
+			virtual_address: 0x5555_6666_7777_8888
+			total_size: 0x9999_aaaa
+			element_size: 0xbbbb_cccc
+			readwrite: 1
+		})
+	bytes = []u8{len: data.bytes.len}
+	for index in 0 .. data.bytes.len {
+		bytes[index] = data.bytes[index]
+	}
+	base := fw.g13_v13_5_hw_data_b_io_mappings_offset
+	assert read_u64(bytes, base) == 0x1111_2222_3333_4444
+	assert read_u64(bytes, base + 8) == 0x5555_6666_7777_8888
+	assert read_u32(bytes, base + 16) == 0x9999_aaaa
+	assert read_u32(bytes, base + 20) == 0xbbbb_cccc
+	assert read_u64(bytes, base + 24) == 1
+}
+
+fn check_initdata() {
+	mut data := fw.G13InitDataBlob{}
+	assert fw.build_g13_initdata_blob(mut data, .v13_5_partial, 0x1111_2222_3333_4444,
+		0x5555_6666_7777_8888, 0x9999_aaaa_bbbb_cccc, 0xdddd_eeee_ffff_0001, 40)
+	mut bytes := []u8{len: data.bytes.len}
+	for index in 0 .. data.bytes.len {
+		bytes[index] = data.bytes[index]
+	}
+	assert read_u32(bytes, 0) == 0x1f28_6ba0
+	assert read_u32(bytes, 4) == 0x00b0_0601
+	assert read_u64(bytes, 8) == 0x1111_2222_3333_4444
+	assert read_u64(bytes, 0x18) == 0x5555_6666_7777_8888
+	assert read_u64(bytes, 0x20) == 0x9999_aaaa_bbbb_cccc
+	assert read_u64(bytes, 0x28) == 0xdddd_eeee_ffff_0001
 }
 
 // Nothing outside the two G13 ABIs may build these blobs.
@@ -249,6 +325,8 @@ fn main() {
 	check_power_zone_entry()
 	check_dropped_field()
 	check_globals()
+	check_hwdata_b()
+	check_initdata()
 	check_unsupported_abi_refused()
 	println('G13 firmware ABI translation tests passed')
 }

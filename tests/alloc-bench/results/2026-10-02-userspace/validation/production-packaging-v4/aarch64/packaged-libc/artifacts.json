@@ -1,0 +1,22 @@
+{
+  "malloc.h": {
+    "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "bytes": 387,
+    "private_artifact": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v4/aarch64/packaged-libc/malloc.h"
+  },
+  "musl-build.json": {
+    "sha256": "da2b47bd93d30c5af1486b572a963862e671ed3bc6ff8d891d6b3101279da10e",
+    "bytes": 2807,
+    "private_artifact": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v4/aarch64/packaged-libc/musl-build.json"
+  },
+  "ld-musl-aarch64.so.1": {
+    "sha256": "3f395f9980f5e31e0c0341e4568fe795a88485dbc2f9b52e1feeac2654df4a7a",
+    "bytes": 1024952,
+    "private_artifact": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v4/aarch64/packaged-libc/ld-musl-aarch64.so.1"
+  },
+  "libc.a": {
+    "sha256": "1a070ee70b34db179677bf98e03b3adf9f0aa3604b5a9b68929219b0f35d0a3c",
+    "bytes": 2832528,
+    "private_artifact": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v4/aarch64/packaged-libc/libc.a"
+  }
+}

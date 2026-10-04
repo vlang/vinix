@@ -9,7 +9,6 @@ import klock
 import proc
 import resource
 import stat
-import usercopy
 
 pub const in_access = u32(0x00000001)
 pub const in_modify = u32(0x00000002)
@@ -58,8 +57,11 @@ mut:
 
 	watches    []InotifyWatch
 	queue      []u8
+	creator_domain u32
 	next_wd    int = 1
 	overflowed bool
+	// The interface box its descriptors share, freed with the instance.
+	box &resource.Resource = unsafe { nil }
 }
 
 __global (
@@ -86,11 +88,15 @@ fn append_u32(mut bytes []u8, value u32) {
 	bytes << u8(value >> 24)
 }
 
-fn queued_record_size(bytes []u8) u64 {
-	if bytes.len < 16 {
+// The size of the record at `offset` in the queue. An offset rather than a
+// slice: slicing marks the queue's buffer as shared, and every later
+// delete_many() then copied the queue to a new buffer and left the old one.
+fn queued_record_size(bytes []u8, offset int) u64 {
+	if bytes.len - offset < 16 {
 		return 0
 	}
-	name_len := u32(bytes[12]) | (u32(bytes[13]) << 8) | (u32(bytes[14]) << 16) | (u32(bytes[15]) << 24)
+	at := offset + 12
+	name_len := u32(bytes[at]) | (u32(bytes[at + 1]) << 8) | (u32(bytes[at + 2]) << 16) | (u32(bytes[at + 3]) << 24)
 	return 16 + u64(name_len)
 }
 
@@ -177,20 +183,19 @@ fn inotify_wait(mut this INotify, handle_ptr voidptr) bool {
 	mut handle := unsafe { &file.Handle(handle_ptr) }
 	this.l.release()
 	if handle != unsafe { nil } { handle.l.release() }
-	mut events := [&this.event]
-	event.await(mut events, true) or {
-		unsafe { events.free() }
+	event.await_one(mut this.event, true) or {
 		if handle != unsafe { nil } { handle.l.acquire() }
 		this.l.acquire()
 		return false
 	}
-	unsafe { events.free() }
 	if handle != unsafe { nil } { handle.l.acquire() }
 	this.l.acquire()
 	return true
 }
 
 fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	domain := proc.mac_current_domain()
+	if domain != 0 && domain != this.creator_domain { errno.set(errno.eacces); return none }
 	if buf == unsafe { nil } {
 		errno.set(errno.efault)
 		return none
@@ -208,7 +213,7 @@ fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64)
 			return none
 		}
 	}
-	first := queued_record_size(this.queue)
+	first := queued_record_size(this.queue, 0)
 	if first == 0 {
 		errno.set(errno.eio)
 		return none
@@ -219,16 +224,13 @@ fn (mut this INotify) read(handle_ptr voidptr, buf voidptr, _loc u64, count u64)
 	}
 	mut amount := u64(0)
 	for amount < u64(this.queue.len) {
-		record := queued_record_size(this.queue[int(amount)..])
+		record := queued_record_size(this.queue, int(amount))
 		if record == 0 || amount + record > count {
 			break
 		}
 		amount += record
 	}
-	if !usercopy.copy_to_user(u64(buf), voidptr(&this.queue[0]), amount) {
-		errno.set(errno.efault)
-		return none
-	}
+	unsafe { C.memcpy(buf, voidptr(&this.queue[0]), amount) }
 	this.queue.delete_many(0, int(amount))
 	if this.queue.len == 0 {
 		this.status &= ~file.pollin
@@ -261,6 +263,7 @@ fn (mut this INotify) unref(_handle voidptr) ? {
 	unsafe {
 		this.watches.free()
 		this.queue.free()
+		free(voidptr(this.box))
 		free(voidptr(this))
 	}
 }
@@ -287,13 +290,17 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 	// The descriptor's Handle owns the resource reference.  The registry is
 	// only an index protected by inotify_lock, so it must not keep a closed
 	// instance alive indefinitely.
-	mut inotify := &INotify{}
+	mut inotify := &INotify{creator_domain: proc.mac_current_domain()}
 	inotify.stat.mode = stat.ifchr | 0o600
 	inotify.stat.blksize = 1
+	// Nothing slices these, so a grown one frees the buffer it outgrew.
+	inotify.queue.flags |= .noslices
+	inotify.watches.flags |= .noslices
 	inotify_lock.acquire()
 	inotify_instances << inotify
 	inotify_lock.release()
-	mut res := &resource.Resource(unsafe { inotify })
+	inotify.box = &resource.Resource(unsafe { inotify }) @[freed]
+	mut res := inotify.box
 	fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, flags, 0, false) or {
 		return errno.err, errno.get()
 	}
@@ -306,23 +313,30 @@ pub fn syscall_inotify_add_watch(_ voidptr, fdnum int, _path charptr, mask u32) 
 		return errno.err, errno.einval
 	}
 	path := user_path(_path) or { return errno.err, errno.get() }
+	defer {
+		unsafe { path.free() }
+	}
 	if path.len == 0 {
 		return errno.err, errno.enoent
 	}
 	follow := mask & in_dont_follow == 0
-	node := get_node(proc.current_thread().process.current_directory, path, follow) or {
+	node := get_node(proc.current_directory_of(proc.current_thread().process), path, follow) or {
+		return errno.err, errno.get()
+	}
+	if !policy_check(node, proc.policy_read) {
 		return errno.err, errno.get()
 	}
 	if mask & in_onlydir != 0 && !stat.isdir(node.resource.stat.mode) {
 		return errno.err, errno.enotdir
 	}
-	if !check_access(node, access_read, true) {
-		return errno.err, errno.eacces
-	}
+	check_access(node, access_read, true) or { return errno.err, errno.get() }
 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	mut res := fd.handle.resource
 	if mut res is INotify {
+		if proc.mac_current_domain() != 0 && proc.mac_current_domain() != res.creator_domain {
+			return errno.err, errno.eacces
+		}
 		res.l.acquire()
 		defer { res.l.release() }
 		for mut watch in res.watches {
@@ -354,6 +368,9 @@ pub fn syscall_inotify_rm_watch(_ voidptr, fdnum int, wd int) (u64, u64) {
 	defer { fd.unref() }
 	mut res := fd.handle.resource
 	if mut res is INotify {
+		if proc.mac_current_domain() != 0 && proc.mac_current_domain() != res.creator_domain {
+			return errno.err, errno.eacces
+		}
 		res.l.acquire()
 		defer { res.l.release() }
 		for i, watch in res.watches {

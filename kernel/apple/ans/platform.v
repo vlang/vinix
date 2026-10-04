@@ -20,6 +20,8 @@ mut:
 	sart    devicetree.DTReg
 	reset   Domain
 	power   []Domain
+	// DMA addresses the bus passes through untranslated end here.
+	dma_limit u64
 }
 
 fn compatible(node &devicetree.DTNode, value string) bool {
@@ -112,73 +114,145 @@ fn plan_power(node &devicetree.DTNode, depth int, mut plan Plan) bool {
 	return true
 }
 
+fn read_cells(values []u32, at int, count int) u64 {
+	mut value := u64(0)
+	for i in 0 .. count {
+		value = (value << 32) | u64(values[at + i])
+	}
+	return value
+}
+
+// The end of the identity window from address 0 that a node's dma-ranges
+// gives, or none when any entry translates. Asahi's trees give the soc bus
+// <0 0 0 0 0xffffffff 0xffffc000> so that DARTs can reach memory above 4 GiB:
+// one identity window over nearly the whole address space, which moves no
+// address and only bounds them.
+fn identity_window(node &devicetree.DTNode) ?u64 {
+	child_cells := int(devicetree.get_u32(node, '#address-cells') or { u32(2) })
+	size_cells := int(devicetree.get_u32(node, '#size-cells') or { u32(1) })
+	mut parent_cells := 2
+	if node.parent != unsafe { nil } {
+		parent_cells = int(devicetree.get_u32(node.parent, '#address-cells') or { u32(2) })
+	}
+	if child_cells < 1 || child_cells > 2 || parent_cells < 1 || parent_cells > 2
+		|| size_cells < 1 || size_cells > 2 {
+		return none
+	}
+	values := devicetree.get_u32_array(node, 'dma-ranges') or { return none }
+	defer { unsafe { values.free() } }
+	entry := child_cells + parent_cells + size_cells
+	if values.len == 0 || values.len % entry != 0 {
+		return none
+	}
+	mut limit := u64(0)
+	for i := 0; i < values.len; i += entry {
+		child := read_cells(values, i, child_cells)
+		parent := read_cells(values, i + child_cells, parent_cells)
+		size := read_cells(values, i + child_cells + parent_cells, size_cells)
+		if child != parent || size == 0 {
+			return none
+		}
+		if child == 0 {
+			limit = size
+		}
+	}
+	if limit == 0 {
+		return none
+	}
+	return limit
+}
+
 // This transport uses physical DMA addresses, not translated IOVAs. The M1
-// binding uses SART/NVMMU; a new IOMMU or non-identity DMA bus is not supported.
-fn identity_dma(node &devicetree.DTNode) bool {
+// binding uses SART/NVMMU; an IOMMU or a bus that translates DMA is not
+// supported. Returns where untranslated DMA addresses end.
+fn dma_limit(node &devicetree.DTNode) ?u64 {
+	mut limit := ~u64(0)
 	mut current := node
 	for _ in 0 .. 64 {
-		if current == unsafe { nil } { return true }
+		if current == unsafe { nil } { return limit }
 		if ranges := devicetree.get_property(current, 'dma-ranges') {
-			if ranges.len != 0 { return false }
+			if ranges.len != 0 {
+				window := identity_window(current) or { return none }
+				if window < limit { limit = window }
+			}
 		}
 		if iommu := devicetree.get_property(current, 'iommus') {
 			_ = iommu
-			return false
+			return none
 		}
 		current = current.parent
 	}
+	return none
+}
+
+// Which discovery check failed: "invalid or unsupported device-tree
+// resources" alone left the first M1 boot with nothing to go on.
+fn refuse(reason string) bool {
+	C.kprintf(c'ans: device tree: %.*s\n', i32(reason.len), reason.str)
 	return false
 }
 
 fn discover(node &devicetree.DTNode, mut plan Plan) bool {
-	if !identity_dma(node) { return false }
-	regs := devicetree.get_translated_reg_ranges(node) or { return false }
+	plan.dma_limit = dma_limit(node) or {
+		return refuse('the bus translates DMA addresses (dma-ranges or an IOMMU)')
+	}
+	regs := devicetree.get_translated_reg_ranges(node) or { return refuse('no registers') }
 	defer { unsafe { regs.free() } }
-	names := devicetree.get_string_list(node, 'reg-names') or { return false }
+	names := devicetree.get_string_list(node, 'reg-names') or { return refuse('no reg-names') }
 	defer { unsafe { names.free() } }
 	if regs.len != 2 || names.len != 2 || names[0] != 'nvme' || names[1] != 'ans'
 		|| !valid_region(regs[0], 0x28124) || !valid_region(regs[1], 0x48) {
-		return false
+		return refuse('registers are not the nvme and ans apertures expected')
 	}
 	plan.nvme = regs[0]
 	plan.asc = regs[1]
-	mboxes := devicetree.get_u32_array(node, 'mboxes') or { return false }
+	mboxes := devicetree.get_u32_array(node, 'mboxes') or { return refuse('no mboxes') }
 	defer { unsafe { mboxes.free() } }
-	if mboxes.len != 1 { return false }
-	mbox := devicetree.find_phandle(mboxes[0]) or { return false }
+	if mboxes.len != 1 { return refuse('not exactly one mailbox') }
+	mbox := devicetree.find_phandle(mboxes[0]) or { return refuse('mailbox node missing') }
 	if !enabled(mbox) || !compatible(mbox, 'apple,asc-mailbox-v4')
 		|| devicetree.get_u32(mbox, '#mbox-cells') or { u32(1) } != 0 {
-		return false
+		return refuse('mailbox is not an enabled apple,asc-mailbox-v4')
 	}
-	plan.mailbox = single_region(mbox, 0x840) or { return false }
-	sart_handle := devicetree.get_u32(node, 'apple,sart') or { return false }
-	sart := devicetree.find_phandle(sart_handle) or { return false }
-	if !enabled(sart) || !compatible(sart, 'apple,t8103-sart') { return false }
-	plan.sart = single_region(sart, 0x80) or { return false }
-	pd := devicetree.get_u32_array(node, 'power-domains') or { return false }
+	plan.mailbox = single_region(mbox, 0x840) or { return refuse('mailbox registers unusable') }
+	sart_handle := devicetree.get_u32(node, 'apple,sart') or { return refuse('no apple,sart') }
+	sart := devicetree.find_phandle(sart_handle) or { return refuse('SART node missing') }
+	if !enabled(sart) || !compatible(sart, 'apple,t8103-sart') {
+		return refuse('SART is not an enabled apple,t8103-sart')
+	}
+	plan.sart = single_region(sart, 0x80) or { return refuse('SART registers unusable') }
+	pd := devicetree.get_u32_array(node, 'power-domains') or { return refuse('no power-domains') }
 	defer { unsafe { pd.free() } }
-	pd_names := devicetree.get_string_list(node, 'power-domain-names') or { return false }
+	pd_names := devicetree.get_string_list(node, 'power-domain-names') or {
+		return refuse('no power-domain-names')
+	}
 	defer { unsafe { pd_names.free() } }
-	resets := devicetree.get_u32_array(node, 'resets') or { return false }
+	resets := devicetree.get_u32_array(node, 'resets') or { return refuse('no resets') }
 	defer { unsafe { resets.free() } }
 	if pd.len != 2 || pd_names.len != 2 || pd_names[0] != 'ans'
 		|| pd_names[1] != 'apcie0' || resets.len != 1 || resets[0] != pd[0] {
-		return false
+		return refuse('power domains are not ans and apcie0 with the ans domain as reset')
 	}
-	reset := devicetree.find_phandle(resets[0]) or { return false }
-	if devicetree.get_u32(reset, '#reset-cells') or { u32(1) } != 0 { return false }
-	plan.reset = domain(resets[0]) or { return false }
+	reset := devicetree.find_phandle(resets[0]) or { return refuse('reset node missing') }
+	if devicetree.get_u32(reset, '#reset-cells') or { u32(1) } != 0 {
+		return refuse('reset takes arguments')
+	}
+	plan.reset = domain(resets[0]) or { return refuse('reset is not a t8103 PMGR power state') }
 	// These apertures belong to distinct devices. Refuse aliasing resources.
 	if overlap(plan.nvme, plan.asc) || overlap(plan.nvme, plan.mailbox)
 		|| overlap(plan.nvme, plan.sart) || overlap(plan.asc, plan.mailbox)
 		|| overlap(plan.asc, plan.sart) || overlap(plan.mailbox, plan.sart) {
-		return false
+		return refuse('device apertures overlap')
 	}
 	if !plan_power(node, 0, mut plan) || !plan_power(mbox, 0, mut plan)
-		|| !plan_power(sart, 0, mut plan) { return false }
+		|| !plan_power(sart, 0, mut plan) {
+		return refuse('a power domain or one it depends on is unusable')
+	}
 	for d in plan.power {
 		if overlap(d.region, plan.nvme) || overlap(d.region, plan.asc)
-			|| overlap(d.region, plan.mailbox) || overlap(d.region, plan.sart) { return false }
+			|| overlap(d.region, plan.mailbox) || overlap(d.region, plan.sart) {
+			return refuse('a PMGR region overlaps a device aperture')
+		}
 	}
 	return true
 }
@@ -206,15 +280,21 @@ fn initialise_hardware() bool {
 	sart := memory.map_mmio(plan.sart.base, plan.sart.size)
 	reset := memory.map_mmio(plan.reset.region.base, plan.reset.region.size)
 	if nvme == 0 || asc == 0 || mailbox == 0 || sart == 0 || reset == 0 { return false }
-	// One bounded, fallible allocation. PMM pages are 4 KiB; DMA is 16-KiB aligned.
+	// One bounded, fallible allocation. DMA is 16 KiB aligned.
 	bytes := u64(0x460000)
-	physical := u64(memory.pmm_alloc_aligned_fallible(bytes / 4096, 4))
+	physical := u64(memory.pmm_alloc_aligned_fallible(bytes / memory.page_size,
+		u64(0x4000) / memory.page_size))
 	if physical == 0 { println('ans: DMA allocation failed'); return false }
+	if physical + bytes > plan.dma_limit {
+		memory.pmm_free(voidptr(physical), bytes / memory.page_size)
+		println('ans: DMA arena lies beyond the bus DMA window; not probing')
+		return false
+	}
 	// Never free this arena after hardware has been started, even on error.
 	// Its queues, TCBs and firmware system buffers may still be DMA targets.
 	for d in plan.power {
 		if !pmgr.enable_region(d.region.base, d.region.size, d.offset) {
-			memory.pmm_free(voidptr(physical), bytes / 4096)
+			memory.pmm_free(voidptr(physical), bytes / memory.page_size)
 			println('ans: power-domain enable failed')
 			return false
 		}
@@ -222,8 +302,7 @@ fn initialise_hardware() bool {
 	result := C.vinix_ans_init(nvme, asc, mailbox, sart, reset + plan.reset.offset,
 		voidptr(physical + memory.get_hhdm_offset()), physical, bytes)
 	if result != 0 {
-		C.printf(c'ans: initialization failed error=%d stage=%u nvme_status=0x%x (DMA pinned)\n',
-			result, C.vinix_ans_stage(), C.vinix_ans_completion_status())
+		report('initialization failed (DMA pinned)', result)
 		return false
 	}
 	return true

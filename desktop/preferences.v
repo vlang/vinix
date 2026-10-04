@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 // One versioned record for every desktop preference. No device readback,
 // pending request, or application-local state belongs in this file.
@@ -33,9 +37,43 @@ fn desktop_preferences_valid(p DesktopPreferences) bool {
 		&& int(p.settings.taskbar_mode) <= int(TaskbarMode.combined)
 		&& int(p.settings.theme) >= int(ThemeKind.default_)
 		&& int(p.settings.theme) <= int(ThemeKind.macos)
+		&& int(p.settings.language) >= 0 && int(p.settings.language) < desktop_languages.len
 		&& p.settings.wallpaper_color >= 0
 		&& p.settings.wallpaper_color < wallpaper_colors.len
 		&& p.settings.wallpaper_image >= -1
+		&& keyboard_settings_valid(p.settings.keyboard_layouts, p.settings.keyboard_layout)
+}
+
+// The enabled input sources are saved in Settings' order, e.g. `us,ru`.
+fn desktop_encode_keyboard_layouts(mask u32) string {
+	mut codes := []string{cap: keyboard_layouts.len}
+	for layout in keyboard_layouts {
+		if mask & layout.bit() != 0 {
+			codes << layout.code()
+		}
+	}
+	text := codes.join(',')
+	unsafe { codes.free() }
+	return text
+}
+
+// Each code once, at least one, nothing unknown; the slices are borrowed.
+fn desktop_parse_keyboard_layouts(text string) ?u32 {
+	mut mask := u32(0)
+	mut start := 0
+	for start <= text.len {
+		mut end := start
+		for end < text.len && text[end] != `,` {
+			end++
+		}
+		layout := keyboard_layout_from_code(text[start..end]) or { return none }
+		if mask & layout.bit() != 0 {
+			return none
+		}
+		mask |= layout.bit()
+		start = end + 1
+	}
+	return mask
 }
 
 fn desktop_encode_preferences(p DesktopPreferences) ?string {
@@ -50,11 +88,14 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	side := if p.settings.button_side == .left { 'left' } else { 'right' }
 	taskbar := if p.settings.taskbar_mode == .combined { 'combined' } else { 'standard' }
 	theme := if p.settings.theme == .macos { 'macos' } else { 'default' }
+	language := p.settings.language.code()
 	clock_24_hour := if p.settings.clock_24_hour { 'true' } else { 'false' }
 	clock_show_seconds := if p.settings.clock_show_seconds { 'true' } else { 'false' }
 	clock_show_date := if p.settings.clock_show_date { 'true' } else { 'false' }
 	clock_show_weekday := if p.settings.clock_show_weekday { 'true' } else { 'false' }
-	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\n'
+	keyboard_sources := desktop_encode_keyboard_layouts(p.settings.keyboard_layouts)
+	keyboard_layout := p.settings.keyboard_layout.code()
+	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\n'
 }
 
 // Unlike string.int(), this cannot accept a numeric prefix or wrap on overflow.
@@ -112,16 +153,17 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'version' { u32(1) }
 			'scale' { u32(2) }
 			'button_side' { u32(4) }
-		
-'taskbar_mode' { u32(8) }
-		
-'theme' { u32(16) }
+			'taskbar_mode' { u32(8) }
+			'theme' { u32(16) }
 			'wallpaper_color' { u32(32) }
 			'wallpaper_image' { u32(64) }
 			'clock_24_hour' { u32(128) }
 			'clock_show_seconds' { u32(256) }
 			'clock_show_date' { u32(512) }
 			'clock_show_weekday' { u32(1024) }
+			'keyboard_layouts' { u32(2048) }
+			'keyboard_layout' { u32(4096) }
+			'language' { u32(8192) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -154,13 +196,15 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 					else { return none }
 				}
 			}
-		
-'theme' {
+			'theme' {
 				p.settings.theme = match value {
 					'default' { ThemeKind.default_ }
 					'macos' { ThemeKind.macos }
 					else { return none }
 				}
+			}
+			'language' {
+				p.settings.language = desktop_language_from_code(value)?
 			}
 			'clock_24_hour' {
 				p.settings.clock_24_hour = match value {
@@ -192,8 +236,18 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			}
 			'wallpaper_color' { p.settings.wallpaper_color = desktop_preference_index(value)? }
 			'wallpaper_image' { p.settings.wallpaper_image = desktop_preference_index(value)? }
+			'keyboard_layouts' { p.settings.keyboard_layouts = desktop_parse_keyboard_layouts(value)? }
+			'keyboard_layout' { p.settings.keyboard_layout = keyboard_layout_from_code(value)? }
 			else {}
 		}
+	}
+	// A record naming only the current input source enables it beside US, and
+	// one listing only the enabled sources types with the first of them. When
+	// both are named the current one must be among the enabled.
+	if seen & u32(2048) == 0 {
+		p.settings.keyboard_layouts |= p.settings.keyboard_layout.bit()
+	} else if seen & u32(4096) == 0 {
+		p.settings.keyboard_layout = keyboard_first_layout(p.settings.keyboard_layouts)
 	}
 	if seen & u32(1) == 0 || !desktop_preferences_valid(p) {
 		return none

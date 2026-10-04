@@ -1,0 +1,5 @@
+#!/bin/sh
+# The desktop opens this APK in its hosted X11 window using native ATL/ART.
+set -eu
+apk=${VINIX_ROBLOX_APK:-${HOME:-/root}/Roblox.apk}
+exec /usr/bin/run-roblox "$apk" "$@"

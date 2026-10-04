@@ -10,13 +10,15 @@ module virtio_gpu
 // synchronous: this keeps GEM lifetime and CPU readback ordering exact while
 // still executing every Gallium command on virglrenderer and the host GPU.
 import aarch64.cpu
+import aarch64.timer
 import aarch64.uart
 import drm
 import drm.gem
 import drm.ioctl
+import drm.syncobj
 import klock
 import memory
-import time
+import memory.mmap
 import usercopy
 
 const reg_magic = u64(0x000)
@@ -55,7 +57,7 @@ const queue_align = u64(4096)
 const wanted_queue_size = u16(8)
 const request_capacity = u64(1024 * 1024 + 4096)
 const response_capacity = u64(128 * 1024)
-const command_timeout_ns = u64(5_000_000_000)
+const command_timeout_ns = u64(120_000_000_000)
 
 const cmd_resource_unref = u32(0x0102)
 const cmd_resource_attach_backing = u32(0x0106)
@@ -221,23 +223,39 @@ mut:
 	capset_mask    u64
 	ready          bool
 	lock           klock.Lock
+	common         u64
+	notify         u64
+	isr            u64
+	config         u64
+	hostmem_base   u64
+	hostmem_size   u64
+	features       u32
 }
 
 @[heap]
 struct VirtioObject {
 mut:
-	gem_object  &gem.GemObject = unsafe { nil }
-	resource_id u32
-	references  u32
+	gem_object    &gem.GemObject = unsafe { nil }
+	resource_id   u32
+	references    u32
+	blob_mem      u32
+	host_offset   u64
+	host_reserved bool
+	host_mapping  bool // first mapping in progress; see map_host_blob
+	host_mapped   bool
 }
 
 struct VirtioFile {
 mut:
 	context_id      u32
 	context_created bool
+	capset_id       u32
+	num_rings       u32 = 1
 	objects         []&VirtioObject
-	mmap_objects    []&VirtioObject
-	lock            klock.Lock
+	// Execbuffer validates every BO handle; keep that lookup constant-time.
+	owned        [max_resources]&VirtioObject
+	mmap_objects []&VirtioObject
+	lock         klock.Lock
 }
 
 __global (
@@ -292,10 +310,15 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 	defer {
 		virtgpu_transport.lock.release()
 	}
+	if !virtgpu_transport.ready {
+		return 0, 0
+	}
 
 	unsafe {
 		C.memcpy(voidptr(virtgpu_transport.request_virt), command, command_length)
-		C.memset(voidptr(virtgpu_transport.response_virt), 0, response_capacity)
+		// QEMU overwrites the response header and reports its used length.
+		// Clearing 128 KiB for every GL command just burns guest CPU time.
+		C.memset(voidptr(virtgpu_transport.response_virt), 0, sizeof(ControlHeader))
 	}
 	if payload_length != 0 {
 		destination := voidptr(virtgpu_transport.request_virt + command_length)
@@ -317,7 +340,7 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 			virtgpu_transport.next_fence++
 		}
 		unsafe {
-			*&u32(virtgpu_transport.request_virt + 4) = control_flag_fence
+			*&u32(virtgpu_transport.request_virt + 4) |= control_flag_fence
 			*&u64(virtgpu_transport.request_virt + 8) = virtgpu_transport.next_fence
 		}
 	}
@@ -334,19 +357,27 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 	unsafe {
 		*&u16(virtgpu_transport.avail + 2) = virtgpu_transport.next_available
 	}
-	mmio_w32(virtgpu_transport.base + reg_queue_notify, 0)
+	if virtgpu_transport.common != 0 {
+		mmio_w16(virtgpu_transport.notify, 0)
+	} else {
+		mmio_w32(virtgpu_transport.base + reg_queue_notify, 0)
+	}
 
-	deadline := time.monotonic_ns() + command_timeout_ns
-	mut spins := u64(0)
+	// The transport lock masks local interrupts, so the scheduler's clock may
+	// stop advancing on a single-CPU guest. The hardware counter does not.
+	deadline := timer.get_ns() + command_timeout_ns
 	for {
 		cpu.dmb_ish()
 		used_index := unsafe { *&u16(virtgpu_transport.used + 2) }
 		if used_index != virtgpu_transport.last_used {
 			break
 		}
-		spins++
-		if spins > 100_000_000 || time.monotonic_ns() >= deadline {
-			C.printf(c'virtio-gpu: command 0x%x timed out\n', unsafe { *&u32(virtgpu_transport.request_virt) })
+		if timer.get_ns() >= deadline {
+			// The host can still complete this command later. Reusing its
+			// descriptors or DMA buffers would confuse that completion with the
+			// next command and corrupt the VirGL resource stream.
+			virtgpu_transport.ready = false
+			uart.puts(c'virtio-gpu: command timed out; disabling transport\n')
 			return 0, 0
 		}
 	}
@@ -357,9 +388,13 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 	virtgpu_transport.last_used++
 	cpu.dmb_ish()
 
-	interrupts := mmio_r32(virtgpu_transport.base + reg_interrupt_status)
-	if interrupts != 0 {
-		mmio_w32(virtgpu_transport.base + reg_interrupt_ack, interrupts)
+	if virtgpu_transport.common != 0 {
+		mmio_r8(virtgpu_transport.isr)
+	} else {
+		interrupts := mmio_r32(virtgpu_transport.base + reg_interrupt_status)
+		if interrupts != 0 {
+			mmio_w32(virtgpu_transport.base + reg_interrupt_ack, interrupts)
+		}
 	}
 
 	response_type := unsafe { *&u32(virtgpu_transport.response_virt) }
@@ -380,7 +415,7 @@ fn submit(command voidptr, command_length u64, payload u64, payload_length u64,
 
 fn header(type_ u32, context_id u32) ControlHeader {
 	return ControlHeader{
-		type_: type_
+		type_:  type_
 		ctx_id: context_id
 	}
 }
@@ -417,6 +452,8 @@ fn get_file(handle voidptr) ?&VirtioFile {
 	mut file := &VirtioFile{
 		context_id: context_id
 	}
+	file.objects.flags |= .noslices
+	file.mmap_objects.flags |= .noslices
 	files[key] = file
 	files_lock.release()
 	return file
@@ -431,8 +468,9 @@ fn ensure_context(mut file VirtioFile) bool {
 		return true
 	}
 	mut request := ContextCreate{
-		hdr: header(cmd_ctx_create, file.context_id)
-		name_length: 5
+		hdr:          header(cmd_ctx_create, file.context_id)
+		name_length:  5
+		context_init: file.capset_id
 	}
 	name := 'vinix'
 	for i in 0 .. name.len {
@@ -446,12 +484,14 @@ fn ensure_context(mut file VirtioFile) bool {
 }
 
 fn find_owned(mut file VirtioFile, handle u32) ?&VirtioObject {
-	for object in file.objects {
-		if object.gem_object != unsafe { nil } && object.gem_object.handle == handle {
-			return object
-		}
+	if handle >= max_resources {
+		return none
 	}
-	return none
+	object := file.owned[handle]
+	if object == unsafe { nil } {
+		return none
+	}
+	return object
 }
 
 fn allocate_resource_id() u32 {
@@ -472,6 +512,7 @@ fn release_object(_object &VirtioObject) {
 	}
 	mut last := false
 	objects_lock.acquire()
+	gem_object := object.gem_object
 	if object.references > 0 {
 		object.references--
 		last = object.references == 0
@@ -483,13 +524,27 @@ fn release_object(_object &VirtioObject) {
 	objects_lock.release()
 
 	if last {
+		mut unmapped := false
+		if object.host_mapped {
+			mut unmap := ResourceCommand{ hdr: header(cmd_resource_unmap_blob, 0), resource_id: object.resource_id }
+			unmapped = nodata(voidptr(&unmap), sizeof(unmap), unsafe { nil }, 0, false)
+		}
 		mut request := ResourceCommand{
-			hdr: header(cmd_resource_unref, 0)
+			hdr:         header(cmd_resource_unref, 0)
 			resource_id: object.resource_id
 		}
-		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
+		// Guest backing must outlive the renderer's fence. HOST3D blobs own
+		// no PMM pages: their synchronous unmap/unref response retires our
+		// aperture, while the host retains its Vulkan allocation. A legacy
+		// context-zero GL fence would add a display tick to every blob close.
+		unreferenced := nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, !gem_object.external)
+		// Successful unref also removes a host mapping. Never reuse an aperture
+		// span after both teardown commands fail.
+		if object.host_reserved && (unmapped || unreferenced) {
+			release_host_span(object.host_offset, gem_object.size)
+		}
 	}
-	gem.unref(object.gem_object)
+	gem.unref(gem_object)
 	if last {
 		unsafe { free(voidptr(object)) }
 	}
@@ -497,9 +552,11 @@ fn release_object(_object &VirtioObject) {
 
 fn context_resource(command_type u32, context_id u32, resource_id u32) bool {
 	mut request := ResourceCommand{
-		hdr: header(command_type, context_id)
+		hdr:         header(command_type, context_id)
 		resource_id: resource_id
 	}
+	// Attach and detach update the renderer's resource table synchronously.
+	// Teardown still fences RESOURCE_UNREF before freeing guest backing.
 	return nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
 }
 
@@ -516,6 +573,7 @@ fn remove_owned(mut file VirtioFile, handle u32) int {
 	for index, object in file.objects {
 		if object.gem_object != unsafe { nil } && object.gem_object.handle == handle {
 			file.objects.delete(index)
+			file.owned[handle] = unsafe { nil }
 			file.lock.release()
 			context_resource(cmd_ctx_detach_resource, file.context_id, object.resource_id)
 			release_object(object)
@@ -537,20 +595,76 @@ fn map_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 		file.lock.release()
 		return -2
 	}
-	mut present := false
-	for mapped in file.mmap_objects {
-		if mapped == object {
-			present = true
+	if object.gem_object.external && !object.host_reserved {
+		file.lock.release()
+		return -22
+	}
+	// The object must outlive its first mapping, which runs without the
+	// file lock because it waits for the host.
+	retain_object(object)
+	file.lock.release()
+	result := map_host_blob(object)
+	if result == 0 {
+		request.offset = gem.create_mmap_offset(object.gem_object)
+	}
+	release_object(object)
+	return result
+}
+
+fn mapping_covers(object &VirtioObject, offset u64, length u64) bool {
+	if object == unsafe { nil } || object.gem_object == unsafe { nil } || length == 0 || (object.gem_object.external && !object.host_mapped) {
+		return false
+	}
+	// Pairs with map_host_blob_unlocked: callers next read the blob's address
+	// and cache attributes, published before host_mapped.
+	cpu.dmb_ishld()
+	base := object.gem_object.mmap_offset
+	size := object.gem_object.size
+	return offset >= base && offset - base < size && length <= size - (offset - base)
+}
+
+fn mmap_retain(_dev &drm.DrmDevice, handle voidptr, offset u64, length u64) bool {
+	mut file := get_file(handle) or { return false }
+	file.lock.acquire()
+	mut found := &VirtioObject(unsafe { nil })
+	for object in file.objects {
+		if mapping_covers(object, offset, length) {
+			found = object
 			break
 		}
 	}
-	if !present {
-		retain_object(object)
-		file.mmap_objects << object
+	if found == unsafe { nil } {
+		// A fork can copy a mapping after its GEM handle was closed. The
+		// original mapping still owns the resource until its last VMA goes.
+		for object in file.mmap_objects {
+			if mapping_covers(object, offset, length) {
+				found = object
+				break
+			}
+		}
 	}
-	request.offset = gem.create_mmap_offset(object.gem_object)
+	if found == unsafe { nil } {
+		file.lock.release()
+		return false
+	}
+	retain_object(found)
+	file.mmap_objects << found
 	file.lock.release()
-	return 0
+	return true
+}
+
+fn mmap_release(_dev &drm.DrmDevice, handle voidptr, offset u64, length u64) {
+	mut file := get_file(handle) or { return }
+	file.lock.acquire()
+	for index, object in file.mmap_objects {
+		if mapping_covers(object, offset, length) {
+			file.mmap_objects.delete(index)
+			file.lock.release()
+			release_object(object)
+			return
+		}
+	}
+	file.lock.release()
 }
 
 fn getparam_handler(_dev &drm.DrmDevice, _handle voidptr, data voidptr) int {
@@ -565,7 +679,10 @@ fn getparam_handler(_dev &drm.DrmDevice, _handle voidptr, data voidptr) int {
 		ioctl.virtgpu_param_supported_capset_ids {
 			u32(virtgpu_transport.capset_mask)
 		}
-		ioctl.virtgpu_param_resource_blob, ioctl.virtgpu_param_host_visible, ioctl.virtgpu_param_cross_device, ioctl.virtgpu_param_context_init, ioctl.virtgpu_param_explicit_debug_name {
+		ioctl.virtgpu_param_resource_blob { u32((virtgpu_transport.features & 8) != 0) }
+		ioctl.virtgpu_param_context_init { u32((virtgpu_transport.features & 16) != 0) }
+		ioctl.virtgpu_param_host_visible { u32(virtgpu_transport.hostmem_size != 0) }
+		ioctl.virtgpu_param_cross_device, ioctl.virtgpu_param_explicit_debug_name {
 			u32(0)
 		}
 		else {
@@ -592,55 +709,57 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 	object := gem.create(size) or { return -12 }
 	resource_id := allocate_resource_id()
 	mut create := ResourceCreate3d{
-		hdr: header(cmd_resource_create_3d, 0)
+		hdr:         header(cmd_resource_create_3d, 0)
 		resource_id: resource_id
-		target: request.target
-		format: request.format
-		bind: request.bind
-		width: request.width
-		height: request.height
-		depth: request.depth
-		array_size: request.array_size
-		last_level: request.last_level
-		nr_samples: request.nr_samples
-		flags: request.flags
+		target:      request.target
+		format:      request.format
+		bind:        request.bind
+		width:       request.width
+		height:      request.height
+		depth:       request.depth
+		array_size:  request.array_size
+		last_level:  request.last_level
+		nr_samples:  request.nr_samples
+		flags:       request.flags
 	}
-	if !nodata(voidptr(&create), sizeof(create), unsafe { nil }, 0, true) {
+	// The host finishes creating and attaching these resources before it
+	// acknowledges each control command. Neither needs a GPU completion fence.
+	if !nodata(voidptr(&create), sizeof(create), unsafe { nil }, 0, false) {
 		gem.unref(object)
 		return -5
 	}
 	mut attach := ResourceAttachBacking{
-		hdr: header(cmd_resource_attach_backing, 0)
+		hdr:         header(cmd_resource_attach_backing, 0)
 		resource_id: resource_id
-		nr_entries: 1
+		nr_entries:  1
 	}
 	mut entry := MemoryEntry{
 		address: object.phys_addr
-		length: u32(object.size)
+		length:  u32(object.size)
 	}
 	if object.size > u64(0xffff_ffff)
 		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), false) {
 		mut unref := ResourceCommand{
-			hdr: header(cmd_resource_unref, 0)
+			hdr:         header(cmd_resource_unref, 0)
 			resource_id: resource_id
 		}
-		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, false)
+		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, true)
 		gem.unref(object)
 		return -5
 	}
 	if !context_resource(cmd_ctx_attach_resource, file.context_id, resource_id) {
 		mut unref := ResourceCommand{
-			hdr: header(cmd_resource_unref, 0)
+			hdr:         header(cmd_resource_unref, 0)
 			resource_id: resource_id
 		}
-		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, false)
+		nodata(voidptr(&unref), sizeof(unref), unsafe { nil }, 0, true)
 		gem.unref(object)
 		return -5
 	}
 	mut virtio_object := &VirtioObject{
-		gem_object: object
+		gem_object:  object
 		resource_id: resource_id
-		references: 1
+		references:  1
 	}
 	objects_lock.acquire()
 	if object.handle >= max_resources || objects_by_handle[object.handle] != unsafe { nil } {
@@ -653,6 +772,7 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 	objects_lock.release()
 	file.lock.acquire()
 	file.objects << virtio_object
+	file.owned[object.handle] = virtio_object
 	file.lock.release()
 	request.bo_handle = object.handle
 	request.res_handle = resource_id
@@ -669,7 +789,7 @@ fn resource_info_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int 
 	}
 	request.res_handle = object.resource_id
 	request.size = u32(object.gem_object.size)
-	request.blob_mem = 0
+	request.blob_mem = object.blob_mem
 	file.lock.release()
 	return 0
 }
@@ -689,22 +809,26 @@ fn transfer_handler(handle voidptr, data voidptr, to_host bool) int {
 		file.lock.release()
 		return -2
 	}
-	resource_id := object.resource_id
-	file.lock.release()
 	mut command := Transfer3d{
-		hdr: header(if to_host {
+		hdr:          header(if to_host {
 			cmd_transfer_to_host_3d
 		} else {
 			cmd_transfer_from_host_3d
 		}, file.context_id)
-		box: request.box
-		offset: u64(request.offset)
-		resource_id: resource_id
-		level: request.level
-		stride: request.stride
+		box:          request.box
+		offset:       u64(request.offset)
+		resource_id:  object.resource_id
+		level:        request.level
+		stride:       request.stride
 		layer_stride: request.layer_stride
 	}
-	return if nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0, true) { 0 } else { -5 }
+	// QEMU calls virgl_renderer_transfer_write_iov before acknowledging an
+	// unfenced upload, so it has finished reading guest backing at return.
+	// A readback still needs the GPU fence before userspace sees its pixels.
+	completed := nodata(voidptr(&command), sizeof(command), unsafe { nil }, 0,
+		!to_host)
+	file.lock.release()
+	return if completed { 0 } else { -5 }
 }
 
 fn transfer_from_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
@@ -718,8 +842,8 @@ fn transfer_to_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 fn execbuffer_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	mut request := unsafe { &ioctl.DrmVirtgpuExecbuffer(data) }
 	known_flags := ioctl.virtgpu_execbuf_fence_fd_in | ioctl.virtgpu_execbuf_fence_fd_out | ioctl.virtgpu_execbuf_ring_idx
-	if request.flags & ~known_flags != 0 || request.flags != 0 || request.size == 0
-		|| request.size > request_capacity - sizeof(Submit3d) || request.command == 0
+	if request.flags & ~known_flags != 0
+		|| request.size > request_capacity - sizeof(Submit3d) || (request.size != 0 && request.command == 0)
 		|| request.num_in_syncobjs != 0 || request.num_out_syncobjs != 0 {
 		return -22
 	}
@@ -728,6 +852,13 @@ fn execbuffer_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 		return -5
 	}
 	if request.num_bo_handles > 4096 || (request.num_bo_handles != 0 && request.bo_handles == 0) {
+		return -22
+	}
+	if request.flags & ioctl.virtgpu_execbuf_fence_fd_in != 0 {
+		fence := drm.sync_file_fence_from_fd(request.fence_fd) or { return -9 }
+		if !syncobj.wait(fence, command_timeout_ns) { return -16 }
+	}
+	if request.flags & ioctl.virtgpu_execbuf_ring_idx != 0 && request.ring_idx >= file.num_rings {
 		return -22
 	}
 	file.lock.acquire()
@@ -741,14 +872,32 @@ fn execbuffer_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 			return -2
 		}
 	}
-	file.lock.release()
 	mut command := Submit3d{
-		hdr: header(cmd_submit_3d, file.context_id)
+		hdr:  header(cmd_submit_3d, file.context_id)
 		size: request.size
 	}
+	// Venus control submissions default to its CPU timeline (ring zero).
+	// Without INFO_RING_IDX, QEMU creates a legacy GL fence even for a Venus
+	// context, delaying each notify by a display tick.
+	if file.capset_id == 4 || request.flags & ioctl.virtgpu_execbuf_ring_idx != 0 {
+		command.hdr.flags |= 2 // VIRTIO_GPU_FLAG_INFO_RING_IDX
+		command.hdr.ring_idx = if request.flags & ioctl.virtgpu_execbuf_ring_idx != 0 {
+			u8(request.ring_idx)
+		} else {
+			u8(0)
+		}
+	}
+	// A concurrent GEM close must not unref a buffer used by this submission.
 	response_type, _ := submit(voidptr(&command), sizeof(command), request.command, request.size, true, unsafe { nil }, 0, true)
+	file.lock.release()
+	if response_type != resp_ok_nodata { return -5 }
 	request.fence_fd = -1
-	return if response_type == resp_ok_nodata { 0 } else { -5 }
+	if request.flags & ioctl.virtgpu_execbuf_fence_fd_out != 0 {
+		// submit has waited for this exact host ring fence. The exported fd
+		// therefore represents completed work and needs no per-submit fence.
+		request.fence_fd = i32(drm.create_sync_file_fd(&completed_fence) or { return -24 })
+	}
+	return 0
 }
 
 fn wait_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
@@ -796,8 +945,8 @@ fn get_caps_handler(_dev &drm.DrmDevice, _handle voidptr, data voidptr) int {
 		memory.free(buffer)
 	}
 	mut command := GetCapset{
-		hdr: header(cmd_get_capset, 0)
-		capset_id: request.cap_set_id
+		hdr:            header(cmd_get_capset, 0)
+		capset_id:      request.cap_set_id
 		capset_version: request.cap_set_ver
 	}
 	response_type, used_length := submit(voidptr(&command), sizeof(command), 0, 0, false, buffer, buffer_size, false)
@@ -828,6 +977,12 @@ fn export_object(_dev &drm.DrmDevice, handle voidptr, object_handle u32) ?&gem.G
 	}
 	retain_object(object)
 	file.lock.release()
+	// A dma-buf fd can be mapped without DRM_IOCTL_VIRTGPU_MAP, and that path
+	// reads the blob's address and cache attributes without host_mapped.
+	if map_host_blob(object) != 0 {
+		release_object(object)
+		return none
+	}
 	return object.gem_object
 }
 
@@ -853,8 +1008,9 @@ fn import_object(_dev &drm.DrmDevice, handle voidptr, object &gem.GemObject) ?u3
 	}
 	file.lock.acquire()
 	if existing := find_owned(mut file, object.handle) {
+		handle_id := existing.gem_object.handle
 		file.lock.release()
-		return existing.gem_object.handle
+		return handle_id
 	}
 	objects_lock.acquire()
 	mut virtio_object := objects_by_handle[object.handle]
@@ -872,14 +1028,29 @@ fn import_object(_dev &drm.DrmDevice, handle voidptr, object &gem.GemObject) ?u3
 		return none
 	}
 	file.objects << virtio_object
+	file.owned[object.handle] = virtio_object
 	file.lock.release()
 	return object.handle
 }
 
-fn mmap_object(_dev &drm.DrmDevice, handle voidptr, page u64, _flags int) voidptr {
+fn mmap_attributes(_dev &drm.DrmDevice, handle voidptr, offset u64) u64 {
+	mut file := get_file(handle) or { return 0 }
+	file.lock.acquire()
+	defer { file.lock.release() }
+	for object in file.objects {
+		if mapping_covers(object, offset, 1) { return object.gem_object.pte_extra }
+	}
+	for object in file.mmap_objects {
+		if mapping_covers(object, offset, 1) { return object.gem_object.pte_extra }
+	}
+	return 0
+}
+
+fn mmap_object(_dev &drm.DrmDevice, handle voidptr, page u64, flags int) voidptr {
 	mut file := get_file(handle) or { return unsafe { nil } }
 	file.lock.acquire()
 	for object in file.mmap_objects {
+		if object.gem_object.external && flags & mmap.map_shared == 0 { continue }
 		if physical := gem.get_object_mmap_page(object.gem_object, page) {
 			file.lock.release()
 			return physical
@@ -907,6 +1078,9 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	mapped_objects := file.mmap_objects.clone()
 	context_created := file.context_created
 	context_id := file.context_id
+	for object in file.objects {
+		file.owned[object.gem_object.handle] = unsafe { nil }
+	}
 	file.objects.clear()
 	file.mmap_objects.clear()
 	file.lock.release()
@@ -923,20 +1097,25 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 		mut request := ContextCommand{
 			hdr: header(cmd_ctx_destroy, context_id)
 		}
-		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, false)
+		nodata(voidptr(&request), sizeof(request), unsafe { nil }, 0, true)
 	}
 	unsafe { free(voidptr(file)) }
 }
 
 fn query_capsets() bool {
-	count := mmio_r32(virtgpu_transport.base + reg_config + 12)
+	config := if virtgpu_transport.common != 0 {
+		virtgpu_transport.config
+	} else {
+		virtgpu_transport.base + reg_config
+	}
+	count := mmio_r32(config + 12)
 	uart.puts(c'virtio-gpu: host reports ')
 	uart.put_dec(count)
 	uart.puts(c' capsets\n')
 	virtgpu_transport.capset_count = if count < max_capsets { count } else { max_capsets }
 	for index := u32(0); index < virtgpu_transport.capset_count; index++ {
 		mut command := GetCapsetInfo{
-			hdr: header(cmd_get_capset_info, 0)
+			hdr:          header(cmd_get_capset_info, 0)
 			capset_index: index
 		}
 		mut response := CapsetInfoResponse{}
@@ -945,9 +1124,9 @@ fn query_capsets() bool {
 			return false
 		}
 		virtgpu_transport.capsets[index] = CapsetInfo{
-			id: response.capset_id
+			id:          response.capset_id
 			max_version: response.max_version
-			max_size: response.max_size
+			max_size:    response.max_size
 		}
 		if response.capset_id < 64 {
 			virtgpu_transport.capset_mask |= u64(1) << response.capset_id
@@ -960,11 +1139,12 @@ fn query_capsets() bool {
 		uart.put_dec(response.max_size)
 		uart.puts(c'\n')
 	}
-	return (virtgpu_transport.capset_mask & (u64(1) << 1 | u64(1) << 2)) != 0
+	return (virtgpu_transport.capset_mask & (u64(1) << 1 | u64(1) << 2 | u64(1) << 4)) != 0
 }
 
 fn validate_layouts() bool {
-	return sizeof(ControlHeader) == 24 && sizeof(ResourceCommand) == 32
+	return sizeof(ResourceCreateBlob) == 56 && sizeof(ResourceMapBlob) == 40 && sizeof(ResourceMapResponse) == 32 && sizeof(ContextParam) == 16
+		&& sizeof(ControlHeader) == 24 && sizeof(ResourceCommand) == 32
 		&& sizeof(ResourceAttachBacking) == 32 && sizeof(MemoryEntry) == 16
 		&& sizeof(ResourceCreate3d) == 72 && sizeof(ContextCreate) == 96
 		&& sizeof(ContextCommand) == 24 && sizeof(Transfer3d) == 72 && sizeof(Submit3d) == 32
@@ -1007,7 +1187,7 @@ pub fn initialise(hhdm u64) bool {
 			return false
 		}
 		mmio_w32(base + reg_guest_features, virtio_gpu_f_virgl)
-		mmio_w32(base + reg_guest_page_size, 4096)
+		mmio_w32(base + reg_guest_page_size, u32(page_size))
 
 		mmio_w32(base + reg_queue_sel, 0)
 		maximum := mmio_r32(base + reg_queue_num_max)
@@ -1038,18 +1218,18 @@ pub fn initialise(hhdm u64) bool {
 			C.memset(voidptr(response_phys + hhdm), 0, response_pages * page_size)
 		}
 		virtgpu_transport = Transport{
-			base: base
-			hhdm: hhdm
-			queue_size: queue_size
-			desc: queue_virt
-			avail: queue_virt + avail_offset
-			used: queue_virt + used_offset
-			request_phys: request_phys
-			request_virt: request_phys + hhdm
+			base:          base
+			hhdm:          hhdm
+			queue_size:    queue_size
+			desc:          queue_virt
+			avail:         queue_virt + avail_offset
+			used:          queue_virt + used_offset
+			request_phys:  request_phys
+			request_virt:  request_phys + hhdm
 			response_phys: response_phys
 			response_virt: response_phys + hhdm
-			next_fence: 1
-			ready: true
+			next_fence:    1
+			ready:         true
 		}
 		mmio_w32(base + reg_queue_pfn, u32(queue_phys / page_size))
 		mmio_w32(base + reg_status, status_acknowledge | status_driver | status_driver_ok)
@@ -1061,74 +1241,84 @@ pub fn initialise(hhdm u64) bool {
 			return false
 		}
 
-		mut driver := &drm.DrmDriver{
-			name: 'virtio_gpu'
-			desc: 'Vinix VirtIO-GPU VirGL'
-			major: 0
-			minor: 0
-			patchlevel: 1
-			features: drm.driver_gem | drm.driver_render | drm.driver_compute
-			ioctls: [
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_map
-					handler: map_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_execbuffer
-					handler: execbuffer_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_getparam
-					handler: getparam_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_resource_create
-					handler: resource_create_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_resource_info
-					handler: resource_info_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_transfer_from_host
-					handler: transfer_from_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_transfer_to_host
-					handler: transfer_to_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_wait
-					handler: wait_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_get_caps
-					handler: get_caps_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_resource_create_blob
-					handler: unsupported_handler
-				},
-				drm.DrmIoctl{
-					cmd: ioctl.drm_virtgpu_context_init
-					handler: unsupported_handler
-				},
-			]
-			file_close: close_file
-			gem_close: close_handle
-			gem_export: export_object
-			gem_export_put: release_exported_object
-			gem_import: import_object
-			mmap: mmap_object
-		}
-		drm.register_driver(driver) or {
-			virtgpu_transport.ready = false
-			uart.puts(c'virtio-gpu: DRM registration failed\n')
-			return false
-		}
-		uart.puts(c'virtio-gpu: VirGL render node ready\n')
-		return true
+		return register_driver()
 	}
-	uart.puts(c'virtio-gpu: no MMIO device found\n')
+	if initialise_pci(hhdm) {
+		return register_driver()
+	}
+	uart.puts(c'virtio-gpu: no GPU transport found\n')
 	return false
+}
+
+fn register_driver() bool {
+	mut driver := &drm.DrmDriver{
+		name:            'virtio_gpu'
+		desc:            'Vinix VirtIO-GPU VirGL'
+		major:           0
+		minor:           0
+		patchlevel:      1
+		features:        drm.driver_gem | drm.driver_render | drm.driver_compute
+		ioctls:          [
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_map
+				handler: map_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_execbuffer
+				handler: execbuffer_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_getparam
+				handler: getparam_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_resource_create
+				handler: resource_create_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_resource_info
+				handler: resource_info_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_transfer_from_host
+				handler: transfer_from_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_transfer_to_host
+				handler: transfer_to_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_wait
+				handler: wait_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_get_caps
+				handler: get_caps_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_resource_create_blob
+				handler: resource_create_blob_handler
+			},
+			drm.DrmIoctl{
+				cmd:     ioctl.drm_virtgpu_context_init
+				handler: context_init_handler
+			},
+		]
+		file_close:      close_file
+		gem_close:       close_handle
+		gem_export:      export_object
+		gem_export_put:  release_exported_object
+		gem_import:      import_object
+		mmap_attributes: mmap_attributes
+		mmap:            mmap_object
+		mmap_retain:     mmap_retain
+		mmap_release:    mmap_release
+	}
+	drm.register_driver(driver) or {
+		virtgpu_transport.ready = false
+		uart.puts(c'virtio-gpu: DRM registration failed\n')
+		return false
+	}
+	uart.puts(c'virtio-gpu: VirGL render node ready\n')
+	return true
 }

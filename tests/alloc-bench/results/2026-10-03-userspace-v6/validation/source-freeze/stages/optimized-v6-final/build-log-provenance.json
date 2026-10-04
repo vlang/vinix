@@ -1,0 +1,7 @@
+{
+  "original_file": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/optimized-v6-final/inputs/build.log",
+  "full_build_log_sha256": "d1c36bd9b9fec94d0a9bd922a5c5e5bb5826f4b9eb0fcc5394a34a67e554d80a",
+  "full_build_log_bytes": 5913598,
+  "saved_excerpt": "allocator-build-excerpt.log",
+  "excerpt_scope": "Every mallocng/calloc compile line and last twelve full-log lines; full log remains in immutable source freeze and hash manifest."
+}

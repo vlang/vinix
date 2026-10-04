@@ -113,7 +113,9 @@ else
 fi
 
 echo "==> Staging Zsh, Vim, and Oh My Zsh..."
-stage_alpine_packages zsh vim
+# libuuid is libSM's, which the X11 layer's clients link against; the arm64
+# userland gets it from its fuller package set.
+stage_alpine_packages zsh vim libuuid
 "$SCRIPT_DIR/build-support/stage-oh-my-zsh.sh" "$STAGING" "$DOWNLOADS"
 
 # Vinix starts /sbin/init itself. Use Alpine's unmodified /bin/busybox through
@@ -143,6 +145,10 @@ if [ "$ALPINE_DEVTOOLS" = 1 ] && [ ! -x "$STAGING/usr/bin/gcc" ]; then
     echo "ERROR: Alpine build-base did not provide /usr/bin/gcc" >&2
     exit 1
 fi
+
+echo "==> Installing Vinix's optimized musl allocator..."
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch x86_64 --staging "$STAGING"
 
 mkdir -p "$(dirname "$INITRAMFS")"
 INITRAMFS_TMP="$(mktemp "$(dirname "$INITRAMFS")/.initramfs.tar.XXXXXX")"

@@ -1,0 +1,10 @@
+{
+  "loader_sha256": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+  "symbol_offsets": {
+    "__libc": 682176,
+    "__malloc_context": 682752,
+    "__malloc_lock": 692280,
+    "__malloc_size_classes": 631616
+  },
+  "notes": "Offsets from immutable loader ELF symbol table; runtime prints no address or secret values."
+}

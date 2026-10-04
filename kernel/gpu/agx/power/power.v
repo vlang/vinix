@@ -26,7 +26,10 @@ const pmp_ptd_record_size = u32(32)
 const pmp_ptd_name_offset = u32(16)
 const pmp_ptd_name_size = u32(16)
 const t6050_ptd_reg_index = 7
-const t6050_ptd_base = u64(0x84240000)
+// CPU physical addresses, as get_translated_reg_ranges and XNU both resolve
+// them: /arm-io's ranges move the template's 0x8xxxxxxx child addresses up by
+// 0x200000000 (IODeviceMemory on an M5 Max agrees).
+const t6050_ptd_base = u64(0x284240000)
 const t6050_ptd_size = u64(0x40000)
 const t6050_die_stride = u64(0x4000000000)
 const t6050_ptd_read_stride = u64(16)
@@ -75,7 +78,7 @@ const t6050_chosen_path = '/chosen'
 // the image base, in order, and takes the first that carries the magic and a
 // supported version.
 const t6050_rtk_id_candidates = [u32(0x20), 0xc0, 0x204, 0xc00, 0x1020, 0x1204,
-	0x4020, 0x4204]
+	0x4020, 0x4204]!
 const t6050_pmgr_path = '/arm-io/pmgr'
 
 // ApplePTD returns one 16-byte pair. The second word is not the raw MMIO word:
@@ -263,7 +266,7 @@ pub const t6050_patchbay_inputs = [
 	T6050PatchBayInput{'PMCB', 'pmc-pmgr', .pmgr, .pmc_pmgr_bit3, true},
 	T6050PatchBayInput{'PMCX', 'pmc-msg-disabled', .provider, .value, false},
 	T6050PatchBayInput{'CVAR', 'soc-chip-variant', .provider, .value, false},
-]
+]!
 
 // One located patchbay region inside an RTKit image. RTBuddy searches a fixed
 // list of candidate IOP-virtual offsets for a `uuid` identity block and reads
@@ -407,7 +410,8 @@ pub fn copy_t6050_patchbay(data voidptr, region &T6050PatchBayRegion) ?T6050Patc
 	if region.padded_size == 0 || region.align_pad + region.size > region.padded_size {
 		return none
 	}
-	mut bytes := []u8{len: int(region.padded_size)}
+	// The copy's owner frees its data.
+	mut bytes := []u8{len: int(region.padded_size)} @[freed]
 	for index := u32(0); index < region.padded_size; index++ {
 		bytes[index] = read_native_u8(data, index)
 	}
@@ -741,6 +745,7 @@ pub fn map_t6050_pmp_wrapper(die u32) ?T6050PmpWrapper {
 	regions := devicetree.get_translated_reg_ranges(wrapper) or { return none }
 	control_base := memory.map_mmio(regions[0].base, regions[0].size)
 	iorvbar_base := memory.map_mmio(regions[1].base, regions[1].size)
+	unsafe { regions.free() }
 	if control_base == 0 || iorvbar_base == 0 {
 		return none
 	}
@@ -1036,14 +1041,18 @@ fn read_t6050_patchbay_property(node &devicetree.DTNode, input &T6050PatchBayInp
 pub fn get_t6050_patchbay_values(provider &devicetree.DTNode) ?[]T6050PatchBayValue {
 	chosen := devicetree.find_node(t6050_chosen_path) or { return none }
 	pmgr := devicetree.find_node(t6050_pmgr_path) or { return none }
-	mut values := []T6050PatchBayValue{cap: t6050_patchbay_inputs.len}
+	// The caller frees the values.
+	mut values := []T6050PatchBayValue{cap: t6050_patchbay_inputs.len} @[freed]
 	for input in t6050_patchbay_inputs {
 		node := match input.node {
 			.chosen { chosen }
 			.pmgr { pmgr }
 			.provider { provider }
 		}
-		tag := t6050_patchbay_tag(input.tag) or { return none }
+		tag := t6050_patchbay_tag(input.tag) or {
+			unsafe { values.free() }
+			return none
+		}
 		if raw := read_t6050_patchbay_property(node, &input) {
 			values << T6050PatchBayValue{
 				tag: tag
@@ -1093,25 +1102,32 @@ fn get_t6050_pmp_firmware_ownership(nub &devicetree.DTNode) T6050PmpFirmwareOwne
 
 fn validate_t6050_patchbay_codec() bool {
 	mandatory := ['BDID', 'DVID', 'DCAP', 'DCHD', 'PMC_', 'PMCV', 'PMCB',
-		'PMCX', 'CVAR']
+		'PMCX', 'CVAR']!
 	// Build a version-5 identity block and a patchbay holding the nine
 	// mandatory 32-bit tags, then walk it exactly as RTBuddyPatchBay does.
-	mut records := []u8{}
+	mut records := []u8{cap: mandatory.len * 12} @[freed]
+	defer {
+		unsafe { records.free() }
+	}
 	for index, name in mandatory {
 		tag := t6050_patchbay_tag(name) or { return false }
 		stored := t6050_patchbay_stored_bytes(tag)
 		for byte_index in 0 .. 4 {
 			records << stored[byte_index]
 		}
-		records << [u8(4), 0, 0, 0]
-		records << [u8(index), 0, 0, 0]
+		for value in [u8(4), 0, 0, 0, u8(index), 0, 0, 0]! {
+			records << value
+		}
 	}
 	// The image spells every tag backwards; BDID is stored as the bytes DIDB.
 	bdid := t6050_patchbay_tag('BDID') or { return false }
 	if bdid != 0x42444944 || t6050_patchbay_stored_bytes(bdid) != [u8(`D`), `I`, `D`, `B`]! {
 		return false
 	}
-	mut block := []u8{len: int(rtk_id_block_size)}
+	mut block := []u8{len: int(rtk_id_block_size)} @[freed]
+	defer {
+		unsafe { block.free() }
+	}
 	block[0] = u8(rtk_id_block_magic)
 	block[1] = u8(rtk_id_block_magic >> 8)
 	block[2] = u8(rtk_id_block_magic >> 16)
@@ -1154,10 +1170,16 @@ fn validate_t6050_patchbay_codec() bool {
 	// The host copy spans the whole padded region, and an edit is refused
 	// unless every requested tag already exists as a 32-bit record.
 	mut bay := copy_t6050_patchbay(records.data, &region) or { return false }
+	defer {
+		unsafe { bay.data.free() }
+	}
 	if bay.data.len != int(region.padded_size) || bay.dirty {
 		return false
 	}
-	mut target := []u8{len: int(region.padded_size)}
+	mut target := []u8{len: int(region.padded_size)} @[freed]
+	defer {
+		unsafe { target.free() }
+	}
 	// Nothing is pushed before an edit, and nothing is pushed for a region
 	// whose segment is not writable.
 	if bay.write_back(target.data) {
@@ -1169,7 +1191,10 @@ fn validate_t6050_patchbay_codec() bool {
 	if bay.set_value(t6050_patchbay_tag('ZZZZ') or { return false }, 1) {
 		return false
 	}
-	mut values := []T6050PatchBayValue{}
+	mut values := []T6050PatchBayValue{cap: mandatory.len + 1} @[freed]
+	defer {
+		unsafe { values.free() }
+	}
 	for index, name in mandatory {
 		values << T6050PatchBayValue{
 			tag: t6050_patchbay_tag(name) or { return false }
@@ -1207,6 +1232,9 @@ fn validate_t6050_patchbay_codec() bool {
 		writable: false
 	}
 	mut locked := copy_t6050_patchbay(records.data, &unwritable) or { return false }
+	defer {
+		unsafe { locked.data.free() }
+	}
 	if !locked.set_value(bdid, 1) || locked.write_back(target.data) {
 		return false
 	}
@@ -1465,7 +1493,10 @@ fn validate_t6050_preload_address_codec() bool {
 			T6050PmpSegment{},
 		]!
 	}
-	mut image := []u8{len: int(small_size)}
+	mut image := []u8{len: int(small_size)} @[freed]
+	defer {
+		unsafe { image.free() }
+	}
 	if _ := locate_t6050_rtk_identity(image.data, &small) {
 		return false
 	}
@@ -1754,7 +1785,10 @@ fn fixed_native_name_matches(data voidptr, size u32, expected string) bool {
 }
 
 fn node_string_contains(node &devicetree.DTNode, property string, expected string) bool {
-	values := devicetree.get_string_list(node, property) or { return false }
+	mut values := devicetree.get_string_list(node, property) or { return false }
+	defer {
+		unsafe { values.free() }
+	}
 	for value in values {
 		if value == expected {
 			return true
@@ -1788,27 +1822,33 @@ fn native_properties_equal(left &devicetree.DTNode, right &devicetree.DTNode,
 }
 
 fn find_native_asc_node(role u32) ?&devicetree.DTNode {
-	name := if role == 0 { 'gfx-asc' } else { 'gfx1-asc' }
-	if node := devicetree.find_node('/arm-io/${name}') {
+	arm_io_path := if role == 0 { '/arm-io/gfx-asc' } else { '/arm-io/gfx1-asc' }
+	if node := devicetree.find_node(arm_io_path) {
 		return node
 	}
-	if node := devicetree.find_node('/soc/${name}') {
+	soc_path := if role == 0 { '/soc/gfx-asc' } else { '/soc/gfx1-asc' }
+	if node := devicetree.find_node(soc_path) {
 		return node
 	}
 	return none
 }
 
-fn validate_gate_array(node &devicetree.DTNode, property string, expected []u32) bool {
+// `expected` points at `count` values, usually a fixed array on the caller's
+// stack: an array literal per check was a heap allocation that was never freed.
+fn validate_gate_array(node &devicetree.DTNode, property string, expected &u32, count int) bool {
 	values := devicetree.get_le_u32_array(node, property) or {
 		C.printf(c'agx: native node %s has malformed %s\n', node.name.str, property.str)
 		return false
 	}
-	if values.len != expected.len {
+	defer {
+		unsafe { values.free() }
+	}
+	if values.len != count {
 		C.printf(c'agx: native node %s has unexpected %s count\n', node.name.str, property.str)
 		return false
 	}
-	for index := 0; index < expected.len; index++ {
-		if values[index] != expected[index] {
+	for index := 0; index < count; index++ {
+		if values[index] != unsafe { expected[index] } {
 			C.printf(c'agx: native node %s has unexpected %s[%u]=0x%x\n', node.name.str,
 				property.str, u32(index), values[index])
 			return false
@@ -1817,17 +1857,21 @@ fn validate_gate_array(node &devicetree.DTNode, property string, expected []u32)
 	return true
 }
 
-fn validate_u32_array(node &devicetree.DTNode, property string, expected []u32) bool {
+// As validate_gate_array(), `expected` points at `count` values.
+fn validate_u32_array(node &devicetree.DTNode, property string, expected &u32, count int) bool {
 	values := devicetree.get_le_u32_array(node, property) or {
 		C.printf(c'agx: native node %s has malformed %s\n', node.name.str, property.str)
 		return false
 	}
-	if values.len != expected.len {
+	defer {
+		unsafe { values.free() }
+	}
+	if values.len != count {
 		C.printf(c'agx: native node %s has unexpected %s count\n', node.name.str, property.str)
 		return false
 	}
-	for index := 0; index < expected.len; index++ {
-		if values[index] != expected[index] {
+	for index := 0; index < count; index++ {
+		if values[index] != unsafe { expected[index] } {
 			C.printf(c'agx: native node %s has unexpected %s[%u]=0x%x\n', node.name.str,
 				property.str, u32(index), values[index])
 			return false
@@ -1914,6 +1958,9 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 		println('agx: t6050 PMGR register table is malformed')
 		return false
 	}
+	defer {
+		unsafe { regions.free() }
+	}
 	if regions.len != 60 {
 		C.printf(c'agx: t6050 PMGR has %u register regions, expected 60\n', u32(regions.len))
 		return false
@@ -1934,7 +1981,7 @@ fn validate_ptd_apertures(pmgr_node &devicetree.DTNode) bool {
 	}
 	// AppleT6050PMGR maps this same RegMap entry once per die. Keep both
 	// physical results explicit even though this validator performs no mapping.
-	if ptd.base + die_stride != 0x4084240000 {
+	if ptd.base + die_stride != 0x4284240000 {
 		println('agx: t6050 die-1 PTD aperture changed')
 		return false
 	}
@@ -1949,6 +1996,9 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 		println('agx: t6050 PMP wrapper register table is malformed')
 		return false
 	}
+	defer {
+		unsafe { regions.free() }
+	}
 	if regions.len != 4 {
 		C.printf(c'agx: t6050 PMP%u has %u wrapper registers, expected 4\n', die,
 			u32(regions.len))
@@ -1958,7 +2008,7 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 	// aperture. AppleASCWrapV6 maps reg[1] as its 64-bit IORVBAR aperture,
 	// while ApplePMPv2 independently resolves reg[3] as PTD-update memory.
 	// Keep reg[2] unlabeled until its consumer is proven.
-	bases := [u64(0x84e00000), 0x84850000, 0x84500000, 0x84250000]!
+	bases := [u64(0x284e00000), 0x284850000, 0x284500000, 0x284250000]!
 	sizes := [u64(0x88000), 0x4000, 0x100000, 0x4000]!
 	die_offset := u64(die) * t6050_die_stride
 	for index := 0; index < regions.len; index++ {
@@ -1982,16 +2032,15 @@ fn validate_pmp_wrapper(wrapper &devicetree.DTNode, die u32) bool {
 		C.printf(c'agx: t6050 PMP%u wrapper control properties changed\n', die)
 		return false
 	}
-	if die == 0 {
-		return validate_u32_array(wrapper, 'interrupts', [u32(0x18d), 0x18c, 0x18f,
-			0x18e])
-			&& validate_gate_array(wrapper, 'power-gates', [u32(0x1b), 0x1c])
-			&& validate_gate_array(wrapper, 'clock-gates', [u32(0x1b), 0x1c])
+	mut interrupts := [u32(0x18d), 0x18c, 0x18f, 0x18e]!
+	mut gates := [u32(0x1b), 0x1c]!
+	if die != 0 {
+		interrupts = [u32(0xdad), 0xdac, 0xdaf, 0xdae]!
+		gates = [u32(0x1000001b), 0x1000001c]!
 	}
-	return validate_u32_array(wrapper, 'interrupts', [u32(0xdad), 0xdac, 0xdaf,
-		0xdae])
-		&& validate_gate_array(wrapper, 'power-gates', [u32(0x1000001b), 0x1000001c])
-		&& validate_gate_array(wrapper, 'clock-gates', [u32(0x1000001b), 0x1000001c])
+	return validate_u32_array(wrapper, 'interrupts', &interrupts[0], interrupts.len)
+		&& validate_gate_array(wrapper, 'power-gates', &gates[0], gates.len)
+		&& validate_gate_array(wrapper, 'clock-gates', &gates[0], gates.len)
 }
 
 fn validate_t6050_pmp_instance(die u32) ?&devicetree.DTNode {
@@ -2079,18 +2128,22 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		println('agx: t6050 PMGR has no PMP version')
 		return false
 	}
+	ptd_ranges := [u32(10), 11, 12, 13, 2, 4]!
 	if pmp_version != 2
-		|| !validate_u32_array(pmgr_node, 'ptd-ranges', [u32(10), 11, 12, 13, 2, 4])
+		|| !validate_u32_array(pmgr_node, 'ptd-ranges', &ptd_ranges[0], ptd_ranges.len)
 		|| !validate_ptd_apertures(pmgr_node) {
 		println('agx: native t6050 ApplePTD ownership changed')
 		return false
 	}
-	if !validate_gate_array(gpu_node, 'power-gates', [u32(0x268), 0x267])
-		|| !validate_gate_array(gpu_node, 'clock-gates', [u32(0x268), 0x267])
-		|| !validate_gate_array(gfx_asc, 'power-gates', [u32(0x266)])
-		|| !validate_gate_array(gfx_asc, 'clock-gates', [u32(0x266)])
-		|| !validate_gate_array(gfx1_asc, 'power-gates', [u32(0x291)])
-		|| !validate_gate_array(gfx1_asc, 'clock-gates', [u32(0x291)]) {
+	gpu_gates := [u32(0x268), 0x267]!
+	gfx_asc_gate := u32(0x266)
+	gfx1_asc_gate := u32(0x291)
+	if !validate_gate_array(gpu_node, 'power-gates', &gpu_gates[0], gpu_gates.len)
+		|| !validate_gate_array(gpu_node, 'clock-gates', &gpu_gates[0], gpu_gates.len)
+		|| !validate_gate_array(gfx_asc, 'power-gates', &gfx_asc_gate, 1)
+		|| !validate_gate_array(gfx_asc, 'clock-gates', &gfx_asc_gate, 1)
+		|| !validate_gate_array(gfx1_asc, 'power-gates', &gfx1_asc_gate, 1)
+		|| !validate_gate_array(gfx1_asc, 'clock-gates', &gfx1_asc_gate, 1) {
 		return false
 	}
 	if !validate_pmgr_device(pmgr_node, 0x268, 'GFX_SGX', 572, 0x10, 0, 0)
@@ -2114,6 +2167,7 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 			resolved_inputs++
 		}
 	}
+	unsafe { patchbay_values.free() }
 	firmware := get_t6050_pmp_firmware_ownership(pmp0_nub)
 	if firmware.needs_host_image() {
 		// Expected on Mac17,6: iBoot maps the segments but does not hand off a
@@ -2121,12 +2175,13 @@ pub fn validate_t6050_contract(gpu_node &devicetree.DTNode) bool {
 		// patchbay before any PMP transition is legal.
 		println('agx: native t6050 PMP firmware image is host-owned; RTKit handoff still required')
 	}
+	pm_ptd_ranges := [u32(1), 2, 3, 4, 5, 6, 7, 8, 40, 9, 10, 11, 12, 13, 14]!
 	if !validate_ptd_range(pmp0_nub, 'PMP-STATUS', 2, 1, 1, 16)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PKT', 9, 0x90, 0x150, 0)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-REQ', 10, 0x1e0, 8, 0)
 		|| !validate_ptd_range(pmp0_nub, 'SOC-DEV-PS-ACK', 11, 0x1e8, 8, 0)
-		|| !validate_u32_array(pmp0_nub, 'pm-ptd-ranges', [u32(1), 2, 3, 4, 5, 6,
-			7, 8, 40, 9, 10, 11, 12, 13, 14]) {
+		|| !validate_u32_array(pmp0_nub, 'pm-ptd-ranges', &pm_ptd_ranges[0],
+			pm_ptd_ranges.len) {
 		return false
 	}
 	C.printf(c'agx: validated native t6050 PMP power ownership (%u active die(s), PMP_STATUS interrupt slot %u of %u per die, iboot-mapped segments %u, %u/%u patchbay inputs resolved, read-only)\n',

@@ -19,10 +19,13 @@ import sched
 import errno
 import usercopy
 import proc
+import security
 import stat
 import aarch64.cpu.local as cpulocal
 import aarch64.uart
 import sysvshm
+import sysvsem
+import sysvmsg
 import krandom
 
 // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
@@ -41,14 +44,6 @@ fn syscall_vacant(gpr_state voidptr) (u64, u64) {
 	uart.put_dec(gpr.x8)
 	uart.puts(c'\n')
 	return u64(-1), errno.enosys
-}
-
-// Vinix filesystems do not expose extended attributes yet. Linux software
-// probes every xattr entry point during prefix and cache setup; ENOTSUP is the
-// defined filesystem answer and avoids treating each harmless probe as an
-// unknown syscall.
-fn syscall_linux_xattr_unsupported(_ voidptr) (u64, u64) {
-	return errno.err, errno.enotsup
 }
 
 // Ring buffer for last N syscalls before a crash
@@ -73,15 +68,90 @@ __global (
 	sc_trace_gpr_state = u64(0)
 )
 
+// The table slot of the stand-in for a call a seccomp filter turned away.
+const seccomp_verdict_nr = u64(511)
+
+// Returns what the call a seccomp filter turned away returns.
+fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
+	e := proc.current_thread().seccomp_errno
+	if e == 0 {
+		return 0, 0
+	}
+	return errno.err, e
+}
+
+// What a call runs as once the process's seccomp filters have seen it: the
+// call itself, or the stand-in returning their verdict. A call is killed
+// here with SIGSYS when that is the verdict.
+fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
+	process := t.process
+	if process.seccomp_mode == proc.seccomp_mode_strict {
+		// read, write, exit and rt_sigreturn are all strict mode allows.
+		if nr == 63 || nr == 64 || nr == 93 || nr == 139 {
+			return nr
+		}
+		security.audit_seccomp(nr, gpr.pc, proc.seccomp_ret_kill_process)
+		userland.exit_with_fatal_signal(u8(9))
+		return seccomp_verdict_nr
+	}
+	verdict := proc.seccomp_verdict(process.seccomp, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
+		gpr.x4, gpr.x5]!)
+	if verdict & proc.seccomp_ret_action_full != proc.seccomp_ret_allow {
+		t.audit_sequence = security.audit_seccomp(nr, gpr.pc, verdict)
+	}
+	match verdict & proc.seccomp_ret_action_full {
+		proc.seccomp_ret_allow, proc.seccomp_ret_log {
+			return nr
+		}
+		proc.seccomp_ret_errno {
+			mut e := u64(verdict & proc.seccomp_ret_data)
+			if e > 4095 {
+				e = 4095
+			}
+			t.seccomp_errno = e
+			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_trap {
+			userland.sendsig(t, u8(31))
+			t.seccomp_errno = errno.enosys
+			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_trace, proc.seccomp_ret_user_notif {
+			// No tracer and no listener: Linux fails the call with ENOSYS.
+			t.seccomp_errno = errno.enosys
+			return seccomp_verdict_nr
+		}
+		else {
+			userland.exit_with_fatal_signal(u8(31))
+			return seccomp_verdict_nr
+		}
+	}
+}
+
+// Called on every syscall's way in. Answers the table slot to run.
 @[export: 'syscall_trace']
-pub fn syscall_trace(gpr_state voidptr) {
+pub fn syscall_trace(gpr_state voidptr) u64 {
+	proc.cpu_enter_kernel()
+	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
+	nr := gpr.x8
 	// A busy userspace workload can keep the HVF scheduler out of its normal
 	// idle polling loop. This throttled, input-only call keeps the desktop
 	// responsive while translated applications occupy every virtual CPU.
 	sched.poll_syscall_input()
-	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
-	nr := gpr.x8
 	mut current_thread := proc.current_thread()
+	current_thread.audit_sequence = 0
+	mut stack_process := current_thread.process
+	if !proc.syscall_stack_allowed(mut stack_process, gpr.sp) {
+		userland.exit_with_fatal_signal(u8(11))
+	}
+	if !proc.syscall_origin_allowed(mut stack_process, nr, gpr.pc - 4) {
+		userland.exit_with_fatal_signal(u8(6))
+	}
+	current_thread.syscall_x0 = gpr.x0
+	current_thread.syscall_nr = i64(nr)
+	current_thread.syscall_x1 = gpr.x1
+	current_thread.syscall_x2 = gpr.x2
+	current_thread.syscall_x3 = gpr.x3
 	pid := u64(current_thread.process.pid)
 	// Debug: detect x30=0x220000 corruption at syscall entry
 	if pid == 3 && gpr.x30 == u64(0x220000) {
@@ -109,10 +179,24 @@ pub fn syscall_trace(gpr_state voidptr) {
 	sc_ring[idx].pid = pid
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
+	if current_thread.process.seccomp_mode != proc.seccomp_mode_disabled {
+		slot := seccomp_entry(mut current_thread, gpr, nr)
+		if slot != nr {
+			return slot
+		}
+	}
+	if current_thread.process.pledge != 0 {
+		return pledge_entry(mut current_thread, gpr, nr)
+	}
+	return nr
 }
 
 @[export: 'syscall_trace_ret']
 pub fn syscall_trace_ret(ret u64, err u64) {
+	mut current_thread := proc.current_thread()
+	security.audit_complete(current_thread.audit_sequence, ret, err)
+	current_thread.audit_sequence = 0
+	current_thread.syscall_nr = -1
 	if !sc_trace_active {
 		return
 	}
@@ -162,525 +246,14 @@ fn syscall_linux_mmap(gpr_state voidptr, addr voidptr, length u64, prot u64, fla
 	return file.syscall_mmap(gpr_state, addr, length, prot_and_flags, fdnum, offset)
 }
 
-// Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
-fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
-	// FUTEX_PRIVATE_FLAG does not change the lookup: futexes are keyed by their
-	// physical address already. FUTEX_CLOCK_REALTIME selects the clock used by
-	// absolute FUTEX_WAIT_BITSET deadlines.
-	op := futex_op & 0x7f
-	match op {
-		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
-			if op == 9 && val3 == 0 {
-				return errno.err, errno.einval
-			}
-			if timeout == 0 {
-				return futex.wait(uaddr, int(val))
-			}
-
-			mut duration := time.TimeSpec{}
-			if !usercopy.copy_from_user(voidptr(&duration), timeout, sizeof(time.TimeSpec)) {
-				return errno.err, errno.efault
-			}
-			if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
-				return errno.err, errno.einval
-			}
-
-			// FUTEX_WAIT has a relative timeout. FUTEX_WAIT_BITSET names an
-			// absolute deadline, so turn it into the relative duration used by
-			// the Vinix timer queue.
-			if op == 9 {
-				clock_id := if futex_op & 0x100 != 0 {
-					time.clock_type_realtime
-				} else {
-					time.clock_type_monotonic
-				}
-				now := time.clock_now(clock_id) or { return errno.err, errno.einval }
-				if duration.sub(now) {
-					return errno.err, errno.etimedout
-				}
-			}
-			return futex.wait_timeout(uaddr, int(val), duration)
-		}
-		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
-			return futex.wake(uaddr), 0
-		}
-		3, 4 { // FUTEX_REQUEUE, FUTEX_CMP_REQUEUE
-			// Moving waiters over to uaddr2 would need a real wait queue.
-			// Waking them instead is heavier but still correct: pthread_cond
-			// waiters recheck their sequence and contend for the mutex, which
-			// is exactly what the requeue would have made them do.
-			woken := futex.wake(uaddr)
-			if uaddr2 != 0 {
-				futex.wake(uaddr2)
-			}
-			return woken, 0
-		}
-		else {
-			return u64(-1), errno.enosys
-		}
-	}
-}
-
-struct LinuxIOVec {
-mut:
-	base u64
-	len  u64
-}
-
-const linux_iov_max = 1024
-
-// Validate the complete vector before doing any I/O.  Linux rejects a bad
-// iovcnt, pointer, or aggregate length without partially consuming the file.
-fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
-	if iovcnt < 0 || iovcnt > linux_iov_max {
-		return 0, errno.einval
-	}
-	if iovcnt == 0 {
-		return 0, 0
-	}
-	if iov_ptr == 0 {
-		return 0, errno.efault
-	}
-
-	mut total := u64(0)
-	for i := 0; i < iovcnt; i++ {
-		mut iov := LinuxIOVec{}
-		if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(i) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
-			return 0, errno.efault
-		}
-		if iov.len > u64(0x7fffffffffffffff) - total {
-			return 0, errno.einval
-		}
-		total += iov.len
-	}
-	return total, 0
-}
-
-fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
-	mut iov := LinuxIOVec{}
-	if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(index) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
-		return none
-	}
-	return iov
-}
-
-// Linux writev(fd, iov, iovcnt) is one write operation.  In particular, a
-// protocol header and its payload must reach a stream socket together; issuing
-// one resource write per iovec lets the peer consume an incomplete message and
-// close before the payload is written.
-fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
-	total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
-	if total == 0 {
-		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
-			return errno.err, errno.get()
-		}
-		checked_fd.unref()
-		return 0, 0
-	}
-
-	buffer := unsafe { malloc(total) }
-	if buffer == unsafe { nil } {
-		return errno.err, errno.enomem
-	}
-	defer {
-		unsafe { free(buffer) }
-	}
-
-	mut offset := u64(0)
-	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
-		if iov.len == 0 {
-			continue
-		}
-		if !usercopy.copy_from_user(voidptr(u64(buffer) + offset), iov.base, iov.len) {
-			return errno.err, errno.efault
-		}
-		offset += iov.len
-	}
-	return fs.syscall_write(gpr_state, fdnum, buffer, total)
-}
-
-// Linux getdents64(fd, dirp, count) — fill buffer with directory entries.
-// Vinix readdir returns one entry at a time; we loop to fill the buffer.
+// The bounded scratch storage and record layouts are shared with amd64.
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
-	mut offset := u64(0)
-	for offset + 19 < count { // minimum dirent64 size: 19 bytes + 1 name char
-		mut dirent := stat.Dirent{}
-		ret, err := fs.syscall_readdir(gpr_state, fdnum, mut &dirent)
-		if err != 0 {
-			if offset > 0 {
-				return offset, 0
-			}
-			return ret, err
-		}
-		// Vinix readdir returns (errno.err, 0) at end of directory
-		if ret == errno.err {
-			break
-		}
-		// Calculate name length
-		mut name_len := u64(0)
-		for name_len < 1024 && dirent.name[name_len] != 0 {
-			name_len++
-		}
-		// Record length: d_ino(8) + d_off(8) + d_reclen(2) + d_type(1) + name + null, aligned to 8
-		reclen := (u64(19) + name_len + u64(1) + u64(7)) & ~u64(7)
-		if offset + reclen > count {
-			// syscall_readdir() advances the shared directory position. Leave
-			// this entry for the next getdents64 call instead of losing it.
-			fs.readdir_unread(fdnum)
-			break
-		}
-		// Write linux_dirent64 to user buffer
-		unsafe {
-			*&u64(dirp + offset) = dirent.ino
-			*&u64(dirp + offset + 8) = dirent.off
-			*&u16(dirp + offset + 16) = u16(reclen)
-			*&u8(dirp + offset + 18) = dirent.@type
-			C.memcpy(voidptr(dirp + offset + 19), &dirent.name[0], name_len + 1)
-		}
-		offset += reclen
-	}
-	return offset, 0
+	return linux_getdents(gpr_state, fdnum, dirp, count, false)
 }
 
-// Linux uname(buf) — fill utsname (6 x 65-byte fields).
+// Linux uname(buf); see linux_uname().
 fn syscall_linux_uname(_ voidptr, buf u64) (u64, u64) {
-	mut uts := [390]u8{}
-	unsafe {
-		C.strcpy(charptr(&uts[0]), c'Vinix')
-		C.strcpy(charptr(&uts[65]), c'vinix')
-		C.strcpy(charptr(&uts[130]), c'0.1.0')
-		C.strcpy(charptr(&uts[195]), c'Vinix 0.1.0 aarch64')
-		C.strcpy(charptr(&uts[260]), c'aarch64')
-	}
-	net.copy_hostname(u64(&uts[65]))
-	net.copy_domainname(u64(&uts[325]))
-	if !usercopy.copy_to_user(buf, voidptr(&uts[0]), u64(uts.len)) {
-		return errno.err, errno.efault
-	}
-	return 0, 0
-}
-
-// prctl(2). Only the operations that mean something here are served; the rest
-// are reported as unsupported rather than answered with a fabricated success,
-// so a caller checking the result learns the truth.
-const pr_set_pdeathsig = 1
-
-const pr_get_pdeathsig = 2
-
-const pr_get_dumpable = 3
-
-const pr_set_dumpable = 4
-
-const pr_set_name = 15
-
-const pr_get_name = 16
-
-const pr_set_no_new_privs = 38
-
-const pr_get_no_new_privs = 39
-
-const task_comm_len = 16
-
-fn syscall_linux_prctl(_ voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
-	mut process := proc.current_thread().process
-
-	match option {
-		pr_set_name {
-			// The name is the thread's, up to 16 bytes including the null.
-			mut raw := [task_comm_len]u8{}
-			if !usercopy.copy_from_user(voidptr(&raw[0]), arg2, task_comm_len) {
-				return errno.err, errno.efault
-			}
-			raw[task_comm_len - 1] = 0
-			process.name = unsafe { cstring_to_vstring(&raw[0]) }
-			return 0, 0
-		}
-		pr_get_name {
-			mut raw := [task_comm_len]u8{}
-			mut length := u64(process.name.len)
-			if length > task_comm_len - 1 {
-				length = task_comm_len - 1
-			}
-			unsafe { C.memcpy(&raw[0], process.name.str, length) }
-			if !usercopy.copy_to_user(arg2, voidptr(&raw[0]), task_comm_len) {
-				return errno.err, errno.efault
-			}
-			return 0, 0
-		}
-		pr_get_dumpable {
-			return 1, 0
-		}
-		pr_set_dumpable, pr_set_pdeathsig, pr_set_no_new_privs {
-			// Accepted and remembered nowhere: there is no core dump to
-			// suppress, no parent death to notice and no privilege to gain.
-			return 0, 0
-		}
-		pr_get_pdeathsig, pr_get_no_new_privs {
-			value := i32(0)
-			if !usercopy.copy_to_user(arg2, voidptr(&value), sizeof(i32)) {
-				return errno.err, errno.efault
-			}
-			return 0, 0
-		}
-		else {
-			return errno.err, errno.einval
-		}
-	}
-}
-
-fn syscall_linux_prlimit64(_ voidptr, pid int, res int, new_rlim u64, old_rlim u64) (u64, u64) {
-	if res < 0 || res >= proc.rlimit_nlimits {
-		return errno.err, errno.einval
-	}
-	mut process := proc.current_thread().process
-	if pid != 0 && pid != process.pid {
-		return errno.err, errno.esrch
-	}
-
-	process.rlimits_lock.acquire()
-	defer { process.rlimits_lock.release() }
-	old := process.rlimits[res]
-	if old_rlim != 0 {
-		if !usercopy.copy_to_user(old_rlim, voidptr(&old), sizeof(proc.RLimit)) {
-			return errno.err, errno.efault
-		}
-	}
-
-	if new_rlim != 0 {
-		mut wanted := proc.RLimit{}
-		if !usercopy.copy_from_user(voidptr(&wanted), new_rlim, sizeof(proc.RLimit)) {
-			return errno.err, errno.efault
-		}
-		if wanted.cur > wanted.max {
-			return errno.err, errno.einval
-		}
-		if wanted.max > old.max && process.euid != 0 {
-			return errno.err, errno.eperm
-		}
-		if res == proc.rlimit_nofile && wanted.max > u64(proc.max_fds) {
-			return errno.err, errno.eperm
-		}
-		if res == proc.rlimit_nproc && wanted.max >= u64(proc.max_pid) {
-			return errno.err, errno.eperm
-		}
-		process.rlimits[res] = wanted
-	}
-
-	return 0, 0
-}
-
-fn syscall_linux_gettid(_ voidptr) (u64, u64) {
-	current := proc.current_thread()
-	return u64(current.tid), 0
-}
-
-// ── X11 / dynamic-linking syscall stubs ──
-
-// sendfile(out, in, offset, count).  A page-sized bounce buffer keeps the
-// transfer bounded; an explicit offset leaves the input descriptor position
-// alone, while a null offset consumes it just like read(2).
-fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u64, count u64) (u64, u64) {
-	mut input_offset := i64(0)
-	positioned := offset_ptr != 0
-	if positioned {
-		if !usercopy.copy_from_user(voidptr(&input_offset), offset_ptr, sizeof(i64)) {
-			return errno.err, errno.efault
-		}
-		if input_offset < 0 {
-			return errno.err, errno.einval
-		}
-		// Check that the offset is writable before consuming either descriptor.
-		if !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
-			return errno.err, errno.efault
-		}
-	}
-
-	// Linux validates both descriptors even for a zero-byte transfer.
-	mut input_fd := file.fd_from_fdnum(unsafe { nil }, in_fd) or {
-		return errno.err, errno.get()
-	}
-	input_fd.unref()
-	mut output_fd := file.fd_from_fdnum(unsafe { nil }, out_fd) or {
-		return errno.err, errno.get()
-	}
-	output_fd.unref()
-	if count == 0 {
-		return 0, 0
-	}
-
-	buffer := unsafe { malloc(page_size) }
-	if buffer == unsafe { nil } {
-		return errno.err, errno.enomem
-	}
-	defer {
-		unsafe { free(buffer) }
-	}
-
-	mut total := u64(0)
-	for total < count {
-		mut chunk := count - total
-		if chunk > page_size {
-			chunk = page_size
-		}
-
-		got, read_error := if positioned {
-			file.syscall_pread(gpr_state, in_fd, buffer, chunk, input_offset)
-		} else {
-			fs.syscall_read(gpr_state, in_fd, buffer, chunk)
-		}
-		if read_error != 0 {
-			if total > 0 {
-				break
-			}
-			return got, read_error
-		}
-		if got == 0 {
-			break
-		}
-
-		written, write_error := fs.syscall_write(gpr_state, out_fd, buffer, got)
-		if written < got && !positioned {
-			// read() already advanced the shared input position.  Put back the
-			// suffix the output did not accept.
-			fs.syscall_seek(gpr_state, in_fd, -i64(got - written), 1)
-		}
-		if write_error != 0 {
-			if total == 0 {
-				return written, write_error
-			}
-			break
-		}
-
-		total += written
-		if positioned {
-			input_offset += i64(written)
-		}
-		if written < got {
-			break
-		}
-	}
-
-	if positioned
-		&& !usercopy.copy_to_user(offset_ptr, voidptr(&input_offset), sizeof(i64)) {
-		return errno.err, errno.efault
-	}
-	return total, 0
-}
-
-// pread64: read at offset without changing file position.
-fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	return file.syscall_pread(gpr_state, fdnum, buf, count, offset)
-}
-
-// pwrite64: write at offset without changing file position.
-fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	return file.syscall_pwrite(gpr_state, fdnum, buf, count, offset)
-}
-
-// setitimer / getitimer: ITIMER_REAL delivers SIGALRM via scheduler tick.
-// struct itimerval layout (aarch64):
-//   0: it_interval.tv_sec  (i64)
-//   8: it_interval.tv_usec (i64)
-//  16: it_value.tv_sec     (i64)
-//  24: it_value.tv_usec    (i64)
-fn syscall_linux_setitimer(_ voidptr, which int, new_value u64, old_value u64) (u64, u64) {
-	if which != 0 {
-		// Only ITIMER_REAL (0) supported; ITIMER_VIRTUAL (1) and
-		// ITIMER_PROF (2) are no-ops.
-		if old_value != 0 {
-			unsafe { C.memset(voidptr(old_value), 0, 32) }
-		}
-		return 0, 0
-	}
-
-	mut current_thread := proc.current_thread()
-
-	mut value_us := i64(0)
-	mut interval_us := i64(0)
-	if new_value != 0 {
-		interval_sec := unsafe { *&i64(new_value) }
-		interval_usec := unsafe { *&i64(new_value + 8) }
-		value_sec := unsafe { *&i64(new_value + 16) }
-		value_usec := unsafe { *&i64(new_value + 24) }
-		interval_us = interval_sec * 1000000 + interval_usec
-		value_us = value_sec * 1000000 + value_usec
-	}
-
-	old_val, old_int := sched.set_itimer_real(current_thread, value_us, interval_us)
-
-	if old_value != 0 {
-		unsafe {
-			*&i64(old_value) = old_int / 1000000 // it_interval.tv_sec
-			*&i64(old_value + 8) = old_int % 1000000 // it_interval.tv_usec
-			*&i64(old_value + 16) = old_val / 1000000 // it_value.tv_sec
-			*&i64(old_value + 24) = old_val % 1000000 // it_value.tv_usec
-		}
-	}
-
-	return 0, 0
-}
-
-fn syscall_linux_getitimer(_ voidptr, which int, curr_value u64) (u64, u64) {
-	if which != 0 || curr_value == 0 {
-		if curr_value != 0 {
-			unsafe { C.memset(voidptr(curr_value), 0, 32) }
-		}
-		return 0, 0
-	}
-
-	current_thread := proc.current_thread()
-	val, intv := sched.get_itimer_real(current_thread)
-
-	unsafe {
-		*&i64(curr_value) = intv / 1000000 // it_interval.tv_sec
-		*&i64(curr_value + 8) = intv % 1000000 // it_interval.tv_usec
-		*&i64(curr_value + 16) = val / 1000000 // it_value.tv_sec
-		*&i64(curr_value + 24) = val % 1000000 // it_value.tv_usec
-	}
-
-	return 0, 0
-}
-
-// setpgid / getpgid: wait4()/waitid() select on process groups, so these have
-// to be real.
-fn syscall_linux_setpgid(_ voidptr, pid int, pgid int) (u64, u64) {
-	if pid < 0 || pgid < 0 {
-		return errno.err, errno.einval
-	}
-
-	mut target := proc.current_thread().process
-	if pid != 0 {
-		if pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		target = processes[pid]
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-	}
-
-	target.pgid = if pgid == 0 { target.pid } else { pgid }
-
-	return 0, 0
-}
-
-fn syscall_linux_getpgid(_ voidptr, pid int) (u64, u64) {
-	mut target := proc.current_thread().process
-	if pid != 0 {
-		if pid < 0 || pid >= proc.max_pid {
-			return errno.err, errno.esrch
-		}
-		target = processes[pid]
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-	}
-
-	return u64(target.pgid), 0
+	return linux_uname(buf, c'Vinix 0.1.0 aarch64', c'aarch64')
 }
 
 // sendmsg is implemented by the socket layer so AF_INET datagrams retain their
@@ -697,79 +270,11 @@ fn syscall_linux_recvfrom(gpr_state voidptr, fdnum int, buf voidptr, len u64, fl
 	return socket.syscall_recvfrom(gpr_state, fdnum, buf, len, flags, src_addr, unsafe { &u32(addrlen) })
 }
 
-fn syscall_linux_sched_yield(_ voidptr) (u64, u64) {
-	// yield(false) is the dying-thread path and never returns to the caller;
-	// giving up the timeslice while staying runnable is what is wanted here.
-	sched.reschedule()
-	return 0, 0
-}
-
-// dup(oldfd) via fcntl(oldfd, F_DUPFD, 0)
-fn syscall_linux_dup(gpr_state voidptr, oldfd int) (u64, u64) {
-	return file.syscall_fcntl(gpr_state, oldfd, 0, 0)
-}
-
 // Convert Vinix stat.Stat (144 bytes, x86_64 layout) to Linux aarch64 struct stat (128 bytes).
 // Field order and sizes differ: mode/nlink are swapped and narrower on aarch64, blksize is i32.
-// struct statx, the 256-byte form statx(2) fills. Its timestamps and its
-// split-out device numbers mean it cannot share the struct stat conversion.
-const statx_basic_stats = u32(0x7ff)
-
-fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
-	unsafe {
-		*&i64(dst + 0) = sec
-		*&u32(dst + 8) = u32(nsec)
-		*&i32(dst + 12) = 0
-	}
-}
-
-fn convert_stat_to_statx(src &stat.Stat, dst u64) {
-	unsafe {
-		C.memset(voidptr(dst), 0, 256)
-
-		*&u32(dst + 0) = statx_basic_stats // stx_mask: what we filled in
-		*&u32(dst + 4) = u32(src.blksize)
-		*&u64(dst + 8) = 0 // stx_attributes
-		*&u32(dst + 16) = u32(src.nlink)
-		*&u32(dst + 20) = src.uid
-		*&u32(dst + 24) = src.gid
-		*&u16(dst + 28) = u16(src.mode)
-		*&u64(dst + 32) = src.ino
-		*&u64(dst + 40) = u64(src.size)
-		*&u64(dst + 48) = u64(src.blocks)
-		*&u64(dst + 56) = 0 // stx_attributes_mask
-
-		write_statx_timestamp(dst + 64, src.atim.tv_sec, src.atim.tv_nsec)
-		write_statx_timestamp(dst + 80, 0, 0) // stx_btime: not tracked
-		write_statx_timestamp(dst + 96, src.ctim.tv_sec, src.ctim.tv_nsec)
-		write_statx_timestamp(dst + 112, src.mtim.tv_sec, src.mtim.tv_nsec)
-
-		*&u32(dst + 128) = u32(src.rdev >> 32) // stx_rdev_major
-		*&u32(dst + 132) = u32(src.rdev & 0xffffffff) // stx_rdev_minor
-		*&u32(dst + 136) = u32(src.dev >> 32) // stx_dev_major
-		*&u32(dst + 140) = u32(src.dev & 0xffffffff) // stx_dev_minor
-	}
-}
-
-// statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
-// free to answer with more than was asked for as long as stx_mask says what it
-// actually filled.
-fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _mask u32, buf u64) (u64, u64) {
-	if buf == 0 {
-		return errno.err, errno.efault
-	}
-
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
-	if err != 0 {
-		return ret, err
-	}
-
-	convert_stat_to_statx(&vinix_stat, buf)
-	return 0, 0
-}
-
-fn convert_stat_to_linux(src &stat.Stat, dst u64) {
+fn convert_stat_to_linux(src &stat.Stat, user_dst u64) bool {
+	mut buf := [128]u8{}
+	dst := unsafe { u64(&buf[0]) }
 	unsafe {
 		*&u64(dst + 0) = src.dev
 		*&u64(dst + 8) = src.ino
@@ -792,155 +297,37 @@ fn convert_stat_to_linux(src &stat.Stat, dst u64) {
 		*&u32(dst + 120) = 0 // __unused4
 		*&u32(dst + 124) = 0 // __unused5
 	}
+	return usercopy.copy_to_user(user_dst, unsafe { voidptr(&buf[0]) }, u64(sizeof(buf)))
 }
 
 // fstatat wrapper: call Vinix fstatat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u64, flags int) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, &vinix_stat, flags)
+	// Neither the filesystem fill nor the checked conversion retains this scratch.
+	stat_storage := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
+	unsafe { *stat_storage = stat.Stat{} }
+	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, stat_storage, flags)
 	if err != 0 {
 		return ret, err
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
+	if !convert_stat_to_linux(stat_storage, linux_buf) {
+		return errno.err, errno.efault
+	}
 	return 0, 0
 }
 
 // fstat wrapper: call Vinix fstat with a local buffer, then convert to Linux layout.
 fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
-	mut vinix_stat := stat.Stat{}
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, &vinix_stat)
+	// Neither the filesystem fill nor the checked conversion retains this scratch.
+	stat_storage := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
+	unsafe { *stat_storage = stat.Stat{} }
+	ret, err := fs.syscall_fstat(gpr_state, fdnum, stat_storage)
 	if err != 0 {
 		return ret, err
 	}
-	convert_stat_to_linux(&vinix_stat, linux_buf)
-	return 0, 0
-}
-
-// readv(fd, iov, iovcnt)
-fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
-	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
-	if iovcnt == 0 {
-		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
-			return errno.err, errno.get()
-		}
-		checked_fd.unref()
-		return 0, 0
-	}
-
-	mut total := u64(0)
-	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
-		if iov.len == 0 {
-			continue
-		}
-		ret, err := fs.syscall_read(gpr_state, fdnum, voidptr(iov.base), iov.len)
-		if err != 0 {
-			if total > 0 {
-				return total, 0
-			}
-			return ret, err
-		}
-		total += ret
-		if ret < iov.len {
-			break
-		}
-	}
-	return total, 0
-}
-
-const grnd_nonblock = 0x0001
-
-const grnd_random = 0x0002
-
-const grnd_insecure = 0x0004
-
-fn syscall_linux_getrandom(_ voidptr, buf u64, count u64, flags u32) (u64, u64) {
-	if flags & ~u32(grnd_nonblock | grnd_random | grnd_insecure) != 0 {
-		return errno.err, errno.einval
-	}
-	if count == 0 {
-		return 0, 0
-	}
-	if buf == 0 {
+	if !convert_stat_to_linux(stat_storage, linux_buf) {
 		return errno.err, errno.efault
 	}
-
-	allow_insecure := flags & u32(grnd_insecure) != 0
-	if !krandom.is_ready() && !allow_insecure {
-		return errno.err, errno.eagain
-	}
-	mut bounce := [256]u8{}
-	mut written := u64(0)
-	for written < count {
-		mut chunk := count - written
-		if chunk > bounce.len {
-			chunk = u64(bounce.len)
-		}
-		if !krandom.fill(&bounce[0], chunk, allow_insecure) {
-			return errno.err, errno.eagain
-		}
-		if !usercopy.copy_to_user(buf + written, voidptr(&bounce[0]), chunk) {
-			// Report the bytes that did land, as the manual page requires.
-			if written > 0 {
-				return written, 0
-			}
-			return errno.err, errno.efault
-		}
-		written += chunk
-	}
-	unsafe { C.memset(&bounce[0], 0, sizeof(bounce)) }
-
-	return written, 0
-}
-
-const prio_process = 0
-
-fn syscall_linux_setpriority(_ voidptr, which int, who int, prio int) (u64, u64) {
-	if which != prio_process || who < 0 {
-		return errno.err, errno.einval
-	}
-	mut caller := proc.current_thread().process
-	target_pid := if who == 0 { caller.pid } else { who }
-	mut wanted := prio
-	if wanted < -20 {
-		wanted = -20
-	}
-	if wanted > 19 {
-		wanted = 19
-	}
-
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	mut target := proc.process_at(target_pid)
-	if target == unsafe { nil } {
-		return errno.err, errno.esrch
-	}
-	if caller.euid != 0 && caller.euid != target.euid && caller.euid != target.uid {
-		return errno.err, errno.eperm
-	}
-	if wanted < target.nice && caller.euid != 0 {
-		return errno.err, errno.eacces
-	}
-	target.nice = wanted
 	return 0, 0
-}
-
-fn syscall_linux_getpriority(_ voidptr, which int, who int) (u64, u64) {
-	if which != prio_process || who < 0 {
-		return errno.err, errno.einval
-	}
-	target_pid := if who == 0 { proc.current_thread().process.pid } else { who }
-	proc.lock_table()
-	defer { proc.unlock_table() }
-	target := proc.process_at(target_pid)
-	if target == unsafe { nil } {
-		return errno.err, errno.esrch
-	}
-	// The raw syscall returns 20 - nice so every successful result is positive.
-	return u64(20 - target.nice), 0
 }
 
 // ── Syscall table initialization with Linux aarch64 numbers ──
@@ -955,10 +342,20 @@ pub fn init_syscall_table() {
 	// Reference: include/uapi/asm-generic/unistd.h
 
 	// File I/O
-	for i := 5; i <= 16; i++ {
-		syscall_table[i] = voidptr(syscall_linux_xattr_unsupported)
-	}
+	syscall_table[5] = voidptr(fs.syscall_setxattr) // __NR_setxattr
+	syscall_table[6] = voidptr(fs.syscall_lsetxattr) // __NR_lsetxattr
+	syscall_table[7] = voidptr(fs.syscall_fsetxattr) // __NR_fsetxattr
+	syscall_table[8] = voidptr(fs.syscall_getxattr) // __NR_getxattr
+	syscall_table[9] = voidptr(fs.syscall_lgetxattr) // __NR_lgetxattr
+	syscall_table[10] = voidptr(fs.syscall_fgetxattr) // __NR_fgetxattr
+	syscall_table[11] = voidptr(fs.syscall_listxattr) // __NR_listxattr
+	syscall_table[12] = voidptr(fs.syscall_llistxattr) // __NR_llistxattr
+	syscall_table[13] = voidptr(fs.syscall_flistxattr) // __NR_flistxattr
+	syscall_table[14] = voidptr(fs.syscall_removexattr) // __NR_removexattr
+	syscall_table[15] = voidptr(fs.syscall_lremovexattr) // __NR_lremovexattr
+	syscall_table[16] = voidptr(fs.syscall_fremovexattr) // __NR_fremovexattr
 	syscall_table[17] = voidptr(fs.syscall_getcwd) // __NR_getcwd
+	syscall_table[seccomp_verdict_nr] = voidptr(syscall_seccomp_verdict)
 	syscall_table[19] = voidptr(file.syscall_eventfd2) // __NR_eventfd2
 	syscall_table[23] = voidptr(syscall_linux_dup) // __NR_dup
 	syscall_table[24] = voidptr(file.syscall_dup3) // __NR_dup3
@@ -983,7 +380,7 @@ pub fn init_syscall_table() {
 	syscall_table[55] = voidptr(fs.syscall_fchown) // __NR_fchown
 	syscall_table[56] = voidptr(syscall_linux_openat) // __NR_openat
 	syscall_table[57] = voidptr(fs.syscall_close) // __NR_close
-	syscall_table[59] = voidptr(pipe.syscall_pipe) // __NR_pipe2
+	syscall_table[59] = voidptr(pipe.syscall_pipe_checked) // __NR_pipe2
 	syscall_table[61] = voidptr(syscall_linux_getdents64) // __NR_getdents64
 	syscall_table[62] = voidptr(fs.syscall_seek) // __NR_lseek
 	syscall_table[63] = voidptr(fs.syscall_read) // __NR_read
@@ -996,7 +393,7 @@ pub fn init_syscall_table() {
 	syscall_table[70] = voidptr(syscall_linux_pwritev) // __NR_pwritev
 	syscall_table[72] = voidptr(file.syscall_pselect6) // __NR_pselect6
 	syscall_table[73] = voidptr(file.syscall_ppoll) // __NR_ppoll
-	syscall_table[74] = voidptr(userland.syscall_signalfd) // __NR_signalfd4
+	syscall_table[74] = voidptr(userland.syscall_signalfd4) // __NR_signalfd4
 	syscall_table[78] = voidptr(fs.syscall_readlinkat) // __NR_readlinkat
 	syscall_table[79] = voidptr(syscall_linux_fstatat) // __NR_fstatat / newfstatat
 	syscall_table[80] = voidptr(syscall_linux_fstat) // __NR_fstat
@@ -1011,7 +408,9 @@ pub fn init_syscall_table() {
 	syscall_table[86] = voidptr(file.syscall_timerfd_settime) // __NR_timerfd_settime
 	syscall_table[87] = voidptr(file.syscall_timerfd_gettime) // __NR_timerfd_gettime
 	syscall_table[267] = voidptr(fs.syscall_syncfs) // __NR_syncfs
+	syscall_table[269] = voidptr(syscall_linux_sendmmsg) // __NR_sendmmsg
 	syscall_table[279] = voidptr(fs.syscall_memfd_create) // __NR_memfd_create
+	syscall_table[280] = voidptr(syscall_linux_bpf) // __NR_bpf
 	syscall_table[281] = voidptr(userland.syscall_execveat) // __NR_execveat
 	syscall_table[283] = voidptr(syscall_linux_membarrier) // __NR_membarrier
 	syscall_table[285] = voidptr(pipe.syscall_copy_file_range) // __NR_copy_file_range
@@ -1113,6 +512,8 @@ pub fn init_syscall_table() {
 	syscall_table[155] = voidptr(syscall_linux_getpgid) // __NR_getpgid
 	syscall_table[165] = voidptr(sys.syscall_getrusage) // __NR_getrusage
 	syscall_table[167] = voidptr(syscall_linux_prctl) // __NR_prctl
+	syscall_table[270] = voidptr(syscall_linux_process_vm_readv) // process_vm_readv
+	syscall_table[271] = voidptr(syscall_linux_process_vm_writev) // process_vm_writev
 	syscall_table[38] = voidptr(fs.syscall_renameat) // __NR_renameat
 	syscall_table[276] = voidptr(fs.syscall_renameat2) // __NR_renameat2
 	syscall_table[43] = voidptr(fs.syscall_statfs) // __NR_statfs
@@ -1120,6 +521,8 @@ pub fn init_syscall_table() {
 	syscall_table[45] = voidptr(fs.syscall_truncate) // __NR_truncate
 	syscall_table[278] = voidptr(syscall_linux_getrandom) // __NR_getrandom
 	syscall_table[435] = voidptr(userland.syscall_clone3) // __NR_clone3
+	syscall_table[424] = voidptr(userland.syscall_pidfd_send_signal)
+	syscall_table[434] = voidptr(userland.syscall_pidfd_open)
 	syscall_table[223] = voidptr(file.syscall_fadvise64) // __NR_fadvise64
 
 	// Sockets
@@ -1127,7 +530,7 @@ pub fn init_syscall_table() {
 	syscall_table[199] = voidptr(socket.syscall_socketpair) // __NR_socketpair
 	syscall_table[200] = voidptr(socket.syscall_bind) // __NR_bind
 	syscall_table[201] = voidptr(socket.syscall_listen) // __NR_listen
-	syscall_table[202] = voidptr(socket.syscall_accept) // __NR_accept
+	syscall_table[202] = voidptr(syscall_linux_accept) // __NR_accept
 	syscall_table[203] = voidptr(socket.syscall_connect) // __NR_connect
 	syscall_table[204] = voidptr(socket.syscall_getsockname) // __NR_getsockname
 	syscall_table[205] = voidptr(socket.syscall_getpeername) // __NR_getpeername
@@ -1139,9 +542,18 @@ pub fn init_syscall_table() {
 	syscall_table[211] = voidptr(syscall_linux_sendmsg) // __NR_sendmsg
 	syscall_table[212] = voidptr(socket.syscall_recvmsg) // __NR_recvmsg
 	syscall_table[242] = voidptr(syscall_linux_accept4) // __NR_accept4
+	syscall_table[243] = voidptr(syscall_linux_recvmmsg) // __NR_recvmmsg
 
 	// Memory
 	syscall_table[194] = voidptr(sysvshm.syscall_shmget) // __NR_shmget
+	syscall_table[190] = voidptr(sysvsem.syscall_semget) // __NR_semget
+	syscall_table[186] = voidptr(sysvmsg.syscall_msgget)
+	syscall_table[187] = voidptr(sysvmsg.syscall_msgctl)
+	syscall_table[188] = voidptr(sysvmsg.syscall_msgrcv)
+	syscall_table[189] = voidptr(sysvmsg.syscall_msgsnd)
+	syscall_table[191] = voidptr(sysvsem.syscall_semctl) // __NR_semctl
+	syscall_table[192] = voidptr(sysvsem.syscall_semtimedop) // __NR_semtimedop
+	syscall_table[193] = voidptr(sysvsem.syscall_semop) // __NR_semop
 	syscall_table[195] = voidptr(sysvshm.syscall_shmctl) // __NR_shmctl
 	syscall_table[196] = voidptr(sysvshm.syscall_shmat) // __NR_shmat
 	syscall_table[197] = voidptr(sysvshm.syscall_shmdt) // __NR_shmdt
@@ -1154,12 +566,12 @@ pub fn init_syscall_table() {
 	syscall_table[226] = voidptr(mmap.syscall_mprotect) // __NR_mprotect
 	syscall_table[232] = voidptr(mmap.syscall_mincore) // __NR_mincore
 	syscall_table[227] = voidptr(mmap.syscall_msync) // __NR_msync
-	syscall_table[228] = voidptr(syscall_linux_mlock) // __NR_mlock
-	syscall_table[229] = voidptr(syscall_linux_mlock) // __NR_munlock
-	syscall_table[230] = voidptr(syscall_linux_mlockall) // __NR_mlockall
-	syscall_table[231] = voidptr(syscall_linux_munlockall) // __NR_munlockall
+	syscall_table[228] = voidptr(mmap.syscall_mlock) // __NR_mlock
+	syscall_table[229] = voidptr(mmap.syscall_munlock) // __NR_munlock
+	syscall_table[230] = voidptr(mmap.syscall_mlockall) // __NR_mlockall
+	syscall_table[231] = voidptr(mmap.syscall_munlockall) // __NR_munlockall
 	syscall_table[233] = voidptr(mmap.syscall_madvise) // __NR_madvise
-	syscall_table[284] = voidptr(syscall_linux_mlock2) // __NR_mlock2
+	syscall_table[284] = voidptr(mmap.syscall_mlock2) // __NR_mlock2
 
 	// Misc
 	syscall_table[260] = voidptr(userland.syscall_wait4) // __NR_wait4
@@ -1177,4 +589,5 @@ pub fn init_syscall_table() {
 	// io_pgetevents: a program calling statx got set_tls with statx's arguments.
 	syscall_table[245] = voidptr(cpu.syscall_set_tls)
 	syscall_table[246] = voidptr(userland.syscall_sigentry)
+	init_sysv_message_syscalls()
 }

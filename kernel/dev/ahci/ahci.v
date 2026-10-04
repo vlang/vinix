@@ -2,6 +2,7 @@
 module ahci
 
 import pci
+import proc
 import memory
 import stat
 import klock
@@ -11,7 +12,9 @@ import errno
 import block.partition
 import fs
 import katomic
+import lib
 import time.sys
+import x86.hpet as hpet_clock
 
 const ahci_class = 0x1
 const ahci_subclass = 0x6
@@ -33,6 +36,11 @@ const fis_bist = 0x58
 const fis_pio_setup = 0x5f
 const fis_device_bits = 0xa1
 const sector_size = 0x200
+// The most one command moves: the size of each disk's bounce buffer. A
+// command has one PRDT entry, which would take up to 4 MiB.
+const max_transfer = u64(1024 * 1024)
+const command_timeout_ns = u64(30_000_000_000)
+const port_error_mask = u32((1 << 30) | (1 << 29) | (1 << 28) | (1 << 27) | (1 << 26) | (1 << 24))
 
 @[packed]
 struct AHCIRegisters {
@@ -73,8 +81,8 @@ pub mut:
 	sntf      u32
 	fbs       u32
 	devslp    u32
-	reserved1 [11]u32
-	vs        [10]u32
+	reserved1 [10]u32
+	vs        [4]u32
 }
 
 @[packed]
@@ -173,6 +181,13 @@ pub mut:
 
 	parent_controller &AHCIController
 	volatile regs              &AHCIPortRegisters
+	// Where every transfer is staged: max_transfer bytes, physically
+	// contiguous, taken once while memory still has runs that long.
+	bounce voidptr = unsafe { nil }
+	// A timed-out command may still own the permanent bounce buffer and
+	// command tables. Keep them allocated and refuse to reuse this port.
+	failed        bool
+	flush_command u8
 }
 
 __global (
@@ -180,50 +195,127 @@ __global (
 )
 
 fn (mut dev AHCIDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
-	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
-		errno.set(errno.eio)
-		return none
-	}
-
-	start_blk := loc / dev.stat.blksize
-	page_cnt := count / dev.stat.blksize
-
-	aligned_buffer := voidptr(u64(memory.pmm_alloc(u64(page_cnt))) + higher_half)
-
-	if dev.rw_lba(aligned_buffer, u64(start_blk), u64(page_cnt), false) == -1 {
-		errno.set(errno.eio)
-		memory.pmm_free(aligned_buffer, u64(page_cnt))
-		return none
-	}
-
-	unsafe { C.memcpy(buffer, aligned_buffer, count) }
-
-	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), u64(page_cnt))
-
-	return i64(count)
+	return dev.transfer(buffer, loc, count, false)
 }
 
 fn (mut dev AHCIDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	return dev.transfer(buffer, loc, count, true)
+}
+
+fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
+	dev.l.acquire()
+	defer { dev.l.release() }
+	if dev.failed || dev.flush_command == 0 {
+		errno.set(errno.eio)
+		return none
+	}
+	slot := dev.find_cmd_slot() or {
+		errno.set(errno.eio)
+		return none
+	}
+	mut volatile regs := dev.regs
+	mut volatile header := unsafe {
+		&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half +
+			slot * sizeof(AHCIHBACommand))
+	}
+	// FLUSH CACHE is a non-data command: there is no PRDT or write flag.
+	header.flags = u16(sizeof(AHCIFISh2d) / 4)
+	header.prdtl = 0
+	header.prdbc = 0
+	mut volatile table := unsafe {
+		&AHCIHBACommandTable((u64(header.ctba) | (u64(header.ctbau) << 32)) + higher_half)
+	}
+	mut volatile fis := unsafe { &AHCIFISh2d(&table.cfis) }
+	unsafe { C.memset(fis, 0, sizeof(AHCIFISh2d)) }
+	fis.fis_type = fis_reg_h2d
+	fis.flags = 1 << 7
+	fis.command = dev.flush_command
+	if !dev.send_cmd(slot) {
+		errno.set(errno.eio)
+		return none
+	}
+}
+
+// Move `count` bytes at `loc` through the bounce buffer, a chunk per
+// command. One command at a time: the port is stopped and started around
+// each, and the page cache's writeback thread shares the disk with whoever
+// else is reading or writing it. The buffer used to be allocated for each
+// call, a page per sector; once the page cache had filled memory, no run was
+// that long and the allocator panicked.
+fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool) ?i64 {
 	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
 		errno.set(errno.eio)
 		return none
 	}
-
-	start_blk := loc / dev.stat.blksize
-	page_cnt := count / dev.stat.blksize
-
-	aligned_buffer := voidptr(u64(memory.pmm_alloc(u64(page_cnt))) + higher_half)
-	unsafe { C.memcpy(aligned_buffer, buffer, count) }
-
-	if dev.rw_lba(aligned_buffer, u64(start_blk), u64(page_cnt), true) == -1 {
-		errno.set(errno.eio)
-		memory.pmm_free(aligned_buffer, u64(page_cnt))
-		return none
+	if count == 0 {
+		return 0
 	}
-
-	memory.pmm_free(voidptr(u64(aligned_buffer) - higher_half), u64(page_cnt))
-
+	// A program's buffer (read(2) of /dev/sd0 hands it over as it is) is
+	// copied with no lock held: touching it can fault, and the fault can come
+	// back here for a page of a file on this disk.
+	user := u64(buffer) < memory.user_address_limit()
+	mut staging := voidptr(unsafe { nil })
+	mut staging_pages := u64(0)
+	mut most := max_transfer
+	if user {
+		// As much as a command takes, or a page when memory is short.
+		staging_pages = lib.div_roundup(if count < max_transfer { count } else { max_transfer },
+			page_size)
+		mut physical := memory.pmm_alloc_nozero_fallible(staging_pages)
+		if physical == unsafe { nil } {
+			staging_pages = 1
+			physical = memory.pmm_alloc_nozero_fallible(1)
+		}
+		if physical == unsafe { nil } {
+			errno.set(errno.enomem)
+			return none
+		}
+		staging = voidptr(u64(physical) + higher_half)
+		most = staging_pages * page_size
+	}
+	defer {
+		if staging != unsafe { nil } {
+			memory.pmm_free(voidptr(u64(staging) - higher_half), staging_pages)
+		}
+	}
+	for done := u64(0); done < count; {
+		chunk := if count - done < most { count - done } else { most }
+		caller := voidptr(u64(buffer) + done)
+		near := if user { staging } else { caller }
+		if write && user {
+			unsafe { C.memcpy(staging, caller, chunk) }
+		}
+		dev.l.acquire()
+		if dev.failed {
+			dev.l.release()
+			errno.set(errno.eio)
+			return none
+		}
+		if write {
+			unsafe { C.memcpy(dev.bounce, near, chunk) }
+		}
+		ok := dev.rw_lba(dev.bounce, (loc + done) / u64(dev.stat.blksize),
+			chunk / u64(dev.stat.blksize), write) != -1
+		if ok && !write {
+			unsafe { C.memcpy(near, dev.bounce, chunk) }
+		}
+		dev.l.release()
+		if !ok {
+			errno.set(errno.eio)
+			return none
+		}
+		proc.account_disk_transfer(chunk, write)
+		if !write && user {
+			unsafe { C.memcpy(caller, staging, chunk) }
+		}
+		proc.account_disk_io(chunk, write)
+		done += chunk
+	}
 	return i64(count)
+}
+
+fn (dev &AHCIDevice) block_identity() resource.BlockIdentity {
+	return resource.BlockIdentity{is_block: true, disk_id: dev.stat.rdev, length: u64(dev.stat.size)}
 }
 
 fn (mut dev AHCIDevice) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -251,8 +343,10 @@ fn (mut dev AHCIDevice) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut d AHCIDevice) find_cmd_slot() ?u32 {
+	if d.failed { return none }
+	mut volatile regs := d.regs
 	for i := u32(0); i < d.parent_controller.cmd_slots; i++ {
-		if ((d.regs.sact | d.regs.ci) & (1 << i)) == 0 {
+		if ((regs.sact | regs.ci) & (1 << i)) == 0 {
 			return i
 		}
 	}
@@ -271,21 +365,73 @@ fn (mut d AHCIDevice) set_prdt(cmd_hdr &AHCIHBACommand, buffer u64, interrupt u3
 	return cmd_table
 }
 
-fn (mut d AHCIDevice) send_cmd(slot u32) {
-	for (d.regs.tfd & (0x88)) != 0 {}
+fn (mut d AHCIDevice) send_cmd(slot u32) bool {
+	// The registers are read through a volatile local. V does not carry
+	// `volatile` on a struct field into C, and in a -prod kernel each loop
+	// below then read its register once and spun for good.
+	mut volatile regs := d.regs
+	if d.failed { return false }
+	deadline := hpet_clock.nanoseconds() + command_timeout_ns
+	for (regs.tfd & (0x88)) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
 
-	d.regs.cmd &= ~hba_cmd_st
+	regs.cmd &= ~hba_cmd_st
 
-	for (d.regs.cmd & hba_cmd_cr) != 0 {}
+	for (regs.cmd & hba_cmd_cr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
 
-	d.regs.cmd |= hba_cmd_fr | hba_cmd_st
-	d.regs.ci = 1 << slot
+	// FIS receive before start, as the specification orders them. This set
+	// hba_cmd_fr, the read-only "FIS receive running" bit, so from the second
+	// command on the port ran without it.
+	regs.cmd |= hba_cmd_fre
+	regs.cmd |= hba_cmd_st
+	regs.ints = u32(-1)
+	regs.serr = u32(-1)
+	katomic.sync()
+	regs.ci = 1 << slot
 
-	for d.regs.ci & (1 << slot) != 0 {}
+	for regs.ci & (1 << slot) != 0 {
+		if regs.ints & port_error_mask != 0 || hpet_clock.nanoseconds() >= deadline {
+			// Stop issuing work. Do not reuse DMA memory even if this engine
+			// fails to stop; all device-owned allocations are permanent.
+			regs.cmd &= ~hba_cmd_st
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
+	katomic.sync()
+	ok := regs.ints & port_error_mask == 0 && regs.tfd & 1 == 0
 
-	d.regs.cmd &= ~hba_cmd_st
-	for (d.regs.cmd & hba_cmd_st) != 0 {}
-	d.regs.cmd &= ~hba_cmd_fre
+	// Stopped when the list engine says so (CR), and FIS receive the same
+	// way (FR); this waited on the bits it had just cleared.
+	regs.cmd &= ~hba_cmd_st
+	for (regs.cmd & hba_cmd_cr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
+	regs.cmd &= ~hba_cmd_fre
+	for (regs.cmd & hba_cmd_fr) != 0 {
+		if hpet_clock.nanoseconds() >= deadline {
+			d.failed = true
+			return false
+		}
+		klock.spin_hint()
+	}
+	return ok
 }
 
 fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
@@ -294,14 +440,17 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 		return -1
 	}
 
+	mut volatile regs := d.regs
 	mut volatile cmd_hdr := unsafe {
-		&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+		&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half +
 			cmd_slot * sizeof(AHCIHBACommand))
 	}
 
 	cmd_hdr.flags &= ~(0b11111 | (1 << 6))
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
+	if rw { cmd_hdr.flags |= 1 << 6 }
 	cmd_hdr.prdtl = 1
+	cmd_hdr.prdbc = 0
 
 	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(buffer) - higher_half, 1, u32(cnt * sector_size - 1))
 
@@ -328,7 +477,7 @@ fn (mut d AHCIDevice) rw_lba(buffer voidptr, start u64, cnt u64, rw bool) int {
 	cmd_ptr.countl = u8(cnt & 0xff)
 	cmd_ptr.counth = u8((cnt >> 8) & 0xff)
 
-	d.send_cmd(cmd_slot)
+	if !d.send_cmd(cmd_slot) { return -1 }
 
 	return 0
 }
@@ -339,14 +488,15 @@ fn (mut d AHCIDevice) initialise() ?int {
 		return none
 	}
 
+	mut volatile regs := d.regs
 	command_list := u64(memory.pmm_alloc(1))
 
-	d.regs.clb = u32(command_list)
-	d.regs.clbu = u32(command_list >> 32)
+	regs.clb = u32(command_list)
+	regs.clbu = u32(command_list >> 32)
 
 	for i := u32(0); i < 32; i++ {
 		mut volatile cmd_hdr := unsafe {
-			&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+			&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half +
 				i * sizeof(AHCIHBACommand))
 		}
 
@@ -358,13 +508,13 @@ fn (mut d AHCIDevice) initialise() ?int {
 
 	fib_base := u64(memory.pmm_alloc(1))
 
-	d.regs.fb = u32(fib_base)
-	d.regs.fbu = u32(fib_base >> 32)
+	regs.fb = u32(fib_base)
+	regs.fbu = u32(fib_base >> 32)
 
-	d.regs.cmd |= (1 << 0) | (1 << 4)
+	regs.cmd |= (1 << 0) | (1 << 4)
 
 	mut volatile cmd_hdr := unsafe {
-		&AHCIHBACommand((u64(d.regs.clb) | (u64(d.regs.clbu) << 32)) + higher_half +
+		&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half +
 			cmd_slot * sizeof(AHCIHBACommand))
 	}
 
@@ -383,7 +533,20 @@ fn (mut d AHCIDevice) initialise() ?int {
 	cmd_ptr.flags = (1 << 7)
 	cmd_ptr.fis_type = fis_reg_h2d
 
-	d.send_cmd(cmd_slot)
+	if !d.send_cmd(cmd_slot) {
+		// IDENTIFY may still be writing; retain its page on failure.
+		return none
+	}
+	// ATA IDENTIFY word 83 declares FLUSH CACHE/FLUSH CACHE EXT support.
+	// Do not silently report a persistence barrier on an unsupported disk.
+	commands := unsafe { identity[83] }
+	if commands & 0xc000 == 0x4000 {
+		if commands & (1 << 13) != 0 {
+			d.flush_command = 0xea
+		} else if commands & (1 << 12) != 0 {
+			d.flush_command = 0xe7
+		}
+	}
 
 	mut sector_cnt := unsafe { *(&u64(&identity[100])) }
 
@@ -416,30 +579,39 @@ fn (mut d AHCIDevice) initialise() ?int {
 			model_number[i + 1] = tmp
 		}
 
-		print('ahci: device: serial number: ${cstring_to_vstring(serial_number)}\n')
-		print('ahci: device: firmware revision: ${cstring_to_vstring(firmware_revision)}\n')
-		print('ahci: device: model number: ${cstring_to_vstring(model_number)}\n')
+		C.kprintf(c'ahci: device: serial number: %s\n', serial_number)
+		C.kprintf(c'ahci: device: firmware revision: %s\n', firmware_revision)
+		C.kprintf(c'ahci: device: model number: %s\n', model_number)
+		free(serial_number)
+		free(firmware_revision)
+		free(model_number)
 	}
-	print('ahci: device: sector count: ${sector_cnt}\n')
+	C.kprintf(c'ahci: device: sector count: %llu\n', u64(sector_cnt))
+
+	d.bounce = voidptr(u64(memory.pmm_alloc(lib.div_roundup(max_transfer, page_size))) +
+		higher_half)
 
 	d.stat.blocks = sector_cnt
 	d.stat.blksize = sector_size
 	d.stat.size = sector_cnt * sector_size
 	d.stat.rdev = resource.create_dev_id()
 	d.stat.mode = 0o644 | stat.ifblk
+	memory.pmm_free(voidptr(u64(identity) - higher_half), 1)
 
 	return 0
 }
 
 pub fn (mut c AHCIController) declare_ownership() int {
-	if c.regs.cap2 & (1 << 0) == 0 {
+	// Through a volatile local, as AHCIDevice.send_cmd() explains.
+	mut volatile regs := c.regs
+	if regs.cap2 & (1 << 0) == 0 {
 		print('ahci: bios handoff not supported\n')
 		return -1
 	}
 
-	c.regs.bohc |= (1 << 1)
+	regs.bohc |= (1 << 1)
 
-	for c.regs.bohc & (1 << 0) == 0 {
+	for regs.bohc & (1 << 0) == 0 {
 		asm volatile amd64 {
 			pause
 		}
@@ -447,11 +619,11 @@ pub fn (mut c AHCIController) declare_ownership() int {
 
 	sys.nsleep(25 * 1000000)
 
-	if c.regs.bohc & (1 << 4) != 0 {
+	if regs.bohc & (1 << 4) != 0 {
 		sys.nsleep(2 * 1000000000)
 	}
 
-	if c.regs.bohc & (1 << 4) != 0 || c.regs.bohc & (1 << 0) != 0 || c.regs.bohc & (1 << 1) == 0 {
+	if regs.bohc & (1 << 4) != 0 || regs.bohc & (1 << 0) != 0 || regs.bohc & (1 << 1) == 0 {
 		print('ahci: bios handoff failed\n')
 		return -1
 	}
@@ -469,27 +641,31 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 	c.pci_bar = pci_device.get_bar(0x5)
 	c.regs = unsafe { &AHCIRegisters(c.pci_bar.base + higher_half) }
+	mut volatile regs := c.regs
 
-	c.version_maj = (c.regs.vs >> 16) & 0xffff
-	c.version_min = c.regs.vs & 0xffff
+	c.version_maj = (regs.vs >> 16) & 0xffff
+	c.version_min = regs.vs & 0xffff
 
-	print('ahci: controller detected version ${c.version_maj:x}:${c.version_min:x}\n')
+	C.kprintf(c'ahci: controller detected version %llx:%llx\n', u64(c.version_maj),
+		u64(c.version_min))
 
-	if c.regs.cap & (1 << 31) == 0 {
+	if regs.cap & (1 << 31) == 0 {
 		print('ahci: 64 bit addressing not supported\n')
 		return -1
 	}
 
 	c.declare_ownership()
 
-	c.regs.ghc |= (1 << 31)
-	c.regs.ghc &= ~(1 << 1)
+	regs.ghc |= (1 << 31)
+	regs.ghc &= ~(1 << 1)
 
-	c.port_cnt = c.regs.cap & 0b11111
-	c.cmd_slots = (c.regs.cap >> 8) & 0b11111
+	// CAP.NP encodes the last port number, rather than the port count.
+	c.port_cnt = (regs.cap & 0b11111) + 1
+	// CAP.NCS similarly encodes the last usable command slot.
+	c.cmd_slots = ((regs.cap >> 8) & 0b11111) + 1
 
 	for i := u64(0); i < c.port_cnt; i++ {
-		if c.regs.pi & (1 << i) != 0 {
+		if regs.pi & (1 << i) != 0 {
 			mut volatile port := unsafe {
 				&AHCIPortRegisters(c.pci_bar.base + sizeof(AHCIRegisters) +
 					i * sizeof(AHCIPortRegisters) + higher_half)
@@ -497,7 +673,7 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 
 			match port.sig {
 				sata_ata {
-					print('ahci: sata drive found on port ${i}\n')
+					C.kprintf(c'ahci: sata drive found on port %llu\n', u64(i))
 
 					mut device := &AHCIDevice{
 						parent_controller: unsafe { c }
@@ -509,16 +685,27 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 						continue
 					}
 
-					fs.devtmpfs_add_device(device, 'sd${c.device_list.len}')
-					partition.scan_partitions(mut device, 'sd${c.device_list.len}-')
+					// The device node keeps the name; the partitions' names are
+					// made from the prefix, which goes afterwards.
+					mut name := lib.new_text(8)
+					name.add('sd')
+					name.add_decimal(c.device_list.len)
+					fs.devtmpfs_add_device(device, name.str())
+					mut prefix_text := lib.new_text(8)
+					prefix_text.add('sd')
+					prefix_text.add_decimal(c.device_list.len)
+					prefix_text.add_byte(`-`)
+					prefix := prefix_text.str()
+					partition.scan_partitions(mut device, prefix)
+					unsafe { prefix.free() }
 
 					c.device_list << device
 				}
 				sata_atapi {
-					print('ahci: enclosure management bridge found on port ${i}\n')
+					C.kprintf(c'ahci: enclosure management bridge found on port %llu\n', u64(i))
 				}
 				sata_pm {
-					print('ahci: port multipler found on port ${i}\n')
+					C.kprintf(c'ahci: port multipler found on port %llu\n', u64(i))
 				}
 				else {}
 			}

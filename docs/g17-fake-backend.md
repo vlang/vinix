@@ -106,8 +106,8 @@ selector/value graph, the color/depth/stencil resource traces, and m1n1
 global selector address space, and no partial-pipeline, partial-depth, or
 partial-stencil member is promoted by analogy.
 
-The expected-write list is deliberately path-specific. The recovered 314
-virtual encoder call sites cover 3D, TA, FastBlit, and CL; they are not 314
+The expected-write list is deliberately path-specific. The recovered virtual,
+inline and direct-append sites cover 3D, TA, FastBlit, and CL; they are not
 writes that every render must execute.
 
 `tools/agx-re/compile_fake_g17_plan.py` independently compiles a concrete 3D
@@ -133,8 +133,10 @@ graph into the freestanding, allocation-free
 `kernel/c/agx_fake_g17_encode.c`. The generated encoder contains no JSON parser
 or dynamic expression interpreter: descriptor/command expressions are emitted
 as checked integer operations, graph successors are direct branches, and the
-five external values plus the one external decision live in a fixed input
-structure. `gpu.agx.fake.encode_fake_g17_3d` exposes it to the V backend and returns the
+two external values (the parameter-management and USC private-memory pool
+addresses) plus the power-column count live in a fixed input structure. The
+accelerator fields the producer also reads are folded in as recovered
+constants; see `channels.accelerator_inputs` in the recovery. `gpu.agx.fake.encode_fake_g17_3d` exposes it to the V backend and returns the
 exact golden writes consumed by `submit_fake_g17`.
 
 `gpu.agx.fake.verify_fake_g17` is the V adapter. `gpu.agx.fake.submit_fake_g17` first installs a
@@ -147,8 +149,9 @@ bookkeeping as a hardware completion.
 
 The host test compiles the exact allocation-free C verifier linked into the
 kernel together with the recovered encoder. It covers successful traces, every
-validation class, a 314-entry stress trace, and all 16 combinations of the
-three descriptor-controlled branches and external channel branch. Stable
+validation class, a 314-entry stress trace, all 16 combinations of the
+three descriptor-controlled branches and a narrow or wide column count, and
+the descriptor `+0x7f8` append. Stable
 whole-buffer hashes produced by the separate Python reference make the C
 encoder comparison byte-exact:
 

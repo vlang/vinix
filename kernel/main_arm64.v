@@ -2,11 +2,14 @@
 module main
 
 import memory
+import acpisync
 import term
 import lib.stubs
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
+import aarch64.cpu.initialisation
 import aarch64.exception
+import aarch64.firmware
 import aarch64.aic
 import aarch64.gic
 import aarch64.timer
@@ -18,14 +21,19 @@ import aarch64.virtio_input
 import aarch64.virtio_gpu
 import aarch64.virtio_blk
 import aarch64.virtio_net
+import aarch64.virtio_snd
+import aarch64.xhci
 import apple.smc
 import apple.ans
 import apple.typec
+import apple.speakers
 import devicetree
+import pci
 import initramfs
 import numa
 import fs
 import sched
+import proc
 import stat
 import pipe
 import futex
@@ -33,25 +41,32 @@ import socket
 import socket.inet
 import limine
 import event
-import event.eventstruct
 import pagecache
 import gpu.agx.driver as agx_driver
 import gpu.agx.fake as fake_agx
 import gpu.dcp
 import syscall as _
 import syscall.table
+import sysdisk
+import block.verity
 import dev.console
+import dev.e1000
 import dev.fbdev
 import dev.fbdev.simple
 import dev.pointerdev
 import dev.procdev
 import dev.pty
+import dev.tty
 import dev.random
 import dev.streams
 import time
 import userland
+import security
 
 #include "apple_display_hotplug.h"
+#include "pci_config_arm_test.h"
+
+fn C.vinix_pci_config_arm_context_selftest() int
 
 fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
 	reboot_attempted int, framebuffer_width u64, framebuffer_height u64) int
@@ -146,9 +161,16 @@ fn parse_aic_guest_virtual_timer_irq() ?u32 {
 // hardware IRQ event, so it must be serviced from the FIQ dispatch path and
 // gated on the timer's own ISTATUS rather than on an AIC IRQ number.
 fn aic_fiq_handler(gpr_state voidptr) {
-	if timer.is_pending() {
+	sched.gpu_exec_fiq_trace(0, 0)
+	ctl := cpu.read_cntv_ctl_el0()
+	sched.gpu_exec_fiq_trace(1, ctl)
+	if ctl & 4 != 0 {
+		sched.gpu_exec_fiq_trace(2, ctl)
 		timer_handler := sched.get_timer_handler()
 		timer_handler(gpr_state)
+		sched.gpu_exec_fiq_trace(3, cpu.read_cntv_ctl_el0())
+	} else {
+		sched.gpu_exec_fiq_trace(4, ctl)
 	}
 }
 
@@ -159,12 +181,16 @@ fn bootstrap_cpu0() {
 	cpu_local.timer_freq = cpu.read_cntfrq_el0()
 	cpu_locals << cpu_local
 	cpu.write_tpidr_el1(0)
+	sched.prepare_cpu_stacks(0)
 	cpu.enable_el0_cache_access()
+	initialisation.enable_user_guard(true)
 	cpu.init_fpu_globals()
 	print('CPU 0 bootstrap done\n')
 }
 
-fn kmain_thread(qemu_platform bool) {
+fn kmain_thread(qemu_platform bool, acpi_platform bool) {
+	acpisync.scheduler_ready()
+	acpisync.test_native()
 	boot_stage(11)
 	print('kmain_thread: started\n')
 
@@ -198,11 +224,24 @@ fn kmain_thread(qemu_platform bool) {
 	// volume instead of unpacking the image into RAM. The initramfs stays in
 	// the boot payload as the fallback for a volume that does not carry a
 	// system, so an unusable disk still reaches a usable machine.
-	disk_root := qemu_platform && virtio_blk.mount_persistent_root()
+	//
+	// A machine booted from an installer image does the same with a disk of
+	// its own, installing the image onto a blank one first; see sysdisk.
+	verified_root := verity.requested()
+	if verified_root { verity.mount_root() }
+	mut disk_root := verified_root || (qemu_platform && virtio_blk.mount_persistent_root())
+	mut unpacked := false
+	if !disk_root && sysdisk.requested() {
+		outcome := sysdisk.mount_or_install()
+		disk_root = outcome != .in_memory
+		unpacked = outcome == .installed || outcome == .updated
+	}
 	if disk_root {
 		// The image itself is already installed on the volume; the per-run
 		// overlay modules after it are not, and still have to be applied.
-		initramfs.initialise_overlays()
+		if !unpacked && !verified_root {
+			initramfs.initialise_overlays()
+		}
 		print('kmain_thread: persistent root done\n')
 	} else {
 		initramfs.initialise()
@@ -211,6 +250,13 @@ fn kmain_thread(qemu_platform bool) {
 			panic('QEMU persistent storage was requested but could not be mounted')
 		}
 	}
+
+	// Shared-memory files need tmpfs's paged backing. A regular file left on
+	// devtmpfs grows as one contiguous allocation; Chromium creates segments
+	// larger than that allocator can reliably extend. Mount this after the
+	// disk-root handoff so both boot modes use the same /dev/shm.
+	fs.create(vfs_root, '/dev/shm', 0o1777 | stat.ifdir) or {}
+	fs.mount(vfs_root, '', '/dev/shm', 'tmpfs') or {}
 
 	// /sys after the root is settled rather than alongside /dev and /proc: a
 	// disk root replaces the tree those two are carried across into, and this
@@ -262,6 +308,13 @@ fn kmain_thread(qemu_platform bool) {
 
 	table.init_syscall_table()
 	table.init_storage_syscalls()
+	table.init_clock_control_syscalls()
+	table.init_container_syscalls()
+	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
+	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
+	proc.register_cpu_signal_hook(voidptr(userland.cpu_signal_process))
+	proc.register_job_orphan_hook(voidptr(userland.signal_orphaned_job_group))
+	sched.register_user_signal_hook(voidptr(userland.interrupt_return))
 	print('kmain_thread: syscall table done\n')
 
 	// Register segfault handler so user-space crashes kill the process
@@ -273,13 +326,29 @@ fn kmain_thread(qemu_platform bool) {
 	random.initialise()
 	print('kmain_thread: random done\n')
 	if qemu_platform {
-		virtio_gpu.initialise(memory.get_hhdm_offset())
+		virtio_snd.initialise(memory.get_hhdm_offset())
+	} else if devicetree.is_available() {
+		// The MacBook Air's built-in speakers, with their protection model.
+		if early_cmdline_contains('vinix.apple_speakers=0') {
+			print('apple-speakers: off (vinix.apple_speakers=0)\n')
+		} else {
+			speakers.initialise()
+		}
 	}
 
 	fbdev.initialise()
 	fbdev.register_driver(simple.get_driver())
 	print('kmain_thread: fbdev done\n')
 
+	// A USB keyboard and pointer, before /dev/pointer takes the pointer's
+	// range. They are all a VirtualBox VM has to type and point with. Its
+	// network card is on PCIe too.
+	if qemu_platform || acpi_platform {
+		start_pci()
+	}
+	if qemu_platform {
+		virtio_gpu.initialise(memory.get_hhdm_offset())
+	}
 	pointerdev.initialise()
 	print('kmain_thread: pointer done\n')
 
@@ -289,6 +358,7 @@ fn kmain_thread(qemu_platform bool) {
 	print('kmain_thread: pty done\n')
 
 	console.initialise()
+	tty.initialise()
 	print('kmain_thread: console done\n')
 
 	// ANS is independent of the GPU, and disabled unless explicitly requested.
@@ -316,35 +386,114 @@ fn kmain_thread(qemu_platform bool) {
 	sched.dequeue_and_die()
 }
 
-// How long a write may sit in memory before it is pushed to the device.
-const writeback_interval_seconds = i64(5)
-
-// Filesystem writes land in a write-back page cache, which on its own hands a
-// page to the disk only when the LRU evicts it. A small file -- the usual case
-// -- is therefore still in memory when the machine stops, and a restart loses
-// it, which is what made a persistent /root look like it was not persistent at
-// all. Linux answers this with a writeback timer; so does this thread. sync(2)
-// and reboot(2) are still the exact guarantees, and this only bounds the window
-// for everything that never calls them, including a VM window simply closed.
-fn writeback_thread() {
-	for {
-		mut events := []&eventstruct.Event{}
-		mut interval := time.new_timer(time.TimeSpec{
-			tv_sec: writeback_interval_seconds
-			tv_nsec: 0
-		})
-		events << &interval.event
-		event.await(mut events, true) or {}
-		interval.disarm()
-		unsafe { free(interval) }
-		unsafe { events.free() }
-		// A device that cannot take the write keeps its pages dirty and
-		// retryable, so the next round tries again rather than giving up.
-		pagecache.sync_all()
-		// DHCP runs from the scheduler's poll callback, which cannot write to
-		// the root filesystem. This is a thread that can.
-		inet.publish_resolver()
+// Map PCIe configuration space from the MCFG, scan it, and start the drivers
+// for what is there: an xHCI controller for USB input, and an Intel e1000
+// network card unless VirtIO networking already came up.
+fn start_pci() {
+	ecam := firmware.pcie_ecam() or {
+		print('pci: no MCFG; skipping PCIe\n')
+		return
 	}
+	buses := u64(ecam.end_bus) + 1
+	bytes := buses << 20
+	if ecam.start_bus != 0 || ecam.end_bus < ecam.start_bus || ecam.base == 0 ||
+		(ecam.base & 0xfff) != 0 || ecam.base > (u64(1) << 48) - bytes ||
+		bytes > u64(-1) - higher_half || ecam.base > u64(-1) - higher_half - bytes {
+		print('pci: unsupported or invalid MCFG bus aperture; skipping PCIe\n')
+		return
+	}
+	if !pci.set_ecam(memory.map_mmio(ecam.base, bytes), u32(buses)) {
+		panic('Invalid or conflicting PCIe configuration aperture')
+	}
+	$if pci_config_test ? {
+		if C.vinix_pci_config_arm_context_selftest() != 0 {
+			panic('ARM PCI configuration context self-test failed')
+		}
+		C.kprintf(c'pci: ARM checked config widths, bounds and interrupt masks passed\n')
+	}
+	pci.initialise()
+	if !xhci.initialise() {
+		print('xhci: no USB controller\n')
+	}
+	e1000.initialise()
+}
+
+// iBoot's tree names the controller by version under /arm-io and describes
+// an AICv2/v3's layout in vendor properties.
+fn find_adt_aic() ?(&devicetree.DTNode, u32) {
+	if node := devicetree.find_compatible('aic,3') {
+		return node, u32(3)
+	}
+	if node := devicetree.find_compatible('aic,2') {
+		return node, u32(2)
+	}
+	if node := devicetree.find_compatible('aic,1') {
+		return node, u32(1)
+	}
+	return none
+}
+
+fn initialise_adt_aic() bool {
+	node, version := find_adt_aic() or {
+		print('aic: no aic,1/2/3 node in the Apple device tree\n')
+		return false
+	}
+	regs := devicetree.get_translated_reg_ranges(node) or {
+		print('aic: unreadable reg\n')
+		return false
+	}
+	defer {
+		unsafe { regs.free() }
+	}
+	if regs.len == 0 {
+		return false
+	}
+	if version == 1 {
+		return aic.initialise(regs[0].base)
+	}
+	iack := devicetree.get_le_u64(node, 'aic-iack-offset') or {
+		print('aic: no aic-iack-offset\n')
+		return false
+	}
+	// AICv2 has these at fixed offsets and its config words at 0x2000;
+	// AICv3 only says where they are.
+	cap0 := devicetree.get_le_u32(node, 'cap0-offset') or {
+		if version != 2 {
+			print('aic: no cap0-offset\n')
+			return false
+		}
+		u32(4)
+	}
+	maxnumirq := devicetree.get_le_u32(node, 'maxnumirq-offset') or {
+		if version != 2 {
+			print('aic: no maxnumirq-offset\n')
+			return false
+		}
+		u32(0xc)
+	}
+	config := devicetree.get_le_u32(node, 'extint-baseaddress') or {
+		if version != 2 {
+			print('aic: no extint-baseaddress\n')
+			return false
+		}
+		u32(0x2000)
+	}
+	layout := aic.V2Layout{
+		version:             version
+		base:                regs[0].base
+		size:                regs[0].size
+		event:               iack
+		cap0:                cap0
+		maxnumirq:           maxnumirq
+		config:              config
+		global_config:       devicetree.get_le_u32(node, 'aicglbcfg-offset') or {
+			if version == 2 { u32(0x14) } else { u32(0) }
+		}
+		extintrcfg_stride:   devicetree.get_le_u32(node, 'extintrcfg-stride') or { u32(0) }
+		intmaskset_stride:   devicetree.get_le_u32(node, 'intmaskset-stride') or { u32(0) }
+		intmaskclear_stride: devicetree.get_le_u32(node, 'intmaskclear-stride') or { u32(0) }
+	}
+	return aic.initialise_v2(layout)
 }
 
 fn get_dt_base(compat string, default_base u64) u64 {
@@ -381,7 +530,7 @@ fn configure_apple_bringup_from_cmdline() {
 	// different parameter containing this name. Last explicit option wins.
 	mut option_start := 0
 	for index := 0; index <= cmdline.len; index++ {
-		if index != cmdline.len && cmdline[index] !in [` `, `\t`, `\r`, `\n`] {
+		if index != cmdline.len && !is_cmdline_space(cmdline[index]) {
 			continue
 		}
 		// Compare in place: command-line parsing does not allocate.
@@ -529,6 +678,12 @@ fn early_cmdline_contains(needle string) bool {
 	return false
 }
 
+// What separates command-line options. Compared one by one: `!in` a list
+// literal built the list on the heap.
+fn is_cmdline_space(c u8) bool {
+	return c == ` ` || c == `\t` || c == `\r` || c == `\n`
+}
+
 // Allocation-free exact token lookup for decisions made before _vinit. Unlike
 // a substring search, `vinix.display=external-test` must not change scanout.
 fn early_cmdline_has_token(token string) bool {
@@ -540,7 +695,7 @@ fn early_cmdline_has_token(token string) bool {
 	mut start := 0
 	for index := 0; true; index++ {
 		value := unsafe { text[index] }
-		if value != 0 && value !in [` `, `\t`, `\r`, `\n`] {
+		if value != 0 && !is_cmdline_space(value) {
 			continue
 		}
 		length := index - start
@@ -565,6 +720,9 @@ fn early_cmdline_has_token(token string) bool {
 }
 
 fn kmain() {
+	// Before anything that returns: see c/stack_protector.c.
+	C.vinix_stack_guard_init()
+	memory.configure_page_size()
 	// Read the cmdline before touching anything else. The framebuffer used to
 	// be written first, which made it impossible to tell a kernel that never
 	// ran from one that faulted on the very first pixel: both leave the black
@@ -650,12 +808,23 @@ fn kmain() {
 
 	configure_apple_bringup_from_cmdline()
 
+	// QEMU's virt machine names itself in its ACPI tables, so an image booted
+	// in QEMU without vinix.qemu_platform=1 -- a release ISO, say -- still gets
+	// its keyboard, tablet and interrupt controller. Apple hardware has no ACPI.
+	// vinix.platform=acpi skips this, so the path other UEFI machines take can
+	// be exercised in QEMU.
+	if !force_qemu_platform && firmware.is_qemu()
+		&& !early_cmdline_contains('vinix.platform=acpi') {
+		force_qemu_platform = true
+	}
+
 	// Optional QEMU virt MMIO path (PL011/GIC/Virtio-input). Keep this opt-in
 	// so missing DTB on real hardware does not trigger invalid MMIO accesses.
 	if force_qemu_platform {
 		uart.initialise(memory.get_hhdm_offset() + 0x09000000)
 		uart.puts(c'\n=== Vinix aarch64 booting (qemu mode) ===\n')
 	}
+	security.initialise_boot_policy()
 
 	// Set up exception vectors (replaces x86 GDT/IDF/ISR)
 	exception.initialise()
@@ -680,6 +849,7 @@ fn kmain() {
 	fb_phys, fb_len := term.framebuffer_phys_span()
 	memory.declare_framebuffer(fb_phys, fb_len)
 	memory.vmm_init()
+	exception.install_guarded_stack(0)
 	boot_stage(7)
 
 	// Init terminal (after vmm_init so page tables are active and framebuffer is mapped)
@@ -693,19 +863,26 @@ fn kmain() {
 
 	// Apple-specific hardware init (only with device tree / Apple Silicon)
 	if have_dt {
-		// Apple Interrupt Controller
-		mut aic_phys := get_dt_base('apple,aic2', 0)
-		if aic_phys == 0 {
-			aic_phys = get_dt_base('apple,aic', 0)
+		// Apple Interrupt Controller: from m1n1's Linux tree, or from iBoot's
+		// own when the Apple loader started us.
+		apple_adt := devicetree.is_apple_adt()
+		mut aic_phys := u64(0)
+		if !apple_adt {
+			aic_phys = get_dt_base('apple,aic2', 0)
+			if aic_phys == 0 {
+				aic_phys = get_dt_base('apple,aic', 0)
+			}
 		}
-		if aic_phys != 0 {
+		if apple_adt || aic_phys != 0 {
 			print('init aic...\n')
 			// Two channels around the call: a red bar (row 40) and a line with
 			// the CPU state, so "nothing after init aic" can be pinned to the
 			// call itself, to the callee, or to the text path.
 			term.early_stage_mark(40)
-			print('aic.0 calling initialise, CurrentEL=${cpu.read_currentel()} DAIF=0x${cpu.read_daif():x}\n')
-			if aic.initialise(aic_phys) {
+			C.kprintf(c'aic.0 calling initialise, CurrentEL=%llu DAIF=0x%llx\n', u64(cpu.read_currentel()),
+				u64(cpu.read_daif()))
+			started := if apple_adt { initialise_adt_aic() } else { aic.initialise(aic_phys) }
+			if started {
 				if timer_irq := parse_aic_guest_virtual_timer_irq() {
 					aic_timer_irq = timer_irq
 				}
@@ -713,7 +890,7 @@ fn kmain() {
 				// dispatch path instead of unmasking it as an AIC hardware IRQ.
 				aic.register_fiq_handler(aic_fiq_handler)
 				use_aic = true
-				print('aic: timer via FIQ (dt irq hint ${aic_timer_irq})\n')
+				C.kprintf(c'aic: timer via FIQ (dt irq hint %llu)\n', u64(aic_timer_irq))
 				print('aic done\n')
 			} else {
 				// Keep going on CPU 0 without an interrupt controller: the rest of
@@ -750,6 +927,19 @@ fn kmain() {
 	}
 	boot_stage(8)
 
+	// A UEFI machine other than QEMU -- VirtualBox's, say -- describes its
+	// console UART and interrupt controller in ACPI instead of putting them at
+	// QEMU's addresses. Apple hardware has no ACPI and took the path above.
+	acpi_platform := !use_aic && !force_qemu_platform && firmware.has_acpi()
+	if acpi_platform {
+		// VirtualBox has no SPCR; its UART is only in the DSDT.
+		uart_phys := firmware.console_uart() or { firmware.dsdt_pl011() or { u64(0) } }
+		if uart_phys != 0 {
+			uart.initialise(memory.map_mmio(uart_phys, 0x1000))
+			uart.puts(c'\n=== Vinix aarch64 booting (ACPI) ===\n')
+		}
+	}
+
 	// Virtio-input keyboard probe/GIC setup is for the QEMU virt machine.
 	if !use_aic && force_qemu_platform {
 		print('init virtio-input...\n')
@@ -772,6 +962,14 @@ fn kmain() {
 		print('init gic (QEMU virt)...\n')
 		gic.initialise(memory.get_hhdm_offset())
 		print('gic done\n')
+	} else if acpi_platform {
+		if g := firmware.gic() {
+			C.kprintf(c'init gic (ACPI: GICD 0x%llx, GICR 0x%llx)...\n', u64(g.dist), u64(g.redist))
+			gic.initialise_at(g.dist, g.redist, g.redist_len)
+			print('gic done\n')
+		} else {
+			print('no GIC in the MADT\n')
+		}
 	}
 
 	// ARM64 PCI ECAM setup is not wired yet; skip to avoid unsafe probing.
@@ -785,6 +983,8 @@ fn kmain() {
 	numa.initialise()
 	print('numa done\n')
 
+	sched.configure_virtual_idle(!use_aic && force_qemu_platform,
+		early_cmdline_has_token('vinix.hvf_fast_idle=1'))
 	// Limine 12.8's VHE-aware trampoline can safely park Apple APs at EL2. Use
 	// four logical CPUs on Apple hardware while retaining the existing all-CPU
 	// behaviour in virtual machines (currently configured with four vCPUs).
@@ -812,13 +1012,14 @@ fn kmain() {
 	numa.attach_cpus()
 
 	print('init time...\n')
+	acpisync.test_boot()
 	time.initialise()
 	print('time done\n')
 
 	print('init sched...\n')
 	sched.initialise()
 	// Wire scheduler timer callback for the active interrupt controller.
-	if !use_aic && force_qemu_platform {
+	if !use_aic && gic.is_initialised() {
 		gic.set_timer_handler(sched.get_timer_handler())
 	}
 	print('sched done\n')
@@ -827,8 +1028,8 @@ fn kmain() {
 	print('spawning kmain_thread via scheduler...\n')
 	// Capture the early platform decision before the scheduler handoff. Limine's
 	// response storage is bootloader-owned and must not be re-read later.
-	spawn kmain_thread(force_qemu_platform)
+	spawn kmain_thread(force_qemu_platform, acpi_platform)
 	print('spawn done, calling await...\n')
 
-	sched.await()
+	sched.enter_idle()
 }

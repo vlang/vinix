@@ -2,6 +2,7 @@ module fs
 
 import errno
 import proc
+import posix_acl
 import resource
 import stat
 
@@ -20,60 +21,118 @@ fn credential_in_group(process &proc.Process, gid u32, effective bool) bool {
 	return false
 }
 
-// Check owner/group/other mode bits against either the effective credentials
-// used by normal filesystem operations or the real credentials used by
-// access(2). Root bypasses read/write checks, but a regular file still needs at
-// least one execute bit before root may execute it.
-pub fn check_access(node &VFSNode, requested u32, effective bool) bool {
-	if unsafe { node == nil } || unsafe { node.resource == nil } {
-		return false
+// Whether the caller holds `cap`. access(2) asks with the real credentials,
+// for which Linux counts a real uid of zero as holding the permitted set.
+fn holds_capability(process &proc.Process, cap int, effective bool) bool {
+	caps := if effective {
+		process.caps.effective
+	} else if process.uid == 0 {
+		process.caps.permitted
+	} else {
+		u64(0)
 	}
-	process := proc.current_thread().process
-	uid := if effective { process.euid } else { process.uid }
-	mode := node.resource.stat.mode
-	if uid == 0 {
-		if requested & access_exec != 0 && !stat.isdir(mode) && mode & 0o111 == 0 {
-			return false
-		}
-		return true
-	}
-
-	mut allowed := mode & 0o7
-	if uid == node.resource.stat.uid {
-		allowed = (mode >> 6) & 0o7
-	} else if credential_in_group(process, node.resource.stat.gid, effective) {
-		allowed = (mode >> 3) & 0o7
-	}
-	return allowed & requested == requested
+	return caps & (u64(1) << cap) != 0
 }
 
-fn require_access(node &VFSNode, requested u32) ? {
-	if !check_access(node, requested, true) {
+// Check owner/group/other mode bits against either the effective credentials
+// used by normal filesystem operations or the real credentials used by
+// access(2). Being root is not what lifts the checks, capabilities are, so
+// a container's root that has had them dropped is bound by the mode bits:
+// CAP_DAC_OVERRIDE allows any access except executing a file with no execute
+// bit at all, and CAP_DAC_READ_SEARCH allows reading and searching.
+// Success grants the request; failures preserve EACCES or the backend's EIO.
+// ACL lookup errors cannot be turned into a capability-based permission grant.
+pub fn check_access(node &VFSNode, requested u32, effective bool) ? {
+	if unsafe { node == nil } || unsafe { node.resource == nil } {
 		errno.set(errno.eacces)
 		return none
 	}
+	if requested == 0 { return }
+	mut mandatory := u32(0)
+	if requested & access_read != 0 { mandatory |= proc.mac_read }
+	if requested & access_write != 0 { mandatory |= proc.mac_write }
+	if requested & access_exec != 0 {
+		mandatory |= if stat.isdir(node.resource.stat.mode) { proc.mac_search } else { proc.mac_execute }
+	}
+	mac_node(node, mandatory)?
+	process := proc.current_thread().process
+	uid := if effective { process.euid } else { process.uid }
+	gid := if effective { process.egid } else { process.gid }
+	mut res := unsafe { node.resource }
+	mut acl := []u8{} @[freed]
+	acl.flags |= .noslices
+	defer { unsafe { acl.free() } }
+	metadata := resource.permission_snapshot(mut res, mut acl)?
+	mode := metadata.mode
+	has_acl := acl.len != 0
+	mut permitted := false
+	if has_acl {
+		if acl.len <= 4 || !posix_acl.valid(acl) { errno.set(errno.eio); return none }
+		derived, _ := posix_acl.mode(acl, mode)
+		if derived & 0o777 != mode & 0o777 { errno.set(errno.eio); return none }
+		permitted = posix_acl.permits(acl, metadata.uid, metadata.gid, uid, gid,
+			process.groups, requested)
+	} else {
+		mut allowed := mode & 0o7
+		if uid == metadata.uid { allowed = (mode >> 6) & 0o7 }
+		else if credential_in_group(process, metadata.gid, effective) { allowed = (mode >> 3) & 0o7 }
+		permitted = allowed & requested == requested
+	}
+	if permitted { return }
+	if holds_capability(process, proc.cap_dac_override, effective) {
+		if requested & access_exec != 0 && !stat.isdir(mode) && mode & 0o111 == 0 {
+			errno.set(errno.eacces)
+			return none
+		}
+		return
+	}
+	if holds_capability(process, proc.cap_dac_read_search, effective) {
+		searching := stat.isdir(mode) && requested & ~(access_read | access_exec) == 0
+		if requested & ~access_read == 0 || searching {
+			return
+		}
+	}
+
+	errno.set(errno.eacces)
+	return none
 }
 
-fn may_remove(parent &VFSNode, target &VFSNode) bool {
-	if !check_access(parent, access_write | access_exec, true) {
-		return false
-	}
+fn require_access(node &VFSNode, requested u32) ? {
+	check_access(node, requested, true)?
+}
+
+fn may_remove(parent &VFSNode, target &VFSNode) ? {
+	mac_node(target, proc.mac_remove)?
+	mac_node(parent, proc.mac_remove)?
+	check_access(parent, access_write | access_exec, true)?
 	if parent.resource.stat.mode & 0o1000 == 0 {
-		return true
+		return
 	}
 	process := proc.current_thread().process
-	return process.euid == 0 || process.euid == parent.resource.stat.uid
-		|| process.euid == target.resource.stat.uid
+	if holds_capability(process, proc.cap_fowner, true)
+		|| process.euid == parent.resource.stat.uid || process.euid == target.resource.stat.uid { return }
+	errno.set(errno.eperm)
+	return none
 }
 
 fn owns_resource(uid u32) bool {
 	process := proc.current_thread().process
-	return process.euid == 0 || process.euid == uid
+	return holds_capability(process, proc.cap_fowner, true) || process.euid == uid
+}
+
+fn may_keep_setgid(gid u32) bool {
+	process := proc.current_thread().process
+	return holds_capability(process, proc.cap_fsetid, true)
+		|| credential_in_group(process, gid, true)
+}
+
+fn chmod_permissions(mode u32, gid u32) u32 {
+	return if may_keep_setgid(gid) { mode } else { mode & ~u32(0o2000) }
 }
 
 fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 	process := proc.current_thread().process
-	if process.euid == 0 {
+	if holds_capability(process, proc.cap_chown, true) {
 		return true
 	}
 	if process.euid != uid || (new_uid != u32(-1) && new_uid != uid) {
@@ -83,6 +142,7 @@ fn may_chown(uid u32, new_uid u32, new_gid u32) bool {
 }
 
 fn apply_creation_identity(mut node VFSNode, parent &VFSNode) ? {
+	mac_creation(parent, mut node)?
 	process := proc.current_thread().process
 	desired_gid := if parent.resource.stat.mode & 0o2000 != 0 {
 		parent.resource.stat.gid

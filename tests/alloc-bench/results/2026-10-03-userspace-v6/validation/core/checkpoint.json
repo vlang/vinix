@@ -1,0 +1,8 @@
+{
+  "status": "complete",
+  "updated_utc": "2026-10-02T22:53:13.827454+00:00",
+  "driver_pid": 50085,
+  "active_mode": null,
+  "final_gates": "/Users/alex/code/vinix/build/useralloc-core-v6/final-gates.json",
+  "owned_jobs_running": []
+}

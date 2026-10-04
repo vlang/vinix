@@ -22,6 +22,7 @@ pub mut:
 	parent_device &resource.Resource
 	device_offset u64
 	sector_cnt    u64
+	identity resource.BlockIdentity
 }
 
 @[packed]
@@ -64,6 +65,15 @@ pub mut:
 	crc32_partition_array u32
 }
 
+fn (this &Partition) block_identity() resource.BlockIdentity { return this.identity }
+
+fn partition_identity(parent resource.BlockIdentity, offset u64, length u64) resource.BlockIdentity {
+	if !parent.valid() || offset > parent.length || length > parent.length - offset {
+		return resource.BlockIdentity{is_block: true}
+	}
+	return resource.BlockIdentity{is_block: true, disk_id: parent.disk_id, start: parent.start + offset, length: length}
+}
+
 fn (mut this Partition) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if (count + loc) > (this.sector_cnt * this.parent_device.stat.blksize) {
 		return none
@@ -84,6 +94,12 @@ fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return this.parent_device.ioctl(handle, request, argp)
 }
 
+// A partition has no separate write cache. Its persistence barrier is the
+// parent's, including errors from the hardware cache flush.
+fn (mut this Partition) sync(handle voidptr) ? {
+	resource.sync_resource(mut this.parent_device, handle)?
+}
+
 fn (mut this Partition) unref(handle voidptr) ? {
 	return this.parent_device.unref(handle)
 }
@@ -102,7 +118,17 @@ fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
 	return this.parent_device.mmap(handle, page, flags)
 }
 
+// The device name of partition `index`: the device's own and the number. The
+// device node keeps it as its name.
+fn partition_name(prefix string, index int) string {
+	mut text := lib.new_text(prefix.len + 20)
+	text.add(prefix)
+	text.add_decimal(i64(index))
+	return text.str()
+}
+
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
+	parent_identity := resource.block_identity(mut parent_device)
 	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
 
 	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
@@ -149,12 +175,15 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.blocks = partition.sector_cnt
 			partition.stat.blksize = parent_device.stat.blksize
 			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('gpt: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			C.kprintf(c'gpt: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
 		}
 
 		return 0
@@ -187,12 +216,15 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.stat.blocks = partition.sector_cnt
 			partition.stat.blksize = parent_device.stat.blksize
 			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
 			partition.stat.mode = 0o644 | stat.ifblk
 
-			print('mbr: partition detected [start: ${partition.device_offset:x} sector cnt: ${partition.sector_cnt}]\n')
+			C.kprintf(c'mbr: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
 
-			fs.devtmpfs_add_device(partition, '${prefix}${i}')
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
 		}
 
 		return 0

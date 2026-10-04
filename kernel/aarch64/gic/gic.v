@@ -13,9 +13,11 @@ module gic
 import aarch64.cpu
 import aarch64.exception
 import aarch64.uart
+import memory
 
 // Interrupt IDs
 const intid_timer = u32(27) // EL1 Virtual Timer PPI (INTID 27)
+const intid_reschedule = u32(1) // Scheduler SGI, Group 1 Non-Secure
 const intid_spurious = u32(1023)
 
 // QEMU virt GIC addresses (from DTB: intc@8000000)
@@ -206,10 +208,23 @@ pub fn is_initialised() bool {
 	return gicd_base != 0
 }
 
+// Bring up QEMU virt's GIC, at the addresses its device tree gives it.
 pub fn initialise(hhdm u64) {
 	gicd_base = hhdm + gicd_base_phys
 	gicr_base = hhdm + gicr_base_phys
+	start()
+}
 
+// Bring up a GIC at the addresses firmware reported (the ACPI MADT on a UEFI
+// machine such as VirtualBox's). They are anywhere in the physical address
+// space, so they are mapped as Device memory first.
+pub fn initialise_at(dist_phys u64, redist_phys u64, redist_len u64) {
+	gicd_base = memory.map_mmio(dist_phys, 0x10000)
+	gicr_base = memory.map_mmio(redist_phys, if redist_len != 0 { redist_len } else { gicr_stride })
+	start()
+}
+
+fn start() {
 	uart.puts(c'  gic: GICD at 0x')
 	gic_put_hex(gicd_base)
 	uart.puts(c' GICR at 0x')
@@ -321,6 +336,26 @@ pub fn set_timer_handler(handler fn (voidptr)) {
 	gic_timer_callback = handler
 }
 
+// ICC_SGI1R_EL1 names the complete MPIDR affinity path. RS=0 supports
+// Aff0 0..15 without depending on the optional Range Selector extension.
+pub fn send_reschedule(mpidr u64) bool {
+	if !is_initialised() || mpidr & 0xff >= 16 { return false }
+	value := ((mpidr >> 32) & 0xff) << 48
+		| ((mpidr >> 16) & 0xff) << 32
+		| u64(intid_reschedule) << 24
+		| ((mpidr >> 8) & 0xff) << 16
+		| u64(1) << (mpidr & 0xf)
+	// Publish the queue before the destination observes the interrupt.
+	cpu.dsb_ish()
+	asm volatile aarch64 {
+		msr icc_sgi1r_el1, value
+		isb
+		; ; r (value)
+		; memory
+	}
+	return true
+}
+
 // Poll ICC_IAR1 (acknowledge interrupt) - for polled mode
 pub fn poll_iar1() u32 {
 	return read_icc_iar1()
@@ -329,8 +364,8 @@ pub fn poll_iar1() u32 {
 // Handle an interrupt in polled mode (bypass exception vector).
 // Used as HVF workaround since QEMU+HVF doesn't inject IRQs to guest.
 pub fn dispatch_polled(intid u32, gpr_state voidptr) {
-	if intid == intid_timer {
-		cpu.write_cntv_ctl_el0(0x2) // Mask timer to clear level IRQ
+	if intid == intid_timer || intid == intid_reschedule {
+		if intid == intid_timer { cpu.write_cntv_ctl_el0(0x2) }
 		write_icc_eoir1(intid)
 
 		if gic_timer_callback != unsafe { nil } {
@@ -349,8 +384,8 @@ fn gic_dispatch(gpr_state voidptr) {
 		return
 	}
 
-	if intid == intid_timer {
-		cpu.write_cntv_ctl_el0(0x2) // Mask timer to clear level IRQ
+	if intid == intid_timer || intid == intid_reschedule {
+		if intid == intid_timer { cpu.write_cntv_ctl_el0(0x2) }
 		write_icc_eoir1(intid)
 
 		if gic_timer_callback != unsafe { nil } {

@@ -1,0 +1,1003 @@
+{
+  "candidate_patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+  "all_machine_checks_pass": true,
+  "object_count": 24,
+  "stages": {
+    "optimized-v6-final": {
+      "manifest": {
+        "version": "1.2.5",
+        "alpine_package": "musl-1.2.5-r11",
+        "arch": "x86_64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+        "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "isatty-glibc-align.patch",
+            "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+          },
+          {
+            "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+            "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+          },
+          {
+            "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+            "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+          },
+          {
+            "name": "loongarch64-add-TLSDESC-support.patch",
+            "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+          },
+          {
+            "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+            "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+          },
+          {
+            "name": "loongarch64-add-bits-hwcap.h.patch",
+            "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+          },
+          {
+            "name": "CVE-2025-26519.patch",
+            "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc"
+        ],
+        "compiler_version": "x86_64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "x86_64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+        "ldflags": "-Wl,-soname,libc.musl-x86_64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 1,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/musl-1.2.5/configure",
+          "--target=x86_64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+        "libc_a_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace"
+      },
+      "manifest_sha256": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686",
+      "stage_manifest_matches_cache": true,
+      "patch_sha256_matches_candidate": true,
+      "cached_patch_sha256_matches_candidate": true,
+      "loader_sha256": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+      "archive_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "loader_matches_manifest_and_cache": true,
+      "archive_matches_manifest_and_cache": true,
+      "source_sha256": {
+        "malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+        "meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+        "free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+        "glue.h": "292c97bdb158e5cce1d05b084c55963e19c8ed9bb11f01ad4526b1441cc55d70",
+        "realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+        "aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348"
+      },
+      "objects": {
+        "malloc.o": {
+          "object_sha256": "96e3895fb3c7ea778f85020bf88607411e52dda9970bf5efc22941b84d93ad8e",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/malloc.o",
+          "assembly_sha256": "fb2f71ed004c292bcc5876fc163e9c741fb9eb657d96cd1514ce33a5854b4b91",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-malloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_pushes": [
+            "8d:\t55                   \tpush   %rbp",
+            "8e:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [],
+          "malloc_slow_tail_jump_relocations": [
+            "a3: R_X86_64_PC32\t.text.malloc_slow-0x4",
+            "290: R_X86_64_PC32\t.text.malloc_slow-0x4"
+          ],
+          "archive_member_count": 1,
+          "archive_member_sha256s": [
+            "96e3895fb3c7ea778f85020bf88607411e52dda9970bf5efc22941b84d93ad8e"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "3de86c0a8fdf32385a97c8f97174cfd3547fe6e8a2f02d3f226d545048687e0c",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "malloc.lo": {
+          "object_sha256": "8ec42f2fc80349248ea00305e44d8765150fc8ddff295f8a7b1b87a037ebbb2f",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/malloc.lo",
+          "assembly_sha256": "873da86a4626604a1872ff4663700a3c60281c65f9cef51a7c0765b2edfdaf0b",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-malloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_pushes": [
+            "91:\t55                   \tpush   %rbp",
+            "92:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [],
+          "malloc_slow_tail_jump_relocations": [
+            "a7: R_X86_64_PC32\t.text.malloc_slow-0x4",
+            "2a9: R_X86_64_PC32\t.text.malloc_slow-0x4"
+          ],
+          "function_assembly_sha256": "b8248a10a1d5e4f98a71759a4046076549dcf3ace2bd5b5de8edf2927c86639e",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "free.o": {
+          "object_sha256": "5fdd54a98d23385b30af98960ec4ef5e07ff678c66b2565d3be740f3e5359bce",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/free.o",
+          "assembly_sha256": "af70297f0be9cdfbc505ff69b23bc8d422bc6b498d4eb696b47f5507416bac75",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-free-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "2c8:\te8 00 00 00 00       \tcall   2cd <__libc_free+0x2cd>",
+            "2e6:\te8 00 00 00 00       \tcall   2eb <__libc_free+0x2eb>",
+            "2f7:\te8 00 00 00 00       \tcall   2fc <__libc_free+0x2fc>",
+            "30a:\te8 00 00 00 00       \tcall   30f <__libc_free+0x30f>",
+            "316:\te8 00 00 00 00       \tcall   31b <__libc_free+0x31b>"
+          ],
+          "function_pushes": [
+            "9:\t41 55                \tpush   %r13",
+            "11:\t41 54                \tpush   %r12",
+            "13:\t55                   \tpush   %rbp",
+            "14:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "205:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "3b2e1799c222f8238999d39378d2307b01a15726c5931fbce6fe93071c9d2011",
+            "5fdd54a98d23385b30af98960ec4ef5e07ff678c66b2565d3be740f3e5359bce"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "2f6a2a21dfc58106c2fc9daf46af8c8eb4a2d50922629734ad98104ccd47bdf6",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "205:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ]
+        },
+        "free.lo": {
+          "object_sha256": "d9724335f497d2f80df25574bcbaddbb0055a23cfffd70e67f57a0c06dccba79",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/free.lo",
+          "assembly_sha256": "4568bf88635a577dcb7c382d3ac8448cfb06d59d00bb262e4679a699fb1c9481",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-free-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "2cb:\te8 00 00 00 00       \tcall   2d0 <__libc_free+0x2d0>",
+            "2e9:\te8 00 00 00 00       \tcall   2ee <__libc_free+0x2ee>",
+            "2fa:\te8 00 00 00 00       \tcall   2ff <__libc_free+0x2ff>",
+            "30f:\te8 00 00 00 00       \tcall   314 <__libc_free+0x314>",
+            "31d:\te8 00 00 00 00       \tcall   322 <__libc_free+0x322>"
+          ],
+          "function_pushes": [
+            "9:\t41 55                \tpush   %r13",
+            "11:\t41 54                \tpush   %r12",
+            "13:\t55                   \tpush   %rbp",
+            "14:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "208:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ],
+          "function_assembly_sha256": "8ef5c6d80e753dc9a0b7a6fd34e6356bfcb9db793ddcb17e73bdeb99c26f599b",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "208:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ]
+        },
+        "realloc.o": {
+          "object_sha256": "d2f3440cac199ad4d114c65e90d8eea4ecb2f9410b343c2dd8b3198bcb3c1692",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/realloc.o",
+          "assembly_sha256": "8f1d0fc62dffd1daee344141c592ffd6f89307077f49d91bdcafad49941ac84e",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-realloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "21a:\te8 00 00 00 00       \tcall   21f <__libc_realloc+0x21f>",
+            "23a:\te8 00 00 00 00       \tcall   23f <__libc_realloc+0x23f>",
+            "242:\te8 00 00 00 00       \tcall   247 <__libc_realloc+0x247>",
+            "2d7:\te8 00 00 00 00       \tcall   2dc <__libc_realloc+0x2dc>",
+            "406:\te8 00 00 00 00       \tcall   40b <__libc_realloc+0x40b>"
+          ],
+          "function_pushes": [
+            "0:\t41 57                \tpush   %r15",
+            "2:\t41 56                \tpush   %r14",
+            "4:\t41 55                \tpush   %r13",
+            "6:\t41 54                \tpush   %r12",
+            "8:\t55                   \tpush   %rbp",
+            "c:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "d:\t48 83 ec 18          \tsub    $0x18,%rsp",
+            "247:\t48 83 c4 18          \tadd    $0x18,%rsp",
+            "259:\t48 83 c4 18          \tadd    $0x18,%rsp"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "d2f3440cac199ad4d114c65e90d8eea4ecb2f9410b343c2dd8b3198bcb3c1692",
+            "5e48364e664ac9a8c1be1bcdcc24058fda1494f9735779b8a15f9e331bff7732"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "29638ae74f26e5fefab2f9972aa3c04a04bbc1a6122aeb3fe0c058ccc514e5f8",
+          "slot_info_helper_call_or_symbol_present": false
+        },
+        "realloc.lo": {
+          "object_sha256": "e00ec12e26eb2579c1356c2ef554b05847ffd654c3840d0150996eccb992ba47",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/objects/obj/src/malloc/mallocng/realloc.lo",
+          "assembly_sha256": "44e369a60dce4f03c2e2294f676c8171de917a4e8f39f9fbff110a9d56149d85",
+          "assembly_path": "build/useralloc-review-v6/optimized-v6-final-realloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "21c:\te8 00 00 00 00       \tcall   221 <__libc_realloc+0x221>",
+            "23c:\te8 00 00 00 00       \tcall   241 <__libc_realloc+0x241>",
+            "244:\te8 00 00 00 00       \tcall   249 <__libc_realloc+0x249>",
+            "2e0:\te8 00 00 00 00       \tcall   2e5 <__libc_realloc+0x2e5>",
+            "40d:\te8 00 00 00 00       \tcall   412 <__libc_realloc+0x412>"
+          ],
+          "function_pushes": [
+            "0:\t41 57                \tpush   %r15",
+            "2:\t41 56                \tpush   %r14",
+            "4:\t41 55                \tpush   %r13",
+            "6:\t41 54                \tpush   %r12",
+            "8:\t55                   \tpush   %rbp",
+            "c:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "d:\t48 83 ec 18          \tsub    $0x18,%rsp",
+            "249:\t48 83 c4 18          \tadd    $0x18,%rsp",
+            "25b:\t48 83 c4 18          \tadd    $0x18,%rsp"
+          ],
+          "function_assembly_sha256": "bf4cf9baf924fcfe6193c5f93ad78d33ba02e14943c414de6c528beec8792427",
+          "slot_info_helper_call_or_symbol_present": false
+        }
+      },
+      "loader_symbols_sha256": "f3c7f78c5c90bcb994b69cc7ad6366cf7b1af4a8591534c43779b74aae78c5ba"
+    },
+    "disabled-v6-final": {
+      "manifest": {
+        "version": "1.2.5",
+        "alpine_package": "musl-1.2.5-r11",
+        "arch": "x86_64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+        "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "isatty-glibc-align.patch",
+            "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+          },
+          {
+            "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+            "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+          },
+          {
+            "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+            "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+          },
+          {
+            "name": "loongarch64-add-TLSDESC-support.patch",
+            "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+          },
+          {
+            "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+            "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+          },
+          {
+            "name": "loongarch64-add-bits-hwcap.h.patch",
+            "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+          },
+          {
+            "name": "CVE-2025-26519.patch",
+            "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc"
+        ],
+        "compiler_version": "x86_64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "x86_64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=0",
+        "ldflags": "-Wl,-soname,libc.musl-x86_64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 0,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/musl-1.2.5/configure",
+          "--target=x86_64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "6823587a26b219dba2ebd9345228102a881998b4e627172fc6841b1731472e12",
+        "libc_a_sha256": "71791f9aa6942ab3ded61f20092d7ac9e8e978d38a263f593e12bb04892dd94d"
+      },
+      "manifest_sha256": "2a4e8b096711797d0f0d4e205914e590ad13cebad70a84309c7f923e8f94620d",
+      "stage_manifest_matches_cache": true,
+      "patch_sha256_matches_candidate": true,
+      "cached_patch_sha256_matches_candidate": true,
+      "loader_sha256": "6823587a26b219dba2ebd9345228102a881998b4e627172fc6841b1731472e12",
+      "archive_sha256": "71791f9aa6942ab3ded61f20092d7ac9e8e978d38a263f593e12bb04892dd94d",
+      "loader_matches_manifest_and_cache": true,
+      "archive_matches_manifest_and_cache": true,
+      "source_sha256": {
+        "malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+        "meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+        "free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+        "glue.h": "292c97bdb158e5cce1d05b084c55963e19c8ed9bb11f01ad4526b1441cc55d70",
+        "realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+        "aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348"
+      },
+      "objects": {
+        "malloc.o": {
+          "object_sha256": "4ea90c9002674e819301f0be66969ca7b3c80aad5e912c6f75014cd61d132d93",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/malloc.o",
+          "assembly_sha256": "dc4d7180f855b53adaeafc147ebad3fce4199c250bf11c0a687f1ee3f7f08c6b",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-malloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_pushes": [
+            "8d:\t55                   \tpush   %rbp",
+            "8e:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [],
+          "malloc_slow_tail_jump_relocations": [
+            "a3: R_X86_64_PC32\t.text.malloc_slow-0x4",
+            "290: R_X86_64_PC32\t.text.malloc_slow-0x4"
+          ],
+          "archive_member_count": 1,
+          "archive_member_sha256s": [
+            "4ea90c9002674e819301f0be66969ca7b3c80aad5e912c6f75014cd61d132d93"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "3de86c0a8fdf32385a97c8f97174cfd3547fe6e8a2f02d3f226d545048687e0c",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "malloc.lo": {
+          "object_sha256": "c1b70cc82420f736d50a2d21d4882c9ca1b72fc0da6ec448492e0485893ec0b2",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/malloc.lo",
+          "assembly_sha256": "4eac41fbea65fc55b07844dfa7d1911fdaa8e9b1c3a7f854a9d6de47897fd071",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-malloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_pushes": [
+            "91:\t55                   \tpush   %rbp",
+            "92:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [],
+          "malloc_slow_tail_jump_relocations": [
+            "a7: R_X86_64_PC32\t.text.malloc_slow-0x4",
+            "2a9: R_X86_64_PC32\t.text.malloc_slow-0x4"
+          ],
+          "function_assembly_sha256": "b8248a10a1d5e4f98a71759a4046076549dcf3ace2bd5b5de8edf2927c86639e",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "free.o": {
+          "object_sha256": "1504c27b3b6d3fda173f6e70c87106f65d18bc949bcbfe6144803a74125c6775",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/free.o",
+          "assembly_sha256": "9aabbd4b9c58e66596a75c0ab6fb9f586bd7f86769b82448030f45d2d6bc75a5",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-free-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "234:\te8 00 00 00 00       \tcall   239 <__libc_free+0x239>",
+            "252:\te8 00 00 00 00       \tcall   257 <__libc_free+0x257>",
+            "263:\te8 00 00 00 00       \tcall   268 <__libc_free+0x268>",
+            "276:\te8 00 00 00 00       \tcall   27b <__libc_free+0x27b>",
+            "282:\te8 00 00 00 00       \tcall   287 <__libc_free+0x287>"
+          ],
+          "function_pushes": [
+            "9:\t41 55                \tpush   %r13",
+            "11:\t41 54                \tpush   %r12",
+            "13:\t55                   \tpush   %rbp",
+            "14:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "1ca:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "3b2e1799c222f8238999d39378d2307b01a15726c5931fbce6fe93071c9d2011",
+            "1504c27b3b6d3fda173f6e70c87106f65d18bc949bcbfe6144803a74125c6775"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "849425665c50f069ac2917b2eb8a29c92d4ef8488c858a4e6ff017c86c036daf",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "1ca:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ]
+        },
+        "free.lo": {
+          "object_sha256": "6f6ec58364d2ce22ba453acb12bafcd2dd9b4c67f5ac5b5224d29b6d031b4684",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/free.lo",
+          "assembly_sha256": "fbd060cfe5610d36ef0bddad1d07aa8f27c2203cbc2294555ee59bf3612fb240",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-free-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "237:\te8 00 00 00 00       \tcall   23c <__libc_free+0x23c>",
+            "255:\te8 00 00 00 00       \tcall   25a <__libc_free+0x25a>",
+            "266:\te8 00 00 00 00       \tcall   26b <__libc_free+0x26b>",
+            "27b:\te8 00 00 00 00       \tcall   280 <__libc_free+0x280>",
+            "289:\te8 00 00 00 00       \tcall   28e <__libc_free+0x28e>"
+          ],
+          "function_pushes": [
+            "9:\t41 55                \tpush   %r13",
+            "11:\t41 54                \tpush   %r12",
+            "13:\t55                   \tpush   %rbp",
+            "14:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "1cd:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ],
+          "function_assembly_sha256": "70ec59b38163f62d8bc7ead444af750d00ff965ab5bbf646a5d62e00f65ffcb2",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "15:\t48 83 ec 08          \tsub    $0x8,%rsp",
+            "1cd:\t48 83 c4 08          \tadd    $0x8,%rsp"
+          ]
+        },
+        "realloc.o": {
+          "object_sha256": "d2f3440cac199ad4d114c65e90d8eea4ecb2f9410b343c2dd8b3198bcb3c1692",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/realloc.o",
+          "assembly_sha256": "87b777673806cad1cfa8c990673ca7a68043a4e1dc8a32e197446d1bdce73fbd",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-realloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "21a:\te8 00 00 00 00       \tcall   21f <__libc_realloc+0x21f>",
+            "23a:\te8 00 00 00 00       \tcall   23f <__libc_realloc+0x23f>",
+            "242:\te8 00 00 00 00       \tcall   247 <__libc_realloc+0x247>",
+            "2d7:\te8 00 00 00 00       \tcall   2dc <__libc_realloc+0x2dc>",
+            "406:\te8 00 00 00 00       \tcall   40b <__libc_realloc+0x40b>"
+          ],
+          "function_pushes": [
+            "0:\t41 57                \tpush   %r15",
+            "2:\t41 56                \tpush   %r14",
+            "4:\t41 55                \tpush   %r13",
+            "6:\t41 54                \tpush   %r12",
+            "8:\t55                   \tpush   %rbp",
+            "c:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "d:\t48 83 ec 18          \tsub    $0x18,%rsp",
+            "247:\t48 83 c4 18          \tadd    $0x18,%rsp",
+            "259:\t48 83 c4 18          \tadd    $0x18,%rsp"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "d2f3440cac199ad4d114c65e90d8eea4ecb2f9410b343c2dd8b3198bcb3c1692",
+            "5e48364e664ac9a8c1be1bcdcc24058fda1494f9735779b8a15f9e331bff7732"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "29638ae74f26e5fefab2f9972aa3c04a04bbc1a6122aeb3fe0c058ccc514e5f8",
+          "slot_info_helper_call_or_symbol_present": false
+        },
+        "realloc.lo": {
+          "object_sha256": "e00ec12e26eb2579c1356c2ef554b05847ffd654c3840d0150996eccb992ba47",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/e2aafe45791c748b1a101bcb8e017566e835e6f27fd623513503e67ee426bd6e/objects/obj/src/malloc/mallocng/realloc.lo",
+          "assembly_sha256": "f837cdaecc7f994755d44fd79718c338e0e66af6173ce98479873750df4baa76",
+          "assembly_path": "build/useralloc-review-v6/disabled-v6-final-realloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "21c:\te8 00 00 00 00       \tcall   221 <__libc_realloc+0x221>",
+            "23c:\te8 00 00 00 00       \tcall   241 <__libc_realloc+0x241>",
+            "244:\te8 00 00 00 00       \tcall   249 <__libc_realloc+0x249>",
+            "2e0:\te8 00 00 00 00       \tcall   2e5 <__libc_realloc+0x2e5>",
+            "40d:\te8 00 00 00 00       \tcall   412 <__libc_realloc+0x412>"
+          ],
+          "function_pushes": [
+            "0:\t41 57                \tpush   %r15",
+            "2:\t41 56                \tpush   %r14",
+            "4:\t41 55                \tpush   %r13",
+            "6:\t41 54                \tpush   %r12",
+            "8:\t55                   \tpush   %rbp",
+            "c:\t53                   \tpush   %rbx"
+          ],
+          "function_stack_arithmetic": [
+            "d:\t48 83 ec 18          \tsub    $0x18,%rsp",
+            "249:\t48 83 c4 18          \tadd    $0x18,%rsp",
+            "25b:\t48 83 c4 18          \tadd    $0x18,%rsp"
+          ],
+          "function_assembly_sha256": "bf4cf9baf924fcfe6193c5f93ad78d33ba02e14943c414de6c528beec8792427",
+          "slot_info_helper_call_or_symbol_present": false
+        }
+      },
+      "loader_symbols_sha256": "874ff61e93cefa321d02b08bac7d3580b3e302c7ede214dda440e9470b657646"
+    },
+    "optimized-arm126-v6-final": {
+      "manifest": {
+        "version": "1.2.6",
+        "alpine_package": "musl-1.2.6-r2",
+        "arch": "aarch64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+        "source_sha256": "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+            "sha256": "b2067680c66af9eb9f4fdc1fa5d9337a9fd62bdab2c437b416aa97d79eb884ee"
+          },
+          {
+            "name": "fix-loongarch64-zero-len-extcontext.patch",
+            "sha256": "92c8e965798ed516c15cb2a4e7c4ac45ec1eb68b6abff16c73adff2a3bae1b14"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+        ],
+        "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "aarch64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+        "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 1,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/musl-1.2.6/configure",
+          "--target=aarch64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "8289c205aa793bc6920dc7fff4e42d28dd6de2bec42bbd222548ef6c0abaffce",
+        "libc_a_sha256": "2a83589ee880356aa73f7809db76ccfa8f803f5ba78908ba2700e702b36620ca"
+      },
+      "manifest_sha256": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656",
+      "stage_manifest_matches_cache": true,
+      "patch_sha256_matches_candidate": true,
+      "cached_patch_sha256_matches_candidate": true,
+      "loader_sha256": "8289c205aa793bc6920dc7fff4e42d28dd6de2bec42bbd222548ef6c0abaffce",
+      "archive_sha256": "2a83589ee880356aa73f7809db76ccfa8f803f5ba78908ba2700e702b36620ca",
+      "loader_matches_manifest_and_cache": true,
+      "archive_matches_manifest_and_cache": true,
+      "source_sha256": {
+        "malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+        "meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+        "free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+        "glue.h": "99aab3632bed29fb76467b443847775b99e762fddd127fd20b5f130da484353c",
+        "realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+        "aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348"
+      },
+      "objects": {
+        "malloc.o": {
+          "object_sha256": "814e79144acf638fd02c1d3eae57b60e6a4fcd33c3c0340d4fd6bb3a724a4fdf",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/malloc.o",
+          "assembly_sha256": "c2f4a30e6548d9b67096f4be8b9f238882760eebe697c1025b613d54cd5baf31",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-malloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "archive_member_count": 1,
+          "archive_member_sha256s": [
+            "814e79144acf638fd02c1d3eae57b60e6a4fcd33c3c0340d4fd6bb3a724a4fdf"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "c790790732fd6fda3a0a56c76094c3a9cfd851b333c6220eace74fe32b768ed0",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "malloc.lo": {
+          "object_sha256": "c75cc1b1d67bb5fca64afc950e2cf59a89b0eee08ef5ce761479f2a0d680569b",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/malloc.lo",
+          "assembly_sha256": "2025e490c967cc8efed572fcf082799bc581a58e70eda970afe71d7527b2e698",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-malloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_assembly_sha256": "7e2550945629c323e837b4d93b4a9bb7e6b520f5e7a2ffc0caf6a47286a2ec22",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "free.o": {
+          "object_sha256": "c39dc4e53d50dadc0a935f31d8db82ae3b086ec126199c64310080a988649e55",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/free.o",
+          "assembly_sha256": "f99e84da1379627e6f08768d8568c3bd16c32a35111d8dbc9ba69cea976712b2",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-free-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "284:\t94000000 \tbl\t0 <__libc_free>",
+            "2ac:\t94000000 \tbl\t0 <__lock>",
+            "2c0:\t94000000 \tbl\t0 <__unlock>",
+            "2c8:\t94000000 \tbl\t0 <___errno_location>",
+            "2dc:\t94000000 \tbl\t0 <munmap>"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "7b060f09cf095d822797fc6f813ce910543d3c7c8a5ce65754170283516f721d",
+            "c39dc4e53d50dadc0a935f31d8db82ae3b086ec126199c64310080a988649e55"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "e2359b8e65968addae57c7c5793aa45e24955c2d1ce16f81aca46db45f7a4106",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "3c:\ta9bd4ffe \tstp\tx30, x19, [sp, #-48]!",
+            "1d8:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "264:\ta8c34ffe \tldp\tx30, x19, [sp], #48",
+            "26c:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "29c:\ta94157f4 \tldp\tx20, x21, [sp, #16]",
+            "2a8:\tb9002fe1 \tstr\tw1, [sp, #44]",
+            "2b0:\tb9402fe1 \tldr\tw1, [sp, #44]",
+            "2e4:\ta94157f4 \tldp\tx20, x21, [sp, #16]"
+          ]
+        },
+        "free.lo": {
+          "object_sha256": "0aa93f0c410a27122055b30dac1b03d924fb35c89e7818b6fd646adf90a76281",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/free.lo",
+          "assembly_sha256": "9014b8c3ed1f117c01ef9268d5304ae0d53413f6e81fc75631f676119175b380",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-free-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "290:\t94000000 \tbl\t0 <__libc_free>",
+            "2bc:\t94000000 \tbl\t0 <__lock>",
+            "2c8:\t94000000 \tbl\t0 <__unlock>",
+            "2d0:\t94000000 \tbl\t0 <___errno_location>",
+            "2e4:\t94000000 \tbl\t0 <munmap>"
+          ],
+          "function_assembly_sha256": "1fff8d9e6591e688e093f94baeb983159126b18bb1216b8f7d03f5351eadc01b",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "3c:\ta9bd4ffe \tstp\tx30, x19, [sp, #-48]!",
+            "1f8:\ta8c34ffe \tldp\tx30, x19, [sp], #48",
+            "218:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "278:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "2ac:\ta94157f4 \tldp\tx20, x21, [sp, #16]",
+            "2b8:\tb9002fe1 \tstr\tw1, [sp, #44]",
+            "2c0:\tb9402fe1 \tldr\tw1, [sp, #44]",
+            "2ec:\ta94157f4 \tldp\tx20, x21, [sp, #16]"
+          ]
+        },
+        "realloc.o": {
+          "object_sha256": "7900739b36f0fbcce212382261c8e5d0205d6aef0a2e2a071ad4c0962f8b2ee5",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/realloc.o",
+          "assembly_sha256": "5a17123dfc3fa08f995fb278326b1122f46bc48e308517557d4532d15cb6db1f",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-realloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "1f4:\t94000000 \tbl\t0 <__libc_malloc_impl>",
+            "210:\t94000000 \tbl\t0 <memcpy>",
+            "218:\t94000000 \tbl\t0 <__libc_free>",
+            "288:\t94000000 \tbl\t0 <___errno_location>",
+            "37c:\t94000000 \tbl\t0 <__mremap>"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "7900739b36f0fbcce212382261c8e5d0205d6aef0a2e2a071ad4c0962f8b2ee5",
+            "b6d01b51d7377cb9d888e9f03b5b0be2b7bedfea5ab50af95f09ab2f492fdbe9"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "04cc24795ca8c2fe6a5b9bac8c3805f0183d6d576c9976c25eb79332406620b4",
+          "slot_info_helper_call_or_symbol_present": false
+        },
+        "realloc.lo": {
+          "object_sha256": "17cca22257ebc46aa1f37100241e3a3852c323be3ddb84e543b9a88fa3e3d997",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/960d5f8e8b6ed7696677da75d64eea0cb926a83eca2aa353b15980cbb01883d4/objects/obj/src/malloc/mallocng/realloc.lo",
+          "assembly_sha256": "70e9d6d7dd31fe72d0addff981e90b810ae4ec1b05ae8bda47912b1a6f0de6d8",
+          "assembly_path": "build/useralloc-review-v6/optimized-arm126-v6-final-realloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "1fc:\t94000000 \tbl\t0 <__libc_malloc_impl>",
+            "218:\t94000000 \tbl\t0 <memcpy>",
+            "220:\t94000000 \tbl\t0 <__libc_free>",
+            "290:\t94000000 \tbl\t0 <___errno_location>",
+            "384:\t94000000 \tbl\t0 <__mremap>"
+          ],
+          "function_assembly_sha256": "db3a042b431fdfb1093768759c765eebe0d83d41a88a9f99214648a46decc462",
+          "slot_info_helper_call_or_symbol_present": false
+        }
+      },
+      "loader_symbols_sha256": "fc02e125ecf9fde41762aaade4e581947209547477fd721e501d40dece1e4802"
+    },
+    "disabled-arm126-v6-final": {
+      "manifest": {
+        "version": "1.2.6",
+        "alpine_package": "musl-1.2.6-r2",
+        "arch": "aarch64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+        "source_sha256": "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+            "sha256": "b2067680c66af9eb9f4fdc1fa5d9337a9fd62bdab2c437b416aa97d79eb884ee"
+          },
+          {
+            "name": "fix-loongarch64-zero-len-extcontext.patch",
+            "sha256": "92c8e965798ed516c15cb2a4e7c4ac45ec1eb68b6abff16c73adff2a3bae1b14"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+        ],
+        "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "aarch64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=0",
+        "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 0,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/musl-1.2.6/configure",
+          "--target=aarch64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "4263f540e5fb55b094951d5b569748fbe75bdeef7eb57ee9632520bbac68c488",
+        "libc_a_sha256": "cb6701c8d10786d417420386dd0d5cb04023bce9f832b9ae72c95d45ffaa75e2"
+      },
+      "manifest_sha256": "ae39cc32810d60a98c6cedb786dfddea15182a42396e0597301a3fabd2495098",
+      "stage_manifest_matches_cache": true,
+      "patch_sha256_matches_candidate": true,
+      "cached_patch_sha256_matches_candidate": true,
+      "loader_sha256": "4263f540e5fb55b094951d5b569748fbe75bdeef7eb57ee9632520bbac68c488",
+      "archive_sha256": "cb6701c8d10786d417420386dd0d5cb04023bce9f832b9ae72c95d45ffaa75e2",
+      "loader_matches_manifest_and_cache": true,
+      "archive_matches_manifest_and_cache": true,
+      "source_sha256": {
+        "malloc.c": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+        "meta.h": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+        "free.c": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+        "glue.h": "99aab3632bed29fb76467b443847775b99e762fddd127fd20b5f130da484353c",
+        "realloc.c": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+        "aligned_alloc.c": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348"
+      },
+      "objects": {
+        "malloc.o": {
+          "object_sha256": "cdaa2d44f42d92d3629d516daf1df305a0a29d6befcd20a27031962bf3a60c86",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/malloc.o",
+          "assembly_sha256": "aeedae158ec2ff5fc0035711484e1b0d7cfba24790fb58fa686dd79de880eb65",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-malloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "archive_member_count": 1,
+          "archive_member_sha256s": [
+            "cdaa2d44f42d92d3629d516daf1df305a0a29d6befcd20a27031962bf3a60c86"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "c790790732fd6fda3a0a56c76094c3a9cfd851b333c6220eace74fe32b768ed0",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "malloc.lo": {
+          "object_sha256": "2b1eba2f7e672e4caa1055e5995dc85b3ecc960e5c4dc1346aa20601ebaa05fd",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/malloc.lo",
+          "assembly_sha256": "db4a00f0d7bdbcfc039cf354e0b1382d53bf6c1d66f5baa30bac8027470740ba",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-malloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": true,
+          "trap_instruction_present": true,
+          "function_calls": [],
+          "function_assembly_sha256": "7e2550945629c323e837b4d93b4a9bb7e6b520f5e7a2ffc0caf6a47286a2ec22",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_fallback_is_tail_branch": true,
+          "function_stack_frame_allocation_present": false
+        },
+        "free.o": {
+          "object_sha256": "6b052d9bffb5f4936850270297c8f7e234adbe92c22d5c1c5f18d5305ec19aa3",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/free.o",
+          "assembly_sha256": "9ff601812e49f3e23700ca404221ceb9c97a405451473b5f4216f0bd1059bf61",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-free-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "220:\t94000000 \tbl\t0 <__libc_free>",
+            "248:\t94000000 \tbl\t0 <__lock>",
+            "25c:\t94000000 \tbl\t0 <__unlock>",
+            "264:\t94000000 \tbl\t0 <___errno_location>",
+            "278:\t94000000 \tbl\t0 <munmap>"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "7b060f09cf095d822797fc6f813ce910543d3c7c8a5ce65754170283516f721d",
+            "6b052d9bffb5f4936850270297c8f7e234adbe92c22d5c1c5f18d5305ec19aa3"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "cbda3d773d2648a31496fa502fb87573b504fed6f4e41abd863dc1936013393c",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "3c:\ta9bd4ffe \tstp\tx30, x19, [sp, #-48]!",
+            "1c8:\ta8c34ffe \tldp\tx30, x19, [sp], #48",
+            "1e8:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "208:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "238:\ta94157f4 \tldp\tx20, x21, [sp, #16]",
+            "244:\tb9002fe1 \tstr\tw1, [sp, #44]",
+            "24c:\tb9402fe1 \tldr\tw1, [sp, #44]",
+            "280:\ta94157f4 \tldp\tx20, x21, [sp, #16]"
+          ]
+        },
+        "free.lo": {
+          "object_sha256": "87050b4aa1249323205bec0fbaf65569e07f4da5841f96788280ddb6fc99678a",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/free.lo",
+          "assembly_sha256": "e8140f4a2c4042fffdf877b62ddbc300870319bf5498f309d014053a2a2316af",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-free-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "220:\t94000000 \tbl\t0 <__libc_free>",
+            "24c:\t94000000 \tbl\t0 <__lock>",
+            "258:\t94000000 \tbl\t0 <__unlock>",
+            "260:\t94000000 \tbl\t0 <___errno_location>",
+            "274:\t94000000 \tbl\t0 <munmap>"
+          ],
+          "function_assembly_sha256": "98f7ad3b630bd9420d7ab74b1c2f863fa8db2b3d08f7f86c00d01607a10c77e9",
+          "slot_info_helper_call_or_symbol_present": false,
+          "function_stack_instructions": [
+            "3c:\ta9bd4ffe \tstp\tx30, x19, [sp, #-48]!",
+            "1c8:\ta8c34ffe \tldp\tx30, x19, [sp], #48",
+            "1e8:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "208:\ta90157f4 \tstp\tx20, x21, [sp, #16]",
+            "23c:\ta94157f4 \tldp\tx20, x21, [sp, #16]",
+            "248:\tb9002fe1 \tstr\tw1, [sp, #44]",
+            "250:\tb9402fe1 \tldr\tw1, [sp, #44]",
+            "27c:\ta94157f4 \tldp\tx20, x21, [sp, #16]"
+          ]
+        },
+        "realloc.o": {
+          "object_sha256": "7900739b36f0fbcce212382261c8e5d0205d6aef0a2e2a071ad4c0962f8b2ee5",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/realloc.o",
+          "assembly_sha256": "f118e72a74e742d2eae1b23eb601509a363bc7fbc48cce77605453adce7d4387",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-realloc-o.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "1f4:\t94000000 \tbl\t0 <__libc_malloc_impl>",
+            "210:\t94000000 \tbl\t0 <memcpy>",
+            "218:\t94000000 \tbl\t0 <__libc_free>",
+            "288:\t94000000 \tbl\t0 <___errno_location>",
+            "37c:\t94000000 \tbl\t0 <__mremap>"
+          ],
+          "archive_member_count": 2,
+          "archive_member_sha256s": [
+            "7900739b36f0fbcce212382261c8e5d0205d6aef0a2e2a071ad4c0962f8b2ee5",
+            "b6d01b51d7377cb9d888e9f03b5b0be2b7bedfea5ab50af95f09ab2f492fdbe9"
+          ],
+          "archive_byte_identical_member_count": 1,
+          "archive_member_byte_identical": true,
+          "function_assembly_sha256": "04cc24795ca8c2fe6a5b9bac8c3805f0183d6d576c9976c25eb79332406620b4",
+          "slot_info_helper_call_or_symbol_present": false
+        },
+        "realloc.lo": {
+          "object_sha256": "17cca22257ebc46aa1f37100241e3a3852c323be3ddb84e543b9a88fa3e3d997",
+          "object_path": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/aarch64/8aad8f723adaef17f8d174ed7f056b626093fa67fc8ddb0c76ab0f8be6f11817/objects/obj/src/malloc/mallocng/realloc.lo",
+          "assembly_sha256": "9a429503e5a684a44265a6e4e864efad6da10db8521f53db7527438cdbbd3064",
+          "assembly_path": "build/useralloc-review-v6/disabled-arm126-v6-final-realloc-lo.asm",
+          "function_has_stack_canary_reference": false,
+          "object_has_stack_canary_reference": false,
+          "trap_instruction_present": true,
+          "function_calls": [
+            "1fc:\t94000000 \tbl\t0 <__libc_malloc_impl>",
+            "218:\t94000000 \tbl\t0 <memcpy>",
+            "220:\t94000000 \tbl\t0 <__libc_free>",
+            "290:\t94000000 \tbl\t0 <___errno_location>",
+            "384:\t94000000 \tbl\t0 <__mremap>"
+          ],
+          "function_assembly_sha256": "db3a042b431fdfb1093768759c765eebe0d83d41a88a9f99214648a46decc462",
+          "slot_info_helper_call_or_symbol_present": false
+        }
+      },
+      "loader_symbols_sha256": "1700d2adc993568a61eed1d49e83a053ad36c7d9e9a9f6457a730e4c0e656194"
+    }
+  }
+}

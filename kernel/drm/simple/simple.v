@@ -45,6 +45,9 @@ fn get_file(handle voidptr) ?&SimpleFile {
 		return file
 	}
 	mut file := &SimpleFile{}
+	// Nothing slices these, so growing them can free the old buffer.
+	file.objects.flags |= .noslices
+	file.mmap_objects.flags |= .noslices
 	simple_files[key] = file
 	simple_files_lock.release()
 	return file
@@ -207,10 +210,10 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	simple_files_lock.release()
 
 	file.lock.acquire()
-	objects := file.objects.clone()
-	mapped := file.mmap_objects.clone()
-	file.objects.clear()
-	file.mmap_objects.clear()
+	mut objects := unsafe { file.objects }
+	mut mapped := unsafe { file.mmap_objects }
+	file.objects = []&gem.GemObject{}
+	file.mmap_objects = []&gem.GemObject{}
 	file.lock.release()
 	for obj in objects {
 		gem.unref(obj)
@@ -218,7 +221,11 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	for obj in mapped {
 		gem.unref(obj)
 	}
-	unsafe { free(voidptr(file)) }
+	unsafe {
+		objects.free()
+		mapped.free()
+		free(voidptr(file))
+	}
 }
 
 // Multiple firmware framebuffers share one allocator.

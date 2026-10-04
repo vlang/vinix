@@ -25,12 +25,59 @@ rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/utilities_test.v" "$work/ui/"
 printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
 
+# Rebuild handoff owns a one-shot terminal snapshot as well as its elapsed-time
+# record. Keep its parser and row serialization cases isolated from the broad
+# utility suite so this test file does not overlap application catalog changes.
+cp "$root/desktop/tools/tests/terminal_rebuild_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_rebuild_test.v"
+rm -f "$work/ui/terminal_rebuild_test.v"
+
+# The terminal grid holds code points decoded from the PTY's UTF-8 output.
+cp "$root/desktop/tools/tests/terminal_utf8_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/terminal_utf8_test.v"
+rm -f "$work/ui/terminal_utf8_test.v"
+
+# Activity Monitor keeps process selection across snapshots and sends SIGKILL
+# without waiting for an arbitrary process. Exercise it with owned children.
+cp "$root/desktop/tools/tests/activity_kill_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_kill_test.v"
+rm -f "$work/ui/activity_kill_test.v"
+
+# Graceful termination, suspend/resume, tree signals and priority changes use
+# owned children so host verification never signals another session's process.
+cp "$root/desktop/tools/tests/activity_controls_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_controls_test.v"
+rm -f "$work/ui/activity_controls_test.v"
+
 # The staged Calculator uses ui2's compile-time `$vml` lowering, which is
 # provided by V's current compiler. Keep test and production compilation on
 # the same frontend.
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utilities_test.v"
 rm -f "$work/ui/utilities_test.v"
+
+# The Editor stores UTF-8 bytes but moves, deletes and draws by character.
+cp "$root/desktop/tools/tests/editor_utf8_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/editor_utf8_test.v"
+rm -f "$work/ui/editor_utf8_test.v"
+
+cp "$root/desktop/tools/tests/taskbar_pinning_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/taskbar_pinning_test.v"
+rm -f "$work/ui/taskbar_pinning_test.v"
+
+# Reordering, previews and Aero Peek, Show Desktop, Jump Lists, Start menu
+# history, the notification area and taskbar progress share hover timers and
+# persistent lists, so they run in their own entry point.
+cp "$root/desktop/tools/tests/taskbar_features_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/taskbar_features_test.v"
+rm -f "$work/ui/taskbar_features_test.v"
 
 # Quick Launch shares the switcher's global keyboard path. Keep its Cmd-Space,
 # query filtering and modal overlay cases isolated from the broader utility
@@ -47,6 +94,13 @@ cp "$root/desktop/tools/tests/titlebar_click_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/titlebar_click_test.v"
 rm -f "$work/ui/titlebar_click_test.v"
 
+# Workspaces and keyboard tiling are compositor state rather than application
+# behavior. Keep their focus, visibility, pager and geometry cases together.
+cp "$root/desktop/tools/tests/workspace_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/workspace_test.v"
+rm -f "$work/ui/workspace_test.v"
+
 # First-launch registration owns the whole compositor until its profile is
 # durable. Exercise its exclusive tree, non-dismissible input and verifier file
 # separately because it intentionally never enters the normal desktop loop.
@@ -55,12 +109,62 @@ cp "$root/desktop/tools/tests/registration_test.v" "$work/ui/"
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/registration_test.v"
 rm -f "$work/ui/registration_test.v"
 
+# The app picker follows registration with the same exclusive ownership of the
+# display and keyboard, then hands its choice to the first Terminal.
+cp "$root/desktop/tools/tests/app_selection_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/app_selection_test.v"
+rm -f "$work/ui/app_selection_test.v"
+
 # Miller columns use real directory listings and their own retained navigation
 # state, so exercise them independently from the broader utility model tests.
 cp "$root/desktop/tools/tests/files_columns_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_columns_test.v"
 rm -f "$work/ui/files_columns_test.v"
+
+cp "$root/desktop/tools/tests/files_list_columns_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_list_columns_test.v"
+rm -f "$work/ui/files_list_columns_test.v"
+
+cp "$root/desktop/tools/tests/files_sidebar_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_sidebar_test.v"
+rm -f "$work/ui/files_sidebar_test.v"
+
+cp "$root/desktop/tools/tests/files_settings_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_settings_test.v"
+rm -f "$work/ui/files_settings_test.v"
+
+cp "$root/desktop/tools/tests/files_commander_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_commander_test.v"
+rm -f "$work/ui/files_commander_test.v"
+
+# Finder's look under the macOS theme: the toolbar the window draws in its
+# title bar, Back and Forward, Finder's columns and the search field.
+cp "$root/desktop/tools/tests/files_finder_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_finder_test.v"
+rm -f "$work/ui/files_finder_test.v"
+
+cp "$root/desktop/tools/tests/files_settings_process_integration.v" "$work/ui/main.v"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/files-settings-process" "$work/ui"
+"$work/files-settings-process"
+rm -f "$work/ui/main.v"
+
+cp "$root/desktop/tools/tests/files_quicklook_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_quicklook_test.v"
+rm -f "$work/ui/files_quicklook_test.v"
+
+cp "$root/desktop/tools/tests/files_mouse_back_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_mouse_back_test.v"
+rm -f "$work/ui/files_mouse_back_test.v"
 
 # Build a real executable as well as V's generated test runner. It execs
 # itself twice in native-app mode and verifies UI, actions, state sync and

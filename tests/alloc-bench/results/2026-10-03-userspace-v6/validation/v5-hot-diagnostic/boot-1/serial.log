@@ -1,0 +1,211 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./.PKGINFO sz=646
+!>+ [3] ./.SIGN.RSA.alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub sz=512
+!>+ [4] ./bin/ sz=0
+!>+ [5] ./bin/arch sz=0
+!>+ [6] ./bin/ash sz=0
+!>+ [7] ./bin/base64 sz=0
+!>+ [8] ./bin/bbconfig sz=0
+!>+ [9] ./bin/busybox sz=808712
+!>+ [10] ./bin/cat sz=0
+!>+ [11] ./bin/chattr sz=0
+!>+ [12] ./bin/chgrp sz=0
+!>+ [13] ./bin/chmod sz=0
+!>+ [14] ./bin/chown sz=0
+!>+ [15] ./bin/cp sz=0
+!>+ [16] ./bin/date sz=0
+!>+ [17] ./bin/dd sz=0
+!>+ [18] ./bin/df sz=0
+!>+ [19] ./bin/dmesg sz=0
+!>+ [20] ./bin/dnsdomainname sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [200] ./etc/terminfo/t/terminator sz=1802
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [400] ./root/.oh-my-zsh/plugins/bgnotify/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [600] ./root/.oh-my-zsh/plugins/emacs/emacs.plugin.zsh sz=2166
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [800] ./root/.oh-my-zsh/plugins/hcloud/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1000] ./root/.oh-my-zsh/plugins/mercurial/README.md sz=2872
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1200] ./root/.oh-my-zsh/plugins/rake-fast/README.md sz=1109
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1400] ./root/.oh-my-zsh/plugins/thefuck/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1600] ./root/.oh-my-zsh/plugins/zsh-navigation-tools/doc/znt-tmux.zsh sz=2147
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1800] ./root/.oh-my-zsh/themes/strug.zsh-theme sz=953
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2000] ./usr/bin/openvt sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2200] ./usr/include/scsi/scsi_ioctl.h sz=322
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2400] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/include/gfniintrin.h sz=15474
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2600] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/config/i386/unix.h sz=2878
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2800] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/lower-subreg.h sz=2081
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [3000] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/tristate.h sz=2074
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [3200] ./usr/x86_64-alpine-linux-musl/bin/objcopy sz=194824
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff80017fffee00
+initramfs: Done (3366 entries)
+DIAG-GUEST-BEGIN
+DIAG-EXEC-BEGIN invocation=1 linkage=dynamic
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=138711000 ns_per_pair=693.555 cpu_ns=139030000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=104295000 ns_per_pair=521.475 cpu_ns=104348000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=97457000 ns_per_pair=487.285 cpu_ns=97498000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=120709000 ns_per_pair=603.545 cpu_ns=120748000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=145258000 ns_per_pair=726.290 cpu_ns=145291000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=137046000 ns_per_pair=685.230 cpu_ns=137098000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=132819000 ns_per_pair=664.095 cpu_ns=132853000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=98454000 ns_per_pair=492.270 cpu_ns=98503000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=198197000 ns_per_pair=990.985 cpu_ns=198230000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=89065000 ns_per_pair=445.325 cpu_ns=89096000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=85221000 ns_per_pair=426.105 cpu_ns=85253000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=163079000 ns_per_pair=815.395 cpu_ns=163111000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=94545000 ns_per_pair=472.725 cpu_ns=94595000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=124208000 ns_per_pair=621.040 cpu_ns=124241000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=1 linkage=dynamic exit_code=0
+DIAG-EXEC-BEGIN invocation=1 linkage=static
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=187405000 ns_per_pair=937.025 cpu_ns=187533000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=183666000 ns_per_pair=918.330 cpu_ns=183708000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=207558000 ns_per_pair=1037.790 cpu_ns=207592000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=115179000 ns_per_pair=575.895 cpu_ns=115212000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=265049000 ns_per_pair=1325.245 cpu_ns=265084000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=102120000 ns_per_pair=510.600 cpu_ns=102172000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=173404000 ns_per_pair=867.020 cpu_ns=173436000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=96266000 ns_per_pair=481.330 cpu_ns=96322000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=123713000 ns_per_pair=618.565 cpu_ns=123746000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=104655000 ns_per_pair=523.275 cpu_ns=104689000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=133267000 ns_per_pair=666.335 cpu_ns=133298000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=122547000 ns_per_pair=612.735 cpu_ns=122580000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=127943000 ns_per_pair=639.715 cpu_ns=127991000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=128235000 ns_per_pair=641.175 cpu_ns=128274000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=1 linkage=static exit_code=0
+DIAG-EXEC-BEGIN invocation=2 linkage=dynamic
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=187101000 ns_per_pair=935.505 cpu_ns=187219000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=145716000 ns_per_pair=728.580 cpu_ns=145780000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=134582000 ns_per_pair=672.910 cpu_ns=134629000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=189777000 ns_per_pair=948.885 cpu_ns=189889000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=240748000 ns_per_pair=1203.740 cpu_ns=240788000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=137256000 ns_per_pair=686.280 cpu_ns=137313000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=207930000 ns_per_pair=1039.650 cpu_ns=207960000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=82328000 ns_per_pair=411.640 cpu_ns=82409000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=175662000 ns_per_pair=878.310 cpu_ns=175697000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=129923000 ns_per_pair=649.615 cpu_ns=129955000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=121756000 ns_per_pair=608.780 cpu_ns=121787000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=101943000 ns_per_pair=509.715 cpu_ns=102298000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=93745000 ns_per_pair=468.725 cpu_ns=93843000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=88941000 ns_per_pair=444.705 cpu_ns=89015000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=2 linkage=dynamic exit_code=0
+DIAG-EXEC-BEGIN invocation=2 linkage=static
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=76847000 ns_per_pair=384.235 cpu_ns=76964000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=103736000 ns_per_pair=518.680 cpu_ns=103789000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=108506000 ns_per_pair=542.530 cpu_ns=108541000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=207360000 ns_per_pair=1036.800 cpu_ns=207396000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=102186000 ns_per_pair=510.930 cpu_ns=102220000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=73068000 ns_per_pair=365.340 cpu_ns=73121000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=77333000 ns_per_pair=386.665 cpu_ns=77364000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=82450000 ns_per_pair=412.250 cpu_ns=82492000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=111435000 ns_per_pair=557.175 cpu_ns=111469000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=114401000 ns_per_pair=572.005 cpu_ns=114433000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=88035000 ns_per_pair=440.175 cpu_ns=88064000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=82496000 ns_per_pair=412.480 cpu_ns=82524000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=83552000 ns_per_pair=417.760 cpu_ns=83597000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=77641000 ns_per_pair=388.205 cpu_ns=77867000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=2 linkage=static exit_code=0
+DIAG-EXEC-BEGIN invocation=3 linkage=dynamic
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=95126000 ns_per_pair=475.630 cpu_ns=95240000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=102399000 ns_per_pair=511.995 cpu_ns=102444000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=147448000 ns_per_pair=737.240 cpu_ns=147483000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=231532000 ns_per_pair=1157.660 cpu_ns=231570000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=131957000 ns_per_pair=659.785 cpu_ns=132000000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=115172000 ns_per_pair=575.860 cpu_ns=115225000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=101892000 ns_per_pair=509.460 cpu_ns=101934000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=224035000 ns_per_pair=1120.175 cpu_ns=224084000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=530336000 ns_per_pair=2651.680 cpu_ns=530408000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=304041000 ns_per_pair=1520.205 cpu_ns=304072000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=275206000 ns_per_pair=1376.030 cpu_ns=275240000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=207395000 ns_per_pair=1036.975 cpu_ns=209271000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=144501000 ns_per_pair=722.505 cpu_ns=144555000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=135003000 ns_per_pair=675.015 cpu_ns=135355000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=3 linkage=dynamic exit_code=0
+DIAG-EXEC-BEGIN invocation=3 linkage=static
+ALLOC-META schema=1 label=private_state_sampler platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+DIAG-STATE phase=after-metadata group=none need_locks=0 lock=0
+DIAG-STATE phase=fresh-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=fresh-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=fresh-hot sample=1 pairs=200000 elapsed_ns=87162000 ns_per_pair=435.810 cpu_ns=87364000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=2 pairs=200000 elapsed_ns=108447000 ns_per_pair=542.235 cpu_ns=108554000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=3 pairs=200000 elapsed_ns=136196000 ns_per_pair=680.980 cpu_ns=136230000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=4 pairs=200000 elapsed_ns=159987000 ns_per_pair=799.935 cpu_ns=160025000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=5 pairs=200000 elapsed_ns=93929000 ns_per_pair=469.645 cpu_ns=93977000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=6 pairs=200000 elapsed_ns=97608000 ns_per_pair=488.040 cpu_ns=97657000 checksum=51000000
+DIAG-HOT phase=fresh-hot sample=7 pairs=200000 elapsed_ns=81991000 ns_per_pair=409.955 cpu_ns=82025000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=0 freed=255 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-STATE phase=after-mixed class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=200 freed=55 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-STATE phase=post-mixed-hot class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=post-mixed-hot pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-HOT phase=post-mixed-hot sample=1 pairs=200000 elapsed_ns=73767000 ns_per_pair=368.835 cpu_ns=73819000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=2 pairs=200000 elapsed_ns=87926000 ns_per_pair=439.630 cpu_ns=87956000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=3 pairs=200000 elapsed_ns=95476000 ns_per_pair=477.380 cpu_ns=95511000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=4 pairs=200000 elapsed_ns=106433000 ns_per_pair=532.165 cpu_ns=106465000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=5 pairs=200000 elapsed_ns=86923000 ns_per_pair=434.615 cpu_ns=86955000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=6 pairs=200000 elapsed_ns=90339000 ns_per_pair=451.695 cpu_ns=90392000 checksum=51000000
+DIAG-HOT phase=post-mixed-hot sample=7 pairs=200000 elapsed_ns=75072000 ns_per_pair=375.360 cpu_ns=75101000 checksum=51000000
+DIAG-STATE phase=after-samples class=4 slots=8 maplen=0 nested=1 sole=1 group_count=1 active_idx=7 avail=224 freed=31 stride=80 full_stride=1 usage=8 need_locks=0 lock=0 mem_page_offset=16 meta_cacheline_offset=24
+DIAG-PROBE phase=after-samples pairs=32 class4=32 sole=32 nested=32 full_stride=32 eligible=32 lock_zero=32 need_zero=32 need_negative=0 group_changes=0 reserved_min=5 reserved_max=5 offset_min=0 offset_max=35 slots=0:4,1:4,2:4,3:4,4:4,5:4,6:4,7:4,
+DIAG-SAMPLER-DONE
+DIAG-EXEC-END invocation=3 linkage=static exit_code=0
+DIAG-GUEST-DONE

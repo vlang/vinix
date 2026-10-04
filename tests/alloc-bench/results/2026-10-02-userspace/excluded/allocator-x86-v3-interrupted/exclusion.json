@@ -1,0 +1,5 @@
+{
+  "excluded_from_final_validation": true,
+  "reason": "Turn/session interruption stopped the guest after optimized dynamic PASS and optimized static start; the full four-mode verification was restarted and completed in validation/allocator-x86-v3.",
+  "source_sha256": "80afae96dfe97bcf7fda9d39ebc7446027b7eab0138af8b4ec32bec4c8ecfd62"
+}

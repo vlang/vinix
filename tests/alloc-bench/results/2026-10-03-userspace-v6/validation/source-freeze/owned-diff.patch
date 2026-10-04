@@ -1,0 +1,381 @@
+diff --git a/build-support/musl/malloc-retain.patch b/build-support/musl/malloc-retain.patch
+index a10218b0..a519ac8c 100644
+--- a/build-support/musl/malloc-retain.patch
++++ b/build-support/musl/malloc-retain.patch
+@@ -43,7 +43,67 @@
+  	return m->avail_mask = mask & act;
+  }
+  
+-@@ -181,7 +199,7 @@
++@@ -126,7 +144,14 @@
++ 	return p[-3] & 31;
++ }
++ 
++-static inline struct meta *get_meta(const unsigned char *p)
+++struct slot_info {
+++	size_t stride, class_stride;
+++	int index;
+++};
+++
+++/* Share values already needed for header validation with free(). Other
+++ * callers keep the same pointer-only get_meta interface. */
+++static inline struct meta *get_meta_with_info(const unsigned char *p, struct slot_info *info)
++ {
++ 	assert(!((uintptr_t)p & 15));
++ 	int offset = *(const uint16_t *)(p - 2);
++@@ -144,16 +169,35 @@
++ 	assert(!(meta->freed_mask & (1u<<index)));
++ 	const struct meta_area *area = (void *)((uintptr_t)meta & -4096);
++ 	assert(area->check == ctx.secret);
++-	if (meta->sizeclass < 48) {
++-		assert(offset >= size_classes[meta->sizeclass]*index);
++-		assert(offset < size_classes[meta->sizeclass]*(index+1));
++-	} else {
++-		assert(meta->sizeclass == 63);
++-	}
++-	if (meta->maplen) {
++-		assert(offset <= meta->maplen*4096UL/UNIT - 1);
+++	size_t class_stride = 0;
+++	int sc = meta->sizeclass;
+++	if (sc < 48) {
+++		int units = size_classes[sc];
+++		assert(offset >= units*index);
+++		assert(offset < units*(index+1));
+++		class_stride = UNIT*units;
+++	} else {
+++		assert(sc == 63);
+++		/* Direct mappings always own one slot and a nonempty map. */
+++		assert(!meta->last_idx);
+++		assert(meta->maplen);
+++	}
+++	size_t maplen = meta->maplen;
+++	if (maplen) {
+++		assert(offset <= maplen*4096UL/UNIT - 1);
+++	}
+++	if (info) {
+++		info->index = index;
+++		info->class_stride = class_stride;
+++		info->stride = !meta->last_idx && maplen ? maplen*4096UL-UNIT :
+++			class_stride;
++ 	}
++ 	return (struct meta *)meta;
+++}
+++
+++static inline struct meta *get_meta(const unsigned char *p)
+++{
+++	return get_meta_with_info(p, 0);
++ }
++ 
++ static inline size_t get_nominal_size(const unsigned char *p, const unsigned char *end)
++@@ -181,7 +225,7 @@
+  	}
+  }
+  
+@@ -52,7 +112,7 @@
+  {
+  	int reserved = end-p-n;
+  	if (reserved) end[-reserved] = 0;
+-@@ -190,7 +208,12 @@
++@@ -190,7 +234,12 @@
+  		end[-5] = 0;
+  		reserved = 5;
+  	}
+@@ -66,7 +126,7 @@
+  }
+  
+  static inline void *enframe(struct meta *g, int idx, size_t n, int ctr)
+-@@ -201,14 +224,20 @@
++@@ -201,14 +250,20 @@
+  	unsigned char *end = p+stride-IB;
+  	// cycle offset within slot to increase interval to address
+  	// reuse, facilitate trapping double-free.
+@@ -94,7 +154,7 @@
+  	}
+  	if (off) {
+  		// store offset in unused header at offset zero
+-@@ -221,8 +250,8 @@
++@@ -221,8 +276,8 @@
+  		p[-4] = 0;
+  	}
+  	*(uint16_t *)(p-2) = (size_t)(p-g->mem->storage)/UNIT;
+@@ -105,7 +165,7 @@
+  	return p;
+  }
+  
+-@@ -231,7 +260,7 @@
++@@ -231,7 +286,7 @@
+  	n = (n+IB-1)>>4;
+  	if (n<10) return n;
+  	n++;
+@@ -114,7 +174,7 @@
+  	if (n>size_classes[i+1]) i+=2;
+  	if (n>size_classes[i]) i++;
+  	return i;
+-@@ -244,6 +273,18 @@
++@@ -244,6 +299,18 @@
+  		return 1;
+  	}
+  	return 0;
+@@ -167,6 +227,15 @@
+  
+  	struct meta *g = alloc_group(sc, req);
+  	if (!g) return -1;
++@@ -296,7 +303,7 @@
++ 	return 0;
++ }
++ 
++-void *malloc(size_t n)
+++static __attribute__((noinline)) void *malloc_slow(size_t n)
++ {
++ 	if (size_overflows(n)) return 0;
++ 	struct meta *g;
+ @@ -307,6 +314,20 @@
+  
+  	if (n >= MMAP_THRESHOLD) {
+@@ -210,7 +279,39 @@
+  		goto success;
+  	}
+  	upgradelock();
+-@@ -382,6 +407,8 @@
++@@ -379,9 +404,40 @@
++ 	return enframe(g, idx, n, ctr);
++ }
++ 
+++void *malloc(size_t n)
+++{
+++	/* Keep the ordinary single-thread path free of mapping and lock calls.
+++	 * Negative need_locks transitions and any held/congested malloc lock
+++	 * use the original path, including its actual-state unlock. */
+++	if (n < MMAP_THRESHOLD && !MT && !*(volatile int *)__malloc_lock) {
+++		int sc = size_to_class(n);
+++		struct meta *g = ctx.active[sc];
+++		if (g) {
+++			uint32_t mask = g->avail_mask;
+++			/* Refilling the sole group needs no queue changes when some
+++			 * freed slots are already active. Grow inactive pages and
+++			 * traverse other groups through the unchanged slow path. */
+++			if (!mask && g->next == g &&
+++			    (g->freed_mask & ((2u<<g->mem->active_idx)-1))) {
+++				mask = activate_group(g);
+++				assert(mask);
+++				decay_bounces(g->sizeclass);
+++			}
+++			if (mask) {
+++				uint32_t first = mask & -mask;
+++				g->avail_mask = mask-first;
+++				return enframe(g, __builtin_ctz(first), n, ctx.mmap_counter);
+++			}
+++		}
+++	}
+++	return malloc_slow(n);
+++}
+++
+  int is_allzero(void *p)
+  {
+  	struct meta *g = get_meta(p);
+@@ -276,7 +377,21 @@
+  	return (struct mapinfo){ 0 };
+  }
+  
+-@@ -113,6 +142,18 @@
++@@ -102,9 +131,10 @@
++ {
++ 	if (!p) return;
++ 
++-	struct meta *g = get_meta(p);
++-	int idx = get_slot_index(p);
++-	size_t stride = get_stride(g);
+++	struct slot_info info;
+++	struct meta *g = get_meta_with_info(p, &info);
+++	int idx = info.index;
+++	size_t stride = info.stride;
++ 	unsigned char *start = g->mem->storage + stride*idx;
++ 	unsigned char *end = start + stride - IB;
++ 	get_nominal_size(p, end);
++@@ -113,6 +143,18 @@
+  	// invalidate offset to group header, and cycle offset of
+  	// used region within slot if current offset is zero.
+  	*(uint16_t *)((char *)p-2) = 0;
+@@ -286,7 +401,7 @@
+ +	 * publication so activation still rotates through all its slots.
+ +	 * Metadata, redzones and the caller header were checked above. */
+ +	if (VINIX_MALLOC_RETAIN && !MT && g->sizeclass < 48 && g->next == g &&
+-+	    stride >= UNIT*size_classes[g->sizeclass] &&
+++	    stride >= info.class_stride &&
+ +	    (g->maplen ? g->maplen*4096UL : UNIT + stride*(g->last_idx+1))
+ +	    <= RETAIN_GROUP_MAX_BYTES) {
+ +		g->freed_mask |= self;
+@@ -295,7 +410,7 @@
+  
+  	// release any whole pages contained in the slot to be freed
+  	// unless it's a single-slot group that will be unmapped.
+-@@ -149,3 +190,45 @@
++@@ -149,3 +191,45 @@
+  		errno = e;
+  	}
+  }
+diff --git a/tests/user-alloc/README.md b/tests/user-alloc/README.md
+index 7adae489..8d67e810 100644
+--- a/tests/user-alloc/README.md
++++ b/tests/user-alloc/README.md
+@@ -10,6 +10,13 @@ units keep musl's offset cycling. Header stamping uses the selected slot
+ index directly; resize keeps the existing header index. Group, secret,
+ nominal-size and overflow-byte checks stay in both paths.
+ 
++Ordinary single-thread allocations can consume an available slot, or refill
++the sole active group from already active freed slots, before entering the
++mapping and locking path. This requires both the thread state and the actual
++malloc lock to be clear. Other states use musl's existing allocation path.
++Freeing shares the slot index and stride obtained during metadata validation;
++the original header, secret, bounds, live-slot and nominal-size checks remain.
++
+ Compile with the guest's native GCC and run both link modes:
+ 
+ ```sh
+@@ -39,6 +46,9 @@ corrected counter-based clock before allocation timings are meaningful.
+ `verify-all-classes.c` adds bursts at all 48 ordinary class boundaries, trimming
+ while allocations stay live, dirty reuse followed by `calloc`, and repeated
+ thread creation and teardown with allocations transferred between threads.
++It also repeatedly exhausts and refills warmed groups while retaining a live
++allocation, and allocates, resizes and trims inside all three public atfork
++callbacks with a concurrent worker and again after that worker exits.
+ Run it against each staged allocator alongside `verify.c`, with both linkage
+ modes. A pass prints `UALLOC-SUPPLEMENT-DONE`:
+ 
+@@ -48,3 +58,18 @@ gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -pthread verify-all-classes.
+ gcc -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -pthread -static verify-all-classes.c -o verify-all-classes-static
+ ./verify-all-classes-static
+ ```
++
++The final v6 runtime validation passed on x86_64 with musl 1.2.5 and AArch64
++with musl 1.2.6. Each architecture ran both suites with retention enabled
++and disabled, using dynamic and static linkage: eight combinations, each
++reporting 1,910 original checks and 30,942 supplemental checks, for 262,816
++reported checks in total. All 32 corruption children terminated with the
++expected signals, and `clock.c` passed on both architectures.
++
++The enabled runs retained 3,575,808 and 3,584,000 bytes on x86_64, and
++3,653,632 and 3,751,936 bytes on AArch64 (dynamic and static respectively).
++Every one of the eight footprint measurements returned exactly to its warmed
++mapping baseline after trim. These are finite-workload correctness and mapping
++measurements; they do not establish the worst-case retention bound or a
++performance result. The refill and atfork tests exercise public behavior;
++they do not instrument which internal allocation branch each call takes.
+diff --git a/tests/user-alloc/verify-all-classes.c b/tests/user-alloc/verify-all-classes.c
+index 070a8f3e..2dd04e27 100644
+--- a/tests/user-alloc/verify-all-classes.c
++++ b/tests/user-alloc/verify-all-classes.c
+@@ -81,10 +81,112 @@ static int repeated_thread_transitions(void)
+     return 0;
+ }
+ 
++/* Small independent requests repeatedly exhaust and refill a warmed group.
++ * Keeping one allocation alive also checks that reuse never steals its slot. */
++static int repeated_group_refills(void)
++{
++    static const size_t requests[] = {0, 11, 27, 43, 59, 75, 123, 187,
++        315, 491, 1003, 2011, 4075, 8171, 16363, 32747, 65515, 131051};
++    for (unsigned s=0; s<sizeof requests/sizeof requests[0]; ++s) {
++        size_t n=requests[s];
++        (void)malloc_trim(0);
++        unsigned char *held=malloc(n);
++        REQUIRE(held);
++        memset(held,0x57,n);
++        for (unsigned round=0; round<129; ++round) {
++            unsigned char *p=round&1 ? calloc(1,n) : malloc(n);
++            REQUIRE(p && p!=held && !((uintptr_t)p&15));
++            if (round&1) REQUIRE(has_byte(p,n,0));
++            memset(p,(int)(round+1),n);
++            REQUIRE(has_byte(p,n,(unsigned char)(round+1)));
++            REQUIRE(has_byte(held,n,0x57));
++            free(p);
++        }
++        free(held);
++        (void)malloc_trim(0);
++    }
++    puts("UALLOC-GROUP-REFILLS requests=18 rounds=129");
++    return 0;
++}
++
++static unsigned char *callback_live;
++static unsigned callback_prepare_count, callback_parent_count, callback_child_count;
++static int callback_failed;
++
++static void callback_allocate(void)
++{
++    unsigned char *p=calloc(1,75);
++    if (!p || !has_byte(p,75,0)) { callback_failed=1; free(p); return; }
++    memset(p,0xa6,75);
++    unsigned char *q=realloc(p,262144);
++    if (!q) { callback_failed=1; free(p); return; }
++    if (!has_byte(q,75,0xa6) || !has_byte(callback_live,96,0x3c))
++        callback_failed=1;
++    memset(q,0xda,262144);
++    free(q);
++    errno=EDOM;
++    (void)malloc_trim(0);
++    if (errno!=EDOM || !has_byte(callback_live,96,0x3c)) callback_failed=1;
++}
++
++static void callback_prepare(void) { ++callback_prepare_count; callback_allocate(); }
++static void callback_parent(void) { ++callback_parent_count; callback_allocate(); }
++static void callback_child(void) { ++callback_child_count; callback_allocate(); }
++
++/* Exercise allocation in each public atfork callback, both with a concurrent
++ * allocator thread and after it exits and need_locks changes state again. */
++static int allocations_in_fork_callbacks(void)
++{
++    callback_live=malloc(96);
++    REQUIRE(callback_live);
++    memset(callback_live,0x3c,96);
++    REQUIRE(!pthread_atfork(callback_prepare,callback_parent,callback_child));
++    for (unsigned phase=0; phase<2; ++phase) {
++        pthread_t thread;
++        if (!phase) {
++            atomic_store(&worker_stop,0);
++            REQUIRE(!pthread_create(&thread,NULL,worker,(void *)(uintptr_t)3));
++        }
++        for (unsigned trial=0; trial<4; ++trial) {
++            unsigned expected=phase*4+trial+1;
++            pid_t child=fork();
++            REQUIRE(child>=0);
++            if (!child) {
++                alarm(20);
++                int ok=!callback_failed && callback_prepare_count==expected &&
++                    callback_parent_count==expected-1 && callback_child_count==1 &&
++                    has_byte(callback_live,96,0x3c);
++                free(callback_live);
++                _exit(ok ? 0 : 1);
++            }
++            int status;
++            REQUIRE(waitpid(child,&status,0)==child && WIFEXITED(status) &&
++                !WEXITSTATUS(status));
++            REQUIRE(!callback_failed && callback_prepare_count==expected &&
++                callback_parent_count==expected && !callback_child_count &&
++                has_byte(callback_live,96,0x3c));
++        }
++        if (!phase) {
++            atomic_store(&worker_stop,1);
++            void *transfer=NULL;
++            REQUIRE(!pthread_join(thread,&transfer));
++            REQUIRE(transfer && has_byte(transfer,79+3*64,30));
++            free(transfer);
++            REQUIRE(!atomic_load(&worker_failed));
++        }
++    }
++    /* No subsequent fork invokes the permanently registered callbacks. */
++    free(callback_live);
++    callback_live=NULL;
++    puts("UALLOC-ATFORK-ALLOCATIONS phases=2 forks=8");
++    return 0;
++}
++
+ int main(void)
+ {
+     alarm(180);
+-    if (every_class_burst() || repeated_thread_transitions()) return 1;
++    if (every_class_burst() || repeated_group_refills() ||
++        repeated_thread_transitions() || allocations_in_fork_callbacks()) return 1;
+     (void)malloc_trim(0);
+     printf("UALLOC-SUPPLEMENT-DONE checks=%u\n", checks);
+     return 0;

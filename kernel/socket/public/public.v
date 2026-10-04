@@ -75,6 +75,10 @@ pub const so_reuseport = 15
 
 pub const so_passcred = 16
 
+pub const so_rcvtimeo = 20
+
+pub const so_sndtimeo = 21
+
 pub const so_peercred = 17
 
 pub const so_acceptconn = 30
@@ -125,7 +129,7 @@ pub struct MsgHdr {
 pub mut:
 	msg_name       voidptr
 	msg_namelen    u32
-	msg_iov        &IoVec
+	msg_iov        &IoVec = unsafe { nil }
 	msg_iovlen     u64
 	msg_control    voidptr
 	msg_controllen u64

@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Byte-exact G13/macOS 12.3 fragment work command.
 //
 // The offsets below are the ones g13.v hands to the microsequence, so firmware
@@ -20,6 +22,7 @@ pub const g13_fragment_unk_buf_0_offset = u64(0x8ec)
 pub const g13_fragment_cur_ts_offset = u64(0x904)
 pub const g13_fragment_start_ts_offset = u64(0x90c)
 pub const g13_fragment_end_ts_offset = u64(0x914)
+pub const g13_fragment_v13_5_size = u64(0x974)
 
 @[packed]
 pub struct G13ClearPipelineBinding {
@@ -226,6 +229,91 @@ pub mut:
 	tail_padding               [3]u8
 }
 
+@[packed]
+pub struct G13RunFragmentV135 {
+pub mut:
+	bytes [0x974]u8
+}
+
+pub fn g13_fragment_active_size(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { u64(sizeof(G13RunFragment)) }
+		.v13_5_partial { g13_fragment_v13_5_size }
+		else { none }
+	}
+}
+
+pub fn g13_fragment_job_params_1_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x78 } .v13_5_partial { 0x80 } else { none } }
+}
+
+pub fn g13_fragment_job_params_2_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x3c0 } .v13_5_partial { 0x3c8 } else { none } }
+}
+
+pub fn g13_fragment_job_params_3_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x4b0 } .v13_5_partial { 0x4a8 } else { none } }
+}
+
+pub fn g13_fragment_unk_758_flag_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x760 } .v13_5_partial { 0x770 } else { none } }
+}
+
+pub fn g13_fragment_busy_flag_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x878 } .v13_5_partial { 0x888 } else { none } }
+}
+
+pub fn g13_fragment_overflow_count_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x87c } .v13_5_partial { 0x88c } else { none } }
+}
+
+pub fn g13_fragment_unk_pointee_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x8b8 } .v13_5_partial { 0x8c8 } else { none } }
+}
+
+pub fn g13_fragment_unk_buf_0_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x8ec } .v13_5_partial { 0x900 } else { none } }
+}
+
+pub fn g13_fragment_cur_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x904 } .v13_5_partial { 0x918 } else { none } }
+}
+
+pub fn g13_fragment_start_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x90c } .v13_5_partial { 0x920 } else { none } }
+}
+
+pub fn g13_fragment_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
+	return match abi { .v12_3 { 0x914 } .v13_5_partial { 0x928 } else { none } }
+}
+
+pub fn make_g13_fragment_v13_5(legacy &G13RunFragment) G13RunFragmentV135 {
+	mut out := G13RunFragmentV135{}
+	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
+	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x074)
+	// Start3DStruct2's AuxFBInfo gains an eight-byte tail while the opaque
+	// suffix shrinks by the same amount, keeping the enclosing size at 0x348.
+	g13_copy_bytes(voidptr(&out), 0x080, voidptr(legacy), 0x078, 0x040)
+	g13_copy_bytes(voidptr(&out), 0x0c8, voidptr(legacy), 0x0b8, 0x128)
+	g13_copy_bytes(voidptr(&out), 0x1f0, voidptr(legacy), 0x1e0, 0x1d8)
+	// Struct1 is 0xe0 at both Ventura and the pinned m1n1 12.3 definition.
+	g13_copy_bytes(voidptr(&out), 0x3c8, voidptr(legacy), 0x3c0, 0x0e0)
+	// Struct3 gains a 0x10 register prefix, the larger AuxFBInfo, and one tail
+	// pointer. Copy its three stable regions around those insertions.
+	g13_copy_bytes(voidptr(&out), 0x4b8, voidptr(legacy), 0x4b0, 0x220)
+	g13_copy_bytes(voidptr(&out), 0x6d8, voidptr(legacy), 0x6d0, 0x010)
+	g13_copy_bytes(voidptr(&out), 0x6f0, voidptr(legacy), 0x6e0, 0x080)
+	// The command tail is grouped as flags/busy, Struct6, Struct7, then
+	// timestamps. Struct7 gains a four-byte prefix at 13.5.
+	g13_copy_bytes(voidptr(&out), 0x770, voidptr(legacy), 0x760, 0x11c)
+	g13_copy_bytes(voidptr(&out), 0x88c, voidptr(legacy), 0x87c, 0x03c)
+	g13_copy_bytes(voidptr(&out), 0x8cc, voidptr(legacy), 0x8b8, 0x034)
+	// Copy through client_sequence. Ventura's two additional timestamp words
+	// and trailing flags remain zero-initialised after it.
+	g13_copy_bytes(voidptr(&out), 0x900, voidptr(legacy), 0x8ec, 0x041)
+	return out
+}
+
 pub fn g13_store_pipeline_binding(pipeline_bind u32, address u32) G13StorePipelineBinding {
 	return G13StorePipelineBinding{
 		pipeline_bind: pipeline_bind
@@ -241,4 +329,5 @@ pub fn validate_g13_fragment_layouts() bool {
 		&& sizeof(G13FragmentJobParameters2) == 0xf0
 		&& sizeof(G13FragmentJobParameters3) == 0x2b0
 		&& sizeof(G13RunFragment) == 0x938
+		&& sizeof(G13RunFragmentV135) == g13_fragment_v13_5_size
 }

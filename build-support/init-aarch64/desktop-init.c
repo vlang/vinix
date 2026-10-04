@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* Freestanding ARM64 init for the desktop image.
  *
  * Native applications are separate processes, and the compositor is a
@@ -166,6 +170,22 @@ static void install_power_signals(void) {
 	install_power_signal(12 /* SIGUSR2: power off */);
 }
 
+/* A blocking wait4 only watches the children its caller had when it began, so
+ * an orphan handed to PID 1 later could die without waking it. SIGCHLD cuts
+ * that wait short, and wait_for_child() then waits again, this time with the
+ * orphan among the children. The kernel delivers SIGCHLD only to a process
+ * that handles it. */
+static void child_signal_handler(int signal) {
+	(void)signal;
+}
+
+static void install_child_signal(void) {
+	struct kernel_sigaction action = {
+		child_signal_handler, 0, signal_restorer, 0,
+	};
+	syscall4(134 /* rt_sigaction */, 17 /* SIGCHLD */, (u64)&action, 0, 8);
+}
+
 static void apply_power_request(void) {
 	int signal = requested_power_signal;
 	u64 command;
@@ -184,14 +204,34 @@ struct kernel_timespec {
 	i64 nanoseconds;
 };
 
+/* Every child that exits interrupts the sleep with SIGCHLD, which leaves what
+ * was left of it in `delay`; sleep that out too. A power or reload request
+ * still cuts it short. */
+static void pause_for(struct kernel_timespec delay) {
+	while (syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
+	                (u64)&delay, (u64)&delay) == -4 /* EINTR */
+	       && !requested_power_signal && !requested_desktop_reload) {
+	}
+}
+
 static void restart_pause(void) {
 	struct kernel_timespec delay = { 1, 0 };
-	syscall4(115 /* clock_nanosleep */, 1 /* CLOCK_MONOTONIC */, 0,
-	         (u64)&delay, 0);
+	pause_for(delay);
+}
+
+static void teardown_pause(void) {
+	struct kernel_timespec delay = { 0, 10000000 /* 10 ms */ };
+	pause_for(delay);
 }
 
 /* Wait for one supervised child. A power signal interrupts wait4; forward it
- * once, then let the compositor perform its normal clean shutdown. */
+ * once, then let the compositor perform its normal clean shutdown.
+ *
+ * Every process whose parent dies is handed to PID 1, and nothing else will
+ * ever reap it, so wait for any child rather than only this one. Waiting on
+ * the compositor alone left each orphan that exited -- an application whose
+ * launcher had gone, a daemon's double fork -- a zombie for the whole
+ * session. */
 static void wait_for_child(i64 child, int *status) {
 	int forwarded_signal = 0;
 	for (;;) {
@@ -202,22 +242,34 @@ static void wait_for_child(i64 child, int *status) {
 			syscall2(129 /* kill */, (u64)child, (u64)signal);
 			forwarded_signal = signal;
 		}
-		if (syscall4(260 /* wait4 */, (u64)child, (u64)status, 0, 0) == child)
+		int any_status = 0;
+		if (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&any_status, 0, 0) == child) {
+			*status = any_status;
 			return;
+		}
 	}
 }
 
 static i64 spawn_program(char **arguments, char **fallback, int own_group,
-					 int *status, char **environment) {
+					 int *status, char **environment, int trace_launch) {
 	i64 child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	/* Keep the post-clone trace on the child only. Concurrent parent/child
+	 * writes to the framebuffer console make the diagnostic itself capable of
+	 * stalling before exec, which hides the boundary it is meant to expose. */
 	if (child == 0) {
 		if (own_group)
 			syscall2(154 /* setpgid */, 0, 0);
+		if (trace_launch)
+			print("init: GPU desktop child process group ready; entering execve\n");
 		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
 		         (u64)environment);
+		if (trace_launch)
+			print("init: GPU desktop execve returned; trying software fallback\n");
 		if (fallback)
 			syscall3(221 /* execve */, (u64)fallback[0], (u64)fallback,
 			         (u64)environment);
+		if (trace_launch)
+			print("init: GPU and software desktop execve both failed\n");
 		syscall1(93 /* exit */, 127);
 	}
 	if (child > 0) {
@@ -228,19 +280,99 @@ static i64 spawn_program(char **arguments, char **fallback, int own_group,
 	return child;
 }
 
-static void stop_desktop_group(i64 child) {
-	int status;
-	if (child > 0) {
-		/* Application children inherit the compositor's process group. If the
-		 * compositor died before closing them, do not carry them into its next
-		 * session. */
-		syscall2(129 /* kill */, (u64)-child, 15 /* SIGTERM */);
-		restart_pause();
-		syscall2(129 /* kill */, (u64)-child, 9 /* SIGKILL */);
+static int executable_available(const char *path);
+
+static void start_files_sync(char **environment) {
+	char *arguments[] = { "/usr/bin/vinix-files-sync", (char *)0 };
+	i64 child;
+	if (!executable_available(arguments[0]))
+		return;
+	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		/* The helper must survive a compositor restart and its process-group
+		 * cleanup. It exits immediately outside a QEMU host-source boot. */
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		syscall1(93 /* exit */, 127);
 	}
+}
+
+/* Ask vinix-os.org, in the background, whether a newer Vinix has been
+ * released. The helper leaves the answer in /run for the desktop to compare
+ * with /etc/vinix-release; like vinix-files-sync it outlives compositor
+ * restarts, and it exits at once on a development image, which has no
+ * release to compare. */
+static void start_version_check(char **environment) {
+	char *arguments[] = { "/usr/libexec/vinix-version-check", (char *)0 };
+	i64 child;
+	if (!executable_available(arguments[0]))
+		return;
+	child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		syscall1(93 /* exit */, 127);
+	}
+}
+
+static void start_security_audit(char **environment) {
+	char *arguments[] = { "/usr/libexec/vinix-security-audit-supervise", (char *)0 };
+	if (!executable_available(arguments[0]))
+		return;
+	i64 child = syscall5(220 /* clone */, 17 /* SIGCHLD */, 0, 0, 0, 0);
+	if (child == 0) {
+		/* Remain outside the compositor's process group across app reloads. */
+		syscall2(154 /* setpgid */, 0, 0);
+		syscall3(221 /* execve */, (u64)arguments[0], (u64)arguments,
+		         (u64)environment);
+		print("init: security audit supervisor could not start\n");
+		syscall1(93 /* exit */, 127);
+	} else if (child < 0) {
+		print("init: security audit supervisor could not fork\n");
+	}
+}
+
+static void reap_exited_children(void) {
+	int status;
 	while (syscall4(260 /* wait4 */, (u64)(i64)-1, (u64)&status,
 	                1 /* WNOHANG */, 0) > 0) {
 	}
+}
+
+static int wait_for_desktop_group(i64 child, int attempts) {
+	while (attempts-- > 0) {
+		/* The compositor's application children are adopted by PID 1 when it
+		 * exits. Reap first: kill(group, 0) deliberately still sees zombies. */
+		reap_exited_children();
+		if (syscall2(129 /* kill */, (u64)-child, 0) < 0)
+			return 1;
+		teardown_pause();
+	}
+	return 0;
+}
+
+static void stop_desktop_group(i64 child) {
+	if (child <= 0) {
+		reap_exited_children();
+		return;
+	}
+
+	/* Application children inherit the compositor's process group. If the
+	 * compositor died before closing them, do not carry them into its next
+	 * session. More importantly, do not launch a replacement while those old
+	 * processes are still exiting: doing that used to race their address-space
+	 * and scheduler teardown against the new compositor, intermittently
+	 * wedging the whole guest after an in-Terminal desktop rebuild. */
+	syscall2(129 /* kill */, (u64)-child, 15 /* SIGTERM */);
+	if (wait_for_desktop_group(child, 100 /* one second */))
+		return;
+
+	syscall2(129 /* kill */, (u64)-child, 9 /* SIGKILL */);
+	if (!wait_for_desktop_group(child, 500 /* five seconds */))
+		print("init: old desktop process group did not stop within five seconds\n");
+	reap_exited_children();
 }
 
 static int gpu_available(void) {
@@ -259,6 +391,96 @@ static int executable_available(const char *path) {
 		return 0;
 	syscall1(57 /* close */, (u64)fd);
 	return 1;
+}
+
+/* A development reload replaces /usr/bin/vinix-desktop so all of its
+ * multicall application links use the same freshly built program. A disk-root
+ * QEMU machine persists that mutation, including across a host-side image
+ * rebuild whose contents happen to be unchanged. Restore the packaged inode
+ * atomically at boot and clear /run state before deciding which session this
+ * boot should start. The immutable copy is deliberately outside /usr/bin so a
+ * reload can never overwrite it through one of the multicall links. */
+/* The applications vinix-files-sync installs one at a time from a host
+ * cross-build during a QEMU session, replacing their multicall links. Keep
+ * this list in step with that helper's. */
+static const struct {
+	const char *path;
+	const char *temporary;
+	const char *version;
+} live_apps[] = {
+	{ "/usr/bin/vinix-files", "/usr/bin/.vinix-files.system",
+	  "/run/vinix-files-version" },
+	{ "/usr/bin/vinix-activity", "/usr/bin/.vinix-activity.system",
+	  "/run/vinix-activity-version" },
+	{ "/usr/bin/vinix-settings", "/usr/bin/.vinix-settings.system",
+	  "/run/vinix-settings-version" },
+};
+
+static void prepare_desktop_boot(void) {
+	static const char system_desktop[] =
+		"/usr/libexec/vinix-desktop-system";
+	static const char temporary_desktop[] =
+		"/usr/bin/.vinix-desktop.system";
+	static const char desktop[] = "/usr/bin/vinix-desktop";
+	const u64 at_fdcwd = (u64)(i64)-100;
+
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-desktop-development", 0);
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-desktop-ready", 0);
+	/* Last boot's answer from vinix-version-check, if the desktop never took
+	 * it; this boot asks again. */
+	syscall3(35 /* unlinkat */, at_fdcwd,
+	         (u64)"/run/vinix-latest-release", 0);
+	/* A single-app cross-build replaces that app's symlink during a QEMU
+	 * session. Restore the packaged multicall link before starting the next
+	 * session. */
+	for (u64 i = 0; i < sizeof(live_apps) / sizeof(live_apps[0]); i++) {
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].version, 0);
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].temporary, 0);
+		if (syscall3(36 /* symlinkat */, (u64)"vinix-desktop", at_fdcwd,
+		             (u64)live_apps[i].temporary) < 0)
+			continue;
+		if (syscall4(38 /* renameat */, at_fdcwd, (u64)live_apps[i].temporary,
+		             at_fdcwd, (u64)live_apps[i].path) < 0)
+			syscall3(35 /* unlinkat */, at_fdcwd, (u64)live_apps[i].temporary, 0);
+	}
+
+	/* Older images have no immutable copy. Leave their existing desktop alone
+	 * rather than removing the only executable they can start. */
+	if (!executable_available(system_desktop))
+		return;
+	syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_desktop, 0);
+	if (syscall5(37 /* linkat */, at_fdcwd, (u64)system_desktop,
+	             at_fdcwd, (u64)temporary_desktop, 0) < 0 ||
+	    syscall4(38 /* renameat */, at_fdcwd, (u64)temporary_desktop,
+	             at_fdcwd, (u64)desktop) < 0) {
+		syscall3(35 /* unlinkat */, at_fdcwd, (u64)temporary_desktop, 0);
+		print("init: could not restore the packaged desktop; keeping the existing binary\n");
+	}
+}
+
+/* Xvfb's -fbdir file is a live, frequently rewritten mmap. Keeping those
+ * transient framebuffers on the persistent ext2 root drives writeback on
+ * every frame and can leave the X server with msync I/O errors. Give hosted
+ * applications a private RAM-backed directory for this boot. The marker is
+ * created only after the mount succeeds so older kernels fall back to /tmp. */
+static void prepare_hosted_x11_storage(void) {
+	static const char directory[] = "/run/vinix-hosted-x11";
+	static const char marker[] = "/run/vinix-hosted-x11/.tmpfs-ready";
+	const u64 at_fdcwd = (u64)(i64)-100;
+	i64 fd;
+
+	syscall3(34 /* mkdirat */, at_fdcwd, (u64)directory, 0700);
+	if (syscall5(40 /* mount */, (u64)"/dev/null", (u64)directory,
+	             (u64)"tmpfs", 0, 0) < 0) {
+		print("init: hosted X11 scratch mount unavailable; using /tmp\n");
+		return;
+	}
+	fd = syscall4(56 /* openat */, at_fdcwd, (u64)marker,
+	              0x41 /* O_CREAT | O_WRONLY */, 0600);
+	if (fd >= 0)
+		syscall1(57 /* close */, (u64)fd);
 }
 
 /* A self-hosted desktop build writes this marker before asking PID 1 to
@@ -306,14 +528,20 @@ void _start(void) {
 	char *shell[] = { "/bin/zsh", "-l", (char *)0 };
 	int status = 0;
 	i64 child;
+	prepare_desktop_boot();
+	prepare_hosted_x11_storage();
 	install_power_signals();
+	install_child_signal();
+	start_security_audit(environment);
+	start_files_sync(environment);
+	start_version_check(environment);
 
 #ifdef VINIX_WIFI_BUNDLE
 	char *wifi[] = {
 		"/usr/bin/wifi-ctl", "load", "/usr/share/vinix/wifi", (char *)0,
 	};
 	print("\nVinix: loading the selected Wi-Fi firmware\n");
-	child = spawn_program(wifi, (char **)0, 0, &status, environment);
+	child = spawn_program(wifi, (char **)0, 0, &status, environment, 0);
 	if (requested_power_signal)
 		apply_power_request();
 	if (child < 0 || status != 0)
@@ -322,7 +550,7 @@ void _start(void) {
 
 	if (hyprland_requested() && executable_available(hyprland[0])) {
 		print("\nVinix: starting Hyprland\n");
-		child = spawn_program(hyprland, (char **)0, 1, &status, environment);
+		child = spawn_program(hyprland, (char **)0, 1, &status, environment, 0);
 		if (requested_power_signal)
 			apply_power_request();
 		print("init: Hyprland exited; starting the native recovery desktop\n");
@@ -341,19 +569,26 @@ void _start(void) {
 			print("\nVinix: starting the desktop\n");
 		}
 		status = 0;
-		child = spawn_program(selected, fallback, 1, &status, environment);
+		child = spawn_program(selected, fallback, 1, &status, environment,
+		                      selected == gpu_desktop);
 		if (requested_power_signal)
 			apply_power_request();
 		if (requested_desktop_reload) {
 			requested_desktop_reload = 0;
 			print("init: desktop reload requested; starting the new binary\n");
 			stop_desktop_group(child);
+			/* Closing the old Terminal's PTY can deliver another SIGHUP while
+			 * its process group is being dismantled. It belongs to the reload
+			 * already completed above; carrying it into the replacement session
+			 * creates an endless ready/reload loop. A real later build will send
+			 * a new request after the replacement is running. */
+			requested_desktop_reload = 0;
 			continue;
 		}
 		if (child < 0 || status == (127 << 8)) {
 			print("init: could not start vinix-desktop; opening a recovery shell\n");
 			status = 0;
-			child = spawn_program(shell, (char **)0, 0, &status, environment);
+			child = spawn_program(shell, (char **)0, 0, &status, environment, 0);
 			if (requested_power_signal)
 				apply_power_request();
 			if (child < 0)
@@ -362,5 +597,6 @@ void _start(void) {
 		}
 		report_desktop_exit(child, status);
 		stop_desktop_group(child);
+		restart_pause();
 	}
 }

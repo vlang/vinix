@@ -31,5 +31,9 @@ fn architecture_seed(mut output [64]u8) bool {
 		}
 		unsafe { C.memcpy(&output[i], &word, 4) }
 	}
-	return ur_rdseed || ur_rdrand
+	return ur_rdseed || ur_rdrand || jitter_entropy_seed(mut output)
+}
+
+fn cycle_counter() u64 {
+	return cpu.rdtsc()
 }

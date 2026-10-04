@@ -1,0 +1,273 @@
+
+/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/x86_64/blob.c.o:	file format elf64-x86-64
+
+Disassembly of section .text.memory__Pagemap__unmap_page_unlocked:
+
+0000000000000000 <memory__Pagemap__unmap_page_unlocked>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 41 57                        	pushq	%r15
+       6: 41 56                        	pushq	%r14
+       8: 41 55                        	pushq	%r13
+       a: 41 54                        	pushq	%r12
+       c: 53                           	pushq	%rbx
+       d: 48 83 ec 28                  	subq	$0x28, %rsp
+      11: 49 89 f5                     	movq	%rsi, %r13
+      14: 48 89 f0                     	movq	%rsi, %rax
+      17: 48 c1 e8 30                  	shrq	$0x30, %rax
+      1b: 25 ff 01 00 00               	andl	$0x1ff, %eax            # imm = 0x1FF
+      20: 48 8b 5f 08                  	movq	0x8(%rdi), %rbx
+      24: 4c 8b 15 00 00 00 00         	movq	(%rip), %r10            # 0x2b <memory__Pagemap__unmap_page_unlocked+0x2b>
+		0000000000000027:  R_X86_64_PC32	memory__higher_half-0x4
+      2b: 49 8d 0c 1a                  	leaq	(%r10,%rbx), %rcx
+      2f: 44 0f b6 05 00 00 00 00      	movzbl	(%rip), %r8d            # 0x37 <memory__Pagemap__unmap_page_unlocked+0x37>
+		0000000000000033:  R_X86_64_PC32	memory__la57-0x4
+      37: 48 89 ca                     	movq	%rcx, %rdx
+      3a: 41 80 f8 01                  	cmpb	$0x1, %r8b
+      3e: 75 1e                        	jne	0x5e <memory__Pagemap__unmap_page_unlocked+0x5e>
+      40: 48 8b 1c c1                  	movq	(%rcx,%rax,8), %rbx
+      44: f6 c3 01                     	testb	$0x1, %bl
+      47: 0f 84 83 00 00 00            	je	0xd0 <memory__Pagemap__unmap_page_unlocked+0xd0>
+      4d: 48 ba 00 f0 ff ff ff ff ff 7f	movabsq	$0x7ffffffffffff000, %rdx # imm = 0x7FFFFFFFFFFFF000
+      57: 48 21 d3                     	andq	%rdx, %rbx
+      5a: 49 8d 14 1a                  	leaq	(%r10,%rbx), %rdx
+      5e: 4d 89 e9                     	movq	%r13, %r9
+      61: 49 c1 e9 27                  	shrq	$0x27, %r9
+      65: 41 81 e1 ff 01 00 00         	andl	$0x1ff, %r9d            # imm = 0x1FF
+      6c: 4b 8d 34 ca                  	leaq	(%r10,%r9,8), %rsi
+      70: 4c 8b 34 33                  	movq	(%rbx,%rsi), %r14
+      74: 41 f6 c6 01                  	testb	$0x1, %r14b
+      78: 74 56                        	je	0xd0 <memory__Pagemap__unmap_page_unlocked+0xd0>
+      7a: 48 89 7d c0                  	movq	%rdi, -0x40(%rbp)
+      7e: 4d 89 eb                     	movq	%r13, %r11
+      81: 49 c1 eb 1e                  	shrq	$0x1e, %r11
+      85: 41 81 e3 ff 01 00 00         	andl	$0x1ff, %r11d           # imm = 0x1FF
+      8c: 49 bc 00 f0 ff ff ff ff ff 7f	movabsq	$0x7ffffffffffff000, %r12 # imm = 0x7FFFFFFFFFFFF000
+      96: 4d 21 e6                     	andq	%r12, %r14
+      99: 4b 8d 34 da                  	leaq	(%r10,%r11,8), %rsi
+      9d: 4d 8b 3c 36                  	movq	(%r14,%rsi), %r15
+      a1: 41 f6 c7 01                  	testb	$0x1, %r15b
+      a5: 74 29                        	je	0xd0 <memory__Pagemap__unmap_page_unlocked+0xd0>
+      a7: 48 89 55 d0                  	movq	%rdx, -0x30(%rbp)
+      ab: 44 89 ee                     	movl	%r13d, %esi
+      ae: c1 ee 15                     	shrl	$0x15, %esi
+      b1: 81 e6 ff 01 00 00            	andl	$0x1ff, %esi            # imm = 0x1FF
+      b7: 4d 21 e7                     	andq	%r12, %r15
+      ba: 4c 89 7d b8                  	movq	%r15, -0x48(%rbp)
+      be: 4d 8d 3c f2                  	leaq	(%r10,%rsi,8), %r15
+      c2: 48 8b 55 b8                  	movq	-0x48(%rbp), %rdx
+      c6: 4a 8b 3c 3a                  	movq	(%rdx,%r15), %rdi
+      ca: 40 f6 c7 01                  	testb	$0x1, %dil
+      ce: 75 11                        	jne	0xe1 <memory__Pagemap__unmap_page_unlocked+0xe1>
+      d0: 31 c0                        	xorl	%eax, %eax
+      d2: 48 83 c4 28                  	addq	$0x28, %rsp
+      d6: 5b                           	popq	%rbx
+      d7: 41 5c                        	popq	%r12
+      d9: 41 5d                        	popq	%r13
+      db: 41 5e                        	popq	%r14
+      dd: 41 5f                        	popq	%r15
+      df: 5d                           	popq	%rbp
+      e0: c3                           	retq
+      e1: 45 89 ef                     	movl	%r13d, %r15d
+      e4: 41 c1 ef 0c                  	shrl	$0xc, %r15d
+      e8: 41 81 e7 ff 01 00 00         	andl	$0x1ff, %r15d           # imm = 0x1FF
+      ef: 4c 21 e7                     	andq	%r12, %rdi
+      f2: 4e 8d 24 17                  	leaq	(%rdi,%r10), %r12
+      f6: 4b 8b 14 fc                  	movq	(%r12,%r15,8), %rdx
+      fa: 48 89 55 c8                  	movq	%rdx, -0x38(%rbp)
+      fe: 4b c7 04 fc 00 00 00 00      	movq	$0x0, (%r12,%r15,8)
+     106: 49 81 ff ff 01 00 00         	cmpq	$0x1ff, %r15            # imm = 0x1FF
+     10d: 74 61                        	je	0x170 <memory__Pagemap__unmap_page_unlocked+0x170>
+     10f: 4b 83 7c fc 08 00            	cmpq	$0x0, 0x8(%r12,%r15,8)
+     115: 74 59                        	je	0x170 <memory__Pagemap__unmap_page_unlocked+0x170>
+     117: b8 01 00 00 00               	movl	$0x1, %eax
+     11c: f6 45 c8 01                  	testb	$0x1, -0x38(%rbp)
+     120: 74 b0                        	je	0xd2 <memory__Pagemap__unmap_page_unlocked+0xd2>
+     122: 48 8b 7d c0                  	movq	-0x40(%rbp), %rdi
+     126: 80 7f 48 00                  	cmpb	$0x0, 0x48(%rdi)
+     12a: 75 a6                        	jne	0xd2 <memory__Pagemap__unmap_page_unlocked+0xd2>
+     12c: 48 8b 4f 08                  	movq	0x8(%rdi), %rcx
+     130: 48 81 ff 00 00 00 00         	cmpq	$0x0, %rdi
+		0000000000000133:  R_X86_64_32S	memory__kernel_pagemap
+     137: 74 08                        	je	0x141 <memory__Pagemap__unmap_page_unlocked+0x141>
+     139: 0f 20 da                     	movq	%cr3, %rdx
+     13c: 48 39 ca                     	cmpq	%rcx, %rdx
+     13f: 75 05                        	jne	0x146 <memory__Pagemap__unmap_page_unlocked+0x146>
+     141: 41 0f 01 7d 00               	invlpg	(%r13)
+     146: 48 83 3d 00 00 00 00 00      	cmpq	$0x0, (%rip)            # 0x14e <memory__Pagemap__unmap_page_unlocked+0x14e>
+		0000000000000149:  R_X86_64_PC32	memory__tlb_shootdown-0x5
+     14e: 74 82                        	je	0xd2 <memory__Pagemap__unmap_page_unlocked+0xd2>
+     150: 31 d2                        	xorl	%edx, %edx
+     152: 48 81 ff 00 00 00 00         	cmpq	$0x0, %rdi
+		0000000000000155:  R_X86_64_32S	memory__kernel_pagemap
+     159: 0f 94 c2                     	sete	%dl
+     15c: 0f ae f0                     	mfence
+     15f: 48 89 cf                     	movq	%rcx, %rdi
+     162: 4c 89 ee                     	movq	%r13, %rsi
+     165: ff 15 00 00 00 00            	callq	*(%rip)                 # 0x16b <memory__Pagemap__unmap_page_unlocked+0x16b>
+		0000000000000167:  R_X86_64_PC32	memory__tlb_shootdown-0x4
+     16b: e9 a2 01 00 00               	jmp	0x312 <memory__Pagemap__unmap_page_unlocked+0x312>
+     170: 4f 8d 3c 16                  	leaq	(%r14,%r10), %r15
+     174: 4c 89 7d b0                  	movq	%r15, -0x50(%rbp)
+     178: 4c 03 55 b8                  	addq	-0x48(%rbp), %r10
+     17c: 49 83 c4 18                  	addq	$0x18, %r12
+     180: 45 31 ff                     	xorl	%r15d, %r15d
+     183: 66 66 66 66 2e 0f 1f 84 00 00 00 00 00       	nopw	%cs:(%rax,%rax)
+     190: 4b 83 7c fc e8 00            	cmpq	$0x0, -0x18(%r12,%r15,8)
+     196: 0f 85 7b ff ff ff            	jne	0x117 <memory__Pagemap__unmap_page_unlocked+0x117>
+     19c: 4b 83 7c fc f0 00            	cmpq	$0x0, -0x10(%r12,%r15,8)
+     1a2: 0f 85 6f ff ff ff            	jne	0x117 <memory__Pagemap__unmap_page_unlocked+0x117>
+     1a8: 4b 83 7c fc f8 00            	cmpq	$0x0, -0x8(%r12,%r15,8)
+     1ae: 0f 85 63 ff ff ff            	jne	0x117 <memory__Pagemap__unmap_page_unlocked+0x117>
+     1b4: 4b 83 3c fc 00               	cmpq	$0x0, (%r12,%r15,8)
+     1b9: 0f 85 58 ff ff ff            	jne	0x117 <memory__Pagemap__unmap_page_unlocked+0x117>
+     1bf: 49 83 c7 04                  	addq	$0x4, %r15
+     1c3: 49 81 ff 00 02 00 00         	cmpq	$0x200, %r15            # imm = 0x200
+     1ca: 75 c4                        	jne	0x190 <memory__Pagemap__unmap_page_unlocked+0x190>
+     1cc: 49 c7 04 f2 00 00 00 00      	movq	$0x0, (%r10,%rsi,8)
+     1d4: 48 81 fe ff 01 00 00         	cmpq	$0x1ff, %rsi            # imm = 0x1FF
+     1db: 74 1f                        	je	0x1fc <memory__Pagemap__unmap_page_unlocked+0x1fc>
+     1dd: 49 83 7c f2 08 00            	cmpq	$0x0, 0x8(%r10,%rsi,8)
+     1e3: 74 17                        	je	0x1fc <memory__Pagemap__unmap_page_unlocked+0x1fc>
+     1e5: 45 31 e4                     	xorl	%r12d, %r12d
+     1e8: c7 45 c8 00 00 00 00         	movl	$0x0, -0x38(%rbp)
+     1ef: c7 45 d0 00 00 00 00         	movl	$0x0, -0x30(%rbp)
+     1f6: 4c 8b 7d b8                  	movq	-0x48(%rbp), %r15
+     1fa: eb 71                        	jmp	0x26d <memory__Pagemap__unmap_page_unlocked+0x26d>
+     1fc: 49 83 c2 18                  	addq	$0x18, %r10
+     200: 31 f6                        	xorl	%esi, %esi
+     202: 4c 8b 7d b8                  	movq	-0x48(%rbp), %r15
+     206: 49 83 7c f2 e8 00            	cmpq	$0x0, -0x18(%r10,%rsi,8)
+     20c: 75 4e                        	jne	0x25c <memory__Pagemap__unmap_page_unlocked+0x25c>
+     20e: 49 83 7c f2 f0 00            	cmpq	$0x0, -0x10(%r10,%rsi,8)
+     214: 75 46                        	jne	0x25c <memory__Pagemap__unmap_page_unlocked+0x25c>
+     216: 49 83 7c f2 f8 00            	cmpq	$0x0, -0x8(%r10,%rsi,8)
+     21c: 75 3e                        	jne	0x25c <memory__Pagemap__unmap_page_unlocked+0x25c>
+     21e: 49 83 3c f2 00               	cmpq	$0x0, (%r10,%rsi,8)
+     223: 75 37                        	jne	0x25c <memory__Pagemap__unmap_page_unlocked+0x25c>
+     225: 48 83 c6 04                  	addq	$0x4, %rsi
+     229: 48 81 fe 00 02 00 00         	cmpq	$0x200, %rsi            # imm = 0x200
+     230: 75 d4                        	jne	0x206 <memory__Pagemap__unmap_page_unlocked+0x206>
+     232: 4c 8b 65 b0                  	movq	-0x50(%rbp), %r12
+     236: 4b c7 04 dc 00 00 00 00      	movq	$0x0, (%r12,%r11,8)
+     23e: 49 81 fb ff 01 00 00         	cmpq	$0x1ff, %r11            # imm = 0x1FF
+     245: 0f 84 d1 00 00 00            	je	0x31c <memory__Pagemap__unmap_page_unlocked+0x31c>
+     24b: 4b 83 7c dc 08 00            	cmpq	$0x0, 0x8(%r12,%r11,8)
+     251: 0f 84 c5 00 00 00            	je	0x31c <memory__Pagemap__unmap_page_unlocked+0x31c>
+     257: 41 b4 01                     	movb	$0x1, %r12b
+     25a: eb 03                        	jmp	0x25f <memory__Pagemap__unmap_page_unlocked+0x25f>
+     25c: 45 31 e4                     	xorl	%r12d, %r12d
+     25f: c7 45 c8 00 00 00 00         	movl	$0x0, -0x38(%rbp)
+     266: c7 45 d0 00 00 00 00         	movl	$0x0, -0x30(%rbp)
+     26d: 4c 8b 55 c0                  	movq	-0x40(%rbp), %r10
+     271: 41 80 7a 48 00               	cmpb	$0x0, 0x48(%r10)
+     276: 75 4f                        	jne	0x2c7 <memory__Pagemap__unmap_page_unlocked+0x2c7>
+     278: 49 8b 42 08                  	movq	0x8(%r10), %rax
+     27c: 49 81 fa 00 00 00 00         	cmpq	$0x0, %r10
+		000000000000027f:  R_X86_64_32S	memory__kernel_pagemap
+     283: 74 08                        	je	0x28d <memory__Pagemap__unmap_page_unlocked+0x28d>
+     285: 0f 20 d9                     	movq	%cr3, %rcx
+     288: 48 39 c1                     	cmpq	%rax, %rcx
+     28b: 75 05                        	jne	0x292 <memory__Pagemap__unmap_page_unlocked+0x292>
+     28d: 41 0f 01 7d 00               	invlpg	(%r13)
+     292: 48 83 3d 00 00 00 00 00      	cmpq	$0x0, (%rip)            # 0x29a <memory__Pagemap__unmap_page_unlocked+0x29a>
+		0000000000000295:  R_X86_64_PC32	memory__tlb_shootdown-0x5
+     29a: 74 2b                        	je	0x2c7 <memory__Pagemap__unmap_page_unlocked+0x2c7>
+     29c: 45 89 e7                     	movl	%r12d, %r15d
+     29f: 49 89 fc                     	movq	%rdi, %r12
+     2a2: 31 d2                        	xorl	%edx, %edx
+     2a4: 49 81 fa 00 00 00 00         	cmpq	$0x0, %r10
+		00000000000002a7:  R_X86_64_32S	memory__kernel_pagemap
+     2ab: 0f 94 c2                     	sete	%dl
+     2ae: 0f ae f0                     	mfence
+     2b1: 48 89 c7                     	movq	%rax, %rdi
+     2b4: 4c 89 ee                     	movq	%r13, %rsi
+     2b7: ff 15 00 00 00 00            	callq	*(%rip)                 # 0x2bd <memory__Pagemap__unmap_page_unlocked+0x2bd>
+		00000000000002b9:  R_X86_64_PC32	memory__tlb_shootdown-0x4
+     2bd: 4c 89 e7                     	movq	%r12, %rdi
+     2c0: 45 89 fc                     	movl	%r15d, %r12d
+     2c3: 4c 8b 7d b8                  	movq	-0x48(%rbp), %r15
+     2c7: be 01 00 00 00               	movl	$0x1, %esi
+     2cc: e8 00 00 00 00               	callq	0x2d1 <memory__Pagemap__unmap_page_unlocked+0x2d1>
+		00000000000002cd:  R_X86_64_PLT32	memory__pmm_free-0x4
+     2d1: 45 84 e4                     	testb	%r12b, %r12b
+     2d4: 74 0d                        	je	0x2e3 <memory__Pagemap__unmap_page_unlocked+0x2e3>
+     2d6: be 01 00 00 00               	movl	$0x1, %esi
+     2db: 4c 89 ff                     	movq	%r15, %rdi
+     2de: e8 00 00 00 00               	callq	0x2e3 <memory__Pagemap__unmap_page_unlocked+0x2e3>
+		00000000000002df:  R_X86_64_PLT32	memory__pmm_free-0x4
+     2e3: 80 7d c8 00                  	cmpb	$0x0, -0x38(%rbp)
+     2e7: 74 0d                        	je	0x2f6 <memory__Pagemap__unmap_page_unlocked+0x2f6>
+     2e9: be 01 00 00 00               	movl	$0x1, %esi
+     2ee: 4c 89 f7                     	movq	%r14, %rdi
+     2f1: e8 00 00 00 00               	callq	0x2f6 <memory__Pagemap__unmap_page_unlocked+0x2f6>
+		00000000000002f2:  R_X86_64_PLT32	memory__pmm_free-0x4
+     2f6: b8 01 00 00 00               	movl	$0x1, %eax
+     2fb: 80 7d d0 00                  	cmpb	$0x0, -0x30(%rbp)
+     2ff: 0f 84 cd fd ff ff            	je	0xd2 <memory__Pagemap__unmap_page_unlocked+0xd2>
+     305: be 01 00 00 00               	movl	$0x1, %esi
+     30a: 48 89 df                     	movq	%rbx, %rdi
+     30d: e8 00 00 00 00               	callq	0x312 <memory__Pagemap__unmap_page_unlocked+0x312>
+		000000000000030e:  R_X86_64_PLT32	memory__pmm_free-0x4
+     312: b8 01 00 00 00               	movl	$0x1, %eax
+     317: e9 b6 fd ff ff               	jmp	0xd2 <memory__Pagemap__unmap_page_unlocked+0xd2>
+     31c: 49 83 c4 18                  	addq	$0x18, %r12
+     320: 31 f6                        	xorl	%esi, %esi
+     322: 4c 8b 55 c0                  	movq	-0x40(%rbp), %r10
+     326: 4d 89 e3                     	movq	%r12, %r11
+     329: 41 b4 01                     	movb	$0x1, %r12b
+     32c: 49 83 7c f3 e8 00            	cmpq	$0x0, -0x18(%r11,%rsi,8)
+     332: 75 5e                        	jne	0x392 <memory__Pagemap__unmap_page_unlocked+0x392>
+     334: 49 83 7c f3 f0 00            	cmpq	$0x0, -0x10(%r11,%rsi,8)
+     33a: 75 56                        	jne	0x392 <memory__Pagemap__unmap_page_unlocked+0x392>
+     33c: 49 83 7c f3 f8 00            	cmpq	$0x0, -0x8(%r11,%rsi,8)
+     342: 75 4e                        	jne	0x392 <memory__Pagemap__unmap_page_unlocked+0x392>
+     344: 49 83 3c f3 00               	cmpq	$0x0, (%r11,%rsi,8)
+     349: 75 47                        	jne	0x392 <memory__Pagemap__unmap_page_unlocked+0x392>
+     34b: 48 83 c6 04                  	addq	$0x4, %rsi
+     34f: 48 81 fe 00 02 00 00         	cmpq	$0x200, %rsi            # imm = 0x200
+     356: 75 d1                        	jne	0x329 <memory__Pagemap__unmap_page_unlocked+0x329>
+     358: 48 8b 75 d0                  	movq	-0x30(%rbp), %rsi
+     35c: 4a c7 04 ce 00 00 00 00      	movq	$0x0, (%rsi,%r9,8)
+     364: 41 b4 01                     	movb	$0x1, %r12b
+     367: 45 84 c0                     	testb	%r8b, %r8b
+     36a: 74 15                        	je	0x381 <memory__Pagemap__unmap_page_unlocked+0x381>
+     36c: 41 81 f9 ff 01 00 00         	cmpl	$0x1ff, %r9d            # imm = 0x1FF
+     373: 74 30                        	je	0x3a5 <memory__Pagemap__unmap_page_unlocked+0x3a5>
+     375: 48 8b 75 d0                  	movq	-0x30(%rbp), %rsi
+     379: 4a 83 7c ce 08 00            	cmpq	$0x0, 0x8(%rsi,%r9,8)
+     37f: 74 24                        	je	0x3a5 <memory__Pagemap__unmap_page_unlocked+0x3a5>
+     381: c7 45 d0 00 00 00 00         	movl	$0x0, -0x30(%rbp)
+     388: b0 01                        	movb	$0x1, %al
+     38a: 89 45 c8                     	movl	%eax, -0x38(%rbp)
+     38d: e9 df fe ff ff               	jmp	0x271 <memory__Pagemap__unmap_page_unlocked+0x271>
+     392: c7 45 c8 00 00 00 00         	movl	$0x0, -0x38(%rbp)
+     399: c7 45 d0 00 00 00 00         	movl	$0x0, -0x30(%rbp)
+     3a0: e9 cc fe ff ff               	jmp	0x271 <memory__Pagemap__unmap_page_unlocked+0x271>
+     3a5: 31 f6                        	xorl	%esi, %esi
+     3a7: 4c 8b 45 d0                  	movq	-0x30(%rbp), %r8
+     3ab: 49 83 3c f0 00               	cmpq	$0x0, (%r8,%rsi,8)
+     3b0: 75 3f                        	jne	0x3f1 <memory__Pagemap__unmap_page_unlocked+0x3f1>
+     3b2: 49 83 7c f0 08 00            	cmpq	$0x0, 0x8(%r8,%rsi,8)
+     3b8: 75 37                        	jne	0x3f1 <memory__Pagemap__unmap_page_unlocked+0x3f1>
+     3ba: 49 83 7c f0 10 00            	cmpq	$0x0, 0x10(%r8,%rsi,8)
+     3c0: 75 2f                        	jne	0x3f1 <memory__Pagemap__unmap_page_unlocked+0x3f1>
+     3c2: 49 83 7c f0 18 00            	cmpq	$0x0, 0x18(%r8,%rsi,8)
+     3c8: 75 27                        	jne	0x3f1 <memory__Pagemap__unmap_page_unlocked+0x3f1>
+     3ca: 48 83 c6 04                  	addq	$0x4, %rsi
+     3ce: 48 81 fe 00 02 00 00         	cmpq	$0x200, %rsi            # imm = 0x200
+     3d5: 75 d4                        	jne	0x3ab <memory__Pagemap__unmap_page_unlocked+0x3ab>
+     3d7: 48 c7 04 c1 00 00 00 00      	movq	$0x0, (%rcx,%rax,8)
+     3df: 41 b4 01                     	movb	$0x1, %r12b
+     3e2: b0 01                        	movb	$0x1, %al
+     3e4: 89 45 c8                     	movl	%eax, -0x38(%rbp)
+     3e7: b0 01                        	movb	$0x1, %al
+     3e9: 89 45 d0                     	movl	%eax, -0x30(%rbp)
+     3ec: e9 05 fe ff ff               	jmp	0x1f6 <memory__Pagemap__unmap_page_unlocked+0x1f6>
+     3f1: c7 45 d0 00 00 00 00         	movl	$0x0, -0x30(%rbp)
+     3f8: b0 01                        	movb	$0x1, %al
+     3fa: 89 45 c8                     	movl	%eax, -0x38(%rbp)
+     3fd: 4c 8b 7d b8                  	movq	-0x48(%rbp), %r15
+     401: 4c 8b 55 c0                  	movq	-0x40(%rbp), %r10
+     405: 41 b4 01                     	movb	$0x1, %r12b
+     408: e9 64 fe ff ff               	jmp	0x271 <memory__Pagemap__unmap_page_unlocked+0x271>

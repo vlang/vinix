@@ -1171,11 +1171,11 @@ fn populate_g17_pio_mappings(mut config G17HardwareConfig, hardware &hw.HwConfig
 	// Recovered from the G17C getPIORelativeOffsetTable virtual selected by
 	// the pinned macOS 26.5 driver. Entries whose primary offset is -1 use a
 	// different host-only mapping path and do not populate these records.
-	indices := [u32(17), 47, 26, 29, 31, 33, 34, 28, 32, 35, 37, 43]
+	indices := [u32(17), 47, 26, 29, 31, 33, 34, 28, 32, 35, 37, 43]!
 	offsets := [u64(0), 0x23d00, 0xd04000, 0xd10000, 0xd40000, 0xd44000, 0xd4c000, 0xd50000,
-		0xd60000, 0xe00000, 0xe40000, 0xe60000]
+		0xd60000, 0xe00000, 0xe40000, 0xe60000]!
 	sizes := [u32(0x21500), 0x200, 0x8000, 0x4000, 0x4000, 0x4000, 0x200, 0x10000, 0x20000, 0x4000,
-		0x4000, 0x58]
+		0x4000, 0x58]!
 
 	if hardware.gpu_mmio_base == 0 || hardware.gpu_mmio_size == 0 {
 		return false
@@ -1865,7 +1865,7 @@ const g17_descriptor_scalars = [
 	G17DescriptorScalar{ member: 0x126c, bytes: 4, value: 0xffff_ffff },
 	G17DescriptorScalar{ member: 0x13a8, bytes: 8, value: 0xffff_ffff },
 	G17DescriptorScalar{ member: 0x13e8, bytes: 4, value: 0xffff_ffff },
-]
+]!
 
 fn write_g17_descriptor_value(destination &u8, member u64, bytes u64, value u64) {
 	unsafe {

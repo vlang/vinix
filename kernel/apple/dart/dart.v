@@ -63,8 +63,8 @@ const dart_l1_bits = u32(11)
 const dart_l1_entries = u32(1) << dart_l1_bits
 const dart_l2_bits = u32(11)
 const dart_l2_entries = u32(1) << dart_l2_bits
-const dart_l1_pages = u64((dart_l1_entries * 8 + 4095) / 4096) // 16 KiB
-const dart_l2_pages = u64(4) // 16 KiB
+const dart_l1_pages = u64(1)
+const dart_l2_pages = u64(1)
 
 pub struct DART {
 pub mut:
@@ -74,11 +74,11 @@ pub mut:
 	l1_table  &u64 = unsafe { nil }
 }
 
-// Allocate `pages` contiguous 4 KiB pages whose base is 16 KiB aligned, as the
+// Allocate `pages` contiguous kernel pages whose base is 16 KiB aligned, as the
 // DART table/descriptor format requires (the L1->L2 pointer masks the low 14
 // bits, so a merely 4 KiB-aligned table would be truncated).
 fn alloc_16k_aligned(pages u64) &u64 {
-	raw := memory.pmm_alloc_aligned_fallible(pages, dart_page_size / 4096)
+	raw := memory.pmm_alloc_aligned_fallible(pages, dart_page_size / memory.page_size)
 	if raw == unsafe { nil } {
 		return unsafe { nil }
 	}
@@ -98,7 +98,7 @@ pub fn new_dart(base u64, stream_id u8) DART {
 		panic('dart: Failed to allocate L1 page table')
 	}
 	unsafe {
-		C.memset(voidptr(u64(d.l1_table) + higher_half), 0, dart_l1_pages * 4096)
+		C.memset(voidptr(u64(d.l1_table) + higher_half), 0, dart_l1_pages * memory.page_size)
 	}
 
 	println('dart: DART at 0x${base:x}, stream ${stream_id}')
@@ -217,7 +217,7 @@ fn (mut d DART) map_page(iova u64, phys u64) bool {
 			return false
 		}
 		unsafe {
-			C.memset(voidptr(u64(l2_table) + higher_half), 0, dart_l2_pages * 4096)
+			C.memset(voidptr(u64(l2_table) + higher_half), 0, dart_l2_pages * memory.page_size)
 		}
 		unsafe {
 			l1_p[l1_idx] = (u64(l2_table) & dart_pte_address_mask) | dart_pte_valid

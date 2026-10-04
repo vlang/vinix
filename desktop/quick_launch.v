@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Quick Launch: a Spotlight-style application search overlay.
 module main
 
@@ -76,7 +79,7 @@ fn (d &Desktop) quick_launch_match_count() int {
 	query := d.quick_launch_query_text()
 	mut count := 0
 	for factory in available_apps {
-		if start_menu_matches(factory.title, query) {
+		if app_matches(factory.title, query) {
 			count++
 		}
 	}
@@ -111,7 +114,7 @@ fn (d &Desktop) quick_launch_app_index(result_index int) ?int {
 	query := d.quick_launch_query_text()
 	mut result := 0
 	for app_index, factory in available_apps {
-		if !start_menu_matches(factory.title, query) {
+		if !app_matches(factory.title, query) {
 			continue
 		}
 		if result == result_index {
@@ -170,6 +173,10 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 		match ch {
 			8, 127 {
 				if d.switcher.query.len > 0 {
+					// A letter from another input source is several bytes.
+					for d.switcher.query.len > 1 && d.switcher.query.last() & 0xc0 == 0x80 {
+						d.switcher.query.delete_last()
+					}
 					d.switcher.query.delete_last()
 					d.switcher.index = 0
 					d.dirty = true
@@ -183,7 +190,7 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 				d.quick_launch_move_selection(1)
 			}
 			else {
-				if ch >= 0x20 && ch < 0x7f && d.switcher.query.len < start_menu_max_query {
+				if ch >= 0x20 && ch != 0x7f && d.switcher.query.len < start_menu_max_query {
 					d.switcher.query << ch
 					d.switcher.index = 0
 					d.dirty = true
@@ -280,7 +287,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 
 	mut panel_children := frame_elements(result_count + 3)
 	query := d.quick_launch_query_text()
-	search_text := if query.len > 0 { query } else { 'Search applications' }
+	search_text := if query.len > 0 { query } else { tr('quick_launch.search') }
 	panel_children << ui2.button_with_image('', search_text, 'builtin:search', ui2.rect(f64(quick_launch_panel_padding), f64(quick_launch_panel_padding), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_search_height)), ui2.BoxStyle{
 		bg: quick_launch_field_bg
 		radius: 10
@@ -292,7 +299,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 
 	row_y := quick_launch_panel_padding + quick_launch_search_height + 8
 	if result_count == 0 {
-		panel_children << ui2.label('quick-launch.empty', 'No applications found', ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
+		panel_children << ui2.label('quick-launch.empty', tr('quick_launch.empty'), ui2.rect(24, f64(row_y + 9), f64(width - 48), 30), ui2.TextStyle{
 			color: quick_launch_muted
 			size: 13
 			align: .left
@@ -300,7 +307,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 	} else {
 		mut result := 0
 		for factory in available_apps {
-			if !start_menu_matches(factory.title, query) {
+			if !app_matches(factory.title, query) {
 				continue
 			}
 			if result >= result_count {
@@ -309,7 +316,7 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 			id := d.switcher.ids[result]
 			selected := result == d.switcher.index
 			hovered := d.hover == id
-			panel_children << ui2.button_with_image(id, factory.title, factory.icon, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
+			panel_children << ui2.button_with_image(id, app_title_text(factory.title), factory.icon, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
 				bg: if selected { d.theme().accent } else if hovered { quick_launch_hover } else { quick_launch_bg }
 				radius: 7
 			}, ui2.TextStyle{

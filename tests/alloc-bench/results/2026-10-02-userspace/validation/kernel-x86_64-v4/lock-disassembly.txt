@@ -1,0 +1,653 @@
+
+build/useralloc-kernel-speed-v4/x86_64/blob.c.o:	file format elf64-x86-64
+
+Disassembly of section .text.klock__Lock__release:
+
+0000000000000000 <klock__Lock__release>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 48 83 ec 10                  	subq	$0x10, %rsp
+       8: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0xf <klock__Lock__release+0xf>
+       f: 48 89 45 f8                  	movq	%rax, -0x8(%rbp)
+      13: 0f b6 47 01                  	movzbl	0x1(%rdi), %eax
+      17: 31 c9                        	xorl	%ecx, %ecx
+      19: 88 0f                        	movb	%cl, (%rdi)
+      1b: 48 c7 45 f0 00 00 00 00      	movq	$0x0, -0x10(%rbp)
+      23: 9c                           	pushfq
+      24: 8f 45 f0                     	popq	-0x10(%rbp)
+      27: 84 c0                        	testb	%al, %al
+      29: 74 03                        	je	0x2e <klock__Lock__release+0x2e>
+      2b: fb                           	sti
+      2c: eb 01                        	jmp	0x2f <klock__Lock__release+0x2f>
+      2e: fa                           	cli
+      2f: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x36 <klock__Lock__release+0x36>
+      36: 48 3b 45 f8                  	cmpq	-0x8(%rbp), %rax
+      3a: 75 06                        	jne	0x42 <klock__Lock__release+0x42>
+      3c: 48 83 c4 10                  	addq	$0x10, %rsp
+      40: 5d                           	popq	%rbp
+      41: c3                           	retq
+      42: e8 00 00 00 00               	callq	0x47 <klock__Lock__release+0x47>
+
+Disassembly of section .text.file__release_flock:
+
+0000000000000000 <file__release_flock>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 41 57                        	pushq	%r15
+       6: 41 56                        	pushq	%r14
+       8: 41 55                        	pushq	%r13
+       a: 41 54                        	pushq	%r12
+       c: 53                           	pushq	%rbx
+       d: 48 81 ec c8 00 00 00         	subq	$0xc8, %rsp
+      14: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x1b <file__release_flock+0x1b>
+      1b: 48 89 45 d0                  	movq	%rax, -0x30(%rbp)
+      1f: 48 8b 47 08                  	movq	0x8(%rdi), %rax
+      23: b9 ff ff ff 7f               	movl	$0x7fffffff, %ecx       # imm = 0x7FFFFFFF
+      28: 23 48 08                     	andl	0x8(%rax), %ecx
+      2b: 81 f9 fd f4 5d 3f            	cmpl	$0x3f5df4fd, %ecx       # imm = 0x3F5DF4FD
+      31: 7e 4d                        	jle	0x80 <file__release_flock+0x80>
+      33: 81 f9 54 93 31 62            	cmpl	$0x62319354, %ecx       # imm = 0x62319354
+      39: 0f 8f 8e 00 00 00            	jg	0xcd <file__release_flock+0xcd>
+      3f: 81 f9 54 70 25 55            	cmpl	$0x55257054, %ecx       # imm = 0x55257054
+      45: 0f 8e 6a 01 00 00            	jle	0x1b5 <file__release_flock+0x1b5>
+      4b: 81 f9 2d e3 11 59            	cmpl	$0x5911e32d, %ecx       # imm = 0x5911E32D
+      51: 0f 8f f1 01 00 00            	jg	0x248 <file__release_flock+0x248>
+      57: 81 f9 55 70 25 55            	cmpl	$0x55257055, %ecx       # imm = 0x55257055
+      5d: 0f 84 75 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      63: 81 f9 df 08 dd 55            	cmpl	$0x55dd08df, %ecx       # imm = 0x55DD08DF
+      69: 0f 84 69 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      6f: 81 f9 f4 e4 cc 58            	cmpl	$0x58cce4f4, %ecx       # imm = 0x58CCE4F4
+      75: 0f 84 5d 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      7b: e9 60 02 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+      80: 81 f9 c8 bf 86 25            	cmpl	$0x2586bfc8, %ecx       # imm = 0x2586BFC8
+      86: 0f 8e 82 00 00 00            	jle	0x10e <file__release_flock+0x10e>
+      8c: 81 f9 c6 07 bd 35            	cmpl	$0x35bd07c6, %ecx       # imm = 0x35BD07C6
+      92: 0f 8e e8 00 00 00            	jle	0x180 <file__release_flock+0x180>
+      98: 81 f9 97 10 a7 3a            	cmpl	$0x3aa71097, %ecx       # imm = 0x3AA71097
+      9e: 0f 8f 7b 01 00 00            	jg	0x21f <file__release_flock+0x21f>
+      a4: 81 f9 c7 07 bd 35            	cmpl	$0x35bd07c7, %ecx       # imm = 0x35BD07C7
+      aa: 0f 84 28 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      b0: 81 f9 97 88 33 37            	cmpl	$0x37338897, %ecx       # imm = 0x37338897
+      b6: 0f 84 1c 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      bc: 81 f9 81 41 01 3a            	cmpl	$0x3a014181, %ecx       # imm = 0x3A014181
+      c2: 0f 84 10 02 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      c8: e9 13 02 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+      cd: 81 f9 b6 3c f0 68            	cmpl	$0x68f03cb6, %ecx       # imm = 0x68F03CB6
+      d3: 0f 8e 11 01 00 00            	jle	0x1ea <file__release_flock+0x1ea>
+      d9: 81 f9 00 cc 14 75            	cmpl	$0x7514cc00, %ecx       # imm = 0x7514CC00
+      df: 0f 8f 81 01 00 00            	jg	0x266 <file__release_flock+0x266>
+      e5: 81 f9 b7 3c f0 68            	cmpl	$0x68f03cb7, %ecx       # imm = 0x68F03CB7
+      eb: 0f 84 e7 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      f1: 81 f9 e7 84 c5 6f            	cmpl	$0x6fc584e7, %ecx       # imm = 0x6FC584E7
+      f7: 0f 84 db 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+      fd: 81 f9 16 fc 4f 70            	cmpl	$0x704ffc16, %ecx       # imm = 0x704FFC16
+     103: 0f 84 cf 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     109: e9 d2 01 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     10e: 81 f9 af 69 47 11            	cmpl	$0x114769af, %ecx       # imm = 0x114769AF
+     114: 7f 35                        	jg	0x14b <file__release_flock+0x14b>
+     116: 81 f9 f2 c5 3c 04            	cmpl	$0x43cc5f2, %ecx        # imm = 0x43CC5F2
+     11c: 0f 8e 5e 01 00 00            	jle	0x280 <file__release_flock+0x280>
+     122: 81 f9 f3 c5 3c 04            	cmpl	$0x43cc5f3, %ecx        # imm = 0x43CC5F3
+     128: 0f 84 aa 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     12e: 81 f9 63 01 5a 0a            	cmpl	$0xa5a0163, %ecx        # imm = 0xA5A0163
+     134: 0f 84 9e 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     13a: 81 f9 db ac 74 0c            	cmpl	$0xc74acdb, %ecx        # imm = 0xC74ACDB
+     140: 0f 84 92 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     146: e9 95 01 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     14b: 81 f9 8f 95 dd 15            	cmpl	$0x15dd958f, %ecx       # imm = 0x15DD958F
+     151: 0f 8e 3b 01 00 00            	jle	0x292 <file__release_flock+0x292>
+     157: 81 f9 90 95 dd 15            	cmpl	$0x15dd9590, %ecx       # imm = 0x15DD9590
+     15d: 0f 84 75 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     163: 81 f9 bb 2f 29 18            	cmpl	$0x18292fbb, %ecx       # imm = 0x18292FBB
+     169: 0f 84 69 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     16f: 81 f9 eb 5c 6d 1a            	cmpl	$0x1a6d5ceb, %ecx       # imm = 0x1A6D5CEB
+     175: 0f 84 5d 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     17b: e9 60 01 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     180: 81 f9 f0 a1 10 29            	cmpl	$0x2910a1f0, %ecx       # imm = 0x2910A1F0
+     186: 0f 8e 18 01 00 00            	jle	0x2a4 <file__release_flock+0x2a4>
+     18c: 81 f9 f1 a1 10 29            	cmpl	$0x2910a1f1, %ecx       # imm = 0x2910A1F1
+     192: 0f 84 40 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     198: 81 f9 65 24 72 34            	cmpl	$0x34722465, %ecx       # imm = 0x34722465
+     19e: 0f 84 34 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     1a4: 81 f9 20 19 9d 34            	cmpl	$0x349d1920, %ecx       # imm = 0x349D1920
+     1aa: 0f 84 28 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     1b0: e9 2b 01 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     1b5: 81 f9 af e3 57 45            	cmpl	$0x4557e3af, %ecx       # imm = 0x4557E3AF
+     1bb: 0f 8e f5 00 00 00            	jle	0x2b6 <file__release_flock+0x2b6>
+     1c1: 81 f9 b0 e3 57 45            	cmpl	$0x4557e3b0, %ecx       # imm = 0x4557E3B0
+     1c7: 0f 84 0b 01 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     1cd: 81 f9 2d 83 09 49            	cmpl	$0x4909832d, %ecx       # imm = 0x4909832D
+     1d3: 0f 84 ff 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     1d9: 81 f9 49 3e b6 4a            	cmpl	$0x4ab63e49, %ecx       # imm = 0x4AB63E49
+     1df: 0f 84 f3 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     1e5: e9 f6 00 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     1ea: 81 f9 75 c8 5d 64            	cmpl	$0x645dc875, %ecx       # imm = 0x645DC875
+     1f0: 0f 8e d2 00 00 00            	jle	0x2c8 <file__release_flock+0x2c8>
+     1f6: 81 f9 76 c8 5d 64            	cmpl	$0x645dc876, %ecx       # imm = 0x645DC876
+     1fc: 0f 84 d6 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     202: 81 f9 56 76 59 66            	cmpl	$0x66597656, %ecx       # imm = 0x66597656
+     208: 0f 84 ca 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     20e: 81 f9 82 16 f6 67            	cmpl	$0x67f61682, %ecx       # imm = 0x67F61682
+     214: 0f 84 be 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     21a: e9 c1 00 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     21f: 81 f9 98 10 a7 3a            	cmpl	$0x3aa71098, %ecx       # imm = 0x3AA71098
+     225: 0f 84 ad 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     22b: 81 f9 50 f7 72 3b            	cmpl	$0x3b72f750, %ecx       # imm = 0x3B72F750
+     231: 0f 84 a1 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     237: 81 f9 f5 c1 74 3d            	cmpl	$0x3d74c1f5, %ecx       # imm = 0x3D74C1F5
+     23d: 0f 84 95 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     243: e9 98 00 00 00               	jmp	0x2e0 <file__release_flock+0x2e0>
+     248: 81 f9 2e e3 11 59            	cmpl	$0x5911e32e, %ecx       # imm = 0x5911E32E
+     24e: 0f 84 84 00 00 00            	je	0x2d8 <file__release_flock+0x2d8>
+     254: 81 f9 65 85 6b 5b            	cmpl	$0x5b6b8565, %ecx       # imm = 0x5B6B8565
+     25a: 74 7c                        	je	0x2d8 <file__release_flock+0x2d8>
+     25c: 81 f9 93 f4 25 62            	cmpl	$0x6225f493, %ecx       # imm = 0x6225F493
+     262: 74 74                        	je	0x2d8 <file__release_flock+0x2d8>
+     264: eb 7a                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     266: 81 f9 01 cc 14 75            	cmpl	$0x7514cc01, %ecx       # imm = 0x7514CC01
+     26c: 74 6a                        	je	0x2d8 <file__release_flock+0x2d8>
+     26e: 81 f9 84 9b fb 76            	cmpl	$0x76fb9b84, %ecx       # imm = 0x76FB9B84
+     274: 74 62                        	je	0x2d8 <file__release_flock+0x2d8>
+     276: 81 f9 89 e1 a2 78            	cmpl	$0x78a2e189, %ecx       # imm = 0x78A2E189
+     27c: 74 5a                        	je	0x2d8 <file__release_flock+0x2d8>
+     27e: eb 60                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     280: 81 f9 92 0b 12 01            	cmpl	$0x1120b92, %ecx        # imm = 0x1120B92
+     286: 74 50                        	je	0x2d8 <file__release_flock+0x2d8>
+     288: 81 f9 ef 14 52 02            	cmpl	$0x25214ef, %ecx        # imm = 0x25214EF
+     28e: 74 48                        	je	0x2d8 <file__release_flock+0x2d8>
+     290: eb 4e                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     292: 81 f9 b0 69 47 11            	cmpl	$0x114769b0, %ecx       # imm = 0x114769B0
+     298: 74 3e                        	je	0x2d8 <file__release_flock+0x2d8>
+     29a: 81 f9 44 69 f0 12            	cmpl	$0x12f06944, %ecx       # imm = 0x12F06944
+     2a0: 74 36                        	je	0x2d8 <file__release_flock+0x2d8>
+     2a2: eb 3c                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     2a4: 81 f9 c9 bf 86 25            	cmpl	$0x2586bfc9, %ecx       # imm = 0x2586BFC9
+     2aa: 74 2c                        	je	0x2d8 <file__release_flock+0x2d8>
+     2ac: 81 f9 5d 0e f4 28            	cmpl	$0x28f40e5d, %ecx       # imm = 0x28F40E5D
+     2b2: 74 24                        	je	0x2d8 <file__release_flock+0x2d8>
+     2b4: eb 2a                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     2b6: 81 f9 fe f4 5d 3f            	cmpl	$0x3f5df4fe, %ecx       # imm = 0x3F5DF4FE
+     2bc: 74 1a                        	je	0x2d8 <file__release_flock+0x2d8>
+     2be: 81 f9 89 ae 0f 42            	cmpl	$0x420fae89, %ecx       # imm = 0x420FAE89
+     2c4: 74 12                        	je	0x2d8 <file__release_flock+0x2d8>
+     2c6: eb 18                        	jmp	0x2e0 <file__release_flock+0x2e0>
+     2c8: 81 f9 55 93 31 62            	cmpl	$0x62319355, %ecx       # imm = 0x62319355
+     2ce: 74 08                        	je	0x2d8 <file__release_flock+0x2d8>
+     2d0: 81 f9 58 5a 24 64            	cmpl	$0x64245a58, %ecx       # imm = 0x64245A58
+     2d6: 75 08                        	jne	0x2e0 <file__release_flock+0x2e0>
+     2d8: 48 8b 08                     	movq	(%rax), %rcx
+     2db: 48 85 c9                     	testq	%rcx, %rcx
+     2de: 75 04                        	jne	0x2e4 <file__release_flock+0x2e4>
+     2e0: 48 8d 48 10                  	leaq	0x10(%rax), %rcx
+     2e4: ba 00 f0 00 00               	movl	$0xf000, %edx           # imm = 0xF000
+     2e9: 23 51 18                     	andl	0x18(%rcx), %edx
+     2ec: 89 d1                        	movl	%edx, %ecx
+     2ee: 66 f7 d9                     	negw	%cx
+     2f1: 70 0c                        	jo	0x2ff <file__release_flock+0x2ff>
+     2f3: 81 fa 00 40 00 00            	cmpl	$0x4000, %edx           # imm = 0x4000
+     2f9: 0f 85 5c 02 00 00            	jne	0x55b <file__release_flock+0x55b>
+     2ff: 48 89 bd 18 ff ff ff         	movq	%rdi, -0xe8(%rbp)
+     306: 48 8b 18                     	movq	(%rax), %rbx
+     309: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     310: e8 00 00 00 00               	callq	0x315 <file__release_flock+0x315>
+     315: 48 8b 15 00 00 00 00         	movq	(%rip), %rdx            # 0x31c <file__release_flock+0x31c>
+     31c: 48 85 d2                     	testq	%rdx, %rdx
+     31f: 0f 84 9d 01 00 00            	je	0x4c2 <file__release_flock+0x4c2>
+     325: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     32c: b9 38 00 00 00               	movl	$0x38, %ecx
+     331: 31 f6                        	xorl	%esi, %esi
+     333: e8 00 00 00 00               	callq	0x338 <file__release_flock+0x338>
+     338: 4c 8b 35 00 00 00 00         	movq	(%rip), %r14            # 0x33f <file__release_flock+0x33f>
+     33f: 4d 85 f6                     	testq	%r14, %r14
+     342: 0f 8e c6 01 00 00            	jle	0x50e <file__release_flock+0x50e>
+     348: 4c 8d 65 88                  	leaq	-0x78(%rbp), %r12
+     34c: 45 31 ed                     	xorl	%r13d, %r13d
+     34f: 45 31 ff                     	xorl	%r15d, %r15d
+     352: 4c 8b 8d 18 ff ff ff         	movq	-0xe8(%rbp), %r9
+     359: eb 14                        	jmp	0x36f <file__release_flock+0x36f>
+     35b: 0f 1f 44 00 00               	nopl	(%rax,%rax)
+     360: 49 ff c7                     	incq	%r15
+     363: 41 89 f5                     	movl	%esi, %r13d
+     366: 4d 39 f7                     	cmpq	%r14, %r15
+     369: 0f 8d e5 00 00 00            	jge	0x454 <file__release_flock+0x454>
+     36f: 4d 39 f7                     	cmpq	%r14, %r15
+     372: 0f 8d 06 02 00 00            	jge	0x57e <file__release_flock+0x57e>
+     378: 48 8b 35 00 00 00 00         	movq	(%rip), %rsi            # 0x37f <file__release_flock+0x37f>
+     37f: 48 8b 3d 00 00 00 00         	movq	(%rip), %rdi            # 0x386 <file__release_flock+0x386>
+     386: 49 0f af ff                  	imulq	%r15, %rdi
+     38a: 48 8b 04 3e                  	movq	(%rsi,%rdi), %rax
+     38e: 48 8b 4c 3e 08               	movq	0x8(%rsi,%rdi), %rcx
+     393: 48 8b 54 3e 10               	movq	0x10(%rsi,%rdi), %rdx
+     398: 4c 8b 44 3e 18               	movq	0x18(%rsi,%rdi), %r8
+     39d: 4c 89 85 20 ff ff ff         	movq	%r8, -0xe0(%rbp)
+     3a4: 4c 8b 44 3e 20               	movq	0x20(%rsi,%rdi), %r8
+     3a9: 4c 89 85 28 ff ff ff         	movq	%r8, -0xd8(%rbp)
+     3b0: 4c 8b 44 3e 28               	movq	0x28(%rsi,%rdi), %r8
+     3b5: 4c 89 85 30 ff ff ff         	movq	%r8, -0xd0(%rbp)
+     3bc: 48 8b 74 3e 30               	movq	0x30(%rsi,%rdi), %rsi
+     3c1: 48 89 b5 38 ff ff ff         	movq	%rsi, -0xc8(%rbp)
+     3c8: 48 89 d6                     	movq	%rdx, %rsi
+     3cb: 48 83 f6 01                  	xorq	$0x1, %rsi
+     3cf: 48 89 c7                     	movq	%rax, %rdi
+     3d2: 48 31 df                     	xorq	%rbx, %rdi
+     3d5: 48 09 f7                     	orq	%rsi, %rdi
+     3d8: 49 89 c8                     	movq	%rcx, %r8
+     3db: 4d 31 c8                     	xorq	%r9, %r8
+     3de: 40 b6 01                     	movb	$0x1, %sil
+     3e1: 49 09 f8                     	orq	%rdi, %r8
+     3e4: 0f 84 76 ff ff ff            	je	0x360 <file__release_flock+0x360>
+     3ea: 48 89 85 70 ff ff ff         	movq	%rax, -0x90(%rbp)
+     3f1: 48 89 8d 78 ff ff ff         	movq	%rcx, -0x88(%rbp)
+     3f8: 48 89 55 80                  	movq	%rdx, -0x80(%rbp)
+     3fc: 48 8b 85 38 ff ff ff         	movq	-0xc8(%rbp), %rax
+     403: 49 89 44 24 18               	movq	%rax, 0x18(%r12)
+     408: 48 8b 85 30 ff ff ff         	movq	-0xd0(%rbp), %rax
+     40f: 49 89 44 24 10               	movq	%rax, 0x10(%r12)
+     414: 48 8b 85 20 ff ff ff         	movq	-0xe0(%rbp), %rax
+     41b: 48 8b 8d 28 ff ff ff         	movq	-0xd8(%rbp), %rcx
+     422: 49 89 4c 24 08               	movq	%rcx, 0x8(%r12)
+     427: 49 89 04 24                  	movq	%rax, (%r12)
+     42b: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     432: 48 8d b5 70 ff ff ff         	leaq	-0x90(%rbp), %rsi
+     439: e8 00 00 00 00               	callq	0x43e <file__release_flock+0x43e>
+     43e: 4c 8b 8d 18 ff ff ff         	movq	-0xe8(%rbp), %r9
+     445: 4c 8b 35 00 00 00 00         	movq	(%rip), %r14            # 0x44c <file__release_flock+0x44c>
+     44c: 44 89 ee                     	movl	%r13d, %esi
+     44f: e9 0c ff ff ff               	jmp	0x360 <file__release_flock+0x360>
+     454: 40 f6 c6 01                  	testb	$0x1, %sil
+     458: 0f 84 b0 00 00 00            	je	0x50e <file__release_flock+0x50e>
+     45e: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     465: e8 00 00 00 00               	callq	0x46a <file__release_flock+0x46a>
+     46a: 48 8b 85 68 ff ff ff         	movq	-0x98(%rbp), %rax
+     471: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x478 <file__release_flock+0x478>
+     478: 48 8b 85 60 ff ff ff         	movq	-0xa0(%rbp), %rax
+     47f: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x486 <file__release_flock+0x486>
+     486: 48 8b 85 58 ff ff ff         	movq	-0xa8(%rbp), %rax
+     48d: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x494 <file__release_flock+0x494>
+     494: 48 8b 85 50 ff ff ff         	movq	-0xb0(%rbp), %rax
+     49b: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x4a2 <file__release_flock+0x4a2>
+     4a2: 48 8b 85 40 ff ff ff         	movq	-0xc0(%rbp), %rax
+     4a9: 48 8b 8d 48 ff ff ff         	movq	-0xb8(%rbp), %rcx
+     4b0: 48 89 0d 00 00 00 00         	movq	%rcx, (%rip)            # 0x4b7 <file__release_flock+0x4b7>
+     4b7: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x4be <file__release_flock+0x4be>
+     4be: b0 01                        	movb	$0x1, %al
+     4c0: eb 5a                        	jmp	0x51c <file__release_flock+0x51c>
+     4c2: 48 c7 85 60 ff ff ff 00 00 00 00     	movq	$0x0, -0xa0(%rbp)
+     4cd: 48 c7 85 58 ff ff ff 00 00 00 00     	movq	$0x0, -0xa8(%rbp)
+     4d8: 48 c7 85 50 ff ff ff 00 00 00 00     	movq	$0x0, -0xb0(%rbp)
+     4e3: 48 c7 85 48 ff ff ff 00 00 00 00     	movq	$0x0, -0xb8(%rbp)
+     4ee: 48 c7 85 40 ff ff ff 00 00 00 00     	movq	$0x0, -0xc0(%rbp)
+     4f9: c7 85 60 ff ff ff 10 00 00 00	movl	$0x10, -0xa0(%rbp)
+     503: 48 c7 85 68 ff ff ff 38 00 00 00     	movq	$0x38, -0x98(%rbp)
+     50e: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     515: e8 00 00 00 00               	callq	0x51a <file__release_flock+0x51a>
+     51a: 31 c0                        	xorl	%eax, %eax
+     51c: 0f b6 0d 00 00 00 00         	movzbl	(%rip), %ecx            # 0x523 <file__release_flock+0x523>
+     523: 31 d2                        	xorl	%edx, %edx
+     525: 88 15 00 00 00 00            	movb	%dl, (%rip)             # 0x52b <file__release_flock+0x52b>
+     52b: 48 c7 85 70 ff ff ff 00 00 00 00     	movq	$0x0, -0x90(%rbp)
+     536: 9c                           	pushfq
+     537: 8f 85 70 ff ff ff            	popq	-0x90(%rbp)
+     53d: 84 c9                        	testb	%cl, %cl
+     53f: 74 07                        	je	0x548 <file__release_flock+0x548>
+     541: fb                           	sti
+     542: 84 c0                        	testb	%al, %al
+     544: 75 07                        	jne	0x54d <file__release_flock+0x54d>
+     546: eb 13                        	jmp	0x55b <file__release_flock+0x55b>
+     548: fa                           	cli
+     549: 84 c0                        	testb	%al, %al
+     54b: 74 0e                        	je	0x55b <file__release_flock+0x55b>
+     54d: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     554: 31 f6                        	xorl	%esi, %esi
+     556: e8 00 00 00 00               	callq	0x55b <file__release_flock+0x55b>
+     55b: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x562 <file__release_flock+0x562>
+     562: 48 3b 45 d0                  	cmpq	-0x30(%rbp), %rax
+     566: 0f 85 ab 00 00 00            	jne	0x617 <file__release_flock+0x617>
+     56c: 48 81 c4 c8 00 00 00         	addq	$0xc8, %rsp
+     573: 5b                           	popq	%rbx
+     574: 41 5c                        	popq	%r12
+     576: 41 5d                        	popq	%r13
+     578: 41 5e                        	popq	%r14
+     57a: 41 5f                        	popq	%r15
+     57c: 5d                           	popq	%rbp
+     57d: c3                           	retq
+     57e: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x585 <file__release_flock+0x585>
+     585: 48 89 45 80                  	movq	%rax, -0x80(%rbp)
+     589: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x590 <file__release_flock+0x590>
+     590: 48 89 85 78 ff ff ff         	movq	%rax, -0x88(%rbp)
+     597: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x59e <file__release_flock+0x59e>
+     59e: 48 89 85 70 ff ff ff         	movq	%rax, -0x90(%rbp)
+     5a5: 48 8d 7d 88                  	leaq	-0x78(%rbp), %rdi
+     5a9: 4c 89 fe                     	movq	%r15, %rsi
+     5ac: e8 00 00 00 00               	callq	0x5b1 <file__release_flock+0x5b1>
+     5b1: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x5b8 <file__release_flock+0x5b8>
+     5b8: 48 89 45 b0                  	movq	%rax, -0x50(%rbp)
+     5bc: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x5c3 <file__release_flock+0x5c3>
+     5c3: 48 89 45 a8                  	movq	%rax, -0x58(%rbp)
+     5c7: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x5ce <file__release_flock+0x5ce>
+     5ce: 48 89 45 a0                  	movq	%rax, -0x60(%rbp)
+     5d2: 48 8d 7d b8                  	leaq	-0x48(%rbp), %rdi
+     5d6: 4c 89 f6                     	movq	%r14, %rsi
+     5d9: e8 00 00 00 00               	callq	0x5de <file__release_flock+0x5de>
+     5de: 48 8d bd 20 ff ff ff         	leaq	-0xe0(%rbp), %rdi
+     5e5: 48 8d 95 70 ff ff ff         	leaq	-0x90(%rbp), %rdx
+     5ec: be 04 00 00 00               	movl	$0x4, %esi
+     5f1: e8 00 00 00 00               	callq	0x5f6 <file__release_flock+0x5f6>
+     5f6: 48 83 ec 08                  	subq	$0x8, %rsp
+     5fa: 48 8b 85 30 ff ff ff         	movq	-0xd0(%rbp), %rax
+     601: 48 8b 8d 20 ff ff ff         	movq	-0xe0(%rbp), %rcx
+     608: 48 8b 95 28 ff ff ff         	movq	-0xd8(%rbp), %rdx
+     60f: 50                           	pushq	%rax
+     610: 52                           	pushq	%rdx
+     611: 51                           	pushq	%rcx
+     612: e8 00 00 00 00               	callq	0x617 <file__release_flock+0x617>
+     617: e8 00 00 00 00               	callq	0x61c <file__release_flock+0x61c>
+
+Disassembly of section .text.file__release_posix_locks:
+
+0000000000000000 <file__release_posix_locks>:
+       0: 55                           	pushq	%rbp
+       1: 48 89 e5                     	movq	%rsp, %rbp
+       4: 41 57                        	pushq	%r15
+       6: 41 56                        	pushq	%r14
+       8: 41 55                        	pushq	%r13
+       a: 41 54                        	pushq	%r12
+       c: 53                           	pushq	%rbx
+       d: 48 81 ec c8 00 00 00         	subq	$0xc8, %rsp
+      14: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x1b <file__release_posix_locks+0x1b>
+      1b: 48 89 45 d0                  	movq	%rax, -0x30(%rbp)
+      1f: b8 ff ff ff 7f               	movl	$0x7fffffff, %eax       # imm = 0x7FFFFFFF
+      24: 23 47 08                     	andl	0x8(%rdi), %eax
+      27: 3d fd f4 5d 3f               	cmpl	$0x3f5df4fd, %eax       # imm = 0x3F5DF4FD
+      2c: 7e 43                        	jle	0x71 <file__release_posix_locks+0x71>
+      2e: 3d 54 93 31 62               	cmpl	$0x62319354, %eax       # imm = 0x62319354
+      33: 7f 7f                        	jg	0xb4 <file__release_posix_locks+0xb4>
+      35: 3d 54 70 25 55               	cmpl	$0x55257054, %eax       # imm = 0x55257054
+      3a: 0f 8e 4a 01 00 00            	jle	0x18a <file__release_posix_locks+0x18a>
+      40: 3d 2d e3 11 59               	cmpl	$0x5911e32d, %eax       # imm = 0x5911E32D
+      45: 0f 8f c7 01 00 00            	jg	0x212 <file__release_posix_locks+0x212>
+      4b: 3d 55 70 25 55               	cmpl	$0x55257055, %eax       # imm = 0x55257055
+      50: 0f 84 38 02 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      56: 3d df 08 dd 55               	cmpl	$0x55dd08df, %eax       # imm = 0x55DD08DF
+      5b: 0f 84 2d 02 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      61: 3d f4 e4 cc 58               	cmpl	$0x58cce4f4, %eax       # imm = 0x58CCE4F4
+      66: 0f 84 22 02 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      6c: e9 25 02 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+      71: 3d c8 bf 86 25               	cmpl	$0x2586bfc8, %eax       # imm = 0x2586BFC8
+      76: 7e 78                        	jle	0xf0 <file__release_posix_locks+0xf0>
+      78: 3d c6 07 bd 35               	cmpl	$0x35bd07c6, %eax       # imm = 0x35BD07C6
+      7d: 0f 8e d6 00 00 00            	jle	0x159 <file__release_posix_locks+0x159>
+      83: 3d 97 10 a7 3a               	cmpl	$0x3aa71097, %eax       # imm = 0x3AA71097
+      88: 0f 8f 5e 01 00 00            	jg	0x1ec <file__release_posix_locks+0x1ec>
+      8e: 3d c7 07 bd 35               	cmpl	$0x35bd07c7, %eax       # imm = 0x35BD07C7
+      93: 0f 84 f5 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      99: 3d 97 88 33 37               	cmpl	$0x37338897, %eax       # imm = 0x37338897
+      9e: 0f 84 ea 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      a4: 3d 81 41 01 3a               	cmpl	$0x3a014181, %eax       # imm = 0x3A014181
+      a9: 0f 84 df 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      af: e9 e2 01 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+      b4: 3d b6 3c f0 68               	cmpl	$0x68f03cb6, %eax       # imm = 0x68F03CB6
+      b9: 0f 8e fc 00 00 00            	jle	0x1bb <file__release_posix_locks+0x1bb>
+      bf: 3d 00 cc 14 75               	cmpl	$0x7514cc00, %eax       # imm = 0x7514CC00
+      c4: 0f 8f 5f 01 00 00            	jg	0x229 <file__release_posix_locks+0x229>
+      ca: 3d b7 3c f0 68               	cmpl	$0x68f03cb7, %eax       # imm = 0x68F03CB7
+      cf: 0f 84 b9 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      d5: 3d e7 84 c5 6f               	cmpl	$0x6fc584e7, %eax       # imm = 0x6FC584E7
+      da: 0f 84 ae 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      e0: 3d 16 fc 4f 70               	cmpl	$0x704ffc16, %eax       # imm = 0x704FFC16
+      e5: 0f 84 a3 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+      eb: e9 a6 01 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+      f0: 3d af 69 47 11               	cmpl	$0x114769af, %eax       # imm = 0x114769AF
+      f5: 7f 31                        	jg	0x128 <file__release_posix_locks+0x128>
+      f7: 3d f2 c5 3c 04               	cmpl	$0x43cc5f2, %eax        # imm = 0x43CC5F2
+      fc: 0f 8e 3e 01 00 00            	jle	0x240 <file__release_posix_locks+0x240>
+     102: 3d f3 c5 3c 04               	cmpl	$0x43cc5f3, %eax        # imm = 0x43CC5F3
+     107: 0f 84 81 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     10d: 3d 63 01 5a 0a               	cmpl	$0xa5a0163, %eax        # imm = 0xA5A0163
+     112: 0f 84 76 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     118: 3d db ac 74 0c               	cmpl	$0xc74acdb, %eax        # imm = 0xC74ACDB
+     11d: 0f 84 6b 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     123: e9 6e 01 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     128: 3d 8f 95 dd 15               	cmpl	$0x15dd958f, %eax       # imm = 0x15DD958F
+     12d: 0f 8e 1d 01 00 00            	jle	0x250 <file__release_posix_locks+0x250>
+     133: 3d 90 95 dd 15               	cmpl	$0x15dd9590, %eax       # imm = 0x15DD9590
+     138: 0f 84 50 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     13e: 3d bb 2f 29 18               	cmpl	$0x18292fbb, %eax       # imm = 0x18292FBB
+     143: 0f 84 45 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     149: 3d eb 5c 6d 1a               	cmpl	$0x1a6d5ceb, %eax       # imm = 0x1A6D5CEB
+     14e: 0f 84 3a 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     154: e9 3d 01 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     159: 3d f0 a1 10 29               	cmpl	$0x2910a1f0, %eax       # imm = 0x2910A1F0
+     15e: 0f 8e fc 00 00 00            	jle	0x260 <file__release_posix_locks+0x260>
+     164: 3d f1 a1 10 29               	cmpl	$0x2910a1f1, %eax       # imm = 0x2910A1F1
+     169: 0f 84 1f 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     16f: 3d 65 24 72 34               	cmpl	$0x34722465, %eax       # imm = 0x34722465
+     174: 0f 84 14 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     17a: 3d 20 19 9d 34               	cmpl	$0x349d1920, %eax       # imm = 0x349D1920
+     17f: 0f 84 09 01 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     185: e9 0c 01 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     18a: 3d af e3 57 45               	cmpl	$0x4557e3af, %eax       # imm = 0x4557E3AF
+     18f: 0f 8e db 00 00 00            	jle	0x270 <file__release_posix_locks+0x270>
+     195: 3d b0 e3 57 45               	cmpl	$0x4557e3b0, %eax       # imm = 0x4557E3B0
+     19a: 0f 84 ee 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1a0: 3d 2d 83 09 49               	cmpl	$0x4909832d, %eax       # imm = 0x4909832D
+     1a5: 0f 84 e3 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1ab: 3d 49 3e b6 4a               	cmpl	$0x4ab63e49, %eax       # imm = 0x4AB63E49
+     1b0: 0f 84 d8 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1b6: e9 db 00 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     1bb: 3d 75 c8 5d 64               	cmpl	$0x645dc875, %eax       # imm = 0x645DC875
+     1c0: 0f 8e ba 00 00 00            	jle	0x280 <file__release_posix_locks+0x280>
+     1c6: 3d 76 c8 5d 64               	cmpl	$0x645dc876, %eax       # imm = 0x645DC876
+     1cb: 0f 84 bd 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1d1: 3d 56 76 59 66               	cmpl	$0x66597656, %eax       # imm = 0x66597656
+     1d6: 0f 84 b2 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1dc: 3d 82 16 f6 67               	cmpl	$0x67f61682, %eax       # imm = 0x67F61682
+     1e1: 0f 84 a7 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1e7: e9 aa 00 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     1ec: 3d 98 10 a7 3a               	cmpl	$0x3aa71098, %eax       # imm = 0x3AA71098
+     1f1: 0f 84 97 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     1f7: 3d 50 f7 72 3b               	cmpl	$0x3b72f750, %eax       # imm = 0x3B72F750
+     1fc: 0f 84 8c 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     202: 3d f5 c1 74 3d               	cmpl	$0x3d74c1f5, %eax       # imm = 0x3D74C1F5
+     207: 0f 84 81 00 00 00            	je	0x28e <file__release_posix_locks+0x28e>
+     20d: e9 84 00 00 00               	jmp	0x296 <file__release_posix_locks+0x296>
+     212: 3d 2e e3 11 59               	cmpl	$0x5911e32e, %eax       # imm = 0x5911E32E
+     217: 74 75                        	je	0x28e <file__release_posix_locks+0x28e>
+     219: 3d 65 85 6b 5b               	cmpl	$0x5b6b8565, %eax       # imm = 0x5B6B8565
+     21e: 74 6e                        	je	0x28e <file__release_posix_locks+0x28e>
+     220: 3d 93 f4 25 62               	cmpl	$0x6225f493, %eax       # imm = 0x6225F493
+     225: 74 67                        	je	0x28e <file__release_posix_locks+0x28e>
+     227: eb 6d                        	jmp	0x296 <file__release_posix_locks+0x296>
+     229: 3d 01 cc 14 75               	cmpl	$0x7514cc01, %eax       # imm = 0x7514CC01
+     22e: 74 5e                        	je	0x28e <file__release_posix_locks+0x28e>
+     230: 3d 84 9b fb 76               	cmpl	$0x76fb9b84, %eax       # imm = 0x76FB9B84
+     235: 74 57                        	je	0x28e <file__release_posix_locks+0x28e>
+     237: 3d 89 e1 a2 78               	cmpl	$0x78a2e189, %eax       # imm = 0x78A2E189
+     23c: 74 50                        	je	0x28e <file__release_posix_locks+0x28e>
+     23e: eb 56                        	jmp	0x296 <file__release_posix_locks+0x296>
+     240: 3d 92 0b 12 01               	cmpl	$0x1120b92, %eax        # imm = 0x1120B92
+     245: 74 47                        	je	0x28e <file__release_posix_locks+0x28e>
+     247: 3d ef 14 52 02               	cmpl	$0x25214ef, %eax        # imm = 0x25214EF
+     24c: 74 40                        	je	0x28e <file__release_posix_locks+0x28e>
+     24e: eb 46                        	jmp	0x296 <file__release_posix_locks+0x296>
+     250: 3d b0 69 47 11               	cmpl	$0x114769b0, %eax       # imm = 0x114769B0
+     255: 74 37                        	je	0x28e <file__release_posix_locks+0x28e>
+     257: 3d 44 69 f0 12               	cmpl	$0x12f06944, %eax       # imm = 0x12F06944
+     25c: 74 30                        	je	0x28e <file__release_posix_locks+0x28e>
+     25e: eb 36                        	jmp	0x296 <file__release_posix_locks+0x296>
+     260: 3d c9 bf 86 25               	cmpl	$0x2586bfc9, %eax       # imm = 0x2586BFC9
+     265: 74 27                        	je	0x28e <file__release_posix_locks+0x28e>
+     267: 3d 5d 0e f4 28               	cmpl	$0x28f40e5d, %eax       # imm = 0x28F40E5D
+     26c: 74 20                        	je	0x28e <file__release_posix_locks+0x28e>
+     26e: eb 26                        	jmp	0x296 <file__release_posix_locks+0x296>
+     270: 3d fe f4 5d 3f               	cmpl	$0x3f5df4fe, %eax       # imm = 0x3F5DF4FE
+     275: 74 17                        	je	0x28e <file__release_posix_locks+0x28e>
+     277: 3d 89 ae 0f 42               	cmpl	$0x420fae89, %eax       # imm = 0x420FAE89
+     27c: 74 10                        	je	0x28e <file__release_posix_locks+0x28e>
+     27e: eb 16                        	jmp	0x296 <file__release_posix_locks+0x296>
+     280: 3d 55 93 31 62               	cmpl	$0x62319355, %eax       # imm = 0x62319355
+     285: 74 07                        	je	0x28e <file__release_posix_locks+0x28e>
+     287: 3d 58 5a 24 64               	cmpl	$0x64245a58, %eax       # imm = 0x64245A58
+     28c: 75 08                        	jne	0x296 <file__release_posix_locks+0x296>
+     28e: 48 8b 07                     	movq	(%rdi), %rax
+     291: 48 85 c0                     	testq	%rax, %rax
+     294: 75 04                        	jne	0x29a <file__release_posix_locks+0x29a>
+     296: 48 8d 47 10                  	leaq	0x10(%rdi), %rax
+     29a: b9 00 f0 00 00               	movl	$0xf000, %ecx           # imm = 0xF000
+     29f: 23 48 18                     	andl	0x18(%rax), %ecx
+     2a2: 81 f9 00 80 00 00            	cmpl	$0x8000, %ecx           # imm = 0x8000
+     2a8: 0f 85 52 02 00 00            	jne	0x500 <file__release_posix_locks+0x500>
+     2ae: 48 89 b5 18 ff ff ff         	movq	%rsi, -0xe8(%rbp)
+     2b5: 48 8b 1f                     	movq	(%rdi), %rbx
+     2b8: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     2bf: e8 00 00 00 00               	callq	0x2c4 <file__release_posix_locks+0x2c4>
+     2c4: 48 8b 15 00 00 00 00         	movq	(%rip), %rdx            # 0x2cb <file__release_posix_locks+0x2cb>
+     2cb: 48 85 d2                     	testq	%rdx, %rdx
+     2ce: 0f 84 93 01 00 00            	je	0x467 <file__release_posix_locks+0x467>
+     2d4: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     2db: b9 38 00 00 00               	movl	$0x38, %ecx
+     2e0: 31 f6                        	xorl	%esi, %esi
+     2e2: e8 00 00 00 00               	callq	0x2e7 <file__release_posix_locks+0x2e7>
+     2e7: 4c 8b 35 00 00 00 00         	movq	(%rip), %r14            # 0x2ee <file__release_posix_locks+0x2ee>
+     2ee: 4d 85 f6                     	testq	%r14, %r14
+     2f1: 0f 8e bc 01 00 00            	jle	0x4b3 <file__release_posix_locks+0x4b3>
+     2f7: 4c 8d 65 88                  	leaq	-0x78(%rbp), %r12
+     2fb: 45 31 ed                     	xorl	%r13d, %r13d
+     2fe: 45 31 ff                     	xorl	%r15d, %r15d
+     301: 4c 8b 8d 18 ff ff ff         	movq	-0xe8(%rbp), %r9
+     308: eb 15                        	jmp	0x31f <file__release_posix_locks+0x31f>
+     30a: 66 0f 1f 44 00 00            	nopw	(%rax,%rax)
+     310: 49 ff c7                     	incq	%r15
+     313: 41 89 f5                     	movl	%esi, %r13d
+     316: 4d 39 f7                     	cmpq	%r14, %r15
+     319: 0f 8d da 00 00 00            	jge	0x3f9 <file__release_posix_locks+0x3f9>
+     31f: 4d 39 f7                     	cmpq	%r14, %r15
+     322: 0f 8d fb 01 00 00            	jge	0x523 <file__release_posix_locks+0x523>
+     328: 48 8b 35 00 00 00 00         	movq	(%rip), %rsi            # 0x32f <file__release_posix_locks+0x32f>
+     32f: 48 8b 3d 00 00 00 00         	movq	(%rip), %rdi            # 0x336 <file__release_posix_locks+0x336>
+     336: 49 0f af ff                  	imulq	%r15, %rdi
+     33a: 48 8b 04 3e                  	movq	(%rsi,%rdi), %rax
+     33e: 48 8b 4c 3e 08               	movq	0x8(%rsi,%rdi), %rcx
+     343: 48 8b 54 3e 10               	movq	0x10(%rsi,%rdi), %rdx
+     348: 4c 8b 44 3e 18               	movq	0x18(%rsi,%rdi), %r8
+     34d: 4c 89 85 20 ff ff ff         	movq	%r8, -0xe0(%rbp)
+     354: 4c 8b 44 3e 20               	movq	0x20(%rsi,%rdi), %r8
+     359: 4c 89 85 28 ff ff ff         	movq	%r8, -0xd8(%rbp)
+     360: 4c 8b 44 3e 28               	movq	0x28(%rsi,%rdi), %r8
+     365: 4c 89 85 30 ff ff ff         	movq	%r8, -0xd0(%rbp)
+     36c: 48 8b 74 3e 30               	movq	0x30(%rsi,%rdi), %rsi
+     371: 48 89 b5 38 ff ff ff         	movq	%rsi, -0xc8(%rbp)
+     378: 48 89 c7                     	movq	%rax, %rdi
+     37b: 48 31 df                     	xorq	%rbx, %rdi
+     37e: 48 09 d7                     	orq	%rdx, %rdi
+     381: 49 89 c8                     	movq	%rcx, %r8
+     384: 4d 31 c8                     	xorq	%r9, %r8
+     387: 40 b6 01                     	movb	$0x1, %sil
+     38a: 49 09 f8                     	orq	%rdi, %r8
+     38d: 74 81                        	je	0x310 <file__release_posix_locks+0x310>
+     38f: 48 89 85 70 ff ff ff         	movq	%rax, -0x90(%rbp)
+     396: 48 89 8d 78 ff ff ff         	movq	%rcx, -0x88(%rbp)
+     39d: 48 89 55 80                  	movq	%rdx, -0x80(%rbp)
+     3a1: 48 8b 85 38 ff ff ff         	movq	-0xc8(%rbp), %rax
+     3a8: 49 89 44 24 18               	movq	%rax, 0x18(%r12)
+     3ad: 48 8b 85 30 ff ff ff         	movq	-0xd0(%rbp), %rax
+     3b4: 49 89 44 24 10               	movq	%rax, 0x10(%r12)
+     3b9: 48 8b 85 20 ff ff ff         	movq	-0xe0(%rbp), %rax
+     3c0: 48 8b 8d 28 ff ff ff         	movq	-0xd8(%rbp), %rcx
+     3c7: 49 89 4c 24 08               	movq	%rcx, 0x8(%r12)
+     3cc: 49 89 04 24                  	movq	%rax, (%r12)
+     3d0: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     3d7: 48 8d b5 70 ff ff ff         	leaq	-0x90(%rbp), %rsi
+     3de: e8 00 00 00 00               	callq	0x3e3 <file__release_posix_locks+0x3e3>
+     3e3: 4c 8b 8d 18 ff ff ff         	movq	-0xe8(%rbp), %r9
+     3ea: 4c 8b 35 00 00 00 00         	movq	(%rip), %r14            # 0x3f1 <file__release_posix_locks+0x3f1>
+     3f1: 44 89 ee                     	movl	%r13d, %esi
+     3f4: e9 17 ff ff ff               	jmp	0x310 <file__release_posix_locks+0x310>
+     3f9: 40 f6 c6 01                  	testb	$0x1, %sil
+     3fd: 0f 84 b0 00 00 00            	je	0x4b3 <file__release_posix_locks+0x4b3>
+     403: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     40a: e8 00 00 00 00               	callq	0x40f <file__release_posix_locks+0x40f>
+     40f: 48 8b 85 68 ff ff ff         	movq	-0x98(%rbp), %rax
+     416: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x41d <file__release_posix_locks+0x41d>
+     41d: 48 8b 85 60 ff ff ff         	movq	-0xa0(%rbp), %rax
+     424: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x42b <file__release_posix_locks+0x42b>
+     42b: 48 8b 85 58 ff ff ff         	movq	-0xa8(%rbp), %rax
+     432: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x439 <file__release_posix_locks+0x439>
+     439: 48 8b 85 50 ff ff ff         	movq	-0xb0(%rbp), %rax
+     440: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x447 <file__release_posix_locks+0x447>
+     447: 48 8b 85 40 ff ff ff         	movq	-0xc0(%rbp), %rax
+     44e: 48 8b 8d 48 ff ff ff         	movq	-0xb8(%rbp), %rcx
+     455: 48 89 0d 00 00 00 00         	movq	%rcx, (%rip)            # 0x45c <file__release_posix_locks+0x45c>
+     45c: 48 89 05 00 00 00 00         	movq	%rax, (%rip)            # 0x463 <file__release_posix_locks+0x463>
+     463: b0 01                        	movb	$0x1, %al
+     465: eb 5a                        	jmp	0x4c1 <file__release_posix_locks+0x4c1>
+     467: 48 c7 85 60 ff ff ff 00 00 00 00     	movq	$0x0, -0xa0(%rbp)
+     472: 48 c7 85 58 ff ff ff 00 00 00 00     	movq	$0x0, -0xa8(%rbp)
+     47d: 48 c7 85 50 ff ff ff 00 00 00 00     	movq	$0x0, -0xb0(%rbp)
+     488: 48 c7 85 48 ff ff ff 00 00 00 00     	movq	$0x0, -0xb8(%rbp)
+     493: 48 c7 85 40 ff ff ff 00 00 00 00     	movq	$0x0, -0xc0(%rbp)
+     49e: c7 85 60 ff ff ff 10 00 00 00	movl	$0x10, -0xa0(%rbp)
+     4a8: 48 c7 85 68 ff ff ff 38 00 00 00     	movq	$0x38, -0x98(%rbp)
+     4b3: 48 8d bd 40 ff ff ff         	leaq	-0xc0(%rbp), %rdi
+     4ba: e8 00 00 00 00               	callq	0x4bf <file__release_posix_locks+0x4bf>
+     4bf: 31 c0                        	xorl	%eax, %eax
+     4c1: 0f b6 0d 00 00 00 00         	movzbl	(%rip), %ecx            # 0x4c8 <file__release_posix_locks+0x4c8>
+     4c8: 31 d2                        	xorl	%edx, %edx
+     4ca: 88 15 00 00 00 00            	movb	%dl, (%rip)             # 0x4d0 <file__release_posix_locks+0x4d0>
+     4d0: 48 c7 85 70 ff ff ff 00 00 00 00     	movq	$0x0, -0x90(%rbp)
+     4db: 9c                           	pushfq
+     4dc: 8f 85 70 ff ff ff            	popq	-0x90(%rbp)
+     4e2: 84 c9                        	testb	%cl, %cl
+     4e4: 74 07                        	je	0x4ed <file__release_posix_locks+0x4ed>
+     4e6: fb                           	sti
+     4e7: 84 c0                        	testb	%al, %al
+     4e9: 75 07                        	jne	0x4f2 <file__release_posix_locks+0x4f2>
+     4eb: eb 13                        	jmp	0x500 <file__release_posix_locks+0x500>
+     4ed: fa                           	cli
+     4ee: 84 c0                        	testb	%al, %al
+     4f0: 74 0e                        	je	0x500 <file__release_posix_locks+0x500>
+     4f2: 48 c7 c7 00 00 00 00         	movq	$0x0, %rdi
+     4f9: 31 f6                        	xorl	%esi, %esi
+     4fb: e8 00 00 00 00               	callq	0x500 <file__release_posix_locks+0x500>
+     500: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x507 <file__release_posix_locks+0x507>
+     507: 48 3b 45 d0                  	cmpq	-0x30(%rbp), %rax
+     50b: 0f 85 ab 00 00 00            	jne	0x5bc <file__release_posix_locks+0x5bc>
+     511: 48 81 c4 c8 00 00 00         	addq	$0xc8, %rsp
+     518: 5b                           	popq	%rbx
+     519: 41 5c                        	popq	%r12
+     51b: 41 5d                        	popq	%r13
+     51d: 41 5e                        	popq	%r14
+     51f: 41 5f                        	popq	%r15
+     521: 5d                           	popq	%rbp
+     522: c3                           	retq
+     523: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x52a <file__release_posix_locks+0x52a>
+     52a: 48 89 45 80                  	movq	%rax, -0x80(%rbp)
+     52e: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x535 <file__release_posix_locks+0x535>
+     535: 48 89 85 78 ff ff ff         	movq	%rax, -0x88(%rbp)
+     53c: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x543 <file__release_posix_locks+0x543>
+     543: 48 89 85 70 ff ff ff         	movq	%rax, -0x90(%rbp)
+     54a: 48 8d 7d 88                  	leaq	-0x78(%rbp), %rdi
+     54e: 4c 89 fe                     	movq	%r15, %rsi
+     551: e8 00 00 00 00               	callq	0x556 <file__release_posix_locks+0x556>
+     556: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x55d <file__release_posix_locks+0x55d>
+     55d: 48 89 45 b0                  	movq	%rax, -0x50(%rbp)
+     561: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x568 <file__release_posix_locks+0x568>
+     568: 48 89 45 a8                  	movq	%rax, -0x58(%rbp)
+     56c: 48 8b 05 00 00 00 00         	movq	(%rip), %rax            # 0x573 <file__release_posix_locks+0x573>
+     573: 48 89 45 a0                  	movq	%rax, -0x60(%rbp)
+     577: 48 8d 7d b8                  	leaq	-0x48(%rbp), %rdi
+     57b: 4c 89 f6                     	movq	%r14, %rsi
+     57e: e8 00 00 00 00               	callq	0x583 <file__release_posix_locks+0x583>
+     583: 48 8d bd 20 ff ff ff         	leaq	-0xe0(%rbp), %rdi
+     58a: 48 8d 95 70 ff ff ff         	leaq	-0x90(%rbp), %rdx
+     591: be 04 00 00 00               	movl	$0x4, %esi
+     596: e8 00 00 00 00               	callq	0x59b <file__release_posix_locks+0x59b>
+     59b: 48 83 ec 08                  	subq	$0x8, %rsp
+     59f: 48 8b 85 30 ff ff ff         	movq	-0xd0(%rbp), %rax
+     5a6: 48 8b 8d 20 ff ff ff         	movq	-0xe0(%rbp), %rcx
+     5ad: 48 8b 95 28 ff ff ff         	movq	-0xd8(%rbp), %rdx
+     5b4: 50                           	pushq	%rax
+     5b5: 52                           	pushq	%rdx
+     5b6: 51                           	pushq	%rcx
+     5b7: e8 00 00 00 00               	callq	0x5bc <file__release_posix_locks+0x5bc>
+     5bc: e8 00 00 00 00               	callq	0x5c1 <file__release_posix_locks+0x5c1>

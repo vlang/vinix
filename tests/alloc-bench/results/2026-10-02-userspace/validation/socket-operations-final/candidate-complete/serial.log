@@ -1,0 +1,927 @@
+==> Increasing new boot disk to 129 MiB for the selected initramfs
+==> Creating 129 MiB boot disk image (one-time)...
+==> Using initramfs: initramfs.tar
+==> Injecting test init: /Users/alex/code/vinix/build/useralloc-socket-operations-v3/candidate-complete/rootfs/sbin/init
+==> Copying Limine config to boot disk...
+==> Copying kernel to boot disk...
+==> Package installs persist in: /Users/alex/code/vinix/build/useralloc-socket-operations-v3/candidate-complete/packages.tar
+==> Starting QEMU (Ctrl-A X to quit)...
+==> Sound: off
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 000BFDB6000 start failed: 00000001
+Error: Image at 000BFCB2000 start failed: Unsupported
+Error: Image at 000BFC37000 start failed: Not Found
+Error: Image at 000BFB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x1,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x1,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0xb86ec000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0xb86ec000 to 0xffffffff80000000, length: 0x1d4000
+vmm: Kernel: Mapping 0xb88c0000 to 0xffffffff801d4000, length: 0x24000
+vmm: Kernel: Mapping 0xb88e4000 to 0xffffffff801f8000, length: 0xd9e000
+vmm: HHDM 0-4GiB mapped (525714 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x8000 mapped
+vmm: framebuffer 0xbc7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0xb86ec000 +0x1f8000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+init smp...
+smp: BSP MPIDR:       0
+smp: Discovered CPUs: 2
+smp: Starting CPUs:   2
+security: PAN enabled
+smp: CPU 0 online!
+smp: CPU 1 online!
+smp: 2 CPUs online
+smp done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: found at slot 28
+virtio-net: ready, DHCP requested
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff0000bcb65000
+initramfs: Size:    65024
+initramfs: Unpacking...
+>+ [1] ._. sz=163
+!>+ [2] PaxHeader/currentdir sz=136
+!>+ [3] ./ sz=0
+>+ [4] ./._proc sz=163
+!>+ [5] ./PaxHeader/proc sz=136
+!>+ [6] ./proc/ sz=0
+!>+ [7] ./._sbin sz=163
+!>+ [8] ./PaxHeader/sbin sz=136
+!>+ [9] ./sbin/ sz=0
+!>+ [10] ./._root sz=163
+!>+ [11] ./PaxHeader/root sz=136
+!>+ [12] ./root/ sz=0
+!>+ [13] ./._dev sz=163
+!>+ [14] ./PaxHeader/dev sz=136
+!>+ [15] ./dev/ sz=0
+!>+ [16] ./._tmp sz=163
+!>+ [17] ./PaxHeader/tmp sz=136
+!>+ [18] ./tmp/ sz=0
+!>+ [19] ./sbin/._init sz=163
+!>+ [20] ./sbin/PaxHeader/init sz=136
+!>+!>initramfs: no ustar sig at 0xffff0000bcb74a00
+initramfs: Done (21 entries)
+initramfs: Module:  2
+initramfs: Address: 0xffff0000b86cb000
+initramfs: Size:    132608
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./usr/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./etc/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./etc/vinix-pkg/ sz=0
+!>+ [7] ./etc/vinix/ sz=0
+!>+ [8] ./etc/vinix/qemu-host-source-url sz=0
+!>+ [9] ./etc/vinix-pkg/base-files sz=214
+!>+ [10] ./etc/vinix-pkg/qemu-store-url sz=22
+!>+ [11] ./sbin/init sz=45784
+!>+ [12] ./usr/bin/ sz=0
+!>+ [13] ./usr/libexec/ sz=0
+!>+ [14] ./usr/libexec/vinix-pkg-core sz=43004
+!>+ [15] ./usr/libexec/vinix-persist-packages sz=5211
+!>+ [16] ./usr/bin/vinix-desktop-reload sz=3872
+!>+ [17] ./usr/bin/vinix-files-sync sz=2346
+!>+ [18] ./usr/bin/vinix-desktop-build sz=12928
+!>+ [19] ./usr/bin/vinix-host-sync sz=4402
+!>+ [20] ./usr/bin/pkg sz=616
+!>initramfs: no ustar sig at 0xffff0000b86eb200
+initramfs: Done (20 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211460
+vfs: Mounted `proc` to `/proc` with filesystem `proc`
+SOCKET-OPS-SLAB-BEGIN operation=0 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 189 5
+size-512 512 160 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 18 2
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=0 phase=before
+SOCKET-OPS-RESULT operation=0 name=empty_recvmsg calls=8192 before=2027503616 after=2027503616 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=0 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 189 5
+size-512 512 162 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 18 2
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=0 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=1 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 11 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 191 5
+size-512 512 164 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 20 2
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=1 phase=before
+SOCKET-OPS-RESULT operation=1 name=empty_recvfrom calls=8192 before=2027503616 after=2027503616 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=1 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 11 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 191 5
+size-512 512 166 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 20 2
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=1 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=2 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 5 1
+size-384 384 193 5
+size-512 512 168 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 22 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=2 phase=before
+SOCKET-OPS-RESULT operation=2 name=sendto_recvfrom calls=8192 before=2027454464 after=2027454464 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=2 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 5 1
+size-384 384 193 5
+size-512 512 170 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 22 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=2 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=3 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 195 5
+size-512 512 173 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 24 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=3 phase=before
+SOCKET-OPS-RESULT operation=3 name=sendmsg_recvmsg calls=8192 before=2027454464 after=2027454464 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=3 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 195 5
+size-512 512 175 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 24 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=3 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=4 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 197 5
+size-512 512 177 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 26 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=4 phase=before
+SOCKET-OPS-RESULT operation=4 name=large_sendmsg_recvmsg calls=8192 before=2027454464 after=2027454464 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=4 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 197 5
+size-512 512 179 6
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 26 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=4 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=5 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 199 5
+size-512 512 180 6
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 28 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=5 phase=before
+SOCKET-OPS-RESULT operation=5 name=socket_names calls=8192 before=2027487232 after=2027487232 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=5 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 199 5
+size-512 512 182 6
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 28 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 43
+# written after free 1
+SOCKET-OPS-SLAB-END operation=5 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=6 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 201 5
+size-512 512 184 6
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 30 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=6 phase=before
+SOCKET-OPS-RESULT operation=6 name=stream_fd_sendmsg_recvmsg calls=8192 before=2027454464 after=2027454464 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=6 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 201 5
+size-512 512 186 6
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 30 3
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=6 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=7 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 204 5
+size-512 512 188 7
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 32 4
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=7 phase=before
+SOCKET-OPS-RESULT operation=7 name=datagram_fd_sendmsg_recvmsg calls=8192 before=2027421696 after=2027421696 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=7 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 204 5
+size-512 512 190 7
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 32 4
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=7 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=8 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 205 5
+size-512 512 192 7
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 34 4
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=8 phase=before
+SOCKET-OPS-RESULT operation=8 name=seqpacket_fd_sendmsg_recvmsg calls=8192 before=2027421696 after=2027421696 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=8 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 205 5
+size-512 512 194 7
+size-768 768 1 1
+size-1024 1024 5 1
+size-1536 1536 34 4
+size-2048 2048 0 0
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=8 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=9 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 207 5
+size-512 512 196 7
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 36 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=9 phase=before
+SOCKET-OPS-RESULT operation=9 name=stream_control_truncate calls=8192 before=2027405312 after=2027405312 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=9 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 207 5
+size-512 512 198 7
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 36 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=9 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=10 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 210 6
+size-512 512 200 7
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 38 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=10 phase=before
+SOCKET-OPS-RESULT operation=10 name=datagram_control_truncate calls=8192 before=2027388928 after=2027388928 retained=0
+SOCKET-OPS-SLAB-BEGIN operation=10 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 210 6
+size-512 512 202 7
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 38 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=10 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 211 6
+size-512 512 268 9
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 40 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=11 phase=before
+SOCKET-OPS-RESULT operation=11 name=stream_read_discards_rights calls=8192 before=2027356160 after=2023030784 retained=4325376
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 211 6
+size-512 512 8462 273
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 40 4
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=11 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 214 6
+size-512 512 8528 276
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 42 5
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=12 phase=before
+SOCKET-OPS-RESULT operation=12 name=datagram_read_discards_rights calls=8192 before=2022965248 after=2018639872 retained=4325376
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 38 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 467 6
+size-256 256 4 1
+size-384 384 214 6
+size-512 512 16722 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 42 5
+size-2048 2048 1 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=12 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 343 9
+size-512 512 16724 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 172 18
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 45
+# written after free 1
+SOCKET-OPS-SLAB-END operation=13 phase=before
+SOCKET-OPS-RESULT operation=13 name=stream_close_queued_rights calls=8192 before=2018377728 after=1983578112 retained=34799616
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 16727 399
+size-512 512 16726 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 16556 1656
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 141
+# written after free 1
+SOCKET-OPS-SLAB-END operation=13 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 16857 402
+size-512 512 16728 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 16686 1669
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 141
+# written after free 1
+SOCKET-OPS-SLAB-END operation=14 phase=before
+SOCKET-OPS-RESULT operation=14 name=datagram_close_queued_rights calls=8192 before=1983315968 after=1948516352 retained=34799616
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 33241 792
+size-512 512 16730 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 33070 3307
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 237
+# written after free 1
+SOCKET-OPS-SLAB-END operation=14 phase=after
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=before
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 33371 795
+size-512 512 16732 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 33200 3320
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 237
+# written after free 1
+SOCKET-OPS-SLAB-END operation=15 phase=before
+SOCKET-OPS-RESULT operation=15 name=closed_stream_send calls=8192 before=1948254208 after=1915011072 retained=33243136
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=after
+# class      size    objects   pages
+size-16 16 436 1
+size-32 32 54 1
+size-48 48 37 1
+size-64 64 308 2
+size-96 96 5 1
+size-128 128 10 1
+size-192 192 466 6
+size-256 256 4 1
+size-384 384 49755 1185
+size-512 512 16734 540
+size-768 768 1 1
+size-1024 1024 4 1
+size-1536 1536 49584 4959
+size-2048 2048 0 1
+size-2688 2688 0 0
+size-4048 4048 0 0
+size-5392 5392 0 0
+size-8096 8096 0 0
+large - - 237
+# written after free 1
+SOCKET-OPS-SLAB-END operation=15 phase=after
+SOCKET-OPS-FAIL kind=17 warm=0 errno=95
+SOCKET-OPS-DONE result=1 completed=16
+QEMU: Terminated
+

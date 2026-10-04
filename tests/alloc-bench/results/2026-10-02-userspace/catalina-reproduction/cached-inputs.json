@@ -1,0 +1,46 @@
+{
+  "gcc14.tbz2": {
+    "bytes": 160471404,
+    "sha256": "54c537e811e4933033e659c2c57c2eb39246024caea55463968261afdda72afc"
+  },
+  "gcc-c-only.tar.gz": {
+    "bytes": 19646596,
+    "sha256": "25aa925d8ab33ba6890cd7c73b2471bf34ba90bf35e78d5889cddabb5f21271b"
+  },
+  "sdk-headers.tar.gz": {
+    "bytes": 4124658,
+    "sha256": "137dd9319cf215de7064f31c78b5086c65b1687c3682e105f8860ffb768381ea"
+  },
+  "gmp.tbz2": {
+    "bytes": 605673,
+    "sha256": "cbe5de72b52ac6e5401e223782d04a90fd234a0942f277df10899a5181f04a30"
+  },
+  "isl.tbz2": {
+    "bytes": 1403439,
+    "sha256": "b9087c49af116a05c3deaf1ba62657ad2c612578f6050514cb8dc00751587c64"
+  },
+  "libgcc14.tbz2": {
+    "bytes": 177346,
+    "sha256": "2f48db1e1bedfc2ee4950c361f6b3a02f8e3eda56a7a55d76430f6a5078522fe"
+  },
+  "libmpc.tbz2": {
+    "bytes": 117315,
+    "sha256": "2870a9e6ab5128c1014c1e507461b88a7d704e1d890c0737d89732aaf626f7ad"
+  },
+  "mpfr.tbz2": {
+    "bytes": 522118,
+    "sha256": "febb6e46e4d4e27d67ed215764b4766c09c79121640427f383aebe7ba69da09e"
+  },
+  "libiconv.tbz2": {
+    "bytes": 1571001,
+    "sha256": "e72d97d9975240dfdb1f44a36c2ae6f223430664e331cc2516ab073a7705126e"
+  },
+  "zlib.tbz2": {
+    "bytes": 207287,
+    "sha256": "cca691a7f4b224c749bb29ca89987211f011df055bda32c59098b7e9d0ec927e"
+  },
+  "zstd.tbz2": {
+    "bytes": 1113650,
+    "sha256": "6344a443dc27f7ccdc119cda4dbafd1ab2dcf394bdebf08169f5885c71fc87d6"
+  }
+}

@@ -28,6 +28,8 @@ const exception_stack_size = 32768
 
 __global (
 	exception_stacks [max_exception_stacks][exception_stack_size]u8
+	guarded_exception_tops [256]u64
+	emergency_stack_tops [256]u64
 	// Static line buffer for the fatal report. The report must not allocate:
 	// a fault inside the allocator (or on memory it relies on) would otherwise
 	// re-fault while being reported, recursing into silence. That is exactly
@@ -96,6 +98,8 @@ fn emit_fatal_line(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 }
 
 pub fn initialise() {
+	// Establish the permanent scratch pointer before installing vectors.
+	cpu.write_tpidr_el1(0)
 	irq_dispatch_fn = default_irq_dispatch
 	cpu.write_vbar_el1(u64(voidptr(C.exception_vectors)))
 	cpu.isb()
@@ -127,6 +131,46 @@ fn install_exception_stack(cpu_number u64) {
 	cpu.isb()
 }
 
+// Early Limine entry precedes page tables. Once they are active, replace the
+// bootstrap fallback with a private guarded exception stack on every CPU.
+pub fn install_guarded_stack(cpu_number u64) {
+	// This boot-only handoff may update the inactive SP_EL1 while running
+	// at EL1t/EL2t; the leaf helper deliberately leaves SPSel at zero.
+	if cpu.read_stack_selector() != 0 { panic('Guarded exception setup requires inactive SP_EL1') }
+	if cpu_number >= 256 { panic('Too many CPUs for private exception stacks') }
+	if guarded_exception_tops[cpu_number] == 0 {
+		base := memory.kernel_stack_alloc(exception_stack_size)
+		if base == unsafe { nil } { panic('Cannot allocate guarded exception stack') }
+		guarded_exception_tops[cpu_number] = u64(base) + exception_stack_size
+	}
+	if emergency_stack_tops[cpu_number] == 0 {
+		base := memory.kernel_stack_alloc(exception_stack_size)
+		if base == unsafe { nil } { panic('Cannot allocate guarded emergency stack') }
+		emergency_stack_tops[cpu_number] = u64(base) + exception_stack_size
+	}
+	cpu.set_exception_emergency_stack(cpu_number, emergency_stack_tops[cpu_number])
+	cpu.set_sp_el1(guarded_exception_tops[cpu_number])
+	cpu.isb()
+}
+
+// Vector entry has saved the original registers on an independent owned
+// stack. Only exact compile-time selftest labels may return; real exhaustion
+// is fatal. No Thread pointer or allocation is needed to reach this report.
+@[export: 'exception__stack_exhausted']
+pub fn stack_exhausted(gpr_state &cpulocal.GPRState) {
+	far := cpu.read_far_el1()
+	resume := memory.stack_guard_probe_fixup(gpr_state.pc, far)
+	if resume != 0 {
+		mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+		state.pc = resume
+		return
+	}
+	C.vinix_stack_guard_diagnostic(gpr_state.sp, gpr_state.pc, far)
+	C.vinix_stack_guard_message(c'STACK-GUARD FATAL emergency-stack exhaustion\n')
+	C.printf_panic(c'kernel stack guard: exhausted sp=0x%llx pc=0x%llx far=0x%llx\n', gpr_state.sp, gpr_state.pc, far)
+	fault_handler(0x25, cpu.read_esr_el1(), far, gpr_state)
+}
+
 // Did the instruction that faulted belong to userspace?
 //
 // SPSR's mode field is the exact answer: M[3:0] is zero only for EL0t. The PC
@@ -141,7 +185,21 @@ fn from_userspace(gpr_state &cpulocal.GPRState) bool {
 // Called from vectors.S for synchronous exceptions
 @[export: 'exception__sync_handler']
 pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
+	user_entry := from_userspace(gpr_state)
+	if user_entry { proc.cpu_enter_kernel() }
+	defer { if user_entry { proc.cpu_leave_kernel() } }
 	ec := (esr >> 26) & 0x3f // Exception Class
+	if !user_entry && ec == 0x25 {
+		resume := memory.stack_guard_probe_fixup(gpr_state.pc, far)
+		if resume != 0 {
+			mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+			state.pc = resume
+			return
+		}
+		if memory.kernel_stack_guard(far) {
+			C.printf_panic(c'kernel stack guard: address=0x%llx sp=0x%llx\n', far, gpr_state.sp)
+		}
+	}
 
 	match ec {
 		0x01 { // Trapped WFI/WFE from userspace
@@ -205,6 +263,20 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			}
 			fault_handler(ec, esr, far, gpr_state)
 		}
+		0x18 { // Trapped MSR, MRS or system instruction
+			// A read of an ID register from userspace is answered, as Linux 4.11
+			// and later answer it; anything else is an illegal instruction.
+			if from_userspace(gpr_state) {
+				if emulate_id_register_read(esr, gpr_state) {
+					return
+				}
+				if userland.dispatch_sync_signal(gpr_state, u8(userland.sigill)) {
+					return
+				}
+				terminate_faulting_process(ec, esr, far, gpr_state, u8(userland.sigill))
+			}
+			fault_handler(ec, esr, far, gpr_state)
+		}
 		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
 			mmap.pf_handler(gpr_state) or {
 				if userland.dispatch_sync_fault(gpr_state, far, esr) {
@@ -233,6 +305,31 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 	}
+}
+
+// An MRS of a register in the ID space (op0 3, op1 0, CRn 0) from EL0: put
+// what Linux would answer in its destination and step past it.
+fn emulate_id_register_read(esr u64, gpr_state &cpulocal.GPRState) bool {
+	iss := esr & 0x1ffffff
+	is_read := iss & 1 != 0
+	crm := (iss >> 1) & 0xf
+	rt := (iss >> 5) & 0x1f
+	crn := (iss >> 10) & 0xf
+	op1 := (iss >> 14) & 0x7
+	op2 := (iss >> 17) & 0x7
+	op0 := (iss >> 20) & 0x3
+	if !is_read || op0 != 3 || op1 != 0 || crn != 0 {
+		return false
+	}
+	value := cpu.emulated_id_register(crm, op2)
+	mut state := unsafe { &cpulocal.GPRState(gpr_state) }
+	if rt != 31 {
+		unsafe {
+			*(&u64(u64(voidptr(state)) + rt * 8)) = value
+		}
+	}
+	state.pc += 4
+	return true
 }
 
 // A fault raised by a userspace instruction that no handler took over ends that
@@ -343,7 +440,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// this walks the faulting thread's pagemap.
 	if ec == 0x0 && from_userspace(gpr_state) && proc.current_thread() != unsafe { nil } {
 		mut current_thread := proc.current_thread()
-		pc_page := gpr_state.pc & ~u64(0xfff)
+		pc_page := gpr_state.pc & ~(page_size - 1)
 		phys := current_thread.process.pagemap.virt2phys(pc_page) or { u64(0) }
 		pte_p := current_thread.process.pagemap.virt2pte(pc_page, false) or { unsafe { &u64(0) } }
 		mut pte_val := u64(0)
@@ -360,7 +457,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 
 		// Dump 32 bytes of instructions at PC (read via HHDM)
 		if phys != 0 {
-			pc_offset := gpr_state.pc & u64(0xfff)
+			pc_offset := gpr_state.pc & (page_size - 1)
 			kernel_addr := phys + higher_half + pc_offset
 			uart.puts(c'INSN AT PC (via HHDM):\n')
 			for ioff := u64(0); ioff < 32; ioff += 4 {
@@ -398,9 +495,9 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 		uart_put_hex(sp_val)
 		uart.puts(c':\n')
 		for si := dump_start; si < sp_val + 128; si += 8 {
-			si_page := si & ~u64(0xfff)
+			si_page := si & ~(page_size - 1)
 			si_phys := current_thread.process.pagemap.virt2phys(si_page) or { continue }
-			si_offset := si & u64(0xfff)
+			si_offset := si & (page_size - 1)
 			if si_offset + 8 > page_size {
 				continue
 			}
@@ -430,7 +527,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	// Dump PTE info for instruction abort or user data abort
 	if ec == 0x20 || ec == 0x24 {
 		mut current_thread := proc.current_thread()
-		page_addr := far & ~u64(0xfff)
+		page_addr := far & ~(memory.page_size - 1)
 		phys := current_thread.process.pagemap.virt2phys(page_addr) or { u64(0) }
 		pte_p := current_thread.process.pagemap.virt2pte(page_addr, false) or { unsafe { &u64(0) } }
 		mut pte_val := u64(0)
@@ -483,7 +580,7 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			// Check for physical page aliasing: walk TTBR0 page table to find
 			// ALL virtual addresses mapped to the same physical page as chunk
 			mut current_thread := proc.current_thread()
-			chunk_phys := current_thread.process.pagemap.virt2phys(chunk & ~u64(0xfff)) or {
+			chunk_phys := current_thread.process.pagemap.virt2phys(chunk & ~(memory.page_size - 1)) or {
 				uart.puts(c'  Chunk page not mapped!\n')
 				u64(0)
 			}
@@ -494,37 +591,31 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 				hh := higher_half
 				pt_top := current_thread.process.pagemap.top_level
 				mut alias_count := 0
-				for l0i := u64(0); l0i < 512; l0i++ {
-					l0e := unsafe { *&u64(u64(pt_top) + hh + l0i * 8) }
-					if l0e & 1 == 0 {
+				for l1i := u64(0); l1i < memory.page_size / 8; l1i++ {
+					l1e := unsafe { *&u64(u64(pt_top) + hh + l1i * 8) }
+					if l1e & 1 == 0 {
 						continue
 					}
-					l1_base := l0e & memory.pte_flags_mask
-					for l1i := u64(0); l1i < 512; l1i++ {
-						l1e := unsafe { *&u64(l1_base + hh + l1i * 8) }
-						if l1e & 1 == 0 {
+					l2_base := l1e & memory.pte_flags_mask
+					for l2i := u64(0); l2i < memory.page_size / 8; l2i++ {
+						l2e := unsafe { *&u64(l2_base + hh + l2i * 8) }
+						if l2e & 1 == 0 {
 							continue
 						}
-						l2_base := l1e & memory.pte_flags_mask
-						for l2i := u64(0); l2i < 512; l2i++ {
-							l2e := unsafe { *&u64(l2_base + hh + l2i * 8) }
-							if l2e & 1 == 0 {
-								continue
-							}
-							l3_base := l2e & memory.pte_flags_mask
-							for l3i := u64(0); l3i < 512; l3i++ {
+						l3_base := l2e & memory.pte_flags_mask
+						for l3i := u64(0); l3i < memory.page_size / 8; l3i++ {
 								l3e := unsafe { *&u64(l3_base + hh + l3i * 8) }
 								if l3e & 1 == 0 {
 									continue
 								}
 								phys := l3e & memory.pte_flags_mask
 								if phys == chunk_phys {
-									virt := (l0i << 39) | (l1i << 30) | (l2i << 21) | (l3i << 12)
+									virt := (l1i << 36) | (l2i << 25) | (l3i << 14)
 									uart.puts(c'  VIRT=0x')
 									uart_put_hex(virt)
 									uart.puts(c' PTE=0x')
 									uart_put_hex(l3e)
-									if virt == (chunk & ~u64(0xfff)) {
+									if virt == (chunk & ~(memory.page_size - 1)) {
 										uart.puts(c' (expected)')
 									} else {
 										uart.puts(c' *** ALIAS! ***')
@@ -535,7 +626,6 @@ fn fault_handler(ec u64, esr u64, far u64, gpr_state &cpulocal.GPRState) {
 							}
 						}
 					}
-				}
 				if alias_count <= 1 {
 					uart.puts(c'  No aliasing found (page mapped once)\n')
 				} else {
@@ -608,6 +698,7 @@ fn uart_put_hex(val u64) {
 // Called from vectors.S for IRQ exceptions
 @[export: 'exception__irq_handler']
 pub fn irq_handler(gpr_state &cpulocal.GPRState) {
+	if from_userspace(gpr_state) { proc.cpu_enter_kernel() }
 	irq_dispatch(gpr_state)
 }
 

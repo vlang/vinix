@@ -125,7 +125,9 @@ pub fn release_handle(_dev &drm.DrmDevice, handle voidptr) {
 	file_map_lock.release()
 
 	mut ff := unsafe { f }
-	ff.close()
+	if ff.close() {
+		unsafe { free(voidptr(ff)) }
+	}
 }
 
 pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
@@ -137,16 +139,30 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		|| current.process.pid <= 0 {
 		return none
 	}
-	return &GpuFile{
+	// find_vm() reads the VM list without the file lock, so it must never
+	// move: sized for every context there is, as a file cannot have more VMs.
+	// close() frees it.
+	vms := []&mmu.UatContext{cap: mmu.uat_num_contexts} @[freed]
+	mut f := &GpuFile{
 		dev: unsafe { dev }
 		next_queue_id: 1
 		next_timestamp_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
+		vms: vms
 	}
+	// Nothing slices these, so growing one can free its old buffer.
+	f.queues.flags |= .noslices
+	f.mappings.flags |= .noslices
+	f.g17_queues.flags |= .noslices
+	f.g13_queues.flags |= .noslices
+	f.timestamp_objects.flags |= .noslices
+	return f
 }
 
-pub fn (mut f GpuFile) close() {
+// Tear the file down. False when live jobs keep it, and with it the file
+// itself, which completions still point at.
+pub fn (mut f GpuFile) close() bool {
 	f.lock.acquire()
 	for vm_id := u32(1); vm_id < mmu.uat_num_contexts; vm_id++ {
 		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
@@ -155,13 +171,14 @@ pub fn (mut f GpuFile) close() {
 			// firmware. A normal Mesa close waits its output fence first.
 			C.printf(c'agx: retaining closing DRM file with live VM %u jobs\n', vm_id)
 			f.lock.release()
-			return
+			return false
 		}
 	}
 	for mut q in f.queues {
 		q.destroy()
 	}
-	f.queues.clear()
+	unsafe { f.queues.free() }
+	f.queues = []&workqueue.WorkQueue{}
 	manager := gpu.get_global_manager() or { unsafe { nil } }
 	if manager != unsafe { nil } {
 		mut gpu_manager := unsafe { manager }
@@ -169,14 +186,16 @@ pub fn (mut f GpuFile) close() {
 			gpu_manager.release_g17_queue_resources(ownership.resources)
 		}
 	}
-	f.g17_queues.clear()
+	unsafe { f.g17_queues.free() }
+	f.g17_queues = []G17QueueOwnership{}
 	if manager != unsafe { nil } {
 		mut gpu_manager := unsafe { manager }
 		for ownership in f.g13_queues {
 			gpu_manager.release_g13_queue_resources(ownership.resources)
 		}
 	}
-	f.g13_queues.clear()
+	unsafe { f.g13_queues.free() }
+	f.g13_queues = []G13QueueOwnership{}
 	if manager != unsafe { nil } {
 		mut gpu_manager := unsafe { manager }
 		for object in f.timestamp_objects {
@@ -188,7 +207,8 @@ pub fn (mut f GpuFile) close() {
 			gem.unref(object.obj)
 		}
 	}
-	f.timestamp_objects.clear()
+	unsafe { f.timestamp_objects.free() }
+	f.timestamp_objects = []TimestampObject{}
 
 	mgr := uat_mgr
 	if mgr != unsafe { nil } {
@@ -197,13 +217,16 @@ pub fn (mut f GpuFile) close() {
 			m.destroy_context(vm)
 		}
 	}
-	f.vms.clear()
+	unsafe { f.vms.free() }
+	f.vms = []&mmu.UatContext{}
 	for mapping in f.mappings {
 		gem.unref(mapping.obj)
 	}
-	f.mappings.clear()
+	unsafe { f.mappings.free() }
+	f.mappings = []GpuMapping{}
 	f.objects.release_all()
 	f.lock.release()
+	return true
 }
 
 fn (mut f GpuFile) get_object_ref(handle u32) ?&gem.GemObject {
@@ -357,10 +380,11 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 // Firmware may retain both UAT translations and noncoherent cache lines after
 // a mapping changes, so every bind and unbind has to invalidate them.
 //
-// Only G13's protocol is implemented: it breaks the range into the 16-bit page
-// counts accepted by FwCtlMsg. Any other generation fails closed. Returning
-// success without flushing would hand userspace a mapping the GPU may never
-// observe, or keep a freed page live in a firmware translation.
+// Only G13's protocol is implemented. The full byte range is published in its
+// handoff slot; FwCtlMsg only tells firmware which slot to process. Any other
+// generation fails closed. Returning success without flushing would hand
+// userspace a mapping the GPU may never observe, or keep a freed page live in
+// a firmware translation.
 fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
 	manager := gpu.get_global_manager() or { return false }
 	if manager.hw_config.gpu_gen != .g13 {
@@ -368,18 +392,7 @@ fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
 		return false
 	}
 	mut gpu_manager := unsafe { manager }
-	max_flush_size := u64(0xffff) * pgtable.uat_pgsz
-	mut current := addr
-	mut remaining := size
-	for remaining != 0 {
-		chunk := if remaining > max_flush_size { max_flush_size } else { remaining }
-		if !gpu_manager.flush_g13_uat_range(ctx.id, current, chunk) {
-			return false
-		}
-		current += chunk
-		remaining -= chunk
-	}
-	return true
+	return gpu_manager.flush_g13_uat_range(ctx.id, addr, size)
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {

@@ -15,6 +15,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${VINIX_LIBREOFFICE_BUILD_DIR:-$SCRIPT_DIR/build-aarch64-libreoffice}"
 DOWNLOADS="$BUILD_DIR/downloads"
 STAGING="$BUILD_DIR/staging"
+CACHE_STATE="$BUILD_DIR/.staging-cache-key"
 
 # v3.22 is the branch the Firefox layer is on, and LibreOffice 25.2 wants the
 # same ICU 76 and GTK 3 those packages carry. Mixing it with the v3.21 base
@@ -22,6 +23,7 @@ STAGING="$BUILD_DIR/staging"
 ALPINE_BRANCH="${ALPINE_BRANCH:-v3.22}"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}/$ALPINE_BRANCH"
 ALPINE_ARCH=aarch64
+BRANCH_KEY="$(printf '%s' "$ALPINE_BRANCH" | tr '/:' '__')"
 
 for tool in curl python3 tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
@@ -31,12 +33,30 @@ for tool in curl python3 tar; do
 done
 
 mkdir -p "$DOWNLOADS"
+CACHE_ARGS=(
+    --state "$CACHE_STATE" --staging "$STAGING"
+    --value "$ALPINE_BRANCH" --value "$ALPINE_MIRROR" --value "$ALPINE_ARCH"
+    --metadata "$DOWNLOADS"
+    --source "$SCRIPT_DIR/build-libreoffice-aarch64.sh"
+    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/alpine-resolve.py"
+    --source "$SCRIPT_DIR/build-support/libreoffice"
+    --executable usr/lib/libreoffice/program/soffice.bin
+    --executable usr/bin/run-libreoffice
+    --required usr/lib/libreoffice/program/libvclplug_gtk3lo.so
+    --required usr/lib/libreoffice/program/libswlo.so
+)
+if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+    echo "==> Reusing cached LibreOffice staging"
+    exit 0
+fi
+rm -f "$CACHE_STATE"
 rm -rf "$STAGING"
 mkdir -p "$STAGING"
 
 for repository in main community; do
-    index="$DOWNLOADS/${repository}_APKINDEX"
-    if [ ! -f "$index" ]; then
+    index="$DOWNLOADS/${BRANCH_KEY}_${repository}_APKINDEX"
+    if [ ! -s "$index" ]; then
         echo "  fetching ${repository} index"
         archive="$DOWNLOADS/${repository}_APKINDEX.tar.gz"
         curl -fL --retry 3 -o "$archive" \
@@ -131,3 +151,4 @@ echo "staged packages: $(wc -l < "$BUILD_DIR/packages" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $BUILD_DIR/packages"
 echo "launcher: /usr/bin/run-libreoffice"
+python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"

@@ -84,6 +84,35 @@ PACKAGE = {
         b"VINIX CHROMIUM PASS: the installed browser runs",
     ),
 }
+# First-run setup is the compositor's own flow rather than a hosted app: the
+# registration screen, the app picker that follows it, and the Terminal that
+# installs the chosen apps.
+# Steam is Valve's x86 client on the translators. The boot checks the glibc
+# runtime and the translators first, then waits for the updater to install
+# the client and map its first window on the hosted X11 display.
+STEAM = {
+    "init": "tests/steam/steam-init.sh",
+    "pass": b"VINIX STEAM TEST: PASS",
+    "fail": (b"VINIX STEAM TEST: FAIL",),
+    "features": (
+        b"VINIX STEAM PASS: translated glibc runtime",
+        b"VINIX STEAM PASS: System V semaphore wake",
+        b"VINIX STEAM PASS: the hosted display has a framebuffer",
+        b"VINIX STEAM PASS: client window mapped",
+    ),
+    "persist_size_mb": 12288,
+}
+FIRST_RUN = {
+    "init": "tests/desktop/first-run-apps-init.sh",
+    "pass": b"VINIX FIRST RUN TEST: PASS",
+    "fail": (b"VINIX FIRST RUN TEST: FAIL",),
+    "features": (
+        b"VINIX FIRST RUN PASS: registration created the user",
+        b"VINIX FIRST RUN PASS: the app picker follows registration",
+        b"VINIX FIRST RUN PASS: the picker finished and the desktop started",
+        b"VINIX FIRST RUN PASS: the Terminal installed the chosen apps",
+    ),
+}
 COMMON_FAIL_MARKERS = (b"FATAL EXCEPTION", b"KERNEL PANIC")
 
 
@@ -141,11 +170,12 @@ def run_vm(root: Path, guest_init: Path, initramfs: Path, state_dir: Path,
 
     environment = os.environ.copy()
     environment["VINIX_INITRAMFS"] = str(initramfs)
+    environment["VINIX_INITRAMFS_COMPRESSED"] = "1" if initramfs.suffix == ".gz" else "0"
     environment["VINIX_BOOT_DISK"] = str(state_dir / "boot.img")
     environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
     environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
     environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "256"
+    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = str(profile.get("persist_size_mb", 256))
     environment.pop("VINIX_QEMU_PERSIST", None)
     environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
     environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
@@ -247,12 +277,16 @@ def main() -> int:
                         help="install Chromium with pkg instead of driving a staged one")
     parser.add_argument("--libreoffice", action="store_true",
                         help="drive LibreOffice Writer instead of a browser")
+    parser.add_argument("--first-run", action="store_true",
+                        help="drive first-run registration and the app picker")
+    parser.add_argument("--steam", action="store_true",
+                        help="drive Valve's Steam client through the x86 translators")
     parser.add_argument("--init", type=Path)
     parser.add_argument("--initramfs", type=Path,
                         default=root / "build-support/init-aarch64/initramfs-desktop.tar")
     parser.add_argument("--state-dir", type=Path,
                         default=root / "build/browser-vm")
-    parser.add_argument("--mem", type=int, default=8192)
+    parser.add_argument("--mem", type=int)
     # A package boot fetches a quarter of a gigabyte through QEMU's user
     # networking and unpacks it on an emulated CPU; the browser boots are the
     # quick ones.
@@ -270,13 +304,23 @@ def main() -> int:
     if arguments.libreoffice and (arguments.desktop or arguments.package
                                   or arguments.firefox):
         parser.error("--libreoffice drives the office suite; it cannot be combined with another profile")
-    profile = (LIBREOFFICE if arguments.libreoffice
+    if arguments.first_run and (arguments.libreoffice or arguments.desktop
+                                or arguments.package or arguments.firefox):
+        parser.error("--first-run drives setup itself; it cannot be combined with another profile")
+    if arguments.steam and (arguments.first_run or arguments.libreoffice
+                            or arguments.desktop or arguments.package
+                            or arguments.firefox):
+        parser.error("--steam drives Steam; it cannot be combined with another profile")
+    profile = (STEAM if arguments.steam
+               else FIRST_RUN if arguments.first_run
+               else LIBREOFFICE if arguments.libreoffice
                else DESKTOP if arguments.desktop else PACKAGE if arguments.package
                else FIREFOX if arguments.firefox else BRING_UP)
     timeout = arguments.timeout or (5400 if arguments.package else 1800)
     guest_init = arguments.init or (root / profile["init"])
+    memory_mb = arguments.mem if arguments.mem is not None else (32768 if arguments.steam else 8192)
     return run_vm(root, guest_init.resolve(), arguments.initramfs.resolve(),
-                  arguments.state_dir.resolve(), arguments.mem, timeout,
+                  arguments.state_dir.resolve(), memory_mb, timeout,
                   arguments.build, profile)
 
 

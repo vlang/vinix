@@ -1,0 +1,8 @@
+ARM-SOCKET-SLAB-BEGIN phase=before
+ARM-SOCKET-SLAB-END phase=before
+ARM-SOCKET-BEGIN calls=65536
+QEMU CORE FAIL line 1541: after.freeram + 6UL * 1024 * 1024 >= before.freeram (errno=11)
+ARM-SOCKET-MEMORY before=2027175936 after=1984020480 retained=43155456
+ARM-SOCKET-SLAB-BEGIN phase=after
+ARM-SOCKET-SLAB-END phase=after
+ARM-SOCKET-DONE result=1

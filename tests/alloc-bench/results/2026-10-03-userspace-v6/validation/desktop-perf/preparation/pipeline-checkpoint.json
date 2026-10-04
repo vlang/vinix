@@ -1,0 +1,7 @@
+{
+  "phase": "complete-after-separate-validation",
+  "started_utc": "2026-10-02T22:47:31.536586+00:00",
+  "updated_utc": "2026-10-02T22:56:30.408108+00:00",
+  "validation": "build/useralloc-desktop-perf-v6/validation.json",
+  "orchestration_issue": "Resident pipeline unpacked inspect_run into2values instead of3 after actualguestdriverexit0. Fullraw transcript/results retained; separate corrected rootvalidator returnedPASS43rows without repeating guest."
+}

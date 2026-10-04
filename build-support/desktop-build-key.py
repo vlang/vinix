@@ -20,6 +20,8 @@ import importlib.util
 import os
 import platform
 import shutil
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -113,6 +115,9 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     minecraft_staging = resolved_env_path(
         env, "VINIX_MINECRAFT_STAGING", root / "build-aarch64-minecraft/staging"
     )
+    doom_staging = resolved_env_path(
+        env, "VINIX_DOOM_STAGING", root / "build-aarch64-doom/staging"
+    )
     asahi_staging = resolved_env_path(
         env, "VINIX_ASAHI_STAGING", root / "build-aarch64-asahi/staging"
     )
@@ -125,41 +130,58 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
     x86_staging = resolved_env_path(
         env, "VINIX_X86_TRANSLATION_STAGING", root / "build-aarch64-x86-translation/staging"
     )
+    roblox_staging = resolved_env_path(
+        env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/aarch64/staging"
+    )
+    android_staging = resolved_env_path(
+        env, "VINIX_ANDROID_STAGING", root / "build-aarch64-android/aarch64/staging"
+    )
     gpu_sysroot = resolved_env_path(
         env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
     )
+    sibling_ui2 = root.parent / "ui2"
+    default_ui2 = sibling_ui2 if (sibling_ui2 / "v.mod").is_file() else root / "third_party/ui2"
+    ui2_source = resolved_env_path(env, "VINIX_UI2_SOURCE", default_ui2)
 
     source_paths = [
         root / "build-desktop-aarch64.sh",
         root / "build-support/content-key.py",
+        root / "build-support/musl/stage.py",
+        root / "build-support/musl/malloc-retain.patch",
+        root / "build-support/musl/alpine",
+        root / "build-support/musl/alpine-1.2.6",
         root / "build-support/desktop-build-key.py",
         root / "desktop",
-        root / "third_party/ui2/v.mod",
-        root / "third_party/ui2/ui",
-        root / "third_party/ui2/appkit",
-        root / "third_party/ui2/uikit",
-        root / "third_party/ui2/windows",
-        root / "third_party/ui2/linux",
-        root / "third_party/ui2/assets",
-        root / "third_party/ui2/examples/calculator",
-        root / "compat/macos/apps/Calculator",
-        root / "compat/macos/bundle",
-        root / "compat/macos/include",
-        root / "compat/macos/macho",
+        ui2_source / "v.mod",
+        ui2_source / "ui",
+        ui2_source / "uikit",
+        ui2_source / "windows",
+        ui2_source / "linux",
+        ui2_source / "assets",
+        ui2_source / "examples",
         root / "build-support/aarch64-cc-shim",
         root / "build-support/init-aarch64/desktop-init.c",
         root / "tools/m1-wifi/wifi-ctl.c",
         root / "kernel/c",
         root / "build-support/vinix-pkg",
+        root / "build-support/v-command",
+        root / "build-support/java-cacerts.py",
+        root / "build-support/minecraft",
+        root / "build-support/doom",
         root / "build-support/vinix-desktop-build",
         root / "build-support/vinix-desktop-reload",
+        root / "build-support/vinix-host-sync",
         root / "build-support/xorg-server/startx",
+        root / "build-support/xorg-server/vinix-wine-host.c",
         root / "build-support/firefox",
         root / "build-support/gimp",
         root / "build-support/libreoffice",
         root / "build-support/chromium",
         root / "build-support/hyprland",
+        root / "build-support/roblox",
+        root / "build-support/android",
         root / "gl-triangle/run-m1-agx-smoke",
+        root / "gl-triangle/egl_triangle.c",
         root / "tests/browsers/firefox-smoke.html",
         root / "tests/browsers/chromium-smoke.html",
         root / "tests/packages/x-window-check.py",
@@ -180,10 +202,13 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         chromium_staging,
         libreoffice_staging,
         minecraft_staging,
+        doom_staging,
         asahi_staging,
         hyprland_staging,
         blender_staging,
         x86_staging,
+        roblox_staging,
+        android_staging,
     ]
 
     llvm_bin = Path(os.path.expanduser(env.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin")))
@@ -202,6 +227,19 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         ("python", Path(sys.executable).resolve()),
     ]
 
+    musl_cc = shlex.split(env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
+    musl_executable = shutil.which(musl_cc[0], path=env.get("PATH")) if musl_cc else None
+    musl_version = "missing"
+    if musl_executable:
+        tools.append(("musl-cc", Path(musl_executable).resolve()))
+        try:
+            musl_version = subprocess.check_output(
+                [musl_executable, *musl_cc[1:], "--version"], text=True,
+                stderr=subprocess.STDOUT, timeout=10,
+            ).splitlines()[0]
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
+            musl_version = "unavailable"
+
     digest = hashlib.sha256()
     CONTENT_KEY.add_field(digest, b"vinix-desktop-run-build-key-v1")
     add_text(digest, "platform", platform.system())
@@ -212,13 +250,17 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         add_text(digest, "pillow-version", getattr(PIL, "__version__", "unknown"))
     except ImportError:
         add_text(digest, "pillow-version", "missing")
+    add_text(digest, "optimized-musl", env.get("VINIX_OPTIMIZED_MUSL", "1"))
+    add_text(digest, "musl-retain", env.get("VINIX_MUSL_RETAIN", "1"))
+    add_text(digest, "musl-compiler", env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
+    add_text(digest, "musl-compiler-version", musl_version)
     add_text(digest, "with-asahi", env.get("VINIX_WITH_ASAHI_GPU", "0"))
     add_text(digest, "macho-linker", env.get("VINIX_MACHO_LINKER", "auto"))
     add_text(digest, "sources", tree_key(source_paths, metadata_only=False))
     add_text(
         digest,
-        "x11-generation",
-        tree_key([x11_staging, gpu_sysroot], metadata_only=True),
+        "inplace-layer-generation",
+        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
     )
     for path in layer_roots:
         add_text(digest, f"layer:{path}", root_generation(path))

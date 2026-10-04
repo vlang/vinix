@@ -163,6 +163,43 @@ fn release_mapping(handle voidptr) {
 	segments_lock.release()
 }
 
+// Linux's ipcperms(): whether the caller has the access `wanted` (r=4, w=2,
+// x=1, in any of the three places) to a segment by its mode, as its owner or
+// creator, as one of their group, or as anyone else, or holds
+// CAP_IPC_OWNER. No call checked, so any process could attach, read and
+// write any other user's segment -- an X client's MIT-SHM image, say.
+fn may_use_unlocked(segment &Segment, wanted u32) bool {
+	process := proc.current_thread().process
+	requested := ((wanted >> 6) | (wanted >> 3) | wanted) & 0o7
+	mut granted := segment.mode
+	if process.euid == segment.cuid || process.euid == segment.uid {
+		granted >>= 6
+	} else if in_group(process, segment.cgid) || in_group(process, segment.gid) {
+		granted >>= 3
+	}
+	return requested & ~granted & 0o7 == 0 || proc.has_capability(process, proc.cap_ipc_owner)
+}
+
+// What IPC_SET and IPC_RMID need: to be the owner or the creator, or to hold
+// CAP_SYS_ADMIN. Anyone could make a segment theirs or take it away.
+fn may_control_unlocked(segment &Segment) bool {
+	process := proc.current_thread().process
+	return process.euid == segment.cuid || process.euid == segment.uid
+		|| proc.has_capability(process, proc.cap_sys_admin)
+}
+
+fn in_group(process &proc.Process, gid u32) bool {
+	if process.egid == gid {
+		return true
+	}
+	for group in process.groups {
+		if group == gid {
+			return true
+		}
+	}
+	return false
+}
+
 pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 	segments_lock.acquire()
 
@@ -176,6 +213,10 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 			if size > existing.size {
 				segments_lock.release()
 				return errno.err, errno.einval
+			}
+			if !may_use_unlocked(existing, u32(flags) & 0o777) {
+				segments_lock.release()
+				return errno.err, errno.eacces
 			}
 			id := existing.id
 			segments_lock.release()
@@ -243,6 +284,14 @@ pub fn syscall_shmat(_ voidptr, shmid int, requested_address u64, flags int) (u6
 		segments_lock.release()
 		return errno.err, errno.einval
 	}
+	mut wanted := if flags & shm_rdonly != 0 { u32(0o444) } else { u32(0o666) }
+	if flags & shm_exec != 0 {
+		wanted |= 0o111
+	}
+	if !may_use_unlocked(segment, wanted) {
+		segments_lock.release()
+		return errno.err, errno.eacces
+	}
 	// Keep IPC_RMID from reclaiming the segment between lookup and mmap's
 	// mapping-retain callback.
 	segment.operations++
@@ -257,6 +306,10 @@ pub fn syscall_shmat(_ voidptr, shmid int, requested_address u64, flags int) (u6
 		prot |= mmap.prot_exec
 	}
 	mut map_flags := mmap.map_shared
+	// An attachment made read-only stays so: mprotect() may not raise it.
+	if flags & shm_rdonly != 0 {
+		map_flags |= mmap.map_no_write
+	}
 	if address != 0 {
 		if flags & shm_remap != 0 {
 			map_flags |= mmap.map_fixed
@@ -321,6 +374,22 @@ pub fn syscall_shmctl(_ voidptr, shmid int, command int, buffer u64) (u64, u64) 
 	if segment == unsafe { nil } {
 		segments_lock.release()
 		return errno.err, errno.einval
+	}
+
+	match command {
+		ipc_rmid, ipc_set {
+			if !may_control_unlocked(segment) {
+				segments_lock.release()
+				return errno.err, errno.eperm
+			}
+		}
+		ipc_stat {
+			if !may_use_unlocked(segment, 0o444) {
+				segments_lock.release()
+				return errno.err, errno.eacces
+			}
+		}
+		else {}
 	}
 
 	match command {

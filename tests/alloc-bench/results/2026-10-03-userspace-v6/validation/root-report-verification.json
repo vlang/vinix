@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "checked_utc": "2026-10-02T23:17:27.849585+00:00",
+  "canonical_recompute_exit_code": 0,
+  "both_cohorts_all_six_pass": true,
+  "pooled_all_six_pass": true,
+  "raw_sample_count": 168,
+  "exact_match_independent_root_arithmetic": true,
+  "scripts_sha256": {
+    "recompute.py": "d4a0697f5ff063f30e35ed86ed31fe0f55e98f119476877e01a174207492392f",
+    "compare.py": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+    "bench.c": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9"
+  }
+}

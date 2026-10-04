@@ -103,8 +103,9 @@ clone_repo_commit \
     lwip-repository \
     77dcd25a72509eb83f72b033d219b1d40cd8eb95
 rm -rf c/lwip
-mkdir -p c/lwip/core/ipv4 c/lwip/netif
+mkdir -p c/lwip/core/ipv4 c/lwip/core/ipv6 c/lwip/netif
 cp -rp lwip-repository/src/include c/lwip/
 cp -p lwip-repository/src/core/*.c c/lwip/core/
 cp -p lwip-repository/src/core/ipv4/*.c c/lwip/core/ipv4/
+cp -p lwip-repository/src/core/ipv6/*.c c/lwip/core/ipv6/
 cp -p lwip-repository/src/netif/ethernet.c c/lwip/netif/

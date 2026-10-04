@@ -318,9 +318,10 @@ pub fn pmm_alloc_on_node(count u64, node int, strict bool) voidptr {
 		return unsafe { nil }
 	}
 	// Pages are always handed out zeroed, for the same reason as pmm_alloc.
+	word_count := (count * page_size) / 8
 	unsafe {
 		mut ptr := &u64(u64(ret) + higher_half)
-		for i := u64(0); i < (count * page_size) / 8; i++ {
+		for i := u64(0); i < word_count; i++ {
 			ptr[i] = 0
 		}
 	}

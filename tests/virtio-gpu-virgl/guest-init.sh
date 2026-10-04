@@ -19,6 +19,22 @@ mkdir -p "$XDG_RUNTIME_DIR" "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME" /tmp
 chmod 700 "$XDG_RUNTIME_DIR"
 
 echo "VINIX_VIRGL_VM_BEGIN"
+
+# The VirGL QEMU has no libslirp of its own. The runner's network bridge must
+# carry DHCP and reach the loopback package server before first-run installs.
+i=0
+while [ ! -s /etc/resolv.conf ] && [ "$i" -lt 60 ]; do
+    sleep 1
+    i=$((i + 1))
+done
+store_url=$(cat /etc/vinix-pkg/qemu-store-url)
+if [ ! -s /etc/resolv.conf ] ||
+   ! curl --fail --silent --show-error --max-time 15 "$store_url/health"; then
+    echo "VINIX_VIRGL_VM_FAIL:2"
+    while :; do sleep 60; done
+fi
+echo "VINIX_VIRGL_NETWORK_PASS"
+
 /usr/bin/run-virgl-smoke
 status=$?
 if [ "$status" -eq 0 ]; then

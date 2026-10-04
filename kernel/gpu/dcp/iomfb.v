@@ -183,7 +183,7 @@ pub fn iomfb_get_timing_modes(mut rtk rtkit.RTKit, state &IomfbState) []IomfbTim
 	}
 
 	if modes.len > 0 {
-		println('iomfb: Enumerated ${modes.len} timing mode(s)')
+		C.kprintf(c'iomfb: Enumerated %lld timing mode(s)\n', i64(modes.len))
 	}
 
 	return modes

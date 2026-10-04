@@ -2,8 +2,8 @@
 # Assemble the aarch64 Vinix userland from official Alpine binaries.
 #
 # The base filesystem, BusyBox, musl, Linux headers, and optional guest GCC
-# come from Alpine packages. Nothing in this script builds a libc, compiler,
-# or base command suite from source.
+# come from Alpine packages. The ABI-compatible musl loader and static libc
+# are rebuilt with Vinix allocation reuse; the command suite and GCC stay packaged.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -639,6 +639,10 @@ else
 fi
 
 echo "==> Packaging initramfs..."
+echo "==> Installing Vinix's optimized musl allocator..."
+python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$STAGING"
+python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
+
 mkdir -p "$(dirname "$INITRAMFS")"
 cd "$STAGING"
 # Write beside the published image and rename only once tar has finished.

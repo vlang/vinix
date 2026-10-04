@@ -299,7 +299,8 @@ pub fn attach_cpus() {
 	}
 	for id := 0; id < numa_node_count; id++ {
 		megabytes := memory.pmm_node_total_pages(id) * page_size / (1024 * 1024)
-		println('numa: node ${id} holds cpus 0x${numa_nodes[id].cpu_mask:x} and ${megabytes} MiB')
+		C.kprintf(c'numa: node %lld holds cpus 0x%llx and %llu MiB\n', i64(id), u64(numa_nodes[id].cpu_mask),
+			u64(megabytes))
 	}
 }
 
@@ -678,23 +679,25 @@ pub fn syscall_mbind(_ voidptr, addr u64, _length u64, mode int, nodemask u64, m
 // ── Reporting ───────────────────────────────────────────────────────────────
 
 fn report() {
+	name := source()
 	if !numa_multinode {
-		println('numa: one memory node (${source()})')
+		C.kprintf(c'numa: one memory node (%.*s)\n', i32(name.len), name.str)
 		return
 	}
-	println('numa: ${numa_node_count} memory nodes from ${source()}')
+	C.kprintf(c'numa: %lld memory nodes from %.*s\n', i64(numa_node_count), i32(name.len),
+		name.str)
 	for id := 0; id < numa_node_count; id++ {
 		for r := 0; r < numa_nodes[id].range_count; r++ {
 			base := numa_nodes[id].range_base[r]
 			size := numa_nodes[id].range_size[r]
-			println('numa:   node ${id} memory 0x${base:x}-0x${base + size:x}')
+			C.kprintf(c'numa:   node %lld memory 0x%llx-0x%llx\n', i64(id), u64(base), u64(base + size))
 		}
 	}
 	for a := 0; a < numa_node_count; a++ {
-		mut line := 'numa:   node ${a} distances'
+		C.kprintf(c'numa:   node %lld distances', i64(a))
 		for b := 0; b < numa_node_count; b++ {
-			line += ' ${distance(a, b)}'
+			C.kprintf(c' %llu', u64(distance(a, b)))
 		}
-		println(line)
+		C.kprintf(c'\n')
 	}
 }

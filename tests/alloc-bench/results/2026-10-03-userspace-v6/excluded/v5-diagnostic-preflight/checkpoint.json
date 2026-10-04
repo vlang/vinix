@@ -1,0 +1,18 @@
+{
+  "started_utc": "2026-10-02T22:34:05.957200+00:00",
+  "driver_pid": 59375,
+  "stage": "failed",
+  "boots": [
+    {
+      "ordinal": 1,
+      "state_dir": "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-1",
+      "started_utc": "2026-10-02T22:34:05.970083+00:00",
+      "status": "booting",
+      "qemu_pid": 64703,
+      "qemu_exit_code": 0,
+      "qemu_stopped_utc": "2026-10-02T22:34:31.038550+00:00"
+    }
+  ],
+  "updated_utc": "2026-10-02T22:34:31.039398+00:00",
+  "error": "RuntimeError('Guest failure in /Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-1/serial.log')"
+}

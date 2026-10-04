@@ -152,7 +152,9 @@ fn sampler_array_bytes(count u32) u64 {
 // assigns a member, the C verifier will additionally require that exact VA at
 // that member before it allows synthetic completion.
 pub fn stage_render_resource_references(command &agxrender.Command) []FakeG17ResourceReference {
-	mut resources := []FakeG17ResourceReference{cap: 64}
+	// ioctl_submit() frees this. Nothing slices it while it grows.
+	mut resources := []FakeG17ResourceReference{cap: 64} @[freed]
+	resources.flags |= .noslices
 	append_render_resource_at(mut resources, .encoder, .gpu_va,
 		command.encoder_ptr, 4, fake_g17_vm_read, fw.g17_render_encoder_member)
 	append_render_resource(mut resources, .vertex_helper_argument, .gpu_va, command.vertex_helper_arg, 8, fake_g17_vm_read)

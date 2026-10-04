@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Wallpapers: a flat gradient, or one of the photographs the build downloaded.
 //
 // Vinix has no JPEG or PNG decoder, so the photographs arrive already decoded:
@@ -87,10 +90,22 @@ fn load_raw_image(path string) ?RawImage {
 	if int(got) < needed {
 		return none
 	}
+	pixels := buffer[vwp_header_size..needed].clone()
+	unsafe { buffer.free() }
 	return RawImage{
 		width: width
 		height: height
-		pixels: buffer[vwp_header_size..needed].clone()
+		pixels: pixels
+	}
+}
+
+fn free_wallpaper_list(images []WallpaperImage) {
+	unsafe {
+		for image in images {
+			image.name.free()
+			image.file.free()
+		}
+		images.free()
 	}
 }
 

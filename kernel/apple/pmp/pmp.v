@@ -122,7 +122,7 @@ pub fn validate_pmp_message_codec() bool {
 		return false
 	}
 	// Everything outside 1..4 is unknown, including zero and the top class.
-	for class in [u32(0), 5, 6, 15] {
+	for class in [u32(0), 5, 6, 15]! {
 		if classify(u64(class) << class_shift) != .unknown {
 			return false
 		}

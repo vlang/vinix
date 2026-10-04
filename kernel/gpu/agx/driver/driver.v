@@ -78,17 +78,19 @@ fn find_gpu_node() ?(&devicetree.DTNode, u32, bool) {
 }
 
 fn find_native_asc_node(role u32) ?&devicetree.DTNode {
-	name := if role == 0 { 'gfx-asc' } else { 'gfx1-asc' }
-	if node := devicetree.find_node('/arm-io/${name}') {
+	arm_io_path := if role == 0 { '/arm-io/gfx-asc' } else { '/arm-io/gfx1-asc' }
+	if node := devicetree.find_node(arm_io_path) {
 		return node
 	}
-	if node := devicetree.find_node('/soc/${name}') {
+	soc_path := if role == 0 { '/soc/gfx-asc' } else { '/soc/gfx1-asc' }
+	if node := devicetree.find_node(soc_path) {
 		return node
 	}
 	return none
 }
 
-fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bool {
+fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool,
+	mut cfg hw.HwConfig) bool {
 	// The tuple arrives as standard big-endian FDT cells. An M1 Air booted
 	// through m1n1 supplies apple,firmware-compat and no apple,firmware-abi at
 	// all, so the fallback below is the spelling that actually turns up on
@@ -110,16 +112,25 @@ fn validate_g13_firmware_compat(gpu_node &devicetree.DTNode, native_adt bool) bo
 			return false
 		}
 	}
+	defer {
+		unsafe { compat.free() }
+	}
 	if compat.len != 3 {
-		println('agx: malformed t8103 ${property_name} tuple')
+		C.kprintf(c'agx: malformed t8103 %.*s tuple\n', i32(property_name.len), property_name.str)
 		return false
 	}
-	println('agx: t8103 ${property_name} ${compat[0]}.${compat[1]}.${compat[2]}')
-	if compat[0] != 12 || compat[1] != 3 || compat[2] != 0 {
-		println('agx: only the G13 12.3.0 firmware ABI is being implemented')
-		return false
+	C.kprintf(c'agx: t8103 %.*s %llu.%llu.%llu\n', i32(property_name.len), property_name.str,
+		u64(compat[0]), u64(compat[1]), u64(compat[2]))
+	if compat[0] == 12 && compat[1] == 3 && compat[2] == 0 {
+		cfg.firmware_abi = .v12_3
+		return true
 	}
-	return true
+	if compat[0] == 13 && compat[1] == 5 && compat[2] == 0 {
+		cfg.firmware_abi = .v13_5_partial
+		return true
+	}
+	println('agx: supported G13 firmware ABIs are 12.3.0 and 13.5.0')
+	return false
 }
 
 fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
@@ -128,6 +139,9 @@ fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
 		return
 	}
 	version := devicetree.get_u32_array(gpu_node, 'apple,firmware-version') or { return }
+	defer {
+		unsafe { version.free() }
+	}
 	if version.len > cfg.firmware_version.len {
 		println('agx: ignoring malformed firmware version tuple')
 		return
@@ -137,7 +151,8 @@ fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
 	}
 	// The compat tuple says which ABI the firmware speaks; this says which
 	// firmware it is. A bring-up that stops on the ABI needs both.
-	println('agx: t8103 apple,firmware-version ${cfg.firmware_version[0]}.${cfg.firmware_version[1]}.${cfg.firmware_version[2]}')
+	C.kprintf(c'agx: t8103 apple,firmware-version %llu.%llu.%llu\n', u64(cfg.firmware_version[0]),
+		u64(cfg.firmware_version[1]), u64(cfg.firmware_version[2]))
 }
 
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
@@ -145,6 +160,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 	gpu_regs := devicetree.get_translated_reg_ranges(gpu_node) or {
 		println('agx: failed to translate GPU register ranges')
 		return none
+	}
+	defer {
+		unsafe { gpu_regs.free() }
 	}
 	if native_adt {
 		if gpu_regs.len == 0 {
@@ -158,6 +176,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		asc_regs := devicetree.get_translated_reg_ranges(asc_node) or {
 			println('agx: failed to translate native gfx-asc registers')
 			return none
+		}
+		defer {
+			unsafe { asc_regs.free() }
 		}
 		if asc_regs.len == 0 || asc_regs[0].size < 0x9000 {
 			println('agx: native gfx-asc register window is incomplete')
@@ -178,12 +199,14 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 			}
 			if secondary_regs.len == 0 || secondary_regs[0].size < 0x9000 {
 				println('agx: native gfx1-asc register window is incomplete')
+				unsafe { secondary_regs.free() }
 				return none
 			}
 			secondary_asc_base = secondary_regs[0].base
 			secondary_asc_size = secondary_regs[0].size
 			secondary_mailbox_base = secondary_regs[0].base + 0x8000
 			firmware_role_count = 2
+			unsafe { secondary_regs.free() }
 		}
 		ttbs_base := devicetree.get_le_u64(gpu_node, 'gpu-region-base') or {
 			println('agx: native SGX node has no gpu-region-base')
@@ -250,6 +273,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		println('agx: failed to translate GPU mailbox registers')
 		return none
 	}
+	defer {
+		unsafe { mailbox_regs.free() }
+	}
 	if mailbox_regs.len == 0 {
 		println('agx: GPU mailbox has no register range')
 		return none
@@ -262,6 +288,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		println('agx: failed to translate GPU TTB region')
 		return none
 	}
+	defer {
+		unsafe { ttbs_regs.free() }
+	}
 	handoff_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region', 'memory-region-names', 'handoff') or {
 		println('agx: GPU handoff reserved-memory region is missing')
 		return none
@@ -270,6 +299,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		println('agx: failed to translate GPU handoff region')
 		return none
 	}
+	defer {
+		unsafe { handoff_regs.free() }
+	}
 	pagetables_node := devicetree.get_named_phandle_node(gpu_node, 'memory-region', 'memory-region-names', 'pagetables') or {
 		println('agx: GPU page-table reserved-memory region is missing')
 		return none
@@ -277,6 +309,9 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 	pagetables_regs := devicetree.get_translated_reg_ranges(pagetables_node) or {
 		println('agx: failed to translate GPU page-table region')
 		return none
+	}
+	defer {
+		unsafe { pagetables_regs.free() }
 	}
 	if ttbs_regs.len == 0 || handoff_regs.len == 0 || pagetables_regs.len == 0 {
 		println('agx: GPU reserved-memory region has no address')
@@ -318,12 +353,13 @@ fn load_t6050_chip_info(mut cfg hw.HwConfig) bool {
 		return false
 	}
 	if chip_id != cfg.chip_id {
-		println('agx: t6050 chip-id mismatch 0x${chip_id:x} != 0x${cfg.chip_id:x}')
+		C.kprintf(c'agx: t6050 chip-id mismatch 0x%llx != 0x%llx\n', u64(chip_id), u64(cfg.chip_id))
 		return false
 	}
 	cfg.soc_revision_major = chip_revision >> 4
 	cfg.soc_revision_minor = chip_revision & 7
-	println('agx: loaded native chip info 0x${chip_id:x} revision ${cfg.soc_revision_major}.${cfg.soc_revision_minor}')
+	C.kprintf(c'agx: loaded native chip info 0x%llx revision %llu.%llu\n', u64(chip_id),
+		u64(cfg.soc_revision_major), u64(cfg.soc_revision_minor))
 	return true
 }
 
@@ -340,7 +376,7 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 		return false
 	}
 	cfg.gpu_power_sample_period = sample_period
-	println('agx: loaded native GPU power sample period ${sample_period}')
+	C.kprintf(c'agx: loaded native GPU power sample period %llu\n', u64(sample_period))
 	return true
 }
 
@@ -378,10 +414,15 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 fn report_native_t8103_performance_gap(gpu_node &devicetree.DTNode, power_loaded bool) {
 	state_count := devicetree.get_le_u32(gpu_node, 'perf-state-count') or { u32(0) }
 	max_state := devicetree.get_le_u32(gpu_node, 'gpu-num-perf-states') or { u32(0) }
-	state_words := (devicetree.get_le_u32_array(gpu_node, 'perf-states') or { []u32{} }).len
+	mut state_words := 0
+	if states := devicetree.get_le_u32_array(gpu_node, 'perf-states') {
+		state_words = states.len
+		unsafe { states.free() }
+	}
 	println('agx: native t8103 GPU boot data is incomplete')
-	println('agx:   perf-states: ${state_count} states, max ${max_state}, ${state_words} words')
-	println('agx:   power controller: ${if power_loaded { 'complete' } else { 'incomplete' }}')
+	C.kprintf(c'agx:   perf-states: %llu states, max %llu, %lld words\n', u64(state_count),
+		u64(max_state), i64(state_words))
+	C.kprintf(c'agx:   power controller: %s\n', if power_loaded { c'complete' } else { c'incomplete' })
 	println('agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage')
 	println('agx:   see tools/agx-re/recover_t8103_adt.py for where each one comes from')
 }
@@ -401,7 +442,7 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		return false
 	}
 	if opp_table.children.len < 2 {
-		println('agx: invalid t8103 OPP count ${u32(opp_table.children.len)}')
+		C.kprintf(c'agx: invalid t8103 OPP count %llu\n', u64(u32(opp_table.children.len)))
 		return false
 	}
 	min_sram_microvolt := devicetree.get_u32(gpu_node, 'apple,min-sram-microvolt') or {
@@ -418,10 +459,20 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		return false
 	}
 
-	mut entries := []hw.OppEntry{cap: opp_table.children.len}
+	// apply_opp_table() copies what it keeps, so the entries go on every return.
+	mut entries := []hw.OppEntry{cap: opp_table.children.len} @[freed]
+	defer {
+		for entry in entries {
+			unsafe { entry.voltage_uv.free() }
+		}
+		unsafe { entries.free() }
+	}
 	for opp in opp_table.children {
 		if status := devicetree.get_string_list(opp, 'status') {
-			if status.len > 0 && status[0] == 'disabled' {
+			mut owned_status := status
+			disabled := owned_status.len > 0 && owned_status[0] == 'disabled'
+			unsafe { owned_status.free() }
+			if disabled {
 				continue
 			}
 		}
@@ -441,6 +492,7 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		}
 		power_uw := devicetree.get_u32(opp, 'opp-microwatt') or {
 			println('agx: t8103 OPP has no opp-microwatt value')
+			unsafe { voltage_uv.free() }
 			return false
 		}
 		entries << hw.OppEntry{
@@ -455,11 +507,13 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	}
 
 	cfg.gpu_power_sample_period = power_sample_period
-	// println, not C.printf: kernel/c/printf.c makes _putchar a no-op under
+	// C.kprintf, not C.printf: kernel/c/printf.c makes _putchar a no-op under
 	// -DPROD, so this bring-up evidence would never reach a real serial log.
 	base_mhz := cfg.perf_state_frequencies[cfg.perf_state_base] / 1_000_000
 	max_mhz := cfg.perf_state_frequencies[cfg.perf_state_count - 1] / 1_000_000
-	println('agx: loaded ${cfg.perf_state_count} t8103 operating points (${cfg.perf_state_off_count()} off, ${base_mhz}..${max_mhz} MHz, ${cfg.max_power_mw} mW max)')
+	C.kprintf(c'agx: loaded %llu t8103 operating points (%llu off, %llu..%llu MHz, %llu mW max)\n',
+		u64(cfg.perf_state_count), u64(cfg.perf_state_off_count()), u64(base_mhz), u64(max_mhz),
+		u64(cfg.max_power_mw))
 	return true
 }
 
@@ -471,12 +525,22 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 // recovered from a base-M1 DeviceTree and AGXG13G's own string table by
 // tools/agx-re/recover_t8103_adt.py, so both boot paths can share one reader
 // instead of keeping two transcriptions of forty-two property names in step.
+// The caller frees the result.
 fn g13_power_property(native_adt bool, name string) string {
-	return if native_adt { 'gpu-${name}' } else { 'apple,${name}' }
+	property := if native_adt { 'gpu-' + name } else { 'apple,' + name } @[freed]
+	return property
+}
+
+// The prefix g13_power_property() puts in front of a name, for printing.
+fn g13_power_prefix(native_adt bool) &char {
+	return if native_adt { c'gpu-' } else { c'apple,' }
 }
 
 fn get_g13_power_u32(node &devicetree.DTNode, native_adt bool, name string) ?u32 {
 	property := g13_power_property(native_adt, name)
+	defer {
+		unsafe { property.free() }
+	}
 	if native_adt {
 		return devicetree.get_le_u32(node, property)
 	}
@@ -485,7 +549,8 @@ fn get_g13_power_u32(node &devicetree.DTNode, native_adt bool, name string) ?u32
 
 fn get_g13_power_required_u32(node &devicetree.DTNode, native_adt bool, name string) ?u32 {
 	value := get_g13_power_u32(node, native_adt, name) or {
-		println('agx: t8103 boot data has no ${g13_power_property(native_adt, name)}')
+		C.kprintf(c'agx: t8103 boot data has no %s%.*s\n', g13_power_prefix(native_adt),
+			i32(name.len), name.str)
 		return none
 	}
 	return value
@@ -493,6 +558,9 @@ fn get_g13_power_required_u32(node &devicetree.DTNode, native_adt bool, name str
 
 fn get_g13_power_u32_array(node &devicetree.DTNode, native_adt bool, name string) ?[]u32 {
 	property := g13_power_property(native_adt, name)
+	defer {
+		unsafe { property.free() }
+	}
 	if native_adt {
 		return devicetree.get_le_u32_array(node, property)
 	}
@@ -502,7 +570,8 @@ fn get_g13_power_u32_array(node &devicetree.DTNode, native_adt bool, name string
 fn get_g13_power_required_u32_array(node &devicetree.DTNode, native_adt bool,
 	name string) ?[]u32 {
 	value := get_g13_power_u32_array(node, native_adt, name) or {
-		println('agx: t8103 boot data has no ${g13_power_property(native_adt, name)}')
+		C.kprintf(c'agx: t8103 boot data has no %s%.*s\n', g13_power_prefix(native_adt),
+			i32(name.len), name.str)
 		return none
 	}
 	return value
@@ -540,20 +609,29 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bo
 		se_kp_1_f32: 0xc1200000 // -10.0f
 		se_reset_criteria: 50
 	}
-	if _ := devicetree.get_property(gpu_node, g13_power_property(native_adt, 'power-zones')) {
+	zones_property := g13_power_property(native_adt, 'power-zones')
+	mut has_zones := false
+	if _ := devicetree.get_property(gpu_node, zones_property) {
+		has_zones = true
+	}
+	unsafe { zones_property.free() }
+	if has_zones {
 		zones := get_g13_power_u32_array(gpu_node, native_adt, 'power-zones') or {
-			println('agx: malformed t8103 ${g13_power_property(native_adt, "power-zones")}')
+			C.kprintf(c'agx: malformed t8103 %spower-zones\n', g13_power_prefix(native_adt))
 			return false
 		}
+		defer {
+			unsafe { zones.free() }
+		}
 		if zones.len > 15 || zones.len % 3 != 0 {
-			println('agx: invalid t8103 ${g13_power_property(native_adt, "power-zones")} length')
+			C.kprintf(c'agx: invalid t8103 %spower-zones length\n', g13_power_prefix(native_adt))
 			return false
 		}
 		power.power_zone_count = u32(zones.len / 3)
 		for index := u32(0); index < power.power_zone_count; index++ {
 			base := index * 3
 			if zones[base + 2] == 0 || zones[base + 1] > zones[base] {
-				println('agx: invalid t8103 power zone ${index}')
+				C.kprintf(c'agx: invalid t8103 power zone %llu\n', u64(index))
 				return false
 			}
 			power.power_zones[index] = hw.G13PowerZoneConfig{
@@ -567,8 +645,14 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bo
 	core_leak := get_g13_power_required_u32_array(gpu_node, native_adt, 'core-leak-coef') or {
 		return false
 	}
+	defer {
+		unsafe { core_leak.free() }
+	}
 	sram_leak := get_g13_power_required_u32_array(gpu_node, native_adt, 'sram-leak-coef') or {
 		return false
+	}
+	defer {
+		unsafe { sram_leak.free() }
 	}
 	if core_leak.len != int(cfg.num_clusters) || sram_leak.len != int(cfg.num_clusters) {
 		println('agx: invalid t8103 leakage coefficient count')
@@ -639,7 +723,7 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bo
 		power.perf_integral_gain_f32, power.perf_integral_gain2_f32,
 		power.perf_proportional_gain_f32, power.perf_proportional_gain2_f32, power.ppm_ki_f32,
 		power.ppm_kp_f32, power.pwr_integral_gain_f32, power.pwr_proportional_gain_f32,
-		power.se_ki_f32, power.se_ki_1_f32, power.se_kp_f32, power.se_kp_1_f32]
+		power.se_ki_f32, power.se_ki_1_f32, power.se_kp_f32, power.se_kp_1_f32]!
 	for value in float_fields {
 		if !valid_f32_bits(value) {
 			println('agx: t8103 power configuration contains a non-finite coefficient')
@@ -657,8 +741,9 @@ fn load_t8103_power_controller_config(gpu_node &devicetree.DTNode, native_adt bo
 	}
 	power.valid = true
 	cfg.g13_power = power
-	zone_word := if power.power_zone_count == 1 { 'zone' } else { 'zones' }
-	println('agx: loaded t8103 power controller (${power.power_zone_count} ${zone_word}, ${period} ms period)')
+	zone_word := if power.power_zone_count == 1 { c'zone' } else { c'zones' }
+	C.kprintf(c'agx: loaded t8103 power controller (%llu %s, %llu ms period)\n',
+		u64(power.power_zone_count), zone_word, u64(period))
 	return true
 }
 
@@ -684,20 +769,28 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	}
 	if state_count == 0 || state_count > 16 || table_count == 0 || table_count > 16
 		|| max_state + 1 != state_count || base_state == 0 || base_state >= max_state {
-		println('agx: invalid t6050 performance dimensions states=${state_count} tables=${table_count} base=${base_state} max=${max_state}')
+		C.kprintf(c'agx: invalid t6050 performance dimensions states=%llu tables=%llu base=%llu max=%llu\n',
+			u64(state_count), u64(table_count), u64(base_state), u64(max_state))
 		return false
 	}
 	states := devicetree.get_le_u32_array(gpu_node, 'perf-states') or {
 		println('agx: t6050 has no perf-states')
 		return false
 	}
+	defer {
+		unsafe { states.free() }
+	}
 	sram_states := devicetree.get_le_u32_array(gpu_node, 'perf-states-sram') or {
 		println('agx: t6050 has no perf-states-sram')
 		return false
 	}
+	defer {
+		unsafe { sram_states.free() }
+	}
 	expected_words := int(state_count * table_count * 2)
 	if states.len != expected_words || sram_states.len != expected_words {
-		println('agx: invalid t6050 performance table lengths core=${u32(states.len)} sram=${u32(sram_states.len)} expected=${u32(expected_words)}')
+		C.kprintf(c'agx: invalid t6050 performance table lengths core=%llu sram=%llu expected=%llu\n',
+			u64(u32(states.len)), u64(u32(sram_states.len)), u64(u32(expected_words)))
 		return false
 	}
 
@@ -709,11 +802,13 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 			if table == 0 {
 				cfg.perf_state_frequencies[state] = frequency
 			} else if frequency != cfg.perf_state_frequencies[state] {
-				println('agx: t6050 performance table ${table} state ${state} has mismatched frequency')
+				C.kprintf(c'agx: t6050 performance table %llu state %llu has mismatched frequency\n',
+					u64(table), u64(state))
 				return false
 			}
 			if sram_states[source] != frequency {
-				println('agx: t6050 SRAM table ${table} state ${state} has mismatched frequency')
+				C.kprintf(c'agx: t6050 SRAM table %llu state %llu has mismatched frequency\n',
+					u64(table), u64(state))
 				return false
 			}
 			cfg.perf_state_voltages[destination] = states[source + 1]
@@ -723,7 +818,9 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 	cfg.perf_state_count = state_count
 	cfg.perf_state_table_count = table_count
 	cfg.perf_state_base = base_state
-	println('agx: loaded ${state_count} x ${table_count} native performance states (${cfg.perf_state_frequencies[0] / 1000000}..${cfg.perf_state_frequencies[state_count - 1] / 1000000} MHz)')
+	C.kprintf(c'agx: loaded %llu x %llu native performance states (%llu..%llu MHz)\n',
+		u64(state_count), u64(table_count), u64(cfg.perf_state_frequencies[0] / 1000000),
+		u64(cfg.perf_state_frequencies[state_count - 1] / 1000000))
 	return true
 }
 
@@ -733,19 +830,23 @@ fn load_t6050_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 // voltages to mV and clamps SRAM voltage to max(core, default).
 fn load_t6050_aux_performance_domain(gpu_node &devicetree.DTNode, name string) ?hw.AuxPerfStateConfig {
 	values := devicetree.get_le_u64_array(gpu_node, name) or {
-		println('agx: t6050 has no ${name}')
+		C.kprintf(c'agx: t6050 has no %.*s\n', i32(name.len), name.str)
 		return none
+	}
+	defer {
+		unsafe { values.free() }
 	}
 	if values.len < 2 || values[0] == 0 || values[0] > 2 || values[1] == 0
 		|| values[1] > 16 {
-		println('agx: invalid t6050 ${name} dimensions')
+		C.kprintf(c'agx: invalid t6050 %.*s dimensions\n', i32(name.len), name.str)
 		return none
 	}
 	table_count := u32(values[0])
 	state_count := u32(values[1])
 	expected_values := 2 + int(table_count) * (int(state_count) * 2 + 1)
 	if values.len != expected_values {
-		println('agx: invalid t6050 ${name} length=${u32(values.len)} expected=${u32(expected_values)}')
+		C.kprintf(c'agx: invalid t6050 %.*s length=%llu expected=%llu\n', i32(name.len), name.str,
+			u64(u32(values.len)), u64(u32(expected_values)))
 		return none
 	}
 
@@ -760,13 +861,14 @@ fn load_t6050_aux_performance_domain(gpu_node &devicetree.DTNode, name string) ?
 			frequency := values[source + 1]
 			if voltage_uv % 1_000 != 0 || voltage_uv / 1_000 > 0xffff_ffff
 				|| frequency > 0xffff_ffff {
-				println('agx: invalid t6050 ${name} state value')
+				C.kprintf(c'agx: invalid t6050 %.*s state value\n', i32(name.len), name.str)
 				return none
 			}
 			if table == 0 {
 				result.frequencies[state] = u32(frequency)
 			} else if frequency != result.frequencies[state] {
-				println('agx: t6050 ${name} table ${table} state ${state} has mismatched frequency')
+				C.kprintf(c'agx: t6050 %.*s table %llu state %llu has mismatched frequency\n',
+					i32(name.len), name.str, u64(table), u64(state))
 				return none
 			}
 			result.voltages[state * 2 + table] = u32(voltage_uv / 1_000)
@@ -777,7 +879,7 @@ fn load_t6050_aux_performance_domain(gpu_node &devicetree.DTNode, name string) ?
 	for table := u32(0); table < table_count; table++ {
 		default_uv := values[defaults_base + int(table)]
 		if default_uv % 1_000 != 0 || default_uv / 1_000 > 0xffff_ffff {
-			println('agx: invalid t6050 ${name} SRAM default')
+			C.kprintf(c'agx: invalid t6050 %.*s SRAM default\n', i32(name.len), name.str)
 			return none
 		}
 		default_mv := u32(default_uv / 1_000)
@@ -795,12 +897,16 @@ fn load_t6050_aux_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwC
 	afr := load_t6050_aux_performance_domain(gpu_node, 'afr-perf-states') or { return false }
 	cfg.cs_perf_states = cs
 	cfg.afr_perf_states = afr
-	println('agx: loaded native CS/AFR performance states (${cs.state_count}/${afr.state_count} states)')
+	C.kprintf(c'agx: loaded native CS/AFR performance states (%llu/%llu states)\n',
+		u64(cs.state_count), u64(afr.state_count))
 	return true
 }
 
 fn is_pmgr_power_domain(node &devicetree.DTNode) bool {
-	compatibles := devicetree.get_string_list(node, 'compatible') or { return false }
+	mut compatibles := devicetree.get_string_list(node, 'compatible') or { return false }
+	defer {
+		unsafe { compatibles.free() }
+	}
 	for compatible in compatibles {
 		if compatible == 'apple,pmgr-pwrstate' || compatible == 'apple,t8103-pmgr-pwrstate' {
 			return true
@@ -824,39 +930,49 @@ fn enable_device_power_domains(node &devicetree.DTNode, depth u32) bool {
 		}
 		return true
 	}
+	defer {
+		unsafe { domains.free() }
+	}
 	if depth == 0 && domains.len == 0 {
 		println('agx: GPU node has an empty power-domain list')
 		return false
 	}
 	for handle in domains {
 		domain := devicetree.find_phandle(handle) or {
-			println('agx: unresolved power-domain phandle 0x${handle:x}')
+			C.kprintf(c'agx: unresolved power-domain phandle 0x%llx\n', u64(handle))
 			return false
 		}
 		cells := devicetree.get_u32(domain, '#power-domain-cells') or { u32(0) }
 		if cells != 0 || !is_pmgr_power_domain(domain) {
-			println('agx: unsupported power-domain provider ${domain.name}')
+			C.kprintf(c'agx: unsupported power-domain provider %.*s\n', i32(domain.name.len),
+				domain.name.str)
 			return false
 		}
 		if !enable_device_power_domains(domain, depth + 1) {
 			return false
 		}
 		offset := devicetree.get_u32(domain, 'reg') or {
-			println('agx: power domain ${domain.name} has no register offset')
+			C.kprintf(c'agx: power domain %.*s has no register offset\n', i32(domain.name.len),
+				domain.name.str)
 			return false
 		}
 		if domain.parent == unsafe { nil } {
 			return false
 		}
 		apertures := devicetree.get_translated_reg_ranges(domain.parent) or {
-			println('agx: power domain ${domain.name} has no PMGR aperture')
+			C.kprintf(c'agx: power domain %.*s has no PMGR aperture\n', i32(domain.name.len),
+				domain.name.str)
 			return false
 		}
-		if apertures.len == 0 || !pmgr.enable_region(apertures[0].base, apertures[0].size, offset) {
-			println('agx: failed to enable power domain ${domain.name}')
+		enabled := apertures.len != 0
+			&& pmgr.enable_region(apertures[0].base, apertures[0].size, offset)
+		unsafe { apertures.free() }
+		if !enabled {
+			C.kprintf(c'agx: failed to enable power domain %.*s\n', i32(domain.name.len),
+				domain.name.str)
 			return false
 		}
-		println('agx: enabled power domain ${domain.name}')
+		C.kprintf(c'agx: enabled power domain %.*s\n', i32(domain.name.len), domain.name.str)
 	}
 	return true
 }
@@ -871,7 +987,7 @@ fn enable_device_power_domains(node &devicetree.DTNode, depth u32) bool {
 // named, so one boot reports all of them.
 fn g13_abi_check(passed bool, name string) bool {
 	if !passed {
-		println('agx: G13 ABI self-check failed: ${name}')
+		C.kprintf(c'agx: G13 ABI self-check failed: %.*s\n', i32(name.len), name.str)
 	}
 	return passed
 }
@@ -905,7 +1021,7 @@ pub fn initialise() {
 		return
 	}
 	mut cfg := hw.get_config(chip_id) or {
-		println('agx: No hardware configuration for chip 0x${chip_id:x}')
+		C.kprintf(c'agx: No hardware configuration for chip 0x%llx\n', u64(chip_id))
 		return
 	}
 	load_fdt_firmware_version(gpu_node, native_adt, mut cfg)
@@ -946,9 +1062,11 @@ pub fn initialise() {
 			println('agx: internal G17 firmware layout validation failed')
 			return
 		}
-		println('agx: detected t6050 / G17C, ${cfg.gpu_core_count} cores in ${cfg.num_mgpus} GPU partitions')
+		C.kprintf(c'agx: detected t6050 / G17C, %llu cores in %llu GPU partitions\n',
+			u64(cfg.gpu_core_count), u64(cfg.num_mgpus))
 	} else {
-		println('agx: detected chip 0x${chip_id:x}, up to ${cfg.gpu_core_count} cores')
+		C.kprintf(c'agx: detected chip 0x%llx, up to %llu cores\n', u64(chip_id),
+			u64(cfg.gpu_core_count))
 	}
 
 	// Step 2: Resolve all addresses without touching hardware. Native Apple
@@ -960,7 +1078,7 @@ pub fn initialise() {
 	cfg.gpu_mmio_base = platform.sgx_base
 	cfg.gpu_mmio_size = platform.sgx_size
 	agx_driver_inst.detected = true
-	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt) {
+	if chip_id == 0x8103 && !validate_g13_firmware_compat(gpu_node, native_adt, mut cfg) {
 		return
 	}
 	if platform.ttbs_size < 64 * 16 {
@@ -985,7 +1103,9 @@ pub fn initialise() {
 	// Never power a GPU whose private firmware ABI or platform performance
 	// inputs are incomplete. This check precedes every power-domain/ASC write.
 	if !cfg.can_boot_firmware() {
-		println('agx: chip 0x${chip_id:x} firmware ABI ${cfg.firmware_abi_name()} is not complete; leaving hardware untouched')
+		abi_name := cfg.firmware_abi_name()
+		C.kprintf(c'agx: chip 0x%llx firmware ABI %.*s is not complete; leaving hardware untouched\n',
+			u64(chip_id), i32(abi_name.len), abi_name.str)
 		return
 	}
 	if chip_id == 0x8103 && !g13_performance_config_complete {
@@ -1009,14 +1129,19 @@ pub fn initialise() {
 			println('agx: G13 hardware identity exceeds t8103 limits')
 			return
 		}
-		println('agx: t8103 topology ${identity.total_active_cores}/${identity.num_clusters * identity.num_cores_per_cluster} active cores, mask=0x${identity.core_masks[0]:x}')
+		C.kprintf(c'agx: t8103 topology %llu/%llu active cores, mask=0x%llx\n',
+			u64(identity.total_active_cores),
+			u64(identity.num_clusters * identity.num_cores_per_cluster), u64(identity.core_masks[0]))
 	}
 	agx_driver_inst.hw_config = cfg
-	println('agx: ASC=0x${platform.asc_base:x} SGX=0x${platform.sgx_base:x} mailbox=0x${platform.mailbox_base:x} TTBs=0x${platform.ttbs_base:x}+0x${platform.ttbs_size:x}')
+	C.kprintf(c'agx: ASC=0x%llx SGX=0x%llx mailbox=0x%llx TTBs=0x%llx+0x%llx\n', platform.asc_base,
+		platform.sgx_base, platform.mailbox_base, platform.ttbs_base, platform.ttbs_size)
 	if platform.firmware_role_count == 2 {
-		println('agx: GFX1 ASC=0x${platform.secondary_asc_base:x} mailbox=0x${platform.secondary_mailbox_base:x}')
+		C.kprintf(c'agx: GFX1 ASC=0x%llx mailbox=0x%llx\n', platform.secondary_asc_base,
+			platform.secondary_mailbox_base)
 	}
-	println('agx: UAT handoff=0x${platform.handoff_base:x}+0x${platform.handoff_size:x} page tables=0x${platform.pagetables_base:x}+0x${platform.pagetables_size:x}')
+	C.kprintf(c'agx: UAT handoff=0x%llx+0x%llx page tables=0x%llx+0x%llx\n', platform.handoff_base,
+		platform.handoff_size, platform.pagetables_base, platform.pagetables_size)
 
 	// Step 3: Initialize the AGX-internal UAT from its reserved TTB region.
 	handoff_abi := if cfg.firmware_abi == .g17_26_5_partial {
@@ -1051,7 +1176,7 @@ pub fn initialise() {
 		return
 	}
 
-	agx_driver_inst.gpu = &mgr
+	agx_driver_inst.gpu = mgr
 	gpu.set_global_manager(agx_driver_inst.gpu)
 
 	// Step 7: Register DRM driver (name "asahi", features GEM|RENDER|COMPUTE)
@@ -1079,7 +1204,7 @@ pub fn initialise() {
 
 	// Step 8: Log success
 	println('agx: Apple GPU driver initialized successfully')
-	println('agx: DRM device registered as card${agx_driver_inst.drm_dev.dev_id}')
+	C.kprintf(c'agx: DRM device registered as card%llu\n', u64(agx_driver_inst.drm_dev.dev_id))
 }
 
 // Tear down the GPU driver and release all resources.

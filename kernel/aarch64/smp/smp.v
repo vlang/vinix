@@ -35,9 +35,9 @@ pub fn initialise(max_cpus u64) {
 		online_target = max_cpus
 	}
 
-	println('smp: BSP MPIDR:       ${smp_tag.bsp_mpidr:x}')
-	println('smp: Discovered CPUs: ${smp_tag.cpu_count}')
-	println('smp: Starting CPUs:   ${online_target}')
+	C.kprintf(c'smp: BSP MPIDR:       %llx\n', u64(smp_tag.bsp_mpidr))
+	C.kprintf(c'smp: Discovered CPUs: %llu\n', u64(smp_tag.cpu_count))
+	C.kprintf(c'smp: Starting CPUs:   %llu\n', u64(online_target))
 
 	smp_info_array := smp_tag.cpus
 	mut bsp_index := smp_tag.cpu_count
@@ -94,5 +94,5 @@ pub fn initialise(max_cpus u64) {
 	memory.heap_enable_cpu_caches(u64(cpu_locals.len))
 	smp_ready = true
 
-	println('smp: ${logical_cpu} CPUs online')
+	C.kprintf(c'smp: %llu CPUs online\n', u64(logical_cpu))
 }

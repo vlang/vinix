@@ -1,0 +1,8 @@
+{
+  "commit": "c9c8ce01bd98c7e73df5c211558c49ee85ec3f0e",
+  "source_sha256": {
+    "kernel/socket/socket.v": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+    "kernel/socket/unix/unix.v": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6"
+  },
+  "proof": "The committed socket files exactly match both final kernel build source fingerprints."
+}

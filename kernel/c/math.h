@@ -10,5 +10,6 @@
 double ceil(double x);
 double floor(double x);
 double fabs(double x);
+double pow(double x, double y);
 
 #endif

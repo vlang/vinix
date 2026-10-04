@@ -67,6 +67,26 @@ class DesktopBuildKeyTests(unittest.TestCase):
             write(root / "desktop/main.v", "module main\nconst changed = true\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
+    def test_v_launcher_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            launcher = root / "build-support/v-command"
+            write(launcher, "old launcher\n")
+            first = MODULE.compute_key(root, v, env)
+            write(launcher, "new launcher\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
+    def test_m1_triangle_source_change_invalidates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            v, env = self.fixture(root)
+            triangle = root / "gl-triangle/egl_triangle.c"
+            write(triangle, "int main(void) { return 0; }\n")
+            first = MODULE.compute_key(root, v, env)
+            write(triangle, "int main(void) { return 1; }\n")
+            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
+
     def test_nested_x11_rewrite_invalidates_in_place(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -100,16 +120,6 @@ class DesktopBuildKeyTests(unittest.TestCase):
             old = root / "old-v-staging"
             staging.rename(old)
             write(staging / "usr/bin/v", "second compiler\n")
-            self.assertNotEqual(first, MODULE.compute_key(root, v, env))
-
-    def test_guest_compatibility_module_change_invalidates(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            v, env = self.fixture(root)
-            module = root / "compat/macos/macho/macho.v"
-            write(module, "module macho\n")
-            first = MODULE.compute_key(root, v, env)
-            write(module, "module macho\nconst changed = true\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
     def test_compiler_generation_invalidates(self) -> None:

@@ -1,0 +1,90 @@
+#!/bin/sh
+# Keep an X11 host alive while Steam's detached client runs. Valve's shell
+# launcher returns before the client exits, and its first updater exits after
+# installing the current client without starting the new one on Vinix.
+set -u
+
+launcher=${VINIX_STEAM_LAUNCHER:-/usr/bin/steam}
+home=${HOME:-/root}
+data=${STEAM_DATA_HOME:-${XDG_DATA_HOME:-$home/.local/share}}/Steam
+pidfile=$home/.steam/steam.pid
+installed=$data/package/steam_client_ubuntu12.installed
+bootstrap_log=$data/logs/bootstrap_log.txt
+installed_at_start=false
+[ -s "$installed" ] && installed_at_start=true
+
+# Steam's bundled font leaves conspicuous gaps in the small login labels
+# (notably G-N in SIGN and C-C in ACCOUNT) on the private X display. The
+# client CSS has the same label rule in both login layouts. Use the DejaVu
+# Sans font already in the Vinix image for those labels alone, and reapply
+# after an updater has replaced the stylesheet.
+fix_login_label_spacing() {
+    original='font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:.02em;user-select:none'
+    for sheet in "$data"/steamui/css/*.css; do
+        [ -f "$sheet" ] || continue
+        grep -Fq "$original" "$sheet" || continue
+        temporary="${sheet}.vinix-font.$$"
+        if LC_ALL=C sed 's|font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:\.02em;user-select:none|font-family:DejaVu Sans,Arial,Helvetica,sans-serif;font-size:12px;color:#afafaf;text-transform:uppercase;letter-spacing:0;user-select:none|g' "$sheet" > "$temporary" &&
+            chmod 0644 "$temporary" && mv -f "$temporary" "$sheet"; then
+            :
+        else
+            rm -f "$temporary"
+            echo "steam-hosted: could not adjust login label font: $sheet" >&2
+        fi
+    done
+}
+
+launches=0
+installed_flags_added=false
+while [ "$launches" -lt 2 ]; do
+    launches=$((launches + 1))
+    log_bytes=0
+    [ ! -f "$bootstrap_log" ] || log_bytes=$(wc -c < "$bootstrap_log")
+    # The installed client still checks Valve's update manifest with these
+    # flags. Its full verification path can detach before the X11 host sees
+    # the client, leaving the desktop with an empty Steam window.
+    if [ "$installed_flags_added" = false ] && [ -s "$installed" ]; then
+        set -- -noverifyfiles -nobootstrapperupdate "$@"
+        installed_flags_added=true
+    fi
+    fix_login_label_spacing
+    "$launcher" "$@" || exit $?
+
+    # steam.sh may return just before it writes the client's PID file.
+    pid=
+    attempt=0
+    while [ "$attempt" -lt 60 ]; do
+        candidate=$(cat "$pidfile" 2>/dev/null || true)
+        case "$candidate" in
+            ''|0|*[!0-9]*) ;;
+            *)
+                if kill -0 "$candidate" 2>/dev/null; then
+                    pid=$candidate
+                    break
+                fi
+                ;;
+        esac
+        attempt=$((attempt + 1))
+        sleep 1
+    done
+
+    if [ -n "$pid" ]; then
+        while kill -0 "$pid" 2>/dev/null; do
+            sleep 2
+        done
+    fi
+
+    updated=false
+    if [ -f "$bootstrap_log" ] &&
+        tail -c +"$((log_bytes + 1))" "$bootstrap_log" 2>/dev/null | grep -q 'Update complete'; then
+        updated=true
+    fi
+    if [ "$launches" -eq 1 ] && [ -s "$installed" ] &&
+        { [ "$installed_at_start" = false ] || [ "$updated" = true ]; }; then
+        # Give Valve's updater time to release its lock after closing the
+        # original client, then start the installed client in this X display.
+        sleep 2
+        continue
+    fi
+    exit 0
+done

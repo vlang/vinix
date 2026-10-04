@@ -40,6 +40,8 @@ for arg in "$@"; do
     esac
 done
 
+python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
+
 # The ordinary userland and desktop builders intentionally merge every cached
 # optional staging tree they find. Point the two native on-demand layers at an
 # empty temporary tree so an earlier component build cannot silently bloat
@@ -151,6 +153,7 @@ for image_path in \
     usr/bin/v \
     usr/bin/vinix-desktop-build \
     usr/bin/vinix-desktop-reload \
+    usr/bin/vinix-host-sync \
     usr/bin/Xorg \
     usr/bin/run-firefox \
     usr/bin/Hyprland \

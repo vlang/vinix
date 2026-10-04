@@ -105,7 +105,8 @@ fn conflicting_lock(resource_id voidptr, owner u64, class int, start u64, end u6
 // prefixes and suffixes make partial unlock/replacement behave byte-for-byte.
 fn replace_owner_range(resource_id voidptr, owner u64, class int, start u64, end u64,
 	add bool, write bool, pid int) {
-	mut next := []AdvisoryLock{cap: advisory_locks.len + 2}
+	// It replaces advisory_locks, which is freed here.
+	mut next := []AdvisoryLock{cap: advisory_locks.len + 2} @[freed]
 	for held in advisory_locks {
 		if held.resource_id != resource_id || held.class != class || held.owner != owner
 			|| !ranges_overlap(held.start, held.end, start, end) {
@@ -158,13 +159,10 @@ fn set_posix_lock(mut handle Handle, mut flock Flock, blocking bool) ? {
 				errno.set(errno.eagain)
 				return none
 			}
-			mut events := [&advisory_lock_event]
-			event.await_from_generation(mut events, true, 0, generation) or {
-				unsafe { events.free() }
+			event.await_one_from_generation(mut advisory_lock_event, true, generation) or {
 				errno.set(errno.eintr)
 				return none
 			}
-			unsafe { events.free() }
 			continue
 		}
 		replace_owner_range(resource_id, owner, lock_class_posix, range.start, range.end,
@@ -192,13 +190,18 @@ fn get_posix_lock(handle &Handle, mut flock Flock) ? {
 	flock.l_whence = 0
 	flock.l_start = i64(conflict.start)
 	flock.l_len = if conflict.end == u64(-1) { 0 } else { i64(conflict.end - conflict.start) }
-	flock.l_pid = i32(conflict.pid)
+	flock.l_pid = i32(proc.pid_seen_by_caller(int(conflict.pid)))
 }
 
 fn release_posix_locks(res &resource.Resource, pid int) {
+	// fcntl_lock only admits regular files. Other resources cannot have
+	// record locks, so closing them needs no global lock-table work.
+	if !stat.isreg(res.stat.mode) {
+		return
+	}
 	resource_id := lock_resource_id(res)
 	advisory_locks_lock.acquire()
-	mut next := []AdvisoryLock{cap: advisory_locks.len}
+	mut next := []AdvisoryLock{cap: advisory_locks.len} @[freed]
 	mut changed := false
 	for held in advisory_locks {
 		if held.class == lock_class_posix && held.resource_id == resource_id
@@ -221,10 +224,16 @@ fn release_posix_locks(res &resource.Resource, pid int) {
 }
 
 fn release_flock(handle &Handle) {
+	// syscall_flock admits only regular files and directories. Pipe/socket
+	// teardown cannot release an entry from this table.
+	mode := handle.resource.stat.mode
+	if !stat.isreg(mode) && !stat.isdir(mode) {
+		return
+	}
 	resource_id := lock_resource_id(handle.resource)
 	owner := u64(handle)
 	advisory_locks_lock.acquire()
-	mut next := []AdvisoryLock{cap: advisory_locks.len}
+	mut next := []AdvisoryLock{cap: advisory_locks.len} @[freed]
 	mut changed := false
 	for held in advisory_locks {
 		if held.class == lock_class_flock && held.resource_id == resource_id
@@ -254,6 +263,7 @@ pub fn syscall_flock(_ voidptr, fdnum int, operation int) (u64, u64) {
 	mut fd := fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.ebadf }
 	defer { fd.unref() }
 	mut handle := fd.handle
+	handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	if !stat.isreg(handle.resource.stat.mode) && !stat.isdir(handle.resource.stat.mode) {
 		return errno.err, errno.einval
 	}
@@ -275,14 +285,13 @@ pub fn syscall_flock(_ voidptr, fdnum int, operation int) (u64, u64) {
 			if operation & lock_nb != 0 {
 				return errno.err, errno.ewouldblock
 			}
-			mut events := [&advisory_lock_event]
-			event.await_from_generation(mut events, true, 0, generation) or {
-				unsafe { events.free() }
+			event.await_one_from_generation(mut advisory_lock_event, true, generation) or {
 				return errno.err, errno.eintr
 			}
-			unsafe { events.free() }
 			continue
 		}
+		// Nothing slices the list, so growing can free the old block.
+		advisory_locks.flags |= .noslices
 		advisory_locks << AdvisoryLock{resource_id, owner, lock_class_flock, 0,
 			u64(-1), write, 0}
 		advisory_locks_lock.release()

@@ -67,6 +67,15 @@ pub fn initial_mmap_base() u64 {
 }
 
 pub const abi_sysv = 0x00
+// ELFOSABI_GNU, which is also ELFOSABI_LINUX. glibc marks a static program
+// that uses GNU indirect functions with it -- Ubuntu's ldconfig.real -- and
+// Linux runs it as it runs any other.
+pub const abi_gnu = 0x03
+
+fn supported_osabi(osabi u8) bool {
+	return osabi == abi_sysv || osabi == abi_gnu
+}
+pub const arch_i386 = 0x03
 pub const arch_x86_64 = 0x3e
 pub const arch_aarch64 = 0xb7
 pub const bits_le = 0x01
@@ -129,6 +138,38 @@ struct LoadedRange {
 	length u64
 }
 
+// How far past its load base an image's LOAD segments reach.
+fn load_extent(mut res resource.Resource, header Header) !u64 {
+	mut extent := u64(0)
+	for i := u64(0); i < header.ph_num; i++ {
+		mut phdr := ProgramHdr{}
+		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+			sizeof(ProgramHdr))!
+		if phdr.p_type != pt_load {
+			continue
+		}
+		if phdr.p_memsz > u64(-1) - phdr.p_vaddr {
+			return error('elf: LOAD size overflow')
+		}
+		if phdr.p_vaddr + phdr.p_memsz > extent {
+			extent = phdr.p_vaddr + phdr.p_memsz
+		}
+	}
+	return extent
+}
+
+// The range a PIE's base is picked from. The whole program has to end below
+// interpreter_base, where the interpreter's range starts: a 28 MiB docker
+// placed near the top of its range would otherwise have ld.so mapped over
+// part of it. A program too big to move gets the lowest base.
+fn pie_span(extent u64) u64 {
+	room := interpreter_base - pie_base
+	if extent >= room {
+		return 0
+	}
+	return room - extent
+}
+
 fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! {
 	read := res.read(unsafe { nil }, buf, offset, length) or {
 		return error('elf: read failure')
@@ -143,39 +184,70 @@ fn read_exact(mut res resource.Resource, buf voidptr, offset u64, length u64) ! 
 // translator instead of jumping directly into foreign instructions.
 pub fn architecture(_res &resource.Resource) !u16 {
 	mut res := unsafe { _res }
-	mut header := &Header{}
+	// On the stack: `&Header{}` was a heap block that nothing freed, one for
+	// every exec, as was each program header below.
+	mut header := unsafe { &Header(C.vinix_stack_alloc(sizeof(Header))) }
+	unsafe { *header = Header{} }
 
 	read_exact(mut res, header, 0, sizeof(Header))!
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
-	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| header.ident[ei_osabi] != abi_sysv {
+	// The machine of a 32-bit file is in the same place as a 64-bit one's;
+	// the exec path asks so it can hand i386 programs to their translator.
+	// Loading one natively is still refused by load.
+	if (header.ident[ei_class] != 0x01 && header.ident[ei_class] != 0x02)
+		|| header.ident[ei_data] != bits_le || !supported_osabi(header.ident[ei_osabi]) {
 		return error('elf: Unsupported ELF file')
 	}
 
 	return header.machine
 }
 
+fn exec_trace(enabled bool, image string, stage string) {
+	if enabled {
+		C.kprintf(c'exec[gpu]/elf %.*s: %.*s\n', i32(image.len), image.str, i32(stage.len),
+			stage.str)
+	}
+}
+
 pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxval, string) {
+	return load_impl(_pagemap, _res, _base, false, '')
+}
+
+// Verbose production-visible loader diagnostics for the one hardware desktop
+// exec under investigation. Keeping this as a separate entry point avoids
+// flooding every normal program launch.
+pub fn load_traced(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, image string) !(Auxval, string) {
+	return load_impl(_pagemap, _res, _base, true, image)
+}
+
+fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace bool, image string) !(Auxval, string) {
 	mut res := unsafe { _res }
 	mut pagemap := unsafe { _pagemap }
 	mut base := _base
 
-	mut header := &Header{}
+	mut header := unsafe { &Header(C.vinix_stack_alloc(sizeof(Header))) }
+	unsafe { *header = Header{} }
 
+	exec_trace(trace, image, 'reading ELF header')
 	read_exact(mut res, header, 0, sizeof(Header))!
+	exec_trace(trace, image, 'ELF header read')
 
 	if unsafe { C.memcmp(&header.ident, c'\177ELF', 4) } != 0 {
 		return error('elf: Invalid magic')
 	}
 
 	if header.ident[ei_class] != 0x02 || header.ident[ei_data] != bits_le
-		|| header.ident[ei_osabi] != abi_sysv
+		|| !supported_osabi(header.ident[ei_osabi])
 		|| (header.machine != arch_x86_64 && header.machine != arch_aarch64)
 		|| (header.@type != et_exec && header.@type != et_dyn)
 		|| header.phdr_size != sizeof(ProgramHdr) {
 		return error('elf: Unsupported ELF file')
+	}
+	if trace {
+		C.kprintf(c'exec[gpu]/elf %.*s: header valid type=%llu phnum=%llu entry=0x%llx\n',
+			i32(image.len), image.str, u64(header.@type), u64(header.ph_num), u64(header.entry))
 	}
 	program_header_bytes := u64(header.ph_num) * sizeof(ProgramHdr)
 	if header.phoff > u64(res.stat.size)
@@ -188,7 +260,13 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	// in ld-musl and userspace. Apply a non-zero base for PIE binaries
 	// when no explicit base is given (base=0 means "auto" for ET_DYN).
 	if base == 0 && header.@type == u16(et_dyn) {
-		base = pie_base + random_offset(image_aslr_span - pie_base, image_alignment)
+		exec_trace(trace, image, 'choosing PIE load base')
+		extent := load_extent(mut res, *header)!
+		base = pie_base + random_offset(pie_span(extent), image_alignment)
+	}
+	if trace {
+		C.kprintf(c'exec[gpu]/elf %.*s: effective load base=0x%llx\n', i32(image.len), image.str,
+			u64(base))
 	}
 	if header.entry > u64(-1) - base {
 		return error('elf: entry address overflow')
@@ -205,10 +283,11 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	mut ld_path := ''
 	mut load_addr := u64(0)
 	mut load_addr_set := false
-	mut loaded_ranges := []LoadedRange{}
+	mut loaded_ranges := []LoadedRange{cap: int(header.ph_num)} @[freed]
 	mut committed := false
 	defer {
 		if !committed {
+			exec_trace(trace, image, 'load failed; rolling back mapped ranges')
 			for i := loaded_ranges.len; i > 0; i-- {
 				range := loaded_ranges[i - 1]
 				mmap.munmap(mut pagemap, voidptr(range.base), range.length) or {}
@@ -221,12 +300,22 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	}
 
 	for i := u64(0); i < header.ph_num; i++ {
-		mut phdr := &ProgramHdr{}
+		mut phdr := ProgramHdr{}
 
-		read_exact(mut res, phdr, header.phoff + (sizeof(ProgramHdr) * i), sizeof(ProgramHdr))!
+		if trace {
+			C.kprintf(c'exec[gpu]/elf %.*s: reading program header %llu/%llu\n', i32(image.len),
+				image.str, u64(i + 1), u64(header.ph_num))
+		}
+		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+			sizeof(ProgramHdr))!
+		if trace {
+			C.kprintf(c'exec[gpu]/elf %.*s: program header %llu type=%llu flags=0x%llx\n',
+				i32(image.len), image.str, u64(i + 1), u64(phdr.p_type), u64(phdr.p_flags))
+		}
 
 		match phdr.p_type {
 			pt_interp {
+				exec_trace(trace, image, 'reading interpreter path')
 				if ld_path != '' {
 					return error('elf: multiple interpreters')
 				}
@@ -246,12 +335,14 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 				unsafe { (&u8(p))[phdr.p_filesz] = 0 }
 				ld_path = unsafe { cstring_to_vstring(p) }
 				unsafe { free(p) }
+				exec_trace(trace, image, 'interpreter path read')
 			}
 			pt_phdr {
 				if phdr.p_vaddr > u64(-1) - base {
 					return error('elf: PHDR address overflow')
 				}
 				auxval.at_phdr = base + phdr.p_vaddr
+				exec_trace(trace, image, 'recorded PT_PHDR address')
 			}
 			else {}
 		}
@@ -308,7 +399,16 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		virt := lib.align_down(segment_address, page_size)
 		file_offset := i64(lib.align_down(phdr.p_offset, page_size))
 		file_backed_length := misalign + phdr.p_filesz
+		if trace {
+			C.kprintf(c'exec[gpu]/elf %.*s: mapping LOAD %llu va=0x%llx len=0x%llx file=0x%llx prot=%lld\n',
+				i32(image.len), image.str, u64(i + 1), u64(virt), u64(mapping_length), u64(file_offset),
+				i64(pf))
+		}
 		mmap.mmap_file_segment(pagemap, virt, mapping_length, pf, res, file_offset, 0, file_backed_length) or { return error('elf: unable to map LOAD segment') }
+		if trace {
+			C.kprintf(c'exec[gpu]/elf %.*s: mapped LOAD %llu\n', i32(image.len), image.str,
+				u64(i + 1))
+		}
 		loaded_ranges << LoadedRange{
 			base: virt
 			length: mapping_length
@@ -322,6 +422,7 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 		return error('elf: no loadable segments')
 	}
 	if auxval.at_phdr == 0 {
+		exec_trace(trace, image, 'deriving missing PT_PHDR address')
 		if header.phoff > u64(-1) - load_addr {
 			return error('elf: PHDR address overflow')
 		}
@@ -329,5 +430,9 @@ pub fn load(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64) !(Auxv
 	}
 
 	committed = true
+	if trace {
+		C.kprintf(c'exec[gpu]/elf %.*s: committed entry=0x%llx phdr=0x%llx\n', i32(image.len),
+			image.str, u64(auxval.at_entry), u64(auxval.at_phdr))
+	}
 	return auxval, ld_path
 }

@@ -145,6 +145,11 @@ pub fn (mut ch TxChannel) enqueue_with_token(data voidptr) ?u32 {
 		C.memcpy(dest, data, ch.entry_size)
 	}
 
+	// Firmware must never observe the advanced pointer before the complete
+	// entry. Asahi uses a full-system barrier here because these rings cross
+	// the AP/ASC coherency boundary; the release store alone is not the full
+	// device-observation barrier required by that contract.
+	katomic.sync()
 	katomic.store(mut write_ptr, next_wp)
 	return next_wp
 }

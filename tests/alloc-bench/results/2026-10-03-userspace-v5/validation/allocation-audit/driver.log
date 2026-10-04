@@ -1,0 +1,33 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/third_party/useralloc-speed-v5/tests/kernel-allocs/run.sh"
+  ],
+  "environment": {
+    "V": "/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v"
+  },
+  "candidate_exit_code": 1,
+  "baseline_source": "build/useralloc-kernel-speed-v4/allocation-audit/candidate.log",
+  "baseline_sites": 432,
+  "candidate_sites": 440,
+  "path_kind_deltas": {
+    "block/partition/partition.v local moved to the heap: its address escapes": 1,
+    "file/file.v local moved to the heap: its address escapes": 1,
+    "fs/cpuinfo_amd64.v local moved to the heap: its address escapes": 1,
+    "proc/proc_amd64.v local moved to the heap: its address escapes": 1,
+    "syscall/table/linux_table_amd64.v local moved to the heap: its address escapes": 2,
+    "userland/userland.v local moved to the heap: its address escapes": 2
+  },
+  "allocation_site_regression": true,
+  "reported_architectures": [
+    [
+      "aarch64",
+      "322 source files, 374 allocation sites (V exit 0)"
+    ],
+    [
+      "x86_64",
+      "251 source files, 316 allocation sites (V exit 0)"
+    ]
+  ],
+  "compiler_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "notes": "Literal unchanged allowlist result retained; compare exact frozen-V e29 baseline without line-number noise. No allowlist edits."
+}

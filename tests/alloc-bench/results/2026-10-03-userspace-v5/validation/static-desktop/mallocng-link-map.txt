@@ -1,0 +1,2 @@
+          5cf94c           5cf94c      26c     4         /Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v5/sysroot/usr/lib/libc.a(free.o):(.text.malloc_trim)
+          5cf94c           5cf94c      26c     1                 malloc_trim

@@ -12,9 +12,13 @@ import re
 import struct
 
 REQUIRED = {
-    'apple__wifi__initialise', 'apple__wifi__poll',
-    'apple__wifi__WifiDevice_read', 'apple__wifi__WifiDevice_write',
-    'apple__wifi__WifiDevice_ioctl',
+    # apple/wifi/wifi.v declares `module wifi`, not `module apple_wifi` -- V
+    # mangles by module statement, not by directory path (the same class of
+    # mismatch fixed in kernel/c/printf.c), and struct methods get a double
+    # underscore before the method name (<module>__<Struct>__<method>).
+    'wifi__initialise', 'wifi__poll',
+    'wifi__WifiDevice__read', 'wifi__WifiDevice__write',
+    'wifi__WifiDevice__ioctl',
     'brcm_m1_prepare', 'brcm_m1_status', 'brcm_m1_upload', 'brcm_m1_boot',
     'brcm_m1_join', 'brcm_m1_poll', 'brcm_m1_read', 'brcm_m1_write', 'brcm_m1_stop',
     'bw_probe', 'bw_start', 'bw_poll', 'bw_join_wpa2',
@@ -87,13 +91,17 @@ def body(source: str, name: str) -> str:
 
 
 def verify_hooks(source: str) -> None:
-    init = body(source, 'dev__console__initialise')
-    poll = body(source, 'dev__console__poll_uart_input')
-    require(init.count('apple__wifi__initialise();') == 1, 'missing/duplicate Wi-Fi initialization')
-    require(poll.count('apple__wifi__poll();') == 1, 'missing/duplicate Wi-Fi polling')
-    require(init.index('apple__wifi__initialise();') < init.index('sched__set_uart_poll_callback('),
+    # Same module-vs-directory-path mangling as REQUIRED above:
+    # dev/console/console_arm64.v is `module console`, aarch64/uart/uart.v is
+    # `module uart`, aarch64/virtio_input/virtio_input.v is
+    # `module virtio_input`.
+    init = body(source, 'console__initialise')
+    poll = body(source, 'console__poll_uart_input')
+    require(init.count('wifi__initialise();') == 1, 'missing/duplicate Wi-Fi initialization')
+    require(poll.count('wifi__poll();') == 1, 'missing/duplicate Wi-Fi polling')
+    require(init.index('wifi__initialise();') < init.index('sched__set_uart_poll_callback('),
             'poll callback installed before Wi-Fi initialization')
-    require('aarch64__virtio_input__poll();' in poll and 'aarch64__uart__getc()' in poll,
+    require('virtio_input__poll();' in poll and 'uart__getc()' in poll,
             'existing UART/VirtIO input hooks were lost')
 
 

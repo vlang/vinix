@@ -22,6 +22,8 @@ pub mut:
 	lock        klock.Lock
 	mmap_offset u64
 	name        string
+	pte_extra   u64 // identical cache attributes for kernel and user aliases
+	external    bool // host-visible aperture; never returned to the PMM
 }
 
 const gem_max_handles = u32(4096)
@@ -39,8 +41,18 @@ pub fn create(size u64) ?&GemObject {
 }
 
 // Create a GEM object with a physical and size alignment suitable for the
-// target device. AGX callers use 16 KiB; ordinary DRM users retain 4 KiB.
+// target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
+	return create_object(size, alignment, false)
+}
+
+// Metadata for a host-owned resource. The driver installs its physical
+// aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
+pub fn create_external(size u64) ?&GemObject {
+	return create_object(size, page_size, true)
+}
+
+fn create_object(size u64, alignment u64, external bool) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -78,12 +90,12 @@ pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 	}
 
 	// Fallible allocation: a user-sized request must never panic the kernel.
-	phys := memory.pmm_alloc_aligned_fallible(pages, alignment / page_size)
-	if phys == unsafe { nil } {
+	phys := if external { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
+	if !external && phys == unsafe { nil } {
 		return none
 	}
 	if aligned_size > u64(-1) - next_mmap_offset {
-		memory.pmm_free(phys, pages)
+		if !external { memory.pmm_free(phys, pages) }
 		return none
 	}
 
@@ -92,6 +104,7 @@ pub fn create_aligned(size u64, alignment u64) ?&GemObject {
 
 	mut obj := &GemObject{
 		handle:      handle
+		external:    external
 		size:        aligned_size
 		refcount:    1
 		phys_addr:   u64(phys)
@@ -116,7 +129,7 @@ pub fn destroy(obj &GemObject) {
 	}
 	gem_objects_lock.release()
 
-	if obj.phys_addr != 0 {
+	if obj.phys_addr != 0 && !obj.external {
 		pages := obj.size / page_size
 		memory.pmm_free(voidptr(obj.phys_addr), pages)
 	}
@@ -156,6 +169,7 @@ pub fn unref(obj &GemObject) {
 	if !katomic.dec(mut rc) {
 		// refcount reached zero
 		destroy(obj)
+		if obj.external { unsafe { free(voidptr(obj)) } }
 	}
 }
 
@@ -170,7 +184,8 @@ pub fn create_mmap_offset(obj &GemObject) u64 {
 // Resolve a fake DRM mmap page only within one already-authorized object.
 // The caller owns a reference to obj for the full mapping lifetime.
 pub fn get_object_mmap_page(obj &GemObject, page u64) ?voidptr {
-	if obj == unsafe { nil } || page > u64(0xffff_ffff_ffff_ffff) / page_size {
+	if obj == unsafe { nil } || page > u64(0xffff_ffff_ffff_ffff) / page_size
+		|| (obj.external && obj.phys_addr == 0) {
 		return none
 	}
 	byte_offset := page * page_size

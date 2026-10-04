@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // A terminal, built into the desktop.
 //
 // It runs the shell on a Unix98 pseudo-terminal. The kernel line discipline
@@ -27,6 +30,14 @@ mut:
 	poll() bool
 }
 
+// PollPacedApp is a PollingApp that knows when its next poll can find
+// something new, and returns that in each poll reply. The compositor then
+// waits that long rather than its fixed cadence: a clock showing seconds has
+// nothing new for most of a second, and a quiet shell for longer still.
+interface PollPacedApp {
+	next_poll_ms() u64
+}
+
 enum AppPointerPhase {
 	move
 	down
@@ -39,12 +50,21 @@ enum AppPointerButton {
 	left
 	middle
 	right
+	back
 }
 
 interface PointerApp {
 mut:
 	pointer_input_enabled() bool
 	pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int)
+}
+
+// PointerMoveApp is a PointerApp that can tell whether moving the pointer
+// can change it now. The answer travels back in the pointer reply, so a
+// window whose application ignores a move is neither rebuilt nor repainted
+// for it. An application without this is assumed to change on every event.
+interface PointerMoveApp {
+	pointer_moves_matter() bool
 }
 
 interface ClosingApp {
@@ -60,6 +80,8 @@ const terminal_reads_per_frame = 8
 const terminal_csi_parameter_limit = 16
 const terminal_default_rows = 24
 const terminal_default_columns = 80
+// Malformed UTF-8 takes one cell per rejected byte or cut-short sequence.
+const terminal_replacement_char = rune(0xfffd)
 
 const terminal_action_scroll_up = 'term.scroll.up'
 const terminal_action_scroll_down = 'term.scroll.down'
@@ -67,12 +89,23 @@ const terminal_action_scroll_down = 'term.scroll.down'
 const terminal_row_height = 16
 const terminal_column_width = 8
 const terminal_padding = 8
+const terminal_rebuild_notice_path = '/run/vinix-desktop-rebuild'
+const terminal_rebuild_snapshot_path = '/run/vinix-desktop-rebuild-terminal'
+const terminal_rebuild_notice_max_age_ms = u64(600_000)
+const terminal_rebuild_snapshot_max_bytes = u64(1024 * 1024)
+
+const terminal_active_poll_ms = u64(100)
+const terminal_quiet_poll_ms = u64(250)
+const terminal_idle_poll_ms = u64(500)
 
 struct TerminalApp {
 mut:
-	// The visible terminal is a fixed grid of bytes. Keeping it flat makes
-	// scrolling and erasing deterministic and avoids one allocation per cell.
-	screen         []u8
+	// When the shell last printed anything; see next_poll_ms.
+	last_output_ms u64
+	// The visible terminal is a fixed grid of code points, one per cell. Keeping
+	// it flat makes scrolling and erasing deterministic and avoids one
+	// allocation per cell.
+	screen         []rune
 	rendered_rows  []string
 	dirty_rows     []bool
 	rows           int
@@ -83,7 +116,7 @@ mut:
 	autowrap       bool = true
 	wrap_pending   bool
 	insert_mode    bool
-	last_printed   u8 = ` `
+	last_printed   rune = ` `
 
 	scroll_top          int
 	scroll_bottom       int
@@ -93,7 +126,7 @@ mut:
 	// Vim uses the alternate screen. Preserve the shell's main screen so leaving
 	// Vim reveals the command that launched it and its prompt again.
 	alternate_screen   bool
-	main_screen        []u8
+	main_screen        []rune
 	main_rows          int
 	main_columns       int
 	main_cursor_row    int
@@ -111,6 +144,21 @@ mut:
 	csi_count               int
 	csi_private             u8
 	csi_has_digits          bool
+	// The start of an OSC string, enough to recognise the taskbar progress
+	// sequence OSC 9;4. Anything longer is skipped, as before.
+	osc_bytes [terminal_osc_limit]u8
+	osc_len   int
+	// Taskbar state published for this window: progress from OSC 9;4 and a
+	// new attention serial for each bell.
+	taskbar TaskStatus
+
+	// Text outside escape sequences is UTF-8, and a sequence may straddle two
+	// reads. The bounds limit the next byte so overlong forms, surrogates and
+	// code points past U+10FFFF are rejected as they arrive.
+	utf8_code   u32
+	utf8_needed int
+	utf8_lower  u8 = 0x80
+	utf8_upper  u8 = 0xbf
 
 	read_buf []u8
 
@@ -125,9 +173,175 @@ mut:
 	visible_rows     int = 1
 }
 
+const terminal_osc_limit = 32
+
 fn open_terminal(mut _ Desktop) !NativeApp {
 	return &TerminalApp{
 		read_buf: []u8{len: terminal_read_chunk}
+	}
+}
+
+// The shell that ran vinix-desktop-build exits with the old session. Its
+// replacement Terminal consumes the result after the new compositor is ready.
+struct TerminalRebuildRecord {
+	started_ms u64
+	shell_pid  int = -1
+}
+
+fn terminal_rebuild_uptime_ms(value string) ?u64 {
+	parts := value.split('.')
+	if parts.len != 2 || parts[0].len == 0 || parts[0].len > 10 || parts[1].len != 2 {
+		return none
+	}
+	for ch in value {
+		if ch != `.` && (ch < `0` || ch > `9`) {
+			return none
+		}
+	}
+	return parts[0].u64() * 1000 + parts[1].u64() * 10
+}
+
+fn terminal_rebuild_record(record string, compositor_pid int, now_ms u64) ?TerminalRebuildRecord {
+	fields := record.trim_space().split(' ')
+	if (fields.len != 2 && fields.len != 3) || fields[0].int() != compositor_pid
+		|| compositor_pid <= 0
+		|| now_ms == ~u64(0) {
+		return none
+	}
+	started_ms := terminal_rebuild_uptime_ms(fields[1]) or { return none }
+	if started_ms > now_ms || now_ms - started_ms > terminal_rebuild_notice_max_age_ms {
+		return none
+	}
+	shell_pid := if fields.len == 3 { fields[2].int() } else { -1 }
+	if fields.len == 3 && shell_pid <= 0 {
+		return none
+	}
+	return TerminalRebuildRecord{
+		started_ms: started_ms
+		shell_pid:  shell_pid
+	}
+}
+
+fn terminal_rebuild_result(record TerminalRebuildRecord, now_ms u64) string {
+	return 'vinix-desktop has been rebuilt in ${f64(now_ms - record.started_ms) / 1000.0:.2f} seconds\r\n'
+}
+
+fn terminal_rebuild_message(value string, compositor_pid int, now_ms u64) string {
+	record := terminal_rebuild_record(value, compositor_pid, now_ms) or { return '' }
+	return terminal_rebuild_result(record, now_ms)
+}
+
+fn terminal_take_rebuild_snapshot() string {
+	info := desktop_stat(terminal_rebuild_snapshot_path) or { return '' }
+	defer {
+		desktop_unlink(terminal_rebuild_snapshot_path)
+	}
+	if info.is_dir || info.size == 0 || info.size > terminal_rebuild_snapshot_max_bytes {
+		return ''
+	}
+	mut data := []u8{len: int(info.size)}
+	got := desktop_read_file(terminal_rebuild_snapshot_path, data.data, info.size)
+	if got != i64(info.size) {
+		unsafe { data.free() }
+		return ''
+	}
+	return data.bytestr()
+}
+
+fn terminal_take_rebuild_message() string {
+	if !desktop_is_development_session()
+		|| C.access(c'/run/vinix-desktop-ready', 0) != 0 {
+		return ''
+	}
+	mut data := []u8{len: 64}
+	got := desktop_read_file(terminal_rebuild_notice_path, data.data, u64(data.len))
+	if got < 0 {
+		return ''
+	}
+	desktop_unlink(terminal_rebuild_notice_path)
+	if got == 0 || got >= data.len {
+		return ''
+	}
+	now_ms := desktop_monotonic_ms()
+	record := terminal_rebuild_record(data[..int(got)].bytestr(), C.getppid(), now_ms) or {
+		return ''
+	}
+	snapshot := terminal_take_rebuild_snapshot()
+	result := terminal_rebuild_result(record, now_ms)
+	return snapshot + result
+}
+
+fn terminal_append_snapshot_line(mut output []u8, line string) bool {
+	if u64(output.len + line.len + 2) > terminal_rebuild_snapshot_max_bytes {
+		return false
+	}
+	for ch in line {
+		output << ch
+	}
+	output << `\r`
+	output << `\n`
+	return true
+}
+
+// Flatten the visible main screen and scrollback into ordinary terminal text.
+// The replacement gets a new PTY, so control state cannot safely be retained;
+// the displayed rows are the durable part users need after a self-hosted build.
+fn (a &TerminalApp) rebuild_snapshot() string {
+	if a.alternate_screen || a.rows <= 0 || a.columns <= 0 || a.screen.len == 0 {
+		return ''
+	}
+	mut output := []u8{cap: 16 * 1024}
+	for line in a.lines {
+		if !terminal_append_snapshot_line(mut output, line) {
+			unsafe { output.free() }
+			return ''
+		}
+	}
+	mut last_row := -1
+	for row in 0 .. a.rows {
+		start := row * a.columns
+		for column in 0 .. a.columns {
+			if a.screen[start + column] != ` ` {
+				last_row = row
+				break
+			}
+		}
+	}
+	for row in 0 .. last_row + 1 {
+		line := a.row_string(row)
+		if !terminal_append_snapshot_line(mut output, line) {
+			unsafe { line.free() }
+			unsafe { output.free() }
+			return ''
+		}
+		if line.len > 0 {
+			unsafe { line.free() }
+		}
+	}
+	return output.bytestr()
+}
+
+fn (mut a TerminalApp) preserve_rebuild_snapshot() {
+	if a.pid <= 0 {
+		return
+	}
+	mut data := []u8{len: 96}
+	got := desktop_read_file(terminal_rebuild_notice_path, data.data, u64(data.len))
+	if got <= 0 || got >= data.len {
+		return
+	}
+	record := terminal_rebuild_record(data[..int(got)].bytestr(), C.getppid(),
+		desktop_monotonic_ms()) or { return }
+	if record.shell_pid != a.pid {
+		return
+	}
+	// The reload signal can reach the compositor before its next regular app
+	// poll. Drain the final helper line before taking the screen snapshot.
+	a.poll()
+	snapshot := a.rebuild_snapshot()
+	if snapshot.len > 0 {
+		desktop_write_file(terminal_rebuild_snapshot_path, snapshot.str, u64(snapshot.len))
+		unsafe { snapshot.free() }
 	}
 }
 
@@ -141,11 +355,11 @@ fn terminal_clamp(value int, low int, high int) int {
 	return value
 }
 
-fn terminal_blank_screen(rows int, columns int) []u8 {
-	return []u8{len: rows * columns, init: ` `}
+fn terminal_blank_screen(rows int, columns int) []rune {
+	return []rune{len: rows * columns, init: ` `}
 }
 
-fn terminal_resize_cells(cells []u8, old_rows int, old_columns int, rows int, columns int) []u8 {
+fn terminal_resize_cells(cells []rune, old_rows int, old_columns int, rows int, columns int) []rune {
 	mut resized := terminal_blank_screen(rows, columns)
 	copy_rows := if old_rows < rows { old_rows } else { rows }
 	copy_columns := if old_columns < columns { old_columns } else { columns }
@@ -265,7 +479,58 @@ fn (a &TerminalApp) row_string(row int) string {
 	for end > start && a.screen[end - 1] == ` ` {
 		end--
 	}
-	return a.screen[start..end].bytestr()
+	return terminal_cells_text(a.screen, start, end, -1)
+}
+
+// Cells only ever hold valid scalar values, so encoding has no error case.
+fn terminal_utf8_len(ch rune) int {
+	code := u32(ch)
+	return if code < 0x80 {
+		1
+	} else if code < 0x800 {
+		2
+	} else if code < 0x10000 {
+		3
+	} else {
+		4
+	}
+}
+
+fn terminal_append_utf8(mut output []u8, ch rune) {
+	code := u32(ch)
+	if code < 0x80 {
+		output << u8(code)
+	} else if code < 0x800 {
+		output << u8(0xc0 | (code >> 6))
+		output << u8(0x80 | (code & 0x3f))
+	} else if code < 0x10000 {
+		output << u8(0xe0 | (code >> 12))
+		output << u8(0x80 | ((code >> 6) & 0x3f))
+		output << u8(0x80 | (code & 0x3f))
+	} else {
+		output << u8(0xf0 | (code >> 18))
+		output << u8(0x80 | ((code >> 12) & 0x3f))
+		output << u8(0x80 | ((code >> 6) & 0x3f))
+		output << u8(0x80 | (code & 0x3f))
+	}
+}
+
+// terminal_cells_text encodes cells[start..end] as the UTF-8 a label draws.
+// The cell at index `cursor`, if any, is drawn as the cursor instead.
+fn terminal_cells_text(cells []rune, start int, end int, cursor int) string {
+	mut size := 0
+	for index in start .. end {
+		size += if index == cursor { 1 } else { terminal_utf8_len(cells[index]) }
+	}
+	mut bytes := []u8{cap: size}
+	for index in start .. end {
+		terminal_append_utf8(mut bytes, if index == cursor { `_` } else { cells[index] })
+	}
+	next := bytes.bytestr()
+	if bytes.cap > 0 {
+		unsafe { bytes.free() }
+	}
+	return next
 }
 
 fn (mut a TerminalApp) push_history_row(row int) {
@@ -343,7 +608,9 @@ fn (mut a TerminalApp) reverse_index() {
 	a.mark_row_dirty(a.cursor_row)
 }
 
-fn (mut a TerminalApp) put_visible_byte(ch u8) {
+// Every code point takes one cell; wide and combining characters are not
+// distinguished yet.
+fn (mut a TerminalApp) put_visible_char(ch rune) {
 	if a.wrap_pending {
 		a.cursor_column = 0
 		a.line_feed()
@@ -366,8 +633,16 @@ fn (mut a TerminalApp) put_visible_byte(ch u8) {
 
 fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int) {
 	a.started = true
-	shell := desktop_spawn_shell(terminal_shell, rows, columns, width, height) or {
-		a.error = 'cannot start ${terminal_shell}'
+	// The first Terminal after setup installs the apps chosen there, then
+	// hands the same PTY to the ordinary interactive shell.
+	command := desktop_take_first_run_install()
+	defer {
+		if command.len > 0 {
+			unsafe { command.free() }
+		}
+	}
+	shell := desktop_spawn_shell(terminal_shell, command, rows, columns, width, height) or {
+		a.error = tr_fill('terminal.cannot_start', terminal_shell)
 		a.ingest_output(a.error.bytes())
 		a.exited = true
 		return
@@ -376,6 +651,10 @@ fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int)
 	a.terminal = shell.terminal
 	a.terminal_rows = rows
 	a.terminal_columns = columns
+	message := terminal_take_rebuild_message()
+	if message.len > 0 {
+		a.ingest_output(message.bytes())
+	}
 }
 
 fn (mut a TerminalApp) poll() bool {
@@ -395,6 +674,9 @@ fn (mut a TerminalApp) poll() bool {
 			break
 		}
 	}
+	if changed {
+		a.last_output_ms = desktop_monotonic_ms()
+	}
 
 	if !a.exited && a.pid >= 0 && desktop_child_exited(a.pid) {
 		a.ingest_output('\r\n[${terminal_shell} exited]'.bytes())
@@ -407,6 +689,24 @@ fn (mut a TerminalApp) poll() bool {
 	return changed
 }
 
+// A shell that has just printed is polled at the Terminal's full cadence, so
+// a command's output streams. One that has been quiet for a while is only
+// waiting for its user, whose typing polls it at once; background output
+// then shows within a quarter or half of a second instead of a tenth.
+fn (a &TerminalApp) next_poll_ms() u64 {
+	now := desktop_monotonic_ms()
+	if a.terminal < 0 {
+		return 0
+	}
+	if now == ~u64(0) || now < a.last_output_ms || now - a.last_output_ms < 1000 {
+		return terminal_active_poll_ms
+	}
+	if now - a.last_output_ms < 10_000 {
+		return terminal_quiet_poll_ms
+	}
+	return terminal_idle_poll_ms
+}
+
 fn (mut a TerminalApp) ingest_output(output []u8) {
 	a.ensure_screen()
 	for ch in output {
@@ -414,17 +714,83 @@ fn (mut a TerminalApp) ingest_output(output []u8) {
 			a.ingest_escape_byte(ch)
 			continue
 		}
+		if a.utf8_needed > 0 {
+			if a.continue_utf8(ch) {
+				continue
+			}
+			// A sequence cut short is replaced as a whole, and the byte that
+			// interrupted it is read afresh rather than swallowed.
+			a.put_visible_char(terminal_replacement_char)
+		}
 		if ch == 0x1b {
 			a.escape_state = 1
+			continue
+		}
+		if ch >= 0x80 {
+			a.begin_utf8(ch)
 			continue
 		}
 		a.ingest_terminal_byte(ch)
 	}
 }
 
+// begin_utf8 starts a sequence at its lead byte. E0, ED, F0 and F4 narrow the
+// range of the next byte; that is what rules out overlong forms, surrogates
+// and code points past U+10FFFF. A byte that cannot lead is replaced alone.
+fn (mut a TerminalApp) begin_utf8(ch u8) {
+	a.utf8_lower = 0x80
+	a.utf8_upper = 0xbf
+	if ch >= 0xc2 && ch <= 0xdf {
+		a.utf8_code = u32(ch & 0x1f)
+		a.utf8_needed = 1
+	} else if ch >= 0xe0 && ch <= 0xef {
+		if ch == 0xe0 {
+			a.utf8_lower = 0xa0
+		} else if ch == 0xed {
+			a.utf8_upper = 0x9f
+		}
+		a.utf8_code = u32(ch & 0x0f)
+		a.utf8_needed = 2
+	} else if ch >= 0xf0 && ch <= 0xf4 {
+		if ch == 0xf0 {
+			a.utf8_lower = 0x90
+		} else if ch == 0xf4 {
+			a.utf8_upper = 0x8f
+		}
+		a.utf8_code = u32(ch & 0x07)
+		a.utf8_needed = 3
+	} else {
+		a.put_visible_char(terminal_replacement_char)
+	}
+}
+
+// continue_utf8 reports whether ch belongs to the pending sequence, and prints
+// the code point once the sequence is complete. C1 controls have no glyph and
+// are dropped, like DEL.
+fn (mut a TerminalApp) continue_utf8(ch u8) bool {
+	if ch < a.utf8_lower || ch > a.utf8_upper {
+		a.utf8_needed = 0
+		return false
+	}
+	a.utf8_lower = 0x80
+	a.utf8_upper = 0xbf
+	a.utf8_code = (a.utf8_code << 6) | u32(ch & 0x3f)
+	a.utf8_needed--
+	if a.utf8_needed == 0 && a.utf8_code >= 0xa0 {
+		a.put_visible_char(rune(a.utf8_code))
+	}
+	return true
+}
+
 fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 	match ch {
-		0, 0x07 {}
+		0 {}
+		0x07 {
+			// A bell asks for attention. The taskbar flags the button until
+			// the window is next brought up, and not at all if it is focused.
+			a.taskbar.attention_serial++
+			publish_taskbar_status(a.taskbar)
+		}
 		`\n`, 0x0b, 0x0c { a.line_feed() }
 		`\r` { a.move_cursor(a.cursor_row, 0) }
 		`\t` {
@@ -436,7 +802,7 @@ fn (mut a TerminalApp) ingest_terminal_byte(ch u8) {
 		}
 		else {
 			if ch >= 0x20 && ch != 0x7f {
-				a.put_visible_byte(ch)
+				a.put_visible_char(rune(ch))
 			}
 		}
 	}
@@ -550,6 +916,30 @@ fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
 			} else if ch == 0x1b {
 				a.escape_state = 4
 			} else {
+				a.osc_bytes[0] = ch
+				a.osc_len = 1
+				a.escape_state = 8
+			}
+		}
+		8 {
+			// Collecting a short OSC string until BEL or ST ends it.
+			if ch == 0x07 {
+				a.finish_osc()
+				a.escape_state = 0
+			} else if ch == 0x1b {
+				a.escape_state = 9
+			} else if a.osc_len < terminal_osc_limit {
+				a.osc_bytes[a.osc_len] = ch
+				a.osc_len++
+			} else {
+				a.escape_state = 3
+			}
+		}
+		9 {
+			if ch == `\\` {
+				a.finish_osc()
+				a.escape_state = 0
+			} else {
 				a.escape_state = 3
 			}
 		}
@@ -563,6 +953,45 @@ fn (mut a TerminalApp) ingest_escape_byte(ch u8) {
 			a.escape_state = 0
 		}
 	}
+}
+
+// finish_osc acts on OSC 9;4;<state>;<percent>, the progress report that
+// Windows Terminal and ConEmu put on the taskbar: 0 clears it, 1 is ordinary
+// progress, 2 an error, 3 indeterminate and 4 paused. An error or pause with
+// no percentage keeps the last one. Every other OSC is ignored, as before.
+fn (mut a TerminalApp) finish_osc() {
+	if a.osc_len < 3 || a.osc_bytes[0] != `9` || a.osc_bytes[1] != `;` || a.osc_bytes[2] != `4` {
+		return
+	}
+	mut values := [2]int{}
+	mut present := [2]bool{}
+	mut field := -1
+	for index in 3 .. a.osc_len {
+		ch := a.osc_bytes[index]
+		if ch == `;` {
+			field++
+			continue
+		}
+		if field < 0 || field > 1 || ch < `0` || ch > `9` {
+			continue
+		}
+		if values[field] < 1000 {
+			values[field] = values[field] * 10 + int(ch - `0`)
+		}
+		present[field] = true
+	}
+	state := match values[0] {
+		1 { TaskProgress.normal }
+		2 { TaskProgress.error }
+		3 { TaskProgress.indeterminate }
+		4 { TaskProgress.paused }
+		else { TaskProgress.none_ }
+	}
+	a.taskbar.progress_state = state
+	if present[1] || state == .normal || state == .none_ {
+		a.taskbar.progress = if values[1] > 100 { 100 } else { values[1] }
+	}
+	publish_taskbar_status(a.taskbar)
 }
 
 fn (a &TerminalApp) csi_value(index int, default_value int) int {
@@ -641,7 +1070,7 @@ fn (mut a TerminalApp) leave_alternate_screen() {
 	}
 	old_alternate := a.screen
 	a.screen = a.main_screen
-	a.main_screen = []u8{}
+	a.main_screen = []rune{}
 	if old_alternate.cap > 0 {
 		unsafe { old_alternate.free() }
 	}
@@ -716,7 +1145,7 @@ fn (mut a TerminalApp) apply_csi(command u8) {
 		`T` { a.scroll_region_down(a.scroll_top, a.scroll_bottom, amount) }
 		`b` {
 			for _ in 0 .. amount {
-				a.put_visible_byte(a.last_printed)
+				a.put_visible_char(a.last_printed)
 			}
 		}
 		`r` {
@@ -796,17 +1225,8 @@ fn (mut a TerminalApp) rendered_row(row int) string {
 			end = cursor_end
 		}
 	}
-	mut bytes := []u8{len: end - start}
-	for index in 0 .. bytes.len {
-		bytes[index] = a.screen[start + index]
-	}
-	if a.cursor_visible && row == a.cursor_row && a.cursor_column < bytes.len {
-		bytes[a.cursor_column] = `_`
-	}
-	next := bytes.bytestr()
-	if bytes.cap > 0 {
-		unsafe { bytes.free() }
-	}
+	cursor := if a.cursor_visible && row == a.cursor_row { start + a.cursor_column } else { -1 }
+	next := terminal_cells_text(a.screen, start, end, cursor)
 	a.rendered_rows[row] = replaced_terminal_text(a.rendered_rows[row], next)
 	a.dirty_rows[row] = false
 	return a.rendered_rows[row]
@@ -834,6 +1254,7 @@ fn (mut a TerminalApp) key_input(text string) {
 }
 
 fn (mut a TerminalApp) close_app() {
+	a.preserve_rebuild_snapshot()
 	if a.terminal >= 0 {
 		desktop_close(a.terminal)
 		a.terminal = -1
@@ -892,9 +1313,9 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			continue
 		}
 		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
-			color: terminal_text
+			color:       terminal_text
 			font_family: 'mono'
-			size: 13
+			size:        13
 		})
 	}
 
@@ -902,19 +1323,19 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 		button := 18
 		right := width - terminal_padding - button
 		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg: terminal_button
+			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
 			color: terminal_text
-			size: 12
+			size:  12
 			align: .center
 		})
 		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg: terminal_button
+			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
 			color: terminal_text
-			size: 12
+			size:  12
 			align: .center
 		})
 	}

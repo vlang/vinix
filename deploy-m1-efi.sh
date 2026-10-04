@@ -9,6 +9,8 @@ ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
 GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
+USE_SOUND_INITRAMFS=0
+REQUIRE_APPLE_SPEAKERS=0
 USE_DESKTOP_INITRAMFS=0
 INITRAMFS_COMPRESSED=0
 USE_NATIVE_RESOLUTION=0
@@ -54,6 +56,13 @@ for argument in "$@"; do
             # whole of what makes this safe to boot on a machine that still has
             # macOS on it. There is no default and there must not be one.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.ans_rw=PARTUUID=${argument#*=}"
+            ;;
+        --ans-persist=*)
+            # Mount one ext2 partition, by PARTUUID, read-write over /root:
+            # the desktop's users and files survive a reboot. Vinix refuses
+            # a volume an unclean shutdown left dirty, so kek.sh checks it
+            # from macOS before each deployment.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.persist=PARTUUID=${argument#*=}"
             ;;
         --ans-root=*)
             # Boot root from that partition instead of the initramfs, read-only.
@@ -118,8 +127,21 @@ for argument in "$@"; do
             # problem is reading the large module, not the kernel.
             USE_MINIMAL_INITRAMFS=1
             ;;
+        --sound-initramfs)
+            USE_SOUND_INITRAMFS=1
+            REQUIRE_APPLE_SPEAKERS=1
+            ;;
+        --apple-speakers)
+            # Refuse a kernel without the M1 Air speaker driver. The driver
+            # itself is on by default; this only checks that it was built in.
+            REQUIRE_APPLE_SPEAKERS=1
+            ;;
+        --no-apple-speakers)
+            # Leave the built-in speakers off: no /dev/dsp on this boot.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_speakers=0"
+            ;;
         --help|-h)
-            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-persist=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--no-apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -145,15 +167,31 @@ if [ "$GPU_PROBE_ONLY" -eq 1 ] && [ "$ENABLE_APPLE_GPU" -ne 1 ]; then
     echo "error: --gpu-probe-only requires --apple-gpu or --all-drivers" >&2
     exit 1
 fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ] && { [ "$USE_MINIMAL_INITRAMFS" -eq 1 ] || [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; }; then
+    echo "error: --sound-initramfs cannot be combined with another initramfs mode" >&2
+    exit 1
+fi
 
 if [ ! -d "$ESP_MOUNT" ]; then
     echo "error: ESP mount path does not exist: $ESP_MOUNT"
     exit 1
 fi
 
+# macOS indexes every volume it mounts, this one included: Spotlight stored a
+# 20 MB index of the boot image in the same 500 MiB ESP that barely holds the
+# image. Keep Spotlight and fsevents off this volume and drop what they kept,
+# before the free space is measured.
+if [ "$(uname -s)" = Darwin ]; then
+    mdutil -i off "$ESP_MOUNT" >/dev/null 2>&1 || true
+    rm -rf "$ESP_MOUNT/.Spotlight-V100/Store-V1" "$ESP_MOUNT/.Spotlight-V100/Store-V2"
+    touch "$ESP_MOUNT/.metadata_never_index" 2>/dev/null || true
+    mkdir -p "$ESP_MOUNT/.fseventsd" 2>/dev/null && touch "$ESP_MOUNT/.fseventsd/no_log" 2>/dev/null || true
+fi
+
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
+SOUND_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-sound.tar"
 DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
 DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
 LIMINE_VERSION="12.8.0"
@@ -183,6 +221,15 @@ if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     INITRAMFS="$MINIMAL_INITRAMFS"
     echo "using minimal initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
 fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$SOUND_INITRAMFS" ]; then
+        echo "error: sound test initramfs not built: $SOUND_INITRAMFS" >&2
+        echo "hint: run tests/apple-speakers/build-guest.sh" >&2
+        exit 1
+    fi
+    INITRAMFS="$SOUND_INITRAMFS"
+    echo "using sound test initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
+fi
 
 for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
     if [ ! -f "$f" ]; then
@@ -201,6 +248,18 @@ if ! LC_ALL=C grep -aFq "$SMP_REQUEST_ID" "$KERNEL"; then
     exit 1
 fi
 echo "kernel includes Limine MP request (native boot limit: 4 CPUs)"
+
+# A kernel built from a tree that never calls speakers.initialise() boots
+# normally and leaves no /dev/dsp. The speaker test then reads as a driver
+# failure with no apple-speakers line on screen, when the driver never ran.
+if [ "$REQUIRE_APPLE_SPEAKERS" -eq 1 ]; then
+    if ! LC_ALL=C grep -aFq "apple-speakers: MacBook Air J313 speakers" "$KERNEL"; then
+        echo "error: this kernel has no M1 Air speaker driver: $KERNEL" >&2
+        echo "hint: rebuild it from a tree whose kernel/main_arm64.v calls speakers.initialise()" >&2
+        exit 1
+    fi
+    echo "kernel includes the M1 Air speaker driver"
+fi
 
 if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
     echo "APPLE GPU: kernel AGX probe enabled"
@@ -294,8 +353,12 @@ mkdir -p "$ESP_MOUNT/EFI/BOOT"
 mkdir -p "$ESP_MOUNT/boot"
 mkdir -p "$ESP_MOUNT/limine"
 
-if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ]; then
-    cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
+# Keep the loader this replaces only when it is not an earlier Limine: that
+# one is the next deployment's to overwrite, and a copy of it is just less
+# room for the image.
+if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ] &&
+   ! LC_ALL=C grep -aqF "Limine" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"; then
+    COPYFILE_DISABLE=1 cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
 fi
 if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
     sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
@@ -324,6 +387,11 @@ install_verified() {
     label="$3"
     stage="$dst.vinix-new"
     rm -f "$stage"
+    # Unchanged since the last deployment: rewriting it would only risk it.
+    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+        echo "$label unchanged"
+        return 0
+    fi
 
     size="$(wc -c < "$src" | tr -d ' ')"
     if [ "$size" -gt 4294967295 ]; then

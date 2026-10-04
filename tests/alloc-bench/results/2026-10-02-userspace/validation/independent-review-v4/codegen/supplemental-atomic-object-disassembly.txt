@@ -1,0 +1,32 @@
+
+/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/atomic-extracted.o:	file format elf64-x86-64
+
+Disassembly of section .text:
+
+00000000000000b0 <katomic__load_T_ptr_Probe>:
+      b0:      	pushq	%rbp
+      b1:      	movq	%rsp, %rbp
+      b4:      	testb	$0x7, %dil
+      b8:      	je	0xc3 <katomic__load_T_ptr_Probe+0x13>
+      ba:      	xorl	%eax, %eax
+      bc:      	lock
+      bd:      	xaddq	%rax, (%rdi)
+      c1:      	popq	%rbp
+      c2:      	retq
+      c3:      	movq	(%rdi), %rax
+      c6:      	popq	%rbp
+      c7:      	retq
+      c8:      	nopl	(%rax,%rax)
+
+00000000000000d0 <katomic__load_T_u16>:
+      d0:      	pushq	%rbp
+      d1:      	movq	%rsp, %rbp
+      d4:      	testb	$0x1, %dil
+      d8:      	jne	0xdf <katomic__load_T_u16+0xf>
+      da:      	movw	(%rdi), %ax
+      dd:      	popq	%rbp
+      de:      	retq
+      df:      	xorl	%eax, %eax
+      e1:      	lock		xaddw	%ax, (%rdi)
+      e6:      	popq	%rbp
+      e7:      	retq

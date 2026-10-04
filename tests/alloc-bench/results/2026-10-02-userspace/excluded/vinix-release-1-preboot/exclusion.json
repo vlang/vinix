@@ -1,0 +1,9 @@
+{
+  "status": "excluded-preboot-harness-failure",
+  "reason": "Completed ISO builder removes its staging tree; the old benchmark runner attempted to hash iso-build/iso-root/boot/vinix after that cleanup. It failed before starting QEMU or recording any benchmark sample.",
+  "actual_inner_runner_exit_code": 1,
+  "original_private_wrapper_exit_code": 0,
+  "wrapper_note": "The original private wrapper recorded the inner failure but accidentally returned success to its outer orchestrator. The corrected wrapper propagates the inner status. The failed preparation is never accepted as a timing run.",
+  "fix_commit": "a2d05006",
+  "final_cohort_mapping": "Final Vinix cohort1 uses release2 and final Vinix cohort2 uses release3, each requiring real exit0 and complete strict-validated samples."
+}

@@ -1,0 +1,15 @@
+{
+  "status": "PASS",
+  "checked_utc": "2026-10-02T22:46:52.232965+00:00",
+  "reviewer": "root independent completed tar rehash",
+  "initramfs_sha256": "77554f123944cf158a3557778c69add94b60d677fe83ffdb2de224e53ec7a095",
+  "files": {
+    "lib/ld-musl-aarch64.so.1": "0bdb92db9a5a647e78102cbe11c62bcb5dfd482ba1ac1d69512e9a10a5c3c12e",
+    "usr/lib/libc.a": "b58d975a4b6d326bf1c8f485c0080959a3d57f62fd25ec5d2fc61491e8606e8b",
+    "usr/include/malloc.h": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "usr/share/vinix/musl-build.json": "27092fb71fae915dce451a7bdc97fb9ecd3517089a3d1837b8c67610f2c61ed1"
+  },
+  "symlink": "../../lib/ld-musl-aarch64.so.1",
+  "builder_log_sha256": "a47cc315f2f53e506b496244d4aec0385919980943709b6b0ca57ded92f81d10",
+  "note": "Actual completed production archive bytes match staging, final manifest and copied packaged-libc artifacts. ARM packaging is pinned musl1.2.5; ARM runtime/static desktop is pinned musl1.2.6."
+}

@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
@@ -49,6 +53,23 @@ fn test_taskbar_clock_formats_24_and_12_hour_time() {
 	desktop.settings.clock_show_weekday = false
 	_, no_date_line := desktop.taskbar_clock_strings_at(seconds)
 	assert no_date_line == ''
+}
+
+fn test_taskbar_build_date_uses_the_clock_time_zone() {
+	mut desktop := Desktop{}
+	// 1970-01-01 13:05:09 UTC.
+	build_time, build_date := desktop.taskbar_build_strings_at(47_109, false)
+	assert build_time == 'Built 13:05'
+	assert build_date == '01 Jan'
+
+	desktop.tz_offset_seconds = 3 * 3600
+	local_time, local_date := desktop.taskbar_build_strings_at(47_109, false)
+	assert local_time == 'Built 16:05'
+	assert local_date == '01 Jan'
+
+	gpu_time, gpu_date := desktop.taskbar_build_strings_at(47_109, true)
+	assert gpu_time == 'Built 16:05'
+	assert gpu_date == '01 Jan gpu+'
 }
 
 fn test_date_time_settings_controls_update_desktop_preferences() {
