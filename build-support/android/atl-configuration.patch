@@ -2624,3 +2624,14 @@ diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/andro
  
  	public int getImportantForAutofill() { return 0; }
  
+--- a/src/api-impl/android/location/LocationManager.java
++++ b/src/api-impl/android/location/LocationManager.java
+@@ -56,0 +57,8 @@
++	/** ATL currently exposes no enabled location providers. */
++	public boolean isProviderEnabled(String provider) {
++		if (provider == null) {
++			throw new IllegalArgumentException("invalid provider: null");
++		}
++		return false;
++	}
++

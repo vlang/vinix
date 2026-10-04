@@ -25,6 +25,10 @@ normal fixture verifies focus, all three APIs, hint metadata and input
 preservation on Vinix. The unchanged client accepts and clears username text,
 updates the Next button, and returns to the welcome screen without crashing
 during a three-minute desktop observation.
+The client's device-attribute query now resolves
+`LocationManager.isProviderEnabled(String)`: ATL reports no enabled providers,
+returns false for non-null names and rejects null as Android 26 requires. This
+supplies availability metadata without creating GPS support or a location fix.
 Authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),

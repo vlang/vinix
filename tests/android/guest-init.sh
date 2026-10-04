@@ -290,6 +290,31 @@ if [ -n "${TEST_AUTOFILL_PROBE:-}" ]; then
         || fail "native framework disabled autofill probe did not report its assertions passing"
     echo ANDROID-AUTOFILL-VERIFIED
 fi
+if [ -n "${TEST_LOCATION_PROBE:-}" ]; then
+    echo ANDROID-LOCATION-START
+    rm -f /tmp/android-location-status
+    mkfifo /tmp/android-location-events
+    (while :; do sleep 30; done) >/tmp/android-location-events &
+    location_input_pid=$!
+    /usr/bin/vinix-wine-host :93 /tmp/android-location-probe 128x128x24 \
+        /opt/android-test/location-launch --fill \
+        </tmp/android-location-events >/tmp/android-location-probe.log 2>&1 || {
+        kill "$location_input_pid" 2>/dev/null || true
+        wait "$location_input_pid" 2>/dev/null || true
+        rm -f /tmp/android-location-events
+        cat /tmp/android-location-probe.log
+        fail "native framework unavailable location providers probe failed"
+    }
+    kill "$location_input_pid" 2>/dev/null || true
+    wait "$location_input_pid" 2>/dev/null || true
+    rm -f /tmp/android-location-events
+    cat /tmp/android-location-probe.log
+    [ "$(cat /tmp/android-location-status 2>/dev/null)" = 0 ] \
+        || fail "native framework unavailable location providers probe did not exit successfully"
+    grep -q '^ANDROID-LOCATION-PASS ' /tmp/android-location-probe.log \
+        || fail "native framework unavailable location providers probe did not report its assertions passing"
+    echo ANDROID-LOCATION-VERIFIED
+fi
 if [ -n "${TEST_BIONIC_LOADER_PROBE:-}" ]; then
     (
         runtime=/opt/vinix-android-aarch64

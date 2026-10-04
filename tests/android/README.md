@@ -328,6 +328,34 @@ record the fixture hash and preflight verdict separately from application
 functionality. This verifies Android's no-service behavior; an enabled Autofill
 service and Roblox gameplay require separate support and checks.
 
+## Unavailable Location providers preflight
+
+`--location-probe /path/to/android-location-probe.apk` runs
+[AndroidLocationProbe.java](AndroidLocationProbe.java) as a normal APK against the
+production typed location service. It checks that `isProviderEnabled(String)`
+returns false for GPS, network and unknown names, rejects null with
+`IllegalArgumentException`, and preserves ATL's empty provider lists and absent
+last-known location. Repeated worker queries require no Looper; a main Handler
+continuation checks that the queries leave the event loop usable.
+
+Build it with the coherent production class archive and resource APK:
+
+```sh
+python3 tests/android/location-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --framework-res /path/to/atl/output/framework-res.apk \
+    --core-classes /path/to/core-all_classes.jar --r8 /path/to/r8-8.3.37.jar \
+    --output /tmp/android-location-probe
+```
+
+The helper pins core and R8 and includes only fixture classes. The guest runs it
+on private display `:93` before the application, requires the actual APK child
+to exit zero plus an anchored `ANDROID-LOCATION-PASS` marker, then emits
+`ANDROID-LOCATION-VERIFIED`. Results record its unchanged APK hash and verdict.
+The same APK on the preceding runtime must fail at the missing
+`isProviderEnabled(String)` method. This checks provider availability metadata;
+it creates no location provider or position and does not establish gameplay.
+
 ## Pointer capture preflights
 
 `--pointer-probe /path/to/android-pointer-capture-probe.jar` runs
