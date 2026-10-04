@@ -84,6 +84,7 @@ enum WineHostEventKind as u32 {
 	right_up
 	wheel_up
 	wheel_down
+	paste
 }
 
 struct WineHostEvent {
@@ -566,7 +567,7 @@ fn (mut app HostedX11App) pointer_input_enabled() bool {
 }
 
 fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, keys string) {
-	if app.input_fd < 0 || keys.len > 4096 {
+	if app.input_fd < 0 || keys.len > clipboard_max_bytes {
 		return
 	}
 	event := WineHostEvent{
@@ -638,6 +639,12 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 fn (mut app HostedX11App) key_input(text string) {
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
+	}
+}
+
+fn (mut app HostedX11App) paste_input(text string) {
+	if text.len > 0 {
+		app.send_host_event(.paste, 0, 0, text)
 	}
 }
 

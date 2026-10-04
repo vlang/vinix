@@ -662,6 +662,21 @@ installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
 
+Copy text on the host, click a text field in the guest, and press **Ctrl+V**
+(**Ctrl+Shift+V** also works in Terminal). On macOS, **Cmd+V** works while QEMU
+has grabbed input; Ctrl+V also works without the grab. Unicode, tabs and multiple
+lines are supported in Terminal, Text Editor and hosted X11 applications such
+as Firefox and Wine Notepad. Terminal honors bracketed paste when the shell or
+editor enables it. Pasted text bypasses the guest keyboard layout.
+
+The aarch64 launcher enables the host clipboard service by default. It reads
+the clipboard only when the guest requests a paste, over the existing loopback
+host connection. macOS uses `pbpaste`; Linux needs `wl-paste` on Wayland, or
+`xclip`/`xsel` on X11. Text is limited to 64 KiB per paste. Pass
+`--no-clipboard` or set `VINIX_QEMU_CLIPBOARD=0` to disable it. Sharing requires
+QEMU user networking; images booted outside this launcher have no host clipboard
+until `/etc/vinix/host-clipboard-url` is configured.
+
 The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick
 desktop edits inside the running VM, use `vinix-desktop-build` below.

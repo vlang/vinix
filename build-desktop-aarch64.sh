@@ -577,6 +577,8 @@ if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
     echo "Run ./build-x11-aarch64.sh first." >&2
     exit 1
 fi
+sh "$SCRIPT_DIR/build-support/xorg-server/build-wine-host.sh" aarch64 \
+    "$X11_STAGING" "$SYSROOT"
 if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
    [ ! -x "$NETWORK_TOOLS_STAGING/sbin/apk" ] ||
    [ ! -s "$NETWORK_TOOLS_STAGING/etc/vinix-pkg/base-world" ]; then

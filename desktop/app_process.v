@@ -67,6 +67,7 @@ enum AppCommand as u8 {
 	poll
 	pointer
 	close
+	paste_input
 }
 
 struct AppPointerPayload {
@@ -779,7 +780,7 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	payload_length := int(reader.take_u32()!)
 	unsafe { header.free() }
 	if magic != app_protocol_magic || version != app_protocol_version
-		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.close)
+		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.paste_input)
 		|| payload_length < 0 || payload_length > app_protocol_max_payload {
 		return error('invalid application request')
 	}
@@ -1017,6 +1018,17 @@ fn run_app_process(options AppProcessOptions) {
 					break
 				}
 			}
+			.paste_input {
+				if mut app is PastingApp {
+					app.paste_input(payload)
+				} else if mut app is KeyboardApp {
+					app.key_input(payload)
+				}
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
 			.poll {
 				changed := if mut app is PollingApp { app.poll() } else { false }
 				mut poll_payload := [u8(if changed { 1 } else { 0 })]
@@ -1102,6 +1114,7 @@ mut:
 	poll_sampled     bool
 	last_poll_ms     u64
 	keyboard         bool
+	standalone       bool
 	pointer          bool
 	us_keys          bool
 	closed           bool
@@ -1182,6 +1195,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		polling:          factory.polling
 		poll_interval_ms: factory.poll_interval_ms
 		keyboard:         factory.keyboard
+		standalone:       factory.standalone
 		pointer:          factory.pointer
 		us_keys:          factory.us_keys
 		desktop:          desktop
@@ -1333,6 +1347,20 @@ fn (mut a RemoteApp) key_input(text string) {
 	// The terminal's slave will echo or answer this input asynchronously. Let
 	// the next compositor pass check for that output instead of making typed
 	// characters wait for the normal idle polling interval.
+	a.poll_sampled = false
+}
+
+fn (mut a RemoteApp) paste_input(text string) {
+	if !a.keyboard || text.len == 0 {
+		return
+	}
+	a.tree_stale = true
+	// Installed standalone clients may predate the dedicated paste command.
+	command := if a.standalone { AppCommand.key_input } else { AppCommand.paste_input }
+	reply := a.transact(command, 0, 0, text) or { return }
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
 	a.poll_sampled = false
 }
 
