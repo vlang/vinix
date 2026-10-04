@@ -98,14 +98,21 @@ fn oom_badness_of(pid int) (u64, u64) {
 	return oom_badness(process)
 }
 
-// The process with the most to give back, and how much; pid 0 when there is
-// none.
+// The process to kill for memory `requester` asked for, and how much it holds;
+// pid 0 when there is none. It is the one with the most to give back, with
+// two exceptions.
 //
 // The process drawing the screen -- the desktop -- is chosen only when
 // nothing else can be. Every window is its, so killing it ends the session
 // whatever the other programs hold, and on a full RAM root with little else
 // running it is often the largest process there is.
-fn oom_select() (int, u64) {
+//
+// The process asking is chosen over a larger one that holds less than twice
+// as much. Its going ends the demand for certain, where a bystander's only
+// feeds it: with 20 MiB left on a full RAM root, a program on its way to a
+// gigabyte ran out while it was still the size of the file manager, which
+// was killed for it, and then the program was too.
+fn oom_select(requester int) (int, u64) {
 	screen := term.graphics_owner()
 	mut best := 0
 	mut best_score := u64(0)
@@ -125,6 +132,12 @@ fn oom_select() (int, u64) {
 		score, bytes := oom_badness_of(screen)
 		if score != 0 {
 			return screen, bytes
+		}
+	}
+	if requester > 1 && requester != screen && requester != best {
+		score, bytes := oom_badness_of(requester)
+		if score != 0 && score >= best_score / 2 {
+			return requester, bytes
 		}
 	}
 	return best, best_bytes
@@ -150,7 +163,8 @@ fn oom_kill(pid int, bytes u64) {
 
 // The process being killed for memory, after choosing one if none is on its
 // way out. 0 when nothing is left to kill, -1 while another thread chooses.
-fn oom_victim() int {
+// `requester` is the process that asked for the page.
+fn oom_victim(requester int) int {
 	if !katomic.cas(mut &oom_choosing, u32(0), u32(1)) {
 		return -1
 	}
@@ -163,7 +177,7 @@ fn oom_victim() int {
 		return previous
 	}
 	// One that outlasted its welcome stays marked, and is not chosen again.
-	pid, bytes := oom_select()
+	pid, bytes := oom_select(requester)
 	if pid == 0 {
 		return 0
 	}
@@ -180,6 +194,11 @@ fn oom_victim_gone(process &proc.Process) {
 	if process.oom_killed {
 		katomic.cas(mut &oom_victim_pid, process.pid, 0)
 	}
+}
+
+// The process a thread asks for memory for, or 0 for a kernel thread.
+fn oom_requester(t &proc.Thread) int {
+	return if t.process != unsafe { nil } { t.process.pid } else { 0 }
 }
 
 // Sleep, to be woken early only by being killed or told to exit.
@@ -224,7 +243,7 @@ fn recover_memory(sleepable bool) bool {
 		if memory.user_memory_available() {
 			return true
 		}
-		if round >= oom_reclaim_rounds && oom_victim() == 0 {
+		if round >= oom_reclaim_rounds && oom_victim(oom_requester(t)) == 0 {
 			return false
 		}
 		oom_pause()

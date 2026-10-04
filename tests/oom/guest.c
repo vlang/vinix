@@ -229,17 +229,15 @@ static void require_killed(int status, const char *why) {
 	require(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL, why);
 }
 
-/* A process holding most of memory and doing nothing, and a small one that
- * goes on asking for more. The large one is killed for it; the small one,
- * which had to wait for that memory, carries on with it. */
-static void bystander(unsigned long long free_bytes) {
+/* A process that takes `percent` of free memory and then does nothing. */
+static pid_t start_sleeper(unsigned long long free_bytes, unsigned percent) {
 	int ready[2];
 	require(pipe(ready) == 0, "sleeper pipe");
 	pid_t sleeper = fork();
 	require(sleeper >= 0, "fork sleeper");
 	if (sleeper == 0) {
 		close(ready[0]);
-		size_t length = (size_t)(free_bytes / 100 * 60);
+		size_t length = (size_t)(free_bytes / 100 * percent);
 		volatile unsigned char *pages = hog_mapping(length);
 		for (size_t offset = 0; offset < length; offset += 4096) pages[offset] = 1;
 		if (write(ready[1], "r", 1) != 1) _exit(4);
@@ -249,7 +247,14 @@ static void bystander(unsigned long long free_bytes) {
 	char mark;
 	require(read(ready[0], &mark, 1) == 1, "sleeper holds its memory");
 	close(ready[0]);
+	return sleeper;
+}
 
+/* A process holding most of memory and doing nothing, and a small one that
+ * goes on asking for more. The large one is killed for it; the small one,
+ * which had to wait for that memory, carries on with it. */
+static void bystander(unsigned long long free_bytes) {
+	pid_t sleeper = start_sleeper(free_bytes, 80);
 	int report;
 	pid_t grower = start_hog(HOG_PAGE_FAULTS, &report);
 	int status = 0;
@@ -259,8 +264,24 @@ static void bystander(unsigned long long free_bytes) {
 	require(waitpid(grower, &status, 0) == grower, "wait for grower");
 	require_killed(status, "the grower is killed once it holds the most");
 	printf("OOM grower touched %lluM past a %lluM sleeper\n", touched / MIB,
-		free_bytes / 100 * 60 / MIB);
+		free_bytes / 100 * 80 / MIB);
 	require(touched > free_bytes / 2, "the grower went on with the sleeper's memory");
+}
+
+/* The same with the two nearer in size: the one asking holds more than half
+ * of what the idle one does by the time memory runs out, and is the one
+ * killed. The idle one is left alone. */
+static void requester_preferred(unsigned long long free_bytes) {
+	pid_t sleeper = start_sleeper(free_bytes, 55);
+	int status = 0;
+	unsigned long long touched = hog(HOG_PAGE_FAULTS, &status);
+	require_killed(status, "the process asking is killed");
+	printf("OOM grower touched %lluM beside a %lluM sleeper\n", touched / MIB,
+		free_bytes / 100 * 55 / MIB);
+	require(touched < free_bytes / 2, "the grower never had the sleeper's memory");
+	require(waitpid(sleeper, &status, WNOHANG) == 0, "the idle process is still running");
+	require(kill(sleeper, SIGKILL) == 0, "stop the sleeper");
+	require(waitpid(sleeper, &status, 0) == sleeper, "wait for sleeper");
 }
 
 /* A file filled through a shared mapping rather than by write(2), as a linker
@@ -404,6 +425,9 @@ int main(void) {
 	bystander(free_after_hogs);
 	run_child(16, "start a process after the bystander round");
 	puts("OOM PASS the largest process is the one killed");
+	requester_preferred(meminfo("MemFree:"));
+	run_child(16, "start a process after the requester round");
+	puts("OOM PASS the process asking is killed when it is near the largest");
 
 	/* 7. Whoever draws the screen is killed last. */
 	screen_owner_spared(meminfo("MemFree:"));

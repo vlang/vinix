@@ -19,7 +19,9 @@ A process that needs a page it cannot have gets a process killed for it
 (`kernel/userland/oom.v`): the one with the most resident memory, weighed by
 `/proc/<pid>/oom_score_adj` as Linux weighs it. -1000 exempts a process, init
 is never chosen, and the process that has taken the screen (`KDSETMODE`, the
-desktop) is chosen only when nothing else can be. Whoever needed the page
+desktop) is chosen only when nothing else can be. The process asking is
+chosen over a larger one that holds less than twice as much: its going ends
+the demand, where a bystander's only feeds it. Whoever needed the page
 waits for the memory and tries again; a thread of the process killed dies of
 `SIGKILL`. The kernel names what it killed on the console:
 
@@ -47,9 +49,9 @@ reclaim`. Starting a program was enough.
 `guest.c` is PID 1 of a 1 GiB guest. It fills the root with one file and then
 with small ones; takes all the memory there is from a child in each way a
 process comes by it (small mappings, page faults, a `read(2)` into untouched
-memory, four threads); has a small process ask for memory while a large one
-sits on most of it, and again with the large one owning the screen; and fills
-a named file and a memfd through shared mappings. After each it checks what
+memory, four threads); has a process ask for memory beside an idle one that
+holds far more, one that holds about as much, and one that owns the screen;
+and fills a named file and a memfd through shared mappings. After each it checks what
 was refused or killed, that a new process still starts, and that the memory
 came back.
 
