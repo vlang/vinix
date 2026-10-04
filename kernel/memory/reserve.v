@@ -30,7 +30,8 @@ __global (
 	// How many allocations for a process found no memory; see exhaustions().
 	user_exhaustions   = u64(0)
 	exhaustion_handler fn (bool) bool
-	reserve_pass       fn () bool
+	reserve_pass       fn (u64) bool
+	reclaimable_hint   fn () u64
 )
 
 pub fn user_reserve_pages() u64 {
@@ -44,6 +45,13 @@ pub fn file_reserve_pages() u64 {
 // Whether `count` pages can be handed out with `reserve` left free, once what
 // can be regenerated has been given back. Read without the allocator's lock:
 // several CPUs may each take a page past the line, which a reserve can bear.
+//
+// What a cache holds clean counts as free even when it could not be had this
+// instant. A reclaimer another CPU is in the middle of gives this one nothing,
+// and a cache whose lock is taken, as it is across a read from the disk, is
+// passed over: on a system whose root is a disk, where the cache fills
+// whatever memory is left, that would have files refused room and processes
+// killed with most of memory there for the taking.
 fn room_above(reserve u64, count u64) bool {
 	wanted := reserve + count
 	free := free_pages
@@ -51,7 +59,22 @@ fn room_above(reserve u64, count u64) bool {
 		return true
 	}
 	reclaim_pages(wanted - free + reserve_reclaim_batch)
-	return free_pages >= wanted
+	if free_pages >= wanted {
+		return true
+	}
+	return free_pages + reclaimable_pages() >= wanted
+}
+
+// Registered by the page cache: how many pages it could give back.
+pub fn register_reclaimable(hint fn () u64) {
+	reclaimable_hint = hint
+}
+
+fn reclaimable_pages() u64 {
+	if reclaimable_hint == unsafe { nil } {
+		return 0
+	}
+	return reclaimable_hint()
 }
 
 // Whether a file may take `count` more pages for its data.
@@ -66,7 +89,7 @@ pub fn user_room(count u64) bool {
 	if room_above(user_reserve_pages(), count) {
 		return true
 	}
-	if reserve_pass != unsafe { nil } && reserve_pass() {
+	if reserve_pass != unsafe { nil } && reserve_pass(count) {
 		return true
 	}
 	note_exhaustion()
@@ -139,11 +162,12 @@ pub fn register_exhaustion_handler(handler fn (bool) bool) {
 }
 
 // Registered by userland too: whether the calling thread has been let into
-// the reserve for its next page, which uses the pass up. A fault the kernel
-// takes on a process' page, copying to or from it with a lock held or for a
-// process that is being killed, can neither wait for memory nor fail: before
-// there was a reserve it took the page, and it still does.
-pub fn register_reserve_pass(pass fn () bool) {
+// the reserve for this many pages, which uses that much of its pass up. A
+// fault the kernel takes on a process' page, copying to or from it with a
+// lock held or for a process that is being killed, can neither wait for
+// memory nor fail: before there was a reserve it took the page, and it still
+// does.
+pub fn register_reserve_pass(pass fn (u64) bool) {
 	reserve_pass = pass
 }
 

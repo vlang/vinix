@@ -27,6 +27,10 @@ import time
 // cannot be interrupted before it starts.
 const oom_patience_ns = u64(5000000000)
 
+// How long one that has begun to exit is waited for. It is on its way, and
+// what is left to choose by then may be the desktop.
+const oom_exit_patience_ns = u64(30000000000)
+
 // How long a thread sleeps between looks at whether the memory has come, and
 // how many of those sleeps one call sits out before handing back to its
 // caller, which tries its allocation again and comes back if it must.
@@ -39,6 +43,20 @@ const oom_pause_rounds = 100
 // there a moment later, with nothing killed for it.
 const oom_reclaim_rounds = 3
 
+// How many times in a row a choice is put off because a process' address
+// space could not be looked at. A process holds its own for the whole of a
+// fork; chosen without it, the kill falls on a smaller one, or on the desktop.
+const oom_busy_rounds = 20
+
+// A pass into the reserve is good for this many pages. Paging one in takes
+// two at the most: the page of a file, and the process' own copy of it.
+const oom_pass_pages = u32(4)
+
+// How many passes a thread is given between two returns to userspace. A
+// page-in that a pass does not get through is not one that memory was all
+// that stood in the way of, and is given up on rather than tried for good.
+const oom_pass_limit = u32(1024)
+
 __global (
 	// One thread chooses at a time; the rest wait for what it chose.
 	oom_choosing   u32
@@ -46,6 +64,7 @@ __global (
 	oom_victim_pid int
 	oom_victim_ns  u64
 	oom_kill_count u64
+	oom_busy_count int
 )
 
 pub fn initialise_oom() {
@@ -65,42 +84,64 @@ fn oom_dying(t &proc.Thread) bool {
 		|| (t.process != unsafe { nil } && t.process.exiting)
 }
 
+// The process a thread asks for memory for, or 0 for a kernel thread.
+fn oom_requester(t &proc.Thread) int {
+	return if t.process != unsafe { nil } { t.process.pid } else { 0 }
+}
+
+// What killing a process would give back, as oom_badness() has it.
+struct OomScore {
+	// Weighed by oom_score_adj; 0 for a process that is not to be killed.
+	score u64
+	bytes u64
+	// Its address space could not be looked at, and nothing is known.
+	busy bool
+}
+
 // What killing a process would give back, weighed by its oom_score_adj as
 // Linux weighs it: a point is a thousandth of the machine's memory, and
 // -1000 exempts the process. 0 for one that is not to be killed: init, one
 // already exiting, and one killed for memory before, which either is on its
 // way or cannot be made to go. The caller holds the process table.
-fn oom_badness(process &proc.Process) (u64, u64) {
+fn oom_badness(process &proc.Process) OomScore {
 	if process.pid <= 1 || process.exiting || process.oom_killed
 		|| unsafe { process.pagemap == nil } || process.oom_score_adj <= -1000 {
-		return 0, 0
+		return OomScore{}
 	}
-	bytes := mmap.resident_bytes(process.pagemap)
+	bytes := mmap.resident_bytes(process.pagemap) or {
+		return OomScore{
+			busy: true
+		}
+	}
 	if bytes == 0 {
-		return 0, 0
+		return OomScore{}
 	}
-	score := i64(bytes) + i64(process.oom_score_adj) * i64(memory.total_bytes() / 1000)
-	if score < 1 {
-		return 1, bytes
+	weighed := i64(bytes) + i64(process.oom_score_adj) * i64(memory.total_bytes() / 1000)
+	mut score := u64(1)
+	if weighed > 1 {
+		score = u64(weighed)
 	}
-	return u64(score), bytes
+	return OomScore{
+		score: score
+		bytes: bytes
+	}
 }
 
-fn oom_badness_of(pid int) (u64, u64) {
+fn oom_badness_of(pid int) OomScore {
 	proc.lock_table()
-	defer {
-		proc.unlock_table()
-	}
 	process := proc.process_at(pid)
-	if process == unsafe { nil } {
-		return 0, 0
+	mut found := OomScore{}
+	if process != unsafe { nil } {
+		found = oom_badness(process)
 	}
-	return oom_badness(process)
+	proc.unlock_table()
+	return found
 }
 
 // The process to kill for memory `requester` asked for, and how much it holds;
-// pid 0 when there is none. It is the one with the most to give back, with
-// two exceptions.
+// pid 0 when there is none, -1 when the choice is put off because a process
+// could not be looked at. It is the one with the most to give back, with two
+// exceptions.
 //
 // The process drawing the screen -- the desktop -- is chosen only when
 // nothing else can be. Every window is its, so killing it ends the session
@@ -117,52 +158,96 @@ fn oom_select(requester int) (int, u64) {
 	mut best := 0
 	mut best_score := u64(0)
 	mut best_bytes := u64(0)
+	mut busy := false
 	for pid := 2; pid < proc.max_pid; pid++ {
 		if pid == screen {
 			continue
 		}
-		score, bytes := oom_badness_of(pid)
-		if score > best_score {
+		found := oom_badness_of(pid)
+		if found.busy {
+			busy = true
+		}
+		if found.score > best_score {
 			best = pid
-			best_score = score
-			best_bytes = bytes
+			best_score = found.score
+			best_bytes = found.bytes
 		}
 	}
+	if busy && oom_busy_count < oom_busy_rounds {
+		oom_busy_count++
+		return -1, 0
+	}
+	oom_busy_count = 0
 	if best == 0 && screen > 1 {
-		score, bytes := oom_badness_of(screen)
-		if score != 0 {
-			return screen, bytes
+		found := oom_badness_of(screen)
+		if found.score != 0 {
+			return screen, found.bytes
 		}
 	}
 	if requester > 1 && requester != screen && requester != best {
-		score, bytes := oom_badness_of(requester)
-		if score != 0 && score >= best_score / 2 {
-			return requester, bytes
+		found := oom_badness_of(requester)
+		if found.score != 0 && found.score >= best_score / 2 {
+			return requester, found.bytes
 		}
 	}
 	return best, best_bytes
 }
 
-fn oom_kill(pid int, bytes u64) {
+// Whether a process is in the middle of exiting.
+fn oom_exiting(pid int) bool {
+	proc.lock_table()
+	process := proc.process_at(pid)
+	exiting := process != unsafe { nil } && process.exiting
+	proc.unlock_table()
+	return exiting
+}
+
+fn oom_mark(pid int, killed bool) {
+	proc.lock_table()
+	mut process := proc.process_at(pid)
+	if process != unsafe { nil } {
+		process.oom_killed = killed
+	}
+	proc.unlock_table()
+}
+
+// Kill the process chosen. False when it turned out to be exiting on its own
+// by now, or has no thread to take the signal yet, as a fork child has before
+// its first is attached: neither is marked, and the choice is made again.
+fn oom_kill(pid int, bytes u64) bool {
 	// The name is the process', which may be gone by the time it is printed.
 	mut name := [64]u8{}
 	proc.lock_table()
 	mut process := proc.process_at(pid)
-	if process != unsafe { nil } {
-		process.oom_killed = true
-		for i := 0; i < process.name.len && i < name.len - 1; i++ {
-			name[i] = unsafe { process.name.str[i] }
-		}
+	if process == unsafe { nil } || process.exiting {
+		proc.unlock_table()
+		return false
+	}
+	process.oom_killed = true
+	for i := 0; i < process.name.len && i < name.len - 1; i++ {
+		name[i] = unsafe { process.name.str[i] }
 	}
 	proc.unlock_table()
+
+	mut target := proc.pin_process_at(pid)
+	mut accepted := false
+	if target != unsafe { nil } {
+		accepted = signal_process(mut target, sigkill)
+		proc.unpin_process(target)
+	}
+	if !accepted {
+		oom_mark(pid, false)
+		return false
+	}
 	katomic.inc(mut &oom_kill_count)
-	signal_pid(pid, sigkill)
 	C.kprintf(c'oom: out of memory: killed %s, which held %llu MiB\n', unsafe { &name[0] },
 		bytes >> 20)
+	return true
 }
 
 // The process being killed for memory, after choosing one if none is on its
-// way out. 0 when nothing is left to kill, -1 while another thread chooses.
+// way out. 0 when nothing is left to kill, -1 when the caller should look
+// again: another thread is choosing, or the choice could not be made yet.
 // `requester` is the process that asked for the page.
 fn oom_victim(requester int) int {
 	if !katomic.cas(mut &oom_choosing, u32(0), u32(1)) {
@@ -173,17 +258,25 @@ fn oom_victim(requester int) int {
 	}
 	now := time.monotonic_ns()
 	previous := katomic.load(&oom_victim_pid)
-	if previous != 0 && now - oom_victim_ns < oom_patience_ns {
-		return previous
+	if previous != 0 {
+		age := now - oom_victim_ns
+		if age < oom_patience_ns || (age < oom_exit_patience_ns && oom_exiting(previous)) {
+			return previous
+		}
 	}
 	// One that outlasted its welcome stays marked, and is not chosen again.
 	pid, bytes := oom_select(requester)
-	if pid == 0 {
-		return 0
+	if pid <= 0 {
+		return pid
 	}
+	// Published before the process is marked, so that its exit, which looks
+	// for the mark, finds its pid here to take away.
 	oom_victim_ns = now
 	katomic.store(mut &oom_victim_pid, pid)
-	oom_kill(pid, bytes)
+	if !oom_kill(pid, bytes) {
+		katomic.cas(mut &oom_victim_pid, pid, 0)
+		return -1
+	}
 	return pid
 }
 
@@ -196,11 +289,6 @@ fn oom_victim_gone(process &proc.Process) {
 	}
 }
 
-// The process a thread asks for memory for, or 0 for a kernel thread.
-fn oom_requester(t &proc.Thread) int {
-	return if t.process != unsafe { nil } { t.process.pid } else { 0 }
-}
-
 // Sleep, to be woken early only by being killed or told to exit.
 fn oom_pause() {
 	mut timer := time.new_timer(time.TimeSpec{
@@ -210,6 +298,18 @@ fn oom_pause() {
 	event.await_one_masked(mut timer.event, signal_bit(sigkill)) or {}
 	timer.disarm()
 	unsafe { free(timer) }
+}
+
+// Let a thread into the reserve for the page-in it is in the middle of.
+// False once it has been let in too often since it last left for userspace.
+fn oom_grant(mut t proc.Thread) bool {
+	t.owes_memory = true
+	if t.reserve_grants >= oom_pass_limit {
+		return false
+	}
+	t.reserve_grants++
+	t.reserve_pass = oom_pass_pages
+	return true
 }
 
 // memory.recover_from_exhaustion(): the calling thread needed a page for its
@@ -233,14 +333,15 @@ fn recover_memory(sleepable bool) bool {
 		if oom_dying(t) || !memory.reserve_half_left() {
 			return false
 		}
-		t.reserve_pass = true
-		return true
+		return oom_grant(mut t)
 	}
 	for round in 0 .. oom_pause_rounds {
 		if oom_dying(t) {
 			return false
 		}
-		if memory.user_memory_available() {
+		// Not before one sleep: a caller told to try again at once, with the
+		// page still not to be had, would spin on it.
+		if round > 0 && memory.user_memory_available() {
 			return true
 		}
 		if round >= oom_reclaim_rounds && oom_victim(oom_requester(t)) == 0 {
@@ -254,12 +355,15 @@ fn recover_memory(sleepable bool) bool {
 // On the way out of a syscall, which holds nothing by now: a page the thread
 // could not wait for is waited for here, so that a process taking memory
 // through syscalls alone is killed for it as one taking it by faults is.
+// What is left of a pass into the reserve goes with it.
 pub fn settle_owed_memory() {
 	mut t := proc.current_thread()
 	if t == unsafe { nil } || !t.owes_memory {
 		return
 	}
 	t.owes_memory = false
+	t.reserve_pass = 0
+	t.reserve_grants = 0
 	recover_memory(true)
 }
 
@@ -277,28 +381,26 @@ pub fn exit_if_killed_for_memory() {
 	exit_with_fatal_signal(u8(sigkill))
 }
 
-// Let the calling thread's next page come out of the reserve, for a fault the
-// kernel itself took on a process' page and has to see through: it holds a
-// lock and cannot wait for memory, or the process is the one being killed and
-// is in the middle of a syscall. False when there is no page at all, and the
-// fault is the kernel's to report.
+// Let the calling thread's next pages come out of the reserve, for a fault
+// the kernel itself took on a process' page and has to see through: it holds
+// a lock and cannot wait for memory, or the process is the one being killed
+// and is in the middle of a syscall. False when there is no page at all, or
+// passes have not got the fault through, and it is the kernel's to report.
 pub fn grant_reserve_page() bool {
 	mut t := proc.current_thread()
 	if t == unsafe { nil } || !memory.any_free() {
 		return false
 	}
-	t.reserve_pass = true
-	t.owes_memory = true
-	return true
+	return oom_grant(mut t)
 }
 
 // memory's reserve pass: whether the calling thread has been let into the
-// reserve, which is good for the one page.
-fn take_reserve_pass() bool {
+// reserve for `count` more pages.
+fn take_reserve_pass(count u64) bool {
 	mut t := proc.current_thread()
-	if t == unsafe { nil } || !t.reserve_pass {
+	if t == unsafe { nil } || u64(t.reserve_pass) < count {
 		return false
 	}
-	t.reserve_pass = false
+	t.reserve_pass -= u32(count)
 	return true
 }

@@ -12,7 +12,9 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/ipc.h>
 #include <sys/mount.h>
+#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/wait.h>
@@ -117,6 +119,29 @@ static void run_child(unsigned megabytes, const char *why) {
 	}
 	int status = 0;
 	require(waitpid(pid, &status, 0) == pid, why);
+	require(WIFEXITED(status) && WEXITSTATUS(status) == 0, why);
+}
+
+/* A System V shared memory segment is its mappers' memory, as a memfd is, not
+ * a file's: a process can still make and fill one when the root is full,
+ * which is how an X client hands the server its images. */
+static void shared_segment(unsigned megabytes, const char *why) {
+	pid_t pid = fork();
+	require(pid >= 0, why);
+	if (pid == 0) {
+		size_t length = (size_t)megabytes * MIB;
+		int id = shmget(IPC_PRIVATE, length, IPC_CREAT | 0600);
+		if (id < 0) _exit(20);
+		volatile unsigned char *pages = shmat(id, NULL, 0);
+		if (pages == (void *)-1) _exit(21);
+		for (size_t offset = 0; offset < length; offset += 4096) pages[offset] = 1;
+		if (shmdt((void *)pages) != 0) _exit(22);
+		if (shmctl(id, IPC_RMID, NULL) != 0) _exit(23);
+		_exit(0);
+	}
+	int status = 0;
+	require(waitpid(pid, &status, 0) == pid, why);
+	if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) printf("OOM status=0x%x\n", status);
 	require(WIFEXITED(status) && WEXITSTATUS(status) == 0, why);
 }
 
@@ -363,6 +388,7 @@ int main(void) {
 	require((unsigned long long)space.f_bavail * space.f_bsize < 2 * MIB,
 		"a full tmpfs reports no space");
 	run_child(1, "start a process on a full tmpfs");
+	shared_segment(8, "fill a shared memory segment on a full tmpfs");
 	puts("OOM PASS full tmpfs: ENOSPC, and processes still start");
 
 	/* 2. On top of that, a process that takes whatever memory is left. */

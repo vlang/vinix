@@ -35,6 +35,9 @@ pub mut:
 	storage_owned bool
 	// memfd_create(2) files take seals; nothing else does.
 	memfd bool
+	// Made by create_anonymous(), with no place in any directory: a memfd,
+	// a System V shared memory segment. Its link count says 1 all the same.
+	nameless bool
 	seals u32
 	// A file that is mapped MAP_SHARED can no longer live in one movable
 	// buffer: growing it would relocate the pages a mapping already points at.
@@ -265,9 +268,11 @@ fn tmpfs_page(file_data bool) voidptr {
 // has a name, so the page outlives every process that maps it, and killing
 // one for it would give nothing back. Writing a file through a mapping --
 // a linker does -- then stops where write(2) does, with a fault in place of
-// ENOSPC. A memfd, or a file that has been unlinked, goes with its mappers.
+// ENOSPC. A memfd, a shared memory segment or a file that has been unlinked
+// is memory its mappers share, and theirs to answer for: an X client's
+// MIT-SHM image is as much its own as what it mallocs.
 fn (this &TmpFSResource) outlives_mappers() bool {
-	return !this.memfd && this.stat.nlink > 0
+	return !this.nameless && this.stat.nlink > 0
 }
 
 // Give the file discrete, immovable physical pages. Called before it is first
@@ -799,6 +804,7 @@ pub fn create_anonymous(mode u32) &resource.Resource {
 	mut new_resource := &TmpFSResource{
 		storage: unsafe { nil }
 		refcount: 1
+		nameless: true
 	}
 
 	new_resource.can_mmap = true

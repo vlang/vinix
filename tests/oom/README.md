@@ -71,6 +71,10 @@ one panics.
 - Memory the kernel takes on a process' behalf is not charged to it: a
   process that makes a million empty files, or sockets, takes slab memory
   from the reserve, and killing it gives none of that back.
+- On arm64, once less than half of the reserve is left, a syscall that needs
+  an untouched page of its caller's paged in fails with `EFAULT` until the
+  memory of the process killed comes back: it cannot wait there, and the
+  rest of the reserve is the kernel's.
 - A process reading another's memory (`process_vm_readv`) holds that address
   space while it waits; if the other is the one killed, it is waited for the
   full five seconds before another is chosen.
