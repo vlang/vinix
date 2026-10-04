@@ -312,6 +312,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	table.init_container_syscalls()
 	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
 	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
+	userland.initialise_oom()
 	proc.register_cpu_signal_hook(voidptr(userland.cpu_signal_process))
 	proc.register_job_orphan_hook(voidptr(userland.signal_orphaned_job_group))
 	sched.register_user_signal_hook(voidptr(userland.interrupt_return))

@@ -273,6 +273,13 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 	return await_valid(mut events, block, false, 0, 0, []u64{}, false, 0)
 }
 
+// Whether the caller may wait at all. With interrupts off it holds a lock,
+// and a wait would let go of the CPU with the lock still taken, and come back
+// with interrupts on whatever they were.
+pub fn may_wait() bool {
+	return interrupt_state()
+}
+
 // Signal acceptance waits must also wake for their requested blocked signals.
 // Keep the same mask for both the pre-sleep check and wake classification.
 pub fn await_masked(mut events []&eventstruct.Event, block bool, interrupt_mask u64) ?u64 {

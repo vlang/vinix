@@ -161,6 +161,46 @@ pub fn process_memory(_pagemap &memory.Pagemap) ?ProcessMemory {
 	}
 }
 
+// What killing the process whose address space this is would give back, near
+// enough: every resident page of its mappings, each counted as its share,
+// device memory apart. Its copies of the files it runs and the memfds it
+// maps are memory as its anonymous pages are; Linux weighs a process by all
+// of its resident set too. As anonymous_resident_bytes(), this tries the
+// lock for a while and answers 0 for an address space it cannot have: it
+// runs for every process with the process table held.
+pub fn resident_bytes(_pagemap &memory.Pagemap) u64 {
+	mut pagemap := unsafe { _pagemap }
+	if pagemap == unsafe { nil } {
+		return 0
+	}
+	mut acquired := false
+	for _ in 0 .. 100000 {
+		if pagemap.l.test_and_acquire() {
+			acquired = true
+			break
+		}
+	}
+	if !acquired {
+		return 0
+	}
+	defer {
+		pagemap.l.release()
+	}
+	mut bytes := u64(0)
+	for i := 0; i < pagemap.mmap_ranges.len; i++ {
+		range := unsafe { &MmapRangeLocal(pagemap.mmap_ranges[i]) }
+		if unsafe { range == nil } || range.prot == prot_none {
+			continue
+		}
+		if range.global != unsafe { nil }
+			&& range.global.pte_extra & (memory.pte_uncached | memory.pte_device) != 0 {
+			continue
+		}
+		bytes += pagemap.resident_share(range.base, range.base + range.length)
+	}
+	return bytes
+}
+
 // Let go of the files mappings() held.
 pub fn release_mappings(mut list []MappingInfo) {
 	for info in list {

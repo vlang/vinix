@@ -172,6 +172,12 @@ fn (mut this TmpFSResource) materialize_locked(min_capacity u64) bool {
 		new_capacity = lib.align_up(new_capacity, page_size)
 	}
 
+	// The buffer and the page of bookkeeping malloc() keeps in front of it. A
+	// file is refused what programs need to run in (memory/reserve.v), and so
+	// never asks malloc() for what is not there, which stops the kernel.
+	if !memory.file_room(new_capacity / page_size + 1) {
+		return false
+	}
 	new_storage := memory.malloc(new_capacity)
 	if new_storage == unsafe { nil } {
 		return false
@@ -224,7 +230,7 @@ fn (mut this TmpFSResource) reserve_shared_mapping(offset u64, length u64) bool 
 	defer {
 		this.l.release()
 	}
-	if !this.ensure_paged_locked() {
+	if !this.ensure_paged_locked(this.outlives_mappers()) {
 		return false
 	}
 	mut end := offset + length
@@ -238,10 +244,31 @@ fn (mut this TmpFSResource) lazy_shared_mapping() bool {
 	return true
 }
 
+// A page of the file's. One taken for a write is file data, which leaves
+// programs their memory: the write fails with ENOSPC before it takes that.
+// One taken for a shared mapping of a file nothing names is the mapping
+// process' own memory, as an anonymous page would be, and running out is
+// that process' to answer for.
+fn tmpfs_page(file_data bool) voidptr {
+	if file_data {
+		return memory.pmm_alloc_file(1)
+	}
+	return memory.pmm_alloc_user(1)
+}
+
+// Whether a page a shared mapping takes is file data all the same: the file
+// has a name, so the page outlives every process that maps it, and killing
+// one for it would give nothing back. Writing a file through a mapping --
+// a linker does -- then stops where write(2) does, with a fault in place of
+// ENOSPC. A memfd, or a file that has been unlinked, goes with its mappers.
+fn (this &TmpFSResource) outlives_mappers() bool {
+	return !this.memfd && this.stat.nlink > 0
+}
+
 // Give the file discrete, immovable physical pages. Called before it is first
 // shared-mapped. The contiguous buffer, borrowed or owned, is copied across
-// page by page and then let go.
-fn (mut this TmpFSResource) ensure_paged_locked() bool {
+// page by page and then let go. `file_data` is for tmpfs_page().
+fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 	if this.paged {
 		return true
 	}
@@ -250,7 +277,7 @@ fn (mut this TmpFSResource) ensure_paged_locked() bool {
 	mut pages := []u64{cap: int(page_count)} @[freed]
 	size := u64(this.stat.size)
 	for i := u64(0); i < page_count; i++ {
-		phys := memory.pmm_alloc_fallible(1)
+		phys := tmpfs_page(file_data)
 		if phys == unsafe { nil } {
 			for allocated in pages {
 				memory.pmm_free(voidptr(allocated), 1)
@@ -300,11 +327,11 @@ fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 	return true
 }
 
-fn (mut this TmpFSResource) materialize_page_locked(index int) bool {
+fn (mut this TmpFSResource) materialize_page_locked(index int, file_data bool) bool {
 	if this.pages[index] != 0 {
 		return true
 	}
-	phys := memory.pmm_alloc_fallible(1)
+	phys := tmpfs_page(file_data)
 	if phys == unsafe { nil } {
 		return false
 	}
@@ -353,16 +380,23 @@ fn (mut this TmpFSResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		if offset >= u64(this.stat.size) {
 			return unsafe { nil }
 		}
-		if !this.ensure_paged_locked() {
+		file_data := this.outlives_mappers()
+		if !this.ensure_paged_locked(file_data) {
 			return unsafe { nil }
 		}
-		if !this.grow_pages_locked(page + 1) || !this.materialize_page_locked(int(page)) {
+		if !this.grow_pages_locked(page + 1)
+			|| !this.materialize_page_locked(int(page), file_data) {
 			return unsafe { nil }
 		}
 		return voidptr(this.pages[int(page)])
 	}
 
-	copy_page := memory.pmm_alloc(1)
+	// The process' own copy. With none to be had the fault fails, and a
+	// process is killed for the memory: this used to stop the kernel.
+	copy_page := memory.pmm_alloc_user(1)
+	if copy_page == unsafe { nil } {
+		return unsafe { nil }
+	}
 	file_size := u64(this.stat.size)
 	if offset < file_size {
 		copy_size := if page_size < file_size - offset { page_size } else { file_size - offset }
@@ -481,7 +515,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 		errno.set(errno.eperm)
 		return none
 	}
-	if !this.paged && write_end > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+	if !this.paged && write_end > tmpfs_contiguous_limit && !this.ensure_paged_locked(true) {
 		errno.set(errno.enospc)
 		return none
 	}
@@ -497,7 +531,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 			return none
 		}
 		for index := int(write_at / page_size); index <= int((write_end - 1) / page_size); index++ {
-			if !this.materialize_page_locked(index) {
+			if !this.materialize_page_locked(index, true) {
 				errno.set(errno.enospc)
 				return none
 			}
@@ -506,6 +540,7 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 	} else {
 		if !this.storage_owned || write_end > this.capacity {
 			if !this.materialize_locked(write_end) {
+				errno.set(errno.enospc)
 				return none
 			}
 		}
@@ -536,8 +571,10 @@ fn (mut this TmpFSResource) filesystem_stat() resource.FileSystemStat {
 		@type: 0x01021994
 		bsize: page_size
 		blocks: memory.total_bytes() / page_size
-		bfree: memory.free_bytes() / page_size
-		bavail: memory.free_bytes() / page_size
+		// What a file can still take: free memory less what is kept for
+		// programs to run in.
+		bfree: memory.file_room_bytes() / page_size
+		bavail: memory.file_room_bytes() / page_size
 		files: u64(-1)
 		ffree: u64(-1)
 		namelen: 255
@@ -615,7 +652,7 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		return
 	}
 
-	if !this.paged && new_size > tmpfs_contiguous_limit && !this.ensure_paged_locked() {
+	if !this.paged && new_size > tmpfs_contiguous_limit && !this.ensure_paged_locked(true) {
 		errno.set(errno.enospc)
 		return none
 	}
@@ -627,6 +664,7 @@ fn (mut this TmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		}
 	} else {
 		if !this.materialize_locked(new_size) {
+			errno.set(errno.enospc)
 			return none
 		}
 		// Anything past the old end of the file has to read back as zero, whether

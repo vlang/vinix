@@ -477,27 +477,45 @@ fn interleave_next(mut process proc.Process, mask u64) int {
 
 // A page for the current thread's address space, honouring its memory policy.
 // Returns nil on exhaustion, like the fallible PMM entry points it wraps: the
-// caller is serving a userspace fault and can report ENOMEM.
+// caller is serving a userspace fault and can report ENOMEM. The memory the
+// kernel keeps for itself is exhaustion too (memory/reserve.v); what a caller
+// does about it is memory.recover_from_exhaustion().
 pub fn alloc_user_page() voidptr {
 	if !numa_multinode {
-		return memory.pmm_alloc_fallible(1)
+		return memory.pmm_alloc_user(1)
 	}
 	node, strict := preferred_node()
 	if node < 0 {
-		return memory.pmm_alloc_fallible(1)
+		return memory.pmm_alloc_user(1)
 	}
-	return memory.pmm_alloc_on_node(1, node, strict)
+	if !memory.user_room(1) {
+		return unsafe { nil }
+	}
+	return note_node_exhaustion(memory.pmm_alloc_on_node(1, node, strict), strict)
 }
 
 pub fn alloc_user_page_nozero() voidptr {
 	if !numa_multinode {
-		return memory.pmm_alloc_nozero_fallible(1)
+		return memory.pmm_alloc_user_nozero(1)
 	}
 	node, strict := preferred_node()
 	if node < 0 {
-		return memory.pmm_alloc_nozero_fallible(1)
+		return memory.pmm_alloc_user_nozero(1)
 	}
-	return memory.pmm_alloc_nozero_on_node(1, node, strict)
+	if !memory.user_room(1) {
+		return unsafe { nil }
+	}
+	return note_node_exhaustion(memory.pmm_alloc_nozero_on_node(1, node, strict), strict)
+}
+
+// A node that is full under a strict policy is the policy's doing, with
+// memory free elsewhere: killing a process for it would free nothing the
+// caller may use. Any other failure is the machine out of memory.
+fn note_node_exhaustion(page voidptr, strict bool) voidptr {
+	if page == unsafe { nil } && !strict {
+		memory.note_exhaustion()
+	}
+	return page
 }
 
 // ── Syscalls ────────────────────────────────────────────────────────────────
