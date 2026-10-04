@@ -381,6 +381,9 @@ bounds the guest's initial window check. Its state directory is private
 `--interactive` requires `--observe --mode desktop` and retains the normal
 native runtime preflights and X11 window check. Its guest does not open a
 second console shell, so the desktop keeps receiving keyboard input.
+The desktop's Terminal icon is available for explicit local diagnostics.
+The minimal test image includes zsh and its modules from the staged userland;
+a supplied `--initramfs` keeps its existing shell.
 
 This mode does not send keys, load the calculator text observer, capture any
 screenshots, or copy application diagnostic logs to the host, including on

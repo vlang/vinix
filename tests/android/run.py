@@ -276,10 +276,19 @@ def prepare(args: argparse.Namespace) -> Path | None:
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(overlay / "usr/bin/vinix-wine-host")], check=True)
     shutil.copy2(args.desktop, overlay / "usr/bin/vinix-desktop")
-    app = overlay / "usr/bin" / ("vinix-roblox" if args.launcher == "roblox" else "vinix-android-calculator")
-    if app.exists() or app.is_symlink():
-        app.unlink()
-    app.symlink_to("vinix-desktop")
+    for app_name in ("vinix-roblox" if args.launcher == "roblox" else "vinix-android-calculator",
+                     "vinix-terminal"):
+        app = overlay / "usr/bin" / app_name
+        if app.exists() or app.is_symlink():
+            app.unlink()
+        app.symlink_to("vinix-desktop")
+    if args.initramfs is None:
+        shutil.copy2(args.repo / "build-aarch64-userland/staging/bin/zsh", overlay / "usr/bin/zsh")
+        copy_layer(args.repo / "build-aarch64-userland/staging/usr/lib/zsh", overlay / "usr/lib/zsh")
+        shell = overlay / "bin/zsh"
+        if shell.exists() or shell.is_symlink():
+            shell.unlink()
+        shell.symlink_to("../usr/bin/zsh")
     icons = overlay / "usr/share/vinix/icons"
     icons.mkdir(parents=True, exist_ok=True)
     for icon in (args.repo / "desktop/assets").glob("*.qoi"):
