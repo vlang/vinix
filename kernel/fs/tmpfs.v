@@ -97,7 +97,18 @@ fn (mut this TmpFSResource) release_mapping_range(_handle voidptr, _offset u64, 
 // the allocator panics rather than fail: runc copies its ~10 MiB binary into a
 // memfd for every container it starts, and that brought the kernel down after
 // a handful of containers.
-const tmpfs_contiguous_limit = u64(1) << 20
+//
+// The limit is the largest object the heap keeps in a slab. A buffer past
+// that is whole pages with a page of bookkeeping in front, and doubling made
+// it a power of two besides: a file of 100 bytes took two pages, 32 KiB of
+// them on a machine with 16 KiB pages, and one of 70 KiB took 132 KiB. On a
+// system that runs from memory that is what a package costs to install.
+// Pages hold a file of any size to within a page, and a slab object one of a
+// few hundred bytes to within its size class.
+const tmpfs_contiguous_limit = u64(2048)
+
+// The smallest buffer a file is given.
+const tmpfs_smallest_buffer = u64(64)
 
 const f_seal_seal = u32(0x1)
 const f_seal_shrink = u32(0x2)
@@ -145,37 +156,31 @@ fn (mut this TmpFSResource) sync_mapping(_handle voidptr, _offset u64, _length u
 
 fn (mut this TmpFSResource) advise(_handle voidptr, _offset u64, _length u64, _advice int) ? {}
 
-// materialize_locked gives a borrowed (or as-yet empty) file writable tmpfs
-// storage.  The caller holds this.l.  Keep the minimum allocation at one page:
-// tmpfs.mmap returns physical pages and therefore needs a page-aligned big
-// allocation rather than a small slab object.
+// materialize_locked gives a borrowed (or as-yet empty) file a writable buffer
+// of its own with room for `min_capacity` bytes, which with the file's own
+// size is no more than tmpfs_contiguous_limit: the caller keeps anything
+// larger in pages. The caller holds this.l.
 fn (mut this TmpFSResource) materialize_locked(min_capacity u64) bool {
 	if this.storage_owned && min_capacity <= this.capacity {
 		return true
 	}
 
-	mut new_capacity := if this.storage_owned { this.capacity } else { u64(this.stat.size) }
-	if new_capacity < page_size {
-		new_capacity = page_size
-	}
-	for min_capacity > new_capacity {
-		if new_capacity > u64(-1) / 2 {
-			new_capacity = min_capacity
-			break
-		}
+	// Room for what the file holds as well as for what is asked. A borrowed
+	// file's capacity is that of the image it points into, not a buffer's.
+	held := u64(this.stat.size)
+	wanted := if min_capacity > held { min_capacity } else { held }
+	mut new_capacity := tmpfs_smallest_buffer
+	for new_capacity < wanted && new_capacity < tmpfs_contiguous_limit {
 		new_capacity *= 2
 	}
-	// malloc's large allocations occupy complete physical pages. Record that
-	// usable tail as capacity too, so mapping the last partial file page does
-	// not trigger a needless second allocation (and exponential growth).
-	if new_capacity <= u64(-1) - (page_size - 1) {
-		new_capacity = lib.align_up(new_capacity, page_size)
+	if new_capacity < wanted {
+		return false
 	}
 
-	// The buffer and the page of bookkeeping malloc() keeps in front of it. A
-	// file is refused what programs need to run in (memory/reserve.v), and so
-	// never asks malloc() for what is not there, which stops the kernel.
-	if !memory.file_room(new_capacity / page_size + 1) {
+	// At most one new page for the slab. A file is refused what programs
+	// need to run in (memory/reserve.v), and so never asks malloc() for what
+	// is not there, which stops the kernel.
+	if !memory.file_room(1) {
 		return false
 	}
 	new_storage := memory.malloc(new_capacity)
@@ -515,7 +520,10 @@ fn (mut this TmpFSResource) write_locked(_handle voidptr, buf voidptr, loc u64, 
 		errno.set(errno.eperm)
 		return none
 	}
-	if !this.paged && write_end > tmpfs_contiguous_limit && !this.ensure_paged_locked(true) {
+	// By what the file holds as well as by where the write ends: a small write
+	// into a large file borrowed from the image copies it into pages too.
+	if !this.paged && (write_end > tmpfs_contiguous_limit
+		|| u64(this.stat.size) > tmpfs_contiguous_limit) && !this.ensure_paged_locked(true) {
 		errno.set(errno.enospc)
 		return none
 	}
