@@ -181,3 +181,32 @@ archives. A normal fixture APK verifies metadata, copied split paths, a split
 asset and a real ARM64 JNI library on Vinix. Login and gameplay remain unverified.
 Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
 `tests/roblox/build-test.py`.
+
+## The Windows client and Wine
+
+The Windows Player does not run on Vinix through [Wine](wine.md), and the
+APK above is the client to use. `tests/roblox-windows/run.py` fetches the
+current Windows deployment, starts it under Wine and shows where it stops.
+
+`RobloxPlayerBeta.exe` imports a single library, `RobloxPlayerBeta.dll`:
+Hyperion, Roblox's anti-tamper layer, which unpacks the rest of the client.
+Wine loads both and the system libraries they name. Hyperion then makes
+Windows system calls itself, with the `syscall` instruction, instead of
+calling ntdll. On ARM64 Vinix the client is translated by qemu-user, which
+turns every `syscall` of the program it translates into the Linux system
+call of that number. Hyperion's numbers are not Linux system calls: a run
+reports ones such as `-1815183216` and `1609580753`, whose high bits change
+from run to run. Each returns `ENOSYS`, the first is followed by an access
+violation at address `0xFFFFFFFFFFFFFFDA`, which is that error, and the
+client faults again inside each of its exception handlers until its stack
+overflows. No window is created. Wine never sees these calls: the Linux
+facilities for catching a program's own `syscall` instructions, seccomp
+filters and Syscall User Dispatch, are not offered to a translated program
+by qemu-user, and the staged Wine 9.17 shows no handler for them either.
+
+That is not the last obstacle, which is why Vinix stops there. Roblox has
+refused the Player under Wine since March 2024, and
+[Vinegar](https://github.com/vinegarhq/vinegar), the Linux bootstrapper for
+the Windows builds, has run only Roblox Studio since then. A Vinix that
+emulated those system calls would arrive at a check written to turn Wine
+away, and getting past an anti-cheat check is not something Vinix does.
