@@ -29,6 +29,17 @@ The client's device-attribute query now resolves
 `LocationManager.isProviderEnabled(String)`: ATL reports no enabled providers,
 returns false for non-null names and rejects null as Android 26 requires. This
 supplies availability metadata without creating GPS support or a location fix.
+The ARM64 signal return path now resumes a transiently unaligned interrupted
+stack pointer while retaining signal-frame validation. A measured native crash
+after welcome-screen startup was in ATL's framebuffer wrapper: a presentation
+timeout left its current buffer null. ATL now retains the current framebuffer
+on timeout, reports a thread-local EGL allocation error and associates each
+queued GTK callback with its submitted buffer. The normal SurfaceView/JNI
+fixture exercises buffer starvation, retained pixels, resumed presentation and
+surface destruction with pending callbacks through the production runtime.
+The rebuilt runtime passes that fixture on Vinix. The signed client keeps its
+welcome and sign-in screens drawing through a three-minute desktop observation,
+including maximizing, typing, clearing and returning to the welcome screen.
 Authentication and gameplay remain unverified.
 
 Build the coherent native Android runtime described in [Android APKs](android.md),

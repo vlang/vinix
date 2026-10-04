@@ -388,6 +388,45 @@ reentrant release/reacquire, focus loss, cursor restoration and subsequent
 normal clicks. It exercises a relative XTest device; absolute-device recentering
 and real gameplay require separate checks in Vinix.
 
+## Production EGL buffer queue regression
+
+`AndroidEglQueueProbe.java` and `android-egl-queue-probe.c` form an ordinary APK
+with a public `SurfaceView` and a JNI render worker. The worker uses production
+`ANativeWindow`, EGL and GLES entrypoints. A finite main-thread pause delays GTK
+consumption, exhausts the three-buffer queue and requires a bounded failed swap
+with `EGL_BAD_ALLOC`. The fixture checks that the actual framebuffer binding and
+existing green pixel survive both the failed swap and a default-framebuffer bind.
+The UI thread checks its independent EGL error state before the worker consumes
+and clears its error. Resuming GTK must recycle buffers for 32 further swaps;
+normal window/EGL cleanup also runs with submitted callbacks still pending.
+
+Build against the selected runtime's coherent framework classes and resources
+on native ARM64 Alpine Linux:
+
+```sh
+python3 tests/android/egl-queue-test.py \
+    --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
+    --framework-res /path/to/atl/res/framework-res/framework-res.apk \
+    --core-classes /usr/lib/java/core-all_classes.jar \
+    --r8 /path/to/r8-8.3.37.jar --jni-include /path/to/java8/include \
+    --output /tmp/egl-queue-fixture
+```
+
+The small ARM64 JNI library imports public platform APIs without host-library
+`DT_NEEDED` entries. The builder checks its ELF architecture and 16 KiB load
+alignment, pins the DEX compiler inputs, restricts packaged classes to the test
+app, and records exact source, runtime-input and APK hashes.
+
+Pass `--egl-queue-probe /tmp/egl-queue-fixture/android-egl-queue-probe.apk` to
+`tests/android/run.py` alongside the normal native preflights. The guest uses a
+private X display `:92` after the common preflights, records the numeric child
+exit in `ANDROID-EGL-QUEUE-CHILD`, and accepts the probe only after the child
+exits zero and emits an anchored `ANDROID-EGL-QUEUE-PASS` line. The host requires
+the resulting `ANDROID-EGL-QUEUE-VERIFIED` line and records fixture identity,
+status and `egl_queue_probe_exit_status`. Run the same APK on the old and new
+runtime for a decisive control;
+the new-runtime fixture passing does not by itself establish Roblox gameplay.
+
 ## Interactive Roblox session
 
 After staging the native Android runtime and Roblox launcher, keep the real

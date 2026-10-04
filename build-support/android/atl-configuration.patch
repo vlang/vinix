@@ -2635,3 +2635,71 @@ diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/andro
 +		return false;
 +	}
 +
+--- a/src/libandroid/egl.c
++++ b/src/libandroid/egl.c
+@@ -21,0 +22,11 @@
++
++/* The synthetic window surfaces have errors of their own, on the caller's thread. */
++static _Thread_local EGLint atl_egl_error = EGL_SUCCESS;
++
++EGLint bionic_eglGetError(void)
++{
++	EGLint native_error = eglGetError();
++	EGLint error = atl_egl_error;
++	atl_egl_error = EGL_SUCCESS;
++	return error != EGL_SUCCESS ? error : native_error;
++}
+@@ -88,0 +100,2 @@
++	if (__unlikely__(!strcmp(procname, "eglGetError")))
++		return (void (*)(void))bionic_eglGetError;
+@@ -211 +223,0 @@
+-	struct atl_surface_buffer *front_buffer;
+@@ -423 +435,3 @@
+-	ATLSurface *atl_surface = data;
++	/* Each idle callback owns the buffer submitted by that particular swap. */
++	struct atl_surface_buffer *buffer = data;
++	ATLSurface *atl_surface = buffer->surface;
+@@ -428 +441,0 @@
+-	struct atl_surface_buffer *buffer = atl_surface->front_buffer;
+@@ -465,0 +479,5 @@
++	if (!atl_surface->back_buffer || atl_surface->destroyed) {
++		atl_egl_error = EGL_BAD_SURFACE;
++		return EGL_FALSE;
++	}
++
+@@ -467,11 +485,15 @@
+-	if (atl_surface->back_buffer) {
+-		g_async_queue_timeout_pop(atl_surface->vsync, 50000); // 50ms
+-		atl_surface->front_buffer = atl_surface->back_buffer;
+-		atl_surface->back_buffer = NULL;
+-		g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, queue_texture, g_object_ref(atl_surface), NULL);
+-	}
+-	atl_surface->back_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
+-	if (atl_surface->back_buffer)
+-		glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer->gl_framebuffer);
+-	else
+-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
++	g_async_queue_timeout_pop(atl_surface->vsync, 50000); // 50ms
++	/* Reserve the next drawable before handing the current one to GTK. A slow
++	 * consumer must not leave a successful, current surface without a buffer. */
++	struct atl_surface_buffer *next_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
++	if (!next_buffer) {
++		atl_egl_error = EGL_BAD_ALLOC;
++		return EGL_FALSE;
++	}
++	struct atl_surface_buffer *submitted_buffer = atl_surface->back_buffer;
++	atl_surface->back_buffer = next_buffer;
++	glBindFramebuffer(GL_FRAMEBUFFER, next_buffer->gl_framebuffer);
++	/* This reference transfers from the idle callback to its texture's
++	 * destroy notification, or is dropped there if the surface was destroyed. */
++	g_object_ref(atl_surface);
++	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, queue_texture, submitted_buffer, NULL);
+@@ -517,0 +540,4 @@
++	/* Preserve the actual binding if an invalid synthetic surface has no
++	 * drawable; framebuffer zero is not a drawable in the surfaceless context. */
++	if (atl_surface && !atl_surface->back_buffer)
++		return;
+--- a/src/libandroid/native_window.h
++++ b/src/libandroid/native_window.h
+@@ -25,0 +26 @@
++EGLint bionic_eglGetError(void);

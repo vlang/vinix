@@ -396,6 +396,34 @@ if [ -n "${TEST_EGL_PROBE:-}" ]; then
     echo ANDROID-EGL-VERIFIED
 fi
 
+if [ -n "${TEST_EGL_QUEUE_PROBE:-}" ]; then
+    echo ANDROID-EGL-QUEUE-START
+    rm -f /tmp/android-egl-queue-status
+    mkfifo /tmp/android-egl-queue-events
+    (while :; do sleep 30; done) >/tmp/android-egl-queue-events &
+    egl_queue_input_pid=$!
+    /usr/bin/vinix-wine-host :92 /tmp/android-egl-queue-probe 128x128x24 \
+        /opt/android-test/egl-queue-launch --fill \
+        </tmp/android-egl-queue-events >/tmp/android-egl-queue-probe.log 2>&1 || {
+        kill "$egl_queue_input_pid" 2>/dev/null || true
+        wait "$egl_queue_input_pid" 2>/dev/null || true
+        rm -f /tmp/android-egl-queue-events
+        cat /tmp/android-egl-queue-probe.log
+        fail "native EGL buffer queue probe failed"
+    }
+    kill "$egl_queue_input_pid" 2>/dev/null || true
+    wait "$egl_queue_input_pid" 2>/dev/null || true
+    rm -f /tmp/android-egl-queue-events
+    cat /tmp/android-egl-queue-probe.log
+    egl_queue_status=$(cat /tmp/android-egl-queue-status 2>/dev/null)
+    echo "ANDROID-EGL-QUEUE-CHILD status=${egl_queue_status:-missing}"
+    [ "$egl_queue_status" = 0 ] \
+        || fail "native EGL buffer queue probe did not exit successfully"
+    grep -q '^ANDROID-EGL-QUEUE-PASS ' /tmp/android-egl-queue-probe.log \
+        || fail "native EGL buffer queue probe did not report its assertions passing"
+    echo ANDROID-EGL-QUEUE-VERIFIED
+fi
+
 if [ "$TEST_MODE" = direct ]; then
     mkfifo /tmp/android-events
     # Keep the bridge input pipe alive without sending invented events.
