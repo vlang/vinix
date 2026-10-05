@@ -12,7 +12,8 @@ module speakers
 // channels, I2C buses, pins and power domains. On J313 only, an older boot
 // tree may omit the shared amplifier shutdown GPIO; the published J313 board
 // wiring supplies that one pin after the other codec details are checked.
-// The register work and protection model are in c/apple_speakers.c.
+// The register work and protection model are in speakers/spkcore/core.v.
+import apple.speakers.spkcore as _
 import aarch64.kio
 import aarch64.pmgr
 import apple.dart
@@ -75,25 +76,25 @@ mut:
 	dma_errors     u64
 }
 
-fn C.vinix_apple_speakers_init(cfg &C.vinix_apple_speakers_config) int
-fn C.vinix_apple_speakers_configure(rate u32) int
-fn C.vinix_apple_speakers_start_clocks() int
-fn C.vinix_apple_speakers_start_stream() int
+fn C.vinix_apple_speakers_init(cfg &C.vinix_apple_speakers_config) i32
+fn C.vinix_apple_speakers_configure(rate u32) i32
+fn C.vinix_apple_speakers_start_clocks() i32
+fn C.vinix_apple_speakers_start_stream() i32
 fn C.vinix_apple_speakers_stop()
-fn C.vinix_apple_speakers_wants_start() int
+fn C.vinix_apple_speakers_wants_start() i32
 fn C.vinix_apple_speakers_service() u32
 fn C.vinix_apple_speakers_reserve(length &u32) &u8
 fn C.vinix_apple_speakers_commit(bytes u32)
 fn C.vinix_apple_speakers_room() u32
 fn C.vinix_apple_speakers_drain()
-fn C.vinix_apple_speakers_drained() int
+fn C.vinix_apple_speakers_drained() i32
 fn C.vinix_apple_speakers_set_volume(percent u32)
-fn C.vinix_apple_speakers_running() int
-fn C.vinix_apple_speakers_active() int
-fn C.vinix_apple_speakers_faulted() int
+fn C.vinix_apple_speakers_running() i32
+fn C.vinix_apple_speakers_active() i32
+fn C.vinix_apple_speakers_faulted() i32
 fn C.vinix_apple_speakers_fail()
 fn C.vinix_apple_speakers_get_status(out &C.vinix_apple_speakers_status)
-fn C.vinix_apple_speakers_take_event(out &i32) int
+fn C.vinix_apple_speakers_take_event(out &i32) i32
 fn C.vinix_apple_speakers_debug(out &u64)
 
 // macaudio's frontends: playback on the secondary (BCLK = 256 fs, room for
@@ -923,7 +924,7 @@ fn start_locked() {
 	}
 }
 
-// The C driver switches an MCA cluster's power domain through this, under the
+// The driver core switches an MCA cluster's power domain through this, under the
 // stream lock, at the point in its start or stop sequence where the cluster's
 // clock runs.
 fn cluster_power(cluster u32, on i32) i32 {

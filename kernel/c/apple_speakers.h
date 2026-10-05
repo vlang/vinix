@@ -75,7 +75,12 @@ struct vinix_apple_speakers_status {
 
 /* 1 on success. Resets and configures both amplifiers, leaves them shut down
  * and muted, and sets up the DMA channels. Nothing plays until start. */
-int vinix_apple_speakers_init(const struct vinix_apple_speakers_config *cfg);
+#ifdef VINIX_V_RUNTIME
+#define VINIX_SPK_CONST
+#else
+#define VINIX_SPK_CONST const
+#endif
+int vinix_apple_speakers_init(VINIX_SPK_CONST struct vinix_apple_speakers_config *cfg);
 
 /* Prepare for a stream at `rate` Hz, S16_LE stereo. 0 if unsupported. */
 int vinix_apple_speakers_configure(uint32_t rate);
@@ -125,4 +130,5 @@ void vinix_apple_speakers_debug(uint64_t out[VINIX_SPK_DEBUG_WORDS]);
  * 11 cluster power domain did not switch (cluster, on). */
 int vinix_apple_speakers_take_event(int32_t out[3]);
 
+#undef VINIX_SPK_CONST
 #endif

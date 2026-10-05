@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
  * Host tests for the J313 speaker driver. They compile the production
- * kernel/c/apple_speakers.c against a simulated machine: two TAS5770L
+ * kernel/apple/speakers/spkcore/core.v against a simulated machine: two TAS5770L
  * amplifiers behind P.A. Semi I2C FIFOs, ADMAC descriptor and report rings
  * that move real samples in simulated time, and V/I sense derived from what
  * the amplifiers are actually playing. The protection model is checked
@@ -14,7 +14,7 @@
 #include <string.h>
 
 #define VINIX_APPLE_SPEAKERS_TEST
-#include "../../kernel/c/apple_speakers.c"
+#include "core_fixture.h"
 
 #define FAKE_MCA    0x10000000ull
 #define FAKE_SWITCH 0x11000000ull

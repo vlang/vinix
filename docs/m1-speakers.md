@@ -32,7 +32,7 @@ the speakers off.
 
 - `kernel/apple/speakers/speakers.v`: device tree discovery, power, pins, the
   DART, `/dev/dsp`, and the service thread.
-- `kernel/c/apple_speakers.c`: the register work, the playback and sense
+- `kernel/apple/speakers/spkcore/core.v`: the register work, the playback and sense
   rings, and the protection model.
 
 ## Speaker protection
