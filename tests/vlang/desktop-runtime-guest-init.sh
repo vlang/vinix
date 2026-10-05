@@ -1,6 +1,6 @@
 #!/bin/sh
 # Exercise a supervisor reload with a preinstalled /root/vinix-desktop.
-# Intended for run-desktop-aarch64.sh --guest-init diagnostics.
+# Intended for scripts/run-desktop-aarch64.sh --guest-init diagnostics.
 set -eu
 
 export HOME=/root

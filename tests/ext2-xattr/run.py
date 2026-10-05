@@ -129,7 +129,7 @@ def main():
         seed_access_acl(debugfs, disk, "/acl-inconsistent", value)
         subprocess.run([str(debugfs), "-w", "-R", "set_inode_field /acl-inconsistent mode 0100600", str(disk)], check=True)
     if args.arch == "aarch64":
-        command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial", "--mem=1024", f"--guest-init={state / 'init'}"]
+        command = [str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--mem=1024", f"--guest-init={state / 'init'}"]
         marker = "/xattr-marker"
     else:
         archive = state / "initramfs.tar"

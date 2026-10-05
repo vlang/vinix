@@ -36,7 +36,7 @@ From an isolated worktree with the normal dependencies available:
 make -C kernel ARCH=aarch64 CC=clang V=/Users/alex/code/v/v LIMINE_MP=1 STACK_GUARD_TEST=1 -j4
 python3 tests/kernel-stack-guards/run.py --arch aarch64 --repo /Users/alex/code/vinix --kernel kernel
 
-STACK_GUARD_TEST=1 NPROC=4 V=/Users/alex/code/v/v ./build-amd64.sh --no-userland --no-iso
+STACK_GUARD_TEST=1 NPROC=4 V=/Users/alex/code/v/v ./scripts/build-amd64.sh --no-userland --no-iso
 python3 tests/kernel-stack-guards/run.py --arch amd64 --repo /Users/alex/code/vinix --kernel build-amd64-kernel/bin/vinix
 ```
 

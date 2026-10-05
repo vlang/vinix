@@ -91,7 +91,7 @@ if [ -n "${DISPLAY:-}" ]; then
 fi
 
 if [ ! -x /usr/bin/Xorg ] || [ ! -x /usr/bin/startx ]; then
-    echo "run-firefox: Xorg is required; stage it with build-x11-aarch64.sh" >&2
+    echo "run-firefox: Xorg is required; stage it with scripts/build-x11-aarch64.sh" >&2
     exit 1
 fi
 

@@ -9,7 +9,7 @@ export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 echo "VINIX GTK PACKAGE TEST"
 
 if [ ! -x /usr/bin/Xorg ]; then
-	echo "GTK test needs the Vinix Xorg build (run build-x11-aarch64.sh first)" >&2
+	echo "GTK test needs the Vinix Xorg build (run scripts/build-x11-aarch64.sh first)" >&2
 	exit 1
 fi
 

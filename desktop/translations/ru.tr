@@ -1334,7 +1334,7 @@ surface.blender.exited
 Blender завершил работу.
 -----
 surface.blender.not_staged
-Нативный Blender не подготовлен. Запустите build-blender-native-aarch64.sh.
+Нативный Blender не подготовлен. Запустите scripts/build-blender-native-aarch64.sh.
 -----
 surface.blender.starting
 Запуск нативного Blender…
@@ -1673,7 +1673,7 @@ wine.doom.exited
 DOOM завершил работу.
 -----
 wine.doom.missing
-DOOM не установлен. Запустите build-doom-aarch64.sh.
+DOOM не установлен. Запустите scripts/build-doom-aarch64.sh.
 -----
 wine.doom.starting
 Запуск DOOM…
@@ -1706,7 +1706,7 @@ wine.gothic.exited
 Gothic II завершил работу.
 -----
 wine.gothic.missing
-Gothic II не установлен. Запустите build-opengothic-aarch64.sh.
+Gothic II не установлен. Запустите scripts/build-opengothic-aarch64.sh.
 -----
 wine.gothic.starting
 Запуск Gothic II…

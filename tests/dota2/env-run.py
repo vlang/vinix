@@ -218,7 +218,7 @@ def main() -> None:
         environment.pop(inherited, None)
     if sys.platform != "darwin":
         environment.setdefault("USE_TCG", "1")
-    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=2048"]
+    command = [str(REPO / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=2048"]
     report = {"test_source_sha256": digest(HERE / "env-test.c"),
         "native_source_sha256": digest(HERE / "env-native-wait.c"),
         "test_ELF_sha256": binary_pins["old"]["sha256"], "test_build_commands": build_commands,

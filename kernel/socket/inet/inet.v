@@ -341,7 +341,7 @@ fn is_cmdline_space(c u8) bool {
 // list after DHCP's. QEMU's user network answers DNS at 10.0.2.3 by asking
 // only the first resolver the host has; when that one does not answer -- one
 // set by hand for another network -- the guest resolved nothing while the
-// host, which asks the others too, worked. run-aarch64.sh passes the others.
+// host, which asks the others too, worked. scripts/run-aarch64.sh passes the others.
 fn read_extra_nameservers() {
 	kernel_file := limine.kernel_file()
 	if kernel_file == unsafe { nil } || kernel_file.cmdline == unsafe { nil } {

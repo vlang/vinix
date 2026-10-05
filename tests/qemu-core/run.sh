@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-# `run.sh amd64` runs the same test on the amd64 kernel build-amd64.sh made:
+# `run.sh amd64` runs the same test on the amd64 kernel scripts/build-amd64.sh made:
 # built for x86-64, installed as /sbin/init in a throwaway ISO, and booted once
 # under TCG, there being no persistent volume for a second boot to check.
 if [ "${1:-}" = amd64 ]; then
@@ -39,7 +39,7 @@ for input in \
 	"$sysroot/lib/libgcc.a"; do
 	if [ ! -e "$input" ]; then
 		echo "ERROR: AArch64 test sysroot input is missing: $input" >&2
-		echo "       Run ./build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
+		echo "       Run ./scripts/build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
 		exit 1
 	fi
 done

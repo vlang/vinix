@@ -10,13 +10,13 @@ See [build, validation and hardware bring-up instructions](../tests/m1-wifi/READ
 
 Hardware probing remains opt-in with `vinix.apple_wifi=1`; firmware is not
 included. The normal `desktop` and `desktop-drivers` deployments now supply
-that argument, and `kek.sh desktop-wifi` names the Wi-Fi-only choice explicitly.
-Direct deployments can pass `deploy-m1-efi.sh --apple-wifi`. A boot without one
+that argument, and `scripts/kek.sh desktop-wifi` names the Wi-Fi-only choice explicitly.
+Direct deployments can pass `scripts/deploy-m1-efi.sh --apple-wifi`. A boot without one
 of those choices intentionally has no `/dev/wlan0`.
 
 The desktop initramfs includes the target `wifi-ctl` utility. To make a locally
 packaged, matching bundle available at boot, build with
-`VINIX_WIFI_BUNDLE=/path/to/wifi-bundle ./build-desktop-aarch64.sh` or pass
+`VINIX_WIFI_BUNDLE=/path/to/wifi-bundle ./scripts/build-desktop-aarch64.sh` or pass
 `--wifi-bundle=/path/to/wifi-bundle`. The build requires all five package files,
 and init runs `wifi-ctl load /usr/share/vinix/wifi` before starting the desktop.
 The loader rechecks the bundle manifest against the detected chip and refuses a

@@ -41,17 +41,17 @@ inherit.
 Build the desktop image and the AArch64 kernel as usual:
 
 ```sh
-./build-desktop-aarch64.sh
+./scripts/build-desktop-aarch64.sh
 make -C kernel ARCH=aarch64 CC=clang
 ```
 
 Deploy with the external-display handoff flag:
 
 ```sh
-./deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
+./scripts/deploy-m1-efi.sh --apple-studio-display --desktop-initramfs /Volumes/EFI
 ```
 
-On the development M1 configured by `kek.sh`, the shorthand is:
+On the development M1 configured by `scripts/kek.sh`, the shorthand is:
 
 ```sh
 sudo ~/code/kek.sh studio
@@ -122,6 +122,6 @@ negotiation.
   stack; the existing internal-panel DCP experiment is not a substitute.
 
 For a failed hardware boot, first use the normal `diag`/`halt` modes described
-by `kek.sh` to confirm the kernel is entered. If the internal panel shows the
+by `scripts/kek.sh` to confirm the kernel is entered. If the internal panel shows the
 `external handoff` line again after automatic recovery, firmware exposed only
 that panel; make the Studio Display the active boot output before retrying.

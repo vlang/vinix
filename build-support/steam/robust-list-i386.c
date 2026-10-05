@@ -4,7 +4,7 @@
  * as an unusable pthread implementation and crashes during UI startup.
  *
  * This is the i386 glibc 2.36 thread layout shipped in the Debian Bookworm
- * runtime that build-steam-aarch64.sh stages. QEMU's set_robust_list trace
+ * runtime that scripts/build-steam-aarch64.sh stages. QEMU's set_robust_list trace
  * confirms that glibc registers pthread_self() + 0x6c with a 12-byte head.
  * Keep this preload confined to translated i386 programs; native programs and
  * the 64-bit Steam helper have different thread layouts. */

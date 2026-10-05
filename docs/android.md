@@ -68,11 +68,11 @@ Python 3, curl and `aarch64-linux-musl-gcc`:
 ```sh
 python3 build-support/android/art-bootclasspath.py \
   --build-dir build-aarch64-android/aarch64/java-build --art-runtime /path/to/art-runtime
-./build-android-aarch64.sh --art-runtime /path/to/art-runtime \
+./scripts/build-android-aarch64.sh --art-runtime /path/to/art-runtime \
   --bionic-runtime /path/to/bionic-runtime --atl-runtime /path/to/atl-runtime \
   --with-calculator
-./build-desktop-aarch64.sh --compact-initramfs --with-android
-./run-desktop-aarch64.sh --no-build --mem=12288
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-android
+./scripts/run-desktop-aarch64.sh --no-build --mem=12288
 ```
 
 The default ART overlay location is

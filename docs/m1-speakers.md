@@ -83,7 +83,7 @@ If that line never appears, the speakers keep working 20 dB down, and the
 lines around it say why. A line ending in `speakers off` means the device
 tree or the hardware was not as expected. Every path through the driver
 prints at least one `apple-speakers:` line, so a boot with none at all ran a
-kernel built without the driver; `deploy-m1-efi.sh --sound-initramfs` and
+kernel built without the driver; `scripts/deploy-m1-efi.sh --sound-initramfs` and
 `--apple-speakers` refuse to install such a kernel.
 
 To turn the driver off, boot with `vinix.apple_speakers=0` on the kernel

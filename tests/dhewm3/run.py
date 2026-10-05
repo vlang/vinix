@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Replay identical dhewm3 frames on ARM64 Vinix and Debian under QEMU/HVF.
 
-Requires build-dhewm3-aarch64.sh, the X11/userland layers and a Debian arm64
+Requires scripts/build-dhewm3-aarch64.sh, the X11/userland layers and a Debian arm64
 kernel Image. --record records a shared demo on the selected OS first.
 The Debian package root (base-files and busybox-static) is supplied with
 --debian-root; the game, libc and Mesa runtime are deliberately shared.
@@ -132,7 +132,7 @@ def run_guest(args, work: Path, root: Path, os_name: str) -> dict:
             "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4",
             "VINIX_KEEP_TEMP_BOOT_DISK": "1",
         })
-        command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=8192"]
+        command = [str(args.repo / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=8192"]
     action = "recording" if args.record else "capturing" if args.screenshot else "checking clocks" if args.clock_only else "benchmarking"
     print(f"Booting {os_name}, {action}", flush=True)
     pid, master = pty.fork()

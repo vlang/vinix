@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Play OpenGothic in a Vinix desktop window under QEMU/HVF.
 
-Requires build-opengothic-aarch64.sh with --demo or --game, a desktop from
-build-desktop-aarch64.sh --no-initramfs, and the X11 and userland layers. The
+Requires scripts/build-opengothic-aarch64.sh with --demo or --game, a desktop from
+scripts/build-desktop-aarch64.sh --no-initramfs, and the X11 and userland layers. The
 test starts a new game from the keyboard, lets the world render and fails if
 the engine crashes or exits. It leaves a screenshot.
 """
@@ -175,7 +175,7 @@ def run_guest(args, work: Path, root: Path) -> Path:
     firmware = args.repo / "boot-image/edk2-aarch64-code-2048x1536.fd"
     if firmware.exists():
         environment.update({"VINIX_QEMU_RESOLUTION": "2048x1536x32", "VINIX_OVMF_CODE": str(firmware)})
-    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist", "--mem=12288" if args.venus else "--mem=8192", "--venus" if args.venus else "--serial"]
+    command = [str(args.repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist", "--mem=12288" if args.venus else "--mem=8192", "--venus" if args.venus else "--serial"]
     print("Booting Vinix with Gothic II open", flush=True)
     pid, master = pty.fork()
     if pid == 0:
@@ -261,7 +261,7 @@ def run_guest(args, work: Path, root: Path) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", type=Path, default=ROOT, help="checkout holding the layers and run-aarch64.sh")
+    parser.add_argument("--repo", type=Path, default=ROOT, help="checkout holding the layers and scripts/run-aarch64.sh")
     parser.add_argument("--build", type=Path, help="OpenGothic build directory (default: REPO/build/opengothic)")
     parser.add_argument("--desktop", type=Path, help="cross-built desktop (default: build/vinix-desktop here)")
     parser.add_argument("--kernel-dir", type=Path)
@@ -285,7 +285,7 @@ def main() -> None:
     args.desktop = (args.desktop or ROOT / "build/vinix-desktop").resolve()
     args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
     if not (args.build / "staging/usr/share/games/gothic2/_work/Data").is_dir():
-        parser.error("no game data is staged: run build-opengothic-aarch64.sh with --demo or --game")
+        parser.error("no game data is staged: run scripts/build-opengothic-aarch64.sh with --demo or --game")
     work = args.work.resolve()
     work.mkdir(parents=True, exist_ok=True)
     screenshot = run_guest(args, work, prepare(args, work))

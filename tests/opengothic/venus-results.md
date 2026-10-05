@@ -11,7 +11,7 @@ The [recorded result](venus-performance.json) includes the exact binary hashes.
 An earlier release run measured 89.63 FPS before integration with the latest
 kernel changes from other sessions.
 
-The [screenshot](../../vinix-opengothic-venus.png) is QEMU's framebuffer
+The [screenshot](../../docs/screenshots/vinix-opengothic-venus.png) is QEMU's framebuffer
 capture after starting a new game and sending movement input. Its overlay
 identifies `Virtio-GPU Venus (Apple M5 Max)`. Rendering uses the host GPU;
 Xvfb and the Vinix desktop copy the completed images for presentation.

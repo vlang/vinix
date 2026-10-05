@@ -43,7 +43,7 @@ KERNEL_MARKERS = (
     b"numa:   node 1 distances 20 10",
 )
 
-# Two nodes of one gigabyte, two CPUs each, one hop apart. run-aarch64.sh boots
+# Two nodes of one gigabyte, two CPUs each, one hop apart. scripts/run-aarch64.sh boots
 # with -smp 4 and -m as given, and QEMU requires the memory backends to add up
 # to that total.
 NUMA_TOPOLOGY = " ".join(
@@ -130,7 +130,7 @@ def run_vm(
         environment.setdefault("USE_TCG", "1")
 
     command = [
-        str(root / "run-aarch64.sh"),
+        str(root / "scripts/run-aarch64.sh"),
         "--serial",
         f"--mem={GUEST_MEMORY_MB}",
         f"--guest-init={guest_init}",

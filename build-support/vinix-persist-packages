@@ -1,6 +1,6 @@
 #!/bin/sh
 # Save package-owned additions and package database changes outside QEMU's
-# RAM-backed root. run-aarch64.sh layers the resulting USTAR archive over the
+# RAM-backed root. scripts/run-aarch64.sh layers the resulting USTAR archive over the
 # base initramfs on the next boot.
 set -eu
 LC_ALL=C

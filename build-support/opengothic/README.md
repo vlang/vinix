@@ -12,10 +12,10 @@ Build on a host with Python 3, Git, curl, tar, CMake, Ninja, glslang and the
 `aarch64-linux-musl-ar` cross compilers:
 
 ```sh
-./build-opengothic-aarch64.sh --demo
-./build-venus-aarch64.sh
-./build-desktop-aarch64.sh
-VINIX_KEKVM_DIR="$HOME/code/kekvm" ./run-desktop-aarch64.sh --venus
+./scripts/build-opengothic-aarch64.sh --demo
+./scripts/build-venus-aarch64.sh
+./scripts/build-desktop-aarch64.sh
+VINIX_KEKVM_DIR="$HOME/code/kekvm" ./scripts/run-desktop-aarch64.sh --venus
 ```
 
 The accelerated path needs KekVM's prepared GPU backend (`make setup-gpu`
@@ -37,7 +37,7 @@ To use your own Gothic II / Night of the Raven installation, name its
 directory instead:
 
 ```sh
-./build-opengothic-aarch64.sh --game "/path/to/Gothic II"
+./scripts/build-opengothic-aarch64.sh --game "/path/to/Gothic II"
 ```
 
 That stages its `Data`, `_work` and `System` directories, whatever their case,

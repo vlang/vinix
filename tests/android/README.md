@@ -5,8 +5,8 @@ Build the native 16 KiB ART, bionic and coherent ATL overlays as described in
 then build the Android runtime and sample APK, desktop and kernel:
 
 ```sh
-./build-android-aarch64.sh --with-calculator
-./build-desktop-aarch64.sh --no-initramfs
+./scripts/build-android-aarch64.sh --with-calculator
+./scripts/build-desktop-aarch64.sh --no-initramfs
 make -C kernel ARCH=aarch64 CC=clang LIMINE_MP=1
 python3 tests/android/run.py
 ```
@@ -34,7 +34,7 @@ python3 tests/android/run.py --desktop /path/to/vinix-desktop \
     --kernel-dir /path/to/kernel --state-dir /tmp/vinix-android-test
 python3 tests/android/run.py --apk /path/to/calculator.apk \
     --activity calculator/Calculator --keys '123+456' --expect 579
-./build-desktop-aarch64.sh --compact-initramfs --with-android
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-android
 python3 tests/android/run.py --initramfs build-support/init-aarch64/initramfs-desktop.tar \
     --memory 12288
 python3 tests/android/run.py --boot-probe build/android-native-java/probe/ArtBootProbe.jar \

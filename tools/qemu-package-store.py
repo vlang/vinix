@@ -27,7 +27,7 @@ from host_clipboard import ClipboardError, read_clipboard
 MAX_SHARED_FILE_BYTES = 64 * 1024 * 1024
 
 # Native applications a host cross-build can replace in a running guest, by
-# exec name, and the directory under the source root cross-compile-app.sh
+# exec name, and the directory under the source root scripts/cross-compile-app.sh
 # publishes each one's executable and version to.
 LIVE_APPS = {
     "vinix-files": "build-aarch64-desktop-apps/files-live",

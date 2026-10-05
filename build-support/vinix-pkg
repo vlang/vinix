@@ -22,7 +22,7 @@ SUBLIME_SHA256=${VINIX_SUBLIME_SHA256:-cf4b6aa74ea2a2aab02e144599cf9e4a423cbb954
 MINECRAFT_VERSION=${VINIX_MINECRAFT_VERSION:-release}
 MINECRAFT_JAVA_MAJOR=21
 MINECRAFT_DOWNLOAD_JOBS=${VINIX_MINECRAFT_DOWNLOAD_JOBS:-8}
-# build-voffice-aarch64.sh produces this asset for the vlang/office releases.
+# scripts/build-voffice-aarch64.sh produces this asset for the vlang/office releases.
 VOFFICE_URL=${VINIX_VOFFICE_URL:-https://github.com/vlang/office/releases/latest/download/VOffice-vinix-aarch64.tar.gz}
 VOFFICE_SHA256_URL=${VINIX_VOFFICE_SHA256_URL:-$VOFFICE_URL.sha256}
 
@@ -1045,7 +1045,7 @@ download_file() {
 }
 
 # VOffice is not part of the image. Its releases carry a Vinix build of Writer
-# and Calc, cross-compiled by build-voffice-aarch64.sh as native clients of the
+# and Calc, cross-compiled by scripts/build-voffice-aarch64.sh as native clients of the
 # compositor's pipe protocol, together with their artwork and translations.
 install_voffice() {
 	case "$(uname -m)" in

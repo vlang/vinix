@@ -15,10 +15,10 @@ test.
 A 60-second sample of gameplay in Xardas's tower at 1280×720 recorded 117
 Mesa overlay samples: **57.98 FPS median**, 37.87 minimum and 70.61 maximum.
 This covers the demo's opening scene. The engine remained running for over
-15 minutes without a crash. [Screenshot](../../kekvm-opengothic.png).
+15 minutes without a crash. [Screenshot](../../docs/screenshots/kekvm-opengothic.png).
 
 First stage the engine source, Vulkan headers and demo with
-`./build-opengothic-aarch64.sh --demo`, and prepare the GPU guest in
+`./scripts/build-opengothic-aarch64.sh --demo`, and prepare the GPU guest in
 `~/code/kekvm` as its README describes. Boot the GPU disk in a snapshot, with
 private firmware variables and a read-only 9p share of the build directory.
 These are KekVM's Venus arguments with that share added:

@@ -175,7 +175,7 @@ def command_for(arguments: argparse.Namespace, root: Path) -> tuple[list[str], d
         if platform.system() != "Darwin":
             environment.setdefault("USE_TCG", "1")
         return [
-            str(root / "run-aarch64.sh"),
+            str(root / "scripts/run-aarch64.sh"),
             "--no-build",
             "--serial",
             "--mem=2048",

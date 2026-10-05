@@ -5,7 +5,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause
  * In-guest regression coverage for the VM, VFS, and Linux ABI fundamentals,
  * the same on both architectures. The binary is linked statically and
- * installed as PID 1: by run-aarch64.sh's --guest-init hook on arm64, and in
+ * installed as PID 1: by scripts/run-aarch64.sh's --guest-init hook on arm64, and in
  * a throwaway ISO on amd64; see run.sh. */
 #define _GNU_SOURCE
 #include <dirent.h>

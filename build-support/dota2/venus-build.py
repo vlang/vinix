@@ -3,7 +3,7 @@
 
 Venus forwards Vulkan to the host GPU through Vinix's virtio-gpu render node
 when Vinix runs on KekVM's GPU-enabled QEMU. The native ARM64 driver from
-build-venus-aarch64.sh cannot load into the translated x86-64 game, so this
+scripts/build-venus-aarch64.sh cannot load into the translated x86-64 game, so this
 builds the same Mesa release and Vinix patch for x86-64 glibc, against the
 Debian sysroot that mesa-build.py prepares for Lavapipe.
 """

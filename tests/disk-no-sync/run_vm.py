@@ -46,7 +46,7 @@ def available_port() -> str:
 
 
 def gone(pid: int, master: int, seconds: float) -> bool:
-    # pty.fork made run-aarch64.sh the leader of a process group of its own,
+    # pty.fork made scripts/run-aarch64.sh the leader of a process group of its own,
     # and QEMU is in it. The script exiting is not enough: a QEMU it leaves
     # behind still runs the guest and holds the disk images. The terminal is
     # read meanwhile, as nothing can finish exiting with output to it unread.
@@ -131,7 +131,7 @@ def initramfs(path: Path, step: str) -> None:
 
 def boot(root: Path, arguments: argparse.Namespace, environment: dict[str, str],
          build: bool, step: str) -> tuple[bool, int]:
-    command = [str(root / "run-aarch64.sh"), "--serial", "--mem=2048",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
                f"--guest-init={arguments.init}"]
     if not build:
         command.insert(1, "--no-build")

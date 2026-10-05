@@ -27,7 +27,7 @@ architectures. The VM drivers and ARM sysroot can come from the main checkout.
 ```sh
 make -C kernel ARCH=aarch64 ALLOC_TRACK=1 LIMINE_MP=1 CC=clang \
   AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/path/to/v -j4
-ALLOC_TRACK=1 NPROC=4 V=/path/to/v ./build-amd64.sh --no-userland --no-iso
+ALLOC_TRACK=1 NPROC=4 V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
 python3 tests/procfs-mount/check-generated.py kernel/obj/blob.c
 python3 tests/procfs-mount/check-generated.py build-amd64-kernel/obj/blob.c
 

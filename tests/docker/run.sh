@@ -15,12 +15,12 @@ trap cleanup EXIT INT TERM
 
 if [ ! -f "$minirootfs" ]; then
 	echo "ERROR: Alpine minirootfs is missing: $minirootfs" >&2
-	echo "       Run ./build-userland-aarch64.sh first." >&2
+	echo "       Run ./scripts/build-userland-aarch64.sh first." >&2
 	exit 1
 fi
 if [ ! -x "$docker_staging/usr/bin/dockerd" ]; then
 	echo "ERROR: Docker staging is missing: $docker_staging" >&2
-	echo "       Run ./build-docker-aarch64.sh first." >&2
+	echo "       Run ./scripts/build-docker-aarch64.sh first." >&2
 	exit 1
 fi
 

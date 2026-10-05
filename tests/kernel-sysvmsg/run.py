@@ -50,7 +50,7 @@ def main():
             "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": str(args.smp),
             "VINIX_KEEP_TEMP_BOOT_DISK": "1",
         })
-        command = [str(repo / "run-aarch64.sh"), "--no-build", "--no-persist", "--serial",
+        command = [str(repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist", "--serial",
                    "--mem=2048", f"--guest-init={binary}"]
         args.log.parent.mkdir(parents=True, exist_ok=True)
         with args.log.open("wb") as output:

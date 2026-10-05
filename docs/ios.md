@@ -20,13 +20,13 @@ the implemented subset. The existing native Vinix calculator is a separate app.
 
 ## Build and run
 
-Build the AArch64 Alpine development sysroot with `./build-userland-aarch64.sh`
+Build the AArch64 Alpine development sysroot with `./scripts/build-userland-aarch64.sh`
 once, then:
 
 ```sh
-./build-ios-aarch64.sh
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build
+./scripts/build-ios-aarch64.sh
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-build
 # Open "iOS Calculator" from the desktop or Start menu.
 ```
 
@@ -36,7 +36,7 @@ includes the runner and bundle when `build/ios/staging` exists; `VINIX_IOS_STAGI
 selects another staging directory. The launcher passes the installed Mach-O to
 the runtime at `/usr/share/vinix/ios/Calculator.app/Calculator`.
 
-Use `./build-ios-aarch64.sh --with-2048` to download, build and stage iOS-2048
+Use `./scripts/build-ios-aarch64.sh --with-2048` to download, build and stage iOS-2048
 as well. Open **iOS 2048**, then **Play Game**. Drag to swipe, or use arrow keys
 or WASD. The `vinix-ios-2048` launcher loads
 `/usr/share/vinix/ios/NumberTileGame.app/NumberTileGame`. Its bundle and IPA are

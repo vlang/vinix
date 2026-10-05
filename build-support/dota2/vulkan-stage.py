@@ -278,7 +278,7 @@ def main() -> None:
     index = steam / f"downloads/{args.release}_amd64_Packages"
     manifest = steam / "amd64-packages"
     if not (source / "lib64/ld-linux-x86-64.so.2").exists() or not index.exists():
-        parser.error("build-steam-aarch64.sh must stage the glibc root and package index first")
+        parser.error("scripts/build-steam-aarch64.sh must stage the glibc root and package index first")
     if root == source or source in root.parents or root in source.parents:
         parser.error("the Vulkan build must be separate from the Steam build")
 

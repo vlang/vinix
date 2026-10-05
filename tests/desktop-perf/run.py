@@ -23,7 +23,7 @@ Scenarios:
              kernel heap, reported as PERF-OPS lines (optional)
 
 The display is QEMU's 2048x1536 desktop resolution, the one
-run-desktop-aarch64.sh boots, at the desktop's default scale for it (100%).
+scripts/run-desktop-aarch64.sh boots, at the desktop's default scale for it (100%).
 Each run keeps its serial log and requested reports, and removes its temporary
 VM images and binaries after QEMU stops.
 """
@@ -421,7 +421,7 @@ def main() -> int:
     parser.add_argument("--desktop-args", default="",
                         help="extra compositor arguments, such as --stats")
     # The whole desktop image is loaded into RAM when there is no persistent
-    # system volume, as with run-desktop-aarch64.sh --no-persist.
+    # system volume, as with scripts/run-desktop-aarch64.sh --no-persist.
     parser.add_argument("--mem", type=int, default=12288)
     parser.add_argument("--initramfs", type=Path,
                         default=ROOT / "build-support/init-aarch64/initramfs-desktop.tar")
@@ -467,7 +467,7 @@ def main() -> int:
         qmp = str(work / "qmp.sock")
 
         # The desktop image is larger than FAT32 allows for one file, so it goes
-        # to Limine on a cached ISO9660 disk, the way run-desktop-aarch64.sh
+        # to Limine on a cached ISO9660 disk, the way scripts/run-desktop-aarch64.sh
         # --no-persist boots it. The cache is keyed by the image's identity.
         initramfs = arguments.initramfs.resolve()
         # One cache per image, so measuring a second image never rewrites the
@@ -505,7 +505,7 @@ def main() -> int:
             "VINIX_QEMU_AUDIO": "off",
         })
         environment.pop("VINIX_QEMU_PERSIST", None)
-        command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
+        command = [str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial",
                    f"--mem={arguments.mem}", f"--guest-init={Path(__file__).with_name('perf-init.sh')}"]
 
         per_run = arguments.settle + arguments.seconds + 60

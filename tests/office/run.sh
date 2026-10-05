@@ -3,8 +3,8 @@
 #
 # The image has to have been built with the office layer in it:
 #
-#   ./build-libreoffice-aarch64.sh
-#   ./build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
+#   ./scripts/build-libreoffice-aarch64.sh
+#   ./scripts/build-desktop-aarch64.sh --compact-initramfs --with-libreoffice
 #
 # The suite adds about 1.5 GiB to the image, and this boot is a RAM root, so
 # the guest needs enough memory to hold the whole of it plus the machine.
@@ -15,7 +15,7 @@ initramfs=${VINIX_DESKTOP_INITRAMFS:-"$repo/build-support/init-aarch64/initramfs
 
 if [ ! -f "$initramfs" ]; then
 	echo "ERROR: desktop image not found: $initramfs" >&2
-	echo "       Run ./build-desktop-aarch64.sh --compact-initramfs --with-libreoffice" >&2
+	echo "       Run ./scripts/build-desktop-aarch64.sh --compact-initramfs --with-libreoffice" >&2
 	exit 1
 fi
 
