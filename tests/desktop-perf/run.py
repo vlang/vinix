@@ -15,6 +15,8 @@ Scenarios:
     storage  Archive Utility, Disk Utility and Backup, untouched (optional)
     productivity Notes, Reminders and Grapher, untouched (optional)
     tools    Color Meter, Calculator and Notes, untouched (optional)
+    workflows Dictionary, Text Editor, Calendar and Files, untouched (optional;
+             requires --dictionary-data with prepared local data and license)
     pointer  the default session while the pointer sweeps across the screen
     drag     the default session while the System window is dragged around
     wakeups  no desktop: a process sleeping 16 ms at a time, the frame pacing
@@ -49,6 +51,7 @@ import shlex
 import signal
 import socket
 import statistics
+import struct
 import subprocess
 import sys
 import tempfile
@@ -57,7 +60,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ABS_MAX = 32767
-SCENARIOS = ("idle", "apps", "utilities", "storage", "productivity", "tools", "pointer", "drag", "wakeups", "churn", "cache", "ops")
+SCENARIOS = ("idle", "apps", "utilities", "storage", "productivity", "tools", "workflows", "pointer", "drag", "wakeups", "churn", "cache", "ops")
 SHOT = re.compile(rb"PERF-SHOT variant=(\S+) scenario=(\S+) round=(\d+)")
 DRIVE = re.compile(rb"PERF-DRIVE (\S+) (\d+)")
 MEASUREMENT = re.compile(
@@ -115,9 +118,11 @@ def expected_measurements(variants: list[str], scenarios: list[str], rounds: int
 def valid_desktop_result(row: dict) -> bool:
     try:
         seconds = float(row["seconds"])
-        # These scenarios request three native clients. A compositor which
-        # silently failed to launch them must not pass its startup smoke run.
-        minimum_processes = 4 if row.get("scenario") in ("utilities", "storage", "productivity", "tools") else 0
+        # Count the compositor plus every requested native client, so missing
+        # launches cannot pass a startup smoke run.
+        scenario = row.get("scenario")
+        minimum_processes = (5 if scenario == "workflows" else
+                             4 if scenario in ("utilities", "storage", "productivity", "tools") else 0)
         return (all(math.isfinite(float(row[key])) for key in
                     (*DESKTOP_METRICS, "system_used_mb"))
                 and math.isfinite(seconds) and seconds > 0
@@ -416,6 +421,26 @@ def temporary_vm(work: Path):
             signal.signal(signal.SIGTERM, previous_sigterm)
 
 
+def dictionary_assets(directory: Path) -> tuple[Path, Path]:
+    """Check already-prepared local assets; never prepare or download data."""
+    data, license_file = directory / "dictionary.vnd", directory / "LICENSE.WordNet"
+    if not data.is_file() or not license_file.is_file():
+        raise ValueError("dictionary data requires regular dictionary.vnd and LICENSE.WordNet files")
+    size = data.stat().st_size
+    if not 24 <= size <= 64 * 1024 * 1024 or not 0 < license_file.stat().st_size <= 16384:
+        raise ValueError("dictionary data or license exceeds supported size bounds")
+    with data.open("rb") as source:
+        header = source.read(24)
+    if len(header) != 24 or header[:8] != b"VNXDICT1":
+        raise ValueError("dictionary.vnd has an invalid VNXDICT1 header")
+    count, keys, definitions, reserved = struct.unpack("<IIII", header[8:])
+    if not (1 <= count <= 200000 and count <= keys <= count * 128
+            and count <= definitions <= count * 65536 and reserved == 0
+            and size == 24 + count * 16 + keys + definitions):
+        raise ValueError("dictionary.vnd has invalid header bounds or length")
+    return data, license_file
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -433,6 +458,9 @@ def main() -> int:
     parser.add_argument("--mem", type=int, default=12288)
     parser.add_argument("--initramfs", type=Path,
                         default=ROOT / "build-support/init-aarch64/initramfs-desktop.tar")
+    parser.add_argument("--dictionary-data", type=Path,
+                        help="directory containing prepared dictionary.vnd and LICENSE.WordNet; "
+                             "required for workflows, copied through the VM overlay without downloads")
     parser.add_argument("--json", type=Path, help="also write every result here")
     parser.add_argument("--shots", type=Path,
                         help="save a screenshot of every run here (PPM)")
@@ -458,11 +486,24 @@ def main() -> int:
         builds.append((name, Path(binary)))
     if len({name for name, _ in builds}) != len(builds):
         parser.error("build labels must be unique")
+    if "workflows" in scenarios and arguments.dictionary_data is None:
+        parser.error("workflows requires --dictionary-data=DIR with prepared local data and license")
+    assets = None
+    if arguments.dictionary_data is not None:
+        try:
+            assets = dictionary_assets(arguments.dictionary_data)
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
 
     work = Path(tempfile.mkdtemp(prefix="vinix-desktop-perf."))
     with temporary_vm(work) as runtime:
         overlay = runtime / "overlay/opt/vinix-perf"
         overlay.mkdir(parents=True)
+        if assets is not None:
+            dictionary = runtime / "overlay/usr/share/vinix/dictionary"
+            dictionary.mkdir(parents=True)
+            for asset in assets:
+                shutil.copyfile(asset, dictionary / asset.name)
         for name, binary in builds:
             shutil.copyfile(binary, overlay / f"vinix-desktop-{name}")
         compile_measure(Path(__file__).with_name("measure.c"), overlay / "measure")

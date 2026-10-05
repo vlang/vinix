@@ -157,12 +157,27 @@ run_case() {
 			ln -sf vinix-desktop "/usr/bin/$app"
 		done
 	fi
+	if [ "$scenario" = workflows ]; then
+		if [ ! -s /usr/share/vinix/dictionary/dictionary.vnd ] || \
+			[ ! -s /usr/share/vinix/dictionary/LICENSE.WordNet ]; then
+			echo "PERF-ERROR $label prepared Dictionary data or license is missing"
+			return
+		fi
+		for app in vinix-dictionary vinix-editor vinix-calendar vinix-files; do
+			ln -sf vinix-desktop "/usr/bin/$app"
+		done
+	fi
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
 	sync
 	sleep 2
 	used_before=$("$perf/measure" used)
 	log=/tmp/desktop-$variant-$scenario-$round.log
 	case "$scenario" in
+		workflows)
+			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
+				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Dictionary \
+					'--open=Text Editor' --open=Calendar --open=Files >"$log" 2>&1 &
+			;;
 		tools)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
 				/usr/bin/vinix-desktop $DESKTOP_ARGS '--open=Color Meter' \

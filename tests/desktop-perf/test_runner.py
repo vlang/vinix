@@ -9,6 +9,7 @@ from pathlib import Path
 import queue
 import re
 import shlex
+import struct
 import tempfile
 import threading
 import unittest
@@ -27,6 +28,17 @@ FILE_OPS = ("file", "rename", "unlink_open", "rename_over", "hardlink", "mkdir",
 PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version", "/bin/busybox awk BEGIN{}")
 
 
+def prepared_dictionary(directory):
+    """One valid offline headword in the documented portable data format."""
+    directory.mkdir()
+    key, definition = b"computer", b"An electronic machine."
+    data = (b"VNXDICT1" + struct.pack("<IIII", 1, len(key), len(definition), 0)
+            + struct.pack("<IIII", 0, len(key), 0, len(definition)) + key + definition)
+    (directory / "dictionary.vnd").write_bytes(data)
+    (directory / "LICENSE.WordNet").write_bytes(b"Local test fixture license\n")
+    return data
+
+
 def case_lines(variant, scenario, round_number):
     label = f"variant={variant} scenario={scenario} round={round_number}"
     if scenario == "ops":
@@ -42,7 +54,8 @@ def case_lines(variant, scenario, round_number):
                 "per_second=62.5 cpu=0.10 us_per_wakeup=16" for via in ("nanosleep", "poll")]
     if scenario == "cache":
         return [f"PERF-CACHE {label} written_mb=32 used_mb=33 cached_kb=32768 slab_kb=1024"]
-    processes = 4 if scenario in ("utilities", "storage", "productivity", "tools") else 1
+    processes = (5 if scenario == "workflows" else
+                 4 if scenario in ("utilities", "storage", "productivity", "tools") else 1)
     return [f"PERF-RESULT {label} seconds=1.0 processes={processes} desktop_cpu=1.0 apps_cpu=0.0 "
             "total_cpu=1.0 desktop_mb=2.0 apps_mb=0.0 total_mb=2.0 system_used_mb=20.0 physical_mb=2.0"]
 
@@ -68,8 +81,8 @@ class VerdictTests(unittest.TestCase):
         result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
                                           scenarios, ["before", "after"], 2)
         self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 204)
-        self.assertEqual(sum("report" not in row for row in rows), 32)
+        self.assertEqual(len(rows), 208)
+        self.assertEqual(sum("report" not in row for row in rows), 36)
 
     def test_native_utility_scenarios_require_three_client_processes(self):
         for scenario in ("utilities", "storage", "productivity", "tools"):
@@ -89,6 +102,29 @@ class VerdictTests(unittest.TestCase):
         launch = re.search(r'^\t\ttools\)\n(.*?)^\t\t\t;;', shell, re.M | re.S).group(1)
         arguments = shlex.split(launch)
         for title in ("Color Meter", "Calculator", "Notes"):
+            self.assertIn(f"--open={title}", arguments)
+
+    def test_workflows_require_four_native_clients_and_cached_image_aliases(self):
+        for processes in (0, 1, 4, 5):
+            with self.subTest(processes=processes):
+                line = case_lines("new", "workflows", 1)[0].replace(
+                    "processes=5", f"processes={processes}")
+                result, _, errors = self.verdict([line, runner.DONE.decode()], ["workflows"])
+                self.assertEqual(result, 0 if processes == 5 else 1)
+                if processes < 5:
+                    self.assertIn("invalid desktop metrics", errors)
+        shell = Path(__file__).with_name("perf-init.sh").read_text()
+        aliases = re.search(r'if \[ "\$scenario" = workflows \]; then(.*?)\n\tfi',
+                            shell, re.S).group(1)
+        for executable in ("vinix-dictionary", "vinix-editor", "vinix-calendar", "vinix-files"):
+            self.assertIn(executable, aliases)
+        self.assertIn('ln -sf vinix-desktop "/usr/bin/$app"', aliases)
+        self.assertIn("/usr/share/vinix/dictionary/dictionary.vnd", aliases)
+        self.assertIn("/usr/share/vinix/dictionary/LICENSE.WordNet", aliases)
+        self.assertIn("PERF-ERROR", aliases)
+        launch = re.search(r'^\t\tworkflows\)\n(.*?)^\t\t\t;;', shell, re.M | re.S).group(1)
+        arguments = shlex.split(launch)
+        for title in ("Dictionary", "Text Editor", "Calendar", "Files"):
             self.assertIn(f"--open={title}", arguments)
 
     def test_partial_ops_timeout_keeps_json_but_fails(self):
@@ -226,12 +262,15 @@ class VerdictTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
-    def main_verdict(self, lines, transcript=None, expired=False, exit_code=0, closed=True):
+    def main_verdict(self, lines, transcript=None, expired=False, exit_code=0, closed=True,
+                     scenario="ops", dictionary=False):
         transcript = transcript if transcript is not None else lines
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             binary = work / "desktop"
             binary.write_bytes(b"fixture")
+            data_directory = work / "dictionary-data"
+            data = prepared_dictionary(data_directory) if dictionary else None
             output = work / "results.json"
             console = mock.Mock()
             console.lines = queue.Queue()
@@ -243,12 +282,20 @@ class MainTests(unittest.TestCase):
             console.transcript = bytearray(("\n".join(transcript) + "\n").encode())
 
             def start_guest():
+                if dictionary:
+                    overlaid = work / "vm/overlay/usr/share/vinix/dictionary"
+                    self.assertEqual((overlaid / "dictionary.vnd").read_bytes(), data)
+                    self.assertEqual((overlaid / "LICENSE.WordNet").read_bytes(),
+                                     (data_directory / "LICENSE.WordNet").read_bytes())
                 for name in ("boot.img", "root.ext2", "efivars.fd", "packages.tar"):
                     (work / "vm" / name).write_bytes(b"temporary VM image")
                 return 1234, 99
 
-            with mock.patch.object(runner.sys, "argv", ["run.py", f"new={binary}", "--rounds=1",
-                                                        "--scenarios=ops", "--json", str(output), "--timeout=1"]), \
+            arguments = ["run.py", f"new={binary}", "--rounds=1", f"--scenarios={scenario}",
+                         "--json", str(output), "--timeout=1"]
+            if dictionary:
+                arguments += ["--dictionary-data", str(data_directory)]
+            with mock.patch.object(runner.sys, "argv", arguments), \
                     mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(work)), \
                     mock.patch.object(runner, "compile_measure"), \
                     mock.patch.object(runner.subprocess, "run"), \
@@ -288,6 +335,87 @@ class MainTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertEqual(len(rows), 36)
         self.assertIn(runner.DONE, log)
+
+    def test_workflows_overlay_both_local_assets_before_guest_launch_and_cleanup(self):
+        result, rows, log = self.main_verdict(complete_lines(["new"], ["workflows"], 1),
+                                             scenario="workflows", dictionary=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["processes"], "5")
+        self.assertIn(runner.DONE, log)
+
+    def test_workflows_require_local_dictionary_before_building_or_booting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "desktop"
+            binary.write_bytes(b"fixture")
+            with mock.patch.object(runner.sys, "argv", ["run.py", f"new={binary}",
+                                                        "--scenarios=workflows"]), \
+                    mock.patch.object(runner, "compile_measure") as compile_guest, \
+                    mock.patch.object(runner.subprocess, "run") as commands, \
+                    mock.patch.object(runner.pty, "fork") as launch, \
+                    contextlib.redirect_stderr(io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as stopped:
+                    runner.main()
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertIn("--dictionary-data", stderr.getvalue())
+            compile_guest.assert_not_called()
+            commands.assert_not_called()
+            launch.assert_not_called()
+
+
+class DictionaryAssetsTests(unittest.TestCase):
+    def test_prepared_data_and_unchanged_license_are_accepted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "prepared"
+            data = prepared_dictionary(source)
+            assets = runner.dictionary_assets(source)
+            self.assertEqual(tuple(path.name for path in assets), ("dictionary.vnd", "LICENSE.WordNet"))
+            self.assertEqual(assets[0].read_bytes(), data)
+            self.assertEqual(assets[1].read_bytes(), b"Local test fixture license\n")
+
+    def test_missing_license_nonregular_or_empty_assets_fail(self):
+        for broken in ("missing_license", "empty_license", "data_directory", "empty_data"):
+            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
+                source = Path(directory) / "prepared"
+                prepared_dictionary(source)
+                if broken == "missing_license":
+                    (source / "LICENSE.WordNet").unlink()
+                elif broken == "empty_license":
+                    (source / "LICENSE.WordNet").write_bytes(b"")
+                elif broken == "data_directory":
+                    (source / "dictionary.vnd").unlink()
+                    (source / "dictionary.vnd").mkdir()
+                else:
+                    (source / "dictionary.vnd").write_bytes(b"")
+                with self.assertRaises(ValueError):
+                    runner.dictionary_assets(source)
+
+    def test_damaged_header_invalid_bounds_and_trailing_data_fail(self):
+        for broken in ("magic", "count", "reserved", "key_size", "definition_size", "trailing"):
+            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
+                source = Path(directory) / "prepared"
+                data = bytearray(prepared_dictionary(source))
+                if broken == "magic":
+                    data[0] = 0
+                elif broken == "trailing":
+                    data += b"unexpected"
+                else:
+                    at, value = {"count": (8, 0), "reserved": (20, 1),
+                                 "key_size": (12, 129), "definition_size": (16, 0)}[broken]
+                    struct.pack_into("<I", data, at, value)
+                (source / "dictionary.vnd").write_bytes(data)
+                with self.assertRaises(ValueError):
+                    runner.dictionary_assets(source)
+
+    def test_oversized_local_data_and_license_fail_before_copy(self):
+        for oversized in ("dictionary.vnd", "LICENSE.WordNet"):
+            with self.subTest(oversized=oversized), tempfile.TemporaryDirectory() as directory:
+                source = Path(directory) / "prepared"
+                prepared_dictionary(source)
+                with (source / oversized).open("wb") as stream:
+                    stream.truncate(64 * 1024 * 1024 + 1 if oversized == "dictionary.vnd" else 16385)
+                with self.assertRaises(ValueError):
+                    runner.dictionary_assets(source)
 
 
 class TemporaryVMTests(unittest.TestCase):
