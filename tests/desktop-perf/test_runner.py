@@ -66,8 +66,8 @@ class VerdictTests(unittest.TestCase):
         result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
                                           scenarios, ["before", "after"], 2)
         self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 188)
-        self.assertEqual(sum("report" not in row for row in rows), 16)
+        self.assertEqual(len(rows), 192)
+        self.assertEqual(sum("report" not in row for row in rows), 20)
 
     def test_partial_ops_timeout_keeps_json_but_fails(self):
         lines = case_lines("new", "ops", 1)[:2]

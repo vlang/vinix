@@ -2471,3 +2471,285 @@ i
 calculator.memory.indicator
 M
 -----
+console.source.xorg
+Журнал Xorg
+-----
+console.source.firefox
+Журнал Firefox
+-----
+console.source.chromium
+Журнал Chromium
+-----
+console.load
+Открыть
+-----
+console.refresh
+Обновить
+-----
+console.follow
+Следить
+-----
+console.matches
+Найденные строки
+-----
+console.filter
+Точный фильтр
+-----
+console.empty
+Этот журнал пуст.
+-----
+console.no_matches
+Нет строк, соответствующих точному фильтру.
+-----
+console.no_file
+Журнал не существует. Выберите другой путь или запустите приложение, которое его создаёт.
+-----
+console.not_regular
+Поддерживаются только обычные файлы. Устройства, ссылки, папки и каналы недоступны.
+-----
+console.read_failed
+Не удалось прочитать журнал.
+-----
+console.invalid_path
+Введите абсолютный путь к файлу без управляющих символов.
+-----
+console.up
+Страница вверх
+-----
+console.down
+Страница вниз
+-----
+console.left
+Влево
+-----
+console.right
+Вправо
+-----
+console.limited
+Последние 128 КиБ
+-----
+console.export
+Экспорт строк
+-----
+console.export_exists
+Файл экспорта уже существует. Выберите новое имя.
+-----
+console.export_failed
+Не удалось экспортировать найденные строки.
+-----
+console.export_saved
+Найденные строки экспортированы.
+-----
+console.hint
+Фильтр учитывает регистр и ищет точный текст. Экспорт сохраняет все найденные строки без перезаписи файлов.
+-----
+app.system_information
+Сведения о системе
+-----
+system_information.overview
+Обзор
+-----
+system_information.hardware
+Оборудование
+-----
+system_information.storage
+Накопители
+-----
+system_information.packages
+Установленные пакеты
+-----
+system_information.unavailable
+Недоступно
+-----
+system_information.kernel
+Ядро
+-----
+system_information.cpu
+Модель процессора
+-----
+system_information.architecture
+Архитектура процессора
+-----
+system_information.cpu_online
+Активные процессоры
+-----
+system_information.memory_total
+Всего памяти
+-----
+system_information.memory_available
+Доступная память
+-----
+system_information.memory_cached
+Кэшированная память
+-----
+system_information.uptime
+Время работы (секунды)
+-----
+system_information.cpu_report
+Отчёт о процессоре
+-----
+system_information.numa_nodes
+Активные узлы памяти
+-----
+system_information.gpu_report
+Отчёт драйвера GPU
+-----
+system_information.network_report
+Отчёт о сетевых интерфейсах
+-----
+system_information.device_inventory_unavailable
+Сведения об устройствах и драйверах PCI / USB недоступны
+-----
+system_information.custom_package
+Дополнительный пакет (версия недоступна)
+-----
+system_information.source
+Источник
+-----
+system_information.mount
+Точка монтирования (путь; файловая система; источник; параметры)
+-----
+system_information.capacity
+Всего / занято / доступно (байты)
+-----
+system_information.capacity_unavailable
+Ёмкость этой файловой системы недоступна
+-----
+system_information.package_version_unavailable
+Пакет (версия недоступна)
+-----
+system_information.packages_empty
+Установленные пакеты APK не записаны
+-----
+system_information.read_failed
+Не удалось прочитать отчёт полностью
+-----
+system_information.refresh
+Обновить
+-----
+system_information.previous
+Назад
+-----
+system_information.next
+Далее
+-----
+system_information.limited
+Отчёт ограничен; часть сведений пропущена
+-----
+system_information.destination
+Путь отчёта · Ctrl-L для замены
+-----
+system_information.export
+Экспорт отчёта
+-----
+system_information.item
+{0}: {1}
+-----
+system_information.report.invalid
+Введите абсолютный путь для отчёта
+-----
+system_information.report.exists
+По этому пути уже есть файл
+-----
+system_information.report.saved
+Отчёт сохранён
+-----
+system_information.report.failed
+Не удалось сохранить отчёт
+-----
+app.preview
+Просмотр
+-----
+app.console
+Консоль
+-----
+preview.open
+Открыть
+-----
+preview.fit
+Вписать
+-----
+preview.actual
+100%
+-----
+preview.zoom.out
+-
+-----
+preview.zoom.in
++
+-----
+preview.rotate.left
+Влево
+-----
+preview.rotate.right
+Вправо
+-----
+preview.export.png
+Экспорт PNG
+-----
+preview.export.copy
+Копия оригинала
+-----
+preview.export.to
+Путь экспорта
+-----
+preview.path.open.placeholder
+Введите путь к PNG или JPEG
+-----
+preview.path.export.placeholder
+Введите новый путь для вывода
+-----
+preview.zoom.percent
+{0}%
+-----
+preview.details
+{0} × {1} пкс · {2}
+-----
+preview.status.choose
+Откройте изображение PNG или JPEG.
+-----
+preview.status.enter_path
+Сначала введите путь к изображению.
+-----
+preview.status.cannot_open
+Не удалось открыть изображение.
+-----
+preview.status.source_limit
+Файл изображения превышает предел 40 МиБ.
+-----
+preview.status.unsupported
+Просмотр поддерживает изображения PNG и JPEG.
+-----
+preview.status.pdf_unavailable
+Просмотр PDF пока недоступен.
+-----
+preview.status.cannot_decode
+Изображение повреждено или не удалось его декодировать.
+-----
+preview.status.pixel_limit
+Изображение превышает 8 миллионов пикселей или 8192 пикселя на сторону.
+-----
+preview.status.opened
+Изображение открыто.
+-----
+preview.status.surface_failed
+Не удалось показать изображение.
+-----
+preview.status.no_image
+Откройте изображение перед экспортом.
+-----
+preview.status.export_path
+Сначала введите новый путь экспорта.
+-----
+preview.status.exists
+Этот путь уже существует. Выберите новый.
+-----
+preview.status.export_failed
+Не удалось экспортировать изображение.
+-----
+preview.status.copied
+Оригинал изображения скопирован.
+-----
+preview.status.exported
+Изображение PNG экспортировано.
+-----

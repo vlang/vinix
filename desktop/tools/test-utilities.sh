@@ -157,7 +157,7 @@ cp "$root/desktop/tools/tests/files_settings_process_integration.v" "$work/ui/ma
 rm -f "$work/ui/main.v"
 
 cp "$root/desktop/tools/tests/files_quicklook_test.v" "$work/ui/"
-"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+"$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_quicklook_test.v"
 rm -f "$work/ui/files_quicklook_test.v"
 
@@ -167,11 +167,13 @@ cp "$root/desktop/tools/tests/files_mouse_back_test.v" "$work/ui/"
 rm -f "$work/ui/files_mouse_back_test.v"
 
 # Build a real executable as well as V's generated test runner. It execs
-# itself twice in native-app mode and verifies UI, actions, state sync and
-# clean shutdown across actual process boundaries.
+# native-app clients and verifies UI, actions, state sync, utility exports and
+# clean shutdown across actual process boundaries. Image decoding uses Clang,
+# matching the production cross-build.
 cp "$root/desktop/tools/tests/app_process_integration.v" "$work/ui/main.v"
-"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
+"$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/app-process-integration" "$work/ui"
 "$work/app-process-integration"
 
 "$root/desktop/tools/test-utility-parity.sh"
+SKIP_NATIVE_IPC=1 "$root/desktop/tools/test-new-utilities.sh"

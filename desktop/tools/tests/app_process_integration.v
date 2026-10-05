@@ -10,6 +10,7 @@ module main
 
 import os
 import ui2
+import encoding.base64
 
 fn tree_has_id(element ui2.Element, id string) bool {
 	if element.id == id {
@@ -45,6 +46,14 @@ fn tree_contains_text(element ui2.Element, text string) bool {
 		}
 	}
 	return false
+}
+
+fn tree_text_dump(element ui2.Element) string {
+	mut text := element.text + '\n'
+	for child in element.children {
+		text += tree_text_dump(child)
+	}
+	return text
 }
 
 fn close_remote(mut app NativeApp) {
@@ -312,5 +321,85 @@ fn main() {
 		}
 	}
 	close_remote(mut terminal)
+	check_new_utility_clients(mut desktop)
 	desktop_restore_requested_scale()
+}
+
+// Open real documents, deliver edits and exports through the native protocol,
+// then inspect the result outside each child process.
+fn check_new_utility_clients(mut desktop Desktop) {
+	root := os.join_path(os.temp_dir(), 'vinix-utility-ipc-${os.getpid()}')
+	os.mkdir(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	image_path := os.join_path(root, 'image.png')
+	image_export := os.join_path(root, 'rotated.png')
+	image := base64.decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAD0lEQVR4nGP4z8DwHwgbABB5A359Y87XAAAAAElFTkSuQmCC')
+	os.write_file_array(image_path, image) or { panic(err) }
+	preview_factory := app_factory_named('vinix-preview') or { panic('Preview is not registered') }
+	mut preview := start_remote_app_at_with_timeout(arguments()[0], preview_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	preview_open := jump_open_prefix + image_path
+	preview.handle(preview_open) or { panic(err) }
+	preview.handle(preview_action_rotate_right) or { panic(err) }
+	preview.handle(preview_action_export_path) or { panic(err) }
+	if mut preview is RemoteApp { preview.paste_input(image_export) }
+	preview.handle(preview_action_export_png) or { panic(err) }
+	preview_tree := preview.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+	assert tree_has_id(preview_tree, preview_action_image)
+	assert tree_contains_text(preview_tree, 'PNG image exported.')
+	free_tree(preview_tree)
+	close_remote(mut preview)
+	exported_image := os.read_bytes(image_export) or { panic(err) }
+	mut image_width := 0
+	mut image_height := 0
+	mut image_channels := 0
+	assert C.stbi_info_from_memory(exported_image.data, exported_image.len, &image_width,
+		&image_height, &image_channels) == 1
+	assert image_width == 1 && image_height == 2
+
+	log_path := os.join_path(root, 'application.log')
+	log_export := os.join_path(root, 'matching.txt')
+	os.write_file(log_path, 'alpha boot\nbeta warning\nalpha ready\n') or { panic(err) }
+	console_factory := app_factory_named('vinix-console') or { panic('Console is not registered') }
+	mut console := start_remote_app_at_with_timeout(arguments()[0], console_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	console_open := jump_open_prefix + log_path
+	console.handle(console_open) or { panic(err) }
+	console.handle('console.filter') or { panic(err) }
+	if mut console is RemoteApp { console.paste_input('alpha') }
+	console.handle('console.export_path') or { panic(err) }
+	if mut console is RemoteApp {
+		console.key_input('\x01')
+		console.paste_input(log_export)
+	}
+	console.handle('console.export') or { panic(err) }
+	console_tree := console.build(ui2.rect(0, 0, 800, 536)) or { panic(err) }
+	assert tree_contains_text(console_tree, 'alpha ready')
+	assert !tree_contains_text(console_tree, 'beta warning')
+	free_tree(console_tree)
+	close_remote(mut console)
+	log_text := os.read_file(log_export) or { panic(err) }
+	assert log_text == 'alpha boot\nalpha ready\n'
+
+	report_path := os.join_path(root, 'system.txt')
+	info_factory := app_factory_named('vinix-system-information') or {
+		panic('System Information is not registered')
+	}
+	mut info := start_remote_app_at_with_timeout(arguments()[0], info_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	info.handle('system_information.path') or { panic(err) }
+	if mut info is RemoteApp { info.paste_input(report_path) }
+	info.handle('system_information.export') or { panic(err) }
+	info_tree := info.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+	assert tree_has_id(info_tree, 'system_information.refresh')
+	assert tree_contains_text(info_tree, 'Report saved'), 'System Information export: ${tree_text_dump(info_tree)}'
+	free_tree(info_tree)
+	close_remote(mut info)
+	report := os.read_file(report_path) or { panic(err) }
+	assert report.contains('System Information') && report.contains('Installed packages')
+	assert report.contains('Storage') && report.contains('Hardware')
+	unsafe {
+		image_path.free(); image_export.free(); image.free(); preview_open.free(); exported_image.free()
+		log_path.free(); log_export.free(); console_open.free(); log_text.free(); report_path.free(); report.free()
+	}
 }

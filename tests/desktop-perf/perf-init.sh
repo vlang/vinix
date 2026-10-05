@@ -135,12 +135,24 @@ run_case() {
 	fi
 
 	install -m755 "$perf/vinix-desktop-$variant" /usr/bin/vinix-desktop
+	# Older cached initramfs images do not contain these new native exec names.
+	# The scenario exercises the same symlinks installed by both image builders.
+	if [ "$scenario" = utilities ]; then
+		for app in vinix-preview vinix-console vinix-system-information; do
+			ln -sf vinix-desktop "/usr/bin/$app"
+		done
+	fi
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
 	sync
 	sleep 2
 	used_before=$("$perf/measure" used)
 	log=/tmp/desktop-$variant-$scenario-$round.log
 	case "$scenario" in
+		utilities)
+			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
+				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Preview --open=Console \
+					'--open=System Information' >"$log" 2>&1 &
+			;;
 		apps)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
 				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Files --open=Terminal --open=Clock \

@@ -2471,3 +2471,285 @@ i
 calculator.memory.indicator
 M
 -----
+console.source.xorg
+Registro de Xorg
+-----
+console.source.firefox
+Registro de Firefox
+-----
+console.source.chromium
+Registro de Chromium
+-----
+console.load
+Abrir
+-----
+console.refresh
+Actualizar
+-----
+console.follow
+Seguir registro
+-----
+console.matches
+Filas coincidentes
+-----
+console.filter
+Filtro exacto
+-----
+console.empty
+Este registro está vacío.
+-----
+console.no_matches
+Ninguna fila coincide con el filtro exacto.
+-----
+console.no_file
+El registro no existe. Elige otra ruta o inicia la aplicación que lo escribe.
+-----
+console.not_regular
+Solo se admiten archivos normales. No se pueden ver dispositivos, enlaces, carpetas ni tuberías.
+-----
+console.read_failed
+No se pudo leer el registro.
+-----
+console.invalid_path
+Introduce una ruta absoluta sin caracteres de control.
+-----
+console.up
+Página anterior
+-----
+console.down
+Página siguiente
+-----
+console.left
+Izquierda
+-----
+console.right
+Derecha
+-----
+console.limited
+Últimos 128 KiB
+-----
+console.export
+Exportar filas
+-----
+console.export_exists
+La ruta de exportación ya existe. Elige otro nombre de archivo.
+-----
+console.export_failed
+No se pudieron exportar las filas coincidentes.
+-----
+console.export_saved
+Filas coincidentes exportadas.
+-----
+console.hint
+El filtro busca texto literal y distingue mayúsculas. La exportación guarda todas las filas coincidentes sin sobrescribir archivos.
+-----
+app.system_information
+Información del sistema
+-----
+system_information.overview
+Resumen
+-----
+system_information.hardware
+Hardware
+-----
+system_information.storage
+Almacenamiento
+-----
+system_information.packages
+Paquetes instalados
+-----
+system_information.unavailable
+No disponible
+-----
+system_information.kernel
+Núcleo
+-----
+system_information.cpu
+Modelo de CPU
+-----
+system_information.architecture
+Arquitectura de CPU informada
+-----
+system_information.cpu_online
+CPU activas
+-----
+system_information.memory_total
+Memoria total
+-----
+system_information.memory_available
+Memoria disponible
+-----
+system_information.memory_cached
+Memoria en caché
+-----
+system_information.uptime
+Tiempo de actividad (segundos)
+-----
+system_information.cpu_report
+Informe de CPU
+-----
+system_information.numa_nodes
+Nodos de memoria activos
+-----
+system_information.gpu_report
+Informe del controlador GPU
+-----
+system_information.network_report
+Informe de interfaces de red
+-----
+system_information.device_inventory_unavailable
+Inventario de dispositivos y controladores PCI / USB no disponible
+-----
+system_information.custom_package
+Paquete adicional (versión no disponible)
+-----
+system_information.source
+Origen
+-----
+system_information.mount
+Montaje (ruta; sistema de archivos; origen; opciones)
+-----
+system_information.capacity
+Total / usado / disponible (bytes)
+-----
+system_information.capacity_unavailable
+Capacidad no disponible para este sistema de archivos
+-----
+system_information.package_version_unavailable
+Paquete (versión no disponible)
+-----
+system_information.packages_empty
+No hay paquetes APK instalados registrados
+-----
+system_information.read_failed
+No se pudo terminar de leer este informe
+-----
+system_information.refresh
+Actualizar
+-----
+system_information.previous
+Anterior
+-----
+system_information.next
+Siguiente
+-----
+system_information.limited
+Informe limitado; se ha omitido parte de la información
+-----
+system_information.destination
+Destino del informe · Ctrl-L para reemplazar
+-----
+system_information.export
+Exportar informe
+-----
+system_information.item
+{0}: {1}
+-----
+system_information.report.invalid
+Introduce una ruta absoluta para el informe
+-----
+system_information.report.exists
+Ya existe un archivo en este destino
+-----
+system_information.report.saved
+Informe guardado
+-----
+system_information.report.failed
+No se pudo guardar el informe
+-----
+app.preview
+Vista previa
+-----
+app.console
+Consola
+-----
+preview.open
+Abrir
+-----
+preview.fit
+Ajustar
+-----
+preview.actual
+100%
+-----
+preview.zoom.out
+-
+-----
+preview.zoom.in
++
+-----
+preview.rotate.left
+Girar izquierda
+-----
+preview.rotate.right
+Girar derecha
+-----
+preview.export.png
+Exportar PNG
+-----
+preview.export.copy
+Copiar original
+-----
+preview.export.to
+Exportar a
+-----
+preview.path.open.placeholder
+Introduce una ruta PNG o JPEG
+-----
+preview.path.export.placeholder
+Introduce una nueva ruta de salida
+-----
+preview.zoom.percent
+{0}%
+-----
+preview.details
+{0} × {1} px · {2}
+-----
+preview.status.choose
+Abre una imagen PNG o JPEG para empezar.
+-----
+preview.status.enter_path
+Introduce primero la ruta de una imagen.
+-----
+preview.status.cannot_open
+No se puede abrir esta imagen.
+-----
+preview.status.source_limit
+El archivo supera el límite de 40 MiB.
+-----
+preview.status.unsupported
+Vista previa admite imágenes PNG y JPEG.
+-----
+preview.status.pdf_unavailable
+La visualización de PDF aún no está disponible.
+-----
+preview.status.cannot_decode
+La imagen está dañada o no se puede decodificar.
+-----
+preview.status.pixel_limit
+La imagen supera 8 millones de píxeles o 8192 píxeles por lado.
+-----
+preview.status.opened
+Imagen abierta.
+-----
+preview.status.surface_failed
+No se puede mostrar la imagen.
+-----
+preview.status.no_image
+Abre una imagen antes de exportar.
+-----
+preview.status.export_path
+Introduce primero una nueva ruta de exportación.
+-----
+preview.status.exists
+Esta ruta de salida ya existe. Elige otra.
+-----
+preview.status.export_failed
+No se pudo exportar la imagen.
+-----
+preview.status.copied
+Imagen original copiada.
+-----
+preview.status.exported
+Imagen PNG exportada.
+-----

@@ -264,7 +264,7 @@ done
 # the aarch64 desktop image.
 for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix-dota2 \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
-    vinix-disk-usage \
+    vinix-disk-usage vinix-preview vinix-console vinix-system-information \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \
     vinix-capture; do

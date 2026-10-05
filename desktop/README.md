@@ -51,6 +51,11 @@ What it does:
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs
 - a **clock** with a large local-time display and a tenth-second stopwatch
+- **Preview**, an image viewer with zoom, pan, rotation and PNG/original export
+- **Console**, a bounded application-log viewer with tail following, exact
+  filtering and matching-row export
+- **System Information**, current hardware, storage and installed-package
+  reports with refresh and export
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
@@ -106,6 +111,9 @@ typing any word with a q in it drop the user back to the console.
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
+    preview_app*.v  the standalone image viewer and export model
+    console_app*.v  bounded log snapshots, filtering and tail following
+    system_information*.v  system-source inventory and report export
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
     taskbar_preview.v  thumbnails, the window picker, Aero Peek, Show Desktop

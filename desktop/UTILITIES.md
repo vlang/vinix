@@ -1,11 +1,12 @@
 # Desktop utility inventory and macOS feature gaps
 
 Audited against the sources in this repository on 2026-10-05. This document
-records what was present, what this change implements, and the remaining work.
+records the original inventory, implemented utility work, and the remaining work.
 It does not claim complete macOS parity.
 
 The native utilities are Files, Activity Monitor, Settings, Text Editor,
-Calculator, Calendar, Clock, Capture, Disk Usage and Terminal. Both desktop
+Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console
+and System Information. Both desktop
 image builders install their executable names as clients of the multicall
 desktop. Files Settings, Quick Look, Quick Launch and the notification area are
 supporting surfaces rather than additional utility payloads.
@@ -28,6 +29,9 @@ Vinix engineering proposals based on the inspected code.
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection | Capacity/free-space/mount overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
 | Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents | Selection and copy, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
+| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, PNG export and original-file copying without overwriting | PDF rendering and page navigation; annotations, selections/cropping, EXIF orientation, colour profiles/adjustments, metadata, additional formats, printing and a file picker |
+| Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
+| System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; refresh, paging and text export without overwriting | Broader device/driver APIs, searchable structured properties and remote reports; unavailable sources are labelled explicitly |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
@@ -35,8 +39,11 @@ and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-di
 [Calculator modes](https://support.apple.com/guide/calculator/choose-the-right-mode-calc22d50970/mac),
 [Calendar events](https://support.apple.com/en-gb/guide/calendar/icalwr13-events/mac)
 and [calendar interchange](https://support.apple.com/guide/calendar/import-or-export-calendars-icl1023/27.0/mac/27),
-[Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac)
-and [screenshot targets](https://support.apple.com/en-ie/102646).
+[Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac),
+[screenshot targets](https://support.apple.com/en-ie/102646),
+[Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
+[Console log messages](https://support.apple.com/guide/console/log-messages-cnsl1012/mac)
+and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac).
 
 ### Hosted and installable applications
 
@@ -55,8 +62,8 @@ their third-party application internals are outside the native-utility changes.
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the ten native utilities account for the complete
-31-entry application catalog. Vim and shell tools installed in the userland
+These 21 entries plus the thirteen native utilities account for the complete
+34-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
 ## Missing utility applications to implement
@@ -68,9 +75,6 @@ desktop workflow.
 
 | Priority | Utility / macOS comparison | First useful milestone | Dependencies or boundary |
 | --- | --- | --- | --- |
-| P1 | Preview | Standalone image/PDF viewer, zoom, rotation, page navigation, save/export | Reuse image decoding and Quick Look; add a maintained PDF renderer. Annotations and printing follow. |
-| P1 | Console | Browse and tail kernel/app logs, search/filter and export | Define log locations, retention and access controls; do not fabricate crash reports from ordinary logs. |
-| P1 | System Information | CPU/memory/device, mount, driver and installed-package inventory with export | Start with real procfs/device/pkg reports. Settings About now supplies the small summary. |
 | P1 | Archive Utility | Browse/extract/create common archives, progress/cancel and errors | Use available archive tools; reject path traversal and escaping links during extraction. |
 | P1 | Disk Utility | Read-only disks/partitions/mounts/capacity overview, then mount/unmount | Block/mount discovery and privilege mediation. Formatting, repair and partition editing need explicit destructive-operation UI and filesystem tools. |
 | P1 | Backup / Time Machine workflow | Versioned folder backup, browse versions and restore to a chosen destination | Durable destination handling, free-space limits and clear restore conflicts; system snapshots are later filesystem work. |
@@ -127,6 +131,24 @@ not proposed as general Vinix utility ports.
   operation and Escape stops/cancels it.
 - **Settings:** choose About and Refresh to read system-reported information.
   Missing data is labelled unavailable.
+- **Preview:** enter an image path and Open; choose Fit, 100%, zoom or Rotate.
+  Export PNG saves the current rotation with alpha; Original Copy keeps the
+  exact encoded input. Enter a new output path because neither overwrites.
+  Successful opens appear in the app's Recent Items. PDF support remains work.
+- **Console:** choose a log preset or enter an absolute regular-file path.
+  Follow Tail refreshes once per second; paging suspends follow. The exact,
+  case-sensitive filter and Export Rows apply to all retained rows, including
+  those outside the viewport. Snapshots keep at most the last 128 KiB.
+  Missing logs stay unavailable until their producer creates them.
+- **System Information:** choose a report category and Refresh to collect
+  current system data. Enter a new export path to save the report. Data comes
+  from Vinix's procfs, CPU topology, GPU reports, mount capacity and package
+  databases; absent facilities are reported as unavailable.
+
+The image builders install `vinix-preview`, `vinix-console` and
+`vinix-system-information` as native multicall clients. Existing guest images
+need those new executable names installed as well as the updated desktop
+binary before the new menu entries can launch them.
 
 ## Validation
 
@@ -137,6 +159,11 @@ frontend with `-gc none -manualfree`. It is also called by
 Files, UTF-8 editing/terminal rendering and the application catalog. Run
 `desktop/tools/test-settings.sh` for preference/device and translation checks,
 and `desktop/tools/test-activity.sh` for process controls and resource lifetimes.
+`desktop/tools/test-new-utilities.sh` covers the three new utility models,
+catalog/search integration, translations/fonts, owned-memory cleanup and real
+native-process IPC. It uses Clang for the image decoder and heap checks.
+`tests/desktop-perf/run.py --scenarios=utilities` adds a guest startup/rendering
+scenario for Preview, Console and System Information.
 
 Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have

@@ -2471,3 +2471,285 @@ i
 calculator.memory.indicator
 M
 -----
+console.source.xorg
+Xorg Log
+-----
+console.source.firefox
+Firefox Log
+-----
+console.source.chromium
+Chromium Log
+-----
+console.load
+Open
+-----
+console.refresh
+Refresh
+-----
+console.follow
+Follow Tail
+-----
+console.matches
+Matching rows
+-----
+console.filter
+Exact filter
+-----
+console.empty
+This log file is empty.
+-----
+console.no_matches
+No rows match the exact filter.
+-----
+console.no_file
+The log file does not exist. Choose another path or start the application that writes it.
+-----
+console.not_regular
+Only regular files are supported. Devices, links, directories, and pipes cannot be viewed.
+-----
+console.read_failed
+The log file could not be read.
+-----
+console.invalid_path
+Enter an absolute file path with no control characters.
+-----
+console.up
+Page Up
+-----
+console.down
+Page Down
+-----
+console.left
+Left
+-----
+console.right
+Right
+-----
+console.limited
+Last 128 KiB
+-----
+console.export
+Export Rows
+-----
+console.export_exists
+The export path already exists. Choose a new file name.
+-----
+console.export_failed
+The matching rows could not be exported.
+-----
+console.export_saved
+Matching rows exported.
+-----
+console.hint
+Filter is case-sensitive literal text. Export saves all matching rows without overwriting files.
+-----
+app.system_information
+System Information
+-----
+system_information.overview
+Overview
+-----
+system_information.hardware
+Hardware
+-----
+system_information.storage
+Storage
+-----
+system_information.packages
+Installed packages
+-----
+system_information.unavailable
+Unavailable
+-----
+system_information.kernel
+Kernel
+-----
+system_information.cpu
+CPU model
+-----
+system_information.architecture
+Reported CPU architecture
+-----
+system_information.cpu_online
+Online CPUs
+-----
+system_information.memory_total
+Total memory
+-----
+system_information.memory_available
+Available memory
+-----
+system_information.memory_cached
+Cached memory
+-----
+system_information.uptime
+Uptime (seconds)
+-----
+system_information.cpu_report
+CPU report
+-----
+system_information.numa_nodes
+Online memory nodes
+-----
+system_information.gpu_report
+GPU driver report
+-----
+system_information.network_report
+Network interface report
+-----
+system_information.device_inventory_unavailable
+PCI / USB device and driver inventory unavailable
+-----
+system_information.custom_package
+Custom package (version unavailable)
+-----
+system_information.source
+Source
+-----
+system_information.mount
+Mount (path; filesystem; source; options)
+-----
+system_information.capacity
+Total / used / available (bytes)
+-----
+system_information.capacity_unavailable
+Capacity unavailable for this filesystem
+-----
+system_information.package_version_unavailable
+Package (version unavailable)
+-----
+system_information.packages_empty
+No installed APK packages recorded
+-----
+system_information.read_failed
+Could not finish reading this report
+-----
+system_information.refresh
+Refresh
+-----
+system_information.previous
+Previous
+-----
+system_information.next
+Next
+-----
+system_information.limited
+Report limited; some information omitted
+-----
+system_information.destination
+Report destination · Ctrl-L to replace
+-----
+system_information.export
+Export report
+-----
+system_information.item
+{0}: {1}
+-----
+system_information.report.invalid
+Enter an absolute report destination
+-----
+system_information.report.exists
+A file already exists at this destination
+-----
+system_information.report.saved
+Report saved
+-----
+system_information.report.failed
+Could not save the report
+-----
+app.preview
+Preview
+-----
+app.console
+Console
+-----
+preview.open
+Open
+-----
+preview.fit
+Fit
+-----
+preview.actual
+100%
+-----
+preview.zoom.out
+-
+-----
+preview.zoom.in
++
+-----
+preview.rotate.left
+Rotate Left
+-----
+preview.rotate.right
+Rotate Right
+-----
+preview.export.png
+Export PNG
+-----
+preview.export.copy
+Original Copy
+-----
+preview.export.to
+Export To
+-----
+preview.path.open.placeholder
+Enter a PNG or JPEG path
+-----
+preview.path.export.placeholder
+Enter a new output path
+-----
+preview.zoom.percent
+{0}%
+-----
+preview.details
+{0} × {1} px · {2}
+-----
+preview.status.choose
+Open a PNG or JPEG image to begin.
+-----
+preview.status.enter_path
+Enter an image path first.
+-----
+preview.status.cannot_open
+Cannot open this image.
+-----
+preview.status.source_limit
+Image file exceeds the 40 MiB limit.
+-----
+preview.status.unsupported
+Preview supports PNG and JPEG images.
+-----
+preview.status.pdf_unavailable
+PDF viewing is not available yet.
+-----
+preview.status.cannot_decode
+The image is damaged or cannot be decoded.
+-----
+preview.status.pixel_limit
+Image exceeds 8 million pixels or 8192 pixels per side.
+-----
+preview.status.opened
+Image opened.
+-----
+preview.status.surface_failed
+Cannot display the image.
+-----
+preview.status.no_image
+Open an image before exporting.
+-----
+preview.status.export_path
+Enter a new export path first.
+-----
+preview.status.exists
+That output path already exists. Choose a new path.
+-----
+preview.status.export_failed
+The image could not be exported.
+-----
+preview.status.copied
+Original image copied.
+-----
+preview.status.exported
+PNG image exported.
+-----

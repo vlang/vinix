@@ -1396,6 +1396,46 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		// Application and file icons. These are filled shapes rather than
 		// hairlines: they are read at a glance and at whatever size the
 		// element gives them, not aligned to the pixel grid like the chrome's.
+		'preview' {
+			body := w * 4 / 5
+			tall := h * 2 / 3
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0x387fbd)
+			d.canvas.fill_circle(left + body * 3 / 4, top + tall / 3, if w > 24 { 3 } else { 1 }, 0xffd368)
+			d.canvas.draw_line(left + body / 8, top + tall * 4 / 5,
+				left + body * 2 / 5, top + tall * 2 / 5, 0xe6f3fb, if w > 24 { 3 } else { 1 })
+			d.canvas.draw_line(left + body * 2 / 5, top + tall * 2 / 5,
+				left + body * 4 / 5, top + tall * 4 / 5, 0xe6f3fb, if w > 24 { 3 } else { 1 })
+		}
+		'console' {
+			body := w * 4 / 5
+			tall := h * 2 / 3
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0x23394f)
+			for row in 0 .. 3 {
+				d.canvas.fill_rect(left + body / 6, top + tall / 4 + row * tall / 5,
+					body * (if row == 2 { 1 } else { 2 }) / 3, if h > 24 { 2 } else { 1 }, 0x8be0b1)
+			}
+		}
+		'system_information' {
+			body := w * 3 / 5
+			tall := h * 3 / 5
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0x56738f)
+			for pin in 1 .. 4 {
+				px := left + pin * body / 4
+				py := top + pin * tall / 4
+				d.canvas.draw_line(px, top - h / 10, px, top, 0xafc6da, 1)
+				d.canvas.draw_line(px, top + tall, px, top + tall + h / 10, 0xafc6da, 1)
+				d.canvas.draw_line(left - w / 10, py, left, py, 0xafc6da, 1)
+				d.canvas.draw_line(left + body, py, left + body + w / 10, py, 0xafc6da, 1)
+			}
+			d.canvas.fill_circle(cx, cy - tall / 5, if w > 24 { 2 } else { 1 }, 0xffffff)
+			d.canvas.fill_rect(cx - 1, cy, if w > 24 { 3 } else { 2 }, tall / 3, 0xffffff)
+		}
 		'folder' {
 			body := w * 4 / 5
 			tall := h * 5 / 8

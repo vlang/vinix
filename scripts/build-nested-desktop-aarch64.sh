@@ -26,7 +26,8 @@ mkdir -p "$work/root/usr/share/vinix/icons"
 install -m644 "$repo"/desktop/assets/*.qoi \
     "$work/root/usr/share/vinix/icons/"
 for app in vinix-files vinix-calculator vinix-terminal vinix-settings \
-    vinix-activity vinix-editor vinix-calendar vinix-clock; do
+    vinix-activity vinix-editor vinix-calendar vinix-clock \
+    vinix-preview vinix-console vinix-system-information; do
     ln -sf vinix-desktop "$work/root/usr/bin/$app"
 done
 mkdir -p "$work/root/dev" "$work/root/proc" "$work/root/sys" \

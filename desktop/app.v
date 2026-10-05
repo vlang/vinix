@@ -67,12 +67,14 @@ const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2',
 	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13',
 	'start.launch.14', 'start.launch.15', 'start.launch.16', 'start.launch.17', 'start.launch.18',
 	'start.launch.19', 'start.launch.20', 'start.launch.21', 'start.launch.22', 'start.launch.23',
-	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29', 'start.launch.30']
+	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29', 'start.launch.30',
+	'start.launch.31', 'start.launch.32', 'start.launch.33']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
 	'shortcut.12', 'shortcut.13', 'shortcut.14', 'shortcut.15', 'shortcut.16', 'shortcut.17',
 	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21', 'shortcut.22', 'shortcut.23',
-	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30']
+	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30',
+	'shortcut.31', 'shortcut.32', 'shortcut.33']
 
 // available_apps is what the Start menu and wallpaper offer. The native
 // Calculator includes space below its ui2 keypad for memory and result history.
@@ -436,6 +438,37 @@ const available_apps = [
 		poll_interval_ms: 50
 		standalone:       true
 	},
+	AppFactory{
+		title: 'Preview'
+		icon: 'builtin:preview'
+		width: 800
+		height: 600
+		process_name: 'vinix-preview'
+		keyboard: true
+		pointer: true
+		open: open_preview
+	},
+	AppFactory{
+		title: 'Console'
+		icon: 'builtin:console'
+		width: 800
+		height: 560
+		process_name: 'vinix-console'
+		keyboard: true
+		polling: true
+		poll_interval_ms: 1000
+		open: open_console
+	},
+	AppFactory{
+		title: 'System Information'
+		icon: 'builtin:system_information'
+		width: 780
+		height: 540
+		process_name: 'vinix-system-information'
+		keyboard: true
+		pointer: true
+		open: open_system_information
+	},
 ]
 
 fn files_settings_factory() AppFactory {
@@ -473,6 +506,9 @@ fn app_title_text(title string) string {
 		'Text Editor' { 'app.text_editor' }
 		'Calendar' { 'app.calendar' }
 		'Clock' { 'app.clock' }
+		'Preview' { 'app.preview' }
+		'Console' { 'app.console' }
+		'System Information' { 'app.system_information' }
 		'Wine Calculator' { 'app.wine_calculator' }
 		'Wine Notepad' { 'app.wine_notepad' }
 		'Vinix in QEMU' { 'app.qemu' }
