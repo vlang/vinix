@@ -9,7 +9,7 @@
 #include <string.h>
 #define VINIX_APPLE_SPI_TEST
 /* Test the exact production implementation, not a reimplemented model. */
-#include "../../kernel/c/apple_spi_keyboard.c"
+#include "../apple-spi-keyboard/core_fixture.h"
 
 static unsigned tests;
 static void le16(uint8_t *p, uint16_t v) { p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); }

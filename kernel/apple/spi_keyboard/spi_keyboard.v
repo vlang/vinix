@@ -3,6 +3,8 @@
 @[has_globals]
 module spi_keyboard
 
+import apple.spi_keyboard.spicore as _
+
 import aarch64.kio
 import aarch64.pmgr
 import devicetree
@@ -11,10 +13,10 @@ import memory
 
 #include "apple_spi_keyboard.h"
 
-fn C.vinix_apple_spi_keyboard_init(spi u64, enable u64, enable_low int, ready u64, ready_low int, input_hz u32, maximum_hz u32) int
-fn C.vinix_apple_spi_keyboard_poll(output &u8, capacity u64, application_cursor int) int
+fn C.vinix_apple_spi_keyboard_init(spi u64, enable u64, enable_low i32, ready u64, ready_low i32, input_hz u32, maximum_hz u32) i32
+fn C.vinix_apple_spi_keyboard_poll(output &u8, capacity u64, application_cursor i32) i32
 fn C.vinix_apple_spi_keyboard_reports() u64
-fn C.vinix_apple_spi_keyboard_caps_lock() int
+fn C.vinix_apple_spi_keyboard_caps_lock() i32
 fn C.vinix_apple_spi_touchpad_reports() u64
 fn C.vinix_call_void_fn(callback voidptr)
 

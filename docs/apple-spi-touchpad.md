@@ -80,9 +80,9 @@ existing device-tree/power/pinmux setup
     -> locked 8-word snapshot -> existing /dev/pointer -> desktop cursor
 ```
 
-`kernel/c/apple_spi_touchpad.h` contains the internal allocation-free parser
-and state machine. It is included by `apple_spi_keyboard.c` so production and
-host tests execute the same implementation. `touchpad.v` is a small adapter
+`kernel/apple/spi_keyboard/spicore/core.v` contains the allocation-free
+transport, parser and state machine. Host C fixtures link the production V
+implementation through its C ABI. `touchpad.v` is a small adapter
 inside the existing `apple.spi_keyboard` module, sharing its lock. No second
 controller driver, IRQ handler, DMA engine, or competing SPI reader is created.
 
@@ -148,28 +148,19 @@ cursor. A lift, multiple active contacts, a report gap of at least 100 ms,
 a malformed report, or a delta larger than 2048 sensor units rebases movement.
 This limits jumps where no documented stable contact ID is available. It is
 not a substitute for full multitouch tracking or palm rejection. Rebuild after
-changing the constants in `apple_spi_touchpad.h` to tune speed/thresholds.
+changing the constants in `spicore/core.v` to tune speed/thresholds.
 
 ## Reproducible tests
 
 ```sh
 # Both suites, AddressSanitizer + UndefinedBehaviorSanitizer:
-CC=clang SANITIZE=1 ./tests/apple-spi-touchpad/run.sh
-
-# Both suites, optimized host build without sanitizer dependencies:
-CC=gcc ./tests/apple-spi-touchpad/run.sh
-
-# Target-compile the actual production C transport, not the host-test branch:
-clang --target=aarch64-none-elf -D__AARCH64__ -D__vinix__ \
-    -std=gnu99 -ffreestanding -fno-stack-protector -fno-strict-aliasing \
-    -march=armv8.4-a -mgeneral-regs-only -Wall -Wextra -Werror -O2 \
-    -c kernel/c/apple_spi_keyboard.c -o /tmp/apple-spi-aarch64.o
+CC=clang ./tests/apple-spi-touchpad/run.sh
 ```
 
-The last command uses Clang's freestanding headers. It verifies C target code
-generation, not the V adapter, the full kernel link, or MMIO behavior on M1.
+Both kernel architectures also build and pass the QEMU boot/syscall check.
+QEMU does not emulate the physical Apple SPI device.
 
-The keyboard suite has 19 groups and 100,000 mutated packets. The touchpad
+The keyboard suite has 20 groups and 100,000 mutated packets. The touchpad
 suite has 19 groups and 100,000 mutated messages. It checks an independently
 specified feature-command byte vector; signed
 coordinates; lifting and discontinuities; button edges; all splits of a

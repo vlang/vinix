@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #define VINIX_APPLE_SPI_TEST
-#include "../../kernel/c/apple_spi_keyboard.c"
+#include "../apple-spi-keyboard/core_fixture.h"
 
 static unsigned groups;
 static void seal(uint8_t p[256]) { tp_put16(p + 254, tp_crc(p, 254)); }

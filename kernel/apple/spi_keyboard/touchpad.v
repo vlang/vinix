@@ -5,7 +5,7 @@ module spi_keyboard
 
 #include "apple_spi_keyboard.h"
 
-fn C.vinix_apple_spi_touchpad_read(output &i32) int
+fn C.vinix_apple_spi_touchpad_read(output &i32) i32
 
 __global (
 	apple_spi_touchpad_reported = false
