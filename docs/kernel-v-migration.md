@@ -148,14 +148,43 @@ All ten porting stages are committed. Apple hardware-specific protocols have
 host MMIO/firmware fixtures and boot coverage; physical ANS, SMC, SPI, Wi-Fi
 and speaker operation still require testing on a supported Apple machine.
 
-## Next batch, started 2026-10-05
+## Completed continuation: 10,191 original C lines
 
 The continuation starts from `823aeb116eb3b3ab20463ccb9b1c3fba6f0c41ae`.
 That revision has 6,488 lines in 16 top-level kernel C files, including the
 54-line existing Linux header binding. Embedded native diagnostic fixtures
 remain independent C callers and are recorded separately from translated
-implementation lines. The requested approximately 10,000-line scope extends
-beyond the remaining kernel implementations; subsequent stages are in progress.
+implementation lines. The completed scope extends beyond the remaining kernel
+implementations into first-party boot and tools code. It covers 12,837 original
+C lines and conservatively credits **10,191 translated lines**, excluding
+independent diagnostics, native ABI code and other uncredited source lines.
+Moving a C fixture receives no translation credit. Counts include comments and
+blank lines; the lower bound subtracts entire new C binding files even where
+their lines do not correspond directly to retained original implementation.
+
+| Scope | Original C lines | Conservative translated lines | Commit |
+| --- | ---: | ---: | --- |
+| Console and formatting benchmark policy | 195 | 119 | `3a2c4ed6` |
+| Allocation instrumentation | 228 | 219 | `acad3b2a` |
+| Apple ADT/FDT and freestanding helpers | 719 | 719 | `5f6951c7` |
+| LinuxKPI wait-bit and wound/wait | 426 | 345 | `61572a06` |
+| Apple loader runtime and handoff | 1,059 | 1,059 | `5d2c7537` |
+| Sandbox, MAC and audit tools | 859 | 665 | `5cfc023e` |
+| Darwin AGX observation | 480 | 420 | `7149f685` |
+| LinuxKPI allocation, format and logging | 1,456 | 840 | `6b18ca9e` |
+| LinuxKPI tasks, clocks and timers | 1,071 | 718 | `2172fb48` |
+| LinuxKPI synchronization, SRCU and workqueues | 2,724 | 1,704 | `9b785b5f` |
+| Shared Vinix/XNU heap sampler | 334 | 273 | `069f76c3` |
+| X11 input and Wine/clipboard bridges | 1,808 | 1,712 | `58f63ef8` |
+| ARM init variants | 811 | 731 | `58f63ef8` |
+| Wi-Fi CLI | 110 | 110 | `58f63ef8` |
+| EGL and GLUT samples | 557 | 557 | `58f63ef8` |
+| **Total** | **12,837** | **10,191** | |
+
+A separate 32-line GL C heredoc was also ported and is excluded from both
+totals. Upstream dependencies, public ABI layouts, independent C fixtures and
+historical benchmark source snapshots remain intact. Each completed stage was
+committed using its own reviewed paths.
 
 | Stage | Native V location | Validation |
 | --- | --- | --- |
@@ -181,7 +210,7 @@ frame lifetime received independent review.
 
 Apple loader stage 1 moves the ADT reader, FDT writer/converter and freestanding
 memory/string helpers (719 original implementation lines) into
-`apple-boot/vcore/tree.v`. The public C headers and independent converter
+`apple-boot/vcore/tree.v`. The public C ABI and independent converter
 fixtures remain unchanged. ASan/UBSan passed 410,739 memory cases and the
 converter matched 233 XNU register windows (four unsupported nodes skipped).
 The AArch64 loader linked with no undefined symbols or allocator imports and
@@ -195,7 +224,8 @@ port. Both comparison guests idled at the same point; this check remains
 unverified. Its markers and assertions were unchanged, and physical Apple
 boot remains untested.
 
-LinuxKPI wait-bit and wound/wait stage moves 426 original C lines into
+LinuxKPI wait-bit and wound/wait stage covers 426 original C lines, crediting
+345 after subtracting its entire 81-line native binding, and moves policy into
 `compatcore/{wait_bit,ww_mutex}.v`. Unchanged independent host callers passed
 ASan/UBSan, header and pinned upstream checks; both architecture builds passed.
 The ARM boot guest passed and the complete four-CPU x86 LinuxKPI guest passed
@@ -316,8 +346,9 @@ allocation rollback received independent lifetime review. The new sampler has
 not been executed inside XNU; historical macOS benchmark captures are preserved
 as evidence of their original C workload.
 
-The boot/tools stage ports at least 1,712 original X11 bridge lines (1,807
-original lines less both complete 95-line C binding files), 731 ARM init policy
+The boot/tools stage ports at least 1,712 original X11 bridge lines (1,808
+original lines, excluding both complete C binding files totaling 95 lines and
+one uncredited original header line), 731 ARM init policy
 lines (811 original lines less 80 native assembly/restorer lines), 110 Wi-Fi
 CLI lines and 557 EGL/GLUT sample lines. A separate 32-line GL C heredoc also
 became a native V variant and receives no credit in this conservative tally.
@@ -345,3 +376,69 @@ pipeline both passed; the failure and comparison logs remain preserved. No
 assertions or deadlines were weakened. Physical Apple graphics/Wi-Fi and
 optional hardware init branches remain untested. New lifetimes received
 independent review.
+
+The top-level `kernel/c/*.c` inventory now contains 611 lines in ten native ABI
+binding files, excluding `*_test.c`. Wait, mutex, task, time, timer, allocation,
+formatter, logging, synchronization, SRCU, workqueue and heap-sampler algorithms
+are maintained in V. The surviving C supplies Linux header/layout primitives,
+native frame capture and variadic entry points; nanoprintf and imported Linux
+remain unchanged. The exact current binding inventory is in
+[kernel-v-migration-handoff.md](kernel-v-migration-handoff.md).
+
+Final source reconciliation compared all 672 tracked kernel files on each
+build tree against `db601f94` with no differences. Both final builds passed.
+The final default x86 GCC-sampler guest passed all phases and reached userspace
+with ELF SHA256
+`13b771fb76e1e2f47976124d86639045027a15604e29482db58556844cc500a4`;
+the sampler object remains byte-identical to the previously tested genuine
+GCC object. The final ARM kernel SHA256 is
+`945416243c26087a94243d3e47e370881afc3e3c6db2a8a544317c18cc33f7f6`.
+
+The final ARM desktop plan completed all 44 required reports for
+`ops,churn,cache,idle,apps,drag`; screenshots confirmed app launch and window
+dragging. Two additional `ops,churn` rounds completed all 80 reports on each
+of the final V and untouched `823aeb11` C kernels, with unchanged counts of
+200 operations per case and 300 executions per program, one completion marker
+per guest and no fixture errors.
+The C comparison booted ELF SHA256
+`54732d4b8094d88eb3b4c6c7896ebf1008d1ca884c5165f9a2a571add19ba6b5`
+with the same image, desktop, compiler/dependencies and test fixtures.
+
+Raw heap-class and large-page deltas match in 71 of 72 operation reports,
+including all 36 warm reports. The sole difference is one additional 64-byte
+object in the V cold `stat` snapshot. These complete runs do not establish
+universally flat retention: both kernels retain 208 bytes per `mkdir`
+(200 objects each in the 16- and 192-byte classes), and retain 180/160
+16-byte objects per 200 `rename`/`rename_over` operations. Those patterns
+match in both directories and both rounds, in unchanged VFS code. Churn
+whole-machine residuals vary from 0–80 KiB on C and 16–48 KiB on V; no new
+consistent per-operation object-growth pattern was observed. Raw residuals
+remain recorded rather than being treated as zero or harmless.
+`perf-final/final-validation-summary.json`, raw serial logs, screenshots and
+the per-class comparison preserve the evidence. The missing-directory image
+setup failure and an aborted firmware-only startup are recorded separately;
+the completed comparisons keep the original firmware/configuration/assertions.
+
+The required allocation-site check still fails against the existing allowlist.
+An isolated check of unchanged starting revision `823aeb11` gives exactly the
+same 158 rejected sites: 354 reported ARM sites, 293 x86 sites and 414 distinct
+sites across architectures. Comparing site kinds and paths finds no additions
+or removals. The opt-in production LinuxKPI V core reports zero allocation
+warnings, and generated-code/import checks plus exact guest memory baselines
+pass. The allowlist and assertions were not changed. Evidence is preserved in
+`kernel-alloc-{sites,baseline-823,opt-core}.log` and
+`kernel-alloc-baseline-compare.json` in the batch cache.
+
+Linguist 7.27.0 at committed source
+`db601f941aafd7a9335fd2b54cc3dfb41e12e468` reports **V 41.85%, C 23.71%**,
+557 C files, 385 Python files and 283 shell files. The regenerated
+[inventory](linguist-files.md) records committed blob bytes and the pinned
+reproduction command. Every classified path and size was checked against Git
+blobs; no Verilog or vendored trees appear. First-party C bindings and fixtures
+remain counted honestly, and `.gitattributes` is unchanged by this batch.
+
+Current local evidence is under
+`/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/`.
+`progress.json` records stage counts and commits; frozen kernels, provenance
+and serial logs identify the actual tested artifacts. These caches are local;
+this document and the handoff are the durable record.
