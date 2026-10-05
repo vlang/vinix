@@ -39,6 +39,7 @@ def prepare_images(fixtures: Path, destination: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-build", action="store_true", help="reuse build/ios/staging/usr/bin/run-ios")
+    parser.add_argument("--with-2048", action="store_true", help="also build and run pinned upstream iOS-2048")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
@@ -49,13 +50,20 @@ def main() -> int:
     subprocess.run(["sh", str(ROOT / "tests/ios/build-fixture.sh"), str(build / "fixtures")], check=True)
     subprocess.run(["bash", str(ROOT / "examples/ios-calculator/build.sh")],
         env={**os.environ, "VINIX_IOS_CALCULATOR_BUILD_DIR": str(build / "objc")}, check=True)
+    if arguments.with_2048:
+        env = {**os.environ, "VINIX_IOS_2048_BUILD_DIR": str(build / "2048")}
+        subprocess.run(["bash", str(ROOT / "examples/ios-2048/build.sh")], env=env, check=True)
+        subprocess.run(["bash", str(ROOT / "tests/ios/build-2048-model.sh")], env=env, check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     runner.PASS_MARKER = b"VINIX iOS GUEST: PASS"
     runner.FAIL_MARKERS = (b"iOS FAIL:", b"FATAL EXCEPTION", b"KERNEL PANIC")
-    runner.FEATURE_MARKERS = FEATURES
+    runner.FEATURE_MARKERS = FEATURES + ((
+        b"iOS PASS: upstream 2048 eight model merge tests",
+        b"iOS PASS: upstream 2048 launch, swipes, merges, timers and ARC teardown",
+    ) if arguments.with_2048 else ())
     with tempfile.TemporaryDirectory(prefix="vinix-ios-vm-") as directory:
         work = Path(directory)
         rootfs = work / "rootfs"
@@ -66,6 +74,9 @@ def main() -> int:
         for name in ("calculator", "unsupported"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copy2(build / "objc/Calculator.app/Calculator", destination / "UIKitCalculator")
+        if arguments.with_2048:
+            shutil.copytree(build / "2048/NumberTileGame.app", destination / "NumberTileGame.app")
+            shutil.copy2(build / "2048/model-tests", destination / "model-tests")
         prepare_images(build / "fixtures", destination)
         # Same small static musl sysroot used by the existing syscall tests.
         sysroot = Path(os.environ.get("VINIX_IOS_TEST_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))

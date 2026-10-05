@@ -52,6 +52,7 @@ static void run(const char *image, const char *left, const char *op,
 }
 
 extern void test_uikit(void);
+extern void test_2048(void);
 
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -73,6 +74,10 @@ int main(void) {
     run("/opt/ios/truncated", NULL, NULL, NULL, 1, "file range exceeds input");
     puts("iOS PASS: ARM64e and malformed images rejected");
     test_uikit();
+    if (!access("/opt/ios/model-tests", R_OK)) {
+        run("/opt/ios/model-tests", NULL, NULL, NULL, 0, "iOS PASS: upstream 2048 eight model merge tests");
+        test_2048();
+    }
     puts("VINIX iOS GUEST: PASS");
     for (;;) pause();
 }

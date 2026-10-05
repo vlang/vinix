@@ -2,6 +2,7 @@
 module main
 
 import macho
+import os
 
 #include <sys/mman.h>
 #include <unistd.h>
@@ -28,6 +29,7 @@ fn execute(image macho.Image, arguments []string) !int {
 	defer { C.munmap(mapping, usize(layout.size)) }
 	base := u64(mapping)
 	objc_start()
+	ios_runtime.bundle = os.dir(os.real_path(arguments[0]))
 	defer { objc_stop() }
 	fixups := image.plan_fixups(layout, base, runtime_symbol)!
 	for segment in image.segments {

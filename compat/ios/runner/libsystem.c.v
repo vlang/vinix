@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import crypto.rand
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -10,6 +12,19 @@ fn C.malloc(usize) voidptr
 fn C.free(voidptr)
 fn C.memcpy(voidptr, voidptr, usize) voidptr
 fn C.memset(voidptr, int, usize) voidptr
+fn C.floorf(f32) f32
+
+fn darwin_random_uniform(bound u32) u32 {
+	if bound < 2 { return 0 }
+	// Rejection sampling avoids modulo bias; crypto.rand uses each host's OS RNG.
+	threshold := (u32(0) - bound) % bound
+	for {
+		bytes := rand.bytes(4) or { panic('iOS: random source failed') }
+		value := u32(bytes[0]) | u32(bytes[1]) << 8 | u32(bytes[2]) << 16 | u32(bytes[3]) << 24
+		unsafe { bytes.free() }
+		if value >= threshold { return value % bound }
+	}
+}
 
 fn darwin_strlen(text &char) usize {
 	mut length := usize(0)
@@ -82,6 +97,8 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_strcmp' { unsafe { voidptr(darwin_strcmp) } }
 		'_memcpy' { unsafe { voidptr(C.memcpy) } }
 		'_memset' { unsafe { voidptr(C.memset) } }
+		'_arc4random_uniform' { unsafe { voidptr(darwin_random_uniform) } }
+		'_floorf' { unsafe { voidptr(C.floorf) } }
 		else { return error('iOS: libSystem symbol is not implemented: ${symbol}') }
 	}
 	return u64(address)

@@ -70,7 +70,14 @@ class DesktopClient:
         os.close(child_input)
         os.close(child_output)
         self.state = bytes(116)
-        self.reply()
+        try:
+            self.reply()
+        except Exception as error:
+            self.process.kill()
+            out, err = self.process.communicate(timeout=10)
+            os.close(self.request)
+            os.close(self.response)
+            raise RuntimeError(f'{error}: {out.decode(errors="replace")} {err.decode(errors="replace")}') from error
         assert struct.unpack_from("<I", self.state, 48)[0] in (1, 2)
 
     def reply(self):
@@ -90,7 +97,10 @@ class DesktopClient:
         return decode_tree(self.send(1, width=width, height=height))
 
     def close(self):
-        self.send(6)
+        try:
+            self.send(6)
+        except (BrokenPipeError, RuntimeError):
+            self.process.kill()
         os.close(self.request)
         os.close(self.response)
         out, err = self.process.communicate(timeout=10)

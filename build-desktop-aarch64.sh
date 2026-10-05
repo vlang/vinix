@@ -1230,6 +1230,10 @@ if [ -x "$IOS_STAGING/usr/bin/run-ios" ]; then
     ln -sf run-ios "$STAGING/usr/bin/vinix-ios-calculator"
     mkdir -p "$STAGING/usr/share/vinix/ios"
     cp -R "$IOS_STAGING/usr/share/vinix/ios/Calculator.app" "$STAGING/usr/share/vinix/ios/"
+    if [ -f "$IOS_STAGING/usr/share/vinix/ios/NumberTileGame.app/NumberTileGame" ]; then
+        cp -R "$IOS_STAGING/usr/share/vinix/ios/NumberTileGame.app" "$STAGING/usr/share/vinix/ios/"
+        ln -sf run-ios "$STAGING/usr/bin/vinix-ios-2048"
+    fi
 fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control

@@ -870,7 +870,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 	if roblox_split_env.len > 0 {
 		envp << &char(roblox_split_env.str)
 	}
-	if app_name == 'vinix-ios-calculator' {
+	if app_name in ['vinix-ios-calculator', 'vinix-ios-2048'] {
 		trace := C.getenv(c'VINIX_IOS_TRACE')
 		if trace != unsafe { nil } && unsafe { trace[0] == 49 && trace[1] == 0 } {
 			envp << c'VINIX_IOS_TRACE=1'

@@ -1,4 +1,4 @@
-# iOS compatibility: Objective-C UIKit calculator
+# iOS compatibility: Objective-C UIKit applications
 
 `run-ios` loads ordinary ARM64 iOS Mach-O executables in a Vinix userspace
 process. The [Objective-C UIKit calculator](../examples/ios-calculator/README.md)
@@ -7,9 +7,14 @@ arithmetic and receive UIKit target/action messages. V implements the required
 Objective-C, Foundation and UIKit subset; a small assembly trampoline preserves
 integer, floating-point and structure arguments during message dispatch.
 
+[Austin Zheng's iOS-2048](../examples/ios-2048/README.md) also runs from a pinned
+upstream build. Its original Objective-C sources compile without changes. The
+runner loads its launch storyboard source, presents the game controller and
+executes native swipe callbacks, tile merges, scoring and queued moves.
+
 The UIKit view tree is rendered by Vinix's existing desktop compositor using
 the standalone application protocol. The kernel loads the runner's static ELF
-and needs no Mach-O or Darwin syscall changes. This supports this calculator's
+and needs no Mach-O or Darwin syscall changes. This supports the implemented apps'
 API set; general iOS applications and Apple's own Calculator remain outside
 the implemented subset. The existing native Vinix calculator is a separate app.
 
@@ -30,6 +35,12 @@ The iOS builder produces the static runner, `vinix-ios-calculator` launcher,
 includes the runner and bundle when `build/ios/staging` exists; `VINIX_IOS_STAGING`
 selects another staging directory. The launcher passes the installed Mach-O to
 the runtime at `/usr/share/vinix/ios/Calculator.app/Calculator`.
+
+Use `./build-ios-aarch64.sh --with-2048` to download, build and stage iOS-2048
+as well. Open **iOS 2048**, then **Play Game**. Drag to swipe, or use arrow keys
+or WASD. The `vinix-ios-2048` launcher loads
+`/usr/share/vinix/ios/NumberTileGame.app/NumberTileGame`. Its bundle and IPA are
+under `build/ios/2048`; the app's guide records the source revision and license.
 
 `VINIX_IOS_BUILD_DIR`, `VINIX_AARCH64_SYSROOT`, `V` and `LLVM_BIN` select runner
 build inputs/output. `IOS_CLANG`, `IOS_LD`, `IOS_SDK` and
@@ -52,11 +63,12 @@ executing a GUI app directly from a shell does not create a window. Set
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3, addends, weak unresolved symbols |
-| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, `_memcpy`, `_memset`, `_strtod`; Darwin ARM64 `snprintf("%.12g", double)` adapter |
-| Objective-C | Class/metaclass registration, superclass dispatch, absolute/relative method lists, checked metadata, nonfragile ivar adjustment, native method execution, nil returns, allocation/new, retain/release/strong stores, autorelease pools and ARC destructors |
-| Foundation | NSObject allocation/initialization; heap NSString objects created from UTF-8 |
-| UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController, UIView, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius |
-| Desktop | VAPP v10 view/button/label serialization, resize and layout callbacks, button actions, ASCII calculator keyboard input, window close and object teardown |
+| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, `_memcpy`, `_memset`, `_strtod`, `_floorf`, unbiased `_arc4random_uniform`; Darwin ARM64 `snprintf("%.12g", double)` adapter; block ABI helpers |
+| Objective-C | Class/metaclass registration, superclass dispatch, absolute/relative method lists, checked metadata, nonfragile ivar adjustment, native method execution, nil returns, allocation/new/class, retain/release/strong stores, autorelease pools, ARC destructors, zeroing weak references and copied block properties |
+| Foundation | NSObject; UTF-8/constant NSString and integer/object formatting; NSNumber integers, NSIndexPath value equality, NSArray/NSMutableArray, NSMutableDictionary, fast enumeration and NSTimer callbacks |
+| UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
+| Resources | XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
+| Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata and chained import names, including ARM64e images |
 
 Header, command and segment ranges are checked before loading. Chained pointers
@@ -68,15 +80,19 @@ runner releases its mapping on return or link failure and exits after one app.
 ARM64e/PAC, encrypted images, non-PIE binaries, image initializers/terminators,
 Darwin TLS, custom stack sizes, legacy dyld opcodes and multiple chain starts
 per page are rejected. Objective-C categories, +load/+initialize, exceptions,
-weak references, blocks and Swift metadata are unsupported. Mach services,
+Swift metadata are unsupported. Blocks support object/block captures, but not
+`__block` by-reference captures. The runtime and weak tables are single-threaded.
+Mach services,
 direct Darwin syscalls, dynamic framework loading, Swift/SwiftUI, general
-Foundation/UIKit APIs, scenes, nibs and bundle resource loading are not
-implemented. View trees have bounded depth and at most 64 children per view;
-the current action bridge handles controls in the root content view.
+Foundation/UIKit APIs, scenes, compiled nibs/storyboards and Auto Layout are not
+implemented. View trees have bounded depth and at most 64 children per view.
+UIView animations execute their blocks/completions synchronously; only their
+final states are drawn, without sliding/pop interpolation or layer transforms.
 
 Unknown strong imports and unknown methods fail with a specific diagnostic.
 General Darwin variadic calls such as `_printf` cannot be forwarded to musl.
-Only the calculator's `snprintf` double format has a calling-convention adapter.
+The calculator's `snprintf` double format and NSString's supported substitutions
+have calling-convention adapters.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 
@@ -127,6 +143,12 @@ VMODULES="$PWD/compat/ios" v -enable-globals -cc clang test compat/ios
 python3 tests/ios/uikit.py # after building build/ios/run-ios-host above
 python3 tests/ios/run.py
 python3 tests/ios/desktop.py --desktop build/vinix-desktop
+# Upstream iOS-2048, including original model tests and real guest swipes:
+./tests/ios/build-2048-model.sh # after building the app
+build/ios/run-ios-host build/ios/2048/model-tests
+python3 tests/ios/game2048.py
+python3 tests/ios/run.py --with-2048
+python3 tests/ios/desktop.py --app 2048 --desktop build/vinix-desktop
 ```
 
 Host tests cover malformed file/command/section/segment/chain ranges, universal

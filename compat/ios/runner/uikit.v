@@ -66,6 +66,12 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 		return 0
 	}
 	selector := ctext(frame.x[1])
+	if is_block(object) {
+		if !foundation_dispatch(object, selector, mut frame) {
+			panic('iOS: unsupported block message')
+		}
+		return 0
+	}
 	imp := native_method(cls, selector)
 	if imp != 0 { return imp }
 	info := ios_runtime.classes[cls] or { panic('iOS: message to an unknown class') }
@@ -76,11 +82,32 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if foundation_dispatch(object, selector, mut frame) { return true }
 	// Class methods are inherited through their metaclasses.
 	if object in ios_runtime.classes {
 		match selector {
 			'alloc' { frame.x[0] = objc_allocate(object) }
 			'new' { frame.x[0] = objc_new(object) }
+			'whiteColor', 'blackColor', 'darkGrayColor', 'lightGrayColor', 'grayColor' {
+				color := objc_allocate(object)
+				mut header := obj_header(color)
+				header.color = match selector {
+					'whiteColor' { u32(0xffffff) }
+					'blackColor' { u32(0) }
+					'darkGrayColor' { u32(0x555555) }
+					'lightGrayColor' { u32(0xaaaaaa) }
+					else { u32(0x808080) }
+				}
+				frame.x[0] = objc_autorelease(color)
+			}
+			'animateWithDuration:animations:completion:' {
+				block_invoke_void(frame.x[2])
+				block_invoke_bool(frame.x[3], true)
+			}
+			'animateWithDuration:delay:options:animations:completion:' {
+				block_invoke_void(frame.x[3])
+				block_invoke_bool(frame.x[4], true)
+			}
 			'stringWithUTF8String:' { frame.x[0] = make_string(unsafe { &char(frame.x[2]) }) }
 			'colorWithRed:green:blue:alpha:' {
 				color := objc_allocate(object)
@@ -90,7 +117,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 					u32(math.clamp(frame_double(frame, 2), 0, 1) * 255)
 				frame.x[0] = objc_autorelease(color)
 			}
-			'systemFontOfSize:weight:' {
+			'systemFontOfSize:weight:', 'fontWithName:size:' {
 				font := objc_allocate(object)
 				mut header := obj_header(font)
 				header.font_size = frame_double(frame, 0)
@@ -118,6 +145,26 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	match selector {
 		'init' {}
 		'initWithFrame:' { header.frame = frame_rect(frame) }
+		'initWithTarget:action:' {
+			header.target = frame.x[2]
+			header.action = frame.x[3]
+		}
+		'setNumberOfTouchesRequired:' {
+			if frame.x[2] != 1 { panic('iOS: only single-touch swipe gestures are supported') }
+		}
+		'setDirection:' { header.number = i64(frame.x[2]) }
+		'addGestureRecognizer:' { header.gestures << objc_retain(frame.x[2]) }
+		'setAffineTransform:' {} // Final animation states are rendered without interpolation.
+		'presentViewController:animated:completion:' {
+			store_field(object, 8, frame.x[2])
+			ui_load_controller(frame.x[2])
+			block_invoke_void(frame.x[4])
+		}
+		'dismissViewControllerAnimated:completion:' {
+			root := obj_header(ios_runtime.window).fields[7]
+			store_field(root, 8, 0)
+			block_invoke_void(frame.x[3])
+		}
 		'viewDidLoad', 'viewDidLayoutSubviews' {}
 		'view' {
 			if header.fields[6] == 0 {
@@ -133,14 +180,21 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		'safeAreaInsets' { return_rect(mut frame, ObjRect{}) }
 		'setFrame:' { header.frame = frame_rect(frame) }
 		'layer' {
-			if header.fields[4] == 0 { header.fields[4] = objc_allocate(ios_runtime.names['CALayer']) }
+			if header.fields[4] == 0 {
+				header.fields[4] = objc_allocate(ios_runtime.names['CALayer'])
+			}
 			frame.x[0] = header.fields[4]
 		}
 		'setCornerRadius:' { header.radius = frame_double(frame, 0) }
 		'cornerRadius' { frame_float_return(mut frame, 0, header.radius) }
 		'tag' { frame.x[0] = u64(header.tag) }
 		'setTag:' { header.tag = i64(frame.x[2]) }
-		'titleLabel' { frame.x[0] = header.fields[5] }
+		'titleLabel' {
+			if header.fields[5] == 0 {
+				header.fields[5] = objc_allocate(ios_runtime.names['UILabel'])
+			}
+			frame.x[0] = header.fields[5]
+		}
 		'text', 'backgroundColor', 'textColor', 'font', 'rootViewController' {
 			index := match selector {
 				'text' { 0 }
@@ -161,19 +215,30 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			}
 			store_field(object, index, frame.x[2])
 			if ios_runtime.trace && selector == 'setText:' {
-				println('iOS UILabel: ${ctext(u64(obj_header(frame.x[2]).text))}')
+				println('iOS UILabel: ${string_text(frame.x[2])}')
 			}
 		}
 		'setTitle:forState:', 'setTitleColor:forState:' {
+			if header.fields[5] == 0 {
+				header.fields[5] = objc_allocate(ios_runtime.names['UILabel'])
+			}
 			store_field(header.fields[5], if selector == 'setTitle:forState:' { 0 } else { 3 }, frame.x[2])
 		}
-		'setAccessibilityLabel:', 'setAdjustsFontSizeToFitWidth:', 'setMinimumScaleFactor:' {}
+		'setAccessibilityLabel:', 'setAdjustsFontSizeToFitWidth:', 'setMinimumScaleFactor:',
+		'setUserInteractionEnabled:', 'setShowsTouchWhenHighlighted:' {
+		}
 		'setTextAlignment:' { header.align = int(frame.x[2]) }
 		'addSubview:' {
-			if header.child_count == 64 { panic('iOS: UIView child limit exceeded') }
-			header.children[header.child_count] = objc_retain(frame.x[2])
-			header.child_count++
+			ui_add_child(object, frame.x[2])
 		}
+		'removeFromSuperview' { ui_remove_child(object) }
+		'initWithTitle:message:delegate:cancelButtonTitle:otherButtonTitles:' {
+			store_field(object, 0, frame.x[2])
+			store_field(object, 1, frame.x[3])
+			store_field(object, 3, frame.x[5])
+		}
+		'show' { ui_show_alert(object) }
+		'dismissAlert:' { ui_remove_child(object) }
 		'addTarget:action:forControlEvents:' {
 			if frame.x[4] != 64 { panic('iOS: unsupported UIControl event') }
 			header.target = frame.x[2]
@@ -183,8 +248,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			objc_release(ios_runtime.window)
 			ios_runtime.window = objc_retain(object)
 			controller := header.fields[7]
-			invoke_void(controller, c'viewDidLoad')
-			invoke_void(controller, c'viewDidLayoutSubviews')
+			ui_load_controller(controller)
 		}
 		else { return false }
 	}
@@ -195,10 +259,14 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 	_ = argc
 	_ = argv
 	_ = principal
-	name := ctext(u64(obj_header(delegate_name).text))
+	name := string_text(delegate_name)
 	cls := ios_runtime.names[name] or { panic('iOS: application delegate class is missing') }
 	delegate := objc_new(cls)
 	defer { objc_release(delegate) }
+	ui_load_storyboard(delegate) or {
+		eprintln('iOS: ${err}')
+		return 1
+	}
 	selector := c'application:didFinishLaunchingWithOptions:'
 	imp := native_method(cls, ctext(u64(selector)))
 	if imp == 0 { panic('iOS: application delegate launch method is missing') }
@@ -218,24 +286,21 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 }
 
 fn ui_root_view() u64 {
-	controller := obj_header(ios_runtime.window).fields[7]
+	controller := ui_current_controller()
 	return obj_header(controller).fields[6]
 }
 
 fn ui_layout(width int, height int) {
 	mut view := obj_header(ui_root_view())
 	view.frame = ObjRect{0, 0, f64(width), f64(height)}
-	invoke_void(obj_header(ios_runtime.window).fields[7], c'viewDidLayoutSubviews')
+	invoke_void(ui_current_controller(), c'viewDidLayoutSubviews')
 }
 
-fn ui_action(index int) ! {
-	view := obj_header(ui_root_view())
-	if index < 0 || index >= view.child_count { return error('invalid UIKit action index') }
-	button := view.children[index]
+fn ui_action(button u64) ! {
+	if !ui_contains(ui_root_view(), button, 0) {
+		return error('UIKit action is outside the visible view tree')
+	}
 	header := obj_header(button)
 	if header.target == 0 || header.action == 0 { return error('UIKit action has no target') }
-	imp := native_method(read64(header.target), ctext(header.action))
-	if imp == 0 { return error('UIKit action method is missing') }
-	action := unsafe { ObjAction(voidptr(imp)) }
-	action(header.target, unsafe { &char(header.action) }, button)
+	invoke_action(header.target, header.action, button)
 }

@@ -50,14 +50,14 @@ fn wire_color(object u64, fallback u32) u32 {
 	return if object == 0 { fallback } else { obj_header(object).color }
 }
 
-fn encode_view(mut bytes []u8, object u64, index int, root bool, depth int) ! {
+fn encode_view(mut bytes []u8, object u64, root bool, depth int) ! {
 	if depth > 32 || bytes.len > 1024 * 1024 {
 		return error('UIKit view tree exceeds protocol limits')
 	}
 	header := obj_header(object)
 	button := header.target != 0
 	label := if button { obj_header(header.fields[5]) } else { header }
-	text := if label.fields[0] != 0 { ctext(u64(obj_header(label.fields[0]).text)) } else { '' }
+	text := string_text(label.fields[0])
 	font := if label.fields[1] == 0 { f64(17) } else { obj_header(label.fields[1]).font_size }
 	kind := if root {
 		u8(0)
@@ -112,7 +112,7 @@ fn encode_view(mut bytes []u8, object u64, index int, root bool, depth int) ! {
 	wire_f64(mut bytes, 0)
 	mut id_buffer := [32]u8{}
 	length := if button {
-		C.snprintf(unsafe { &char(&id_buffer[0]) }, 32, c'ios.%d', index)
+		C.snprintf(unsafe { &char(&id_buffer[0]) }, 32, c'ios.%llu', object)
 	} else {
 		0
 	}
@@ -122,12 +122,12 @@ fn encode_view(mut bytes []u8, object u64, index int, root bool, depth int) ! {
 	wire_string(mut bytes, '')
 	wire_string(mut bytes, text)
 	for _ in 0 .. 6 { wire_string(mut bytes, '') }
-	wire_string(mut bytes, if kind == 2 { 'bottom' } else { 'middle' })
+	wire_string(mut bytes, if kind == 2 && label.align == 2 { 'bottom' } else { 'middle' })
 	wire_string(mut bytes, '')
 	wire_u32(mut bytes, 0) // menu
 	wire_u32(mut bytes, u32(header.child_count))
 	for i in 0 .. header.child_count {
-		encode_view(mut bytes, header.children[i], i, false, depth + 1)!
+		encode_view(mut bytes, header.children[i], false, depth + 1)!
 	}
 }
 
@@ -154,11 +154,12 @@ fn ui_event_loop(request int, response int) ! {
 	state[36] = 1 // US keyboard
 	state[48] = 1 // 100% scale (the protocol uses integer factors)
 	mut encoded := []u8{cap: 16384}
-	defer { unsafe {
-		state.free()
-		encoded.free()
+	defer {
+		unsafe {
+			state.free()
+			encoded.free()
+		}
 	}
-	 }
 	if !ui_reply(response, state, encoded) { return error('desktop handshake failed') }
 	mut header := []u8{len: 136}
 	defer { unsafe { header.free() } }
@@ -175,6 +176,7 @@ fn ui_event_loop(request int, response int) ! {
 		}
 		unsafe { C.memcpy(state.data, &header[16], 116) }
 		pool := objc_pool_push()
+		ios_runtime.dirty = timers_fire() || ios_runtime.dirty
 		encoded.clear()
 		command := header[5]
 		match command {
@@ -185,32 +187,66 @@ fn ui_event_loop(request int, response int) ! {
 					return error('invalid UIKit window size')
 				}
 				ui_layout(width, height)
-				encode_view(mut encoded, ui_root_view(), -1, true, 0)!
+				encode_view(mut encoded, ui_root_view(), true, 0)!
 			}
 			2 {
 				text := unsafe { tos(payload.data, payload.len) }
 				if !text.starts_with('ios.') { return error('invalid UIKit action') }
 				suffix := text[4..]
-				index := suffix.int()
+				index := suffix.u64()
 				unsafe { suffix.free() }
 				ui_action(index)!
 			}
 			3, 7 {
-				view := obj_header(ui_root_view())
-				for key in payload {
-					tag := match key {
-						10, 13 { i64(`=`) }
-						`c`, 27 { i64(`C`) }
-						else { i64(key) }
-					}
-					for i in 0 .. view.child_count {
-						if obj_header(view.children[i]).target != 0 && obj_header(view.children[i]).tag == tag {
-							ui_action(i)!
+				text := unsafe { tos(payload.data, payload.len) }
+				direction := match text {
+					'up', '\x1b[A', 'w' { i64(4) }
+					'down', '\x1b[B', 's' { i64(8) }
+					'left', '\x1b[D', 'a' { i64(2) }
+					'right', '\x1b[C', 'd' { i64(1) }
+					else { i64(0) }
+				}
+				if direction != 0 && ui_swipe(ui_root_view(), direction, 0) {
+					// A gesture consumes the entire key event.
+				} else {
+					for key in payload {
+						tag := match key {
+							10, 13 { i64(`=`) }
+							`c`, 27 { i64(`C`) }
+							else { i64(key) }
 						}
+						ui_key(ui_root_view(), tag, 0)
 					}
 				}
 			}
-			4 { encoded << u8(0) }
+			4 {
+				encoded << u8(ios_runtime.dirty)
+				ios_runtime.dirty = false
+			}
+			5 {
+				if payload.len != 28 { return error('invalid UIKit pointer payload') }
+				phase := wire_number(payload, 0)
+				x := int(i32(wire_number(payload, 12)))
+				y := int(i32(wire_number(payload, 16)))
+				if phase == 1 && wire_number(payload, 4) == 1 {
+					ios_runtime.pointer_down = true
+					ios_runtime.pointer_x = x
+					ios_runtime.pointer_y = y
+				} else if phase == 2 && ios_runtime.pointer_down {
+					ios_runtime.pointer_down = false
+					dx := x - ios_runtime.pointer_x
+					dy := y - ios_runtime.pointer_y
+					if math.abs(dx) + math.abs(dy) >= 30 {
+						direction := if math.abs(dx) > math.abs(dy) {
+							if dx > 0 { i64(1) } else { i64(2) }
+						} else {
+							if dy > 0 { i64(8) } else { i64(4) }
+						}
+						ui_swipe(ui_root_view(), direction, 0)
+					}
+				}
+				encoded << u8(ios_runtime.dirty)
+			}
 			6 {}
 			else { return error('unsupported UIKit desktop command') }
 		}

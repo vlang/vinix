@@ -42,11 +42,26 @@ class QMP:
             {'type': 'btn', 'data': {'button': 'left', 'down': False}}]})
         time.sleep(.4)
 
+    def swipe(self, x0, y0, x1, y1):
+        def move(x, y):
+            self.call('input-send-event', {'events': [
+                {'type': 'abs', 'data': {'axis': 'x', 'value': round(x*32767/2048)}},
+                {'type': 'abs', 'data': {'axis': 'y', 'value': round(y*32767/1536)}}]})
+        move(x0,y0)
+        self.call('input-send-event', {'events': [{'type': 'btn', 'data': {'button': 'left', 'down': True}}]})
+        time.sleep(.1)
+        for i in range(1,7):
+            move(x0+(x1-x0)*i/6, y0+(y1-y0)*i/6)
+            time.sleep(.04)
+        self.call('input-send-event', {'events': [{'type': 'btn', 'data': {'button': 'left', 'down': False}}]})
+        time.sleep(.4)
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--desktop', type=Path, default=ROOT/'build/vinix-desktop')
     parser.add_argument('--timeout', type=int, default=120)
+    parser.add_argument('--app', choices=['calculator', '2048'], default='calculator')
     args = parser.parse_args()
     build = ROOT/'build/ios'
     if not args.desktop.is_file():
@@ -63,6 +78,7 @@ def main():
         sysroot = ROOT/'build-aarch64-userland/sysroot'
         subprocess.run(['clang', '--target=aarch64-linux-musl', f'--sysroot={sysroot}',
             '-static', '-O2', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
+            '-DIOS_TEST_APP="'+('iOS 2048' if args.app == '2048' else 'iOS Calculator')+'"',
             str(ROOT/'tests/ios/desktop-init.c'), f'-L{sysroot}/lib', '-fuse-ld=lld',
             '-o', str(work/'init')], check=True)
         subprocess.run(['tar', '--format=ustar', '-cf', str(work/'rootfs.tar'), '-C', str(rootfs), '.'],
@@ -79,7 +95,8 @@ def main():
         environment.pop('VINIX_QEMU_PERSIST', None)
         environment.pop('VINIX_QEMU_OVERLAY', None)
         environment.pop('VINIX_QEMU_ROOT_DISK', None)
-        log_path = build/'desktop.log'
+        name = '2048' if args.app == '2048' else 'calculator'
+        log_path = build/('2048-desktop.log' if args.app == '2048' else 'desktop.log')
         with log_path.open('wb') as log:
             process = subprocess.Popen([str(ROOT/'run-aarch64.sh'), '--no-build', '--serial',
                 '--mem=2048', f'--guest-init={work}/init'], env=environment,
@@ -97,15 +114,28 @@ def main():
                     raise RuntimeError('desktop startup timed out; see '+str(log_path))
                 qmp = QMP(qmp_path)
                 time.sleep(1)
-                qmp.call('screendump', {'filename': str(build/'calculator-before.ppm')})
+                qmp.call('screendump', {'filename': str(build/(name+'-before.ppm'))})
                 # The single window opens at (120,60), with a 34-pixel title.
                 # These centers come from the app's own 390x680 layout.
-                for x, y in [(177.75,441.75), (452.25,624.75), (269.25,533.25), (452.25,716.25)]:
-                    qmp.click(x, y)
+                if args.app == '2048':
+                    qmp.click(120+160, 94+284) # Upstream storyboard's Play Game.
+                    for i in range(16):
+                        x0,y0,x1,y1 = [(420,434,220,434), (315,534,315,334),
+                                      (220,434,420,434), (315,334,315,534)][i%4]
+                        qmp.swipe(x0,y0,x1,y1)
+                else:
+                    for x, y in [(177.75,441.75), (452.25,624.75), (269.25,533.25), (452.25,716.25)]:
+                        qmp.click(x, y)
                 time.sleep(1)
-                qmp.call('screendump', {'filename': str(build/'calculator.ppm')})
+                qmp.call('screendump', {'filename': str(build/(name+'.ppm'))})
                 transcript = log_path.read_bytes()
-                if b'iOS UILabel: 12' not in transcript:
+                if args.app == '2048':
+                    import re
+                    scores = [int(v) for v in re.findall(rb'iOS UILabel: SCORE: (\d+)', transcript)]
+                    if not scores or max(scores) < 4:
+                        raise RuntimeError('real desktop swipes did not merge tiles; see '+str(log_path))
+                    print('Vinix desktop: upstream iOS-2048 launched; pointer swipes reached score', max(scores))
+                elif b'iOS UILabel: 12' not in transcript:
                     raise RuntimeError('real desktop clicks did not calculate 12; see '+str(log_path))
                 qmp.call('quit')
                 process.wait(timeout=10)
@@ -114,8 +144,9 @@ def main():
                     os.killpg(process.pid, signal.SIGTERM)
                     process.wait(timeout=10)
                 qmp_path.unlink(missing_ok=True)
-    print('Vinix desktop: unmodified iOS Mach-O launched; real clicks calculated 7+5=12')
-    print('Screenshot:', build/'calculator.ppm')
+    if args.app == 'calculator':
+        print('Vinix desktop: unmodified iOS Mach-O launched; real clicks calculated 7+5=12')
+    print('Screenshot:', build/(name+'.ppm'))
 
 
 if __name__ == '__main__':

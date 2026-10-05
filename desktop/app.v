@@ -67,12 +67,12 @@ const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2',
 	'start.launch.9', 'start.launch.10', 'start.launch.11', 'start.launch.12', 'start.launch.13',
 	'start.launch.14', 'start.launch.15', 'start.launch.16', 'start.launch.17', 'start.launch.18',
 	'start.launch.19', 'start.launch.20', 'start.launch.21', 'start.launch.22', 'start.launch.23',
-	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29']
+	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29', 'start.launch.30']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
 	'shortcut.12', 'shortcut.13', 'shortcut.14', 'shortcut.15', 'shortcut.16', 'shortcut.17',
 	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21', 'shortcut.22', 'shortcut.23',
-	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29']
+	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30']
 
 // available_apps is what the Start menu and the wallpaper offer. The calculator's
 // window is sized from the constants its own source declares, so the window
@@ -420,6 +420,18 @@ const available_apps = [
 		process_name: 'vinix-ios-calculator'
 		keyboard: true
 		standalone: true
+	},
+	AppFactory{
+		title:            'iOS 2048'
+		icon:             'asset:calculator'
+		width:            390
+		height:           680 + default_title_height
+		process_name:     'vinix-ios-2048'
+		keyboard:         true
+		pointer:          true
+		polling:          true
+		poll_interval_ms: 50
+		standalone:       true
 	},
 ]
 

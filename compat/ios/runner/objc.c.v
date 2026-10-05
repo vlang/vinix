@@ -50,9 +50,20 @@ mut:
 	align       int
 	target      u64 // UIControl targets are non-owning.
 	action      u64
-	fields      [8]u64
+	fields      [9]u64
 	children    [64]u64
 	child_count int
+	items       []u64
+	keys        []u64
+	gestures    []u64
+	mutation    u64
+	parent_view u64 // Non-owning, cleared when detached.
+	number      i64
+	section     i64
+	valid       bool
+	deadline    i64
+	repeat      bool
+	loaded      bool
 }
 
 struct ObjRect {
@@ -65,19 +76,32 @@ mut:
 
 struct RegisterFrame {
 mut:
-	x [10]u64
-	q [16]u64
+	x     [10]u64
+	q     [16]u64
+	stack u64 // Original Darwin stack, including variadic arguments.
 }
 
 struct ObjRuntime {
 mut:
-	classes map[u64]&ObjClass
-	names   map[string]u64
-	pool    []u64
-	window  u64
-	screen  u64
-	live    int
-	trace   bool
+	classes      map[u64]&ObjClass
+	names        map[string]u64
+	pool         []u64
+	window       u64
+	screen       u64
+	live         int
+	trace        bool
+	constants    map[u64]bool
+	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
+	timers       []u64
+	block_refs   map[u64]int
+	block_isa    [3]u64
+	transform    [6]f64
+	bundle       string
+	selectors    []string
+	dirty        bool
+	pointer_down bool
+	pointer_x    int
+	pointer_y    int
 }
 
 __global ios_runtime = &ObjRuntime(unsafe { nil })
@@ -85,11 +109,20 @@ __global ios_runtime = &ObjRuntime(unsafe { nil })
 fn objc_start() {
 	ios_runtime = &ObjRuntime{ trace: os.getenv('VINIX_IOS_TRACE') == '1' }
 	ios_runtime.pool.flags |= .noslices
-	for name in ['NSObject', 'NSString', 'UIColor', 'UIFont', 'CALayer', 'UIView', 'UILabel', 'UIButton',
-		'UIWindow', 'UIViewController', 'UIScreen'] {
+	ios_runtime.timers.flags |= .noslices
+	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
+	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+		'NSDictionary', 'NSMutableDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
+		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
+		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView'] {
 		parent := match name {
 			'NSObject' { u64(0) }
-			'UILabel', 'UIButton', 'UIWindow' { ios_runtime.names['UIView'] }
+			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
+			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView' { ios_runtime.names['UIView'] }
+			'UIButton' { ios_runtime.names['UIControl'] }
+			'NSMutableArray' { ios_runtime.names['NSArray'] }
+			'NSMutableDictionary' { ios_runtime.names['NSDictionary'] }
+			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
 		cls := unsafe { &AbiClass(C.calloc(2, sizeof(AbiClass))) }
@@ -131,6 +164,14 @@ fn objc_allocate(cls u64) u64 {
 	mut header := unsafe { &ObjHeader(memory) }
 	header.refs = 1
 	header.font_size = 17
+	// calloc does not initialize V array element sizes. Set them explicitly
+	// before any collection/gesture push can grow these buffers.
+	header.items = []u64{}
+	header.keys = []u64{}
+	header.gestures = []u64{}
+	header.items.flags |= .noslices
+	header.keys.flags |= .noslices
+	header.gestures.flags |= .noslices
 	object := u64(memory) + sizeof(ObjHeader)
 	unsafe { *(&u64(object)) = cls }
 	ios_runtime.live++
@@ -138,7 +179,8 @@ fn objc_allocate(cls u64) u64 {
 }
 
 fn objc_retain(object u64) u64 {
-	if object != 0 && object !in ios_runtime.classes {
+	if object != 0 && is_block(object) { return block_retain(object) }
+	if object != 0 && object !in ios_runtime.classes && object !in ios_runtime.constants {
 		mut header := obj_header(object)
 		header.refs++
 	}
@@ -162,11 +204,22 @@ fn native_method(cls u64, selector string) u64 {
 }
 
 fn objc_release(object u64) {
-	if object == 0 || object in ios_runtime.classes { return }
+	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants { return }
+	if is_block(object) {
+		block_release(object)
+		return
+	}
 	mut header := obj_header(object)
 	if header.refs <= 0 { panic('iOS: over-release') }
 	header.refs--
 	if header.refs != 0 { return }
+	// Zero weak slots before destructors can observe a dying object.
+	for location, referent in ios_runtime.weak {
+		if referent == object {
+			unsafe { *(&u64(location)) = 0 }
+			ios_runtime.weak[location] = 0
+		}
+	}
 	// Invoke each class's compiler-generated ARC destructor once, derived first.
 	mut cls := read64(object)
 	for _ in 0 .. 128 {
@@ -179,7 +232,19 @@ fn objc_release(object u64) {
 		cls = info.parent
 	}
 	for field in header.fields { objc_release(field) }
-	for i in 0 .. header.child_count { objc_release(header.children[i]) }
+	for i in 0 .. header.child_count {
+		mut child := obj_header(header.children[i])
+		child.parent_view = 0
+		objc_release(header.children[i])
+	}
+	for item in header.items { objc_release(item) }
+	for key in header.keys { objc_release(key) }
+	for gesture in header.gestures { objc_release(gesture) }
+	unsafe {
+		header.items.free()
+		header.keys.free()
+		header.gestures.free()
+	}
 	C.free(header.text)
 	C.free(header)
 	ios_runtime.live--
@@ -200,7 +265,9 @@ fn objc_autorelease(object u64) u64 {
 fn objc_pool_push() u64 { return u64(ios_runtime.pool.len) + 1 }
 
 fn objc_pool_pop(token u64) {
-	if token == 0 || token > u64(ios_runtime.pool.len) + 1 { panic('iOS: invalid autorelease pool') }
+	if token == 0 || token > u64(ios_runtime.pool.len) + 1 {
+		panic('iOS: invalid autorelease pool')
+	}
 	for ios_runtime.pool.len >= int(token) {
 		object := ios_runtime.pool.pop()
 		objc_release(object)
@@ -215,12 +282,18 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	for timer in ios_runtime.timers {
+		timer_invalidate(timer)
+		objc_release(timer)
+	}
+	ios_runtime.timers.clear()
 	objc_release(ios_runtime.window)
 	objc_release(ios_runtime.screen)
 	objc_pool_pop(1)
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
+	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for address, info in ios_runtime.classes {
 		if info.owned { C.free(unsafe { voidptr(address) }) }
 	}
@@ -236,6 +309,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 
 fn runtime_symbol(library string, symbol string) !u64 {
 	if library == '/usr/lib/libSystem.B.dylib' {
+		if address := block_symbol(symbol) { return address }
 		if symbol == '_strtod' { return u64(unsafe { voidptr(C.strtod) }) }
 		if symbol == '_snprintf' { return u64(unsafe { voidptr(C.ios_snprintf) }) }
 		return libsystem_symbol(library, symbol)
@@ -248,8 +322,18 @@ fn runtime_symbol(library string, symbol string) !u64 {
 				unsafe { voidptr(objc_retain) }
 			}
 			'_objc_release' { unsafe { voidptr(objc_release) } }
+			'_objc_autoreleaseReturnValue' { unsafe { voidptr(objc_autorelease) } }
 			'_objc_alloc' { unsafe { voidptr(objc_allocate) } }
 			'_objc_opt_new' { unsafe { voidptr(objc_new) } }
+			'_objc_alloc_init' { unsafe { voidptr(objc_new) } }
+			'_objc_opt_class' { unsafe { voidptr(objc_class) } }
+			'_objc_retainBlock' { unsafe { voidptr(block_copy) } }
+			'_objc_setProperty_nonatomic_copy' { unsafe { voidptr(objc_property_copy) } }
+			'_objc_initWeak', '_objc_storeWeak' { unsafe { voidptr(objc_store_weak) } }
+			'_objc_destroyWeak' { unsafe { voidptr(objc_destroy_weak) } }
+			'_objc_loadWeakRetained' { unsafe { voidptr(objc_load_weak) } }
+			'_objc_copyWeak' { unsafe { voidptr(objc_copy_weak) } }
+			'_objc_enumerationMutation' { unsafe { voidptr(objc_enumeration_mutation) } }
 			'_objc_storeStrong' { unsafe { voidptr(objc_store_strong) } }
 			'_objc_autoreleasePoolPush' { unsafe { voidptr(objc_pool_push) } }
 			'_objc_autoreleasePoolPop' { unsafe { voidptr(objc_pool_pop) } }
@@ -259,10 +343,14 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		return u64(address)
 	}
 	if library !in ['/System/Library/Frameworks/Foundation.framework/Foundation',
-		'/System/Library/Frameworks/UIKit.framework/UIKit'] {
+		'/System/Library/Frameworks/UIKit.framework/UIKit',
+		'/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
 	if symbol == '_UIApplicationMain' { return u64(unsafe { voidptr(ui_application_main) }) }
+	if symbol == '_NSStringFromClass' { return u64(unsafe { voidptr(ns_string_from_class) }) }
+	if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
+	if symbol == '_CGAffineTransformIdentity' { return u64(unsafe { &ios_runtime.transform[0] }) }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
 			cls := ios_runtime.names[symbol[prefix.len..]] or { break }
@@ -404,6 +492,22 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 	mut classes := []u64{}
 	for segment in image.segments {
 		for section in segment.sections {
+			if section.name == '__cfstring' {
+				if section.size % 32 != 0 { return error('iOS: invalid constant string section') }
+				start := base + section.address - layout.base
+				m.range(start, section.size, false)!
+				for offset := u64(0); offset < section.size; offset += 32 {
+					address := start + offset
+					if read32(address + 8) != 0x7c8 {
+						return error('iOS: only UTF-8 constant strings are supported')
+					}
+					m.range(read64(address + 16), read64(address + 24) + 1, false)!
+					if unsafe { *(&u8(read64(address + 16) + read64(address + 24))) } != 0 {
+						return error('iOS: constant string is not terminated')
+					}
+					ios_runtime.constants[address] = true
+				}
+			}
 			if section.name in ['__objc_catlist', '__objc_nlclslist', '__objc_nlcatlist'] && section.size != 0 {
 				return error('iOS: Objective-C categories/+load are not implemented')
 			}

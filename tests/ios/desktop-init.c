@@ -5,6 +5,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef IOS_TEST_APP
+#define IOS_TEST_APP "iOS Calculator"
+#endif
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     mkdir("/run", 0755); mkdir("/root/.config", 0755);
@@ -18,7 +21,7 @@ int main(void) {
     setenv("VINIX_SYSTEM_SESSION", "1", 1);
     pid_t child = fork();
     if (child == 0) {
-        execl("/usr/bin/vinix-desktop", "vinix-desktop", "--open=iOS Calculator", (char *)NULL);
+        execl("/usr/bin/vinix-desktop", "vinix-desktop", "--open=" IOS_TEST_APP, (char *)NULL);
         perror("desktop exec"); _exit(127);
     }
     if (child < 0) return 1;

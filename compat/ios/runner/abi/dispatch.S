@@ -27,6 +27,8 @@ SYM(ios_objc_super):
     stp q2, q3, [sp, #112]
     stp q4, q5, [sp, #144]
     stp q6, q7, [sp, #176]
+    add x17, sp, #224
+    str x17, [sp, #208]
     mov x0, sp
     mov x1, x16
     bl SYM(ios_dispatch)

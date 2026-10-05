@@ -1,6 +1,14 @@
 #!/bin/bash
 # Build the V Mach-O compatibility runner as a static ARM64 Vinix executable.
 set -euo pipefail
+WITH_2048=0
+for option in "$@"; do
+    case "$option" in
+        --with-2048) WITH_2048=1 ;;
+        --help|-h) echo 'Usage: build-ios-aarch64.sh [--with-2048]'; exit 0 ;;
+        *) echo "ERROR: unknown option: $option" >&2; exit 2 ;;
+    esac
+done
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "$SCRIPT_DIR/build-support/find-v.sh"
 OUTPUT="${VINIX_IOS_BUILD_DIR:-$SCRIPT_DIR/build/ios}"
@@ -35,3 +43,8 @@ VINIX_IOS_CALCULATOR_BUILD_DIR="$OUTPUT/objc" bash "$SCRIPT_DIR/examples/ios-cal
 mkdir -p "$OUTPUT/staging/usr/share/vinix/ios"
 cp -R "$OUTPUT/objc/Calculator.app" "$OUTPUT/staging/usr/share/vinix/ios/"
 ln -sf run-ios "$OUTPUT/staging/usr/bin/vinix-ios-calculator"
+if [ "$WITH_2048" = 1 ]; then
+    VINIX_IOS_2048_BUILD_DIR="$OUTPUT/2048" bash "$SCRIPT_DIR/examples/ios-2048/build.sh"
+    cp -R "$OUTPUT/2048/NumberTileGame.app" "$OUTPUT/staging/usr/share/vinix/ios/"
+    ln -sf run-ios "$OUTPUT/staging/usr/bin/vinix-ios-2048"
+fi

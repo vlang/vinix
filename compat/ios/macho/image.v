@@ -314,7 +314,8 @@ pub fn (image Image) execution_issues() []string {
 	for library in image.libraries {
 		if library.name !in ['/usr/lib/libSystem.B.dylib', '/usr/lib/libobjc.A.dylib',
 			'/System/Library/Frameworks/Foundation.framework/Foundation',
-			'/System/Library/Frameworks/UIKit.framework/UIKit'] && !library.weak {
+			'/System/Library/Frameworks/UIKit.framework/UIKit',
+			'/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] && !library.weak {
 			issues << 'framework/library is not implemented: ${library.name}'
 		}
 	}

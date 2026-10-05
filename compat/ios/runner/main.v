@@ -36,8 +36,11 @@ fn inspect(image macho.Image, show_imports bool) ! {
 }
 
 fn main() {
-	if os.file_name(os.args[0]) == 'vinix-ios-calculator' {
-		run_binary('/usr/share/vinix/ios/Calculator.app/Calculator', ['/usr/share/vinix/ios/Calculator.app/Calculator'])
+	launcher := os.file_name(os.args[0])
+	if launcher in ['vinix-ios-calculator', 'vinix-ios-2048'] {
+		name := if launcher == 'vinix-ios-calculator' { 'Calculator' } else { 'NumberTileGame' }
+		path := '/usr/share/vinix/ios/${name}.app/${name}'
+		run_binary(path, [path])
 		return
 	}
 	if os.args.len < 2 || os.args[1] in ['--help', '-h'] {
