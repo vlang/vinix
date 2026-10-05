@@ -268,6 +268,23 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		return ret, 0
 	}
 
+	// A zero timeout is only a readiness probe, even with descriptors.
+	if voidptr(tmo_p) != unsafe { nil } && tmo_p.tv_sec == 0 && tmo_p.tv_nsec == 0 {
+		return 0, 0
+	}
+
+	// The scheduler stores at most max_events distinct listeners per thread.
+	// Count shared resource events once, plus the optional timeout event.
+	mut needed_events := if voidptr(tmo_p) != unsafe { nil } { 1 } else { 0 }
+	for i in 0 .. events.len {
+		mut duplicate := false
+		for j in 0 .. i {
+			if voidptr(events[i]) == voidptr(events[j]) { duplicate = true; break }
+		}
+		if !duplicate { needed_events++ }
+		if needed_events > proc.max_events { return errno.err, errno.einval }
+	}
+
 	mut timer := &time.Timer(unsafe { nil })
 
 	if voidptr(tmo_p) != unsafe { nil } {
@@ -285,6 +302,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		}
 	}
 
+	mut timed_out := false
 	for {
 		generations.clear()
 		for mut ev in events { generations << event.generation(mut ev) }
@@ -296,27 +314,12 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 			if fdd.revents != 0 { ret++ }
 		}
 		if ret != 0 { return ret, 0 }
+		if timed_out { return 0, 0 }
 		which := event.await_changes(mut events, generations, true) or { return errno.err, errno.eintr }
-
-		if voidptr(timer) != unsafe { nil } {
-			if which == u64(events.len) - 1 {
-				return 0, 0
-			}
-		}
-
-		status := fdlist[which].handle.resource.status
-
-		mut fdd := unsafe { &fds[fdnums[which]] }
-
-		revents := poll_revents(status, fdd.events)
-		if revents != 0 {
-			fdd.revents = revents
-			ret++
-			break
-		}
+		timed_out = voidptr(timer) != unsafe { nil } && which == u64(events.len) - 1
+		// Rescan every descriptor after a wake. Several pollfds can refer to
+		// the same event, and readiness may change before a timeout wakes us.
 	}
-
-	return ret, 0
 }
 
 // ppoll may sleep while a socket or pipe becomes ready. Keep the poll array,

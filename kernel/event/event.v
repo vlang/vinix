@@ -12,7 +12,7 @@ __global (
 
 fn duplicate_event_before(events []&eventstruct.Event, index u64) bool {
 	for previous := u64(0); previous < index; previous++ {
-		if events[previous] == events[index] {
+		if voidptr(events[previous]) == voidptr(events[index]) {
 			return true
 		}
 	}
