@@ -1,5 +1,8 @@
 # Kernel C to V migration
 
+The [next-session handoff](kernel-v-migration-handoff.md) lists the remaining
+implementations, build/test setup and porting constraints from the latest batch.
+
 Port first-party implementations in small stages, preserving their external
 interfaces. Keep third-party libraries, their C headers, and independent C
 test callers. Generated C from V is a build artifact, not maintained source.
