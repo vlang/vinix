@@ -14,10 +14,15 @@ if [ ! -d "$SOURCE_DIR/.git" ]; then
         echo "Set VINIX_EDK2_SOURCE to a fresh location or remove it." >&2
         exit 1
     fi
-    echo "==> Fetching edk2 $EDK2_TAG (including its required submodules)..."
-    git clone --depth 1 --branch "$EDK2_TAG" --recurse-submodules \
+    echo "==> Fetching edk2 $EDK2_TAG..."
+    git clone --depth 1 --branch "$EDK2_TAG" \
         https://github.com/tianocore/edk2.git "$SOURCE_DIR"
 fi
+
+# EDK2 needs only its direct submodules; recursive updates fetch unused test
+# dependencies. Update existing checkouts too, so an interrupted fetch recovers.
+echo "==> Fetching edk2's required submodules..."
+git -C "$SOURCE_DIR" submodule update --init --depth 1
 
 # EDK2 uses CRLF line endings; the patch in this repository uses LF. Ignore
 # that difference in context lines when checking and applying the patch.

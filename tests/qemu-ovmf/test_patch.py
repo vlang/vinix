@@ -80,8 +80,77 @@ class FirmwarePatchTests(unittest.TestCase):
             VINIX_EDK2_SOURCE=str(self.source),
             GIT_CONFIG_GLOBAL=os.devnull,
             GIT_CONFIG_NOSYSTEM="1",
+            GIT_AUTHOR_NAME="Firmware Test",
+            GIT_AUTHOR_EMAIL="firmware-test@example.invalid",
+            GIT_COMMITTER_NAME="Firmware Test",
+            GIT_COMMITTER_EMAIL="firmware-test@example.invalid",
             LC_ALL="C",
         )
+
+    def git(self, repository, *arguments):
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            env=self.environment,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout.strip()
+
+    def prepare_bootstrap(self):
+        """Use local repositories, with an intentionally unavailable nested repo."""
+        dependency = Path(self.temporary.name) / "brotli-remote"
+        dependency.mkdir()
+        self.git(dependency, "init", "-q")
+        (dependency / "README").write_text("required first-level source\n")
+        self.git(dependency, "add", "README")
+        self.git(dependency, "commit", "-qm", "Initial source")
+        nested_commit = self.git(dependency, "rev-parse", "HEAD")
+        # A recursive fetch would fail here. EDK2 never needs this nested code.
+        unavailable = Path(self.temporary.name) / "unavailable-nested-repository"
+        (dependency / ".gitmodules").write_text(
+            '[submodule "unused-tests"]\n'
+            '\tpath = unused-tests\n'
+            f'\turl = {unavailable.as_uri()}\n'
+        )
+        self.git(
+            dependency, "update-index", "--add", "--cacheinfo",
+            "160000", nested_commit, "unused-tests"
+        )
+        self.git(dependency, "add", ".gitmodules")
+        self.git(dependency, "commit", "-qm", "Add unused nested dependency")
+
+        remote = Path(self.temporary.name) / "edk2-remote"
+        (remote / DRIVER.parent).mkdir(parents=True)
+        self.git(remote, "init", "-q")
+        (remote / DRIVER).write_bytes(UPSTREAM.replace(b"\n", b"\r\n"))
+        self.git(remote, "add", str(DRIVER))
+        self.git(remote, "commit", "-qm", "Initial driver")
+        submodule = "BaseTools/Source/C/BrotliCompress/brotli"
+        (remote / ".gitmodules").write_text(
+            f'[submodule "{submodule}"]\n'
+            f'\tpath = {submodule}\n'
+            f'\turl = {dependency.as_uri()}\n'
+        )
+        self.git(
+            remote, "update-index", "--add", "--cacheinfo", "160000",
+            self.git(dependency, "rev-parse", "HEAD"), submodule
+        )
+        self.git(remote, "add", ".gitmodules")
+        self.git(remote, "commit", "-qm", "Add required first-level dependency")
+        self.git(remote, "tag", "edk2-stable202511")
+        shutil.rmtree(self.source)
+
+        # Rewrite only the builder's EDK2 URL. File transports keep these tests
+        # offline and preserve real shallow-clone and submodule behavior.
+        self.environment.update(
+            GIT_CONFIG_COUNT="2",
+            GIT_CONFIG_KEY_0=f"url.{remote.as_uri()}.insteadOf",
+            GIT_CONFIG_VALUE_0="https://github.com/tianocore/edk2.git",
+            GIT_CONFIG_KEY_1="protocol.file.allow",
+            GIT_CONFIG_VALUE_1="always",
+        )
+        return self.source / submodule
 
     def run_builder(self):
         return subprocess.run(
@@ -129,6 +198,32 @@ class FirmwarePatchTests(unittest.TestCase):
                 self.assert_reached_build(rerun)
                 self.assertIn("patch is already applied", rerun.stdout)
                 self.assertEqual(self.driver.read_bytes(), patched)
+
+    def test_fresh_bootstrap_fetches_shallow_direct_submodules_only(self):
+        dependency = self.prepare_bootstrap()
+        self.assert_reached_build(self.run_builder())
+        self.assertEqual(
+            (dependency / "README").read_text(), "required first-level source\n"
+        )
+        for repository in (self.source, dependency):
+            self.assertEqual(
+                self.git(repository, "rev-parse", "--is-shallow-repository"), "true"
+            )
+        self.assertFalse((dependency / "unused-tests/.git").exists())
+
+    def test_existing_checkout_recovers_missing_submodules(self):
+        dependency = self.prepare_bootstrap()
+        self.git(
+            self.checkout, "clone", "--depth", "1", "--branch",
+            "edk2-stable202511", "https://github.com/tianocore/edk2.git",
+            str(self.source)
+        )
+        # This is the state left when the first attempt stops after cloning
+        # EDK2 but before initializing its dependencies.
+        self.assertFalse((dependency / "README").exists())
+        self.assert_reached_build(self.run_builder())
+        self.assertTrue((dependency / "README").exists())
+        self.assertFalse((dependency / "unused-tests/.git").exists())
 
     def test_incomplete_mode_is_rejected(self):
         self.driver.write_bytes(UPSTREAM)
