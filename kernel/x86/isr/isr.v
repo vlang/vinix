@@ -190,7 +190,7 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 			else { 128 } // SI_KERNEL
 		}
 		// A CPU exception arrives with interrupts off, and everything past this
-		// point -- sendsig's scheduler enqueue, syscall_exit's own printf,
+		// point -- sendsig's scheduler enqueue, fatal exit's own printf,
 		// dequeue_and_die's cross-CPU work -- can spin on a klock.Lock.
 		// test_and_acquire() restores whatever the ambient interrupt state
 		// already was on a failed attempt (see klock_amd64.v), so a lock held by
@@ -205,7 +205,7 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		// handler is running on the faulting thread's own stack: its
 		// kernel_stack through tss.rsp0 (set per thread by scheduler_isr), or
 		// its pf_stack through ist3 when reached from pf_handler. The
-		// syscall_exit path below can block in yield(true), for example on
+		// fatal exit path below can block in yield(true), for example on
 		// writeback while closing files, exactly as a syscall would.
 		asm volatile amd64 {
 			sti
