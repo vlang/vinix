@@ -4,16 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-/* Native varargs and opaque upstream fields only; all formatting is V.
- * x86_64 va_list is an array parameter, while the Apple ARM host uses a
- * pointer parameter. Preserve the original parameter's consumption rules. */
+/* Native ABI declarations only; implementations and cursor access are V. */
 #ifndef VINIX_V_RUNTIME
-#if defined(__x86_64__)
-#define VKR_VA_PARAMETER(args) ((void *)(args))
-#else
-#define VKR_VA_PARAMETER(args) ((void *)&(args))
-#endif
-#endif
 int vkr_arg_int(void *);
 unsigned int vkr_arg_uint(void *);
 long vkr_arg_long(void *);
@@ -27,14 +19,14 @@ uint64_t vkr_pointer_hash(uint64_t, void *);
 uint64_t vkr_resource_start(void *);
 uint64_t vkr_resource_end(void *);
 uint64_t vkr_resource_flags(void *);
-#ifndef VINIX_V_RUNTIME
 struct vkr_pci_match {
     uint32_t vendor, device, subvendor, subdevice, class_code, class_mask;
     unsigned long data;
 };
-#endif
 struct vkr_pci_match *vkr_tigerlake_table(size_t *);
+#endif
 void *vinix_linuxkpi_alloc_pages(size_t, bool);
+#ifndef VINIX_V_RUNTIME
 void *vkr_log_lifecycle(void);
 void *vkr_log_ready(void);
 void vkr_log_reinit(void *);
@@ -52,6 +44,15 @@ int vkr_log_console(unsigned int);
 void vkr_log_call_sink(void *, void *, void *);
 void vkr_log_write(void *, size_t);
 bool vkr_log_key(void *);
+#endif
+#ifdef VINIX_LINUXKPI_HOST_TEST
+#define VINIX_LINUXKPI_LOG_HOST 1
+#else
+#define VINIX_LINUXKPI_LOG_HOST 0
+#endif
+void pthread_exit(void *);
+void vinix_linuxkpi_host_logger_enter(void);
+void vinix_linuxkpi_host_logger_leave(void);
 #ifndef VINIX_V_RUNTIME
 unsigned long long vinix_linuxkpi_log_caller(void);
 #endif

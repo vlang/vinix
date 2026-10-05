@@ -268,6 +268,7 @@ ifeq ($(LINUXKPI),1)
     override CPPFLAGS += -DVINIX_LINUXKPI
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
+    LINUXKPI_OBJ += obj/linuxkpi/headercore.o
     $(LINUXKPI_COBJ): override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
 endif
 
@@ -363,6 +364,15 @@ $(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
 # The original SipHash translation unit expects Kbuild export declarations.
 obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h
 
+# This isolated V module uses the unchanged upstream inline/header primitives.
+# Its generated C is a build artifact and does not join the main kernel blob.
+obj/linuxkpi/headercore.c: $(wildcard linuxkpi/headercore/*.v) $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile-v-primitives.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+	mkdir -p "$$(dirname $@)"
+	python3 ../tests/linuxkpi/compile-v-primitives.py --arch amd64 $@
+
+obj/linuxkpi/headercore.o: obj/linuxkpi/headercore.c GNUmakefile $(V_CONFIG_STAMP)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -std=gnu11 -c $< -o $@
+
 obj/linuxkpi/%.o: $(LINUXKPI_SOURCE_DIR)/lib/%.c GNUmakefile $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
@@ -427,6 +437,8 @@ obj/asm/aarch64/alloc_track.S.o obj/asm/x86_64/alloc_track.S.o: $(V_CONFIG_STAMP
 obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
 obj/asm/aarch64/printf_abi.S.o: asm/aarch64/varargs.inc
 obj/asm/x86_64/printf_abi.S.o: asm/x86_64/varargs.inc
+obj/asm/aarch64/linuxkpi_varargs.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
+obj/asm/x86_64/linuxkpi_varargs.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 
 # Compile the unchanged upstream implementation header directly. Its C source
 # remains third-party; all first-party output policy and ABI bridges are V/asm.

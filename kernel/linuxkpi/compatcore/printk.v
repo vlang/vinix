@@ -4,23 +4,6 @@
 module compatcore
 
 fn C.memmove(voidptr, voidptr, usize) voidptr
-fn C.vkr_log_lifecycle() voidptr
-fn C.vkr_log_ready() voidptr
-fn C.vkr_log_reinit(voidptr)
-fn C.vkr_log_complete(voidptr)
-fn C.vkr_log_wait(voidptr)
-fn C.vkr_log_current_get() voidptr
-fn C.vkr_log_task_put(voidptr)
-fn C.vkr_log_create(fn (voidptr) voidptr, voidptr) i32
-fn C.vkr_log_join() i32
-fn C.vkr_log_exit()
-fn C.vkr_log_host_enter()
-fn C.vkr_log_host_leave()
-fn C.vkr_log_suppress() i32
-fn C.vkr_log_console(u32) i32
-fn C.vkr_log_call_sink(voidptr, voidptr, voidptr)
-fn C.vkr_log_write(voidptr, usize)
-fn C.vkr_log_key(voidptr) bool
 fn C.vinix_linuxkpi_log_caller() u64
 fn C.msleep(u32)
 fn C.__msecs_to_jiffies(u32) u64
@@ -100,7 +83,7 @@ pub fn vkr_log_emit(facility i32, input_level i32, dev_info voidptr, fmt &char, 
 	unsafe {
 		if facility != 0 || usize(dev_info) != 0 { return -95 }
 		if input_level < -2 || input_level > 7 || usize(fmt) == 0 { return -22 }
-		if C.vkr_log_suppress() != 0 { return 0 }
+		if vkr_log_suppress() != 0 { return 0 }
 		mut level := if input_level == -2 { i32(-1) } else { input_level }
 		mut record := PrintRecord{}
 		result := vkr_format_entry(&record.text[0], sizeof(record.text), fmt, args, &record.format_status)
@@ -135,7 +118,7 @@ pub fn vkr_log_emit(facility i32, input_level i32, dev_info voidptr, fmt &char, 
 		}
 		record.text[length] = 0
 		record.length = u16(length)
-		record.level = u8(if level == -1 { C.vkr_log_console(1) & 7 } else { level })
+		record.level = u8(if level == -1 { vkr_log_console(1) & 7 } else { level })
 		record.caller = C.vinix_linuxkpi_log_caller()
 		flags := vkrp_lock()
 		require(vkr_log_submitted != u64(-1))
@@ -215,12 +198,12 @@ pub fn vkr_log_flush(snapshot u64, timeout_ms u32) i32 {
 
 fn vkrp_worker(_ voidptr) voidptr {
 	unsafe {
-		C.vkr_log_host_enter()
-		task := C.vkr_log_current_get()
+		vkr_log_host_enter()
+		task := vkr_log_current_get()
 		mut flags := vkrp_lock()
 		vkr_log_task = task
 		vkrp_unlock(flags)
-		C.vkr_log_complete(C.vkr_log_ready())
+		vkr_log_complete(vkr_log_ready())
 		for {
 			mut record := PrintRecord{}
 			mut sink := voidptr(0)
@@ -241,7 +224,7 @@ fn vkrp_worker(_ voidptr) voidptr {
 			if stop { break }
 			if !key_ready {
 				mut key := [2]u64{}
-				if C.vkr_log_key(&key[0]) {
+				if vkr_log_key(&key[0]) {
 					result := vkr_format_key(&key[0])
 					flags = vkrp_lock()
 					if result == 0 || result == -114 { vkr_log_key_ready = true }
@@ -257,18 +240,18 @@ fn vkrp_worker(_ voidptr) voidptr {
 			}
 			require(C.vinix_linuxkpi_may_sleep())
 			if usize(sink) != 0 {
-				C.vkr_log_call_sink(sink, &record, argument)
-			} else if i32(record.level) < C.vkr_log_console(0) {
+				vkr_log_call_sink(sink, &record, argument)
+			} else if i32(record.level) < vkr_log_console(0) {
 				record.text[record.length] = char(`\n`)
-				C.vkr_log_write(&record.text[0], usize(record.length) + 1)
+				vkr_log_write(&record.text[0], usize(record.length) + 1)
 			}
 			flags = vkrp_lock()
 			require(vkr_log_in_flight == record.sequence)
 			vkr_log_in_flight = 0
 			vkrp_unlock(flags)
 		}
-		C.vkr_log_host_leave()
-		C.vkr_log_exit()
+		vkr_log_host_leave()
+		vkr_log_exit()
 		return nil
 	}
 }
@@ -282,7 +265,7 @@ pub fn vkr_log_bootstrap() i32 {
 		self := caller == vkr_log_task
 		vkrp_unlock(flags)
 		if self { return 0 }
-		lifecycle := C.vkr_log_lifecycle()
+		lifecycle := vkr_log_lifecycle()
 		C.vkp_mutex_lock(lifecycle)
 		flags = vkrp_lock()
 		if usize(vkr_log_task) != 0 {
@@ -294,12 +277,12 @@ pub fn vkr_log_bootstrap() i32 {
 		fail := vkr_log_fail_create
 		vkr_log_fail_create = false
 		vkrp_unlock(flags)
-		C.vkr_log_reinit(C.vkr_log_ready())
-		if fail || C.vkr_log_create(vkrp_worker, nil) != 0 {
+		vkr_log_reinit(vkr_log_ready())
+		if fail || vkr_log_create(vkrp_worker, nil) != 0 {
 			C.vkp_mutex_unlock(lifecycle)
 			return -12
 		}
-		C.vkr_log_wait(C.vkr_log_ready())
+		vkr_log_wait(vkr_log_ready())
 		C.vkp_mutex_unlock(lifecycle)
 		return 0
 	}
@@ -314,7 +297,7 @@ pub fn vkr_log_shutdown() i32 {
 		self := caller == vkr_log_task
 		vkrp_unlock(flags)
 		if self { return -35 }
-		lifecycle := C.vkr_log_lifecycle()
+		lifecycle := vkr_log_lifecycle()
 		C.vkp_mutex_lock(lifecycle)
 		flags = vkrp_lock()
 		task := vkr_log_task
@@ -331,14 +314,14 @@ pub fn vkr_log_shutdown() i32 {
 		vkr_log_stop = true
 		vkr_log_paused = false
 		vkrp_unlock(flags)
-		require(C.vkr_log_join() == 0)
+		require(vkr_log_join() == 0)
 		flags = vkrp_lock()
 		require(vkr_log_count == 0 && vkr_log_in_flight == 0)
 		vkr_log_task = nil
 		vkr_log_sink_callback = nil
 		vkr_log_sink_argument = nil
 		vkrp_unlock(flags)
-		C.vkr_log_task_put(task)
+		vkr_log_task_put(task)
 		C.vkp_mutex_unlock(lifecycle)
 		return 0
 	}
@@ -391,3 +374,20 @@ pub fn vkr_log_fail(fail bool) {
 		vkrp_unlock(flags)
 	}
 }
+
+@[export: 'vinix_linuxkpi_printk_snapshot']
+pub fn native_printk_snapshot() u64 { return vkr_log_snapshot() }
+@[export: 'vinix_linuxkpi_printk_get_state']
+pub fn native_printk_state(p &PrintState) { vkr_log_state(p) }
+@[export: 'vinix_linuxkpi_printk_flush']
+pub fn native_printk_flush(seq u64, timeout u32) i32 { return vkr_log_flush(seq, timeout) }
+@[export: 'vinix_linuxkpi_printk_bootstrap']
+pub fn native_printk_bootstrap() i32 { return vkr_log_bootstrap() }
+@[export: 'vinix_linuxkpi_printk_shutdown']
+pub fn native_printk_shutdown() i32 { return vkr_log_shutdown() }
+@[export: 'vinix_linuxkpi_printk_test_pause']
+pub fn native_printk_pause(pause bool, timeout u32) i32 { return vkr_log_pause(pause, timeout) }
+@[export: 'vinix_linuxkpi_printk_test_sink']
+pub fn native_printk_sink(sink voidptr, arg voidptr) i32 { return vkr_log_sink(sink, arg) }
+@[export: 'vinix_linuxkpi_printk_test_fail_create']
+pub fn native_printk_fail(fail bool) { vkr_log_fail(fail) }

@@ -6,19 +6,6 @@ module compatcore
 
 #include "linuxkpi_runtime_v_primitives.h"
 
-fn C.vkr_arg_int(voidptr) i32
-fn C.vkr_arg_uint(voidptr) u32
-fn C.vkr_arg_long(voidptr) i64
-fn C.vkr_arg_ulong(voidptr) u64
-fn C.vkr_arg_llong(voidptr) i64
-fn C.vkr_arg_size(voidptr) usize
-fn C.vkr_arg_ptrdiff(voidptr) i64
-fn C.vkr_arg_pointer(voidptr) voidptr
-fn C.vkr_nested_parse(voidptr, voidptr)
-fn C.vkr_pointer_hash(u64, voidptr) u64
-fn C.vkr_resource_start(voidptr) u64
-fn C.vkr_resource_end(voidptr) u64
-fn C.vkr_resource_flags(voidptr) u64
 
 @[c: '__atomic_compare_exchange_n']
 fn C.vkr_compare32(&u32, &u32, u32, bool, i32, i32) bool
@@ -215,7 +202,7 @@ fn vkrf_pointer_id(out &FormatOutput, ptr voidptr, original FormatSpec) {
 			vkrf_error(out, c'(____ptrval____)', spec)
 			return
 		}
-		hash := C.vkr_pointer_hash(u64(ptr), &vkr_pointer_key[0])
+		hash := vkr_pointer_hash(u64(ptr), &vkr_pointer_key[0])
 		vkrf_pointer_number(out, hash & 0xffffffff, original)
 	}
 }
@@ -225,9 +212,9 @@ fn vkrf_decimal_spec() FormatSpec { return FormatSpec{ base: 10, width: 0, preci
 fn vkrf_resource(out &FormatOutput, res voidptr, outer FormatSpec, original_decode bool) {
 	unsafe {
 		if vkrf_bad_pointer(out, res, outer) { return }
-		flags := C.vkr_resource_flags(res)
-		start := C.vkr_resource_start(res)
-		end := C.vkr_resource_end(res)
+		flags := vkr_resource_flags(res)
+		start := vkr_resource_start(res)
+		end := vkr_resource_end(res)
 		mut buf := [128]char{}
 		mut local := FormatOutput{ buf: &buf[0], size: sizeof(buf) }
 		mut spec := FormatSpec{ base: 16, width: 10, precision: -1, flags: 64 | 32 | 16 }
@@ -426,7 +413,7 @@ fn vkrf_pointer(out &FormatOutput, extension &char, len usize, ptr voidptr, orig
 					buf:  if out.position < out.size { out.buf + out.position } else { &char(0) }
 					size: if out.position < out.size { out.size - out.position } else { usize(0) }
 				}
-				C.vkr_nested_parse(&inner, ptr)
+				vkr_nested_parse(&inner, ptr)
 				out.position += inner.position
 				out.status |= inner.status
 				if (inner.status & 2) != 0 { out.stop = true }
@@ -488,7 +475,7 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 			if fmt[0] >= char(`0`) && fmt[0] <= char(`9`) {
 				spec.width = vkrf_width_literal(vkrf_decimal(&fmt))
 			} else if fmt[0] == char(`*`) {
-				mut width := C.vkr_arg_int(args)
+				mut width := vkr_arg_int(args)
 				fmt++
 				if vkrf_width_literal(u32(width)) != width {
 					if width > 8388607 { width = 8388607 }
@@ -505,7 +492,7 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 				if fmt[0] >= char(`0`) && fmt[0] <= char(`9`) {
 					spec.precision = vkrf_precision_literal(vkrf_decimal(&fmt))
 				} else if fmt[0] == char(`*`) {
-					mut precision := C.vkr_arg_int(args)
+					mut precision := vkr_arg_int(args)
 					fmt++
 					if precision > 32767 { precision = 32767 }
 					if precision < 0 { precision = 0 }
@@ -531,7 +518,7 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 				continue
 			}
 			if conversion == `c` {
-				c := u8(C.vkr_arg_int(args))
+				c := u8(vkr_arg_int(args))
 				pad := if spec.width > 1 { u32(spec.width - 1) } else { u32(0) }
 				if (spec.flags & 2) == 0 { vkrf_pad(out, ` `, pad) }
 				vkrf_char(out, c)
@@ -539,14 +526,14 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 				continue
 			}
 			if conversion == `s` {
-				str := C.vkr_arg_pointer(args)
+				str := vkr_arg_pointer(args)
 				if !vkrf_bad_pointer(out, str, spec) { vkrf_string(out, str, spec) }
 				continue
 			}
 			if conversion == `p` {
 				extension := fmt
 				for vkrf_alnum(u8(fmt[0])) { fmt++ }
-				vkrf_pointer(out, extension, usize(fmt) - usize(extension), C.vkr_arg_pointer(args), spec)
+				vkrf_pointer(out, extension, usize(fmt) - usize(extension), vkr_arg_pointer(args), spec)
 				continue
 			}
 			if conversion == `o` {
@@ -563,37 +550,37 @@ pub fn vkr_format_parse(out &FormatOutput, format &char, args voidptr) {
 			}
 			mut value := u64(0)
 			if qualifier == `L` {
-				value = u64(C.vkr_arg_llong(args))
+				value = u64(vkr_arg_llong(args))
 			} else if qualifier == `l` {
 				value = if (spec.flags & 1) != 0 {
-					u64(C.vkr_arg_long(args))
+					u64(vkr_arg_long(args))
 				} else {
-					C.vkr_arg_ulong(args)
+					vkr_arg_ulong(args)
 				}
 			} else if qualifier == `z` {
 				value = if (spec.flags & 1) != 0 {
-					u64(C.vkr_arg_long(args))
+					u64(vkr_arg_long(args))
 				} else {
-					u64(C.vkr_arg_size(args))
+					u64(vkr_arg_size(args))
 				}
 			} else if qualifier == `t` {
-				value = u64(C.vkr_arg_ptrdiff(args))
+				value = u64(vkr_arg_ptrdiff(args))
 			} else if qualifier == `H` {
 				value = if (spec.flags & 1) != 0 {
-					u64(i64(i8(C.vkr_arg_int(args))))
+					u64(i64(i8(vkr_arg_int(args))))
 				} else {
-					u64(u8(C.vkr_arg_int(args)))
+					u64(u8(vkr_arg_int(args)))
 				}
 			} else if qualifier == `h` {
 				value = if (spec.flags & 1) != 0 {
-					u64(i64(i16(C.vkr_arg_int(args))))
+					u64(i64(i16(vkr_arg_int(args))))
 				} else {
-					u64(u16(C.vkr_arg_int(args)))
+					u64(u16(vkr_arg_int(args)))
 				}
 			} else if (spec.flags & 1) != 0 {
-				value = u64(i64(C.vkr_arg_int(args)))
+				value = u64(i64(vkr_arg_int(args)))
 			} else {
-				value = u64(C.vkr_arg_uint(args))
+				value = u64(vkr_arg_uint(args))
 			}
 			vkrf_number(out, value, spec)
 		}

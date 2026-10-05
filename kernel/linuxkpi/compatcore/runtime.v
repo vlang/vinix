@@ -4,18 +4,6 @@ module compatcore
 
 fn C.vinix_linuxkpi_alloc_pages(usize, bool) voidptr
 
-struct C.vkr_pci_match {
-	vendor     u32
-	device     u32
-	subvendor  u32
-	subdevice  u32
-	class_code u32
-	class_mask u32
-	data       u64
-}
-
-fn C.vkr_tigerlake_table(&usize) &C.vkr_pci_match
-
 // The old aligned C metadata occupied 32 bytes. Keep that complete size,
 // including its unused tail, immediately before the aligned payload.
 struct RuntimeAllocation {
@@ -127,16 +115,23 @@ pub fn runtime_kmemdup(src voidptr, size usize, flags u32) voidptr {
 
 @[export: 'vinix_linuxkpi_tigerlake_id']
 pub fn runtime_tigerlake_id(vendor u16, device u16, class_code u32) bool {
-	unsafe {
-		if device != 0x9a49 { return false }
-		mut count := usize(0)
-		ids := C.vkr_tigerlake_table(&count)
-		for i := usize(0); i < count; i++ {
-			id := &ids[i]
-			if vendor == id.vendor && device == id.device && (class_code & id.class_mask) == id.class_code {
-				return true
-			}
-		}
-		return false
-	}
+ // The supported device is the imported INTEL_TGL_12_GT2_IDS 0x9a49 entry.
+ return vendor == 0x8086 && device == 0x9a49 && (class_code & 0xff0000) == 0x030000
 }
+
+@[export: 'kmalloc']
+pub fn native_kmalloc(size usize, flags u32) voidptr { return runtime_kmalloc(size, flags) }
+@[export: 'kzalloc']
+pub fn native_kzalloc(size usize, flags u32) voidptr { return runtime_kzalloc(size, flags) }
+@[export: 'kmalloc_array']
+pub fn native_kmalloc_array(count usize, size usize, flags u32) voidptr { return runtime_kmalloc_array(count, size, flags) }
+@[export: 'kcalloc']
+pub fn native_kcalloc(count usize, size usize, flags u32) voidptr { return runtime_kcalloc(count, size, flags) }
+@[export: 'ksize']
+pub fn native_ksize(ptr voidptr) usize { return runtime_ksize(ptr) }
+@[export: 'kfree']
+pub fn native_kfree(ptr voidptr) { runtime_kfree(ptr) }
+@[export: 'krealloc']
+pub fn native_krealloc(ptr voidptr, size usize, flags u32) voidptr { return runtime_krealloc(ptr, size, flags) }
+@[export: 'kmemdup']
+pub fn native_kmemdup(ptr voidptr, size usize, flags u32) voidptr { return runtime_kmemdup(ptr, size, flags) }
