@@ -223,17 +223,19 @@ done
 # that syscall against glibc's thread head and aborts when QEMU returns ENOSYS.
 # Compile the small guest-only shim without host headers or startup objects.
 echo "=== building the i386 Steam robust-list shim ==="
-clang --target=i386-linux-gnu -fPIC -shared -nostdlib -fuse-ld=lld \
-    -Wall -Wextra -Werror \
+python3 "$SCRIPT_DIR/build-support/steam/compile-v-robust.py" "$BUILD_DIR/robust-i386-v.c" --i386
+clang --target=i386-linux-gnu -fPIC -shared -nostdlib -O2 -fno-builtin -fvisibility=hidden -fuse-ld=lld \
+    -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-label -Wno-unused-parameter \
     -Wl,-soname,libvinix-steam-robust.so \
     -o "$ROOT/usr/lib/i386-linux-gnu/libvinix-steam-robust.so" \
-    "$SCRIPT_DIR/build-support/steam/robust-list-i386.c"
+    "$BUILD_DIR/robust-i386-v.c" "$SCRIPT_DIR/build-support/steam/robust-syscall.S"
 echo "=== building the x86-64 Steam robust-list shim ==="
-clang --target=x86_64-linux-gnu -fPIC -shared -nostdlib -fuse-ld=lld \
-    -Wall -Wextra -Werror \
+python3 "$SCRIPT_DIR/build-support/steam/compile-v-robust.py" "$BUILD_DIR/robust-x86_64-v.c"
+clang --target=x86_64-linux-gnu -fPIC -shared -nostdlib -O2 -fno-builtin -fvisibility=hidden -fuse-ld=lld \
+    -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-label -Wno-unused-parameter \
     -Wl,-soname,libvinix-steam-robust.so \
     -o "$ROOT/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so" \
-    "$SCRIPT_DIR/build-support/steam/robust-list-x86_64.c"
+    "$BUILD_DIR/robust-x86_64-v.c" "$SCRIPT_DIR/build-support/steam/robust-syscall.S"
 
 # Exercise 4 KiB x86 MADV_DONTNEED against Vinix's 16 KiB host pages during
 # steam-smoke; adjacent guest pages must survive the discard.
