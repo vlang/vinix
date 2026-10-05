@@ -771,6 +771,7 @@ mut:
 	startup           ActivityStartup
 	gpu               ActivityGpu
 	energy            ActivityEnergy
+	utility_status    string
 	view              ActivityView
 	kill_failed       bool
 	search_focused    bool
@@ -956,6 +957,8 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		}
 		children << ui2.label('', if a.kill_failed {
 			tr('activity.error.kill')
+		} else if a.utility_status != '' {
+			a.utility_status
 		} else {
 			a.monitor.summary
 		}, ui2.rect(f64(activity_padding), f64(footer_y + 5), f64(summary_width), 16), ui2.TextStyle{
@@ -1153,6 +1156,7 @@ fn (mut a ActivityApp) handle(event_id string) ! {
 			a.kill_failed = !desktop_kill_process(a.monitor.selected_pid)
 			if !a.kill_failed {
 				a.monitor.selected_pid = 0
+				if a.monitor.filter == .selected { a.monitor.rebuild_visible() }
 				// Pick up the exit on the next poll without waiting for the process.
 				a.monitor.last_poll_ms = monotonic_millis() - activity_interval_ms
 			}
@@ -1186,6 +1190,7 @@ fn (mut a ActivityApp) handle(event_id string) ! {
 				unsafe { pid_text.free() }
 				if pid > 0 && a.monitor.process_row_index(pid) >= 0 {
 					a.monitor.selected_pid = pid
+					if a.monitor.filter == .selected { a.monitor.rebuild_visible() }
 					a.kill_failed = false
 				}
 			}

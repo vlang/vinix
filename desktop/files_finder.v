@@ -536,7 +536,7 @@ fn (mut a FileBrowserApp) finder_toolbar(width int) ui2.Element {
 
 	// The views, as one segmented control, then the settings and Edit Tags.
 	after_back := back_x + 2 * half + 1 + finder_gap + 1
-	group_width := 3 * finder_segment_width + 2 * (finder_gap + finder_button_width)
+	group_width := 3 * finder_segment_width + 3 * (finder_gap + finder_button_width)
 	views_x := if width - finder_search_width - finder_control_inset - 24 - group_width >= finder_views_x {
 		finder_views_x
 	} else {
@@ -567,9 +567,16 @@ fn (mut a FileBrowserApp) finder_toolbar(width int) ui2.Element {
 	finder_bezel(mut items, tags_x, finder_button_width)
 	finder_control(mut items, file_context_tags, tr('files.toolbar.tags'), 'builtin:tag', tags_x,
 		finder_button_width, a.has_selection(), finder_control_glyph)
+	info_x := tags_x + finder_button_width + finder_gap
+	finder_bezel(mut items, info_x, finder_button_width)
+	items << ui2.Element{
+		...ui2.button(files_action_info, tr('files.info.symbol'), ui2.rect(f64(info_x), f64(finder_control_top), finder_button_width, finder_control_height), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{ color: finder_control_glyph, size: 14, bold: true, align: .center })
+		tooltip:             tr('files.info.title')
+		accessibility_label: tr('files.info.title')
+	}
 
 	// Search, at the far end, as wide as Finder's or as the window leaves.
-	search_left := tags_x + finder_button_width + 24
+	search_left := info_x + finder_button_width + 24
 	mut search_width := width - finder_control_inset - search_left
 	if search_width > finder_search_width {
 		search_width = finder_search_width

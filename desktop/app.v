@@ -74,9 +74,8 @@ const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcu
 	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21', 'shortcut.22', 'shortcut.23',
 	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30']
 
-// available_apps is what the Start menu and the wallpaper offer. The calculator's
-// window is sized from the constants its own source declares, so the window
-// matches what the example asks for rather than a number guessed here.
+// available_apps is what the Start menu and wallpaper offer. The native
+// Calculator includes space below its ui2 keypad for memory and result history.
 const available_apps = [
 	AppFactory{
 		title: 'Files'
@@ -103,9 +102,10 @@ const available_apps = [
 	AppFactory{
 		title: 'Calculator'
 		icon: 'asset:calculator'
-		width: window_width
-		height: window_height + default_title_height
+		width: 340
+		height: 540
 		process_name: 'vinix-calculator'
+		keyboard: true
 		open: open_calculator
 	},
 	AppFactory{
@@ -157,6 +157,7 @@ const available_apps = [
 		width: 640
 		height: 500
 		process_name: 'vinix-calendar'
+		keyboard: true
 		open: open_calendar
 	},
 	AppFactory{
@@ -231,6 +232,7 @@ const available_apps = [
 		width: 560
 		height: 430
 		process_name: 'vinix-capture'
+		keyboard: true
 		polling: true
 		poll_interval_ms: 100
 		open: open_capture
@@ -267,6 +269,7 @@ const available_apps = [
 		width: 880
 		height: 580
 		process_name: 'vinix-disk-usage'
+		keyboard: true
 		// A scan is a state machine the compositor advances; without polling
 		// the walk would only move when the window was clicked.
 		polling: true

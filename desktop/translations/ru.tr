@@ -2230,3 +2230,244 @@ roblox.apk_missing
 -----
 roblox.exited
 Roblox завершил работу. Подробности в журнале приложения.
+-----
+activity.list.export
+Экспорт списка процессов (Ctrl-E)
+-----
+activity.list.exported
+Список процессов сохранён: {0}
+-----
+activity.history.clear
+Очистить историю (Ctrl-L)
+-----
+activity.history.cleared
+История ресурсов очищена
+-----
+activity.filter.inactive
+Неактивные процессы
+-----
+activity.filter.other_users
+Процессы других пользователей
+-----
+activity.filter.selected
+Выбранный процесс
+-----
+editor.undo
+Отменить
+-----
+editor.redo
+Повторить
+-----
+editor.find
+Найти
+-----
+editor.replace
+Заменить
+-----
+editor.find.previous
+Назад
+-----
+editor.find.next
+Далее
+-----
+editor.replace.all
+Заменить всё
+-----
+editor.find.close
+Закрыть
+-----
+editor.status.no_match
+Текст не найден
+-----
+editor.status.match
+Текст найден
+-----
+editor.status.replaced
+Текст заменён
+-----
+calendar.events
+События
+-----
+calendar.events.empty
+В этот день нет событий
+-----
+calendar.event.new
+Новое событие
+-----
+calendar.event.all_day
+Весь день
+-----
+calendar.event.title
+Название
+-----
+calendar.event.time
+Время (ЧЧ:ММ)
+-----
+calendar.event.location
+Место
+-----
+calendar.event.save
+Сохранить
+-----
+calendar.event.cancel
+Отмена
+-----
+calendar.event.delete
+Удалить
+-----
+calendar.event.invalid_time
+Введите время от 00:00 до 23:59
+-----
+calendar.event.title_required
+Введите название события
+-----
+calendar.event.save_failed
+Не удалось сохранить события. Изменения остались открыты
+-----
+calendar.event.read_failed
+Не удалось прочитать события. Существующий файл сохранён
+-----
+calendar.event.limit
+В календаре может быть до 128 событий
+-----
+clock.timer
+Таймер
+-----
+clock.lap
+Круг
+-----
+clock.laps
+Круг / Отрезок / Всего
+-----
+clock.timer.preset.1
+1 мин
+-----
+clock.timer.preset.5
+5 мин
+-----
+clock.timer.preset.15
+15 мин
+-----
+clock.timer.finished
+Время истекло
+-----
+clock.timer.adjust
+Задайте минуты перед запуском
+-----
+calculator.history.title
+История
+-----
+calculator.history.clear
+Очистить
+-----
+disk_usage.path.root
+Папка
+-----
+disk_usage.path.report
+Отчёт
+-----
+disk_usage.button.scan
+Сканировать
+-----
+disk_usage.button.export
+Экспорт CSV
+-----
+disk_usage.report.saved
+Отчёт сохранён: {0}
+-----
+disk_usage.report.failed
+Не удалось сохранить отчёт: {0}
+-----
+disk_usage.report.exists
+Файл уже существует: {0}
+-----
+settings.category.about
+О системе
+-----
+settings.about.kernel
+Операционная система и ядро
+-----
+settings.about.cpu
+Процессор
+-----
+settings.about.memory
+Физическая память
+-----
+settings.about.uptime
+Время работы (секунды)
+-----
+settings.about.unavailable
+Система не предоставила данные
+-----
+settings.about.refresh
+Обновить
+-----
+terminal.find
+Найти
+-----
+terminal.history.clear
+Очистить историю
+-----
+terminal.find.placeholder
+Найти в выводе
+-----
+terminal.find.previous
+Предыдущее совпадение
+-----
+terminal.find.next
+Следующее совпадение
+-----
+terminal.find.no_match
+Текст не найден
+-----
+calendar.event.changed
+События изменены в другом окне. Откройте Календарь заново перед сохранением
+-----
+files.info.title
+Сведения
+-----
+files.info.close
+Закрыть
+-----
+files.info.kind
+Тип
+-----
+files.info.size
+Размер
+-----
+files.info.permissions
+Права доступа
+-----
+files.info.owner
+ID владельца / группы
+-----
+files.info.modified
+Изменён
+-----
+files.info.accessed
+Последний доступ
+-----
+files.info.changed
+Метаданные изменены
+-----
+files.info.target
+Цель ссылки
+-----
+files.info.symbolic_link
+Символическая ссылка
+-----
+files.info.special_file
+Специальный файл
+-----
+files.info.unavailable
+Сведения о файле недоступны
+-----
+calendar.event.invalid_location
+Место должно быть записано в одну строку
+-----
+files.info.symbol
+i
+-----
+calculator.memory.indicator
+M
+-----

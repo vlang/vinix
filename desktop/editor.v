@@ -21,14 +21,28 @@ import ui2
 const editor_default_path = '/root/notes.txt'
 const editor_max_file_size = 64 * 1024
 const editor_max_path = 512
+// The document limit bounds each snapshot, and history never holds more than
+// 32 snapshots across both stacks (at most 2 MB of document bytes).
+const editor_history_limit = 32
+const editor_find_height = 76
 
 const editor_action_new = 'editor.new'
 const editor_action_open = 'editor.open'
 const editor_action_save = 'editor.save'
 const editor_action_path = 'editor.path'
 const editor_action_document = 'editor.document'
+const editor_action_undo = 'editor.undo'
+const editor_action_redo = 'editor.redo'
+const editor_action_find = 'editor.find'
+const editor_action_query = 'editor.find.query'
+const editor_action_replacement = 'editor.find.replacement'
+const editor_action_next = 'editor.find.next'
+const editor_action_previous = 'editor.find.previous'
+const editor_action_replace = 'editor.replace'
+const editor_action_replace_all = 'editor.replace.all'
+const editor_action_find_close = 'editor.find.close'
 
-const editor_toolbar_height = 44
+const editor_toolbar_height = 80
 const editor_status_height = 24
 const editor_row_height = 18
 const editor_padding = 10
@@ -38,6 +52,14 @@ const editor_character_width = 8
 enum EditorFocus {
 	document
 	path
+	query
+	replacement
+}
+
+struct EditorSnapshot {
+	text     []u8
+	cursor   int
+	revision u64
 }
 
 struct TextEditorApp {
@@ -47,14 +69,28 @@ mut:
 	status       []u8
 	// The status line's translation key, whether the path follows it, and the
 	// language it was written in, so that it follows a change of language.
-	status_key      string
-	status_path     bool
-	status_language DesktopLanguage
-	cursor       int
-	focus        EditorFocus = .document
-	scroll       int
-	visible_rows int = 1
-	modified     bool
+	status_key        string
+	status_path       bool
+	status_language   DesktopLanguage
+	cursor            int
+	focus             EditorFocus = .document
+	scroll            int
+	visible_rows      int = 1
+	modified          bool
+	undo_history      []EditorSnapshot
+	redo_history      []EditorSnapshot
+	revision          u64
+	next_revision     u64
+	document_has_save bool
+	saved_revision    u64
+	// One delivered typing run is one edit; navigation splits that run.
+	edit_group    bool
+	edit_recorded bool
+	find_open     bool
+	query         []u8
+	replacement   []u8
+	match_start   int = -1
+	match_end     int = -1
 	// pending gathers a multibyte character until its last byte arrives. The
 	// keyboard is read 64 bytes at a time, so that can be the next key_input.
 	pending     [4]u8
@@ -86,6 +122,7 @@ fn editor_slice_text(bytes []u8, start int, length int) string {
 }
 
 fn editor_append(mut destination []u8, text string) {
+	unsafe { destination.flags |= .noslices }
 	for ch in text {
 		destination << u8(ch)
 	}
@@ -226,6 +263,7 @@ fn (mut a TextEditorApp) follow_language() {
 }
 
 fn (mut a TextEditorApp) new_document() {
+	a.reset_history()
 	a.text.clear()
 	a.cursor = 0
 	a.scroll = 0
@@ -264,11 +302,13 @@ fn (mut a TextEditorApp) open_document() {
 	if got < i64(next.len) {
 		next.trim(int(got))
 	}
+	a.reset_history()
 	unsafe { a.text.free() }
 	a.text = next
 	a.cursor = a.text.len
 	a.scroll = 0
 	a.modified = false
+	a.document_has_save = true
 	a.focus = .document
 	a.set_file_status('editor.status.opened')
 	record_recent_item('vinix-editor', path)
@@ -288,6 +328,8 @@ fn (mut a TextEditorApp) save_document() {
 		a.set_file_status('editor.status.cannot_save')
 		return
 	}
+	a.document_has_save = true
+	a.saved_revision = a.revision
 	a.modified = false
 	a.set_file_status('editor.status.saved')
 	record_recent_item('vinix-editor', path)
@@ -377,6 +419,7 @@ fn (mut a TextEditorApp) settle_cursor() {
 
 // delete_char removes the character of `length` bytes at `start`.
 fn (mut a TextEditorApp) delete_char(start int, length int) {
+	a.record_edit()
 	a.text.delete_many(start, length)
 	a.cursor = start
 	a.settle_cursor()
@@ -387,6 +430,9 @@ fn (mut a TextEditorApp) delete_char(start int, length int) {
 // insert_byte places one byte at the cursor. Every byte of a character goes in
 // before anything else looks at the cursor, so it rests on a boundary.
 fn (mut a TextEditorApp) insert_byte(ch u8) {
+	// The element tree borrows text only until its frame is rendered. History
+	// snapshots own clones, so growth can release the old document buffer.
+	unsafe { a.text.flags |= .noslices }
 	if a.cursor >= a.text.len {
 		a.text << ch
 	} else {
@@ -400,6 +446,7 @@ fn (mut a TextEditorApp) insert(ch u8) {
 		a.set_status('editor.status.limit')
 		return
 	}
+	a.record_edit()
 	a.insert_byte(ch)
 	a.modified = true
 	a.set_status('editor.status.unsaved')
@@ -410,18 +457,15 @@ fn (mut a TextEditorApp) insert(ch u8) {
 fn (mut a TextEditorApp) type_pending() {
 	length := a.pending_len
 	a.pending_len = 0
-	if a.focus == .path {
-		if a.path.len + length <= editor_max_path {
-			for k := 0; k < length; k++ {
-				a.path << a.pending[k]
-			}
-		}
+	if a.focus != .document {
+		a.append_field_character(length)
 		return
 	}
 	if a.text.len + length > editor_max_file_size {
 		a.set_status('editor.status.limit')
 		return
 	}
+	a.record_edit()
 	for k := 0; k < length; k++ {
 		a.insert_byte(a.pending[k])
 	}
@@ -430,6 +474,7 @@ fn (mut a TextEditorApp) type_pending() {
 }
 
 fn (mut a TextEditorApp) edit_path(ch u8) {
+	unsafe { a.path.flags |= .noslices }
 	match ch {
 		8, 127 {
 			if a.path.len > 0 {
@@ -470,6 +515,12 @@ fn (mut a TextEditorApp) document_key(ch u8) {
 }
 
 fn (mut a TextEditorApp) key_input(input string) {
+	a.edit_group = true
+	a.edit_recorded = false
+	defer {
+		a.edit_group = false
+		a.edit_recorded = false
+	}
 	mut i := 0
 	for i < input.len {
 		ch := input[i]
@@ -501,6 +552,28 @@ fn (mut a TextEditorApp) key_input(input string) {
 		// Editor-wide shortcuts remain available because focused applications
 		// receive control bytes before the desktop considers its own shortcuts.
 		match ch {
+			0x1a {
+				a.undo_edit()
+				i++
+				continue
+			}
+			0x19 {
+				a.redo_edit()
+				i++
+				continue
+			}
+			0x06 {
+				a.edit_recorded = false
+				a.find_open = true
+				a.focus = .query
+				i++
+				continue
+			}
+			0x07 {
+				a.find_match(false)
+				i++
+				continue
+			}
 			0x0e {
 				a.new_document()
 				i++
@@ -512,6 +585,7 @@ fn (mut a TextEditorApp) key_input(input string) {
 				continue
 			}
 			0x13 {
+				a.edit_recorded = false
 				a.save_document()
 				i++
 				continue
@@ -519,13 +593,34 @@ fn (mut a TextEditorApp) key_input(input string) {
 			else {}
 		}
 
-		if a.focus == .path {
-			a.edit_path(ch)
+		if ch == 0x1b && (i + 1 >= input.len || input[i + 1] != `[`) {
+			a.close_find()
+			i++
+			continue
+		}
+		// Escape closes Find. Consume a complete arrow sequence in fields so
+		// its printable tail cannot become query or path text.
+		if a.focus != .document {
+			if ch == 0x1b {
+				if i + 1 < input.len && input[i + 1] == `[` {
+					i += 2
+					for i < input.len && (input[i] < 0x40 || input[i] > 0x7e) { i++ }
+					i++
+				} else {
+					a.close_find()
+					a.focus = .document
+					i++
+				}
+				continue
+			}
+			a.field_key(ch)
 			i++
 			continue
 		}
 
 		if ch == 0x1b && i + 2 < input.len && input[i + 1] == `[` {
+			a.edit_recorded = false
+			a.clear_match()
 			code := input[i + 2]
 			match code {
 				`A` { a.move_vertical(-1) }
@@ -573,21 +668,15 @@ fn (mut a TextEditorApp) paste_input(text string) {
 		return
 	}
 	a.pending_len = 0
-	if a.focus == .path {
-		if a.path.len + text.len > editor_max_path {
-			return
-		}
-		for ch in text {
-			if ch >= 32 && ch != 127 {
-				a.path << ch
-			}
-		}
+	if a.focus != .document {
+		a.paste_field(text)
 		return
 	}
 	if a.text.len + text.len > editor_max_file_size {
 		a.set_status('editor.status.limit')
 		return
 	}
+	a.record_edit()
 	for ch in text {
 		a.insert_byte(ch)
 	}
@@ -623,7 +712,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	a.follow_language()
 	width := int(size.width)
 	height := int(size.height)
-	mut children := frame_elements(8)
+	mut children := frame_elements(16)
 
 	// Wide enough for the longest translation, Russian «Сохранить».
 	button_width := 68
@@ -645,12 +734,15 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 		font_family: 'mono'
 		size: 13
 	})))
-	children << ui2.view('', ui2.rect(0, f64(editor_toolbar_height - 1), f64(width), 1), ui2.BoxStyle{
+	a.build_edit_toolbar(mut children)
+	document_top := editor_toolbar_height + if a.find_open { editor_find_height } else { 0 }
+	if a.find_open { a.build_find_panel(mut children, width) }
+	children << ui2.view('', ui2.rect(0, f64(document_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
 
-	document_height := if height > editor_toolbar_height + editor_status_height {
-		height - editor_toolbar_height - editor_status_height
+	document_height := if height > document_top + editor_status_height {
+		height - document_top - editor_status_height
 	} else {
 		editor_row_height
 	}
@@ -668,6 +760,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 			break
 		}
 		end := a.line_end(position)
+		a.build_match_highlight(mut lines, position, end, row)
 		lines << ui2.label('', editor_slice_text(a.text, position, end - position), ui2.rect(f64(editor_padding), f64(editor_padding + row * editor_row_height), f64(width - 2 * editor_padding), f64(editor_row_height)), ui2.TextStyle{
 			color: body_text
 			font_family: 'mono'
@@ -684,7 +777,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 		}
 		position = end + 1
 	}
-	children << ui2.clickable_view(editor_action_document, ui2.rect(0, f64(editor_toolbar_height), f64(width), f64(document_height)), ui2.BoxStyle{
+	children << ui2.clickable_view(editor_action_document, ui2.rect(0, f64(document_top), f64(width), f64(document_height)), ui2.BoxStyle{
 		bg: app_surface
 	}, lines)
 
@@ -712,6 +805,23 @@ fn (mut a TextEditorApp) handle(event_id string) ! {
 		return
 	}
 	match event_id {
+		editor_action_undo { a.undo_edit() }
+		editor_action_redo { a.redo_edit() }
+		editor_action_find {
+			if a.find_open {
+				a.close_find()
+			} else {
+				a.find_open = true
+				a.focus = .query
+			}
+		}
+		editor_action_query { a.focus = .query }
+		editor_action_replacement { a.focus = .replacement }
+		editor_action_next { a.find_match(false) }
+		editor_action_previous { a.find_match(true) }
+		editor_action_replace { a.replace_match() }
+		editor_action_replace_all { a.replace_all() }
+		editor_action_find_close { a.close_find() }
 		editor_action_new { a.new_document() }
 		editor_action_open { a.open_document() }
 		editor_action_save { a.save_document() }

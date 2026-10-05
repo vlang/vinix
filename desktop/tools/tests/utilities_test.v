@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 29
+	assert available_apps.len == 31
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -613,6 +613,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[1].polling && available_apps[1].poll_interval_ms == 50
 	assert available_apps[1].keyboard && available_apps[1].pointer
 	assert available_apps[2].icon == 'asset:calculator'
+	assert available_apps[2].keyboard
 	assert available_apps[3].process_name == 'vinix-terminal'
 	assert available_apps[3].icon == 'asset:terminal'
 	assert available_apps[3].keyboard && available_apps[3].polling
@@ -622,6 +623,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[5].icon == 'asset:activity'
 	assert available_apps[6].icon == 'asset:editor'
 	assert available_apps[7].icon == 'asset:calendar'
+	assert available_apps[7].keyboard
 	assert available_apps[8].icon == 'asset:clock'
 	assert available_apps[9].title == 'Minecraft'
 	assert available_apps[9].process_name == 'vinix-minecraft'
@@ -652,6 +654,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[14].process_name == 'vinix-capture'
 	assert available_apps[14].icon == 'asset:capture'
 	assert available_apps[14].polling
+	assert available_apps[14].keyboard
 	assert available_apps[13].keyboard && available_apps[13].polling
 	assert available_apps[13].pointer
 	assert available_apps[15].title == 'OBS Studio'
@@ -668,7 +671,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[17].process_name == 'vinix-disk-usage'
 	assert available_apps[17].icon == 'asset:disk_usage'
 	assert available_apps[17].polling && available_apps[17].poll_interval_ms == 33
-	assert !available_apps[17].keyboard && !available_apps[17].pointer
+	assert available_apps[17].keyboard && !available_apps[17].pointer
 	assert available_apps[18].title == 'VOffice Writer'
 	assert available_apps[18].process_name == 'voffice-writer'
 	assert available_apps[18].standalone && available_apps[18].keyboard
@@ -724,7 +727,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 29
+	assert available_apps.len == 31
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len

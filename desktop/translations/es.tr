@@ -2230,3 +2230,244 @@ Copia tu APK de Roblox a ~/Roblox.apk o indica su ruta en VINIX_ROBLOX_APK.
 -----
 roblox.exited
 Roblox se ha cerrado. Consulta el registro de la aplicación.
+-----
+activity.list.export
+Exportar procesos (Ctrl-E)
+-----
+activity.list.exported
+Lista de procesos guardada: {0}
+-----
+activity.history.clear
+Borrar historial (Ctrl-L)
+-----
+activity.history.cleared
+Historial de recursos borrado
+-----
+activity.filter.inactive
+Procesos inactivos
+-----
+activity.filter.other_users
+Procesos de otros usuarios
+-----
+activity.filter.selected
+Proceso seleccionado
+-----
+editor.undo
+Deshacer
+-----
+editor.redo
+Rehacer
+-----
+editor.find
+Buscar
+-----
+editor.replace
+Reemplazar
+-----
+editor.find.previous
+Anterior
+-----
+editor.find.next
+Siguiente
+-----
+editor.replace.all
+Reemplazar todo
+-----
+editor.find.close
+Cerrar
+-----
+editor.status.no_match
+Texto no encontrado
+-----
+editor.status.match
+Texto encontrado
+-----
+editor.status.replaced
+Texto reemplazado
+-----
+calendar.events
+Eventos
+-----
+calendar.events.empty
+No hay eventos en esta fecha
+-----
+calendar.event.new
+Nuevo evento
+-----
+calendar.event.all_day
+Todo el día
+-----
+calendar.event.title
+Título
+-----
+calendar.event.time
+Hora (HH:MM)
+-----
+calendar.event.location
+Ubicación
+-----
+calendar.event.save
+Guardar
+-----
+calendar.event.cancel
+Cancelar
+-----
+calendar.event.delete
+Eliminar
+-----
+calendar.event.invalid_time
+Introduce una hora entre 00:00 y 23:59
+-----
+calendar.event.title_required
+Introduce el título del evento
+-----
+calendar.event.save_failed
+No se pudieron guardar los eventos. Los cambios siguen abiertos
+-----
+calendar.event.read_failed
+No se pudieron leer los eventos. Se conservó el archivo existente
+-----
+calendar.event.limit
+El calendario admite hasta 128 eventos
+-----
+clock.timer
+Temporizador
+-----
+clock.lap
+Vuelta
+-----
+clock.laps
+Vuelta / Parcial / Total
+-----
+clock.timer.preset.1
+1 min
+-----
+clock.timer.preset.5
+5 min
+-----
+clock.timer.preset.15
+15 min
+-----
+clock.timer.finished
+Tiempo agotado
+-----
+clock.timer.adjust
+Ajusta los minutos antes de empezar
+-----
+calculator.history.title
+Historial
+-----
+calculator.history.clear
+Borrar
+-----
+disk_usage.path.root
+Carpeta
+-----
+disk_usage.path.report
+Informe
+-----
+disk_usage.button.scan
+Analizar
+-----
+disk_usage.button.export
+Exportar CSV
+-----
+disk_usage.report.saved
+Informe guardado: {0}
+-----
+disk_usage.report.failed
+No se pudo guardar el informe: {0}
+-----
+disk_usage.report.exists
+Ya existe un archivo: {0}
+-----
+settings.category.about
+Acerca de
+-----
+settings.about.kernel
+Sistema operativo y núcleo
+-----
+settings.about.cpu
+Procesador
+-----
+settings.about.memory
+Memoria física
+-----
+settings.about.uptime
+Tiempo activo (segundos)
+-----
+settings.about.unavailable
+El sistema no proporciona datos
+-----
+settings.about.refresh
+Actualizar
+-----
+terminal.find
+Buscar
+-----
+terminal.history.clear
+Borrar historial
+-----
+terminal.find.placeholder
+Buscar en la salida
+-----
+terminal.find.previous
+Coincidencia anterior
+-----
+terminal.find.next
+Coincidencia siguiente
+-----
+terminal.find.no_match
+Texto no encontrado
+-----
+calendar.event.changed
+Los eventos cambiaron en otra ventana. Abre Calendario de nuevo antes de guardar
+-----
+files.info.title
+Obtener información
+-----
+files.info.close
+Cerrar
+-----
+files.info.kind
+Tipo
+-----
+files.info.size
+Tamaño
+-----
+files.info.permissions
+Permisos
+-----
+files.info.owner
+ID de usuario / grupo
+-----
+files.info.modified
+Modificado
+-----
+files.info.accessed
+Último acceso
+-----
+files.info.changed
+Metadatos modificados
+-----
+files.info.target
+Destino del enlace
+-----
+files.info.symbolic_link
+Enlace simbólico
+-----
+files.info.special_file
+Archivo especial
+-----
+files.info.unavailable
+La información del archivo no está disponible
+-----
+calendar.event.invalid_location
+La ubicación debe ocupar una sola línea
+-----
+files.info.symbol
+i
+-----
+calculator.memory.indicator
+M
+-----

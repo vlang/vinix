@@ -23,6 +23,9 @@ enum ActivityFilter {
 	user
 	active
 	system
+	inactive
+	other_users
+	selected
 }
 
 struct ActivityVisible {
@@ -104,6 +107,9 @@ fn (m &ActivityMonitor) matches_row(row &ActivityRow) bool {
 		.user { row.uid_known && row.uid == m.viewer_uid }
 		.active { row.cpu_percent > 0.0 }
 		.system { row.uid_known && row.uid == 0 }
+		.inactive { row.cpu_percent == 0.0 }
+		.other_users { row.uid_known && row.uid != m.viewer_uid }
+		.selected { m.selected_pid > 0 && row.pid == m.selected_pid }
 	}
 }
 
@@ -287,6 +293,9 @@ fn activity_filter_text(filter ActivityFilter) string {
 		.user { tr('activity.filter.user') }
 		.active { tr('activity.filter.active') }
 		.system { tr('activity.filter.system') }
+		.inactive { tr('activity.filter.inactive') }
+		.other_users { tr('activity.filter.other_users') }
+		.selected { tr('activity.filter.selected') }
 	}
 }
 
@@ -351,6 +360,10 @@ fn (a &ActivityApp) build_browse_toolbar(mut children []ui2.Element, width int) 
 		children << activity_toolbar_button(activity_action_interval, activity_interval_text(a.monitor.interval_ms), 112, 4, 28, false)
 		children << activity_toolbar_icon(activity_action_search, tr('activity.search'), 'builtin:finder_search', 146, 4, 24,
 			a.search_focused || a.monitor.query.len > 0)
+		if width >= 246 {
+			children << activity_toolbar_icon(activity_action_export_list, tr('activity.list.export'), 'builtin:finder_list', 180, 4, 28, false)
+			children << activity_toolbar_icon(activity_action_clear_history, tr('activity.history.clear'), 'builtin:close', 214, 4, 28, false)
+		}
 		if a.search_focused {
 			a.build_search_field(mut children, activity_padding, 36, width - 54)
 			children << activity_toolbar_icon(activity_action_search_done, tr('activity.search.done'), 'builtin:close', width - 34, 36, 24, false)
@@ -365,6 +378,8 @@ fn (a &ActivityApp) build_browse_toolbar(mut children []ui2.Element, width int) 
 		}
 		return
 	}
+	children << activity_toolbar_icon(activity_action_export_list, tr('activity.list.export'), 'builtin:finder_list', 78, 4, 28, false)
+	children << activity_toolbar_icon(activity_action_clear_history, tr('activity.history.clear'), 'builtin:close', 112, 4, 28, false)
 	children << activity_toolbar_button(activity_action_pause, if a.monitor.paused {
 		tr('activity.resume_refresh')
 	} else {
@@ -616,6 +631,7 @@ fn activity_vertical_scrollbar(x int, y int, height int, monitor &ActivityMonito
 }
 
 fn (mut a ActivityApp) handle_browse(action string) bool {
+	if a.handle_utility(action) { return true }
 	if action in [activity_action_search, activity_action_filter, activity_action_tree, activity_action_columns] {
 		a.view = .processes
 		a.inspector_open = false
@@ -633,7 +649,10 @@ fn (mut a ActivityApp) handle_browse(action string) bool {
 				.applications { ActivityFilter.user }
 				.user { ActivityFilter.active }
 				.active { ActivityFilter.system }
-				.system { ActivityFilter.all }
+				.system { ActivityFilter.inactive }
+				.inactive { ActivityFilter.other_users }
+				.other_users { ActivityFilter.selected }
+				.selected { ActivityFilter.all }
 			}
 			a.monitor.scroll = 0
 			a.monitor.rebuild_visible()
@@ -706,6 +725,7 @@ fn (mut a ActivityApp) select_relative(delta int) {
 	if next < 0 { next = 0 }
 	if next >= a.monitor.visible.len { next = a.monitor.visible.len - 1 }
 	a.monitor.selected_pid = a.monitor.rows[a.monitor.visible[next].index].pid
+	if a.monitor.filter == .selected { a.monitor.rebuild_visible() }
 	a.kill_failed = false
 	if next < a.monitor.scroll { a.monitor.scroll = next }
 	if next >= a.monitor.scroll + a.monitor.visible_rows {
@@ -755,6 +775,8 @@ fn (mut a ActivityApp) search_key_input(input string) {
 }
 
 fn (mut a ActivityApp) key_input(input string) {
+	if !a.search_focused && input == '\x05' { a.handle_utility(activity_action_export_list); return }
+	if !a.search_focused && input == '\x0c' { a.clear_histories(); return }
 	if a.columns_key_input(input) { return }
 	if a.panel_key_input(input) { return }
 	if a.inspector_open {
@@ -885,6 +907,7 @@ fn (a &ActivityApp) next_poll_ms() u64 {
 }
 
 fn (mut a ActivityApp) close_app() {
+	if a.utility_status.len > 0 { unsafe { a.utility_status.free() } }
 	a.inspector.close()
 	a.resources.free()
 	a.controls.free()

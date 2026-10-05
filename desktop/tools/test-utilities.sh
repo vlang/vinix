@@ -173,3 +173,5 @@ cp "$root/desktop/tools/tests/app_process_integration.v" "$work/ui/main.v"
 "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/app-process-integration" "$work/ui"
 "$work/app-process-integration"
+
+"$root/desktop/tools/test-utility-parity.sh"

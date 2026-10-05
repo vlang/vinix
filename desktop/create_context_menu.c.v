@@ -818,6 +818,10 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		a.reload_files_settings(desktop_home)
 		return
 	}
+	if a.files.info.open {
+		if event_id == files_action_info_close { a.files.info.close() }
+		return
+	}
 	if event_id.starts_with(jump_open_prefix) && !a.settings_only {
 		path := event_id[jump_open_prefix.len..]
 		a.open_jump_path(path, desktop_home)
@@ -968,7 +972,7 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 
 // The settings pane, the tag picker and a preview only take scrolling.
 fn (a &FilesContextApp) pointer_moves_matter() bool {
-	if a.settings_only || a.tag_picker || a.preview.open {
+	if a.settings_only || a.tag_picker || a.preview.open || a.files.info.open {
 		return false
 	}
 	return a.files.pointer_moves_matter()
@@ -997,6 +1001,7 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 		}
 		return
 	}
+	if a.files.info.open { return }
 	if button == .back {
 		if phase == .down {
 			a.clear_context_path()
@@ -1028,6 +1033,7 @@ fn (mut a FilesContextApp) key_input(input string) {
 		if input == '\x1b' { a.tag_picker = false }
 		return
 	}
+	if a.files.info_key_input(input) { return }
 	if a.files.search_focused {
 		a.files.search_key_input(input)
 		return
@@ -1042,6 +1048,7 @@ fn (mut a FilesContextApp) key_input(input string) {
 
 fn (mut a FilesContextApp) close_app() {
 	a.preview.close()
+	a.files.info.close()
 }
 
 fn (mut d Desktop) clear_context_item_path() {

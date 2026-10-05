@@ -12,6 +12,9 @@ M1 image that contains the Asahi Mesa runtime also carries a GPU-enabled binary
 which uses AGX to present that canvas when `/dev/dri/renderD128`
 exists, with an automatic fallback to the static software binary.
 
+The app-by-app comparison with macOS, implemented utility improvements and
+the proposed missing utility applications are in [UTILITIES.md](UTILITIES.md).
+
 What it does:
 
 - a wallpaper, and a taskbar with Start, open windows, the desktop build date

@@ -1006,7 +1006,18 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 		choice_width := (width - 48) / 2
 		children << capture_choice(capture_action_fps_5, tr('capture.video.compact'), 20, 175, choice_width, app.fps == 5)
 		children << capture_choice(capture_action_fps_10, tr('capture.video.smooth'), 28 + choice_width, 175, choice_width, app.fps == 10)
-		children << capture_owned_label(tr_fill('capture.video.facts', capture_fact_separator), ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
+		// Recording already honors the request's timer. Expose it on the Video
+		// page so its delay can be chosen without visiting Screenshot first.
+		children << ui2.label('', tr('capture.screenshot.delay'), ui2.rect(20, 220, 60, 18), ui2.TextStyle{
+			color: body_muted
+			size:  11
+			bold:  true
+		})
+		delay_width := (width - 116) / 3
+		children << capture_choice(capture_action_delay_0, tr('capture.delay.none'), 84, 214, delay_width, app.delay == 0)
+		children << capture_choice(capture_action_delay_3, tr('capture.delay.three_seconds'), 92 + delay_width, 214, delay_width, app.delay == 3)
+		children << capture_choice(capture_action_delay_5, tr('capture.delay.five_seconds'), 100 + delay_width * 2, 214, delay_width, app.delay == 5)
+		children << capture_owned_label(tr_fill('capture.video.facts', capture_fact_separator), ui2.rect(20, 246, f64(width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
@@ -1020,7 +1031,7 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 			tr('capture.video.start')
 		}
 		button_action := if active { capture_action_stop } else { capture_action_start_video }
-		children << ui2.button(button_action, button_text, ui2.rect(20, 250, f64(width - 40), 38), ui2.BoxStyle{
+		children << ui2.button(button_action, button_text, ui2.rect(20, 272, f64(width - 40), 38), ui2.BoxStyle{
 			bg:     if active { clock_stop } else { app_accent }
 			radius: 8
 		}, ui2.TextStyle{
@@ -1078,3 +1089,29 @@ fn (mut app CaptureApp) handle(event_id string) ! {
 		else {}
 	}
 }
+
+fn (mut app CaptureApp) key_input(text string) {
+	for index, ch in text {
+		if ch == 0x1b {
+			if index + 1 < text.len && text[index + 1] == `[` { return }
+			app.request(.stop)
+			return
+		}
+		if ch != `\r` && ch != `\n` { continue }
+		if app.desktop == unsafe { nil } { return }
+		phase := app.desktop.capture.report.phase
+		if phase == .recording || phase == .screenshot_countdown || phase == .video_countdown {
+			app.request(.stop)
+		} else {
+			app.request(if app.page == .screenshot {
+				CaptureCommand.screenshot
+			} else {
+				CaptureCommand.start_video
+			})
+		}
+		return
+	}
+}
+
+// Clipboard text is content, not a capture shortcut.
+fn (mut app CaptureApp) paste_input(_ string) {}

@@ -2230,3 +2230,244 @@ Copy your Roblox APK to ~/Roblox.apk, or set VINIX_ROBLOX_APK to its path.
 -----
 roblox.exited
 Roblox has exited. See the application log for details.
+-----
+activity.list.export
+Export process list (Ctrl-E)
+-----
+activity.list.exported
+Saved process list: {0}
+-----
+activity.history.clear
+Clear history (Ctrl-L)
+-----
+activity.history.cleared
+Resource history cleared
+-----
+activity.filter.inactive
+Inactive Processes
+-----
+activity.filter.other_users
+Other User Processes
+-----
+activity.filter.selected
+Selected Process
+-----
+editor.undo
+Undo
+-----
+editor.redo
+Redo
+-----
+editor.find
+Find
+-----
+editor.replace
+Replace
+-----
+editor.find.previous
+Previous
+-----
+editor.find.next
+Next
+-----
+editor.replace.all
+Replace All
+-----
+editor.find.close
+Close
+-----
+editor.status.no_match
+No matching text
+-----
+editor.status.match
+Matching text found
+-----
+editor.status.replaced
+Text replaced
+-----
+calendar.events
+Events
+-----
+calendar.events.empty
+No events on this date
+-----
+calendar.event.new
+New event
+-----
+calendar.event.all_day
+All day
+-----
+calendar.event.title
+Title
+-----
+calendar.event.time
+Time (HH:MM)
+-----
+calendar.event.location
+Location
+-----
+calendar.event.save
+Save
+-----
+calendar.event.cancel
+Cancel
+-----
+calendar.event.delete
+Delete
+-----
+calendar.event.invalid_time
+Enter a time from 00:00 to 23:59
+-----
+calendar.event.title_required
+Enter an event title
+-----
+calendar.event.save_failed
+Could not save events. Your changes are still open
+-----
+calendar.event.read_failed
+Could not read saved events. The existing file was preserved
+-----
+calendar.event.limit
+The calendar holds up to 128 events
+-----
+clock.timer
+Timer
+-----
+clock.lap
+Lap
+-----
+clock.laps
+Lap / Split / Total
+-----
+clock.timer.preset.1
+1 min
+-----
+clock.timer.preset.5
+5 min
+-----
+clock.timer.preset.15
+15 min
+-----
+clock.timer.finished
+Time is up
+-----
+clock.timer.adjust
+Adjust in minutes before starting
+-----
+calculator.history.title
+History
+-----
+calculator.history.clear
+Clear
+-----
+disk_usage.path.root
+Folder
+-----
+disk_usage.path.report
+Report
+-----
+disk_usage.button.scan
+Scan
+-----
+disk_usage.button.export
+Export CSV
+-----
+disk_usage.report.saved
+Saved report: {0}
+-----
+disk_usage.report.failed
+Could not save report: {0}
+-----
+disk_usage.report.exists
+A file already exists: {0}
+-----
+settings.category.about
+About
+-----
+settings.about.kernel
+Operating system and kernel
+-----
+settings.about.cpu
+Processor
+-----
+settings.about.memory
+Physical memory
+-----
+settings.about.uptime
+Uptime (seconds)
+-----
+settings.about.unavailable
+Not reported by this system
+-----
+settings.about.refresh
+Refresh
+-----
+terminal.find
+Find
+-----
+terminal.history.clear
+Clear scrollback
+-----
+terminal.find.placeholder
+Find in output
+-----
+terminal.find.previous
+Previous match
+-----
+terminal.find.next
+Next match
+-----
+terminal.find.no_match
+No matching text
+-----
+calendar.event.changed
+Events changed in another window. Reopen Calendar before saving
+-----
+files.info.title
+Get Info
+-----
+files.info.close
+Close
+-----
+files.info.kind
+Kind
+-----
+files.info.size
+Size
+-----
+files.info.permissions
+Permissions
+-----
+files.info.owner
+Owner / Group IDs
+-----
+files.info.modified
+Modified
+-----
+files.info.accessed
+Last Accessed
+-----
+files.info.changed
+Metadata Changed
+-----
+files.info.target
+Link Target
+-----
+files.info.symbolic_link
+Symbolic Link
+-----
+files.info.special_file
+Special File
+-----
+files.info.unavailable
+File information is unavailable
+-----
+calendar.event.invalid_location
+Location must be a single line
+-----
+files.info.symbol
+i
+-----
+calculator.memory.indicator
+M
+-----

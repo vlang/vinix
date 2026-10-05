@@ -387,7 +387,7 @@ fn files_content_left(width int) int {
 }
 
 fn files_path_width(width int) int {
-	right := width - files_padding - 4 * files_view_button_width - 3 * 2 - 8
+	right := width - files_padding - 5 * files_view_button_width - 4 * 2 - 8
 	return if right > files_path_left { right - files_path_left } else { 1 }
 }
 
@@ -473,6 +473,7 @@ mut:
 	title_path     string
 	title_language DesktopLanguage
 	tag_actions    map[int]string
+	info           FilesInfoPanel
 }
 
 /* fn open_files(mut _ Desktop) !NativeApp {
@@ -743,6 +744,7 @@ fn (mut a FileBrowserApp) screen_with_sidebar(width int, height int, mut childre
 			f64(height - files_header_height())), ui2.BoxStyle{
 			bg: finder_sidebar_rule
 		}, [])
+		a.build_info_overlay(mut children, width, height)
 		return ui2.screen(files_row_base, children)
 	}
 	if content_left > 0 {
@@ -752,6 +754,7 @@ fn (mut a FileBrowserApp) screen_with_sidebar(width int, height int, mut childre
 			bg: body_rule
 		}, [])
 	}
+	a.build_info_overlay(mut children, width, height)
 	return ui2.screen(app_surface, children)
 }
 
@@ -974,7 +977,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 
 	// Header: where we are, the way back out, and the view choices.
 	view_button_gap := 2
-	view_x := width - files_padding - 4 * files_view_button_width - 3 * view_button_gap
+	view_x := width - files_padding - 5 * files_view_button_width - 4 * view_button_gap
 	children << ui2.button(files_action_up, tr('files.toolbar.up'), ui2.rect(f64(files_padding), files_path_top, 40, files_path_height), ui2.BoxStyle{
 		bg:     if a.current_path() == '/' { files_up_disabled } else { files_up }
 		radius: 5
@@ -991,6 +994,11 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 		view_x + 2 * (files_view_button_width + view_button_gap), a.view_mode == .columns)
 	children << files_view_button(files_action_settings, tr('files.toolbar.settings'), 'builtin:settings',
 		view_x + 3 * (files_view_button_width + view_button_gap), false)
+	children << ui2.Element{
+		...ui2.button(files_action_info, tr('files.info.symbol'), ui2.rect(f64(view_x + 4 * (files_view_button_width + view_button_gap)), 8, files_view_button_width, 22), ui2.BoxStyle{ bg: body_panel, radius: 5 }, ui2.TextStyle{ color: body_text, size: 14, bold: true, align: .center })
+		tooltip:             tr('files.info.title')
+		accessibility_label: tr('files.info.title')
+	}
 	if a.view_mode != .columns {
 		children << ui2.label('', a.current_path(), ui2.rect(files_path_left, files_path_top,
 			f64(a.path_viewport_width), files_path_height), ui2.TextStyle{
@@ -1384,6 +1392,7 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 }
 
 fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, _ int) {
+	if a.info.open { return }
 	if phase == .down {
 		// A press anywhere takes the keyboard from the search field; one on
 		// the field gives it back as the press's action.
@@ -1519,6 +1528,14 @@ fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut a FileBrowserApp) handle(event_id string) ! {
+	if a.info.open {
+		if event_id == files_action_info_close { a.info.close() }
+		return
+	}
+	if event_id == files_action_info {
+		a.open_info()
+		return
+	}
 	if column := files_list_sort_column_for_action(event_id) {
 		if a.view_mode == .list && a.active_tag_id < 0 {
 			a.browser.set_list_sort(column)

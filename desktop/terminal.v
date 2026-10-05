@@ -136,6 +136,12 @@ mut:
 	// Completed rows pushed off the top of the main screen.
 	lines  []string
 	scroll int
+	search_query []u8
+	search_open bool
+	search_match int = -1
+	search_pending [4]u8
+	search_pending_len int
+	search_escape_state int
 
 	// Escape parser state survives non-blocking reads. CSI parameters use a
 	// fixed array so a noisy child cannot allocate without bound.
@@ -523,6 +529,9 @@ fn terminal_cells_text(cells []rune, start int, end int, cursor int) string {
 	for index in start .. end {
 		size += if index == cursor { 1 } else { terminal_utf8_len(cells[index]) }
 	}
+	// Empty rows are common during search and rendering. bytestr() allocates
+	// even for an empty array, while row consumers treat '' as borrowed text.
+	if size == 0 { return '' }
 	mut bytes := []u8{cap: size}
 	for index in start .. end {
 		terminal_append_utf8(mut bytes, if index == cursor { `_` } else { cells[index] })
@@ -535,15 +544,22 @@ fn terminal_cells_text(cells []rune, start int, end int, cursor int) string {
 }
 
 fn (mut a TerminalApp) push_history_row(row int) {
+	unsafe { a.lines.flags |= .noslices }
 	a.lines << a.row_string(row)
 	for a.lines.len > terminal_scrollback {
 		evicted := a.lines[0]
 		a.lines.delete(0)
+		if a.search_match >= 0 { a.search_match-- }
 		if evicted.len > 0 {
 			unsafe { evicted.free() }
 		}
 	}
-	a.scroll = 0
+	if a.search_open && a.scroll > 0 {
+		a.scroll++
+		if a.scroll > a.lines.len { a.scroll = a.lines.len }
+	} else {
+		a.scroll = 0
+	}
 }
 
 fn (mut a TerminalApp) scroll_region_up(top int, bottom int, count int) {
@@ -1245,6 +1261,7 @@ fn replaced_terminal_text(old string, next string) string {
 // Feed keystrokes directly to the PTY master. DEL is the slave's default
 // VERASE, so normalize the desktop keyboard's Backspace byte to it.
 fn (mut a TerminalApp) key_input(text string) {
+	if a.search_open { a.search_input(text); return }
 	if a.terminal < 0 || a.exited || text.len == 0 {
 		return
 	}
@@ -1257,6 +1274,7 @@ fn (mut a TerminalApp) key_input(text string) {
 }
 
 fn (mut a TerminalApp) paste_input(text string) {
+	if a.search_open { a.paste_search(text); return }
 	if a.terminal < 0 || a.exited || text.len == 0 {
 		return
 	}
@@ -1271,6 +1289,10 @@ fn (mut a TerminalApp) paste_input(text string) {
 
 fn (mut a TerminalApp) close_app() {
 	a.preserve_rebuild_snapshot()
+	if a.search_query.cap > 0 { unsafe { a.search_query.free() } }
+	a.search_query = []u8{}
+	a.search_pending_len = 0
+	a.search_escape_state = 0
 	if a.terminal >= 0 {
 		desktop_close(a.terminal)
 		a.terminal = -1
@@ -1285,8 +1307,8 @@ fn (mut a TerminalApp) close_app() {
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	a.visible_rows = if height > 2 * terminal_padding + terminal_row_height {
-		(height - 2 * terminal_padding) / terminal_row_height
+	a.visible_rows = if height > terminal_toolbar_height + 2 * terminal_padding + terminal_row_height {
+		(height - terminal_toolbar_height - 2 * terminal_padding) / terminal_row_height
 	} else {
 		1
 	}
@@ -1316,7 +1338,8 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	}
 	first := a.lines.len - a.scroll
 
-	mut children := frame_elements(a.visible_rows + 2)
+	mut children := frame_elements(a.visible_rows + 8)
+	a.build_search_toolbar(mut children, width)
 	for row in 0 .. a.visible_rows {
 		index := first + row
 		text := if !a.alternate_screen && index < a.lines.len {
@@ -1328,7 +1351,12 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 		if text.len == 0 {
 			continue
 		}
-		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(terminal_padding + row * terminal_row_height), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
+		row_y := terminal_toolbar_height + terminal_padding + row * terminal_row_height
+		if a.search_open && a.search_match == (if a.alternate_screen { row } else { index }) {
+			children << ui2.view('', ui2.rect(f64(terminal_padding), f64(row_y), f64(width - 2 * terminal_padding), f64(terminal_row_height)),
+				ui2.BoxStyle{ bg: terminal_button }, [])
+		}
+		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(row_y), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
 			color:       terminal_text
 			font_family: 'mono'
 			size:        13
@@ -1338,7 +1366,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	if max_scroll > 0 {
 		button := 18
 		right := width - terminal_padding - button
-		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_toolbar_height + terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -1346,7 +1374,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			size:  12
 			align: .center
 		})
-		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_padding), f64(button), 18), ui2.BoxStyle{
+		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_toolbar_height + terminal_padding), f64(button), 18), ui2.BoxStyle{
 			bg:     terminal_button
 			radius: 4
 		}, ui2.TextStyle{
@@ -1360,6 +1388,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a TerminalApp) handle(event_id string) ! {
+	if a.handle_search(event_id) { return }
 	match event_id {
 		terminal_action_scroll_up {
 			a.scroll += a.visible_rows

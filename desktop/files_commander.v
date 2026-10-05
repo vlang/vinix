@@ -258,6 +258,7 @@ fn (mut a FileBrowserApp) commander_begin_drag(pane int, y int) {
 // Files only follows the pointer while one of its drags is under way: the
 // path bar, a scroll bar, or a commander pane's scroll bar.
 fn (a &FileBrowserApp) pointer_moves_matter() bool {
+	if a.info.open { return false }
 	return a.path_drag || a.horizontal_drag || a.vertical_drag_id != -2
 }
 

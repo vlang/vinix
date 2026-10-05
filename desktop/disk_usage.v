@@ -159,8 +159,8 @@ fn (mut r DiskUsageRanking) consider(name string, path string, bytes u64) {
 		return
 	}
 	entry := DiskUsageEntry{
-		name: name
-		path: path
+		name:  name
+		path:  path
 		bytes: bytes
 	}
 	r.entries << entry
@@ -230,7 +230,7 @@ mut:
 
 struct DiskUsageScanner {
 mut:
-	root        string = '/'
+	root        string         = '/'
 	phase       DiskUsagePhase = .complete
 	stack       []DiskUsageFrame
 	files_rank  DiskUsageRanking
@@ -272,7 +272,7 @@ fn (mut s DiskUsageScanner) begin(path string) {
 	s.stack << DiskUsageFrame{
 		path: s.root.clone()
 		name: s.root.clone()
-		dir: dir
+		dir:  dir
 	}
 	s.directories = 1
 	s.phase = .scanning
@@ -370,7 +370,7 @@ fn (mut s DiskUsageScanner) enter(name string, path string, info DesktopNodeInfo
 	s.stack << DiskUsageFrame{
 		path: path
 		name: name
-		dir: dir
+		dir:  dir
 	}
 }
 
@@ -592,6 +592,19 @@ fn disk_usage_duration_text(milliseconds u64) string {
 
 // ── The native application ────────────────────────────────────────
 
+const disk_usage_action_root = 'disk_usage.root'
+const disk_usage_action_scan_path = 'disk_usage.scan_path'
+const disk_usage_action_report_path = 'disk_usage.report_path'
+const disk_usage_action_export = 'disk_usage.export'
+const disk_usage_report_filename = 'disk-usage.csv'
+const disk_usage_path_limit = 512
+
+enum DiskUsageFocus {
+	none_
+	root
+	report
+}
+
 const disk_usage_action_rescan = 'disk_usage.rescan'
 const disk_usage_action_stop = 'disk_usage.stop'
 const disk_usage_action_up = 'disk_usage.up'
@@ -617,9 +630,9 @@ fn disk_usage_scope_title(index int) string {
 // Row actions are literals because the tree is rebuilt on every frame and this
 // target has no garbage collector. They name a row of the window, not an entry
 // of the ranking: the page offset is what turns one into the other.
-const disk_usage_dir_actions = ['disk_usage.dir.0', 'disk_usage.dir.1', 'disk_usage.dir.2', 'disk_usage.dir.3',
-	'disk_usage.dir.4', 'disk_usage.dir.5', 'disk_usage.dir.6', 'disk_usage.dir.7', 'disk_usage.dir.8', 'disk_usage.dir.9',
-	'disk_usage.dir.10', 'disk_usage.dir.11']
+const disk_usage_dir_actions = ['disk_usage.dir.0', 'disk_usage.dir.1', 'disk_usage.dir.2',
+	'disk_usage.dir.3', 'disk_usage.dir.4', 'disk_usage.dir.5', 'disk_usage.dir.6', 'disk_usage.dir.7',
+	'disk_usage.dir.8', 'disk_usage.dir.9', 'disk_usage.dir.10', 'disk_usage.dir.11']
 
 const disk_usage_pad = 12
 const disk_usage_row_height = 48
@@ -628,18 +641,27 @@ const disk_usage_panel_header = 34
 
 struct DiskUsageApp {
 mut:
-	scanner   DiskUsageScanner
-	dir_page  int
-	file_page int
-	dir_rows  int = 1
-	file_rows int = 1
+	scanner         DiskUsageScanner
+	dir_page        int
+	file_page       int
+	dir_rows        int = 1
+	file_rows       int = 1
+	root_input      []u8
+	report_path     []u8
+	focus           DiskUsageFocus
+	path_select_all bool
+	report_status   string
 }
 
 fn open_disk_usage(mut _ Desktop) !NativeApp {
 	mut app := &DiskUsageApp{}
 	// A disk inventory that opened on an empty window and waited to be told
 	// what to look at would be asking a question with one sensible answer.
-	app.scanner.begin('/')
+	app.scan('/')
+	unsafe { app.report_path.flags |= .noslices }
+	path := disk_usage_default_report_path()
+	disk_usage_append(mut app.report_path, path)
+	unsafe { path.free() }
 	return app
 }
 
@@ -660,16 +682,45 @@ fn (mut a DiskUsageApp) poll() bool {
 
 fn (mut a DiskUsageApp) close_app() {
 	a.scanner.release()
+	unsafe {
+		a.root_input.free()
+		a.report_path.free()
+	}
+	a.root_input = []u8{}
+	a.report_path = []u8{}
 }
 
 fn (mut a DiskUsageApp) scan(path string) {
 	a.scanner.begin(path)
 	a.dir_page = 0
 	a.file_page = 0
+	unsafe { a.root_input.flags |= .noslices }
+	a.root_input.clear()
+	disk_usage_append(mut a.root_input, a.scanner.root)
+	a.report_status = ''
+	a.path_select_all = false
 }
 
 fn (mut a DiskUsageApp) handle(event_id string) ! {
 	match event_id {
+		disk_usage_action_root {
+			a.focus = .root
+			a.path_select_all = true
+			return
+		}
+		disk_usage_action_report_path {
+			a.focus = .report
+			a.path_select_all = true
+			return
+		}
+		disk_usage_action_scan_path {
+			a.scan_typed_path()
+			return
+		}
+		disk_usage_action_export {
+			a.export_report()
+			return
+		}
 		disk_usage_action_rescan {
 			a.scan(a.scanner.root)
 			return
@@ -754,6 +805,9 @@ fn (a &DiskUsageApp) phase_title() string {
 // this frame and released with the tree, like every other formatted string
 // here; only the paths inside it belong to the scanner.
 fn (a &DiskUsageApp) status_text() string {
+	if a.report_status.len > 0 {
+		return tr_fill(a.report_status, disk_usage_buffer_text(a.report_path))
+	}
 	match a.scanner.phase {
 		.scanning {
 			return tr_fill('disk_usage.status.walking', a.scanner.current_path())
@@ -792,11 +846,11 @@ fn disk_usage_owned_label(text string, frame ui2.Rect, style ui2.TextStyle) ui2.
 
 fn disk_usage_button(action string, title string, x int, y int, width int, enabled bool) ui2.Element {
 	return ui2.button(action, title, ui2.rect(f64(x), f64(y), f64(width), 24), ui2.BoxStyle{
-		bg: if enabled { files_up } else { files_up_disabled }
+		bg:     if enabled { files_up } else { files_up_disabled }
 		radius: 6
 	}, ui2.TextStyle{
 		color: if enabled { app_on_accent } else { body_muted }
-		size: 13
+		size:  13
 		align: .center
 	})
 }
@@ -804,26 +858,26 @@ fn disk_usage_button(action string, title string, x int, y int, width int, enabl
 fn disk_usage_metric(title string, value string, x int, y int, width int, accent u32) ui2.Element {
 	mut children := frame_elements(3)
 	children << ui2.view('', ui2.rect(0, 0, 4, f64(disk_usage_metric_height)), ui2.BoxStyle{
-		bg: accent
+		bg:     accent
 		radius: 2
 	}, [])
 	children << ui2.label('', title, ui2.rect(16, 11, f64(width - 26), 14), ui2.TextStyle{
 		color: body_muted
-		size: 11
-		bold: true
+		size:  11
+		bold:  true
 	})
 	children << disk_usage_owned_label(value, ui2.rect(16, 29, f64(width - 26), 24), ui2.TextStyle{
 		color: body_heading
-		size: 17
-		bold: true
+		size:  17
+		bold:  true
 	})
 	return ui2.view('', ui2.rect(f64(x), f64(y), f64(width), f64(disk_usage_metric_height)), ui2.BoxStyle{
-		bg: 0xffffff
-		radius: 10
-		border_color: body_rule
-		border_left: 1
-		border_top: 1
-		border_right: 1
+		bg:            0xffffff
+		radius:        10
+		border_color:  body_rule
+		border_left:   1
+		border_top:    1
+		border_right:  1
 		border_bottom: 1
 	}, children)
 }
@@ -845,34 +899,34 @@ fn disk_usage_row(action string, rank int, entry &DiskUsageEntry, y int, width i
 	mut children := frame_elements(5)
 	children << disk_usage_owned_label(number, ui2.rect(10, 5, 22, 16), ui2.TextStyle{
 		color: body_muted
-		size: 11
-		bold: true
+		size:  11
+		bold:  true
 		align: .right
 	})
 	children << ui2.label('', entry.name, ui2.rect(40, 3, f64(width - 132), 18), ui2.TextStyle{
 		color: body_heading
-		size: 13
-		bold: true
+		size:  13
+		bold:  true
 	})
 	children << disk_usage_owned_label(size_text, ui2.rect(f64(width - 90), 3, 80, 18), ui2.TextStyle{
 		color: body_heading
-		size: 13
-		bold: true
+		size:  13
+		bold:  true
 		align: .right
 	})
 	children << ui2.label('', entry.path, ui2.rect(40, 22, f64(width - 50), 14), ui2.TextStyle{
 		color: body_muted
-		size: 11
+		size:  11
 	})
 	// Clear of the path by enough that the bar reads as a bar and not as an
 	// underline of the text above it.
 	children << ui2.view('', ui2.rect(40, 41, f64(bar), 3), ui2.BoxStyle{
-		bg: accent
+		bg:     accent
 		radius: 1
 	}, [])
 	frame := ui2.rect(0, f64(y), f64(width), f64(disk_usage_row_height - 2))
 	box := ui2.BoxStyle{
-		bg: if rank % 2 == 1 { u32(0xffffff) } else { activity_row_alt }
+		bg:     if rank % 2 == 1 { u32(0xffffff) } else { activity_row_alt }
 		radius: 6
 	}
 	if !clickable {
@@ -890,13 +944,13 @@ fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, ro
 	mut children := frame_elements(rows + 6)
 	children << ui2.label('', title, ui2.rect(14, 9, f64(width - 200), 18), ui2.TextStyle{
 		color: body_heading
-		size: 13
-		bold: true
+		size:  13
+		bold:  true
 	})
 	summary_frame := ui2.rect(f64(width - 186), 12, f64(186 - summary_right), 14)
 	summary_style := ui2.TextStyle{
 		color: body_muted
-		size: 11
+		size:  11
 		align: .right
 	}
 	if ranking.entries.len == 0 {
@@ -912,19 +966,19 @@ fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, ro
 
 	if paging {
 		children << ui2.button(back, '-', ui2.rect(f64(width - 54), 8, 22, 18), ui2.BoxStyle{
-			bg: files_up
+			bg:     files_up
 			radius: 5
 		}, ui2.TextStyle{
 			color: app_on_accent
-			size: 11
+			size:  11
 			align: .center
 		})
 		children << ui2.button(next, '+', ui2.rect(f64(width - 28), 8, 22, 18), ui2.BoxStyle{
-			bg: files_up
+			bg:     files_up
 			radius: 5
 		}, ui2.TextStyle{
 			color: app_on_accent
-			size: 11
+			size:  11
 			align: .center
 		})
 	}
@@ -933,7 +987,7 @@ fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, ro
 		children << ui2.label('', tr('disk_usage.panel.empty'), ui2.rect(14,
 			f64(disk_usage_panel_header + 10), f64(width - 28), 18), ui2.TextStyle{
 			color: body_muted
-			size: 11
+			size:  11
 		})
 	}
 	largest := ranking.largest()
@@ -948,12 +1002,12 @@ fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, ro
 	}
 
 	return ui2.view('', ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{
-		bg: 0xffffff
-		radius: 12
-		border_color: body_rule
-		border_left: 1
-		border_top: 1
-		border_right: 1
+		bg:            0xffffff
+		radius:        12
+		border_color:  body_rule
+		border_left:   1
+		border_top:    1
+		border_right:  1
 		border_bottom: 1
 	}, children)
 }
@@ -967,7 +1021,7 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 	inner := width - disk_usage_pad * 2
 	scanning := a.scanner.phase == .scanning
 
-	panel_y := 178
+	panel_y := 234
 	panel_height := height - panel_y - 34
 	rows := if panel_height > disk_usage_panel_header + disk_usage_row_height {
 		(panel_height - disk_usage_panel_header - 8) / disk_usage_row_height
@@ -983,29 +1037,29 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 
 	children << ui2.label('', 'Disk Usage', ui2.rect(f64(disk_usage_pad), 5, 116, 24), ui2.TextStyle{
 		color: body_heading
-		size: 18
-		bold: true
+		size:  18
+		bold:  true
 	})
 	children << ui2.label('', tr('disk_usage.subtitle'), ui2.rect(f64(disk_usage_pad + 110), 12, 160, 16),
 		ui2.TextStyle{
-		color: body_muted
-		size: 11
-	})
+			color: body_muted
+			size:  11
+		})
 
 	mut badge := frame_elements(1)
 	badge << ui2.label('', a.phase_title(), ui2.rect(6, 4, 92, 14), ui2.TextStyle{
 		color: a.phase_color()
-		size: 11
-		bold: true
+		size:  11
+		bold:  true
 		align: .center
 	})
 	children << ui2.view('', ui2.rect(f64(width - disk_usage_pad - 104), 7, 104, 22), ui2.BoxStyle{
-		bg: 0xffffff
-		radius: 11
-		border_color: a.phase_color()
-		border_left: 1
-		border_top: 1
-		border_right: 1
+		bg:            0xffffff
+		radius:        11
+		border_color:  a.phase_color()
+		border_left:   1
+		border_top:    1
+		border_right:  1
 		border_bottom: 1
 	}, badge)
 
@@ -1025,12 +1079,18 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 	children << disk_usage_button(disk_usage_action_rescan, tr('disk_usage.button.rescan'), width - disk_usage_pad -
 		144, 40, 72, !scanning)
 
-	children << ui2.label('', a.scanner.root, ui2.rect(f64(disk_usage_pad), 72, f64(inner), 16),
-		ui2.TextStyle{
-		color: body_text
-		size: 11
-		bold: true
-	})
+	children << ui2.label('', tr('disk_usage.path.root'), ui2.rect(f64(disk_usage_pad), 76, 58, 18),
+		ui2.TextStyle{ color: body_muted, size: 11 })
+	children << disk_usage_path_field(disk_usage_action_root, disk_usage_buffer_text(a.root_input),
+		disk_usage_pad + 62, 72, inner - 148, a.focus == .root)
+	children << disk_usage_button(disk_usage_action_scan_path, tr('disk_usage.button.scan'),
+		width - disk_usage_pad - 78, 72, 78, true)
+	children << ui2.label('', tr('disk_usage.path.report'), ui2.rect(f64(disk_usage_pad), 108, 58, 18),
+		ui2.TextStyle{ color: body_muted, size: 11 })
+	children << disk_usage_path_field(disk_usage_action_report_path, disk_usage_buffer_text(a.report_path),
+		disk_usage_pad + 62, 104, inner - 148, a.focus == .report)
+	children << disk_usage_button(disk_usage_action_export, tr('disk_usage.button.export'),
+		width - disk_usage_pad - 78, 104, 78, !scanning && a.scanner.phase != .failed)
 
 	// The hairline under the controls is the whole progress display: a walk
 	// cannot know how much is left, so it says only that it is moving.
@@ -1039,30 +1099,30 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 		travel := inner + 160
 		offset := int(a.scanner.elapsed_ms / 4 % u64(travel)) - 160
 		bar << ui2.view('', ui2.rect(f64(offset), 0, 160, 3), ui2.BoxStyle{
-			bg: app_accent
+			bg:     app_accent
 			radius: 1
 		}, [])
 	} else if a.scanner.phase == .complete {
 		bar << ui2.view('', ui2.rect(0, 0, f64(inner), 3), ui2.BoxStyle{
-			bg: disk_usage_phase_complete
+			bg:     disk_usage_phase_complete
 			radius: 1
 		}, [])
 	}
-	children << ui2.view('', ui2.rect(f64(disk_usage_pad), 94, f64(inner), 3), ui2.BoxStyle{
-		bg: body_rule
+	children << ui2.view('', ui2.rect(f64(disk_usage_pad), 150, f64(inner), 3), ui2.BoxStyle{
+		bg:     body_rule
 		radius: 1
 	}, bar)
 
 	gap := 10
 	metric_width := (inner - gap * 3) / 4
 	children << disk_usage_metric(tr('disk_usage.metric.size'), disk_usage_size_text(a.scanner.total_bytes),
-		disk_usage_pad, 106, metric_width, app_accent)
+		disk_usage_pad, 162, metric_width, app_accent)
 	children << disk_usage_metric(tr('disk_usage.metric.files'), disk_usage_count_text(a.scanner.files),
-		disk_usage_pad + metric_width + gap, 106, metric_width, disk_usage_files_accent)
+		disk_usage_pad + metric_width + gap, 162, metric_width, disk_usage_files_accent)
 	children << disk_usage_metric(tr('disk_usage.metric.folders'), disk_usage_count_text(a.scanner.directories),
-		disk_usage_pad + (metric_width + gap) * 2, 106, metric_width, disk_usage_folders_accent)
+		disk_usage_pad + (metric_width + gap) * 2, 162, metric_width, disk_usage_folders_accent)
 	children << disk_usage_metric(tr('disk_usage.metric.skipped'), disk_usage_count_text(a.scanner.unreadable),
-		disk_usage_pad + (metric_width + gap) * 3, 106, metric_width, files_error)
+		disk_usage_pad + (metric_width + gap) * 3, 162, metric_width, files_error)
 
 	panel_width := (inner - gap) / 2
 	children << a.panel(tr('disk_usage.panel.folders'), &a.scanner.dirs_rank, a.dir_page, rows,
@@ -1070,18 +1130,18 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 		panel_width, panel_height, disk_usage_folders_accent, !scanning)
 	children << a.panel(tr('disk_usage.panel.files'), &a.scanner.files_rank, a.file_page, rows,
 		disk_usage_dir_actions, disk_usage_action_files_back, disk_usage_action_files_next, disk_usage_pad +
-		panel_width + gap, panel_y, panel_width, panel_height, disk_usage_files_accent, false)
+			panel_width + gap, panel_y, panel_width, panel_height, disk_usage_files_accent, false)
 
 	mut status := frame_elements(1)
 	status << disk_usage_owned_label(a.status_text(), ui2.rect(10, 5, f64(inner - 20), 14), ui2.TextStyle{
 		color: body_text
-		size: 11
+		size:  11
 	})
 	children << ui2.view('', ui2.rect(f64(disk_usage_pad), f64(height - 28), f64(inner), 22),
 		ui2.BoxStyle{
-		bg: body_panel
-		radius: 6
-	}, status)
+			bg:     body_panel
+			radius: 6
+		}, status)
 
 	return ui2.screen(app_surface, children)
 }
@@ -1092,4 +1152,172 @@ fn disk_usage_clamp_page(page int, rows int, total int) int {
 		return if last < 0 { 0 } else { last }
 	}
 	return if page < 0 { 0 } else { page }
+}
+
+fn disk_usage_buffer_text(bytes []u8) string {
+	if bytes.len == 0 { return '' }
+	return unsafe { tos(bytes.data, bytes.len) }
+}
+
+fn disk_usage_path_field(action string, text string, x int, y int, width int, focused bool) ui2.Element {
+	return ui2.button(action, text, ui2.rect(f64(x), f64(y), f64(width), 24), ui2.BoxStyle{
+		bg:            0xffffff
+		radius:        5
+		border_color:  if focused { app_accent } else { body_rule }
+		border_left:   1
+		border_top:    1
+		border_right:  1
+		border_bottom: 1
+	}, ui2.TextStyle{ color: body_text, size: 11 })
+}
+
+fn (mut a DiskUsageApp) scan_typed_path() {
+	path := disk_usage_buffer_text(a.root_input)
+	if path.len == 0 || path[0] != `/` { return }
+	a.scan(path)
+	a.focus = .none_
+}
+
+fn (mut a DiskUsageApp) edit_path(ch u8) {
+	mut bytes := if a.focus == .root { &a.root_input } else { &a.report_path }
+	unsafe { bytes.flags |= .noslices }
+	if a.path_select_all && (ch >= 32 || ch == 8) {
+		bytes.clear()
+		a.path_select_all = false
+		if ch == 8 || ch == 127 { return }
+	}
+	if ch == 8 || ch == 127 {
+		// Delete the entire UTF-8 character, not its last continuation byte.
+		mut from := bytes.len - 1
+		for from > 0 && unsafe { (*bytes)[from] } & 0xc0 == 0x80 { from-- }
+		if from >= 0 { bytes.trim(from) }
+	} else if ch >= 32 && ch != 127 && bytes.len < disk_usage_path_limit {
+		bytes << ch
+	}
+	a.report_status = ''
+}
+
+fn (mut a DiskUsageApp) key_input(text string) {
+	mut at := 0
+	for at < text.len {
+		ch := text[at]
+		if ch == 0x1b && at + 1 < text.len && text[at + 1] == `[` {
+			at += 2
+			for at < text.len {
+				final := text[at] >= 0x40 && text[at] <= 0x7e
+				at++
+				if final { break }
+			}
+			continue
+		}
+		match ch {
+			0x0c {
+				a.focus = .root
+				a.path_select_all = true
+			}
+			0x15 {
+				if a.focus != .none_ {
+					a.path_select_all = true
+					a.edit_path(8)
+				}
+			}
+			0x1b { a.focus = .none_ }
+			`\n`, `\r` {
+				if a.focus == .root {
+					a.scan_typed_path()
+				} else if a.focus == .report {
+					a.export_report()
+				}
+			}
+			else {
+				if a.focus != .none_ { a.edit_path(ch) }
+			}
+		}
+		at++
+	}
+}
+
+fn (mut a DiskUsageApp) paste_input(text string) {
+	if a.focus == .none_ { return }
+	for ch in text {
+		if ch >= 32 && ch != 127 { a.edit_path(ch) }
+	}
+}
+
+// Quote all paths, including embedded quotes/newlines. Column names and raw
+// byte totals remain stable across desktop languages for spreadsheet imports.
+fn disk_usage_csv_row(mut out []u8, kind string, path string, bytes u64) {
+	disk_usage_append(mut out, kind)
+	disk_usage_append(mut out, ',"')
+	for ch in path {
+		if ch == `"` { out << `"` }
+		out << ch
+	}
+	disk_usage_append(mut out, '",')
+	count := bytes.str()
+	disk_usage_append(mut out, count)
+	unsafe { count.free() }
+	out << `\n`
+}
+
+fn (s &DiskUsageScanner) report_csv() []u8 {
+	mut out := []u8{cap: 4096}
+	unsafe { out.flags |= .noslices }
+	disk_usage_append(mut out, 'kind,path,bytes\n')
+	disk_usage_csv_row(mut out, 'root', s.root, s.total_bytes)
+	disk_usage_csv_row(mut out, 'phase', match s.phase {
+		.scanning { 'scanning' }
+		.complete { 'complete' }
+		.cancelled { 'cancelled' }
+		.failed { 'failed' }
+	}, 0)
+	disk_usage_csv_row(mut out, 'file_count', '', s.files)
+	disk_usage_csv_row(mut out, 'directory_count', '', s.directories)
+	disk_usage_csv_row(mut out, 'skipped_count', '', s.unreadable)
+	for entry in s.dirs_rank.entries {
+		disk_usage_csv_row(mut out, 'directory', entry.path, entry.bytes)
+	}
+	for entry in s.files_rank.entries {
+		disk_usage_csv_row(mut out, 'file', entry.path, entry.bytes)
+	}
+	return out
+}
+
+fn (mut a DiskUsageApp) export_report() {
+	if a.scanner.phase == .scanning || a.scanner.phase == .failed { return }
+	path := disk_usage_buffer_text(a.report_path).clone()
+	defer { unsafe { path.free() } }
+	if path.len == 0 || path[0] != `/` { return }
+	// An inventory report must never overwrite one of the scanned files.
+	if desktop_lstat(path) != none {
+		a.report_status = 'disk_usage.report.exists'
+		return
+	}
+	data := a.scanner.report_csv()
+	success := disk_usage_write_report(path, data)
+	unsafe { data.free() }
+	a.report_status = if success { 'disk_usage.report.saved' } else { 'disk_usage.report.failed' }
+}
+
+fn disk_usage_write_report(path string, data []u8) bool {
+	// O_EXCL enforces the same no-overwrite policy even if a file appears
+	// between the existence check and opening the report.
+	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL, 0o644)
+	if fd < 0 { return false }
+	written := desktop_write_all(fd, data.data, u64(data.len))
+	closed := C.close(fd) == 0
+	if !written || !closed {
+		C.unlink(&char(path.str))
+		return false
+	}
+	return true
+}
+
+fn disk_usage_append(mut out []u8, text string) {
+	for ch in text { out << ch }
+}
+
+fn disk_usage_default_report_path() string {
+	home := if desktop_user_home.len > 0 { desktop_user_home } else { desktop_home }
+	return join_path(home, disk_usage_report_filename)
 }

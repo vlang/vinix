@@ -25,10 +25,11 @@ enum SettingsCategory {
 	display
 	battery
 	keyboard
+	about
 }
 
 const settings_categories = [SettingsCategory.appearance, .date_time, .language, .theme, .wallpaper,
-	.wifi, .display, .battery, .keyboard]
+	.wifi, .display, .battery, .keyboard, .about]
 
 fn (c SettingsCategory) title() string {
 	return match c {
@@ -41,6 +42,7 @@ fn (c SettingsCategory) title() string {
 		.display { tr('settings.category.display') }
 		.battery { tr('settings.category.battery') }
 		.keyboard { tr('settings.category.keyboard') }
+		.about { tr('settings.category.about') }
 	}
 }
 
@@ -68,6 +70,7 @@ mut:
 	// NativeApp's build takes only a size — everything else it needs, it holds.
 	desktop  &Desktop = unsafe { nil }
 	category SettingsCategory = .appearance
+	about SettingsAbout
 	images   []WallpaperImage
 	// Display, Battery and Wi-Fi read devices rather than the desktop's own
 	// preferences, so they carry the last readback and the labels made from
@@ -143,6 +146,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 			a.refresh_wifi()
 		}
 	}
+	if a.category == .about && !a.about.initialized { a.about.refresh() }
 
 	children << ui2.view('', ui2.rect(f64(pane_x), 0, f64(pane_width), f64(height)), ui2.BoxStyle{
 		bg: app_surface
@@ -158,6 +162,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 // and have nothing to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
+		.about { return a.about.pane(width) }
 		.wifi {
 			return a.wifi_pane(width, height)
 		}
@@ -441,6 +446,7 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 			// Entering either device pane reads it once, rather than leaving
 			// the pane blank until the next poll comes round.
 			match a.category {
+				.about { a.about.refresh() }
 				.battery { a.battery_read(true) }
 				.wifi {
 					a.wifi_action_result = WifiResult.ok
@@ -455,6 +461,7 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		}
 		return
 	}
+	if event_id == 'settings.about.refresh' { a.about.refresh(); return }
 	if a.category == .wifi {
 		a.handle_wifi(event_id)
 		return

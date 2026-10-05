@@ -183,7 +183,10 @@ fn files_list_kind_text(name string, is_dir bool) string {
 	if dot == 0 || dot + 1 >= lower.len {
 		return tr('files.kind.document').clone()
 	}
-	upper := lower[dot + 1..].to_upper()
+	// Lend the extension span: a sliced temporary followed by to_upper()
+	// would retain the intermediate allocation under -manualfree.
+	extension := unsafe { tos(&u8(lower.str) + dot + 1, lower.len - dot - 1) }
+	upper := extension.to_upper()
 	result := tr_fill('files.kind.extension_file', upper)
 	unsafe { upper.free() }
 	return result

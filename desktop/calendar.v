@@ -42,7 +42,20 @@ mut:
 	selection    string
 	// The language the two labels above were written in. build rewrites them
 	// after a change.
-	language DesktopLanguage
+	language         DesktopLanguage
+	events           CalendarEvents
+	agenda_scroll    int
+	editing          bool
+	edit_index       int = -1
+	edit_focus       int
+	edit_select_all  bool
+	edit_all_day     bool = true
+	edit_title       []u8
+	edit_time        []u8
+	edit_location    []u8
+	edit_pending     [4]u8
+	edit_pending_len int
+	status_key       string
 }
 
 fn open_calendar(mut desktop Desktop) !NativeApp {
@@ -50,6 +63,7 @@ fn open_calendar(mut desktop Desktop) !NativeApp {
 		tz_offset: desktop.tz_offset_seconds
 	}
 	app.go_today()
+	app.events.load(if desktop_user_home != '' { desktop_user_home } else { desktop_home })
 	return app
 }
 
@@ -142,10 +156,15 @@ fn (mut a CalendarApp) go_today() {
 	a.year = civil.year
 	a.month = civil.month
 	a.selected_day = civil.day
+	a.agenda_scroll = 0
 	a.refresh_labels()
 }
 
 fn (mut a CalendarApp) change_month(delta int) {
+	if (a.year <= 1 && a.month == 1 && delta < 0)
+		|| (a.year >= 9999 && a.month == 12 && delta > 0) {
+		return
+	}
 	a.month += delta
 	for a.month < 1 {
 		a.month += 12
@@ -160,6 +179,7 @@ fn (mut a CalendarApp) change_month(delta int) {
 		a.selected_day = last
 	}
 	a.refresh_labels()
+	a.agenda_scroll = 0
 }
 
 fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
@@ -168,29 +188,30 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	}
 	width := int(size.width)
 	height := int(size.height)
+	if a.editing { return a.build_event_editor(width, height) }
 	inner := width - 2 * calendar_padding
-	mut children := frame_elements(45)
+	mut children := frame_elements(100)
 
 	children << ui2.button(calendar_action_previous, '<', ui2.rect(f64(calendar_padding), 14, 34, 28), ui2.BoxStyle{
-		bg: calendar_button
+		bg:     calendar_button
 		radius: 6
 	}, ui2.TextStyle{
 		color: body_text
-		size: 13
+		size:  13
 		align: .center
 	})
 	children << ui2.label('', a.month_title, ui2.rect(f64(calendar_padding + 44), 10, f64(inner - 88), 36), ui2.TextStyle{
 		color: body_heading
-		size: 20
-		bold: true
+		size:  20
+		bold:  true
 		align: .center
 	})
 	children << ui2.button(calendar_action_next, '>', ui2.rect(f64(width - calendar_padding - 34), 14, 34, 28), ui2.BoxStyle{
-		bg: calendar_button
+		bg:     calendar_button
 		radius: 6
 	}, ui2.TextStyle{
 		color: body_text
-		size: 13
+		size:  13
 		align: .center
 	})
 
@@ -200,14 +221,15 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	for column in 0 .. 7 {
 		children << ui2.label('', date_weekday_short((first_weekday + column) % 7), ui2.rect(f64(calendar_padding + column * cell_width), f64(calendar_header_height), f64(cell_width), f64(calendar_weekday_height)), ui2.TextStyle{
 			color: body_muted
-			size: 11
-			bold: true
+			size:  11
+			bold:  true
 			align: .center
 		})
 	}
 
 	grid_top := calendar_header_height + calendar_weekday_height
-	available_grid_height := height - grid_top - calendar_footer_height - calendar_padding
+	agenda_height := 150
+	available_grid_height := height - grid_top - calendar_footer_height - calendar_padding - agenda_height
 	cell_height := if available_grid_height > 6 { available_grid_height / 6 } else { 1 }
 	first := (calendar_weekday(a.year, a.month, 1) - first_weekday + 7) % 7
 	days := calendar_days_in_month(a.year, a.month)
@@ -220,18 +242,29 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 		selected := day == a.selected_day
 		today := a.year == a.today_year && a.month == a.today_month && day == a.today_day
 		children << ui2.clickable_view(calendar_day_actions[day - 1], ui2.rect(f64(x + 2), f64(y + 2), f64(cell_width - 4), f64(cell_height - 4)), ui2.BoxStyle{
-			bg: if selected {
+			bg:          if selected {
 				app_accent
-			} else if today { calendar_today } else { app_surface }
-			radius: 7
+			} else if today {
+				calendar_today
+			} else {
+				app_surface
+			}
+			radius:      7
 			transparent: !selected && !today
 		}, frame_child(ui2.label('', calendar_days[day - 1], ui2.rect(0, 0, f64(cell_width - 4), f64(cell_height - 4)), ui2.TextStyle{
 			color: if selected { app_on_accent } else { body_text }
-			size: 13
-			bold: selected || today
+			size:  13
+			bold:  selected || today
 			align: .center
 		})))
+		if a.events.has_date(a.year, a.month, day) {
+			children << ui2.view('', ui2.rect(f64(x + cell_width / 2 - 2), f64(y + cell_height - 9), 4, 4), ui2.BoxStyle{
+				bg:     if selected { app_on_accent } else { app_accent }
+				radius: 2
+			}, [])
+		}
 	}
+	a.append_agenda(mut children, width, height - calendar_footer_height - agenda_height)
 
 	footer_y := height - calendar_footer_height
 	children << ui2.view('', ui2.rect(0, f64(footer_y), f64(width), 1), ui2.BoxStyle{
@@ -239,14 +272,14 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	}, [])
 	children << ui2.label('', a.selection, ui2.rect(f64(calendar_padding), f64(footer_y), f64(inner - 86), f64(calendar_footer_height)), ui2.TextStyle{
 		color: body_text
-		size: 12
+		size:  12
 	})
 	children << ui2.button(calendar_action_today, tr('calendar.today'), ui2.rect(f64(width - calendar_padding - 72), f64(footer_y + 5), 72, 24), ui2.BoxStyle{
-		bg: calendar_button
+		bg:     calendar_button
 		radius: 5
 	}, ui2.TextStyle{
 		color: body_text
-		size: 12
+		size:  12
 		align: .center
 	})
 
@@ -255,6 +288,51 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a CalendarApp) handle(event_id string) ! {
 	match event_id {
+		'calendar.event.new' {
+			a.begin_event(-1)
+			return
+		}
+		'calendar.event.save' {
+			a.save_event()
+			return
+		}
+		'calendar.event.cancel' {
+			a.editing = false
+			a.status_key = ''
+			return
+		}
+		'calendar.event.delete' {
+			a.delete_event()
+			return
+		}
+		'calendar.event.title' {
+			a.edit_focus = 0
+			a.edit_select_all = true
+			return
+		}
+		'calendar.event.time' {
+			a.edit_focus = 1
+			a.edit_select_all = true
+			return
+		}
+		'calendar.event.location' {
+			a.edit_focus = 2
+			a.edit_select_all = true
+			return
+		}
+		'calendar.event.all_day' {
+			a.edit_all_day = !a.edit_all_day
+			if a.edit_all_day && a.edit_focus == 1 { a.edit_focus = 2 }
+			return
+		}
+		'calendar.agenda.previous' {
+			if a.agenda_scroll > 0 { a.agenda_scroll-- }
+			return
+		}
+		'calendar.agenda.next' {
+			a.agenda_scroll++
+			return
+		}
 		calendar_action_previous {
 			a.change_month(-1)
 			return
@@ -269,11 +347,17 @@ fn (mut a CalendarApp) handle(event_id string) ! {
 		}
 		else {}
 	}
+	if event_id.starts_with('calendar.event.row.') {
+		index := calendar_borrow(event_id, 'calendar.event.row.'.len, event_id.len).int()
+		if index >= 0 && index < a.events.count { a.begin_event(index) }
+		return
+	}
 	if event_id.starts_with(calendar_action_day) {
-		day := event_id[calendar_action_day.len..].int()
+		day := calendar_borrow(event_id, calendar_action_day.len, event_id.len).int()
 		if day >= 1 && day <= calendar_days_in_month(a.year, a.month) {
 			a.selected_day = day
 			a.refresh_labels()
+			a.agenda_scroll = 0
 		}
 	}
 }

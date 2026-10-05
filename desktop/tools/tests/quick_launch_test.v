@@ -81,7 +81,7 @@ fn test_quick_launch_filters_only_available_apps_and_moves_selection() {
 	mut desktop := quick_launch_fixture()
 	desktop.toggle_quick_launch()
 	assert desktop.take_switcher_keys('cal') == ''
-	assert desktop.quick_launch_match_count() == 5
+	assert desktop.quick_launch_match_count() == 6
 
 	first := desktop.quick_launch_app_index(0) or { panic('missing first Calculator result') }
 	second := desktop.quick_launch_app_index(1) or { panic('missing Calendar result') }
@@ -93,6 +93,8 @@ fn test_quick_launch_filters_only_available_apps_and_moves_selection() {
 	assert available_apps[fourth].title == 'VOffice Calc'
 	fifth := desktop.quick_launch_app_index(4) or { panic('missing Android Calculator result') }
 	assert available_apps[fifth].title == 'Android Calculator'
+	sixth := desktop.quick_launch_app_index(5) or { panic('missing iOS Calculator result') }
+	assert available_apps[sixth].title == 'iOS Calculator'
 
 	assert desktop.take_switcher_keys('\x1b[B') == ''
 	assert desktop.switcher.index == 1
