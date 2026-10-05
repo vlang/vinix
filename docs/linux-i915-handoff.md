@@ -488,8 +488,8 @@ driver goal rather than stopping after a plan or an improved audit count.
 | Path | Purpose |
 | --- | --- |
 | `docs/linux-i915.md` | Truthful current support/limitations and tests |
-| `kernel/c/linuxkpi_workqueue.c` | Ordered, delayed and concurrent unbound implementation plus native tests |
-| `kernel/c/linuxkpi_{srcu,timer,time,sync,task,percpu}.c` | Native runtime backends |
+| `kernel/linuxkpi/compatcore/workqueue.v`, `kernel/c/linuxkpi_workqueue_native_test.c` | Ordered, delayed, bound and unbound engine plus independent native tests |
+| `kernel/linuxkpi/compatcore/{srcu,timer,time,sync,task,percpu}.v`, `kernel/c/linuxkpi_*_v_primitives.{c,h}` | Native V backends and narrow Linux header/ABI bindings |
 | `kernel/linuxkpi/bridge_amd64.v` | Native V exports, initialization and measured guest tests |
 | `kernel/linuxkpi/include/vinix/runtime.h` | Internal bridge declarations |
 | `kernel/linuxkpi/include/linux/`, `include/asm/` | Compatibility overlays; many remaining headers stay upstream |
@@ -501,7 +501,7 @@ driver goal rather than stopping after a plan or an improved audit count.
 | `kernel/sched/{sched_amd64,policy}.v`, `kernel/proc/{proc,proc_amd64,proc_arm64}.v` | Affinity, worker scheduling, task/process ownership |
 | `kernel/lib/stubs/pthread.v`, `kernel/c/pthread.h` | Kernel worker creation/join |
 
-Adding a C backend requires native LinuxKPI compiler flags/config dependencies
+Adding a native C binding requires LinuxKPI compiler flags/config dependencies
 in `GNUmakefile` and host source-list integration in `run.sh`. Keep those shared
 edits with root. Ordinary kernel C uses GNU99 and currently emits upstream
 duplicate-typedef warnings; host/audit use GNU11. Do not hide compiler errors

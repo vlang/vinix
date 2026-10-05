@@ -432,8 +432,10 @@ The immutable kernel is under
 `build/dota2-ui-integration/pins/140ce22b1f6a4ffe4399e7b7fe8905558efb2553f2d512defce67e6f87ace79e`,
 and its translator staging is `build/dota2-qemu/staging`. Supply those paths
 with `--kernel-dir`, `--desktop` and `--translator-staging` to use the tested
-artifacts locally; `--host-source` should select `vinix-wine-host.c` from the
-same desktop pin. The probe's automatic report deliberately leaves
-`rendering_verified` false until a human reviews the captures. The separate
+artifacts locally. That historical desktop pin contains the C Wine bridge;
+current `--host-source` builds the V `winehost` core, native ABI adapter and
+generator from the selected source checkout. The probe's automatic report
+deliberately leaves `rendering_verified` false until a human reviews the
+captures. The separate
 visual reviews record the confirmed menu, settings mouse interaction and
 limited console keyboard evidence.
