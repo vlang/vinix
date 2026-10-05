@@ -10,9 +10,20 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+defines=
+if [ "$(uname -s)" = Darwin ]; then
+    defines='-d execinfo_darwin'
+fi
+python3 "$root/build-support/compile-v-module.py" \
+    "$root/desktop/execinfocore" "$work/execinfo.c" $defines \
+    --header "$work/execinfo_compat.h"
+python3 "$root/build-support/compile-v-module.py" \
+    "$root/desktop/tools/tests/execinfofixture" "$work/test.c"
 "$cc" -std=c11 -g -O2 -fno-omit-frame-pointer -funwind-tables \
-	-Wall -Wextra -Werror -I"$root/desktop" \
-	"$root/desktop/execinfo_compat.c" \
-	"$root/desktop/tools/tests/execinfo_compat_test.c" \
+	-D_GNU_SOURCE \
+	-Wall -Wextra -Werror -Wno-unused-function -Wno-unused-label \
+	-Wno-unused-parameter -I"$work" ${CFLAGS:-} \
+	"$work/execinfo.c" "$work/test.c" \
+	${LDFLAGS:-} \
 	-o "$work/execinfo-test"
 "$work/execinfo-test"

@@ -413,6 +413,15 @@ APP_SRC="$BUILD_DIR/app-src"
 python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$UI2_SOURCE/examples/calculator"
 
+# The development image carries generated artifacts alongside their V source.
+python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+    "$SCRIPT_DIR/desktop/execinfocore" "$BUILD_DIR/execinfo.c" --arch arm64 \
+    --header "$BUILD_DIR/execinfo_compat.h"
+rm -f "$APP_SRC/gpu_present.h"
+python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+    "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present-soft.c" --arch arm64 \
+    --header "$APP_SRC/gpu_present.h"
+
 # Keep the compositor executable outside build/, just like the standalone
 # applications. A direct desktop build can then reuse it even after build/
 # has been cleaned. Bump the command version when its V or C flags change.
@@ -422,11 +431,12 @@ V_REAL="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$V")
 LLD_FOR_CACHE="$(command -v "${LD_LLD:-ld.lld}" || true)"
 DESKTOP_CACHE_ARGS=(
     --state "$DESKTOP_CACHE_DIR/.build-key" --staging "$DESKTOP_CACHE_DIR"
-    --value desktop-aarch64-command-v1
+    --value desktop-aarch64-command-v2
     --source "$APP_SRC" --source "$UI2_MODULES/ui2"
     --source "$V_REAL" --vlib "$(dirname "$V_REAL")/vlib"
     --source "$CC_SHIM"
-    --source "$SCRIPT_DIR/desktop/execinfo_compat.c"
+    --source "$SCRIPT_DIR/desktop/execinfocore" --source "$SCRIPT_DIR/desktop/gpucore"
+    --source "$SCRIPT_DIR/build-support/compile-v-module.py"
     --metadata "$LLVM_BIN/clang" --metadata "$LLVM_BIN/llvm-strip"
     --metadata "$SYSROOT/usr/include" --metadata "$GCCLIB/include"
     --metadata "$SYSROOT/usr/lib/crt1.o" --metadata "$SYSROOT/usr/lib/crti.o"
@@ -447,7 +457,7 @@ if [ -f "$ASAHI_STAGING/usr/lib/libEGL.so" ] &&
     GPU_CACHE_AVAILABLE=1
     DESKTOP_CACHE_ARGS+=(
         --value gpu-enabled --executable vinix-desktop-gpu
-        --source "$SCRIPT_DIR/desktop/gpu_present_egl.c"
+        --source "$SCRIPT_DIR/desktop/gpucore"
         --metadata "$ASAHI_STAGING/usr/lib" --metadata "$ASAHI_STAGING/usr/include"
         --metadata "$GPU_SYSROOT/usr/lib" --metadata "$GPU_SYSROOT/usr/include"
     )
@@ -484,9 +494,9 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
         -isystem "$CC_SHIM" \
         -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
         -I "$APP_SRC" \
-        -O2 -fno-stack-protector -w \
+        -D_GNU_SOURCE -O2 -fno-stack-protector -w \
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-        "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+        "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
         -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
         "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
         -fuse-ld=lld -B"$LLVM_BIN" \
@@ -498,9 +508,8 @@ fi
 
 # Mesa is a dynamic runtime, so keep the always-bootable static desktop and
 # build a second executable only when the exact Asahi userspace is available.
-# Both binaries now use this same generated C translation: the software link
-# gets inline no-op presenter stubs from gpu_present.h, while the GPU link
-# selects the external EGL implementation at C compile/link time. The UI is
+# Both binaries use the same generated compositor. Separate V presenter modules
+# provide the software stubs and the optional EGL implementation. The UI is
 # still rasterized into its Canvas on the CPU; EGL/GLES moves scaling and
 # presentation to AGX before the unavoidable firmware-framebuffer readback.
 GPU_DESKTOP_BUILT=0
@@ -509,6 +518,9 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
         echo "==> Reusing cached GPU-enabled desktop executable"
         GPU_DESKTOP_BUILT=1
     else
+        python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+            "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present.c" --arch arm64 \
+            -d gpu_presenter_enabled
         echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
         # Keep the large generated compositor at a fixed address. Building it as
         # PIE creates more than 8,000 relative relocations which musl has to write
@@ -519,10 +531,9 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
             --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
             -isystem "$CC_SHIM" \
             -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
-            -DVINIX_GPU_PRESENTER_EXTERNAL=1 \
-            -O2 -fno-pie -no-pie -fno-stack-protector -w \
-            "$BUILD_DIR/desktop.c" "$SCRIPT_DIR/desktop/execinfo_compat.c" \
-            "$SCRIPT_DIR/desktop/gpu_present_egl.c" \
+            -D_GNU_SOURCE -O2 -fno-pie -no-pie -fno-stack-protector -w \
+            "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" \
+            "$BUILD_DIR/gpu-present.c" \
             -L"$ASAHI_STAGING/usr/lib" \
             -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
             -Wl,-dynamic-linker,/lib/ld-musl-aarch64.so.1 \
@@ -1593,8 +1604,9 @@ DESKTOP_DEV_ROOT="$STAGING/usr/share/vinix/desktop-dev"
 rm -rf "$DESKTOP_DEV_ROOT"
 mkdir -p "$DESKTOP_DEV_ROOT/desktop"
 cp -L "$APP_SRC"/*.v "$APP_SRC"/*.vml "$APP_SRC"/*.h \
-    "$SCRIPT_DIR/desktop/execinfo_compat.c" \
+    "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
     "$SCRIPT_DIR/desktop/README.md" "$DESKTOP_DEV_ROOT/desktop/"
+cp -a "$SCRIPT_DIR/desktop/execinfocore" "$SCRIPT_DIR/desktop/gpucore" "$DESKTOP_DEV_ROOT/desktop/"
 mkdir -p "$DESKTOP_DEV_ROOT/vmodules/ui2"
 cp -aL "$UI2_MODULES/ui2/." "$DESKTOP_DEV_ROOT/vmodules/ui2/"
 if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \

@@ -155,7 +155,8 @@ typing any word with a q in it drop the user back to the console.
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
     font.v         text, from the coverage atlases in font_data.v
     framebuffer.v  /dev/fb0: geometry over ioctl, pixels over mmap
-    gpu_present.v / gpu_present_egl.c  optional M1 EGL/GLES presenter
+    gpu_present.v / gpucore/core.v  optional M1 EGL/GLES presenter
+    execinfocore/core.v  GCC-unwinder API for panic backtraces
     input.v        /dev/pointer, and the terminal in raw mode
     clock.v        CLOCK_REALTIME and the calendar arithmetic on top of it
     theme.v        every colour and measurement in one place

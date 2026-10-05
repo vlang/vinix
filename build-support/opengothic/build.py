@@ -156,8 +156,10 @@ def main():
     # compiled separately from OpenGothic's C++-only warning flags.
     cc = os.environ.get("VINIX_OPENGOTHIC_CC", "aarch64-linux-musl-gcc")
     cxx = os.environ.get("VINIX_OPENGOTHIC_CXX", "aarch64-linux-musl-g++")
-    copy_file(ROOT / "desktop/execinfo_compat.h", sysroot / "usr/include/execinfo.h")
-    run(cc, "-O2", "-c", ROOT / "desktop/execinfo_compat.c", "-o", build / "execinfo.o")
+    run("python3", ROOT / "build-support/compile-v-module.py", ROOT / "desktop/execinfocore",
+        build / "execinfo.c", "--arch", "arm64", "--header", sysroot / "usr/include/execinfo.h")
+    run(cc, "-D_GNU_SOURCE", "-D__V_HAVE_EXECINFO_H=1", "-O2", "-c", build / "execinfo.c",
+        "-o", build / "execinfo.o")
     run(os.environ.get("VINIX_OPENGOTHIC_AR", "aarch64-linux-musl-ar"), "rcs", build / "libexecinfo.a", build / "execinfo.o")
     cmakefile = source / "CMakeLists.txt"
     text = cmakefile.read_text()
