@@ -4,6 +4,7 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 v=${V:-v}
+python3 -m unittest discover -s "$root/desktop/tools/tests" -p test_dictionary_data.py
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 python3 "$root/desktop/tools/stage_ui2.py" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
@@ -26,7 +27,8 @@ root, destination = Path(sys.argv[1]), Path(sys.argv[2])
 names = ['preview_app', 'console_app', 'system_information', 'utilities',
          'archive_app', 'disk_utility', 'backup_app', 'notes_app', 'reminders_app',
          'grapher_app', 'calculator_features', 'color_meter', 'native_close',
-         'start_menu_paging', 'quick_launch', 'i18n']
+         'start_menu_paging', 'quick_launch', 'dictionary', 'editor_workflow',
+         'calendar_ics', 'files_trash', 'i18n']
 imports, bodies = set(), []
 for name in names:
     body = []
@@ -46,7 +48,8 @@ cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 for test in preview_app_memory console_app_memory system_information_memory native_paste_memory \
             archive_app_memory disk_utility_memory backup_app_memory native_poll_memory \
             notes_app_memory reminders_app_memory grapher_app_memory calculator_features_memory \
-            color_meter_memory color_clipboard_memory native_close_memory start_menu_paging_memory; do
+            color_meter_memory color_clipboard_memory native_close_memory start_menu_paging_memory \
+            dictionary_memory editor_workflow_memory calendar_ics_memory files_trash_memory; do
     cp "$root/desktop/tools/tests/${test}_test.v" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${test}_test.v"
