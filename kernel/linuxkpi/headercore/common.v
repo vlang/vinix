@@ -9,7 +9,7 @@ struct C.spinlock_t {}
 @[typedef]
 struct C.refcount_t {}
 struct C.mutex {}
-struct C.task_struct { in_iowait u32 }
+struct C.task_struct { in_iowait u32, __state u32 }
 struct C.wait_bit_key { timeout usize }
 @[typedef]
 struct C.vkh_const_char_p {}

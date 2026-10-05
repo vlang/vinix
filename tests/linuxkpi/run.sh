@@ -27,6 +27,8 @@ ${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
     -Dscnprintf=vinix_linuxkpi_format_test_scnprintf \
     -Dsprintf=vinix_linuxkpi_format_test_sprintf \
     -c "$repo/kernel/asm/$native_asm/linuxkpi_varargs.S" -o "$work/varargs.o"
+${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
+    -c "$repo/kernel/asm/$native_asm/linuxkpi_workqueue_abi.S" -o "$work/workqueue_abi.o"
 ${CC:-clang} -DVINIX_LINUXKPI -c "$repo/kernel/asm/$native_asm/linuxkpi_storage.S" -o "$work/storage.o"
 python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" "$work/headercore.c"
 # Keep upstream header algorithms in their native, separately compiled V object.
@@ -63,7 +65,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
