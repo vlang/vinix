@@ -12,6 +12,7 @@ import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = "823aeb116eb3b3ab20463ccb9b1c3fba6f0c41ae"
+FIXTURE_BASELINE = "8f7239d1fd4c593746279699f6ff25df5f4dd7bd"
 
 def normalized(path):
     pointers = {}
@@ -73,30 +74,48 @@ def main():
         assert "vagt_test_malloc" in imports and "vagt_test_free" in imports
         assert "memdup" not in core.read_text() and "new_array" not in core.read_text()
         binary = work / "v-test"
-        subprocess.run(cc + flags + [str(ROOT / "tests/agx-trace/host.c"), str(obj), "-o", str(binary)], check=True)
+        module_tools = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))
+        generate_module = module_tools["generate"]
+        native, fixture_v = work / "native.c", work / "fixture.c"
+        generate_module(ROOT / "tools/agx-re/nativecore", native, "arm64", ("agx_trace_fixture",))
+        generate_module(ROOT / "tests/agx-trace/tracefixture", fixture_v, "arm64")
+        native_obj, fixture_obj = native.with_suffix(".o"), fixture_v.with_suffix(".o")
+        for source, target in ((native, native_obj), (fixture_v, fixture_obj)):
+            subprocess.run(cc + flags + ["-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                           "-fsanitize-address-use-after-return=always", "-c", source, "-o", target], check=True)
+        native_imports = subprocess.check_output(["nm", "-u", native_obj], text=True)
+        assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", native_imports), native_imports
+        subprocess.run(cc + flags + [str(fixture_obj), str(native_obj), str(obj), "-o", str(binary)], check=True)
         original = work / "original.c"
         original.write_bytes(subprocess.check_output(["git", "show", f"{args.baseline_rev}:tools/agx-re/agx_trace.c"], cwd=ROOT))
-        fixture = (ROOT / "tests/agx-trace/host.c").read_text()
-        prefix = '''#include <stdlib.h>
-#include <mach/mach.h>
-#include <mach/mach_vm.h>
-void *vagt_test_malloc(size_t);
-void vagt_test_free(void *);
-kern_return_t vagt_mock_read(vm_map_read_t, mach_vm_address_t, mach_vm_size_t, mach_vm_address_t, mach_vm_size_t *);
-#define malloc vagt_test_malloc
-#define free vagt_test_free
-#define mach_vm_read_overwrite vagt_mock_read
-'''
-        fixture = fixture.replace('#include "../../tools/agx-re/agx_trace.c"', prefix + '#include "original.c"\n#undef malloc\n#undef free\n#undef mach_vm_read_overwrite')
-        fixture += '''\nkern_return_t vagt_mock_read(vm_map_read_t task, mach_vm_address_t source, mach_vm_size_t bytes, mach_vm_address_t destination, mach_vm_size_t *copied) {
-    (void)task; uint64_t count=0;
-    int status=vagt_read((void *)(uintptr_t)source,(size_t)bytes,(void *)(uintptr_t)destination,&count);
-    *copied=count; return status;
-}\n'''
+        fixture = subprocess.check_output(["git", "show", f"{FIXTURE_BASELINE}:tests/agx-trace/host.c"], cwd=ROOT, text=True)
+        bridge, bridge_api = work / "mach-bridge.c", work / "mach-bridge-api.h"
+        bridge_source = ROOT / "tests/agx-trace/machfixture"
+        generate_module(bridge_source, bridge, "arm64")
+        module_tools["emit_header"](bridge_source, bridge, bridge_api)
+        fixture_api = work / "fixture-api.h"
+        module_tools["emit_header"](ROOT / "tests/agx-trace/tracefixture", fixture_v, fixture_api)
+        allocator_api = work / "allocator-api.h"
+        allocator_api.write_text("\n".join(line for line in fixture_api.read_text().splitlines()
+                                 if re.search(r"\bvagt_test_(?:malloc|free)\(", line)) + "\n")
+        # Only generated declarations and structured preprocessor configuration
+        # surround the immutable baseline; all test adapter bodies live in V.
+        includes = ("<stdlib.h>", "<mach/mach.h>", "<mach/mach_vm.h>",
+                    '"allocator-api.h"', '"mach-bridge-api.h"')
+        remaps = {"malloc": "vagt_test_malloc", "free": "vagt_test_free",
+                  "mach_vm_read_overwrite": "vagt_mock_read"}
+        prefix = "\n".join("#include " + name for name in includes) + "\n"
+        prefix += "\n".join(f"#define {name} {symbol}" for name, symbol in remaps.items()) + "\n"
+        suffix = "\n".join("#undef " + name for name in remaps)
+        fixture = fixture.replace('#include "../../tools/agx-re/agx_trace.c"',
+                                  prefix + '#include "original.c"\n' + suffix)
         baseline = work / "reference.c"
         baseline.write_text(fixture)
         reference = work / "c-test"
-        subprocess.run(cc + flags + ["-I", str(ROOT / "tools/agx-re"), str(baseline), "-o", str(reference)], check=True)
+        bridge_obj = bridge.with_suffix(".o")
+        subprocess.run(cc + flags + ["-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                       "-c", bridge, "-o", bridge_obj], check=True)
+        subprocess.run(cc + flags + ["-I", str(ROOT / "tools/agx-re"), baseline, bridge_obj, "-o", reference], check=True)
         for mode, setting, limit in (("normal","8",8), ("all","8",8), ("normal","999999",65536), ("normal","0",0)):
             v_log, c_log = work / f"v-{mode}-{setting}.jsonl", work / f"c-{mode}-{setting}.jsonl"
             actual_report = subprocess.check_output([str(binary), str(v_log), mode, setting], text=True)
@@ -106,6 +125,34 @@ kern_return_t vagt_mock_read(vm_map_read_t, mach_vm_address_t, mach_vm_size_t, m
             actual, expected = normalized(v_log), normalized(c_log)
             check(actual, mode, limit)
             assert actual == expected, next(((i, a, b) for i, (a,b) in enumerate(zip(actual,expected)) if a != b), (len(actual),len(expected)))
+        # Compile the unmodified production bindings for both Darwin targets.
+        # The ARM host additionally exercises real Mach reads and checks all
+        # dyld entries against actual C export and native framework addresses.
+        production, abi_fixture = work / "production.c", work / "native-abi.c"
+        generate_module(ROOT / "tools/agx-re/nativecore", production, "arm64")
+        generate_module(ROOT / "tests/agx-trace/nativefixture", abi_fixture, "arm64")
+        production_obj, abi_obj = production.with_suffix(".o"), abi_fixture.with_suffix(".o")
+        native_flags = flags + ["-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                                "-fsanitize-address-use-after-return=always"]
+        for source, target in ((production, production_obj), (abi_fixture, abi_obj)):
+            subprocess.run(cc + native_flags + ["-c", source, "-o", target], check=True)
+        real_core = work / "real-core.o"
+        subprocess.run(cc + native_flags + ["-DVINIX_V_RUNTIME", "-I", str(ROOT / "tools/agx-re"),
+                       "-c", core, "-o", real_core], check=True)
+        probe = work / "native-abi"
+        subprocess.run(cc + flags + [abi_obj, production_obj, real_core, "-framework", "IOKit",
+                       "-F/System/Library/PrivateFrameworks", "-framework", "IOGPU", "-o", probe], check=True)
+        print(subprocess.check_output([probe], text=True).strip())
+        for arch in ("arm64", "x86_64"):
+            target = work / ("native-" + arch + ".o")
+            subprocess.run(cc + ["-arch", arch, "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror",
+                           "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                           "-c", production, "-o", target], check=True)
+            native_imports = subprocess.check_output(["nm", "-u", target], text=True)
+            assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", native_imports), native_imports
+            sections = subprocess.check_output(["otool", "-l", target], text=True)
+            section = re.search(r"sectname __interpose\s+segname __DATA\s+addr \S+\s+size (\S+)\s+offset \S+\s+align 2\^(\d+) \(\d+\)\s+reloff \S+\s+nreloc 16", sections)
+            assert section and int(section[1], 16) == 128 and int(section[2]) >= 3, sections
         print("AGX trace: ASan/UBSan, explicit allocation rollback, typed driver forwarding and frozen-C JSON parity passed")
 if __name__ == "__main__":
     main()

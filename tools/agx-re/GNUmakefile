@@ -18,10 +18,16 @@ $(BUILD)/agx_trace_core.c: tracecore/core.v compile-v-trace.py | $(BUILD)
 $(BUILD)/agx_trace_core.o: $(BUILD)/agx_trace_core.c agx_trace_v.h
 	$(CC) $(CFLAGS) -DVINIX_V_RUNTIME -I. -c $< -o $@
 
-$(BUILD)/agx_trace.dylib: agx_trace.c agx_resource_trace.m agx_trace.h agx_trace_v.h $(BUILD)/agx_trace_core.o | $(BUILD)
+$(BUILD)/agx_trace_native.c: nativecore/core.v ../../build-support/compile-v-module.py | $(BUILD)
+	python3 ../../build-support/compile-v-module.py nativecore $@ --arch $(V_ARCH)
+
+$(BUILD)/agx_trace_native.o: $(BUILD)/agx_trace_native.c
+	$(CC) $(CFLAGS) -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -c $< -o $@
+
+$(BUILD)/agx_trace.dylib: agx_resource_trace.m agx_trace.h agx_trace_v.h $(BUILD)/agx_trace_core.o $(BUILD)/agx_trace_native.o | $(BUILD)
 	$(CC) $(CFLAGS) -fobjc-arc -dynamiclib -framework Foundation -framework IOKit \
-		-F/System/Library/PrivateFrameworks -framework IOGPU -o $@ \
-		agx_trace.c agx_resource_trace.m $(BUILD)/agx_trace_core.o
+		-F/System/Library/PrivateFrameworks -framework IOGPU -Wl,-u,_vagt_interpose_table -o $@ \
+		agx_resource_trace.m $(BUILD)/agx_trace_core.o $(BUILD)/agx_trace_native.o
 
 $(BUILD)/metal_triangle: metal_triangle.m | $(BUILD)
 	$(CC) $(CFLAGS) -fobjc-arc -framework Foundation -framework Metal -o $@ $<
