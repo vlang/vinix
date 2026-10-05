@@ -293,6 +293,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		kernel_pagemap.switch_to()
 		memory.note_active_pagemap(cpu_local.cpu_number, u64(kernel_pagemap.top_level))
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
+		cpu_local.tss.rsp0 = cpu_local.idle_int_stack
 		// No LDT for an idle CPU, so that one being freed is not held up
 		// waiting for this CPU to run something.
 		load_process_ldt(mut cpu_local, unsafe { nil })
@@ -333,6 +334,17 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	}
 
 	cpu_local.tss.ist3 = current_thread.pf_stack
+	// Interrupts and exceptions from user mode enter on this thread's own
+	// kernel stack, the one its syscalls use, rather than one shared by every
+	// thread on this CPU. Their handlers can then enable interrupts, be
+	// preempted and block, as syscalls do, without a thread switched in
+	// meanwhile starting its own entry on top of their live frames. Restore
+	// the persistent CPU stack for contexts without a thread entry stack.
+	cpu_local.tss.rsp0 = if current_thread.kernel_stack != 0 {
+		current_thread.kernel_stack
+	} else {
+		cpu_local.idle_int_stack
+	}
 	reap_dead_threads(mut cpu_local)
 
 	// Recorded before it is loaded; see memory.note_active_pagemap().
@@ -868,7 +880,7 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr, arg voidptr)
 @[noreturn]
 pub fn enter_idle() {
 	asm volatile amd64 { cli }
-	top := cpulocal.current().tss.rsp0
+	top := cpulocal.current().idle_int_stack
 	C.vinix_enter_idle(top, voidptr(await), unsafe { nil })
 	for {}
 }
