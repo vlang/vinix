@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test-only PID 1, overlaid by run-aarch64.sh for one VM boot.
+# Test-only PID 1, overlaid by scripts/run-aarch64.sh for one VM boot.
 set -u
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin

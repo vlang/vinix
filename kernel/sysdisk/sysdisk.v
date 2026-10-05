@@ -12,7 +12,7 @@ import stat
 
 // A machine booted from an installer image (the release ISOs pass
 // vinix.disk=auto) keeps its system on a disk, as a QEMU machine started by
-// run-desktop-aarch64.sh does: the whole filesystem survives a restart. Given a
+// scripts/run-desktop-aarch64.sh does: the whole filesystem survives a restart. Given a
 // disk, the first boot installs the image onto it and runs from there; later
 // boots find it and skip unpacking the image into memory; a newer image is
 // unpacked over the old system, leaving /root as it is. Without a disk it runs

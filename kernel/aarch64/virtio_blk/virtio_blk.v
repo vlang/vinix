@@ -5,7 +5,7 @@ module virtio_blk
 
 // A deliberately small legacy VirtIO-MMIO block driver for QEMU's ARM `virt`
 // machine.  The boot volume is a FAT image for UEFI, so a separate ext2
-// volume is attached by run-aarch64.sh when --persist is requested.
+// volume is attached by scripts/run-aarch64.sh when --persist is requested.
 import aarch64.cpu
 import aarch64.uart
 import aarch64.timer

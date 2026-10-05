@@ -1,0 +1,600 @@
+#!/bin/bash
+set -euo pipefail
+
+NPROC="${NPROC:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)}"
+
+# Build X11 stack for Vinix
+# Downloads Alpine packages for libraries/tools,
+# cross-compiles xorg-server + fbdev driver with Vinix patches using clang.
+
+# VINIX_ARCH=x86_64 builds the same layer for amd64; scripts/build-x11-amd64.sh does that.
+VINIX_ARCH="${VINIX_ARCH:-aarch64}"
+case "$VINIX_ARCH" in
+    aarch64) ARCH_DIR=aarch64 ;;
+    x86_64) ARCH_DIR=amd64 ;;
+    *) echo "ERROR: unsupported VINIX_ARCH: $VINIX_ARCH" >&2; exit 1 ;;
+esac
+CROSS_TRIPLE="${VINIX_ARCH}-linux-musl"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -x "$SCRIPT_DIR/link-worktree-build-dirs.sh" ]; then
+    "$SCRIPT_DIR/link-worktree-build-dirs.sh"
+fi
+BUILD_DIR="${VINIX_X11_BUILD_DIR:-$SCRIPT_DIR/build-$ARCH_DIR-x11}"
+# The GCC runtime (crtbegin*.o, libgcc.a) comes from the Alpine userland layer.
+USERLAND_STAGING="${VINIX_USERLAND_STAGING:-$SCRIPT_DIR/build-$ARCH_DIR-userland/staging}"
+SYSROOT="$BUILD_DIR/sysroot"
+STAGING="$BUILD_DIR/staging"  # final output
+DOWNLOADS="$BUILD_DIR/downloads"
+SOURCES="$BUILD_DIR/sources"
+LEGACY_GLX_ROOT="$BUILD_DIR/legacy-glx"
+
+ALPINE_MIRROR="https://dl-cdn.alpinelinux.org/alpine/v3.21"
+ALPINE_ARCH="$VINIX_ARCH"
+# Mesa 24.1 replaced indirect DRI contexts with a compatibility stub. Wine's
+# embedded Xvfb needs a real server-side software context, so keep the last
+# Alpine Mesa release before that change alongside the current client stack.
+LEGACY_GLX_MIRROR="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/${ALPINE_ARCH}"
+LEGACY_MESA_APK="mesa-dri-gallium-24.0.9-r1.apk"
+LEGACY_MESA_GL_APK="mesa-gl-24.0.9-r1.apk"
+LEGACY_MESA_GLAPI_APK="mesa-glapi-24.0.9-r1.apk"
+LEGACY_LLVM_APK="llvm17-libs-17.0.6-r2.apk"
+
+# xorg-server and fbdev versions (matching x86 Vinix recipes)
+XORG_SERVER_VERSION="21.1.16"
+XORG_SERVER_URL="https://xorg.freedesktop.org/releases/individual/xserver/xorg-server-${XORG_SERVER_VERSION}.tar.xz"
+FBDEV_VERSION="0.5.1"
+FBDEV_URL="https://xorg.freedesktop.org/releases/individual/driver/xf86-video-fbdev-${FBDEV_VERSION}.tar.xz"
+
+# Cross-compilation tools
+LLVM_CLANG="/opt/homebrew/opt/llvm/bin/clang"
+LLVM_CLANGXX="/opt/homebrew/opt/llvm/bin/clang++"
+if [ ! -x "$LLVM_CLANG" ]; then
+    LLVM_CLANG="clang"
+fi
+if [ ! -x "$LLVM_CLANGXX" ]; then
+    LLVM_CLANGXX="clang++"
+fi
+GCCLIB="$(find "$USERLAND_STAGING/usr/lib/gcc/${VINIX_ARCH}-alpine-linux-musl" \
+    -mindepth 1 -maxdepth 1 -type d 2>/dev/null | LC_ALL=C sort | tail -n1)"
+GCC_TC_FLAG=""
+if [ -n "$GCCLIB" ]; then
+    GCC_TC_FLAG="--gcc-install-dir=${GCCLIB}"
+fi
+CC="$LLVM_CLANG --target=$CROSS_TRIPLE --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
+LD="ld.lld"
+LLVM_TOOL_DIR="$(dirname "$LLVM_CLANG")"
+AR="$LLVM_TOOL_DIR/llvm-ar"
+RANLIB="$LLVM_TOOL_DIR/llvm-ranlib"
+STRIP="$LLVM_TOOL_DIR/llvm-strip"
+NM="$LLVM_TOOL_DIR/llvm-nm"
+for llvm_tool in "$AR" "$RANLIB" "$STRIP" "$NM"; do
+    if [ ! -x "$llvm_tool" ]; then
+        echo "ERROR: missing LLVM tool: $llvm_tool" >&2
+        exit 1
+    fi
+done
+PKG_CONFIG="pkg-config"
+
+mkdir -p "$BUILD_DIR" "$SYSROOT" "$STAGING" "$DOWNLOADS" "$SOURCES"
+
+# ── Helper: download and extract Alpine package ──
+download_apk() {
+    local repo="$1"  # main or community
+    local pkg="$2"
+    local index_file="$DOWNLOADS/${repo}_APKINDEX"
+
+    # Download index if not cached
+    if [ ! -f "$index_file" ]; then
+        echo "  Downloading ${repo} APKINDEX..."
+        curl -sL "${ALPINE_MIRROR}/${repo}/${ALPINE_ARCH}/APKINDEX.tar.gz" \
+            | tar xz -C "$DOWNLOADS" APKINDEX
+        mv "$DOWNLOADS/APKINDEX" "$index_file"
+    fi
+
+    # Find package filename from index
+    local filename
+    filename=$(awk -v pkg="$pkg" '
+        /^P:/{name=$0; sub(/^P:/,"",name)}
+        /^V:/{ver=$0; sub(/^V:/,"",ver)}
+        /^$/{if(name==pkg) print name "-" ver ".apk"}
+    ' "$index_file")
+
+    if [ -z "$filename" ]; then
+        echo "  WARNING: Package '$pkg' not found in ${repo} repo, skipping"
+        return 1
+    fi
+
+    local url="${ALPINE_MIRROR}/${repo}/${ALPINE_ARCH}/${filename}"
+    local local_file="$DOWNLOADS/${filename}"
+
+    if [ ! -f "$local_file" ]; then
+        echo "  Downloading ${filename}..."
+        curl -sL -o "$local_file" "$url" || {
+            echo "  ERROR: Failed to download $url"
+            return 1
+        }
+    fi
+
+    # Extract to sysroot (APK files are just gzipped tars)
+    echo "  Extracting ${filename} -> sysroot/"
+    tar --ignore-zeros -xzf "$local_file" -C "$SYSROOT" 2>/dev/null || true
+    # Clean up APK metadata
+    rm -f "$SYSROOT/.PKGINFO" "$SYSROOT/.SIGN"*
+}
+
+download_legacy_glx_apk() {
+    local filename="$1"
+    local local_file="$DOWNLOADS/$filename"
+
+    if [ ! -f "$local_file" ]; then
+        echo "  Downloading legacy GLX runtime ${filename}..."
+        curl -fL -o "$local_file" "$LEGACY_GLX_MIRROR/$filename"
+    fi
+
+    echo "  Extracting ${filename} -> legacy-glx/"
+    tar --ignore-zeros -xzf "$local_file" -C "$LEGACY_GLX_ROOT" 2>/dev/null || true
+    rm -f "$LEGACY_GLX_ROOT/.PKGINFO" "$LEGACY_GLX_ROOT/.SIGN"*
+}
+
+# ── Step 1: Download Alpine packages ──
+echo "=== Step 1: Downloading Alpine ${ALPINE_ARCH} packages ==="
+
+# Core C library
+MAIN_PKGS=(
+    musl musl-dev
+    zlib zlib-dev
+    brotli brotli-dev brotli-libs
+    libpng libpng-dev
+    bzip2 bzip2-dev libbz2
+    expat expat-dev libexpat
+    freetype freetype-dev
+    fontconfig fontconfig-dev
+    libffi libffi-dev
+    nettle nettle-dev
+    libxau libxau-dev
+    libxdmcp libxdmcp-dev
+    libxcb libxcb-dev
+    xcb-proto
+    xorgproto
+    xtrans
+    util-macros
+    pixman pixman-dev
+    libepoxy libepoxy-dev
+    libx11 libx11-dev
+    libxext libxext-dev
+    libxrender libxrender-dev
+    libxfixes libxfixes-dev
+    libxrandr libxrandr-dev
+    libxi libxi-dev
+    libxdamage libxdamage-dev
+    libxt libxt-dev
+    libxmu libxmu-dev
+    libxpm libxpm-dev
+    libxaw libxaw-dev
+    libxft libxft-dev
+    libxkbfile libxkbfile-dev
+    libxshmfence libxshmfence-dev
+    libfontenc libfontenc-dev
+    libice libice-dev
+    libsm libsm-dev
+    libxv libxv-dev
+    libxxf86vm libxxf86vm-dev
+    libxtst libxtst-dev
+    libdrm libdrm-dev
+    linux-headers
+    mesa
+    mesa-dev
+    mesa-gl
+    mesa-glapi
+    mesa-egl
+    mesa-gbm
+    mesa-gles
+    mesa-osmesa
+    mesa-xatracker
+    mesa-dri-gallium
+    elfutils
+    libxml2
+    zstd-libs
+    libstdc++
+    libgcc
+    glu
+    glu-dev
+    xkbcomp
+    xkeyboard-config
+    font-misc-misc
+    font-cursor-misc
+)
+
+COMMUNITY_PKGS=(
+    libxfont2
+    libxfont2-dev
+    libxcvt
+    libxcvt-dev
+    xclock
+    xinit
+    xauth
+    xmodmap
+    xrdb
+    xset
+    xorg-server-common
+    freeglut
+    freeglut-dev
+    mesa-demos
+    mesa-utils
+)
+
+if [ "$VINIX_ARCH" = x86_64 ]; then
+    # x86 Mesa's DRI megadriver also carries the Intel and Radeon drivers.
+    # They link libdrm_intel, which needs libpciaccess, and libelf; without
+    # both swrast_dri.so fails to dlopen.
+    MAIN_PKGS+=(libpciaccess libelf)
+fi
+
+echo "--- Downloading main packages ---"
+for pkg in "${MAIN_PKGS[@]}"; do
+    download_apk "main" "$pkg" || true
+done
+
+echo "--- Downloading community packages ---"
+for pkg in "${COMMUNITY_PKGS[@]}"; do
+    download_apk "community" "$pkg" || true
+done
+
+mkdir -p "$LEGACY_GLX_ROOT"
+download_legacy_glx_apk "$LEGACY_MESA_APK"
+download_legacy_glx_apk "$LEGACY_MESA_GL_APK"
+download_legacy_glx_apk "$LEGACY_MESA_GLAPI_APK"
+download_legacy_glx_apk "$LEGACY_LLVM_APK"
+
+# ── Step 2: Fix up sysroot ──
+echo ""
+echo "=== Step 2: Setting up sysroot ==="
+
+# Create standard library symlinks
+# musl installs as /lib/ld-musl-$ARCH.so.1 and /lib/libc.musl-$ARCH.so.1
+# Many packages expect /usr/lib/libc.so
+if [ -d "$SYSROOT/lib" ]; then
+    # Ensure /usr/lib exists and has musl
+    mkdir -p "$SYSROOT/usr/lib"
+    # Link musl crt files if they're in /lib
+    for f in "$SYSROOT"/lib/crt*.o "$SYSROOT"/lib/libc.a "$SYSROOT"/lib/libm.a; do
+        [ -f "$f" ] && ln -sf "$f" "$SYSROOT/usr/lib/" 2>/dev/null || true
+    done
+fi
+
+# Fix pkg-config files to use our sysroot
+if [ -d "$SYSROOT/usr/lib/pkgconfig" ]; then
+    echo "  Fixing pkg-config prefix paths..."
+    for pc in "$SYSROOT"/usr/lib/pkgconfig/*.pc; do
+        [ -f "$pc" ] || continue
+        [ -L "$pc" ] && continue
+        # Replace absolute prefix with sysroot-relative
+        sed -i.bak "s|^prefix=.*|prefix=${SYSROOT}/usr|" "$pc"
+        rm -f "${pc}.bak"
+    done
+fi
+
+echo "  Sysroot size: $(du -sh "$SYSROOT" | cut -f1)"
+
+# ── Step 3: Download and build xorg-server ──
+echo ""
+echo "=== Step 3: Building xorg-server ${XORG_SERVER_VERSION} ==="
+
+XORG_SRC="$SOURCES/xorg-server-${XORG_SERVER_VERSION}"
+XORG_ARCHIVE="$DOWNLOADS/xorg-server-${XORG_SERVER_VERSION}.tar.xz"
+if [ ! -f "$XORG_ARCHIVE" ]; then
+    echo "  Downloading xorg-server source archive..."
+    curl -sL -o "$XORG_ARCHIVE" "$XORG_SERVER_URL"
+fi
+if [ ! -d "$XORG_SRC" ]; then
+    tar xJf "$XORG_ARCHIVE" -C "$SOURCES"
+fi
+
+# Apply Vinix patches
+PATCH_FILE="$SCRIPT_DIR/patches/xorg-server/jinx-working-patch.patch"
+if [ -f "$PATCH_FILE" ]; then
+    echo "  Applying Vinix patches..."
+    cd "$XORG_SRC"
+    # Try to apply, skip if already applied
+    patch -p1 -N < "$PATCH_FILE" 2>/dev/null || echo "  (patches may already be applied)"
+fi
+
+echo "  Configuring xorg-server..."
+cd "$XORG_SRC"
+
+export PKG_CONFIG_PATH="${SYSROOT}/usr/lib/pkgconfig:${SYSROOT}/usr/share/pkgconfig"
+export PKG_CONFIG_SYSROOT_DIR="${SYSROOT}"
+export PKG_CONFIG_LIBDIR="${SYSROOT}/usr/lib/pkgconfig:${SYSROOT}/usr/share/pkgconfig"
+
+# Cross-compilation flags
+export CC="$LLVM_CLANG --target=$CROSS_TRIPLE --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
+export CXX="$LLVM_CLANGXX --target=$CROSS_TRIPLE --sysroot=${SYSROOT} ${GCC_TC_FLAG} -static-libgcc"
+export AR RANLIB STRIP NM PKG_CONFIG
+export CFLAGS="-O2 -I${SYSROOT}/usr/include -D__vinix__"
+export CPPFLAGS="-I${SYSROOT}/usr/include"
+export LDFLAGS="-fuse-ld=lld -L${SYSROOT}/usr/lib -L${SYSROOT}/lib -rdynamic"
+export LD="ld.lld"
+
+./configure \
+    --host=$CROSS_TRIPLE \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-xkb-bin-directory=/usr/bin \
+    --with-xkb-path=/usr/share/X11/xkb \
+    --with-xkb-output=/var/lib/xkb \
+    --with-fontrootdir=/usr/share/fonts/X11 \
+    --enable-xorg \
+    --enable-xvfb \
+    --disable-xephyr \
+    --disable-xnest \
+    --disable-suid-wrapper \
+    --disable-pciaccess \
+    --disable-dpms \
+    --disable-xres \
+    --disable-xvmc \
+    --disable-systemd-logind \
+    --disable-secure-rpc \
+    --disable-config-udev \
+    --disable-dri \
+    --disable-dri2 \
+    --enable-dri3 \
+    --disable-int10-module \
+    --disable-vgahw \
+    --enable-libdrm \
+    --enable-glamor \
+    --enable-glx \
+    --disable-xinerama \
+    --enable-screensaver \
+    2>&1 | tail -20
+
+# pkg-config needs sysrooted prefixes while linking, but Xorg also copies the
+# dri.pc driver directory into the server as a runtime constant. Keep that one
+# path guest-native so Xvfb can find swrast after booting Vinix.
+sed -i.bak \
+    's|^#define DRI_DRIVER_PATH .*|#define DRI_DRIVER_PATH "/usr/lib/xorg/modules/dri"|' \
+    include/dix-config.h
+
+# Fix libtool: cross-compile leaves export_dynamic_flag_spec empty, so -export-dynamic
+# (needed for dlopen'd modules to resolve symbols from the Xorg binary) gets silently dropped.
+sed -i.bak 's/^export_dynamic_flag_spec=""$/export_dynamic_flag_spec="\${wl}--export-dynamic"/' libtool
+
+echo "  Building xorg-server..."
+make -j"$NPROC" 2>&1 | tail -5
+make install DESTDIR="$STAGING" 2>&1 | tail -5
+# Keep the GLX-capable Xvfb for embedded applications such as Office, which
+# need a software OpenGL feature level even though their pixels ultimately go
+# to the native Vinix compositor. The lean server below remains the default.
+install -m755 "$XORG_SRC/hw/vfb/Xvfb" "$STAGING/usr/bin/Xvfb-glx"
+
+# Xorg keeps GLX for Firefox, but an off-screen Wine surface only needs the
+# 2D framebuffer DDX. Build its Xvfb from a separate clean source tree with
+# every GL/DRI path disabled. Alpine's monolithic libGL otherwise pulls the
+# 138 MiB LLVM runtime into even a headless server before -extension GLX can
+# take effect.
+echo "  Building lean headless Xvfb..."
+XORG_XVFB_SRC="$SOURCES/xorg-server-${XORG_SERVER_VERSION}-xvfb"
+XORG_XVFB_TMP="$SOURCES/.xorg-server-${XORG_SERVER_VERSION}-xvfb"
+# This tree has a different configure result from Xorg's in-tree build. Start
+# from the cached release archive each time so neither config.status nor an
+# already-applied Vinix patch can leak between the two variants.
+rm -rf "$XORG_XVFB_SRC" "$XORG_XVFB_TMP"
+mkdir -p "$XORG_XVFB_TMP"
+tar xJf "$XORG_ARCHIVE" -C "$XORG_XVFB_TMP"
+mv "$XORG_XVFB_TMP/xorg-server-${XORG_SERVER_VERSION}" "$XORG_XVFB_SRC"
+rmdir "$XORG_XVFB_TMP"
+if [ -f "$PATCH_FILE" ]; then
+    cd "$XORG_XVFB_SRC"
+    patch -p1 -N < "$PATCH_FILE" 2>/dev/null || true
+fi
+cd "$XORG_XVFB_SRC"
+make distclean >/dev/null 2>&1 || true
+./configure \
+    --host=$CROSS_TRIPLE \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --with-xkb-bin-directory=/usr/bin \
+    --with-xkb-path=/usr/share/X11/xkb \
+    --with-xkb-output=/var/lib/xkb \
+    --with-fontrootdir=/usr/share/fonts/X11 \
+    --disable-xorg \
+    --enable-xvfb \
+    --disable-xephyr \
+    --disable-xnest \
+    --disable-suid-wrapper \
+    --disable-pciaccess \
+    --disable-dpms \
+    --disable-xres \
+    --disable-xvmc \
+    --disable-systemd-logind \
+    --disable-secure-rpc \
+    --disable-config-udev \
+    --disable-dri \
+    --disable-dri2 \
+    --disable-dri3 \
+    --disable-int10-module \
+    --disable-vgahw \
+    --disable-libdrm \
+    --disable-glamor \
+    --disable-glx \
+    --disable-xinerama \
+    --enable-screensaver \
+    2>&1 | tail -20
+make -j"$NPROC" 2>&1 | tail -5
+install -m755 "$XORG_XVFB_SRC/hw/vfb/Xvfb" "$STAGING/usr/bin/Xvfb"
+
+# ── Step 4: Build xf86-video-fbdev ──
+echo ""
+echo "=== Step 4: Building xf86-video-fbdev ${FBDEV_VERSION} ==="
+
+FBDEV_SRC="$SOURCES/xf86-video-fbdev-${FBDEV_VERSION}"
+if [ ! -d "$FBDEV_SRC" ]; then
+    echo "  Downloading fbdev driver source..."
+    curl -sL "$FBDEV_URL" | tar xJ -C "$SOURCES"
+fi
+
+FBDEV_PATCH="$SCRIPT_DIR/patches/xf86-video-fbdev/jinx-working-patch.patch"
+if [ -f "$FBDEV_PATCH" ]; then
+    echo "  Applying Vinix patches..."
+    cd "$FBDEV_SRC"
+    patch -p1 -N < "$FBDEV_PATCH" 2>/dev/null || echo "  (patches may already be applied)"
+fi
+
+echo "  Configuring fbdev driver..."
+cd "$FBDEV_SRC"
+
+# Need xorg-server headers from our build
+export CFLAGS="-O2 -I${SYSROOT}/usr/include -I${STAGING}/usr/include/xorg -I${STAGING}/usr/include/pixman-1 -D__vinix__"
+export PKG_CONFIG_PATH="${STAGING}/usr/lib/pkgconfig:${SYSROOT}/usr/lib/pkgconfig:${SYSROOT}/usr/share/pkgconfig"
+# fbdev links against helper libs produced by xorg-server (e.g. libshadow.so)
+export LDFLAGS="-fuse-ld=lld -L${STAGING}/usr/lib/xorg/modules -Wl,-rpath-link,${STAGING}/usr/lib/xorg/modules -L${SYSROOT}/usr/lib -L${SYSROOT}/lib -rdynamic"
+
+./configure \
+    --host=$CROSS_TRIPLE \
+    --prefix=/usr \
+    --disable-pciaccess \
+    SYSROOT="${SYSROOT}" \
+    2>&1 | tail -10
+
+echo "  Building fbdev driver..."
+make -j"$NPROC" 2>&1 | tail -5
+make install DESTDIR="$STAGING" 2>&1 | tail -5
+
+# ── Step 5: Collect runtime files ──
+echo ""
+echo "=== Step 5: Collecting runtime files ==="
+
+# Copy dynamic linker
+mkdir -p "$STAGING/lib"
+cp -a "$SYSROOT"/lib/ld-musl-*.so.1 "$STAGING/lib/" 2>/dev/null || true
+
+# Copy shared libraries from sysroot
+mkdir -p "$STAGING/usr/lib"
+for lib in "$SYSROOT"/usr/lib/*.so*; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/usr/lib/"
+done
+for lib in "$SYSROOT"/lib/*.so*; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/lib/"
+done
+# Mesa 24.1+ deliberately provides no indirect contexts. Install the isolated
+# Mesa 24.0 software renderer used by Xvfb and replace any artifacts left by a
+# previous build. Native GL clients still use the current libGL above; only the
+# server-side DRI module and its versioned LLVM dependency come from v3.20.
+rm -rf "$STAGING/usr/lib/gallium-pipe" "$STAGING/usr/lib/xorg/modules/dri"
+rm -f "$STAGING/usr/lib/libgallium-"*.so \
+    "$STAGING/usr/lib/libLLVM-19.so" "$STAGING/usr/lib/libLLVM.so.19.1"
+mkdir -p "$STAGING/usr/lib/xorg/modules"
+cp -a "$LEGACY_GLX_ROOT/usr/lib/xorg/modules/dri" \
+    "$STAGING/usr/lib/xorg/modules/"
+for lib in "$LEGACY_GLX_ROOT"/usr/lib/libGL.so* \
+    "$LEGACY_GLX_ROOT"/usr/lib/libglapi.so*; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/usr/lib/"
+done
+for lib in "$LEGACY_GLX_ROOT"/usr/lib/libLLVM-17*.so; do
+    [ -f "$lib" ] || [ -L "$lib" ] || continue
+    cp -a "$lib" "$STAGING/usr/lib/"
+done
+
+# Copy OpenGL/X11 headers for in-guest builds (e.g. triangle demo via gcc)
+mkdir -p "$STAGING/usr/include"
+for incdir in GL KHR X11; do
+    if [ -d "$SYSROOT/usr/include/$incdir" ]; then
+        cp -a "$SYSROOT/usr/include/$incdir" "$STAGING/usr/include/"
+    fi
+done
+
+# Copy binaries from sysroot (xclock, xinit, xauth, etc.)
+mkdir -p "$STAGING/usr/bin"
+for bin in xclock xinit startx xauth xmodmap xrdb xset xkbcomp glxinfo glxgears tri glxdemo; do
+    [ -f "$SYSROOT/usr/bin/$bin" ] && cp -a "$SYSROOT/usr/bin/$bin" "$STAGING/usr/bin/"
+done
+install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
+
+# Vinix exposes its pointer as one small absolute-coordinate packet and its
+# keyboard through the console. Translate both into XTEST events rather than
+# importing Linux's evdev/udev input stack just to run X11 applications.
+echo "  Building Vinix X11 input bridge..."
+$CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c" \
+    -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
+    -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
+    -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-xinput"
+
+# Wine windows stay inside the native compositor by rendering into Xvfb. This
+# companion owns that private X server and translates the compositor's scoped
+# input records into XTEST events; it never opens the physical input devices.
+echo "  Building Vinix embedded Wine host..."
+$CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
+    -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
+    -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
+    -lXtst -lXdamage -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"
+
+# Copy XKB data
+if [ -d "$SYSROOT/usr/share/X11/xkb" ]; then
+    mkdir -p "$STAGING/usr/share/X11"
+    cp -a "$SYSROOT/usr/share/X11/xkb" "$STAGING/usr/share/X11/"
+fi
+
+# Copy fonts
+for fontdir in "$SYSROOT/usr/share/fonts/X11" "$SYSROOT/usr/share/fonts/misc"; do
+    if [ -d "$fontdir" ]; then
+        mkdir -p "$STAGING/$(echo "$fontdir" | sed "s|${SYSROOT}||")"
+        cp -a "$fontdir"/* "$STAGING/$(echo "$fontdir" | sed "s|${SYSROOT}||")/"
+    fi
+done
+
+# Copy fontconfig config
+if [ -d "$SYSROOT/etc/fonts" ]; then
+    mkdir -p "$STAGING/etc/fonts"
+    cp -a "$SYSROOT/etc/fonts"/* "$STAGING/etc/fonts/"
+fi
+
+# Create xorg.conf
+mkdir -p "$STAGING/etc/X11"
+cat > "$STAGING/etc/X11/xorg.conf" << 'XORGEOF'
+Section "ServerFlags"
+    Option "AllowEmptyInput" "true"
+    Option "AutoAddDevices" "false"
+    Option "AutoEnableDevices" "false"
+EndSection
+
+Section "Module"
+    Load "fbdev"
+EndSection
+
+Section "Device"
+    Identifier "Card0"
+    Driver "fbdev"
+    Option "fbdev" "/dev/fb0"
+EndSection
+
+Section "Screen"
+    Identifier "Screen0"
+    Device "Card0"
+EndSection
+XORGEOF
+
+# Create xinitrc
+mkdir -p "$STAGING/root"
+cat > "$STAGING/root/.xinitrc" << 'XINITEOF'
+#!/bin/sh
+exec xclock -geometry 400x400+50+50
+XINITEOF
+chmod +x "$STAGING/root/.xinitrc"
+
+echo ""
+echo "=== Build complete ==="
+echo "Staging directory: $STAGING"
+echo "Size: $(du -sh "$STAGING" | cut -f1)"
+echo ""
+echo "Contents:"
+ls -la "$STAGING/usr/bin/" 2>/dev/null | head -20
+echo "..."
+echo "Xorg modules:"
+ls "$STAGING"/usr/lib/xorg/modules/drivers/ 2>/dev/null || echo "(none yet)"

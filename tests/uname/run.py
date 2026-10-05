@@ -44,7 +44,7 @@ def main():
                        "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_NETWORK": "0",
                        "VINIX_QEMU_CLIPBOARD": "0", "VINIX_QEMU_AUDIO": "off", "VINIX_PRUNE_BUILD": "0",
                        "VINIX_QEMU_EXTRA": f"-qmp unix:{state / 'qmp.sock'},server=on,wait=off"}
-        return runner.boot([str(ROOT / "run-aarch64.sh"), "--no-build", "--serial", "--mem=512"],
+        return runner.boot([str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--mem=512"],
                            environment, state, ["UNAME PASS"],
                            ["UNAME FAIL", "KERNEL PANIC", "FATAL EXCEPTION"], args.timeout)
 

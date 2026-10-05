@@ -2,7 +2,7 @@
 # Install host cross-builds into the running QEMU guest without restarting it.
 #
 # Each application below is one exec name of the multicall desktop. The host
-# publishes a fresh build of it (./cross-compile-app.sh) and this replaces
+# publishes a fresh build of it (./scripts/cross-compile-app.sh) and this replaces
 # just that name's link with the new executable, so reopening the app runs the
 # new code while the desktop and every other app keep running. The name is
 # Files' because Files was the first; init starts the helper by it. Keep the

@@ -10,15 +10,15 @@ desktop, and `vinix.log`, the serial console with the engine's log, in
 `--work`.
 
 ```sh
-./build-opengothic-aarch64.sh --demo
-./build-desktop-aarch64.sh --no-initramfs
+./scripts/build-opengothic-aarch64.sh --demo
+./scripts/build-desktop-aarch64.sh --no-initramfs
 python3 tests/opengothic/run.py --work build/opengothic/test
 ```
 
 It needs the X11 and userland layers (`build-aarch64-x11`,
 `build-aarch64-userland`), a built kernel, `aarch64-linux-musl-gcc`, and
 Pillow for the capture. `--repo` names another checkout to take the layers and
-`run-aarch64.sh` from, `--kernel-dir` another kernel, `--build` another
+`scripts/run-aarch64.sh` from, `--kernel-dir` another kernel, `--build` another
 OpenGothic build directory and `--desktop` another desktop binary.
 
 Two things differ from an installed system. The test removes the game's intro
@@ -36,7 +36,7 @@ bridge and XTEST.
 For native GPU validation, build the private Venus runtime and select KekVM:
 
 ```sh
-./build-venus-aarch64.sh
+./scripts/build-venus-aarch64.sh
 VINIX_KEKVM_DIR="$HOME/code/kekvm" python3 tests/opengothic/run.py \
     --venus --work build/opengothic/venus-test
 ```

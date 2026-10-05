@@ -58,7 +58,7 @@ Build the isolated kernel with dependencies linked from the main checkout:
 
 ```sh
 make -C kernel ARCH=aarch64 CC=clang V=/path/to/v PROD=1 LIMINE_MP=1 ALLOC_TRACK=1
-V=/path/to/v PROD=1 ALLOC_TRACK=1 ./build-amd64.sh --no-userland --no-iso
+V=/path/to/v PROD=1 ALLOC_TRACK=1 ./scripts/build-amd64.sh --no-userland --no-iso
 VINIX_AARCH64_SYSROOT=/path/to/main/build-aarch64-userland/sysroot \
   ./tests/ipv6-multicast/run.sh aarch64
 ./tests/ipv6-multicast/run.sh amd64

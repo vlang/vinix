@@ -1,6 +1,6 @@
 #!/bin/sh
 # Exercise a development reload while the GPU compositor is running.
-# Intended for run-desktop-aarch64.sh gpuvm --guest-init.
+# Intended for scripts/run-desktop-aarch64.sh gpuvm --guest-init.
 set -eu
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin

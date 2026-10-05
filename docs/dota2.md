@@ -16,14 +16,14 @@ Under software rendering, frames take a quarter of a second to minutes. Playing
 a match and online matches have not been verified.
 The game probe saves the actual guest framebuffer for inspection.
 
-![Dota 2 main menu running in a Vinix window](../vinix-dota2-qemu.png)
+![Dota 2 main menu running in a Vinix window](../docs/screenshots/vinix-dota2-qemu.png)
 
 ## Build the runtime and desktop
 
 ```sh
-./build-steam-aarch64.sh
-./build-dota2-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-dota2
+./scripts/build-steam-aarch64.sh
+./scripts/build-dota2-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-dota2
 ```
 
 The Dota layer contains the launcher, libraries and its patched native
@@ -55,7 +55,7 @@ acceleration used by native OpenGothic.
 The staged Lavapipe is rebuilt from Debian's own Mesa 22.3.6 source and
 patches, with one [local patch](../build-support/dota2/mesa/README.md) for null
 descriptor sets. Only `libvulkan_lvp.so` changes; it links against the runtime's
-Debian LLVM 15. `build-dota2-aarch64.sh` cross-builds it with clang, lld, ninja
+Debian LLVM 15. `scripts/build-dota2-aarch64.sh` cross-builds it with clang, lld, ninja
 and pkg-config, and a private Meson. `vulkan-stage.py --debian-lavapipe` keeps
 Debian's unpatched driver for baseline comparisons.
 
@@ -140,7 +140,7 @@ certifying the separate full futex contract or changing the game-test kernel.
 
 ## Host GPU on KekVM (experimental; has crashed the Mac)
 
-On KekVM's GPU-enabled QEMU (`run-aarch64.sh --venus`), the translated game
+On KekVM's GPU-enabled QEMU (`scripts/run-aarch64.sh --venus`), the translated game
 can render on the Mac's GPU through Mesa's Venus driver. The native ARM64
 Venus driver cannot load into the x86-64 process. The runtime therefore
 stages an x86-64 build ([`build-support/dota2/venus`](../build-support/dota2/venus/README.md)),
@@ -218,7 +218,7 @@ establish authenticated matchmaking support.
 
 With the early loader, the real Steam API test passes anonymous initialization,
 callbacks and clean shutdown even with Source 2's tier0 loaded globally. The
-[startup-logo capture](../vinix-dota2-startup-qemu.png) records an earlier
+[startup-logo capture](../docs/screenshots/vinix-dota2-startup-qemu.png) records an earlier
 milestone. The main-menu image above is a later, genuine QEMU framebuffer
 capture from the full game, including its menu artwork and 3D character.
 It was copied without image edits or overlays. Mouse clicks opened and closed
@@ -302,7 +302,7 @@ the 30-minute probe ended, after 5,387,728,896 exported bytes with no read
 errors. Inputs and captures, including `hero-selection-01.png`, are under
 `build/dota2/game-mesa-null-sets-repeat`.
 
-The runtime staged by `build-dota2-aarch64.sh`, with the committed driver
+The runtime staged by `scripts/build-dota2-aarch64.sh`, with the committed driver
 (`a6a4972d...`), reached the menu about 150 seconds after the game started.
 Its first `map dota`, typed as the menu appeared, failed the same way; the
 second loaded the map. The client joined the local server over UDP at
@@ -314,7 +314,7 @@ crashed the game with a null-pointer read in game code, with that command on
 the faulting thread's stack. Captures and inputs are under
 `build/dota2/game-product-console-map`.
 
-![Dota 2 team selection on a local map in a Vinix window](../vinix-dota2-team-select-qemu.png)
+![Dota 2 team selection on a local map in a Vinix window](../docs/screenshots/vinix-dota2-team-select-qemu.png)
 
 The first local map of a session failed in all three launches that did not
 change network timeouts, including one that waited four minutes at the menu.
@@ -367,7 +367,7 @@ last 83 seconds of game time took about 20 minutes. The server then entered
 `DOTA_GAMERULES_STATE_GAME_IN_PROGRESS`, and the hero's gold began to rise.
 Inputs and captures are under `build/dota2/game-software-hero`.
 
-![Marci at the Dire base in a local Dota 2 match in a Vinix window](../vinix-dota2-hero-map-qemu.png)
+![Marci at the Dire base in a local Dota 2 match in a Vinix window](../docs/screenshots/vinix-dota2-hero-map-qemu.png)
 
 That run used Lavapipe at 854 by 480 with the kernel and desktop listed below.
 The other artifacts were newer:

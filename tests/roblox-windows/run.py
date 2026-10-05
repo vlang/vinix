@@ -7,7 +7,7 @@ test init that starts RobloxPlayerBeta.exe on a private Xvfb display. The
 serial transcript, Wine's log, Roblox's own logs and the frames the guest
 uploads are kept below --work.
 
-Requires build-x86-translation-aarch64.sh, the X11 and userland layers and a
+Requires scripts/build-x86-translation-aarch64.sh, the X11 and userland layers and a
 kernel. Nothing proprietary is stored in the repository.
 """
 from __future__ import annotations
@@ -304,7 +304,7 @@ def run_guest(args, work: Path, root: Path) -> bytes:
         "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_HOST_SOURCE": "0",
         "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": str(args.cpus), "VINIX_KEEP_TEMP_BOOT_DISK": "1",
     })
-    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist", f"--mem={args.mem}", "--serial"]
+    command = [str(args.repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist", f"--mem={args.mem}", "--serial"]
     print("Booting Vinix with the Windows Player", flush=True)
     pid, master = pty.fork()
     if pid == 0:
@@ -355,10 +355,10 @@ def run_guest(args, work: Path, root: Path) -> bytes:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--repo", type=Path, default=ROOT, help="checkout holding the layers and run-aarch64.sh")
+    parser.add_argument("--repo", type=Path, default=ROOT, help="checkout holding the layers and scripts/run-aarch64.sh")
     parser.add_argument("--kernel-dir", type=Path, help="kernel directory holding bin/vinix")
     parser.add_argument("--translation", type=Path,
-                        help="stage of build-x86-translation-aarch64.sh; the checkout's otherwise")
+                        help="stage of scripts/build-x86-translation-aarch64.sh; the checkout's otherwise")
     parser.add_argument("--work", type=Path, default=ROOT / "build/roblox-windows")
     parser.add_argument("--version", help="deployment to test, e.g. version-02c37bc51a384b8f; the current one otherwise")
     parser.add_argument("--winedebug", default="fixme-all,err+all", help="WINEDEBUG for the client")

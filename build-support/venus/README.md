@@ -1,6 +1,6 @@
 # Mesa Venus for Vinix
 
-`./build-venus-aarch64.sh` cross-builds Mesa 25.0.5 for ARM64/musl, with only
+`./scripts/build-venus-aarch64.sh` cross-builds Mesa 25.0.5 for ARM64/musl, with only
 the Vulkan Venus driver, X11 presentation and the FPS overlay. Mesa's archive
 and the Alpine 3.21 build dependencies are checked against pinned hashes.
 The runtime is staged under `build-aarch64-venus/staging/opt/venus` and stays
@@ -8,10 +8,10 @@ separate from the X11 and Lavapipe libraries.
 
 The build needs the ARM64 musl cross toolchain, Python, Ninja, pkg-config and
 OpenGothic's staged Vulkan loader, headers and host glslang tools. Build the
-engine first with `./build-opengothic-aarch64.sh --demo` or `--game`.
+engine first with `./scripts/build-opengothic-aarch64.sh --demo` or `--game`.
 `VINIX_VENUS_BUILD_DIR` and `VINIX_OPENGOTHIC_BUILD_DIR` override those outputs.
 
-Boot with `VINIX_KEKVM_DIR="$HOME/code/kekvm" ./run-desktop-aarch64.sh --venus`.
+Boot with `VINIX_KEKVM_DIR="$HOME/code/kekvm" ./scripts/run-desktop-aarch64.sh --venus`.
 KekVM must have its GPU backend prepared with `make setup-gpu`. The launch
 script uses its private QEMU, ANGLE, virglrenderer and KosmicKrisp Vulkan-on-
 Metal backend. Vinix's 16 KiB pages match Hypervisor.framework's host mappings.

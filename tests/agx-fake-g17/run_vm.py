@@ -139,7 +139,7 @@ def run_vm(root: Path, timeout: int) -> int:
         environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
 
         command = [
-            str(root / "run-aarch64.sh"),
+            str(root / "scripts/run-aarch64.sh"),
             "--no-build",
             "--serial",
             "--fake-g17",

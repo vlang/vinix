@@ -224,7 +224,7 @@ def main() -> None:
         environment.pop(inherited, None)
     if sys.platform != "darwin":
         environment.setdefault("USE_TCG", "1")
-    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist",
+    command = [str(REPO / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--no-persist",
                f"--mem={args.memory_mib}"]
     report = {"probe_source_sha256": digest(HERE / "lavapipe-null-sets.c"),
         "native_source_sha256": digest(HERE / "lavapipe-native-wait.c"),

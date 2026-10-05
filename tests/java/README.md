@@ -9,8 +9,8 @@ loopback networking.
 Build the OpenJDK overlay and userland with:
 
 ```sh
-./build-java-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-java-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 The ARM64 VM userland boot suite invokes `/root/java-smoke.sh` automatically.

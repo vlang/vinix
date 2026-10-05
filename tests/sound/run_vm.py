@@ -59,7 +59,7 @@ def boot(root: Path, guest_init: Path, initramfs: Path, state: Path, wav: Path,
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
 
-    command = [str(root / "run-aarch64.sh"), "--serial", "--mem=2048",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
                f"--guest-init={guest_init}"]
     if no_build:
         command.insert(1, "--no-build")
@@ -208,7 +208,7 @@ def main() -> int:
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2],
-                        help="checkout whose run-aarch64.sh and kernel to boot")
+                        help="checkout whose scripts/run-aarch64.sh and kernel to boot")
     parser.add_argument("--no-build", action="store_true")
     arguments = parser.parse_args()
 

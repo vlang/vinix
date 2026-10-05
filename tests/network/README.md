@@ -12,7 +12,7 @@ clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 \
   -Wl,-e,_start -Wl,-static -o /tmp/vinix-net-init tests/network/init.c
 ```
 
-Boot through `run-aarch64.sh` with that archive selected through
+Boot through `scripts/run-aarch64.sh` with that archive selected through
 `VINIX_INITRAMFS`. A successful serial log ends with `NET TEST PASSED`.
 
 `guest-tools-boot.sh` is the integration test used by the network developer

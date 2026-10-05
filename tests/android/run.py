@@ -596,7 +596,7 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
         environment["USE_TCG"] = "1"
     elif args.interactive:
         environment["QEMU_DISPLAY_BACKEND"] = "cocoa"
-    command = [str(args.repo / "run-aarch64.sh"), "--no-build", "--no-persist",
+    command = [str(args.repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist",
                f"--mem={args.memory}", f"--guest-init={ROOT / 'tests/android/guest-init.sh'}"]
     if not args.interactive:
         command.append("--serial")

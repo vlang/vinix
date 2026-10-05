@@ -8,8 +8,8 @@ GCC toolchain is present, it also compiles and runs a cgo program.
 Build the Go overlay and userland with:
 
 ```sh
-./build-go-aarch64.sh
-./build-userland-aarch64.sh
+./scripts/build-go-aarch64.sh
+./scripts/build-userland-aarch64.sh
 ```
 
 The VM userland boot suite invokes `smoke.sh`, which checks `go`, `gofmt`, and

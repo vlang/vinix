@@ -51,7 +51,7 @@ def provenance(android_stage: Path) -> dict:
     runtime = android_stage / PREFIX
     android_launcher = android_stage / "usr/bin/run-android"
     if not android_launcher.is_file() or not os.access(android_launcher, os.X_OK):
-        raise RuntimeError("Build the native Android runtime with ./build-android-aarch64.sh first")
+        raise RuntimeError("Build the native Android runtime with ./scripts/build-android-aarch64.sh first")
     if digest(android_launcher) != digest(ROOT / "build-support/android/run-android"):
         raise RuntimeError("Android runtime has a stale launcher; rebuild the Android layer")
     art = art_tools()

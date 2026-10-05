@@ -481,7 +481,7 @@ def main() -> None:
             if platform.system() != "Darwin":
                 environment.setdefault("USE_TCG", "1")
             # KekVM's GPU needs a GL display; its serial console still uses stdio.
-            command = [str(REPO / "run-aarch64.sh"), "--no-build",
+            command = [str(REPO / "scripts/run-aarch64.sh"), "--no-build",
                        "--venus" if args.venus else "--serial", f"--mem={args.memory_mib}"]
             print(f"Real game probe artifacts: {work}; read-only game disk: {uri}", flush=True)
             pid, master = pty.fork()

@@ -47,7 +47,7 @@ def main():
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
     print(f'Guest artifacts: {state}', flush=True)
-    command = [str(ROOT / 'run-aarch64.sh'), '--no-build', '--serial', '--mem=1024', f'--guest-init={state / "init"}']
+    command = [str(ROOT / 'scripts/run-aarch64.sh'), '--no-build', '--serial', '--mem=1024', f'--guest-init={state / "init"}']
     result = helper.boot(command, environment, state, ['SECURELEVEL ALL PASS'],
                          ['SECURELEVEL FAIL:', 'KERNEL PANIC', 'FATAL EXCEPTION'], 240)
     if result:

@@ -21,9 +21,9 @@ downloads Valve's installer package and the Debian libraries Valve's
 desktop image with both:
 
 ```sh
-./build-x86-translation-aarch64.sh --translator-only
-./build-steam-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-steam
+./scripts/build-x86-translation-aarch64.sh --translator-only
+./scripts/build-steam-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-steam
 ```
 
 The Steam layer adds about 1.3 GiB before compression. For a faster VM build,
@@ -34,7 +34,7 @@ The resulting compressed Steam image is about 1 GiB with the current layers,
 which exceeds the 500 MiB Asahi EFI partition; this build currently targets
 the AArch64 VM.
 
-`build-steam-aarch64.sh` fetches `steam.deb` from Valve's CDN and the packages
+`scripts/build-steam-aarch64.sh` fetches `steam.deb` from Valve's CDN and the packages
 from `deb.debian.org`; set `VINIX_STEAM_DEB_URL`, `DEBIAN_MIRROR` and
 `VINIX_STEAM_DEBIAN_RELEASE` to take them from elsewhere. It installs nothing
 with dpkg: `build-support/debian-root.py` resolves the closure from the
