@@ -18,38 +18,41 @@ mut:
 
 struct NotesApp {
 mut:
-	items          [notes_limit]NotesEntry
-	count          int
-	next_id        u64 = 1
-	selected       int = -1
-	home_fd        int = -1
-	record         string
-	read_failed    bool
-	dirty          bool
-	status         string = 'notes.ready'
-	export_status  string
-	title          []u8
-	body           []u8
-	query          []u8
-	export_path    []u8
-	default_export string
-	actions        [notes_limit]string
-	matches        [notes_limit]int
-	matched        int
-	list_scroll    int
-	body_scroll    int
-	page_rows      int = 12
-	text_rows      int = 16
-	text_columns   int = 65
-	wrap_starts    [notes_body_limit + 1]int
-	wrap_count     int = 1
-	cursor         int
-	focus          int = 2
-	select_all     bool
-	delete_pending bool
-	pending        [4]u8
-	pending_len    int
-	last_edit      u64
+	items           [notes_limit]NotesEntry
+	count           int
+	next_id         u64 = 1
+	selected        int = -1
+	home_fd         int = -1
+	record          string
+	read_failed     bool
+	dirty           bool
+	status          string = 'notes.ready'
+	export_status   string
+	title           []u8
+	body            []u8
+	query           []u8
+	export_path     []u8
+	default_export  string
+	actions         [notes_limit]string
+	matches         [notes_limit]int
+	matched         int
+	list_scroll     int
+	body_scroll     int
+	page_rows       int = 12
+	text_rows       int = 16
+	text_columns    int = 65
+	wrap_starts     [notes_body_limit + 1]int
+	wrap_count      int = 1
+	cursor          int
+	focus           int = 2
+	select_all      bool
+	delete_pending  bool
+	close_requested bool
+	discard_pending bool
+	discard_allowed bool
+	pending         [4]u8
+	pending_len     int
+	last_edit       u64
 }
 
 fn new_notes_app(home string) NotesApp {
@@ -232,6 +235,8 @@ fn (a &NotesApp) encode(skip int) string {
 }
 
 fn (mut a NotesApp) reload() {
+	a.discard_pending = false
+	a.discard_allowed = false
 	if a.dirty {
 		a.status = 'notes.unsaved'
 		return
@@ -267,6 +272,8 @@ fn (mut a NotesApp) reload() {
 
 fn (mut a NotesApp) save() bool {
 	if !a.dirty { return true }
+	a.discard_pending = false
+	a.discard_allowed = false
 	if a.read_failed {
 		a.status = 'notes.corrupt'
 		return false
@@ -297,6 +304,7 @@ fn (mut a NotesApp) save() bool {
 		a.items[a.selected].body = editor_bytes_text(a.body).clone()
 	}
 	a.dirty = false
+	a.close_requested = false
 	a.status = if state == 1 { 'notes.durability_failed' } else { 'notes.saved' }
 	a.refilter()
 	return true
@@ -393,6 +401,7 @@ fn (mut a NotesApp) refilter() {
 }
 
 fn (mut a NotesApp) mark_dirty() {
+	a.reset_close_choice()
 	a.dirty = true
 	a.status = 'notes.unsaved'
 	a.last_edit = desktop_monotonic_ms()
@@ -401,7 +410,7 @@ fn (mut a NotesApp) mark_dirty() {
 }
 
 fn (mut a NotesApp) poll_at(now u64) bool {
-	if !a.dirty || now == ~u64(0) || now < a.last_edit || now - a.last_edit < notes_autosave_ms {
+	if !a.dirty || a.discard_allowed || now == ~u64(0) || now < a.last_edit || now - a.last_edit < notes_autosave_ms {
 		return false
 	}
 	// A failed save stays visible, and retries are bounded instead of touching
@@ -415,15 +424,35 @@ fn (mut a NotesApp) poll_at(now u64) bool {
 fn (mut a NotesApp) poll() bool { return a.poll_at(desktop_monotonic_ms()) }
 
 fn (a &NotesApp) next_poll_ms() u64 {
-	if !a.dirty { return 2000 }
+	if !a.dirty || a.discard_allowed { return 2000 }
 	now := desktop_monotonic_ms()
 	if now == ~u64(0) || now < a.last_edit { return notes_autosave_ms }
 	elapsed := now - a.last_edit
 	return if elapsed < notes_autosave_ms { notes_autosave_ms - elapsed } else { u64(1) }
 }
 
+fn (mut a NotesApp) reset_close_choice() {
+	a.close_requested = false
+	a.discard_pending = false
+	a.discard_allowed = false
+	if a.status == 'notes.discard_ready' {
+		a.status = if a.dirty { 'notes.unsaved' } else { 'notes.ready' }
+	}
+}
+
+fn (mut a NotesApp) prepare_close() bool {
+	if !a.dirty || a.discard_allowed { return true }
+	if a.save() { return true }
+	a.close_requested = true
+	a.discard_pending = false
+	a.export_status = ''
+	return false
+}
+
 fn (mut a NotesApp) close_app() {
-	if a.dirty { a.save() }
+	// Forced process termination still bypasses the guard. An ordinary close
+	// reaches destruction only after save or the explicit discard confirmation.
+	if a.dirty && !a.discard_allowed { a.save() }
 	a.free_items()
 	for index in 0 .. notes_limit {
 		unsafe { a.actions[index].free() }
@@ -444,6 +473,7 @@ fn (mut a NotesApp) close_app() {
 	a.export_path = []u8{}
 	a.default_export = ''
 	a.dirty = false
+	a.reset_close_choice()
 	a.selected = -1
 	if a.home_fd >= 0 {
 		desktop_close(a.home_fd)

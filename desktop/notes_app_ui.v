@@ -68,6 +68,24 @@ fn (mut a NotesApp) handle(event_id string) ! {
 		'notes.save' { a.save() }
 		'notes.refresh' { a.reload() }
 		'notes.delete' { a.delete_note() }
+		'notes.keep_editing' {
+			a.reset_close_choice()
+			a.status = if a.dirty { 'notes.unsaved' } else { 'notes.ready' }
+		}
+		'notes.discard' {
+			if a.close_requested && a.dirty {
+				a.discard_pending = true
+				a.discard_allowed = false
+			}
+		}
+		'notes.confirm_discard' {
+			if a.close_requested && a.discard_pending && a.dirty {
+				a.discard_allowed = true
+				a.discard_pending = false
+				a.status = 'notes.discard_ready'
+				a.export_status = ''
+			}
+		}
 		'notes.cancel_delete' {
 			a.delete_pending = false
 			a.status = if a.dirty { 'notes.unsaved' } else { 'notes.ready' }
@@ -97,6 +115,7 @@ fn (mut a NotesApp) handle(event_id string) ! {
 }
 
 fn (mut a NotesApp) insert_text(text string) {
+	a.reset_close_choice()
 	if a.focus == 0 || a.focus == 3 {
 		if a.focus == 0 {
 			console_edit_character(mut a.query, text, 256, a.select_all)
@@ -141,6 +160,7 @@ fn (mut a NotesApp) insert_text(text string) {
 }
 
 fn (mut a NotesApp) backspace(forward bool) {
+	a.reset_close_choice()
 	if a.focus == 0 {
 		console_backspace(mut a.query, a.select_all)
 		a.refilter()
@@ -257,6 +277,7 @@ fn (mut a NotesApp) key_input(input string) {
 }
 
 fn (mut a NotesApp) paste_input(text string) {
+	a.reset_close_choice()
 	a.pending_len = 0
 	// A paste is one bounded UTF-8 edit. Reject malformed/control text as a
 	// whole, preserving a selected draft if the replacement is invalid.
@@ -273,6 +294,7 @@ fn (a &NotesApp) pointer_moves_matter() bool { return false }
 
 fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int,
 	x int, y int, _ int, height int) {
+	close_height := if a.close_requested { 64 } else { 0 }
 	if phase == .scroll {
 		if x < 230 {
 			a.list_scroll -= scroll * 3
@@ -284,7 +306,7 @@ fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton
 			a.body_scroll -= scroll * 3
 			a.clamp_body_scroll()
 		}
-	} else if phase == .down && button == .left && x >= 248 && y >= 101 && y < height - 118 && a.selected >= 0 {
+	} else if phase == .down && button == .left && x >= 248 && y >= 101 && y < height - close_height - 118 && a.selected >= 0 {
 		row := a.body_scroll + (y - 101) / 18
 		if row < a.wrap_count {
 			a.focus_field(2)
@@ -296,8 +318,9 @@ fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton
 fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
+	close_height := if a.close_requested { 64 } else { 0 }
 	a.page_rows = if height > 250 { (height - 213) / 30 } else { 1 }
-	a.text_rows = if height >= 243 { (height - 225) / 18 } else { 1 }
+	a.text_rows = if height - close_height >= 243 { (height - close_height - 225) / 18 } else { 1 }
 	a.text_columns = if width > 296 { (width - 276) / 8 } else { 1 }
 	a.rewrap()
 	// Resizing can remove wrapped rows or fit the whole note in one page.
@@ -342,7 +365,16 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 			lines << ui2.view('', ui2.rect(f64(8 + column * 8), f64(6 + (row - a.body_scroll) * 18), 1, 17), ui2.BoxStyle{ bg: app_accent }, [])
 		}
 	}
-	children << ui2.clickable_view('notes.body', ui2.rect(240, 95, f64(width - 252), f64(height - 213)), ui2.BoxStyle{ bg: body_panel, radius: 4 }, lines)
+	children << ui2.clickable_view('notes.body', ui2.rect(240, 95, f64(width - 252), f64(height - close_height - 213)), ui2.BoxStyle{ bg: body_panel, radius: 4 }, lines)
+	if a.close_requested {
+		key := if a.discard_pending { 'notes.confirm_discard_hint' } else { 'notes.close_required' }
+		children << ui2.label('', tr(key), ui2.rect(240, f64(height - 178), f64(width - 252), 22), ui2.TextStyle{ color: app_accent, size: 11 })
+		children << console_button('notes.keep_editing', 'notes.keep_editing', 240, height - 150, 146, false)
+		children << console_button('notes.discard', 'notes.discard', 394, height - 150, 140, false)
+		if a.discard_pending {
+			children << console_button('notes.confirm_discard', 'notes.confirm_discard', 542, height - 150, width - 554, true)
+		}
+	}
 	children << console_field('notes.export_path', editor_bytes_text(a.export_path), 240, height - 108, width - 360, a.focus == 3)
 	children << console_button('notes.export', 'notes.export', width - 112, height - 108, 100, false)
 	children << ui2.label('', tr(if a.export_status.len > 0 { a.export_status } else { a.status }), ui2.rect(240, f64(height - 73), f64(width - 252), 28), ui2.TextStyle{

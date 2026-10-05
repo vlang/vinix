@@ -371,3 +371,102 @@ fn test_notes_widening_and_tall_resize_preserve_visible_text_and_caret() {
 	free_tree(shallow)
 	a.close_app()
 }
+
+fn test_notes_normal_close_saves_or_preserves_an_invalid_draft_until_explicit_discard() {
+	home := notes_test_home('close-invalid')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() }
+	}
+	mut a := new_notes_app(home)
+	a.new_note()
+	notes_test_edit(mut a, 'Saved title', 'saved body')
+	assert a.prepare_close() && !a.dirty
+	a.focus_field(1)
+	a.key_input('\x01\x7f')
+	assert !a.prepare_close() && a.dirty && a.close_requested
+	assert a.status == 'notes.title_required'
+	assert !a.prepare_close() && !a.discard_allowed
+	a.handle('notes.confirm_discard')!
+	assert !a.discard_allowed
+	a.handle('notes.discard')!
+	assert a.discard_pending && !a.discard_allowed
+	// Pressing X again cancels confirmation; it never chooses discard.
+	assert !a.prepare_close() && !a.discard_pending && !a.discard_allowed
+	a.handle('notes.keep_editing')!
+	assert !a.close_requested && a.dirty
+	a.paste_input('Repaired title')
+	assert a.prepare_close() && !a.dirty
+	a.focus_field(1)
+	a.key_input('\x01\x7f')
+	assert !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	assert a.discard_allowed && a.dirty && a.prepare_close()
+	assert !a.poll_at(a.last_edit + notes_autosave_ms) && a.next_poll_ms() == 2000
+	a.close_app()
+	mut check := new_notes_app(home)
+	assert check.items[0].title == 'Repaired title' && check.items[0].body == 'saved body'
+	check.close_app()
+}
+
+fn test_notes_conflicting_close_export_retry_and_new_edits_revoke_discard_permission() {
+	home := notes_test_home('close-conflict')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() }
+	}
+	mut a := new_notes_app(home)
+	a.new_note()
+	notes_test_edit(mut a, 'Original', 'first')
+	assert a.save()
+	mut newer := new_notes_app(home)
+	notes_test_edit(mut newer, 'Newer', 'stored')
+	assert newer.save()
+	notes_test_edit(mut a, 'Draft', 'unsaved 😀')
+	assert !a.prepare_close() && a.status == 'notes.conflict'
+	a.handle('notes.export')!
+	assert a.export_status == 'notes.export_saved'
+	assert !a.prepare_close() && a.dirty
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	assert a.prepare_close()
+	a.focus_field(0)
+	a.key_input('D')
+	assert !a.discard_allowed && a.status == 'notes.unsaved' && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.focus_field(3)
+	a.paste_input('draft-export.txt')
+	assert !a.discard_allowed && a.status == 'notes.unsaved' && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.focus_field(2)
+	a.key_input('X')
+	assert !a.discard_allowed && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.key_input('\x7f')
+	assert !a.discard_allowed && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.key_input('\x01')
+	a.paste_input('Replaced draft')
+	assert !a.discard_allowed && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.handle('notes.save')!
+	assert !a.discard_allowed && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.handle('notes.keep_editing')!
+	assert a.status == 'notes.unsaved'
+	assert !a.discard_allowed && !a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.close_app()
+	newer.close_app()
+	mut check := new_notes_app(home)
+	assert check.items[0].title == 'Newer' && check.items[0].body == 'stored'
+	check.close_app()
+}

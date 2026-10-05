@@ -147,3 +147,49 @@ fn test_notes_maximum_text_wrapping_and_oversize_store_releases_buffers() {
 	a.close_app()
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep_zero_bytes() {
+	home := notes_heap_home('close')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() }
+	}
+	mut a := new_notes_app(home)
+	a.new_note()
+	assert a.save()
+	a.focus_field(1)
+	a.key_input('\x01\x7f')
+	begin_frame_elements()
+	warm := a.build(ui2.rect(0, 0, 820, 576))!
+	free_tree(warm)
+	// The close panel reserves fewer text rows and uses another arena bucket.
+	// Warm both persistent frame capacities before measuring repeated frames.
+	assert !a.prepare_close()
+	a.handle('notes.discard')!
+	begin_frame_elements()
+	close_warm := a.build(ui2.rect(0, 0, 820, 576))!
+	free_tree(close_warm)
+	a.handle('notes.keep_editing')!
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		assert !a.prepare_close() && a.close_requested
+		a.handle('notes.discard')!
+		begin_frame_elements()
+		tree := a.build(ui2.rect(0, 0, 820, 576))!
+		free_tree(tree)
+		a.handle('notes.confirm_discard')!
+		assert a.prepare_close() && a.discard_allowed
+		a.focus_field(2)
+		a.paste_input('日😀')
+		assert !a.discard_allowed
+		a.key_input('\x01\x7f')
+		assert !a.prepare_close()
+		a.handle('notes.keep_editing')!
+		assert !a.close_requested && a.dirty
+	}
+	a.prepare_close()
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.close_app()
+	assert C.vinix_heap_end() == 0
+}
