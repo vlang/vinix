@@ -258,3 +258,17 @@ stack values and generated code imports no implicit allocator. These lifetimes
 received independent review. The original permanent trace-stream ownership is
 preserved; mocked Mach/driver calls do not verify private ABI behavior on Apple
 hardware.
+
+LinuxKPI allocation, formatter and logger implementations now live in
+`compatcore/{runtime,format,printk}.v`. The 1,456-line original scope contains
+405 lines of unchanged independent C diagnostics and 25 lines of fixture
+scaffolding; excluding the entire 186-line native binding translations leaves
+at least 840 original lines translated. Native C retains imported PCI tables,
+Linux header access, `va_list` access and public variadic entry points. V owns
+allocation metadata/rollback, formatting and pointer-key publication, bounded
+owned log records, worker construction and draining. Host ASan/UBSan, public
+headers and untouched upstream fixtures pass; both architecture builds and
+ARM boot pass. The complete four-CPU x86 LinuxKPI guest passed every required
+marker and exact free-page baseline, using kernel SHA256
+`9edf46d7d6f29de1f101567887879526c566dd5cc6e1c00564b5736b22bc7135`.
+New allocation and asynchronous record lifetimes received independent review.
