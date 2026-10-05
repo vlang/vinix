@@ -14,14 +14,14 @@ that this patch supplies.
 
 ## Source layout
 
-* `kernel/c/brcm_wifi.{c,h}`: BCM4378 core inventory/OTP, firmware bootstrap,
+* `kernel/apple/wifi/wificore/core.v` and `kernel/c/brcm_wifi.h`: BCM4378 core inventory/OTP, firmware bootstrap,
   board NVRAM packing, CLM/TXCAP/calibration loading, PCIe message rings,
   completion ownership, firmware commands, radio control, network scanning,
   WPA2-PSK/CCMP, and raw Ethernet.
-* `kernel/c/brcm_m1.{c,h}`: Apple PCIe port reset/clock sequencing, BAR allocation,
+* `kernel/apple/wifi/m1core/` and `kernel/c/brcm_m1.h`: Apple PCIe port reset/clock sequencing, BAR allocation,
   a bounded 4 MiB DART mapping, exact-width MMIO and cache maintenance, loader
   staging, diagnostics and a bounded receive queue.
-* `kernel/modules/apple/wifi/wifi.v`: J313 device-tree validation, PMGR and MMIO
+* `kernel/apple/wifi/wifi.v`: J313 device-tree validation, PMGR and MMIO
   setup, entropy expansion, `/dev/wlan0`, checked user copies and poll integration.
 * `tools/m1-wifi/`: explicit firmware packager and control utility.
 * `tests/m1-wifi/`: portable protocol tests, simulated platform policy tests,
@@ -49,10 +49,11 @@ symbols and missing console hooks. It checks 18 retained Wi-Fi symbols after
 linker garbage collection, plus initialization and polling call sites. Ten
 negative/positive verifier tests run against the linked production image.
 
-Other validation: 26 protocol groups (including 100,000 parser mutations) and
-7 simulated-platform groups pass with Clang ASan/UBSan and optimized GCC.
-Both driver C files separately compile using the kernel's freestanding headers
-with `-Wall -Wextra -Werror`. All 17 SPI keyboard regression groups pass. The
+Current V core validation: 26 protocol groups (including 100,000 parser
+mutations) and seven simulated-platform groups pass with Clang ASan/UBSan
+and no allocator imports. Both architecture builds and QEMU boot/syscall
+checks pass. Physical firmware boot, association and DMA remain unverified.
+The SPI keyboard and touchpad regression groups also pass. The
 full kernel still emits existing V notices and third-party warnings; this is
 not a claim that the whole tree is warning-free. The control utility is tested
 on the host and cross-built as a static AArch64 binary for the desktop image;

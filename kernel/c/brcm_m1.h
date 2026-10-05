@@ -9,7 +9,7 @@ struct bw_m1_plan {
     uint64_t window, window_bus, window_size;
     uint64_t pool_cpu, pool_physical, tables_cpu, tables_physical;
     uint32_t sid, gpio_active_low;
-    const uint8_t *calibration, *seed;
+    BW_CONST uint8_t *calibration, *seed;
     size_t calibration_len, seed_len;
     uint8_t mac[6];
     char antenna[16];
@@ -42,16 +42,16 @@ struct bw_m1_plan {
  *           entries of 48 bytes: ssid_len8@0,secure8@1,channel16@2,
  *           rssi16@4,BSSID[6]@8,SSID[32]@16. Unused entries are zero.
  */
-int brcm_m1_prepare(const struct bw_m1_plan *);
+int brcm_m1_prepare(BW_CONST struct bw_m1_plan *);
 int brcm_m1_status(uint8_t *output);
-int brcm_m1_upload(const uint8_t *chunk);
-int brcm_m1_boot(const uint8_t *manifest);
-int brcm_m1_join(const uint8_t *request);
-int brcm_m1_radio(const uint8_t *request);
+int brcm_m1_upload(BW_CONST uint8_t *chunk);
+int brcm_m1_boot(BW_CONST uint8_t *manifest);
+int brcm_m1_join(BW_CONST uint8_t *request);
+int brcm_m1_radio(BW_CONST uint8_t *request);
 int brcm_m1_scan(void);
 int brcm_m1_networks(uint8_t *output);
 int brcm_m1_poll(void);
 int brcm_m1_read(uint8_t *, size_t);
-int brcm_m1_write(const uint8_t *, size_t);
+int brcm_m1_write(BW_CONST uint8_t *, size_t);
 void brcm_m1_stop(void);
 #endif

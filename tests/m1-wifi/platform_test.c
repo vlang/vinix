@@ -19,17 +19,17 @@ static struct reg regs[256];static unsigned nr,reads,writes,sync_calls;
 static uint64_t elapsed,probe_bar;static uint64_t probe_size,probe_bar2,probe_size2;static uint64_t timeout_register;
 static uint32_t reg_get(uint64_t a){for(unsigned i=0;i<nr;i++)if(regs[i].address==a)return regs[i].value;return 0;}
 static void reg_set(uint64_t a,uint32_t v){for(unsigned i=0;i<nr;i++)if(regs[i].address==a){regs[i].value=v;return;}assert(nr<256);regs[nr++]=(struct reg){a,v};}
-static uint8_t vinix_mmio_read8(void *p){reads++;return (uint8_t)(reg_get((uintptr_t)p&~3ull)>>(((uintptr_t)p&3)*8));}
-static uint16_t vinix_mmio_read16(void *p){reads++;return (uint16_t)(reg_get((uintptr_t)p&~3ull)>>(((uintptr_t)p&2)*8));}
-static uint32_t vinix_mmio_read32(void *p){reads++;uint64_t a=(uintptr_t)p;uint32_t v=reg_get(a);if(a==timeout_register)return v|4;if(probe_bar&&a==probe_bar&&v==UINT32_MAX)return (uint32_t)(~(probe_size-1))|4;if(probe_bar2&&a==probe_bar2&&v==UINT32_MAX)return (uint32_t)(~(probe_size2-1))|4;return v;}
-static void vinix_mmio_write8(void *p,uint8_t v){writes++;uint64_t a=(uintptr_t)p;unsigned sh=(a&3)*8;reg_set(a&~3ull,(reg_get(a&~3ull)&~(255u<<sh))|((uint32_t)v<<sh));}
-static void vinix_mmio_write16(void *p,uint16_t v){writes++;uint64_t a=(uintptr_t)p;unsigned sh=(a&2)*8;reg_set(a&~3ull,(reg_get(a&~3ull)&~(65535u<<sh))|((uint32_t)v<<sh));}
-static void vinix_mmio_write32(void *p,uint32_t v){writes++;reg_set((uintptr_t)p,v);}
-static uint64_t clock_us(void){return elapsed;}
-static void delay(uint32_t us){elapsed+=us;}
-static void barrier(void){}
-static void cache_sync(void *p,size_t n,int to_device){assert(p&&n&&to_device>=0&&to_device<=1);sync_calls++;}
-#include "../../kernel/c/brcm_m1.c"
+uint8_t vinix_mmio_read8(void *p){reads++;return (uint8_t)(reg_get((uintptr_t)p&~3ull)>>(((uintptr_t)p&3)*8));}
+uint16_t vinix_mmio_read16(void *p){reads++;return (uint16_t)(reg_get((uintptr_t)p&~3ull)>>(((uintptr_t)p&2)*8));}
+uint32_t vinix_mmio_read32(void *p){reads++;uint64_t a=(uintptr_t)p;uint32_t v=reg_get(a);if(a==timeout_register)return v|4;if(probe_bar&&a==probe_bar&&v==UINT32_MAX)return (uint32_t)(~(probe_size-1))|4;if(probe_bar2&&a==probe_bar2&&v==UINT32_MAX)return (uint32_t)(~(probe_size2-1))|4;return v;}
+void vinix_mmio_write8(void *p,uint8_t v){writes++;uint64_t a=(uintptr_t)p;unsigned sh=(a&3)*8;reg_set(a&~3ull,(reg_get(a&~3ull)&~(255u<<sh))|((uint32_t)v<<sh));}
+void vinix_mmio_write16(void *p,uint16_t v){writes++;uint64_t a=(uintptr_t)p;unsigned sh=(a&2)*8;reg_set(a&~3ull,(reg_get(a&~3ull)&~(65535u<<sh))|((uint32_t)v<<sh));}
+void vinix_mmio_write32(void *p,uint32_t v){writes++;reg_set((uintptr_t)p,v);}
+uint64_t vinix_m1_test_clock_us(void){return elapsed;}
+void vinix_m1_test_delay(uint32_t us){elapsed+=us;}
+void vinix_m1_test_barrier(void){}
+void vinix_m1_test_cache_sync(void *p,size_t n,int to_device){assert(p&&n&&to_device>=0&&to_device<=1);sync_calls++;}
+#include "platform_fixture.h"
 
 static uint8_t seed[256],cal[4]={1,2,3,4};
 static struct bw_m1_plan plan(void){

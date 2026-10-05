@@ -7,6 +7,11 @@
 #define VINIX_BRCM_WIFI_H
 #include <stddef.h>
 #include <stdint.h>
+#ifdef VINIX_V_RUNTIME
+#define BW_CONST
+#else
+#define BW_CONST const
+#endif
 
 #define BW_POOL_MIN (4u * 1024u * 1024u)
 #define BW_MAX_FRAME 1514u
@@ -26,7 +31,14 @@ enum bw_error { BW_OK = 0, BW_EINVAL = -1, BW_ENOSPC = -2, BW_EIO = -3,
     BW_ETIME = -4, BW_EPROTO = -5, BW_ENOTSUP = -6, BW_ENOLINK = -7 };
 
 struct bw_ops {
+#ifdef VINIX_V_RUNTIME
+    union {
+        uint32_t (*read)(void *, unsigned, uint32_t, unsigned);
+        uint32_t (*v_read)(void *, unsigned, uint32_t, unsigned);
+    };
+#else
     uint32_t (*read)(void *, unsigned space, uint32_t offset, unsigned width);
+#endif
     void (*write)(void *, unsigned space, uint32_t offset, unsigned width, uint32_t value);
     uint64_t (*time_us)(void *);
     void (*delay_us)(void *, uint32_t);
@@ -38,20 +50,33 @@ struct bw_ops {
     /* Must disable PCI bus mastering and drain/quiesce before return.
      * The driver NEVER frees or reuses the DMA pool after a fatal error. */
     void (*stop_dma)(void *);
-    void (*receive)(void *, const uint8_t *ethernet, size_t length);
+    void (*receive)(void *, BW_CONST uint8_t *ethernet, size_t length);
 };
 struct bw_core { uint32_t base, wrap; uint16_t id; uint8_t rev; };
 struct bw_mem { uint8_t *cpu; uint64_t dma; size_t len; };
 struct bw_ring {
     struct bw_mem mem;
     uint32_t wi, ri;
-    uint16_t count, item, read, write;
+    uint16_t count, item;
+#ifdef VINIX_V_RUNTIME
+    union { uint16_t read; uint16_t v_read; };
+#else
+    uint16_t read;
+#endif
+    uint16_t write;
     uint8_t dma_indices;
 };
 struct bw_packet { struct bw_mem mem; uint32_t token; uint8_t owner, kind; };
-struct bw_otp { char module[16], vendor[16], revision[16], silicon[16]; };
+struct bw_otp {
+#ifdef VINIX_V_RUNTIME
+    union { char module[16]; char module_[16]; };
+#else
+    char module[16];
+#endif
+    char vendor[16], revision[16], silicon[16];
+};
 struct bw_firmware {
-    const uint8_t *code, *nvram, *clm, *txcap, *calibration, *seed;
+    BW_CONST uint8_t *code, *nvram, *clm, *txcap, *calibration, *seed;
     size_t code_len, nvram_len, clm_len, txcap_len, calibration_len, seed_len;
     uint8_t silicon_revision;
     uint8_t mac[6];
@@ -67,7 +92,13 @@ struct bw_device {
     void *cookie;
     enum bw_state state;
     int error;
-    uint32_t regs_size, tcm_size, ram_base, ram_size, shared, flags, rx_offset;
+    uint32_t regs_size, tcm_size, ram_base, ram_size;
+#ifdef VINIX_V_RUNTIME
+    union { uint32_t shared; uint32_t shared_; };
+#else
+    uint32_t shared;
+#endif
+    uint32_t flags, rx_offset;
     uint32_t ring_info, h2d_mb, d2h_mb;
     uint16_t submission_count, completion_count, max_rx;
     uint8_t revision, pcie_revision, version, index_size, mb_via_ctl;
@@ -96,26 +127,30 @@ struct bw_device {
 
 /* Initialize software only. Pool must already be isolated by DART; bus master
  * remains disabled until platform code has established that isolation. */
-int bw_init(struct bw_device *, const struct bw_ops *, void *cookie,
+int bw_init(struct bw_device *, BW_CONST struct bw_ops *, void *cookie,
     void *pool_cpu, uint64_t pool_dma, size_t pool_len,
     uint32_t registers_size, uint32_t tcm_size);
 /* Probe only accesses the declared endpoint. Reads core inventory and OTP;
  * it does not upload firmware or turn on the radio. */
 int bw_probe(struct bw_device *);
-int bw_start(struct bw_device *, const struct bw_firmware *);
+int bw_start(struct bw_device *, BW_CONST struct bw_firmware *);
 int bw_radio(struct bw_device *, int enabled);
 int bw_scan(struct bw_device *);
 int bw_networks(struct bw_device *, uint8_t *output, size_t capacity);
-int bw_join_wpa2(struct bw_device *, const uint8_t *ssid, size_t ssid_len,
-    const uint8_t *passphrase, size_t passphrase_len);
+int bw_join_wpa2(struct bw_device *, BW_CONST uint8_t *ssid, size_t ssid_len,
+    BW_CONST uint8_t *passphrase, size_t passphrase_len);
 int bw_disconnect(struct bw_device *);
 int bw_poll(struct bw_device *, unsigned budget);
-int bw_transmit(struct bw_device *, const uint8_t *ethernet, size_t length);
+int bw_transmit(struct bw_device *, BW_CONST uint8_t *ethernet, size_t length);
 void bw_stop(struct bw_device *);
 
 /* Bounded, host-testable parsers. NVRAM input is board-specific text; output
  * includes double NUL, padding, and the Broadcom complement length token. */
-int bw_nvram_pack(const uint8_t *, size_t, uint8_t *, size_t, size_t *);
-int bw_otp_parse(const uint8_t *, size_t, struct bw_otp *);
+int bw_nvram_pack(BW_CONST uint8_t *, size_t, uint8_t *, size_t, size_t *);
+int bw_otp_parse(BW_CONST uint8_t *, size_t, struct bw_otp *);
+#ifdef VINIX_V_RUNTIME
+char *bw_state_name(int);
+#else
 const char *bw_state_name(enum bw_state);
+#endif
 #endif

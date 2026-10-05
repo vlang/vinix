@@ -3,6 +3,8 @@
 @[has_globals]
 module wifi
 
+import apple.wifi.m1core as _
+
 import aarch64.pmgr
 import crypto.sha256
 import devicetree
@@ -48,27 +50,27 @@ mut:
 	antenna         [16]u8
 }
 
-fn C.brcm_m1_prepare(plan &C.bw_m1_plan) int
+fn C.brcm_m1_prepare(plan &C.bw_m1_plan) i32
 
-fn C.brcm_m1_status(output &u8) int
+fn C.brcm_m1_status(output &u8) i32
 
-fn C.brcm_m1_upload(input &u8) int
+fn C.brcm_m1_upload(input &u8) i32
 
-fn C.brcm_m1_boot(input &u8) int
+fn C.brcm_m1_boot(input &u8) i32
 
-fn C.brcm_m1_join(input &u8) int
+fn C.brcm_m1_join(input &u8) i32
 
-fn C.brcm_m1_radio(input &u8) int
+fn C.brcm_m1_radio(input &u8) i32
 
-fn C.brcm_m1_scan() int
+fn C.brcm_m1_scan() i32
 
-fn C.brcm_m1_networks(output &u8) int
+fn C.brcm_m1_networks(output &u8) i32
 
-fn C.brcm_m1_poll() int
+fn C.brcm_m1_poll() i32
 
-fn C.brcm_m1_read(output &u8, capacity usize) int
+fn C.brcm_m1_read(output &u8, capacity usize) i32
 
-fn C.brcm_m1_write(input &u8, count usize) int
+fn C.brcm_m1_write(input &u8, count usize) i32
 
 fn C.brcm_m1_stop()
 
