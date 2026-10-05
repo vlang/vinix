@@ -147,6 +147,25 @@ fn vmap_alloc_guarded(count u64, stack bool) voidptr {
 	return voidptr(base)
 }
 
+// The independently owned geometry for a live allocation. A caller freeing
+// or reallocating its own block uses it to validate writable header metadata.
+fn vmap_allocation_pages(base u64) u64 {
+	if !vmap_contains(base) || base & (page_size - 1) != 0 {
+		return 0
+	}
+	first := (base - vmap_base) / page_size
+	vmap_lock.acquire()
+	defer { vmap_lock.release() }
+	if !lib.bittest(unsafe { &vmap_heads[0] }, first) {
+		return 0
+	}
+	mut guard := first + 1
+	for guard < vmap_slots && !lib.bittest(unsafe { &vmap_tails[0] }, guard) {
+		guard++
+	}
+	return if guard < vmap_slots { guard - first } else { u64(0) }
+}
+
 // Give back the allocation that starts at `base`, and say how many pages it
 // had: 0 when nothing was allocated there, as for a second free.
 fn vmap_free(base u64) u64 {
@@ -251,8 +270,7 @@ fn vmap_selftest() {
 	mapped := vmap_alloc(lib.div_roundup(size, page_size) + 1)
 	heap_test_require(mapped != unsafe { nil })
 	mut metadata := unsafe { &MallocMetadata(mapped) }
-	metadata.pages = lib.div_roundup(size, page_size)
-	metadata.size = size
+	update_big_metadata(mut metadata, lib.div_roundup(size, page_size), size)
 	adjust_big_alloc_pages(i64(metadata.pages + 1))
 	ptr := voidptr(u64(mapped) + page_size)
 	unsafe { C.memset(ptr, 0x5a, size) }

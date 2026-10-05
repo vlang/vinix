@@ -571,10 +571,32 @@ fn init_medium_slabs() {
 	}
 }
 
-struct MallocMetadata {
-mut:
-	pages u64
-	size  u64
+fn checked_big_metadata(ptr voidptr) ?&MallocMetadata {
+	address := u64(ptr)
+	base := address - page_size
+	mut backing_pages := u64(0)
+	if vmap_contains(address) {
+		// The out-of-line bitmap proves that the header page is still mapped;
+		// never dereference an unmapped vmap header after a repeated free.
+		backing_pages = vmap_allocation_pages(base)
+		if backing_pages == 0 {
+			lib.kpanic(unsafe { nil }, c'Heap: invalid big allocation')
+			return none
+		}
+	} else if address < higher_half + page_size
+		|| (base - higher_half) / page_size >= pmm_avl_page_count {
+		lib.kpanic(unsafe { nil }, c'Heap: invalid big allocation')
+		return none
+	}
+	metadata := unsafe { &MallocMetadata(base) }
+	if !big_metadata_valid(metadata)
+		|| (backing_pages != 0 && metadata.pages != backing_pages - 1)
+		|| (backing_pages == 0
+			&& metadata.pages >= pmm_avl_page_count - (base - higher_half) / page_size) {
+		lib.kpanic(unsafe { nil }, c'Heap: corrupt big allocation metadata')
+		return none
+	}
+	return metadata
 }
 
 @[export: 'free']
@@ -603,23 +625,18 @@ pub fn free(ptr voidptr) {
 }
 
 fn big_free(ptr voidptr) {
+	mut metadata := checked_big_metadata(ptr) or { return }
+	pages := metadata.pages + 1
+	base := u64(metadata)
+	// Snapshot accounting before either release path poisons/unmaps the header.
+	invalidate_big_metadata(mut metadata)
 	if vmap_contains(u64(ptr)) {
-		pages := vmap_free(u64(ptr) - page_size)
-		adjust_big_alloc_pages(-i64(pages))
+		released := vmap_free(base)
+		adjust_big_alloc_pages(-i64(released))
 		return
 	}
-
-	metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
-
-	// A metadata page that has already been freed reads as pmm_free()'s
-	// poison, so a second free of the same allocation finds an impossible page
-	// count here, which pmm_free() refuses. Something in the kernel does free
-	// one twice; keep it out of the count as well.
-	if metadata.pages == 0 || metadata.pages >= pmm_avl_page_count {
-		return
-	}
-	adjust_big_alloc_pages(-i64(metadata.pages + 1))
-	pmm_free(voidptr(u64(metadata) - higher_half), metadata.pages + 1)
+	adjust_big_alloc_pages(-i64(pages))
+	pmm_free(voidptr(base - higher_half), pages)
 }
 
 // Pages held by allocations too large for a slab class, their metadata pages
@@ -733,8 +750,7 @@ fn big_alloc_inner(size u64, panic_oom bool) voidptr {
 
 	mut metadata := unsafe { &MallocMetadata(base) }
 
-	metadata.pages = page_count
-	metadata.size = size
+	update_big_metadata(mut metadata, page_count, size)
 	adjust_big_alloc_pages(i64(page_count + 1))
 
 	return voidptr(base + page_size)
@@ -778,10 +794,10 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 	if new_size > (u64(-1) / page_size - 1) * page_size {
 		return unsafe { nil }
 	}
-	mut metadata := unsafe { &MallocMetadata(u64(ptr) - page_size) }
+	mut metadata := checked_big_metadata(ptr) or { return unsafe { nil } }
 
 	if lib.div_roundup(metadata.size, page_size) == lib.div_roundup(new_size, page_size) {
-		metadata.size = new_size
+		update_big_metadata(mut metadata, metadata.pages, new_size)
 		return ptr
 	}
 
