@@ -1,7 +1,8 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-based on `cfb51ac0c7d24600c7da6e73a00f889004fd9439` with the accompanying root
+for the V memory-runtime migration (parent `acd0e3cbd72f195dc123c2a324b4d43ce45fc261`),
+with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
 This is a snapshot; regenerate it when source files change.
@@ -10,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 549 | 6,274,038 | 27.43% |
-| Python | 334 | 3,864,329 | 16.90% |
-| Shell | 273 | 1,219,652 | 5.33% |
+| C | 548 | 6,272,413 | 27.42% |
+| Python | 334 | 3,864,329 | 16.89% |
+| Shell | 273 | 1,220,154 | 5.33% |
 
-All `.v` files are classified as V. The resulting V share is 37.61%, with no
+All `.v` files are classified as V. The resulting V share is 37.62%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -163,7 +164,6 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/locale.h` | 45 |
 | `kernel/c/lwipopts.h` | 3,094 |
 | `kernel/c/math.h` | 486 |
-| `kernel/c/memory.c` | 3,289 |
 | `kernel/c/net_random.c` | 10,077 |
 | `kernel/c/net_random.h` | 1,582 |
 | `kernel/c/pci_config.c` | 3,417 |
@@ -180,8 +180,8 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/stack_protector.h` | 223 |
 | `kernel/c/stack_slots.h` | 402 |
 | `kernel/c/stdio.h` | 501 |
-| `kernel/c/stdlib.h` | 1,090 |
-| `kernel/c/string.h` | 795 |
+| `kernel/c/stdlib.h` | 1,224 |
+| `kernel/c/string.h` | 1,136 |
 | `kernel/c/symbols.h` | 1,327 |
 | `kernel/c/sys/time.h` | 49 |
 | `kernel/c/sys/types.h` | 51 |
@@ -520,7 +520,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/memlock/test.c` | 21,658 |
 | `tests/memory-pressure/guest.c` | 4,490 |
 | `tests/memory/pagetable.c` | 7,152 |
-| `tests/memory/runtime.c` | 3,709 |
+| `tests/memory/runtime.c` | 4,898 |
 | `tests/mount-policy/test.c` | 27,539 |
 | `tests/mounted-disk-policy/guest.c` | 9,548 |
 | `tests/net-random/test.c` | 6,987 |
@@ -1144,7 +1144,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/mapped-writeback/run-host.sh` | 3,079 |
 | `tests/memlock/run.sh` | 2,073 |
 | `tests/memory-pressure/run.sh` | 3,124 |
-| `tests/memory/run-runtime.sh` | 1,356 |
+| `tests/memory/run-runtime.sh` | 1,858 |
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,094 |
