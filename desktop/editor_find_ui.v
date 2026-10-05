@@ -31,15 +31,16 @@ fn (a &TextEditorApp) build_edit_toolbar(mut children []ui2.Element) {
 }
 
 fn editor_find_field(action string, text []u8, x int, y int, width int, focused bool) ui2.Element {
+	mut label := frame_elements(1)
+	label << ui2.label('', editor_bytes_text(text), ui2.rect(5, 0, f64(width - 10), 28), ui2.TextStyle{
+		color: body_text
+		font_family: 'mono'
+		size: 13
+	})
 	return ui2.clickable_view(action, ui2.rect(f64(x), f64(y), f64(width), 28), ui2.BoxStyle{
 		bg:     if focused { editor_path_focus } else { body_panel }
 		radius: 5
-	}, frame_child(ui2.label('', editor_bytes_text(text), ui2.rect(5, 0, f64(width - 10), 28),
-		ui2.TextStyle{
-			color:       body_text
-			font_family: 'mono'
-			size:        13
-		})))
+	}, label)
 }
 
 fn (a &TextEditorApp) build_find_panel(mut children []ui2.Element, width int) {

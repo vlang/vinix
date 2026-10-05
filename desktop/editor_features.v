@@ -20,7 +20,9 @@ fn editor_history_push(mut history []EditorSnapshot, snapshot EditorSnapshot) {
 		}
 		unsafe { history.len-- }
 	}
-	history << snapshot
+	// Transfer this snapshot's owned bytes. Appending a named struct deep-
+	// clones its array under V3 and leaves the original snapshot allocated.
+	unsafe { history.push_many(&snapshot, 1) }
 }
 
 fn (a &TextEditorApp) snapshot() EditorSnapshot {
@@ -46,6 +48,7 @@ fn (mut a TextEditorApp) reset_history() {
 // A history entry owns its byte array. Undo and redo transfer that ownership
 // back into the document, and evicted entries release it explicitly.
 fn (mut a TextEditorApp) record_edit() {
+	a.cancel_editor_choice()
 	if !a.edit_group || !a.edit_recorded {
 		editor_history_clear(mut a.redo_history)
 		editor_history_push(mut a.undo_history, a.snapshot())
@@ -57,6 +60,7 @@ fn (mut a TextEditorApp) record_edit() {
 }
 
 fn (mut a TextEditorApp) restore_snapshot(snapshot EditorSnapshot) {
+	a.cancel_editor_choice()
 	unsafe { a.text.free() }
 	a.text = snapshot.text
 	a.cursor = snapshot.cursor
@@ -246,15 +250,29 @@ fn (mut a TextEditorApp) append_field_character(length int) {
 	mut field := match a.focus {
 		.path { &a.path }
 		.query { &a.query }
+		.save_as { &a.save_as_path }
 		else { &a.replacement }
 	}
 	unsafe { field.flags |= .noslices }
 	if field.len + length > editor_max_path { return }
+	if a.focus != .save_as { a.cancel_editor_choice() } else { a.discard_pending = false a.discard_close = false }
 	for index in 0 .. length { field << a.pending[index] }
 	if a.focus == .query { a.clear_match() }
 }
 
 fn (mut a TextEditorApp) field_key(ch u8) {
+	if a.focus == .save_as {
+		if ch == `\r` || ch == `\n` { a.create_save_as() return }
+		a.discard_pending = false
+		a.discard_close = false
+		if ch == 1 { a.save_as_path.clear() }
+		else if ch == 8 || ch == 127 {
+			if a.save_as_path.len > 0 { a.save_as_path.trim(editor_char_before(a.save_as_path, a.save_as_path.len)) }
+		} else if ch >= 0x20 && ch < 0x7f && a.save_as_path.len < editor_max_path {
+			editor_append(mut a.save_as_path, unsafe { tos(&ch, 1) })
+		}
+		return
+	}
 	if a.focus == .path {
 		a.edit_path(ch)
 		return
@@ -267,6 +285,7 @@ fn (mut a TextEditorApp) field_key(ch u8) {
 		a.focus = if a.focus == .query { EditorFocus.replacement } else { EditorFocus.query }
 		return
 	}
+	a.cancel_editor_choice()
 	mut field := if a.focus == .query { &a.query } else { &a.replacement }
 	unsafe { field.flags |= .noslices }
 	if ch == 8 || ch == 127 {
@@ -281,10 +300,12 @@ fn (mut a TextEditorApp) paste_field(text string) {
 	mut field := match a.focus {
 		.path { &a.path }
 		.query { &a.query }
+		.save_as { &a.save_as_path }
 		else { &a.replacement }
 	}
 	unsafe { field.flags |= .noslices }
 	if field.len + text.len > editor_max_path { return }
+	if a.focus != .save_as { a.cancel_editor_choice() } else { a.discard_pending = false a.discard_close = false }
 	for ch in text {
 		if ch >= 32 && ch != 127 { field << ch }
 	}
@@ -301,6 +322,10 @@ fn (mut a TextEditorApp) close_app() {
 		a.status.free()
 		a.query.free()
 		a.replacement.free()
+		a.default_path.free()
+		a.document_path.free()
+		a.pending_path.free()
+		a.save_as_path.free()
 	}
 	a = TextEditorApp{}
 }

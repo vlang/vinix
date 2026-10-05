@@ -54,6 +54,7 @@ enum EditorFocus {
 	path
 	query
 	replacement
+	save_as
 }
 
 struct EditorSnapshot {
@@ -89,6 +90,14 @@ mut:
 	find_open     bool
 	query         []u8
 	replacement   []u8
+	default_path  []u8
+	document_path []u8
+	pending_path  []u8
+	pending_action EditorPendingAction
+	discard_pending bool
+	discard_close bool
+	save_as_open bool
+	save_as_path []u8
 	match_start   int = -1
 	match_end     int = -1
 	// pending gathers a multibyte character until its last byte arrives. The
@@ -99,7 +108,12 @@ mut:
 
 fn open_editor(mut _ Desktop) !NativeApp {
 	mut app := &TextEditorApp{}
-	app.set_path(editor_default_path)
+	home := if desktop_user_home.len > 0 { desktop_user_home } else { desktop_home }
+	editor_append(mut app.default_path, home)
+	if app.default_path[app.default_path.len - 1] != `/` { editor_append(mut app.default_path, '/') }
+	editor_append(mut app.default_path, 'notes.txt')
+	editor_append(mut app.document_path, editor_bytes_text(app.default_path))
+	app.set_path(editor_bytes_text(app.default_path))
 	app.set_status('editor.status.new_document')
 	return app
 }
@@ -262,21 +276,24 @@ fn (mut a TextEditorApp) follow_language() {
 	}
 }
 
-fn (mut a TextEditorApp) new_document() {
+fn (mut a TextEditorApp) perform_new_document() {
 	a.reset_history()
 	a.text.clear()
 	a.cursor = 0
 	a.scroll = 0
 	a.modified = false
 	a.focus = .document
-	a.set_path(editor_default_path)
+	path := if a.default_path.len > 0 { editor_bytes_text(a.default_path) } else { editor_default_path }
+	a.set_path(path)
+	a.document_path.clear()
+	editor_append(mut a.document_path, path)
 	a.set_status('editor.status.new_document')
 }
 
-fn (mut a TextEditorApp) open_document() {
-	if a.path.len == 0 {
-		a.set_status('editor.status.enter_path')
-		return
+fn (mut a TextEditorApp) perform_open_document() bool {
+	if !editor_valid_save_path(editor_bytes_text(a.path)) {
+		a.set_status('editor.workflow.invalid_path')
+		return false
 	}
 	// Editable buffers may retain an older suffix after shortening. POSIX
 	// needs a NUL-terminated copy, rather than the frame's borrowed view.
@@ -284,15 +301,15 @@ fn (mut a TextEditorApp) open_document() {
 	defer { unsafe { path.free() } }
 	info := desktop_stat(path) or {
 		a.set_file_status('editor.status.cannot_open')
-		return
+		return false
 	}
 	if info.is_dir {
 		a.set_file_status('editor.status.is_directory')
-		return
+		return false
 	}
 	if info.size > editor_max_file_size {
 		a.set_status('editor.status.too_large')
-		return
+		return false
 	}
 
 	mut next := []u8{len: int(info.size)}
@@ -300,7 +317,7 @@ fn (mut a TextEditorApp) open_document() {
 	if got < 0 {
 		unsafe { next.free() }
 		a.set_file_status('editor.status.cannot_read')
-		return
+		return false
 	}
 	if got < i64(next.len) {
 		next.trim(int(got))
@@ -312,15 +329,20 @@ fn (mut a TextEditorApp) open_document() {
 	a.scroll = 0
 	a.modified = false
 	a.document_has_save = true
+	a.document_path.clear()
+	editor_append(mut a.document_path, path)
 	a.focus = .document
 	a.set_file_status('editor.status.opened')
 	record_recent_item('vinix-editor', path)
+	return true
 }
 
-fn (mut a TextEditorApp) save_document() {
-	if a.path.len == 0 {
-		a.set_status('editor.status.enter_path')
-		return
+fn (mut a TextEditorApp) save_document() bool {
+	a.discard_pending = false
+	a.discard_close = false
+	if !editor_valid_save_path(editor_bytes_text(a.path)) {
+		a.set_status('editor.workflow.invalid_path')
+		return false
 	}
 	path := editor_bytes_text(a.path).clone()
 	defer { unsafe { path.free() } }
@@ -330,13 +352,17 @@ fn (mut a TextEditorApp) save_document() {
 	}
 	if !desktop_write_file(path, data, u64(a.text.len)) {
 		a.set_file_status('editor.status.cannot_save')
-		return
+		return false
 	}
 	a.document_has_save = true
 	a.saved_revision = a.revision
 	a.modified = false
+	a.document_path.clear()
+	editor_append(mut a.document_path, path)
 	a.set_file_status('editor.status.saved')
 	record_recent_item('vinix-editor', path)
+	a.complete_editor_action()
+	return true
 }
 
 fn (a &TextEditorApp) line_start(position int) int {
@@ -478,6 +504,7 @@ fn (mut a TextEditorApp) type_pending() {
 }
 
 fn (mut a TextEditorApp) edit_path(ch u8) {
+	if ch != `\r` && ch != `\n` { a.cancel_editor_choice() }
 	unsafe { a.path.flags |= .noslices }
 	match ch {
 		8, 127 {
@@ -598,6 +625,10 @@ fn (mut a TextEditorApp) key_input(input string) {
 		}
 
 		if ch == 0x1b && (i + 1 >= input.len || input[i + 1] != `[`) {
+			if a.save_as_open || a.pending_action != .none_ {
+				a.cancel_editor_choice()
+				a.save_as_open = false
+			}
 			a.close_find()
 			i++
 			continue
@@ -716,7 +747,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	a.follow_language()
 	width := int(size.width)
 	height := int(size.height)
-	mut children := frame_elements(16)
+	mut children := frame_elements(48)
 
 	// Wide enough for the longest translation, Russian «Сохранить».
 	button_width := 68
@@ -724,23 +755,34 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	children << editor_toolbar_button(editor_action_open, tr('editor.open'), editor_padding + button_width + 6, button_width)
 	children << editor_toolbar_button(editor_action_save, tr('editor.save'), editor_padding + 2 * (button_width + 6), button_width)
 
-	path_x := editor_padding + 3 * (button_width + 6) + 4
+	children << editor_toolbar_button(editor_action_save_as, tr('editor.workflow.save_as'), 232, 112)
+	path_x := 350
 	path_width := if width - path_x - editor_padding > 40 {
 		width - path_x - editor_padding
 	} else {
 		40
 	}
-	children << ui2.clickable_view(editor_action_path, ui2.rect(f64(path_x), 8, f64(path_width), 28), ui2.BoxStyle{
-		bg: if a.focus == .path { editor_path_focus } else { body_panel }
-		radius: 5
-	}, frame_child(ui2.label('', editor_bytes_text(a.path), ui2.rect(0, 0, f64(path_width), 28), ui2.TextStyle{
+	mut path_label := frame_elements(1)
+	path_label << ui2.label('', editor_bytes_text(a.path), ui2.rect(0, 0, f64(path_width), 28), ui2.TextStyle{
 		color: body_text
 		font_family: 'mono'
 		size: 13
-	})))
+	})
+	children << ui2.clickable_view(editor_action_path, ui2.rect(f64(path_x), 8, f64(path_width), 28), ui2.BoxStyle{
+		bg: if a.focus == .path { editor_path_focus } else { body_panel }
+		radius: 5
+	}, path_label)
 	a.build_edit_toolbar(mut children)
-	document_top := editor_toolbar_height + if a.find_open { editor_find_height } else { 0 }
+	mut document_top := editor_toolbar_height + if a.find_open { editor_find_height } else { 0 }
 	if a.find_open { a.build_find_panel(mut children, width) }
+	if a.save_as_open {
+		a.build_save_as_panel(mut children, width, document_top)
+		document_top += editor_save_as_height
+	}
+	if a.pending_action != .none_ {
+		a.build_guard_panel(mut children, width, document_top)
+		document_top += editor_guard_height
+	}
 	children << ui2.view('', ui2.rect(0, f64(document_top - 1), f64(width), 1), ui2.BoxStyle{
 		bg: body_rule
 	}, [])
@@ -809,6 +851,14 @@ fn (mut a TextEditorApp) handle(event_id string) ! {
 		return
 	}
 	match event_id {
+		editor_action_save_as { a.begin_save_as() }
+		editor_action_save_as_path { a.focus = .save_as }
+		editor_action_save_as_create { a.create_save_as() }
+		editor_action_save_as_cancel { a.save_as_open = false a.focus = .document }
+		editor_action_guard_save { a.save_before_replacement() }
+		editor_action_keep_editing { a.cancel_editor_choice() a.save_as_open = false a.focus = .document }
+		editor_action_discard { if a.pending_action != .none_ && a.modified { a.discard_pending = true a.discard_close = false } }
+		editor_action_confirm_discard { a.confirm_editor_discard() }
 		editor_action_undo { a.undo_edit() }
 		editor_action_redo { a.redo_edit() }
 		editor_action_find {

@@ -56,6 +56,8 @@ fn test_editor_history_preserves_delete_cursor_and_invalidates_redo_after_edit()
 
 	// Navigation inside one read splits its two typing runs.
 	editor.new_document()
+	editor.handle(editor_action_discard)!
+	editor.handle(editor_action_confirm_discard)!
 	editor.key_input('one\x1b[Htwo')
 	assert editor.undo_history.len == 2
 	editor.undo_edit()
@@ -74,6 +76,8 @@ fn test_editor_paste_is_one_edit_and_document_limits_do_not_create_history() {
 	editor.redo_edit()
 	assert editor_bytes_text(editor.text) == 'one\ntwo\nтри'
 	editor.new_document()
+	editor.handle(editor_action_discard)!
+	editor.handle(editor_action_confirm_discard)!
 	editor.text = []u8{len: editor_max_file_size, init: `a`}
 	editor.cursor = editor.text.len
 	editor.key_input('bй')
@@ -125,6 +129,8 @@ fn test_editor_history_tracks_saved_state_and_open_new_clear_old_history() {
 	assert editor_bytes_text(editor.text) == 'saved edit'
 	editor.key_input('!')
 	editor.new_document()
+	editor.handle(editor_action_discard)!
+	editor.handle(editor_action_confirm_discard)!
 	assert editor.undo_history.len == 0 && editor.redo_history.len == 0
 	assert !editor.modified
 }
