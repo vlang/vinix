@@ -586,7 +586,7 @@ fn (this &ProcFSResource) contents() string {
 				// repeats with what is being measured.
 				cap := u64(256 * 1024)
 				buf := unsafe { &u8(memory.malloc(cap)) }
-				n := C.alloc_track_dump(buf, cap, 50)
+				n := C.alloc_track_dump(unsafe { &char(buf) }, cap, 50)
 				return unsafe { tos(buf, int(n)) }
 			}
 			return ''
@@ -1040,7 +1040,7 @@ fn heap_pages() u64 {
 // pages it holds, then the allocations too large for any class. A count that
 // only grows while processes come and go is a leak, and its size says where.
 fn C.alloc_track_start()
-fn C.alloc_track_dump(buf &u8, cap u64, min_count u64) u64
+fn C.alloc_track_dump(buf &char, cap u64, min_count u64) u64
 
 fn slabinfo_text() string {
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }

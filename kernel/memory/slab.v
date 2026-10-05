@@ -1,6 +1,8 @@
 @[has_globals; manualfree]
 module memory
 
+import alloctrack as _
+
 import katomic
 import klock
 import lib

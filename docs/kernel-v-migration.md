@@ -159,7 +159,7 @@ beyond the remaining kernel implementations; subsequent stages are in progress.
 
 | Stage | Native V location | Validation |
 | --- | --- | --- |
-| Console policy | `kernel/kprint/printf_policy*.v` | Complete: independent debug/production C ABI callers passed ASan/UBSan across 1,026 buffer lengths, chunk flushes, integer endpoints, embedded NUL, panic/assertion and serial-only benchmark output; no implicit allocator imports; both architecture builds and QEMU boot/syscall guests passed |
+| Console policy (`3a2c4ed6`) | `kernel/kprint/printf_policy*.v` | Complete: independent debug/production C ABI callers passed ASan/UBSan across 1,026 buffer lengths, chunk flushes, integer endpoints, embedded NUL, panic/assertion and serial-only benchmark output; no implicit allocator imports; both architecture builds and QEMU boot/syscall guests passed |
 
 The console entries retain native C variadic/`va_list` access and the unchanged
 nanoprintf dependency. V owns output selection, ordinary-print locking, the
@@ -167,3 +167,12 @@ nanoprintf dependency. V owns output selection, ordinary-print locking, the
 path remains unconditional and lock-free; each callback borrows its live stack
 context only during synchronous formatting. This lifetime was independently
 reviewed before committing. QEMU does not verify physical UART/terminal devices.
+
+| Allocation instrumentation | `kernel/alloctrack` | Complete: ASan/UBSan with 8,192 live records, deletion/replacement/restart and bounded output; no allocator imports; `ALLOC_TRACK=1` builds and native `/proc/allocsites` QEMU guests passed on both architectures |
+
+The tracker retains its fixed table sizes, hash/probe/deletion behavior, aggregate keys,
+acquire/release lock and nonblocking recording policy. A native frame-capture entry
+keeps the original call-chain origin; its compiler barrier prevents a tail call
+from retiring that frame during the synchronous V walk. Optimized x86 output
+retains the CR4 LA57 check. The tables allocate no heap objects, and the new
+frame lifetime received independent review.
