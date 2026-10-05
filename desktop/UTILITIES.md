@@ -149,7 +149,10 @@ unchanged HEAD `823aeb11` reproduced the same byte counts and allocation-size
 maps. The new utility heap checks retain zero bytes; the compositor failures
 remain separate follow-up work.
 
-The unchanged Quick Look PNG-preview host test also crashes with exit 139
-after its text-preview case passes; the same test and normal compiler flags
-reproduce this on `823aeb11`. The remaining utility checks, native IPC checks
-and AArch64 QEMU idle/apps/drag smoke scenarios pass.
+The Quick Look PNG-preview host test crashes with exit 139 under the default
+host C backend, both before and after these changes. With `-cc clang`, the
+backend used by the production cross-build, all four Quick Look cases pass
+on both `823aeb11` and the updated sources. The remaining utility checks,
+native IPC checks and AArch64 QEMU idle/apps/drag smoke scenarios pass. A
+second apps smoke run verifies the final published build and Calculator's
+font-compatible controls.
