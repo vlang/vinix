@@ -54,7 +54,10 @@ def main():
     kernel = args.kernel_dir.resolve() / 'bin/vinix'
     if args.arch == 'aarch64':
         environment.update(VINIX_KERNEL_DIR=str(args.kernel_dir.resolve()), VINIX_INITRAMFS=str(archive), VINIX_BOOT_DISK=str(state / 'boot.img'), VINIX_EFIVARS=str(state / 'efivars.fd'), VINIX_QEMU_HOST_SOURCE='0', VINIX_QEMU_AUDIO='off', VINIX_QEMU_NETWORK='0', VINIX_QEMU_PACKAGE_STORE=str(state / 'packages.tar'), VINIX_QEMU_EXTRA=f'-qmp unix:{state / "qmp.sock"},server=on,wait=off')
-        command = [str(runner_root / 'run-aarch64.sh'), '--no-build', '--serial', '--no-persist', '--mem=1024', f'--guest-init={rootfs / "sbin/init"}']
+        launcher = runner_root / 'scripts/run-aarch64.sh'
+        if not launcher.is_file():
+            launcher = runner_root / 'run-aarch64.sh'
+        command = [str(launcher), '--no-build', '--serial', '--no-persist', '--mem=1024', f'--guest-init={rootfs / "sbin/init"}']
     else:
         iso = state / 'test.iso'
         environment.update(VINIX_AMD64_KERNEL=str(kernel), VINIX_AMD64_INITRAMFS=str(archive), VINIX_AMD64_ISO=str(iso), VINIX_AMD64_ISO_BUILD_DIR=str(state / 'iso'))
