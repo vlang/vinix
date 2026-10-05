@@ -1,15 +1,15 @@
 # Desktop utility inventory and macOS feature gaps
 
-Original audit: 2026-10-05. Storage and productivity follow-ups: 2026-10-06.
+Original audit: 2026-10-05. Storage, productivity and tools follow-ups: 2026-10-06.
 This document records the original inventory, implemented utility work,
 and the remaining work.
 It does not claim complete macOS parity.
 
 The native utilities are Files, Activity Monitor, Settings, Text Editor,
 Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console,
-System Information, Archive Utility, Disk Utility, Backup, Notes, Reminders
-and Grapher. Both desktop image builders install their executable names as
-clients of the multicall desktop. Files Settings, Quick Look, Quick Launch
+System Information, Archive Utility, Disk Utility, Backup, Notes, Reminders,
+Grapher and Color Meter. Both desktop image builders install their executable
+names as clients of the multicall desktop. Files Settings, Quick Look, Quick Launch
 and the notification area are supporting surfaces rather than additional
 utility payloads.
 
@@ -25,7 +25,7 @@ Vinix engineering proposals based on the inspected code.
 | Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog | Persistent view preferences; per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states | Settings search; clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo | General selection/cut/copy, mouse caret/selection, Save As/file picker, unsaved-close/open confirmation, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
-| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, numeric paste validation, memory register, relative percentages, bounded result history with paging and recall | Scientific functions, programmer bases/bitwise operations, RPN, expression parsing, unit/currency conversion, selectable/copyable results, display precision/grouping and history persistence |
+| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square, trig/inverse trig, ln/log10/exp and pi/e, with domain/finite errors and scientific operation history | Further scientific controls (cube/nth-root, log2, hyperbolic/inverse-hyperbolic, random and EE entry); programmer bases/bitwise operations, RPN, expression parsing, unit/currency conversion, Math Notes integration, selectable/copyable results, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda | Duration/multiday events, day/week/year views, recurrence, search, reminders/notifications, multiple calendars, ICS import/export, CalDAV/accounts and invitations |
 | Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; countdown timer, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; multiple named timers; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
@@ -37,14 +37,16 @@ Vinix engineering proposals based on the inspected code.
 | Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and extraction with bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; selective extraction; encryption and larger archives |
 | Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
-| Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes, undo/recovery and close confirmation after failed saves; floating sticky windows |
+| Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and undo/recovery; floating sticky windows |
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
 | Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset and sampled CSV export using the existing native UI protocol | Multiple/implicit/parametric equations, 3D plots, saved graph documents, image/vector export, animations, integration/intersection tools and graph styling |
+| Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking and freeze, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, independent horizontal/vertical locking, image copy and host clipboard writing |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
 [TextEdit search/replace](https://support.apple.com/guide/textedit/find-and-replace-text-txtef6cfde1a/mac),
-[Calculator modes](https://support.apple.com/guide/calculator/choose-the-right-mode-calc22d50970/mac),
+[Calculator modes](https://support.apple.com/guide/calculator/choose-the-right-mode-calc22d50970/mac)
+and [scientific controls](https://support.apple.com/guide/calculator/use-the-scientific-calculator-calcf964141e/mac),
 [Calendar events](https://support.apple.com/en-gb/guide/calendar/icalwr13-events/mac)
 and [calendar interchange](https://support.apple.com/guide/calendar/import-or-export-calendars-icl1023/27.0/mac/27),
 [Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac),
@@ -56,8 +58,9 @@ and [System Information reports](https://support.apple.com/guide/system-informat
 [Disk Utility devices and volumes](https://support.apple.com/en-ca/guide/disk-utility/dskud6b39edb/mac)
 and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac),
 [Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac),
-[Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac)
-and [Grapher](https://support.apple.com/guide/grapher/welcome/mac).
+[Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac),
+[Grapher](https://support.apple.com/guide/grapher/welcome/mac)
+and [Digital Color Meter](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac).
 
 ### Hosted and installable applications
 
@@ -76,27 +79,26 @@ their third-party application internals are outside the native-utility changes.
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the nineteen native utilities account for the complete
-40-entry application catalog. Vim and shell tools installed in the userland
+These 21 entries plus the twenty native utilities account for the complete
+41-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
-The Start menu's All Programs pane still squeezes the full catalog into its
-preferred height. Pagination or scrolling remains launcher work; program
-search covers all catalog entries.
+The Start menu's All Programs and search results use readable 34-pixel rows
+with Previous/Next page controls and PageUp/PageDown navigation. Search covers
+all catalog entries; Enter launches the first result on the visible page.
 
 ## Missing utility applications to implement
 
 The macOS names below identify the comparison. The milestones are proposed
 Vinix applications, with dependencies made explicit. Existing terminal tools,
 Disk Usage, Quick Look or a browser do not supply the corresponding complete
-desktop workflow. Fifteen utility applications remain below. Notes supplies
+desktop workflow. Fourteen utility applications remain below. Notes supplies
 the local note-taking milestone; independent floating Stickies windows remain
 a feature gap in that application.
 
 | Priority | Utility / macOS comparison | First useful milestone | Dependencies or boundary |
 | --- | --- | --- | --- |
 | P2 | Font Book | Preview installed fonts, inspect metadata and install/remove per-user fonts | Runtime font discovery/rendering; the desktop currently relies on baked coverage atlases. |
-| P2 | Digital Color Meter | Pick framebuffer colours, magnify the sample and copy RGB/hex values | Compositor sampling IPC and a guest clipboard copy service. |
 | P2 | Audio MIDI Setup | Output/input devices, formats, levels and test recording | Real audio-device enumeration and mixer/recording APIs; MIDI is a later dependency. |
 | P2 | Voice Memos | Record, play, trim and save local audio | Capture/playback devices and codecs. |
 | P2 | Passwords / Keychain Access | Local encrypted credential store, lock/unlock and export | Threat model, vetted cryptography and secure unlock/key storage; avoid a plaintext credential database. |
@@ -132,7 +134,14 @@ not proposed as general Vinix utility ports.
 - **Clock:** record laps while the stopwatch runs; use the Timer tab for a
   countdown. Expiry is visible in this app; there is no background alarm.
 - **Calculator:** use digits/operators/Enter and Backspace, memory buttons,
-  or click a recent result to recall it. History is bounded to 20 results.
+  or click a recent result to recall it. Select Scientific for unary functions
+  and pi/e; choose DEG or RAD for trig and inverse trig. Ctrl-S switches modes
+  and Ctrl-D switches angle units in Scientific mode. Functions transform the
+  displayed operand, including the right operand of a pending calculation.
+  A new digit replaces a scientific result; repeated equals repeats the last
+  binary operation. Domain errors and non-finite results are shown explicitly.
+  Scientific mode accepts a finite number pasted in exponent notation.
+  History is bounded to 20 results and includes function arguments/angle units.
 - **Terminal:** click Find, type an exact query, use the arrows or Enter to
   advance, and Escape to return keyboard input to the shell. Matches are
   physical output rows, including scrollback; Clear scrollback keeps the
@@ -183,10 +192,12 @@ not proposed as general Vinix utility ports.
   Ctrl-A selects the active field. Notes autosaves after a typing pause. A
   failed save keeps the draft in the open window and blocks note switching;
   export it before reopening after a conflict. Delete requires a second Delete
-  action, with Keep note to cancel. Export text creates a new file. Closing
-  tries one final save, but there is no recovery journal or close confirmation;
-  if that save fails, closing discards the draft. Export an unsaved draft
-  before closing.
+  action, with Keep note to cancel. Export text creates a new file. An ordinary
+  window close or desktop exit tries one final save; a failed save keeps Notes
+  open with its draft. Keep editing cancels the close request. Save again or
+  export the draft; to discard it, choose Discard draft, then Confirm discard,
+  and retry closing. Forced process termination bypasses this guard, and there
+  is no recovery journal.
   Storage is limited to 128 notes, 160-byte titles, 16 KiB bodies and a 1 MiB
   complete record. The user's home alias is resolved once and storage remains
   anchored to that directory; record and lock names refuse symbolic links.
@@ -207,12 +218,24 @@ not proposed as general Vinix utility ports.
   Expressions are limited to 256 bytes/operations, 32 parser levels and 16
   floor/ceil calls. Each plot uses 513 samples. Range magnitudes cannot exceed
   `1e12`, and each span must be at least `1e-9`.
+- **Color Meter:** choose Live to follow the pointer at 100 ms intervals, or
+  enter physical framebuffer X/Y coordinates and Sample (Enter). Freeze,
+  Space or Escape holds the current sample. The 9×9 magnifier marks the chosen
+  1×1, 3×3, 5×5 or 9×9 aperture; RGB channels average the valid pixels in that
+  aperture. The sampled pixels exclude the compositor's drawn cursor using
+  its saved backing pixels. Copy HEX (Ctrl-C) or Copy RGB freezes the sample
+  and copies text within the current guest session. Ctrl-V, Cmd-V or
+  Shift-Insert pastes this guest text into a supported focused field; use
+  Ctrl-Shift-V to request the host clipboard instead. The default window is
+  620×540, with full controls at a content size of at least 584×506. Samples
+  are displayed pixel values; colour-space/ICC conversion, image copy and
+  host clipboard writing remain unavailable.
 
 The image builders install `vinix-preview`, `vinix-console` and
 `vinix-system-information`, `vinix-archive`, `vinix-disk-utility` and
-`vinix-backup`, `vinix-notes`, `vinix-reminders` and `vinix-grapher` as native
-multicall clients. Existing guest images
-need the new executable names installed as well as the updated desktop
+`vinix-backup`, `vinix-notes`, `vinix-reminders`, `vinix-grapher` and
+`vinix-color-meter` as native multicall clients. Existing guest images need
+the new executable names installed as well as the updated desktop
 binary before the new menu entries can launch them.
 
 ## Validation
@@ -224,13 +247,15 @@ frontend with `-gc none -manualfree`. It is also called by
 Files, UTF-8 editing/terminal rendering and the application catalog. Run
 `desktop/tools/test-settings.sh` for preference/device and translation checks,
 and `desktop/tools/test-activity.sh` for process controls and resource lifetimes.
-`desktop/tools/test-new-utilities.sh` covers the nine new utility models,
+`desktop/tools/test-new-utilities.sh` covers the ten new utility models,
 catalog/search integration, translations/fonts, owned-memory cleanup and real
 native-process IPC. It uses Clang for the image decoder and heap checks.
 `tests/desktop-perf/run.py --scenarios=utilities` adds a guest startup/rendering
 scenario for Preview, Console and System Information; `--scenarios=storage`
 starts Archive Utility, Disk Utility and Backup; `--scenarios=productivity`
-starts Notes, Reminders and Grapher.
+starts Notes, Reminders and Grapher; `--scenarios=tools` starts Color Meter,
+Calculator and Notes. Each utility scenario requires the compositor and all
+three native clients, and installs its multicall aliases in older guest images.
 
 Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have

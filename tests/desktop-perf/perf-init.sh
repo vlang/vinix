@@ -152,12 +152,22 @@ run_case() {
 			ln -sf vinix-desktop "/usr/bin/$app"
 		done
 	fi
+	if [ "$scenario" = tools ]; then
+		for app in vinix-color-meter vinix-calculator vinix-notes; do
+			ln -sf vinix-desktop "/usr/bin/$app"
+		done
+	fi
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
 	sync
 	sleep 2
 	used_before=$("$perf/measure" used)
 	log=/tmp/desktop-$variant-$scenario-$round.log
 	case "$scenario" in
+		tools)
+			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
+				/usr/bin/vinix-desktop $DESKTOP_ARGS '--open=Color Meter' \
+					--open=Calculator --open=Notes >"$log" 2>&1 &
+			;;
 		productivity)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
 				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Notes \

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import queue
 import re
+import shlex
 import tempfile
 import threading
 import unittest
@@ -41,7 +42,7 @@ def case_lines(variant, scenario, round_number):
                 "per_second=62.5 cpu=0.10 us_per_wakeup=16" for via in ("nanosleep", "poll")]
     if scenario == "cache":
         return [f"PERF-CACHE {label} written_mb=32 used_mb=33 cached_kb=32768 slab_kb=1024"]
-    processes = 4 if scenario in ("utilities", "storage", "productivity") else 1
+    processes = 4 if scenario in ("utilities", "storage", "productivity", "tools") else 1
     return [f"PERF-RESULT {label} seconds=1.0 processes={processes} desktop_cpu=1.0 apps_cpu=0.0 "
             "total_cpu=1.0 desktop_mb=2.0 apps_mb=0.0 total_mb=2.0 system_used_mb=20.0 physical_mb=2.0"]
 
@@ -67,11 +68,11 @@ class VerdictTests(unittest.TestCase):
         result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
                                           scenarios, ["before", "after"], 2)
         self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 200)
-        self.assertEqual(sum("report" not in row for row in rows), 28)
+        self.assertEqual(len(rows), 204)
+        self.assertEqual(sum("report" not in row for row in rows), 32)
 
     def test_native_utility_scenarios_require_three_client_processes(self):
-        for scenario in ("utilities", "storage", "productivity"):
+        for scenario in ("utilities", "storage", "productivity", "tools"):
             for processes in (0, 1, 3):
                 with self.subTest(scenario=scenario, processes=processes):
                     line = case_lines("new", scenario, 1)[0].replace(
@@ -79,6 +80,16 @@ class VerdictTests(unittest.TestCase):
                     result, _, errors = self.verdict([line, runner.DONE.decode()], [scenario])
                     self.assertEqual(result, 1)
                     self.assertIn("invalid desktop metrics", errors)
+        shell = Path(__file__).with_name("perf-init.sh").read_text()
+        aliases = re.search(r'if \[ "\$scenario" = tools \]; then(.*?)\n\tfi',
+                            shell, re.S).group(1)
+        for executable in ("vinix-color-meter", "vinix-calculator", "vinix-notes"):
+            self.assertIn(executable, aliases)
+        self.assertIn('ln -sf vinix-desktop "/usr/bin/$app"', aliases)
+        launch = re.search(r'^\t\ttools\)\n(.*?)^\t\t\t;;', shell, re.M | re.S).group(1)
+        arguments = shlex.split(launch)
+        for title in ("Color Meter", "Calculator", "Notes"):
+            self.assertIn(f"--open={title}", arguments)
 
     def test_partial_ops_timeout_keeps_json_but_fails(self):
         lines = case_lines("new", "ops", 1)[:2]

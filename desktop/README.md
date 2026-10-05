@@ -14,6 +14,8 @@ exists, with an automatic fallback to the static software binary.
 
 The app-by-app comparison with macOS, implemented utility improvements and
 the proposed missing utility applications are in [UTILITIES.md](UTILITIES.md).
+The application catalog contains 41 entries: 20 native utilities and 21 hosted
+or installable integrations.
 
 What it does:
 
@@ -35,7 +37,8 @@ What it does:
 - resizing a normal window by dragging its lower-right corner
 - a **V Start button** and Windows 7-style two-column Start menu, with pinned
   and recently used programs, their recent items, Recent Items, All Programs,
-  type-to-search, system links and a session button
+  type-to-search, readable paged program/search rows, system links and a
+  session button
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu
   entries, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
@@ -47,6 +50,8 @@ What it does:
   refresh rates, diagnostic exports and per-user startup applications
 - a **text editor** for plain files, with an editable path, open/save controls,
   cursor navigation and keyboard shortcuts
+- a **Calculator** with Basic/Scientific modes, DEG/RAD functions, memory,
+  validated numeric paste and bounded calculation history
 - a **calendar** with month navigation, date selection and a jump back to today
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs
@@ -59,9 +64,12 @@ What it does:
 - **Archive Utility**, TAR browsing, creation and safe extraction with progress/cancel
 - **Disk Utility**, read-only block-device and mounted-volume inspection
 - **Backup**, versioned local folder copies and restore to a new folder
-- **Notes**, searchable local plain-text notes with autosave and text export
+- **Notes**, searchable local plain-text notes with autosave, text export and
+  close confirmation when a final save fails
 - **Reminders**, persistent local tasks with due dates, completion and filters
 - **Grapher**, bounded mathematical function plots with axes, ranges and CSV export
+- **Color Meter**, live screen-colour samples, aperture averages, a magnifier
+  and hex/RGB text copy to the guest session clipboard
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
@@ -116,6 +124,7 @@ typing any word with a q in it drop the user back to the console.
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
+    calculator_app.v  Basic/Scientific functions, memory and result history
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     preview_app*.v  the standalone image viewer and export model
     console_app*.v  bounded log snapshots, filtering and tail following
@@ -126,6 +135,9 @@ typing any word with a q in it drop the user back to the console.
     notes_app*.v  searchable local notes, autosave and text export
     reminders_app*.v  persistent tasks and local due-state display
     grapher_app*.v  bounded expression parsing, plotting and CSV samples
+    color_meter_app.v / color_meter_service.v  colour samples and guest text copy
+    native_close.v  save-aware window/session close requests
+    clipboard.v    guest text paste and asynchronous host clipboard requests
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
     taskbar_preview.v  thumbnails, the window picker, Aero Peek, Show Desktop
@@ -184,9 +196,11 @@ size, an app re-lays-out when its window is resized or maximised.
 Only the compositor opens the framebuffer, pointer and raw keyboard. All
 unrelated descriptors are closed before an app is exec'd, so the app processes
 are ordinary display clients rather than competing display owners. Closing a
-window asks its process to exit and reaps it; leaving the desktop closes every
-remaining client. Settings returns its synchronized preference state with each
-response, allowing theme, wallpaper and scale changes to cross the boundary
+window first asks whether the app can close, then exits and reaps its process.
+A failed final Notes save keeps the draft open until it is saved or explicitly
+discarded; ordinary desktop exit also checks every client before closing any.
+Settings returns its synchronized preference state with each response,
+allowing theme, wallpaper and scale changes to cross the boundary
 immediately.
 
 Vinix's own app names are relative symlinks to one static multicall executable.
@@ -230,11 +244,14 @@ QEMU tests.
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source
-constant, and leaves the model and methods unmodified. Vinix's hosted view uses
-V3's `$vml` expression, so the VML is parsed and lowered to direct Element
-constructors at compile time; no document parser or expression interpreter
-runs in the Calculator process. The compiled tree is reused between requests
-and only its display text changes.
+constant, and leaves the model and methods unmodified. Vinix's adapter adds
+memory, history and Scientific mode. The original VML remains compile-checked
+with V3's `$vml` expression. The runtime keypad uses bounded native Element
+constructors because current V3 VML child appends deep-clone intermediate
+trees without releasing them. Cached literal layouts are reused between
+requests and explicitly released on resize/mode changes; the frame borrows
+the model's display text. No document parser or expression interpreter runs
+in the Calculator process.
 
 The window manager uses reserved prefixes for its own action selectors,
 including `taskbar.`, `task.`, `win.`, `shortcut.`, and `start.`. Each rendered
@@ -364,6 +381,40 @@ full six-week Gregorian month. Its arrow buttons cross year boundaries, a day
 can be selected for a full date in the footer, and **Today** returns to the
 current month. The Clock expands the same local time into an across-the-room
 display and adds a start/stop/reset stopwatch with tenth-second updates.
+
+Calculator offers Basic and Scientific modes. Scientific adds square root,
+reciprocal, square, trig/inverse trig, ln/log10/exp and pi/e, with selectable
+DEG/RAD units, explicit domain/finite errors and 15-significant-digit results.
+Ctrl-S switches mode and Ctrl-D switches angle units in Scientific mode.
+Functions use the displayed operand, including a pending binary operation's
+right operand. Numeric paste accepts finite exponent notation in Scientific
+mode. Memory and repeated equals remain available; click a recent result to
+recall it from the bounded 20-entry history.
+
+Notes keeps local UTF-8 titles and plain-text bodies with search, debounced
+autosave and exclusive text export. If a final save fails, ordinary window
+closing or desktop exit keeps the draft open. Keep editing cancels that close
+request. Retry Save, export the draft, or choose Discard draft followed by
+Confirm discard and retry closing. Forced process termination bypasses the
+guard; Notes does not provide a recovery journal.
+
+Color Meter samples the presented desktop in physical framebuffer pixels.
+Live follows the pointer every 100 ms; Freeze, Space or Escape holds the
+sample. Enter X/Y coordinates and choose Sample (Enter) for a fixed location.
+Its 9×9 magnifier shows the selected 1×1, 3×3, 5×5 or 9×9 aperture, and the
+RGB value averages its valid pixels. Sampling uses the compositor's saved
+cursor backing so the cursor itself does not colour the sample. Copy HEX
+(Ctrl-C) or Copy RGB freezes and copies the value into the guest session
+clipboard. The default window is 620×540, with full controls at a content size
+of at least 584×506. ICC/colour-space conversion, image copy and host clipboard
+writing remain separate work; the macOS comparison is
+[Apple's Digital Color Meter guide](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac).
+
+The optional `tests/desktop-perf/run.py --scenarios=tools` QEMU scenario opens
+Color Meter, Calculator and Notes, installs their aliases in older images,
+and requires the compositor plus all three native clients. It checks startup
+and rendering; utility model/export/ownership tests are documented in
+[UTILITIES.md](UTILITIES.md#validation).
 
 Capture is another pure V/ui2 utility. A screenshot can be immediate or delayed
 by three or five seconds and is written as `/root/Screenshot-<timestamp>.png`.
@@ -694,11 +745,16 @@ installed, one command builds the aarch64 image and boots into the desktop:
     ./scripts/run-desktop-aarch64.sh
 
 Copy text on the host, click a text field in the guest, and press **Ctrl+V**
-(**Ctrl+Shift+V** also works in Terminal). On macOS, **Cmd+V** works while QEMU
-has grabbed input; Ctrl+V also works without the grab. Unicode, tabs and multiple
+(or **Ctrl+Shift+V** to explicitly request host text). On macOS, **Cmd+V**
+works while QEMU has grabbed input; Ctrl+V also works without the grab. Unicode, tabs and multiple
 lines are supported in Terminal, Text Editor and hosted X11 applications such
 as Firefox and Wine Notepad. Terminal honors bracketed paste when the shell or
 editor enables it. Pasted text bypasses the guest keyboard layout.
+
+After Color Meter copies a value, **Ctrl+V**, **Cmd+V** and **Shift+Insert**
+prefer the guest session clipboard. **Ctrl+Shift+V** always requests the host
+clipboard instead. Guest copies stay inside the current desktop session and
+do not write the host clipboard.
 
 The aarch64 launcher enables the host clipboard service by default. It reads
 the clipboard only when the guest requests a paste, over the existing loopback
