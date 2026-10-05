@@ -3,6 +3,11 @@
 #define VINIX_APPLE_ANS_H
 #include <stddef.h>
 #include <stdint.h>
+#ifdef VINIX_V_RUNTIME
+#define VINIX_ANS_CONST
+#else
+#define VINIX_ANS_CONST const
+#endif
 
 /* No format, discard or admin-passthrough API. Writes require a boot-selected
  * Linux-data GPT partition; whole namespaces remain read-only. V owns discovery, lifetime and serialization. DMA memory stays pinned
@@ -29,11 +34,11 @@ uint64_t vinix_ans_partition_blocks(unsigned index, unsigned partition);
 /* Exact byte read; supports unaligned/partial-sector reads using a private
  * DMA bounce buffer. The caller validates/clamps EOF before invoking this. */
 int vinix_ans_read(unsigned index, void *buffer, uint64_t offset, size_t count);
-int vinix_ans_boot_flags(const char *, size_t);
-int vinix_ans_apply_policy(const char *, size_t);
+int vinix_ans_boot_flags(VINIX_ANS_CONST char *, size_t);
+int vinix_ans_apply_policy(VINIX_ANS_CONST char *, size_t);
 int vinix_ans_partition_writable(unsigned, unsigned);
 int vinix_ans_partition_uuid(unsigned, unsigned, char *, size_t);
-int vinix_ans_write(unsigned ns, unsigned partition, const void *, uint64_t, size_t);
+int vinix_ans_write(unsigned ns, unsigned partition, VINIX_ANS_CONST void *, uint64_t, size_t);
 int vinix_ans_flush(void);
 int vinix_ans_shutdown(void);
 int vinix_ans_root_ns(void);
@@ -63,5 +68,6 @@ int vinix_ans_error(void);
 unsigned vinix_ans_stage(void);
 uint16_t vinix_ans_completion_status(void);
 /* Length-bounded, whitespace-tokenized boot opt-in (not a substring match). */
-int vinix_ans_requested(const char *cmdline, size_t length);
+int vinix_ans_requested(VINIX_ANS_CONST char *cmdline, size_t length);
+#undef VINIX_ANS_CONST
 #endif

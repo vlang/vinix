@@ -4,6 +4,7 @@
 module ans
 
 import apple.ans.ext2core as _
+import apple.ans.anscore as _
 
 import resource
 import fs
@@ -18,30 +19,30 @@ import usercopy
 
 #include "apple_ans.h"
 
-fn C.vinix_ans_requested(cmdline &char, length u64) int
-fn C.vinix_ans_boot_flags(cmdline &char, length u64) int
-fn C.vinix_ans_apply_policy(cmdline &char, length u64) int
-fn C.vinix_ans_partition_writable(index u32, partition u32) int
-fn C.vinix_ans_partition_uuid(index u32, partition u32, out &char, capacity u64) int
-fn C.vinix_ans_write(index u32, partition u32, buffer voidptr, offset u64, count u64) int
-fn C.vinix_ans_flush() int
-fn C.vinix_ans_data_close() int
-fn C.vinix_ans_shutdown() int
-fn C.vinix_ans_root_ns() int
-fn C.vinix_ans_root_part() int
-fn C.vinix_ans_init(nvme u64, asc u64, mailbox u64, sart u64, reset u64, dma voidptr, physical u64, bytes u64) int
-fn C.vinix_ans_namespace_count() int
+fn C.vinix_ans_requested(cmdline &char, length u64) i32
+fn C.vinix_ans_boot_flags(cmdline &char, length u64) i32
+fn C.vinix_ans_apply_policy(cmdline &char, length u64) i32
+fn C.vinix_ans_partition_writable(index u32, partition u32) i32
+fn C.vinix_ans_partition_uuid(index u32, partition u32, out &char, capacity u64) i32
+fn C.vinix_ans_write(index u32, partition u32, buffer voidptr, offset u64, count u64) i32
+fn C.vinix_ans_flush() i32
+fn C.vinix_ans_data_close() i32
+fn C.vinix_ans_shutdown() i32
+fn C.vinix_ans_root_ns() i32
+fn C.vinix_ans_root_part() i32
+fn C.vinix_ans_init(nvme u64, asc u64, mailbox u64, sart u64, reset u64, dma voidptr, physical u64, bytes u64) i32
+fn C.vinix_ans_namespace_count() i32
 fn C.vinix_ans_namespace_id(index u32) u32
 fn C.vinix_ans_sector_size(index u32) u32
 fn C.vinix_ans_sector_count(index u32) u64
-fn C.vinix_ans_partition_count(index u32) int
+fn C.vinix_ans_partition_count(index u32) i32
 fn C.vinix_ans_partition_number(index u32, partition u32) u32
 fn C.vinix_ans_partition_start(index u32, partition u32) u64
 fn C.vinix_ans_partition_blocks(index u32, partition u32) u64
-fn C.vinix_ans_read(index u32, buffer voidptr, offset u64, count u64) int
+fn C.vinix_ans_read(index u32, buffer voidptr, offset u64, count u64) i32
 fn C.vinix_ans_stage() u32
 fn C.vinix_ans_completion_status() u16
-fn C.vinix_ans_error() int
+fn C.vinix_ans_error() i32
 
 // The C driver's error codes (enum ANS_*), by name.
 fn error_name(code int) string {

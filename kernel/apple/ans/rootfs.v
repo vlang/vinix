@@ -13,13 +13,13 @@ import katomic
 import errno
 import event.eventstruct
 
-fn C.vinix_ans_root_open() int
+fn C.vinix_ans_root_open() i32
 
-fn C.vinix_ans_root_stat(inode u32, fields &u64) int
+fn C.vinix_ans_root_stat(inode u32, fields &u64) i32
 
 fn C.vinix_ans_root_read(inode u32, buffer voidptr, offset u64, count u64) i64
 
-fn C.vinix_ans_root_next(directory u32, offset &u64, inode &u32, name &char, capacity u64) int
+fn C.vinix_ans_root_next(directory u32, offset &u64, inode &u32, name &char, capacity u64) i32
 
 struct AnsRootFS {
 mut:

@@ -214,20 +214,19 @@ firmware crashes, MDTS, namespace validation and GPT fallback/integrity checks.
 There are 10,000 deterministic mutations each of namespace and GPT-header
 inputs. These are synthetic fixtures, not captures from a physical M1.
 
-Clang AddressSanitizer/UndefinedBehaviorSanitizer and optimized GCC test runs
-pass. Production C passes this freestanding compile with warnings as errors:
+The production controller, boot policy, GPT decoder and persistence/shutdown
+logic live in `kernel/apple/ans/anscore/core.v`; classic ext2 lives in
+`kernel/apple/ans/ext2core/core.v`. The public C ABI headers and independent
+C media models remain. `tests/apple-ans/run.sh` compiles the V implementations
+with the kernel's lifetime settings and runs both suites under ASan/UBSan,
+rejecting any allocator imports.
 
-```sh
-clang --target=aarch64-unknown-none -D__AARCH64__ -ffreestanding \
-  -mgeneral-regs-only -std=gnu99 -O2 -Wall -Wextra -Werror \
-  -c kernel/c/apple_ans.c -o /tmp/apple_ans_aarch64.o
-```
-
-Still required: full V/kernel compilation, DeviceTree integration, real reset/
-RTKit handoff, actual DMA/cache coherency, sustained read verification and
-failure/reboot behavior. Writable I/O, flush and orderly shutdown, filesystem
-integration and explicit root selection must be implemented and validated before
-claiming a persistent internal-SSD root filesystem.
+Both kernel architectures build and their QEMU boot/syscall guests pass.
+QEMU does not emulate Apple's ANS controller: real reset/RTKit handoff, DMA
+cache coherency, sustained SSD I/O and physical failure/reboot behavior still
+require testing on a base M1 machine. The host fixtures validate partition
+write authorization, flush/shutdown ordering and cold-open ext2 persistence;
+they do not establish that a physical SSD is safe to use.
 
 ## Protocol references and attribution
 

@@ -11,31 +11,31 @@ import katomic
 import errno
 import event.eventstruct
 
-fn C.vinix_ans_data_open() int
+fn C.vinix_ans_data_open() i32
 
-fn C.vinix_ans_data_begin() int
+fn C.vinix_ans_data_begin() i32
 
-fn C.vinix_ans_data_stat(inode u32, fields &u64) int
+fn C.vinix_ans_data_stat(inode u32, fields &u64) i32
 
 fn C.vinix_ans_data_read(inode u32, buffer voidptr, offset u64, count u64) i64
 
 fn C.vinix_ans_data_write(inode u32, buffer voidptr, offset u64, count u64) i64
 
-fn C.vinix_ans_data_truncate(inode u32, size u64) int
+fn C.vinix_ans_data_truncate(inode u32, size u64) i32
 
-fn C.vinix_ans_data_next(directory u32, offset &u64, inode &u32, name &char, capacity u64) int
+fn C.vinix_ans_data_next(directory u32, offset &u64, inode &u32, name &char, capacity u64) i32
 
-fn C.vinix_ans_data_create(parent u32, name &char, name_length u64, mode u32, inode &u32) int
+fn C.vinix_ans_data_create(parent u32, name &char, name_length u64, mode u32, inode &u32) i32
 
 fn C.vinix_ans_data_symlink(parent u32, name &char, name_length u64,
-	target &char, target_length u64, inode &u32) int
+	target &char, target_length u64, inode &u32) i32
 
-fn C.vinix_ans_data_link(parent u32, name &char, name_length u64, inode u32) int
+fn C.vinix_ans_data_link(parent u32, name &char, name_length u64, inode u32) i32
 
-fn C.vinix_ans_data_unlink(parent u32, name &char, name_length u64, directory int) int
+fn C.vinix_ans_data_unlink(parent u32, name &char, name_length u64, directory i32) i32
 
 fn C.vinix_ans_data_rename(old_parent u32, old_name &char, old_length u64,
-	new_parent u32, new_name &char, new_length u64, replace int) int
+	new_parent u32, new_name &char, new_length u64, replace i32) i32
 
 fn data_errno(code i64) {
 	value := if code < 0 { -code } else { code }

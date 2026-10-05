@@ -17,8 +17,7 @@
 #undef random32
 #undef t_mutation
 #undef main
-#define VINIX_ANS_TEST
-#include "../../kernel/c/apple_ans.c"
+#include "ans_fixture.h"
 
 #define F_NVME UINT64_C(0x100000)
 #define F_ASC UINT64_C(0x200000)
