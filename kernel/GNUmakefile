@@ -16,6 +16,7 @@ STACK_GUARD_TEST ?= 0
 # Opt-in until the complete i915 kernel API surface is implemented. The
 # imported Linux driver stays byte-for-byte upstream in third_party/.
 LINUXKPI ?= 0
+LINUXKPI_COBJ := $(patsubst c/%.c,obj/c/%.c.o,$(wildcard c/linuxkpi*.c))
 LINUXKPI_SOURCE_DIR ?= $(abspath ../third_party/linux-i915/linux-6.6.157)
 ifneq ($(LINUXKPI),0)
 ifneq ($(LINUXKPI),1)
@@ -267,7 +268,7 @@ ifeq ($(LINUXKPI),1)
     override CPPFLAGS += -DVINIX_LINUXKPI
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
-    obj/c/linuxkpi_v_primitives.c.o obj/c/linuxkpi.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_pci_config_test.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
+    $(LINUXKPI_COBJ): override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
 endif
 
 # ALLOC_TRACK=1 records the call chain of every live slab allocation, for
@@ -345,7 +346,7 @@ override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/as
 # Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
-obj/c/linuxkpi_v_primitives.c.o obj/c/linuxkpi.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_pci_config_test.c.o: $(V_CONFIG_STAMP)
+$(LINUXKPI_COBJ): $(V_CONFIG_STAMP)
 
 ifeq ($(LINUXKPI),1)
 .PHONY: linuxkpi-verify
@@ -353,7 +354,7 @@ linuxkpi-verify:
 	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
 all: linuxkpi-verify
 
-$(LINUXKPI_OBJ) obj/c/linuxkpi_v_primitives.c.o obj/c/linuxkpi.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_pci_config_test.c.o: | linuxkpi-verify
+$(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
 
 # The original SipHash translation unit expects Kbuild export declarations.
 obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h

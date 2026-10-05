@@ -17,6 +17,16 @@ symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
 assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
 print("LinuxKPI: V core has no implicit allocator imports")
 CHECK
+# Link production implementations/bindings and the preserved embedded fixtures.
+# Independent guest *_test.c fixtures are built only by the kernel.
+set --
+for source in "$repo"/kernel/c/linuxkpi*.c; do
+    case "$source" in
+        *_native_test.c) ;;
+        *_test.c) continue ;;
+    esac
+    set -- "$@" "$source"
+done
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
@@ -24,12 +34,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/compat.o" "$repo/kernel/c/linuxkpi_v_primitives.c" "$repo/kernel/c/linuxkpi.c" \
-    "$repo/kernel/c/linuxkpi_task.c" \
-    "$repo/kernel/c/linuxkpi_sync.c" "$repo/kernel/c/linuxkpi_time.c" \
-    "$repo/kernel/c/linuxkpi_timer.c" "$repo/kernel/c/linuxkpi_workqueue.c" \
-    "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_format.c" \
-    "$repo/kernel/c/linuxkpi_printk.c" "$repo/tests/linuxkpi/test.c" \
+    "$work/compat.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \

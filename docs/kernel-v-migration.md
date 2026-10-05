@@ -194,3 +194,14 @@ Real-ADT QEMU with the frozen ARM kernel stopped after scheduler bootstrap
 port. Both comparison guests idled at the same point; this check remains
 unverified. Its markers and assertions were unchanged, and physical Apple
 boot remains untested.
+
+LinuxKPI wait-bit and wound/wait stage moves 426 original C lines into
+`compatcore/{wait_bit,ww_mutex}.v`. Unchanged independent host callers passed
+ASan/UBSan, header and pinned upstream checks; both architecture builds passed.
+The ARM boot guest passed and the complete four-CPU x86 LinuxKPI guest passed
+all required markers, including exact free-page retirement equality. The
+fixed cache-line-aligned wait table, address/bit hashes, acquire tests, captured
+absolute deadlines and actual C callback identities remain intact. Every stack
+waiter is removed under its queue lock before returning; direct mutex handoff
+publishes its saved context and task without reading a detached waiter after
+wakeup. Both lifetime paths received independent review.
