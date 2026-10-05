@@ -336,3 +336,34 @@ for the registered guest user. The drag marker and screenshot confirm actual
 System-window movement. These five-second guest samples check startup and
 rendering; persistence/export correctness and owned-memory cleanup are the
 host assertions described above, not long-running guest performance results.
+
+### Tools follow-up validation (2026-10-06)
+
+The utility runner passes 195 behavior cases, 51 tracked-memory cases and the
+real multicall IPC fixture under V3/Clang with `-gc none -manualfree`.
+All measured repeated paths retain zero owned bytes after persistent frame
+capacities are warmed. Coverage includes physical/HiDPI screen samples,
+cursor backing, edge aperture averages, request/report validation, session
+clipboard copy/paste, every held shortcut fragment boundary, scientific
+functions and errors, Notes failed-save close/session refusal, confirmed
+discard, and all 41 application entries through readable Start-menu pages.
+The final held-coordinate correction passes 8 focused Color Meter behavior
+cases and 3 tracked-memory cases; live IPC also passes on that final source.
+
+The shared message readers, service-request interface wrapper, window
+reordering, fragmented clipboard parser and native keyboard dispatch were
+measured and traced through generated C before their ownership fixes were
+reviewed. Repeated requests, declining close/session checks, complete app
+init/resize/close cycles, and paste fragments now retain zero owned bytes.
+The latest 41-entry catalog also passes 53 Activity Monitor behavior cases and
+seven tracked-memory cases. Host clipboard/UTF-8 checks and all 22 Python
+runner cases pass.
+
+The final tools desktop (`d5145c46`) cross-builds as a static AArch64 ELF with
+Clang and passes QEMU `idle,apps,tools,drag` checks. Tools runs exactly four
+processes: the compositor, Color Meter, Calculator and Notes. Screenshots
+verify live framebuffer colour sampling, readable scientific controls and
+the Notes window; the drag screenshot confirms System-window movement.
+These five-second guest samples check startup and rendering. Persistence,
+clipboard behaviour and owned-memory cleanup are covered by the host and
+native-process IPC assertions above, rather than long-running guest samples.
