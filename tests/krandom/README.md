@@ -5,6 +5,10 @@ tests and SHA-256 known answers, every padding position, unaligned binary
 input, seed-sized buffers and input/output guard checks against V's separate
 standard-library implementation.
 
+Secret erasure uses a volatile byte field in V. The host tests also check
+every offset and length through 64 bytes, including empty and null requests,
+with guards on both sides of the erased range.
+
 The kernel uses the SHA-256 algorithm from
 [FIPS 180-4](https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf), with
 borrowed input/output and fixed local working arrays. Digest, padding and

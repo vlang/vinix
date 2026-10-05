@@ -7,8 +7,6 @@ import limine
 import klock
 import aarch64.cpu
 
-fn C.vinix_arm64_switch_granule(mair u64, root u64, tcr u64)
-
 // ARM64 output address mask for a 16 KiB granule: bits [47:14].
 pub const pte_flags_mask = u64(0x0000_FFFF_FFFF_C000)
 const kernel_pte_address_mask = u64(0x0000_FFFF_FFFF_F000)
@@ -909,5 +907,5 @@ pub fn vmm_activate_on_cpu() {
 	// The individual register helpers issue ISB after each write, which would
 	// interpret one table under the other granule. Publish the complete regime
 	// before a single context-synchronization barrier.
-	C.vinix_arm64_switch_granule(mair, u64(kernel_pagemap.top_level), tcr)
+	switch_granule(mair, u64(kernel_pagemap.top_level), tcr)
 }
