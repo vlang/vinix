@@ -234,3 +234,12 @@ cover completion markers, cancellation, conflicts, unsupported files, source
 changes, bounded versions and incomplete destinations. Image builders install
 all three new executable names; the optional storage scenario requires the
 compositor and all three native clients to be present.
+
+The committed storage desktop (`0dc43400`) cross-builds for AArch64 with Clang
+and passes QEMU `idle,apps,storage,drag` startup/rendering checks. Storage runs
+the compositor and three native clients; screenshots verify each new window
+and show the real `/dev/vda` block-device size. The drag control marker is
+received and its screenshot confirms that the System window moved. These
+five-second guest samples are smoke checks; the copy/extract/restore behavior
+and owned-memory assertions above are host checks, not long-running guest
+performance measurements.
