@@ -191,6 +191,7 @@ fn jump_task_text(title string) string {
 fn jump_list_has_recent(process_name string) bool {
 	return process_name == 'vinix-files' || process_name == 'vinix-editor'
 		|| process_name == 'vinix-preview' || process_name == 'vinix-console'
+		|| process_name == 'vinix-archive'
 }
 
 // user_folder_path returns an owned absolute path for a Jump List task: the

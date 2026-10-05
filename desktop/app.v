@@ -68,13 +68,15 @@ const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2',
 	'start.launch.14', 'start.launch.15', 'start.launch.16', 'start.launch.17', 'start.launch.18',
 	'start.launch.19', 'start.launch.20', 'start.launch.21', 'start.launch.22', 'start.launch.23',
 	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29', 'start.launch.30',
-	'start.launch.31', 'start.launch.32', 'start.launch.33']
+	'start.launch.31', 'start.launch.32', 'start.launch.33',
+	'start.launch.34', 'start.launch.35', 'start.launch.36']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
 	'shortcut.12', 'shortcut.13', 'shortcut.14', 'shortcut.15', 'shortcut.16', 'shortcut.17',
 	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21', 'shortcut.22', 'shortcut.23',
 	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30',
-	'shortcut.31', 'shortcut.32', 'shortcut.33']
+	'shortcut.31', 'shortcut.32', 'shortcut.33',
+	'shortcut.34', 'shortcut.35', 'shortcut.36']
 
 // available_apps is what the Start menu and wallpaper offer. The native
 // Calculator includes space below its ui2 keypad for memory and result history.
@@ -469,6 +471,38 @@ const available_apps = [
 		pointer: true
 		open: open_system_information
 	},
+	AppFactory{
+		title: 'Archive Utility'
+		icon: 'builtin:archive'
+		width: 800
+		height: 680
+		process_name: 'vinix-archive'
+		keyboard: true
+		polling: true
+		poll_interval_ms: 16
+		open: open_archive_app
+	},
+	AppFactory{
+		title: 'Disk Utility'
+		icon: 'builtin:disk_utility'
+		width: 780
+		height: 584
+		process_name: 'vinix-disk-utility'
+		keyboard: true
+		pointer: true
+		open: open_disk_utility
+	},
+	AppFactory{
+		title: 'Backup'
+		icon: 'builtin:backup'
+		width: 760
+		height: 560
+		process_name: 'vinix-backup'
+		keyboard: true
+		polling: true
+		poll_interval_ms: 30
+		open: open_backup_app
+	},
 ]
 
 fn files_settings_factory() AppFactory {
@@ -509,6 +543,9 @@ fn app_title_text(title string) string {
 		'Preview' { 'app.preview' }
 		'Console' { 'app.console' }
 		'System Information' { 'app.system_information' }
+		'Archive Utility' { 'app.archive' }
+		'Disk Utility' { 'app.disk_utility' }
+		'Backup' { 'app.backup' }
 		'Wine Calculator' { 'app.wine_calculator' }
 		'Wine Notepad' { 'app.wine_notepad' }
 		'Vinix in QEMU' { 'app.qemu' }

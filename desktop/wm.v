@@ -886,7 +886,8 @@ fn (mut d Desktop) poll_apps() {
 			// be drained whether or not anyone can see it — but recomposing
 			// the screen for a picture nobody is looking at is pure waste. A
 			// visible one only needs its own window repainted.
-			if app.poll() {
+			mut poller := PollingApp(app)
+			if poller.poll() {
 				d.damage_window(index)
 			}
 		}

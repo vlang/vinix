@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 34
+	assert available_apps.len == 37
 	assert available_apps[31].process_name == 'vinix-preview'
 	assert available_apps[31].keyboard && available_apps[31].pointer
 	assert available_apps[32].process_name == 'vinix-console'
@@ -609,6 +609,13 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[32].poll_interval_ms == 1000
 	assert available_apps[33].process_name == 'vinix-system-information'
 	assert available_apps[33].keyboard && available_apps[33].pointer
+	assert available_apps[34].process_name == 'vinix-archive'
+	assert available_apps[34].keyboard && available_apps[34].polling
+	assert available_apps[34].poll_interval_ms == 16
+	assert available_apps[35].process_name == 'vinix-disk-utility'
+	assert available_apps[35].keyboard && available_apps[35].pointer
+	assert available_apps[36].process_name == 'vinix-backup'
+	assert available_apps[36].keyboard && available_apps[36].polling
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -734,7 +741,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 34
+	assert available_apps.len == 37
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len

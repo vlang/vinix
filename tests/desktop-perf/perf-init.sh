@@ -142,12 +142,22 @@ run_case() {
 			ln -sf vinix-desktop "/usr/bin/$app"
 		done
 	fi
+	if [ "$scenario" = storage ]; then
+		for app in vinix-archive vinix-disk-utility vinix-backup; do
+			ln -sf vinix-desktop "/usr/bin/$app"
+		done
+	fi
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
 	sync
 	sleep 2
 	used_before=$("$perf/measure" used)
 	log=/tmp/desktop-$variant-$scenario-$round.log
 	case "$scenario" in
+		storage)
+			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
+				/usr/bin/vinix-desktop $DESKTOP_ARGS '--open=Archive Utility' \
+					'--open=Disk Utility' --open=Backup >"$log" 2>&1 &
+			;;
 		utilities)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
 				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Preview --open=Console \

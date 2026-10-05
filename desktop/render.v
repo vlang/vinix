@@ -1396,6 +1396,46 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		// Application and file icons. These are filled shapes rather than
 		// hairlines: they are read at a glance and at whatever size the
 		// element gives them, not aligned to the pixel grid like the chrome's.
+		'archive' {
+			body := w * 3 / 5
+			tall := h * 3 / 4
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0xc58b39)
+			zip_width := if w > 24 { 3 } else { 2 }
+			for row in 0 .. 5 {
+				d.canvas.fill_rect(cx - zip_width + (row % 2) * zip_width,
+					top + row * tall / 7, zip_width, if h > 24 { 3 } else { 1 }, 0xffe3a8)
+			}
+			d.canvas.stroke_round_rect(cx - zip_width, top + tall * 5 / 7,
+				zip_width * 2, tall / 6, 1, 0xffe3a8, 255)
+		}
+		'disk_utility' {
+			body := w * 4 / 5
+			tall := h * 2 / 3
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0x708395)
+			d.canvas.fill_circle(cx, cy - tall / 8, tall / 3, 0xc8d7e3)
+			d.canvas.fill_circle(cx, cy - tall / 8, if w > 24 { 3 } else { 1 }, 0x52677a)
+			d.canvas.draw_line(cx, cy - tall / 8, left + body * 4 / 5,
+				top + tall * 4 / 5, 0x354c60, if w > 24 { 3 } else { 1 })
+			d.canvas.fill_circle(left + body * 4 / 5, top + tall * 4 / 5,
+				if w > 24 { 2 } else { 1 }, 0x7cf0ab)
+		}
+		'backup' {
+			body := w * 4 / 5
+			tall := h * 2 / 3
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0x3c9b77)
+			radius := tall / 3
+			d.canvas.fill_circle(cx, cy, radius, 0xd7f5e6)
+			d.canvas.fill_circle(cx, cy, radius * 3 / 4, 0x3c9b77)
+			d.canvas.draw_line(cx, cy, cx, cy - radius / 2, 0xd7f5e6, if w > 24 { 2 } else { 1 })
+			d.canvas.draw_line(cx, cy, cx + radius / 2, cy, 0xd7f5e6, if w > 24 { 2 } else { 1 })
+			d.canvas.fill_rect(cx - radius - 1, cy, radius / 2 + 1, radius / 2 + 1, 0xd7f5e6)
+		}
 		'preview' {
 			body := w * 4 / 5
 			tall := h * 2 / 3

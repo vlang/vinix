@@ -2753,3 +2753,327 @@ Imagen original copiada.
 preview.status.exported
 Imagen PNG exportada.
 -----
+app.archive
+Utilidad de Archivos
+-----
+app.disk_utility
+Utilidad de Discos
+-----
+app.backup
+Copia de Seguridad
+-----
+backup.title
+Copia de seguridad
+-----
+backup.source
+Carpeta de origen
+-----
+backup.store
+Carpeta de copias
+-----
+backup.restore_path
+Nueva carpeta de restauración
+-----
+backup.start
+Crear copia
+-----
+backup.refresh
+Versiones
+-----
+backup.restore
+Restaurar
+-----
+backup.cancel
+Cancelar
+-----
+backup.previous
+Anterior
+-----
+backup.next
+Siguiente
+-----
+backup.ready
+Elija carpetas existentes de origen y copias.
+-----
+backup.running
+Copiando archivos…
+-----
+backup.complete
+Copia de seguridad completada.
+-----
+backup.restored
+Restauración completada.
+-----
+backup.cancelled
+Cancelado. Se conservó la carpeta incompleta.
+-----
+backup.invalid_path
+Introduzca una ruta absoluta sin componentes de puntos ni caracteres de control.
+-----
+backup.overlap
+Las carpetas de origen, copias y restauración no deben superponerse.
+-----
+backup.source_failed
+No se puede abrir de forma segura la carpeta de origen.
+-----
+backup.store_failed
+No se puede abrir de forma segura la carpeta de copias.
+-----
+backup.exists
+El destino de restauración ya existe.
+-----
+backup.copy_failed
+Falló la copia. Se conservó la carpeta incompleta.
+-----
+backup.special
+No se admiten enlaces ni archivos especiales. Se conservó la carpeta incompleta.
+-----
+backup.changed
+El origen cambió durante la copia. Se conservó la carpeta incompleta.
+-----
+backup.limit
+Se alcanzó el límite de profundidad, ruta o número de archivos.
+-----
+backup.no_versions
+No se encontraron copias completas.
+-----
+backup.select_version
+Seleccione una copia completa para restaurar.
+-----
+backup.versions
+Versiones completas
+-----
+backup.progress
+Archivos copiados / bytes copiados
+-----
+backup.hint
+Solo contenido de archivos. No se conservan permisos ni fechas.
+-----
+backup.version_limit
+Se muestran hasta 128 versiones.
+-----
+backup.manifest_failed
+No se pudo guardar el registro de finalización de la copia.
+-----
+backup.incomplete
+Tras cancelar o fallar se conserva una carpeta incompleta.
+-----
+disk_utility.devices
+Dispositivos
+-----
+disk_utility.volumes
+Volúmenes
+-----
+disk_utility.refresh
+Actualizar
+-----
+disk_utility.read_only
+Resumen de almacenamiento de solo lectura
+-----
+disk_utility.device
+Dispositivo
+-----
+disk_utility.kind
+Tipo
+-----
+disk_utility.block_device
+Dispositivo de bloques (disco o partición)
+-----
+disk_utility.size
+Tamaño
+-----
+disk_utility.mount
+Punto de montaje
+-----
+disk_utility.source
+Origen
+-----
+disk_utility.filesystem
+Sistema de archivos
+-----
+disk_utility.options
+Opciones de montaje
+-----
+disk_utility.total
+Capacidad
+-----
+disk_utility.used
+Usado
+-----
+disk_utility.available
+Disponible
+-----
+disk_utility.unavailable
+No disponible
+-----
+disk_utility.metadata_unavailable
+Este núcleo no publica la distribución de particiones ni el estado del disco.
+-----
+disk_utility.devices_unavailable
+Inventario de dispositivos no disponible
+-----
+disk_utility.devices_empty
+No se encontraron dispositivos de bloques
+-----
+disk_utility.mounts_unavailable
+Informe de montajes no disponible
+-----
+disk_utility.mounts_empty
+No se encontraron volúmenes montados
+-----
+disk_utility.previous
+Anterior
+-----
+disk_utility.next
+Siguiente
+-----
+disk_utility.limited
+Inventario limitado a 256 filas e informes acotados.
+-----
+disk_utility.destination
+Destino del informe
+-----
+disk_utility.export
+Exportar informe
+-----
+disk_utility.item
+{0}: {1}
+-----
+disk_utility.size_bytes
+Tamaño (bytes)
+-----
+disk_utility.total_bytes
+Capacidad (bytes)
+-----
+disk_utility.used_bytes
+Usado (bytes)
+-----
+disk_utility.available_bytes
+Disponible (bytes)
+-----
+disk_utility.report.invalid
+Introduzca una ruta absoluta de destino
+-----
+disk_utility.report.exists
+El destino ya existe
+-----
+disk_utility.report.saved
+Informe guardado
+-----
+disk_utility.report.failed
+No se pudo guardar el informe
+-----
+archive.subtitle
+Explorar, extraer y crear archivos TAR sin comprimir
+-----
+archive.path_label
+Archivo
+-----
+archive.destination_label
+Carpeta de extracción
+-----
+archive.source_label
+Origen
+-----
+archive.output_label
+TAR de salida
+-----
+archive.browse
+Explorar
+-----
+archive.extract
+Extraer
+-----
+archive.create
+Crear TAR
+-----
+archive.cancel
+Cancelar
+-----
+archive.up
+Página anterior
+-----
+archive.down
+Página siguiente
+-----
+archive.directory
+Carpeta
+-----
+archive.empty
+No hay entradas en el archivo
+-----
+archive.limits
+Solo TAR · máximo 64 MiB · 2.048 entradas · sin sobrescritura
+-----
+archive.hint
+Introduzca rutas absolutas. La extracción crea una carpeta nueva; se puede archivar un archivo o una carpeta.
+-----
+archive.loading
+Leyendo el archivo...
+-----
+archive.loaded
+Archivo validado. Elija una carpeta nueva de extracción.
+-----
+archive.extracting
+Extrayendo en la carpeta nueva...
+-----
+archive.extracted
+Archivo extraído.
+-----
+archive.creating
+Creando TAR...
+-----
+archive.created
+TAR creado.
+-----
+archive.cancelled
+Cancelado.
+-----
+archive.cancelled_partial
+Cancelado. Quedan archivos parciales en la carpeta nueva de extracción.
+-----
+archive.partial
+No se pudo abrir la carpeta nueva. Se conserva la carpeta vacía.
+-----
+archive.extract_failed
+Falló la extracción. Quedan archivos parciales en la carpeta nueva.
+-----
+archive.exists
+El destino ya existe. Elija una ruta nueva.
+-----
+archive.invalid_path
+Introduzca rutas absolutas sin enlaces simbólicos en los padres, componentes de puntos ni caracteres de control.
+-----
+archive.read_failed
+No se pudo leer el origen. No se admiten enlaces simbólicos.
+-----
+archive.not_regular
+El archivo TAR debe ser un archivo normal.
+-----
+archive.source_limit
+El origen supera el límite de 64 MiB.
+-----
+archive.entry_limit
+El origen supera 2.048 entradas o 32 niveles de carpetas.
+-----
+archive.name_limit
+Un nombre de entrada no cabe en los campos de nombres de TAR.
+-----
+archive.invalid_tar
+TAR inválido o truncado: cabecera, suma de control o bloques finales incompletos.
+-----
+archive.unsupported
+Solo se admite TAR sin comprimir. ZIP, gzip y los formatos TAR extendidos no están disponibles.
+-----
+archive.unsafe_entry
+Entrada insegura: no se admiten enlaces, archivos especiales, rutas de escape ni rutas en conflicto.
+-----
+archive.source_changed
+El origen cambió durante la creación. Se eliminó el TAR incompleto.
+-----
+archive.write_failed
+No se pudo escribir el destino. Compruebe la ruta y el espacio libre.
+-----
+archive.source_unstable
+El archivo cambió durante la lectura. Vuelva a explorarlo.
+-----

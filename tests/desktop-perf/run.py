@@ -12,6 +12,7 @@ Scenarios:
     idle     the default session (System window and Files), untouched
     apps     Files, Terminal, Clock, Activity Monitor and Calculator, untouched
     utilities Preview, Console and System Information, untouched (optional)
+    storage  Archive Utility, Disk Utility and Backup, untouched (optional)
     pointer  the default session while the pointer sweeps across the screen
     drag     the default session while the System window is dragged around
     wakeups  no desktop: a process sleeping 16 ms at a time, the frame pacing
@@ -54,7 +55,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ABS_MAX = 32767
-SCENARIOS = ("idle", "apps", "utilities", "pointer", "drag", "wakeups", "churn", "cache", "ops")
+SCENARIOS = ("idle", "apps", "utilities", "storage", "pointer", "drag", "wakeups", "churn", "cache", "ops")
 SHOT = re.compile(rb"PERF-SHOT variant=(\S+) scenario=(\S+) round=(\d+)")
 DRIVE = re.compile(rb"PERF-DRIVE (\S+) (\d+)")
 MEASUREMENT = re.compile(
@@ -112,9 +113,13 @@ def expected_measurements(variants: list[str], scenarios: list[str], rounds: int
 def valid_desktop_result(row: dict) -> bool:
     try:
         seconds = float(row["seconds"])
+        # These scenarios request three native clients. A compositor which
+        # silently failed to launch them must not pass its startup smoke run.
+        minimum_processes = 4 if row.get("scenario") in ("utilities", "storage") else 0
         return (all(math.isfinite(float(row[key])) for key in
                     (*DESKTOP_METRICS, "system_used_mb"))
-                and math.isfinite(seconds) and seconds > 0 and int(row["processes"]) >= 0)
+                and math.isfinite(seconds) and seconds > 0
+                and int(row["processes"]) >= minimum_processes)
     except (KeyError, ValueError, TypeError):
         return False
 

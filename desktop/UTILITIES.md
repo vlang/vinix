@@ -1,12 +1,12 @@
 # Desktop utility inventory and macOS feature gaps
 
-Audited against the sources in this repository on 2026-10-05. This document
+Original audit: 2026-10-05. Storage utility follow-up: 2026-10-06. This document
 records the original inventory, implemented utility work, and the remaining work.
 It does not claim complete macOS parity.
 
 The native utilities are Files, Activity Monitor, Settings, Text Editor,
-Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console
-and System Information. Both desktop
+Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console,
+System Information, Archive Utility, Disk Utility and Backup. Both desktop
 image builders install their executable names as clients of the multicall
 desktop. Files Settings, Quick Look, Quick Launch and the notification area are
 supporting surfaces rather than additional utility payloads.
@@ -32,6 +32,9 @@ Vinix engineering proposals based on the inspected code.
 | Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, PNG export and original-file copying without overwriting | PDF rendering and page navigation; annotations, selections/cropping, EXIF orientation, colour profiles/adjustments, metadata, additional formats, printing and a file picker |
 | Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
 | System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; refresh, paging and text export without overwriting | Broader device/driver APIs, searchable structured properties and remote reports; unavailable sources are labelled explicitly |
+| Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and extraction with bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; selective extraction; encryption and larger archives |
+| Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
+| Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
@@ -43,7 +46,10 @@ and [calendar interchange](https://support.apple.com/guide/calendar/import-or-ex
 [screenshot targets](https://support.apple.com/en-ie/102646),
 [Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
 [Console log messages](https://support.apple.com/guide/console/log-messages-cnsl1012/mac)
-and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac).
+and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac),
+[archive compression/extraction](https://support.apple.com/en-lk/guide/mac-help/mchlp2528/mac),
+[Disk Utility devices and volumes](https://support.apple.com/en-ca/guide/disk-utility/dskud6b39edb/mac)
+and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac).
 
 ### Hosted and installable applications
 
@@ -62,8 +68,8 @@ their third-party application internals are outside the native-utility changes.
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the thirteen native utilities account for the complete
-34-entry application catalog. Vim and shell tools installed in the userland
+These 21 entries plus the sixteen native utilities account for the complete
+37-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
 ## Missing utility applications to implement
@@ -71,13 +77,12 @@ are terminal programs, not additional native desktop applications.
 The macOS names below identify the comparison. The milestones are proposed
 Vinix applications, with dependencies made explicit. Existing terminal tools,
 Disk Usage, Quick Look or a browser do not supply the corresponding complete
-desktop workflow.
+desktop workflow. Eighteen utility applications remain below. Notes/Stickies,
+Reminders and Grapher are the next milestones that can progress without new
+audio, device or credential services.
 
 | Priority | Utility / macOS comparison | First useful milestone | Dependencies or boundary |
 | --- | --- | --- | --- |
-| P1 | Archive Utility | Browse/extract/create common archives, progress/cancel and errors | Use available archive tools; reject path traversal and escaping links during extraction. |
-| P1 | Disk Utility | Read-only disks/partitions/mounts/capacity overview, then mount/unmount | Block/mount discovery and privilege mediation. Formatting, repair and partition editing need explicit destructive-operation UI and filesystem tools. |
-| P1 | Backup / Time Machine workflow | Versioned folder backup, browse versions and restore to a chosen destination | Durable destination handling, free-space limits and clear restore conflicts; system snapshots are later filesystem work. |
 | P2 | Notes / Stickies | Persistent searchable notes with autosave and export | A local document store; sharing, rich text and sync can follow. |
 | P2 | Reminders | Persistent tasks, due dates and completion | A notification/scheduling service is required for alerts when the app is closed. |
 | P2 | Font Book | Preview installed fonts, inspect metadata and install/remove per-user fonts | Runtime font discovery/rendering; the desktop currently relies on baked coverage atlases. |
@@ -144,10 +149,31 @@ not proposed as general Vinix utility ports.
   current system data. Enter a new export path to save the report. Data comes
   from Vinix's procfs, CPU topology, GPU reports, mount capacity and package
   databases; absent facilities are reported as unavailable.
+- **Archive Utility:** enter an uncompressed TAR path and Browse. Enter a new
+  Extract folder and Extract, or enter a regular-file/folder Source and new
+  Output TAR and Create TAR. Cancel removes an unfinished TAR output; an
+  unfinished extraction keeps its partial files and reports that state. TAR
+  snapshots are immutable after loading, bounded to 64 MiB and 2,048 entries.
+  Traversal, links, special entries and conflicting names are refused. ZIP,
+  gzip and extended TAR records remain unsupported.
+- **Disk Utility:** select Devices or Volumes, click a row or use arrow/page
+  keys to inspect it, and Refresh to read current metadata. Export report saves
+  both inventories to a new path. Device sizes come from block-node metadata;
+  capacity is reported only when filesystem counters are valid. Storage
+  inspection reads metadata; formatting and mount changes remain future work.
+- **Backup:** enter existing, separate Source folder and Backup folder paths,
+  then Back Up. Choose Versions to list completed copies, select a version and
+  enter a New restore folder before Restore. Each copy preserves the relative
+  folder/file layout and contents; it does not preserve all POSIX metadata or
+  provide an atomic filesystem snapshot. Links and special files are refused.
+  Cancel/failure keeps a visibly incomplete folder, never a completed version.
+  No existing restore destination is overwritten. Paths and every traversed
+  component refuse symbolic links.
 
 The image builders install `vinix-preview`, `vinix-console` and
-`vinix-system-information` as native multicall clients. Existing guest images
-need those new executable names installed as well as the updated desktop
+`vinix-system-information`, `vinix-archive`, `vinix-disk-utility` and
+`vinix-backup` as native multicall clients. Existing guest images
+need the new executable names installed as well as the updated desktop
 binary before the new menu entries can launch them.
 
 ## Validation
@@ -159,11 +185,12 @@ frontend with `-gc none -manualfree`. It is also called by
 Files, UTF-8 editing/terminal rendering and the application catalog. Run
 `desktop/tools/test-settings.sh` for preference/device and translation checks,
 and `desktop/tools/test-activity.sh` for process controls and resource lifetimes.
-`desktop/tools/test-new-utilities.sh` covers the three new utility models,
+`desktop/tools/test-new-utilities.sh` covers the six new utility models,
 catalog/search integration, translations/fonts, owned-memory cleanup and real
 native-process IPC. It uses Clang for the image decoder and heap checks.
 `tests/desktop-perf/run.py --scenarios=utilities` adds a guest startup/rendering
-scenario for Preview, Console and System Information.
+scenario for Preview, Console and System Information; `--scenarios=storage`
+starts Archive Utility, Disk Utility and Backup.
 
 Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have
@@ -173,8 +200,13 @@ The original compositor `memory_test.v` baseline with this compiler/ui2 found
 three failures: eight idle redraws retain 8,960 bytes, Start-menu redraws
 retain 10,206 bytes, and 100 idle polls retain 1,600 bytes. An isolated run of
 unchanged HEAD `823aeb11` reproduced the same byte counts and allocation-size
-maps. The new utility heap checks retain zero bytes; the compositor failures
-remain separate follow-up work.
+maps. The storage follow-up fixes the idle-poll interface wrappers, and the
+unchanged original idle-poll case now retains zero bytes. Child-process poll
+replies also leaked 16 bytes per ordinary poll and 132 bytes per paced poll;
+explicit interface receivers and a bounded reply buffer reduce both to zero.
+Five new dispatch cases check the real reply bytes and compositor damage for
+100/200 iterations, including minimized and closed windows. The two redraw
+baselines remain separate follow-up work.
 
 The Quick Look PNG-preview host test crashes with exit 139 under the default
 host C backend, both before and after these changes. With `-cc clang`, the
@@ -190,3 +222,15 @@ startup/rendering scenarios; an additional run verifies individual utility
 windows and actual window dragging. The utility scenario starts all three real
 native clients. PDF rendering, central log collection and broader hardware
 discovery remain the feature gaps listed above.
+
+The storage follow-up passes 132 combined behavioral cases and 22 tracked
+memory cases, with zero retained owned bytes. Real native-process IPC creates,
+validates and extracts a TAR; backs up, lists and restores a folder; exports a
+storage report through a shortened UTF-8 path; and verifies that a button starts
+polling immediately after a long idle hint. Archive security cases cover
+traversal, links, conflicting names, changed sources and byte/entry/depth bounds.
+Its recursive creation fixture keeps descriptor counts flat. Backup fixtures
+cover completion markers, cancellation, conflicts, unsupported files, source
+changes, bounded versions and incomplete destinations. Image builders install
+all three new executable names; the optional storage scenario requires the
+compositor and all three native clients to be present.

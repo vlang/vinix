@@ -60,6 +60,27 @@ fn remote_app_poll_due(interval u64, sampled bool, last_poll_ms u64, now_ms u64)
 	return now_ms - last_poll_ms >= interval
 }
 
+// The native child's poll reply is independent of the pipe transport, so the
+// actual dispatch and wire bytes can also be measured without an IPC fixture.
+fn native_app_poll_reply(mut app NativeApp) []u8 {
+	mut changed := false
+	if mut app is PollingApp {
+		mut poller := PollingApp(app)
+		changed = poller.poll()
+	}
+	// The owned reply has at most five bytes. Preallocate it so appending the
+	// cadence never leaves earlier buffers behind under -manualfree.
+	mut poll_payload := []u8{cap: 5}
+	unsafe { poll_payload.flags |= .noslices }
+	poll_payload << u8(if changed { 1 } else { 0 })
+	// Standalone applications can keep their fixed cadence with one byte.
+	if mut app is PollPacedApp {
+		pacer := PollPacedApp(app)
+		wire_put_u32(mut poll_payload, u32(pacer.next_poll_ms()))
+	}
+	return poll_payload
+}
+
 enum AppCommand as u8 {
 	build = 1
 	handle
@@ -1035,14 +1056,7 @@ fn run_app_process(options AppProcessOptions) {
 				}
 			}
 			.poll {
-				changed := if mut app is PollingApp { app.poll() } else { false }
-				mut poll_payload := [u8(if changed { 1 } else { 0 })]
-				// The reply's optional second field: how long until the next poll
-				// is worth making. A one-byte reply, which standalone applications
-				// send, keeps the application's fixed cadence.
-				if mut app is PollPacedApp {
-					wire_put_u32(mut poll_payload, u32(app.next_poll_ms()))
-				}
+				poll_payload := native_app_poll_reply(mut app)
 				sent := send_app_response(options.response_fd, true, app_current_state(desktop),
 					poll_payload)
 				unsafe { poll_payload.free() }
@@ -1338,6 +1352,9 @@ fn (mut a RemoteApp) handle(event_id string) ! {
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
+	// A button can start asynchronous work after a long idle interval. Check
+	// for its first result on the next compositor pass, as keyboard/paste do.
+	if a.polling { a.poll_sampled = false }
 }
 
 fn (mut a RemoteApp) key_input(text string) {

@@ -322,6 +322,7 @@ fn main() {
 	}
 	close_remote(mut terminal)
 	check_new_utility_clients(mut desktop)
+	check_storage_utility_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -402,4 +403,116 @@ fn check_new_utility_clients(mut desktop Desktop) {
 		image_path.free(); image_export.free(); image.free(); preview_open.free(); exported_image.free()
 		log_path.free(); log_export.free(); console_open.free(); log_text.free(); report_path.free(); report.free()
 	}
+}
+
+fn storage_remote_field(mut app NativeApp, action string, text string) {
+	app.handle(action) or { panic(err) }
+	if mut app is RemoteApp {
+		app.key_input('\x01')
+		app.paste_input(text)
+	}
+}
+
+fn storage_remote_wait(mut app NativeApp, size ui2.Rect, text string) {
+	for _ in 0 .. 500 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(size) or { panic(err) }
+		ready := tree_contains_text(tree, text)
+		free_tree(tree)
+		if ready { return }
+		desktop_sleep_ms(10)
+	}
+	tree := app.build(size) or { panic(err) }
+	panic('Storage utility did not finish: ${tree_text_dump(tree)}')
+}
+
+// Exercise real child-process copies and exports, including paths shortened
+// through native keyboard/paste IPC. Descriptor walks intentionally reject
+// symlink parents, so use the host's canonical temporary directory.
+fn check_storage_utility_clients(mut desktop Desktop) {
+	base := os.real_path(os.temp_dir())
+	root := join_path(base, 'vinix-storage-ipc-${os.getpid()}')
+	os.mkdir(root) or { panic(err) }
+	defer { os.rmdir_all(root) or {}; unsafe { base.free(); root.free() } }
+	source := join_path(root, 'source')
+	store := join_path(root, 'backups')
+	restored := join_path(root, 'restored')
+	archive_path := join_path(root, 'files.tar')
+	extracted := join_path(root, 'extracted')
+	note := join_path(source, 'note.txt')
+	restored_note := join_path(restored, 'note.txt')
+	extracted_source := join_path(extracted, 'source')
+	extracted_note := join_path(extracted_source, 'note.txt')
+	report_path := join_path(root, 'disk-Ж.txt')
+	long_report := report_path + '.long'
+	defer {
+		unsafe {
+			source.free(); store.free(); restored.free(); archive_path.free(); extracted.free()
+			note.free(); restored_note.free(); extracted_source.free(); extracted_note.free()
+			report_path.free(); long_report.free()
+		}
+	}
+	os.mkdir(source) or { panic(err) }
+	os.mkdir(store) or { panic(err) }
+	os.write_file(note, 'Native storage workflow 日本語\n') or { panic(err) }
+	archive_factory := app_factory_named('vinix-archive') or { panic('Archive Utility is not registered') }
+	mut archive := start_remote_app_at_with_timeout(arguments()[0], archive_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	storage_remote_field(mut archive, 'archive.source', source)
+	storage_remote_field(mut archive, 'archive.output', archive_path)
+	if mut archive is RemoteApp {
+		archive.poll_hint_ms = 2000
+		archive.poll_sampled = true
+		archive.last_poll_ms = desktop_monotonic_ms()
+	}
+	archive.handle('archive.create') or { panic(err) }
+	if mut archive is RemoteApp { assert !archive.poll_sampled }
+	storage_remote_wait(mut archive, ui2.rect(0, 0, 800, 656), 'TAR created.')
+	storage_remote_field(mut archive, 'archive.path', archive_path)
+	archive.handle('archive.browse') or { panic(err) }
+	storage_remote_wait(mut archive, ui2.rect(0, 0, 800, 656), 'Archive validated.')
+	storage_remote_field(mut archive, 'archive.destination', extracted)
+	archive.handle('archive.extract') or { panic(err) }
+	storage_remote_wait(mut archive, ui2.rect(0, 0, 800, 656), 'Archive extracted.')
+	close_remote(mut archive)
+	extracted_text := os.read_file(extracted_note) or { panic(err) }
+	assert extracted_text == 'Native storage workflow 日本語\n'
+	unsafe { extracted_text.free() }
+
+	backup_factory := app_factory_named('vinix-backup') or { panic('Backup is not registered') }
+	mut backup := start_remote_app_at_with_timeout(arguments()[0], backup_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	storage_remote_field(mut backup, 'backup.source', source)
+	storage_remote_field(mut backup, 'backup.store', store)
+	backup.handle('backup.start') or { panic(err) }
+	storage_remote_wait(mut backup, ui2.rect(0, 0, 760, 536), 'Backup completed.')
+	backup.handle('backup.refresh') or { panic(err) }
+	// The completed snapshot is the only version in this fresh store.
+	for _ in 0 .. 30 {
+		if mut backup is RemoteApp { backup.poll() }
+		desktop_sleep_ms(10)
+	}
+	backup.handle('backup.version.0') or { panic(err) }
+	storage_remote_field(mut backup, 'backup.restore_path', restored)
+	backup.handle('backup.restore') or { panic(err) }
+	storage_remote_wait(mut backup, ui2.rect(0, 0, 760, 536), 'Restore completed.')
+	close_remote(mut backup)
+	restored_text := os.read_file(restored_note) or { panic(err) }
+	assert restored_text == 'Native storage workflow 日本語\n'
+	unsafe { restored_text.free() }
+
+	disk_factory := app_factory_named('vinix-disk-utility') or { panic('Disk Utility is not registered') }
+	mut disk := start_remote_app_at_with_timeout(arguments()[0], disk_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	storage_remote_field(mut disk, 'disk_utility.path', long_report)
+	if mut disk is RemoteApp { disk.key_input('\x7f\x7f\x7f\x7f\x7f') }
+	disk.handle('disk_utility.export') or { panic(err) }
+	disk_tree := disk.build(ui2.rect(0, 0, 780, 560)) or { panic(err) }
+	assert tree_contains_text(disk_tree, 'Report saved'), 'Disk Utility export: ${tree_text_dump(disk_tree)}'
+	free_tree(disk_tree)
+	close_remote(mut disk)
+	assert !os.exists(long_report)
+	report := os.read_file(report_path) or { panic(err) }
+	assert report.contains('Disk Utility') && report.contains('Devices') && report.contains('Volumes')
+	unsafe { report.free() }
 }

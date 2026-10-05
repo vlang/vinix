@@ -41,7 +41,8 @@ def case_lines(variant, scenario, round_number):
                 "per_second=62.5 cpu=0.10 us_per_wakeup=16" for via in ("nanosleep", "poll")]
     if scenario == "cache":
         return [f"PERF-CACHE {label} written_mb=32 used_mb=33 cached_kb=32768 slab_kb=1024"]
-    return [f"PERF-RESULT {label} seconds=1.0 processes=1 desktop_cpu=1.0 apps_cpu=0.0 "
+    processes = 4 if scenario in ("utilities", "storage") else 1
+    return [f"PERF-RESULT {label} seconds=1.0 processes={processes} desktop_cpu=1.0 apps_cpu=0.0 "
             "total_cpu=1.0 desktop_mb=2.0 apps_mb=0.0 total_mb=2.0 system_used_mb=20.0 physical_mb=2.0"]
 
 
@@ -66,8 +67,18 @@ class VerdictTests(unittest.TestCase):
         result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
                                           scenarios, ["before", "after"], 2)
         self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 192)
-        self.assertEqual(sum("report" not in row for row in rows), 20)
+        self.assertEqual(len(rows), 196)
+        self.assertEqual(sum("report" not in row for row in rows), 24)
+
+    def test_native_utility_scenarios_require_three_client_processes(self):
+        for scenario in ("utilities", "storage"):
+            for processes in (0, 1, 3):
+                with self.subTest(scenario=scenario, processes=processes):
+                    line = case_lines("new", scenario, 1)[0].replace(
+                        "processes=4", f"processes={processes}")
+                    result, _, errors = self.verdict([line, runner.DONE.decode()], [scenario])
+                    self.assertEqual(result, 1)
+                    self.assertIn("invalid desktop metrics", errors)
 
     def test_partial_ops_timeout_keeps_json_but_fails(self):
         lines = case_lines("new", "ops", 1)[:2]

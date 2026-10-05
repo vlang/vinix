@@ -2753,3 +2753,327 @@ preview.status.copied
 preview.status.exported
 Изображение PNG экспортировано.
 -----
+app.archive
+Архиватор
+-----
+app.disk_utility
+Дисковая утилита
+-----
+app.backup
+Резервное копирование
+-----
+backup.title
+Резервное копирование
+-----
+backup.source
+Исходная папка
+-----
+backup.store
+Папка резервных копий
+-----
+backup.restore_path
+Новая папка восстановления
+-----
+backup.start
+Создать копию
+-----
+backup.refresh
+Версии
+-----
+backup.restore
+Восстановить
+-----
+backup.cancel
+Отмена
+-----
+backup.previous
+Назад
+-----
+backup.next
+Вперёд
+-----
+backup.ready
+Выберите существующие исходную папку и папку копий.
+-----
+backup.running
+Копирование файлов…
+-----
+backup.complete
+Резервная копия создана.
+-----
+backup.restored
+Восстановление завершено.
+-----
+backup.cancelled
+Отменено. Незавершённая папка сохранена.
+-----
+backup.invalid_path
+Введите абсолютный путь без компонентов с точками и управляющих символов.
+-----
+backup.overlap
+Исходная папка, папка копий и папка восстановления не должны пересекаться.
+-----
+backup.source_failed
+Не удалось безопасно открыть исходную папку.
+-----
+backup.store_failed
+Не удалось безопасно открыть папку резервных копий.
+-----
+backup.exists
+Папка восстановления уже существует.
+-----
+backup.copy_failed
+Ошибка копирования. Незавершённая папка сохранена.
+-----
+backup.special
+Ссылки и специальные файлы не поддерживаются. Незавершённая папка сохранена.
+-----
+backup.changed
+Источник изменился во время копирования. Незавершённая папка сохранена.
+-----
+backup.limit
+Достигнут предел глубины, длины пути или числа файлов.
+-----
+backup.no_versions
+Завершённые резервные копии не найдены.
+-----
+backup.select_version
+Выберите завершённую копию для восстановления.
+-----
+backup.versions
+Завершённые версии
+-----
+backup.progress
+Скопировано файлов / байтов
+-----
+backup.hint
+Только содержимое файлов. Права доступа и временные метки не сохраняются.
+-----
+backup.version_limit
+Показано не более 128 версий.
+-----
+backup.manifest_failed
+Не удалось сохранить запись о завершении копирования.
+-----
+backup.incomplete
+После отмены или ошибки сохраняется незавершённая папка.
+-----
+disk_utility.devices
+Устройства
+-----
+disk_utility.volumes
+Тома
+-----
+disk_utility.refresh
+Обновить
+-----
+disk_utility.read_only
+Обзор хранилищ без изменений
+-----
+disk_utility.device
+Устройство
+-----
+disk_utility.kind
+Тип
+-----
+disk_utility.block_device
+Блочное устройство (диск или раздел)
+-----
+disk_utility.size
+Размер
+-----
+disk_utility.mount
+Точка монтирования
+-----
+disk_utility.source
+Источник
+-----
+disk_utility.filesystem
+Файловая система
+-----
+disk_utility.options
+Параметры монтирования
+-----
+disk_utility.total
+Ёмкость
+-----
+disk_utility.used
+Занято
+-----
+disk_utility.available
+Доступно
+-----
+disk_utility.unavailable
+Недоступно
+-----
+disk_utility.metadata_unavailable
+Это ядро не публикует схему разделов и состояние диска.
+-----
+disk_utility.devices_unavailable
+Список устройств недоступен
+-----
+disk_utility.devices_empty
+Блочные устройства не обнаружены
+-----
+disk_utility.mounts_unavailable
+Список томов недоступен
+-----
+disk_utility.mounts_empty
+Смонтированные тома не обнаружены
+-----
+disk_utility.previous
+Назад
+-----
+disk_utility.next
+Вперёд
+-----
+disk_utility.limited
+Список ограничен 256 строками; размер отчётов ограничен.
+-----
+disk_utility.destination
+Путь отчёта
+-----
+disk_utility.export
+Сохранить отчёт
+-----
+disk_utility.item
+{0}: {1}
+-----
+disk_utility.size_bytes
+Размер (байты)
+-----
+disk_utility.total_bytes
+Ёмкость (байты)
+-----
+disk_utility.used_bytes
+Занято (байты)
+-----
+disk_utility.available_bytes
+Доступно (байты)
+-----
+disk_utility.report.invalid
+Введите абсолютный путь назначения
+-----
+disk_utility.report.exists
+Путь назначения уже существует
+-----
+disk_utility.report.saved
+Отчёт сохранён
+-----
+disk_utility.report.failed
+Не удалось сохранить отчёт
+-----
+archive.subtitle
+Просмотр, извлечение и создание несжатых архивов TAR
+-----
+archive.path_label
+Архив
+-----
+archive.destination_label
+Папка извлечения
+-----
+archive.source_label
+Источник
+-----
+archive.output_label
+Выходной TAR
+-----
+archive.browse
+Просмотр
+-----
+archive.extract
+Извлечь
+-----
+archive.create
+Создать TAR
+-----
+archive.cancel
+Отмена
+-----
+archive.up
+Выше
+-----
+archive.down
+Ниже
+-----
+archive.directory
+Папка
+-----
+archive.empty
+Архивных записей нет
+-----
+archive.limits
+Только TAR · до 64 МиБ · 2 048 записей · без перезаписи
+-----
+archive.hint
+Введите абсолютные пути. Извлечение создаёт новую папку; создать архив можно из файла или папки.
+-----
+archive.loading
+Чтение архива...
+-----
+archive.loaded
+Архив проверен. Выберите новую папку извлечения.
+-----
+archive.extracting
+Извлечение в новую папку...
+-----
+archive.extracted
+Архив извлечён.
+-----
+archive.creating
+Создание TAR...
+-----
+archive.created
+TAR создан.
+-----
+archive.cancelled
+Отменено.
+-----
+archive.cancelled_partial
+Отменено. Частичные файлы остались в новой папке извлечения.
+-----
+archive.partial
+Не удалось открыть новую папку. Пустая папка сохранена.
+-----
+archive.extract_failed
+Ошибка извлечения. Частичные файлы остались в новой папке.
+-----
+archive.exists
+Путь назначения уже существует. Выберите новый путь.
+-----
+archive.invalid_path
+Введите абсолютные пути без ссылок в родительских папках, компонентов с точками и управляющих символов.
+-----
+archive.read_failed
+Не удалось прочитать источник. Символические ссылки не поддерживаются.
+-----
+archive.not_regular
+Архив должен быть обычным файлом.
+-----
+archive.source_limit
+Источник превышает предел 64 МиБ.
+-----
+archive.entry_limit
+Источник превышает 2 048 записей или 32 уровня папок.
+-----
+archive.name_limit
+Имя записи не помещается в поля имени TAR.
+-----
+archive.invalid_tar
+Некорректный или обрезанный TAR: заголовок, контрольная сумма или конечные блоки неполны.
+-----
+archive.unsupported
+Поддерживается только несжатый TAR. ZIP, gzip и расширенные форматы TAR недоступны.
+-----
+archive.unsafe_entry
+Небезопасная запись: ссылки, специальные файлы, переходы к родителям и конфликтующие пути не поддерживаются.
+-----
+archive.source_changed
+Источник изменился при создании. Незавершённый TAR удалён.
+-----
+archive.write_failed
+Не удалось записать результат. Проверьте путь назначения и свободное место.
+-----
+archive.source_unstable
+Архив изменился во время чтения. Откройте его снова.
+-----

@@ -2753,3 +2753,327 @@ Original image copied.
 preview.status.exported
 PNG image exported.
 -----
+app.archive
+Archive Utility
+-----
+app.disk_utility
+Disk Utility
+-----
+app.backup
+Backup
+-----
+backup.title
+Backup
+-----
+backup.source
+Source folder
+-----
+backup.store
+Backup folder
+-----
+backup.restore_path
+New restore folder
+-----
+backup.start
+Back Up
+-----
+backup.refresh
+Versions
+-----
+backup.restore
+Restore
+-----
+backup.cancel
+Cancel
+-----
+backup.previous
+Previous
+-----
+backup.next
+Next
+-----
+backup.ready
+Choose an existing source and backup folder.
+-----
+backup.running
+Copying files…
+-----
+backup.complete
+Backup completed.
+-----
+backup.restored
+Restore completed.
+-----
+backup.cancelled
+Cancelled. The incomplete folder was kept.
+-----
+backup.invalid_path
+Enter an absolute path without dot components or control characters.
+-----
+backup.overlap
+Source, backup and restore folders must not overlap.
+-----
+backup.source_failed
+Cannot open the source folder safely.
+-----
+backup.store_failed
+Cannot open the backup folder safely.
+-----
+backup.exists
+The restore destination already exists.
+-----
+backup.copy_failed
+Copy failed. The incomplete folder was kept.
+-----
+backup.special
+Links and special files are refused. The incomplete folder was kept.
+-----
+backup.changed
+The source changed during copying. The incomplete folder was kept.
+-----
+backup.limit
+The depth, path or file-count limit was reached.
+-----
+backup.no_versions
+No completed backups found.
+-----
+backup.select_version
+Select a completed backup to restore.
+-----
+backup.versions
+Completed versions
+-----
+backup.progress
+Files copied / bytes copied
+-----
+backup.hint
+File contents only. Permissions and timestamps are not preserved.
+-----
+backup.version_limit
+Showing at most 128 versions.
+-----
+backup.manifest_failed
+The backup completion record could not be saved.
+-----
+backup.incomplete
+An incomplete folder is kept after cancellation or failure.
+-----
+disk_utility.devices
+Devices
+-----
+disk_utility.volumes
+Volumes
+-----
+disk_utility.refresh
+Refresh
+-----
+disk_utility.read_only
+Read-only storage overview
+-----
+disk_utility.device
+Device
+-----
+disk_utility.kind
+Kind
+-----
+disk_utility.block_device
+Block device (disk or partition)
+-----
+disk_utility.size
+Size
+-----
+disk_utility.mount
+Mount point
+-----
+disk_utility.source
+Source
+-----
+disk_utility.filesystem
+Filesystem
+-----
+disk_utility.options
+Mount options
+-----
+disk_utility.total
+Capacity
+-----
+disk_utility.used
+Used
+-----
+disk_utility.available
+Available
+-----
+disk_utility.unavailable
+Unavailable
+-----
+disk_utility.metadata_unavailable
+Partition layout and drive health are not published by this kernel.
+-----
+disk_utility.devices_unavailable
+Device inventory unavailable
+-----
+disk_utility.devices_empty
+No block devices reported
+-----
+disk_utility.mounts_unavailable
+Mount report unavailable
+-----
+disk_utility.mounts_empty
+No mounted volumes reported
+-----
+disk_utility.previous
+Previous
+-----
+disk_utility.next
+Next
+-----
+disk_utility.limited
+Inventory limited to 256 rows and bounded reports.
+-----
+disk_utility.destination
+Report destination
+-----
+disk_utility.export
+Export report
+-----
+disk_utility.item
+{0}: {1}
+-----
+disk_utility.size_bytes
+Size (bytes)
+-----
+disk_utility.total_bytes
+Capacity (bytes)
+-----
+disk_utility.used_bytes
+Used (bytes)
+-----
+disk_utility.available_bytes
+Available (bytes)
+-----
+disk_utility.report.invalid
+Enter an absolute destination path
+-----
+disk_utility.report.exists
+Destination already exists
+-----
+disk_utility.report.saved
+Report saved
+-----
+disk_utility.report.failed
+Could not save report
+-----
+archive.subtitle
+Browse, extract and create uncompressed TAR archives
+-----
+archive.path_label
+Archive
+-----
+archive.destination_label
+Extract folder
+-----
+archive.source_label
+Source
+-----
+archive.output_label
+Output TAR
+-----
+archive.browse
+Browse
+-----
+archive.extract
+Extract
+-----
+archive.create
+Create TAR
+-----
+archive.cancel
+Cancel
+-----
+archive.up
+Page up
+-----
+archive.down
+Page down
+-----
+archive.directory
+Folder
+-----
+archive.empty
+No archive entries
+-----
+archive.limits
+TAR only · 64 MiB maximum · 2,048 entries · existing outputs are refused
+-----
+archive.hint
+Enter absolute paths. Extraction creates a new folder; creation accepts a file or folder.
+-----
+archive.loading
+Reading archive...
+-----
+archive.loaded
+Archive validated. Choose a new extraction folder.
+-----
+archive.extracting
+Extracting into the new folder...
+-----
+archive.extracted
+Archive extracted.
+-----
+archive.creating
+Creating TAR...
+-----
+archive.created
+TAR created.
+-----
+archive.cancelled
+Cancelled.
+-----
+archive.cancelled_partial
+Cancelled. Partial files remain in the new extraction folder.
+-----
+archive.partial
+Could not open the new folder. The empty folder remains.
+-----
+archive.extract_failed
+Extraction failed. Partial files remain in the new folder.
+-----
+archive.exists
+Output already exists. Choose a new path.
+-----
+archive.invalid_path
+Enter absolute paths without symlink parents, dot components or control characters.
+-----
+archive.read_failed
+Could not read the source. Symlinks are refused.
+-----
+archive.not_regular
+The archive must be a regular file.
+-----
+archive.source_limit
+Source exceeds the 64 MiB limit.
+-----
+archive.entry_limit
+Source exceeds 2,048 entries or 32 folder levels.
+-----
+archive.name_limit
+An entry name does not fit the TAR name fields.
+-----
+archive.invalid_tar
+Invalid or truncated TAR: header, checksum or end blocks are incomplete.
+-----
+archive.unsupported
+Only uncompressed TAR is supported. ZIP, gzip and extended TAR formats are unavailable.
+-----
+archive.unsafe_entry
+Unsafe archive entry: links, special files, traversal and conflicting paths are refused.
+-----
+archive.source_changed
+Source changed during creation. The incomplete TAR was removed.
+-----
+archive.write_failed
+Could not write the output. Check the destination and free space.
+-----
+archive.source_unstable
+Archive changed while reading. Browse it again.
+-----

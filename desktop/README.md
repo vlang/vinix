@@ -56,6 +56,9 @@ What it does:
   filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
   reports with refresh and export
+- **Archive Utility**, TAR browsing, creation and safe extraction with progress/cancel
+- **Disk Utility**, read-only block-device and mounted-volume inspection
+- **Backup**, versioned local folder copies and restore to a new folder
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
@@ -114,6 +117,9 @@ typing any word with a q in it drop the user back to the console.
     preview_app*.v  the standalone image viewer and export model
     console_app*.v  bounded log snapshots, filtering and tail following
     system_information*.v  system-source inventory and report export
+    archive_app*.v  bounded TAR browsing, creation and extraction
+    disk_utility*.v  block-device and mounted-volume inspection
+    backup_app*.v  versioned folder copies and restore
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
     taskbar_preview.v  thumbnails, the window picker, Aero Peek, Show Desktop
