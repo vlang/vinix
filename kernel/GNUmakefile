@@ -272,7 +272,7 @@ ifeq ($(LINUXKPI),1)
 endif
 
 # ALLOC_TRACK=1 records the call chain of every live slab allocation, for
-# hunting leaks; see c/alloc_track.c. It costs a 7 MiB table and a lock on
+# hunting leaks; see alloctrack/track_d_alloc_track.v. It costs a 7 MiB table and a lock on
 # every allocation, so it is off unless asked for.
 ifeq ($(ALLOC_TRACK),1)
     override VFLAGS += -d alloc_track
@@ -421,8 +421,8 @@ $(V_CONFIG_STAMP):
 	rm -f obj/.v-config-*
 	touch $@
 
-# The tracker's C half follows the same switch as its V half.
-obj/c/alloc_track.c.o: $(V_CONFIG_STAMP)
+# The native capture entry follows the same switch as its V implementation.
+obj/asm/aarch64/alloc_track.S.o obj/asm/x86_64/alloc_track.S.o: $(V_CONFIG_STAMP)
 obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
 
 obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
