@@ -1,0 +1,10 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# PID 1 starts this supervisor before applications. Collection failures stay
+# visible on the console and retry; the collector never stalls kernel events.
+while :; do
+    /usr/sbin/vinix-security-audit </dev/null
+    task_status=$?
+    echo "security audit collector exited (status $task_status); retrying in one second" >&2
+    sleep 1
+done

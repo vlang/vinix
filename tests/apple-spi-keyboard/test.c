@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #include <assert.h>
 #include <stdio.h>
@@ -109,6 +113,12 @@ static void test_ascii_controls(void)
         b = encode_key((uint8_t)(30 + i), 2, 1, 0, 0);
         assert(b.len == 1 && b.data[0] == (uint8_t)"!@#$%^&*()"[i]);
     }
+    /* The ISO key is § and ±, after Option's escape; Cmd drops it. */
+    expect_bytes(encode_key(100, 0, 0, 0, 0), (const uint8_t *)"\xc2\xa7", 2);
+    expect_bytes(encode_key(100, 2, 1, 0, 0), (const uint8_t *)"\xc2\xb1", 2);
+    expect_bytes(encode_key(100, 0x40, 0, 0, 0), (const uint8_t *)"\033\xc2\xa7", 3);
+    assert(encode_key(100, 0x08, 0, 0, 0).len == 0);
+    expect_bytes(encode_key(49, 0, 0, 0, 0), (const uint8_t *)"\\", 1);
 }
 static void test_navigation_fn_and_function_keys(void)
 {
@@ -124,6 +134,59 @@ static void test_navigation_fn_and_function_keys(void)
     expect_bytes(encode_key(69, 4, 0, 0, 0), (const uint8_t *)"\033\033[24~", 6);
     assert(encode_key(255, 0, 0, 0, 0).len == 0);
 }
+/* Cmd-Tab, and the release of Cmd that closes the window switcher. Neither is
+ * a byte a terminal has ever produced, so the whole of what the desktop sees
+ * is checked here rather than only that something came out. */
+static void test_command_tab(void)
+{
+    struct decoder d = {0}; uint8_t out[128];
+    expect_bytes(encode_key(43, 0x08, 0, 0, 0), (const uint8_t *)"\033[9;9u", 6);
+    expect_bytes(encode_key(43, 0x80, 0, 0, 0), (const uint8_t *)"\033[9;9u", 6);
+    expect_bytes(encode_key(43, 0x0a, 0, 0, 0), (const uint8_t *)"\033[9;10u", 7);
+    /* Without Cmd it is still a tab, and Shift-Tab still back-tab. */
+    expect_bytes(encode_key(43, 0, 0, 0, 0), (const uint8_t *)"\t", 1);
+    expect_bytes(encode_key(43, 2, 0, 0, 0), (const uint8_t *)"\033[Z", 3);
+
+    /* Cmd down alone says nothing; each Tab is one chord; letting Cmd go ends
+     * it once, and a Cmd that was never chorded with ends nothing. */
+    assert(single(&d, 100, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 200, 0x08, 0, 43, out) == 6 && !memcmp(out, "\033[9;9u", 6));
+    assert(single(&d, 300, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 400, 0x0a, 0, 43, out) == 7 && !memcmp(out, "\033[9;10u", 7));
+    assert(single(&d, 500, 0, 0, 0, out) == 12
+        && !memcmp(out, "\033[57444;1:3u", 12));
+    assert(single(&d, 600, 0, 0, 0, out) == 0);
+    assert(single(&d, 700, 0x08, 0, 0, out) == 0);
+    assert(single(&d, 800, 0, 0, 0, out) == 0);
+
+    /* Held down, Cmd-Tab repeats like any other key: the switcher walks on. */
+    assert(single(&d, 1000, 0x08, 0, 43, out) == 6);
+    assert(repeat_key(&d, 1000 + REPEAT_DELAY, 0, out, 128) == 6
+        && !memcmp(out, "\033[9;9u", 6));
+}
+
+static void test_command_chords(void)
+{
+    struct decoder d = {0}; uint8_t out[128];
+    expect_bytes(encode_key(20, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[113;9u", 8); /* Cmd-Q */
+    expect_bytes(encode_key(40, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[13;9u", 7); /* Cmd-Return */
+    expect_bytes(encode_key(20, 0x0f, 0, 0, 0),
+        (const uint8_t *)"\033[81;16u", 8); /* Shift-Ctrl-Alt-Cmd-Q */
+    expect_bytes(encode_key(80, 0x08, 0, 0, 0),
+        (const uint8_t *)"\033[1;9D", 6); /* Cmd-Left */
+    expect_bytes(encode_key(82, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[1;10A", 7); /* Shift-Cmd-Up */
+    expect_bytes(encode_key(31, 0x0a, 0, 0, 0),
+        (const uint8_t *)"\033[64;10u", 8); /* Shift-Cmd-2 */
+
+    assert(single(&d, 100, 0x08, 0, 20, out) == 8
+        && !memcmp(out, "\033[113;9u", 8));
+    assert(single(&d, 200, 0, 0, 0, out) == 12
+        && !memcmp(out, "\033[57444;1:3u", 12));
+}
+
 static void test_repeat(void)
 {
     struct decoder d = {0}; uint8_t out[128];
@@ -343,9 +406,22 @@ static void test_spi_timeout_backoff_disable(void)
         assert(poll_keyboard(&k, out, 128, 0) == 0 && f.writes == writes);
     }
     assert(!k.active);
-    f.now += 10000000;
+    /* Down, and staying down while the cool-off runs. */
     unsigned reads = f.reads;
     assert(poll_keyboard(&k, out, 128, 0) == 0 && f.reads == reads);
+    /* Past it, brought back rather than left dead for the rest of the boot.
+     * Nothing used to clear `active`, so three bad reads cost the machine its
+     * keyboard and its touchpad together while the desktop carried on drawing
+     * -- input simply stopped and never returned. */
+    f.stall = 0;
+    f.now += REVIVE_US + 1;
+    assert(poll_keyboard(&k, out, 128, 0) == -3);
+    assert(k.active && k.errors == 0 && k.revive_at == 0);
+    /* And it works afterwards, rather than merely claiming to be up. */
+    uint8_t keys[6] = {4};
+    packet(f.incoming, 0, 0, keys);
+    f.now = k.next_poll;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a');
 }
 static void test_spi_invalid_fifo_and_recovery(void)
 {
@@ -355,7 +431,7 @@ static void test_spi_invalid_fifo_and_recovery(void)
     f.invalid_fifo = 0; packet(f.incoming, 0, 0, keys); f.now = k.next_poll;
     assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' && k.errors == 0);
 }
-static void test_ready_gpio_fallback_and_repeat(void)
+static void test_ready_gpio_gates_reads_and_repeat(void)
 {
     struct fake f; struct spi_keyboard k = setup(&f, 0); uint8_t out[128], keys[6] = {4};
     k.ready = FAKE_READY; k.ready_low = 1;
@@ -364,9 +440,36 @@ static void test_ready_gpio_fallback_and_repeat(void)
     assert(poll_keyboard(&k, out, 128, 0) == 1);
     f.ready = 1; f.now = k.next_poll; unsigned assertions = f.assertions;
     assert(poll_keyboard(&k, out, 128, 0) == 0 && f.assertions == assertions);
-    f.now = k.last_transfer + FALLBACK_US;
-    assert(poll_keyboard(&k, out, 128, 0) == 0 && f.assertions == assertions + 1);
     f.now = k.decoder.repeat_at;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' &&
+        f.assertions == assertions);
+
+    /* Even after a minute idle, an inactive ready line must not cause an
+     * unsolicited transfer. */
+    f.now += 60000000u;
+    assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a' &&
+        f.assertions == assertions);
+}
+static void test_ready_gpio_invalid_packet_recovery(void)
+{
+    struct fake f; struct spi_keyboard k = setup(&f, 0); uint8_t out[128];
+    k.ready = FAKE_READY;
+    start_keyboard(&k, 120000000, 8000000); f.ready = 1;
+
+    /* FIFO progress and the byte count both succeed, but an all-zero response
+     * is not an Apple packet and must participate in bounded recovery. */
+    for (unsigned i = 1; i <= 3; ++i) {
+        memset(f.incoming, 0, sizeof(f.incoming));
+        f.now = k.next_poll;
+        assert(poll_keyboard(&k, out, 128, 0) == (i == 3 ? -2 : -1));
+        assert(k.errors == i && f.cursor == 256);
+    }
+    assert(!k.active);
+
+    f.now += REVIVE_US + 1;
+    assert(poll_keyboard(&k, out, 128, 0) == -3 && k.active && k.errors == 0);
+    uint8_t keys[6] = {4};
+    packet(f.incoming, 0, 0, keys); f.now = k.next_poll;
     assert(poll_keyboard(&k, out, 128, 0) == 1 && out[0] == 'a');
 }
 static uint32_t random_state = 0x75c29631;
@@ -404,6 +507,8 @@ int main(void)
     run(test_modifiers_and_caps, "independent modifiers and Caps Lock");
     run(test_ascii_controls, "ASCII, control bytes, Option, NUL");
     run(test_navigation_fn_and_function_keys, "navigation, DECCKM, Fn, function keys");
+    run(test_command_tab, "Cmd-Tab chords and the release that ends them");
+    run(test_command_chords, "CSI-u preserves general Cmd chords");
     run(test_repeat, "repeat timing, modifiers, no catch-up burst");
     run(test_rollover, "rollover errors and recovery");
     run(test_crc_and_identity_rejection, "packet/message CRC and identity rejection");
@@ -413,7 +518,8 @@ int main(void)
     run(test_spi_end_to_end, "mock-MMIO SPI to console bytes");
     run(test_spi_timeout_backoff_disable, "bounded timeout, CS cleanup, backoff, disable");
     run(test_spi_invalid_fifo_and_recovery, "invalid FIFO count and recovery");
-    run(test_ready_gpio_fallback_and_repeat, "ready GPIO, fallback polling and repeat");
+    run(test_ready_gpio_gates_reads_and_repeat, "ready GPIO gates idle reads and repeat");
+    run(test_ready_gpio_invalid_packet_recovery, "invalid ready packet resets and recovers");
     run(test_seeded_mutation_fuzz, "100000 deterministic mutated packets");
     printf("PASS: %u test groups\n", tests);
     return 0;

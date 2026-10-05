@@ -1,0 +1,39 @@
+Verbatim error excerpt from build/alloc-bench-validation/audit-diagnostic-x86.log, lines 2253–2287.
+Original full diagnostic SHA-256: b598b6e5eb48e2156b10b2abfbd4ed3213514a06e07cd7a9cb9f6fcea37381b0
+Compiler warnings preceding these errors are omitted.
+
+build/alloc-bench-validation/audit-diagnostic-x86_64/dev/fbdev/simple/simple.v:5:1: builder error: cannot import module "drm.simple" (not found)
+    3 | 
+    4 | import dev.fbdev.api
+    5 | import drm.simple as simpledrm
+      | ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    6 | 
+    7 | pub struct SimpleFBConfig {
+build/alloc-bench-validation/audit-diagnostic-x86_64/dev/fbdev/simple/simple.v:5:8: error: cannot import `drm.simple` into a module with the same name
+    3 | 
+    4 | import dev.fbdev.api
+    5 | import drm.simple as simpledrm
+      |        ~~~~~~~~~~
+    6 | 
+    7 | pub struct SimpleFBConfig {
+build/alloc-bench-validation/audit-diagnostic-x86_64/resource/cache.v:56:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`
+   54 | 
+   55 | pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) bool {
+   56 |     if mut res is MappingLifetimeResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   57 |         mut lifetime := MappingLifetimeResource(res)
+   58 |         mut stack_lifetime := unsafe { &lifetime }
+build/alloc-bench-validation/audit-diagnostic-x86_64/resource/cache.v:66:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`
+   64 | 
+   65 | pub fn release_mapping_range(mut res Resource, handle voidptr, offset u64, length u64) {
+   66 |     if mut res is MappingLifetimeResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   67 |         mut lifetime := MappingLifetimeResource(res)
+   68 |         mut stack_lifetime := unsafe { &lifetime }
+build/alloc-bench-validation/audit-diagnostic-x86_64/resource/cache.v:221:9: error: `MappingAttributesResource` is not compatible with interface `resource.Resource`
+  219 | 
+  220 | pub fn mapping_attributes(mut res Resource, handle voidptr, offset u64) u64 {
+  221 |     if mut res is MappingAttributesResource {
+      |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  222 |         mut attributes := MappingAttributesResource(res)
+  223 |         mut stack_attributes := unsafe { &attributes }

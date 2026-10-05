@@ -1,0 +1,31 @@
+==> Assembling /Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v3/vinix.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v3/.vinix-amd64.iso.PA55Vv'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5656m free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v3/iso-build/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  53.56% done
+ISO image produced: 67545 sectors
+Written to medium : 67545 sectors at LBA 0
+Writing to 'stdio:/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v3/.vinix-amd64.iso.PA55Vv' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0x41f63.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v3/vinix.iso (138332160 bytes)

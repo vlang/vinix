@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Read-only M1 SMC client. Protocol references are recorded in docs/m1-battery.md.
  * This is deliberately a synchronous, SMC-only RTKit client: unlike AGX,
@@ -9,7 +13,11 @@
 #define APP_EP 0x20u
 #define TYPE_SHIFT 52u
 #define EPMAP_LAST (UINT64_C(1) << 51)
+#define KEY_BUIC UINT32_C(0x42554943)
 #define KEY_BRSC UINT32_C(0x42525343)
+#define KEY_B0AV UINT32_C(0x42304156)
+#define KEY_B0AC UINT32_C(0x42304143)
+#define KEY_B0AP UINT32_C(0x42304150)
 #define CMD_READ 0x10u
 #define CMD_SRAM 0x17u
 #define NOTIFY 0x18u
@@ -26,9 +34,13 @@ struct smc_state {
     uint64_t frequency, sram_base, sram_size;
     uint64_t buffer_addr[9], buffer_size[9];
     uint32_t endpoints[8];
+    uint32_t capacity_key;
     uint64_t sample_time;
     int sample, sampled, ready, failed;
-    uint8_t next_id;
+    uint8_t next_id, capacity_length;
+    uint64_t power_time;
+    int power_sampled, power_result, voltage, current, power;
+    unsigned power_flags;
 };
 
 size_t vinix_smc_state_size(void) { return sizeof(struct smc_state); }
@@ -55,7 +67,7 @@ static int expired(struct smc_state *s, uint64_t start, uint64_t ticks)
 
 static uint64_t command_ticks(const struct smc_state *s)
 {
-    return s->frequency / 10 + (s->frequency % 10 != 0); /* 100 ms */
+    return s->frequency / 2 + (s->frequency % 2 != 0); /* 500 ms */
 }
 
 static int send_msg(struct smc_state *s, uint8_t endpoint, uint64_t word)
@@ -200,7 +212,10 @@ static int transaction(struct smc_state *s, unsigned cmd, uint32_t key,
         unsigned status = (unsigned)(word & 0xff);
         if (status)
             return status == 0x84 ? VINIX_SMC_NO_KEY : VINIX_SMC_IO;
-        if (((word >> 16) & 0xffff) != length)
+        /* Response SIZE is eight bits. Bits 31:24 are the firmware WSIZE
+         * field and are not part of the returned payload length.
+         */
+        if (((word >> 16) & 0xff) != length)
             return fail(s, VINIX_SMC_PROTOCOL);
         *result = word;
         return 0;
@@ -275,8 +290,10 @@ int vinix_smc_boot(void *state, void *context,
                 return s->failed;
             if (word & EPMAP_LAST) {
                 map_done = 1;
-                /* Only start system endpoints whose traffic we service. */
-                const unsigned system_eps[] = {1, 2, 4, 8};
+                /* RTKit will not finish booting unless every standard system
+                 * endpoint it advertises is started, including debug (3).
+                 */
+                const unsigned system_eps[] = {1, 2, 3, 4, 8};
                 for (unsigned j = 0; j < sizeof(system_eps)/sizeof(system_eps[0]); ++j)
                     if (has_endpoint(s, system_eps[j]) &&
                         start_endpoint(s, system_eps[j]) < 0)
@@ -294,7 +311,10 @@ int vinix_smc_boot(void *state, void *context,
         default:
             break;
         }
-        if (map_done && !ap_requested) {
+        /* AP power may only be requested after the IOP has acknowledged ON.
+         * Real firmware does not guarantee that ACK arrives with EPMAP.
+         */
+        if (map_done && iop_on && !ap_requested) {
             if (management(s, 11, 0x20) < 0)
                 return s->failed;
             ap_requested = 1;
@@ -357,12 +377,26 @@ int vinix_smc_refresh(void *state)
     if (result < 0)
         return result;
     uint64_t word = 0;
-    result = transaction(s, CMD_READ, KEY_BRSC, 2, &word);
-    if (result == 0) {
-        /* BRSC is ui16, little endian; the mailbox payload is also LE.
-         * B0RM has different byte order and is deliberately not a fallback.
+    uint32_t key = s->capacity_key;
+    unsigned length = s->capacity_length;
+    if (!key) {
+        /* Current Apple firmware exposes charge percentage as BUIC/u8.
+         * BRSC/ui16 remains a read-only fallback for older firmware.
          */
-        unsigned capacity = (unsigned)((word >> 32) & 0xffff);
+        key = KEY_BUIC;
+        length = 1;
+    }
+    result = transaction(s, CMD_READ, key, length, &word);
+    if (result == VINIX_SMC_NO_KEY && !s->capacity_key) {
+        key = KEY_BRSC;
+        length = 2;
+        result = transaction(s, CMD_READ, key, length, &word);
+    }
+    if (result == 0) {
+        s->capacity_key = key;
+        s->capacity_length = (uint8_t)length;
+        unsigned mask = length == 1 ? 0xff : 0xffff;
+        unsigned capacity = (unsigned)((word >> 32) & mask);
         result = capacity <= 100 ? (int)capacity : VINIX_SMC_RANGE;
     }
     if (!s->failed) {
@@ -383,6 +417,72 @@ int vinix_smc_cached_capacity(void *state)
     if (s->clock(s->context) - s->sample_time >= 2 * s->frequency)
         return VINIX_SMC_TIMEOUT;
     return s->sample;
+}
+
+/* Key units and signedness follow upstream macsmc-power.c. Transactions only
+ * read keys; missing sensors are represented by absent validity bits.
+ */
+int vinix_smc_refresh_power(void *state, unsigned *flags, int *voltage,
+                            int *current, int *power)
+{
+    struct smc_state *s = state;
+    if (!s || !s->ready)
+        return s && s->failed ? s->failed : VINIX_SMC_NOT_READY;
+    if (!s->power_sampled || s->clock(s->context) - s->power_time >= s->frequency) {
+        static const uint32_t keys[3] = {KEY_B0AV, KEY_B0AC, KEY_B0AP};
+        s->power_flags = 0;
+        s->power_result = VINIX_SMC_NO_KEY;
+        for (unsigned i = 0; i < 3; ++i) {
+            uint64_t word = 0;
+            int result = transaction(s, CMD_READ, keys[i], i == 2 ? 4 : 2, &word);
+            if (s->failed)
+                return result;
+            if (result != 0)
+                continue;
+            uint32_t value = (uint32_t)(word >> 32);
+            if (i == 0) s->voltage = (uint16_t)value;
+            if (i == 1) s->current = (int16_t)value;
+            if (i == 2) s->power = (int32_t)value;
+            s->power_flags |= 1u << i;
+            s->power_result = 0;
+        }
+        s->power_time = s->clock(s->context);
+        s->power_sampled = 1;
+    }
+    *flags = s->power_flags;
+    *voltage = s->voltage;
+    *current = s->current;
+    *power = s->power;
+    return s->power_result;
+}
+
+uint64_t vinix_smc_power_time(const void *state)
+{
+    const struct smc_state *s = state;
+    return s ? s->power_time : 0;
+}
+
+static unsigned power_field(uint8_t *out, const char *key, int value)
+{
+    unsigned used = 0, count = 0;
+    uint8_t digits[10];
+    while (*key) out[used++] = (uint8_t)*key++;
+    uint32_t magnitude = value < 0 ? (uint32_t)(-(int64_t)value) : (uint32_t)value;
+    if (value < 0) out[used++] = '-';
+    do { digits[count++] = '0' + magnitude % 10; magnitude /= 10; } while (magnitude);
+    while (count) out[used++] = digits[--count];
+    out[used++] = '\n';
+    return used;
+}
+
+int vinix_smc_format_power(unsigned flags, int voltage, int current, int power,
+                           uint8_t output[128])
+{
+    unsigned used = 0;
+    if (flags & 1) used += power_field(output + used, "voltage_mv: ", voltage);
+    if (flags & 2) used += power_field(output + used, "current_ma: ", current);
+    if (flags & 4) used += power_field(output + used, "power_mw: ", power);
+    return (int)used;
 }
 
 uint64_t vinix_smc_sample_time(const void *state)
@@ -411,7 +511,7 @@ const char *vinix_smc_error(int result)
     case VINIX_SMC_IO: return "mailbox/firmware I/O error";
     case VINIX_SMC_TIMEOUT: return "SMC timeout (no retry after an in-flight timeout)";
     case VINIX_SMC_PROTOCOL: return "invalid SMC/RTKit message or SRAM range";
-    case VINIX_SMC_NO_KEY: return "BRSC key unavailable";
+    case VINIX_SMC_NO_KEY: return "BUIC/BRSC keys unavailable";
     case VINIX_SMC_UNSUPPORTED: return "unsupported RTKit version, endpoint, or DMA request";
     case VINIX_SMC_RANGE: return "battery percentage outside 0..100";
     case VINIX_SMC_NOT_READY: return "battery sample unavailable";

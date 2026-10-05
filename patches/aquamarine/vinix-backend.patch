@@ -1,0 +1,856 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6c538d4..f91f966 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,7 +20,10 @@ set(LIBDIR ${CMAKE_INSTALL_FULL_LIBDIR})
+
+ find_package(PkgConfig REQUIRED)
+ find_package(OpenGL REQUIRED COMPONENTS "GLES3")
+-find_package(hyprwayland-scanner 0.4.0 REQUIRED)
++option(AQUAMARINE_VINIX_BACKEND "Build the Vinix framebuffer backend" OFF)
++if(NOT AQUAMARINE_VINIX_BACKEND)
++  find_package(hyprwayland-scanner 0.4.0 REQUIRED)
++endif()
+ pkg_check_modules(
+   deps
+   REQUIRED
+@@ -59,6 +62,9 @@ endif()
+
+ file(GLOB_RECURSE SRCFILES CONFIGURE_DEPENDS "src/*.cpp" "include/*.hpp")
+ file(GLOB_RECURSE PUBLIC_HEADERS CONFIGURE_DEPENDS "include/*.hpp")
++if(AQUAMARINE_VINIX_BACKEND)
++  list(FILTER SRCFILES EXCLUDE REGEX "/backend/Wayland\\.cpp$")
++endif()
+
+ add_library(aquamarine SHARED ${SRCFILES})
+ target_include_directories(
+@@ -67,7 +73,7 @@ target_include_directories(
+   PRIVATE "./src" "./src/include" "./protocols" "${CMAKE_BINARY_DIR}")
+ set_target_properties(aquamarine PROPERTIES VERSION ${AQUAMARINE_VERSION}
+                                             SOVERSION 11)
+-target_link_libraries(aquamarine OpenGL::EGL OpenGL::OpenGL PkgConfig::deps)
++target_link_libraries(aquamarine OpenGL::EGL OpenGL::GL PkgConfig::deps)
+
+ check_include_file("sys/timerfd.h" HAS_TIMERFD)
+ pkg_check_modules(epoll IMPORTED_TARGET epoll-shim)
+@@ -75,7 +81,9 @@ if(NOT HAS_TIMERFD AND epoll_FOUND)
+   target_link_libraries(aquamarine PkgConfig::epoll)
+ endif()
+
+-# Protocols
++# Protocols are only used by the nested Wayland backend. Vinix's compositor
++# backend presents to its framebuffer directly.
++if(NOT AQUAMARINE_VINIX_BACKEND)
+ pkg_get_variable(WAYLAND_PROTOCOLS_DIR wayland-protocols pkgdatadir)
+ message(STATUS "Found wayland-protocols at ${WAYLAND_PROTOCOLS_DIR}")
+ pkg_get_variable(WAYLAND_SCANNER_PKGDATA_DIR wayland-scanner pkgdatadir)
+@@ -110,6 +118,7 @@ protocolwayland()
+
+ protocolnew("stable/xdg-shell" "xdg-shell" false)
+ protocolnew("stable/linux-dmabuf" "linux-dmabuf-v1" false)
++endif()
+
+ # Generate hwdata info
+ pkg_get_variable(HWDATA_DIR hwdata pkgdatadir)
+@@ -128,6 +137,7 @@ endif()
+ configure_file(data/hwdata.hpp.in hwdata.hpp @ONLY)
+
+ # tests
++if(BUILD_TESTING)
+ add_custom_target(tests)
+
+ add_executable(simpleWindow "tests/SimpleWindow.cpp")
+@@ -145,6 +155,7 @@ add_test(
+   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tests
+   COMMAND attachments "attachments")
+ add_dependencies(tests attachments)
++endif()
+
+ # Installation
+ install(TARGETS aquamarine)
+diff --git a/include/aquamarine/backend/Headless.hpp b/include/aquamarine/backend/Headless.hpp
+index c0bb405..1ef2137 100644
+--- a/include/aquamarine/backend/Headless.hpp
++++ b/include/aquamarine/backend/Headless.hpp
+@@ -5,6 +5,9 @@
+ #include "../output/Output.hpp"
+ #include <hyprutils/memory/WeakPtr.hpp>
+ #include <hyprutils/os/FileDescriptor.hpp>
++#ifdef __vinix__
++#include <termios.h>
++#endif
+
+ namespace Aquamarine {
+     class CBackend;
+@@ -65,6 +68,34 @@ namespace Aquamarine {
+
+         size_t                                                          outputIDCounter = 0;
+
++#ifdef __vinix__
++        int                                                             drmfd = -1;
++        int                                                             framebufferFD = -1;
++        int                                                             pointerFD = -1;
++        int                                                             inputTimerFD = -1;
++        int                                                             oldStdinFlags = -1;
++        void*                                                           framebuffer = nullptr;
++        size_t                                                          framebufferLength = 0;
++        uint32_t                                                        width = 0, height = 0, stride = 0, bpp = 0;
++        uint32_t                                                        redOffset = 0, greenOffset = 0, blueOffset = 0;
++        uint32_t                                                        redLength = 0, greenLength = 0, blueLength = 0;
++        termios                                                         oldTermios = {};
++        bool                                                            hasOldTermios = false;
++        bool                                                            inputPublished = false;
++        uint32_t                                                        pointerButtons = 0;
++        bool                                                            superDown = false;
++        std::string                                                     keyboardPending;
++        Hyprutils::Memory::CSharedPointer<IPointer>                     pointer;
++        Hyprutils::Memory::CSharedPointer<IKeyboard>                    keyboard;
++
++        bool setupVinix();
++        void teardownVinix();
++        bool presentVinix(Hyprutils::Memory::CSharedPointer<IBuffer> buffer);
++        void pollVinixInput();
++        void parseVinixKeyboard();
++        void emitVinixKey(uint32_t key, bool pressed);
++#endif
++
+         class CTimer {
+           public:
+             std::chrono::steady_clock::time_point when;
+diff --git a/src/allocator/GBM.cpp b/src/allocator/GBM.cpp
+index 6f596b7..0671c04 100644
+--- a/src/allocator/GBM.cpp
++++ b/src/allocator/GBM.cpp
+@@ -163,7 +163,7 @@ Aquamarine::CGBMBuffer::CGBMBuffer(const SAllocatorBufferParams& params, Hypruti
+     }
+
+     uint32_t flags = GBM_BO_USE_RENDERING;
+-    if (params.scanout && !MULTIGPU)
++    if (params.scanout && !MULTIGPU && swapchain->backendImpl->type() == AQ_BACKEND_DRM)
+         flags |= GBM_BO_USE_SCANOUT;
+
+     uint64_t modifier = DRM_FORMAT_MOD_INVALID;
+@@ -331,6 +331,9 @@ CGBMAllocator::~CGBMAllocator() {
+ SP<CGBMAllocator> Aquamarine::CGBMAllocator::create(int drmfd_, Hyprutils::Memory::CWeakPointer<CBackend> backend_) {
+     uint64_t capabilities = 0;
+     if (drmGetCap(drmfd_, DRM_CAP_PRIME, &capabilities) || !(capabilities & DRM_PRIME_CAP_EXPORT)) {
++#ifdef __vinix__
++        write(STDERR_FILENO, "aquamarine: Vinix DRM PRIME export unavailable\n", sizeof("aquamarine: Vinix DRM PRIME export unavailable\n") - 1);
++#endif
+         backend_->log(AQ_LOG_ERROR, "Cannot create a GBM Allocator: PRIME export is not supported by the gpu.");
+         return nullptr;
+     }
+@@ -338,6 +341,9 @@ SP<CGBMAllocator> Aquamarine::CGBMAllocator::create(int drmfd_, Hyprutils::Memor
+     auto allocator = SP<CGBMAllocator>(new CGBMAllocator(drmfd_, backend_));
+
+     if (!allocator->gbmDevice) {
++#ifdef __vinix__
++        write(STDERR_FILENO, "aquamarine: Mesa could not create a Vinix GBM device\n", sizeof("aquamarine: Mesa could not create a Vinix GBM device\n") - 1);
++#endif
+         backend_->log(AQ_LOG_ERROR, "Cannot create a GBM Allocator: gbm failed to create a device.");
+         return nullptr;
+     }
+@@ -346,6 +352,9 @@ SP<CGBMAllocator> Aquamarine::CGBMAllocator::create(int drmfd_, Hyprutils::Memor
+
+     allocator->self = allocator;
+
++#ifdef __vinix__
++    write(STDERR_FILENO, "aquamarine: Vinix GBM allocator ready\n", sizeof("aquamarine: Vinix GBM allocator ready\n") - 1);
++#endif
+     return allocator;
+ }
+
+@@ -357,8 +366,10 @@ Aquamarine::CGBMAllocator::CGBMAllocator(int fd_, Hyprutils::Memory::CWeakPointe
+
+     gbmDeviceBackendName = gbm_device_get_backend_name(gbmDevice);
+     auto drmName_        = drmGetDeviceNameFromFd2(fd_);
+-    drmName              = drmName_;
+-    free(drmName_);
++    if (drmName_) {
++        drmName = drmName_;
++        free(drmName_);
++    }
+ }
+
+ SP<IBuffer> Aquamarine::CGBMAllocator::acquire(const SAllocatorBufferParams& params, Hyprutils::Memory::CSharedPointer<CSwapchain> swapchain_) {
+diff --git a/src/backend/Backend.cpp b/src/backend/Backend.cpp
+index 07f99f1..4be028d 100644
+--- a/src/backend/Backend.cpp
++++ b/src/backend/Backend.cpp
+@@ -1,9 +1,14 @@
+ #include <aquamarine/backend/Backend.hpp>
++#ifndef __vinix__
+ #include <aquamarine/backend/Wayland.hpp>
++#endif
+ #include <aquamarine/backend/Headless.hpp>
+ #include <aquamarine/backend/DRM.hpp>
+ #include <aquamarine/backend/Null.hpp>
+ #include <aquamarine/allocator/GBM.hpp>
++#ifdef __vinix__
++#include <aquamarine/allocator/DRMDumb.hpp>
++#endif
+ #include <hyprutils/os/FileDescriptor.hpp>
+ #include <ranges>
+ #include <sys/timerfd.h>
+@@ -58,6 +63,10 @@ Aquamarine::SBackendOptions::SBackendOptions() : logFunction(nullptr) {
+ }
+
+ Hyprutils::Memory::CSharedPointer<CBackend> Aquamarine::CBackend::create(const std::vector<SBackendImplementationOptions>& backends, const SBackendOptions& options) {
++#ifdef __vinix__
++    static constexpr char VINIX_CREATE[] = "aquamarine: creating Vinix framebuffer backend\n";
++    write(STDERR_FILENO, VINIX_CREATE, sizeof(VINIX_CREATE) - 1);
++#endif
+     auto backend = SP<CBackend>(new CBackend());
+
+     backend->options               = options;
+@@ -69,17 +78,28 @@ Hyprutils::Memory::CSharedPointer<CBackend> Aquamarine::CBackend::create(const s
+     backend->logger->m_logFn            = options.logFunction;
+     backend->logger->updateLevels();
+
+-    if (backends.size() <= 0)
++#ifndef __vinix__
++    if (backends.empty())
+         return nullptr;
++#endif
+
+     backend->log(AQ_LOG_DEBUG, "Creating an Aquamarine backend!");
+
+     for (auto const& b : backends) {
++#ifdef __vinix__
++        // Vinix exposes framebuffer presentation through its mandatory
++        // headless backend. Its DRM nodes are render-only allocator devices.
++        if (b.backendType == AQ_BACKEND_DRM || b.backendType == AQ_BACKEND_WAYLAND)
++            continue;
++#endif
++#ifndef __vinix__
+         if (b.backendType == AQ_BACKEND_WAYLAND) {
+             auto ref = SP<CWaylandBackend>(new CWaylandBackend(backend));
+             backend->implementations.emplace_back(ref);
+             ref->self = ref;
+-        } else if (b.backendType == AQ_BACKEND_DRM) {
++        } else
++#endif
++        if (b.backendType == AQ_BACKEND_DRM) {
+             auto ref = CDRMBackend::attempt(backend);
+             if (ref.empty()) {
+                 backend->log(AQ_LOG_ERROR, "DRM Backend failed");
+@@ -103,9 +123,23 @@ Hyprutils::Memory::CSharedPointer<CBackend> Aquamarine::CBackend::create(const s
+         }
+     }
+
++#ifdef __vinix__
++    // Hyprland normally includes headless in its request list. Keep a fallback
++    // for clients which only ask for Linux DRM or nested Wayland backends.
++    if (backend->implementations.empty()) {
++        auto vinix = SP<CHeadlessBackend>(new CHeadlessBackend(backend));
++        backend->implementations.emplace_back(vinix);
++        vinix->self = vinix;
++    }
++#endif
++
+     // create a timerfd for idle events
+     backend->idle.fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
+
++#ifdef __vinix__
++    static constexpr char VINIX_CREATED[] = "aquamarine: Vinix framebuffer backend created\n";
++    write(STDERR_FILENO, VINIX_CREATED, sizeof(VINIX_CREATED) - 1);
++#endif
+     return backend;
+ }
+
+@@ -148,6 +182,10 @@ bool Aquamarine::CBackend::start() {
+         return false;
+     }
+
++#ifdef __vinix__
++    write(STDERR_FILENO, "aquamarine: Vinix implementation started\n", sizeof("aquamarine: Vinix implementation started\n") - 1);
++#endif
++
+     // erase failed impls
+     std::erase_if(implementations, [this](const auto& i) {
+         bool failed = i->pollFDs().empty() && i->type() != AQ_BACKEND_NULL;
+@@ -159,18 +197,32 @@ bool Aquamarine::CBackend::start() {
+     // TODO: obviously change this when (if) we add different allocators.
+     for (auto const& b : implementations) {
+         if (b->drmFD() >= 0) {
++#ifdef __vinix__
++            auto fd = dup(b->drmFD());
++#else
+             auto fd = reopenDRMNode(b->drmFD());
++#endif
+             if (fd < 0) {
++#ifdef __vinix__
++                write(STDERR_FILENO, "aquamarine: cannot duplicate Vinix DRM fd\n", sizeof("aquamarine: cannot duplicate Vinix DRM fd\n") - 1);
++#endif
+                 // this is critical, we cannot create an allocator properly
+                 log(AQ_LOG_CRITICAL, "Failed to create an allocator (reopenDRMNode failed)");
+                 return false;
+             }
++#ifdef __vinix__
++            primaryAllocator = CDRMDumbAllocator::create(fd, self);
++#else
+             primaryAllocator = CGBMAllocator::create(fd, self);
++#endif
+             break;
+         }
+     }
+
+     if (!primaryAllocator && (implementations.empty() || implementations.at(0)->type() != AQ_BACKEND_NULL)) {
++#ifdef __vinix__
++        write(STDERR_FILENO, "aquamarine: Vinix backend has no allocator\n", sizeof("aquamarine: Vinix backend has no allocator\n") - 1);
++#endif
+         log(AQ_LOG_CRITICAL, "Cannot open backend: no allocator available");
+         return false;
+     }
+@@ -185,6 +237,9 @@ bool Aquamarine::CBackend::start() {
+
+     sessionFDs = session ? session->pollFDs() : std::vector<Hyprutils::Memory::CSharedPointer<SPollFD>>{};
+
++#ifdef __vinix__
++    write(STDERR_FILENO, "aquamarine: Vinix backend started\n", sizeof("aquamarine: Vinix backend started\n") - 1);
++#endif
+     return true;
+ }
+
+diff --git a/src/backend/Headless.cpp b/src/backend/Headless.cpp
+index 5d735d6..e6632f2 100644
+--- a/src/backend/Headless.cpp
++++ b/src/backend/Headless.cpp
+@@ -7,6 +7,19 @@
+ #include <unistd.h>
+ #include "Shared.hpp"
+
++#ifdef __vinix__
++#include <aquamarine/input/Input.hpp>
++#include <aquamarine/buffer/Buffer.hpp>
++#include <GLES3/gl3.h>
++#include <gbm.h>
++#include <linux/fb.h>
++#include <linux/input-event-codes.h>
++#include <sys/ioctl.h>
++#include <sys/mman.h>
++#include <termios.h>
++#include <charconv>
++#endif
++
+ using namespace Aquamarine;
+ using namespace Hyprutils::Memory;
+ using namespace Hyprutils::Math;
+@@ -14,6 +27,82 @@ using namespace Hyprutils::Math;
+
+ #define TIMESPEC_NSEC_PER_SEC 1000000000LL
+
++#ifdef __vinix__
++namespace {
++    struct SVinixPointerPacket {
++        int32_t  x, y, maxX, maxY;
++        uint32_t buttons, pressed, released;
++        int32_t  scroll;
++    };
++
++    class CVinixPointer final : public IPointer {
++      public:
++        const std::string& getName() override { return name; }
++      private:
++        std::string name = "Vinix pointer";
++    };
++
++    class CVinixKeyboard final : public IKeyboard {
++      public:
++        const std::string& getName() override { return name; }
++      private:
++        std::string name = "Vinix console keyboard";
++    };
++
++    uint32_t monotonicMs() {
++        timespec now = {};
++        clock_gettime(CLOCK_MONOTONIC, &now);
++        return (uint32_t)(now.tv_sec * 1000 + now.tv_nsec / 1000000);
++    }
++
++    uint32_t keyForASCII(char c) {
++        static constexpr uint32_t LETTERS[] = {
++            KEY_A, KEY_B, KEY_C, KEY_D, KEY_E, KEY_F, KEY_G, KEY_H, KEY_I, KEY_J, KEY_K, KEY_L, KEY_M,
++            KEY_N, KEY_O, KEY_P, KEY_Q, KEY_R, KEY_S, KEY_T, KEY_U, KEY_V, KEY_W, KEY_X, KEY_Y, KEY_Z,
++        };
++        static constexpr uint32_t DIGITS[] = {KEY_0, KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6, KEY_7, KEY_8, KEY_9};
++        if (c >= 'a' && c <= 'z')
++            return LETTERS[c - 'a'];
++        if (c >= 'A' && c <= 'Z')
++            return LETTERS[c - 'A'];
++        if (c >= '0' && c <= '9')
++            return DIGITS[c - '0'];
++        switch (c) {
++            case '\n': case '\r': return KEY_ENTER;
++            case '\t': return KEY_TAB;
++            case ' ': return KEY_SPACE;
++            case '\b': case 0x7F: return KEY_BACKSPACE;
++            case '-': case '_': return KEY_MINUS;
++            case '=': case '+': return KEY_EQUAL;
++            case '[': case '{': return KEY_LEFTBRACE;
++            case ']': case '}': return KEY_RIGHTBRACE;
++            case '\\': case '|': return KEY_BACKSLASH;
++            case ';': case ':': return KEY_SEMICOLON;
++            case '\'': case '"': return KEY_APOSTROPHE;
++            case '`': case '~': return KEY_GRAVE;
++            case ',': case '<': return KEY_COMMA;
++            case '.': case '>': return KEY_DOT;
++            case '/': case '?': return KEY_SLASH;
++            case '!': return KEY_1;
++            case '@': return KEY_2;
++            case '#': return KEY_3;
++            case '$': return KEY_4;
++            case '%': return KEY_5;
++            case '^': return KEY_6;
++            case '&': return KEY_7;
++            case '*': return KEY_8;
++            case '(': return KEY_9;
++            case ')': return KEY_0;
++            default: return 0;
++        }
++    }
++
++    bool asciiNeedsShift(char c) {
++        return (c >= 'A' && c <= 'Z') || std::string("!@#$%^&*()_+{}|:\"~<>?").find(c) != std::string::npos;
++    }
++}
++#endif
++
+ Aquamarine::CHeadlessOutput::CHeadlessOutput(const std::string& name_, Hyprutils::Memory::CWeakPointer<CHeadlessBackend> backend_) : backend(backend_) {
+     name = name_;
+
+@@ -32,6 +121,11 @@ Aquamarine::CHeadlessOutput::~CHeadlessOutput() {
+ }
+
+ bool Aquamarine::CHeadlessOutput::commit() {
++#ifdef __vinix__
++    const auto& pending = state->state();
++    if (pending.buffer && !backend->presentVinix(pending.buffer))
++        return false;
++#endif
+     events.commit.emit();
+     state->onCommit();
+     needsFrame = false;
+@@ -66,6 +160,13 @@ void Aquamarine::CHeadlessOutput::scheduleFrame(const scheduleFrameReason reason
+
+     frameScheduled = true;
+
++#ifdef __vinix__
++    // Vinix timerfds are edge-driven by the kernel poller. Drive output
++    // callbacks from the backend's periodic input timer below so a frame
++    // queued before Hyprland installs its event loop cannot lose its wakeup.
++    return;
++#endif
++
+     // schedule next frame when it should occur with a timer
+     int64_t refreshRatemHz = 60000;
+     auto&   currentState   = state->state();
+@@ -101,7 +202,9 @@ bool Aquamarine::CHeadlessOutput::destroy() {
+ }
+
+ Aquamarine::CHeadlessBackend::~CHeadlessBackend() {
+-    ;
++#ifdef __vinix__
++    teardownVinix();
++#endif
+ }
+
+ Aquamarine::CHeadlessBackend::CHeadlessBackend(SP<CBackend> backend_) : backend(backend_) {
+@@ -113,19 +216,36 @@ eBackendType Aquamarine::CHeadlessBackend::type() {
+ }
+
+ bool Aquamarine::CHeadlessBackend::start() {
++#ifdef __vinix__
++    return setupVinix();
++#else
+     return true;
++#endif
+ }
+
+ std::vector<SP<SPollFD>> Aquamarine::CHeadlessBackend::pollFDs() {
+-    return {makeShared<SPollFD>(timers.timerfd.get(), [this]() { dispatchTimers(); })};
++    std::vector<SP<SPollFD>> result = {makeShared<SPollFD>(timers.timerfd.get(), [this]() { dispatchTimers(); })};
++#ifdef __vinix__
++    if (inputTimerFD >= 0)
++        result.emplace_back(makeShared<SPollFD>(inputTimerFD, [this]() { pollVinixInput(); }));
++#endif
++    return result;
+ }
+
+ int Aquamarine::CHeadlessBackend::drmFD() {
++#ifdef __vinix__
++    return drmfd;
++#else
+     return -1;
++#endif
+ }
+
+ int Aquamarine::CHeadlessBackend::drmRenderNodeFD() {
++#ifdef __vinix__
++    return drmfd;
++#else
+     return -1;
++#endif
+ }
+
+ bool Aquamarine::CHeadlessBackend::dispatchEvents() {
+@@ -133,7 +253,11 @@ bool Aquamarine::CHeadlessBackend::dispatchEvents() {
+ }
+
+ uint32_t Aquamarine::CHeadlessBackend::capabilities() {
++#ifdef __vinix__
++    return eBackendCapabilities::AQ_BACKEND_CAPABILITY_POINTER;
++#else
+     return 0;
++#endif
+ }
+
+ bool Aquamarine::CHeadlessBackend::setCursor(SP<IBuffer> buffer, const Hyprutils::Math::Vector2D& hotspot) {
+@@ -141,10 +265,16 @@ bool Aquamarine::CHeadlessBackend::setCursor(SP<IBuffer> buffer, const Hyprutils
+ }
+
+ void Aquamarine::CHeadlessBackend::onReady() {
+-    ;
++#ifdef __vinix__
++    createOutput("Vinix-1");
++#endif
+ }
+
+ std::vector<SDRMFormat> Aquamarine::CHeadlessBackend::getRenderFormats() {
++#ifdef __vinix__
++    return {SDRMFormat{.drmFormat = DRM_FORMAT_XRGB8888, .modifiers = {DRM_FORMAT_INVALID}},
++            SDRMFormat{.drmFormat = DRM_FORMAT_ARGB8888, .modifiers = {DRM_FORMAT_INVALID}}};
++#else
+     for (const auto& impl : backend->getImplementations()) {
+         if (impl->type() != AQ_BACKEND_DRM || impl->getRenderableFormats().empty())
+             continue;
+@@ -168,6 +298,7 @@ std::vector<SDRMFormat> Aquamarine::CHeadlessBackend::getRenderFormats() {
+             SDRMFormat{.drmFormat = DRM_FORMAT_ABGR2101010, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+             SDRMFormat{.drmFormat = DRM_FORMAT_RGBA1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}},
+             SDRMFormat{.drmFormat = DRM_FORMAT_BGRA1010102, .modifiers = {DRM_FORMAT_MOD_LINEAR}}};
++#endif
+ }
+
+ std::vector<SDRMFormat> Aquamarine::CHeadlessBackend::getCursorFormats() {
+@@ -189,7 +320,11 @@ bool Aquamarine::CHeadlessBackend::createOutput(const std::string& name) {
+
+     auto output = SP<CHeadlessOutput>(new CHeadlessOutput(outputName, self.lock()));
+     outputs.emplace_back(output);
++#ifdef __vinix__
++    output->modes.emplace_back(SP<SOutputMode>(new SOutputMode(Vector2D{(double)width, (double)height}, 60000, true)));
++#else
+     output->modes.emplace_back(SP<SOutputMode>(new SOutputMode(Vector2D{1920, 1080}, 60000, true)));
++#endif
+     output->swapchain = CSwapchain::create(backend->primaryAllocator, self.lock());
+     output->self      = output;
+     backend->events.newOutput.emit(SP<IOutput>(output));
+@@ -257,3 +392,309 @@ Hyprutils::Memory::CWeakPointer<IBackendImplementation> Aquamarine::CHeadlessBac
+ bool Aquamarine::CHeadlessBackend::CTimer::expired() {
+     return std::chrono::steady_clock::now() > when;
+ }
++
++#ifdef __vinix__
++bool Aquamarine::CHeadlessBackend::setupVinix() {
++    static constexpr char VINIX_START[] = "aquamarine: starting Vinix framebuffer backend\n";
++    write(STDERR_FILENO, VINIX_START, sizeof(VINIX_START) - 1);
++    framebufferFD = open("/dev/fb0", O_RDWR | O_CLOEXEC);
++    if (framebufferFD < 0) {
++        write(STDERR_FILENO, "aquamarine: cannot open Vinix framebuffer\n", sizeof("aquamarine: cannot open Vinix framebuffer\n") - 1);
++        backend->log(AQ_LOG_ERROR, std::format("vinix: cannot open /dev/fb0: {}", strerror(errno)));
++        return false;
++    }
++
++    fb_var_screeninfo variable = {};
++    fb_fix_screeninfo fixed = {};
++    if (ioctl(framebufferFD, FBIOGET_VSCREENINFO, &variable) < 0 || ioctl(framebufferFD, FBIOGET_FSCREENINFO, &fixed) < 0 || variable.bits_per_pixel != 32) {
++        write(STDERR_FILENO, "aquamarine: cannot query Vinix framebuffer\n", sizeof("aquamarine: cannot query Vinix framebuffer\n") - 1);
++        backend->log(AQ_LOG_ERROR, "vinix: /dev/fb0 must provide a 32-bpp Linux framebuffer");
++        teardownVinix();
++        return false;
++    }
++
++    width       = variable.xres;
++    height      = variable.yres;
++    stride      = fixed.line_length ? fixed.line_length : width * 4;
++    bpp         = variable.bits_per_pixel;
++    redOffset   = variable.red.offset;
++    greenOffset = variable.green.offset;
++    blueOffset  = variable.blue.offset;
++    redLength   = variable.red.length;
++    greenLength = variable.green.length;
++    blueLength  = variable.blue.length;
++    framebufferLength = (size_t)stride * height;
++    framebuffer = mmap(nullptr, framebufferLength, PROT_READ | PROT_WRITE, MAP_SHARED, framebufferFD, 0);
++    if (framebuffer == MAP_FAILED) {
++        write(STDERR_FILENO, "aquamarine: cannot map Vinix framebuffer\n", sizeof("aquamarine: cannot map Vinix framebuffer\n") - 1);
++        framebuffer = nullptr;
++        backend->log(AQ_LOG_ERROR, std::format("vinix: cannot map /dev/fb0: {}", strerror(errno)));
++        teardownVinix();
++        return false;
++    }
++
++    drmfd = open("/dev/dri/renderD128", O_RDWR | O_CLOEXEC);
++    if (drmfd < 0)
++        drmfd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
++    if (drmfd < 0) {
++        write(STDERR_FILENO, "aquamarine: cannot open Vinix DRM allocator\n", sizeof("aquamarine: cannot open Vinix DRM allocator\n") - 1);
++        backend->log(AQ_LOG_ERROR, "vinix: no DRM render device is available");
++        teardownVinix();
++        return false;
++    }
++
++    pointerFD = open("/dev/pointer", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
++    pointer   = makeShared<CVinixPointer>();
++    keyboard  = makeShared<CVinixKeyboard>();
++
++    oldStdinFlags = fcntl(STDIN_FILENO, F_GETFL);
++    if (oldStdinFlags >= 0)
++        fcntl(STDIN_FILENO, F_SETFL, oldStdinFlags | O_NONBLOCK);
++    if (tcgetattr(STDIN_FILENO, &oldTermios) == 0) {
++        hasOldTermios = true;
++        auto raw = oldTermios;
++        raw.c_iflag &= (tcflag_t)~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
++        raw.c_oflag &= (tcflag_t)~OPOST;
++        raw.c_lflag &= (tcflag_t)~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
++        raw.c_cflag &= (tcflag_t)~(CSIZE | PARENB);
++        raw.c_cflag |= CS8;
++        raw.c_cc[VMIN] = 0;
++        raw.c_cc[VTIME] = 0;
++        tcsetattr(STDIN_FILENO, TCSANOW, &raw);
++    }
++
++    inputTimerFD = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
++    if (inputTimerFD < 0) {
++        write(STDERR_FILENO, "aquamarine: cannot create Vinix input timer\n", sizeof("aquamarine: cannot create Vinix input timer\n") - 1);
++        backend->log(AQ_LOG_ERROR, "vinix: cannot create the input timer");
++        teardownVinix();
++        return false;
++    }
++    itimerspec tick = {.it_interval = {.tv_sec = 0, .tv_nsec = 8'000'000}, .it_value = {.tv_sec = 0, .tv_nsec = 8'000'000}};
++    if (timerfd_settime(inputTimerFD, 0, &tick, nullptr) < 0) {
++        write(STDERR_FILENO, "aquamarine: cannot arm Vinix input timer\n", sizeof("aquamarine: cannot arm Vinix input timer\n") - 1);
++        backend->log(AQ_LOG_ERROR, "vinix: cannot arm the input timer");
++        teardownVinix();
++        return false;
++    }
++
++    write(STDERR_FILENO, "aquamarine: Vinix framebuffer backend ready\n", sizeof("aquamarine: Vinix framebuffer backend ready\n") - 1);
++    backend->log(AQ_LOG_DEBUG, std::format("vinix: using /dev/fb0 at {}x{} and DRM fd {}", width, height, drmfd));
++    return true;
++}
++
++void Aquamarine::CHeadlessBackend::teardownVinix() {
++    if (hasOldTermios)
++        tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios);
++    hasOldTermios = false;
++    if (oldStdinFlags >= 0)
++        fcntl(STDIN_FILENO, F_SETFL, oldStdinFlags);
++    oldStdinFlags = -1;
++    if (framebuffer)
++        munmap(framebuffer, framebufferLength);
++    framebuffer = nullptr;
++    for (int* fd : {&inputTimerFD, &pointerFD, &drmfd, &framebufferFD}) {
++        if (*fd >= 0)
++            close(*fd);
++        *fd = -1;
++    }
++}
++
++bool Aquamarine::CHeadlessBackend::presentVinix(SP<IBuffer> buffer) {
++    if (!framebuffer || !buffer)
++        return false;
++
++    // KMS consumes the input fence asynchronously. This backend instead
++    // crosses straight from GL to a CPU framebuffer copy, so finish the
++    // current render before mapping its buffer.
++    glFinish();
++
++    auto [source, format, length] = buffer->beginDataPtr(GBM_BO_TRANSFER_READ);
++    if (!source || !height) {
++        backend->log(AQ_LOG_ERROR, "vinix: compositor buffer cannot be mapped for display");
++        return false;
++    }
++
++    const size_t sourceStride = length / (size_t)buffer->size.y;
++    const uint32_t copyWidth = std::min(width, (uint32_t)buffer->size.x);
++    const uint32_t copyHeight = std::min(height, (uint32_t)buffer->size.y);
++    auto* destination = static_cast<uint8_t*>(framebuffer);
++    const bool framebufferIsXRGB = redOffset == 16 && greenOffset == 8 && blueOffset == 0 && redLength == 8 && greenLength == 8 && blueLength == 8;
++    const bool sourceIsRGB = format == DRM_FORMAT_XRGB8888 || format == DRM_FORMAT_ARGB8888;
++
++    if (framebufferIsXRGB && sourceIsRGB) {
++        for (uint32_t y = 0; y < copyHeight; ++y)
++            memcpy(destination + (size_t)y * stride, source + (size_t)y * sourceStride, (size_t)copyWidth * 4);
++    } else {
++        for (uint32_t y = 0; y < copyHeight; ++y) {
++            const auto* src = reinterpret_cast<const uint32_t*>(source + (size_t)y * sourceStride);
++            auto* dst = reinterpret_cast<uint32_t*>(destination + (size_t)y * stride);
++            for (uint32_t x = 0; x < copyWidth; ++x) {
++                uint32_t pixel = src[x];
++                uint32_t r = 0, g = 0, b = 0;
++                if (sourceIsRGB) {
++                    r = (pixel >> 16) & 0xFF;
++                    g = (pixel >> 8) & 0xFF;
++                    b = pixel & 0xFF;
++                } else {
++                    r = pixel & 0xFF;
++                    g = (pixel >> 8) & 0xFF;
++                    b = (pixel >> 16) & 0xFF;
++                }
++                dst[x] = (r << redOffset) | (g << greenOffset) | (b << blueOffset);
++            }
++        }
++    }
++    buffer->endDataPtr();
++    return true;
++}
++
++void Aquamarine::CHeadlessBackend::emitVinixKey(uint32_t key, bool pressed) {
++    if (key && keyboard)
++        keyboard->events.key.emit(IKeyboard::SKeyEvent{.timeMs = monotonicMs(), .key = key, .pressed = pressed});
++}
++
++void Aquamarine::CHeadlessBackend::parseVinixKeyboard() {
++    auto tap = [this](uint32_t key, uint32_t modifiers) {
++        const bool shift = modifiers & 1, alt = modifiers & 2, control = modifiers & 4, super = modifiers & 8;
++        if (shift) emitVinixKey(KEY_LEFTSHIFT, true);
++        if (alt) emitVinixKey(KEY_LEFTALT, true);
++        if (control) emitVinixKey(KEY_LEFTCTRL, true);
++        if (super && !superDown) {
++            emitVinixKey(KEY_LEFTMETA, true);
++            superDown = true;
++        }
++        emitVinixKey(key, true);
++        emitVinixKey(key, false);
++        if (control) emitVinixKey(KEY_LEFTCTRL, false);
++        if (alt) emitVinixKey(KEY_LEFTALT, false);
++        if (shift) emitVinixKey(KEY_LEFTSHIFT, false);
++    };
++
++    while (!keyboardPending.empty()) {
++        if (keyboardPending.starts_with("\x1B[")) {
++            if (keyboardPending.size() >= 3) {
++                const char final = keyboardPending[2];
++                uint32_t key = final == 'A' ? KEY_UP : final == 'B' ? KEY_DOWN : final == 'C' ? KEY_RIGHT : final == 'D' ? KEY_LEFT :
++                               final == 'H' ? KEY_HOME : final == 'F' ? KEY_END : 0;
++                if (key) {
++                    tap(key, 0);
++                    keyboardPending.erase(0, 3);
++                    continue;
++                }
++            }
++            const auto u = keyboardPending.find('u', 2);
++            if (u != std::string::npos) {
++                const auto semicolon = keyboardPending.find(';', 2);
++                if (semicolon == std::string::npos || semicolon > u) {
++                    keyboardPending.erase(0, u + 1);
++                    continue;
++                }
++                uint32_t codepoint = 0, modifierParam = 1;
++                auto first = keyboardPending.data() + 2;
++                auto middle = keyboardPending.data() + semicolon;
++                std::from_chars(first, middle, codepoint);
++                const auto colon = keyboardPending.find(':', semicolon + 1);
++                auto modifierEnd = keyboardPending.data() + ((colon != std::string::npos && colon < u) ? colon : u);
++                std::from_chars(middle + 1, modifierEnd, modifierParam);
++                bool release = colon != std::string::npos && colon < u && keyboardPending.substr(colon + 1, u - colon - 1) == "3";
++                keyboardPending.erase(0, u + 1);
++                if (codepoint == 57444) {
++                    if (release && superDown) {
++                        emitVinixKey(KEY_LEFTMETA, false);
++                        superDown = false;
++                    }
++                    continue;
++                }
++                uint32_t key = codepoint < 128 ? keyForASCII((char)codepoint) : 0;
++                if (key)
++                    tap(key, modifierParam > 0 ? modifierParam - 1 : 0);
++                continue;
++            }
++            if (keyboardPending.size() >= 4 && keyboardPending[3] == '~') {
++                uint32_t key = keyboardPending[2] == '3' ? KEY_DELETE : keyboardPending[2] == '2' ? KEY_INSERT :
++                               keyboardPending[2] == '5' ? KEY_PAGEUP : keyboardPending[2] == '6' ? KEY_PAGEDOWN : 0;
++                if (key)
++                    tap(key, 0);
++                keyboardPending.erase(0, 4);
++                continue;
++            }
++            if (keyboardPending.size() < 3)
++                return;
++            keyboardPending.erase(0, 1);
++            tap(KEY_ESC, 0);
++            continue;
++        }
++
++        unsigned char c = (unsigned char)keyboardPending[0];
++        keyboardPending.erase(0, 1);
++        if (c == 0x1B) {
++            if (!keyboardPending.empty()) {
++                const char alt = keyboardPending[0];
++                keyboardPending.erase(0, 1);
++                tap(keyForASCII(alt), 2 | (asciiNeedsShift(alt) ? 1 : 0));
++            } else
++                tap(KEY_ESC, 0);
++        } else if (c >= 1 && c <= 26)
++            tap(c == 9 ? KEY_TAB : c == 10 || c == 13 ? KEY_ENTER : keyForASCII('a' + c - 1), c == 9 || c == 10 || c == 13 ? 0 : 4);
++        else
++            tap(keyForASCII((char)c), asciiNeedsShift((char)c) ? 1 : 0);
++    }
++}
++
++void Aquamarine::CHeadlessBackend::pollVinixInput() {
++    // Clear the readiness that dispatched us before emitting callbacks. A
++    // software-rendered frame can take longer than one timer period; if its
++    // expirations were drained afterwards, the event loop would lose the
++    // edge that requests the following frame.
++    uint64_t expirations = 0;
++    read(inputTimerFD, &expirations, sizeof(expirations));
++
++    // Hyprland starts Aquamarine before constructing its input manager. DRM
++    // input discovery is normally asynchronous, so publish the console
++    // devices on the first timer dispatch after its event loop is ready.
++    if (!inputPublished) {
++        backend->events.newKeyboard.emit(keyboard);
++        if (pointerFD >= 0)
++            backend->events.newPointer.emit(pointer);
++        inputPublished = true;
++    }
++
++    const auto now = std::chrono::steady_clock::now();
++    constexpr auto FRAME_INTERVAL = std::chrono::nanoseconds(TIMESPEC_NSEC_PER_SEC / 60);
++    for (const auto& output : outputs) {
++        if (output->frameScheduled && now - output->lastFrame >= FRAME_INTERVAL && output->framecb && *output->framecb)
++            (*output->framecb)();
++    }
++
++    if (pointerFD >= 0 && pointer) {
++        SVinixPointerPacket packet = {};
++        // /dev/pointer is a current-state snapshot, not an event queue: every
++        // read succeeds. Read it exactly once per tick so this callback can
++        // return to the compositor event loop.
++        if (read(pointerFD, &packet, sizeof(packet)) == (ssize_t)sizeof(packet)) {
++            const uint32_t time = monotonicMs();
++            if (packet.maxX > 0 && packet.maxY > 0)
++                pointer->events.warp.emit(IPointer::SWarpEvent{.timeMs = time, .absolute = {(double)packet.x / packet.maxX, (double)packet.y / packet.maxY}});
++            for (uint32_t i = 0; i < 3; ++i) {
++                const uint32_t bit = 1U << i;
++                if (packet.pressed & bit)
++                    pointer->events.button.emit(IPointer::SButtonEvent{.timeMs = time, .button = BTN_LEFT + i, .pressed = true});
++                if (packet.released & bit)
++                    pointer->events.button.emit(IPointer::SButtonEvent{.timeMs = time, .button = BTN_LEFT + i, .pressed = false});
++            }
++            if (packet.scroll)
++                pointer->events.axis.emit(IPointer::SAxisEvent{.timeMs = time, .axis = IPointer::AQ_POINTER_AXIS_VERTICAL,
++                    .source = IPointer::AQ_POINTER_AXIS_SOURCE_WHEEL, .delta = -15.0 * packet.scroll, .discrete = -(double)packet.scroll});
++            pointer->events.frame.emit();
++            pointerButtons = packet.buttons;
++        }
++    }
++
++    char bytes[128];
++    ssize_t count = 0;
++    while ((count = read(STDIN_FILENO, bytes, sizeof(bytes))) > 0)
++        keyboardPending.append(bytes, (size_t)count);
++    parseVinixKeyboard();
++}
++#endif

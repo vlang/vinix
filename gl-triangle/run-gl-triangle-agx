@@ -4,7 +4,8 @@ set -eu
 unset LIBGL_ALWAYS_SOFTWARE
 unset LIBGL_ALWAYS_INDIRECT
 export EGL_PLATFORM=surfaceless
-export MESA_LOADER_DRIVER_OVERRIDE=asahi
+# Mesa selects Asahi or VirGL from the DRM driver name. An explicit override
+# remains available to developers, but forcing Asahi here breaks VM testing.
 
 triangle=/usr/bin/gl-triangle-agx
 if [ "${1:-}" = --rebuild ] || [ "${1:-}" = --compile ]; then

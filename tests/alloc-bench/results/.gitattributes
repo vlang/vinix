@@ -1,0 +1,4 @@
+# Preserve captured serial output, diagnostics and patches byte for byte.
+*.log -text -whitespace
+*.patch -text -whitespace
+audit-diagnostic-x86-errors.txt -text -whitespace

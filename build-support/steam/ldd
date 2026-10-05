@@ -1,0 +1,38 @@
+#!/bin/sh
+# ldd for x86 ELF files on Steam's PATH. Steam's script asks ldd which of the
+# client's libraries are missing; the native ldd only knows AArch64 musl and
+# glibc's ldd execs the loader from the real /lib, which is not there. List
+# the dependencies with the glibc loader of the file's own word size instead.
+set -eu
+
+root="${VINIX_I386_ROOT:-/usr/libexec/vinix-steam/root}"
+root64="${VINIX_X86_64_ROOT:-$root}"
+status=0
+for file do
+    case "$file" in
+        -*) continue ;;
+    esac
+    if [ ! -r "$file" ]; then
+        echo "ldd: $file: No such file or directory" >&2
+        status=1
+        continue
+    fi
+    # EI_CLASS is the fifth byte of the ELF identification.
+    class="$(od -An -tu1 -j4 -N1 "$file" | tr -d ' ')"
+    case "$class" in
+        1) translator=/usr/bin/qemu-i386; prefix="$root"; loader="$root/lib/ld-linux.so.2"; multiarch=i386-linux-gnu ;;
+        2) translator=/usr/bin/qemu-x86_64; prefix="$root64"; loader="$root64/lib64/ld-linux-x86-64.so.2"; multiarch=x86_64-linux-gnu ;;
+        *)
+            echo "	not a dynamic executable" >&2
+            status=1
+            continue
+            ;;
+    esac
+    guest_path="$prefix/usr/lib/$multiarch:$prefix/lib/$multiarch"
+    if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+        guest_path="$guest_path:$LD_LIBRARY_PATH"
+    fi
+    LD_LIBRARY_PATH= "$translator" -L "$prefix" -E "LD_LIBRARY_PATH=$guest_path" \
+        "$loader" --list "$file" || status=$?
+done
+exit "$status"

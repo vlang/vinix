@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+if [ ! -e /dev/dri/renderD128 ]; then
+    echo "VINIX VIRGL RENDER TEST: FAIL (render node unavailable)" >&2
+    exit 1
+fi
+if [ ! -f /usr/share/vinix/mesa-x11-egl ]; then
+    echo "VINIX VIRGL RENDER TEST: FAIL (VirGL Mesa runtime unavailable)" >&2
+    exit 1
+fi
+
+output="$(/usr/bin/run-gl-triangle-agx 2>&1)" || {
+    status=$?
+    printf '%s\n' "$output" >&2
+    echo "VINIX VIRGL RENDER TEST: FAIL ($status)" >&2
+    exit "$status"
+}
+printf '%s\n' "$output"
+case "$output" in
+    *GL_RENDERER=*virgl*) ;;
+    *)
+        echo "VINIX VIRGL RENDER TEST: FAIL (renderer is not VirGL)" >&2
+        exit 1
+        ;;
+esac
+
+echo "VINIX VIRGL RENDER TEST: PASS"

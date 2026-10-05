@@ -39,6 +39,14 @@ int vinix_smc_refresh(void *state);
 int vinix_smc_cached_capacity(void *state);
 /* Timestamp of the last completed sample; serialize access with refresh. */
 uint64_t vinix_smc_sample_time(const void *state);
+/* Read-only battery telemetry. Bits 0/1/2 indicate voltage/current/power.
+ * Values are mV, signed mA and signed mW, without estimating missing sensors.
+ */
+int vinix_smc_refresh_power(void *state, unsigned *flags, int *voltage,
+                            int *current, int *power);
+uint64_t vinix_smc_power_time(const void *state);
+int vinix_smc_format_power(unsigned flags, int voltage, int current, int power,
+                           uint8_t output[128]);
 /* Produces "0\n" through "100\n", without a NUL terminator. */
 int vinix_smc_format_capacity(int percent, uint8_t output[4]);
 const char *vinix_smc_error(int result);

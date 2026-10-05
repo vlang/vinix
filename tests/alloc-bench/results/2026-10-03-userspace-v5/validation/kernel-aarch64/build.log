@@ -1,0 +1,2052 @@
+rm -rf bin obj cc-runtime-x86_64 cc-runtime-aarch64
+mkdir -p obj
+mkdir -p "$(dirname obj/c/aarch64_paging.c.o)"
+mkdir -p "$(dirname obj/c/acpi_sync_test.c.o)"
+mkdir -p "$(dirname obj/c/agx_fake_g17.c.o)"
+mkdir -p "$(dirname obj/c/agx_fake_g17_encode.c.o)"
+mkdir -p "$(dirname obj/c/apple_ans.c.o)"
+mkdir -p "$(dirname obj/c/apple_ans_ext2.c.o)"
+rm -f obj/.v-config-*
+mkdir -p "$(dirname obj/c/apple_display_hotplug.c.o)"
+touch obj/.v-config-aarch64-limine-mp-1-alloc-track--linuxkpi-0
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/agx_fake_g17.c -o obj/c/agx_fake_g17.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_display_hotplug.c -o obj/c/apple_display_hotplug.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/aarch64_paging.c -o obj/c/aarch64_paging.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/agx_fake_g17_encode.c -o obj/c/agx_fake_g17_encode.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_ans.c -o obj/c/apple_ans.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/acpi_sync_test.c -o obj/c/acpi_sync_test.c.o
+mkdir -p "$(dirname obj/c/apple_smc.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_ans_ext2.c -o obj/c/apple_ans_ext2.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_smc.c -o obj/c/apple_smc.c.o
+mkdir -p "$(dirname obj/c/apple_speakers.c.o)"
+mkdir -p "$(dirname obj/c/apple_spi_keyboard.c.o)"
+mkdir -p "$(dirname obj/c/brcm_m1.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_spi_keyboard.c -o obj/c/apple_spi_keyboard.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/apple_speakers.c -o obj/c/apple_speakers.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/brcm_m1.c -o obj/c/brcm_m1.c.o
+mkdir -p "$(dirname obj/c/brcm_wifi.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/brcm_wifi.c -o obj/c/brcm_wifi.c.o
+mkdir -p "$(dirname obj/c/explicit_bzero.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/explicit_bzero.c -o obj/c/explicit_bzero.c.o
+mkdir -p "$(dirname obj/c/flanterm/backends/fb.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -DFLANTERM_FB_DISABLE_BUMP_ALLOC -c c/flanterm/backends/fb.c -o obj/c/flanterm/backends/fb.c.o
+mkdir -p "$(dirname obj/c/flanterm/flanterm.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/flanterm/flanterm.c -o obj/c/flanterm/flanterm.c.o
+mkdir -p "$(dirname obj/c/heap_benchmark.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/heap_benchmark.c -o obj/c/heap_benchmark.c.o
+mkdir -p "$(dirname obj/c/hw_random.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/hw_random.c -o obj/c/hw_random.c.o
+mkdir -p "$(dirname obj/c/linuxkpi.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_bitmap.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi.c -o obj/c/linuxkpi.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_bitmap.c -o obj/c/linuxkpi_bitmap.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_io.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_io_test.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_io.c -o obj/c/linuxkpi_io.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_percpu.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_refcount.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_srcu.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_io_test.c -o obj/c/linuxkpi_io_test.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_srcu_test.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_percpu.c -o obj/c/linuxkpi_percpu.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_refcount.c -o obj/c/linuxkpi_refcount.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_srcu.c -o obj/c/linuxkpi_srcu.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_string.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_srcu_test.c -o obj/c/linuxkpi_srcu_test.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_string.c -o obj/c/linuxkpi_string.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_sync.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_task.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_time.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_timer.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_wait_bit.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_sync.c -o obj/c/linuxkpi_sync.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_task.c -o obj/c/linuxkpi_task.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_timer.c -o obj/c/linuxkpi_timer.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_time.c -o obj/c/linuxkpi_time.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_wait_bit.c -o obj/c/linuxkpi_wait_bit.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_wait_bit_test.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_worker_test.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_wait_bit_test.c -o obj/c/linuxkpi_wait_bit_test.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_workqueue.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_worker_test.c -o obj/c/linuxkpi_worker_test.c.o
+mkdir -p "$(dirname obj/c/linuxkpi_ww_mutex.c.o)"
+mkdir -p "$(dirname obj/c/linuxkpi_ww_mutex_test.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/altcp.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/altcp_alloc.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_workqueue.c -o obj/c/linuxkpi_workqueue.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_ww_mutex.c -o obj/c/linuxkpi_ww_mutex.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/linuxkpi_ww_mutex_test.c -o obj/c/linuxkpi_ww_mutex_test.c.o
+mkdir -p "$(dirname obj/c/lwip/core/altcp_tcp.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/altcp_alloc.c -o obj/c/lwip/core/altcp_alloc.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/altcp.c -o obj/c/lwip/core/altcp.c.o
+mkdir -p "$(dirname obj/c/lwip/core/def.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/altcp_tcp.c -o obj/c/lwip/core/altcp_tcp.c.o
+mkdir -p "$(dirname obj/c/lwip/core/dns.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/inet_chksum.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/def.c -o obj/c/lwip/core/def.c.o
+mkdir -p "$(dirname obj/c/lwip/core/init.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ip.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/acd.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/autoip.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/inet_chksum.c -o obj/c/lwip/core/inet_chksum.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/dns.c -o obj/c/lwip/core/dns.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ip.c -o obj/c/lwip/core/ip.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/init.c -o obj/c/lwip/core/init.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/acd.c -o obj/c/lwip/core/ipv4/acd.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/autoip.c -o obj/c/lwip/core/ipv4/autoip.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/dhcp.c.o)"
+c/lwip/core/def.c:108:28: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+  108 |   size_t tokenlen = strlen(token);
+      |                            ^~~~~
+c/string.h:19:21: note: passing argument to parameter 's' here
+   19 | size_t strlen(char *s);
+      |                     ^
+c/lwip/core/def.c:113:36: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+  113 |     if ((*p == *token) && (strncmp(p, token, tokenlen) == 0)) {
+      |                                    ^
+c/string.h:18:19: note: passing argument to parameter 's1' here
+   18 | int strncmp(char *s1, char *s2, size_t n);
+      |                   ^
+c/lwip/core/def.c:113:39: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+  113 |     if ((*p == *token) && (strncmp(p, token, tokenlen) == 0)) {
+      |                                       ^~~~~
+c/string.h:18:29: note: passing argument to parameter 's2' here
+   18 | int strncmp(char *s1, char *s2, size_t n);
+      |                             ^
+c/lwip/core/def.c:131:28: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+  131 |   size_t tokenlen = strlen(token);
+      |                            ^~~~~
+c/string.h:19:21: note: passing argument to parameter 's' here
+   19 | size_t strlen(char *s);
+      |                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/dhcp.c -o obj/c/lwip/core/ipv4/dhcp.c.o
+4 warnings generated.
+c/lwip/core/dns.c:1588:24: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+ 1588 |   hostnamelen = strlen(hostname);
+      |                        ^~~~~~~~
+c/string.h:19:21: note: passing argument to parameter 's' here
+   19 | size_t strlen(char *s);
+      |                     ^
+c/lwip/core/dns.c:1599:14: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+ 1599 |   if (strcmp(hostname, "localhost") == 0) {
+      |              ^~~~~~~~
+c/string.h:17:18: note: passing argument to parameter 's1' here
+   17 | int strcmp(char *s1, char *s2);
+      |                  ^
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/etharp.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/icmp.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/igmp.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/etharp.c -o obj/c/lwip/core/ipv4/etharp.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/ip4.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/icmp.c -o obj/c/lwip/core/ipv4/icmp.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/igmp.c -o obj/c/lwip/core/ipv4/igmp.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/ip4_addr.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/ip4.c -o obj/c/lwip/core/ipv4/ip4.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv4/ip4_frag.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/ip4_addr.c -o obj/c/lwip/core/ipv4/ip4_addr.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv4/ip4_frag.c -o obj/c/lwip/core/ipv4/ip4_frag.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/dhcp6.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/dhcp6.c -o obj/c/lwip/core/ipv6/dhcp6.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/ethip6.c.o)"
+2 warnings generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/ethip6.c -o obj/c/lwip/core/ipv6/ethip6.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/icmp6.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/icmp6.c -o obj/c/lwip/core/ipv6/icmp6.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/inet6.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/ip6.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/ip6_addr.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/ip6_frag.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/inet6.c -o obj/c/lwip/core/ipv6/inet6.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/ip6.c -o obj/c/lwip/core/ipv6/ip6.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/ip6_addr.c -o obj/c/lwip/core/ipv6/ip6_addr.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/ip6_frag.c -o obj/c/lwip/core/ipv6/ip6_frag.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/mld6.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/mld6.c -o obj/c/lwip/core/ipv6/mld6.c.o
+mkdir -p "$(dirname obj/c/lwip/core/ipv6/nd6.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/mem.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/memp.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/ipv6/nd6.c -o obj/c/lwip/core/ipv6/nd6.c.o
+mkdir -p "$(dirname obj/c/lwip/core/netif.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/mem.c -o obj/c/lwip/core/mem.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/memp.c -o obj/c/lwip/core/memp.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/netif.c -o obj/c/lwip/core/netif.c.o
+mkdir -p "$(dirname obj/c/lwip/core/pbuf.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/pbuf.c -o obj/c/lwip/core/pbuf.c.o
+mkdir -p "$(dirname obj/c/lwip/core/raw.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/stats.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/sys.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/tcp.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/raw.c -o obj/c/lwip/core/raw.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/sys.c -o obj/c/lwip/core/sys.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/stats.c -o obj/c/lwip/core/stats.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/tcp.c -o obj/c/lwip/core/tcp.c.o
+mkdir -p "$(dirname obj/c/lwip/core/tcp_in.c.o)"
+c/lwip/core/pbuf.c:1549:23: warning: passing 'const char *' to parameter of type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+ 1549 |   substr_len = strlen(substr);
+      |                       ^~~~~~
+c/string.h:19:21: note: passing argument to parameter 's' here
+   19 | size_t strlen(char *s);
+      |                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/tcp_in.c -o obj/c/lwip/core/tcp_in.c.o
+mkdir -p "$(dirname obj/c/lwip/core/tcp_out.c.o)"
+mkdir -p "$(dirname obj/c/lwip/core/timeouts.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/tcp_out.c -o obj/c/lwip/core/tcp_out.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/timeouts.c -o obj/c/lwip/core/timeouts.c.o
+mkdir -p "$(dirname obj/c/lwip/core/udp.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/core/udp.c -o obj/c/lwip/core/udp.c.o
+mkdir -p "$(dirname obj/c/lwip/netif/ethernet.c.o)"
+1 warning generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/lwip/netif/ethernet.c -o obj/c/lwip/netif/ethernet.c.o
+mkdir -p "$(dirname obj/c/memory.c.o)"
+mkdir -p "$(dirname obj/c/net_random.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/memory.c -o obj/c/memory.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/net_random.c -o obj/c/net_random.c.o
+mkdir -p "$(dirname obj/c/printf.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/printf.c -o obj/c/printf.c.o
+mkdir -p "$(dirname obj/c/printf_benchmark.c.o)"
+mkdir -p "$(dirname obj/c/stack_protector.c.o)"
+mkdir -p "$(dirname obj/c/uacpi/default_handlers.c.o)"
+c/printf.c:30:13: warning: unused function '_putchar' [-Wunused-function]
+   30 | static void _putchar(int character, void *extra_arg) {
+      |             ^~~~~~~~
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/printf_benchmark.c -o obj/c/printf_benchmark.c.o
+mkdir -p "$(dirname obj/c/uacpi/event.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/stack_protector.c -o obj/c/stack_protector.c.o
+mkdir -p "$(dirname obj/c/uacpi/interpreter.c.o)"
+mkdir -p "$(dirname obj/c/uacpi/io.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/default_handlers.c -o obj/c/uacpi/default_handlers.c.o
+mkdir -p "$(dirname obj/c/uacpi/mutex.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/event.c -o obj/c/uacpi/event.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/interpreter.c -o obj/c/uacpi/interpreter.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/io.c -o obj/c/uacpi/io.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/mutex.c -o obj/c/uacpi/mutex.c.o
+mkdir -p "$(dirname obj/c/uacpi/namespace.c.o)"
+In file included from c/uacpi/default_handlers.c:1:
+In file included from c/uacpi/internal/opregion.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/default_handlers.c:2:
+In file included from c/uacpi/internal/namespace.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/default_handlers.c:2:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/event.c:1:
+In file included from c/uacpi/internal/event.h:3:
+In file included from c/uacpi/event.h:4:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/default_handlers.c:6:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } uacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef struct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+mkdir -p "$(dirname obj/c/uacpi/notify.c.o)"
+In file included from c/uacpi/event.c:3:
+In file included from c/uacpi/internal/context.h:6:
+In file included from c/uacpi/internal/dynamic_array.h:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/interpreter.c:1:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/interpreter.c:2:
+In file included from c/uacpi/internal/interpreter.h:5:
+In file included from c/uacpi/internal/namespace.h:6In file included from c/uacpi/event.c:4:
+c/uacpi/namespace.h:10:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } u:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | tyacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef pedef struct uacpi_nstruct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+amespace_node uacpi_namespace_node;
+      | In file included from c/uacpi/event.c:6:
+                                    ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpic/uacpi/internal/namespace.h:_nam35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]espa
+   35 | } uacpi_ce_nnode uacpami_namespace_node;
+      |                                     ^
+espace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_noIn file included from c/uacpi/interpreter.c:2:
+In file included from c/uacpi/internal/interpreter.h:5:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+de uacpi_namespace_node;
+      |                                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/namespace.c -o obj/c/uacpi/namespace.c.o
+In file included from c/uacpi/io.c:1:
+In file included from c/uacpi/internal/io.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/io.c:1:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } uacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef struct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+In file included from c/uacpi/mutex.c:2:
+In file included from c/uacpi/internal/mutex.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_objectIn file included from c/uacpi/io.c:3:
+In file included from c/uacpi/internal/log.h:4:
+In file included from c/uacpi/internal/context.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+;
+      |                             ^
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/interpreter.c:14:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } uacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef struct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+In file included from c/uacpi/io.c:7:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uIn file included from c/uacpi/mutex.c:3:
+In file included from c/uacpi/internal/log.h:4:
+In file included from c/uacpi/internal/context.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_nacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+amespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/notify.c -o obj/c/uacpi/notify.c.o
+In file included from c/uacpi/mutex.c:7:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+4 warnings generated.
+In file included from c/uacpi/namespace.c:1:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/namespace.c:2:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/namespace.c:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+mkdir -p "$(dirname obj/c/uacpi/opcodes.c.o)"
+In file included from c/uacpi/notify.c:1:
+In file included from c/uacpi/internal/notify.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/notify.c:3:
+In file included from c/uacpi/internal/namespace.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/notify.c:3:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+1 warning generated.
+mkdir -p "$(dirname obj/c/uacpi/opregion.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/opcodes.c -o obj/c/uacpi/opcodes.c.o
+3 warnings generated.
+mkdir -p "$(dirname obj/c/uacpi/osi.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/opregion.c -o obj/c/uacpi/opregion.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/osi.c -o obj/c/uacpi/osi.c.o
+3 warnings generated.
+mkdir -p "$(dirname obj/c/uacpi/registers.c.o)"
+In file included from c/uacpi/opregion.c:3:
+In file included from c/uacpi/internal/opregion.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/opregion.c:4:
+In file included from c/uacpi/internal/namespace.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_name/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/registers.c -o obj/c/uacpi/registers.c.o
+space_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/opregion.c:4:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+mkdir -p "$(dirname obj/c/uacpi/resources.c.o)"
+In file included from c/uacpi/osi.c:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/osi.c:5:
+In file included from c/uacpi/internal/utilities.h:4:
+In file included from c/uacpi/utilities.h:5:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+4 warnings generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/resources.c -o obj/c/uacpi/resources.c.o
+mkdir -p "$(dirname obj/c/uacpi/shareable.c.o)"
+In file included from c/uacpi/registers.c:2:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/registers.c:3:
+In file included from c/uacpi/internal/context.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/shareable.c -o obj/c/uacpi/shareable.c.o
+In file included from c/uacpi/registers.c:4:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } uacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef struct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+3 warnings generated.
+mkdir -p "$(dirname obj/c/uacpi/sleep.c.o)"
+In file included from c/uacpi/resources.c:3:
+In file included from c/uacpi/internal/resources.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/resources.c:5:
+In file included from c/uacpi/internal/utilities.h:4:
+In file included from c/uacpi/utilities.h:5:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/resources.c:7:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/sleep.c -o obj/c/uacpi/sleep.c.o
+2 warnings generated.
+mkdir -p "$(dirname obj/c/uacpi/stdlib.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/stdlib.c -o obj/c/uacpi/stdlib.c.o
+mkdir -p "$(dirname obj/c/uacpi/tables.c.o)"
+3 warnings generated.
+mkdir -p "$(dirname obj/c/uacpi/types.c.o)"
+3 warnings generated.
+In file included from c/uacpi/sleep.c:1:
+In file included from c/uacpi/sleep.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/sleep.c:2:
+In file included from c/uacpi/internal/context.h:6:
+In file included from c/uacpi/internal/dynamic_array.h:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+mkdir -p "$(dirname obj/c/uacpi/uacpi.c.o)"
+In file included from c/uacpi/sleep.c:4:
+c/uacpi/internal/io.h:21:3: warning: redefinition of typedef 'uacpi_mapped_gas' is a C11 feature [-Wtypedef-redefinition]
+   21 | } uacpi_mapped_gas;
+      |   ^
+c/uacpi/io.h:13:33: note: previous definition is here
+   13 | typedef struct uacpi_mapped_gas uacpi_mapped_gas;
+      |                                 ^
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/tables.c -o obj/c/uacpi/tables.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/types.c -o obj/c/uacpi/types.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/uacpi.c -o obj/c/uacpi/uacpi.c.o
+In file included from c/uacpi/stdlib.c:1:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/stdlib.c:2:
+In file included from c/uacpi/internal/utilities.h:4:
+In file included from c/uacpi/utilities.h:5:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/tables.c:1:
+In file included from c/uacpi/internal/tables.h:3:
+In file included from c/uacpi/internal/context.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/tables.c:1:
+In file included from c/uacpi/internal/tables.h:3:
+In file included from c/uacpi/internal/context.h:6:
+In file included from c/uacpi/internal/dynamic_array.h:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/tables.c:1:
+In file included from c/uacpi/internal/tables.h:4:
+In file included from c/uacpi/internal/interpreter.h:5:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/types.c:2:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/types.c:6:
+In file included from c/uacpi/internal/log.h:4:
+In file included from c/uacpi/internal/context.h:5:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/uacpi.c:1:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_nIn file included from c/uacpi/types.c:7:
+c/uacpi/internal/namespace.h:35:3: ode uacwarning: pi_namespredefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+ace_node;
+      |                                     ^
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/uacpi.c:5:
+In file included from c/uacpi/internal/log.h:4:
+In file included from c/uacpi/internal/context.h:6:
+In file included from c/uacpi/internal/dynamic_array.h:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+3 warnings generated.
+In file included from c/uacpi/uacpi.c:8:
+In file included from c/uacpi/internal/tables.h:4:
+In file included from c/uacpi/internal/interpreter.h:5:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+mkdir -p "$(dirname obj/c/uacpi/utilities.c.o)"
+4 warnings generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/uacpi/utilities.c -o obj/c/uacpi/utilities.c.o
+mkdir -p "$(dirname obj/c/vinix_net.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/vinix_net.c -o obj/c/vinix_net.c.o
+In file included from c/uacpi/utilities.c:3:
+In file included from c/uacpi/uacpi.h:6:
+c/uacpi/namespace.h:10:37: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+c/uacpi/types.h:95:37: note: previous definition is here
+   95 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+In file included from c/uacpi/utilities.c:5:
+In file included from c/uacpi/internal/context.h:6:
+In file included from c/uacpi/internal/dynamic_array.h:4:
+In file included from c/uacpi/internal/stdlib.h:3:
+c/uacpi/internal/types.h:269:3: warning: redefinition of typedef 'uacpi_object' is a C11 feature [-Wtypedef-redefinition]
+  269 | } uacpi_object;
+      |   ^
+c/uacpi/types.h:142:29: note: previous definition is here
+  142 | typedef struct uacpi_object uacpi_object;
+      |                             ^
+In file included from c/uacpi/utilities.c:8:
+c/uacpi/internal/namespace.h:35:3: warning: redefinition of typedef 'uacpi_namespace_node' is a C11 feature [-Wtypedef-redefinition]
+   35 | } uacpi_namespace_node;
+      |   ^
+c/uacpi/namespace.h:10:37: note: previous definition is here
+   10 | typedef struct uacpi_namespace_node uacpi_namespace_node;
+      |                                     ^
+3 warnings generated.
+mkdir -p "$(dirname obj/c/vmx.c.o)"
+3 warnings generated.
+mkdir -p "$(dirname obj/asm/aarch64/fpu.S.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/vmx.c -o obj/c/vmx.c.o
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c asm/aarch64/fpu.S -o obj/asm/aarch64/fpu.S.o
+2 warnings generated.
+mkdir -p "$(dirname obj/asm/aarch64/kio.S.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c asm/aarch64/kio.S -o obj/asm/aarch64/kio.S.o
+mkdir -p "$(dirname obj/asm/aarch64/psci.S.o)"
+mkdir -p "$(dirname obj/asm/aarch64/sched_switch.S.o)"
+3 warnings generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c asm/aarch64/psci.S -o obj/asm/aarch64/psci.S.o
+mkdir -p "$(dirname obj/asm/aarch64/vectors.S.o)"
+3 warnings generated.
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c asm/aarch64/sched_switch.S -o obj/asm/aarch64/sched_switch.S.o
+rm -rf cc-runtime-aarch64
+cp -r cc-runtime cc-runtime-aarch64
+mkdir -p "$(dirname obj/blob.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c asm/aarch64/vectors.S -o obj/asm/aarch64/vectors.S.o
+rm -rf obj/vsrc
+3 warnings generated.
+for f in aarch64/aic/aic.v aarch64/cpu/cpu.v aarch64/cpu/initialisation/initialisation.v aarch64/cpu/local/local.v aarch64/exception/exception.v aarch64/firmware/firmware.v aarch64/gic/gic.v aarch64/kio/kio.v aarch64/pcie/pcie.v aarch64/pmgr/pmgr.v aarch64/smp/request_d_limine_mp.v aarch64/smp/request_notd_limine_mp.v aarch64/smp/smp.v aarch64/timer/timer.v aarch64/uart/uart.v aarch64/virtio_blk/virtio_blk.v aarch64/virtio_gpu/pci.v aarch64/virtio_gpu/venus.v aarch64/virtio_gpu/virtio_gpu.v aarch64/virtio_input/virtio_input.v aarch64/virtio_net/virtio_net.v aarch64/virtio_snd/virtio_snd.v aarch64/wdt/wdt.v aarch64/xhci/hid.v aarch64/xhci/xhci.v acpisync/clock_arm64.v acpisync/sync.v apple/ans/ans.v apple/ans/datafs.v apple/ans/platform.v apple/ans/rootfs.v apple/dart/dart.v apple/dart/t8110.v apple/mailbox/mailbox.v apple/pmp/pmp.v apple/rtkit/rtkit.v apple/smc/smc.v apple/speakers/speakers.v apple/spi_keyboard/spi_keyboard.v apple/spi_keyboard/touchpad.v apple/typec/typec.v apple/wifi/wifi.v bitmap/bitmap.v block/partition/partition.v dev/ahci/ahci.v dev/console/console_arm64.v dev/console/terminal.v dev/e1000/e1000.v dev/e1000/e1000_arm64.v dev/fbdev/api/driver.v dev/fbdev/api/linux_uapi.v dev/fbdev/fbdev.v dev/fbdev/simple/simple.v dev/keyboard/keyboard.v dev/oss/dsp.v dev/oss/mixer.v dev/pointerdev/pointerdev.v dev/procdev/procdev.v dev/pty/pty.v dev/random/random.v dev/streams/streams.v dev/tty/tty.v devicetree/devicetree.v drm/drm.v drm/gem/gem.v drm/ioctl/ioctl.v drm/mode/mode.v drm/simple/simple.v drm/syncobj/syncobj.v elf/elf.v errno/errno.v event/event.v event/event_arm64.v event/eventstruct/eventstruct.v event/stack_list.v fdtstrings/fdtstrings.v file/epoll.v file/epoll_arm64.v file/eventfd.v file/file.v file/locks.v file/memory_pressure.v file/pselect.v file/timerfd.v flanterm/flanterm.v fs/attributes.v fs/cgroup.v fs/cpuinfo_arm64.v fs/devtmpfs.v fs/disk_root.v fs/ext2/ext2.v fs/ext2/mapping.v fs/ext2/mkfs.v fs/ext2/namespace.v fs/ext2/pagecache.v fs/ext2/xattr.v fs/ext2/xattr_block.v fs/inotify.v fs/mknod.v fs/mount.v fs/mount_policy.v fs/namespaces.v fs/overlay.v fs/permissions.v fs/policy.v fs/procfs.v fs/removed.v fs/ssd_root_arm64.v fs/sysfs.v fs/tmpfs.v fs/vfs.v fs/wx_policy.v fs/xattr.v futex/futex.v gpu/agx/alloc/alloc.v gpu/agx/bo/bo.v gpu/agx/buffer/buffer.v gpu/agx/channel/channel.v gpu/agx/command/command.v gpu/agx/compute/compute.v gpu/agx/driver/driver.v gpu/agx/event/event.v gpu/agx/fake/backend.v gpu/agx/fake/descriptor.v gpu/agx/fake/driver.v gpu/agx/fake/vm.v gpu/agx/file/file.v gpu/agx/fw/buffer.v gpu/agx/fw/channels.v gpu/agx/fw/compute.v gpu/agx/fw/event_g13.v gpu/agx/fw/fragment.v gpu/agx/fw/g13_initdata_layout.v gpu/agx/fw/g13_initdata_layout_use.v gpu/agx/fw/g17.v gpu/agx/fw/g17_power_model.v gpu/agx/fw/g17_power_tables.v gpu/agx/fw/initdata_g13.v gpu/agx/fw/initdata_g13_globals.v gpu/agx/fw/initdata_g13_hwdata.v gpu/agx/fw/initdata_g13_hwdata_a.v gpu/agx/fw/initdata_g13_v13_5.v gpu/agx/fw/job.v gpu/agx/fw/microseq.v gpu/agx/fw/types.v gpu/agx/fw/vertex.v gpu/agx/fw/workqueue.v gpu/agx/gpu/g13.v gpu/agx/gpu/g17.v gpu/agx/gpu/gpu.v gpu/agx/hw/hw.v gpu/agx/hw/perf.v gpu/agx/hw/t6050.v gpu/agx/hw/t8103.v gpu/agx/mmu/mmu.v gpu/agx/pgtable/pgtable.v gpu/agx/power/power.v gpu/agx/queue/compute.v gpu/agx/queue/render.v gpu/agx/regs/regs.v gpu/agx/render/render.v gpu/agx/submission/submission.v gpu/agx/vm/vm.v gpu/agx/workqueue/workqueue.v gpu/dcp/afk.v gpu/dcp/backlight/backlight.v gpu/dcp/backlight/core/core.v gpu/dcp/backlight_transport.v gpu/dcp/dcp.v gpu/dcp/iomfb.v gpu/dcp/plane.v initramfs/initramfs.v initramfs/uart_arm64.v ioctl/common.v ioctl/fbio.v ioctl/term.v katomic/katomic_arm64.v klock/klock_arm64.v kprint/kprint.v kprint/kprint_arm64.v krandom/random.v krandom/random_arm64.v lib/bit.v lib/kprintf.v lib/math.v lib/mount_context.v lib/panic.v lib/panic_arm64.v lib/stack_slots.v lib/stubs/file.v lib/stubs/misc.v lib/stubs/pthread.v lib/stubs/string.v lib/text.v limine/limine.v limine/smp_arm64.v main.v main_arm64.v memory/acpi_sync_snapshot.v memory/heap_selftest.v memory/inspection.v memory/mmap/immutable.v memory/mmap/inherit.v memory/mmap/linux.v memory/mmap/maps.v memory/mmap/mmap.v memory/mmap/mmap_arm64.v memory/mmap/noexec.v memory/mmap/page_in.v memory/physical.v memory/physical_numa.v memory/pressure.v memory/pressure_policy.v memory/slab.v memory/user_guard.v memory/virtual.v memory/virtual_arm64.v memory/vmap.v memory/vmap_arm64.v memory/xnu_zone_heap.v memory/xnu_zone_heap_arm64.v net/hostname.v numa/numa.v numa/numa_acpi.v numa/numa_arm64.v pagecache/pagecache.v pagecache/reclaim.v pci/device.v pci/device_arm64.v pci/scan.v pipe/pipe.v pipe/transfer.v pipe/usercopy.v posixtimer/posix_timer.v proc/cgroup_account.v proc/container.v proc/cpu_account.v proc/fs_mount.v proc/inspect.v proc/pidns.v proc/pledge.v proc/proc.v proc/proc_arm64.v proc/seccomp.v proc/sigcookie.v proc/signal_bits.v proc/thread_refs.v proc/unveil.v resource/attributes.v resource/cache.v resource/flags_arm64.v resource/resource.v resource/xattr.v sched/inherit.v sched/itimer.v sched/kernel_thread_arm64.v sched/policy.v sched/preemption.v sched/reap.v sched/sched.v sched/sched_arm64.v sched/user_stack.v security/audit.v security/policy.v security/securelevel.v socket/inet/inet.v socket/inet/interfaces.v socket/netlink/netlink.v socket/public/public.v socket/socket.v socket/unix/unix.v stat/stat.v syscall/common.v syscall/table/container.v syscall/table/container_arm64.v syscall/table/gaps.v syscall/table/linux_common.v syscall/table/linux_compat.v syscall/table/mmap_aslr.v syscall/table/mmap_aslr_arm64.v syscall/table/pledge.v syscall/table/pledge_arm64.v syscall/table/process_vm.v syscall/table/storage.v syscall/table/storage_arm64.v syscall/table/syscall_table_arm64.v sysdisk/sysdisk.v sysvmsg/sysvmsg.v sysvsem/sysvsem.v sysvshm/sysvshm.v term/term.v termios/termios.v time/sys/linux.v time/sys/syscalls.v time/time.v time/time_arm64.v usercopy/usercopy.v usercopy/word_atomic_arm64.v userland/clone_arm64.v userland/cred.v userland/exec.v userland/exec_args.v userland/exit.v userland/linux_task.v userland/owed_sync.v userland/signal.v userland/signal_numbers.v userland/signal_send.v userland/signalfd.v userland/userland_arm64.v xnualloc/bitmap.v xnualloc/buddy.v xnualloc/magazine.v xnualloc/zone.v; do mkdir -p "obj/vsrc/$(dirname $f)" && ln -sf "/Users/alex/code/vinix/third_party/useralloc-speed-v5/kernel/$f" "obj/vsrc/$f"; done
+mkdir -p "$(dirname obj/c/alloc_track.c.o)"
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -c c/alloc_track.c -o obj/c/alloc_track.c.o
+/Library/Developer/CommandLineTools/usr/bin/make -C cc-runtime-aarch64 -f cc-runtime.mk \
+		CC="/usr/bin/clang -target aarch64-unknown-none" \
+		AR="/opt/homebrew/opt/llvm/bin/llvm-ar" \
+		CFLAGS="-g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only" \
+		CPPFLAGS='-isystem ../freestnd-c-hdrs -DCC_RUNTIME_NO_FLOAT'
+Building cc-runtime.a...
+4 warnings generated.
+-rw-r--r--@ 1 alex  staff  398972 Oct  3 00:27 cc-runtime.a
+Done.
+cp v.mod obj/vsrc/v.mod
+/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v -d heap_selftest -os vinix -enable-globals -nofloat -manualfree -message-limit 10000 -gc none -target-libc-headers -no-closures -d no_backtrace -arch arm64 -d aarch64 -d limine_mp -prod -o obj/blob.c obj/vsrc
+main.v:10:8: warning: module 'stubs (lib.stubs)' is imported but never used. Use `import stubs (lib.stubs) as _`, to silence this warning, or just remove the unused import line
+    8 | import fs
+    9 | import krandom
+   10 | import lib.stubs
+      |        ~~~~~~~~~
+   11 | import limine
+   12 | import memory
+main_arm64.v:41:8: warning: module 'inet (socket.inet)' is imported but never used. Use `import inet (socket.inet) as _`, to silence this warning, or just remove the unused import line
+   39 | import futex
+   40 | import socket
+   41 | import socket.inet
+      |        ~~~~~~~~~~~
+   42 | import limine
+   43 | import event
+main_arm64.v:43:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+   41 | import socket.inet
+   42 | import limine
+   43 | import event
+      |        ~~~~~
+   44 | import pagecache
+   45 | import gpu.agx.driver as agx_driver
+main_arm64.v:44:8: warning: module 'pagecache' is imported but never used. Use `import pagecache as _`, to silence this warning, or just remove the unused import line
+   42 | import limine
+   43 | import event
+   44 | import pagecache
+      |        ~~~~~~~~~
+   45 | import gpu.agx.driver as agx_driver
+   46 | import gpu.agx.fake as fake_agx
+fs/attributes.v:22:8: warning: module 'stat' is imported but never used. Use `import stat as _`, to silence this warning, or just remove the unused import line
+   20 | import resource
+   21 | import security
+   22 | import stat
+      |        ~~~~
+   23 | import usercopy
+   24 |
+fs/vfs.v:11:8: warning: module 'security' is imported but never used. Use `import security as _`, to silence this warning, or just remove the unused import line
+    9 | import file
+   10 | import errno
+   11 | import security
+      |        ~~~~~~~~
+   12 | import ioctl
+   13 | import time
+memory/slab.v:7:8: warning: module 'xnualloc' is imported but never used. Use `import xnualloc as _`, to silence this warning, or just remove the unused import line
+    5 | import klock
+    6 | import lib
+    7 | import xnualloc
+      |        ~~~~~~~~
+    8 | 
+    9 | // The default bitmap path remains the independent Vinix implementation.
+aarch64/exception/exception.v:8:8: warning: module 'lib' is imported but never used. Use `import lib as _`, to silence this warning, or just remove the unused import line
+    6 | import aarch64.uart
+    7 | import klock
+    8 | import lib
+      |        ~~~
+    9 | import memory
+   10 | import memory.mmap
+aarch64/smp/smp.v:4:8: warning: module 'limine' is imported but never used. Use `import limine as _`, to silence this warning, or just remove the unused import line
+    2 | module smp
+    3 | 
+    4 | import limine
+      |        ~~~~~~
+    5 | import memory
+    6 | import katomic
+sched/sched_arm64.v:14:8: warning: module 'mmap (memory.mmap)' is imported but never used. Use `import mmap (memory.mmap) as _`, to silence this warning, or just remove the unused import line
+   12 | import proc
+   13 | import memory
+   14 | import memory.mmap
+      |        ~~~~~~~~~~~
+   15 | import elf
+   16 | import lib
+proc/proc_arm64.v:5:8: warning: module 'katomic' is imported but never used. Use `import katomic as _`, to silence this warning, or just remove the unused import line
+    3 | 
+    4 | import klock
+    5 | import katomic
+      |        ~~~~~~~
+    6 | import lib
+    7 | import aarch64.cpu
+gpu/dcp/afk.v:12:8: warning: module 'memory' is imported but never used. Use `import memory as _`, to silence this warning, or just remove the unused import line
+   10 | // reply, report) on top of AFK queue entries.
+   11 | 
+   12 | import memory
+      |        ~~~~~~
+   13 | import klock
+   14 | import aarch64.cpu
+gpu/dcp/iomfb.v:15:8: warning: module 'memory' is imported but never used. Use `import memory as _`, to silence this warning, or just remove the unused import line
+   13 | import apple.mailbox
+   14 | import klock
+   15 | import memory
+      |        ~~~~~~
+   16 | import aarch64.cpu
+   17 |
+gpu/dcp/plane.v:9:8: warning: module 'gem (drm.gem)' is imported but never used. Use `import gem (drm.gem) as _`, to silence this warning, or just remove the unused import line
+    7 | 
+    8 | import drm.mode
+    9 | import drm.gem
+      |        ~~~~~~~
+   10 | import klock
+   11 |
+gpu/dcp/plane.v:10:8: warning: module 'klock' is imported but never used. Use `import klock as _`, to silence this warning, or just remove the unused import line
+    8 | import drm.mode
+    9 | import drm.gem
+   10 | import klock
+      |        ~~~~~
+   11 | 
+   12 | // Supported pixel formats (DRM fourcc codes)
+syscall/table/syscall_table_arm64.v:8:8: warning: module 'futex' is imported but never used. Use `import futex as _`, to silence this warning, or just remove the unused import line
+    6 | import aarch64.cpu
+    7 | import userland
+    8 | import futex
+      |        ~~~~~
+    9 | import pipe
+   10 | import posixtimer
+syscall/table/syscall_table_arm64.v:15:8: warning: module 'time' is imported but never used. Use `import time as _`, to silence this warning, or just remove the unused import line
+   13 | import memory.mmap
+   14 | import numa
+   15 | import time
+      |        ~~~~
+   16 | import time.sys
+   17 | import net
+syscall/table/syscall_table_arm64.v:29:8: warning: module 'krandom' is imported but never used. Use `import krandom as _`, to silence this warning, or just remove the unused import line
+   27 | import sysvsem
+   28 | import sysvmsg
+   29 | import krandom
+      |        ~~~~~~~
+   30 | 
+   31 | // Linux aarch64 syscall numbers (from asm-generic/unistd.h).
+userland/clone_arm64.v:10:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+    8 | import aarch64.cpu.local as cpulocal
+    9 | import errno
+   10 | import event
+      |        ~~~~~
+   11 | import event.eventstruct
+   12 | import file
+userland/clone_arm64.v:11:8: warning: module 'eventstruct (event.eventstruct)' is imported but never used. Use `import eventstruct (event.eventstruct) as _`, to silence this warning, or just remove the unused import line
+    9 | import errno
+   10 | import event
+   11 | import event.eventstruct
+      |        ~~~~~~~~~~~~~~~~~
+   12 | import file
+   13 | import fs
+userland/clone_arm64.v:14:8: warning: module 'futex' is imported but never used. Use `import futex as _`, to silence this warning, or just remove the unused import line
+   12 | import file
+   13 | import fs
+   14 | import futex
+      |        ~~~~~
+   15 | import katomic
+   16 | import lib
+userland/clone_arm64.v:18:8: warning: module 'posixtimer' is imported but never used. Use `import posixtimer as _`, to silence this warning, or just remove the unused import line
+   16 | import lib
+   17 | import memory.mmap
+   18 | import posixtimer
+      |        ~~~~~~~~~~
+   19 | import proc
+   20 | import sched
+userland/clone_arm64.v:21:8: warning: module 'term' is imported but never used. Use `import term as _`, to silence this warning, or just remove the unused import line
+   19 | import proc
+   20 | import sched
+   21 | import term
+      |        ~~~~
+   22 | import time
+   23 | import usercopy
+userland/clone_arm64.v:22:8: warning: module 'time' is imported but never used. Use `import time as _`, to silence this warning, or just remove the unused import line
+   20 | import sched
+   21 | import term
+   22 | import time
+      |        ~~~~
+   23 | import usercopy
+   24 |
+fs/ext2/ext2.v:7:8: warning: module 'event' is imported but never used. Use `import event as _`, to silence this warning, or just remove the unused import line
+    5 | import resource as resource_mod
+    6 | import lib
+    7 | import event
+      |        ~~~~~
+    8 | import event.eventstruct
+    9 | import memory
+drm/mode/mode.v:10:8: warning: module 'katomic' is imported but never used. Use `import katomic as _`, to silence this warning, or just remove the unused import line
+    8 | import drm.gem
+    9 | import klock
+   10 | import katomic
+      |        ~~~~~~~
+   11 | 
+   12 | // Connector status
+fs/mount.v:519:6: notice: variable `mount_flags` shadows a function declaration
+  517 |     basename := final_component.clone()
+  518 |     mut mount_node := &VFSNode(unsafe { nil })
+  519 |     mut mount_flags := flags
+      |         ~~~~~~~~~~~
+  520 |     if kind == 'cgroup2' {
+  521 |         mount_node = cgroup_mount_root(parent_of_tgt_node, basename) or {
+fs/mount.v:904:2: notice: variable `new_mount` shadows a function declaration
+  902 |     }
+  903 |     directory := calling_directory()
+  904 |     new_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+      |     ~~~~~~~~~
+  905 |     mut new_root := get_node_and_mount(directory, new_path, true, new_mount) or { return errno.err, errno.get() }
+  906 |     mut put_old := get_node(directory, old_path, true) or { return errno.err, errno.get() }
+fs/namespaces.v:183:7: notice: variable `link` shadows a function declaration
+  181 |             continue
+  182 |         }
+  183 |         mut link := create_node(dir.filesystem, dir, name, false)
+      |             ~~~~
+  184 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+  185 |         link.symlink_target = text
+fs/procfs.v:219:4: notice: variable `link` shadows a function declaration
+  217 |     for link_name in ['self', 'thread-self']! {
+  218 |         if link_name in root.children {
+  219 |             link := unsafe { root.children[link_name] }
+      |             ~~~~
+  220 |             mut link_resource := unsafe { &ProcFSResource(link.resource) }
+  221 |             link_resource.view = view
+fs/procfs.v:1163:2: notice: variable `link` shadows a function declaration
+ 1161 |         return false
+ 1162 |     }
+ 1163 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1164 |     return link.kind == .self_link || link.kind == .thread_self_link
+ 1165 | }
+fs/procfs.v:1177:2: notice: variable `link` shadows a function declaration
+ 1175 |     // namespace's own, and there it is known by its kernel pid. A reader that
+ 1176 |     // tree cannot see has no self in it.
+ 1177 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1178 |     view := unsafe { &proc.Namespace(link.view) }
+ 1179 |     pid := proc.pid_in(current.process, view)
+fs/procfs.v:1284:7: notice: variable `link` shadows a function declaration
+ 1282 |     if directory.pid != 0 && (name == 'exe' || name == 'cwd' || name == 'root')
+ 1283 |         && name in node.children {
+ 1284 |         mut link := unsafe { node.children[name] }
+      |             ~~~~
+ 1285 |         match name {
+ 1286 |             'exe' {
+fs/procfs.v:1502:6: notice: variable `link` shadows a function declaration
+ 1500 | 
+ 1501 | fn add_process_link(mut node VFSNode, name string, pid int) &VFSNode {
+ 1502 |     mut link := create_node(node.filesystem, node, name, false)
+      |         ~~~~
+ 1503 |     link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o777, pid, 0)
+ 1504 |     unsafe {
+fs/procfs.v:1593:9: notice: variable `link` shadows a function declaration
+ 1591 |             if child != unsafe { nil } && child.name.len > 0 && child.name[0] >= `0`
+ 1592 |                 && child.name[0] <= `9` {
+ 1593 |                 mut link := unsafe { child }
+      |                     ~~~~
+ 1594 |                 link.magic_target = unsafe { nil }
+ 1595 |             }
+fs/procfs.v:1618:7: notice: variable `link` shadows a function declaration
+ 1616 |         // stats these names through the directory, and which runc relies on
+ 1617 |         // when it re-executes itself from a memfd.
+ 1618 |         mut link := create_node(descriptors.filesystem, descriptors, name, false)
+      |             ~~~~
+ 1619 |         link.resource = new_procfs_resource(.symlink, stat.iflnk | 0o700, pid, 0)
+ 1620 |         link.magic_target = target
+fs/procfs.v:1657:2: notice: variable `link` shadows a function declaration
+ 1655 |         return true
+ 1656 |     }
+ 1657 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1658 |     return link.kind != .symlink || link.pid == 0 || proc.may_inspect(link.pid)
+ 1659 | }
+fs/procfs.v:1666:2: notice: variable `link` shadows a function declaration
+ 1664 |         return none
+ 1665 |     }
+ 1666 |     link := unsafe { &ProcFSResource(node.resource) }
+      |     ~~~~
+ 1667 |     if link.kind != .symlink || link.pid == 0 || node.parent.name != 'fd' {
+ 1668 |         return none
+fs/vfs.v:200:80: notice: `identity` is immutable, cannot have a mutable reference to an immutable object
+  198 |     }
+  199 |     mut index := u64(0)
+  200 |     mut current_node := reduce_node_on_mount(parent, false, depth + 1, effective, identity)
+      |                                                                                   ~~~~~~~~
+  201 | 
+  202 |     if path[index] == `/` {
+krandom/random.v:108:16: notice: `buf` is immutable, cannot have a mutable reference to an immutable object
+  106 | fn (mut this Generator) fill_locked(buf voidptr, count u64) {
+  107 |     mut remaining := count
+  108 |     mut target := buf
+      |                   ~~~
+  109 |     mut block := [16]u32{}
+  110 |     for remaining != 0 {
+memory/pressure.v:39:2: notice: variable `free` shadows a function declaration
+   37 | 
+   38 | pub fn pressure_snapshot() PressureSnapshot {
+   39 |     free := free_bytes()
+      |     ~~~~
+   40 |     total := total_bytes()
+   41 |     pressure_lock.acquire()
+memory/pressure.v:63:2: notice: variable `free` shadows a function declaration
+   61 | // for subsequent passes. Anonymous and live file mappings are not evicted.
+   62 | pub fn pressure_maintenance() {
+   63 |     free := free_bytes()
+      |     ~~~~
+   64 |     marks := pressure_watermarks(total_bytes())
+   65 |     pressure_lock.acquire()
+pagecache/pagecache.v:133:2: notice: uninitialized `fn` struct fields are not allowed, since they can result in segfaults; use `?fn` or `@[required]` or initialize the field with `=` (if you absolutely want to have unsafe function pointers, use `= unsafe { nil }`)
+  131 |     // reboot path -- can reach the backing store. Both are nil until then.
+  132 |     writeback_context voidptr
+  133 |     writeback         IO
+      |     ~~~~~~~~~~~~~~~~~~~~
+  134 | pub:
+  135 |     capacity int = default_capacity
+socket/inet/inet.v:299:6: notice: variable `address` shadows a function declaration
+  297 |     last_poll_ms = now_ms
+  298 | 
+  299 |     mut address := u32(0)
+      |         ~~~~~~~
+  300 |     mut netmask := u32(0)
+  301 |     mut gateway := u32(0)
+socket/inet/inet.v:408:6: notice: variable `address` shadows a function declaration
+  406 | fn parse_nameservers(value &u8) {
+  407 |     mut count := 0
+  408 |     mut address := u32(0)
+      |         ~~~~~~~
+  409 |     mut octet := u32(0)
+  410 |     mut octets := 0
+socket/inet/interfaces.v:46:6: notice: variable `address` shadows a function declaration
+   44 | // A fixed lwIP address slot avoids allocating a second interface registry.
+   45 | pub fn ipv6_address(index u32, slot u32) ?IPv6InterfaceAddress {
+   46 |     mut address := C.vinix_ip_address{}
+      |         ~~~~~~~
+   47 |     mut prefix := u32(0)
+   48 |     mut flags := u32(0)
+socket/inet/interfaces.v:82:7: notice: variable `address` shadows a function declaration
+   80 |     mut mtu := u32(0)
+   81 |     if link_info(unsafe { &mac }, unsafe { &mtu }) {
+   82 |         mut address := u32(0)
+      |             ~~~~~~~
+   83 |         mut netmask := u32(0)
+   84 |         mut gateway := u32(0)
+aarch64/aic/aic.v:21:7: notice: unused constant: `aic_whoami`
+   19 | // AIC registers (offsets from base)
+   20 | const aic_info = u32(0x0004)
+   21 | const aic_whoami = u32(0x2000)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   22 | const aic_event = u32(0x2004)
+   23 | const aic_ipi_set = u32(0x2008)
+aarch64/aic/aic.v:25:7: notice: unused constant: `aic_ipi_mask_set`
+   23 | const aic_ipi_set = u32(0x2008)
+   24 | const aic_ipi_clr = u32(0x200c)
+   25 | const aic_ipi_mask_set = u32(0x2024)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   26 | const aic_ipi_mask_clr = u32(0x2028)
+   27 | const aic_hw_state = u32(0x3000) // base for per-irq state
+aarch64/aic/aic.v:27:7: notice: unused constant: `aic_hw_state`
+   25 | const aic_ipi_mask_set = u32(0x2024)
+   26 | const aic_ipi_mask_clr = u32(0x2028)
+   27 | const aic_hw_state = u32(0x3000) // base for per-irq state
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~
+   28 | 
+   29 | // Per-IRQ register offsets (indexed by IRQ number, 32 IRQs per 32-bit reg).
+aarch64/aic/aic.v:32:7: notice: unused constant: `aic_sw_set`
+   30 | // AICv1 layout (matches Linux irq-apple-aic.c):
+   31 | //   SW set/clear at 0x4000/0x4080, mask set/clear at 0x4100/0x4180.
+   32 | const aic_sw_set = u32(0x4000)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   33 | const aic_sw_clr = u32(0x4080)
+   34 | const aic_mask_set = u32(0x4100)
+aarch64/aic/aic.v:33:7: notice: unused constant: `aic_sw_clr`
+   31 | //   SW set/clear at 0x4000/0x4080, mask set/clear at 0x4100/0x4180.
+   32 | const aic_sw_set = u32(0x4000)
+   33 | const aic_sw_clr = u32(0x4080)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   34 | const aic_mask_set = u32(0x4100)
+   35 | const aic_mask_clr = u32(0x4180)
+aarch64/aic/aic.v:40:7: notice: unused constant: `aic_event_die_shift`
+   38 | const aic_event_type_hw = u32(1)
+   39 | const aic_event_type_ipi = u32(4)
+   40 | const aic_event_die_shift = u32(0)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   41 | const aic_event_irq_mask = u32(0xffff)
+   42 |
+aarch64/uart/uart.v:84:11: notice: `s` is immutable, cannot have a mutable reference to an immutable object
+   82 |         return
+   83 |     }
+   84 |     mut p := s
+      |              ^
+   85 |     for unsafe { *p } != 0 {
+   86 |         c := u8(unsafe { *p })
+aarch64/xhci/xhci.v:228:3: notice: variable `control` shadows a function declaration
+  226 |     if r.index == ring_trbs - 1 {
+  227 |         link := r.virt + u64(ring_trbs - 1) * 16
+  228 |         control := mem_rd(link + 12)
+      |         ~~~~~~~
+  229 |         cpu.dmb_ish()
+  230 |         mem_wr(link + 12, (control & ~trb_cycle) | r.cycle)
+aarch64/xhci/xhci.v:261:2: notice: variable `control` shadows a function declaration
+  259 | fn next_event() ?Event {
+  260 |     addr := xhci_event_virt + u64(xhci_event_index) * 16
+  261 |     control := mem_rd(addr + 12)
+      |     ~~~~~~~
+  262 |     if control & trb_cycle != xhci_event_cycle {
+  263 |         return none
+apple/ans/platform.v:37:11: notice: `node` is immutable, cannot have a mutable reference to an immutable object
+   35 | 
+   36 | fn enabled(node &devicetree.DTNode) bool {
+   37 |     mut n := node
+      |              ~~~~
+   38 |     for _ in 0 .. 64 {
+   39 |         if n == unsafe { nil } { return true }
+apple/ans/platform.v:170:17: notice: `node` is immutable, cannot have a mutable reference to an immutable object
+  168 | fn dma_limit(node &devicetree.DTNode) ?u64 {
+  169 |     mut limit := ~u64(0)
+  170 |     mut current := node
+      |                    ~~~~
+  171 |     for _ in 0 .. 64 {
+  172 |         if current == unsafe { nil } { return limit }
+apple/ans/rootfs.v:98:2: notice: variable `copy` shadows a function declaration
+   96 |         this.pages[page] = source
+   97 |     }
+   98 |     copy := memory.pmm_alloc_fallible(1)
+      |     ~~~~
+   99 |     if copy == unsafe { nil } {
+  100 |         return unsafe { nil }
+apple/speakers/speakers.v:226:17: notice: `node` is immutable, cannot have a mutable reference to an immutable object
+  224 | 
+  225 | fn enabled(node &devicetree.DTNode) bool {
+  226 |     mut current := node
+      |                    ~~~~
+  227 |     for _ in 0 .. 64 {
+  228 |         if current == unsafe { nil } {
+proc/pledge.v:91:7: notice: unused constant: `pledge_efault`
+   89 | const pledge_e2big = u64(7)
+   90 | const pledge_eacces = u64(13)
+   91 | const pledge_efault = u64(14)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+   92 | const pledge_einval = u64(22)
+   93 | const pledge_enosys = u64(38)
+proc/pledge.v:92:7: notice: unused constant: `pledge_einval`
+   90 | const pledge_eacces = u64(13)
+   91 | const pledge_efault = u64(14)
+   92 | const pledge_einval = u64(22)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+   93 | const pledge_enosys = u64(38)
+   94 |
+proc/proc.v:869:4: notice: unused function: `command_name`
+  867 | // A Vinix process is named for the path it was executed from with its pid
+  868 | // appended; the part that corresponds to comm is the basename without that.
+  869 | fn command_name(name string) string {
+      |    ~~~~~~~~~~~~
+  870 |     start, end := command_name_bounds(name)
+  871 |     if start >= end {
+proc/unveil.v:251:6: notice: variable `copy` shadows a function declaration
+  249 |     mut entries := []UnveilEntry{cap: source.entries.len} @[freed]
+  250 |     entries.flags |= .noslices
+  251 |     mut copy := &UnveilSet{
+      |         ~~~~
+  252 |         entries: entries
+  253 |         locked:  source.locked
+gpu/agx/driver/driver.v:472:24: notice: left-side of assignment expects a mutable reference, but variable `status` is immutable, declare it with `mut` to make it mutable or clone it
+  470 |     for opp in opp_table.children {
+  471 |         if status := devicetree.get_string_list(opp, 'status') {
+  472 |             mut owned_status := status
+      |                                 ~~~~~~
+  473 |             disabled := owned_status.len > 0 && owned_status[0] == 'disabled'
+  474 |             unsafe { owned_status.free() }
+gpu/agx/fake/backend.v:188:2: notice: variable `error` shadows a function declaration
+  186 |     }
+  187 |     mut write_count := u32(0)
+  188 |     error := C.vinix_fake_g17_encode_3d(command, command_bytes, descriptor, descriptor_bytes, command_gpu_address, voidptr(inputs), write_pointer, u32(writes.len), &write_count)
+      |     ~~~~~
+  189 |     return FakeG17Encoding{
+  190 |         error: u32(error)
+gpu/dcp/afk.v:29:7: notice: unused constant: `epic_cat_notify`
+   27 | 
+   28 | // EPIC message categories (layered on top of AFK)
+   29 | const epic_cat_notify = u32(0)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   30 | const epic_cat_command = u32(3)
+   31 | const epic_cat_reply = u32(4)
+gpu/dcp/afk.v:30:7: notice: unused constant: `epic_cat_command`
+   28 | // EPIC message categories (layered on top of AFK)
+   29 | const epic_cat_notify = u32(0)
+   30 | const epic_cat_command = u32(3)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+   31 | const epic_cat_reply = u32(4)
+   32 | const epic_cat_report = u32(5)
+gpu/dcp/afk.v:31:7: notice: unused constant: `epic_cat_reply`
+   29 | const epic_cat_notify = u32(0)
+   30 | const epic_cat_command = u32(3)
+   31 | const epic_cat_reply = u32(4)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+   32 | const epic_cat_report = u32(5)
+   33 |
+gpu/dcp/afk.v:32:7: notice: unused constant: `epic_cat_report`
+   30 | const epic_cat_command = u32(3)
+   31 | const epic_cat_reply = u32(4)
+   32 | const epic_cat_report = u32(5)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   33 | 
+   34 | // Minimum ringbuffer size (must hold at least header + one entry)
+gpu/dcp/iomfb.v:36:7: notice: unused constant: `iomfb_power_on`
+   34 | // Power states for iomfb_set_power
+   35 | const iomfb_power_off = u32(0)
+   36 | const iomfb_power_on = u32(1)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+   37 | 
+   38 | // Maximum number of timing modes the firmware can report
+gpu/dcp/plane.v:149:4: notice: unused function: `calc_pitch`
+  147 | // width and format. The pitch is aligned to 64 bytes as required by
+  148 | // the DCP hardware.
+  149 | fn calc_pitch(width u32, format u32) u32 {
+      |    ~~~~~~~~~~
+  150 |     bpp := format_bpp(format)
+  151 |     if bpp == 0 {
+syscall/table/mmap_aslr_arm64.v:13:14: notice: `addr` is immutable, cannot have a mutable reference to an immutable object
+   11 | fn syscall_linux_mmap_aslr(gpr_state voidptr, addr voidptr, length u64, prot u64,
+   12 |     flags u64, fdnum int, offset i64) (u64, u64) {
+   13 |     mut hint := addr
+      |                 ~~~~
+   14 |     if addr == unsafe { nil }
+   15 |         && flags & u64(mmap.map_fixed | mmap.map_fixed_noreplace) == 0 {
+dev/console/terminal.v:337:2: notice: variable `copy` shadows a function declaration
+  335 |     latest_thread = proc.current_thread()
+  336 | 
+  337 |     copy := unsafe { malloc(count) }
+      |     ~~~~
+  338 |     defer {
+  339 |         unsafe { free(copy) }
+userland/exit.v:39:6: notice: variable `current_process` shadows a function declaration
+   37 | fn thread_exit(status int, group bool) {
+   38 |     mut current_thread := proc.current_thread()
+   39 |     mut current_process := current_thread.process
+      |         ~~~~~~~~~~~~~~~
+   40 | 
+   41 |     // A sibling tearing the process down may already have given up waiting and
+userland/exit.v:80:6: notice: variable `current_process` shadows a function declaration
+   78 | pub fn exit_with_fatal_signal(signal u8) {
+   79 |     mut current_thread := proc.current_thread()
+   80 |     mut current_process := current_thread.process
+      |         ~~~~~~~~~~~~~~~
+   81 | 
+   82 |     if !proc.claim_thread_exit(current_thread) {
+userland/linux_task.v:368:6: notice: variable `current_process` shadows a function declaration
+  366 | // wait4(pid, status, options, rusage).
+  367 | pub fn syscall_wait4(_ voidptr, pid int, status_ptr u64, options int, rusage_ptr u64) (u64, u64) {
+  368 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  369 | 
+  370 |     mut child, err := take_exited_child(mut current_process, pid, options & wnohang == 0)
+userland/linux_task.v:395:6: notice: variable `current_process` shadows a function declaration
+  393 | // waitid(idtype, id, infop, options, rusage).
+  394 | pub fn syscall_waitid(_ voidptr, idtype int, id u64, infop u64, options int, rusage_ptr u64) (u64, u64) {
+  395 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  396 | 
+  397 |     // Exactly which state changes to report has to be asked for; we only ever
+userland/signal.v:29:7: notice: unused constant: `sa_handler_offset`
+   27 | 
+   28 | // struct k_sigaction as the raw syscall sees it: handler, flags, restorer, mask.
+   29 | const sa_handler_offset = u64(0)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~
+   30 | 
+   31 | const sa_flags_offset = u64(8)
+userland/signal.v:31:7: notice: unused constant: `sa_flags_offset`
+   29 | const sa_handler_offset = u64(0)
+   30 | 
+   31 | const sa_flags_offset = u64(8)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   32 | 
+   33 | const sa_restorer_offset = u64(16)
+userland/signal.v:33:7: notice: unused constant: `sa_restorer_offset`
+   31 | const sa_flags_offset = u64(8)
+   32 | 
+   33 | const sa_restorer_offset = u64(16)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   34 | 
+   35 | const sa_mask_offset = u64(24)
+userland/signal.v:35:7: notice: unused constant: `sa_mask_offset`
+   33 | const sa_restorer_offset = u64(16)
+   34 | 
+   35 | const sa_mask_offset = u64(24)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   36 | 
+   37 | const k_sigaction_size = u64(32)
+userland/signal_send.v:159:6: notice: variable `current_process` shadows a function declaration
+  157 |     }
+  158 | 
+  159 |     mut current_process := proc.current_thread().process
+      |         ~~~~~~~~~~~~~~~
+  160 |     // Pids and groups are the caller's namespace's numbers.
+  161 |     viewer := current_process.numbered_in
+userland/userland_arm64.v:1025:22: notice: left-side of assignment expects a mutable reference, but variable `envp` is immutable, declare it with `mut` to make it mutable or clone it
+ 1023 |     // that LD_PRELOAD along. Do not make the AArch64 loader open an x86 library.
+ 1024 |     // A later x86 exec will receive the matching preload from the handoff above.
+ 1025 |     mut program_envp := envp
+      |                         ~~~~
+ 1026 |     mut foreign_preload := ''
+ 1027 |     for entry in envp {
+resource/cache.v:222:7: notice: variable `attributes` shadows a function declaration
+  220 | pub fn mapping_attributes(mut res Resource, handle voidptr, offset u64) u64 {
+  221 |     if mut res is MappingAttributesResource {
+  222 |         mut attributes := MappingAttributesResource(res)
+      |             ~~~~~~~~~~
+  223 |         mut stack_attributes := unsafe { &attributes }
+  224 |         // Returning the call directly makes V heap-promote the interface.
+xnualloc/buddy.v:203:15: notice: `chain` is immutable, cannot have a mutable reference to an immutable object
+  201 |             next.prev = index
+  202 |         }
+  203 |         mut node := chain
+      |                     ~~~~~
+  204 |         node.next = hd.next
+  205 |         node.prev = hd_index
+xnualloc/magazine.v:150:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  148 |     unsafe {
+  149 |         if minimum != nil && minimum.full > d.full {
+  150 |             mut m := minimum
+      |                      ~~~~~~~
+  151 |             m.full = d.full
+  152 |         }
+xnualloc/magazine.v:168:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  166 |         d.empty--
+  167 |         if minimum != nil && minimum.empty > d.empty {
+  168 |             mut m := minimum
+      |                      ~~~~~~~
+  169 |             m.empty = d.empty
+  170 |         }
+xnualloc/magazine.v:186:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  184 |     unsafe {
+  185 |         if minimum != nil && minimum.full > src.full {
+  186 |             mut m := minimum
+      |                      ~~~~~~~
+  187 |             m.full = src.full
+  188 |         }
+xnualloc/magazine.v:190:15: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  188 |         }
+  189 |         head := src.head
+  190 |         mut last := head
+      |                     ~~~~
+  191 |         for i := u32(1); i < n; i++ {
+  192 |             last = last.next
+xnualloc/magazine.v:221:13: notice: `minimum` is immutable, cannot have a mutable reference to an immutable object
+  219 |     unsafe {
+  220 |         if minimum != nil && minimum.empty > src.empty {
+  221 |             mut m := minimum
+      |                      ~~~~~~~
+  222 |             m.empty = src.empty
+  223 |         }
+xnualloc/magazine.v:225:15: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  223 |         }
+  224 |         head := *src.tail
+  225 |         mut last := head
+      |                     ~~~~
+  226 |         for i := u32(1); i < n; i++ {
+  227 |             last = last.next
+xnualloc/zone.v:279:12: notice: `head` is immutable, cannot have a mutable reference to an immutable object
+  277 | fn (z &Zone) zone_element_resolve_from(head &ZoneChunk, addr u64) &ZoneChunk {
+  278 |     unsafe {
+  279 |         mut p := head
+      |                  ~~~~
+  280 |         for p != nil {
+  281 |             if z.slot(p, addr) != no_element {
+drm/syncobj/syncobj.v:116:2: notice: variable `error` shadows a function declaration
+  114 |     mut f := unsafe { fence }
+  115 |     f.lock.acquire()
+  116 |     error := f.error
+      |     ~~~~~
+  117 |     f.lock.release()
+  118 |     return error
+dev/oss/mixer.v:62:7: notice: unused constant: `mixt_group`
+   60 | 
+   61 | const mixt_devroot = 0
+   62 | const mixt_group = 1
+      |       ~~~~~~~~~~~~~~
+   63 | const mixt_onoff = 2
+   64 | const mixt_enum = 3
+dev/oss/mixer.v:63:7: notice: unused constant: `mixt_onoff`
+   61 | const mixt_devroot = 0
+   62 | const mixt_group = 1
+   63 | const mixt_onoff = 2
+      |       ~~~~~~~~~~~~~~
+   64 | const mixt_enum = 3
+   65 | const mixt_monoslider = 4
+dev/oss/mixer.v:64:7: notice: unused constant: `mixt_enum`
+   62 | const mixt_group = 1
+   63 | const mixt_onoff = 2
+   64 | const mixt_enum = 3
+      |       ~~~~~~~~~~~~~
+   65 | const mixt_monoslider = 4
+   66 | const mixt_stereoslider = 5
+dev/oss/mixer.v:66:7: notice: unused constant: `mixt_stereoslider`
+   64 | const mixt_enum = 3
+   65 | const mixt_monoslider = 4
+   66 | const mixt_stereoslider = 5
+      |       ~~~~~~~~~~~~~~~~~~~~~
+   67 | const mixt_message = 6
+   68 | const mixt_monovu = 7
+dev/oss/mixer.v:67:7: notice: unused constant: `mixt_message`
+   65 | const mixt_monoslider = 4
+   66 | const mixt_stereoslider = 5
+   67 | const mixt_message = 6
+      |       ~~~~~~~~~~~~~~~~
+   68 | const mixt_monovu = 7
+   69 | const mixt_stereovu = 8
+dev/oss/mixer.v:68:7: notice: unused constant: `mixt_monovu`
+   66 | const mixt_stereoslider = 5
+   67 | const mixt_message = 6
+   68 | const mixt_monovu = 7
+      |       ~~~~~~~~~~~~~~~
+   69 | const mixt_stereovu = 8
+   70 | const mixt_monopeak = 9
+dev/oss/mixer.v:69:7: notice: unused constant: `mixt_stereovu`
+   67 | const mixt_message = 6
+   68 | const mixt_monovu = 7
+   69 | const mixt_stereovu = 8
+      |       ~~~~~~~~~~~~~~~~~
+   70 | const mixt_monopeak = 9
+   71 | const mixt_stereopeak = 10
+dev/oss/mixer.v:70:7: notice: unused constant: `mixt_monopeak`
+   68 | const mixt_monovu = 7
+   69 | const mixt_stereovu = 8
+   70 | const mixt_monopeak = 9
+      |       ~~~~~~~~~~~~~~~~~
+   71 | const mixt_stereopeak = 10
+   72 | const mixt_radiogroup = 11
+dev/oss/mixer.v:71:7: notice: unused constant: `mixt_stereopeak`
+   69 | const mixt_stereovu = 8
+   70 | const mixt_monopeak = 9
+   71 | const mixt_stereopeak = 10
+      |       ~~~~~~~~~~~~~~~~~~~~
+   72 | const mixt_radiogroup = 11
+   73 | const mixt_marker = 12
+dev/oss/mixer.v:72:7: notice: unused constant: `mixt_radiogroup`
+   70 | const mixt_monopeak = 9
+   71 | const mixt_stereopeak = 10
+   72 | const mixt_radiogroup = 11
+      |       ~~~~~~~~~~~~~~~~~~~~
+   73 | const mixt_marker = 12
+   74 | const mixt_value = 13
+dev/oss/mixer.v:74:7: notice: unused constant: `mixt_value`
+   72 | const mixt_radiogroup = 11
+   73 | const mixt_marker = 12
+   74 | const mixt_value = 13
+      |       ~~~~~~~~~~~~~~~
+   75 | const mixt_hexvalue = 14
+   76 | const mixt_slider = 17
+dev/oss/mixer.v:75:7: notice: unused constant: `mixt_hexvalue`
+   73 | const mixt_marker = 12
+   74 | const mixt_value = 13
+   75 | const mixt_hexvalue = 14
+      |       ~~~~~~~~~~~~~~~~~~
+   76 | const mixt_slider = 17
+   77 | const mixt_3d = 18
+dev/oss/mixer.v:76:7: notice: unused constant: `mixt_slider`
+   74 | const mixt_value = 13
+   75 | const mixt_hexvalue = 14
+   76 | const mixt_slider = 17
+      |       ~~~~~~~~~~~~~~~~
+   77 | const mixt_3d = 18
+   78 | const mixt_monoslider16 = 19
+dev/oss/mixer.v:77:7: notice: unused constant: `mixt_3d`
+   75 | const mixt_hexvalue = 14
+   76 | const mixt_slider = 17
+   77 | const mixt_3d = 18
+      |       ~~~~~~~~~~~~
+   78 | const mixt_monoslider16 = 19
+   79 | const mixt_stereoslider16 = 20
+dev/oss/mixer.v:78:7: notice: unused constant: `mixt_monoslider16`
+   76 | const mixt_slider = 17
+   77 | const mixt_3d = 18
+   78 | const mixt_monoslider16 = 19
+      |       ~~~~~~~~~~~~~~~~~~~~~~
+   79 | const mixt_stereoslider16 = 20
+   80 | const mixt_mute = 21
+dev/oss/mixer.v:79:7: notice: unused constant: `mixt_stereoslider16`
+   77 | const mixt_3d = 18
+   78 | const mixt_monoslider16 = 19
+   79 | const mixt_stereoslider16 = 20
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+   80 | const mixt_mute = 21
+   81 | const mixt_enum_multi = 22
+dev/oss/mixer.v:80:7: notice: unused constant: `mixt_mute`
+   78 | const mixt_monoslider16 = 19
+   79 | const mixt_stereoslider16 = 20
+   80 | const mixt_mute = 21
+      |       ~~~~~~~~~~~~~~
+   81 | const mixt_enum_multi = 22
+   82 |
+dev/oss/mixer.v:81:7: notice: unused constant: `mixt_enum_multi`
+   79 | const mixt_stereoslider16 = 20
+   80 | const mixt_mute = 21
+   81 | const mixt_enum_multi = 22
+      |       ~~~~~~~~~~~~~~~~~~~~
+   82 | 
+   83 | const mixf_readable = 0x1
+dev/oss/mixer.v:85:7: notice: unused constant: `mixf_poll`
+   83 | const mixf_readable = 0x1
+   84 | const mixf_writable = 0x2
+   85 | const mixf_poll = 0x4
+      |       ~~~~~~~~~~~~~~~
+   86 | const mixf_hz = 0x8
+   87 | const mixf_string = 0x10
+dev/oss/mixer.v:86:7: notice: unused constant: `mixf_hz`
+   84 | const mixf_writable = 0x2
+   85 | const mixf_poll = 0x4
+   86 | const mixf_hz = 0x8
+      |       ~~~~~~~~~~~~~
+   87 | const mixf_string = 0x10
+   88 | const mixf_dynamic = 0x10
+dev/oss/mixer.v:87:7: notice: unused constant: `mixf_string`
+   85 | const mixf_poll = 0x4
+   86 | const mixf_hz = 0x8
+   87 | const mixf_string = 0x10
+      |       ~~~~~~~~~~~~~~~~~~
+   88 | const mixf_dynamic = 0x10
+   89 | const mixf_okfail = 0x20
+dev/oss/mixer.v:88:7: notice: unused constant: `mixf_dynamic`
+   86 | const mixf_hz = 0x8
+   87 | const mixf_string = 0x10
+   88 | const mixf_dynamic = 0x10
+      |       ~~~~~~~~~~~~~~~~~~~
+   89 | const mixf_okfail = 0x20
+   90 | const mixf_flat = 0x40
+dev/oss/mixer.v:89:7: notice: unused constant: `mixf_okfail`
+   87 | const mixf_string = 0x10
+   88 | const mixf_dynamic = 0x10
+   89 | const mixf_okfail = 0x20
+      |       ~~~~~~~~~~~~~~~~~~
+   90 | const mixf_flat = 0x40
+   91 | const mixf_legacy = 0x80
+dev/oss/mixer.v:90:7: notice: unused constant: `mixf_flat`
+   88 | const mixf_dynamic = 0x10
+   89 | const mixf_okfail = 0x20
+   90 | const mixf_flat = 0x40
+      |       ~~~~~~~~~~~~~~~~
+   91 | const mixf_legacy = 0x80
+   92 | const mixf_centibel = 0x100
+dev/oss/mixer.v:91:7: notice: unused constant: `mixf_legacy`
+   89 | const mixf_okfail = 0x20
+   90 | const mixf_flat = 0x40
+   91 | const mixf_legacy = 0x80
+      |       ~~~~~~~~~~~~~~~~~~
+   92 | const mixf_centibel = 0x100
+   93 | const mixf_decibel = 0x200
+dev/oss/mixer.v:92:7: notice: unused constant: `mixf_centibel`
+   90 | const mixf_flat = 0x40
+   91 | const mixf_legacy = 0x80
+   92 | const mixf_centibel = 0x100
+      |       ~~~~~~~~~~~~~~~~~~~~~
+   93 | const mixf_decibel = 0x200
+   94 | const mixf_mainvol = 0x400
+dev/oss/mixer.v:93:7: notice: unused constant: `mixf_decibel`
+   91 | const mixf_legacy = 0x80
+   92 | const mixf_centibel = 0x100
+   93 | const mixf_decibel = 0x200
+      |       ~~~~~~~~~~~~~~~~~~~~
+   94 | const mixf_mainvol = 0x400
+   95 | const mixf_pcmvol = 0x800
+dev/oss/mixer.v:95:7: notice: unused constant: `mixf_pcmvol`
+   93 | const mixf_decibel = 0x200
+   94 | const mixf_mainvol = 0x400
+   95 | const mixf_pcmvol = 0x800
+      |       ~~~~~~~~~~~~~~~~~~~
+   96 | const mixf_recvol = 0x1000
+   97 | const mixf_monvol = 0x2000
+dev/oss/mixer.v:96:7: notice: unused constant: `mixf_recvol`
+   94 | const mixf_mainvol = 0x400
+   95 | const mixf_pcmvol = 0x800
+   96 | const mixf_recvol = 0x1000
+      |       ~~~~~~~~~~~~~~~~~~~~
+   97 | const mixf_monvol = 0x2000
+   98 | const mixf_wide = 0x4000
+dev/oss/mixer.v:97:7: notice: unused constant: `mixf_monvol`
+   95 | const mixf_pcmvol = 0x800
+   96 | const mixf_recvol = 0x1000
+   97 | const mixf_monvol = 0x2000
+      |       ~~~~~~~~~~~~~~~~~~~~
+   98 | const mixf_wide = 0x4000
+   99 | const mixf_descr = 0x8000
+dev/oss/mixer.v:98:7: notice: unused constant: `mixf_wide`
+   96 | const mixf_recvol = 0x1000
+   97 | const mixf_monvol = 0x2000
+   98 | const mixf_wide = 0x4000
+      |       ~~~~~~~~~~~~~~~~~~
+   99 | const mixf_descr = 0x8000
+  100 | const mixf_disabled = 0x10000
+dev/oss/mixer.v:99:7: notice: unused constant: `mixf_descr`
+   97 | const mixf_monvol = 0x2000
+   98 | const mixf_wide = 0x4000
+   99 | const mixf_descr = 0x8000
+      |       ~~~~~~~~~~~~~~~~~~~
+  100 | const mixf_disabled = 0x10000
+  101 |
+dev/oss/mixer.v:100:7: notice: unused constant: `mixf_disabled`
+   98 | const mixf_wide = 0x4000
+   99 | const mixf_descr = 0x8000
+  100 | const mixf_disabled = 0x10000
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+  101 | 
+  102 | const mixext_scope_input = 0x1
+dev/oss/mixer.v:102:7: notice: unused constant: `mixext_scope_input`
+  100 | const mixf_disabled = 0x10000
+  101 | 
+  102 | const mixext_scope_input = 0x1
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+  103 | const mixext_scope_output = 0x2
+  104 |
+dev/oss/mixer.v:103:7: notice: unused constant: `mixext_scope_output`
+  101 | 
+  102 | const mixext_scope_input = 0x1
+  103 | const mixext_scope_output = 0x2
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+  104 | 
+  105 | struct OssMixExtRoot {
+apple/dart/dart.v:15:7: notice: unused constant: `dart_params1`
+   13 | 
+   14 | // DART register offsets
+   15 | const dart_params1 = u32(0x0000)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~
+   16 | const dart_params2 = u32(0x0004)
+   17 | const dart_tbl_config = u32(0x0100) // per-stream table config base
+apple/dart/dart.v:16:7: notice: unused constant: `dart_params2`
+   14 | // DART register offsets
+   15 | const dart_params1 = u32(0x0000)
+   16 | const dart_params2 = u32(0x0004)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~
+   17 | const dart_tbl_config = u32(0x0100) // per-stream table config base
+   18 | const dart_err_status = u32(0x0040)
+apple/dart/dart.v:17:7: notice: unused constant: `dart_tbl_config`
+   15 | const dart_params1 = u32(0x0000)
+   16 | const dart_params2 = u32(0x0004)
+   17 | const dart_tbl_config = u32(0x0100) // per-stream table config base
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   18 | const dart_err_status = u32(0x0040)
+   19 | const dart_err_addrl = u32(0x0050)
+apple/dart/dart.v:18:7: notice: unused constant: `dart_err_status`
+   16 | const dart_params2 = u32(0x0004)
+   17 | const dart_tbl_config = u32(0x0100) // per-stream table config base
+   18 | const dart_err_status = u32(0x0040)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   19 | const dart_err_addrl = u32(0x0050)
+   20 | const dart_err_addrh = u32(0x0054)
+apple/dart/dart.v:19:7: notice: unused constant: `dart_err_addrl`
+   17 | const dart_tbl_config = u32(0x0100) // per-stream table config base
+   18 | const dart_err_status = u32(0x0040)
+   19 | const dart_err_addrl = u32(0x0050)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   20 | const dart_err_addrh = u32(0x0054)
+   21 | const dart_tcr = u32(0x0100) // Translation Control Register (per-stream, stride 4)
+apple/dart/dart.v:20:7: notice: unused constant: `dart_err_addrh`
+   18 | const dart_err_status = u32(0x0040)
+   19 | const dart_err_addrl = u32(0x0050)
+   20 | const dart_err_addrh = u32(0x0054)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   21 | const dart_tcr = u32(0x0100) // Translation Control Register (per-stream, stride 4)
+   22 | const dart_ttbr_base = u32(0x0200) // Translation Table Base (per-stream, 4 TTBRs each)
+socket/unix/unix.v:25:7: notice: unused constant: `msg_dontwait`
+   23 | const msg_peek = 0x02
+   24 | const msg_trunc = 0x20
+   25 | const msg_dontwait = 0x40
+      |       ~~~~~~~~~~~~~~~~~~~
+   26 | const msg_waitall = 0x100
+   27 | const cmsg_header_size = u64(16)
+socket/unix/unix.v:26:7: notice: unused constant: `msg_waitall`
+   24 | const msg_trunc = 0x20
+   25 | const msg_dontwait = 0x40
+   26 | const msg_waitall = 0x100
+      |       ~~~~~~~~~~~~~~~~~~~
+   27 | const cmsg_header_size = u64(16)
+   28 | const cmsg_align = u64(8)
+socket/netlink/netlink.v:24:7: notice: unused constant: `nlmsg_noop`
+   22 | 
+   23 | // nlmsghdr types.
+   24 | const nlmsg_noop = u16(1)
+      |       ~~~~~~~~~~~~~~~~~~~
+   25 | const nlmsg_error = u16(2)
+   26 | const nlmsg_done = u16(3)
+socket/netlink/netlink.v:29:7: notice: unused constant: `rtm_setlink`
+   27 | const rtm_newlink = u16(16)
+   28 | const rtm_getlink = u16(18)
+   29 | const rtm_setlink = u16(19)
+      |       ~~~~~~~~~~~~~~~~~~~~~
+   30 | const rtm_newaddr = u16(20)
+   31 | const rtm_getaddr = u16(22)
+socket/netlink/netlink.v:36:7: notice: unused constant: `nlm_f_request`
+   34 | 
+   35 | // nlmsghdr flags.
+   36 | const nlm_f_request = u16(1)
+      |       ~~~~~~~~~~~~~~~~~~~~~~
+   37 | const nlm_f_multi = u16(2)
+   38 | const nlm_f_ack = u16(4)
+socket/netlink/netlink.v:38:7: notice: unused constant: `nlm_f_ack`
+   36 | const nlm_f_request = u16(1)
+   37 | const nlm_f_multi = u16(2)
+   38 | const nlm_f_ack = u16(4)
+      |       ~~~~~~~~~~~~~~~~~~
+   39 | const nlm_f_dump = u16(0x300) // NLM_F_ROOT | NLM_F_MATCH
+   40 |
+gpu/agx/mmu/mmu.v:231:13: notice: `h` is immutable, cannot have a mutable reference to an immutable object
+  229 |     }
+  230 |     unsafe {
+  231 |         mut hp := h
+      |                   ^
+  232 |         shared_store8(mut &hp.lock_ap, 1)
+  233 |     }
+gpu/agx/mmu/mmu.v:237:15: notice: `h` is immutable, cannot have a mutable reference to an immutable object
+  235 |         if katomic.load(&h.turn) != 0 {
+  236 |             unsafe {
+  237 |                 mut hp := h
+      |                           ^
+  238 |                 shared_store8(mut &hp.lock_ap, 0)
+  239 |             }
+gpu/agx/mmu/mmu.v:244:15: notice: `h` is immutable, cannot have a mutable reference to an immutable object
+  242 |             }
+  243 |             unsafe {
+  244 |                 mut hp := h
+      |                           ^
+  245 |                 shared_store8(mut &hp.lock_ap, 1)
+  246 |             }
+gpu/agx/mmu/mmu.v:257:13: notice: `h` is immutable, cannot have a mutable reference to an immutable object
+  255 |     }
+  256 |     unsafe {
+  257 |         mut hp := h
+      |                   ^
+  258 |         katomic.store(mut &hp.turn, u32(1))
+  259 |         shared_store8(mut &hp.lock_ap, 0)
+gpu/agx/mmu/mmu.v:724:16: notice: `info` is immutable, cannot have a mutable reference to an immutable object
+  722 |     }
+  723 |     unsafe {
+  724 |         mut entry := info
+      |                      ~~~~
+  725 |         katomic.store(mut &entry.addr, addr)
+  726 |         katomic.store(mut &entry.size, size)
+gpu/agx/mmu/mmu.v:742:16: notice: `info` is immutable, cannot have a mutable reference to an immutable object
+  740 |     }
+  741 |     unsafe {
+  742 |         mut entry := info
+      |                      ~~~~
+  743 |         katomic.store(mut &entry.state, u64(0))
+  744 |     }
+gpu/agx/mmu/mmu.v:760:16: notice: `info` is immutable, cannot have a mutable reference to an immutable object
+  758 |     }
+  759 |     unsafe {
+  760 |         mut entry := info
+      |                      ~~~~
+  761 |         katomic.store(mut &entry.addr, u64(0))
+  762 |         katomic.store(mut &entry.size, u64(0))
+apple/wifi/wifi.v:115:13: notice: `node` is immutable, cannot have a mutable reference to an immutable object
+  113 | 
+  114 | fn enabled(node &devicetree.DTNode) bool {
+  115 |     mut cur := node
+      |                ~~~~
+  116 |     for _ in 0 .. 64 {
+  117 |         if cur == unsafe { nil } {
+apple/spi_keyboard/spi_keyboard.v:79:17: notice: `node` is immutable, cannot have a mutable reference to an immutable object
+   77 | 
+   78 | fn enabled(node &devicetree.DTNode) bool {
+   79 |     mut current := node
+      |                    ~~~~
+   80 |     // Do not probe a child of a disabled bus. Bound even malformed ancestry.
+   81 |     for _ in 0 .. 64 {
+fs/overlay.v:86:34: notice: unused parameter: `node`
+   84 | }
+   85 | 
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+      |                                  ~~~~
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+fs/overlay.v:88:31: notice: unused parameter: `parent`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                               ~~~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+fs/overlay.v:88:48: notice: unused parameter: `name`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                                                ~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+fs/overlay.v:88:61: notice: unused parameter: `source`
+   86 | fn (mut this OverlayFS) populate(node &VFSNode) {}
+   87 | 
+   88 | fn (mut this OverlayFS) mount(parent &VFSNode, name string, source &VFSNode) ?&VFSNode {
+      |                                                             ~~~~~~
+   89 |     // Mounted through overlay_mount(), which gets the options.
+   90 |     errno.set(errno.einval)
+fs/overlay.v:121:32: notice: unused parameter: `old_parent`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                ~~~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+fs/overlay.v:121:53: notice: unused parameter: `old_name`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                     ~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+fs/overlay.v:121:70: notice: unused parameter: `new_parent`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                      ~~~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+fs/overlay.v:121:91: notice: unused parameter: `new_name`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                                           ~~~~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+fs/overlay.v:121:108: notice: unused parameter: `flags`
+  119 | }
+  120 | 
+  121 | fn (mut this OverlayFS) rename(old_parent &VFSNode, old_name string, new_parent &VFSNode, new_name string, flags int) ? {
+      |                                                                                                            ~~~~~
+  122 |     // rename() hands overlay directories to overlay_rename() instead.
+  123 |     errno.set(errno.exdev)
+apple/speakers/speakers.v:986:31: notice: unused parameter: `fmt`
+  984 | }
+  985 | 
+  986 | fn (c SpeakerCard) refine_fmt(fmt u32) u32 {
+      |                               ~~~
+  987 |     return oss.afmt_s16_le
+  988 | }
+apple/speakers/speakers.v:994:36: notice: unused parameter: `channels`
+  992 | }
+  993 | 
+  994 | fn (c SpeakerCard) refine_channels(channels u8) u8 {
+      |                                    ~~~~~~~~
+  995 |     return 2
+  996 | }
+apple/speakers/speakers.v:1036:39: notice: unused parameter: `fmt`
+ 1034 | }
+ 1035 | 
+ 1036 | fn (mut s SpeakerStream) setup_params(fmt u32, rate u32, channels u8) {
+      |                                       ~~~
+ 1037 |     s.lock()
+ 1038 |     defer {
+apple/speakers/speakers.v:1036:58: notice: unused parameter: `channels`
+ 1034 | }
+ 1035 | 
+ 1036 | fn (mut s SpeakerStream) setup_params(fmt u32, rate u32, channels u8) {
+      |                                                          ~~~~~~~~
+ 1037 |     s.lock()
+ 1038 |     defer {
+syscall/table/gaps.v:542:27: notice: unused parameter: `gpr_state`
+  540 | // bytes of each left in its msg_len. glibc's resolver sends a lookup's A and
+  541 | // AAAA queries together this way when a host has addresses of both kinds.
+  542 | fn syscall_linux_sendmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int) (u64, u64) {
+      |                           ~~~~~~~~~
+  543 |     count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+  544 |     mut sent := u32(0)
+syscall/table/gaps.v:573:27: notice: unused parameter: `gpr_state`
+  571 | // only for the first; the timeout is not kept, so without it the call waits
+  572 | // for every message as a blocking socket would.
+  573 | fn syscall_linux_recvmmsg(gpr_state voidptr, fdnum int, vec u64, vlen u32, flags int, _timeout u64) (u64, u64) {
+      |                           ~~~~~~~~~
+  574 |     count := if vlen > linux_uio_maxiov { u32(linux_uio_maxiov) } else { vlen }
+  575 |     mut received := u32(0)
+syscall/table/linux_common.v:169:25: notice: unused parameter: `gpr_state`
+  167 | // one resource write per iovec lets the peer consume an incomplete message and
+  168 | // close before the payload is written.
+  169 | fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+      |                         ~~~~~~~~~
+  170 |     total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
+  171 |     if validation_error != 0 {
+memory/mmap/mmap.v:1615:81: notice: unused parameter: `prot`
+ 1613 | }
+ 1614 | 
+ 1615 | fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, prot int,
+      |                                                                                 ~~~~
+ 1616 |     skip_lazy_shared bool) ? {
+ 1617 |     length := lib.align_up(_length, page_size)
+fs/ext2/ext2.v:321:33: notice: unused parameter: `handle`
+  319 | }
+  320 | 
+  321 | fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
+      |                                 ~~~~~~
+  322 |     this.l.acquire()
+  323 |     this.filesystem.l.acquire()
+fs/ext2/ext2.v:534:70: notice: unused parameter: `source`
+  532 | }
+  533 | 
+  534 | fn (mut this EXT2Filesystem) mount(parent &vfs.VFSNode, name string, source &vfs.VFSNode) ?&vfs.VFSNode {
+      |                                                                      ~~~~~~
+  535 |     this.dev_id = resource_mod.create_dev_id()
+  536 |
+event/event_arm64.v:18:4: notice: unused function: `leave_for_good`
+   16 | // A thread leaving for good needs nothing more here: the current thread is
+   17 | // found through TPIDR_EL1, which proc.set_current_thread keeps.
+   18 | fn leave_for_good(_ &proc.Thread) {}
+      |    ~~~~~~~~~~~~~~
+fs/mount.v:297:4: notice: unused function: `logical_parent`
+  295 | // Where `..` leads from `node`. The root of the caller's tree is its own
+  296 | // parent, and the root of a mount leads out through the node it covers.
+  297 | fn logical_parent(node &VFSNode) &VFSNode {
+      |    ~~~~~~~~~~~~~~
+  298 |     mut current := unsafe { node }
+  299 |     for _ in 0 .. 64 {
+fs/tmpfs.v:73:7: notice: unused constant: `f_seal_exec`
+   71 | const f_seal_write = u32(0x8)
+   72 | const f_seal_future_write = u32(0x10)
+   73 | const f_seal_exec = u32(0x20)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~
+   74 | 
+   75 | fn (mut this TmpFSResource) get_seals() ?u32 {
+socket/inet/inet.v:78:7: notice: unused constant: `tcp_nodelay`
+   76 | const ipv6_v6only = 26
+   77 | const ipv6_unicast_hops = 16
+   78 | const tcp_nodelay = 1
+      |       ~~~~~~~~~~~~~~~
+   79 | 
+   80 | // TCP keepalive controls, in seconds and probes, applied by the transport.
+socket/inet/inet.v:81:7: notice: unused constant: `tcp_keepidle`
+   79 | 
+   80 | // TCP keepalive controls, in seconds and probes, applied by the transport.
+   81 | const tcp_keepidle = 4
+      |       ~~~~~~~~~~~~~~~~
+   82 | const tcp_keepintvl = 5
+   83 | const tcp_keepcnt = 6
+socket/inet/inet.v:82:7: notice: unused constant: `tcp_keepintvl`
+   80 | // TCP keepalive controls, in seconds and probes, applied by the transport.
+   81 | const tcp_keepidle = 4
+   82 | const tcp_keepintvl = 5
+      |       ~~~~~~~~~~~~~~~~~
+   83 | const tcp_keepcnt = 6
+   84 | const ip_tos = 1
+socket/inet/inet.v:83:7: notice: unused constant: `tcp_keepcnt`
+   81 | const tcp_keepidle = 4
+   82 | const tcp_keepintvl = 5
+   83 | const tcp_keepcnt = 6
+      |       ~~~~~~~~~~~~~~~
+   84 | const ip_tos = 1
+   85 | const ip_ttl = 2
+socket/inet/inet.v:84:7: notice: unused constant: `ip_tos`
+   82 | const tcp_keepintvl = 5
+   83 | const tcp_keepcnt = 6
+   84 | const ip_tos = 1
+      |       ~~~~~~~~~~
+   85 | const ip_ttl = 2
+   86 | const ip_recverr = 11
+socket/inet/inet.v:85:7: notice: unused constant: `ip_ttl`
+   83 | const tcp_keepcnt = 6
+   84 | const ip_tos = 1
+   85 | const ip_ttl = 2
+      |       ~~~~~~~~~~
+   86 | const ip_recverr = 11
+   87 |
+aarch64/gic/gic.v:57:4: notice: unused function: `gicd_read32`
+   55 | // incorrect code on aarch64). DSB/DMB barriers ensure Device memory ordering.
+   56 | 
+   57 | fn gicd_read32(offset u64) u32 {
+      |    ~~~~~~~~~~~
+   58 |     addr := gicd_base + offset
+   59 |     val := unsafe { *&u32(addr) }
+aarch64/wdt/wdt.v:23:7: notice: unused constant: `wd0_bite_time`
+   21 | 
+   22 | const wd0_cur_time = u32(0x00)
+   23 | const wd0_bite_time = u32(0x04)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+   24 | const wd0_ctrl = u32(0x0c)
+   25 | const wd1_cur_time = u32(0x10)
+aarch64/wdt/wdt.v:29:7: notice: unused constant: `ctrl_irq_en`
+   27 | const wd1_ctrl = u32(0x1c)
+   28 | 
+   29 | const ctrl_irq_en = u32(1) << 0
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+   30 | const ctrl_irq_status = u32(1) << 1
+   31 | const ctrl_reset_en = u32(1) << 2
+aarch64/wdt/wdt.v:30:7: notice: unused constant: `ctrl_irq_status`
+   28 | 
+   29 | const ctrl_irq_en = u32(1) << 0
+   30 | const ctrl_irq_status = u32(1) << 1
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   31 | const ctrl_reset_en = u32(1) << 2
+   32 |
+aarch64/virtio_input/virtio_input.v:72:7: notice: unused constant: `ev_syn`
+   70 | 
+   71 | // Linux input event types
+   72 | const ev_syn = u16(0)
+      |       ~~~~~~~~~~~~~~~
+   73 | const ev_key = u16(1)
+   74 | const ev_rel = u16(2)
+aarch64/virtio_gpu/virtio_gpu.v:951:4: notice: unused function: `unsupported_handler`
+  949 | }
+  950 | 
+  951 | fn unsupported_handler(_dev &drm.DrmDevice, _handle voidptr, _data voidptr) int {
+      |    ~~~~~~~~~~~~~~~~~~~
+  952 |     return -22
+  953 | }
+apple/speakers/speakers.v:135:7: notice: unused constant: `service_progress`
+  133 | 
+  134 | const service_running = u32(1)
+  135 | const service_progress = u32(2)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~
+  136 | const service_drained = u32(4)
+  137 | const service_fault = u32(8)
+apple/speakers/speakers.v:136:7: notice: unused constant: `service_drained`
+  134 | const service_running = u32(1)
+  135 | const service_progress = u32(2)
+  136 | const service_drained = u32(4)
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~
+  137 | const service_fault = u32(8)
+  138 | const service_idle = u32(16)
+devicetree/devicetree.v:19:7: notice: unused constant: `fdt_end`
+   17 | const fdt_prop = u32(3)
+   18 | const fdt_nop = u32(4)
+   19 | const fdt_end = u32(9)
+      |       ~~~~~~~~~~~~~~~~
+   20 | 
+   21 | @[packed]
+pci/scan.v:12:7: notice: unused constant: `max_bus`
+   10 | const max_device = 32
+   11 | 
+   12 | const max_bus = 256
+      |       ~~~~~~~~~~~~~
+   13 | 
+   14 | pub fn initialise() {
+sed 's/call 0(/call *(/g;/Wimplicit-function-declaration/d' < obj/blob.c > obj/blob.c.tmp
+mv obj/blob.c.tmp obj/blob.c
+/usr/bin/clang -target aarch64-unknown-none -g -O2 -pipe -g -Wall -Wextra -std=gnu99 -nostdinc -ffreestanding -fno-omit-frame-pointer -fstack-protector-strong -mstack-protector-guard=global -fno-stack-check -fno-lto -fno-PIC -ffunction-sections -fdata-sections -fno-strict-aliasing -march=armv8.4-a -mgeneral-regs-only -I c -I c/lwip/include -isystem freestnd-c-hdrs  -D__AARCH64__ -MMD -MP -DPROD -D__vinix__ -w -c obj/blob.c -o obj/blob.c.o
+mkdir -p "$(dirname bin/vinix)"
+/opt/homebrew/bin/ld.lld -m aarch64elf --build-id=none --nostdlib --static -z max-page-size=0x4000 --gc-sections -T linker-aarch64.ld obj/blob.c.o obj/c/aarch64_paging.c.o obj/c/acpi_sync_test.c.o obj/c/agx_fake_g17.c.o obj/c/agx_fake_g17_encode.c.o obj/c/alloc_track.c.o obj/c/apple_ans.c.o obj/c/apple_ans_ext2.c.o obj/c/apple_display_hotplug.c.o obj/c/apple_smc.c.o obj/c/apple_speakers.c.o obj/c/apple_spi_keyboard.c.o obj/c/brcm_m1.c.o obj/c/brcm_wifi.c.o obj/c/explicit_bzero.c.o obj/c/flanterm/backends/fb.c.o obj/c/flanterm/flanterm.c.o obj/c/heap_benchmark.c.o obj/c/hw_random.c.o obj/c/linuxkpi.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/lwip/core/altcp.c.o obj/c/lwip/core/altcp_alloc.c.o obj/c/lwip/core/altcp_tcp.c.o obj/c/lwip/core/def.c.o obj/c/lwip/core/dns.c.o obj/c/lwip/core/inet_chksum.c.o obj/c/lwip/core/init.c.o obj/c/lwip/core/ip.c.o obj/c/lwip/core/ipv4/acd.c.o obj/c/lwip/core/ipv4/autoip.c.o obj/c/lwip/core/ipv4/dhcp.c.o obj/c/lwip/core/ipv4/etharp.c.o obj/c/lwip/core/ipv4/icmp.c.o obj/c/lwip/core/ipv4/igmp.c.o obj/c/lwip/core/ipv4/ip4.c.o obj/c/lwip/core/ipv4/ip4_addr.c.o obj/c/lwip/core/ipv4/ip4_frag.c.o obj/c/lwip/core/ipv6/dhcp6.c.o obj/c/lwip/core/ipv6/ethip6.c.o obj/c/lwip/core/ipv6/icmp6.c.o obj/c/lwip/core/ipv6/inet6.c.o obj/c/lwip/core/ipv6/ip6.c.o obj/c/lwip/core/ipv6/ip6_addr.c.o obj/c/lwip/core/ipv6/ip6_frag.c.o obj/c/lwip/core/ipv6/mld6.c.o obj/c/lwip/core/ipv6/nd6.c.o obj/c/lwip/core/mem.c.o obj/c/lwip/core/memp.c.o obj/c/lwip/core/netif.c.o obj/c/lwip/core/pbuf.c.o obj/c/lwip/core/raw.c.o obj/c/lwip/core/stats.c.o obj/c/lwip/core/sys.c.o obj/c/lwip/core/tcp.c.o obj/c/lwip/core/tcp_in.c.o obj/c/lwip/core/tcp_out.c.o obj/c/lwip/core/timeouts.c.o obj/c/lwip/core/udp.c.o obj/c/lwip/netif/ethernet.c.o obj/c/memory.c.o obj/c/net_random.c.o obj/c/printf.c.o obj/c/printf_benchmark.c.o obj/c/stack_protector.c.o obj/c/uacpi/default_handlers.c.o obj/c/uacpi/event.c.o obj/c/uacpi/interpreter.c.o obj/c/uacpi/io.c.o obj/c/uacpi/mutex.c.o obj/c/uacpi/namespace.c.o obj/c/uacpi/notify.c.o obj/c/uacpi/opcodes.c.o obj/c/uacpi/opregion.c.o obj/c/uacpi/osi.c.o obj/c/uacpi/registers.c.o obj/c/uacpi/resources.c.o obj/c/uacpi/shareable.c.o obj/c/uacpi/sleep.c.o obj/c/uacpi/stdlib.c.o obj/c/uacpi/tables.c.o obj/c/uacpi/types.c.o obj/c/uacpi/uacpi.c.o obj/c/uacpi/utilities.c.o obj/c/vinix_net.c.o obj/c/vmx.c.o obj/asm/aarch64/fpu.S.o obj/asm/aarch64/kio.S.o obj/asm/aarch64/psci.S.o obj/asm/aarch64/sched_switch.S.o obj/asm/aarch64/vectors.S.o  cc-runtime-aarch64/cc-runtime.a -o bin/vinix

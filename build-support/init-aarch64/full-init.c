@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* Freestanding ARM64 init for the full BusyBox/GCC/V test image. */
 typedef unsigned long u64;
 typedef long i64;
@@ -43,7 +47,7 @@ void _start(void) {
 	};
 #endif
     char *environment[] = {
-        "PATH=/aarch64-linux-musl-native/bin:/bin:/sbin:/usr/bin:/usr/sbin",
+        "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         "HOME=/root",
         "TERM=linux",
         "PS1=vinix# ",

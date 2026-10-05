@@ -8,28 +8,56 @@ command -v "$v" >/dev/null 2>&1 || { echo 'ERROR: V is required.' >&2; exit 1; }
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir "$work/clients"
-for name in device_io.v platform.c.v backlight_client.v battery_client.v; do
+for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v scale.v settings_model.v preferences.v preferences.c.v; do
     cp "$root/desktop/$name" "$work/clients/"
 done
+cp "$root/desktop/libc_compat.h" "$work/clients/"
 cp "$root/desktop/tools/tests/device_io_mock.v" "$work/clients/"
-for name in backlight_client battery_client platform; do
+cp "$root/desktop/tools/tests/taskbar_status_mock.v" "$work/clients/"
+for name in backlight_client battery_client wifi_client platform preferences clock_preferences; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/clients/"
     # Invoke the test file directly so older vtest runners cannot lose the
     # shell quoting around a module path containing '|'. V runs its tests.
-    "$v" -gc none -enable-globals -stats \
-        -path "@vlib|@vmodules|$root/kernel/modules" "$work/clients/${name}_test.v"
+    "$v" -new-compiler -nocache -gc none -enable-globals -stats \
+        -path "@vlib|@vmodules|$root/kernel" "$work/clients/${name}_test.v"
 done
 if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
 [ -f "$root/third_party/ui2/v.mod" ] || {
     echo 'ERROR: Settings UI tests require third_party/ui2.' >&2; exit 1;
 }
+python3 "$root/desktop/tools/stage_ui2.py" \
+    "$work/modules/ui2" "$root/third_party/ui2" \
+    "$root/desktop/tools/ui2_headless_bounds.v"
+# Settings is a category of the whole desktop application now, so the UI tests
+# build against the real thing rather than a hand-picked subset.
+# Staged exactly as the real build stages it, including Calculator's ui2 model,
+# so the tests build against the desktop that ships. main.v is then dropped: its
+# fn main() would collide with the test runner's.
 mkdir "$work/ui"
-for name in settings.v battery.v theme.v device_io.v platform.c.v backlight_client.v battery_client.v; do
-    cp "$root/desktop/$name" "$work/ui/"
-done
+python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
+    "$root/third_party/ui2/examples/calculator" >/dev/null
+rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/settings_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/settings_persistence_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/clock_settings_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/keyboard_layout_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/switcher_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/memory_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/i18n_test.v" "$work/ui/"
+cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 # Both sets share fixture_app and element_named in one translation unit.
 sed '1,/^import ui2$/d' "$root/desktop/tools/tests/battery_test.v" >> "$work/ui/settings_test.v"
 printf "Module { name: 'settings_tests' }\n" > "$work/ui/v.mod"
-"$v" -gc none -enable-globals -stats -d ui2_headless \
-    -path "@vlib|@vmodules|$root/third_party" "$work/ui/settings_test.v"
+for name in settings switcher settings_persistence clock_settings keyboard_layout i18n; do
+    "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+        -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
+done
+# Each area's text in Russian and Spanish, beside i18n_test.v's checks that
+# every language is complete.
+for test in "$root"/desktop/tools/tests/i18n_*_test.v; do
+    cp "$test" "$work/ui/"
+    "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
+        -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/$(basename "$test")"
+done
+"$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/memory_test.v"

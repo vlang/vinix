@@ -1,0 +1,27 @@
+Kext with invalid signature (-67062) allowed: <OSKext 0x7fd8204333c0 [0x7fff87512cc0]> { URL = "file:///private/var/tmp/vinix-alloc-kext/AllocKernelBench.kext/", ID = "org.vinix.AllocKernelBench" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7fd82043e810 [0x7fff87512cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/IOKit.kext/", ID = "com.apple.kpi.iokit" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7fd82043ed10 [0x7fff87512cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/Libkern.kext/", ID = "com.apple.kpi.libkern" }
+Disabling KextAudit: SIP is off
+KALLOC-META schema=3 platform=xnu timer=x86-tsc samples=5 hot_pairs=100000 batch_rounds=48 batch_width=256 big_pairs=128 big_bytes=262144 operation=alloc_free_pair
+KALLOC-VALIDATION platform=xnu sizes=16,32,48,64,96,128,192,256,384,512,768,1024,1536,2048 zero_validation=warmup_every_requested_byte payload_validation=endpoints timed_zero_validation=0
+KALLOC-COMPILER platform=xnu compiler=gcc compiler_major=14 compiler_minor=3 compiler_patch=0
+KALLOC-SAMPLE platform=xnu phase=hot64 sample=1 pairs=100000 ticks=553658000 ticks_per_pair=5536 checksum=25486688
+KALLOC-SAMPLE platform=xnu phase=hot64 sample=2 pairs=100000 ticks=458652000 ticks_per_pair=4586 checksum=25486688
+KALLOC-SAMPLE platform=xnu phase=hot64 sample=3 pairs=100000 ticks=527521000 ticks_per_pair=5275 checksum=25486688
+KALLOC-SAMPLE platform=xnu phase=hot64 sample=4 pairs=100000 ticks=564316000 ticks_per_pair=5643 checksum=25486688
+KALLOC-SAMPLE platform=xnu phase=hot64 sample=5 pairs=100000 ticks=531458000 ticks_per_pair=5314 checksum=25486688
+KALLOC-RESULT platform=xnu phase=hot64 pairs=100000 samples=5 warmup_pairs=100000 median_ticks=531458000 min_ticks=458652000 max_ticks=564316000 median_ticks_per_pair=5314 checksum=25486688
+KALLOC-SAMPLE platform=xnu phase=mixed256 sample=1 pairs=12288 ticks=337675000 ticks_per_pair=27480 checksum=1855488
+KALLOC-SAMPLE platform=xnu phase=mixed256 sample=2 pairs=12288 ticks=251900000 ticks_per_pair=20499 checksum=1855488
+KALLOC-SAMPLE platform=xnu phase=mixed256 sample=3 pairs=12288 ticks=187911000 ticks_per_pair=15292 checksum=1855488
+KALLOC-SAMPLE platform=xnu phase=mixed256 sample=4 pairs=12288 ticks=77235000 ticks_per_pair=6285 checksum=1855488
+KALLOC-SAMPLE platform=xnu phase=mixed256 sample=5 pairs=12288 ticks=324815000 ticks_per_pair=26433 checksum=1855488
+KALLOC-RESULT platform=xnu phase=mixed256 pairs=12288 samples=5 warmup_pairs=12288 median_ticks=251900000 min_ticks=77235000 max_ticks=337675000 median_ticks_per_pair=20499 checksum=1855488
+KALLOC-SAMPLE platform=xnu phase=big262144 sample=1 pairs=128 ticks=745189000 ticks_per_pair=5821789 checksum=16256
+KALLOC-SAMPLE platform=xnu phase=big262144 sample=2 pairs=128 ticks=577594000 ticks_per_pair=4512453 checksum=16256
+KALLOC-SAMPLE platform=xnu phase=big262144 sample=3 pairs=128 ticks=716864000 ticks_per_pair=5600500 checksum=16256
+KALLOC-SAMPLE platform=xnu phase=big262144 sample=4 pairs=128 ticks=688816000 ticks_per_pair=5381375 checksum=16256
+KALLOC-SAMPLE platform=xnu phase=big262144 sample=5 pairs=128 ticks=852212000 ticks_per_pair=6657906 checksum=16256
+KALLOC-RESULT platform=xnu phase=big262144 pairs=128 samples=5 warmup_pairs=128 median_ticks=716864000 min_ticks=577594000 max_ticks=852212000 median_ticks_per_pair=5600500 checksum=16256
+KALLOC-DONE platform=xnu phases=3 checksum=27358432
+localhost:/ root# 

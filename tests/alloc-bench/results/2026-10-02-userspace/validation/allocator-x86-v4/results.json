@@ -1,0 +1,189 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "suite": "supplemental",
+      "checks": 22776
+    }
+  ],
+  "total_checks": 98744,
+  "footprints": [
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "before": 1031061319680,
+      "retained": 1031064895488,
+      "trimmed": 1031061319680,
+      "retained_delta": 3575808,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "before": 1031060676608,
+      "retained": 1031064260608,
+      "trimmed": 1031060676608,
+      "retained_delta": 3584000,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "before": 1031061311488,
+      "retained": 1031061311488,
+      "trimmed": 1031061311488,
+      "retained_delta": 0,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "before": 1031060668416,
+      "retained": 1031060672512,
+      "trimmed": 1031060668416,
+      "retained_delta": 4096,
+      "trimmed_delta": 0
+    }
+  ],
+  "corruption": [
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=0 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "dynamic",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "linkage": "static",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    }
+  ],
+  "clock_lines": [
+    "CLOCK-REFERENCE-BEGIN ns=1790969451922976000",
+    "CLOCK-REFERENCE-END ns=1790969452338662000 elapsed=415686000",
+    "CLOCK-COUNTER sleep_ns=51730000 sleep_ticks=51772000 busy_ns=415686000 busy_ticks=413925000 ratio=1.005070",
+    "CLOCK-DONE precise counter, coarse snapshots, absolute sleeps, timerfd and futex"
+  ],
+  "kernel_sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186",
+  "source_sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+  "supplemental_source_sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+  "serial_sha256": "748a6a700b4dad8178d53c613cf2300658e44a48e1e0c1699119647971d9f36d",
+  "embedded_input_proof": "embedded-input-check.json",
+  "preboot_failures": [
+    ".preboot-path-error.runner.log",
+    ".preboot-disk-error.runner.log"
+  ]
+}

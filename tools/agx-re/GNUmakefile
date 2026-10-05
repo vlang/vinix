@@ -2,7 +2,7 @@ CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 
-.PHONY: all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-g17-abi generate-g17-power-model check-g17-power-model layout test trace trace-resources clean
+.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 $(BUILD):
@@ -34,8 +34,35 @@ kernel-kexts:
 recover-t6050-power: kernel-kexts pmp-firmware
 	./recover_t6050_power.py
 
+# The base-M1 GPU driver and DeviceTree ship on every Mac, staged under Preboot
+# for restore, so this needs no M1 to run.
+g13g-kexts:
+	./extract_fileset.py --platform mac13g --output build/kext/g13g \
+		--entry com.apple.AGXG13G --entry com.apple.AGXFirmwareKextG13GRTBuddy
+
+recover-t8103-adt: g13g-kexts
+	./recover_t8103_adt.py > $(BUILD)/recovered-t8103-adt.json.tmp
+	mv $(BUILD)/recovered-t8103-adt.json.tmp $(BUILD)/recovered-t8103-adt.json
+
 recover-g17-abi: firmware kernel-kexts
-	./recover_g17_abi.py
+	./recover_g17_abi.py > $(BUILD)/recovered-g17-abi.json.tmp
+	mv $(BUILD)/recovered-g17-abi.json.tmp $(BUILD)/recovered-g17-abi.json
+
+# The 13.5 firmware ABI layout, computed from m1n1's versioned definitions.
+# Needs the m1n1 checkout: git clone https://github.com/AsahiLinux/m1n1 ~/code/3rd/m1n1
+generate-g13-initdata-layout:
+	./generate_g13_initdata_layout.py
+
+check-g13-initdata-layout:
+	./generate_g13_initdata_layout.py --check
+
+# Compare the contracts that have caused hardware-only failures against the
+# reverse-engineered m1n1 source. Set ASAHI_LINUX to include its MMU ordering.
+check-g13-reference: check-g13-initdata-layout
+	./check_g13_reference_contract.py $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
+
+report-g13-initdata-layout:
+	./generate_g13_initdata_layout.py --report
 
 generate-g17-power-model:
 	./generate_g17_power_model.py
@@ -43,11 +70,23 @@ generate-g17-power-model:
 check-g17-power-model:
 	./generate_g17_power_model.py --check
 
+generate-fake-g17-encoder:
+	./generate_fake_g17_3d_encoder.py
+
+check-fake-g17-encoder:
+	./generate_fake_g17_3d_encoder.py --check
+
 test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
 		test_extract_pmp_firmware.py test_extract_fileset.py \
-		test_recover_t6050_power.py test_recover_g17_abi.py \
+		test_recover_t6050_power.py test_recover_t8103_adt.py \
+		test_check_g13_reference_contract.py \
+		test_generate_g13_initdata_layout.py \
+		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
+		test_generate_fake_g17_3d_encoder.py \
+		test_compile_fake_g17_plan.py \
+		test_map_g17_resource_descriptors.py \
 		test_trace_diff.py
 
 layout: all
@@ -69,6 +108,26 @@ trace-resources: all
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle pair
 	./trace_diff.py $(BUILD)/agx_trace_resources.jsonl
+
+trace-depth-resources: all
+	rm -f $(BUILD)/agx_trace_depth_resources.jsonl
+	AGX_TRACE_FILE=$(CURDIR)/$(BUILD)/agx_trace_depth_resources.jsonl \
+		AGX_TRACE_BYTES=65536 \
+		AGX_TRACE_RESOURCES=1 \
+		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
+		$(CURDIR)/$(BUILD)/metal_triangle depth-pair
+	./trace_diff.py $(BUILD)/agx_trace_depth_resources.jsonl \
+		--left depth-clear --right depth-triangle
+
+trace-stencil-resources: all
+	rm -f $(BUILD)/agx_trace_stencil_resources.jsonl
+	AGX_TRACE_FILE=$(CURDIR)/$(BUILD)/agx_trace_stencil_resources.jsonl \
+		AGX_TRACE_BYTES=65536 \
+		AGX_TRACE_RESOURCES=1 \
+		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
+		$(CURDIR)/$(BUILD)/metal_triangle stencil-pair
+	./trace_diff.py $(BUILD)/agx_trace_stencil_resources.jsonl \
+		--left stencil-clear --right stencil-triangle
 
 clean:
 	rm -rf $(BUILD)

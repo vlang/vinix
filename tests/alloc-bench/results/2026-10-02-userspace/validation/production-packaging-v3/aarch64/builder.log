@@ -1,0 +1,52 @@
+==> Staging the Alpine aarch64 userland...
+==> Staging Alpine's prebuilt C/C++ toolchain...
+    extracting binutils-2.43.1-r3.apk
+    extracting build-base-0.5-r3.apk
+    extracting file-5.46-r2.apk
+    extracting fortify-headers-1.1-r5.apk
+    extracting g++-14.2.0-r4.apk
+    extracting gcc-14.2.0-r4.apk
+    extracting gmp-6.3.0-r2.apk
+    extracting isl25-0.25-r2.apk
+    extracting jansson-2.14-r4.apk
+    extracting libatomic-14.2.0-r4.apk
+    extracting libgcc-14.2.0-r4.apk
+    extracting libgomp-14.2.0-r4.apk
+    extracting libmagic-5.46-r2.apk
+    extracting libncursesw-6.5_p20241006-r3.apk
+    extracting libstdc++-14.2.0-r4.apk
+    extracting libstdc++-dev-14.2.0-r4.apk
+    extracting make-4.4.1-r2.apk
+    extracting mpc1-1.3.1-r1.apk
+    extracting mpfr4-4.2.1-r0.apk
+    extracting musl-1.2.5-r11.apk
+    extracting musl-dev-1.2.5-r11.apk
+    extracting ncurses-terminfo-base-6.5_p20241006-r3.apk
+    extracting patch-2.7.6-r10.apk
+    extracting vim-9.1.1105-r0.apk
+    extracting vim-common-9.1.1105-r0.apk
+    extracting xxd-9.1.1105-r0.apk
+    extracting zlib-1.3.2-r0.apk
+    extracting zstd-libs-1.5.6-r2.apk
+==> Staging Zsh, Vim, and Oh My Zsh...
+    extracting libcap2-2.78-r0.apk
+    extracting libncursesw-6.5_p20241006-r3.apk
+    extracting musl-1.2.5-r11.apk
+    extracting ncurses-terminfo-base-6.5_p20241006-r3.apk
+    extracting vim-9.1.1105-r0.apk
+    extracting vim-common-9.1.1105-r0.apk
+    extracting xxd-9.1.1105-r0.apk
+    extracting zsh-5.9-r4.apk
+/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v3/aarch64/staging/bin/busybox:              ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-aarch64.so.1, BuildID[sha1]=2aa6a9488c75b34b48e5b4233ae3140a83f30ae4, stripped
+/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v3/aarch64/staging/lib/ld-musl-aarch64.so.1: ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), static-pie linked, BuildID[sha1]=0c94262ce5d8ca4c497b55e093c018e562afab0c, stripped
+==> Skipping optional runtime overlays (VINIX_ALPINE_BASE_ONLY=1)
+==> Packaging initramfs...
+==> Installing Vinix's optimized musl allocator...
+    staged Vinix musl 1.2.5 (aarch64, retention=1, d65e65489a77)
+    initramfs: 288M
+
+=== Build complete ===
+Initramfs: /Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v3/aarch64/initramfs.tar
+Busybox applets: 378
+
+To boot: ./run-aarch64.sh

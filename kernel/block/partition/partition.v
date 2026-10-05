@@ -1,0 +1,234 @@
+module partition
+
+import memory
+import stat
+import klock
+import event.eventstruct
+import resource
+import lib
+import fs
+
+const gpt_signature = u64(0x5452415020494645)
+
+struct Partition {
+pub mut:
+	stat     stat.Stat
+	refcount int
+	l        klock.Lock
+	event    eventstruct.Event
+	status   int
+	can_mmap bool
+
+	parent_device &resource.Resource
+	device_offset u64
+	sector_cnt    u64
+	identity resource.BlockIdentity
+}
+
+@[packed]
+struct MBRPartition {
+pub mut:
+	drive_status   u8
+	starting_chs   [3]u8
+	partition_type u8
+	ending_chs     [3]u8
+	starting_lba   u32
+	sector_cnt     u32
+}
+
+struct GPTPartitionEntry {
+pub mut:
+	partition_type_guid [2]u64
+	partition_guid      [2]u64
+	starting_lba        u64
+	last_lba            u64
+	flags               u64
+	name                [9]u64
+}
+
+@[packed]
+struct GPTPartitionTableHDR {
+pub mut:
+	identifier            u64
+	version               u32
+	hdr_size              u32
+	checksum              u32
+	reserved0             u32
+	hdr_lba               u64
+	alt_hdr_lba           u64
+	first_block           u64
+	last_block            u64
+	guid                  [2]u64
+	partition_array_lba   u64
+	partition_entry_cnt   u32
+	partition_entry_size  u32
+	crc32_partition_array u32
+}
+
+fn (this &Partition) block_identity() resource.BlockIdentity { return this.identity }
+
+fn partition_identity(parent resource.BlockIdentity, offset u64, length u64) resource.BlockIdentity {
+	if !parent.valid() || offset > parent.length || length > parent.length - offset {
+		return resource.BlockIdentity{is_block: true}
+	}
+	return resource.BlockIdentity{is_block: true, disk_id: parent.disk_id, start: parent.start + offset, length: length}
+}
+
+fn (mut this Partition) write(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if (count + loc) > (this.sector_cnt * this.parent_device.stat.blksize) {
+		return none
+	}
+
+	return this.parent_device.write(handle, buffer, loc + this.device_offset, count)
+}
+
+fn (mut this Partition) read(handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if (count + loc) > (this.sector_cnt * this.parent_device.stat.blksize) {
+		return none
+	}
+
+	return this.parent_device.read(handle, buffer, loc + this.device_offset, count)
+}
+
+fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	return this.parent_device.ioctl(handle, request, argp)
+}
+
+// A partition has no separate write cache. Its persistence barrier is the
+// parent's, including errors from the hardware cache flush.
+fn (mut this Partition) sync(handle voidptr) ? {
+	resource.sync_resource(mut this.parent_device, handle)?
+}
+
+fn (mut this Partition) unref(handle voidptr) ? {
+	return this.parent_device.unref(handle)
+}
+
+fn (mut this Partition) link(_handle voidptr) ? {
+}
+
+fn (mut this Partition) unlink(_handle voidptr) ? {
+}
+
+fn (mut this Partition) grow(handle voidptr, new_size u64) ? {
+	return this.parent_device.grow(handle, new_size)
+}
+
+fn (mut this Partition) mmap(handle voidptr, page u64, flags int) voidptr {
+	return this.parent_device.mmap(handle, page, flags)
+}
+
+// The device name of partition `index`: the device's own and the number. The
+// device node keeps it as its name.
+fn partition_name(prefix string, index int) string {
+	mut text := lib.new_text(prefix.len + 20)
+	text.add(prefix)
+	text.add_decimal(i64(index))
+	return text.str()
+}
+
+pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
+	parent_identity := resource.block_identity(mut parent_device)
+	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
+
+	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
+		print('block: unable to read from device\n')
+		return -1
+	}
+
+	gpt_hdr := unsafe { *&GPTPartitionTableHDR(lba_buffer) }
+
+	if gpt_hdr.identifier == gpt_signature {
+		entry_list_lba := gpt_hdr.partition_array_lba
+		entry_cnt := gpt_hdr.partition_entry_cnt
+		entry_list_size := lib.align_up(sizeof(GPTPartitionEntry) * entry_cnt, u64(parent_device.stat.blksize))
+
+		if gpt_hdr.partition_entry_size != sizeof(GPTPartitionEntry) {
+			print('gpt: fatal parsing error\n')
+			return -1
+		}
+
+		partition_entry_buffer := memory.malloc(entry_list_size)
+
+		parent_device.read(0, partition_entry_buffer, u64(entry_list_lba * parent_device.stat.blksize),
+			entry_list_size) or {
+			print('block: unable to read from device\n')
+			return -1
+		}
+
+		partition_entry_list := unsafe { &GPTPartitionEntry(partition_entry_buffer) }
+
+		for i := 0; i < entry_cnt; i++ {
+			partition_entry := unsafe { &GPTPartitionEntry(&partition_entry_list[i]) }
+
+			if partition_entry.partition_type_guid[0] == 0
+				&& partition_entry.partition_type_guid[1] == 0 {
+				continue
+			}
+
+			mut partition := &Partition{
+				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
+				sector_cnt:    partition_entry.last_lba - partition_entry.starting_lba
+				parent_device: unsafe { parent_device }
+			}
+
+			partition.stat.blocks = partition.sector_cnt
+			partition.stat.blksize = parent_device.stat.blksize
+			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
+			partition.stat.rdev = resource.create_dev_id()
+			partition.stat.mode = 0o644 | stat.ifblk
+
+			C.kprintf(c'gpt: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
+
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+		}
+
+		return 0
+	}
+
+	parent_device.read(0, lba_buffer, 0, u64(parent_device.stat.blksize)) or {
+		print('block: unable to read from device\n')
+		return -1
+	}
+
+	mbr_signature := unsafe { &u16(lba_buffer)[255] }
+
+	if mbr_signature == 0xaa55 {
+		partitions := unsafe { &MBRPartition(u64(lba_buffer) + 0x1be) }
+
+		for i := 0; i < 4; i++ {
+			if unsafe { partitions[i].partition_type } == 0
+				|| unsafe { partitions[i].partition_type } == 0xee {
+				continue
+			}
+
+			partition_entry := unsafe { &MBRPartition(&partitions[i]) }
+
+			mut partition := &Partition{
+				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
+				sector_cnt:    partition_entry.sector_cnt
+				parent_device: unsafe { parent_device }
+			}
+
+			partition.stat.blocks = partition.sector_cnt
+			partition.stat.blksize = parent_device.stat.blksize
+			partition.stat.size = partition.sector_cnt * partition.stat.blksize
+			partition.identity = partition_identity(parent_identity, partition.device_offset,
+				u64(partition.stat.size))
+			partition.stat.rdev = resource.create_dev_id()
+			partition.stat.mode = 0o644 | stat.ifblk
+
+			C.kprintf(c'mbr: partition detected [start: %llx sector cnt: %llu]\n',
+				u64(partition.device_offset), u64(partition.sector_cnt))
+
+			fs.devtmpfs_add_device(partition, partition_name(prefix, i))
+		}
+
+		return 0
+	}
+
+	return -1
+}

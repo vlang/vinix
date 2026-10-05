@@ -1,0 +1,8 @@
+#!/bin/sh
+# Steam's web helper starts through this entry point even with the container
+# runtime disabled. Keep Chromium on the software GL path supported by Vinix
+# and avoid its zygote's unsupported process setup under qemu-x86_64.
+export LIBGL_ALWAYS_SOFTWARE=1
+exec /usr/libexec/vinix-steam/root/usr/bin/env "$@" \
+    --no-zygote --renderer-process-limit=1 \
+    --disable-vulkan --use-gl=angle --use-angle=gl

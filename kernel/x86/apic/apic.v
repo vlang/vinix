@@ -1,0 +1,239 @@
+@[has_globals]
+module apic
+
+import x86.kio
+import x86.msr
+import x86.cpu.local as cpulocal
+import x86.cpu
+import x86.hpet as hpet_clock
+
+const lapic_reg_icr0 = 0x300
+const lapic_reg_icr1 = 0x310
+// ICR's delivery status: the last IPI has not been accepted yet.
+const icr_delivery_pending = u32(1) << 12
+const lapic_reg_spurious = 0x0f0
+const lapic_reg_eoi = 0x0b0
+const lapic_reg_timer = 0x320
+const lapic_reg_timer_initcnt = 0x380
+const lapic_reg_timer_curcnt = 0x390
+const lapic_reg_timer_div = 0x3e0
+
+__global (
+	lapic_base  = u64(0)
+	x2apic_mode = bool(false)
+)
+
+fn xapic_read(reg u32) u32 {
+	if lapic_base == u64(0) {
+		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	}
+	return kio.mmin(unsafe { &u32(lapic_base + reg) })
+}
+
+fn x2apic_read(reg u32) u64 {
+	return msr.rdmsr(0x800 + (reg >> 4))
+}
+
+fn xapic_write(reg u32, val u32) {
+	if lapic_base == u64(0) {
+		lapic_base = u64(msr.rdmsr(0x1b) & 0xfffff000) + higher_half
+	}
+	kio.mmout(unsafe { &u32(lapic_base + reg) }, val)
+}
+
+fn x2apic_write(reg u32, val u64) {
+	msr.wrmsr(0x800 + (reg >> 4), val)
+}
+
+fn lapic_read(reg u32) u64 {
+	if x2apic_mode {
+		return x2apic_read(reg)
+	} else {
+		return xapic_read(reg)
+	}
+}
+
+fn lapic_write(reg u32, val u64) {
+	if x2apic_mode {
+		x2apic_write(reg, val)
+	} else {
+		xapic_write(reg, u32(val))
+	}
+}
+
+pub fn lapic_timer_stop() {
+	lapic_write(lapic_reg_timer_initcnt, 0)
+	lapic_write(lapic_reg_timer, (1 << 16))
+}
+
+pub fn lapic_timer_calibrate(mut cpu_local cpulocal.Local) {
+	lapic_timer_stop()
+
+	lapic_write(lapic_reg_timer, (1 << 16) | 0xff) // Vector 0xff, masked
+	lapic_write(lapic_reg_timer_div, 0b1011) // Timer divisor = 1
+
+	cpuid_success, _, _, ecx, _ := cpu.cpuid(0x15, 0)
+	if cpuid_success == true && ecx != 0 {
+		cpu_local.lapic_timer_freq = ecx
+		return
+	}
+
+	// Measured against the HPET, or the TSC the HPET module calibrated when
+	// there is none. It used to be the PIT, which wraps every 55 ms: a host
+	// that set the virtual CPU aside for longer turned the difference of two
+	// PIT readings into a huge number, the frequency came out as 0, every
+	// one-shot was programmed with a count of 0 and never fired, and the boot
+	// stopped in the scheduler's first wait. Both clocks here keep counting
+	// while the virtual CPU is away, so their ratio holds.
+	mut rates := [3]u64{}
+	mut taken := 0
+	for attempt := 0; attempt < 12 && taken < 3; attempt++ {
+		rate := lapic_ticks_per_second()
+		if rate >= 1000000 {
+			rates[taken] = rate
+			taken++
+		}
+	}
+	cpu_local.lapic_timer_freq = match taken {
+		// Nothing plausible. QEMU and most hardware run the APIC timer at
+		// 1 GHz or less; a guess keeps the scheduler ticking.
+		0 { u64(1000000000) }
+		1 { rates[0] }
+		2 { (rates[0] + rates[1]) / 2 }
+		else { median_of_three(rates[0], rates[1], rates[2]) }
+	}
+
+	lapic_timer_stop()
+}
+
+// LAPIC timer ticks across 10 ms, or 0 when the count ran out first: the
+// virtual CPU was away for longer than the counter lasts.
+fn lapic_ticks_per_second() u64 {
+	lapic_write(lapic_reg_timer_initcnt, 0xffffffff)
+	start := hpet_clock.nanoseconds()
+	for hpet_clock.nanoseconds() - start < 10000000 {}
+	remaining := u64(lapic_read(lapic_reg_timer_curcnt))
+	elapsed := hpet_clock.nanoseconds() - start
+	lapic_timer_stop()
+	if remaining == 0 || elapsed == 0 {
+		return 0
+	}
+	return (u64(0xffffffff) - remaining) * 1000000000 / elapsed
+}
+
+fn median_of_three(a u64, b u64, c u64) u64 {
+	if (a <= b && b <= c) || (c <= b && b <= a) {
+		return b
+	}
+	if (b <= a && a <= c) || (c <= a && a <= b) {
+		return a
+	}
+	return c
+}
+
+pub fn lapic_timer_oneshot(mut cpu_local cpulocal.Local, vec u8, us u64) {
+	lapic_timer_stop()
+
+	ticks := us * (cpu_local.lapic_timer_freq / 1000000)
+
+	lapic_write(lapic_reg_timer, vec)
+	lapic_write(lapic_reg_timer_div, 0b1011)
+	lapic_write(lapic_reg_timer_initcnt, u32(ticks))
+}
+
+pub fn lapic_enable(spurious_vect u8) {
+	lapic_write(lapic_reg_spurious, lapic_read(lapic_reg_spurious) | (1 << 8) | spurious_vect)
+}
+
+@[export: 'x86__apic__lapic_eoi']
+pub fn lapic_eoi() {
+	lapic_write(lapic_reg_eoi, 0)
+}
+
+pub fn lapic_send_ipi(lapic_id u32, vector u8) {
+	if x2apic_mode {
+		x2apic_write(lapic_reg_icr0, (u64(lapic_id) << 32) | vector)
+		return
+	}
+	// The xAPIC takes an IPI as two writes, destination and then vector. An
+	// interrupt between them whose handler sent an IPI of its own changed the
+	// destination under this one, which went to the wrong CPU; and one written
+	// while the last was still being delivered could be lost. Either way a
+	// TLB shootdown waiting for the answer waited for good.
+	ints := cpu.interrupt_toggle(false)
+	for xapic_read(lapic_reg_icr0) & icr_delivery_pending != 0 {
+		asm volatile amd64 {
+			pause
+			; ; ; memory
+		}
+	}
+	xapic_write(lapic_reg_icr1, u32(lapic_id) << 24)
+	xapic_write(lapic_reg_icr0, vector)
+	cpu.interrupt_toggle(ints)
+}
+
+fn io_apic_read(io_apic int, reg u32) u32 {
+	base := u64(madt_io_apics[io_apic].address) + higher_half
+	kio.mmout(unsafe { &u32(base) }, reg)
+	return kio.mmin(unsafe { &u32(base + 16) })
+}
+
+fn io_apic_write(io_apic int, reg u32, value u32) {
+	base := u64(madt_io_apics[io_apic].address) + higher_half
+	kio.mmout(unsafe { &u32(base) }, reg)
+	kio.mmout(unsafe { &u32(base + 16) }, value)
+}
+
+fn io_apic_gsi_count(io_apic int) u32 {
+	return (io_apic_read(io_apic, 1) & 0xff0000) >> 16
+}
+
+fn io_apic_from_gsi(gsi u32) int {
+	for i := 0; i < madt_io_apics.len; i++ {
+		if madt_io_apics[i].gsib <= gsi && madt_io_apics[i].gsib + io_apic_gsi_count(i) > gsi {
+			return i
+		}
+	}
+
+	panic('Cannot determine IO APIC from GSI')
+}
+
+pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, status bool) {
+	io_apic := io_apic_from_gsi(gsi)
+
+	mut redirect := u64(vector)
+
+	if flags & (1 << 1) != 0 {
+		redirect |= (1 << 13)
+	}
+
+	if flags & (1 << 3) != 0 {
+		redirect |= (1 << 15)
+	}
+
+	if status == false {
+		redirect |= (1 << 16)
+	}
+
+	redirect |= u64(lapic_id) << 56
+
+	ioredtbl := (gsi - madt_io_apics[io_apic].gsib) * 2 + 16
+
+	io_apic_write(io_apic, ioredtbl, u32(redirect))
+	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
+}
+
+@[export: 'x86__apic__io_apic_set_irq_redirect']
+pub fn io_apic_set_irq_redirect(lapic_id u32, vector u8, irq u8, status bool) {
+	for i := 0; i < madt_isos.len; i++ {
+		if madt_isos[i].irq_source == irq {
+			if status {
+				C.kprintf(c'apic: IRQ %llu using override\n', u64(irq))
+			}
+			io_apic_set_gsi_redirect(lapic_id, vector, madt_isos[i].gsi, madt_isos[i].flags,
+				status)
+			return
+		}
+	}
+	io_apic_set_gsi_redirect(lapic_id, vector, irq, 0, status)
+}

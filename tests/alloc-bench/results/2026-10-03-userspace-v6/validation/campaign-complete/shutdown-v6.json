@@ -1,0 +1,20 @@
+{
+  "status": "COMPLETE",
+  "requested_utc": "2026-10-02T23:11:21.781569+00:00",
+  "qemu_pid": 36435,
+  "controller_pid": 15655,
+  "previous_qmp_status": {
+    "status": "paused",
+    "running": false
+  },
+  "serial_offset": 88228,
+  "commands": [
+    "sync",
+    "/sbin/shutdown -h now"
+  ],
+  "reason": "Complete predeclared v6 target passed; shut down only owned disposable Catalina clone.",
+  "checked_utc": "2026-10-02T23:12:28.743028+00:00",
+  "owned_qemu_and_controller_running": false,
+  "serial_shutdown_sha256": "ca36ccaa5b8f443613d71b03957fdb74724ca5a03cb87f09bae6909aeffc1541",
+  "termination": "Guest clean shutdown; both own processes exited without host signals."
+}

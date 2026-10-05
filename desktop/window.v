@@ -1,7 +1,11 @@
-// Windows and what they show. The desktop has no way to launch other
-// programs yet, so a window's contents come from a small set of built-in
-// pages; everything about the frame, the title bar and the taskbar entry
-// works the same whichever page is inside.
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Windows and what they show. Native windows contain a built-in page or a
+// ui2 tree received from an application process. External display-owning programs are launched by
+// the window manager and only use a native window to report a startup error.
 module main
 
 import ui2
@@ -11,20 +15,37 @@ enum Page {
 	system
 	palette
 	notes
-	// A window whose contents come from a hosted ui2 application rather than
+	external_error
+	// Says a newer Vinix release is out. See version_check.v.
+	outdated
+	// A window whose contents come from a native application process rather than
 	// from one of the pages below.
 	app
 }
 
+enum WindowSnap {
+	none_
+	left
+	right
+	top_left
+	top_right
+	bottom_left
+	bottom_right
+}
+
 struct Window {
 mut:
-	id        int
-	title     string
-	page      Page
-	x         int
-	y         int
-	width     int
-	height    int
+	id     int
+	title  string
+	page   Page
+	x      int
+	y      int
+	width  int
+	height int
+	hide_body_cursor bool
+	// The glyph that stands for the window in the switcher. An application
+	// lends its own; a built-in page has none of its own to lend.
+	icon string = 'builtin:window'
 	// Element ids, built once when the window opens. The tree is rebuilt every
 	// frame and this target has no garbage collector, so interpolating them
 	// per frame would grow the process for no reason.
@@ -36,16 +57,46 @@ mut:
 	id_minimize string
 	id_divider  string
 	id_body     string
-	id_task     string
+	// One grip per corner; id_resize is the lower right.
+	id_resize    string
+	id_resize_sw string
+	id_resize_nw string
+	id_resize_ne string
+	id_task      string
 	// Geometry to come back to when a maximised window is restored.
 	restore_x      int
 	restore_y      int
 	restore_width  int
 	restore_height int
-	maximized bool
-	minimized bool
+	maximized      bool
+	snap           WindowSnap
+	minimized      bool
+	// Workspaces are zero-based internally and numbered from one in the UI.
+	// A window belongs to exactly one workspace; its application keeps running
+	// while another workspace is shown.
+	workspace int
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1
+	// Stable catalog identity for taskbar pinning; separate from the client slot.
+	factory_index int = -1
+	// Position among unpinned taskbar buttons. It starts as the window id, so
+	// buttons appear in opening order, and dragging a button swaps ranks.
+	task_rank int
+	// Hover-preview identities, built once like the chrome ids above.
+	id_preview       string
+	id_preview_close string
+	id_thumbnail     string
+	// The last unobstructed picture of the window, sampled from the composed
+	// canvas at the backing store's density. Minimized and covered windows
+	// keep showing the last picture that was taken of them.
+	thumbnail        []u32
+	thumbnail_width  int
+	thumbnail_height int
+	thumbnail_scale  int
+	// Taskbar progress, badge and attention reported by the window's process.
+	status_path    string
+	status         TaskStatus
+	attention_seen int
 }
 
 fn (w &Window) frame_rect() ui2.Rect {
@@ -63,73 +114,131 @@ fn (w &Window) content(width int, height int, desktop &Desktop) []ui2.Element {
 		.system { system_page(width, height, desktop) }
 		.palette { palette_page(width, height) }
 		.notes { notes_page(width, height) }
+		.external_error { external_error_page(width, desktop) }
+		.outdated { outdated_page(width, desktop) }
 		// An application's contents are built by the window manager, which is
 		// the only thing holding a mutable reference to it.
 		.app { []ui2.Element{} }
 	}
 }
 
+fn external_error_page(width int, desktop &Desktop) []ui2.Element {
+	pad := 18
+	inner := width - 2 * pad
+	mut children := frame_elements(5)
+	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
+		bg:     app_accent
+		radius: 2
+	}, [])
+	children << heading(desktop.external_error_title, pad, 34, inner)
+	children << body_line(desktop.external_error, pad, 68, inner)
+	children << muted_line(desktop.external_error_note, pad, 100, inner)
+	children << muted_line(desktop.external_error_hint, pad, 120, inner)
+	return children
+}
+
 fn heading(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 20), ui2.TextStyle{
 		color: body_heading
-		size: 17
-		bold: true
+		size:  17
+		bold:  true
 	})
 }
 
 fn body_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 18), ui2.TextStyle{
 		color: body_text
-		size: 13
+		size:  13
+	})
+}
+
+// owned_body_line takes ownership of a string formatted for this frame. Its
+// marker is understood by free_tree, after rendering has finished with it.
+fn owned_body_line(text string, x int, y int, width int) ui2.Element {
+	return ui2.label(frame_owned_text_id, text, ui2.rect(f64(x), f64(y), f64(width), 18), ui2.TextStyle{
+		color: body_text
+		size:  13
 	})
 }
 
 fn muted_line(text string, x int, y int, width int) ui2.Element {
 	return ui2.label('', text, ui2.rect(f64(x), f64(y), f64(width), 16), ui2.TextStyle{
 		color: body_muted
-		size: 11
+		size:  11
 	})
 }
 
 fn welcome_page(width int, _height int) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
-	return [
-		ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
-			bg: accent
-			radius: 2
-		}, []),
-		heading('Welcome to Vinix', pad, 32, inner),
-		body_line('A desktop written from scratch in V,', pad, 60, inner),
-		body_line('drawing straight into the framebuffer.', pad, 78, inner),
-		ui2.view('', ui2.rect(f64(pad), 104, f64(inner), 1), ui2.BoxStyle{
-			bg: body_rule
-		}, []),
-		muted_line('Drag a title bar to move a window.', pad, 116, inner),
-		muted_line('The taskbar lists everything that is open.', pad, 134, inner),
-	]
+	mut children := frame_elements(7)
+	children << ui2.view('', ui2.rect(f64(pad), 18, f64(inner), 4), ui2.BoxStyle{
+		bg:     app_accent
+		radius: 2
+	}, [])
+	children << heading(tr('window.welcome.heading'), pad, 32, inner)
+	children << body_line(tr('window.welcome.line_1'), pad, 60, inner)
+	children << body_line(tr('window.welcome.line_2'), pad, 78, inner)
+	children << ui2.view('', ui2.rect(f64(pad), 104, f64(inner), 1), ui2.BoxStyle{
+		bg: body_rule
+	}, [])
+	children << muted_line(tr('window.welcome.hint_1'), pad, 116, inner)
+	children << muted_line(tr('window.welcome.hint_2'), pad, 134, inner)
+	return children
 }
 
 fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
-	open_windows := desktop.windows.len
-	visible := desktop.visible_window_count()
-	return [
-		heading('System', pad, 18, inner),
-		ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
-			bg: body_panel
-			radius: 6
-		}, [
-			body_line('Display   ${desktop.canvas.width} x ${desktop.canvas.height}',
-				12, 12, inner - 24),
-			body_line('Pointer   ${desktop.pointer_description()}', 12, 32, inner - 24),
-			body_line('Windows   ${open_windows} open, ${visible} on screen', 12, 52,
-				inner - 24),
-			body_line('Frames    ${desktop.frames}', 12, 72, inner - 24),
-			muted_line('Press Esc or q to leave the desktop.', 12, 96, inner - 24),
-		]),
-	]
+	display_width := desktop.canvas.width.str()
+	display_height := desktop.canvas.height.str()
+	display := tr_fill2('window.system.display', display_width, display_height)
+	unsafe {
+		display_width.free()
+		display_height.free()
+	}
+	pointer := tr_fill('window.system.pointer', desktop.pointer_description())
+	open_windows := desktop.windows.len.str()
+	visible_windows := desktop.visible_window_count().str()
+	windows := tr_fill2('window.system.windows', open_windows, visible_windows)
+	unsafe {
+		open_windows.free()
+		visible_windows.free()
+	}
+	frame_count := desktop.frames.str()
+	frames := tr_fill('window.system.frames', frame_count)
+	unsafe { frame_count.free() }
+	battery := device_line('/dev/battery', tr('window.system.battery_absent'),
+		tr('window.system.battery_present'))
+	backlight := device_line('/dev/apple-panel-bl', tr('window.system.backlight_absent'),
+		tr('window.system.backlight_present'))
+	mut panel_children := frame_elements(7)
+	panel_children << owned_body_line(display, 12, 12, inner - 24)
+	panel_children << owned_body_line(pointer, 12, 32, inner - 24)
+	panel_children << owned_body_line(windows, 12, 52, inner - 24)
+	panel_children << owned_body_line(frames, 12, 72, inner - 24)
+	panel_children << owned_body_line(battery, 12, 92, inner - 24)
+	panel_children << owned_body_line(backlight, 12, 112, inner - 24)
+	panel_children << muted_line(tr('window.system.shortcuts'), 12, 136, inner - 24)
+	mut children := frame_elements(2)
+	children << heading(tr('window.system'), pad, 18, inner)
+	children << ui2.view('', ui2.rect(f64(pad), 46, f64(inner), f64(height - 46 - pad)), ui2.BoxStyle{
+		bg:     body_panel
+		radius: 6
+	}, panel_children)
+	return children
+}
+
+// Whether a device node is there at all, which is the difference between a
+// driver that failed and a feature that does nothing. A machine with no serial
+// port paints the boot log over with this desktop, so "the battery reads --%"
+// and "F1 changes no brightness" otherwise look like desktop bugs when both
+// are really the kernel never having registered the device.
+// Both texts are translations; present has a `{0}` for the path. The line
+// returned is newly allocated either way, for an owned label.
+fn device_line(path string, absent string, present string) string {
+	desktop_stat(path) or { return absent.clone() }
+	return tr_substitute(present, path, '', '')
 }
 
 fn palette_page(width int, height int) []ui2.Element {
@@ -153,15 +262,13 @@ fn palette_page(width int, height int) []ui2.Element {
 	cell_height := (height - top - pad - (rows - 1) * gap) / rows
 	cell := if cell_width < cell_height { cell_width } else { cell_height }
 
-	mut children := [
-		heading('Palette', pad, 18, inner),
-	]
+	mut children := frame_elements(swatches.len + 1)
+	children << heading(tr('window.palette'), pad, 18, inner)
 	for i, color in swatches {
 		column := i % columns
 		row := i / columns
-		children << ui2.view('', ui2.rect(f64(pad + column * (cell + gap)), f64(top +
-			row * (cell + gap)), f64(cell), f64(cell)), ui2.BoxStyle{
-			bg: color
+		children << ui2.view('', ui2.rect(f64(pad + column * (cell + gap)), f64(top + row * (cell + gap)), f64(cell), f64(cell)), ui2.BoxStyle{
+			bg:     color
 			radius: 6
 		}, [])
 	}
@@ -172,15 +279,14 @@ fn notes_page(width int, _height int) []ui2.Element {
 	pad := 18
 	inner := width - 2 * pad
 	lines := [
-		'The compositor owns every pixel:',
-		'wallpaper, frames, text and cursor.',
+		tr('window.notes.line_1'),
+		tr('window.notes.line_2'),
 		'',
-		'Layout and hit testing come from a',
-		'ui2 element tree, rebuilt each frame.',
+		tr('window.notes.line_3'),
+		tr('window.notes.line_4'),
 	]
-	mut children := [
-		heading('Notes', pad, 18, inner),
-	]
+	mut children := frame_elements(lines.len + 1)
+	children << heading(tr('window.notes'), pad, 18, inner)
 	for i, line in lines {
 		children << body_line(line, pad, 50 + i * 19, inner)
 	}

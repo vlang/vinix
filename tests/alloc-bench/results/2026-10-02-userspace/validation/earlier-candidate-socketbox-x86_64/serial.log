@@ -1,0 +1,44 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./root/ sz=0
+!>+ [4] ./sbin/ sz=0
+!>+ [5] ./sbin/init sz=172848
+!>+ [6] ./tmp/ sz=0
+!>+ [7] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000007919e400
+initramfs: Done (7 entries)
+SOCKETBOX START
+SOCKETBOX PROGRESS receives=0
+SOCKETBOX progress=0 time=1790954789.888007000
+SOCKETBOX progress=4096 time=1790954790.181851000
+SOCKETBOX PROGRESS receives=8192
+SOCKETBOX progress=8192 time=1790954790.655794000
+SOCKETBOX progress=12288 time=1790954791.062676000
+SOCKETBOX PROGRESS receives=16384
+SOCKETBOX progress=16384 time=1790954791.621060000
+SOCKETBOX progress=20480 time=1790954791.933028000
+SOCKETBOX PROGRESS receives=24576
+SOCKETBOX progress=24576 time=1790954792.417312000
+SOCKETBOX progress=28672 time=1790954792.888723000
+SOCKETBOX PROGRESS receives=32768
+SOCKETBOX progress=32768 time=1790954793.188930000
+SOCKETBOX progress=36864 time=1790954793.436458000
+SOCKETBOX PROGRESS receives=40960
+SOCKETBOX progress=40960 time=1790954793.907977000
+SOCKETBOX progress=45056 time=1790954794.293236000
+SOCKETBOX PROGRESS receives=49152
+SOCKETBOX progress=49152 time=1790954794.577854000
+SOCKETBOX progress=53248 time=1790954794.978644000
+SOCKETBOX PROGRESS receives=57344
+SOCKETBOX progress=57344 time=1790954795.407651000
+SOCKETBOX progress=61440 time=1790954795.777583000
+QEMU CORE FAIL line 1543: after.freeram + 6UL * 1024 * 1024 >= before.freeram (errno=11)
+QEMU CORE FAIL line 93: WIFEXITED(status) && WEXITSTATUS(status) == 0 (errno=0)
+SOCKETBOX FAIL: worker
+ERROR: missing expected QEMU result: SOCKETBOX DONE
+ERROR: observed QEMU failure: QEMU CORE FAIL line
+ERROR: observed QEMU failure: SOCKETBOX FAIL
+==> Starting amd64 QEMU core feature boot

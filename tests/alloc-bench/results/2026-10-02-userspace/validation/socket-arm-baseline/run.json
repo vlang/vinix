@@ -1,0 +1,39 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/third_party/useralloc-vm-next/run-aarch64.sh",
+    "--no-build",
+    "--serial",
+    "--mem=2048",
+    "--guest-init=/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/rootfs/sbin/init",
+    "--no-persist"
+  ],
+  "environment": {
+    "VINIX_INITRAMFS": "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/initramfs.tar",
+    "VINIX_KERNEL_DIR": "/Users/alex/code/vinix/third_party/useralloc-audit-baseline-v3/kernel",
+    "VINIX_BOOT_DISK": "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/boot.img",
+    "VINIX_BOOT_DISK_SIZE_MB": "128",
+    "VINIX_EFIVARS": "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/vars.fd",
+    "VINIX_QEMU_PACKAGE_STORE": "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/packages.tar",
+    "VINIX_QEMU_PERSIST": "0",
+    "VINIX_QEMU_HOST_SOURCE": "0",
+    "VINIX_QEMU_AUDIO": "off",
+    "VINIX_QEMU_SMP": "2",
+    "VINIX_KEEP_TEMP_BOOT_DISK": "1",
+    "USE_TCG": "0"
+  },
+  "kernel_sha256": "1268f7348d4074767657395989e7cecfa100cc61a7e279592bab77d0222a889f",
+  "initramfs_sha256": "6f82dbb4d0af7cb8000e552d3f1df25bbea5c0eed016f1953dbb08fa8efea536",
+  "passed": false,
+  "completed_cases": 0,
+  "markers": [
+    "ARM-SOCKET-SLAB-BEGIN phase=before",
+    "ARM-SOCKET-SLAB-END phase=before",
+    "ARM-SOCKET-BEGIN calls=65536",
+    "QEMU CORE FAIL line 1541: after.freeram + 6UL * 1024 * 1024 >= before.freeram (errno=11)",
+    "ARM-SOCKET-MEMORY before=2027175936 after=1984020480 retained=43155456",
+    "ARM-SOCKET-SLAB-BEGIN phase=after",
+    "ARM-SOCKET-SLAB-END phase=after",
+    "ARM-SOCKET-DONE result=1"
+  ],
+  "serial_sha256": "5ab549ebf3c34db0f9824d337494fb6fcf012a8e73cce496b2631aec186834e9"
+}

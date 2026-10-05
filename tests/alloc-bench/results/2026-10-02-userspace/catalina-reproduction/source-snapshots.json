@@ -1,0 +1,34 @@
+{
+  "argv.json": {
+    "sha256": "97b1c18ba48f89eb594fe1a7508e6f952824f934a616ec303596cd7e1cea3c60",
+    "bytes": 1854
+  },
+  "build-provenance.json": {
+    "sha256": "d57ef7ec9c613452a936f71a7c14efaf154856dbc3781d4def244b07c551bb36",
+    "bytes": 1706
+  },
+  "cached-inputs.json": {
+    "sha256": "c0bbd9062f92ba9aee0aa3d7644ee3296fa830ec119f32a97233408042fcf2fd",
+    "bytes": 1402
+  },
+  "control.py": {
+    "sha256": "14c4eb64e2643e18cce5005c4e74cc29a5d17d2db5155e8f75d3027e0230abf8",
+    "bytes": 1058
+  },
+  "dependency-urls.json": {
+    "sha256": "096f43bcef3444fd2af5d045f3c32428d445fefe6f89f596450181bfca06a770",
+    "bytes": 1004
+  },
+  "measure-recorded.py": {
+    "sha256": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+    "bytes": 2225
+  },
+  "preparation-commands.txt": {
+    "sha256": "643841685497ba05c6663c4b3efa840cbb17d5ee1aa540b044565bb3258f43fb",
+    "bytes": 1340
+  },
+  "preparation-serial.log": {
+    "sha256": "fbe713f6ddb05fa9d0aab6f1de2a53b3c4745d97acf8a4196ced334584a8ba18",
+    "bytes": 26655
+  }
+}

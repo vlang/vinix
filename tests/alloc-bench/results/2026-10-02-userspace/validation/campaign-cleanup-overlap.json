@@ -1,0 +1,18 @@
+{
+  "affected_capture": "vinix-1",
+  "disclosure": "Cleanup of closed correctness artifacts overlapped the first final capture. This is retained host activity, not a failed or changed measured input. All raw samples remain included without correction or exclusion.",
+  "native_cleanup_completion_utc": "2026-10-02T19:50:00.522120+00:00",
+  "arm_cleanup_completion_utc": "2026-10-02T19:50:02.294770+00:00",
+  "conservative_estimated_overlap_window_utc": [
+    "2026-10-02T19:49:59+00:00",
+    "2026-10-02T19:50:03+00:00"
+  ],
+  "window_is_estimate": true,
+  "exact_start_was_recorded": false,
+  "reported_command_duration_seconds": 2.523,
+  "source": "Root task-coordination disclosure plus preserved per-architecture reproducible-artifacts-removed.json completion records.",
+  "removal_records": [
+    "allocator-x86-v4/reproducible-artifacts-removed.json",
+    "allocator-arm-v4/reproducible-artifacts-removed.json"
+  ]
+}

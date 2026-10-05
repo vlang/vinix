@@ -1,0 +1,10 @@
+{
+  "blob_c_sha256": "4f6debb3de556e11391620e0ccca0e65ec2ea7f735e2e5c1255584e971be556d",
+  "blob_object_sha256": "c9a00dc639393afee6ee1685d70ea96a53744f5135915582fd2285ee0b0180e9",
+  "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+  "extracted_functions_sha256": {
+    "memory__table_empty_after_clear.c": "4a6b71bda1ea0a9d6e27ce1fb060a74641bd289354e6b990a6d60a3c1026eede",
+    "memory__Pagemap__unmap_page_unlocked.c": "99c0ef5b906893b584960cd70e080938e3b5e5c3613f992b6a317660090e46f1"
+  },
+  "allocation_markers_found": []
+}

@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libobjc.A.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '__objc_empty_cache', '_objc_msgSend', '_objc_msgSendSuper2', '_objc_retain', '_objc_release', '_objc_storeStrong', '_objc_retainAutoreleasedReturnValue', '_objc_autoreleaseReturnValue', '_objc_autoreleasePoolPush', '_objc_autoreleasePoolPop', '_objc_alloc', '_objc_alloc_init', '_objc_opt_new', '_objc_opt_class', '_objc_retainBlock', '_objc_setProperty_nonatomic_copy', '_objc_initWeak', '_objc_storeWeak', '_objc_destroyWeak', '_objc_loadWeakRetained', '_objc_copyWeak', '_objc_enumerationMutation' ]
+...

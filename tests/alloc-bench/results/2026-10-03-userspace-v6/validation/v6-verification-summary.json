@@ -1,0 +1,71 @@
+{
+  "x86_64": {
+    "results": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v6-final/results.json",
+    "results_sha256": "f8831fe51d157e535b2be439a01d7ef3a2c94fcd43b7b541f56e1dd5ece89aaf",
+    "total_checks": 131408,
+    "corruption_children": 16,
+    "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+    "retained_delta_bytes": [
+      3575808,
+      3584000,
+      0,
+      4096
+    ],
+    "trimmed_delta_bytes": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "serial_sha256": "d2d7b7785513a626fc8f18dac52f6db06365e03eefd57e1b93994cf04100d1f1",
+    "clock_passed": true,
+    "driver_exit": {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/correctness-v6-x86-driver.py"
+      ],
+      "returncode": 0,
+      "started_utc": "2026-10-02T22:35:14.788693+00:00",
+      "finished_utc": "2026-10-02T22:38:28.212549+00:00"
+    }
+  },
+  "aarch64": {
+    "results": "/Users/alex/code/vinix/build/useralloc-arm-v6-final/results.json",
+    "results_sha256": "b06672113226a49a31ea8fe89ea77881f26cce63d88678405d6f61e9c34d6bfb",
+    "total_checks": 131408,
+    "corruption_children": 16,
+    "kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7",
+    "retained_delta_bytes": [
+      3653632,
+      3751936,
+      0,
+      0
+    ],
+    "trimmed_delta_bytes": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "serial_sha256": "fed22d27c5c6ff89ebebaaadf8037701436b78c6a8a8ea07620eb588362d0985",
+    "clock_passed": true,
+    "driver_exit": {
+      "argv": [
+        "/Library/Developer/CommandLineTools/usr/bin/python3",
+        "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/correctness-v6-arm-driver.py"
+      ],
+      "returncode": 0,
+      "started_utc": "2026-10-02T22:37:15.145982+00:00",
+      "finished_utc": "2026-10-02T22:37:51.077939+00:00"
+    }
+  },
+  "total_checks": 262816,
+  "total_corruption_children": 32,
+  "patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+  "all_passed": true,
+  "source_sha256": {
+    "verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "verify-all-classes.c": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+    "clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71"
+  }
+}

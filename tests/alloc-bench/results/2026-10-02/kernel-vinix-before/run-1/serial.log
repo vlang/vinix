@@ -1,0 +1,24 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01HKALLOC-META schema=3 platform=vinix timer=x86-tsc samples=5 hot_pairs=100000 batch_rounds=48 batch_width=256 big_pairs=128 big_bytes=262144 operation=alloc_free_pair
+KALLOC-VALIDATION platform=vinix sizes=16,32,48,64,96,128,192,256,384,512,768,1024,1536,2048 zero_validation=warmup_every_requested_byte payload_validation=endpoints timed_zero_validation=0
+KALLOC-COMPILER platform=vinix compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=1 pairs=100000 ticks=483070000 ticks_per_pair=4830 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=2 pairs=100000 ticks=336616000 ticks_per_pair=3366 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=3 pairs=100000 ticks=338865000 ticks_per_pair=3388 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=4 pairs=100000 ticks=208306000 ticks_per_pair=2083 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=5 pairs=100000 ticks=571520000 ticks_per_pair=5715 checksum=25486688
+KALLOC-RESULT platform=vinix phase=hot64 pairs=100000 samples=5 warmup_pairs=100000 median_ticks=338865000 min_ticks=208306000 max_ticks=571520000 median_ticks_per_pair=3388 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=1 pairs=12288 ticks=254081000 ticks_per_pair=20677 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=2 pairs=12288 ticks=290347000 ticks_per_pair=23628 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=3 pairs=12288 ticks=178563000 ticks_per_pair=14531 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=4 pairs=12288 ticks=297010000 ticks_per_pair=24170 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=5 pairs=12288 ticks=356318000 ticks_per_pair=28997 checksum=1855488
+KALLOC-RESULT platform=vinix phase=mixed256 pairs=12288 samples=5 warmup_pairs=12288 median_ticks=290347000 min_ticks=178563000 max_ticks=356318000 median_ticks_per_pair=23628 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=1 pairs=128 ticks=256598000 ticks_per_pair=2004671 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=2 pairs=128 ticks=220167000 ticks_per_pair=1720054 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=3 pairs=128 ticks=279761000 ticks_per_pair=2185632 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=4 pairs=128 ticks=324914000 ticks_per_pair=2538390 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=5 pairs=128 ticks=315692000 ticks_per_pair=2466343 checksum=16256
+KALLOC-RESULT platform=vinix phase=big262144 pairs=128 samples=5 warmup_pairs=128 median_ticks=279761000 min_ticks=220167000 max_ticks=324914000 median_ticks_per_pair=2185632 checksum=16256
+KALLOC-DONE platform=vinix phases=3 checksum=27358432

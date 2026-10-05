@@ -1,0 +1,4 @@
+{
+  "prior": "/Users/alex/code/vinix/build/useralloc-pipe/perf-v5-preparation",
+  "scope": "Only final libc stage and static desktop paths changed. Workload sources byte-identical. Frozen prior full initramfs reused."
+}

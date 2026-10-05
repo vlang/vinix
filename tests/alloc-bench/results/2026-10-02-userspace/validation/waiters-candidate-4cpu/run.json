@@ -1,0 +1,19 @@
+{
+  "base_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "kernel_variant": "combined VM+pipe + heap_selftest",
+  "kernel_sha256": "b9ed08dd6855b41720165c62d3cf57fb2ba2fd00965029187090aa28a3b7c905",
+  "test_sha256": "49ef258f877c15ffaab294a7b1e25c93a4446346ef94fca74b904d76d1151ebb",
+  "init_sha256": "ca1ec40e99274ef3ec45282a123ce3dc6354cbd8dda863b730df5c14a0129c75",
+  "qemu_config": [
+    "q35,smm=off",
+    "tcg",
+    "max",
+    "2048 MiB",
+    "4 vCPU"
+  ],
+  "timeout_seconds": 120,
+  "outcome": "No PASS; stalls creating worker69. Same existing >64-waiter creation failure as baseline worker70. QMP watcher did not capture an in-range lib__kpanic RIP before deadline.",
+  "runner_exit_code": 1,
+  "serial_log": "/Users/alex/code/vinix/build/useralloc-pipe/waiters-candidate-4cpu/serial.log",
+  "scope": "Original existing 80-waiter futex test, diagnostic prints only."
+}

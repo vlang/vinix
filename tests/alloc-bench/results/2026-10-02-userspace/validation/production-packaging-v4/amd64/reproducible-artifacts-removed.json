@@ -1,0 +1,16 @@
+{
+  "removed_utc": "2026-10-02T19:29:07.878056+00:00",
+  "reason": "Host disk exhaustion after production builder verification PASS. Packaged loader/static archive/header/manifest saved separately; raw logs, provenance, pinned inputs and cached musl remain.",
+  "artifacts": [
+    {
+      "path": "initramfs.tar",
+      "kind": "file",
+      "sha256": "ec12aaae1fb59dfcd2158923c38be2d83e8ff3a32e36b97013de1cc4376a1655",
+      "size": 296638976
+    },
+    {
+      "path": "staging",
+      "kind": "directory"
+    }
+  ]
+}

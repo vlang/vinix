@@ -1,0 +1,90 @@
+#!/bin/sh
+# Check the pieces Steam stands on: both translators running glibc programs
+# from the staged Debian root, the kernel handing i386 and x86-64 ELF files
+# to them, the helpers on Steam's PATH, and Valve's bootstrap archive.
+set -eu
+
+echo "VINIX STEAM SMOKE TEST"
+root="${VINIX_STEAM_ROOT:-/usr/libexec/vinix-steam/root}"
+helpers="${VINIX_STEAM_HELPERS:-/usr/libexec/vinix-steam/bin}"
+bootstrap="${VINIX_STEAM_BOOTSTRAP:-/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz}"
+work="$(mktemp -d /tmp/steam-smoke.XXXXXX)"
+trap 'rm -rf "$work"' EXIT
+
+fail() {
+	echo "VINIX STEAM SMOKE: FAIL $*" >&2
+	echo "VINIX STEAM SMOKE TEST: FAIL"
+	exit 1
+}
+
+export VINIX_I386_ROOT="$root"
+export VINIX_X86_64_ROOT="$root"
+export VINIX_X86_MULTIARCH=1
+export VINIX_ALLOW_WX=1
+export QEMU_CPU=max
+export PATH="$helpers:$root/usr/bin:$root/bin:$PATH"
+
+# x86-64 glibc through the kernel's exec hook: the file is started by its
+# path, not through run-x86-64, and bash finds its own libraries.
+output="$("$root/usr/bin/bash" -c 'echo "bash ${BASH_VERSINFO[0]} $(uname -m)"')" \
+	|| fail "x86-64 bash did not run"
+case "$output" in
+	"bash "[0-9]*" x86_64") echo "VINIX STEAM SMOKE PASS: x86-64 glibc bash ($output)" ;;
+	*) fail "unexpected x86-64 bash output: $output" ;;
+esac
+
+# The 64-bit robust-list preload belongs to translated glibc processes.
+# When Bash starts a native shell helper, the kernel must remove that foreign
+# LD_PRELOAD before the AArch64 loader runs it.
+preload64="$root/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
+[ -f "$preload64" ] || fail "the x86-64 robust-list shim is missing"
+export VINIX_X86_64_PRELOAD="$preload64"
+output="$("$root/usr/bin/bash" -c 'uname -s')" || fail "translated Bash could not start native uname"
+[ "$output" = Linux ] || fail "translated Bash's native uname reported $output"
+echo "VINIX STEAM SMOKE PASS: x86-64 preload and native helper"
+
+/usr/bin/steam-madvise-probe || fail "translated 4 KiB madvise clobbered neighboring data"
+echo "VINIX STEAM SMOKE PASS: translated 4 KiB madvise preserves neighbors"
+
+# The bootstrap archive Valve ships, unpacked by the GNU tar of the root.
+(cd "$work" && "$helpers/tar" xJf "$bootstrap") || fail "could not unpack $bootstrap"
+[ -x "$work/steam.sh" ] || fail "the bootstrap has no steam.sh"
+[ -x "$work/ubuntu12_32/steam" ] || fail "the bootstrap has no ubuntu12_32/steam"
+echo "VINIX STEAM SMOKE PASS: bootstrap unpacked"
+
+# i386 glibc: the client's own loader lists the client's libraries, all of
+# them found in the root.
+listing="$(ldd "$work/ubuntu12_32/steam")" || fail "ldd could not list the i386 client"
+case "$listing" in
+	*"not found"*) fail "the i386 client misses libraries: $listing" ;;
+	*libc.so.6*) echo "VINIX STEAM SMOKE PASS: i386 client libraries resolved" ;;
+	*) fail "unexpected ldd output: $listing" ;;
+esac
+
+# An i386 ELF started by path goes to qemu-i386 through the kernel. The
+# glibc loader is the one i386 program in the root that runs on its own.
+output="$("$root/lib/ld-linux.so.2" --version 2>&1 | head -1)" || true
+case "$output" in
+	*GLIBC*|*"ld.so"*) echo "VINIX STEAM SMOKE PASS: i386 glibc loader ran ($output)" ;;
+	*) fail "the i386 loader did not run: $output" ;;
+esac
+
+# Valve's own check of the machine: an x86-64 program, and the one that
+# refuses a CPU without the client's baseline, which is why the launcher
+# asks the translators for their fullest CPU.
+if output="$("$work/ubuntu12_32/steam-runtime/amd64/usr/bin/steam-runtime-check-requirements" 2>&1)"; then
+	echo "VINIX STEAM SMOKE PASS: client requirements satisfied"
+else
+	case "$output" in
+		*"requires user namespaces"*)
+			echo "VINIX STEAM SMOKE PASS: namespace probe needs compatibility mode" ;;
+		*) fail "steam-runtime-check-requirements failed: $output" ;;
+	esac
+fi
+
+# Steam's scripts require a kernel that calls itself Linux.
+output="$(/usr/bin/unshare -u "$root/usr/bin/uname" -s 2>/dev/null || uname -s)"
+[ "$output" = Linux ] || fail "uname reports $output, not Linux"
+echo "VINIX STEAM SMOKE PASS: uname says Linux"
+
+echo "VINIX STEAM SMOKE TEST: PASS"

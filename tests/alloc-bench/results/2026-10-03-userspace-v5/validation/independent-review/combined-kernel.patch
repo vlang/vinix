@@ -1,0 +1,1329 @@
+diff --git a/kernel/c/memory.c b/kernel/c/memory.c
+index b994994c..9582bf6e 100644
+--- a/kernel/c/memory.c
++++ b/kernel/c/memory.c
+@@ -2,24 +2,70 @@
+ #include <stddef.h>
+ #include <string.h>
+ 
++// may_alias keeps word accesses valid for arbitrary object representations.
++// Word operations use only naturally aligned addresses and stay entirely in
++// the requested range; byte prefixes/tails never access a neighbouring page.
++typedef uint64_t memory_word __attribute__((__may_alias__));
++
+ void *memcpy(void *restrict dest, const void *restrict src, size_t n) {
+     uint8_t *restrict pdest = (uint8_t *restrict)dest;
+     const uint8_t *restrict psrc = (const uint8_t *restrict)src;
+ 
+-    for (size_t i = 0; i < n; i++) {
+-        pdest[i] = psrc[i];
++    // Different alignments cannot both be advanced to a word boundary.
++    if ((((uintptr_t)pdest ^ (uintptr_t)psrc) & 7) == 0) {
++        while (n && ((uintptr_t)pdest & 7)) {
++            *pdest++ = *psrc++;
++            n--;
++        }
++        if (n >= 8) {
++            memory_word *restrict d = (memory_word *restrict)pdest;
++            const memory_word *restrict s = (const memory_word *restrict)psrc;
++            while (n >= 64) {
++                d[0] = s[0]; d[1] = s[1]; d[2] = s[2]; d[3] = s[3];
++                d[4] = s[4]; d[5] = s[5]; d[6] = s[6]; d[7] = s[7];
++                d += 8;
++                s += 8;
++                n -= 64;
++            }
++            while (n >= 8) {
++                *d++ = *s++;
++                n -= 8;
++            }
++            pdest = (uint8_t *)d;
++            psrc = (const uint8_t *)s;
++        }
++    }
++    while (n--) {
++        *pdest++ = *psrc++;
+     }
+-
+     return dest;
+ }
+ 
+ void *memset(void *s, int c, size_t n) {
+     uint8_t *p = (uint8_t *)s;
+-
+-    for (size_t i = 0; i < n; i++) {
+-        p[i] = (uint8_t)c;
++    const uint8_t byte = (uint8_t)c;
++    while (n && ((uintptr_t)p & 7)) {
++        *p++ = byte;
++        n--;
++    }
++    if (n >= 8) {
++        const memory_word fill = (memory_word)byte * 0x0101010101010101ULL;
++        memory_word *w = (memory_word *)p;
++        while (n >= 64) {
++            w[0] = fill; w[1] = fill; w[2] = fill; w[3] = fill;
++            w[4] = fill; w[5] = fill; w[6] = fill; w[7] = fill;
++            w += 8;
++            n -= 64;
++        }
++        while (n >= 8) {
++            *w++ = fill;
++            n -= 8;
++        }
++        p = (uint8_t *)w;
++    }
++    while (n--) {
++        *p++ = byte;
+     }
+-
+     return s;
+ }
+ 
+diff --git a/kernel/file/locks.v b/kernel/file/locks.v
+index a86b0784..5102fd38 100644
+--- a/kernel/file/locks.v
++++ b/kernel/file/locks.v
+@@ -194,6 +194,11 @@ fn get_posix_lock(handle &Handle, mut flock Flock) ? {
+ }
+ 
+ fn release_posix_locks(res &resource.Resource, pid int) {
++	// fcntl_lock only admits regular files. Other resources cannot have
++	// record locks, so closing them needs no global lock-table work.
++	if !stat.isreg(res.stat.mode) {
++		return
++	}
+ 	resource_id := lock_resource_id(res)
+ 	advisory_locks_lock.acquire()
+ 	mut next := []AdvisoryLock{cap: advisory_locks.len} @[freed]
+@@ -219,6 +224,12 @@ fn release_posix_locks(res &resource.Resource, pid int) {
+ }
+ 
+ fn release_flock(handle &Handle) {
++	// syscall_flock admits only regular files and directories. Pipe/socket
++	// teardown cannot release an entry from this table.
++	mode := handle.resource.stat.mode
++	if !stat.isreg(mode) && !stat.isdir(mode) {
++		return
++	}
+ 	resource_id := lock_resource_id(handle.resource)
+ 	owner := u64(handle)
+ 	advisory_locks_lock.acquire()
+diff --git a/kernel/file/timerfd.v b/kernel/file/timerfd.v
+index 6dfea07c..1f54701b 100644
+--- a/kernel/file/timerfd.v
++++ b/kernel/file/timerfd.v
+@@ -59,7 +59,7 @@ __global (
+ )
+ 
+ fn monotonic_ns() u64 {
+-	now := monotonic_clock
++	now := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 	return u64(now.tv_sec) * 1000000000 + u64(now.tv_nsec)
+ }
+ 
+@@ -360,12 +360,20 @@ pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, o
+ 	if flags & tfd_timer_abstime != 0 {
+ 		// An absolute deadline is on the timer's own clock. Both clocks advance
+ 		// together here, so the monotonic reading is the one to keep.
+-		now_wall := if timer.clock_id == 0 { timespec_to_ns(realtime_clock) } else { monotonic_ns() }
++		// Read realtime first so conversion skew can only delay an expiry.
++		wall_now := if timer.clock_id == 0 {
++			wall_clock := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
++			timespec_to_ns(wall_clock)
++		} else {
++			u64(0)
++		}
++		now_monotonic := monotonic_ns()
++		now_wall := if timer.clock_id == 0 { wall_now } else { now_monotonic }
+ 		if wanted <= now_wall {
+ 			// Already past: it fires on the next tick.
+-			timer.deadline_ns = monotonic_ns()
++			timer.deadline_ns = now_monotonic
+ 		} else {
+-			timer.deadline_ns = monotonic_ns() + (wanted - now_wall)
++			timer.deadline_ns = now_monotonic + (wanted - now_wall)
+ 		}
+ 	} else {
+ 		timer.deadline_ns = monotonic_ns() + wanted
+diff --git a/kernel/katomic/katomic_amd64.v b/kernel/katomic/katomic_amd64.v
+index cbb08ff0..99feb883 100644
+--- a/kernel/katomic/katomic_amd64.v
++++ b/kernel/katomic/katomic_amd64.v
+@@ -142,15 +142,95 @@ pub fn store[T](mut var T, value T) {
+ 	}
+ }
+ 
++// A release store is sufficient for publishing an unlocked spinlock. Ordinary
++// stores are ordered on x86; the memory clobber also prevents the compiler from
++// moving critical-section accesses after this store. Generic store above keeps
++// its stronger sequentially consistent XCHG ordering.
++pub fn store_release(var &bool, value bool) {
++	mut target := unsafe { &u8(var) }
++	byte := if value { u8(1) } else { u8(0) }
++	asm volatile amd64 {
++		mov target, byte
++		; =m (*target) as target
++		; r (byte) as byte
++		; memory
++	}
++}
++
++// x86 sequential consistency uses MOV loads with fenced (XCHG) stores. Loads
++// therefore need no read-modify-write cycle. Both forms retain a compiler
++// memory barrier. Keep the locked form for a misaligned operand: unlike MOV,
++// it is atomic even if the operand crosses a cache-line boundary.
++// Width-specific views address the slot itself for pointer-valued T, avoiding
++// the V C backend's extra dereference of a generic pointer operand.
+ pub fn load[T](var &T) T {
+ 	mut ret := unsafe { T(0) }
+-	unsafe {
++	if sizeof(T) == 1 {
++		target := unsafe { &u8(var) }
+ 		asm volatile amd64 {
+-			lock xadd var, ret
+-			; +m (*var) as var
+-			  +r (ret)
+-			; ; memory
++			mov ret, target
++			; =r (ret)
++			; m (*target) as target
++			; memory
+ 		}
++		return ret
+ 	}
+-	return ret
++	if sizeof(T) == 2 {
++		target := unsafe { &u16(var) }
++		if usize(var) & 1 != 0 {
++			asm volatile amd64 {
++				lock xadd target, ret
++				; +m (*target) as target
++				  +r (ret)
++				; ; memory
++			}
++			return ret
++		}
++		asm volatile amd64 {
++			mov ret, target
++			; =r (ret)
++			; m (*target) as target
++			; memory
++		}
++		return ret
++	}
++	if sizeof(T) == 4 {
++		target := unsafe { &u32(var) }
++		if usize(var) & 3 != 0 {
++			asm volatile amd64 {
++				lock xadd target, ret
++				; +m (*target) as target
++				  +r (ret)
++				; ; memory
++			}
++			return ret
++		}
++		asm volatile amd64 {
++			mov ret, target
++			; =r (ret)
++			; m (*target) as target
++			; memory
++		}
++		return ret
++	}
++	if sizeof(T) == 8 {
++		target := unsafe { &u64(var) }
++		if usize(var) & 7 != 0 {
++			asm volatile amd64 {
++				lock xadd target, ret
++				; +m (*target) as target
++				  +r (ret)
++				; ; memory
++			}
++			return ret
++		}
++		asm volatile amd64 {
++			mov ret, target
++			; =r (ret)
++			; m (*target) as target
++			; memory
++		}
++		return ret
++	}
++	panic('katomic.load: unsupported operand width')
+ }
+diff --git a/kernel/klock/klock_amd64.v b/kernel/klock/klock_amd64.v
+index 4535626c..2010b292 100644
+--- a/kernel/klock/klock_amd64.v
++++ b/kernel/klock/klock_amd64.v
+@@ -51,7 +51,7 @@ pub fn (mut l Lock) release() {
+ 	// Snapshot before unlocking: another CPU can then overwrite l.ints.
+ 	// Keep the same ordering as the ARM64 implementation.
+ 	ints := l.ints
+-	katomic.store(mut &l.l, false)
++	katomic.store_release(&l.l, false)
+ 	cpu.interrupt_toggle(ints)
+ }
+ 
+diff --git a/kernel/memory/mmap/mmap.v b/kernel/memory/mmap/mmap.v
+index 13ce1817..8c468da7 100644
+--- a/kernel/memory/mmap/mmap.v
++++ b/kernel/memory/mmap/mmap.v
+@@ -1,6 +1,7 @@
+ module mmap
+ 
+ import klock
++import katomic
+ import memory
+ import numa
+ import resource
+@@ -17,6 +18,7 @@ pub const map_private = 0x02
+ pub const map_shared = 0x01
+ pub const map_fixed = 0x10
+ pub const map_fixed_noreplace = 0x100000
++pub const map_populate = 0x8000
+ pub const map_anon = 0x20
+ pub const map_anonymous = 0x20
+ 
+@@ -65,6 +67,8 @@ __global (
+ 	// exec reallocated the list under the delete and corrupted the heap. Taken
+ 	// inside a page map's lock, and only for the change itself.
+ 	range_locals_lock klock.Lock
++	// Identifies an insertion even when a slab reuses a removed local pointer.
++	next_range_generation = u64(1)
+ )
+ 
+ // Resources that need uncached page table mappings (e.g., framebuffers).
+@@ -117,10 +121,13 @@ pub mut:
+ 	tree_right &MmapRangeLocal = unsafe { nil }
+ 	tree_priority u64
+ 	list_index int
++	generation u64
+ }
+ 
+ pub struct MmapRangeGlobal {
+ pub mut:
++	// A reservation needs no physical page tables until its first page is
++	// installed. top_level is created under shadow_pagemap.l at that point.
+ 	shadow_pagemap    memory.Pagemap
+ 	locals            []&MmapRangeLocal
+ 	resource          &resource.Resource = unsafe { nil }
+@@ -281,6 +288,7 @@ fn range_lower_bound(pagemap &memory.Pagemap, base u64) &MmapRangeLocal {
+ 
+ fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
+ 	mut local := unsafe { _local }
++	local.generation = katomic.inc(mut &next_range_generation)
+ 	local.tree_left = unsafe { nil }
+ 	local.tree_right = unsafe { nil }
+ 	local.tree_priority = range_priority(local.base)
+@@ -771,19 +779,24 @@ fn range_page_has_file_data(global &MmapRangeGlobal, virt u64) bool {
+ 	return relative < data_end && relative + page_size > global.file_data_start
+ }
+ 
++// This does not follow a local/global range pointer: the caller may have
++// dropped pagemap.l while acquiring memory and the range may have vanished.
++fn acquire_anonymous_page() ?voidptr {
++	// First touch decides where anonymous memory lives, respecting the
++	// faulting thread's set_mempolicy/mbind policy. The allocator zeros it.
++	page := numa.alloc_user_page()
++	if page == unsafe { nil } {
++		errno.set(errno.enomem)
++		return none
++	}
++	return page
++}
++
+ fn acquire_range_page(local &MmapRangeLocal, virt u64, file_page u64) ?voidptr {
+ 	global := local.global
+ 	if local.flags & map_anonymous != 0
+ 		|| (global.segmented_file && !range_page_has_file_data(global, virt)) {
+-		// First touch decides where anonymous memory lives: the page comes from
+-		// the node running the thread that faulted, unless set_mempolicy(2) or
+-		// mbind(2) named somewhere else.
+-		page := numa.alloc_user_page()
+-		if page == unsafe { nil } {
+-			errno.set(errno.enomem)
+-			return none
+-		}
+-		return page
++		return acquire_anonymous_page()
+ 	}
+ 
+ 	mut res := global.resource
+@@ -899,16 +912,17 @@ pub fn map_page_in_range(_g &MmapRangeGlobal, virt_addr u64, phys_addr u64, _pro
+ //
+ // Nothing is left for the caller to release: a page that loses is released
+ // here, and one that wins belongs to the range.
+-pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, virt u64, file_page u64, page voidptr, flags int) ? {
++pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, generation u64, virt u64, file_page u64, page voidptr, flags int) ? {
+ 	pagemap.l.acquire()
+ 	current, _, _ := addr2range(pagemap, virt) or {
+ 		pagemap.l.release()
+ 		drop_unmapped_page(page, flags)
+ 		return none
+ 	}
+-	// Split since, by an mprotect(): the address is still mapped, so the access
+-	// is only retried, and faults again against the range as it is now.
+-	if voidptr(current) != voidptr(local) {
++	// A split or replacement changed the range while the page was acquired.
++	// A pointer match alone is insufficient: slab reuse can give a replacement
++	// the old pointer. Retry against the range which now covers the address.
++	if voidptr(current) != voidptr(local) || current.generation != generation {
+ 		pagemap.l.release()
+ 		drop_unmapped_page(page, flags)
+ 		return
+@@ -927,6 +941,9 @@ pub fn install_range_page(mut pagemap memory.Pagemap, local &MmapRangeLocal, vir
+ 	mut phys := u64(page)
+ 	mut surplus := false
+ 	g.shadow_pagemap.l.acquire()
++	if g.shadow_pagemap.top_level == unsafe { nil } {
++		g.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
++	}
+ 	if existing := g.shadow_pagemap.virt2phys(virt) {
+ 		// Another thread got the page in first; ours goes back.
+ 		phys = existing
+@@ -1304,7 +1321,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	range_local.global = range_global
+ 
+ 	range_global.add_local(range_local)
+-	range_global.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
+ 
+ 	// Choose and claim the virtual span as one locked operation. Wine first
+ 	// probes preferred PE addresses with MAP_FIXED_NOREPLACE, while POSIX mmap
+@@ -1315,7 +1331,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		base = hint
+ 		if !range_is_free_unlocked(pagemap, base, length) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1327,7 +1342,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		if voidptr(pagemap) == voidptr(process.pagemap)
+ 			&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1341,7 +1355,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		if voidptr(pagemap) == voidptr(process.pagemap)
+ 			&& !mapping_fits_address_limit(pagemap, process, base, length, true, charged_length, limit_credit) {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1352,7 +1365,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 		}
+ 		munmap_unlocked(mut pagemap, addr, length) or {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1365,7 +1377,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	} else {
+ 		base = find_free_base_unlocked(pagemap, process.mmap_anon_non_fixed_base, length) or {
+ 			pagemap.l.release()
+-			memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 			unsafe {
+ 				range_global.locals.free()
+ 				free(range_global)
+@@ -1378,7 +1389,6 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	if !fixed && voidptr(pagemap) == voidptr(process.pagemap)
+ 		&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
+ 		pagemap.l.release()
+-		memory.pmm_free(range_global.shadow_pagemap.top_level, 1)
+ 		unsafe {
+ 			range_global.locals.free()
+ 			free(range_global)
+@@ -1391,37 +1401,20 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 	range_global.base = base
+ 	published = true
+ 	insert_range_unlocked(mut pagemap, range_local)
++	range_generation := range_local.generation
+ 	pagemap.l.release()
+ 
+-	// PROT_NONE and large anonymous mappings are address-space reservations, not
+-	// committed memory. Large runtimes reserve far more virtual memory than they
+-	// will ever touch, so let the page-fault path commit accessible pages on
+-	// demand. mprotect() commits a PROT_NONE subset before making it accessible.
+-	//
+-	// Pre-fault smaller and file-backed mappings to avoid demand-paging faults.
+-	// On QEMU+HVF, LDP/STP instructions on unmapped pages cause data aborts
+-	// without ISV bit set, which crashes HVF.
+-	//
+-	// A process in a cgroup gets all its private anonymous memory on demand,
+-	// so the group is charged for the pages it touches and not for ones a
+-	// runtime set aside and never used (see page_in). Large mappings show
+-	// that faulting such pages in is safe on HVF.
+-	//
+-	// A private file mapping is filled in on demand too, as the ELF loader's
+-	// segments always were. Each of its pages is a copy of the file's, and
+-	// copying every page up front cost a process the whole of every library
+-	// it loaded: musl maps an object's whole span before placing its segments,
+-	// so Firefox's 130 MB libxul was copied in full by every one of its
+-	// processes, and a 4 GiB machine ran out of memory while it started.
+-	//
+-	// A private file mapping is filled in on demand too, as the ELF loader's
+-	// segments always were. Each of its pages is a copy of the file's, and
+-	// copying every page up front cost a process the whole of every library
+-	// it loaded: musl maps an object's whole span before placing its segments,
+-	// so Firefox's 130 MB libxul was copied in full by every one of its
+-	// processes, and a 4 GiB machine ran out of memory while it started.
+-	lazy_anonymous := flags & map_anonymous != 0 && (length >= lazy_anonymous_threshold
+-		|| (flags & map_shared == 0 && memory_accounted(process, pagemap)))
++	// Private anonymous x86 mappings are committed on first touch. Reserving
++	// a short-lived span which is never touched then needs neither data pages
++	// nor a separate shadow page-table hierarchy. Shared small mappings keep
++	// their existing eager policy, and MAP_POPULATE explicitly commits pages.
++	// ARM keeps small mappings eager: HVF cannot handle every LDP/STP data
++	// abort on an absent page, so changing that policy needs separate testing.
++	// Large reservations and cgroup-accounted mappings were already sparse.
++	lazy_anonymous := flags & map_anonymous != 0 && flags & map_populate == 0
++		&& (length >= lazy_anonymous_threshold
++			|| (flags & map_shared == 0
++				&& (demand_private_anonymous() || memory_accounted(process, pagemap))))
+ 	lazy_private_file := flags & map_anonymous == 0 && flags & map_shared == 0
+ 	// Convert movable shared-file storage before any page can be handed out,
+ 	// including when the mapping itself will be populated on demand.
+@@ -1452,7 +1445,11 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
+ 				continue
+ 			}
+-			page := acquire_range_page(range_local, base + i, file_page) or {
++			page := if flags & map_anonymous != 0 {
++				acquire_anonymous_page()
++			} else {
++				acquire_range_page(range_local, base + i, file_page)
++			} or {
+ 				munmap(mut pagemap, voidptr(base), length) or {}
+ 				errno.set(errno.einval)
+ 				return none
+@@ -1468,7 +1465,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
+ 			if page != unsafe { nil } {
+ 				// The range is already visible to the process' other threads,
+ 				// which may fault on this very page while it is pre-faulted.
+-				install_range_page(mut pagemap, range_local, base + i, file_page, page, flags) or {
++				install_range_page(mut pagemap, range_local, range_generation, base + i, file_page, page, flags) or {
+ 					munmap(mut pagemap, voidptr(base), length) or {}
+ 					errno.set(errno.enomem)
+ 					return none
+@@ -1631,17 +1628,22 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64,
+ 		}
+ 
+ 		flags := local_range.flags
+-		global_range := local_range.global
++		generation := local_range.generation
++		lazy_shared := skip_lazy_shared && flags & map_shared != 0 && local_range.global.lazy_file
+ 		pagemap.l.release()
+-		if skip_lazy_shared && flags & map_shared != 0 && global_range.lazy_file {
++		if lazy_shared {
+ 			continue
+ 		}
+ 
+-		page := acquire_range_page(local_range, virt, file_page) or {
++		page := if flags & map_anonymous != 0 {
++			acquire_anonymous_page()
++		} else {
++			acquire_range_page(local_range, virt, file_page)
++		} or {
+ 			errno.set(errno.enomem)
+ 			return none
+ 		}
+-		install_range_page(mut pagemap, local_range, virt, file_page, page, flags) or {
++		install_range_page(mut pagemap, local_range, generation, virt, file_page, page, flags) or {
+ 			errno.set(errno.enomem)
+ 			return none
+ 		}
+@@ -1870,6 +1872,14 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ?
+ // the last local (and destroy the global) in the middle of the walk.
+ fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin u64, end u64,
+ 	flags int) {
++	// There are no pages to reclaim from a reservation never touched. The
++	// shadow lock also serializes a sharer installing its very first page.
++	global_range.shadow_pagemap.l.acquire()
++	empty := global_range.shadow_pagemap.top_level == unsafe { nil }
++	global_range.shadow_pagemap.l.release()
++	if empty {
++		return
++	}
+ 	mut cursor := begin
+ 	for cursor < end {
+ 		global_range.shadow_pagemap.l.acquire()
+@@ -1977,8 +1987,11 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
+ 			range_locals_lock.release()
+ 			if last {
+ 				global_end := global_range.base + global_range.length
+-				mut next_shadow := global_range.shadow_pagemap.next_present(global_range.base,
+-					global_end)
++				mut next_shadow := if global_range.shadow_pagemap.top_level == unsafe { nil } {
++					global_end
++				} else {
++					global_range.shadow_pagemap.next_present(global_range.base, global_end)
++				}
+ 				for next_shadow < global_end {
+ 					j := next_shadow
+ 					next_shadow = global_range.shadow_pagemap.next_present(j + page_size, global_end)
+@@ -1990,7 +2003,9 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
+ 					file_page := u64(global_range.offset) / page_size + (j - global_range.base) / page_size
+ 					release_range_page(global_range, j, file_page, voidptr(phys), local_range.flags)
+ 				}
+-				memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
++				if global_range.shadow_pagemap.top_level != unsafe { nil } {
++					memory.pmm_free(global_range.shadow_pagemap.top_level, 1)
++				}
+ 				if global_range.owns_mapping_ref {
+ 					mut retained := global_range.resource
+ 					resource.release_mapping_range(mut retained, global_range.handle,
+diff --git a/kernel/memory/mmap/mmap_amd64.v b/kernel/memory/mmap/mmap_amd64.v
+index 616c952e..78bbbba8 100644
+--- a/kernel/memory/mmap/mmap_amd64.v
++++ b/kernel/memory/mmap/mmap_amd64.v
+@@ -172,3 +172,8 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
+ 
+ // x86 keeps the instruction cache coherent with stores.
+ fn sync_new_code_page(_page voidptr) {}
++
++// Small private anonymous mappings may wait until their first access.
++fn demand_private_anonymous() bool {
++	return true
++}
+diff --git a/kernel/memory/mmap/mmap_arm64.v b/kernel/memory/mmap/mmap_arm64.v
+index 11786aa5..a0e3fc8d 100644
+--- a/kernel/memory/mmap/mmap_arm64.v
++++ b/kernel/memory/mmap/mmap_arm64.v
+@@ -124,3 +124,8 @@ fn report_direct_access(gpr_state &cpulocal.GPRState, addr u64, write bool, curr
+ fn sync_new_code_page(page voidptr) {
+ 	cpu.sync_instruction_cache(u64(page) + higher_half, page_size)
+ }
++
++// Small private anonymous mappings may wait until their first access.
++fn demand_private_anonymous() bool {
++	return false
++}
+diff --git a/kernel/memory/mmap/page_in.v b/kernel/memory/mmap/page_in.v
+index 9ffe2941..c84d6d8a 100644
+--- a/kernel/memory/mmap/page_in.v
++++ b/kernel/memory/mmap/page_in.v
+@@ -21,19 +21,24 @@ fn page_in(mut pagemap memory.Pagemap, addr u64, present_is_done bool) ? {
+ 		}
+ 	}
+ 	flags := range_local.flags
++	generation := range_local.generation
+ 	executable := range_local.prot & prot_exec != 0
+ 
+ 	pagemap.l.release()
+ 
+ 	virt := memory_page * page_size
+-	page := acquire_range_page(range_local, virt, file_page) or {
++	page := if flags & map_anonymous != 0 {
++		acquire_anonymous_page()
++	} else {
++		acquire_range_page(range_local, virt, file_page)
++	} or {
+ 		return none
+ 	}
+ 	if executable {
+ 		sync_new_code_page(page)
+ 	}
+ 
+-	install_range_page(mut pagemap, range_local, virt, file_page, page, flags)?
++	install_range_page(mut pagemap, range_local, generation, virt, file_page, page, flags)?
+ 	note_anonymous_fault(pagemap, flags)
+ }
+ 
+diff --git a/kernel/memory/virtual_amd64.v b/kernel/memory/virtual_amd64.v
+index 791c2af5..47dc2d22 100644
+--- a/kernel/memory/virtual_amd64.v
++++ b/kernel/memory/virtual_amd64.v
+@@ -179,62 +179,67 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
+ 	unsafe {
+ 		old := *pte_p
+ 		*pte_p = 0
+-		// Before any table below goes back: a CPU still holding a translation
+-		// through it would walk a page that is someone else's by then.
+-		if old & 1 != 0 {
+-			pagemap.invalidate(virt)
+-		}
+-
+-		mut i := u64(0)
+-		for ; i < 512; i++ {
+-			if pml1_p[i] != 0 {
+-				break
++		// The next entry usually remains mapped while a contiguous range is
++		// removed in address order. Check it first; sparse tables still get
++		// the complete scan, including entries with software-only flags.
++		if !table_empty_after_clear(pml1_p, pml1_entry) {
++			if old & 1 != 0 {
++				pagemap.invalidate(virt)
+ 			}
+-		}
+-		if i == 512 {
+-			pmm_free(pml1, 1)
+-			pml2_p[pml2_entry] = 0
++			return
+ 		}
+ 
+-		i = u64(0)
+-		for ; i < 512; i++ {
+-			if pml2_p[i] != 0 {
+-				break
++		// A surviving child makes every ancestor nonempty. Only scan the
++		// next level after removing an empty child, and detach all reclaimed
++		// tables before the shootdown so no CPU can walk them after it.
++		pml2_p[pml2_entry] = 0
++		remove_pml2 := table_empty_after_clear(pml2_p, pml2_entry)
++		mut remove_pml3 := false
++		mut remove_pml4 := false
++		if remove_pml2 {
++			pml3_p[pml3_entry] = 0
++			remove_pml3 = table_empty_after_clear(pml3_p, pml3_entry)
++			if remove_pml3 {
++				pml4_p[pml4_entry] = 0
++				if la57 {
++					remove_pml4 = table_empty_after_clear(pml4_p, pml4_entry)
++					if remove_pml4 {
++						pml5_p[pml5_entry] = 0
++					}
++				}
+ 			}
+ 		}
+-		if i == 512 {
++		// Before any detached table goes back: a CPU may have cached its
++		// parent even when the leaf was absent. Drop those paging-structure
++		// entries as well as any translation before returning the pages.
++		pagemap.invalidate(virt)
++		pmm_free(pml1, 1)
++		if remove_pml2 {
+ 			pmm_free(pml2, 1)
+-			pml3_p[pml3_entry] = 0
+-		}
+-
+-		i = u64(0)
+-		for ; i < 512; i++ {
+-			if pml3_p[i] != 0 {
+-				break
+-			}
+ 		}
+-		if i == 512 {
++		if remove_pml3 {
+ 			pmm_free(pml3, 1)
+-			pml4_p[pml4_entry] = 0
+ 		}
+-		if la57 {
+-			// From the start of the table, as for the levels below. Carrying on
+-			// from where the PML3 scan stopped found the PML4 empty whenever its
+-			// live entries sat below that index, and freed it with them: every
+-			// munmap of more than a page on a 5-level machine lost the rest of
+-			// its pages, and every exec leaked the 8 MiB stack.
+-			i = 0
+-			for ; i < 512; i++ {
+-				if pml4_p[i] != 0 {
+-					break
+-				}
+-			}
+-			if i == 512 {
+-				pmm_free(pml4, 1)
+-				pml5_p[pml5_entry] = 0
+-			}
++		if remove_pml4 {
++			pmm_free(pml4, 1)
++		}
++	}
++}
++
++// Called with the page-map lock held, after clearing `index`. A single live
++// successor proves the table nonempty; when it is absent, inspect every entry
++// so a hole or a live entry earlier in the table cannot hide a mapped page.
++@[inline]
++fn table_empty_after_clear(table &u64, index u64) bool {
++	if index < 511 && unsafe { table[index + 1] } != 0 {
++		return false
++	}
++	for i := u64(0); i < 512; i++ {
++		if unsafe { table[i] } != 0 {
++			return false
+ 		}
+ 	}
++	return true
+ }
+ 
+ // Change the protection of a page that is mapped. One that is not is left
+diff --git a/kernel/pipe/pipe.v b/kernel/pipe/pipe.v
+index 49619797..f0e50cdb 100644
+--- a/kernel/pipe/pipe.v
++++ b/kernel/pipe/pipe.v
+@@ -10,6 +10,7 @@ import file
+ import katomic
+ import proc
+ import time
++import memory
+ 
+ // Keep POSIX's atomic-write guarantee at one page, but give the circular
+ // buffer enough room for ordinary protocol messages. A page-sized capacity
+@@ -51,7 +52,10 @@ pub fn initialise() {}
+ 
+ pub fn create() ?&Pipe {
+ 	mut p := &Pipe{
+-		data:     unsafe { malloc(pipe_capacity) }
++		// The capacity and readiness of an empty pipe do not need backing
++		// storage. Allocate the ring on its first nonempty write; shells and
++		// runtimes often create pipes that close without carrying any bytes.
++		data:     unsafe { nil }
+ 		capacity: pipe_capacity
+ 		// A pipe starts with one read-side and one write-side open-file
+ 		// description. dup() and fork() share those descriptions, so their
+@@ -334,6 +338,15 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
+ 		errno.set(errno.epipe)
+ 		return none
+ 	}
++	if this.data == unsafe { nil } {
++		// The pipe lock also serializes first writers. A failed allocation
++		// leaves an empty, writable pipe so a later write can try again.
++		this.data = memory.malloc_packed_fallible(this.capacity)
++		if this.data == unsafe { nil } {
++			errno.set(errno.enomem)
++			return none
++		}
++	}
+ 
+ 	mut written := u64(0)
+ 	atomic_write := _count <= pipe_buf
+@@ -567,6 +580,15 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
+ 		errno.set(errno.ebusy)
+ 		return none
+ 	}
++	if this.data == unsafe { nil } {
++		// A ring with no storage is empty. Resizing changes its promised
++		// capacity without allocating bytes that no writer has supplied.
++		this.capacity = new_capacity
++		this.status |= file.pollout
++		this.l.release()
++		event.trigger(mut this.event, false)
++		return new_capacity
++	}
+ 
+ 	new_data := unsafe { malloc(new_capacity) }
+ 	if new_data == unsafe { nil } {
+diff --git a/kernel/socket/socket.v b/kernel/socket/socket.v
+index 8eeb7d1b..97a7bbb7 100644
+--- a/kernel/socket/socket.v
++++ b/kernel/socket/socket.v
+@@ -34,6 +34,9 @@ const control_max = u64(64 * 1024)
+ // UIO_MAXIOV.
+ const iov_max = u64(1024)
+ 
++// Synchronous scratch uses caller-stack storage: V can heap-promote even
++// unsafe addresses of fixed-array locals under -manualfree. Socket families
++// copy these buffers during the call; they never retain their addresses.
+ // A transfer this small uses a buffer on the stack.
+ const small_message = u64(512)
+ 
+@@ -373,7 +376,8 @@ pub fn syscall_bind(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u64)
+ 	if _addr == unsafe { nil } {
+ 		return errno.err, if addrlen == 0 { errno.einval } else { errno.efault }
+ 	}
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	address := address_from_user(_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+ 		return errno.err, errno.get()
+ 	}
+@@ -459,7 +463,8 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
+ 			return errno.err, errno.efault
+ 		}
+ 	}
+-	mut small := [512]u8{}
++	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
++	unsafe { C.memset(small, 0, small_message) }
+ 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+ 	if buffer == unsafe { nil } {
+ 		return errno.err, errno.enomem
+@@ -488,7 +493,8 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
+ 	}
+ 	// A family with no address to report leaves these as they are, and then
+ 	// so is the caller's buffer left.
+-	mut storage := [128]u8{init: 0xff}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0xff, sockaddr_max) }
+ 	offered := if header.msg_name == unsafe { nil } {
+ 		u32(0)
+ 	} else if header.msg_namelen < sockaddr_max {
+@@ -537,7 +543,7 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
+ 	}
+ 	header.msg_controllen = message.msg_controllen
+ 	if header.msg_name != unsafe { nil }
+-		&& (message.msg_namelen != offered || storage[0] != 0xff || storage[1] != 0xff) {
++		&& (message.msg_namelen != offered || unsafe { storage[0] } != 0xff || unsafe { storage[1] } != 0xff) {
+ 		named := if message.msg_namelen < offered { message.msg_namelen } else { offered }
+ 		if named != 0 && !usercopy.copy_to_user(u64(header.msg_name), unsafe { voidptr(&storage[0]) }, named) {
+ 			return errno.err, errno.efault
+@@ -596,12 +602,14 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
+ 	if !usercopy.user_range(u64(buf), len) {
+ 		return errno.err, errno.efault
+ 	}
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	address := address_from_user(dest_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+ 		return errno.err, errno.get()
+ 	}
+ 	size := if len <= message_max { len } else { message_max + 1 }
+-	mut small := [512]u8{}
++	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
++	unsafe { C.memset(small, 0, small_message) }
+ 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+ 	if buffer == unsafe { nil } {
+ 		return errno.err, errno.enomem
+@@ -709,11 +717,14 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
+ 	}
+ 	// A family that has no address to report leaves these as they are, and
+ 	// then so is the caller's buffer left.
+-	mut storage := [128]u8{init: 0xff}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0xff, sockaddr_max) }
+ 	offered := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+-	mut length := offered
++	mut length := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }
++	unsafe { *length = offered }
+ 	size := if len < message_max { len } else { message_max }
+-	mut small := [512]u8{}
++	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
++	unsafe { C.memset(small, 0, small_message) }
+ 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
+ 	if buffer == unsafe { nil } {
+ 		return errno.err, errno.enomem
+@@ -727,7 +738,7 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
+ 	mut length_out := &u32(unsafe { nil })
+ 	if wants_address {
+ 		address_out = unsafe { voidptr(&storage[0]) }
+-		length_out = unsafe { &length }
++		length_out = length
+ 	}
+ 	received, err := receive_to_kernel(fdnum, buffer, size, flags, address_out, length_out)
+ 	if err != 0 {
+@@ -739,9 +750,9 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
+ 	if copied != 0 && !usercopy.copy_to_user(u64(buf), buffer, copied) {
+ 		return errno.err, errno.efault
+ 	}
+-	if wants_address && (length != offered || storage[0] != 0xff || storage[1] != 0xff)
++	if wants_address && (unsafe { *length } != offered || unsafe { storage[0] } != 0xff || unsafe { storage[1] } != 0xff)
+ 		&& !address_to_user(src_addr, u64(voidptr(addrlen)), unsafe { voidptr(&storage[0]) },
+-		capacity, length) {
++		capacity, unsafe { *length }) {
+ 		return errno.err, errno.efault
+ 	}
+ 	return received, 0
+@@ -838,11 +849,12 @@ fn iovec_total(header &sock_pub.MsgHdr) ?u64 {
+ }
+ 
+ pub fn syscall_sendmsg(_ voidptr, fdnum int, msg &sock_pub.MsgHdr, flags int) (u64, u64) {
+-	mut header := sock_pub.MsgHdr{}
+-	if !usercopy.copy_from_user(voidptr(&header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
++	mut header := unsafe { &sock_pub.MsgHdr(C.vinix_stack_alloc(sizeof(sock_pub.MsgHdr))) }
++	unsafe { *header = sock_pub.MsgHdr{} }
++	if !usercopy.copy_from_user(voidptr(header), u64(voidptr(msg)), sizeof(sock_pub.MsgHdr)) {
+ 		return errno.err, errno.efault
+ 	}
+-	return send_message(fdnum, unsafe { &header }, flags)
++	return send_message(fdnum, header, flags)
+ }
+ 
+ // sendmsg(2) for a header already copied in, as sendmmsg(2) has each of its
+@@ -858,7 +870,8 @@ pub fn send_message(fdnum int, header &sock_pub.MsgHdr, flags int) (u64, u64) {
+ 	if total > message_max {
+ 		total = message_max + 1
+ 	}
+-	mut small := [512]u8{}
++	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
++	unsafe { C.memset(small, 0, small_message) }
+ 	buffer := if total <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(total) } }
+ 	if buffer == unsafe { nil } {
+ 		return errno.err, errno.enomem
+@@ -882,7 +895,8 @@ pub fn send_message(fdnum int, header &sock_pub.MsgHdr, flags int) (u64, u64) {
+ 	}
+ 	total = copied
+ 
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	name := address_from_user(header.msg_name, header.msg_namelen, unsafe { voidptr(&storage[0]) }) or {
+ 		return errno.err, errno.get()
+ 	}
+@@ -913,9 +927,12 @@ fn send_with_control(fdnum int, buffer voidptr, total u64, header &sock_pub.MsgH
+ 	if !usercopy.copy_from_user(control, u64(header.msg_control), header.msg_controllen) {
+ 		return errno.err, errno.efault
+ 	}
+-	message := sock_pub.MsgHdr{
+-		msg_control:    control
+-		msg_controllen: header.msg_controllen
++	mut message := unsafe { &sock_pub.MsgHdr(C.vinix_stack_alloc(sizeof(sock_pub.MsgHdr))) }
++	unsafe {
++		*message = sock_pub.MsgHdr{
++			msg_control:    control
++			msg_controllen: header.msg_controllen
++		}
+ 	}
+ 	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+ 	defer {
+@@ -923,7 +940,7 @@ fn send_with_control(fdnum int, buffer voidptr, total u64, header &sock_pub.MsgH
+ 	}
+ 	mut res := fd.handle.resource
+ 	if mut res is sock_unix.UnixSocket {
+-		mut passed_fds := collect_passed_fds(unsafe { &message }) or {
++		mut passed_fds := collect_passed_fds(message) or {
+ 			return errno.err, errno.get()
+ 		}
+ 		old_flags := fd.handle.flags
+@@ -979,7 +996,8 @@ pub fn syscall_connect(_ voidptr, fdnum int, _addr voidptr, addrlen u32) (u64, u
+ 	if _addr == unsafe { nil } {
+ 		return errno.err, if addrlen == 0 { errno.einval } else { errno.efault }
+ 	}
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	address := address_from_user(_addr, addrlen, unsafe { voidptr(&storage[0]) }) or {
+ 		return errno.err, errno.get()
+ 	}
+@@ -998,7 +1016,8 @@ pub fn syscall_getpeername(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
+ 	if !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
+ 		return errno.err, errno.efault
+ 	}
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	mut length := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+ 	// The family always has somewhere to write. A null address with room
+ 	// claimed for it is found out on the way back to the caller.
+@@ -1048,7 +1067,8 @@ pub fn syscall_getsockname(_ voidptr, fdnum int, _addr voidptr, addrlen &u32) (u
+ 	if !usercopy.copy_from_user(voidptr(&capacity), u64(voidptr(addrlen)), sizeof(u32)) {
+ 		return errno.err, errno.efault
+ 	}
+-	mut storage := [128]u8{}
++	storage := unsafe { &u8(C.vinix_stack_alloc(sockaddr_max)) }
++	unsafe { C.memset(storage, 0, sockaddr_max) }
+ 	mut length := if capacity < sockaddr_max { capacity } else { sockaddr_max }
+ 	// The family always has somewhere to write. A null address with room
+ 	// claimed for it is found out on the way back to the caller.
+diff --git a/kernel/socket/unix/unix.v b/kernel/socket/unix/unix.v
+index 9e8d2b8d..628d977d 100644
+--- a/kernel/socket/unix/unix.v
++++ b/kernel/socket/unix/unix.v
+@@ -719,7 +719,8 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
+ 		group.fds << fds
+ 		// Nothing slices these queues, so growing can free the old block.
+ 		peer.pending_fd_groups.flags |= .noslices
+-		peer.pending_fd_groups << group
++		// Transfer the backing array with its owned FD references to the queue.
++		peer.pending_fd_groups << unsafe { group }
+ 	}
+ 	// On a SOCK_SEQPACKET peer this send is one record. The write above did not
+ 	// split it -- a message larger than the buffer is refused, and the wait
+@@ -793,7 +794,8 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
+ 		group.fds << fds
+ 		// Nothing slices these queues, so growing can free the old block.
+ 		target.pending_fd_groups.flags |= .noslices
+-		target.pending_fd_groups << group
++		// Transfer the backing array with its owned FD references to the queue.
++		target.pending_fd_groups << unsafe { group }
+ 	}
+ 	if count != 0 {
+ 		mut before_wrap := count
+diff --git a/kernel/time/sys/linux.v b/kernel/time/sys/linux.v
+index f020fc6d..b7d0d7de 100644
+--- a/kernel/time/sys/linux.v
++++ b/kernel/time/sys/linux.v
+@@ -124,7 +124,7 @@ pub fn syscall_gettimeofday(_ voidptr, tv u64, tz u64) (u64, u64) {
+ 	return 0, 0
+ }
+ 
+-// Precise wall clocks use the architectural counter on ARM64. Coarse clocks
++// Precise wall clocks use a free-running counter. Coarse clocks
+ // and CPU accounting are still sampled by the timer tick.
+ pub fn syscall_clock_getres(_ voidptr, clock_id int, res u64) (u64, u64) {
+ 	read_clock(clock_id) or { return errno.err, errno.get() }
+@@ -179,7 +179,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64,
+ 		return 0, 0
+ 	}
+ 
+-	started := monotonic_clock
++	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 
+ 	mut events := []&eventstruct.Event{}
+ 	defer {
+@@ -198,7 +198,7 @@ pub fn syscall_clock_nanosleep(_ voidptr, clock_id int, flags int, request u64,
+ 		// the deadline and can simply ask again. A relative one gets what is
+ 		// left, worked out from how long it actually waited.
+ 		if flags & timer_abstime == 0 && remain != 0 {
+-			mut elapsed := monotonic_clock
++			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 			elapsed.sub(started)
+ 
+ 			mut left := duration
+diff --git a/kernel/time/sys/syscalls.v b/kernel/time/sys/syscalls.v
+index c3ac9cda..7d0a5354 100644
+--- a/kernel/time/sys/syscalls.v
++++ b/kernel/time/sys/syscalls.v
+@@ -54,7 +54,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
+ 		return errno.err, errno.einval
+ 	}
+ 
+-	started := monotonic_clock
++	started := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 
+ 	mut events := []&eventstruct.Event{}
+ 	defer {
+@@ -75,7 +75,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
+ 			// the time actually spent asleep, not the absolute monotonic clock.
+ 			// Returning the latter makes libc's ordinary EINTR retry sleep until
+ 			// approximately the Unix epoch measured from now.
+-			mut elapsed := monotonic_clock
++			mut elapsed := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+ 			elapsed.sub(started)
+ 
+ 			mut left := duration
+diff --git a/kernel/time/time.v b/kernel/time/time.v
+index 996b2864..7b93b16a 100644
+--- a/kernel/time/time.v
++++ b/kernel/time/time.v
+@@ -2,7 +2,6 @@
+ module time
+ 
+ import event.eventstruct
+-import katomic
+ import klock
+ 
+ pub const timer_frequency = u64(1000)
+@@ -64,28 +63,15 @@ __global (
+ // Return a stable snapshot of a clock for interfaces, such as absolute futex
+ // deadlines, that need to translate a point in time into a timer duration.
+ pub fn clock_now(clock_id int) ?TimeSpec {
+-	$if aarch64 {
+-		return precise_clock_now(clock_id)
+-	}
+-	match clock_id {
+-		clock_type_realtime {
+-			return realtime_clock
+-		}
+-		clock_type_monotonic {
+-			return monotonic_clock
+-		}
+-		else {
+-			return none
+-		}
+-	}
++	return precise_clock_now(clock_id)
+ }
+ 
+ fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
+ 
+-// timer_handler is the fixed frequency case: a tick source that really does
+-// interrupt at `timer_frequency` can just say so.
++// A periodic interrupt samples the counter rather than counting deliveries:
++// hardware can merge multiple ticks while interrupts are disabled.
+ pub fn timer_handler() {
+-	advance_clocks(TimeSpec{0, i64(1000000000 / timer_frequency)})
++	advance_to_ns(counter_now_ns())
+ }
+ 
+ // advance_to_ns moves the clocks forward to a reading of a free running
+@@ -103,14 +89,20 @@ pub fn advance_to_ns(now_ns u64) {
+ 		return
+ 	}
+ 	last := clock_last_ns
+-	clock_last_ns = now_ns
+-	clock_tick_lock.release()
+-
+-	if last == 0 || now_ns <= last {
++	if now_ns <= last {
++		clock_tick_lock.release()
+ 		return
+ 	}
++	clock_last_ns = now_ns
+ 	delta := now_ns - last
+-	advance_clocks(TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)})
++	interval := TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)}
++	monotonic_clock.add(interval)
++	realtime_clock.add(interval)
++	clock_tick_lock.release()
++
++	// Events and hooks may take scheduler locks. Keep them outside the clock
++	// update lock; timers compare absolute deadlines if another tick wins.
++	expire_timers()
+ }
+ 
+ // Anything that has to look at the clock every tick registers here. The
+@@ -139,40 +131,18 @@ pub fn register_tick_hook(hook fn ()) bool {
+ 	return true
+ }
+ 
+-// Time that has passed but has not been taken off the armed timers yet,
+-// because the CPU it passed on found another one already walking them. It is
+-// added to the next interval that does get through, so a timer counts down by
+-// every nanosecond that has elapsed rather than only by the ones nobody
+-// collided over -- otherwise a sleep runs long by however much tick time was
+-// dropped, and it runs longer the more CPUs there are to collide.
+-__global (
+-	timers_unapplied_ns = u64(0)
+-)
+-
+-// advance_clocks moves both clocks forward by `interval` and expires every
+-// armed timer that interval covers.
+-pub fn advance_clocks(interval TimeSpec) {
+-	monotonic_clock.add(interval)
+-	realtime_clock.add(interval)
+-
++// Counter deadlines include every interval even when a tick loses this lock.
++fn expire_timers() {
+ 	if timers_lock.test_and_acquire() == true {
+-		mut applied := interval
+-		carried := katomic.load(&timers_unapplied_ns)
+-		if carried > 0 && katomic.cas(mut &timers_unapplied_ns, carried, u64(0)) {
+-			applied.add(TimeSpec{i64(carried / 1000000000), i64(carried % 1000000000)})
+-		}
+-
++		// One counter read covers this pass. A newly armed timer cannot enter
++		// the list until this lock is released.
++		now_ns := counter_now_ns()
+ 		for i := 0; i < armed_timers.len; i++ {
+ 			mut timer := armed_timers[i]
+ 			if timer.fired == true {
+ 				continue
+ 			}
+-			mut expired := false
+-			$if aarch64 {
+-				expired = counter_timer_expired(timer.deadline_ns)
+-			} $else {
+-				expired = timer.when.sub(applied)
+-			}
++			expired := now_ns >= timer.deadline_ns
+ 			if expired {
+ 				C.event__trigger(mut &timer.event, false)
+ 				timer.fired = true
+@@ -180,14 +150,6 @@ pub fn advance_clocks(interval TimeSpec) {
+ 		}
+ 
+ 		timers_lock.release()
+-	} else {
+-		missed := u64(interval.tv_sec) * 1000000000 + u64(interval.tv_nsec)
+-		for {
+-			carried := katomic.load(&timers_unapplied_ns)
+-			if katomic.cas(mut &timers_unapplied_ns, carried, carried + missed) {
+-				break
+-			}
+-		}
+ 	}
+ 
+ 	count := tick_hooks_len
+@@ -202,7 +164,7 @@ pub mut:
+ 	event eventstruct.Event
+ 	index int
+ 	fired bool
+-	// ARM64 timers expire against the counter, so a tick cannot charge them
++	// Timers expire against the counter, so a tick cannot charge them
+ 	// for time that passed before they were armed.
+ 	deadline_ns u64
+ }
+@@ -235,9 +197,7 @@ pub fn (mut this Timer) arm() {
+ 	timers_lock.acquire()
+ 
+ 	this.fired = false
+-	$if aarch64 {
+-		this.deadline_ns = counter_timer_deadline(this.when)
+-	}
++	this.deadline_ns = counter_timer_deadline(this.when)
+ 	this.index = armed_timers.len
+ 	armed_timers << this
+ 
+diff --git a/kernel/time/time_amd64.v b/kernel/time/time_amd64.v
+index bcbc9da2..da13d592 100644
+--- a/kernel/time/time_amd64.v
++++ b/kernel/time/time_amd64.v
+@@ -2,6 +2,12 @@
+ module time
+ 
+ import limine
++import x86.hpet as hpet_clock
++
++__global (
++	clock_origin_ns u64
++	clock_epoch     i64
++)
+ 
+ @[_linker_section: '.requests']
+ @[cinit]
+@@ -20,10 +26,48 @@ pub fn initialise() {
+ 
+ 	monotonic_clock = TimeSpec{i64(epoch), 0}
+ 	realtime_clock = TimeSpec{i64(epoch), 0}
++	clock_epoch = i64(epoch)
++	clock_origin_ns = hpet_clock.nanoseconds()
++	clock_last_ns = clock_origin_ns
+ 
+ 	pit_initialise()
+ }
+ 
+ pub fn clock_resolution_ns() u64 {
+-	return 1000000000 / timer_frequency
++	resolution := u64(hpet_clock.resolution_nanoseconds())
++	return if resolution == 0 { u64(1) } else { resolution }
++}
++
++fn counter_now_ns() u64 {
++	return hpet_clock.nanoseconds()
++}
++
++// IRQ delivery may coalesce while a syscall holds interrupts disabled. The
++// free-running HPET (or calibrated TSC fallback) still counts that time.
++fn precise_clock_now(clock_id int) ?TimeSpec {
++	if clock_id != clock_type_realtime && clock_id != clock_type_monotonic {
++		return none
++	}
++	elapsed := hpet_clock.nanoseconds() - clock_origin_ns
++	return TimeSpec{
++		tv_sec:  clock_epoch + i64(elapsed / 1000000000)
++		tv_nsec: i64(elapsed % 1000000000)
++	}
++}
++
++fn counter_timer_deadline(duration TimeSpec) u64 {
++	now := hpet_clock.nanoseconds()
++	if duration.tv_sec < 0 || duration.tv_nsec < 0 {
++		return now
++	}
++	room := ~u64(0) - now
++	seconds := u64(duration.tv_sec)
++	if seconds > room / 1000000000 {
++		return ~u64(0)
++	}
++	whole := seconds * 1000000000
++	if u64(duration.tv_nsec) > room - whole {
++		return ~u64(0)
++	}
++	return now + whole + u64(duration.tv_nsec)
+ }
+diff --git a/kernel/time/time_arm64.v b/kernel/time/time_arm64.v
+index e5a8e4d6..a15c7e47 100644
+--- a/kernel/time/time_arm64.v
++++ b/kernel/time/time_arm64.v
+@@ -49,6 +49,10 @@ pub fn clock_resolution_ns() u64 {
+ 	return timer.resolution_ns()
+ }
+ 
++fn counter_now_ns() u64 {
++	return timer.get_ns()
++}
++
+ fn counter_timer_deadline(duration TimeSpec) u64 {
+ 	now := timer.get_ns()
+ 	if duration.tv_sec < 0 || duration.tv_nsec < 0 {
+@@ -67,7 +71,3 @@ fn counter_timer_deadline(duration TimeSpec) u64 {
+ 	}
+ 	return now + whole + u64(duration.tv_nsec)
+ }
+-
+-fn counter_timer_expired(deadline u64) bool {
+-	return timer.get_ns() >= deadline
+-}

@@ -35,11 +35,15 @@ static void t_policy(void)
     char line[512];
     snprintf(line, sizeof(line), "vinix.apple_ans=1 vinix.ans_rw=PARTUUID=%s", rw_uuid);
     assert(vinix_ans_boot_flags(line, strlen(line)) == (VINIX_ANS_ENABLE|VINIX_ANS_WRITE));
+    snprintf(line, sizeof(line), "vinix.apple_ans=1 vinix.persist=PARTUUID=%s", rw_uuid);
+    assert(vinix_ans_boot_flags(line, strlen(line)) ==
+        (VINIX_ANS_ENABLE|VINIX_ANS_WRITE|VINIX_ANS_PERSIST));
     const char *bad[] = {"vinix.apple_ans=10", "vinix.ans_rw=all", "vinix.root=/dev/ans0n1p1",
-        "vinix.rootmode=rw", "vinix.rootfstype=ext4", "vinix.rootfallback=yes",
+        "vinix.rootmode=rw", "vinix.rootfstype=ext4", "vinix.rootfallback=yes", "vinix.persist=all",
         "vinix.apple_ans=1 vinix.root=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000",
         "vinix.apple_ans=1 vinix.apple_ans=0 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000",
-        "vinix.apple_ans=1 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000"};
+        "vinix.apple_ans=1 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000",
+        "vinix.apple_ans=1 vinix.ans_rw=PARTUUID=00000001-0000-0000-0000-000000000000 vinix.persist=PARTUUID=00000002-0000-0000-0000-000000000000"};
     for (unsigned i=0;i<sizeof(bad)/sizeof(bad[0]);++i) assert(vinix_ans_boot_flags(bad[i],strlen(bad[i]))<0);
     assert(vinix_ans_boot_flags(NULL,0)==0 && vinix_ans_boot_flags(NULL,1)<0);
     assert(vinix_ans_boot_flags("vinix.apple_ans=1\0hidden",23)<0);

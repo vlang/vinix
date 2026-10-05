@@ -1,0 +1,260 @@
+
+build/useralloc-kernel-speed-v4/aarch64/memory.c.o:	file format elf64-littleaarch64
+
+Disassembly of section .text.memcpy:
+
+0000000000000000 <memcpy>:
+       0: 4a000028     	eor	w8, w1, w0
+       4: f240091f     	tst	x8, #0x7
+       8: 540000a0     	b.eq	0x1c <memcpy+0x1c>
+       c: aa0203e8     	mov	x8, x2
+      10: aa0003ea     	mov	x10, x0
+      14: aa0103e9     	mov	x9, x1
+      18: 1400005d     	b	0x18c <memcpy+0x18c>
+      1c: b4000822     	cbz	x2, 0x120 <memcpy+0x120>
+      20: 92400808     	and	x8, x0, #0x7
+      24: b40007e8     	cbz	x8, 0x120 <memcpy+0x120>
+      28: aa0103e9     	mov	x9, x1
+      2c: aa0003ea     	mov	x10, x0
+      30: f1000448     	subs	x8, x2, #0x1
+      34: 3840152b     	ldrb	w11, [x9], #0x1
+      38: 3800154b     	strb	w11, [x10], #0x1
+      3c: 54000780     	b.eq	0x12c <memcpy+0x12c>
+      40: 9240094b     	and	x11, x10, #0x7
+      44: b400074b     	cbz	x11, 0x12c <memcpy+0x12c>
+      48: 3940042b     	ldrb	w11, [x1, #0x1]
+      4c: f1000848     	subs	x8, x2, #0x2
+      50: 91000829     	add	x9, x1, #0x2
+      54: 9100080a     	add	x10, x0, #0x2
+      58: 3900040b     	strb	w11, [x0, #0x1]
+      5c: 54000680     	b.eq	0x12c <memcpy+0x12c>
+      60: 9240094b     	and	x11, x10, #0x7
+      64: b400064b     	cbz	x11, 0x12c <memcpy+0x12c>
+      68: 3940082b     	ldrb	w11, [x1, #0x2]
+      6c: f1000c48     	subs	x8, x2, #0x3
+      70: 91000c29     	add	x9, x1, #0x3
+      74: 91000c0a     	add	x10, x0, #0x3
+      78: 3900080b     	strb	w11, [x0, #0x2]
+      7c: 54000580     	b.eq	0x12c <memcpy+0x12c>
+      80: 9240094b     	and	x11, x10, #0x7
+      84: b400054b     	cbz	x11, 0x12c <memcpy+0x12c>
+      88: 39400c2b     	ldrb	w11, [x1, #0x3]
+      8c: f1001048     	subs	x8, x2, #0x4
+      90: 91001029     	add	x9, x1, #0x4
+      94: 9100100a     	add	x10, x0, #0x4
+      98: 39000c0b     	strb	w11, [x0, #0x3]
+      9c: 54000480     	b.eq	0x12c <memcpy+0x12c>
+      a0: 9240094b     	and	x11, x10, #0x7
+      a4: b400044b     	cbz	x11, 0x12c <memcpy+0x12c>
+      a8: 3940102b     	ldrb	w11, [x1, #0x4]
+      ac: f1001448     	subs	x8, x2, #0x5
+      b0: 91001429     	add	x9, x1, #0x5
+      b4: 9100140a     	add	x10, x0, #0x5
+      b8: 3900100b     	strb	w11, [x0, #0x4]
+      bc: 54000380     	b.eq	0x12c <memcpy+0x12c>
+      c0: 9240094b     	and	x11, x10, #0x7
+      c4: b400034b     	cbz	x11, 0x12c <memcpy+0x12c>
+      c8: 3940142b     	ldrb	w11, [x1, #0x5]
+      cc: f1001848     	subs	x8, x2, #0x6
+      d0: 91001829     	add	x9, x1, #0x6
+      d4: 9100180a     	add	x10, x0, #0x6
+      d8: 3900140b     	strb	w11, [x0, #0x5]
+      dc: 54000280     	b.eq	0x12c <memcpy+0x12c>
+      e0: 9240094b     	and	x11, x10, #0x7
+      e4: b400024b     	cbz	x11, 0x12c <memcpy+0x12c>
+      e8: 3940182b     	ldrb	w11, [x1, #0x6]
+      ec: f1001c48     	subs	x8, x2, #0x7
+      f0: 91001c29     	add	x9, x1, #0x7
+      f4: 91001c0a     	add	x10, x0, #0x7
+      f8: 3900180b     	strb	w11, [x0, #0x6]
+      fc: 54000180     	b.eq	0x12c <memcpy+0x12c>
+     100: 9240094b     	and	x11, x10, #0x7
+     104: b400014b     	cbz	x11, 0x12c <memcpy+0x12c>
+     108: 39401c28     	ldrb	w8, [x1, #0x7]
+     10c: 91002029     	add	x9, x1, #0x8
+     110: 9100200a     	add	x10, x0, #0x8
+     114: 39001c08     	strb	w8, [x0, #0x7]
+     118: d1002048     	sub	x8, x2, #0x8
+     11c: 14000004     	b	0x12c <memcpy+0x12c>
+     120: aa0203e8     	mov	x8, x2
+     124: aa0003ea     	mov	x10, x0
+     128: aa0103e9     	mov	x9, x1
+     12c: f100211f     	cmp	x8, #0x8
+     130: 540002e3     	b.lo	0x18c <memcpy+0x18c>
+     134: f101011f     	cmp	x8, #0x40
+     138: 54000203     	b.lo	0x178 <memcpy+0x178>
+     13c: a940312b     	ldp	x11, x12, [x9]
+     140: d1010108     	sub	x8, x8, #0x40
+     144: f100fd1f     	cmp	x8, #0x3f
+     148: a900314b     	stp	x11, x12, [x10]
+     14c: a941352b     	ldp	x11, x13, [x9, #0x10]
+     150: a901354b     	stp	x11, x13, [x10, #0x10]
+     154: a9422d2c     	ldp	x12, x11, [x9, #0x20]
+     158: a9022d4c     	stp	x12, x11, [x10, #0x20]
+     15c: a9432d2c     	ldp	x12, x11, [x9, #0x30]
+     160: 91010129     	add	x9, x9, #0x40
+     164: a9032d4c     	stp	x12, x11, [x10, #0x30]
+     168: 9101014a     	add	x10, x10, #0x40
+     16c: 54fffe88     	b.hi	0x13c <memcpy+0x13c>
+     170: f100211f     	cmp	x8, #0x8
+     174: 540000c3     	b.lo	0x18c <memcpy+0x18c>
+     178: f840852b     	ldr	x11, [x9], #0x8
+     17c: d1002108     	sub	x8, x8, #0x8
+     180: f1001d1f     	cmp	x8, #0x7
+     184: f800854b     	str	x11, [x10], #0x8
+     188: 54ffff88     	b.hi	0x178 <memcpy+0x178>
+     18c: b40000a8     	cbz	x8, 0x1a0 <memcpy+0x1a0>
+     190: 3840152b     	ldrb	w11, [x9], #0x1
+     194: f1000508     	subs	x8, x8, #0x1
+     198: 3800154b     	strb	w11, [x10], #0x1
+     19c: 54ffffa1     	b.ne	0x190 <memcpy+0x190>
+     1a0: d65f03c0     	ret
+
+Disassembly of section .text.memset:
+
+0000000000000000 <memset>:
+       0: b4000622     	cbz	x2, 0xc4 <memset+0xc4>
+       4: 92400808     	and	x8, x0, #0x7
+       8: b40005e8     	cbz	x8, 0xc4 <memset+0xc4>
+       c: aa0003ea     	mov	x10, x0
+      10: f1000448     	subs	x8, x2, #0x1
+      14: 38001541     	strb	w1, [x10], #0x1
+      18: 540005a0     	b.eq	0xcc <memset+0xcc>
+      1c: 92400949     	and	x9, x10, #0x7
+      20: b4000569     	cbz	x9, 0xcc <memset+0xcc>
+      24: f1000848     	subs	x8, x2, #0x2
+      28: 9100080a     	add	x10, x0, #0x2
+      2c: 39000401     	strb	w1, [x0, #0x1]
+      30: 540004e0     	b.eq	0xcc <memset+0xcc>
+      34: 92400949     	and	x9, x10, #0x7
+      38: b40004a9     	cbz	x9, 0xcc <memset+0xcc>
+      3c: f1000c48     	subs	x8, x2, #0x3
+      40: 91000c0a     	add	x10, x0, #0x3
+      44: 39000801     	strb	w1, [x0, #0x2]
+      48: 54000420     	b.eq	0xcc <memset+0xcc>
+      4c: 92400949     	and	x9, x10, #0x7
+      50: b40003e9     	cbz	x9, 0xcc <memset+0xcc>
+      54: f1001048     	subs	x8, x2, #0x4
+      58: 9100100a     	add	x10, x0, #0x4
+      5c: 39000c01     	strb	w1, [x0, #0x3]
+      60: 54000360     	b.eq	0xcc <memset+0xcc>
+      64: 92400949     	and	x9, x10, #0x7
+      68: b4000329     	cbz	x9, 0xcc <memset+0xcc>
+      6c: f1001448     	subs	x8, x2, #0x5
+      70: 9100140a     	add	x10, x0, #0x5
+      74: 39001001     	strb	w1, [x0, #0x4]
+      78: 540002a0     	b.eq	0xcc <memset+0xcc>
+      7c: 92400949     	and	x9, x10, #0x7
+      80: b4000269     	cbz	x9, 0xcc <memset+0xcc>
+      84: f1001848     	subs	x8, x2, #0x6
+      88: 9100180a     	add	x10, x0, #0x6
+      8c: 39001401     	strb	w1, [x0, #0x5]
+      90: 540001e0     	b.eq	0xcc <memset+0xcc>
+      94: 92400949     	and	x9, x10, #0x7
+      98: b40001a9     	cbz	x9, 0xcc <memset+0xcc>
+      9c: f1001c48     	subs	x8, x2, #0x7
+      a0: 91001c0a     	add	x10, x0, #0x7
+      a4: 39001801     	strb	w1, [x0, #0x6]
+      a8: 54000120     	b.eq	0xcc <memset+0xcc>
+      ac: 92400949     	and	x9, x10, #0x7
+      b0: b40000e9     	cbz	x9, 0xcc <memset+0xcc>
+      b4: 9100200a     	add	x10, x0, #0x8
+      b8: d1002048     	sub	x8, x2, #0x8
+      bc: 39001c01     	strb	w1, [x0, #0x7]
+      c0: 14000003     	b	0xcc <memset+0xcc>
+      c4: aa0003ea     	mov	x10, x0
+      c8: aa0203e8     	mov	x8, x2
+      cc: f100211f     	cmp	x8, #0x8
+      d0: 54000143     	b.lo	0xf8 <memset+0xf8>
+      d4: 12001c29     	and	w9, w1, #0xff
+      d8: b200c3eb     	mov	x11, #0x101010101010101 // =72340172838076673
+      dc: 9b0b7d29     	mul	x9, x9, x11
+      e0: f101010b     	subs	x11, x8, #0x40
+      e4: 540004e3     	b.lo	0x180 <memset+0x180>
+      e8: f101017f     	cmp	x11, #0x40
+      ec: 540000a2     	b.hs	0x100 <memset+0x100>
+      f0: aa0a03eb     	mov	x11, x10
+      f4: 14000018     	b	0x154 <memset+0x154>
+      f8: aa0a03eb     	mov	x11, x10
+      fc: 1400003d     	b	0x1f0 <memset+0x1f0>
+     100: d346fd6b     	lsr	x11, x11, #6
+     104: 9100056c     	add	x12, x11, #0x1
+     108: 927fe58d     	and	x13, x12, #0x7fffffffffffffe
+     10c: d37ae5ae     	lsl	x14, x13, #6
+     110: 8b0e014b     	add	x11, x10, x14
+     114: cb0e0108     	sub	x8, x8, x14
+     118: 9101014a     	add	x10, x10, #0x40
+     11c: aa0d03ee     	mov	x14, x13
+     120: a93c2549     	stp	x9, x9, [x10, #-0x40]
+     124: f10009ce     	subs	x14, x14, #0x2
+     128: a9002549     	stp	x9, x9, [x10]
+     12c: a93d2549     	stp	x9, x9, [x10, #-0x30]
+     130: a9012549     	stp	x9, x9, [x10, #0x10]
+     134: a93e2549     	stp	x9, x9, [x10, #-0x20]
+     138: a9022549     	stp	x9, x9, [x10, #0x20]
+     13c: a93f2549     	stp	x9, x9, [x10, #-0x10]
+     140: a9032549     	stp	x9, x9, [x10, #0x30]
+     144: 9102014a     	add	x10, x10, #0x80
+     148: 54fffec1     	b.ne	0x120 <memset+0x120>
+     14c: eb0d019f     	cmp	x12, x13
+     150: 54000120     	b.eq	0x174 <memset+0x174>
+     154: d1010108     	sub	x8, x8, #0x40
+     158: a9002569     	stp	x9, x9, [x11]
+     15c: a9012569     	stp	x9, x9, [x11, #0x10]
+     160: f100fd1f     	cmp	x8, #0x3f
+     164: a9022569     	stp	x9, x9, [x11, #0x20]
+     168: a9032569     	stp	x9, x9, [x11, #0x30]
+     16c: 9101016b     	add	x11, x11, #0x40
+     170: 54ffff28     	b.hi	0x154 <memset+0x154>
+     174: f100211f     	cmp	x8, #0x8
+     178: aa0b03ea     	mov	x10, x11
+     17c: 540003a3     	b.lo	0x1f0 <memset+0x1f0>
+     180: 528000eb     	mov	w11, #0x7               // =7
+     184: 928000ec     	mov	x12, #-0x8              // =-8
+     188: cb08016b     	sub	x11, x11, x8
+     18c: b100217f     	cmn	x11, #0x8
+     190: 9a8c816b     	csel	x11, x11, x12, hi
+     194: 8b08016b     	add	x11, x11, x8
+     198: f100217f     	cmp	x11, #0x8
+     19c: 54000062     	b.hs	0x1a8 <memset+0x1a8>
+     1a0: aa0a03eb     	mov	x11, x10
+     1a4: 1400000f     	b	0x1e0 <memset+0x1e0>
+     1a8: d343fd6b     	lsr	x11, x11, #3
+     1ac: 9100056c     	add	x12, x11, #0x1
+     1b0: 927ff18d     	and	x13, x12, #0x3ffffffffffffffe
+     1b4: d37df1ae     	lsl	x14, x13, #3
+     1b8: 8b0e014b     	add	x11, x10, x14
+     1bc: cb0e0108     	sub	x8, x8, x14
+     1c0: 9100214a     	add	x10, x10, #0x8
+     1c4: aa0d03ee     	mov	x14, x13
+     1c8: f10009ce     	subs	x14, x14, #0x2
+     1cc: a93fa549     	stp	x9, x9, [x10, #-0x8]
+     1d0: 9100414a     	add	x10, x10, #0x10
+     1d4: 54ffffa1     	b.ne	0x1c8 <memset+0x1c8>
+     1d8: eb0d019f     	cmp	x12, x13
+     1dc: 540000a0     	b.eq	0x1f0 <memset+0x1f0>
+     1e0: d1002108     	sub	x8, x8, #0x8
+     1e4: f8008569     	str	x9, [x11], #0x8
+     1e8: f1001d1f     	cmp	x8, #0x7
+     1ec: 54ffffa8     	b.hi	0x1e0 <memset+0x1e0>
+     1f0: b4000288     	cbz	x8, 0x240 <memset+0x240>
+     1f4: f100051f     	cmp	x8, #0x1
+     1f8: 54000081     	b.ne	0x208 <memset+0x208>
+     1fc: aa0803e9     	mov	x9, x8
+     200: aa0b03ea     	mov	x10, x11
+     204: 1400000c     	b	0x234 <memset+0x234>
+     208: 927ff90c     	and	x12, x8, #0xfffffffffffffffe
+     20c: 92400109     	and	x9, x8, #0x1
+     210: 8b0c016a     	add	x10, x11, x12
+     214: 9100056b     	add	x11, x11, #0x1
+     218: aa0c03ed     	mov	x13, x12
+     21c: f10009ad     	subs	x13, x13, #0x2
+     220: 381ff161     	sturb	w1, [x11, #-0x1]
+     224: 38002561     	strb	w1, [x11], #0x2
+     228: 54ffffa1     	b.ne	0x21c <memset+0x21c>
+     22c: eb0c011f     	cmp	x8, x12
+     230: 54000080     	b.eq	0x240 <memset+0x240>
+     234: f1000529     	subs	x9, x9, #0x1
+     238: 38001541     	strb	w1, [x10], #0x1
+     23c: 54ffffc1     	b.ne	0x234 <memset+0x234>
+     240: d65f03c0     	ret

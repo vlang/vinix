@@ -1,0 +1,315 @@
+#!/bin/sh
+# Compile the editable desktop sources with the native V and TCC toolchains.
+# A successful build is installed atomically and activated unless --no-reload
+# is requested.
+set -eu
+
+system_dev_dir=${VINIX_DESKTOP_SYSTEM_DEV:-/usr/share/vinix/desktop-dev}
+home_dev_dir=${VINIX_DESKTOP_HOME_DEV:-/root}
+source_dir=${VINIX_DESKTOP_SOURCE:-$home_dev_dir/desktop}
+module_dir=${VINIX_DESKTOP_MODULES:-$home_dev_dir/vmodules}
+output=${VINIX_DESKTOP_OUTPUT:-/root/vinix-desktop}
+system_version_file=$system_dev_dir/.source-version
+home_version_file=$home_dev_dir/.vinix-desktop-dev-version
+host_url_file=${VINIX_HOST_SOURCE_URL_FILE:-/etc/vinix/qemu-host-source-url}
+host_repo=${VINIX_HOST_MOUNT:-/mnt/host/vinix}
+source_explicit=0
+module_explicit=0
+host_source=0
+reload=1
+
+if [ "${VINIX_DESKTOP_SOURCE+x}" = x ]; then
+	source_explicit=1
+fi
+if [ "${VINIX_DESKTOP_MODULES+x}" = x ]; then
+	module_explicit=1
+fi
+
+usage() {
+	cat >&2 <<'EOF'
+usage: vinix-desktop-build [--no-reload] [--source=DIR] [--modules=DIR] [--output=FILE]
+
+Builds the editable Vinix desktop with the in-guest V compiler. A QEMU boot
+uses the latest sources from the host checkout by default. The new binary is
+installed and the running desktop session is reloaded unless --no-reload is
+passed.
+EOF
+	exit 2
+}
+
+for argument in "$@"; do
+	case "$argument" in
+		--no-reload) reload=0 ;;
+		--source=*) source_dir=${argument#*=}; source_explicit=1 ;;
+		--modules=*) module_dir=${argument#*=}; module_explicit=1 ;;
+		--output=*) output=${argument#*=} ;;
+		--help|-h) usage ;;
+		*) echo "vinix-desktop-build: unknown option: $argument" >&2; usage ;;
+	esac
+done
+
+# /proc/uptime uses the same monotonic clock as the desktop. Keep the start
+# time across the compositor exec so the replacement Terminal can include its
+# own startup in the reported duration.
+build_started_uptime=
+build_shell_pid=
+if [ "$reload" -eq 1 ]; then
+	uptime_file=${VINIX_DESKTOP_UPTIME_FILE:-/proc/uptime}
+	# Vinix procfs regenerates /proc/uptime on each read. The shell read builtin
+	# can wait indefinitely on this file; awk takes the first record and exits.
+	build_started_uptime=$(awk 'NR == 1 { print $1; exit }' "$uptime_file") || {
+		echo "vinix-desktop-build: cannot read $uptime_file" >&2
+		exit 1
+	}
+	[ -n "$build_started_uptime" ] || {
+		echo "vinix-desktop-build: $uptime_file is empty" >&2
+		exit 1
+	}
+	# The compositor can have several Terminal clients. Remember which shell
+	# launched this command so only its visible screen is restored after reload.
+	build_shell_pid=$PPID
+fi
+
+# The QEMU runner publishes the host checkout through a loopback-only service.
+# Refresh it at build time rather than boot time: every invocation then sees
+# edits made while this VM is still running. Explicit source/module paths keep
+# their original meaning and never trigger an implicit host sync.
+if [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
+	[ -s "$host_url_file" ]; then
+	command -v vinix-host-sync >/dev/null 2>&1 || {
+		echo "vinix-desktop-build: vinix-host-sync is not installed" >&2
+		exit 1
+	}
+	vinix-host-sync
+	source_dir=$host_repo/.vinix-build/desktop
+	module_dir=$host_repo/.vinix-build/vmodules
+	host_source=1
+fi
+
+# /root is persistent across image upgrades. Older desktop sources can contain
+# only one side of an API change after new packaged files are merged into that
+# directory, producing hundreds of misleading V errors. The marker identifies
+# the coherent source+module generation seeded by this image. Preserve local
+# edits within one generation, but default to the immutable matching pair when
+# the editable tree came from an older image. Explicit paths remain available
+# for intentionally building or repairing such a tree.
+if [ "$host_source" -eq 0 ] && [ "$source_explicit" -eq 0 ] && [ "$module_explicit" -eq 0 ] && \
+	[ -f "$system_version_file" ] && \
+	! cmp -s "$system_version_file" "$home_version_file"; then
+	echo "vinix-desktop-build: editable desktop tree is from another image; using the system source copy"
+	source_dir=$system_dev_dir/desktop
+	module_dir=$system_dev_dir/vmodules
+fi
+
+if [ ! -f "$source_dir/main.v" ] && [ "$source_dir" = "$home_dev_dir/desktop" ] \
+	&& [ -f "$system_dev_dir/desktop/main.v" ]; then
+	echo "vinix-desktop-build: $source_dir is missing; using the system source copy"
+	source_dir=$system_dev_dir/desktop
+fi
+if [ "$host_source" -eq 0 ] && [ ! -f "$module_dir/ui2/v.mod" ] && [ "$module_dir" = "$home_dev_dir/vmodules" ] \
+	&& [ -f "$system_dev_dir/vmodules/ui2/v.mod" ]; then
+	echo "vinix-desktop-build: $module_dir is incomplete; using the system module copy"
+	module_dir=$system_dev_dir/vmodules
+fi
+
+[ -f "$source_dir/main.v" ] || {
+	echo "vinix-desktop-build: desktop source not found: $source_dir" >&2
+	exit 1
+}
+if [ "$host_source" -eq 1 ]; then
+	[ -f "$module_dir/ui2/v.mod" ] || {
+		echo "vinix-desktop-build: staged host ui2 module not found: $module_dir/ui2" >&2
+		echo "vinix-desktop-build: restart QEMU once to update the host source service" >&2
+		exit 1
+	}
+else
+	[ -f "$module_dir/ui2/v.mod" ] || {
+		echo "vinix-desktop-build: ui2 module not found: $module_dir/ui2" >&2
+		exit 1
+	}
+fi
+command -v tcc >/dev/null 2>&1 || {
+	echo "vinix-desktop-build: TCC is not installed" >&2
+	exit 1
+}
+v_compiler=${VINIX_DESKTOP_V_COMPILER:-/usr/lib/vlang/v}
+[ -x "$v_compiler" ] || {
+	echo "vinix-desktop-build: V compiler is not installed: $v_compiler" >&2
+	exit 1
+}
+real_tcc=$(command -v tcc)
+cache_dir=${VINIX_DESKTOP_CACHE_DIR:-$home_dev_dir/.cache/vinix-desktop}
+# V3 opens hundreds of cache entries per build. A shallow path avoids extra
+# Vinix ext2 lookups; /tmp is on the disk-root volume in the desktop VM.
+V3CACHE=${VINIX_DESKTOP_V3CACHE:-/tmp/v3}
+mkdir -p "$cache_dir/build" "$cache_dir/bin" "$cache_dir/compat" "$V3CACHE"
+export V3CACHE
+
+# V3's program cache also keys its executable to the output path.
+build_output=$cache_dir/build/vinix-desktop
+build_log=$(mktemp /tmp/vinix-desktop-build.XXXXXX)
+staged_output=
+shim_temp_cc=
+shim_temp_tcc=
+compat_temp_c=
+compat_temp_o=
+cleanup() {
+	[ -z "$staged_output" ] || rm -f "$staged_output"
+	[ -z "$shim_temp_cc" ] || rm -f "$shim_temp_cc"
+	[ -z "$shim_temp_tcc" ] || rm -f "$shim_temp_tcc"
+	[ -z "$compat_temp_c" ] || rm -f "$compat_temp_c"
+	[ -z "$compat_temp_o" ] || rm -f "$compat_temp_o"
+	rm -f "$build_log"
+}
+trap cleanup EXIT HUP INT TERM
+
+publish_output() {
+	staged_output="$output.next.$$"
+	rm -f "$staged_output"
+	# V atomically replaces build_output after a successful compile. A hard link
+	# retains that complete inode and avoids copying the 65 MB desktop binary.
+	# A separate filesystem still uses a staged copy and atomic rename.
+	if ! ln "$build_output" "$staged_output" 2>/dev/null; then
+		cp "$build_output" "$staged_output"
+		chmod 755 "$staged_output"
+	fi
+	mv -f "$staged_output" "$output"
+	staged_output=
+}
+
+module_path=$module_dir
+if [ "$host_source" -eq 1 ]; then
+	# Python staging runs in the macOS source service. The guest consumes its
+	# materialized output directly and therefore needs only V and TCC.
+	module_path="$module_dir|$host_repo|$host_repo/third_party"
+fi
+
+# The installed /usr/bin/v wrapper and an explicit -cc tcc both disable V3's
+# module cache. V3 also auto-selects a PATH-visible tcc before its cache gate.
+# For this build only, leave the compiler argument at its cacheable default
+# `cc`, resolve that name to TCC, and hide TCC from the version probe that
+# selects the uncached implicit-TCC path. V's generic `cc` link plan assumes
+# bundled TCC resources, which this image removes in favor of Alpine TCC.
+# The wrapper drops those missing paths. Its stable path and mtime let V reuse
+# cached module objects across invocations.
+VINIX_DESKTOP_VROOT=${v_compiler%/*}
+export VINIX_DESKTOP_VROOT
+shim_version=$cache_dir/bin/.desktop-shims-v1
+if [ ! -f "$shim_version" ] || [ ! -x "$cache_dir/bin/cc" ] || [ ! -x "$cache_dir/bin/tcc" ]; then
+	shim_temp_cc=$cache_dir/bin/.cc.$$
+	shim_temp_tcc=$cache_dir/bin/.tcc.$$
+	cat > "$shim_temp_cc" <<'EOF'
+#!/bin/sh
+remaining=$#
+while [ "$remaining" -gt 0 ]; do
+	arg=$1
+	shift
+	remaining=$((remaining - 1))
+	case "$arg" in
+		"-B$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib"|\
+		"-I$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib/include"|\
+		"-L$VINIX_DESKTOP_VROOT/thirdparty/tcc/lib") ;;
+		*) set -- "$@" "$arg" ;;
+	esac
+done
+exec "$VINIX_DESKTOP_REAL_TCC" "$@"
+EOF
+	cat > "$shim_temp_tcc" <<'EOF'
+#!/bin/sh
+if [ "$#" -eq 1 ] && [ "$1" = -v ]; then
+	exit 1
+fi
+exec "$VINIX_DESKTOP_REAL_TCC" "$@"
+EOF
+	chmod 755 "$shim_temp_cc" "$shim_temp_tcc"
+	mv -f "$shim_temp_cc" "$cache_dir/bin/cc"
+	mv -f "$shim_temp_tcc" "$cache_dir/bin/tcc"
+	: > "$shim_version"
+fi
+VINIX_DESKTOP_REAL_TCC=$real_tcc
+export VINIX_DESKTOP_REAL_TCC
+PATH=$cache_dir/bin:$PATH
+export PATH
+
+# This V3 revision can omit two generated enum-string functions from a cached
+# time object. Its initial full build succeeds, but the next desktop source edit
+# then fails to link. Supply weak definitions, so V's own definitions take
+# precedence whenever they are present. The ABI matches V's builtin string.
+# Build the tiny object once and keep its path and mtime stable for V3's cache.
+compat_object=$cache_dir/compat/time-autostr.o
+compat_version=$cache_dir/compat/.time-autostr-v1
+if [ ! -f "$compat_version" ] || [ ! -f "$compat_object" ]; then
+	compat_temp_c=$cache_dir/compat/.time-autostr.$$.c
+	compat_temp_o=$cache_dir/compat/.time-autostr.$$.o
+	cat > "$compat_temp_c" <<'EOF'
+#include <string.h>
+typedef struct { unsigned char *str; int len; int is_lit; } vinix_string;
+extern vinix_string strconv__format_int(long long value, int base);
+static vinix_string vinix_enum_literal(const char *value) {
+	return (vinix_string){(unsigned char *)value, (int)strlen(value), 1};
+}
+__attribute__((weak)) vinix_string time__FormatTime__autostr(int value) {
+	static const char *names[] = {"hhmm12", "hhmm24", "hhmmss12", "hhmmss24",
+		"hhmmss24_milli", "hhmmss24_micro", "hhmmss24_nano", "no_time"};
+	if (value >= 0 && value < (int)(sizeof(names) / sizeof(names[0])))
+		return vinix_enum_literal(names[value]);
+	return strconv__format_int(value, 10);
+}
+__attribute__((weak)) vinix_string time__FormatDate__autostr(int value) {
+	static const char *names[] = {"ddmmyy", "ddmmyyyy", "mmddyy", "mmddyyyy",
+		"mmmd", "mmmdd", "mmmddyy", "mmmddyyyy", "no_date",
+		"yyyymmdd", "yymmdd"};
+	if (value >= 0 && value < (int)(sizeof(names) / sizeof(names[0])))
+		return vinix_enum_literal(names[value]);
+	return strconv__format_int(value, 10);
+}
+EOF
+	"$real_tcc" -c -o "$compat_temp_o" "$compat_temp_c"
+	mv -f "$compat_temp_o" "$compat_object"
+	: > "$compat_version"
+fi
+
+# Let V drive TCC instead of stopping at generated C. Its TCC flag plan adds
+# the compiler's backtrace runtime and Vinix's arm64 atomic support object;
+# invoking TCC on the C file by hand would omit both pieces. Link statically, matching
+# the packaged compositor: the dynamic TCC binary can start, but repeatedly
+# loading it through each native application currently wedges Vinix during the
+# replacement session's startup. Do not pass -prod here: V's current driver
+# deliberately follows a production TCC attempt with a system-CC pass, while
+# TCC itself does not provide an optimizing production mode. Ask V to show the
+# C command so the build can reject a successful retry through another compiler.
+# Put musl's public
+# headers first to avoid TCC's bundled stddef.h redeclaring a wchar_t that an
+# earlier musl header already supplied. Disable compiler retry so a future TCC
+# regression fails explicitly instead of silently using GCC.
+# The desktop uses time.sleep/ticks and sync.Mutex, but no timer or waitgroup
+# APIs. Their implementations both insert sync/thread_helper.h under different
+# C contexts, which makes V3 abandon the module cache for the entire build.
+echo "==> Building Vinix desktop with V3 and TCC"
+if ! VFLAGS= "$v_compiler" -new-compiler -no-memory-limit -no-parallel -os linux -arch arm64 -musl -showcc -gc none -manualfree \
+	-enable-globals -no-retry-compilation -cflags -I/usr/include -ldflags "-static $compat_object" \
+	-d ui2_headless -exclude '@vlib/time/timer*.c.v,@vlib/sync/waitgroup*.c.v' \
+	-path "@vlib|$module_path|@vmodules|$source_dir" \
+	-o "$build_output" "$source_dir" >"$build_log" 2>&1; then
+	cat "$build_log" >&2
+	echo "vinix-desktop-build: V/TCC compilation failed" >&2
+	exit 1
+fi
+if ! grep -Eq '^[[:space:]]*> cc([[:space:]]|$)' "$build_log"; then
+	cat "$build_log" >&2
+	echo "vinix-desktop-build: V did not report a TCC compile" >&2
+	exit 1
+fi
+[ -x "$build_output" ] || chmod 755 "$build_output"
+
+if [ "$reload" -eq 1 ]; then
+	publish_output
+	# A terminal launched by the old compositor disappears during the orderly
+	# session teardown, so leave the stable copy in place before sending SIGHUP.
+	VINIX_DESKTOP_REBUILD_STARTED=$build_started_uptime \
+		VINIX_DESKTOP_REBUILD_SHELL=$build_shell_pid \
+		vinix-desktop-reload "$output"
+else
+	publish_output
+	echo "vinix-desktop-build: wrote $output"
+fi

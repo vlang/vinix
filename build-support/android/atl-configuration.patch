@@ -1,0 +1,2705 @@
+--- a/src/libandroid/configuration.c
++++ b/src/libandroid/configuration.c
+@@ -1,425 +1,106 @@
+ #include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include <androidfw/androidfw_c_api.h>
+ 
+-typedef void AConfiguration;
+-typedef void AAssetManager;
++/* Use androidfw's public C configuration, not an assumed AssetManager layout. */
++typedef struct ResTable_config AConfiguration;
++typedef struct AssetManager AAssetManager;
+ 
+-/**
+- * Create a new AConfiguration, initialized with no values set.
+- */
+-AConfiguration *AConfiguration_new()
++AConfiguration *AConfiguration_new(void)
+ {
+-	return 0;
++    AConfiguration *config = calloc(1, sizeof(*config));
++    if (config != NULL)
++        config->size = sizeof(*config);
++    return config;
+ }
+ 
+-/**
+- * Free an AConfiguration that was previously created with
+- * AConfiguration_new().
+- */
+ void AConfiguration_delete(AConfiguration *config)
+ {
+-	return;
++    free(config);
+ }
+ 
+-/**
+- * Create and return a new AConfiguration based on the current configuration in
+- * use in the given {@link AAssetManager}.
+- */
+ void AConfiguration_fromAssetManager(AConfiguration *out, AAssetManager *am)
+ {
+-	return;
++    AssetManager_lock(am);
++    AssetManager_getConfiguration(am, out);
++    AssetManager_unlock(am);
+ }
+ 
+-/**
+- * Copy the contents of 'src' to 'dest'.
+- */
+ void AConfiguration_copy(AConfiguration *dest, AConfiguration *src)
+ {
+-	return;
++    *dest = *src;
+ }
+ 
+-/**
+- * Return the current MCC set in the configuration.  0 if not set.
+- */
+-int32_t AConfiguration_getMcc(AConfiguration *config)
++#define CONFIGURATION_FIELD(Name, field) \
++    int32_t AConfiguration_get##Name(AConfiguration *config) { return config->field; } \
++    void AConfiguration_set##Name(AConfiguration *config, int32_t value) { config->field = value; }
++
++CONFIGURATION_FIELD(Mcc, mcc)
++CONFIGURATION_FIELD(Mnc, mnc)
++CONFIGURATION_FIELD(Orientation, orientation)
++CONFIGURATION_FIELD(Touchscreen, touchscreen)
++CONFIGURATION_FIELD(Density, density)
++CONFIGURATION_FIELD(Keyboard, keyboard)
++CONFIGURATION_FIELD(Navigation, navigation)
++CONFIGURATION_FIELD(SdkVersion, sdkVersion)
++CONFIGURATION_FIELD(ScreenWidthDp, screenWidthDp)
++CONFIGURATION_FIELD(ScreenHeightDp, screenHeightDp)
++CONFIGURATION_FIELD(SmallestScreenWidthDp, smallestScreenWidthDp)
++
++void AConfiguration_getLanguage(AConfiguration *config, char *out)
+ {
+-	return -1;
++    memcpy(out, config->language, sizeof(config->language));
+ }
+ 
+-/**
+- * Set the current MCC in the configuration.  0 to clear.
+- */
+-void AConfiguration_setMcc(AConfiguration *config, int32_t mcc)
++void AConfiguration_setLanguage(AConfiguration *config, const char *value)
+ {
+-	return;
++    memcpy(config->language, value, sizeof(config->language));
++    memset(config->localeScript, 0, sizeof(config->localeScript));
++    config->localeScriptWasComputed = false;
+ }
+ 
+-/**
+- * Return the current MNC set in the configuration.  0 if not set.
+- */
+-int32_t AConfiguration_getMnc(AConfiguration *config)
++void AConfiguration_getCountry(AConfiguration *config, char *out)
+ {
+-	return -1;
++    memcpy(out, config->country, sizeof(config->country));
+ }
+ 
+-/**
+- * Set the current MNC in the configuration.  0 to clear.
+- */
+-void AConfiguration_setMnc(AConfiguration *config, int32_t mnc)
++void AConfiguration_setCountry(AConfiguration *config, const char *value)
+ {
+-	return;
++    memcpy(config->country, value, sizeof(config->country));
++    memset(config->localeScript, 0, sizeof(config->localeScript));
++    config->localeScriptWasComputed = false;
+ }
+ 
+-/**
+- * Return the current language code set in the configuration.  The output will
+- * be filled with an array of two characters.  They are not 0-terminated.  If
+- * a language is not set, they will be 0.
+- */
+-void AConfiguration_getLanguage(AConfiguration *config, char *outLanguage)
++/* These packed masks are defined by the pinned androidfw ResourceTypes.h.
++ * Keep unrelated fields in the same byte when changing one qualifier. */
++#define CONFIGURATION_BITS(Name, field, mask, shift) \
++    int32_t AConfiguration_get##Name(AConfiguration *config) \
++    { return (config->field & (mask)) >> (shift); } \
++    void AConfiguration_set##Name(AConfiguration *config, int32_t value) \
++    { config->field = (config->field & ~(mask)) | (((uint32_t)value << (shift)) & (mask)); }
++
++CONFIGURATION_BITS(KeysHidden, inputFlags, 0x03, 0)
++CONFIGURATION_BITS(NavHidden, inputFlags, 0x0c, 2)
++CONFIGURATION_BITS(ScreenSize, screenLayout, 0x0f, 0)
++CONFIGURATION_BITS(ScreenLong, screenLayout, 0x30, 4)
++CONFIGURATION_BITS(LayoutDirection, screenLayout, 0xc0, 6)
++CONFIGURATION_BITS(ScreenRound, screenLayout2, 0x03, 0)
++CONFIGURATION_BITS(UiModeType, uiMode, 0x0f, 0)
++CONFIGURATION_BITS(UiModeNight, uiMode, 0x30, 4)
++
++int32_t AConfiguration_diff(AConfiguration *a, AConfiguration *b)
+ {
+-	/* Assume not set. */
+-	outLanguage[0] = 0;
+-	outLanguage[1] = 0;
++    return ResTable_config_diff(a, b);
+ }
+ 
+-/**
+- * Set the current language code in the configuration, from the first two
+- * characters in the string.
+- */
+-void AConfiguration_setLanguage(AConfiguration *config, const char *language)
++int32_t AConfiguration_match(AConfiguration *base, AConfiguration *requested)
+ {
+-	return;
++    return ResTable_config_match(base, requested);
+ }
+ 
+-/**
+- * Return the current country code set in the configuration.  The output will
+- * be filled with an array of two characters.  They are not 0-terminated.  If
+- * a country is not set, they will be 0.
+- */
+-void AConfiguration_getCountry(AConfiguration *config, char *outCountry)
++int32_t AConfiguration_isBetterThan(AConfiguration *base, AConfiguration *test,
++                                   AConfiguration *requested)
+ {
+-	/* Assume not set. */
+-	outCountry[0] = 0;
+-	outCountry[1] = 0;
++    return ResTable_config_isBetterThan(base, test, requested);
+ }
+-
+-/**
+- * Set the current country code in the configuration, from the first two
+- * characters in the string.
+- */
+-void AConfiguration_setCountry(AConfiguration *config, const char *country)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_ORIENTATION_* set in the configuration.
+- */
+-int32_t AConfiguration_getOrientation(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current orientation in the configuration.
+- */
+-void AConfiguration_setOrientation(AConfiguration *config, int32_t orientation)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_TOUCHSCREEN_* set in the configuration.
+- */
+-int32_t AConfiguration_getTouchscreen(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current touchscreen in the configuration.
+- */
+-void AConfiguration_setTouchscreen(AConfiguration *config, int32_t touchscreen)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_DENSITY_* set in the configuration.
+- */
+-int32_t AConfiguration_getDensity(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current density in the configuration.
+- */
+-void AConfiguration_setDensity(AConfiguration *config, int32_t density)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_KEYBOARD_* set in the configuration.
+- */
+-int32_t AConfiguration_getKeyboard(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current keyboard in the configuration.
+- */
+-void AConfiguration_setKeyboard(AConfiguration *config, int32_t keyboard)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_NAVIGATION_* set in the configuration.
+- */
+-int32_t AConfiguration_getNavigation(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current navigation in the configuration.
+- */
+-void AConfiguration_setNavigation(AConfiguration *config, int32_t navigation)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_KEYSHIDDEN_* set in the configuration.
+- */
+-int32_t AConfiguration_getKeysHidden(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current keys hidden in the configuration.
+- */
+-void AConfiguration_setKeysHidden(AConfiguration *config, int32_t keysHidden)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_NAVHIDDEN_* set in the configuration.
+- */
+-int32_t AConfiguration_getNavHidden(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current nav hidden in the configuration.
+- */
+-void AConfiguration_setNavHidden(AConfiguration *config, int32_t navHidden)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current SDK (API) version set in the configuration.
+- */
+-int32_t AConfiguration_getSdkVersion(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current SDK version in the configuration.
+- */
+-void AConfiguration_setSdkVersion(AConfiguration *config, int32_t sdkVersion)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_SCREENSIZE_* set in the configuration.
+- */
+-int32_t AConfiguration_getScreenSize(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current screen size in the configuration.
+- */
+-void AConfiguration_setScreenSize(AConfiguration *config, int32_t screenSize)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_SCREENLONG_* set in the configuration.
+- */
+-int32_t AConfiguration_getScreenLong(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current screen long in the configuration.
+- */
+-void AConfiguration_setScreenLong(AConfiguration *config, int32_t screenLong)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_SCREENROUND_* set in the configuration.
+- */
+-int32_t AConfiguration_getScreenRound(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current screen round in the configuration.
+- */
+-void AConfiguration_setScreenRound(AConfiguration *config, int32_t screenRound)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_UI_MODE_TYPE_* set in the configuration.
+- */
+-int32_t AConfiguration_getUiModeType(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current UI mode type in the configuration.
+- */
+-void AConfiguration_setUiModeType(AConfiguration *config, int32_t uiModeType)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current ACONFIGURATION_UI_MODE_NIGHT_* set in the configuration.
+- */
+-int32_t AConfiguration_getUiModeNight(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the current UI mode night in the configuration.
+- */
+-void AConfiguration_setUiModeNight(AConfiguration *config, int32_t uiModeNight)
+-{
+-	return;
+-}
+-
+-#if __ANDROID_API__ >= 13
+-/**
+- * Return the current configuration screen width in dp units, or
+- * ACONFIGURATION_SCREEN_WIDTH_DP_ANY if not set.
+- */
+-int32_t AConfiguration_getScreenWidthDp(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the configuration's current screen width in dp units.
+- */
+-void AConfiguration_setScreenWidthDp(AConfiguration *config, int32_t value)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the current configuration screen height in dp units, or
+- * ACONFIGURATION_SCREEN_HEIGHT_DP_ANY if not set.
+- */
+-int32_t AConfiguration_getScreenHeightDp(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the configuration's current screen width in dp units.
+- */
+-void AConfiguration_setScreenHeightDp(AConfiguration *config, int32_t value)
+-{
+-	return;
+-}
+-
+-/**
+- * Return the configuration's smallest screen width in dp units, or
+- * ACONFIGURATION_SMALLEST_SCREEN_WIDTH_DP_ANY if not set.
+- */
+-int32_t AConfiguration_getSmallestScreenWidthDp(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the configuration's smallest screen width in dp units.
+- */
+-void AConfiguration_setSmallestScreenWidthDp(AConfiguration *config, int32_t value)
+-{
+-	return;
+-}
+-#endif /* __ANDROID_API__ >= 13 */
+-
+-#if __ANDROID_API__ >= 17
+-/**
+- * Return the configuration's layout direction, or
+- * ACONFIGURATION_LAYOUTDIR_ANY if not set.
+- */
+-int32_t AConfiguration_getLayoutDirection(AConfiguration *config)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Set the configuration's layout direction.
+- */
+-void AConfiguration_setLayoutDirection(AConfiguration *config, int32_t value)
+-{
+-	return;
+-}
+-#endif /* __ANDROID_API__ >= 17 */
+-
+-/**
+- * Perform a diff between two configurations.  Returns a bit mask of
+- * ACONFIGURATION_* constants, each bit set meaning that configuration element
+- * is different between them.
+- */
+-int32_t AConfiguration_diff(AConfiguration *config1, AConfiguration *config2)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Determine whether 'base' is a valid configuration for use within the
+- * environment 'requested'.  Returns 0 if there are any values in 'base'
+- * that conflict with 'requested'.  Returns 1 if it does not conflict.
+- */
+-int32_t AConfiguration_match(AConfiguration *base, AConfiguration *requested)
+-{
+-	return -1;
+-}
+-
+-/**
+- * Determine whether the configuration in 'test' is better than the existing
+- * configuration in 'base'.  If 'requested' is non-NULL, this decision is based
+- * on the overall configuration given there.  If it is NULL, this decision is
+- * simply based on which configuration is more specific.  Returns non-0 if
+- * 'test' is better than 'base'.
+- *
+- * This assumes you have already filtered the configurations with
+- * AConfiguration_match().
+- */
+-int32_t AConfiguration_isBetterThan(AConfiguration *base, AConfiguration *test,
+-                                    AConfiguration *requested);
+--- a/src/api-impl/android/view/LayoutInflater.java
++++ b/src/api-impl/android/view/LayoutInflater.java
+@@ -257,0 +258,1 @@
++		boolean pendingRequestFocus = false;
+@@ -271,2 +272,2 @@
+-				throw new Exception("<requestFocus /> not supported atm");
+-				// parseRequestFocus(parser, parent);
++				pendingRequestFocus = true;
++				consumeChildElements(parser);
+@@ -301,0 +303,4 @@
++		// Children are attached before restoring focus, regardless of tag order.
++		if (pendingRequestFocus)
++			parent.restoreDefaultFocus();
++
+@@ -303,0 +309,10 @@
++	}
++
++	private static void consumeChildElements(XmlPullParser parser) throws Exception {
++		final int depth = parser.getDepth();
++		int type;
++		while (((type = parser.next()) != XmlPullParser.END_TAG
++		        || parser.getDepth() > depth)
++		       && type != XmlPullParser.END_DOCUMENT) {
++			// A requestFocus tag is metadata; none of its children are views.
++		}
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -1293,0 +1294,3 @@
++	public boolean restoreDefaultFocus() {
++		return requestFocus(View.FOCUS_DOWN);
++	}
+diff --git a/meson.build b/meson.build
+index bb13f5f..8b5e6c2 100644
+--- a/meson.build
++++ b/meson.build
+@@ -89,0 +90 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
++                                                                        'src/api-impl-jni/views/PointerCapture.c',
+@@ -186 +187 @@ libtranslationlayer_so = shared_library('translation_layer_main', [
+-                                                                  	dependency('gtk4', version: '>=4.14'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
++                                                                        dependency('gtk4', version: '>=4.14'), dependency('x11'), dependency('xi'), dependency('gl'), dependency('egl'), dependency('wayland-client'), dependency('jni'),
+diff --git a/src/api-impl-jni/views/PointerCapture.c b/src/api-impl-jni/views/PointerCapture.c
+new file mode 100644
+index 0000000..6389010
+--- /dev/null
++++ b/src/api-impl-jni/views/PointerCapture.c
+@@ -0,0 +1,395 @@
++#include "PointerCapture.h"
++#include <glib-unix.h>
++#include <string.h>
++#ifdef GDK_WINDOWING_X11
++#include <gdk/x11/gdkx.h>
++#include <X11/Xlib.h>
++#include <X11/extensions/XInput2.h>
++#endif
++
++/* Pointer capture belongs to the attached window, as on Android. */
++#define CAPTURE_KEY "atl-pointer-capture"
++#ifdef GDK_WINDOWING_X11
++typedef struct {
++	grefcount refs;
++	GtkWidget *root; /* root owns this state */
++	gboolean active;
++	Display *display;
++	Window window;
++	Cursor cursor;
++	int device_id, opcode, source_id;
++	gboolean relative_source;
++	guint64 generation;
++	guint source;
++	unsigned long warp_serial;
++	gboolean warp_pending;
++	double last_x, last_y, center_x, center_y;
++	double entry_root_x, entry_root_y;
++	int buttons;
++	AtlCapturedEvent event;
++	AtlCaptureChanged changed;
++	gpointer data;
++	GDestroyNotify destroy;
++} Capture;
++
++static Capture *capture_ref(Capture *s) { g_ref_count_inc(&s->refs); return s; }
++static void capture_unref(Capture *s) { if (g_ref_count_dec(&s->refs)) g_free(s); }
++
++static void release(Capture *s, gboolean notify)
++{
++	if (!s->active) return;
++	Display *display = s->display;
++	gpointer data = s->data;
++	GDestroyNotify destroy = s->destroy;
++	AtlCaptureChanged changed = s->changed;
++	/* Clear and dispose the old acquisition before calling Java: a callback
++	 * may immediately request a new grab, even on another window. */
++	s->generation++;
++	s->active = FALSE;
++	s->display = NULL;
++	s->data = NULL;
++	if (s->source) { g_source_remove(s->source); s->source = 0; }
++	/* The hidden pointer returns to its entry position before becoming
++	 * visible. Root coordinates avoid a destroyed application-window XID. */
++	XIWarpPointer(display, s->device_id, None, DefaultRootWindow(display),
++	              0, 0, 0, 0, s->entry_root_x, s->entry_root_y);
++	XIUngrabDevice(display, s->device_id, CurrentTime);
++	XFreeCursor(display, s->cursor);
++	XSync(display, False);
++	XCloseDisplay(display);
++	if (notify && changed) changed(s->root, FALSE, data);
++	if (destroy) destroy(data);
++}
++
++static void capture_destroy(gpointer data)
++{
++	Capture *s = data;
++	release(s, FALSE);
++	capture_unref(s);
++}
++
++static void on_unmap(GtkWidget *widget, Capture *s) { (void)widget; release(s, TRUE); }
++static void on_active(GObject *root, GParamSpec *param, Capture *s)
++{
++	(void)param;
++	if (!gtk_window_is_active(GTK_WINDOW(root))) release(s, TRUE);
++}
++
++static void on_device_added(GtkWidget *root, GdkDevice *device)
++{
++	GdkInputSource source = gdk_device_get_source(device);
++	if (source != GDK_SOURCE_MOUSE && source != GDK_SOURCE_KEYBOARD) {
++		Capture *s = g_object_get_data(G_OBJECT(root), CAPTURE_KEY);
++		if (s) release(s, TRUE);
++	}
++}
++
++static gboolean suppress_normal_mouse(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer data)
++{
++	(void)controller;
++	Capture *s = data;
++	if (!s->active) return FALSE;
++	GdkDevice *device = gdk_event_get_device(event);
++	if (!device || gdk_device_get_source(device) != GDK_SOURCE_MOUSE
++	    || gdk_event_get_pointer_emulated(event) || gdk_event_get_device_tool(event)) return FALSE;
++	switch (gdk_event_get_event_type(event)) {
++	case GDK_MOTION_NOTIFY: case GDK_BUTTON_PRESS: case GDK_BUTTON_RELEASE:
++	case GDK_SCROLL: case GDK_ENTER_NOTIFY: case GDK_LEAVE_NOTIFY:
++		return TRUE;
++	default: return FALSE;
++	}
++}
++
++static int android_button(int button)
++{
++	switch (button) {
++	case 1: return 1; /* primary */
++	case 3: return 2; /* secondary */
++	case 2: return 4; /* tertiary */
++	case 8: return 8; /* back */
++	case 9: return 16; /* forward */
++	default: return 0;
++	}
++}
++
++static void emit(Capture *s, int action, int action_button, double dx, double dy,
++                 double scroll_x, double scroll_y, Time time)
++{
++	GtkWidget *root = g_object_ref(s->root);
++	GtkWidget *focused = gtk_root_get_focus(GTK_ROOT(root));
++	if (!focused) { g_object_unref(root); return; }
++	GtkWidget *owner = g_object_ref(focused);
++	double scale = gtk_widget_get_scale_factor(root);
++	/* The callback may release capture/remove the view. It receives only
++	 * numeric copies; both native objects stay alive until it returns. */
++	s->event(owner, action, s->buttons, action_button, dx / scale, dy / scale,
++	         s->last_x / scale, s->last_y / scale, scroll_x, scroll_y,
++	         (guint32)time, s->data);
++	g_object_unref(owner);
++	g_object_unref(root);
++}
++
++static void source_changed(Capture *s, int source_id)
++{
++	if (source_id == s->source_id) return;
++	s->source_id = source_id;
++	s->relative_source = FALSE;
++	int count;
++	XIDeviceInfo *info = XIQueryDevice(s->display, source_id, &count);
++	gboolean relative_x = FALSE, relative_y = FALSE;
++	if (info && count) {
++		for (int i = 0; i < info[0].num_classes; i++) {
++			if (info[0].classes[i]->type != XIValuatorClass) continue;
++			XIValuatorClassInfo *v = (XIValuatorClassInfo *)info[0].classes[i];
++			if (v->number == 0) relative_x = v->mode == XIModeRelative;
++			if (v->number == 1) relative_y = v->mode == XIModeRelative;
++		}
++	}
++	if (info) XIFreeDeviceInfo(info);
++	s->relative_source = relative_x && relative_y;
++}
++
++static gboolean input_ready(gint fd, GIOCondition condition, gpointer data)
++{
++	(void)fd;
++	Capture *s = capture_ref(data);
++	if (condition & (G_IO_HUP | G_IO_ERR)) { release(s, TRUE); capture_unref(s); return G_SOURCE_REMOVE; }
++	/* Keep the window alive if a listener closes it while this source runs. */
++	GtkWidget *root = g_object_ref(s->root);
++	Display *display = s->display;
++	guint64 generation = s->generation;
++	while (s->generation == generation && s->display == display && XPending(display)) {
++		XEvent event;
++		XNextEvent(display, &event);
++		/* GDK may retain is-active during an external XI2 pointer grab.
++		 * Observe real X focus/unmap events on this connection too. Ignore
++		 * grab pseudo-focus and transitions into this window's descendants. */
++		if ((event.type == FocusOut && event.xfocus.mode != NotifyGrab
++		     && event.xfocus.mode != NotifyUngrab && event.xfocus.detail != NotifyInferior)
++		    || event.type == UnmapNotify || event.type == DestroyNotify) {
++			release(s, TRUE);
++			break;
++		}
++		if (event.type != GenericEvent || event.xcookie.extension != s->opcode
++		    || !XGetEventData(display, &event.xcookie)) continue;
++		/* Copy cookie data before calling Java, which may close this Display. */
++		int type = event.xcookie.evtype;
++		Time time = 0;
++		int action = -1, button = 0, before = -1, after = -1;
++		double dx = 0, dy = 0, sx = 0, sy = 0;
++		if (type == XI_RawMotion) {
++			XIRawEvent *e = event.xcookie.data;
++			if (e->deviceid != s->device_id) { XFreeEventData(display, &event.xcookie); continue; }
++			source_changed(s, e->sourceid);
++			time = e->time;
++			if (s->relative_source) {
++				double *v = e->raw_values;
++				for (int axis = 0; axis < e->valuators.mask_len * 8; axis++) {
++					if (!XIMaskIsSet(e->valuators.mask, axis)) continue;
++					if (axis == 0) dx = *v;
++					if (axis == 1) dy = *v;
++					v++;
++				}
++				if (dx || dy) action = 2; /* ACTION_MOVE */
++			}
++		} else if (type == XI_Motion || type == XI_ButtonPress || type == XI_ButtonRelease) {
++			XIDeviceEvent *e = event.xcookie.data;
++			source_changed(s, e->sourceid);
++			time = e->time;
++			if (type == XI_Motion) {
++				if (!s->relative_source) {
++					/* Absolute devices/XTEST need recentering. Xlib exposes the
++					 * request serial, so queued pre-warp input is never mistaken
++					 * for the synthetic recenter motion. */
++					gboolean warp = s->warp_pending && e->serial >= s->warp_serial
++					    && e->event_x == s->center_x && e->event_y == s->center_y;
++					if (warp) s->warp_pending = FALSE;
++					else { dx = e->event_x - s->last_x; dy = e->event_y - s->last_y; if (dx || dy) action = 2; }
++				}
++				s->last_x = e->event_x;
++				s->last_y = e->event_y;
++				int width = gtk_widget_get_width(root) * gtk_widget_get_scale_factor(root);
++				int height = gtk_widget_get_height(root) * gtk_widget_get_scale_factor(root);
++				if (!s->relative_source && !s->warp_pending && width > 4 && height > 4
++				    && (s->last_x < 2 || s->last_y < 2 || s->last_x >= width - 2 || s->last_y >= height - 2)) {
++					s->center_x = width / 2;
++					s->center_y = height / 2;
++					s->warp_serial = NextRequest(display);
++					s->warp_pending = TRUE;
++					XIWarpPointer(display, s->device_id, None, s->window, 0, 0, 0, 0, s->center_x, s->center_y);
++					XFlush(display);
++				}
++			} else {
++				button = android_button(e->detail);
++				if (button) {
++					int previous = s->buttons;
++					if (type == XI_ButtonPress) {
++						s->buttons |= button; action = 11;
++						before = (!(previous & 7) && (s->buttons & 7)) ? 0 : 2;
++					} else {
++						s->buttons &= ~button; action = 12;
++						after = ((previous & 7) && !(s->buttons & 7)) ? 1 : 2;
++					}
++				} else if (type == XI_ButtonPress && e->detail >= 4 && e->detail <= 7) {
++					before = 2; action = 8;
++					if (e->detail == 4) sy = 1;
++					if (e->detail == 5) sy = -1;
++					if (e->detail == 6) sx = -1;
++					if (e->detail == 7) sx = 1;
++				}
++			}
++		}
++		XFreeEventData(display, &event.xcookie);
++		if (before >= 0 && s->active) emit(s, before, 0, 0, 0, 0, 0, time);
++		if (s->generation == generation && action >= 0 && s->active)
++			emit(s, action, button, dx, dy, sx, sy, time);
++		if (s->generation == generation && after >= 0 && s->active)
++			emit(s, after, 0, 0, 0, 0, 0, time);
++	}
++	gboolean alive = s->generation == generation && s->display == display;
++	g_object_unref(root);
++	capture_unref(s);
++	return alive ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
++}
++#endif
++
++gboolean atl_pointer_capture_has(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	return s && s->active;
++#else
++	(void)widget;
++	return FALSE;
++#endif
++}
++
++guint64 atl_pointer_capture_epoch(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	return s ? s->generation : 0;
++#else
++	(void)widget;
++	return 0;
++#endif
++}
++
++void atl_pointer_capture_release(GtkWidget *widget)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(widget);
++	Capture *s = root ? g_object_get_data(G_OBJECT(root), CAPTURE_KEY) : NULL;
++	if (s) release(s, TRUE);
++#else
++	(void)widget;
++#endif
++}
++
++gboolean atl_pointer_capture_request(GtkWidget *owner, AtlCapturedEvent event,
++                                     AtlCaptureChanged changed, gpointer data,
++                                     GDestroyNotify destroy)
++{
++#ifdef GDK_WINDOWING_X11
++	GtkRoot *root = gtk_widget_get_root(owner);
++	if (!root || !GTK_IS_WINDOW(root) || !gtk_widget_get_mapped(GTK_WIDGET(root))
++	    || !gtk_window_is_active(GTK_WINDOW(root))) return FALSE;
++	GdkDisplay *gdk_display = gtk_widget_get_display(owner);
++	if (!GDK_IS_X11_DISPLAY(gdk_display)) return FALSE;
++	Capture *s = g_object_get_data(G_OBJECT(root), CAPTURE_KEY);
++	if (s && s->active) return FALSE;
++	Display *display = XOpenDisplay(gdk_display_get_name(gdk_display));
++	if (!display) return FALSE;
++	int opcode, base_event, base_error, major = 2, minor = 1;
++	if (!XQueryExtension(display, "XInputExtension", &opcode, &base_event, &base_error)
++	    || XIQueryVersion(display, &major, &minor) != Success
++	    || major < 2 || (major == 2 && minor < 1)) { XCloseDisplay(display); return FALSE; }
++	GdkSeat *seat = gdk_display_get_default_seat(gdk_display);
++	/* A master grab includes its attached pointing devices. Until separate
++	 * tablet/touch grab routing exists, refuse capture on mixed seats rather
++	 * than stealing input from other devices. The production X11 seat is a
++	 * mouse plus keyboard. Unsupported backends/seats retain normal input. */
++	GList *devices = gdk_seat_get_devices(seat, GDK_SEAT_CAPABILITY_ALL_POINTING);
++	gboolean mouse_only = TRUE;
++	for (GList *it = devices; it; it = it->next)
++		if (gdk_device_get_source(it->data) != GDK_SOURCE_MOUSE) mouse_only = FALSE;
++	g_list_free(devices);
++	if (!mouse_only) { XCloseDisplay(display); return FALSE; }
++	GdkDevice *pointer = gdk_seat_get_pointer(seat);
++	if (!pointer) { XCloseDisplay(display); return FALSE; }
++	int device_id = gdk_x11_device_get_id(pointer);
++	Window window = gdk_x11_surface_get_xid(gtk_native_get_surface(GTK_NATIVE(root)));
++	char empty[] = {0};
++	Pixmap bitmap = XCreateBitmapFromData(display, window, empty, 1, 1);
++	XColor color = {0};
++	Cursor cursor = XCreatePixmapCursor(display, bitmap, bitmap, &color, &color, 0, 0);
++	XFreePixmap(display, bitmap);
++	unsigned char mask[XIMaskLen(XI_LASTEVENT)] = {0};
++	XISetMask(mask, XI_Motion); XISetMask(mask, XI_ButtonPress); XISetMask(mask, XI_ButtonRelease);
++	XIEventMask events = { device_id, sizeof(mask), mask };
++	int status = XIGrabDevice(display, device_id, window, CurrentTime, cursor,
++	                          XIGrabModeAsync, XIGrabModeAsync, False, &events);
++	/* Do not steal GDK's implicit/explicit grab: its old normal touch/click
++	 * stream must receive its release/cancel. A request may be retried after
++	 * that stream ends. Other clients' grabs are preserved too. */
++	if (status != GrabSuccess) { XFreeCursor(display, cursor); XCloseDisplay(display); return FALSE; }
++	/* XI2.1 provides a defined sourceid. Selecting raw events only on the
++	 * root avoids duplicate delivery through the grab mask. Relative
++	 * valuator deltas continue even at screen/window edges. */
++	memset(mask, 0, sizeof(mask)); XISetMask(mask, XI_RawMotion);
++	XIEventMask raw_events = { XIAllMasterDevices, sizeof(mask), mask };
++	XISelectEvents(display, DefaultRootWindow(display), &raw_events, 1);
++	XSelectInput(display, window, FocusChangeMask | StructureNotifyMask);
++	XSync(display, False);
++	Window query_root = None, query_child = None; double root_x = 0, root_y = 0;
++	XIButtonState buttons = {0}; XIModifierState mods = {0}; XIGroupState group = {0};
++	double last_x = 0, last_y = 0;
++	int initial_buttons = 0;
++	Bool queried = XIQueryPointer(display, device_id, window, &query_root, &query_child,
++	               &root_x, &root_y, &last_x, &last_y, &buttons, &mods, &group);
++	if (buttons.mask) {
++		for (int i = 1; i < buttons.mask_len * 8; i++)
++			if (XIMaskIsSet(buttons.mask, i)) initial_buttons |= android_button(i);
++		XFree(buttons.mask);
++	}
++	if (!queried) {
++		XIUngrabDevice(display, device_id, CurrentTime);
++		XFreeCursor(display, cursor); XCloseDisplay(display); return FALSE;
++	}
++	if (!s) {
++		s = g_new0(Capture, 1); g_ref_count_init(&s->refs); s->root = GTK_WIDGET(root);
++		g_object_set_data_full(G_OBJECT(root), CAPTURE_KEY, s, capture_destroy);
++		GtkEventController *controller = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
++		g_signal_connect(controller, "event", G_CALLBACK(suppress_normal_mouse), s);
++		gtk_widget_add_controller(GTK_WIDGET(root), controller);
++		g_signal_connect(root, "unmap", G_CALLBACK(on_unmap), s);
++		g_signal_connect(root, "notify::is-active", G_CALLBACK(on_active), s);
++		g_signal_connect_object(seat, "device-added", G_CALLBACK(on_device_added), root, G_CONNECT_SWAPPED);
++	}
++	s->generation++;
++	s->active = TRUE; s->display = display; s->window = window;
++	s->cursor = cursor; s->device_id = device_id; s->opcode = opcode;
++	s->source_id = -1; s->buttons = initial_buttons; s->warp_pending = FALSE;
++	s->last_x = last_x; s->last_y = last_y;
++	s->entry_root_x = root_x; s->entry_root_y = root_y;
++	s->event = event; s->changed = changed; s->data = data; s->destroy = destroy;
++	s->source = g_unix_fd_add(ConnectionNumber(display), G_IO_IN | G_IO_HUP | G_IO_ERR, input_ready, s);
++	/* Notify before any input callback; notification may release/reacquire. */
++	guint64 generation = s->generation;
++	capture_ref(s);
++	g_object_ref(root);
++	if (s->generation == generation && changed) changed(GTK_WIDGET(root), TRUE, data);
++	/* XIQueryPointer may already have queued input in Xlib's private buffer. */
++	if (s->generation == generation && s->display == display && XPending(display))
++		input_ready(ConnectionNumber(display), G_IO_IN, s);
++	g_object_unref(root);
++	capture_unref(s);
++	return TRUE;
++#else
++	(void)owner; (void)event; (void)changed; (void)data; (void)destroy;
++	return FALSE;
++#endif
++}
+diff --git a/src/api-impl-jni/views/PointerCapture.h b/src/api-impl-jni/views/PointerCapture.h
+new file mode 100644
+index 0000000..9d8b58a
+--- /dev/null
++++ b/src/api-impl-jni/views/PointerCapture.h
+@@ -0,0 +1,18 @@
++#ifndef ATL_POINTER_CAPTURE_H
++#define ATL_POINTER_CAPTURE_H
++#include <gtk/gtk.h>
++/* GTK-main-thread API. A successful request owns data until release and takes
++ * window-scoped capture; failed requests leave data with the caller. Events are
++ * scalar snapshots, never pointers into Xlib/GDK event storage. */
++typedef void (*AtlCapturedEvent)(GtkWidget *owner, int action, int buttons,
++                               int action_button, double dx, double dy,
++                               double raw_x, double raw_y, double scroll_x,
++                               double scroll_y, guint32 time, gpointer data);
++typedef void (*AtlCaptureChanged)(GtkWidget *root, gboolean captured, gpointer data);
++gboolean atl_pointer_capture_request(GtkWidget *owner, AtlCapturedEvent event,
++                                     AtlCaptureChanged changed, gpointer data,
++                                     GDestroyNotify destroy);
++void atl_pointer_capture_release(GtkWidget *widget);
++gboolean atl_pointer_capture_has(GtkWidget *widget);
++guint64 atl_pointer_capture_epoch(GtkWidget *widget);
++#endif
+diff --git a/src/api-impl-jni/views/android_view_View.c b/src/api-impl-jni/views/android_view_View.c
+index 8d66547..3e665f2 100644
+--- a/src/api-impl-jni/views/android_view_View.c
++++ b/src/api-impl-jni/views/android_view_View.c
+@@ -9,0 +10 @@
++#include "PointerCapture.h"
+@@ -101,0 +103,4 @@ bool view_dispatch_motionevent(JNIEnv *env, WrapperWidget *wrapper, GtkPropagati
++static jobject new_mouse_event(JNIEnv *, int, int, guint32, float, float, float, float,
++                               float, float, int, int, float, float);
++static int mouse_buttons(GdkModifierType);
++
+@@ -117 +122,24 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
+-	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor, SOURCE_TOUCHSCREEN, action, timestamp, ids, coords);
++	GdkDevice *device = gdk_event_get_device(event);
++	gboolean mouse = device && gdk_device_get_source(device) == GDK_SOURCE_MOUSE
++	    && !gdk_event_get_pointer_emulated(event) && !gdk_event_get_device_tool(event);
++	jobject motion_event;
++	if (mouse && num_pointers == 1
++	    && ((struct pointer *)g_ptr_array_index(pointer_indices, 0))->id == 1) {
++		struct pointer *p = g_ptr_array_index(pointer_indices, 0);
++		int buttons = mouse_buttons(gdk_event_get_modifier_state(event));
++		GdkEventType type = gdk_event_get_event_type(event);
++		if (type == GDK_BUTTON_PRESS || type == GDK_BUTTON_RELEASE) {
++			guint button = gdk_button_event_get_button(event);
++			int bit = button == 1 ? 1 : button == 2 ? 4 : button == 3 ? 2 : button == 8 ? 8 : button == 9 ? 16 : 0;
++			if (type == GDK_BUTTON_PRESS) buttons |= bit;
++			else buttons &= ~bit;
++		}
++		int mouse_action = action & 0xff;
++		if (mouse_action == ACTION_POINTER_DOWN) mouse_action = ACTION_DOWN;
++		if (mouse_action == ACTION_POINTER_UP) mouse_action = ACTION_UP;
++		motion_event = new_mouse_event(env, 0x2002, mouse_action, timestamp,
++		    p->coord_x, p->coord_y, p->raw_x, p->raw_y, 0, 0, buttons, 0, 0, 0);
++	} else {
++		motion_event = (*env)->NewObject(env, handle_cache.motion_event.class, handle_cache.motion_event.constructor,
++		    SOURCE_TOUCHSCREEN, action, (jlong)timestamp, ids, coords);
++	}
+@@ -119 +147 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
+-	ret = view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action);
++	ret = motion_event ? view_dispatch_motionevent(env, wrapper, phase, motion_event, event, action) : false;
+@@ -121,0 +150,2 @@ static bool call_ontouch_callback(WrapperWidget *wrapper, int action, struct poi
++	(*env)->DeleteLocalRef(env, ids);
++	(*env)->DeleteLocalRef(env, coords);
+@@ -206 +236 @@ static gboolean on_pointer_event(GtkEventControllerLegacy *event_controller, Gdk
+-			if (!(gdk_event_get_modifier_state(event) & GDK_BUTTON1_MASK))
++			if (!(gdk_event_get_modifier_state(event) & (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK)))
+@@ -318,5 +347,0 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	double x;
+-	double y;
+-	double raw_x;
+-	double raw_y;
+-
+@@ -324,2 +349 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	GdkScrollUnit scroll_unit = gtk_event_controller_scroll_get_unit(controller);
+-	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
++	if ((*env)->PushLocalFrame(env, 8) < 0) return FALSE;
+@@ -327 +351,4 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	WrapperWidget *wrapper = WRAPPER_WIDGET(widget);
++	WrapperWidget *wrapper = g_object_ref(WRAPPER_WIDGET(widget));
++	jobject view = (*env)->NewLocalRef(env, this);
++	GdkEvent *event = gtk_event_controller_get_current_event(GTK_EVENT_CONTROLLER(controller));
++	double raw_x = 0, raw_y = 0;
+@@ -329 +356 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	x = raw_x, y = raw_y;
++	double x = raw_x, y = raw_y;
+@@ -331,2 +358 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-
+-	if (scroll_unit == GDK_SCROLL_UNIT_SURFACE) {
++	if (gtk_event_controller_scroll_get_unit(controller) == GDK_SCROLL_UNIT_SURFACE) {
+@@ -336,4 +362,16 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	jobject motion_event = (*env)->NewObject(env, handle_cache.motion_event.class,
+-	                                         handle_cache.motion_event.constructor_scroll,
+-	                                         SOURCE_CLASS_POINTER, ACTION_SCROLL,
+-	                                         gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy);
++	jobject motion = new_mouse_event(env, 0x2002, ACTION_SCROLL,
++	    gdk_event_get_time(event), x, y, raw_x, raw_y, dx, -dy,
++	    mouse_buttons(gdk_event_get_modifier_state(event)), 0, 0, 0);
++	gboolean ret = FALSE;
++	if (view && motion)
++		ret = (*env)->CallBooleanMethod(env, view, handle_cache.view.dispatchGenericMotionEvent, motion);
++	gboolean failed = (*env)->ExceptionCheck(env);
++	if (failed) (*env)->ExceptionDescribe(env);
++	/* Preserve the Compose hover workaround only while the callback's view
++	 * remains attached. Native and Java references protect reentrant removal. */
++	if (!failed && view && gtk_widget_get_root(widget) && wrapper->hover_x && wrapper->hover_y)
++		call_hover_callback(view, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
++	g_object_unref(wrapper);
++	(*env)->PopLocalFrame(env, NULL);
++	return ret;
++}
+@@ -341,3 +379,13 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	gboolean ret = (*env)->CallBooleanMethod(env, this, handle_cache.view.dispatchGenericMotionEvent, motion_event);
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++/* Captured input targets the view currently focused in the window. */
++static jobject new_mouse_event(JNIEnv *env, int source, int action, guint32 time,
++                               float x, float y, float raw_x, float raw_y,
++                               float scroll_x, float scroll_y, int buttons,
++                               int action_button, float relative_x, float relative_y)
++{
++	jmethodID constructor = (*env)->GetMethodID(env, handle_cache.motion_event.class,
++	    "<init>", "(IIJFFFFFFIIFF)V");
++	if (!constructor) return NULL;
++	return (*env)->NewObject(env, handle_cache.motion_event.class, constructor,
++	    source, action, (jlong)time, x, y, raw_x, raw_y, scroll_x, scroll_y,
++	    buttons, action_button, relative_x, relative_y);
++}
+@@ -345,3 +393,22 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	// HACK: replay last hover event to work around scrolling issues in composeUI apps
+-	if (wrapper->hover_x && wrapper->hover_y)
+-		call_hover_callback(this, ACTION_HOVER_MOVE, wrapper->hover_x, wrapper->hover_y, wrapper->hover_x, wrapper->hover_y);
++static void captured_event(GtkWidget *focused, int action, int buttons, int button,
++                           double dx, double dy, double raw_x, double raw_y,
++                           double scroll_x, double scroll_y, guint32 time, gpointer data)
++{
++	(void)data; (void)raw_x; (void)raw_y;
++	while (focused && !WRAPPER_IS_WIDGET(focused)) focused = gtk_widget_get_parent(focused);
++	if (!focused) return;
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return;
++	jobject view = (*env)->NewLocalRef(env, WRAPPER_WIDGET(focused)->jobj);
++	if (view) {
++		jobject event = new_mouse_event(env, 0x20004, action, time,
++		    dx, dy, dx, dy, scroll_x, scroll_y, buttons, button, dx, dy);
++		if (event) {
++			jmethodID dispatch = (*env)->GetMethodID(env, handle_cache.view.class,
++			    "dispatchCapturedPointerEvent", "(Landroid/view/MotionEvent;)Z");
++			if (dispatch) (*env)->CallBooleanMethod(env, view, dispatch, event);
++		}
++	}
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++}
+@@ -349 +416,134 @@ static gboolean scroll_cb(GtkEventControllerScroll *controller, gdouble dx, gdou
+-	return ret;
++static void collect_capture_views(GtkWidget *widget, GPtrArray *views)
++{
++	if (WRAPPER_IS_WIDGET(widget)) g_ptr_array_add(views, g_object_ref(widget));
++	for (GtkWidget *child = gtk_widget_get_first_child(widget); child; child = gtk_widget_get_next_sibling(child))
++		collect_capture_views(child, views);
++}
++
++static void capture_changed(GtkWidget *root, gboolean captured, gpointer data)
++{
++	(void)data;
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return;
++	jmethodID dispatch = (*env)->GetMethodID(env, handle_cache.view.class,
++	    "dispatchPointerCaptureChanged", "(Z)V");
++	g_object_ref(root);
++	guint64 epoch = atl_pointer_capture_epoch(root);
++	GPtrArray *views = g_ptr_array_new_with_free_func(g_object_unref);
++	/* Snapshot before callbacks: a callback may detach/destroy descendants. */
++	collect_capture_views(root, views);
++	for (guint i = 0; dispatch && i < views->len; i++) {
++		if (atl_pointer_capture_epoch(root) != epoch) break;
++		WrapperWidget *wrapper = g_ptr_array_index(views, i);
++		jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
++		if (view) {
++			(*env)->CallVoidMethod(env, view, dispatch, (jboolean)captured);
++			(*env)->DeleteLocalRef(env, view);
++			if ((*env)->ExceptionCheck(env)) break;
++		}
++	}
++	g_ptr_array_unref(views);
++	g_object_unref(root);
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++}
++
++JNIEXPORT void JNICALL Java_android_view_View_nativeRequestPointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
++	/* Even if the server already released its implicit grab, an ordinary
++	 * Java touch sequence may still await its queued UP/CANCEL. Preserve
++	 * that stream before switching event ownership. */
++	if (pointer_indices && pointer_indices->len) return;
++	atl_pointer_capture_request(wrapper, captured_event, capture_changed, NULL, NULL);
++}
++JNIEXPORT void JNICALL Java_android_view_View_nativeReleasePointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	atl_pointer_capture_release(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
++}
++JNIEXPORT jboolean JNICALL Java_android_view_View_nativeHasPointerCapture(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	return atl_pointer_capture_has(gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr))));
++}
++
++static int mouse_buttons(GdkModifierType state)
++{
++	return ((state & GDK_BUTTON1_MASK) ? 1 : 0)
++	     | ((state & GDK_BUTTON3_MASK) ? 2 : 0)
++	     | ((state & GDK_BUTTON2_MASK) ? 4 : 0);
++}
++
++static gboolean generic_mouse_event(GtkEventControllerLegacy *controller, GdkEvent *event, gpointer data)
++{
++	(void)controller;
++	WrapperWidget *wrapper = data;
++	GdkEventType type = gdk_event_get_event_type(event);
++	if (type != GDK_MOTION_NOTIFY && type != GDK_BUTTON_PRESS && type != GDK_BUTTON_RELEASE) return FALSE;
++	GtkPropagationPhase phase = gtk_event_controller_get_propagation_phase(GTK_EVENT_CONTROLLER(controller));
++	if (type == GDK_MOTION_NOTIFY && phase != GTK_PHASE_BUBBLE) return FALSE;
++	if (type != GDK_MOTION_NOTIFY && phase != GTK_PHASE_CAPTURE) return FALSE;
++	GdkDevice *device = gdk_event_get_device(event);
++	if (!device || gdk_device_get_source(device) != GDK_SOURCE_MOUSE
++	    || gdk_event_get_pointer_emulated(event) || gdk_event_get_device_tool(event)) return FALSE;
++	if (atl_pointer_capture_has(GTK_WIDGET(wrapper))) return TRUE;
++	double raw_x, raw_y;
++	if (!gdk_event_get_position(event, &raw_x, &raw_y)) return FALSE;
++	double x = raw_x, y = raw_y;
++	transform_coords_to_widget_relative(GTK_WIDGET(wrapper), &x, &y);
++	int buttons = mouse_buttons(gdk_event_get_modifier_state(event));
++	int button = 0;
++	/* Ordinary mouse drag MOVE belongs to the touch path. Generic mouse
++	 * motion is hover; button transitions and scroll use the generic path. */
++	if (type == GDK_MOTION_NOTIFY && buttons) return FALSE;
++	int action = ACTION_HOVER_MOVE;
++	if (type != GDK_MOTION_NOTIFY) {
++		switch (gdk_button_event_get_button(event)) {
++		case 1: button = 1; break;
++		case 2: button = 4; break;
++		case 3: button = 2; break;
++		case 8: button = 8; break;
++		case 9: button = 16; break;
++		default: return FALSE;
++		}
++		if (type == GDK_BUTTON_PRESS) { buttons |= button; action = 11; }
++		else { buttons &= ~button; action = 12; }
++	}
++	JNIEnv *env = get_jni_env();
++	if ((*env)->PushLocalFrame(env, 8) < 0) return FALSE;
++	jobject view = (*env)->NewLocalRef(env, wrapper->jobj);
++	jobject motion = new_mouse_event(env, 0x2002, action, gdk_event_get_time(event),
++	    x, y, raw_x, raw_y, 0, 0, buttons, button, 0, 0);
++	gboolean handled = FALSE;
++	if (view && motion) handled = (*env)->CallBooleanMethod(env, view, handle_cache.view.dispatchGenericMotionEvent, motion);
++	if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++	(*env)->PopLocalFrame(env, NULL);
++	/* Mouse DOWN/UP must also complete the ordinary touch sequence. */
++	return type == GDK_MOTION_NOTIFY ? handled : FALSE;
++}
++
++JNIEXPORT void JNICALL Java_android_view_View_nativeSetOnGenericMotionListener(JNIEnv *env, jobject this, jlong widget_ptr)
++{
++	(void)env; (void)this;
++	GtkWidget *wrapper = gtk_widget_get_parent(GTK_WIDGET(_PTR(widget_ptr)));
++	if (!g_object_get_data(G_OBJECT(wrapper), "atl-generic-mouse")) {
++		GtkEventController *controller = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(controller, GTK_PHASE_CAPTURE);
++		g_signal_connect(controller, "event", G_CALLBACK(generic_mouse_event), wrapper);
++		gtk_widget_add_controller(wrapper, controller);
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-mouse", controller);
++		/* Hover bubbles from the target, so an ancestor listener cannot
++		 * preempt the child's normal generic-pointer delivery. */
++		GtkEventController *hover = gtk_event_controller_legacy_new();
++		gtk_event_controller_set_propagation_phase(hover, GTK_PHASE_BUBBLE);
++		g_signal_connect(hover, "event", G_CALLBACK(generic_mouse_event), wrapper);
++		gtk_widget_add_controller(wrapper, hover);
++	}
++	if (!g_object_get_data(G_OBJECT(wrapper), "atl-generic-scroll")) {
++		GtkEventController *controller = gtk_event_controller_scroll_new(GTK_EVENT_CONTROLLER_SCROLL_BOTH_AXES);
++		g_signal_connect(controller, "scroll", G_CALLBACK(scroll_cb), WRAPPER_WIDGET(wrapper)->jobj);
++		gtk_widget_add_controller(wrapper, controller);
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-scroll", controller);
++	}
+@@ -631,0 +832 @@ JNIEXPORT jlong JNICALL Java_android_view_View_native_1constructor(JNIEnv *env,
++		g_object_set_data(G_OBJECT(wrapper), "atl-generic-scroll", controller);
+diff --git a/src/api-impl/android/view/InputDevice.java b/src/api-impl/android/view/InputDevice.java
+index 535d3b1..66852a6 100644
+--- a/src/api-impl/android/view/InputDevice.java
++++ b/src/api-impl/android/view/InputDevice.java
+@@ -6,0 +7,4 @@ public class InputDevice {
++	public static final int SOURCE_CLASS_TRACKBALL = 0x00000004;
++	public static final int SOURCE_MOUSE = 0x00002002;
++	public static final int SOURCE_MOUSE_RELATIVE = 0x00020004;
++
+diff --git a/src/api-impl/android/view/MotionEvent.java b/src/api-impl/android/view/MotionEvent.java
+index e3aa0c8..836f6ef 100644
+--- a/src/api-impl/android/view/MotionEvent.java
++++ b/src/api-impl/android/view/MotionEvent.java
+@@ -1372,0 +1373,11 @@ public final class MotionEvent extends InputEvent {
++	public static final int AXIS_RELATIVE_X = 27;
++	public static final int AXIS_RELATIVE_Y = 28;
++	public static final int ACTION_BUTTON_PRESS = 11;
++	public static final int ACTION_BUTTON_RELEASE = 12;
++
++	private boolean mouseMetadata;
++	private int buttonState;
++	private int actionButton;
++	private float relativeX;
++	private float relativeY;
++
+@@ -1395,0 +1407,13 @@ public final class MotionEvent extends InputEvent {
++	/* Snapshot constructor used by the GTK/X11 mouse bridge. No native event
++	 * memory is retained by Java or by an event copied with obtain(). */
++	public MotionEvent(int source, int action, long eventTime, float x, float y,
++	                   float rawX, float rawY, float scrollX, float scrollY,
++	                   int buttonState, int actionButton, float relativeX, float relativeY) {
++		this(source, action, eventTime, x, y, rawX, rawY, scrollX, scrollY);
++		this.mouseMetadata = true;
++		this.buttonState = buttonState;
++		this.actionButton = actionButton;
++		this.relativeX = relativeX;
++		this.relativeY = relativeY;
++	}
++
+@@ -1428,0 +1453,4 @@ public final class MotionEvent extends InputEvent {
++		ev.source = 0;
++		ev.mouseMetadata = false;
++		ev.buttonState = ev.actionButton = 0;
++		ev.relativeX = ev.relativeY = ev.scroll_dx = ev.scroll_dy = 0;
+@@ -1668,0 +1697,7 @@ public final class MotionEvent extends InputEvent {
++		ev.mouseMetadata = other.mouseMetadata;
++		ev.buttonState = other.buttonState;
++		ev.actionButton = other.actionButton;
++		ev.relativeX = other.relativeX;
++		ev.relativeY = other.relativeY;
++		ev.scroll_dx = other.scroll_dx;
++		ev.scroll_dy = other.scroll_dy;
+@@ -1981,0 +2017,4 @@ public final class MotionEvent extends InputEvent {
++		if (axis == AXIS_X) return getX();
++		if (axis == AXIS_Y) return getY();
++		if (axis == AXIS_RELATIVE_X) return relativeX;
++		if (axis == AXIS_RELATIVE_Y) return relativeY;
+@@ -2024 +2063 @@ public final class MotionEvent extends InputEvent {
+-		return 0x1; // TOOL_TYPE_FINGER
++		return mouseMetadata ? TOOL_TYPE_MOUSE : TOOL_TYPE_FINGER; // GTK event tool
+@@ -2209,0 +2249 @@ public final class MotionEvent extends InputEvent {
++		if (pointerIndex == 0) return getAxisValue(axis);
+@@ -2271,0 +2312,2 @@ public final class MotionEvent extends InputEvent {
++	public final int getActionButton() { return actionButton; }
++
+@@ -2272,0 +2315 @@ public final class MotionEvent extends InputEvent {
++		if (mouseMetadata) return buttonState;
+diff --git a/src/api-impl/android/view/View.java b/src/api-impl/android/view/View.java
+index 8e9679a..50721d2 100644
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -699 +699,5 @@ public class View implements Drawable.Callback {
+-		// TODO
++		boolean onGenericMotion(View v, MotionEvent event);
++	}
++
++	public interface OnCapturedPointerListener {
++		boolean onCapturedPointer(View v, MotionEvent event);
+@@ -1509 +1513,32 @@ public class View implements Drawable.Callback {
+-	public void setOnGenericMotionListener(View.OnGenericMotionListener l) {}
++	private OnGenericMotionListener on_generic_motion_listener;
++	private OnCapturedPointerListener on_captured_pointer_listener;
++
++	public void setOnGenericMotionListener(OnGenericMotionListener l) {
++		on_generic_motion_listener = l;
++		nativeSetOnGenericMotionListener(widget);
++	}
++	private native void nativeSetOnGenericMotionListener(long widget);
++
++	public void setOnCapturedPointerListener(OnCapturedPointerListener l) {
++		on_captured_pointer_listener = l;
++	}
++
++	public void requestPointerCapture() { nativeRequestPointerCapture(widget); }
++	public void releasePointerCapture() { nativeReleasePointerCapture(widget); }
++	public boolean hasPointerCapture() { return nativeHasPointerCapture(widget); }
++	private native void nativeRequestPointerCapture(long widget);
++	private native void nativeReleasePointerCapture(long widget);
++	private native boolean nativeHasPointerCapture(long widget);
++
++	public void onPointerCaptureChange(boolean hasCapture) {}
++	public void dispatchPointerCaptureChanged(boolean hasCapture) {
++		onPointerCaptureChange(hasCapture);
++	}
++
++	public boolean onCapturedPointerEvent(MotionEvent event) { return false; }
++	public boolean dispatchCapturedPointerEvent(MotionEvent event) {
++		if (!hasPointerCapture()) return false;
++		if (on_captured_pointer_listener != null
++		    && on_captured_pointer_listener.onCapturedPointer(this, event)) return true;
++		return onCapturedPointerEvent(event);
++	}
+@@ -1880,0 +1916,2 @@ public class View implements Drawable.Callback {
++		if (isEnabled() && on_generic_motion_listener != null
++		    && on_generic_motion_listener.onGenericMotion(this, event)) return true;
+diff --git a/src/api-impl/android/view/Display.java b/src/api-impl/android/view/Display.java
+index 01d86ee..c7edae8 100644
+--- a/src/api-impl/android/view/Display.java
++++ b/src/api-impl/android/view/Display.java
+@@ -46,0 +47,5 @@ public final class Display {
++	public float[] getSupportedRefreshRates() {
++		// ATL currently exposes one virtual window configuration.
++		return new float[] {getRefreshRate()};
++	}
++
+diff --git a/src/api-impl-jni/app/android_app_Activity.c b/src/api-impl-jni/app/android_app_Activity.c
+index 47f7eff..032ab9c 100644
+--- a/src/api-impl-jni/app/android_app_Activity.c
++++ b/src/api-impl-jni/app/android_app_Activity.c
+@@ -14,0 +15 @@ static jobject activity_current = NULL;
++static guint64 activity_revision;
+@@ -18,5 +19,2 @@ static void activity_close(JNIEnv *env, jobject activity)
+-	// in case some exception was left unhandled in native code, print it here so we don't confuse it with an exception thrown by onDestroy
+-	if ((*env)->ExceptionCheck(env)) {
+-		fprintf(stderr, "activity.onDestroy: seems there was a pending exception... :");
+-		(*env)->ExceptionDescribe(env);
+-	}
++	if ((*env)->ExceptionCheck(env))
++		return;
+@@ -27 +25 @@ static void activity_close(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -31,0 +30 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -35 +34 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-			(*env)->ExceptionDescribe(env);
++			return;
+@@ -36,0 +36 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
++	if (_GET_BOOL_FIELD(activity, "destroyed")) return;
+@@ -40 +40,2 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
++	if (_GET_BOOL_FIELD(activity, "destroyed")) return;
+@@ -44 +45 @@ static void activity_unfocus(JNIEnv *env, jobject activity)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -48,0 +50,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
++	if ((*env)->ExceptionCheck(env)) return;
++	guint64 revision = activity_revision;
+@@ -53,2 +56,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -59,2 +62,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -65,2 +68,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -71,2 +74,2 @@ static void activity_focus(JNIEnv *env, jobject activity)
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
++	if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++		return;
+@@ -77,5 +80,13 @@ static void activity_update_current(JNIEnv *env)
+-	jobject activity_new = activity_backlog ? g_list_first(activity_backlog)->data : NULL;
+-
+-	if (activity_current != activity_new) {
+-		if (activity_current)
+-			activity_unfocus(env, activity_current);
++	if ((*env)->ExceptionCheck(env)) return;
++	jobject head = activity_backlog ? activity_backlog->data : NULL;
++
++	if (activity_current != head) {
++		guint64 revision = activity_revision;
++		jobject previous = activity_current ? (*env)->NewLocalRef(env, activity_current) : NULL;
++		if ((*env)->ExceptionCheck(env)) return;
++		jobject next = head ? (*env)->NewLocalRef(env, head) : NULL;
++		if ((*env)->ExceptionCheck(env)) {
++			if (previous) (*env)->DeleteLocalRef(env, previous);
++			return;
++		}
++		// Callbacks may finish/start activities recursively: detach before calling app code.
+@@ -83,4 +94,4 @@ static void activity_update_current(JNIEnv *env)
+-
+-		if (activity_new)
+-			activity_focus(env, activity_new);
+-		if (activity_new && _GET_BOOL_FIELD(activity_new, "finishing"))
++		if (previous) activity_unfocus(env, previous);
++		if (previous) (*env)->DeleteLocalRef(env, previous);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision || activity_current) {
++			if (next) (*env)->DeleteLocalRef(env, next);
+@@ -87,0 +99 @@ static void activity_update_current(JNIEnv *env)
++		}
+@@ -89 +101,15 @@ static void activity_update_current(JNIEnv *env)
+-		activity_current = activity_new;
++		if (next) activity_focus(env, next);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision || activity_current) {
++			if (next) (*env)->DeleteLocalRef(env, next);
++			return;
++		}
++		if (next && _GET_BOOL_FIELD(next, "finishing")) {
++			(*env)->DeleteLocalRef(env, next);
++			return;
++		}
++		if (next) {
++			// Publish only a still-live backlog reference, never the temporary local pin.
++			if (activity_backlog && (*env)->IsSameObject(env, next, activity_backlog->data))
++				activity_current = activity_backlog->data;
++			(*env)->DeleteLocalRef(env, next);
++		}
+@@ -93,0 +120 @@ static void activity_update_current(JNIEnv *env)
++		if ((*env)->ExceptionCheck(env)) return;
+@@ -95,2 +122,2 @@ static void activity_update_current(JNIEnv *env)
+-		if ((*env)->ExceptionCheck(env))
+-			(*env)->ExceptionDescribe(env);
++		(*env)->DeleteLocalRef(env, current_activity_class);
++		if ((*env)->ExceptionCheck(env)) return;
+@@ -108,0 +136 @@ void activity_window_ready(void)
++	guint64 revision = activity_revision;
+@@ -112,2 +140,2 @@ void activity_window_ready(void)
+-		if ((*env)->ExceptionCheck(env))
+-			(*env)->ExceptionDescribe(env);
++		if ((*env)->ExceptionCheck(env) || revision != activity_revision)
++			return;
+@@ -143,0 +172 @@ void activity_close_all(void)
++	activity_revision++;
+@@ -162,2 +191,3 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-	if (activity_current)
+-		activity_unfocus(env, activity_current);
++	if ((*env)->ExceptionCheck(env)) return;
++	jobject previous = activity_current ? (*env)->NewLocalRef(env, activity_current) : NULL;
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -164,0 +195,3 @@ void activity_start(JNIEnv *env, jobject activity_object)
++	if (previous) activity_unfocus(env, previous);
++	if (previous) (*env)->DeleteLocalRef(env, previous);
++	if ((*env)->ExceptionCheck(env)) return;
+@@ -168 +201 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-		(*env)->ExceptionDescribe(env);
++		return;
+@@ -174,5 +207,4 @@ void activity_start(JNIEnv *env, jobject activity_object)
+-	(*env)->CallVoidMethod(env, activity_object, handle_cache.activity.onPostCreate, NULL);
+-	if ((*env)->ExceptionCheck(env))
+-		(*env)->ExceptionDescribe(env);
+-
+-	activity_backlog = g_list_prepend(activity_backlog, _REF(activity_object));
++	jobject reference = _REF(activity_object);
++	if ((*env)->ExceptionCheck(env) || !reference) return;
++	activity_backlog = g_list_prepend(activity_backlog, reference);
++	activity_revision++;
+@@ -190,0 +223 @@ JNIEXPORT void JNICALL Java_android_app_Activity_nativeFinish(JNIEnv *env, jobje
++			activity_revision++;
+@@ -217,0 +251 @@ JNIEXPORT jboolean JNICALL Java_android_app_Activity_nativeResumeActivity(JNIEnv
++				activity_revision++;
+diff --git a/src/api-impl-jni/handle_cache.c b/src/api-impl-jni/handle_cache.c
+index f3534db..1c658c7 100644
+--- a/src/api-impl-jni/handle_cache.c
++++ b/src/api-impl-jni/handle_cache.c
+@@ -10 +10 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onCreate = _METHOD(handle_cache.activity.class, "onCreate", "(Landroid/os/Bundle;)V");
++	handle_cache.activity.onCreate = _METHOD(handle_cache.activity.class, "performCreate", "(Landroid/os/Bundle;)V");
+@@ -12 +12 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onStart = _METHOD(handle_cache.activity.class, "onStart", "()V");
++	handle_cache.activity.onStart = _METHOD(handle_cache.activity.class, "performStart", "()V");
+@@ -14 +14 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onResume = _METHOD(handle_cache.activity.class, "onResume", "()V");
++	handle_cache.activity.onResume = _METHOD(handle_cache.activity.class, "performResume", "()V");
+@@ -16,3 +16,3 @@ void set_up_handle_cache(JNIEnv *env)
+-	handle_cache.activity.onDestroy = _METHOD(handle_cache.activity.class, "onDestroy", "()V");
+-	handle_cache.activity.onStop = _METHOD(handle_cache.activity.class, "onStop", "()V");
+-	handle_cache.activity.onPause = _METHOD(handle_cache.activity.class, "onPause", "()V");
++	handle_cache.activity.onDestroy = _METHOD(handle_cache.activity.class, "performDestroy", "()V");
++	handle_cache.activity.onStop = _METHOD(handle_cache.activity.class, "performStop", "()V");
++	handle_cache.activity.onPause = _METHOD(handle_cache.activity.class, "performPause", "()V");
+diff --git a/src/api-impl/android/app/Activity.java b/src/api-impl/android/app/Activity.java
+index b613d86..ad4f35e 100644
+--- a/src/api-impl/android/app/Activity.java
++++ b/src/api-impl/android/app/Activity.java
+@@ -54,0 +55,5 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++	List<FragmentTransaction> pendingFragmentTransactions = new ArrayList<>();
++	int fragmentState = 0;
++	private Bundle fragmentSavedState;
++	private boolean postCreated;
++	private boolean fragmentTransactionsScheduled;
+@@ -146,0 +152,81 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++	/* Framework boundaries keep fragment notifications outside app overrides. */
++	final void performCreate(Bundle state) {
++		if (destroyed) return;
++		fragmentSavedState = state;
++		onCreate(state);
++		if (finishing || destroyed) return;
++		dispatchFragmentState(2, state);
++	}
++
++	final void performStart() {
++		if (destroyed) return;
++		getFragmentManager().executePendingTransactions();
++		onStart();
++		if (finishing || destroyed) return;
++		dispatchFragmentState(3, fragmentSavedState);
++		if (finishing || destroyed) return;
++		if (!postCreated) {
++			postCreated = true;
++			onPostCreate(fragmentSavedState);
++		}
++	}
++
++	final void performResume() {
++		if (destroyed) return;
++		onResume();
++		if (finishing || destroyed) return;
++		dispatchFragmentState(4, fragmentSavedState);
++	}
++
++	final void performPause() {
++		if (destroyed) return;
++		dispatchFragmentState(3, fragmentSavedState);
++		if (destroyed) return;
++		onPause();
++	}
++
++	final void performStop() {
++		if (destroyed) return;
++		dispatchFragmentState(2, fragmentSavedState);
++		if (destroyed) return;
++		onStop();
++	}
++
++	final void performDestroy() {
++		if (destroyed) return;
++		destroyed = true;
++		pendingFragmentTransactions.clear();
++		dispatchFragmentState(-1, fragmentSavedState);
++		onDestroy();
++	}
++
++	private void dispatchFragmentState(int state, Bundle savedState) {
++		if (destroyed && state != -1) return;
++		fragmentState = state;
++		fragmentSavedState = savedState;
++		getFragmentManager().executePendingTransactions();
++	}
++
++	void scheduleFragmentTransactions() {
++		if (fragmentTransactionsScheduled) return;
++		fragmentTransactionsScheduled = true;
++		postFragmentTransactionDrain(new Runnable() {
++			@Override public void run() {
++				fragmentTransactionsScheduled = false;
++				if (!destroyed) getFragmentManager().executePendingTransactions();
++			}
++		});
++	}
++
++	void postFragmentTransactionDrain(Runnable drain) {
++		new Handler(Looper.getMainLooper()).post(drain);
++	}
++
++	boolean dispatchFragments() {
++		boolean changed = false;
++		for (Fragment fragment : new ArrayList<>(fragments)) {
++			changed |= fragment.moveToState(fragmentState, fragmentSavedState);
++		}
++		return changed;
++	}
++
+@@ -150,3 +236 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onCreate(savedInstanceState);
+-		}
++		dispatchFragmentState(1, savedInstanceState);
+@@ -167,4 +250,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onStart();
+-		}
+-
+@@ -183,4 +262,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onResume();
+-		}
+-
+@@ -199,4 +274,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onPause();
+-		}
+-
+@@ -210,4 +281,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onStop();
+-		}
+-
+@@ -220,4 +287,0 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
+-		for (Fragment fragment : fragments) {
+-			fragment.onDestroy();
+-		}
+-
+diff --git a/src/api-impl/android/app/Fragment.java b/src/api-impl/android/app/Fragment.java
+index 2922c10..09c2f6e 100644
+--- a/src/api-impl/android/app/Fragment.java
++++ b/src/api-impl/android/app/Fragment.java
+@@ -7,0 +8,2 @@ public class Fragment {
++	String tag;
++	private int state;
+@@ -11,0 +14,3 @@ public class Fragment {
++	public void onActivityCreated(Bundle savedInstanceState) {
++	}
++
+@@ -26,0 +32,30 @@ public class Fragment {
++	boolean moveToState(int target, Bundle savedState) {
++		boolean changed = false;
++		while (state != -1) {
++			// Reentrant callbacks may change the host state: follow its current state.
++			target = activity.fragmentState;
++			if (state == target || (activity.isFinishing() && target > state)) break;
++			changed = true;
++			if (state < target) {
++				switch (++state) {
++				case 1: onCreate(savedState); break;
++				case 2: onActivityCreated(savedState); break;
++				case 3: onStart(); break;
++				case 4: onResume(); break;
++				default: throw new IllegalStateException("Invalid fragment state");
++				}
++			} else if (state == 4) {
++				state = 3;
++				onPause();
++			} else if (state == 3) {
++				state = 2;
++				onStop();
++			} else {
++				boolean wasCreated = state > 0;
++				state = -1;
++				if (wasCreated) onDestroy();
++			}
++		}
++		return changed;
++	}
++
+diff --git a/src/api-impl/android/app/FragmentManager.java b/src/api-impl/android/app/FragmentManager.java
+index 0a14d3c..a5520b7 100644
+--- a/src/api-impl/android/app/FragmentManager.java
++++ b/src/api-impl/android/app/FragmentManager.java
+@@ -11,0 +12,3 @@ public class FragmentManager {
++		for (Fragment fragment : activity.fragments) {
++			if (tag == null ? fragment.tag == null : tag.equals(fragment.tag)) return fragment;
++		}
+@@ -20 +23,7 @@ public class FragmentManager {
+-		return false;
++		boolean changed = false;
++		while (!activity.pendingFragmentTransactions.isEmpty()) {
++			FragmentTransaction transaction = activity.pendingFragmentTransactions.remove(0);
++			transaction.execute();
++			changed = true;
++		}
++		return activity.dispatchFragments() | changed;
+diff --git a/src/api-impl/android/app/FragmentTransaction.java b/src/api-impl/android/app/FragmentTransaction.java
+index 91d2a62..1e3542e 100644
+--- a/src/api-impl/android/app/FragmentTransaction.java
++++ b/src/api-impl/android/app/FragmentTransaction.java
+@@ -3 +3,2 @@ package android.app;
+-public class FragmentTransaction {
++import java.util.ArrayList;
++import java.util.List;
+@@ -5 +6,5 @@ public class FragmentTransaction {
+-	private Activity activity;
++public class FragmentTransaction {
++	private final Activity activity;
++	private final List<Fragment> additions = new ArrayList<>();
++	private final List<String> tags = new ArrayList<>();
++	private boolean committed;
+@@ -11,3 +16,4 @@ public class FragmentTransaction {
+-	public FragmentTransaction add(Fragment fragment, String string) {
+-		fragment.activity = activity;
+-		activity.fragments.add(fragment);
++	public FragmentTransaction add(Fragment fragment, String tag) {
++		if (committed) throw new IllegalStateException("Transaction already committed");
++		additions.add(fragment);
++		tags.add(tag);
+@@ -17,0 +24,5 @@ public class FragmentTransaction {
++		if (committed) throw new IllegalStateException("Transaction already committed");
++		if (activity.destroyed) throw new IllegalStateException("Activity has been destroyed");
++		committed = true;
++		activity.pendingFragmentTransactions.add(this);
++		activity.scheduleFragmentTransactions();
+@@ -19,0 +31,12 @@ public class FragmentTransaction {
++
++	void execute() {
++		for (int i = 0; i < additions.size(); i++) {
++			Fragment fragment = additions.get(i);
++			if (fragment.activity != null || activity.fragments.contains(fragment)) {
++				throw new IllegalStateException("Fragment already added");
++			}
++			fragment.activity = activity;
++			fragment.tag = tags.get(i);
++			activity.fragments.add(fragment);
++		}
++	}
+diff --git a/src/api-impl/android/app/Instrumentation.java b/src/api-impl/android/app/Instrumentation.java
+index 0f56d07..8f5dd6e 100644
+--- a/src/api-impl/android/app/Instrumentation.java
++++ b/src/api-impl/android/app/Instrumentation.java
+@@ -155 +155 @@ public class Instrumentation {
+-				activity.onCreate(savedState);
++				activity.performCreate(savedState);
+diff --git a/src/api-impl/android/app/Activity.java b/src/api-impl/android/app/Activity.java
+index ad4f35e..24b06c4 100644
+--- a/src/api-impl/android/app/Activity.java
++++ b/src/api-impl/android/app/Activity.java
+@@ -163,0 +164 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++		if (finishing || destroyed) return;
+@@ -175,0 +177,2 @@ public class Activity extends ContextThemeWrapper implements Window.Callback, La
++		getFragmentManager().executePendingTransactions();
++		if (finishing || destroyed) return;
+diff --git a/src/api-impl/android/webkit/ValueCallback.java b/src/api-impl/android/webkit/ValueCallback.java
+--- a/src/api-impl/android/webkit/ValueCallback.java
++++ b/src/api-impl/android/webkit/ValueCallback.java
+@@ -3 +3,3 @@
+-public class ValueCallback {}
++public interface ValueCallback<T> {
++	void onReceiveValue(T value);
++}
+diff --git a/src/api-impl/android/webkit/CookieManager.java b/src/api-impl/android/webkit/CookieManager.java
+--- a/src/api-impl/android/webkit/CookieManager.java
++++ b/src/api-impl/android/webkit/CookieManager.java
+@@ -4 +4 @@
+-import android.content.Context;
++import android.os.Handler;
+@@ -7,0 +8,2 @@
++	private static final CookieManager INSTANCE = new CookieManager();
++	private volatile boolean acceptCookies = true;
+@@ -20 +22 @@
+-		return new CookieManager();
++		return INSTANCE;
+@@ -33 +35,3 @@
+-	public void flush() {}
++	public void flush() {
++		if (!nativeFlush()) throw new IllegalStateException("Unable to persist cookies");
++	}
+@@ -36 +40 @@
+-		return "";
++		return nativeGetCookie(url);
+@@ -39 +43,3 @@
+-	public void setCookie(String url, String value) {}
++	public void setCookie(String url, String value) {
++		nativeSetCookie(url, value);
++	}
+@@ -41 +47,10 @@
+-	public void setAcceptCookie(boolean accept) {}
++	public void setCookie(String url, String value, final ValueCallback<Boolean> callback) {
++		// A nonnull callback requires the caller's Looper before the store changes.
++		final Handler handler = callback == null ? null : new Handler();
++		final boolean accepted = nativeSetCookie(url, value);
++		if (handler != null) {
++			handler.post(new Runnable() {
++				@Override public void run() { callback.onReceiveValue(accepted); }
++			});
++		}
++	}
+@@ -42,0 +58,8 @@
++	public void setAcceptCookie(boolean accept) { acceptCookies = accept; }
++
++	public boolean acceptCookie() { return acceptCookies; }
++
++	private static native boolean nativeSetCookie(String url, String value);
++	private static native String nativeGetCookie(String url);
++	private static native boolean nativeFlush();
++
+--- a/meson.build
++++ b/meson.build
+@@ -156,0 +157 @@
++                                                                        'src/api-impl-jni/widgets/android_webkit_CookieManager.c',
+@@ -188 +189 @@
+-                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
++                                                                  	dependency('libportal'), dependency('sqlite3'), dependency('libsoup-3.0'), dependency('libavcodec', version: '>=59'), dependency('libdrm'),
+--- /dev/null
++++ b/src/api-impl-jni/widgets/android_webkit_CookieManager.c
+@@ -0,0 +1,404 @@
++#define _GNU_SOURCE
++#include <errno.h>
++#include <fcntl.h>
++#include <limits.h>
++#include <libsoup/soup.h>
++#include <sqlite3.h>
++#include <string.h>
++#include <sys/stat.h>
++#include <unistd.h>
++
++#include "../generated_headers/android_webkit_CookieManager.h"
++
++/* The launcher's app directory remains owned by the launcher. */
++extern char *get_app_data_dir(void);
++
++typedef struct {
++	SoupCookieJar *jar;
++	sqlite3 *database;
++} AtlCookieStore;
++
++/* No jar or SQLite operation, including lazy initialization, escapes this lock.
++ * This is the manual CookieManager store. Enabled WebViews use a separate
++ * WebKit network process; their cookie sharing is not implemented here. */
++static GMutex cookie_store_mutex;
++static AtlCookieStore cookie_store;
++
++static const char cookie_schema[] =
++	"CREATE TABLE IF NOT EXISTS atl_cookies_v1 ("
++	"name TEXT NOT NULL, value TEXT NOT NULL, domain TEXT NOT NULL,"
++	"path TEXT NOT NULL, expires INTEGER, secure INTEGER NOT NULL,"
++	"http_only INTEGER NOT NULL, same_site INTEGER NOT NULL,"
++	"PRIMARY KEY (name, domain, path))";
++
++static void cookie_changed(SoupCookieJar *jar, SoupCookie *old_cookie,
++		SoupCookie *new_cookie, gpointer changed)
++{
++	/* Soup emits this synchronously under its own mutex. Do not reenter it,
++	 * invoke Java, or query any jar state from this observer. */
++	(void)jar;
++	(void)old_cookie;
++	(void)new_cookie;
++	*(gboolean *)changed = TRUE;
++}
++
++static gboolean cookie_is_expired(SoupCookie *cookie)
++{
++	GDateTime *expires = soup_cookie_get_expires(cookie);
++	return expires && g_date_time_to_unix(expires) <= g_get_real_time() / G_USEC_PER_SEC;
++}
++
++static gboolean jar_add_checked(SoupCookieJar *jar, SoupCookie *cookie, GUri *uri)
++{
++	gboolean changed = FALSE;
++	gulong observer = g_signal_connect(jar, "changed", G_CALLBACK(cookie_changed), &changed);
++	/* This call consumes cookie on both acceptance and rejection. */
++	soup_cookie_jar_add_cookie_full(jar, cookie, uri, NULL);
++	g_signal_handler_disconnect(jar, observer);
++	return changed;
++}
++
++static gboolean valid_expired_deletion(SoupCookieJar *jar, SoupCookie *cookie, GUri *uri)
++{
++	/* An already absent cookie has no changed signal when deleted. Check its
++	 * acceptance in an isolated copy of the actual jar with expiration moved
++	 * forward. Retain all dated existing cookies: they still protect their
++	 * identities from insecure overwrite until the real jar removes them.
++	 * Soup performs the same public suffix, prefix, SameSite and origin checks. */
++	SoupCookieJar *validation = soup_cookie_jar_new();
++	GSList *cookies = soup_cookie_jar_all_cookies(jar);
++	for (GSList *item = cookies; item; item = item->next) {
++		SoupCookie *existing = item->data;
++		if (soup_cookie_get_expires(existing))
++			soup_cookie_set_max_age(existing, SOUP_COOKIE_MAX_AGE_ONE_DAY);
++		soup_cookie_jar_add_cookie(validation, existing);
++	}
++	/* Ownership of each copied cookie moved into validation. */
++	g_slist_free(cookies);
++	SoupCookie *candidate = soup_cookie_copy(cookie);
++	soup_cookie_set_max_age(candidate, SOUP_COOKIE_MAX_AGE_ONE_DAY);
++	gboolean accepted = jar_add_checked(validation, candidate, uri);
++	g_object_unref(validation);
++	return accepted;
++}
++
++static const char *sqlite_text(sqlite3_stmt *statement, int column)
++{
++	if (sqlite3_column_type(statement, column) != SQLITE_TEXT)
++		return NULL;
++	const char *value = (const char *)sqlite3_column_text(statement, column);
++	int length = sqlite3_column_bytes(statement, column);
++	if (!value || strlen(value) != (size_t)length || !g_utf8_validate(value, length, NULL))
++		return NULL;
++	return value;
++}
++
++static gboolean load_cookie_store(AtlCookieStore *store)
++{
++	sqlite3_stmt *statement = NULL;
++	gboolean loaded = FALSE;
++	if (sqlite3_prepare_v2(store->database,
++			"SELECT name,value,domain,path,expires,secure,http_only,same_site "
++			"FROM atl_cookies_v1 ORDER BY rowid", -1, &statement, NULL) != SQLITE_OK)
++		goto done;
++	int result;
++	while ((result = sqlite3_step(statement)) == SQLITE_ROW) {
++		const char *name = sqlite_text(statement, 0);
++		const char *value = sqlite_text(statement, 1);
++		const char *domain = sqlite_text(statement, 2);
++		const char *path = sqlite_text(statement, 3);
++		if (!name || !value || !domain || !*domain || !path || *path != '/')
++			goto done;
++		for (int column = 5; column <= 7; column++)
++			if (sqlite3_column_type(statement, column) != SQLITE_INTEGER)
++				goto done;
++		gint64 secure = sqlite3_column_int64(statement, 5);
++		gint64 http_only = sqlite3_column_int64(statement, 6);
++		gint64 same_site = sqlite3_column_int64(statement, 7);
++		if ((secure != 0 && secure != 1) || (http_only != 0 && http_only != 1) ||
++				same_site < SOUP_SAME_SITE_POLICY_NONE || same_site > SOUP_SAME_SITE_POLICY_STRICT)
++			goto done;
++		GDateTime *expires = NULL;
++		if (sqlite3_column_type(statement, 4) != SQLITE_NULL) {
++			if (sqlite3_column_type(statement, 4) != SQLITE_INTEGER)
++				goto done;
++			gint64 timestamp = sqlite3_column_int64(statement, 4);
++			if (timestamp <= g_get_real_time() / G_USEC_PER_SEC)
++				continue;
++			expires = g_date_time_new_from_unix_utc(timestamp);
++			if (!expires)
++				goto done;
++		}
++		SoupCookie *cookie = soup_cookie_new(name, value, domain, path, -1);
++		soup_cookie_set_secure(cookie, secure);
++		soup_cookie_set_http_only(cookie, http_only);
++		soup_cookie_set_same_site_policy(cookie, same_site);
++		if (expires) {
++			soup_cookie_set_expires(cookie, expires);
++			g_date_time_unref(expires);
++		}
++		if (!jar_add_checked(store->jar, cookie, NULL))
++			goto done;
++	}
++	loaded = result == SQLITE_DONE;
++done:
++	if (statement && sqlite3_finalize(statement) != SQLITE_OK)
++		loaded = FALSE;
++	return loaded;
++}
++
++static gboolean initialize_cookie_store_locked(void)
++{
++	if (cookie_store.jar)
++		return TRUE;
++	const char *directory = get_app_data_dir();
++	if (!directory || !*directory)
++		return FALSE;
++	char *filename = g_build_filename(directory, "cookies.sqlite", NULL);
++	int fd = open(filename, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0600);
++	struct stat status;
++	if (fd < 0) {
++		g_free(filename);
++		return FALSE;
++	}
++	gboolean owned = fstat(fd, &status) == 0 && S_ISREG(status.st_mode) &&
++		status.st_uid == geteuid() && fchmod(fd, 0600) == 0;
++	if (close(fd) != 0)
++		owned = FALSE;
++	if (!owned) {
++		g_free(filename);
++		return FALSE;
++	}
++	AtlCookieStore next = {0};
++	int opened = sqlite3_open_v2(filename, &next.database,
++		SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX | SQLITE_OPEN_NOFOLLOW, NULL);
++	g_free(filename);
++	if (opened != SQLITE_OK)
++		goto failed;
++	if (sqlite3_busy_timeout(next.database, 3000) != SQLITE_OK ||
++			sqlite3_exec(next.database, "PRAGMA synchronous=FULL", NULL, NULL, NULL) != SQLITE_OK ||
++			sqlite3_exec(next.database, cookie_schema, NULL, NULL, NULL) != SQLITE_OK)
++		goto failed;
++	next.jar = soup_cookie_jar_new();
++	if (!load_cookie_store(&next))
++		goto failed;
++	/* Publish only after a complete successful load. A corrupt/unreadable
++	 * store never becomes an empty jar that can overwrite old disk state. */
++	cookie_store = next;
++	return TRUE;
++failed:
++	if (next.jar)
++		g_object_unref(next.jar);
++	if (next.database)
++		sqlite3_close(next.database);
++	return FALSE;
++}
++
++static GUri *cookie_uri(const char *url)
++{
++	/* Android accepts a bare hostname here and fixes it up to HTTP. Restrict
++	 * this compatibility case to a bounded host (no path, userinfo or query);
++	 * callers needing a Secure cookie must supply an explicit HTTPS URL. */
++	const char *scheme_hint = g_uri_peek_scheme(url);
++	char *fixed_url = NULL;
++	if (!scheme_hint) {
++		if (!*url || strlen(url) > 1024 || strpbrk(url, "/?#@"))
++			return NULL;
++		for (const unsigned char *cursor = (const unsigned char *)url; *cursor; cursor++)
++			if (*cursor <= 0x20 || *cursor == 0x7f)
++				return NULL;
++		fixed_url = g_strdup_printf("http://%s/", url);
++	}
++	GUri *uri = g_uri_parse(fixed_url ? fixed_url : url, SOUP_HTTP_URI_FLAGS, NULL);
++	g_free(fixed_url);
++	if (!uri)
++		return NULL;
++	const char *scheme = g_uri_get_scheme(uri);
++	const char *host = g_uri_get_host(uri);
++	if (!scheme || (g_ascii_strcasecmp(scheme, "http") && g_ascii_strcasecmp(scheme, "https")) ||
++			!host || !*host) {
++		g_uri_unref(uri);
++		return NULL;
++	}
++	return uri;
++}
++
++static gboolean set_cookie_locked(const char *url, const char *header)
++{
++	GUri *uri = cookie_uri(url);
++	if (!uri)
++		return FALSE;
++	SoupCookie *cookie = soup_cookie_parse(header, uri);
++	if (!cookie) {
++		g_uri_unref(uri);
++		return FALSE;
++	}
++	gboolean no_op_deletion = cookie_is_expired(cookie) &&
++		valid_expired_deletion(cookie_store.jar, cookie, uri);
++	gboolean changed = jar_add_checked(cookie_store.jar, cookie, uri);
++	g_uri_unref(uri);
++	return changed || no_op_deletion;
++}
++
++static char *get_cookie_locked(const char *url)
++{
++	GUri *uri = cookie_uri(url);
++	if (!uri)
++		return NULL;
++	/* Android's manual getCookie supplies HTTP callers, including HttpOnly. */
++	char *header = soup_cookie_jar_get_cookies(cookie_store.jar, uri, TRUE);
++	g_uri_unref(uri);
++	return header;
++}
++
++static gboolean flush_cookie_store_locked(void)
++{
++	GSList *cookies = soup_cookie_jar_all_cookies(cookie_store.jar);
++	sqlite3_stmt *statement = NULL;
++	gboolean committed = FALSE;
++	if (sqlite3_exec(cookie_store.database, "BEGIN IMMEDIATE", NULL, NULL, NULL) != SQLITE_OK)
++		goto done;
++	if (sqlite3_exec(cookie_store.database, "DELETE FROM atl_cookies_v1", NULL, NULL, NULL) != SQLITE_OK ||
++			sqlite3_prepare_v2(cookie_store.database,
++				"INSERT INTO atl_cookies_v1(name,value,domain,path,expires,secure,http_only,same_site) "
++				"VALUES(?,?,?,?,?,?,?,?)", -1, &statement, NULL) != SQLITE_OK)
++		goto rollback;
++	for (GSList *item = cookies; item; item = item->next) {
++		SoupCookie *cookie = item->data;
++		if (cookie_is_expired(cookie))
++			continue;
++		const char *strings[] = {soup_cookie_get_name(cookie), soup_cookie_get_value(cookie),
++			soup_cookie_get_domain(cookie), soup_cookie_get_path(cookie)};
++		for (int index = 0; index < 4; index++)
++			if (sqlite3_bind_text(statement, index + 1, strings[index], -1, SQLITE_TRANSIENT) != SQLITE_OK)
++				goto rollback;
++		GDateTime *expires = soup_cookie_get_expires(cookie);
++		int result = expires ? sqlite3_bind_int64(statement, 5, g_date_time_to_unix(expires)) :
++			sqlite3_bind_null(statement, 5);
++		if (result != SQLITE_OK ||
++				sqlite3_bind_int(statement, 6, soup_cookie_get_secure(cookie)) != SQLITE_OK ||
++				sqlite3_bind_int(statement, 7, soup_cookie_get_http_only(cookie)) != SQLITE_OK ||
++				sqlite3_bind_int(statement, 8, soup_cookie_get_same_site_policy(cookie)) != SQLITE_OK ||
++				sqlite3_step(statement) != SQLITE_DONE || sqlite3_reset(statement) != SQLITE_OK ||
++				sqlite3_clear_bindings(statement) != SQLITE_OK)
++			goto rollback;
++	}
++	if (sqlite3_finalize(statement) != SQLITE_OK) {
++		statement = NULL;
++		goto rollback;
++	}
++	statement = NULL;
++	if (sqlite3_exec(cookie_store.database, "COMMIT", NULL, NULL, NULL) != SQLITE_OK)
++		goto rollback;
++	committed = TRUE;
++	goto done;
++rollback:
++	if (statement) {
++		sqlite3_finalize(statement);
++		statement = NULL;
++	}
++	if (sqlite3_exec(cookie_store.database, "ROLLBACK", NULL, NULL, NULL) != SQLITE_OK &&
++			!sqlite3_get_autocommit(cookie_store.database)) {
++		/* A connection still inside a failed transaction is unusable. Drop
++		 * the private state so the next call must reload the actual disk store. */
++		sqlite3_close_v2(cookie_store.database);
++		g_object_unref(cookie_store.jar);
++		cookie_store = (AtlCookieStore){0};
++	}
++done:
++	g_slist_free_full(cookies, (GDestroyNotify)soup_cookie_free);
++	return committed;
++}
++
++static void cookie_store_exception(JNIEnv *env)
++{
++	if ((*env)->ExceptionCheck(env))
++		return;
++	jclass type = (*env)->FindClass(env, "java/lang/IllegalStateException");
++	if (type) {
++		(*env)->ThrowNew(env, type, "Unable to access cookie store");
++		(*env)->DeleteLocalRef(env, type);
++	}
++}
++
++static char *cookie_string_utf8(JNIEnv *env, jstring value)
++{
++	if (!value || (*env)->ExceptionCheck(env))
++		return NULL;
++	jsize length = (*env)->GetStringLength(env, value);
++	const jchar *characters = (*env)->GetStringChars(env, value, NULL);
++	if (!characters)
++		return NULL;
++	char *result = NULL;
++	for (jsize index = 0; index < length; index++)
++		if (!characters[index])
++			goto done;
++	result = g_utf16_to_utf8((const gunichar2 *)characters, length, NULL, NULL, NULL);
++done:
++	(*env)->ReleaseStringChars(env, value, characters);
++	return result;
++}
++
++JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_nativeSetCookie(
++		JNIEnv *env, jclass type, jstring url, jstring value)
++{
++	(void)type;
++	char *url_utf8 = cookie_string_utf8(env, url);
++	char *value_utf8 = cookie_string_utf8(env, value);
++	gboolean accepted = FALSE;
++	gboolean initialized = TRUE;
++	if (url_utf8 && value_utf8) {
++		g_mutex_lock(&cookie_store_mutex);
++		initialized = initialize_cookie_store_locked();
++		if (initialized)
++			accepted = set_cookie_locked(url_utf8, value_utf8);
++		g_mutex_unlock(&cookie_store_mutex);
++	}
++	g_free(url_utf8);
++	g_free(value_utf8);
++	if (!initialized)
++		cookie_store_exception(env);
++	return accepted;
++}
++
++JNIEXPORT jstring JNICALL Java_android_webkit_CookieManager_nativeGetCookie(
++		JNIEnv *env, jclass type, jstring url)
++{
++	(void)type;
++	char *url_utf8 = cookie_string_utf8(env, url);
++	if (!url_utf8)
++		return NULL;
++	g_mutex_lock(&cookie_store_mutex);
++	gboolean initialized = initialize_cookie_store_locked();
++	char *header = initialized ? get_cookie_locked(url_utf8) : NULL;
++	g_mutex_unlock(&cookie_store_mutex);
++	g_free(url_utf8);
++	if (!initialized) {
++		cookie_store_exception(env);
++		return NULL;
++	}
++	if (!header)
++		return NULL;
++	glong length;
++	gunichar2 *characters = g_utf8_to_utf16(header, -1, NULL, &length, NULL);
++	g_free(header);
++	if (!characters || length > INT_MAX) {
++		g_free(characters);
++		cookie_store_exception(env);
++		return NULL;
++	}
++	jstring result = (*env)->NewString(env, (const jchar *)characters, (jsize)length);
++	g_free(characters);
++	return result;
++}
++
++JNIEXPORT jboolean JNICALL Java_android_webkit_CookieManager_nativeFlush(JNIEnv *env, jclass type)
++{
++	(void)type;
++	if ((*env)->ExceptionCheck(env))
++		return FALSE;
++	g_mutex_lock(&cookie_store_mutex);
++	gboolean flushed = initialize_cookie_store_locked() && flush_cookie_store_locked();
++	g_mutex_unlock(&cookie_store_mutex);
++	return flushed;
++}
+--- a/src/main-executable/main.c
++++ b/src/main-executable/main.c
+@@ -41,6 +41,41 @@
+ 
+ GtkWidget *window;
+ char *apk_path;
++char *apk_archive_paths;
++
++/* Keep the base first; each archive remains an untouched, separate file. */
++static char *build_apk_archive_paths(const char *base_path, char **split_paths, GError **error)
++{
++	GPtrArray *paths = g_ptr_array_new_with_free_func(free);
++	for (size_t i = 0; i == 0 || (split_paths && split_paths[i - 1]); i++) {
++		const char *input = i == 0 ? base_path : split_paths[i - 1];
++		char *path = realpath(input, NULL);
++		struct stat st;
++		if (!path || strchr(path, ':') || stat(path, &st) || !S_ISREG(st.st_mode) || access(path, R_OK)) {
++			g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
++			            "APK path must be a readable regular file without ':': %s", input);
++			free(path);
++			g_ptr_array_unref(paths);
++			return NULL;
++		}
++		for (guint j = 0; j < paths->len; j++) {
++			if (!strcmp(path, g_ptr_array_index(paths, j))) {
++				g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT, "Repeated APK path: %s", input);
++				free(path);
++				g_ptr_array_unref(paths);
++				return NULL;
++			}
++		}
++		g_ptr_array_add(paths, path);
++	}
++	GString *classpath = g_string_new(NULL);
++	for (guint i = 0; i < paths->len; i++) {
++		if (i) g_string_append_c(classpath, ':');
++		g_string_append(classpath, g_ptr_array_index(paths, i));
++	}
++	g_ptr_array_unref(paths);
++	return g_string_free(classpath, FALSE);
++}
+ 
+ // standard Gtk Application stuff, more or less
+ 
+@@ -231,6 +266,7 @@
+ 	char *prgname;
+ 	char **extra_jvm_options;
+ 	char **extra_string_keys;
++	char **split_apks;
+ 	char *sdk_int;
+ };
+ 
+@@ -337,7 +373,6 @@
+ 
+ static void open(GtkApplication *app, GFile **files, gint nfiles, const gchar *hint, struct jni_callback_data *d)
+ {
+-	// TODO: pass all files to classpath
+ 	/*
+ 	printf("nfiles: %d\n", nfiles);
+ 	for(int i = 0; i < nfiles; i++) {
+@@ -366,18 +401,29 @@
+ 	jobject activity_object;
+ 	jobject application_object;
+ 
+-	char *apk_classpath = g_file_get_path(files[0]);
++	char *base_apk_path = g_file_get_path(files[0]);
+ 	char *apk_name = g_file_get_basename(files[0]);
+ 
+-	if (apk_classpath == NULL) {
++	if (base_apk_path == NULL) {
+ 		fprintf(stderr, "error: the specified file path doesn't seem to be valid\n");
+ 		exit(1);
+ 	}
+ 
+-	if (access(apk_classpath, F_OK) < 0) {
+-		fprintf(stderr, "error: the specified file path (%s) doesn't seem to exist (%m)\n", apk_classpath);
++	if (d->split_apks && (d->install || d->install_internal)) {
++		fprintf(stderr, "error: installing split APKs is not supported\n");
+ 		exit(1);
+ 	}
++	GError *archive_error = NULL;
++	char *apk_classpath = build_apk_archive_paths(base_apk_path, d->split_apks, &archive_error);
++	g_free(base_apk_path);
++	if (!apk_classpath) {
++		fprintf(stderr, "error: %s\n", archive_error->message);
++		g_error_free(archive_error);
++		exit(1);
++	}
++	/* Context source APIs must receive the base, never a colon-separated list. */
++	const char *split_separator = strchr(apk_classpath, ':');
++	base_apk_path = split_separator ? g_strndup(apk_classpath, split_separator - apk_classpath) : g_strdup(apk_classpath);
+ 
+ 	Dl_info libart_so_dl_info;
+ 	// JNI_CreateJavaVM chosen arbitrarily, what matters is that it's a symbol exported by by libart.so
+@@ -473,9 +519,19 @@
+ 	(*env)->CallVoidMethod(env, java_runtime, loadLibrary_with_classloader, _JSTRING("translation_layer_main"), class_loader);
+ 
+ 	// some apps need the apk path since they directly read their apk
+-	apk_path = strdup(apk_classpath);
++	apk_path = base_apk_path;
++	apk_archive_paths = strdup(apk_classpath);
+ 
+ 	(*env)->GetJavaVM(env, &jvm);
++	/* Context initializes and validates the primary package. Check before the
++	 * handle cache requests Activity methods or any application engine is loaded. */
++	jclass context_bootstrap = (*env)->FindClass(env, "android/content/Context");
++	if (!context_bootstrap || (*env)->ExceptionCheck(env)) {
++		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++		fprintf(stderr, "error: failed to initialize application package\n");
++		exit(1);
++	}
++	(*env)->DeleteLocalRef(env, context_bootstrap);
+ 	set_up_handle_cache(env);
+ 
+ 	/* -- misc -- */
+@@ -790,6 +846,7 @@
+ 		{ "install-internal",  0 , 0, G_OPTION_ARG_NONE,         &d->install_internal,          "copy an apk to _installed_apks_ but don't create a desktop entry",                             NULL            },
+ 		{ "extra-jvm-option", 'X', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_jvm_options,         "pass an additional option directly to art (e.g -X \"-verbose:jni\")",                          "\"OPTION\""    },
+ 		{ "extra-string-key", 'e', 0, G_OPTION_ARG_STRING_ARRAY, &d->extra_string_keys,         "pass a string extra (-e key=value)",                                                           "\"KEY=VALUE\"" },
++		{ "split-apk",         0 , 0, G_OPTION_ARG_FILENAME_ARRAY, &d->split_apks,               "add a split APK to the base application (repeat for each split)",                              "APK_PATH" },
+ 		{ "sdk-int",           0 , 0, G_OPTION_ARG_STRING,       &d->sdk_int,                   "shorthand for -X \"-DBuild.VERSION.SDK_INT=<version>\"",                                                           "SDK_INT" },
+ 		/* long_name | short_name | flags                     | arg                  | arg_data     | description                                                                              | arg_desc */
+ 		{ "uri",              'u', G_OPTION_FLAG_OPTIONAL_ARG, G_OPTION_ARG_CALLBACK, option_uri_cb, "open the given URI inside the application",                                               "URI"           },
+@@ -859,6 +916,7 @@
+ 	callback_data->prgname = argv[0];
+ 	callback_data->extra_jvm_options = NULL;
+ 	callback_data->extra_string_keys = NULL;
++	callback_data->split_apks = NULL;
+ 	callback_data->sdk_int = NULL;
+ 
+ 	app = gtk_application_new("com.example.demo_application", G_APPLICATION_NON_UNIQUE | G_APPLICATION_HANDLES_OPEN | G_APPLICATION_CAN_OVERRIDE_APP_ID);
+--- a/src/api-impl-jni/util.c
++++ b/src/api-impl-jni/util.c
+@@ -60,10 +60,11 @@
+ }
+ 
+ extern char *apk_path;
++extern char *apk_archive_paths;
+ void extract_from_apk(const char *path, const char *target)
+ {
+ 	JNIEnv *env = get_jni_env();
+-	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_path), _JSTRING(path), _JSTRING(target));
++	(*env)->CallStaticVoidMethod(env, handle_cache.asset_manager.class, handle_cache.asset_manager.extractFromAPK, _JSTRING(apk_archive_paths ? apk_archive_paths : apk_path), _JSTRING(path), _JSTRING(target));
+ }
+ 
+ /* logging with fallback to stderr */
+--- a/src/api-impl/android/atl/ATLLoadedApp.java
++++ b/src/api-impl/android/atl/ATLLoadedApp.java
+@@ -11,6 +11,7 @@
+ import android.content.res.AssetManager;
+ import android.content.res.Configuration;
+ import android.content.res.Resources;
++import android.content.res.XmlResourceParser;
+ import android.os.Build;
+ import android.os.Handler;
+ import android.os.Looper;
+@@ -22,9 +23,13 @@
+ import java.io.IOException;
+ import java.lang.reflect.Constructor;
+ import java.util.Arrays;
++import java.util.Enumeration;
+ import java.util.HashMap;
+ import java.util.HashSet;
++import java.util.jar.JarFile;
++import java.util.jar.JarEntry;
+ import org.xmlpull.v1.XmlPullParserException;
++import org.xmlpull.v1.XmlPullParser;
+ 
+ /**
+  * Hold ATL Specific application data to load apps
+@@ -100,6 +105,22 @@
+ 
+ 	@NonNull
+ 	public static ATLLoadedApp loadFromPath(String mainApk, String nativePath, String classLoaderPath) throws IOException {
++		String[] archivePaths = classLoaderPath.split(File.pathSeparator, -1);
++		mainApk = new File(mainApk).getCanonicalPath();
++		if (!new File(archivePaths[0]).getCanonicalPath().equals(mainApk)) {
++			throw new IOException("The base APK must be the first application archive");
++		}
++		requireArchiveManifest(mainApk);
++		PackageParser packageParser = new PackageParser(mainApk);
++		// A combined AssetManager searches backwards and can select a split manifest.
++		// Parse metadata with the existing manager that contains only the base APK.
++		PackageParser.Package pkg = packageParser.parsePackage(new File(mainApk), mainApk, new DisplayMetrics(), 0);
++		if (pkg == null || packageParser.getParseError() != PackageManager.INSTALL_SUCCEEDED) {
++			throw new IOException("Failed to parse base APK: " + mainApk);
++		}
++		pkg.applicationInfo.sourceDir = mainApk;
++		pkg.applicationInfo.publicSourceDir = mainApk;
++		validateSplitArchives(archivePaths, pkg);
+ 		if (ATLToggles.ATL_GHAX) {
+ 			// Always load ghax.jar as the first element to override application library classes
+ 			classLoaderPath = ATLPaths.ghax_jar.getPath() + File.pathSeparator + classLoaderPath;
+@@ -107,25 +128,88 @@
+ 		BaseDexClassLoader classLoader = new PathClassLoader(
+ 		    classLoaderPath, nativePath, ATLLoadedApp.class.getClassLoader());
+ 		AssetManager assetManager = new AssetManager(classLoader);
+-		PackageParser packageParser = new PackageParser(mainApk);
+ 		Resources resources = new Resources(assetManager, new DisplayMetrics(), Context.sys_config);
+-		String[] outError = new String[1];
+-		PackageParser.Package pkg;
+-		try {
+-			pkg = packageParser.parsePackage(resources,
+-			                                 assetManager.openXmlResourceParser(1, "AndroidManifest.xml"), 0, outError);
+-		} catch (XmlPullParserException e) {
+-			throw new IOException(outError[0], e);
+-		}
+-		if (packageParser.getParseError() != PackageManager.INSTALL_SUCCEEDED) {
+-			throw new IOException(outError[0]);
+-		}
+ 		packageParser.collectCertificates(pkg, 0);
+ 		// Support for MicroG and other custom GMS implementations.
+ 		if (play_services.contains(pkg.packageName)) {
+ 			ATLSigHelper.addGMSSignatures(pkg);
+ 		}
+ 		return new ATLLoadedApp(resources, classLoader, pkg);
++	}
++
++	private static void validateSplitArchives(String[] archivePaths, PackageParser.Package pkg) throws IOException {
++		if (archivePaths.length == 1) return;
++		String[] splitPaths = new String[archivePaths.length - 1];
++		String[] splitNames = new String[splitPaths.length];
++		HashSet<String> paths = new HashSet<>();
++		HashSet<String> names = new HashSet<>();
++		paths.add(new File(archivePaths[0]).getCanonicalPath());
++		final String androidNamespace = "http://schemas.android.com/apk/res/android";
++		HashSet<String> componentTags = new HashSet<>(Arrays.asList("activity", "activity-alias", "service", "receiver", "provider", "uses-split"));
++		for (int i = 1; i < archivePaths.length; i++) {
++			File file = new File(archivePaths[i]).getCanonicalFile();
++			if (!file.isFile() || !file.canRead() || !paths.add(file.getPath())) {
++				throw new IOException("Unreadable or repeated split APK: " + archivePaths[i]);
++			}
++			requireArchiveManifest(file.getPath());
++			try (JarFile jar = new JarFile(file)) {
++				Enumeration<JarEntry> entries = jar.entries();
++				while (entries.hasMoreElements()) {
++					String name = entries.nextElement().getName();
++					if (name.matches("classes[0-9]*\\.dex")) {
++						throw new IOException("Split APK DEX code is not supported: " + file);
++					}
++				}
++			}
++			AssetManager assets = new AssetManager();
++			XmlResourceParser parser = null;
++			try {
++				assets.addAssetPath(file.getPath());
++				parser = assets.openXmlResourceParser(0, "AndroidManifest.xml");
++				int type;
++				do { type = parser.next(); } while (type != XmlPullParser.START_TAG && type != XmlPullParser.END_DOCUMENT);
++				if (type != XmlPullParser.START_TAG || !"manifest".equals(parser.getName())) {
++					throw new IOException("Split APK has no manifest root: " + file);
++				}
++				String splitName = parser.getAttributeValue(null, "split");
++				String dependency = parser.getAttributeValue(null, "configForSplit");
++				if (dependency == null) dependency = parser.getAttributeValue(androidNamespace, "configForSplit");
++				if (parser.getAttributeBooleanValue(androidNamespace, "isFeatureSplit", false)
++				    || (dependency != null && !dependency.isEmpty())) {
++					throw new IOException("Feature and dependent split APKs are not supported: " + file);
++				}
++				if (!pkg.packageName.equals(parser.getAttributeValue(null, "package"))
++				    || pkg.mVersionCode != parser.getAttributeIntValue(androidNamespace, "versionCode", -1)
++				    || splitName == null || splitName.isEmpty() || !names.add(splitName)) {
++					throw new IOException("Split APK identity does not match the base: " + file);
++				}
++				while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
++					if (type == XmlPullParser.START_TAG && (componentTags.contains(parser.getName())
++					    || ("application".equals(parser.getName()) && parser.getAttributeBooleanValue(androidNamespace, "hasCode", true)))) {
++						throw new IOException("Split APK components or code are not supported: " + file);
++					}
++				}
++				splitPaths[i - 1] = file.getPath();
++				splitNames[i - 1] = splitName;
++			} catch (XmlPullParserException e) {
++				throw new IOException("Failed to parse split APK: " + file, e);
++			} finally {
++				if (parser != null) parser.close();
++				assets.close();
++			}
++		}
++		pkg.applicationInfo.splitSourceDirs = splitPaths;
++		pkg.applicationInfo.splitPublicSourceDirs = splitPaths.clone();
++		pkg.splitNames = splitNames;
++	}
++
++	private static void requireArchiveManifest(String archive) throws IOException {
++		try (JarFile jar = new JarFile(archive)) {
++			JarEntry manifest = jar.getJarEntry("AndroidManifest.xml");
++			if (manifest == null || manifest.isDirectory()) {
++				throw new IOException("APK archive has no AndroidManifest.xml: " + archive);
++			}
++		}
+ 	}
+ 
+ 	public Resources createDefaultResources() {
+--- a/src/api-impl/android/content/pm/PackageParser.java
++++ b/src/api-impl/android/content/pm/PackageParser.java
+@@ -303,6 +303,7 @@
+ 		pi.packageName = p.packageName;
+ 		pi.versionCode = p.mVersionCode;
+ 		pi.versionName = p.mVersionName;
++		pi.splitNames = p.splitNames == null ? null : p.splitNames.clone();
+ 		pi.sharedUserId = p.mSharedUserId;
+ 		pi.sharedUserLabel = p.mSharedUserLabel;
+ 		pi.applicationInfo = generateApplicationInfo(p, flags, state, userId);
+@@ -3261,6 +3262,7 @@
+ 	public final static class Package {
+ 
+ 		public String packageName;
++		public String[] splitNames;
+ 
+ 		// For now we only support one application per package.
+ 		public final ApplicationInfo applicationInfo = new ApplicationInfo();
+--- a/src/api-impl/android/content/pm/ApplicationInfo.java
++++ b/src/api-impl/android/content/pm/ApplicationInfo.java
+@@ -589,6 +589,8 @@
+ 		largestWidthLimitDp = orig.largestWidthLimitDp;
+ 		sourceDir = orig.sourceDir;
+ 		publicSourceDir = orig.publicSourceDir;
++		splitSourceDirs = orig.splitSourceDirs;
++		splitPublicSourceDirs = orig.splitPublicSourceDirs;
+ 		nativeLibraryDir = orig.nativeLibraryDir;
+ 		resourceDirs = orig.resourceDirs;
+ 		seinfo = orig.seinfo;
+--- a/src/main-executable/main.c
++++ b/src/main-executable/main.c
+@@ -527,6 +527,14 @@
+ 	 * handle cache requests Activity methods or any application engine is loaded. */
+ 	jclass context_bootstrap = (*env)->FindClass(env, "android/content/Context");
+ 	if (!context_bootstrap || (*env)->ExceptionCheck(env)) {
++		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
++		fprintf(stderr, "error: failed to initialize application package\n");
++		exit(1);
++	}
++	/* FindClass alone does not initialize Context in ART. JNI specifies that
++	 * GetStaticFieldID runs class initialization, including package validation. */
++	jfieldID context_config = (*env)->GetStaticFieldID(env, context_bootstrap, "sys_config", "Landroid/content/res/Configuration;");
++	if (!context_config || (*env)->ExceptionCheck(env)) {
+ 		if ((*env)->ExceptionCheck(env)) (*env)->ExceptionDescribe(env);
+ 		fprintf(stderr, "error: failed to initialize application package\n");
+ 		exit(1);
+--- a/src/api-impl/android/view/autofill/AutofillManager.java
++++ b/src/api-impl/android/view/autofill/AutofillManager.java
+@@ -1,4 +1,6 @@
+ package android.view.autofill;
++
++import android.view.View;
+ 
+ public class AutofillManager {
+ 
+@@ -6,6 +8,17 @@
+ 
+ 	public interface AutofillClient {}
+ 
++	/** Cancel the current context; ATL has no autofill service or session. */
++	public void cancel() {
++		// Android also returns silently when no autofill service is available.
++	}
++
++	/** There is no enabled service to receive an autofill request. */
++	public void requestAutofill(View view) {}
++
++	/** There is no enabled service to receive a value change. */
++	public void notifyValueChanged(View view) {}
++
+ 	public void registerCallback(AutofillCallback callback) {}
+ 
+ 	public void unregisterCallback(AutofillCallback callback) {}
+--- a/src/api-impl/android/view/View.java
++++ b/src/api-impl/android/view/View.java
+@@ -930,6 +930,7 @@
+ 	public AttributeSet attrs;
+ 	protected ViewGroup.LayoutParams layout_params;
+ 	private Context context;
++	private String[] mAutofillHints;
+ 	private Map<Integer, Object> tags = new HashMap<>();
+ 	private Object tag;
+ 	int gravity = -1; // fallback gravity for layout children
+@@ -2358,6 +2359,20 @@
+ 	}
+ 
+ 	public void setTooltipText(CharSequence tooltip) {}
++
++	/** Return the hint array retained by this view, or null when no hints are set. */
++	@Nullable public String[] getAutofillHints() {
++		return mAutofillHints;
++	}
++
++	/** Store hint metadata using Android 26 array ownership and empty-array semantics. */
++	public void setAutofillHints(@Nullable String... autofillHints) {
++		if (autofillHints == null || autofillHints.length == 0) {
++			mAutofillHints = null;
++		} else {
++			mAutofillHints = autofillHints;
++		}
++	}
+ 
+ 	public int getImportantForAutofill() { return 0; }
+ 
+--- a/src/api-impl/android/location/LocationManager.java
++++ b/src/api-impl/android/location/LocationManager.java
+@@ -56,0 +57,8 @@
++	/** ATL currently exposes no enabled location providers. */
++	public boolean isProviderEnabled(String provider) {
++		if (provider == null) {
++			throw new IllegalArgumentException("invalid provider: null");
++		}
++		return false;
++	}
++
+--- a/src/libandroid/egl.c
++++ b/src/libandroid/egl.c
+@@ -21,0 +22,11 @@
++
++/* The synthetic window surfaces have errors of their own, on the caller's thread. */
++static _Thread_local EGLint atl_egl_error = EGL_SUCCESS;
++
++EGLint bionic_eglGetError(void)
++{
++	EGLint native_error = eglGetError();
++	EGLint error = atl_egl_error;
++	atl_egl_error = EGL_SUCCESS;
++	return error != EGL_SUCCESS ? error : native_error;
++}
+@@ -88,0 +100,2 @@
++	if (__unlikely__(!strcmp(procname, "eglGetError")))
++		return (void (*)(void))bionic_eglGetError;
+@@ -211 +223,0 @@
+-	struct atl_surface_buffer *front_buffer;
+@@ -423 +435,3 @@
+-	ATLSurface *atl_surface = data;
++	/* Each idle callback owns the buffer submitted by that particular swap. */
++	struct atl_surface_buffer *buffer = data;
++	ATLSurface *atl_surface = buffer->surface;
+@@ -428 +441,0 @@
+-	struct atl_surface_buffer *buffer = atl_surface->front_buffer;
+@@ -465,0 +479,5 @@
++	if (!atl_surface->back_buffer || atl_surface->destroyed) {
++		atl_egl_error = EGL_BAD_SURFACE;
++		return EGL_FALSE;
++	}
++
+@@ -467,11 +485,15 @@
+-	if (atl_surface->back_buffer) {
+-		g_async_queue_timeout_pop(atl_surface->vsync, 50000); // 50ms
+-		atl_surface->front_buffer = atl_surface->back_buffer;
+-		atl_surface->back_buffer = NULL;
+-		g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, queue_texture, g_object_ref(atl_surface), NULL);
+-	}
+-	atl_surface->back_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
+-	if (atl_surface->back_buffer)
+-		glBindFramebuffer(GL_FRAMEBUFFER, atl_surface->back_buffer->gl_framebuffer);
+-	else
+-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
++	g_async_queue_timeout_pop(atl_surface->vsync, 50000); // 50ms
++	/* Reserve the next drawable before handing the current one to GTK. A slow
++	 * consumer must not leave a successful, current surface without a buffer. */
++	struct atl_surface_buffer *next_buffer = g_async_queue_timeout_pop(atl_surface->unused_buffers, 100000); // 100ms
++	if (!next_buffer) {
++		atl_egl_error = EGL_BAD_ALLOC;
++		return EGL_FALSE;
++	}
++	struct atl_surface_buffer *submitted_buffer = atl_surface->back_buffer;
++	atl_surface->back_buffer = next_buffer;
++	glBindFramebuffer(GL_FRAMEBUFFER, next_buffer->gl_framebuffer);
++	/* This reference transfers from the idle callback to its texture's
++	 * destroy notification, or is dropped there if the surface was destroyed. */
++	g_object_ref(atl_surface);
++	g_idle_add_full(G_PRIORITY_HIGH_IDLE + 20, queue_texture, submitted_buffer, NULL);
+@@ -517,0 +540,4 @@
++	/* Preserve the actual binding if an invalid synthetic surface has no
++	 * drawable; framebuffer zero is not a drawable in the surfaceless context. */
++	if (atl_surface && !atl_surface->back_buffer)
++		return;
+--- a/src/libandroid/native_window.h
++++ b/src/libandroid/native_window.h
+@@ -25,0 +26 @@
++EGLint bionic_eglGetError(void);

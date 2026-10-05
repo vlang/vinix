@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "updated_utc": "2026-10-02T22:51:02.392966+00:00",
+  "candidate_patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+  "read_only_review": true,
+  "commit_authorized": true,
+  "blocking_issues": [],
+  "review_path": "build/useralloc-review-v6/review.json",
+  "review_sha256": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8",
+  "all_checks_pass": true,
+  "object_count": 24,
+  "archive_member_count": 12,
+  "runtime_checks": 262816,
+  "runtime_modes": 8,
+  "corruption_children": 32,
+  "zero_trim_deltas": 8
+}

@@ -7,14 +7,49 @@
 sched_switch_context:
     // x0 = GPRState pointer, x1 = kernel_stack
 
-    // Restore ELR_EL1 (return PC) and SPSR_EL1 first
+    // Keep the target pointers in callee-saved temporaries while the optional
+    // diagnostic hook uses the normal AAPCS. They are overwritten with the
+    // target thread's own x19/x20 values before eret, so the outgoing values
+    // do not need to be restored.
+    mov x19, x0
+    mov x20, x1
+    mov x1, #0
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+    mov x1, x20
+
+    // Restore ELR_EL1 (return PC) first. Under VHE these EL1 register names
+    // access the corresponding EL2 host registers, which is exactly where the
+    // eventual eret takes its state from.
     ldr x2, [x0, #256]
     msr elr_el1, x2
+
+    // A saved mode of EL0t is exact and must remain EL0t. A non-zero mode
+    // denotes kernel context, but its exception level cannot be hard-coded:
+    // QEMU/OVMF enters Vinix at EL1 while Apple Silicon enters it as a VHE EL2
+    // host. Returning to EL1h from the latter is illegal when HCR_EL2.TGE is
+    // set, producing EC=0x0e at the first instruction of a new thread.
+    // Preserve every flag above M[3:0] and synthesize current-EL handler mode:
+    // CurrentEL is EL << 2, and the low bit selects SP_ELx.
     ldr x2, [x0, #264]
+    and x3, x2, #0xf
+    cbz x3, .write_spsr
+    mrs x3, CurrentEL
+    and x3, x3, #0xc
+    orr x3, x3, #1
+    bic x2, x2, #0xf
+    orr x2, x2, x3
+.write_spsr:
     msr spsr_el1, x2
 
+    mov x0, x19
+    mov x1, #1
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+    mov x1, x20
+
     // Set the appropriate stack pointer based on target EL.
-    // Check SPSR.M[3:0]: 0 = EL0t (user), 5 = EL1h (kernel)
+    // Check saved SPSR.M[3:0]: 0 = EL0t; non-zero = kernel context.
     ldr x3, [x0, #264]         // pstate
     ands xzr, x3, #0xF
     b.ne .set_kernel_sp
@@ -39,7 +74,7 @@ sched_switch_context:
     b .restore_gprs
 
 .set_kernel_sp:
-    // Kernel thread (EL1h): set SP_EL1 directly.
+    // Kernel thread (EL1h under QEMU, EL2h under Apple VHE): set SP_ELx.
     // HVF workaround: eret may restore SP_EL0 instead of SP_EL1,
     // so set BOTH to the same value via SPSel trick.
     ldr x2, [x0, #248]
@@ -51,6 +86,11 @@ sched_switch_context:
     mov sp, x2                  // SP_EL1 = thread's SP
 
 .restore_gprs:
+    mov x0, x19
+    mov x1, #2
+    bl scheduler_gpu_context_trace
+    mov x0, x19
+
     // Restore general purpose registers (from GPRState, not stack)
     ldp x2, x3, [x0, #16]
     ldp x4, x5, [x0, #32]
@@ -116,8 +156,14 @@ yield_dispatch:
     // PC = LR (return address -> resumes at caller after eret)
     str x30, [sp, #256]
 
-    // pstate = EL1h (0x5) -- tells sched_switch_context this is kernel context
+    // A non-zero saved mode marks this as kernel context. sched_switch_context
+    // replaces EL1h with the current EL's handler mode before every eret.
+    // With PAN where the machine has it on: a thread that sleeps in the kernel
+    // comes back as protected as it went.
     mov x2, #0x5
+    adrp x3, kernel_pstate_pan
+    ldr x3, [x3, #:lo12:kernel_pstate_pan]
+    orr x2, x2, x3
     str x2, [sp, #264]
 
     // Call handler(gpr_state_ptr): x0 = GPRState*, handler = saved x0
@@ -130,3 +176,18 @@ yield_dispatch:
     ldr x30, [sp, #240]
     add sp, sp, #288
     ret
+
+// vinix_enter_idle(stack_top, entry, thread)
+// x0 = stack top (16-byte aligned), x1 = function to run there,
+// x2 = argument passed to it after changing stacks.
+//
+// Abandon the current stack and continue at `entry` on `stack_top`. Used when a
+// CPU has just released the thread whose stack it is standing on -- another CPU
+// may already be running that thread, so there is nothing here to return to.
+// Does not return.
+.global vinix_enter_idle
+.type vinix_enter_idle, %function
+vinix_enter_idle:
+    mov sp, x0
+    mov x0, x2
+    br x1

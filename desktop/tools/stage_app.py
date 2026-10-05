@@ -6,15 +6,21 @@ is V code that has to be compiled in. Rather than copy an example into the
 repository and let the copy drift, the build takes the example's own source
 straight from the ui2 checkout and compiles it alongside the desktop.
 
-Only one thing is removed: the example's `fn main()`. It exists to open a
-platform window and block, which is precisely the job the desktop is doing
-instead. Everything the application actually is — its model, its methods, its
-QML document — is compiled unmodified, so what runs on Vinix is the example
-and not a retelling of it.
+The example's `fn main()` is removed because opening and blocking a platform
+window is the desktop's job. An embedded VML source constant used only by that
+entry point is removed with it. The model and its methods remain unmodified, so
+a hosted view can bind that model without copying its business logic.
 
 Both are `module main`, so they can share a directory. The desktop's own files
-are symlinked rather than copied, so editing one is picked up by the next
-build.
+are normally symlinked rather than copied, so editing one is picked up by the
+next build. A source with the redundant legacy license preamble is materialized
+without that preamble for compatibility with the native V3 compiler.
+
+The desktop's translations, desktop/translations/*.tr, are compiled in as
+translations_data.v. Every build mode then carries them: `$embed_file` only
+embeds under -prod, and the development builds Vinix runs on itself would
+otherwise read the files from wherever their sources were when the desktop
+next starts.
 
     stage_app.py <staging-dir> <desktop-dir> <example-dir>...
 """
@@ -28,6 +34,30 @@ import sys
 # with `fn main()`, so cutting from there to the end of the file takes the
 # whole function without having to match braces.
 MAIN_PATTERN = re.compile(r"^fn main\(\) \{", re.MULTILINE)
+EMBEDDED_VIEW_PATTERN = re.compile(
+    r"^const\s+([A-Za-z_]\w*_(?:qml|vml)_source)\s*=\s*"
+    r"\$embed_file\([^\n]+\)\.to_string\(\)\n",
+    re.MULTILINE,
+)
+TRANSLATIONS_DIR = "translations"
+TRANSLATIONS_SOURCE = "translations_data.v"
+LEGACY_LICENSE_PREAMBLE = re.compile(
+    r"\A// Copyright \(c\) [^\n]+\. All rights reserved\.\n"
+    r"// Use of this source code is governed by a GPL v2 license\n"
+    r"// that can be found in the LICENSE file\.\n\n"
+    r"(?=// SPDX-License-Identifier:)",
+)
+
+
+def native_v3_source(text):
+    """Remove a redundant pre-SPDX comment that corrupts V3 source offsets.
+
+    The native V 0.5.2 `$vml` lowering currently misattributes tokens later in
+    a file when this exact multi-line preamble precedes the existing SPDX
+    header. The SPDX header and its copyright remain in the staged source, so
+    this compile-only normalization changes no code or licensing information.
+    """
+    return LEGACY_LICENSE_PREAMBLE.sub("", text, count=1)
 
 
 def stage_desktop(staging, desktop_dir):
@@ -35,12 +65,61 @@ def stage_desktop(staging, desktop_dir):
         source = os.path.join(desktop_dir, name)
         if not os.path.isfile(source):
             continue
-        if not name.endswith(".v"):
+        if not (name.endswith(".v") or name.endswith(".h") or name.endswith(".vml")):
             continue
-        link = os.path.join(staging, name)
-        if os.path.lexists(link):
-            os.remove(link)
-        os.symlink(os.path.abspath(source), link)
+        destination = os.path.join(staging, name)
+        if os.path.lexists(destination):
+            os.remove(destination)
+        if name.endswith(".v"):
+            with open(source) as handle:
+                text = handle.read()
+            compatible = native_v3_source(text)
+            if compatible != text:
+                with open(destination, "w") as handle:
+                    handle.write(compatible)
+                continue
+        os.symlink(os.path.abspath(source), destination)
+
+
+def v_string(text):
+    """Spell text as a single-quoted V literal."""
+    escaped = (text.replace("\\", "\\\\").replace("'", "\\'")
+               .replace("$", "\\$").replace("\t", "\\t").replace("\r", "\\r"))
+    return "'%s'" % escaped
+
+
+def stage_translations(staging, desktop_dir):
+    """Write the translation files as a V map for i18n.load_tr_map_from_files.
+
+    Each file is kept a line per literal, so the source stays readable and no
+    one literal grows past what a small C compiler accepts.
+    """
+    directory = os.path.join(desktop_dir, TRANSLATIONS_DIR)
+    names = sorted(name for name in os.listdir(directory) if name.endswith(".tr"))
+    if not names:
+        sys.exit("%s: no .tr translation files" % directory)
+    out = [
+        "// Generated from desktop/%s/*.tr by desktop/tools/stage_app.py." % TRANSLATIONS_DIR,
+        "// Edit the .tr files, not this.",
+        "module main",
+        "",
+        "const desktop_translation_files = {",
+    ]
+    for name in names:
+        with open(os.path.join(directory, name), encoding="utf-8") as handle:
+            text = handle.read()
+        if "\r" in text:
+            sys.exit("%s: use LF line endings" % name)
+        out.append("\t%s: [" % v_string(name))
+        for line in text.rstrip("\n").split("\n"):
+            out.append("\t\t%s," % v_string(line))
+        # i18n parses sections at "-----\\n". Keep the final newline so a
+        # trailing separator cannot become part of the last translation.
+        out.append("\t].join('\\n') + '\\n'")
+    out.append("}")
+    out.append("")
+    with open(os.path.join(staging, TRANSLATIONS_SOURCE), "w", encoding="utf-8") as handle:
+        handle.write("\n".join(out))
 
 
 def strip_main(text, origin):
@@ -60,7 +139,14 @@ def strip_main(text, origin):
         "// is the example's own source, unmodified.\n" % origin
     )
     body = text[:match.start()].rstrip() + "\n"
-    # `run_qml` was often the file's only use of ui2, and V rejects an import
+    # Runtime examples embed their document so `run_vml` can parse it. A
+    # compile-time `$vml` host neither calls that entry point nor needs to ship
+    # the source text and embedding support in every utility process.
+    for declaration in reversed(list(EMBEDDED_VIEW_PATTERN.finditer(body))):
+        name = declaration.group(1)
+        if len(re.findall(r"\b%s\b" % re.escape(name), body)) == 1:
+            body = body[:declaration.start()] + body[declaration.end():]
+    # `run_vml` was often the file's only use of ui2, and V rejects an import
     # nothing references.
     if "ui2." not in body:
         body = body.replace("\nimport ui2\n", "\nimport ui2 as _\n", 1)
@@ -100,6 +186,7 @@ def main():
     os.makedirs(staging)
 
     stage_desktop(staging, desktop_dir)
+    stage_translations(staging, desktop_dir)
     for example in examples:
         stage_example(staging, example)
     print("    staged %d example(s) into %s" % (len(examples), staging))

@@ -319,3 +319,33 @@ diff -urN --no-dereference xorg-server-clean/os/utils.c xorg-server-workdir/os/u
  }
  
  int
+--- xorg-server-workdir/glamor/glamor_egl.c
++++ xorg-server-gpu/glamor/glamor_egl.c
+@@ -805,6 +805,13 @@
+     if (fd < 0)
+         return BadAlloc;
+ 
++#ifdef __vinix__
++    /* Vinix only exposes authenticated render nodes. It has no legacy DRM
++     * magic/auth ioctls, and the fd passed through DRI3 is the authority. */
++    *fdp = fd;
++    return Success;
++#endif
++
+     /* Before FD passing in the X protocol with DRI3 (and increased
+      * security of rendering with per-process address spaces on the
+      * GPU), the kernel had to come up with a way to have the server
+@@ -887,7 +894,13 @@
+         /* To do DRI3 device FD generation, we need to open a new fd
+          * to the same device we were handed in originally.
+          */
++#ifdef __vinix__
++        /* libdrm normally reconstructs this through Linux sysfs, which Vinix
++         * intentionally does not emulate. */
++        glamor_egl->device_path = strdup("/dev/dri/renderD128");
++#else
+         glamor_egl->device_path = drmGetDeviceNameFromFd2(glamor_egl->fd);
++#endif
+ 
+         if (!dri3_screen_init(screen, &glamor_dri3_info)) {
+             xf86DrvMsg(scrn->scrnIndex, X_ERROR,

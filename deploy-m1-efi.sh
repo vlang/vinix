@@ -1,14 +1,20 @@
 #!/bin/bash
 # Deploy Vinix ARM64 boot files to an already-mounted EFI System Partition.
-# Usage: ./deploy-m1-efi.sh [--apple-gpu] [--minimal-initramfs] /path/to/mounted/esp
+# Usage: ./deploy-m1-efi.sh [--apple-studio-display] [--desktop-initramfs] /path/to/mounted/esp
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ESP_MOUNT=""
 ENABLE_APPLE_GPU=0
+GPU_PROBE_ONLY=0
 USE_MINIMAL_INITRAMFS=0
+USE_SOUND_INITRAMFS=0
+REQUIRE_APPLE_SPEAKERS=0
+USE_DESKTOP_INITRAMFS=0
+INITRAMFS_COMPRESSED=0
 USE_NATIVE_RESOLUTION=0
+USE_EXTERNAL_DISPLAY=0
 CMDLINE_EXTRA=""
 
 for argument in "$@"; do
@@ -17,6 +23,57 @@ for argument in "$@"; do
             ENABLE_APPLE_GPU=1
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1"
             ;;
+        --gpu-probe-only)
+            # Allow a deliberately kernel-only AGX probe. Normal GPU deploys
+            # fail if Mesa or the hardware smoke test is absent, because such
+            # an image cannot answer whether acceleration works.
+            GPU_PROBE_ONLY=1
+            ;;
+        --apple-dcp)
+            # Experimental t8103 internal-panel IOMFB/backlight transport.
+            # Separate from the GPU: probing one must not run the other's
+            # sequence.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_dcp=1"
+            ;;
+        --apple-battery)
+            # Explicitly enable the read-only SMC battery client (it is also
+            # the safe ARM64 default) behind /dev/battery.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_battery=1"
+            ;;
+        --apple-wifi)
+            # The BCM4378 probe and /dev/wlan0 are deliberately opt-in because
+            # the driver takes over PCIe/DART state left by the bootloader.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_wifi=1"
+            ;;
+        --apple-ans)
+            # ANS2 storage: discovery, namespace reads and validated GPT views.
+            # Read-only on its own -- writing needs --ans-rw to name a target.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1"
+            ;;
+        --ans-rw=*)
+            # Authorises writes to exactly one Linux-data GPT partition, by
+            # PARTUUID. Nothing else on the disk becomes writable, which is the
+            # whole of what makes this safe to boot on a machine that still has
+            # macOS on it. There is no default and there must not be one.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.ans_rw=PARTUUID=${argument#*=}"
+            ;;
+        --ans-persist=*)
+            # Mount one ext2 partition, by PARTUUID, read-write over /root:
+            # the desktop's users and files survive a reboot. Vinix refuses
+            # a volume an unclean shutdown left dirty, so kek.sh checks it
+            # from macOS before each deployment.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.persist=PARTUUID=${argument#*=}"
+            ;;
+        --ans-root=*)
+            # Boot root from that partition instead of the initramfs, read-only.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_ans=1 vinix.root=PARTUUID=${argument#*=} vinix.rootfstype=ext2 vinix.rootmode=ro vinix.rootfallback=initramfs"
+            ;;
+        --all-drivers)
+            # Enable every optional Apple subsystem in one switch. Battery is
+            # already the safe default but remains explicit in this mode.
+            ENABLE_APPLE_GPU=1
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_gpu=1 vinix.apple_dcp=1 vinix.apple_battery=1 vinix.apple_wifi=1"
+            ;;
         --native-resolution)
             # Drop the resolution request so Limine keeps whatever mode the
             # firmware already set. Apple Silicon's display is a fixed
@@ -24,6 +81,21 @@ for argument in "$@"; do
             # that one mode, and asking for another blanks the panel at the
             # very moment Limine applies it, just before entering the kernel.
             USE_NATIVE_RESOLUTION=1
+            ;;
+        --apple-studio-display|--external-display)
+            # Preserve the GOP scanout selected by iBoot/m1n1 and ask Vinix
+            # to choose the largest output if firmware exposes more than one.
+            # The native internal-panel DCP probe must stay off: it owns a
+            # different connector and can reset the shared display fabric.
+            USE_EXTERNAL_DISPLAY=1
+            USE_NATIVE_RESOLUTION=1
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display=external vinix.display_hotplug=1 vinix.display_coldplug=reboot vinix.apple_dcp=0"
+            ;;
+        --apple-display-hotplug)
+            # Monitor both CD321x Type-C controllers. This is useful when
+            # testing reconnect independently of GOP selection; it does not
+            # enable the first-attach reboot policy.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.display_hotplug=1"
             ;;
         --force-fault)
             # Self-test of the signal channel: fault on purpose and expect a
@@ -44,14 +116,32 @@ for argument in "$@"; do
             # last stage reached.
             CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.no_early_term=1"
             ;;
+        --desktop-initramfs)
+            # Boot into the full userland image with desktop-init and
+            # vinix-desktop overlaid by build-desktop-aarch64.sh.
+            USE_DESKTOP_INITRAMFS=1
+            ;;
         --minimal-initramfs)
             # Boot with a few-KB initramfs instead of the 120 MB busybox one.
             # If a hang at Limine's "Loading module" line clears with this, the
             # problem is reading the large module, not the kernel.
             USE_MINIMAL_INITRAMFS=1
             ;;
+        --sound-initramfs)
+            USE_SOUND_INITRAMFS=1
+            REQUIRE_APPLE_SPEAKERS=1
+            ;;
+        --apple-speakers)
+            # Refuse a kernel without the M1 Air speaker driver. The driver
+            # itself is on by default; this only checks that it was built in.
+            REQUIRE_APPLE_SPEAKERS=1
+            ;;
+        --no-apple-speakers)
+            # Leave the built-in speakers off: no /dev/dsp on this boot.
+            CMDLINE_EXTRA="$CMDLINE_EXTRA vinix.apple_speakers=0"
+            ;;
         --help|-h)
-            echo "usage: $0 [--apple-gpu] [--minimal-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
+            echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [--apple-gpu] [--gpu-probe-only] [--apple-dcp] [--apple-battery] [--apple-wifi] [--apple-ans] [--ans-rw=UUID] [--ans-persist=UUID] [--ans-root=UUID] [--all-drivers] [--minimal-initramfs] [--sound-initramfs] [--apple-speakers] [--no-apple-speakers] [--desktop-initramfs] [--no-early-term] [--halt-at=N] [--native-resolution] [--force-fault] <mounted_esp_path>"
             exit 0
             ;;
         --*)
@@ -69,7 +159,16 @@ for argument in "$@"; do
 done
 
 if [ -z "$ESP_MOUNT" ]; then
-    echo "usage: $0 [--apple-gpu] <mounted_esp_path>"
+    echo "usage: $0 [--apple-studio-display|--external-display] [--apple-display-hotplug] [options] <mounted_esp_path>"
+    exit 1
+fi
+
+if [ "$GPU_PROBE_ONLY" -eq 1 ] && [ "$ENABLE_APPLE_GPU" -ne 1 ]; then
+    echo "error: --gpu-probe-only requires --apple-gpu or --all-drivers" >&2
+    exit 1
+fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ] && { [ "$USE_MINIMAL_INITRAMFS" -eq 1 ] || [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; }; then
+    echo "error: --sound-initramfs cannot be combined with another initramfs mode" >&2
     exit 1
 fi
 
@@ -78,19 +177,42 @@ if [ ! -d "$ESP_MOUNT" ]; then
     exit 1
 fi
 
+# macOS indexes every volume it mounts, this one included: Spotlight stored a
+# 20 MB index of the boot image in the same 500 MiB ESP that barely holds the
+# image. Keep Spotlight and fsevents off this volume and drop what they kept,
+# before the free space is measured.
+if [ "$(uname -s)" = Darwin ]; then
+    mdutil -i off "$ESP_MOUNT" >/dev/null 2>&1 || true
+    rm -rf "$ESP_MOUNT/.Spotlight-V100/Store-V1" "$ESP_MOUNT/.Spotlight-V100/Store-V2"
+    touch "$ESP_MOUNT/.metadata_never_index" 2>/dev/null || true
+    mkdir -p "$ESP_MOUNT/.fseventsd" 2>/dev/null && touch "$ESP_MOUNT/.fseventsd/no_log" 2>/dev/null || true
+fi
+
 KERNEL="$SCRIPT_DIR/kernel/bin/vinix"
 INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar"
 MINIMAL_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-minimal.tar"
-LIMINE_EFI_BUILT="$SCRIPT_DIR/boot-image/limine-src-9.3.0/bin/BOOTAA64.EFI"
+SOUND_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-sound.tar"
+DESKTOP_INITRAMFS="$SCRIPT_DIR/build-support/init-aarch64/initramfs-desktop.tar"
+DESKTOP_INITRAMFS_GZ="$DESKTOP_INITRAMFS.gz"
+LIMINE_VERSION="12.8.0"
 LIMINE_EFI_BIN="$SCRIPT_DIR/boot-image/limine-bin/BOOTAA64.EFI"
 LIMINE_CONF="$SCRIPT_DIR/build-support/limine.conf"
+LIMINE_EFI="$LIMINE_EFI_BIN"
 
-if [ -f "$LIMINE_EFI_BUILT" ] && { [ ! -f "$LIMINE_EFI_BIN" ] || [ "$LIMINE_EFI_BUILT" -nt "$LIMINE_EFI_BIN" ]; }; then
-    LIMINE_EFI="$LIMINE_EFI_BUILT"
-else
-    LIMINE_EFI="$LIMINE_EFI_BIN"
+if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$DESKTOP_INITRAMFS_GZ" ]; then
+        echo "error: compressed desktop initramfs not built: $DESKTOP_INITRAMFS_GZ" >&2
+        echo "hint: run ./build-desktop-aarch64.sh --compact-initramfs --with-asahi-gpu" >&2
+        exit 1
+    fi
+    if ! gzip -t "$DESKTOP_INITRAMFS_GZ"; then
+        echo "error: compressed desktop initramfs is corrupt: $DESKTOP_INITRAMFS_GZ" >&2
+        exit 1
+    fi
+    INITRAMFS="$DESKTOP_INITRAMFS_GZ"
+    INITRAMFS_COMPRESSED=1
+    echo "using compressed desktop initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes on ESP)"
 fi
-
 if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     if [ ! -f "$MINIMAL_INITRAMFS" ]; then
         echo "error: minimal initramfs not built: $MINIMAL_INITRAMFS" >&2
@@ -98,6 +220,15 @@ if [ "$USE_MINIMAL_INITRAMFS" -eq 1 ]; then
     fi
     INITRAMFS="$MINIMAL_INITRAMFS"
     echo "using minimal initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
+fi
+if [ "$USE_SOUND_INITRAMFS" -eq 1 ]; then
+    if [ ! -f "$SOUND_INITRAMFS" ]; then
+        echo "error: sound test initramfs not built: $SOUND_INITRAMFS" >&2
+        echo "hint: run tests/apple-speakers/build-guest.sh" >&2
+        exit 1
+    fi
+    INITRAMFS="$SOUND_INITRAMFS"
+    echo "using sound test initramfs ($(wc -c < "$INITRAMFS" | tr -d ' ') bytes)"
 fi
 
 for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
@@ -107,21 +238,75 @@ for f in "$KERNEL" "$INITRAMFS" "$LIMINE_EFI" "$LIMINE_CONF"; do
     fi
 done
 
+# Starting Apple APs is safe only through the VHE-aware Limine 12.8 path, and
+# the native kernel now deliberately uses four CPUs. Refuse a stale single-core
+# kernel even if every other deployment input is current.
+SMP_REQUEST_ID=$'\x88\x8b\x4c\xdf\x30\xdd\xb1\xc7\x7b\xf0\x94\xa1\x83\xe8\x82\x0a\x7e\x85\x1b\x9a\x81\x7b\xa6\x95\xe0\x73\x6a\x3b\x72\x1b\xb6\xa0'
+if ! LC_ALL=C grep -aFq "$SMP_REQUEST_ID" "$KERNEL"; then
+    echo "error: M1 kernel has no Limine MP request" >&2
+    echo "hint: rebuild with: make -C kernel ARCH=aarch64 CC=clang LIMINE_MP=1" >&2
+    exit 1
+fi
+echo "kernel includes Limine MP request (native boot limit: 4 CPUs)"
+
+# A kernel built from a tree that never calls speakers.initialise() boots
+# normally and leaves no /dev/dsp. The speaker test then reads as a driver
+# failure with no apple-speakers line on screen, when the driver never ran.
+if [ "$REQUIRE_APPLE_SPEAKERS" -eq 1 ]; then
+    if ! LC_ALL=C grep -aFq "apple-speakers: MacBook Air J313 speakers" "$KERNEL"; then
+        echo "error: this kernel has no M1 Air speaker driver: $KERNEL" >&2
+        echo "hint: rebuild it from a tree whose kernel/main_arm64.v calls speakers.initialise()" >&2
+        exit 1
+    fi
+    echo "kernel includes the M1 Air speaker driver"
+fi
+
+if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
+    echo "APPLE GPU: kernel AGX probe enabled"
+    if [ "$GPU_PROBE_ONLY" -eq 1 ]; then
+        echo "APPLE GPU: probe-only override selected; userspace acceleration is not required"
+    else
+        gpu_check=("$SCRIPT_DIR/build-support/check-m1-gpu-image.sh" \
+            --kernel "$KERNEL" \
+            --triangle-source "$SCRIPT_DIR/gl-triangle/egl_triangle.c")
+        if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
+            gpu_check+=(--desktop)
+        fi
+        if ! "${gpu_check[@]}" "$INITRAMFS"; then
+            echo "error: refusing to deploy an M1 GPU image that cannot run the hardware test" >&2
+            echo "hint: rebuild build-aarch64-asahi/staging in the ARM64 VM, then rebuild the selected image" >&2
+            echo "hint: use --gpu-probe-only only when deliberately testing kernel probe/RTKit without Mesa" >&2
+            exit 1
+        fi
+    fi
+fi
+
 echo "using limine EFI: $LIMINE_EFI"
 
-# The upstream 9.3.0 loader cannot boot this kernel on Apple Silicon: its
-# EL2-to-EL1 hand-off leaves FP/SIMD and the physical timer trapping to EL2
-# on CPUs that keep VHE on. build-limine-aarch64.sh builds the patched one and
-# stamps it with an instruction sequence the upstream binary does not contain.
-if ! xxd -p "$LIMINE_EFI" | tr -d '\n' | grep -q "6806a0d248111cd5"; then
-    echo "error: $LIMINE_EFI is the upstream Limine build, which black-screens on Apple Silicon" >&2
+# Limine 12.x contains the upstream VHE-aware Apple Silicon hand-off. Reject a
+# stale loader and the unpatched build that requires protocol base revision 6.
+if ! LC_ALL=C grep -aF "Limine ${LIMINE_VERSION} (aarch64, UEFI)" \
+    "$LIMINE_EFI" >/dev/null \
+    || LC_ALL=C grep -aF "Base revision %u is no longer supported for aarch64" \
+        "$LIMINE_EFI" >/dev/null; then
+    echo "error: $LIMINE_EFI is not the Vinix-compatible Limine ${LIMINE_VERSION} build" >&2
     echo "hint: run ./build-limine-aarch64.sh first" >&2
     exit 1
 fi
-echo "limine EFI is the Apple Silicon build (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
+echo "limine EFI is ${LIMINE_VERSION} with Apple VHE and Vinix base revision 2 support (sha256 $(shasum -a 256 "$LIMINE_EFI" | cut -c1-16))"
 
 RUNTIME_CONF="$(mktemp "${TMPDIR:-/tmp}/vinix-limine.XXXXXX")"
-trap 'rm -f "$RUNTIME_CONF"' EXIT
+cleanup() {
+    rm -f "$RUNTIME_CONF" "$RUNTIME_CONF.next"
+    rm -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.vinix-new" \
+        "$ESP_MOUNT/boot/vinix.vinix-new" \
+        "$ESP_MOUNT/boot/initramfs.tar.vinix-new" \
+        "$ESP_MOUNT/boot/limine.conf.vinix-new" \
+        "$ESP_MOUNT/limine.conf.vinix-new" \
+        "$ESP_MOUNT/limine/limine.conf.vinix-new" \
+        "$ESP_MOUNT/EFI/BOOT/limine.conf.vinix-new"
+}
+trap cleanup EXIT
 CMDLINE_EXTRA="${CMDLINE_EXTRA# }"
 if [ -n "$CMDLINE_EXTRA" ]; then
     awk -v extra="$CMDLINE_EXTRA" '
@@ -132,6 +317,25 @@ if [ -n "$CMDLINE_EXTRA" ]; then
     echo "kernel cmdline additions: $CMDLINE_EXTRA"
 else
     cp "$LIMINE_CONF" "$RUNTIME_CONF"
+fi
+
+# Limine, not the kernel, expands the compact gzip module. Keep its on-disk
+# name stable so existing verification and recovery tooling still has one
+# canonical payload path.
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    RUNTIME_CONF_NEXT="$RUNTIME_CONF.next"
+    awk '
+        /^[[:space:]]*module_path:/ && !replaced {
+            print "    module_path: $boot():/boot/initramfs.tar"
+            replaced = 1
+            next
+        }
+        { print }
+        END {
+            if (!replaced) print "    module_path: $boot():/boot/initramfs.tar"
+        }
+    ' "$RUNTIME_CONF" > "$RUNTIME_CONF_NEXT"
+    mv -f "$RUNTIME_CONF_NEXT" "$RUNTIME_CONF"
 fi
 
 KERNEL_FILE_INFO="$(file -b "$KERNEL" || true)"
@@ -149,37 +353,21 @@ mkdir -p "$ESP_MOUNT/EFI/BOOT"
 mkdir -p "$ESP_MOUNT/boot"
 mkdir -p "$ESP_MOUNT/limine"
 
-if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ]; then
-    cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
+# Keep the loader this replaces only when it is not an earlier Limine: that
+# one is the next deployment's to overwrite, and a copy of it is just less
+# room for the image.
+if [ -f "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" ] &&
+   ! LC_ALL=C grep -aqF "Limine" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"; then
+    COPYFILE_DISABLE=1 cp "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI.bak"
 fi
-
-cp "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
 if [ "$USE_NATIVE_RESOLUTION" -eq 1 ]; then
     sed -i '' '/^[[:space:]]*resolution:/d' "$RUNTIME_CONF"
     echo "NATIVE RESOLUTION: no mode switch requested; Limine keeps the firmware's framebuffer"
 fi
-
-cp "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf"
-cp "$RUNTIME_CONF" "$ESP_MOUNT/limine/limine.conf"
-# Refuse to start a copy that cannot finish. A half-written initramfs or
-# kernel leaves the ESP looking deployed while the machine will not boot.
-needed=$(( $(wc -c < "$KERNEL") + $(wc -c < "$INITRAMFS") ))
-avail=$(df -k "$ESP_MOUNT" | awk 'NR==2 {print $4 * 1024}')
-if [ -n "$avail" ] && [ "$avail" -lt "$needed" ]; then
-    echo "error: ESP has ${avail} bytes free, needs ${needed}" >&2
-    echo "hint: remove stale files from $ESP_MOUNT/boot" >&2
-    exit 1
+if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
+    echo "EXTERNAL DISPLAY: preserving firmware scanout; Vinix will select the largest GOP framebuffer"
 fi
 
-cp "$KERNEL" "$ESP_MOUNT/boot/vinix"
-cp "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
-
-sync
-
-# Verify what actually landed. cp can fail silently enough that the next
-# symptom is an unbootable machine rather than an error here.
 verify_copy() {
     src="$1"
     dst="$2"
@@ -188,6 +376,77 @@ verify_copy() {
         exit 1
     fi
 }
+
+# Prefer a same-filesystem temporary and rename, which keeps the previous boot
+# file intact if the copy fails. A 500 MiB ESP cannot hold two successive
+# compressed desktop images; after the first deployment, fall back to an
+# in-place replacement only when reclaiming the current target makes it fit.
+install_verified() {
+    src="$1"
+    dst="$2"
+    label="$3"
+    stage="$dst.vinix-new"
+    rm -f "$stage"
+    # Unchanged since the last deployment: rewriting it would only risk it.
+    if [ -f "$dst" ] && cmp -s "$src" "$dst"; then
+        echo "$label unchanged"
+        return 0
+    fi
+
+    size="$(wc -c < "$src" | tr -d ' ')"
+    if [ "$size" -gt 4294967295 ]; then
+        echo "error: $label is ${size} bytes, above FAT32's single-file limit" >&2
+        exit 1
+    fi
+    avail="$(df -Pk "$ESP_MOUNT" | awk 'NR==2 {print $4 * 1024}')"
+    old_size=0
+    if [ -f "$dst" ]; then
+        old_size="$(wc -c < "$dst" | tr -d ' ')"
+    fi
+
+    if [ -n "$avail" ] && [ "$avail" -ge "$size" ]; then
+        if ! COPYFILE_DISABLE=1 cp "$src" "$stage"; then
+            rm -f "$stage"
+            echo "error: failed to stage $label on the ESP" >&2
+            exit 1
+        fi
+        if ! cmp -s "$src" "$stage"; then
+            rm -f "$stage"
+            echo "error: staged $label does not match its source" >&2
+            exit 1
+        fi
+        sync
+        mv -f "$stage" "$dst"
+    elif [ -f "$dst" ] && [ -n "$avail" ] && [ $((avail + old_size)) -ge "$size" ]; then
+        echo "updating $label in place (ESP is too small to retain the previous copy)"
+        if ! COPYFILE_DISABLE=1 cp "$src" "$dst"; then
+            echo "error: failed to replace $label on the ESP; the previous copy may be incomplete" >&2
+            exit 1
+        fi
+    else
+        echo "error: ESP has ${avail:-unknown} bytes free; cannot install ${size}-byte $label" >&2
+        if [ "$old_size" -gt 0 ]; then
+            echo "       replacing the existing ${old_size}-byte file would still not fit" >&2
+        fi
+        echo "hint: macOS data-volume free space is separate from the 500 MiB ESP" >&2
+        exit 1
+    fi
+    verify_copy "$src" "$dst"
+}
+
+# Commit boot inputs before configuration. The EFI-app-local configuration is
+# installed last because it is Limine's first choice; until that rename, the
+# previous configuration continues to name the previous complete payload.
+install_verified "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI" "Limine EFI"
+install_verified "$KERNEL" "$ESP_MOUNT/boot/vinix" "kernel"
+install_verified "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar" "initramfs"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/boot/limine.conf" "boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/limine.conf" "root boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/limine/limine.conf" "Limine boot configuration"
+install_verified "$RUNTIME_CONF" "$ESP_MOUNT/EFI/BOOT/limine.conf" "EFI boot configuration"
+
+sync
+
 verify_copy "$KERNEL" "$ESP_MOUNT/boot/vinix"
 verify_copy "$INITRAMFS" "$ESP_MOUNT/boot/initramfs.tar"
 verify_copy "$LIMINE_EFI" "$ESP_MOUNT/EFI/BOOT/BOOTAA64.EFI"
@@ -207,5 +466,23 @@ kernel_requests="$(xxd -p "$KERNEL" | tr -d '\n' | grep -o '888b4cdf30ddb1c77bf0
 echo "  kernel sha256: $kernel_sha"
 echo "  kernel entry:  0x$kernel_entry"
 echo "  kernel limine requests: $kernel_requests (Limine's 'Requests count' line)"
-echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
+if [ "$INITRAMFS_COMPRESSED" -eq 1 ]; then
+    echo "  initramfs:     $(wc -c < "$INITRAMFS") compressed bytes (Limine expands it)"
+else
+    echo "  initramfs:     $(wc -c < "$INITRAMFS") bytes"
+fi
 echo "Compare the entry point against Limine's 'ELF entry point' line at boot."
+if [ "$USE_EXTERNAL_DISPLAY" -eq 1 ]; then
+    cat <<'EXTERNAL_DISPLAY'
+
+Apple Studio Display handoff is enabled. You can either boot with the display
+already connected, or connect it after Vinix starts on the M1 Air panel. A
+first post-boot connection causes one warm reboot; leave the cable attached so
+iBoot/m1n1 can train the link. Clamshell mode is the most reliable way to make
+firmware choose the Studio Display as its single output.
+
+Vinix will print "framebuffer: selected GOP ... (external handoff)" once the
+kernel owns the selected surface. Unplug/replug of an already handed-off
+output is detected and repainted without another reboot.
+EXTERNAL_DISPLAY
+fi

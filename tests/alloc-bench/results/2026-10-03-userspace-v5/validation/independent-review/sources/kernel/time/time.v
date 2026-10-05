@@ -1,0 +1,238 @@
+@[has_globals]
+module time
+
+import event.eventstruct
+import klock
+
+pub const timer_frequency = u64(1000)
+
+pub const clock_type_realtime = 0
+pub const clock_type_monotonic = 1
+
+pub struct TimeSpec {
+pub mut:
+	tv_sec  i64
+	tv_nsec i64
+}
+
+pub fn (mut this TimeSpec) add(interval TimeSpec) {
+	if this.tv_nsec + interval.tv_nsec > 999999999 {
+		diff := (this.tv_nsec + interval.tv_nsec) - 1000000000
+		this.tv_nsec = diff
+		this.tv_sec++
+	} else {
+		this.tv_nsec += interval.tv_nsec
+	}
+	this.tv_sec += interval.tv_sec
+}
+
+pub fn (mut this TimeSpec) sub(interval TimeSpec) bool {
+	if interval.tv_nsec > this.tv_nsec {
+		diff := interval.tv_nsec - this.tv_nsec
+		this.tv_nsec = 999999999 - diff
+		if this.tv_sec == 0 {
+			this.tv_sec = 0
+			this.tv_nsec = 0
+			return true
+		}
+		this.tv_sec--
+	} else {
+		this.tv_nsec -= interval.tv_nsec
+	}
+	if interval.tv_sec > this.tv_sec {
+		this.tv_sec = 0
+		this.tv_nsec = 0
+		return true
+	}
+	this.tv_sec -= interval.tv_sec
+	if this.tv_sec == 0 && this.tv_nsec == 0 {
+		return true
+	}
+	return false
+}
+
+__global (
+	monotonic_clock TimeSpec
+	realtime_clock  TimeSpec
+	// Counter reading the clocks were last brought up to date with, for
+	// advance_to_ns.
+	clock_last_ns   = u64(0)
+	clock_tick_lock klock.Lock
+)
+
+// Return a stable snapshot of a clock for interfaces, such as absolute futex
+// deadlines, that need to translate a point in time into a timer duration.
+pub fn clock_now(clock_id int) ?TimeSpec {
+	return precise_clock_now(clock_id)
+}
+
+fn C.event__trigger(mut event eventstruct.Event, drop bool) u64
+
+// A periodic interrupt samples the counter rather than counting deliveries:
+// hardware can merge multiple ticks while interrupts are disabled.
+pub fn timer_handler() {
+	advance_to_ns(counter_now_ns())
+}
+
+// advance_to_ns moves the clocks forward to a reading of a free running
+// counter, for a tick source whose interval is not fixed. The aarch64
+// scheduler timer is one: it is re-armed with the current thread's timeslice,
+// so treating each tick as one `timer_frequency` period would make the clock
+// run slow by the ratio between the two, and a thread that sleeps for a
+// wall-clock interval would sleep by the same factor too long.
+//
+// A tick that loses the lock returns without touching `clock_last_ns`, so the
+// interval it saw is not dropped: the next tick to get the lock accounts for
+// it.
+pub fn advance_to_ns(now_ns u64) {
+	if clock_tick_lock.test_and_acquire() == false {
+		return
+	}
+	last := clock_last_ns
+	if now_ns <= last {
+		clock_tick_lock.release()
+		return
+	}
+	clock_last_ns = now_ns
+	delta := now_ns - last
+	interval := TimeSpec{i64(delta / 1000000000), i64(delta % 1000000000)}
+	monotonic_clock.add(interval)
+	realtime_clock.add(interval)
+	clock_tick_lock.release()
+
+	// Events and hooks may take scheduler locks. Keep them outside the clock
+	// update lock; timers compare absolute deadlines if another tick wins.
+	expire_timers()
+}
+
+// Anything that has to look at the clock every tick registers here. The
+// scheduler cannot call into the file module directly — file reaches sched
+// through event — so a timerfd notices its deadline by leaving a hook behind
+// instead.
+const max_tick_hooks = 8
+
+__global (
+	tick_hooks      [max_tick_hooks]fn ()
+	tick_hooks_len  = int(0)
+	tick_hooks_lock klock.Lock
+)
+
+pub fn register_tick_hook(hook fn ()) bool {
+	tick_hooks_lock.acquire()
+	defer {
+		tick_hooks_lock.release()
+	}
+
+	if tick_hooks_len == max_tick_hooks {
+		return false
+	}
+	tick_hooks[tick_hooks_len] = hook
+	tick_hooks_len++
+	return true
+}
+
+// Counter deadlines include every interval even when a tick loses this lock.
+fn expire_timers() {
+	if timers_lock.test_and_acquire() == true {
+		// One counter read covers this pass. A newly armed timer cannot enter
+		// the list until this lock is released.
+		now_ns := counter_now_ns()
+		for i := 0; i < armed_timers.len; i++ {
+			mut timer := armed_timers[i]
+			if timer.fired == true {
+				continue
+			}
+			expired := now_ns >= timer.deadline_ns
+			if expired {
+				C.event__trigger(mut &timer.event, false)
+				timer.fired = true
+			}
+		}
+
+		timers_lock.release()
+	}
+
+	count := tick_hooks_len
+	for i := 0; i < count; i++ {
+		tick_hooks[i]()
+	}
+}
+
+pub struct Timer {
+pub mut:
+	when  TimeSpec
+	event eventstruct.Event
+	index int
+	fired bool
+	// Timers expire against the counter, so a tick cannot charge them
+	// for time that passed before they were armed.
+	deadline_ns u64
+}
+
+__global (
+	timers_lock  klock.Lock
+	armed_timers []&Timer
+)
+
+pub fn (mut this Timer) disarm() {
+	timers_lock.acquire()
+	defer {
+		timers_lock.release()
+	}
+
+	if armed_timers.len == 0 || this.index == -1 {
+		return
+	}
+	if this.index >= armed_timers.len {
+		return
+	}
+
+	armed_timers[this.index] = armed_timers[armed_timers.len - 1]
+	armed_timers[this.index].index = this.index
+	armed_timers.delete_last()
+	this.index = -1
+}
+
+pub fn (mut this Timer) arm() {
+	timers_lock.acquire()
+
+	this.fired = false
+	this.deadline_ns = counter_timer_deadline(this.when)
+	this.index = armed_timers.len
+	armed_timers << this
+
+	timers_lock.release()
+}
+
+// The caller owns the returned timer. After the wait has detached every event
+// listener, it must disarm and free the timer; disarming only removes it from
+// the global schedule and does not release the heap allocation.
+pub fn new_timer(when TimeSpec) &Timer {
+	mut timer := &Timer{
+		when:  when
+		fired: false
+		index: -1
+	}
+
+	timer.arm()
+
+	return timer
+}
+
+// monotonic_ns is the monotonic clock as one nanosecond count, for callers
+// measuring an interval rather than naming an instant. The two fields are read
+// separately and a tick can land between them, which would pair a new second
+// with an old nanosecond and make the reading jump a second backwards; reading
+// the seconds again and retrying once costs nothing and removes that.
+pub fn monotonic_ns() u64 {
+	mut seconds := monotonic_clock.tv_sec
+	mut nanoseconds := monotonic_clock.tv_nsec
+	if monotonic_clock.tv_sec != seconds {
+		seconds = monotonic_clock.tv_sec
+		nanoseconds = monotonic_clock.tv_nsec
+	}
+	if seconds < 0 || nanoseconds < 0 {
+		return 0
+	}
+	return u64(seconds) * 1000000000 + u64(nanoseconds)
+}

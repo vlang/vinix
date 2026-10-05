@@ -1,0 +1,27 @@
+#!/bin/sh
+# Show a nested Vinix boot disk in the native desktop's hosted X11 window.
+set -eu
+
+image=${VINIX_QEMU_DESKTOP_IMAGE:-/root/vinix-inner-desktop.img}
+if [ ! -f "$image" ]; then
+    echo "Vinix guest image missing: $image" >&2
+    exit 1
+fi
+
+lock=/tmp/vinix-qemu-desktop.lock
+if ! mkdir "$lock" 2>/dev/null; then
+    echo 'Vinix in QEMU is already running.' >&2
+    exit 1
+fi
+trap 'rmdir "$lock" 2>/dev/null || true' EXIT HUP INT TERM
+
+export VINIX_QEMU_DISPLAY=vnc=127.0.0.1:1
+export VINIX_QEMU_SERIAL=file:/tmp/vinix-qemu-desktop-serial.log
+export VINIX_QEMU_GUEST_MEM=${VINIX_QEMU_GUEST_MEM:-1024}
+
+/usr/bin/vinix-qemu "$image" &
+qemu_pid=$!
+trap 'kill "$qemu_pid" 2>/dev/null || true; rmdir "$lock" 2>/dev/null || true' EXIT HUP INT TERM
+
+# The fixed-size viewer retries while QEMU binds its built-in VNC server.
+/usr/bin/vinix-vnc-window

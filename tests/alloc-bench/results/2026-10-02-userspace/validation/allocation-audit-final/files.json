@@ -1,0 +1,12 @@
+{
+  "baseline.log": "6fe55f74b4eb38ae0b01c99645873c081a7969b361c52aed51fde978f628fd68",
+  "candidate.log": "34facb2f8c6f8f707d4d0c18d713a020e2186f310842f57ebfc9119306d9da7b",
+  "capture-x86-diagnostic.py": "e12cf3cc259939660fc7385e52e00a399665c818968e8142a412a7f2038595e4",
+  "comparison.json": "e4c8848e5521875b9a3248c032a5f9dc5468429185f2b7969a8a770ac501ec1a",
+  "preparation.json": "202678dfae505b8a3470cf8d132dc5b03a97060fbcef2f3edaa63bd43e549957",
+  "run.py": "20fbf914ddfe030fbd41946276ba04287ed55a0e4cb74ca31d636a61888cd10d",
+  "standard-modules-before.json": "320dd28547fa54e475ba6b69aff1620537a9ed0cac63f1bda634394d7edf9ada",
+  "x86-diagnostic.json": "60f262d88b0ab05ab65835de2619fbe812869c5a5485ff8a67b93de9e8710cf8",
+  "x86-diagnostic.log": "e6caa0f317cb44c8a2c4026c4f4fc0b64ba16e062471c03b93f0ba8e7c4c78ce",
+  "x86-diagnostic.make": "35f3e2e0564e0ed7f1522676652c0829b976595bb78dcca9e12fe50bb7dece4d"
+}

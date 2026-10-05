@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/Foundation.framework/Foundation'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '_OBJC_CLASS_$_NSObject', '_OBJC_METACLASS_$_NSObject', '_OBJC_CLASS_$_NSString' ]
+...

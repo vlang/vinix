@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the Mesa 25.0.5 Asahi userspace used by Vinix/aarch64.
+# Build the Mesa 25.0.5 Asahi and VirGL userspace used by Vinix/aarch64.
 #
 # Run this in the Debian aarch64 build VM. Native Mesa helper programs are
 # built for the VM; the installed driver is linked against an Alpine musl
@@ -66,46 +66,55 @@ if [ ! -d "$MESA_SRC" ]; then
     tar -xJf "$MESA_ARCHIVE" -C "$BUILD_DIR"
 fi
 
-MESA_PATCH="$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch"
-if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
-    echo "==> Applying Vinix Mesa compatibility patch"
-    patch -p1 -d "$MESA_SRC" < "$MESA_PATCH"
-elif ! patch --dry-run -R -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
-    echo "Mesa source is neither clean nor patched as expected" >&2
-    exit 1
-fi
+for MESA_PATCH in \
+    "$SCRIPT_DIR/patches/mesa/jinx-working-patch.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-virgl-render-node.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-fake-g17-renderer.patch" \
+    "$SCRIPT_DIR/patches/mesa/vinix-libagx-link-names.patch"; do
+    if patch --dry-run -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
+        echo "==> Applying $(basename "$MESA_PATCH")"
+        patch -p1 -d "$MESA_SRC" < "$MESA_PATCH"
+    elif ! patch --dry-run -R -p1 -d "$MESA_SRC" < "$MESA_PATCH" >/dev/null 2>&1; then
+        echo "Mesa source is neither clean nor patched for $(basename "$MESA_PATCH")" >&2
+        exit 1
+    fi
+done
 
-if [ ! -x "$HOST_TOOLS/bin/mesa_clc" ] \
-    || [ ! -x "$HOST_TOOLS/bin/vtn_bindgen" ] \
-    || [ ! -x "$HOST_TOOLS/bin/asahi_clc" ]; then
-    echo "==> Building native Asahi shader tools"
-    NATIVE_BUILD="$BUILD_DIR/native-tools-build"
+echo "==> Building native Asahi shader tools"
+NATIVE_BUILD="$BUILD_DIR/native-tools-build"
+NATIVE_MESON_OPTIONS=(
+    --buildtype=release
+    -Dplatforms=
+    -Dglx=disabled
+    -Degl=disabled
+    -Dgbm=disabled
+    -Dopengl=false
+    -Dgles1=disabled
+    -Dgles2=disabled
+    -Dgallium-drivers=asahi
+    -Dvulkan-drivers=
+    -Dllvm=enabled
+    -Dshared-llvm=enabled
+    -Dmesa-clc=enabled
+    -Dprecomp-compiler=enabled
+    -Dbuild-tests=false
+    -Dtools=
+    -Dvideo-codecs=
+)
+if [ -f "$NATIVE_BUILD/build.ninja" ]; then
+    meson setup --reconfigure "$NATIVE_BUILD" "$MESA_SRC" \
+        "${NATIVE_MESON_OPTIONS[@]}"
+else
     meson setup "$NATIVE_BUILD" "$MESA_SRC" \
-        --buildtype=release \
-        -Dplatforms= \
-        -Dglx=disabled \
-        -Degl=disabled \
-        -Dgbm=disabled \
-        -Dopengl=false \
-        -Dgles1=disabled \
-        -Dgles2=disabled \
-        -Dgallium-drivers=asahi \
-        -Dvulkan-drivers= \
-        -Dllvm=enabled \
-        -Dshared-llvm=enabled \
-        -Dmesa-clc=enabled \
-        -Dprecomp-compiler=enabled \
-        -Dbuild-tests=false \
-        -Dtools= \
-        -Dvideo-codecs=
-    ninja -C "$NATIVE_BUILD" -j"$NPROC" \
-        src/compiler/clc/mesa_clc \
-        src/compiler/spirv/vtn_bindgen \
-        src/asahi/clc/asahi_clc
-    install -m755 "$NATIVE_BUILD/src/compiler/clc/mesa_clc" "$HOST_TOOLS/bin/"
-    install -m755 "$NATIVE_BUILD/src/compiler/spirv/vtn_bindgen" "$HOST_TOOLS/bin/"
-    install -m755 "$NATIVE_BUILD/src/asahi/clc/asahi_clc" "$HOST_TOOLS/bin/"
+        "${NATIVE_MESON_OPTIONS[@]}"
 fi
+ninja -C "$NATIVE_BUILD" -j"$NPROC" \
+    src/compiler/clc/mesa_clc \
+    src/compiler/spirv/vtn_bindgen \
+    src/asahi/clc/asahi_clc
+install -m755 "$NATIVE_BUILD/src/compiler/clc/mesa_clc" "$HOST_TOOLS/bin/"
+install -m755 "$NATIVE_BUILD/src/compiler/spirv/vtn_bindgen" "$HOST_TOOLS/bin/"
+install -m755 "$NATIVE_BUILD/src/asahi/clc/asahi_clc" "$HOST_TOOLS/bin/"
 
 APK_DIR="$BUILD_DIR/downloads/apk"
 mkdir -p "$APK_DIR"
@@ -149,9 +158,15 @@ echo "==> Preparing pinned Alpine 3.21 musl sysroot"
 download_index main
 for package in \
     musl musl-dev linux-headers libgcc libstdc++ libstdc++-dev libatomic \
+    libmd libmd-dev libbsd libbsd-dev \
     zlib zlib-dev zstd-libs zstd-dev \
     libdrm libdrm-dev libpciaccess libpciaccess-dev \
-    expat libexpat expat-dev hwdata-pci; do
+    expat libexpat expat-dev hwdata-pci \
+    xorgproto xcb-proto libxau libxau-dev libxdmcp libxdmcp-dev \
+    libxcb libxcb-dev libx11 libx11-dev libxext libxext-dev \
+    libxfixes libxfixes-dev libxrender libxrender-dev \
+    libxrandr libxrandr-dev libxxf86vm libxxf86vm-dev \
+    libxshmfence libxshmfence-dev; do
     extract_apk main "$package"
 done
 # Alpine's runtime package carries the SONAME file but not the linker name.
@@ -198,45 +213,57 @@ c_link_args = ['-fuse-ld=lld', '--rtlib=compiler-rt', '--unwindlib=none']
 cpp_link_args = ['-fuse-ld=lld', '--rtlib=compiler-rt', '--unwindlib=libgcc']
 EOF
 
-echo "==> Building Mesa $MESA_VERSION Asahi for Vinix"
+echo "==> Building Mesa $MESA_VERSION Asahi/VirGL for Vinix"
 export PATH="$HOST_TOOLS/bin:$PATH"
+TARGET_MESON_OPTIONS=(
+    --prefix=/usr
+    --libdir=lib
+    --buildtype=release
+    -Dstrip=true
+    -Dplatforms=x11
+    # Minecraft/GLFW creates GLX contexts. Build libGL against the same
+    # Gallium drivers as EGL so DRI3 can reach Asahi or VirGL directly.
+    -Dglx=dri
+    -Dglvnd=disabled
+    -Degl=enabled
+    -Dgbm=enabled
+    -Dopengl=true
+    -Dgles1=disabled
+    -Dgles2=enabled
+    -Dshared-glapi=enabled
+    -Dgallium-drivers=asahi,virgl,softpipe
+    -Dvulkan-drivers=
+    -Dllvm=disabled
+    -Ddraw-use-llvm=false
+    -Dmesa-clc=system
+    -Dprecomp-compiler=system
+    -Dshader-cache=disabled
+    -Dxmlconfig=disabled
+    -Dvalgrind=disabled
+    -Dlibunwind=disabled
+    -Dbuild-tests=false
+    -Dtools=
+    -Dvideo-codecs=
+)
 if [ -f "$TARGET_BUILD/build.ninja" ]; then
-    meson setup --reconfigure "$TARGET_BUILD" "$MESA_SRC" --cross-file "$CROSS_FILE"
+    meson setup --reconfigure "$TARGET_BUILD" "$MESA_SRC" \
+        --cross-file "$CROSS_FILE" "${TARGET_MESON_OPTIONS[@]}"
 else
     meson setup "$TARGET_BUILD" "$MESA_SRC" --cross-file "$CROSS_FILE" \
-        --prefix=/usr \
-        --libdir=lib \
-        --buildtype=release \
-        -Dstrip=true \
-        -Dplatforms= \
-        -Dglx=disabled \
-        -Degl=enabled \
-        -Dgbm=disabled \
-        -Dopengl=false \
-        -Dgles1=disabled \
-        -Dgles2=enabled \
-        -Dshared-glapi=enabled \
-        -Dgallium-drivers=asahi \
-        -Dvulkan-drivers= \
-        -Dllvm=disabled \
-        -Ddraw-use-llvm=false \
-        -Dmesa-clc=system \
-        -Dprecomp-compiler=system \
-        -Dshader-cache=disabled \
-        -Dxmlconfig=disabled \
-        -Dvalgrind=disabled \
-        -Dlibunwind=disabled \
-        -Dbuild-tests=false \
-        -Dtools= \
-        -Dvideo-codecs=
+        "${TARGET_MESON_OPTIONS[@]}"
 fi
 ninja -C "$TARGET_BUILD" -j"$NPROC"
 rm -rf "$STAGING"
 DESTDIR="$STAGING" ninja -C "$TARGET_BUILD" install
+if [ ! -f "$STAGING/usr/lib/libGL.so.1" ]; then
+    echo "Mesa's DRI GLX library was not installed" >&2
+    exit 1
+fi
 
-echo "==> Installing Asahi runtime and hardware triangle"
+echo "==> Installing Mesa hardware runtime and triangle test"
 mkdir -p "$STAGING/lib" "$STAGING/etc" "$STAGING/usr/lib" \
-    "$STAGING/usr/bin" "$STAGING/usr/share/examples/gl-triangle"
+    "$STAGING/usr/bin" "$STAGING/usr/share/examples/gl-triangle" \
+    "$STAGING/usr/share/vinix"
 # The base ARM64 userland uses a static musl build. The Asahi libraries need
 # Alpine's dynamic loader from the same pinned sysroot as Mesa.
 install -m755 "$SYSROOT/lib/ld-musl-aarch64.so.1" \
@@ -244,7 +271,12 @@ install -m755 "$SYSROOT/lib/ld-musl-aarch64.so.1" \
 printf '%s\n' /lib /usr/lib > "$STAGING/etc/ld-musl-aarch64.path"
 for pattern in \
     'libdrm.so*' 'libpciaccess.so*' 'libstdc++.so*' 'libgcc_s.so*' \
-    'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*'; do
+    'libmd.so*' 'libbsd.so*' \
+    'libatomic.so*' 'libz.so*' 'libzstd.so*' 'libexpat.so*' \
+    'libX11.so*' 'libX11-xcb.so*' 'libXau.so*' 'libXdmcp.so*' \
+    'libxcb.so*' 'libxcb-*.so*' 'libXext.so*' 'libXfixes.so*' \
+    'libXrender.so*' 'libXrandr.so*' 'libXxf86vm.so*' \
+    'libxshmfence.so*'; do
     for library in "$SYSROOT/usr/lib"/$pattern; do
         [ -e "$library" ] || continue
         cp -a "$library" "$STAGING/usr/lib/"
@@ -252,21 +284,34 @@ for pattern in \
 done
 
 TARGET_CC=(clang --target=aarch64-linux-musl --sysroot="$SYSROOT" -fuse-ld=lld --rtlib=compiler-rt --unwindlib=none)
+"${TARGET_CC[@]}" -O2 -Wall -Wextra -Werror -fPIC -shared \
+    "$SCRIPT_DIR/tests/agx-fake-g17/ioctl_fault.c" \
+    -o "$STAGING/usr/lib/libvinix-agx-fault.so" -ldl
 "${TARGET_CC[@]}" -O2 -D__vinix__ \
     -I"$STAGING/usr/include" \
     "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     -L"$STAGING/usr/lib" -Wl,-rpath-link,"$STAGING/usr/lib" \
-    -o "$STAGING/usr/bin/gl-triangle-agx" -lEGL -lGLESv2 -ldl -lpthread -lm
+    -o "$STAGING/usr/bin/gl-triangle-agx" -lEGL -lGLESv2 \
+    -Wl,--no-as-needed -lvinix-agx-fault -Wl,--as-needed \
+    -ldl -lpthread -lm
 install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
     "$STAGING/usr/share/examples/gl-triangle/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" "$STAGING/usr/bin/"
 install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle" "$STAGING/usr/bin/"
+install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" "$STAGING/usr/bin/"
+install -m755 "$SCRIPT_DIR/gl-triangle/run-virgl-smoke" "$STAGING/usr/bin/"
+printf '%s\n' "mesa=$MESA_VERSION drivers=asahi,virgl,softpipe platforms=x11,surfaceless gbm=enabled glx=dri" \
+    > "$STAGING/usr/share/vinix/mesa-x11-egl"
+# Keep the old marker for deployment scripts and images built before the
+# virtual GPU path was added.
+cp "$STAGING/usr/share/vinix/mesa-x11-egl" \
+    "$STAGING/usr/share/vinix/asahi-x11-egl"
 
 X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging"
 if [ -d "$X11_STAGING/usr/lib" ]; then
-    echo "==> Overlaying exact Asahi runtime onto ARM64 X11 staging"
+    echo "==> Overlaying exact Mesa GPU runtime onto ARM64 X11 staging"
     cp -a "$STAGING/." "$X11_STAGING/"
 fi
 
-echo "==> Asahi userspace ready: $STAGING"
+echo "==> Mesa GPU userspace ready: $STAGING"
 file "$STAGING/usr/bin/gl-triangle-agx"

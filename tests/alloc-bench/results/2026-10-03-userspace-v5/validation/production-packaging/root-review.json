@@ -1,0 +1,20 @@
+[
+  {
+    "arch": "amd64",
+    "status": "PASS",
+    "loader_sha256": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+    "static_libc_sha256": "eb50810aa7d3583f6469e23fce4c2f464a86197cfb2a0cdf5293b75baaedd90c",
+    "manifest_sha256": "02c05ac23e63bdc9b47398e4d34ffa04249eaea8b7d7a982d3be3b8601bef8bb",
+    "header_sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "production_recipe": "Actual root userland builder and completed initramfs validation; preserved packaged byte-exact libc files independently rehashed."
+  },
+  {
+    "arch": "aarch64",
+    "status": "PASS",
+    "loader_sha256": "509c99c6f48ce909d2346bc0228af1a7e66c9ece33f4ac3dd1476bc72505a439",
+    "static_libc_sha256": "97516875543172dd81acb8d6cbe391beb5207e9daf28c952838ef587ee2f67f9",
+    "manifest_sha256": "f9eec504f127723376c3a4a9ff98a6f5e9f89280ff8687828d94f47f38271ab3",
+    "header_sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+    "production_recipe": "Actual root userland builder and completed initramfs validation; preserved packaged byte-exact libc files independently rehashed."
+  }
+]

@@ -1,0 +1,432 @@
+{
+  "results": {
+    "candidate-complete": {
+      "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+      "source_sha256": "762f5ecdc8d77713bd83ad791e1443ce879afdfb08eec130b15ea1869d65c7ac",
+      "serial_sha256": "23eeea662fe8eceb154cdd1879437651e4bc4e61591b2ab397c24ebe1e367e69",
+      "completed_cases": 16,
+      "functional_failures": [
+        "SOCKET-OPS-FAIL kind=17 warm=0 errno=95"
+      ],
+      "rows": [
+        {
+          "operation": 0,
+          "name": "empty_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 1,
+          "name": "empty_recvfrom",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 2,
+          "name": "sendto_recvfrom",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 3,
+          "name": "sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 4,
+          "name": "large_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 5,
+          "name": "socket_names",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 6,
+          "name": "stream_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 7,
+          "name": "datagram_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 8,
+          "name": "seqpacket_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 9,
+          "name": "stream_control_truncate",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 10,
+          "name": "datagram_control_truncate",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 11,
+          "name": "stream_read_discards_rights",
+          "calls": 8192,
+          "retained_bytes": 4325376,
+          "live_objects_delta": {
+            "512": 8194
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 12,
+          "name": "datagram_read_discards_rights",
+          "calls": 8192,
+          "retained_bytes": 4325376,
+          "live_objects_delta": {
+            "512": 8194
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 13,
+          "name": "stream_close_queued_rights",
+          "calls": 8192,
+          "retained_bytes": 34799616,
+          "live_objects_delta": {
+            "384": 16384,
+            "512": 2,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 14,
+          "name": "datagram_close_queued_rights",
+          "calls": 8192,
+          "retained_bytes": 34799616,
+          "live_objects_delta": {
+            "384": 16384,
+            "512": 2,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 15,
+          "name": "closed_stream_send",
+          "calls": 8192,
+          "retained_bytes": 33243136,
+          "live_objects_delta": {
+            "384": 16384,
+            "512": 2,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        }
+      ]
+    },
+    "baseline-complete": {
+      "kernel_sha256": "1268f7348d4074767657395989e7cecfa100cc61a7e279592bab77d0222a889f",
+      "source_sha256": "762f5ecdc8d77713bd83ad791e1443ce879afdfb08eec130b15ea1869d65c7ac",
+      "serial_sha256": "45910c222cbf4fb61543ea967c3f0a0bd8978012b7876717384d03e8bb612b8b",
+      "completed_cases": 16,
+      "functional_failures": [
+        "SOCKET-OPS-FAIL kind=17 warm=0 errno=95"
+      ],
+      "rows": [
+        {
+          "operation": 0,
+          "name": "empty_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 5390336,
+          "live_objects_delta": {
+            "128": 8192,
+            "512": 8194
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 1,
+          "name": "empty_recvfrom",
+          "calls": 8192,
+          "retained_bytes": 5521408,
+          "live_objects_delta": {
+            "16": 8192,
+            "128": 8192,
+            "512": 8194
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 2,
+          "name": "sendto_recvfrom",
+          "calls": 8192,
+          "retained_bytes": 10911744,
+          "live_objects_delta": {
+            "16": 8192,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 3,
+          "name": "sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 11304960,
+          "live_objects_delta": {
+            "64": 8192,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 4,
+          "name": "large_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 11321344,
+          "live_objects_delta": {
+            "64": 8192,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 5,
+          "name": "socket_names",
+          "calls": 8192,
+          "retained_bytes": 0,
+          "live_objects_delta": {
+            "512": 2
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 6,
+          "name": "stream_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 12255232,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 7,
+          "name": "datagram_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 12255232,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 8,
+          "name": "seqpacket_fd_sendmsg_recvmsg",
+          "calls": 8192,
+          "retained_bytes": 12238848,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 9,
+          "name": "stream_control_truncate",
+          "calls": 8192,
+          "retained_bytes": 12271616,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 10,
+          "name": "datagram_control_truncate",
+          "calls": 8192,
+          "retained_bytes": 12238848,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 16384,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 11,
+          "name": "stream_read_discards_rights",
+          "calls": 8192,
+          "retained_bytes": 11206656,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 12,
+          "name": "datagram_read_discards_rights",
+          "calls": 8192,
+          "retained_bytes": 11173888,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "512": 16386
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 13,
+          "name": "stream_close_queued_rights",
+          "calls": 8192,
+          "retained_bytes": 41664512,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "384": 16384,
+            "512": 8194,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 14,
+          "name": "datagram_close_queued_rights",
+          "calls": 8192,
+          "retained_bytes": 41631744,
+          "live_objects_delta": {
+            "48": 8192,
+            "64": 16384,
+            "128": 8192,
+            "384": 16384,
+            "512": 8194,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        },
+        {
+          "operation": 15,
+          "name": "closed_stream_send",
+          "calls": 8192,
+          "retained_bytes": 39174144,
+          "live_objects_delta": {
+            "64": 8192,
+            "128": 8192,
+            "384": 16384,
+            "512": 8194,
+            "1536": 16384
+          },
+          "written_after_free_before": 1,
+          "written_after_free_after": 1
+        }
+      ]
+    }
+  },
+  "fixed_paths_passed": true,
+  "owned_fd_metadata_flat": true,
+  "no_introduced_functional_failure": true,
+  "broader_diagnostics": "Cases11/12 plainread and13-15 repeatedcreate/close retained bytes measured immediately after batch; baseline same paths retained at least as much; grace-period settlement will be measured before calling permanent leak. Case17MSG_PEEK EOPNOTSUPP identical baseline/candidate. No source changes to broad paths."
+}

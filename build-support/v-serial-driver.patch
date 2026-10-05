@@ -1,0 +1,61 @@
+--- vlib/v/driver/driver.v
++++ vlib/v/driver/driver.v
+@@ -10868,8 +10868,8 @@
+ 		prepare_markused_overlap := building_v && current_parallel_transform
+ 			&& scope_prealloc_markused && !incremental_cache_hit && !generic_cache_hit
+ 			&& !cache_state.manager.enabled && test_files.len == 0 && !is_checker_fixture
+ 			&& !trivial_literal_output && !input_file.ends_with('.vsh') && !no_skip_unused
+-		prepared_markused_thread := spawn markused.prepare_markused_declarations(a, &pre_tc, prepare_markused_overlap)
++		mut prepared_markused := markused.prepare_markused_declarations(a, &pre_tc, prepare_markused_overlap)
+ 		mut check_was_parallel := false
+ 		if trivial_literal_output && !incremental_cache_hit {
+ 			used_fns = markused.mark_used_without_generic_detection(a, &pre_tc)
+@@ -10888,8 +10888,7 @@
+ 				eprintln('  [ttime]   ck semantics     ${f64(ck_stage_sw.elapsed().microseconds()) / 1000.0:7.2f} ms')
+ 			}
+ 		}
+ 		ck_stage_sw.restart()
+-		mut prepared_markused := prepared_markused_thread.wait()
+ 		if verbose {
+ 			eprintln('  [ttime]   ck mkused wait   ${f64(ck_stage_sw.elapsed().microseconds()) / 1000.0:7.2f} ms')
+ 		}
+@@ -11061,7 +11060,7 @@
+ 		if prepare_transform_overlap {
+ 			transform.materialize_inferred_anonymous_structs_before_prepare(mut a, &pre_tc)
+ 		}
+-		prepared_transform_thread := spawn transform.prepare_selfhost_transform(a, &pre_tc, prepare_transform_overlap)
++		mut prepared_transform := transform.prepare_selfhost_transform(a, &pre_tc, prepare_transform_overlap)
+ 		// Mark used functions (dead-code elimination). This is done before transform
+ 		// so the transformer can skip function bodies that the C backend will prune.
+ 		// Checking and inactive-comptime pruning can add or detach nodes. Rebuild the
+@@ -11136,7 +11135,6 @@
+ 		if prepare_markused_overlap {
+ 			prepared_markused.release()
+ 		}
+-		mut prepared_transform := prepared_transform_thread.wait()
+ 		b.step('markused')
+ 		b.metric('reachable symbols', used_fns.len, 'symbols')
+ 		mut tfpre_sw := time.new_stopwatch()
+@@ -12236,10 +12234,9 @@
+ 		// Nothing below reads the transformed AST or its checker payloads: the C
+ 		// compiler consumes the generated file. Release those arenas alongside it
+ 		// so their unmapping is not serial work after the compile.
+-		mut scope_free_threads := []thread{}
+ 		if retained_transform_scope != unsafe { nil }
+ 			|| retained_transform_prepare_scope != unsafe { nil } {
+-			scope_free_threads << spawn free_retained_scopes(retained_transform_scope, retained_transform_prepare_scope)
++			free_retained_scopes(retained_transform_scope, retained_transform_prepare_scope)
+ 			retained_transform_scope = unsafe { nil }
+ 			retained_transform_prepare_scope = unsafe { nil }
+ 		}
+@@ -12894,10 +12891,7 @@
+ 		os.rm(cache_full_tcc_source) or {}
+ 		os.rm(retained_full_c_source) or {}
+ 		os.rm(cc_src) or {}
+ 		os.rmdir(cc_dir) or {}
+-		for scope_free_thread in scope_free_threads {
+-			scope_free_thread.wait()
+-		}
+ 		b.step(if tcc_cache_hit {
+ 			'tcc (cached)'
+ 		} else if used_tcc {

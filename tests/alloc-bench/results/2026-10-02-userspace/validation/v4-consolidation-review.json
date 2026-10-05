@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "method": "Read actual completed raw captures and manifests; independently check counts, completion, exact serial hashes and source fingerprints. No new guest, build or timing.",
+  "allocator": {
+    "x86": {
+      "passed": true,
+      "original_checks": 7640,
+      "supplemental_checks": 91104,
+      "total_checks": 98744,
+      "corruption_children_rejected": 16,
+      "all_four_trim_deltas_zero": true,
+      "serial_sha256": "748a6a700b4dad8178d53c613cf2300658e44a48e1e0c1699119647971d9f36d"
+    },
+    "arm": {
+      "passed": true,
+      "original_checks": 7640,
+      "supplemental_checks": 91104,
+      "total_checks": 98744,
+      "corruption_children_rejected": 16,
+      "all_four_trim_deltas_zero": true,
+      "serial_sha256": "7efe21c4734bfb951154308c91b1a662cb3987012fb058d1c83cbfb3dc3ad1f6"
+    }
+  },
+  "core": {
+    "x86_64": {
+      "passed": true,
+      "serial_sha256": "dddfe76953413acc830776af7cff906d49bc0ffa759da74e3b7b461999396dda",
+      "kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+      "feature_pass_markers": 53,
+      "advisory_lock_close_dup_markers_present": true
+    },
+    "aarch64": {
+      "passed": true,
+      "serial_sha256": "c5bc7fcf3b59ec99d2936e335b2654a9d0e218fde87cb6381b73ca3c6d071bec",
+      "kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9",
+      "feature_pass_markers": 51,
+      "advisory_lock_close_dup_markers_present": true
+    }
+  },
+  "desktop": {
+    "passed": true,
+    "required_rows": 43,
+    "serial_sha256": "e31d11f00d665fb6199dc6c1d212272707040673a73ff8568c0942b173e5c2ca",
+    "kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9",
+    "desktop_sha256": "342951b1f2718833615ba2bf6e32c4f1cc7a0b06dc01b94c459be7beeaf55614",
+    "note": "Scenario execution completed; retained ops/churn growth remains in the full results."
+  }
+}

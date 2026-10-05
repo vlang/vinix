@@ -1,44 +1,69 @@
 #!/bin/bash
-# Capture the QEMU guest screen through the monitor socket.
+# Capture the QEMU guest screen.
 #
 #   ./desktop/tools/screenshot.sh out.png
 #
-# Requires the VM to have been started with a monitor socket, which
-# run-aarch64.sh does when VINIX_QEMU_EXTRA names one:
+# Requires the VM to have been started with a QMP socket, which
+# run-desktop-aarch64.sh --monitor sets up.
 #
-#   VINIX_QEMU_EXTRA="-monitor unix:/tmp/vinix-monitor,server,nowait" \
-#   VINIX_INITRAMFS=.../initramfs-desktop.tar ./run-aarch64.sh --no-build
+# This talks QMP rather than the human monitor. The human monitor is a
+# `server,nowait` socket that serves one client at a time, and a client that
+# does not disconnect cleanly leaves it unable to accept another — which looks
+# exactly like a hung guest, and twice sent me hunting for a bug in a VM that
+# was running perfectly well. QMP tolerates the same treatment.
 set -e
 
 OUT="${1:-/tmp/vinix-screen.png}"
-SOCKET="${VINIX_MONITOR_SOCKET:-/tmp/vinix-monitor}"
-PPM="$(mktemp -t vinix-screen).ppm"
+SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
 if [ ! -S "$SOCKET" ]; then
-    echo "ERROR: no QEMU monitor socket at $SOCKET"
+    echo "ERROR: no QMP socket at $SOCKET" >&2
+    echo "Start the VM with ./run-desktop-aarch64.sh --monitor" >&2
     exit 1
 fi
 
-# screendump always writes PPM; the guest never sees this happen.
-printf 'screendump %s\nquit_not_really\n' "$PPM" | nc -U "$SOCKET" >/dev/null 2>&1 || true
-
-# The monitor answers before the file is flushed, so wait for it to appear.
-for _ in $(seq 1 40); do
-    if [ -s "$PPM" ]; then
-        break
-    fi
-    sleep 0.25
-done
-
-if [ ! -s "$PPM" ]; then
-    echo "ERROR: screendump produced nothing"
-    exit 1
-fi
-
-python3 -c "
+python3 - "$SOCKET" "$OUT" <<'PY'
+import json
+import os
+import socket
 import sys
+import tempfile
+
 from PIL import Image
-Image.open(sys.argv[1]).save(sys.argv[2])
-" "$PPM" "$OUT"
-rm -f "$PPM"
-echo "$OUT"
+
+socket_path, out_path = sys.argv[1], sys.argv[2]
+
+connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+connection.settimeout(30)
+connection.connect(socket_path)
+stream = connection.makefile("rw", encoding="utf-8", newline="\n")
+stream.readline()  # greeting
+
+
+def command(name, **arguments):
+    request = {"execute": name}
+    if arguments:
+        request["arguments"] = arguments
+    stream.write(json.dumps(request) + "\n")
+    stream.flush()
+    while True:
+        message = json.loads(stream.readline())
+        # Events can arrive between a request and its reply.
+        if "return" in message:
+            return message["return"]
+        if "error" in message:
+            sys.exit("QMP error: %s" % message["error"])
+
+
+command("qmp_capabilities")
+# screendump always writes PPM; the guest never sees this happen.
+ppm = tempfile.mktemp(prefix="vinix-screen-", suffix=".ppm")
+command("screendump", filename=ppm)
+
+if not os.path.exists(ppm) or os.path.getsize(ppm) == 0:
+    sys.exit("screendump produced nothing")
+
+Image.open(ppm).save(out_path)
+os.remove(ppm)
+print(out_path)
+PY

@@ -1,0 +1,17 @@
+#!/bin/sh
+LD_PRELOAD=/root/libgnumeric-trace.so GDK_BACKEND=x11 NO_AT_BRIDGE=1 \
+	/usr/bin/gnumeric --no-splash >/tmp/gnumeric-trace.log 2>&1 &
+client=$!
+sleep 10
+echo "GNumeric diagnostic: client pid=$client"
+kill -0 "$client" && echo "GNumeric diagnostic: client is running"
+ps
+echo "GNumeric diagnostic: application trace follows"
+cat /tmp/gnumeric-trace.log
+if command -v xwininfo >/dev/null 2>&1; then
+	xwininfo -root -tree
+fi
+python3 -u /root/xwindows.py || true
+echo "GNumeric diagnostic: Xorg log follows"
+tail -150 /var/log/Xorg.0.log
+wait "$client"

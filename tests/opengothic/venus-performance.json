@@ -1,0 +1,23 @@
+{
+  "samples": 115,
+  "median_fps": 83.45,
+  "min_fps": 21.57,
+  "max_fps": 135.95,
+  "seconds": 60,
+  "warmup_seconds": 10,
+  "cpus": 4,
+  "kernel_sha256": "63cf15b897ce0658e35d634bd91002ed8b06b09cec10ac06bdf96cedf020ed21",
+  "engine_sha256": "09b0fce8b1c9cb4e698297f741f291b9c1f591be8a597f421387de2ac0bfecef",
+  "venus_sha256": "8201faf42e6c41831accc5adce9470beab3643ddb55dd4689a7f0b266e13554c",
+  "screenshot": "../../vinix-opengothic-venus.png",
+  "resolution": [
+    1280,
+    720
+  ],
+  "host_gpu": "Apple M5 Max",
+  "guest_ram_mib": 12288,
+  "opengothic_commit": "26b7159230834780fc6a8fc9aa0d060863cb443f",
+  "mesa_version": "25.0.5",
+  "qemu_version": "10.2.50 (KekVM, private HVF cutoff patch)",
+  "minimum_median_fps": 55
+}

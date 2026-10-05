@@ -1,0 +1,117 @@
+diff --git a/kernel/memory/virtual_amd64.v b/kernel/memory/virtual_amd64.v
+index 791c2af5..47dc2d22 100644
+--- a/kernel/memory/virtual_amd64.v
++++ b/kernel/memory/virtual_amd64.v
+@@ -179,62 +179,67 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
+ 	unsafe {
+ 		old := *pte_p
+ 		*pte_p = 0
+-		// Before any table below goes back: a CPU still holding a translation
+-		// through it would walk a page that is someone else's by then.
+-		if old & 1 != 0 {
+-			pagemap.invalidate(virt)
+-		}
+-
+-		mut i := u64(0)
+-		for ; i < 512; i++ {
+-			if pml1_p[i] != 0 {
+-				break
++		// The next entry usually remains mapped while a contiguous range is
++		// removed in address order. Check it first; sparse tables still get
++		// the complete scan, including entries with software-only flags.
++		if !table_empty_after_clear(pml1_p, pml1_entry) {
++			if old & 1 != 0 {
++				pagemap.invalidate(virt)
+ 			}
+-		}
+-		if i == 512 {
+-			pmm_free(pml1, 1)
+-			pml2_p[pml2_entry] = 0
++			return
+ 		}
+ 
+-		i = u64(0)
+-		for ; i < 512; i++ {
+-			if pml2_p[i] != 0 {
+-				break
++		// A surviving child makes every ancestor nonempty. Only scan the
++		// next level after removing an empty child, and detach all reclaimed
++		// tables before the shootdown so no CPU can walk them after it.
++		pml2_p[pml2_entry] = 0
++		remove_pml2 := table_empty_after_clear(pml2_p, pml2_entry)
++		mut remove_pml3 := false
++		mut remove_pml4 := false
++		if remove_pml2 {
++			pml3_p[pml3_entry] = 0
++			remove_pml3 = table_empty_after_clear(pml3_p, pml3_entry)
++			if remove_pml3 {
++				pml4_p[pml4_entry] = 0
++				if la57 {
++					remove_pml4 = table_empty_after_clear(pml4_p, pml4_entry)
++					if remove_pml4 {
++						pml5_p[pml5_entry] = 0
++					}
++				}
+ 			}
+ 		}
+-		if i == 512 {
++		// Before any detached table goes back: a CPU may have cached its
++		// parent even when the leaf was absent. Drop those paging-structure
++		// entries as well as any translation before returning the pages.
++		pagemap.invalidate(virt)
++		pmm_free(pml1, 1)
++		if remove_pml2 {
+ 			pmm_free(pml2, 1)
+-			pml3_p[pml3_entry] = 0
+-		}
+-
+-		i = u64(0)
+-		for ; i < 512; i++ {
+-			if pml3_p[i] != 0 {
+-				break
+-			}
+ 		}
+-		if i == 512 {
++		if remove_pml3 {
+ 			pmm_free(pml3, 1)
+-			pml4_p[pml4_entry] = 0
+ 		}
+-		if la57 {
+-			// From the start of the table, as for the levels below. Carrying on
+-			// from where the PML3 scan stopped found the PML4 empty whenever its
+-			// live entries sat below that index, and freed it with them: every
+-			// munmap of more than a page on a 5-level machine lost the rest of
+-			// its pages, and every exec leaked the 8 MiB stack.
+-			i = 0
+-			for ; i < 512; i++ {
+-				if pml4_p[i] != 0 {
+-					break
+-				}
+-			}
+-			if i == 512 {
+-				pmm_free(pml4, 1)
+-				pml5_p[pml5_entry] = 0
+-			}
++		if remove_pml4 {
++			pmm_free(pml4, 1)
++		}
++	}
++}
++
++// Called with the page-map lock held, after clearing `index`. A single live
++// successor proves the table nonempty; when it is absent, inspect every entry
++// so a hole or a live entry earlier in the table cannot hide a mapped page.
++@[inline]
++fn table_empty_after_clear(table &u64, index u64) bool {
++	if index < 511 && unsafe { table[index + 1] } != 0 {
++		return false
++	}
++	for i := u64(0); i < 512; i++ {
++		if unsafe { table[i] } != 0 {
++			return false
+ 		}
+ 	}
++	return true
+ }
+ 
+ // Change the protection of a page that is mapped. One that is not is left

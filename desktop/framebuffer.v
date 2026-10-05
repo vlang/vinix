@@ -1,3 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
+// SPDX-License-Identifier: GPL-2.0-or-later
 // The display side of the desktop: /dev/fb0 is queried for its geometry and
 // then mapped, so a frame reaches the screen as one memcpy out of the back
 // buffer instead of a write syscall per scanline.
@@ -72,7 +77,7 @@ mut:
 // every consumer indexes the mapping as u32.
 struct Framebuffer {
 mut:
-	fd     int = -1
+	fd     int  = -1
 	base   &u32 = unsafe { nil }
 	width  int
 	height int
@@ -84,25 +89,33 @@ mut:
 	r_shift u32
 	g_shift u32
 	b_shift u32
+	gpu              GpuPresenter
+	graphics_claimed bool
 }
 
 fn open_framebuffer(path string) !Framebuffer {
+	gpu_present_startup_stage(c'opening framebuffer device node')
 	fd := desktop_open_rw(path)
 	if fd < 0 {
 		return error('cannot open ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer device node opened')
 
 	mut var := FBVarScreenInfo{}
+	gpu_present_startup_stage(c'querying framebuffer variable geometry')
 	if desktop_ioctl(fd, fbioget_vscreeninfo, &var) < 0 {
 		desktop_close(fd)
 		return error('FBIOGET_VSCREENINFO failed on ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer variable geometry received')
 
 	mut fix := FBFixScreenInfo{}
+	gpu_present_startup_stage(c'querying framebuffer fixed geometry')
 	if desktop_ioctl(fd, fbioget_fscreeninfo, &fix) < 0 {
 		desktop_close(fd)
 		return error('FBIOGET_FSCREENINFO failed on ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer fixed geometry received')
 
 	if var.bits_per_pixel != 32 {
 		desktop_close(fd)
@@ -115,29 +128,56 @@ fn open_framebuffer(path string) !Framebuffer {
 	stride := if fix.line_length > 0 { int(fix.line_length) / 4 } else { width }
 	size := u64(stride) * u64(height) * 4
 
+	gpu_present_startup_stage(c'mapping framebuffer memory')
 	mapping := desktop_mmap_shared(fd, size)
 	if mapping == unsafe { nil } {
 		desktop_close(fd)
 		return error('cannot map ${path}')
 	}
+	gpu_present_startup_stage(c'framebuffer memory mapped')
 
 	return Framebuffer{
-		fd: fd
-		base: unsafe { &u32(mapping) }
-		width: width
-		height: height
-		stride: stride
-		size: size
-		direct: var.red.offset == 16 && var.green.offset == 8 && var.blue.offset == 0
+		fd:      fd
+		base:    unsafe { &u32(mapping) }
+		width:   width
+		height:  height
+		stride:  stride
+		size:    size
+		direct:  var.red.offset == 16 && var.green.offset == 8 && var.blue.offset == 0
 		r_shift: var.red.offset
 		g_shift: var.green.offset
 		b_shift: var.blue.offset
 	}
 }
 
-// present copies a finished frame out in one pass. On the usual XRGB8888
-// framebuffer that is a single memcpy per frame; anything else costs a repack.
-fn (mut fb Framebuffer) present(canvas &Canvas) {
+@[inline]
+fn (fb &Framebuffer) pack_pixel(pixel u32) u32 {
+	if fb.direct {
+		return pixel
+	}
+	return ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift | (pixel & 0xff) << fb.b_shift
+}
+
+fn (mut fb Framebuffer) claim_graphics() {
+	if !fb.graphics_claimed {
+		desktop_set_console_graphics(true)
+		fb.graphics_claimed = true
+	}
+}
+
+// present copies a finished native-resolution frame out in one pass. Canvas
+// keeps logical geometry separately from its backing dimensions, allowing 2x
+// font masks to remain sharp while this final transfer stays scale-agnostic.
+fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
+	// On an M1 build this creates a surfaceless EGL context lazily and lets AGX
+	// composite the CPU canvas into the firmware framebuffer. The static
+	// desktop and any failed GPU initialization continue through this file's
+	// existing software paths.
+	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		fb.graphics_claimed = true
+		return
+	}
+	fb.claim_graphics()
 	if fb.direct {
 		if canvas.stride == fb.stride {
 			unsafe {
@@ -157,15 +197,77 @@ fn (mut fb Framebuffer) present(canvas &Canvas) {
 		src := y * canvas.stride
 		dst := y * fb.stride
 		for x := 0; x < fb.width; x++ {
+			pixel := unsafe { canvas.pixels[src + x] }
+			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
+		}
+	}
+}
+
+// present_damage transfers only a changed logical rectangle. The GPU presenter
+// owns a full-frame hardware path, so it remains preferable when active;
+// software fbdev output otherwise avoids copying untouched desktop pixels.
+fn (mut fb Framebuffer) present_damage(canvas &Canvas, damage DamageRect) {
+	fb.present_damages(canvas, damage, DamageRect{})
+}
+
+// present_damages transfers two changed rectangles, such as where the pointer
+// was and where it is now, without copying everything between them.
+fn (mut fb Framebuffer) present_damages(canvas &Canvas, first DamageRect, second DamageRect) {
+	mut damage := FrameDamage{}
+	damage.add(first)
+	damage.add(second)
+	fb.present_frame_damage(canvas, damage)
+}
+
+fn (mut fb Framebuffer) present_frame_damage(canvas &Canvas, damage FrameDamage) {
+	if !damage.valid() {
+		return
+	}
+	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+		fb.graphics_claimed = true
+		return
+	}
+	fb.claim_graphics()
+	for i in 0 .. damage.count {
+		fb.copy_damage(canvas, damage.rects[i])
+	}
+}
+
+fn (mut fb Framebuffer) copy_damage(canvas &Canvas, damage DamageRect) {
+	if !damage.valid {
+		return
+	}
+	x0 := if damage.x > 0 { damage.x } else { 0 }
+	y0 := if damage.y > 0 { damage.y } else { 0 }
+	x1 := if damage.x + damage.w < canvas.width { damage.x + damage.w } else { canvas.width }
+	y1 := if damage.y + damage.h < canvas.height { damage.y + damage.h } else { canvas.height }
+	if x1 <= x0 || y1 <= y0 {
+		return
+	}
+	physical_x0 := x0 * canvas.scale
+	physical_y0 := y0 * canvas.scale
+	physical_x1 := if x1 * canvas.scale < fb.width { x1 * canvas.scale } else { fb.width }
+	physical_y1 := if y1 * canvas.scale < fb.height { y1 * canvas.scale } else { fb.height }
+	if fb.direct {
+		for y := physical_y0; y < physical_y1; y++ {
 			unsafe {
-				pixel := canvas.pixels[src + x]
-				fb.base[dst + x] = ((pixel >> 16) & 0xff) << fb.r_shift | ((pixel >> 8) & 0xff) << fb.g_shift | (pixel & 0xff) << fb.b_shift
+				vmemcpy(&fb.base[y * fb.stride + physical_x0], &canvas.pixels[y * canvas.stride + physical_x0], usize((physical_x1 - physical_x0) * 4))
 			}
+		}
+		return
+	}
+	for y := physical_y0; y < physical_y1; y++ {
+		src := y * canvas.stride
+		dst := y * fb.stride
+		for x := physical_x0; x < physical_x1; x++ {
+			pixel := unsafe { canvas.pixels[src + x] }
+			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
 		}
 	}
 }
 
 fn (mut fb Framebuffer) close() {
+	fb.gpu.close()
 	if fb.base != unsafe { nil } {
 		desktop_munmap(fb.base, fb.size)
 		fb.base = unsafe { nil }
@@ -173,5 +275,9 @@ fn (mut fb Framebuffer) close() {
 	if fb.fd >= 0 {
 		desktop_close(fb.fd)
 		fb.fd = -1
+	}
+	if fb.graphics_claimed {
+		desktop_set_console_graphics(false)
+		fb.graphics_claimed = false
 	}
 }

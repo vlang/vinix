@@ -1,0 +1,353 @@
+[2J[001;001H[=3h[2J[001;001H[2J[001;001H[8;042;160t[2J[001;001H[2J[001;001H[8;056;240t[2J[001;001HBdsDxe: loading Boot0002 "UEFI QEMU HARDDISK QM00017 " from PciRoot(0x0)/Pci(0x2,0x0)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0002 "UEFI QEMU HARDDISK QM00017 " from PciRoot(0x0)/Pci(0x2,0x0)/Sata(0x2,0xFFFF,0x0)
+Darwin Kernel Version 19.6.0: Thu Oct 29 22:56:45 PDT 2020; root:xnu-6153.141.2.2~1/RELEASE_X86_64
+pmap_startup() delaying init/free of page nums > 0x200000
+pmap_startup() init/release time: 704627 microsec
+pmap_startup() delayed init/release of 0 pages
+vm_page_bootstrap: 1004161 free pages, 36223 wired pages, (up to 0 of which are delayed free)
+kext submap [0x<ptr> - 0x<ptr>], kernel text [0x<ptr> - 0x<ptr>]
+zone leak detection enabled
+zalloc: allocating memory for zone names buffer
+"vm_compressor_mode" is 4
+oslog_init completed, 16 chunks, 8 io pages
+standard timeslicing quantum is 10000 us
+standard background quantum is 2500 us
+WQ[wql_init]: init linktable with max:262144 elements (8388608 bytes)
+WQ[wqp_init]: init prepost table with max:262144 elements (8388608 bytes)
+mig_table_max_displ = 53
+Timeouts adjusted for virtualization (<<6)
+kdp_core zlib memory 0x7000
+ACPI: RSDP 0x000000007FB7E014 000024 (v02 BOCHS )
+ACPI: XSDT 0x000000007FBFD000 00005C (v01 BOCHS  BXPC     00000001      01000013)
+ACPI: FACP 0x000000007FB79000 0000F4 (v03 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: DSDT 0x000000007FB7A000 00216B (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: FACS 0x000000007FBDD000 000040
+ACPI: APIC 0x000000007FB78000 000080 (v03 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: HPET 0x000000007FB77000 000038 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: MCFG 0x000000007FB76000 00003C (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: WAET 0x000000007FB75000 000028 (v01 BOCHS  BXPC     00000001 BXPC 00000001)
+ACPI: BGRT 0x000000007FB74000 000038 (v01 INTEL  EDK2     00000002      01000013)
+ACPI: SSDT 0x000000007FBFE000 00010B (v02 ACDT   SsdtEC   00001000 INTL 20190509)
+Warning - kext com.apple.driver.usb.AppleUSBHostPlatformProperties declares no com.apple.kpi.* dependencies. If it uses any KPIs, the link may fail with undefined symbols.
+ACPI: 2 ACPI AML tables successfully acquired and loaded
+Lilu    config: @ found a disabling argument or no arguments, exiting
+WhateverGreen      init: @ failed to call parent 7
+AppleCredentialManager: init: called, instance = <ptr>.
+AssertMacros: value (value: 0x0), ---, file: /AppleInternal/BuildRoot/Library/Caches/com.apple.xbs/Sources/AppleCredentialManager/AppleCredentialManager-336.100.5/AppleCredentialManager/AppleCredentialManager.cpp:67
+AppleCredentialManager: init: Embedded OS: 0 (over KernelRelay: NO, over SEPManager: NO), in BaseSystem: NO, in InternalSystem: NO.
+ACM: Env_SetVariable: set var[6].
+ACM: Env_SetVariable (len=1): new data: 00 
+ACM: InitCredentialEngine: Global credential set created, CS[10].
+ACM: Env_SetVariable: set var[5].
+ACM: Env_SetVariable (len=1): new data: 00 
+ACMFirstResponderKernelService: init: called, .
+AppleCredentialManager: init: returning, result = true, instance = <ptr>.
+AppleACPICPU: ProcessorId=0 LocalApicId=0 Enabled
+AppleACPICPU: ProcessorId=1 LocalApicId=1 Enabled
+calling mpo_policy_init for AMFI
+Security policy loaded: Apple Mobile File Integrity (AMFI)
+calling mpo_policy_init for Sandbox
+Security policy loaded: Seatbelt sandbox policy (Sandbox)
+calling mpo_policy_init for Quarantine
+Security policy loaded: Quarantine policy (Quarantine)
+calling mpo_policy_init for TMSafetyNet
+Security policy loaded: Safety net for Time Machine (TMSafetyNet)
+Darwin Image4 Validator Version 2.2.0: Thu Oct 29 23:03:20 PDT 2020; root:AppleImage4-61.60.4~3461/AppleImage4/RELEASE_X86_64
+virtual bool CoreAnalyticsHub::start(IOService *)::105:CoreAnalyticsHub start
+AppleCredentialManager: start: called, instance = <ptr>.
+AppleCredentialManager: start: started, instance = <ptr>.
+AppleCredentialManager: start: returning, result = true, instance = <ptr>.
+AppleKeyStore starting (BUILT: Oct 30 2020 05:28:00)
+AppleKeyStore::start: _kernel_relay_enable = 0
+AppleKeyStore::start: _sep_enabled = 0
+AppleSSE::start called
+AssertMacros: value (value: 0x0),  file: /AppleInternal/BuildRoot/Library/Caches/com.apple.xbs/Sources/AppleSSE/AppleSSE-181.140.1/AppleSSE/AppleSSE.cpp, line: 40
+AppleSSE::start returning, result = 1
+ACPI Warning: GPE _E01 has no implementation (20160930/evgpeinit-465)
+IOAPIC: Version 0x20 Vectors 64:87
+ACPI: Executed 1 blocks of module-level executable AML code
+ACPI: sleep states S5
+pci (build 23:15:27 Oct 29 2020), flags 0x20c3080
+Previous shutdown cause: 3
+Sleep failure code 0xffffffff 0xffffffff
+000011.984141 AppleUSBLegacyRoot@: AppleUSBLegacyRoot::init: enabling legacy matching
+[ PCI configuration begin ]
+HID: Legacy shim 2
+console relocated to 0x80000000
+[ PCI configuration end, bridges 1, devices 8 ]
+VirtualSMC      init: @ failed to call parent 7
+VirtualSMC     efend: @ failed to load efi rt services for status
+VirtualSMC      prov: @ legacy mode, most of the features are disabled!
+VirtualSMC      vsmc: @ disabling itself due to multiple devices present
+Copyright (c) 1982, 1986, 1989, 1991, 1993
+	The Regents of the University of California. All rights reserved.
+
+MAC Framework successfully initialized
+using 16384 buffer headers and 10240 cluster IO buffer headers
+mcache: 2 CPU(s), 64 bytes CPU cache line size
+mbinit: done [64 MB total pool size, (42/21) split]
+dlil_init: Waiting for all the create dlil kernel threads to get scheduled at least once.
+dlil_init: All the created dlil kernel threads have been scheduled at least once. Proceeding.
+com.apple.AppleFSCompressionTypeZlib kmod start
+ifnet_attach: All kernel threads created for interface lo0 have been scheduled at least once. Proceeding.
+ifnet_attach: Waiting for all kernel threads created for interface gif0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface gif0 have been scheduled at least once. Proceeding.
+ifnet_attach: Waiting for all kernel threads created for interface stf0 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface stf0 have been scheduled at least once. Proceeding.
+com.apple.AppleFSCompressionTypeDataless kmod start
+calling mpo_policy_init for ASP
+Security policy loaded: Apple System Policy (ASP)
+com.apple.AppleFSCompressionTypeZlib load succeeded
+com.apple.AppleFSCompressionTypeDataless load succeeded
+rooting via boot-uuid from /chosen: 965CE7C6-FA91-4038-8FD7-961AF02A392A
+Waiting on <dict ID="0"><key>IOProviderClass</key><string ID="1">IOResources</string><key>IOResourceMatch</key><string ID="2">boot-uuid-media</string></dict>
+deferred rematching count 0
+ifnet_attach: Waiting for all kernel threads created for interface EHC1 to get scheduled at least once.
+ifnet_attach: All kernel threads created for interface EHC1 have been scheduled at least once. Proceeding.
+HID: Legacy shim 2
+SATA WARNING: IDENTIFY DEVICE checksum not implemented
+SATA WARNING: IDENTIFY DEVICE checksum not implemented
+SATA WARNING: IDENTIFY DEVICE checksum not implemented
+apfs_module_start:1689: load: com.apple.filesystems.apfs, v1412.141.1, apfs-1412.141.1, 2020/10/30
+cryptoAlloc:672: Using 64 buffers with size 16384, 512 buffers size 65536
+swcrypto_threadpool_init:1365: Starting ThreadPool
+swcrypto_threadpool_init:1387: 4 threads would be used for the ThreadPool
+swcrypto_threadpool_worker_thread:1311: ThreadPool worker thread started
+swcrypto_threadpool_worker_thread:1311: ThreadPool worker thread started
+swcrypto_threadpool_worker_thread:1311: ThreadPool worker thread started
+swcrypto_threadpool_worker_thread:1311: ThreadPool worker thread started
+dev_init:294: disk1s2: device accelerated crypto: 0 (compiled @ Oct 30 2020 00:55:31)
+dev_init:297: disk1s2: device_handle block size 4096 block count 16726006 features 0 internal 
+fletcher64_init:106: Selecting SSE2 implementation of fletcher64
+nx_kernel_mount:1121: disk1s2: initializing cache w/hash_size 8192 and cache size 32768
+nx_kernel_mount:1385: disk1s2: checkpoint search: largest xid 3417, best xid 3417 @ 243
+apfs_sysctl_register:1165: done registering sysctls.
+Got boot device = IOService:/AppleACPIPlatformExpert/PCI0/AppleACPIPCI/S10@2/AppleAHCI/PRT4@4/IOAHCIDevice@0/AppleAHCIDiskDriver/IOAHCIBlockStorageDevice/IOBlockStorageDriver/QEMU HARDDISK Media/IOGUIDPartitionScheme/Untitled 2@2/AppleAPFSContainerScheme/BSD root: disk3s5, major 1, minor 11
+disk3s5: device is not readable.
+hfs_mountfs: buf_meta_bread failed with 13
+hfs_mount: hfs_mountfs returned error=13 for device unknown-dev
+hfs_mountroot failed: 13
+apfs_vfsop_mountroot:1502: apfs: mountroot called!
+dev_init:294: /dev/disk3: device accelerated crypto: 0 (compiled @ Oct 30 2020 00:55:31)
+dev_init:297: /dev/disk3: device_handle block size 4096 block count 16726006 features 16 internal 
+nx_kernel_mount:1121: /dev/disk3: initializing cache w/hash_size 16384 and cache size 40960
+nx_kernel_mount:1385: /dev/disk3: checkpoint search: largest xid 3417, best xid 3417 @ 243
+er_state_obj_get_for_recovery:4639: No ER state object for volume vinix catalina - rolling is not happening, nothing to recover.
+apfs_vfsop_mount:1318: Promoter has been locked for /dev/disk3
+handle_mount:329: vol-uuid: 965CE7C6-FA91-4038-8FD7-961AF02A392A block size: 4096 block count: 16726006 (unencrypted; flags: 0x1; features: 1.0.16)
+handle_mount:342: setting dev block size to 4096 from 512
+handle_mount:383: ROSV: apfs mounted RO and is the system volume of a volume group and mounted as the root fs: creating the shadow fs_root
+fs_setup_shadow_fs_root_tree:1452: Created the shadow_fs_root tree <ptr>
+nx_volume_group_update:6431: Set volume (role 0x1) to ac5f xid 0
+apfs_vfsop_mount:1489: mounted volume: vinix catalina
+NOTE: Attempting ROSV mount
+NOTE: DETECTED ROSV CONFIG
+attempting kernel mount for data volume... 
+er_state_obj_get_for_recovery:4639: No ER state object for volume vinix catalina - Data - rolling is not happening, nothing to recover.
+container_identify_vnode_from_idx:1245: identified a volume by index 0
+container_identify_vnode_from_idx:1248: nx -> index: identified string: /dev/disk3s1 
+nx_volume_group_get_volume_indices:6236: Found 2 volumes in group A2C0BA51-05F7-4C27-9E6F-47696D08130D
+handle_mount:329: vol-uuid: A2C0BA51-05F7-4C27-9E6F-47696D08130D block size: 4096 block count: 16726006 (unencrypted; flags: 0x1; features: 1.0.16)
+handle_mount:342: setting dev block size to 4096 from 512
+nx_volume_group_update:6431: Set volume (role 0x40) to 402 xid 0
+attempting kernel mount for vm volume... 
+spaceman_metazone_init:238: metazone for device 0 of size 522687 blocks (encrypted: 0-261343 unencrypted: 261343-490020)
+spaceman_metazone_init:241: metazone also includes omap zone (490020-522687)
+spaceman_allocation_init:399: Initialize soft block-out range on /dev/disk3 0 0 0er_state_obj_get_for_recovery:4639: No ER state object for volume VM - rolling is not happening, nothing to recover.
+container_identify_vnode_from_idx:1245: identified a volume by index 3
+container_identify_vnode_from_idx:1248: nx -> index: identified string: /dev/disk3s4 
+handle_mount:329: vol-uuid: 16A39C73-2592-48B6-ABF0-DBD44FD9D461 block size: 4096 block count: 16726006 (unencrypted; flags: 0x1; features: 1.0.2)
+handle_mount:342: setting dev block size to 4096 from 512
+nx_volume_group_update:6352: Volume VM role 8 Not a System or data volume
+mounted VM volume
+load_init_program: attempting to load /sbin/launchd
+zalloc: allocating memory for zone names buffer
+VM Swap Subsystem is ON
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 256 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 179 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+spaceman_trim_free_blocks:3326: scan took 2.701367 s, trims took 0.166953 s
+spaceman_trim_free_blocks:3334: 10629811 blocks free in 9395 extents
+spaceman_trim_free_blocks:3342: 10629811 blocks trimmed in 9395 extents (17 us/trim, 56273 trims/s)
+spaceman_trim_free_blocks:3345: trim distribution 1:2841 2+:2180 4+:2569 16+:1234 64+:371 256+:200
+kern_open_file_for_direct_io(<ptr>, 0)
+kern_open_file_for_direct_io took 2673 ms
+Opened file /private/var/vm/kernelcore, size 1048576, extents 1, maxio 2000000 ssd 0
+polled file major 1, minor 1, blocksize 4096, pollers 5
+Opened corefile of size 1 MB
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 6 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+AMFI: '/private/var/db/dyld/dyld_shared_cache_x86_64' is adhoc signed.
+port is not ready for callouts
+Darwin Bootstrapper Version 7.0.0: Fri Jun  5 21:08:54 PDT 2020; root:libxpc_executables-1738.140.1~20/launchd/RELEASE_X86_64
+boot-args = keepsyms=1 -s -v serial=3
+ALF, old data swfs_pid_entry <ptr>, updaterules_msg <ptr>, updaterules_state <ptr>Fri Oct  2 16:39:10 2026 localhost com.apple.xpc.launchd[1] <Notice>: Entering single-user mode.
+*** Single-user boot ***
+Root device is mounted read-only
+Enabling and disabling services is not supported in single-user mode,
+and disabled services will not be respected when loading services
+while in single-user mode.
+To mount the root device as read-write:
+	$ /sbin/mount -X /
+To boot the system:
+	$ exit
+localhost:/ root# /sbin/mount -uw /
+/usr/bin/uname -a
+/usr/bin/shasum apfs_vfsop_mount:1155: Remounting system volume /dev/disk3s5 in read/write mode
+sendIONotification:1492: sendIONotification: entered w/ notification e0084002
+sendIONotification:1503: sendIONotification: got service is_v 1 ret 0
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 3 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+-localhost:/ root# /usr/bin/uname -a
+duplicate_jobj_op_to_shadow_fs_root:1895: Shadow create_or_modify_jobj(jobj -549529645840 xid 3419 op 4) failed with error 2
+/usr/bin/shasum -a 256 Darwin localhost 19.6.0 Darwin Kernel Version 19.6.0: Thu Oct 29 22:56:45 PDT 2020; root:xnu-6153.141.2.2~1/RELEASE_X86_64 x86_64
+localhost:/ root# /usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+ls -l /tmp/alloc* /tmp/opt/local/bin/gcc-mp-14
+shasum: /tmp/alloc-bench-native: 
+shasum: /tmp/bench.c: No such file or directory
+localhost:/ root# ls -l /tmp/alloc* /tmp/opt/local/bin/gcc-mp-14
+ls: /tmp/alloc*: No such file or directory
+ls: /tmp/opt/local/bin/gcc-mp-14: No such file or directory
+localhost:/ root# ls /dev/disk*
+ls -l/dev/disk0	/dev/disk1s2	/dev/disk2s2	/dev/disk3s2	/dev/disk3s5
+/dev/disk1	/dev/disk2	/dev/disk3	/dev/disk3s3
+/dev/disk1s1	/dev/disk2s1	/dev/disk3s1	/dev/disk3s4
+localhost:/ root# ls -l /sbin/mount_msdos /System/Library/Extensions/msdosfs.kext
+lrwxr-xr-x  1 root  wheel  67 Sep 19 22:08 /sbin/mount_msdos -> /System/Library/Filesystems/msdos.fs/Contents/Resources/mount_msdos
+
+/System/Library/Extensions/msdosfs.kext:
+total 0
+drwxr-xr-x  6 root  wheel  192 Oct 30  2020 Contents
+localhost:/ root# /sbin/kextload /System/Library/Extensions/msdosfs.kext
+mkdir -p /Volumes/ALLOCBENCH
+/sbin/mount_msdos /dev/disk0 /Volumes/ALLOCBENCH
+ls /Volumes/ALLOCBENCH
+Kext with invalid signature (-67061) allowed: <OSKext 0x7ff60ac50f40 [0x7fff8ae47cc0]> { URL = "file:///System/Library/Extensions/msdosfs.kext/", ID = "com.apple.filesystems.msdosfs" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7ff60ac3ef50 [0x7fff8ae47cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/Mach.kext/", ID = "com.apple.kpi.mach" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7ff60ac3f370 [0x7fff8ae47cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/Unsupported.kext/", ID = "com.apple.kpi.unsupported" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7ff60ac3ecd0 [0x7fff8ae47cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/Libkern.kext/", ID = "com.apple.kpi.libkern" }
+Kext with invalid signature (-67061) allowed: <OSKext 0x7ff60ac3eb90 [0x7fff8ae47cc0]> { URL = "file:///System/Library/Extensions/System.kext/PlugIns/BSDKernel.kext/", ID = "com.apple.kpi.bsd" }
+Disabling KextAudit: SIP is off
+localhost:/ root# mkdir -p /Volumes/ALLOCBENCH
+mkdir: /Volumes/ALLOCBENCH: Read-only file system
+localhost:/ root# /sbin/mount_msdos /dev/disk0 /Volumes/ALLOCBENCH
+mount_msdos: /Volumes/ALLOCBENCH: No such file or directory
+localhost:/ root# ls /Volumes/ALLOCBENCH
+ls: /Volumes/ALLOCBENCH: No such file or directory
+localhost:/ root# mkdir -p /tmp/allocfat
+/sbin/mounmkdir: /tmp/allocfat: Read-only file system
+t_localhost:/ root# /sbin/mount_msdos /dev/disk0 /tmp/allocfat
+ls /tmp/allocfat
+mount_msdos: /private/tmp/allocfat: No such file or directory
+localhost:/ root# ls /tmp/allocfat
+ls: /tmp/allocfat: No such file or directory
+localhost:/ root# mount
+/sbin//dev/disk3s5 on / (apfs, local, journaled)
+devfs on /dev (devfs, local, nobrowse)
+/dev/disk3s1 on /System/Volumes/Data (apfs, local, read-only, journaled, nobrowse)
+/dev/disk3s4 on /private/var/vm (apfs, local, journaled, nobrowse)
+moulocalhost:/ root# /sbin/mount -uw /System/Volumes/Data
+mkdir -p /tmp/alsendIONotification:1492: sendIONotification: entered w/ notification e0084002
+sendIONotification:1503: sendIONotification: got service is_v 1 ret 0
+locfatlocalhost:/ root# mkdir -p /tmp/allocfat
+/sbin/mount_msdo_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+s /delocalhost:/ root# /sbin/mount_msdos /dev/disk0 /tmp/allocfat
+ls /tmp/allocfat
+localhost:/ root# ls /tmp/allocfat
+AllocKernelBench.kext	bench-native.s		heap-native.s		kmod_info.c
+alloc-bench		bench-sdk		heap_benchmark.c	macos-kext-info.c
+alloc-bench-native	bench.c			kmod-native.s		opt
+localhost:/ root# cp -R /tmp/allocfat/opt /tmp/opt
+cp -R /tmp/allocfat/bench-sdk /tmp/bench-sdk
+cp /tmp/allocfat/bench.c /tmp/bench.c
+cp /tmp/allocfat/alloc-bench-native /tmp/alloc-bench-native
+chmod 755 /tmp/alloc-bench-native
+/usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+DYLD_LIBRARY_PATH_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 6 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+=/tmp_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 6 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 4 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+/op_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 3 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 10 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+t/local/lib /tmp/opt/local/bin/gcc-mp-14 --version
+localhost:/ root# cp -R /tmp/allocfat/bench-sdk /tmp/bench-sdk
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 11 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 6 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+cp /tmp/allocfat/bench.c /tmp/bench.c
+cp /tmp/allocfat/alloc-bench-native /tmp/alloc-bench-native
+chmod 755 /tmp/alloc-bench-native
+/usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 --version
+DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -mmacosx-version-min=10.15 -isysroot /tmp/bench-sdk -nostdinc -isystem /tmp/opt/lo_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 4 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+cal/_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 7 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+lib/gcc14/_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+gc_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 12 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+c/_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 3 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 12 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+x86_64-apple-darwin19/14.3.0/include -isystem /tmp/bench-sdk/usr/include -S /tmp/bench.c -o /tmp/bench-native-fresh.s
+/usr/bin/shasum -a 256 /tmp/bench-native-fresh.s
+echo MACOS-USERALLOC-READY
+localhost:/ root# cp /tmp/allocfat/bench.c /tmp/bench.c
+localhost:/ root# cp /tmp/allocfat/alloc-bench-native /tmp/alloc-bench-native
+localhost:/ root# chmod 755 /tmp/alloc-bench-native
+localhost:/ root# /usr/bin/shasum -a 256 /tmp/alloc-bench-native /tmp/bench.c
+aed1e90c728e56b77cbff31c62277eb80762b9a0f54b02e815ce581913352b97  /tmp/alloc-bench-native
+bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9  /tmp/bench.c
+localhost:/ root# DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 --version
+port is not ready for callouts
+port is not ready for callouts
+gcc-mp-14 (MacPorts gcc14 14.3.0_0+stdlib_flag) 14.3.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+localhost:/ root# DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wa ll -Wextra -Werror -fno-builtin -mmacosx-version-min=10.15 -isysroot /tmp/bench-sdk -nostdinc -isyst em /tmp/opt/local/lib/gcc14/gcc/x86_64-apple-darwin19/14.3.0/include -isystem /tmp/bench-sdk/usr/inc lude -S /tmp/bench.c -o /tmp/bench-native-fresh.s
+port is not ready for callouts
+port is not ready for callouts
+port is not ready for callouts
+port is not ready for callouts
+port is not ready for callouts
+port is not ready for callouts
+port is not ready for callouts
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 8 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+localhost:/ root# /usr/bin/shasum -a 256 /tmp/bench-native-fresh.s
+ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd  /tmp/bench-native-fresh.s
+localhost:/ root# echo MACOS-USERALLOC-READY
+MACOS-USERALLOC-READY

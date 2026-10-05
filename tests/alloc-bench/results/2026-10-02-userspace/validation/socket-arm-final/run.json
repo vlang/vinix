@@ -1,0 +1,33 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/third_party/useralloc-vm-next/run-aarch64.sh",
+    "--no-build",
+    "--serial",
+    "--mem=2048",
+    "--guest-init=/Users/alex/code/vinix/build/useralloc-arm-socket-final-v5/rootfs/sbin/init",
+    "--no-persist"
+  ],
+  "environment": {
+    "VINIX_INITRAMFS": "/Users/alex/code/vinix/build/useralloc-arm-socket-final-v5/initramfs.tar",
+    "VINIX_KERNEL_DIR": "/Users/alex/code/vinix/third_party/useralloc-vm-next/kernel",
+    "VINIX_BOOT_DISK": "/Users/alex/code/vinix/build/useralloc-arm-socket-final-v5/boot.img",
+    "VINIX_BOOT_DISK_SIZE_MB": "128",
+    "VINIX_EFIVARS": "/Users/alex/code/vinix/build/useralloc-arm-socket-final-v5/vars.fd",
+    "VINIX_QEMU_PACKAGE_STORE": "/Users/alex/code/vinix/build/useralloc-arm-socket-final-v5/packages.tar",
+    "VINIX_QEMU_PERSIST": "0",
+    "VINIX_QEMU_HOST_SOURCE": "0",
+    "VINIX_QEMU_AUDIO": "off",
+    "VINIX_QEMU_SMP": "2",
+    "VINIX_KEEP_TEMP_BOOT_DISK": "1",
+    "USE_TCG": "0"
+  },
+  "kernel_sha256": "f43f7081476cdeea3e91416aead07014b83bc7532d5ad6bae31adbaa5790f5df",
+  "initramfs_sha256": "1a537bc4a31a8e53c546fc82e3483f253362b083e3b1739a542a2e3509a45d51",
+  "started_utc": "2026-10-02T16:29:34.356858+00:00",
+  "passed": true,
+  "runtime_passed": true,
+  "collector_exit_code": 1,
+  "collector_error": "First capture splitlines mishandled CRLF; both complete captures hit PermissionError in owned process-group cleanup after runtime success. Complete raw markers independently revalidated.",
+  "validation_method": "Byte-preserving complete transcript; CR normalized only for full-line matching, exact65536call completion plus unchanged core memory assertion and freeramdelta0.",
+  "serial_sha256": "d43012279c24cd6ee92ab1bdb95463cb87a33abb890225db8d55fc641d1ea423"
+}

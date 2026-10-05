@@ -1,0 +1,62 @@
+{
+  "status": "PASS",
+  "checked_utc": "2026-10-02T21:41:49.290713+00:00",
+  "gates": {
+    "build/useralloc-kernel-speed-v5/x86_64/build.json": {
+      "sha256": "22587cccbed17d10eba667d748d08ce40f893392a1b0c0f5ce35ba11cc4f4c8a",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-kernel-speed-v5/aarch64/build.json": {
+      "sha256": "a19cef5cc77637c98938237aa936718ad9eaadb2a939bda7e3bbd82c47567919",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-kernel-speed-v5/core-x86_64/run.json": {
+      "sha256": "a4e855635e4bba5f15355c1b4be44c7d53467b101680a5a9388072231ec908a6",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-kernel-speed-v5/core-x86_64-four-level/run.json": {
+      "sha256": "232b6b51cdb23dd6631d26dc52576edca650bed96a510e3d2420b143113f582e",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "build/useralloc-kernel-speed-v5/core-aarch64/run.json": {
+      "sha256": "882ebbf8d70bdbdf74aef0b76fd7aeb0d0a208bcd46142c0fccfa18b60e8e779",
+      "checked_field": "exit_code",
+      "value": 0
+    },
+    "third_party/useralloc-libc/build/useralloc/v5-verification-summary.json": {
+      "sha256": "6182079c64017cd60c31f1f686b106e28a339ac438efab66b237f6242697c9f5",
+      "checked_field": "all_passed",
+      "value": true
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v5/amd64/results.json": {
+      "sha256": "364bcc53ab648bd5affa82aada7e4540791c407bdc60567fbac9368295abda17",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "third_party/useralloc-libc/build/useralloc-production-v5/aarch64/results.json": {
+      "sha256": "b2edc9688f2c738cfcdfcfb9f3ad251f7e82c5009af49a7da9e51df97dc0ce4c",
+      "checked_field": "status",
+      "value": "PASS"
+    },
+    "build/useralloc-pipe/static-desktop-v5/build.json": {
+      "sha256": "0d080097bd05433d537efe706253d322fdb6999035f229d81df69e50542e105a",
+      "checked_field": "build_exit_code",
+      "value": 0
+    },
+    "build/useralloc-review-v5/review.json": {
+      "sha256": "adcae65f0b8b9ffcfba15a24df4e94c97906b4bcbaf51a9f1de290d3501e0543",
+      "checked_field": "passed",
+      "value": true
+    },
+    "build/useralloc-desktop-perf-v5/validation.json": {
+      "sha256": "7f242d6464e69cc556282cb2d841bb0284720b05176ef5c2174e92d53c03ccb6",
+      "checked_field": "status",
+      "value": "PASS"
+    }
+  },
+  "notes": "All owned correctness/build/functional gates complete. Updated full allocation checker compiles both architectures but baseline literalallowlist failure remains; exact v4/v5 site counts are unchanged."
+}

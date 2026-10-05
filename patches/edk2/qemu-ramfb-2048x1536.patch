@@ -1,0 +1,14 @@
+diff --git a/OvmfPkg/QemuRamfbDxe/QemuRamfb.c b/OvmfPkg/QemuRamfbDxe/QemuRamfb.c
+index 41fe3285c3..83b227ac6b 100644
+--- a/OvmfPkg/QemuRamfbDxe/QemuRamfb.c
++++ b/OvmfPkg/QemuRamfbDxe/QemuRamfb.c
+@@ -54,6 +54,10 @@ STATIC EFI_GRAPHICS_OUTPUT_MODE_INFORMATION  mQemuRamfbModeInfo[] = {
+     0,    // Version
+     1024, // HorizontalResolution
+     768,  // VerticalResolution
++  },{
++    0,    // Version
++    2048, // HorizontalResolution
++    1536, // VerticalResolution
+   }
+ };

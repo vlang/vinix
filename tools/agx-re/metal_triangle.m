@@ -13,7 +13,10 @@ static void trace_marker(const char *phase) {
 }
 
 static int submit(id<MTLCommandQueue> queue, id<MTLTexture> texture,
-                  id<MTLRenderPipelineState> pipeline, bool draw, const char *phase) {
+                  id<MTLTexture> depth_texture,
+                  id<MTLRenderPipelineState> pipeline,
+                  id<MTLDepthStencilState> depth_state, bool stencil, bool draw,
+                  const char *phase) {
     id<MTLCommandBuffer> commands = [queue commandBuffer];
 
     MTLRenderPassDescriptor *pass = [MTLRenderPassDescriptor renderPassDescriptor];
@@ -21,11 +24,28 @@ static int submit(id<MTLCommandQueue> queue, id<MTLTexture> texture,
     pass.colorAttachments[0].loadAction = MTLLoadActionClear;
     pass.colorAttachments[0].storeAction = MTLStoreActionStore;
     pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1);
+    if (depth_texture) {
+        pass.depthAttachment.texture = depth_texture;
+        pass.depthAttachment.loadAction = MTLLoadActionClear;
+        pass.depthAttachment.storeAction = MTLStoreActionStore;
+        pass.depthAttachment.clearDepth = 1.0;
+        if (stencil) {
+            pass.stencilAttachment.texture = depth_texture;
+            pass.stencilAttachment.loadAction = MTLLoadActionClear;
+            pass.stencilAttachment.storeAction = MTLStoreActionStore;
+            pass.stencilAttachment.clearStencil = 0;
+        }
+    }
 
     trace_marker(phase);
     id<MTLRenderCommandEncoder> encoder = [commands renderCommandEncoderWithDescriptor:pass];
     if (draw) {
         [encoder setRenderPipelineState:pipeline];
+        if (depth_state) {
+            [encoder setDepthStencilState:depth_state];
+            if (stencil)
+                [encoder setStencilReferenceValue:1];
+        }
         [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     }
     [encoder endEncoding];
@@ -66,6 +86,8 @@ static int run_triangle(const char *mode) {
         return 1;
     }
 
+    bool stencil = strcmp(mode, "stencil-pair") == 0;
+    bool depth = strcmp(mode, "depth-pair") == 0 || stencil;
     NSError *error = nil;
     id<MTLRenderPipelineState> pipeline = nil;
     if (strcmp(mode, "clear") != 0) {
@@ -91,6 +113,14 @@ static int run_triangle(const char *mode) {
         pipeline_desc.vertexFunction = [library newFunctionWithName:@"triangle_vertex"];
         pipeline_desc.fragmentFunction = [library newFunctionWithName:@"triangle_fragment"];
         pipeline_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+        if (depth) {
+            MTLPixelFormat depth_format = stencil
+                ? MTLPixelFormatDepth32Float_Stencil8
+                : MTLPixelFormatDepth32Float;
+            pipeline_desc.depthAttachmentPixelFormat = depth_format;
+            if (stencil)
+                pipeline_desc.stencilAttachmentPixelFormat = depth_format;
+        }
         pipeline = [device newRenderPipelineStateWithDescriptor:pipeline_desc error:&error];
         if (!pipeline) {
             fprintf(stderr, "metal_triangle: pipeline creation failed: %s\n",
@@ -107,21 +137,69 @@ static int run_triangle(const char *mode) {
     texture_desc.storageMode = MTLStorageModeShared;
     texture_desc.usage = MTLTextureUsageRenderTarget;
     id<MTLTexture> texture = [device newTextureWithDescriptor:texture_desc];
+    id<MTLTexture> depth_texture = nil;
+    id<MTLDepthStencilState> depth_state = nil;
+    if (depth) {
+        MTLPixelFormat depth_format = stencil
+            ? MTLPixelFormatDepth32Float_Stencil8
+            : MTLPixelFormatDepth32Float;
+        MTLTextureDescriptor *depth_desc =
+            [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:depth_format
+                                                               width:64
+                                                              height:64
+                                                           mipmapped:NO];
+        depth_desc.storageMode = MTLStorageModePrivate;
+        depth_desc.usage = MTLTextureUsageRenderTarget;
+        depth_texture = [device newTextureWithDescriptor:depth_desc];
+
+        MTLDepthStencilDescriptor *state_desc = [MTLDepthStencilDescriptor new];
+        state_desc.depthCompareFunction = MTLCompareFunctionLess;
+        state_desc.depthWriteEnabled = YES;
+        if (stencil) {
+            MTLStencilDescriptor *stencil_desc = [MTLStencilDescriptor new];
+            stencil_desc.stencilCompareFunction = MTLCompareFunctionAlways;
+            stencil_desc.stencilFailureOperation = MTLStencilOperationKeep;
+            stencil_desc.depthFailureOperation = MTLStencilOperationKeep;
+            stencil_desc.depthStencilPassOperation = MTLStencilOperationReplace;
+            stencil_desc.readMask = 0xff;
+            stencil_desc.writeMask = 0xff;
+            state_desc.frontFaceStencil = stencil_desc;
+            state_desc.backFaceStencil = stencil_desc;
+        }
+        depth_state = [device newDepthStencilStateWithDescriptor:state_desc];
+        if (!depth_texture || !depth_state) {
+            fprintf(stderr, "metal_triangle: depth resource creation failed\n");
+            return 1;
+        }
+    }
     id<MTLCommandQueue> queue = [device newCommandQueue];
     if (strcmp(mode, "pair") == 0) {
-        if (submit(queue, texture, pipeline, false, "clear"))
+        if (submit(queue, texture, nil, pipeline, nil, false, false, "clear"))
             return 1;
-        return submit(queue, texture, pipeline, true, "triangle");
+        return submit(queue, texture, nil, pipeline, nil, false, true, "triangle");
     }
-    return submit(queue, texture, pipeline, strcmp(mode, "clear") != 0, mode);
+    if (depth) {
+        const char *clear_phase = stencil ? "stencil-clear" : "depth-clear";
+        const char *triangle_phase = stencil ? "stencil-triangle" : "depth-triangle";
+        if (submit(queue, texture, depth_texture, pipeline, depth_state, stencil,
+                   false, clear_phase))
+            return 1;
+        return submit(queue, texture, depth_texture, pipeline, depth_state, stencil,
+                      true, triangle_phase);
+    }
+    return submit(queue, texture, nil, pipeline, nil, false,
+                  strcmp(mode, "clear") != 0, mode);
 }
 
 int main(int argc, const char **argv) {
     @autoreleasepool {
         const char *mode = argc == 1 ? "triangle" : argv[1];
-        if (argc > 2 || (strcmp(mode, "clear") != 0 && strcmp(mode, "triangle") != 0 &&
-                         strcmp(mode, "pair") != 0)) {
-            fprintf(stderr, "usage: metal_triangle [clear|triangle|pair]\n");
+        if (argc > 2 ||
+            (strcmp(mode, "clear") != 0 && strcmp(mode, "triangle") != 0 &&
+             strcmp(mode, "pair") != 0 && strcmp(mode, "depth-pair") != 0 &&
+             strcmp(mode, "stencil-pair") != 0)) {
+            fprintf(stderr,
+                    "usage: metal_triangle [clear|triangle|pair|depth-pair|stencil-pair]\n");
             return 2;
         }
         return run_triangle(mode);

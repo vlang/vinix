@@ -1,0 +1,12 @@
+{
+  "files_sha256": {
+    "config.json": "c4b618a03b5811cb1527f552350fb4114618673c220752a381e8b0f18fb92eec",
+    "serial.log": "0a33b479fbef39ba66ec580c4efe19db2c376ee107ea08f9cddfd35334ebcb0e",
+    "driver-exit.json": "91fbe27c658398ed0f678cfc843306e4154e560589aeec4f06566a553cea3fc0",
+    "runner.log": "80ee5bc1f5939d92e47ca3a4e7dfaf4528c9cf661048dbdf93382718bb496472",
+    "coordinator-record.json": "0519e1329ed3b0c7e85c3a5e7857d8d703c8b553009839aede153a64018c749b"
+  },
+  "capture": "catalina-2",
+  "source": "actual complete predeclared v6 capture",
+  "actual_driver_exit_zero": true
+}

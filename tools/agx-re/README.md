@@ -37,6 +37,8 @@ make -f GNUmakefile test
 make -f GNUmakefile inspect
 make -f GNUmakefile trace
 make -f GNUmakefile trace-resources
+make -f GNUmakefile trace-depth-resources
+make -f GNUmakefile trace-stencil-resources
 make -f GNUmakefile layout
 make -f GNUmakefile firmware
 make -f GNUmakefile pmp-firmware
@@ -45,6 +47,10 @@ make -f GNUmakefile recover-t6050-power
 make -f GNUmakefile recover-g17-abi
 ```
 
+`recover-g17-abi` atomically writes the current UUID-pinned report to
+`build/recovered-g17-abi.json`; downstream generators and correlation tools
+consume that canonical path.
+
 The normal trace is written to `build/agx_trace.jsonl`; the larger resource
 trace goes to `build/agx_trace_resources.jsonl`. `AGX_TRACE_BYTES` caps each
 snapshot at 64 KiB. These traces contain process-specific addresses and must
@@ -52,6 +58,18 @@ not be committed. Set `AGX_TRACE_ALL=1` only when calls on non-GPU IOKit
 connections are relevant. Selectors `0x100` through `0x112` are annotated with
 names recovered from the local
 `AGXDeviceUserClient::getTargetAndMethodForIndex` table.
+
+`trace-depth-resources` writes a separate
+`build/agx_trace_depth_resources.jsonl` capture. It submits matched
+`depth-clear` and `depth-triangle` passes with a private `Depth32Float` target,
+so depth-related resource identities can be recovered without changing or
+overwriting the baseline color-only trace.
+
+`trace-stencil-resources` similarly writes
+`build/agx_trace_stencil_resources.jsonl`. Its matched passes use a private
+combined `Depth32Float_Stencil8` target and enable stencil replacement, keeping
+the stencil recovery artifact separate from both color-only and depth-only
+captures.
 
 `trace_diff.py` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
@@ -67,6 +85,23 @@ It can also select a shared allocation by an observed JSON field:
   --event resource_snapshot \
   --where resource_gpu_address=0x10000138000
 ```
+
+`map_g17_resource_descriptors.py` propagates resource-valued qwords observed
+in the private Apple render payload through the independently recovered TA and
+3D-common copy maps:
+
+```sh
+./map_g17_resource_descriptors.py build/agx_trace_resources.jsonl \
+  --abi build/recovered-g17-abi.json
+```
+
+The report deliberately calls its output descriptor-member *candidates*. It
+proves that a value inside a traced `IOGPUMetalResource` range was copied to a
+member, but does not equate that private Metal payload value with any Mesa
+Asahi UAPI field. `PENDING` may be replaced in the fake backend only after that
+last semantic correspondence is independently established. Private Metal
+resources participate through the GPU range recorded at creation time; the
+tool never attempts to read their absent CPU mapping.
 
 `objc_layout` records class, method, and ivar metadata exposed by the local
 Objective-C runtime. `extract_firmware.py` extracts only the matching G17C
@@ -285,10 +320,16 @@ literal audit). All ten inline forms are located too; two CL selectors remain
 symbolic, while their value formulas are complete. Value provenance is
 classified at every virtual call (209 constants
 or direct descriptor loads plus 105 recovered expression trees), so all 314
-call-value formulas are now represented. A complete machine-level emission CFG
-also records possible ordering for all 324 virtual and inline sites, and all 21
-ordering predicates have expression trees. The two runtime CL selectors keep
-the finite static set open, but every selector formula is complete.
+call-value formulas are now represented. A machine-level emission CFG also
+records possible ordering for every virtual, inline and direct
+`AGXKRCEBufferEncoder::append` site (the appends were missed at first: three
+each in 3D, TA and FastBlit, seven in CL). 29 of the 30 ordering predicates
+have expression trees; the one missing is a CL guard, so the 3D, TA and
+FastBlit graphs are complete. CL's runtime selectors, in two inline records
+and six appends, keep the finite static set open.
+Vinix treats the performance-counter sampler as stopped (it implements none),
+which `channels.accelerator_inputs.perf_counter_sampler` records as an explicit
+Vinix policy rather than a property of the Apple driver.
 Channel and scheduler-state construction no longer needs unknown inputs: the
 per-queue timestamp and `_AGFISchedulerState` elements, the 80-unit/1,280-entry
 channel ring geometry, the creating process ID and the app GPU role are all
@@ -296,6 +337,55 @@ recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
 register emission graph into the work-command encoder, implementing the four
 remaining callback error/control event actions, and work-command reclamation.
+`compile_fake_g17_plan.py` now consumes the recovered 3D emission CFG together
+with a raw HAL300 command and its staged descriptor. It rejects selector/mode
+sequences that are not a recovered execution path and independently evaluates
+constant and descriptor-rooted value expressions into the golden format used
+by Vinix's fake-G17 verifier. External object roots remain visibly
+unconstrained. See [the fake backend guide](../../docs/g17-fake-backend.md) for
+the command line and exact trust boundary.
+`encode_fake_g17_3d.py` is the matching host reference producer. It chooses a
+concrete path by evaluating the recovered predicates, emits all four register
+streams while preserving a supplied pool template, and compiles its own output
+back into a verifier plan. Unresolved channel/accelerator branches and values
+must be supplied explicitly; `--zero-template` is intentionally limited to
+fake execution. The full recovered ABI's zero-descriptor fixture emits 368
+writes. Given the power-column count, 360 have independently reproducible
+values and 8 remain explicit external inputs: per pass, the addresses of the
+parameter-management object (descriptor `+0x918`, set by
+`loadParameterManagementData`) and of the USC private-memory pool (descriptor
+`+0xb80`, copied from the channel next to `syncUMAPoolPriority`). Both are
+host-owned pools that Vinix does not implement yet; they are also what the
+type-6, -13 and -15 firmware events grow.
+
+The producers' other accelerator inputs are resolved by
+`channels.accelerator_inputs`. The power-column count at accelerator `+0x4e4`
+is hardware topology and becomes a named `column_count` input. For the 64-bit
+feature-flag word at `+0x6d0` and chip information at `+0xf7ec`, a census
+walks all of `__TEXT_EXEC` for any store, pair store, memory routine or
+escaping interior pointer that can reach those bytes, following pointers
+derived by ADD from function arguments. Every hit is either one of the 18
+pinned accelerator read-modify-write sites or classified as another object
+(with its reason in the table); anything new fails the recovery. With the
+object zero-filled by `OSObject_typed_operator_new`, the union of what those
+sites can OR in gives the bits that may ever be set; bits 20, 29 and 53, which
+the 3D, TA and FastBlit producers test, never are. `AcceleratorX::configureDevice`
+unconditionally overwrites chip-information bytes `+0x28..+0x37` with
+`(0, 1 << 32)` after `retrieveChipInfo` fills them, which is all the 3D
+producer reads there. The census counts, but cannot bound, 96 register-indexed
+stores and 41 memory-routine calls through untracked pointers; those inside
+accelerator methods are clears or fill arrays well away from both ranges.
+`compile_fake_g17_plan.fold_accelerator_inputs` folds these facts into every
+producer's value and branch expressions with a known-bits evaluator, shared by
+the plan compiler (`--column-count`), the reference encoder (`hardware` in the
+externals JSON) and the C generator.
+`generate_fake_g17_3d_encoder.py` lowers the same UUID-pinned graph into the
+checked-in, freestanding C encoder used by the kernel. It emits direct bounded
+integer expressions and graph branches, not a runtime JSON interpreter, and
+returns a fixed-capacity verifier trace alongside the command. Its host test
+checks all 16 combinations of three descriptor branches and a narrow or wide
+column count against byte-exact hashes from the separate Python reference. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
+recovery to catch any stale generated source.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
 eight masked flags, and the independently allocated `0xc40` base prefix; the

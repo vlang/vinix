@@ -1,0 +1,52 @@
+{
+  "compile_command": [
+    "/usr/bin/clang",
+    "-std=gnu99",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-ffreestanding",
+    "-fno-builtin",
+    "-fno-strict-aliasing",
+    "-mgeneral-regs-only",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "-Dmemcpy=vinix_memcpy",
+    "-Dmemset=vinix_memset",
+    "-Dmemmove=vinix_memmove",
+    "-Dmemcmp=vinix_memcmp",
+    "-Datoi=vinix_atoi",
+    "-c",
+    "/Users/alex/code/vinix/kernel/c/memory.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/memory-runtime/memory.o"
+  ],
+  "link_command": [
+    "/usr/bin/clang",
+    "-std=gnu99",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fsanitize=address,undefined",
+    "-fno-omit-frame-pointer",
+    "/Users/alex/code/vinix/tests/memory/runtime.c",
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/memory-runtime/memory.o",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/memory-runtime/runtime"
+  ],
+  "run_command": [
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/memory-runtime/runtime"
+  ],
+  "compiler": "Apple clang version 21.0.0 (clang-2100.1.1.101)",
+  "source_sha256": "0bf772b0a0c5c5f64df62f6df37e87a5fcaaef346c069aa505a83b2bc6db869f",
+  "implementation_sha256": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+  "runner_sha256": "81d0bf9c9a7745580596277bee89d67d9b23cdcb46533990591e456b88734136",
+  "binary_sha256": "ec416dc262cc687b14ca5618d44648d31c366396662a216d3d76086b944cd0e2",
+  "started_utc": "2026-10-02T19:26:48.458889+00:00",
+  "notes": "Repeated same sanitizer test solely to preserve exact compile commands, binary hash and full raw output; first runner also passed 361573 cases.",
+  "exit_code": 0,
+  "finished_utc": "2026-10-02T19:27:41.472348+00:00",
+  "output_sha256": "c2512d83195d219dfdfcdb7b451c6edd63f5cc9d38fafc39c981d53e17f46bc8"
+}

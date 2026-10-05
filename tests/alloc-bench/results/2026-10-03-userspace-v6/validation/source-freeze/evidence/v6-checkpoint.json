@@ -1,0 +1,26 @@
+{
+  "completed_stages": [
+    "optimized-v6-final",
+    "disabled-v6-final",
+    "optimized-arm126-v6-final",
+    "disabled-arm126-v6-final"
+  ],
+  "phase": "correctness",
+  "status": "completed",
+  "patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+  "updated_utc": "2026-10-02T22:38:55.449135+00:00",
+  "jobs": {
+    "x86_correctness": {
+      "pid": 84607,
+      "driver": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/correctness-v6-x86-driver.py",
+      "status": "completed"
+    },
+    "arm_correctness": {
+      "pid": 90148,
+      "driver": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/correctness-v6-arm-driver.py",
+      "status": "completed",
+      "started_utc": "2026-10-02T22:37:15.098648+00:00"
+    }
+  },
+  "verification_summary": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/v6-verification-summary.json"
+}

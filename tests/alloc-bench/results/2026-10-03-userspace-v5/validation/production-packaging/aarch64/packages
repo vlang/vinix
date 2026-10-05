@@ -1,0 +1,8 @@
+main	libcap2-2.78-r0.apk
+main	libncursesw-6.5_p20241006-r3.apk
+main	musl-1.2.5-r11.apk
+main	ncurses-terminfo-base-6.5_p20241006-r3.apk
+main	vim-9.1.1105-r0.apk
+main	vim-common-9.1.1105-r0.apk
+main	xxd-9.1.1105-r0.apk
+main	zsh-5.9-r4.apk

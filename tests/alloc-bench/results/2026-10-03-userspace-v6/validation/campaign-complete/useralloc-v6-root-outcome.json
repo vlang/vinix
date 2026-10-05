@@ -1,0 +1,120 @@
+{
+  "target_passed_both_cohorts_and_pooled": true,
+  "raw_samples_retained": 168,
+  "rows": {
+    "malloc_hot_64": {
+      "cohorts": [
+        {
+          "vinix": 234.2,
+          "catalina": 330.59,
+          "ratio": 0.7084303820442239
+        },
+        {
+          "vinix": 226.72,
+          "catalina": 461.75,
+          "ratio": 0.49100162425554955
+        }
+      ],
+      "pooled": {
+        "vinix": 228.85,
+        "catalina": 387.65250000000003,
+        "ratio": 0.59034831453428
+      }
+    },
+    "malloc_mixed_batch_64": {
+      "cohorts": [
+        {
+          "vinix": 315.79,
+          "catalina": 679.12,
+          "ratio": 0.46499882200494763
+        },
+        {
+          "vinix": 313.02,
+          "catalina": 877.995,
+          "ratio": 0.3565168366562452
+        }
+      ],
+      "pooled": {
+        "vinix": 313.8025,
+        "catalina": 777.99,
+        "ratio": 0.4033503001323925
+      }
+    },
+    "malloc_touch_262144": {
+      "cohorts": [
+        {
+          "vinix": 1663.4,
+          "catalina": 17006.6,
+          "ratio": 0.09780908588430376
+        },
+        {
+          "vinix": 1520.3,
+          "catalina": 19674.1,
+          "ratio": 0.07727418280887055
+        }
+      ],
+      "pooled": {
+        "vinix": 1537.3,
+        "catalina": 18458.800000000003,
+        "ratio": 0.08328277027759116
+      }
+    },
+    "mmap_anon_4096": {
+      "cohorts": [
+        {
+          "vinix": 11555.8,
+          "catalina": 23311.2,
+          "ratio": 0.49571879611517206
+        },
+        {
+          "vinix": 11223.0,
+          "catalina": 30022.1,
+          "ratio": 0.3738246158663118
+        }
+      ],
+      "pooled": {
+        "vinix": 11432.8,
+        "catalina": 27426.5,
+        "ratio": 0.41685231436749126
+      }
+    },
+    "mmap_touch_262144": {
+      "cohorts": [
+        {
+          "vinix": 553381.2,
+          "catalina": 1706616.2,
+          "ratio": 0.32425638523764155
+        },
+        {
+          "vinix": 739101.5,
+          "catalina": 1969034.1,
+          "ratio": 0.3753624683290147
+        }
+      ],
+      "pooled": {
+        "vinix": 669947.75,
+        "catalina": 1924765.85,
+        "ratio": 0.34806714281635864
+      }
+    },
+    "pipe_create_close": {
+      "cohorts": [
+        {
+          "vinix": 24061.7,
+          "catalina": 70689.4,
+          "ratio": 0.3403862531015966
+        },
+        {
+          "vinix": 35396.8,
+          "catalina": 66476.4,
+          "ratio": 0.5324716741580472
+        }
+      ],
+      "pooled": {
+        "vinix": 29889.35,
+        "catalina": 70205.85,
+        "ratio": 0.42573873829602515
+      }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "baseline_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "static_libc_sha256": "2d7538f2fc2ca2c94493fc3d34cbc6bed5cf942063e7ccd365e922156ffdc0d9",
+  "loader_sha256": "c2261960691912280b2a33c53577a4d18bbc829e19c7cef2a554de052ff781ec",
+  "desktop_builder_sha256": "89d5417452e1889e346c470b586ba8dab04b7da7d6644923f3a0424c7fc5af3d",
+  "v_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "source_scope": "Isolated baseline desktop sources, only final libc builder hook applied. Frozen UI2 and development sysroot; private build cache.",
+  "command": [
+    "/bin/bash",
+    "-x",
+    "/Users/alex/code/vinix/third_party/useralloc-pipe/build-desktop-aarch64.sh",
+    "--no-initramfs"
+  ],
+  "environment": {
+    "V": "/Users/alex/code/v/v",
+    "VINIX_AARCH64_SYSROOT": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/sysroot",
+    "VINIX_AARCH64_APP_CACHE": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/app-cache",
+    "VINIX_MUSL_BUILD_DIR": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/musl-cache",
+    "VINIX_MUSL_CC_AARCH64": "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc",
+    "VINIX_UI2_SOURCE": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/ui2",
+    "LLVM_BIN": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v3/llvm-bin"
+  },
+  "build_exit_code": 0,
+  "desktop_sha256": "13c3721b81bc788bd78dbd784780af294774e30a140a356fa73c73b2387cd956",
+  "link_map_sha256": "de7331553d5a8c71f20eb42963743ad21d5a9e48120effce3023aded5124eb70",
+  "linked_symbol_checks": [
+    "malloc_trim exists in final linked binary; final libc.a hash matched before and after production hook"
+  ]
+}

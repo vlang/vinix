@@ -1,0 +1,9 @@
+{
+  "baseline_commit": "e29bcc4dc62e8861dcef5a52901b5214bac7f073",
+  "static_libc_sha256": "690ede9a9960a50c99d56e824d21693824a5d38b06d6c6b7fbbf9b99dfc4ebb0",
+  "loader_sha256": "d44a53ec14839e2f32b62e83d99603aa018a6367733905e4321e4c266ad944bd",
+  "desktop_builder_sha256": "89d5417452e1889e346c470b586ba8dab04b7da7d6644923f3a0424c7fc5af3d",
+  "v_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "source_scope": "Same isolated baseline desktop/frozen UI2 and production builder hook as v4; private v5 sysroot/cache, v5 framing patch and frozen V.",
+  "allocator_patch_sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86"
+}

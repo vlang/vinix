@@ -1,0 +1,43 @@
+--- a/src/gallium/frontends/lavapipe/lvp_execute.c
++++ b/src/gallium/frontends/lavapipe/lvp_execute.c
+@@ -1275,6 +1275,10 @@
+                                const struct vk_descriptor_set_layout *vk_layout,
+                                bool inc_dyn)
+ {
++   /* Independent-set pipeline layouts may omit a set; shaders give it no slots. */
++   if (!vk_layout)
++      return;
++
+    const struct lvp_descriptor_set_layout *layout =
+       vk_to_lvp_descriptor_set_layout(vk_layout);
+ 
+@@ -1302,7 +1306,17 @@
+       increment_dyn_info(dyn_info, layout->vk.set_layouts[i], false);
+    }
+    for (i = 0; i < bds->descriptor_set_count; i++) {
++      if (!layout->vk.set_layouts[bds->first_set + i])
++         continue;
++
+       const struct lvp_descriptor_set *set = lvp_descriptor_set_from_handle(bds->descriptor_sets[i]);
++      if (!set) {
++         /* A null set has no descriptors or dynamic offsets, but shaders still
++          * reserve its layout's slots before the sets that follow it.
++          */
++         increment_dyn_info(dyn_info, layout->vk.set_layouts[bds->first_set + i], false);
++         continue;
++      }
+ 
+       if (set->layout->shader_stages & VK_SHADER_STAGE_COMPUTE_BIT)
+          handle_set_stage(state, dyn_info, set, MESA_SHADER_COMPUTE, PIPE_SHADER_COMPUTE);
+@@ -1337,8 +1351,10 @@
+          continue;
+ 
+       const struct lvp_descriptor_set *set = lvp_descriptor_set_from_handle(bds->descriptor_sets[i]);
+-      if (!set)
++      if (!set) {
++         increment_dyn_info(&dyn_info, layout->vk.set_layouts[bds->first_set + i], false);
+          continue;
++      }
+       /* verify that there's enough total offsets */
+       assert(set->layout->dynamic_offset_count <= dyn_info.dynamic_offset_count);
+       /* verify there's either no offsets... */

@@ -1,0 +1,17 @@
+{
+  "reviewer": "/root/pipe_final",
+  "patch_sha256": "ad8c284020f722a623e104cb283faff04e0989fe0e412db7dca7d4d2018fc589",
+  "source_sha256": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+  "lifetime_result": "PASS",
+  "scope": "15 caller-stack slots: 12 fixed scratch buffers, recvfrom output length, sendmsg header and control header",
+  "findings": [
+    "Existing vinix_stack_alloc macro expands __builtin_alloca in the calling function; fixed sizes are allocated once outside transfer loops and expire only when that call returns.",
+    "Original data/address zero initializers and receive-address0xff sentinel remain; the length and MsgHdr initializers preserve their previous values.",
+    "Blocking socket operations keep the calling kernel stack live, and every usercopy completes before syscall return.",
+    "UNIX binding copies names into owned fields and namespace entries; connection retains socket objects rather than scratch addresses; send/receive copy bytes into or out of owned rings.",
+    "INET TCP uses TCP_WRITE_FLAG_COPY, UDP uses PBUF_RAM and pbuf_take; Netlink copies synchronously.",
+    "recvfrom length is written only during synchronous receive/address copy. collect_passed_fds consumes the control header immediately; queued FD groups contain owned FD references, no MsgHdr or scratch pointer.",
+    "Existing heap allocation and defers for large messages/control data remain unchanged; no new free or grace-period path."
+  ],
+  "generated_c": "Both architectures verify all15 caller-stack slots. Independent x86 review: selected six transfer functions have11 stack slots and zero memdup; four remaining address-only slots present in bind/connect/name functions."
+}

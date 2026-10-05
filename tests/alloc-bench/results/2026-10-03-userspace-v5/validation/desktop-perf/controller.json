@@ -1,0 +1,10 @@
+{
+  "pid": 36053,
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-pipe/perf-v5-preparation/run-driver.py",
+    "/Users/alex/code/vinix/build/useralloc-desktop-perf-v5",
+    "ops,churn,cache,idle,apps,drag",
+    "/Users/alex/code/vinix/build/useralloc-kernel-speed-v5/aarch64/vinix-aarch64"
+  ]
+}

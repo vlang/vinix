@@ -1,0 +1,29 @@
+{
+  "command": [
+    "/Users/alex/code/vinix/build/useralloc-final-audit/compiler/v",
+    "-os",
+    "vinix",
+    "-enable-globals",
+    "-nofloat",
+    "-manualfree",
+    "-message-limit",
+    "100000",
+    "-gc",
+    "none",
+    "-target-libc-headers",
+    "-no-closures",
+    "-d",
+    "no_backtrace",
+    "-arch",
+    "amd64",
+    "-warn-about-allocs",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-allocation-audit-final/x86-diagnostic.c",
+    "/Users/alex/code/vinix/build/useralloc-allocation-audit-final/x86-diagnostic-source"
+  ],
+  "exit_code": 1,
+  "compiler_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "source_count": 246,
+  "log_sha256": "e6caa0f317cb44c8a2c4026c4f4fc0b64ba16e062471c03b93f0ba8e7c4c78ce",
+  "note": "Exact required audit V command and final source; complete diagnostics retained because normal script filters and removes these."
+}

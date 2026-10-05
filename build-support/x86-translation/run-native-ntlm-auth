@@ -1,0 +1,20 @@
+#!/bin/sh
+# Wine may export private x86 runtime paths before invoking a native Vinix
+# integration helper. Discard those variables before the AArch64 loader runs.
+tool="${0##*/}"
+case "$tool" in
+    ntlm_auth|update-mime-database) ;;
+    *)
+        echo "unsupported native Wine helper: $tool" >&2
+        exit 127
+        ;;
+esac
+
+helper="/usr/libexec/vinix-native-helpers/$tool"
+if [ ! -x "$helper" ]; then
+    echo "native Wine helper is not installed: $helper" >&2
+    exit 127
+fi
+
+unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+exec "$helper" "$@"

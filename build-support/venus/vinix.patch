@@ -1,0 +1,289 @@
+--- a/src/virtio/vulkan/vn_renderer_virtgpu.c
++++ b/src/virtio/vulkan/vn_renderer_virtgpu.c
+@@ -1641,6 +1641,19 @@
+ static VkResult
+ virtgpu_open(struct virtgpu *gpu)
+ {
++#ifdef __vinix__
++   char primary[32], render[32];
++   char *nodes[DRM_NODE_MAX] = {primary, NULL, render};
++   drmDevice dev = {.nodes = nodes, .available_nodes = 1 << DRM_NODE_RENDER,
++                    .bustype = DRM_BUS_PLATFORM};
++   for (unsigned i = 0; i < 16; i++) {
++      snprintf(primary, sizeof(primary), "/dev/dri/card%u", i);
++      snprintf(render, sizeof(render), "/dev/dri/renderD%u", 128 + i);
++      VkResult result = virtgpu_open_device(gpu, &dev);
++      if (result == VK_SUCCESS) return result;
++   }
++   return VK_ERROR_INITIALIZATION_FAILED;
++#endif
+    drmDevicePtr devs[8];
+    int count = drmGetDevices2(0, devs, ARRAY_SIZE(devs));
+    if (count < 0) {
+--- a/src/virtio/vulkan/vn_wsi.c
++++ b/src/virtio/vulkan/vn_wsi.c
+@@ -81,11 +81,19 @@
+       &physical_dev->wsi_device, vn_physical_device_to_handle(physical_dev),
+       vn_wsi_proc_addr, alloc, -1, &physical_dev->instance->dri_options,
+       &(struct wsi_device_options){
++#ifdef __vinix__
++         .sw_device = true, /* Xvfb scanout; rendering remains on Venus */
++#else
+          .sw_device = false,
++#endif
+          .extra_xwayland_image = true,
+       });
+    if (result != VK_SUCCESS)
+       return result;
++
++#ifdef __vinix__
++   physical_dev->wsi_device.sw_async = true;
++#endif
+ 
+    physical_dev->wsi_device.supports_modifiers = true;
+    physical_dev->base.base.wsi_device = &physical_dev->wsi_device;
+--- a/src/virtio/vulkan/vn_queue.c
++++ b/src/virtio/vulkan/vn_queue.c
+@@ -990,6 +990,14 @@
+ 
+    if (!submit->wsi_mem)
+       return;
++
++#ifdef __vinix__
++   /* Xvfb consumes CPU readback only after the present worker has waited
++    * for this image's fence. No external dma-buf consumer needs implicit
++    * fencing, and waiting for the whole queue here defeats that overlap. */
++   if (dev->physical_device->wsi_device.sw_async)
++      return;
++#endif
+ 
+    if (dev->renderer->info.has_implicit_fencing) {
+       struct vn_renderer_submit_batch batch = {
+--- a/src/virtio/vulkan/vn_common.c
++++ b/src/virtio/vulkan/vn_common.c
+@@ -244,6 +244,9 @@
+    return (struct vn_relax_state){
+       .instance = instance,
+       .iter = 0,
++#ifdef __vinix__
++      .spin_deadline = os_time_get_nano() + 2000000,
++#endif
+       .profile = vn_relax_get_profile(reason),
+       .reason_str = vn_relax_reason_string(reason),
+    };
+@@ -252,6 +255,14 @@
+ void
+ vn_relax(struct vn_relax_state *state)
+ {
++#ifdef __vinix__
++   /* A short host-GPU wait should not surrender a whole guest timeslice.
++    * Bound polling by wall time, then retain the normal sleeping/watchdog path. */
++   if (os_time_get_nano() < state->spin_deadline) {
++      __asm__ volatile("yield" ::: "memory");
++      return;
++   }
++#endif
+    const uint32_t base_sleep_us = state->profile.base_sleep_us;
+    const uint32_t busy_wait_order = state->profile.busy_wait_order;
+    const uint32_t warn_order = state->profile.warn_order;
+@@ -259,10 +270,18 @@
+ 
+    uint32_t *iter = &state->iter;
+    (*iter)++;
++#ifdef __vinix__
++   /* The bounded spin above replaces the yield phase. Once it expires,
++    * sleep so other guest tasks can run instead of forfeiting many complete
++    * scheduler turns before entering the normal backoff. */
++   if (*iter < (1u << busy_wait_order))
++      *iter = 1u << busy_wait_order;
++#else
+    if (*iter < (1 << busy_wait_order)) {
+       thrd_yield();
+       return;
+    }
++#endif
+ 
+    if (unlikely(*iter % (1 << warn_order) == 0)) {
+       struct vn_instance *instance = state->instance;
+--- a/src/virtio/vulkan/vn_common.h
++++ b/src/virtio/vulkan/vn_common.h
+@@ -242,6 +242,9 @@
+ struct vn_relax_state {
+    struct vn_instance *instance;
+    uint32_t iter;
++#ifdef __vinix__
++   uint64_t spin_deadline;
++#endif
+    const struct vn_relax_profile profile;
+    const char *reason_str;
+ };
+--- a/src/vulkan/wsi/wsi_common.h
++++ b/src/vulkan/wsi/wsi_common.h
+@@ -178,6 +178,8 @@
+    } win32;
+ 
+    bool sw;
++   /* GPU rendering with CPU readback, waited by the X11 present thread. */
++   bool sw_async;
+ 
+    /* Set to true if the implementation is ok with linear WSI images. */
+    bool wants_linear;
+--- a/src/vulkan/wsi/wsi_common.c
++++ b/src/vulkan/wsi/wsi_common.c
+@@ -1555,7 +1555,7 @@
+ #endif
+       }
+ 
+-      if (wsi->sw)
++      if (wsi->sw && !wsi->sw_async)
+ 	      wsi->WaitForFences(device, 1, &swapchain->fences[image_index],
+ 				 true, ~0ull);
+ 
+--- a/src/vulkan/wsi/wsi_common_x11.c
++++ b/src/vulkan/wsi/wsi_common_x11.c
+@@ -86,6 +86,7 @@
+    bool is_proprietary_x11;
+    bool is_xwayland;
+    bool has_mit_shm;
++   bool has_shm_put_image;
+    bool has_xfixes;
+ };
+ 
+@@ -234,7 +235,11 @@
+                                *amd_reply, *nv_reply, *shm_reply = NULL,
+                                *xfixes_reply, *xwl_reply;
+    bool wants_shm = wsi_dev->sw && !(WSI_DEBUG & WSI_DEBUG_NOSHM) &&
++#ifdef __vinix__
++                    true; /* Copy to SysV SHM without importing guest RAM into Venus. */
++#else
+                     wsi_dev->has_import_memory_host;
++#endif
+    bool has_dri3_v1_2 = false;
+    bool has_present_v1_2 = false;
+    bool has_dri3_v1_4 = false;
+@@ -350,9 +355,14 @@
+    if (nv_reply && nv_reply->present)
+       wsi_conn->is_proprietary_x11 = true;
+ 
++   wsi_conn->has_shm_put_image = false;
++#ifdef __vinix__
++   wsi_conn->has_shm_put_image = wants_shm && shm_reply && shm_reply->present;
++#endif
+    wsi_conn->has_mit_shm = false;
+ #ifdef HAVE_X11_DRM
+-   if (wsi_conn->has_dri3 && wsi_conn->has_present && wants_shm) {
++   if (wsi_conn->has_dri3 && wsi_conn->has_present && wants_shm &&
++       wsi_dev->has_import_memory_host) {
+       bool has_mit_shm = shm_reply->present != 0;
+ 
+       xcb_shm_query_version_cookie_t ver_cookie;
+@@ -1094,6 +1104,7 @@
+ 
+    bool                                         has_dri3_modifiers;
+    bool                                         has_mit_shm;
++   bool                                         has_shm_put_image;
+    bool                                         has_async_may_tear;
+ 
+    xcb_connection_t *                           conn;
+@@ -1481,7 +1492,21 @@
+ 
+    /* Begin querying this before submitting the frame for improved async performance.
+     * In this _sw() mode we're expecting network round-trip delay, not just UNIX socket delay. */
+-   xcb_get_geometry_cookie_t geom_cookie = xcb_get_geometry(chain->conn, chain->window);
++   xcb_get_geometry_cookie_t geom_cookie;
++   if (chain->has_shm_put_image) {
++      size_t bytes = (size_t)image->base.row_pitches[0] * chain->extent.height;
++      memcpy(image->shmaddr, image->base.cpu_map, bytes);
++      xcb_shm_put_image(chain->conn, chain->window, chain->gc,
++                       image->base.row_pitches[0] / 4, chain->extent.height,
++                       0, 0, chain->extent.width, chain->extent.height, 0, 0,
++                       chain->depth, XCB_IMAGE_FORMAT_Z_PIXMAP, false,
++                       image->shmseg, 0);
++      /* The reply must follow PutImage: the server must finish reading SHM
++       * before the application can acquire and overwrite this image. */
++      geom_cookie = xcb_get_geometry(chain->conn, chain->window);
++      goto wait_geometry;
++   }
++   geom_cookie = xcb_get_geometry(chain->conn, chain->window);
+ 
+    xcb_void_cookie_t cookie;
+    void *myptr = image->base.cpu_map;
+@@ -1537,6 +1562,7 @@
+       }
+    }
+ 
++wait_geometry:
+    xcb_flush(chain->conn);
+ 
+    /* We don't have queued present here.
+@@ -1621,6 +1647,11 @@
+                           struct wsi_x11_connection *wsi_conn,
+                           VkPresentModeKHR present_mode)
+ {
++   /* CPU scanout needs completed GPU readback, but waiting in this thread
++    * allows the application to encode the next image in parallel. */
++   if (wsi_device->sw_async)
++      return true;
++
+    if (wsi_conn->is_xwayland && !wsi_device->x11.xwaylandWaitReady) {
+       return false;
+    }
+@@ -1983,7 +2014,8 @@
+                                                  &chain->base.fences[image_index],
+                                                  true, UINT64_MAX);
+          if (result != VK_SUCCESS) {
+-            result = VK_ERROR_OUT_OF_DATE_KHR;
++            if (!chain->base.wsi->sw_async)
++               result = VK_ERROR_OUT_OF_DATE_KHR;
+             break;
+          }
+       }
+@@ -2074,8 +2106,27 @@
+       return result;
+ 
+    image->update_region = None;
+-   if (chain->base.wsi->sw && !chain->has_mit_shm)
++   if (chain->base.wsi->sw && !chain->has_mit_shm) {
++      if (chain->has_shm_put_image) {
++         unsigned size = image->base.row_pitches[0] * pCreateInfo->imageExtent.height;
++         if (!alloc_shm(&image->base, size)) {
++            wsi_destroy_image(&chain->base, &image->base);
++            return VK_ERROR_OUT_OF_HOST_MEMORY;
++         }
++         image->shmseg = xcb_generate_id(chain->conn);
++         xcb_generic_error_t *error = xcb_request_check(chain->conn,
++            xcb_shm_attach_checked(chain->conn, image->shmseg, image->shmid, true));
++         if (error) {
++            free(error);
++            image->shmseg = 0;
++            shmdt(image->shmaddr);
++            image->shmaddr = NULL;
++            wsi_destroy_image(&chain->base, &image->base);
++            return VK_ERROR_INITIALIZATION_FAILED;
++         }
++      }
+       return VK_SUCCESS;
++   }
+ 
+ #ifdef HAVE_X11_DRM
+    xcb_void_cookie_t cookie;
+@@ -2250,6 +2301,11 @@
+ #endif
+    }
+ 
++   if (chain->has_shm_put_image && image->shmseg) {
++      xcb_generic_error_t *error = xcb_request_check(chain->conn,
++         xcb_shm_detach_checked(chain->conn, image->shmseg));
++      free(error);
++   }
+    wsi_destroy_image(&chain->base, &image->base);
+ #ifdef HAVE_SYS_SHM_H
+    if (image->shmaddr)
+@@ -2699,6 +2755,7 @@
+    chain->status = VK_SUCCESS;
+    chain->has_dri3_modifiers = wsi_conn->has_dri3_modifiers;
+    chain->has_mit_shm = wsi_conn->has_mit_shm;
++   chain->has_shm_put_image = wsi_conn->has_shm_put_image && !chain->has_mit_shm;
+    chain->has_async_may_tear = present_caps & XCB_PRESENT_CAPABILITY_ASYNC_MAY_TEAR;
+ 
+    /* When images in the swapchain don't fit the window, X can still present them, but it won't

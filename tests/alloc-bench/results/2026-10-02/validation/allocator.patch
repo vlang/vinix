@@ -1,0 +1,80 @@
+diff --git a/kernel/memory/physical.v b/kernel/memory/physical.v
+index 87446858..480438fb 100644
+--- a/kernel/memory/physical.v
++++ b/kernel/memory/physical.v
+@@ -366,9 +366,10 @@ pub fn pmm_alloc(count u64) voidptr {
+ 	ret := pmm_alloc_nozero(count)
+ 
+ 	// We always zero out memory for security reasons
++	word_count := (count * page_size) / 8
+ 	unsafe {
+ 		mut ptr := &u64(u64(ret) + higher_half)
+-		for i := u64(0); i < (count * page_size) / 8; i++ {
++		for i := u64(0); i < word_count; i++ {
+ 			ptr[i] = 0
+ 		}
+ 	}
+@@ -400,9 +401,10 @@ pub fn pmm_alloc_fallible(count u64) voidptr {
+ 	}
+ 
+ 	// We always zero out memory for security reasons
++	word_count := (count * page_size) / 8
+ 	unsafe {
+ 		mut ptr := &u64(u64(ret) + higher_half)
+-		for i := u64(0); i < (count * page_size) / 8; i++ {
++		for i := u64(0); i < word_count; i++ {
+ 			ptr[i] = 0
+ 		}
+ 	}
+@@ -471,6 +473,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
+ 	defer {
+ 		pmm_lock.release()
+ 	}
++	words_per_page := page_size / 8
+ 	for i := page; i < page + count; i++ {
+ 		mut refs := unsafe { &u32(pmm_refcounts) }
+ 		if unsafe { refs[i] } > 1 {
+@@ -482,7 +485,7 @@ pub fn pmm_free(ptr voidptr, count u64) {
+ 		}
+ 		unsafe {
+ 			mut words := &u64(i * page_size + higher_half)
+-			for word := u64(0); word < page_size / 8; word++ {
++			for word := u64(0); word < words_per_page; word++ {
+ 				words[word] = 0xaaaaaaaaaaaaaaaa
+ 			}
+ 			refs[i] = 0
+diff --git a/kernel/memory/physical_numa.v b/kernel/memory/physical_numa.v
+index 8462afb8..f611290b 100644
+--- a/kernel/memory/physical_numa.v
++++ b/kernel/memory/physical_numa.v
+@@ -318,9 +318,10 @@ pub fn pmm_alloc_on_node(count u64, node int, strict bool) voidptr {
+ 		return unsafe { nil }
+ 	}
+ 	// Pages are always handed out zeroed, for the same reason as pmm_alloc.
++	word_count := (count * page_size) / 8
+ 	unsafe {
+ 		mut ptr := &u64(u64(ret) + higher_half)
+-		for i := u64(0); i < (count * page_size) / 8; i++ {
++		for i := u64(0); i < word_count; i++ {
+ 			ptr[i] = 0
+ 		}
+ 	}
+diff --git a/kernel/memory/slab.v b/kernel/memory/slab.v
+index 03ff4a4c..978c882c 100644
+--- a/kernel/memory/slab.v
++++ b/kernel/memory/slab.v
+@@ -341,7 +341,13 @@ pub fn (mut this Slab) sfree(ptr voidptr) {
+ 	}
+ 	was_full := hdr.in_use == hdr.capacity
+ 	// Poison before publishing the slot as free.
+-	unsafe { C.memset(ptr, 0xaa, this.ent_size) }
++	// Validated slots and class sizes are 16-byte aligned, so whole words
++	// cover the payload without touching the adjacent object or page header.
++	word_count := this.ent_size / 8
++	words := unsafe { &u64(ptr) }
++	for i := u64(0); i < word_count; i++ {
++		unsafe { words[i] = slab_poison }
++	}
+ 	$if xnu_bitmap ? {
+ 		// The class lock and preceding check guarantee success.
+ 		if !xnualloc.zone_bits_mark_free_ref(unsafe { &hdr.used[0] }, slab_bitmap_words, slot) {

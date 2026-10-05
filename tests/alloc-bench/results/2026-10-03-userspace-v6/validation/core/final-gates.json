@@ -1,0 +1,64 @@
+{
+  "captured_utc": "2026-10-02T22:53:13.827088+00:00",
+  "allocator_patch_sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d",
+  "kernels": {
+    "x86_64": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+    "aarch64": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7"
+  },
+  "test_source_sha256": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe",
+  "boundary_supplement_sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+  "core": {
+    "x86_64": {
+      "exit_code": 0,
+      "serial_sha256": "3635a64075d6e16f58b060d38a982f202f70df35378802969504d2bbc6b5a461",
+      "started_utc": "2026-10-02T22:49:57.659134+00:00",
+      "finished_utc": "2026-10-02T22:51:32.210209+00:00",
+      "boundary_supplement_pass": true,
+      "all_core_markers_pass": true,
+      "pagetable_check_pass_count": 1,
+      "static_libc_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "init_sha256": "2de81919723a98229e79f56f5919103c6073c6740bccd00106b237f5bb44ae85",
+      "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+      "archive_linkage_verified": true,
+      "static_elf_verified": true,
+      "all_source_core_pass_marker_count": 53
+    },
+    "x86_64-four-level": {
+      "exit_code": 0,
+      "serial_sha256": "60ea36d2437ac8d8b64c397ab94c86964b41c300cdf18ad39bb84b37f21eb1c7",
+      "started_utc": "2026-10-02T22:51:32.229549+00:00",
+      "finished_utc": "2026-10-02T22:52:25.424532+00:00",
+      "boundary_supplement_pass": true,
+      "all_core_markers_pass": true,
+      "pagetable_check_pass_count": 1,
+      "static_libc_sha256": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+      "init_sha256": "2de81919723a98229e79f56f5919103c6073c6740bccd00106b237f5bb44ae85",
+      "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+      "archive_linkage_verified": true,
+      "static_elf_verified": true,
+      "all_source_core_pass_marker_count": 53
+    },
+    "aarch64": {
+      "exit_code": 0,
+      "serial_sha256": "bec27b80377ff3a771b799737fca1bac8370336605c83cb859f2fc04a252b432",
+      "started_utc": "2026-10-02T22:52:25.427297+00:00",
+      "finished_utc": "2026-10-02T22:53:13.446883+00:00",
+      "boundary_supplement_pass": true,
+      "all_core_markers_pass": true,
+      "pagetable_check_pass_count": 1,
+      "static_libc_sha256": "2a83589ee880356aa73f7809db76ccfa8f803f5ba78908ba2700e702b36620ca",
+      "init_sha256": "6ce0f9054cb4bdc3111f758393065e97c0d15e318d2da8e2120e99b2a6991d41",
+      "kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7",
+      "archive_linkage_verified": true,
+      "static_elf_verified": true,
+      "all_source_core_pass_marker_count": 51
+    }
+  },
+  "owned_jobs_running": [],
+  "all_three_modes_pass": true,
+  "owned_directory": "/Users/alex/code/vinix/build/useralloc-core-v6",
+  "notes": "No kernel rebuilds, tracked changes or benchmarks. Final v6 static archives linked and executed on identical frozen v5 kernels. Completed x86 ISO independently extracted; ARM disk kernel independently extracted.",
+  "evidence_audit_sha256": "b0d5fab923522a72d5391085227a230973d88a825ac8817b6acca8130b854f6a",
+  "exact_original_compile_flags_binary_identical": true,
+  "all_source_core_markers_pass": true
+}

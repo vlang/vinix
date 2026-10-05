@@ -1,0 +1,1299 @@
+#!/bin/sh
+# Small Vinix frontend for Alpine's apk package manager.
+set -eu
+
+APK=${VINIX_PKG_APK:-/sbin/apk}
+ROOT=${VINIX_PKG_ROOT:-}
+RESOLV_CONF=${VINIX_PKG_RESOLV_CONF:-$ROOT/etc/resolv.conf}
+CURL=${VINIX_PKG_CURL:-/usr/bin/curl}
+BSDTAR=${VINIX_PKG_BSDTAR:-/usr/bin/bsdtar}
+SHA256SUM=${VINIX_PKG_SHA256SUM:-/bin/busybox sha256sum}
+BUSYBOX=${VINIX_PKG_BUSYBOX-/bin/busybox}
+NETWORK_RETRIES=${VINIX_PKG_NETWORK_RETRIES:-10}
+# With less room than this on the root, in kilobytes, a failure is put down to
+# the root being full.
+MIN_FREE_KB=${VINIX_PKG_MIN_FREE_KB:-16384}
+NETWORK_RETRY_DELAY=${VINIX_PKG_NETWORK_RETRY_DELAY:-1}
+NETWORK_WAIT_SECONDS=${VINIX_PKG_NETWORK_WAIT_SECONDS:-60}
+
+SUBLIME_BUILD=${VINIX_SUBLIME_BUILD:-4200}
+SUBLIME_URL=${VINIX_SUBLIME_URL:-https://download.sublimetext.com/sublime_text_build_${SUBLIME_BUILD}_arm64.tar.xz}
+SUBLIME_SHA256=${VINIX_SUBLIME_SHA256:-cf4b6aa74ea2a2aab02e144599cf9e4a423cbb9543c221f7da1095a95495566a}
+MINECRAFT_VERSION=${VINIX_MINECRAFT_VERSION:-release}
+MINECRAFT_JAVA_MAJOR=21
+MINECRAFT_DOWNLOAD_JOBS=${VINIX_MINECRAFT_DOWNLOAD_JOBS:-8}
+# build-voffice-aarch64.sh produces this asset for the vlang/office releases.
+VOFFICE_URL=${VINIX_VOFFICE_URL:-https://github.com/vlang/office/releases/latest/download/VOffice-vinix-aarch64.tar.gz}
+VOFFICE_SHA256_URL=${VINIX_VOFFICE_SHA256_URL:-$VOFFICE_URL.sha256}
+
+usage() {
+	cat <<'EOF'
+usage: pkg <command> [package ...]
+
+commands:
+  install PACKAGE...  install packages (includes Firefox, Chromium, OBS Studio, VOffice, Minecraft, Java, FFmpeg, GTK, GIMP, Blender, and Sublime Text)
+  remove PACKAGE...   remove packages
+  update              refresh Alpine repository indexes
+  upgrade             upgrade installed packages
+  search QUERY...     search available packages
+  info PACKAGE...     show package information
+  list                list installed packages
+
+Alpine package names can be used directly. Vinix currently tracks Alpine 3.21
+for aarch64; package changes affect the running root filesystem.
+EOF
+}
+
+root_path() {
+	printf '%s%s\n' "$ROOT" "$1"
+}
+
+bb() {
+	if [ -n "$BUSYBOX" ]; then
+		"$BUSYBOX" "$@"
+	else
+		"$@"
+	fi
+}
+
+# Whether the root has run out of room. That is not a mirror's failure:
+# downloading again cannot help, and what the commands say about it is a page
+# of "No space left on device" for whichever files came last.
+out_of_space() {
+	free_kb=$(bb df -Pk "${ROOT:-/}" 2>/dev/null | bb awk 'NR == 2 { print $4 }')
+	case "$free_kb" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$free_kb" -lt "$MIN_FREE_KB" ]
+}
+
+# Say so, and what it means here: a system started from the ISO with no disk
+# keeps every file in memory, so what it has run out of is RAM.
+report_out_of_space() {
+	echo "pkg: no space left on ${ROOT:-/}: $((free_kb / 1024)) MiB free" >&2
+	if [ -z "$ROOT" ] && bb awk '$2 == "/" { type = $3 } END { exit type != "tmpfs" }' \
+		/proc/mounts 2>/dev/null; then
+		echo "pkg: this system keeps its files in memory. Give the machine more RAM, or a blank disk of 4 GiB or more to install itself onto at the next boot." >&2
+	fi
+}
+
+apk() {
+	if [ -n "$ROOT" ]; then
+		"$APK" --root "$ROOT" "$@"
+	else
+		"$APK" "$@"
+	fi
+}
+
+wait_for_network() {
+	case "$NETWORK_RETRIES" in
+		''|*[!0-9]*|0)
+			echo "pkg: VINIX_PKG_NETWORK_RETRIES must be a positive integer" >&2
+			exit 1
+			;;
+	esac
+	case "$NETWORK_WAIT_SECONDS" in
+		''|*[!0-9]*)
+			echo "pkg: VINIX_PKG_NETWORK_WAIT_SECONDS must be a non-negative integer" >&2
+			exit 1
+			;;
+	esac
+	case "$NETWORK_RETRY_DELAY" in
+		''|*[!0-9]*)
+			echo "pkg: VINIX_PKG_NETWORK_RETRY_DELAY must be a non-negative integer" >&2
+			exit 1
+			;;
+	esac
+
+	i=0
+	while [ ! -s "$RESOLV_CONF" ] && [ "$i" -lt "$NETWORK_WAIT_SECONDS" ]; do
+		if [ "$i" -eq 0 ]; then
+			echo "pkg: waiting for DHCP"
+		fi
+		sleep 1
+		i=$((i + 1))
+	done
+	if [ ! -s "$RESOLV_CONF" ]; then
+		echo "pkg: network is not ready: DHCP did not create $RESOLV_CONF" >&2
+		return 1
+	fi
+}
+
+# A package command can arrive just as DHCP or QEMU's DNS proxy comes up. apk
+# reports that as a temporary repository error, then follows it with a long and
+# misleading list of missing packages. Retry the whole safe/idempotent network
+# transaction so a momentary miss cannot poison the first package install.
+apk_network() {
+	attempt=1
+	while ! apk "$@"; do
+		# A root with no room for what apk fetched is not the network's
+		# failure, though apk words it like one, and trying again cannot help.
+		if out_of_space; then
+			report_out_of_space
+			return 1
+		fi
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: package network operation failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: package network operation failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		# Give QEMU's DNS proxy and the Alpine mirror progressively more time
+		# without making the common first-boot retry feel like a long pause.
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+materialize_runtime_library_links() {
+	# Vinix's musl loader opens shared objects with O_NOFOLLOW. Alpine packages
+	# commonly provide an ABI soname as a symlink to a versioned library, so turn
+	# installed library links into regular files just as the base-image builder
+	# does. Restrict the scan to the transaction's owned paths; Blender pulls in
+	# many libraries, but there is no reason to revisit the whole base image.
+	owned_files=$1
+	[ -s "$owned_files" ] || return 0
+	# A redirected shell `read` can block on Vinix regular files. Package library
+	# paths contain no newlines, so split a filtered command substitution on
+	# newlines and disable pathname expansion while iterating it.
+	old_ifs=$IFS
+	IFS='
+'
+	case $- in
+		*f*) restore_glob=false ;;
+		*) restore_glob=true; set -f ;;
+	esac
+	for path in $(LC_ALL=C awk '/^(lib|usr\/lib)\/.*\.so(\..*)?$/' "$owned_files"); do
+		link=$(root_path "/$path")
+		if [ -L "$link" ]; then
+			real=$(bb readlink -f "$link")
+			[ -f "$real" ] || continue
+			# A hard link is a regular directory entry from the loader's point of
+			# view and avoids duplicating Blender's large library dependencies.
+			bb ln -f "$real" "$link.vinix"
+			# Replace the native musl interpreter atomically too; removing that
+			# symlink before invoking mv would prevent mv itself from starting.
+			bb mv "$link.vinix" "$link"
+		fi
+	done
+	IFS=$old_ifs
+	[ "$restore_glob" = false ] || set +f
+}
+
+# Download the complete dependency closure before changing the live root. A
+# transient mirror failure near the end no longer leaves a half-installed GTK
+# stack, and successful archives are retained across network retries. The final
+# apk transaction is deliberately offline and keeps maintainer scripts disabled
+# because they assume Alpine's init system.
+apk_install() (
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	cache=$(bb mktemp -d "$cache_parent/vinix-pkg.XXXXXX")
+	trap 'rm -rf "$cache"' EXIT INT TERM
+	installed_before="$cache/installed-before"
+	installed_after="$cache/installed-after"
+	new_packages="$cache/new-packages"
+	owned_files="$cache/owned-files"
+	LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_before"
+	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
+		[ ! -f "$index" ] || cp "$index" "$cache/"
+	done
+	install_attempt=1
+	while :; do
+		# Some Alpine packages use install_if providers that are considered only
+		# during the add transaction. Callers can name those cache-only packages
+		# so the final offline transaction still has every selected archive.
+		# shellcheck disable=SC2086
+		apk_network --cache-dir "$cache" --no-progress cache download \
+			"$@" ${VINIX_PKG_CACHE_EXTRAS:-}
+		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
+			LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_after"
+			LC_ALL=C comm -13 "$installed_before" "$installed_after" >"$new_packages"
+			if [ -s "$new_packages" ]; then
+				# The installed database already contains every owned path. Read it
+				# once instead of launching `apk info -L` for dozens of dependencies;
+				# repeated short-lived processes are expensive on a first Vinix boot.
+				LC_ALL=C awk '
+					NR == FNR { wanted[$0] = 1; next }
+					/^P:/ { keep = substr($0, 3) in wanted; directory = ""; next }
+					keep && /^F:/ { directory = substr($0, 3); next }
+					keep && /^R:/ {
+						path = (directory == "" ? "" : directory "/") substr($0, 3)
+						if (path ~ /^(bin|etc|lib|opt|sbin|usr|var)\//) print path
+					}
+				' "$new_packages" "$(root_path /lib/apk/db/installed)" \
+					| LC_ALL=C sort -u >"$owned_files"
+			else
+				: >"$owned_files"
+			fi
+			if [ -s "$owned_files" ]; then
+				manifest=$(root_path /var/lib/vinix-pkg/package-files)
+				mkdir -p "$(dirname "$manifest")"
+				{
+					[ ! -f "$manifest" ] || cat "$manifest"
+					cat "$owned_files"
+				} | LC_ALL=C sort -u >"$manifest.new"
+				mv "$manifest.new" "$manifest"
+			fi
+			materialize_runtime_library_links "$owned_files"
+			return 0
+		fi
+		if out_of_space; then
+			report_out_of_space
+			return 1
+		fi
+		if [ "$install_attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: package installation failed after $install_attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: package installation failed; refreshing downloads ($install_attempt/$NETWORK_RETRIES)" >&2
+		rm -f "$cache"/*.apk
+		sleep $((NETWORK_RETRY_DELAY * install_attempt))
+		install_attempt=$((install_attempt + 1))
+	done
+)
+
+have_repository_indexes() {
+	for index in "$(root_path /var/cache/apk)"/APKINDEX.*.tar.gz; do
+		[ -f "$index" ] && return 0
+	done
+	return 1
+}
+
+refresh_repository_indexes() {
+	wait_for_network
+	apk_network update
+}
+
+ensure_repository_indexes() {
+	have_repository_indexes && return 0
+	echo "pkg: refreshing Alpine repository indexes"
+	refresh_repository_indexes
+}
+
+require_root() {
+	if [ -z "$ROOT" ] && [ "$(id -u)" != 0 ]; then
+		echo "pkg: package changes require root" >&2
+		exit 1
+	fi
+}
+
+# The userland builder extracts these packages so networking and apk work on
+# the first boot. Register them as explicitly installed before the first
+# transaction, otherwise removing an application could garbage-collect libc or
+# apk itself as an apparently orphaned dependency.
+bootstrap_database() {
+	marker=$(root_path /var/lib/vinix-pkg/base-ready)
+	[ -f "$marker" ] && return 0
+
+	base_world=$(root_path /etc/vinix-pkg/base-world)
+	if [ ! -s "$base_world" ]; then
+		echo "pkg: missing $base_world" >&2
+		exit 1
+	fi
+
+	echo "pkg: registering the Vinix base packages"
+	# Package names cannot contain whitespace. Expanding this generated file is
+	# intentional and preserves one package name per line as separate arguments.
+	# shellcheck disable=SC2046
+	apk_install $(sed '/^[[:space:]]*#/d; /^[[:space:]]*$/d' "$base_world")
+	mkdir -p "$(dirname "$marker")"
+	: > "$marker"
+}
+
+resolve_packages() {
+	resolved=
+	for requested in "$@"; do
+		case "$requested" in
+			java)
+				resolved="$resolved openjdk21-jdk ca-certificates-bundle"
+				;;
+			minecraft|voffice)
+				# Remove Mojang's client through its own manifest below, but retain
+				# the shared Alpine JVM/X11/Mesa packages. The immutable Vinix base
+				# carries several of those outside apk's database; deleting them here
+				# would remove files Firefox and the desktop still use. VOffice is
+				# compiled from source and owns no apk package at all.
+				;;
+			firefox)
+				resolved="$resolved firefox-esr"
+				;;
+			gtk)
+				# Keep GTK out of the image while making the obvious command
+				# produce a complete, demonstrably useful desktop install.
+				resolved="$resolved gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools"
+				;;
+			gnumeric)
+				resolved="$resolved gnumeric adwaita-icon-theme font-dejavu"
+				;;
+			gimp)
+				resolved="$resolved gimp adwaita-icon-theme font-dejavu"
+				;;
+			chromium)
+				resolved="$resolved chromium chromium-swiftshader adwaita-icon-theme font-dejavu"
+				;;
+			obs|obs-studio)
+				resolved="$resolved obs-studio qt6-qtbase-x11 font-dejavu"
+				;;
+			libreoffice|libreoffice-writer|libreoffice-calc)
+				# One name for the suite. The two document modules share the
+				# 311 MiB libreoffice-common, and the GTK 3 VCL plugin is what
+				# draws them on Vinix; Alpine leaves the plugin optional.
+				resolved="$resolved libreoffice-writer libreoffice-calc libreoffice-gtk libreoffice-lang-en_us adwaita-icon-theme font-dejavu ttf-liberation"
+				;;
+			sublime|sublime-text)
+				resolved="$resolved gcompat gtk+3.0 adwaita-icon-theme font-dejavu libarchive-tools llvm19-libs"
+				;;
+			gtk+3.0-demo) ;;
+			*) resolved="$resolved $requested" ;;
+		esac
+	done
+	printf '%s\n' "${resolved# }"
+}
+
+install_packages() {
+	for requested in "$@"; do
+		case "$requested" in
+			java)
+				apk_install openjdk21-jdk ca-certificates-bundle
+				finalize_java "$MINECRAFT_JAVA_MAJOR"
+				;;
+			minecraft)
+				install_minecraft
+				;;
+			voffice)
+				install_voffice
+				;;
+			firefox)
+				# The image's own browser is Alpine's ESR build; keep a reinstall on
+				# the same release line and give it the same Vinix defaults.
+				apk_install adwaita-icon-theme font-dejavu firefox-esr
+				finalize_firefox
+				# Without the loader cache GTK cannot load a single image, and the
+				# browser spins on pixbuf assertions instead of drawing.
+				finalize_desktop
+				;;
+			gtk)
+				apk_install \
+					adwaita-icon-theme font-dejavu gtk+3.0 libarchive-tools
+				install_gtk_demo
+				finalize_desktop
+				;;
+			gtk+3.0-demo)
+				apk_install gtk+3.0 libarchive-tools
+				install_gtk_demo
+				finalize_desktop
+				;;
+			gnumeric)
+				# Gnumeric's Alpine dependencies provide GTK itself, while these
+				# theme/font packages make the application usable on a fresh Vinix
+				# image that deliberately contains no desktop toolkit.
+				apk_install \
+					adwaita-icon-theme font-dejavu gnumeric
+				finalize_gnumeric
+				;;
+			gimp)
+				# GIMP uses GTK 2, which its Alpine dependency closure supplies.
+				# Add a complete icon theme and readable UI fonts for Vinix's
+				# deliberately toolkit-free base image.
+				apk_install \
+					adwaita-icon-theme font-dejavu gimp
+				finalize_gimp
+				;;
+			ffmpeg)
+				apk_install ffmpeg
+				finalize_ffmpeg
+				;;
+			obs|obs-studio)
+				apk_install obs-studio qt6-qtbase-x11 font-dejavu
+				finalize_obs
+				;;
+			blender)
+				# libgmpxx is what the native Vinix backend adds to Alpine's
+				# own dependency list: that build links GMP's C++ bindings,
+				# and Alpine's blender package declares only libgmp. Without
+				# it /usr/libexec/vinix-blender-native cannot be loaded at
+				# all, and the desktop shows a window that never fills.
+				VINIX_PKG_CACHE_EXTRAS=python3-pycache-pyc0 \
+					apk_install blender libgmpxx
+				finalize_blender
+				;;
+			chromium)
+				# Chromium's Alpine dependencies provide GTK, X11 and NSS. The
+				# icon theme and fonts are what a browser needs but Alpine does
+				# not make it depend on, and chromium-swiftshader is the CPU
+				# Vulkan device ANGLE falls back to when no GPU driver exists.
+				apk_install \
+					adwaita-icon-theme font-dejavu chromium chromium-swiftshader
+				finalize_chromium
+				;;
+			libreoffice|libreoffice-writer|libreoffice-calc)
+				# LibreOffice's Alpine dependencies provide GTK, X11 and its
+				# own UNO Python. The icon theme, UI font and the metric
+				# document fonts are what an office suite needs and Alpine
+				# does not make it depend on.
+				apk_install \
+					adwaita-icon-theme font-dejavu ttf-liberation \
+					libreoffice-writer libreoffice-calc libreoffice-gtk \
+					libreoffice-lang-en_us
+				finalize_libreoffice
+				;;
+			sublime|sublime-text)
+				apk_install \
+					adwaita-icon-theme font-dejavu gcompat gtk+3.0 libarchive-tools \
+					llvm19-libs
+				materialize_gcompat_links
+				install_sublime
+				finalize_desktop
+				;;
+			*)
+				apk_install "$requested"
+				;;
+		esac
+	done
+}
+
+materialize_link() {
+	link=$(root_path "$1")
+	[ -L "$link" ] || return 0
+	target=$(readlink "$link")
+	case "$target" in
+		/*) real=$(root_path "$target") ;;
+		*) real=$(dirname "$link")/$target ;;
+	esac
+	if [ ! -f "$real" ]; then
+		echo "pkg: compatibility loader link has no target: $1" >&2
+		exit 1
+	fi
+	bb cp "$real" "$link.vinix"
+	bb chmod 0755 "$link.vinix"
+	bb rm -f "$link"
+	bb mv "$link.vinix" "$link"
+}
+
+materialize_gcompat_links() {
+	# Vinix's musl loader deliberately opens shared objects with O_NOFOLLOW.
+	# gcompat represents glibc's loader and compatibility sonames as symlinks,
+	# so turn only those known links into regular files after apk installs them.
+	for path in \
+		/lib/ld-linux-aarch64.so.1 \
+		/lib/libc.so.6 \
+		/lib/libcrypt.so.1 \
+		/lib/libdl.so.2 \
+		/lib/libm.so.6 \
+		/lib/libpthread.so.0 \
+		/lib/libresolv.so.2 \
+		/lib/librt.so.1 \
+		/lib/libutil.so.1
+	do
+		materialize_link "$path"
+	done
+}
+
+download_sublime() {
+	destination=$1
+	attempt=1
+	while ! "$CURL" --fail --location --output "$destination" "$SUBLIME_URL"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: Sublime Text download failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: Sublime Text download failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+install_sublime() {
+	manifest=$(root_path /var/lib/vinix-pkg/sublime-text.files)
+	if [ -s "$manifest" ] \
+		&& [ -x "$(root_path /opt/sublime_text/sublime_text)" ] \
+		&& [ -x "$(root_path /usr/bin/subl)" ]; then
+		return 0
+	fi
+
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(bb mktemp -d "$cache_parent/vinix-sublime.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	archive="$temp/sublime-text.tar.xz"
+	download_sublime "$archive"
+	# SHA256SUM may contain a command plus arguments (BusyBox's applet form).
+	# shellcheck disable=SC2086
+	actual=$($SHA256SUM "$archive" | awk '{print $1}')
+	if [ "$actual" != "$SUBLIME_SHA256" ]; then
+		echo "pkg: Sublime Text archive checksum mismatch" >&2
+		exit 1
+	fi
+
+	mkdir -p "$temp/payload"
+	"$BSDTAR" -xJf "$archive" -C "$temp/payload"
+	if [ ! -s "$temp/payload/sublime_text/sublime_text" ] \
+		|| [ ! -s "$temp/payload/sublime_text/plugin_host-3.8" ]; then
+		echo "pkg: Sublime Text archive is missing its ARM64 executables" >&2
+		exit 1
+	fi
+	bb chmod 0755 \
+		"$temp/payload/sublime_text/sublime_text" \
+		"$temp/payload/sublime_text/plugin_host-3.3" \
+		"$temp/payload/sublime_text/plugin_host-3.8" \
+		"$temp/payload/sublime_text/crash_handler"
+
+	remove_sublime
+	mkdir -p "$(root_path /opt)" "$(root_path /usr/bin)" \
+		"$(root_path /usr/share/applications)" \
+		"$(root_path /var/lib/vinix-pkg)" "$(root_path /dev/shm)"
+	bb chmod 1777 "$(root_path /dev/shm)"
+	bb mv "$temp/payload/sublime_text" "$(root_path /opt/sublime_text)"
+
+	cat >"$(root_path /usr/bin/subl)" <<'EOF'
+#!/bin/sh
+if [ -n "${LD_LIBRARY_PATH:-}" ]; then
+	export LD_LIBRARY_PATH="/opt/sublime_text:$LD_LIBRARY_PATH"
+else
+	export LD_LIBRARY_PATH=/opt/sublime_text
+fi
+exec /opt/sublime_text/sublime_text "$@"
+EOF
+	bb chmod 0755 "$(root_path /usr/bin/subl)"
+
+	cat >"$(root_path /usr/share/applications/sublime_text.desktop)" <<'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sublime Text
+GenericName=Text Editor
+Comment=Sophisticated text editor for code, markup and prose
+Exec=/usr/bin/subl %F
+Terminal=false
+MimeType=text/plain;
+Icon=sublime-text
+Categories=TextEditor;Development;
+StartupNotify=true
+EOF
+	for size in 16 32 48 128 256; do
+		icon_dir=$(root_path "/usr/share/icons/hicolor/${size}x${size}/apps")
+		mkdir -p "$icon_dir"
+		bb cp \
+			"$(root_path /opt/sublime_text)/Icon/${size}x${size}/sublime-text.png" \
+			"$icon_dir/sublime-text.png"
+	done
+
+	{
+		printf '%s\n' ./usr/bin/subl ./usr/share/applications/sublime_text.desktop
+		for size in 16 32 48 128 256; do
+			printf '%s\n' "./usr/share/icons/hicolor/${size}x${size}/apps/sublime-text.png"
+		done
+		(
+			cd "$(root_path /)"
+			bb find ./opt/sublime_text -type f
+			bb find ./opt/sublime_text -type l
+		)
+	} >"$manifest"
+
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: Sublime Text $SUBLIME_BUILD installed"
+}
+
+install_gtk_demo() {
+	if [ -n "$ROOT" ]; then
+		apk_install gtk+3.0-demo
+		return
+	fi
+
+	manifest=/var/lib/vinix-pkg/gtk+3.0-demo.files
+	if [ -s "$manifest" ] \
+		&& [ -x /usr/bin/gtk3-demo ] \
+		&& [ -x /usr/bin/gtk3-widget-factory ]; then
+		return 0
+	fi
+
+	# apk fetch verifies the repository signature and package checksum, but does
+	# not enter apk's Vinix-incompatible large-file-list cleanup path. Extract
+	# this data-only examples package and keep a manifest for symmetric removal.
+	temp=$(/bin/busybox mktemp -d /tmp/vinix-pkg-gtk-demo.XXXXXX)
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	mkdir "$temp/payload"
+	apk_network --no-progress fetch --output "$temp" gtk+3.0-demo
+	set -- "$temp"/gtk+3.0-demo-*.apk
+	if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+		echo "pkg: apk did not fetch one GTK demo archive" >&2
+		exit 1
+	fi
+	/usr/bin/bsdtar --ignore-zeros -xzf "$1" -C "$temp/payload"
+	# Vinix creates regular files as 0644 and archive tools restore their final
+	# modes with fchmodat. Make the package's application entries explicit too,
+	# so a partial extractor cannot silently leave unusable examples behind.
+	/bin/busybox chmod 0755 "$temp/payload"/usr/bin/gtk3-*
+	if [ ! -x "$temp/payload/usr/bin/gtk3-demo" ] \
+		|| [ ! -x "$temp/payload/usr/bin/gtk3-widget-factory" ]; then
+		echo "pkg: GTK demo archive is missing its examples" >&2
+		exit 1
+	fi
+
+	(
+		cd "$temp/payload"
+		/bin/busybox find . -type f
+		/bin/busybox find . -type l
+	) >"$temp/manifest"
+	for entry in "$temp/payload"/*; do
+		[ -e "$entry" ] || continue
+		/bin/busybox cp -a "$entry" /
+	done
+	mkdir -p /var/lib/vinix-pkg
+	/bin/busybox cp "$temp/manifest" "$manifest"
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: GTK demos installed"
+}
+
+finalize_desktop() {
+	[ -n "$ROOT" ] && return 0
+	# These are the deterministic cache updates from Alpine's triggers. General
+	# maintainer scripts stay disabled because they assume Alpine's init system.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+}
+
+finalize_gnumeric() {
+	[ -n "$ROOT" ] && return 0
+	# Alpine exposes the versioned executable through a relative symlink. apk's
+	# fchmodat(2) mode restoration is not yet effective on Vinix, so restore the
+	# package's executable bits and materialise its small command launcher.
+	if [ ! -x /usr/bin/gnumeric ]; then
+		set -- /usr/bin/gnumeric-[0-9]*
+		if [ "$#" -ne 1 ] || [ ! -s "$1" ]; then
+			echo "pkg: Gnumeric package has no executable launcher" >&2
+			exit 1
+		fi
+		# Keep all of Gnumeric's command-line tools usable too, as the GTK demo
+		# installer does for its extracted archive.
+		/bin/busybox chmod 0755 "$1" /usr/bin/ssconvert /usr/bin/ssdiff \
+			/usr/bin/ssgrep /usr/bin/ssindex
+		/bin/busybox rm -f /usr/bin/gnumeric
+		/bin/busybox cp "$1" /usr/bin/gnumeric
+		/bin/busybox chmod 0755 /usr/bin/gnumeric
+	fi
+	# Loader and schema caches are required for application startup. Gnumeric
+	# does not require rebuilding the desktop MIME/icon indexes, whose scanners
+	# can monopolise Vinix's sole QEMU CPU after this much larger transaction.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+}
+
+finalize_gimp() {
+	[ -n "$ROOT" ] && return 0
+	# Alpine exposes GIMP through a relative link to its versioned executable.
+	# Vinix package extraction cannot yet restore executable modes with
+	# fchmodat(2), so make the real program and its public launcher explicit.
+	if [ ! -x /usr/bin/gimp ]; then
+		set -- /usr/bin/gimp-[0-9]*
+		if [ "$#" -ne 1 ] || [ ! -s "$1" ]; then
+			echo "pkg: GIMP package has no executable launcher" >&2
+			exit 1
+		fi
+		/bin/busybox chmod 0755 "$1"
+		/bin/busybox rm -f /usr/bin/gimp
+		/bin/busybox cp "$1" /usr/bin/gimp
+		/bin/busybox chmod 0755 /usr/bin/gimp
+	fi
+	# GIMP discovers its file-format plug-ins at startup. Their package modes
+	# need the same explicit restoration as the main executable.
+	if [ -d /usr/lib/gimp/2.0/plug-ins ]; then
+		/bin/busybox find /usr/lib/gimp/2.0/plug-ins -type f \
+			-exec /bin/busybox chmod 0755 {} \;
+	fi
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	# GIMP ships private icon themes outside /usr/share/icons. Alpine normally
+	# indexes these through package triggers; without their caches GTK displays
+	# missing-image placeholders throughout the toolbox and dock controls.
+	for icon_theme in /usr/share/gimp/2.0/icons/*; do
+		[ -f "$icon_theme/index.theme" ] || continue
+		/usr/bin/gtk-update-icon-cache -f -t "$icon_theme"
+	done
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+}
+
+finalize_chromium() {
+	[ -n "$ROOT" ] && return 0
+	# Vinix package extraction cannot restore executable modes with fchmodat(2)
+	# yet. Chromium is a launcher script plus a private application directory,
+	# and every program in it has to be made executable explicitly.
+	for program in /usr/lib/chromium/chrome /usr/lib/chromium/chromium \
+		/usr/lib/chromium/chromium-launcher.sh \
+		/usr/lib/chromium/chrome_crashpad_handler \
+		/usr/lib/chromium/chrome-sandbox \
+		/usr/lib/chromium/xdg-mime /usr/lib/chromium/xdg-settings \
+		/usr/bin/chromium /usr/bin/chromium-browser; do
+		[ -e "$program" ] || continue
+		/bin/busybox chmod 0755 "$program"
+	done
+	if [ ! -x /usr/lib/chromium/chrome ]; then
+		echo "pkg: Chromium package has no application binary" >&2
+		exit 1
+	fi
+	# The image ships the launcher, start page and managed policy so that this
+	# transaction only has to supply the browser. Report a base image that
+	# predates them instead of installing a browser nothing can start.
+	if [ ! -x /usr/bin/run-chromium ]; then
+		echo "pkg: this image has no /usr/bin/run-chromium launcher" >&2
+		exit 1
+	fi
+	# Chromium reads its UI fonts, icons and MIME types through the same GTK
+	# caches every other desktop application uses.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+	# Fontconfig otherwise rebuilds its cache inside every one of Chromium's
+	# processes, on a guest with one CPU.
+	if [ -x /usr/bin/fc-cache ]; then
+		/usr/bin/fc-cache -f
+	fi
+}
+
+finalize_ffmpeg() {
+	# apk creates the command files, but Vinix cannot yet apply the executable
+	# modes from package metadata through fchmodat(2). Restore the complete
+	# command set shipped by Alpine's ffmpeg package rather than making only the
+	# most visible binary work.
+	for program in ffmpeg ffprobe qt-faststart; do
+		path=$(root_path "/usr/bin/$program")
+		[ ! -f "$path" ] || bb chmod 0755 "$path"
+	done
+	if [ ! -x "$(root_path /usr/bin/ffmpeg)" ] \
+		|| [ ! -x "$(root_path /usr/bin/ffprobe)" ]; then
+		echo "pkg: FFmpeg package has no executable tools" >&2
+		exit 1
+	fi
+}
+
+finalize_obs() {
+	# apk extraction on Vinix does not yet restore executable metadata for
+	# package payloads. OBS spawns its own FFmpeg muxer for recordings.
+	for program in obs obs-ffmpeg-mux; do
+		path=$(root_path "/usr/bin/$program")
+		[ ! -f "$path" ] || bb chmod 0755 "$path"
+	done
+	if [ ! -x "$(root_path /usr/bin/obs)" ] \
+		|| [ ! -x "$(root_path /usr/bin/obs-ffmpeg-mux)" ]; then
+		echo "pkg: OBS Studio package has no executable application or muxer" >&2
+		exit 1
+	fi
+}
+
+finalize_libreoffice() {
+	[ -n "$ROOT" ] && return 0
+	# Vinix package extraction cannot restore executable modes with fchmodat(2)
+	# yet. LibreOffice is a private program directory whose members are execed
+	# by each other rather than by the shell, so every one of them has to be
+	# made executable explicitly.
+	for program in /usr/lib/libreoffice/program/soffice.bin \
+		/usr/lib/libreoffice/program/soffice \
+		/usr/lib/libreoffice/program/oosplash \
+		/usr/lib/libreoffice/program/unopkg.bin \
+		/usr/lib/libreoffice/program/uno.bin \
+		/usr/lib/libreoffice/program/senddoc \
+		/usr/bin/libreoffice /usr/bin/soffice; do
+		[ -e "$program" ] || continue
+		/bin/busybox chmod 0755 "$program"
+	done
+	if [ ! -x /usr/lib/libreoffice/program/soffice.bin ]; then
+		echo "pkg: LibreOffice package has no program binary" >&2
+		exit 1
+	fi
+	# The launcher pins SAL_USE_VCLPLUGIN=gtk3, so an image whose closure left
+	# the plugin out would start a suite that cannot open a window.
+	if [ ! -e /usr/lib/libreoffice/program/libvclplug_gtk3lo.so ]; then
+		echo "pkg: LibreOffice package has no GTK 3 VCL plugin" >&2
+		exit 1
+	fi
+	# The image ships the launcher and the profile the desktop starts from, so
+	# this transaction only has to supply the suite. Report a base image that
+	# predates them instead of installing an office nothing can start.
+	if [ ! -x /usr/bin/run-libreoffice ]; then
+		echo "pkg: this image has no /usr/bin/run-libreoffice launcher" >&2
+		exit 1
+	fi
+	# VCL reads its UI fonts, icons and MIME types through the same GTK caches
+	# every other desktop application uses.
+	/usr/bin/gdk-pixbuf-query-loaders --update-cache
+	/usr/bin/glib-compile-schemas /usr/share/glib-2.0/schemas
+	/usr/bin/update-mime-database /usr/share/mime
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+	/usr/bin/gtk-update-icon-cache -f -t /usr/share/icons/Adwaita
+	# Writer asks for the whole font list while drawing its first window, and a
+	# cache miss then scans every font directory on a guest with one CPU.
+	if [ -x /usr/bin/fc-cache ]; then
+		/usr/bin/fc-cache -f
+	fi
+}
+
+finalize_blender() {
+	launcher=$(root_path /usr/bin/blender)
+	real_binary=$(root_path /usr/libexec/vinix-blender)
+
+	# Blender's PulseAudio backend currently reaches pthread operations Vinix
+	# does not implement. Keep the Alpine executable intact under libexec and
+	# make the normal command select Blender's supported no-audio backend.
+	if [ -s "$launcher" ] \
+		&& ! grep -q '^# Vinix Blender launcher$' "$launcher" 2>/dev/null; then
+		mkdir -p "$(dirname "$real_binary")"
+		bb rm -f "$real_binary"
+		bb mv "$launcher" "$real_binary"
+	fi
+	if [ ! -s "$real_binary" ]; then
+		echo "pkg: Blender package has no executable" >&2
+		exit 1
+	fi
+	bb chmod 0755 "$real_binary"
+	cat >"$launcher" <<'EOF'
+#!/bin/sh
+# Vinix Blender launcher
+exec /usr/libexec/vinix-blender -noaudio "$@"
+EOF
+	bb chmod 0755 "$launcher"
+
+	# apk owns the public launcher path, while this additional path must also be
+	# included when the QEMU package layer is persisted across boots.
+	manifest=$(root_path /var/lib/vinix-pkg/package-files)
+	mkdir -p "$(dirname "$manifest")"
+	{
+		[ ! -f "$manifest" ] || cat "$manifest"
+		printf '%s\n' usr/libexec/vinix-blender
+	} | LC_ALL=C sort -u >"$manifest.new"
+	mv "$manifest.new" "$manifest"
+}
+
+finalize_java() {
+	java_major=$1
+	java_home=$(root_path "/usr/lib/jvm/java-${java_major}-openjdk")
+	java_bin="$java_home/bin/java"
+	if [ ! -s "$java_bin" ]; then
+		echo "pkg: OpenJDK $java_major package has no Java executable" >&2
+		exit 1
+	fi
+
+	# apk's fchmodat mode restoration is not effective on Vinix yet. Restore the
+	# JRE command modes and publish the alternatives that Alpine's disabled
+	# maintainer scripts would ordinarily create.
+	for command_path in "$java_home/bin/"*; do
+		[ -f "$command_path" ] || continue
+		bb chmod 0755 "$command_path"
+		command_name=$(basename "$command_path")
+		mkdir -p "$(root_path /usr/bin)"
+		bb ln -sf "../lib/jvm/java-${java_major}-openjdk/bin/$command_name" \
+			"$(root_path "/usr/bin/$command_name")"
+	done
+	if [ ! -x "$java_bin" ]; then
+		echo "pkg: OpenJDK $java_major executable mode could not be restored" >&2
+		exit 1
+	fi
+
+	# java-cacerts is normally populated by an Alpine trigger. Package installs
+	# deliberately disable triggers, so build the same JKS trust store directly.
+	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
+	helper=${VINIX_JAVA_CACERTS_HELPER:-$(root_path /usr/libexec/vinix-minecraft/java-cacerts.py)}
+	certificates=$(root_path /usr/share/ca-certificates/mozilla)
+	cacerts=$(root_path /etc/ssl/certs/java/cacerts)
+	if [ ! -x "$python" ] || [ ! -f "$helper" ]; then
+		echo "pkg: this image lacks the Python Minecraft/Java installer support" >&2
+		exit 1
+	fi
+	"$python" "$helper" "$certificates" "$cacerts"
+}
+
+install_minecraft() {
+	# Alpine supplies the JVM and every musl-native dependency. Mojang supplies
+	# the client, libraries and assets; fetch-minecraft verifies their hashes and
+	# substitutes the matching LWJGL AArch64 natives from Maven Central.
+	apk_install \
+		openjdk21-jre ca-certificates-bundle \
+		gcompat jemalloc openal-soft-libs glfw freetype harfbuzz \
+		mesa-dri-gallium mesa-gl mesa-egl mesa-gbm \
+		libx11 libxcursor libxrandr libxinerama libxi libxxf86vm \
+		wayland-libs-server
+	finalize_java "$MINECRAFT_JAVA_MAJOR"
+	materialize_gcompat_links
+
+	support=$(root_path /usr/libexec/vinix-minecraft)
+	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
+	fetcher=${VINIX_MINECRAFT_FETCHER:-$support/fetch-minecraft.py}
+	for required in \
+		"$python" "$fetcher" "$support/run-minecraft" \
+		"$support/minecraft-login" "$support/minecraft-xinitrc"; do
+		if [ ! -f "$required" ]; then
+			echo "pkg: this image lacks Minecraft installer support: $required" >&2
+			exit 1
+		fi
+	done
+
+	set -- "$fetcher" \
+		--version "$MINECRAFT_VERSION" \
+		--max-java "$MINECRAFT_JAVA_MAJOR" \
+		--staging "${ROOT:-/}" \
+		--game-root /usr/share/minecraft \
+		--jobs "$MINECRAFT_DOWNLOAD_JOBS"
+	if [ "${VINIX_MINECRAFT_ASSETS:-full}" = none ]; then
+		set -- "$@" --no-assets
+	fi
+	"$python" "$@" || {
+		fetch_status=$?
+		if out_of_space; then
+			report_out_of_space
+		fi
+		exit "$fetch_status"
+	}
+
+	game=$(root_path /usr/share/minecraft)
+	launch_env="$game/launch.env"
+	if [ ! -f "$launch_env" ] \
+		|| ! grep -q 'natives-linux-arm64' "$launch_env"; then
+		echo "pkg: downloaded Minecraft has no AArch64 launch description" >&2
+		exit 1
+	fi
+	# shellcheck source=/dev/null
+	. "$launch_env"
+	if ! printf '%s' "$MC_CLASSPATH" | tr ':' '\n' \
+		| grep -Eq '/org/lwjgl/lwjgl/[^/]+/lwjgl-[^/]+\.jar$'; then
+		echo "pkg: downloaded Minecraft has no LWJGL core classes" >&2
+		exit 1
+	fi
+
+	mkdir -p "$(root_path /usr/bin)" "$(root_path /usr/share/vinix)" \
+		"$(root_path /var/lib/vinix-pkg)"
+	bb cp "$support/run-minecraft" "$(root_path /usr/bin/minecraft)"
+	bb cp "$support/minecraft-login" "$(root_path /usr/bin/minecraft-login)"
+	bb cp "$support/minecraft-xinitrc" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)"
+	bb chmod 0755 \
+		"$(root_path /usr/bin/minecraft)" \
+		"$(root_path /usr/bin/minecraft-login)" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)"
+
+	custom_manifest=$(root_path /var/lib/vinix-pkg/minecraft.files)
+	(
+		cd "${ROOT:-/}"
+		bb find ./usr/share/minecraft -type f -o -type l
+		printf '%s\n' \
+			./usr/bin/minecraft \
+			./usr/bin/minecraft-login \
+			./usr/share/vinix/minecraft-xinitrc
+	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
+
+	echo "pkg: official Minecraft: Java Edition $MC_VERSION installed"
+}
+
+# QEMU's RAM-root compatibility mode persists paths from this shared manifest.
+# Disk-root and hardware installs retain custom files in place directly.
+record_custom_files() {
+	custom_manifest=$1
+	package_manifest=$(root_path /var/lib/vinix-pkg/package-files)
+	{
+		[ ! -f "$package_manifest" ] || cat "$package_manifest"
+		sed 's#^\./##' "$custom_manifest"
+	} | LC_ALL=C sort -u >"$package_manifest.new"
+	mv "$package_manifest.new" "$package_manifest"
+}
+
+finalize_firefox() {
+	prefs=$(root_path /usr/share/vinix/firefox/vinix.js)
+	policies=$(root_path /etc/firefox/policies/policies.json)
+	custom_manifest=$(root_path /var/lib/vinix-pkg/firefox.files)
+	: >"$custom_manifest"
+	for app in usr/lib/firefox-esr usr/lib/firefox; do
+		directory=$(root_path "/$app")
+		[ -d "$directory" ] || continue
+		if [ -f "$prefs" ]; then
+			mkdir -p "$directory/defaults/pref"
+			bb cp "$prefs" "$directory/defaults/pref/vinix.js"
+			printf './%s\n' "$app/defaults/pref/vinix.js" >>"$custom_manifest"
+		fi
+		if [ -f "$policies" ]; then
+			mkdir -p "$directory/distribution"
+			bb cp "$policies" "$directory/distribution/policies.json"
+			printf './%s\n' "$app/distribution/policies.json" >>"$custom_manifest"
+		fi
+	done
+	record_custom_files "$custom_manifest"
+}
+
+download_file() {
+	url=$1
+	destination=$2
+	label=$3
+	attempt=1
+	while ! "$CURL" --fail --location --output "$destination" "$url"; do
+		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
+			echo "pkg: $label download failed after $attempt attempts" >&2
+			return 1
+		fi
+		echo "pkg: $label download failed; retrying ($attempt/$NETWORK_RETRIES)" >&2
+		sleep $((NETWORK_RETRY_DELAY * attempt))
+		attempt=$((attempt + 1))
+	done
+}
+
+# VOffice is not part of the image. Its releases carry a Vinix build of Writer
+# and Calc, cross-compiled by build-voffice-aarch64.sh as native clients of the
+# compositor's pipe protocol, together with their artwork and translations.
+install_voffice() {
+	case "$(uname -m)" in
+		aarch64|arm64) ;;
+		*)
+			echo "pkg: VOffice is only published for AArch64 Vinix" >&2
+			exit 1
+			;;
+	esac
+	wait_for_network
+	cache_parent=$(root_path /var/cache)
+	mkdir -p "$cache_parent"
+	temp=$(bb mktemp -d "$cache_parent/vinix-voffice.XXXXXX")
+	trap 'rm -rf "$temp"' EXIT INT TERM
+	archive="$temp/voffice.tar.gz"
+	download_file "$VOFFICE_URL" "$archive" VOffice
+	download_file "$VOFFICE_SHA256_URL" "$archive.sha256" "VOffice checksum"
+	expected=$(awk 'NR == 1 { print $1 }' "$archive.sha256")
+	case "$expected" in
+		''|*[!0-9a-f]*)
+			echo "pkg: VOffice checksum file is malformed" >&2
+			exit 1
+			;;
+	esac
+	# SHA256SUM may contain a command plus arguments (BusyBox's applet form).
+	# shellcheck disable=SC2086
+	actual=$($SHA256SUM "$archive" | awk '{ print $1 }')
+	if [ "$actual" != "$expected" ]; then
+		echo "pkg: VOffice archive checksum mismatch" >&2
+		exit 1
+	fi
+
+	# BusyBox tar is always present, unlike bsdtar. The bundle holds one
+	# top-level directory.
+	mkdir -p "$temp/extract"
+	bb tar -xzf "$archive" -C "$temp/extract"
+	set -- "$temp/extract"/*
+	if [ "$#" -ne 1 ] || [ ! -d "$1" ]; then
+		echo "pkg: VOffice archive does not hold a single application directory" >&2
+		exit 1
+	fi
+	payload=$1
+	for required in voffice-writer voffice-calc assets/logo.png; do
+		if [ ! -s "$payload/$required" ]; then
+			echo "pkg: VOffice archive is missing $required" >&2
+			exit 1
+		fi
+	done
+	if [ ! -d "$payload/assets/ribbon" ] || [ ! -d "$payload/translations" ]; then
+		echo "pkg: VOffice archive is missing its ribbon assets or translations" >&2
+		exit 1
+	fi
+
+	# The applications find their ribbon artwork and translations beside their
+	# executables, and the compositor only reads app icons below /usr/bin/assets.
+	remove_voffice
+	bin=$(root_path /usr/bin)
+	mkdir -p "$bin/assets" "$bin/translations" "$(root_path /var/lib/vinix-pkg)"
+	# Plain recursive copies: the files belong to root, not the packager's uid.
+	bb cp -R "$payload/assets/." "$bin/assets/"
+	bb cp -R "$payload/translations/." "$bin/translations/"
+	for name in writer calc; do
+		bb cp "$payload/voffice-$name" "$bin/voffice-$name"
+		bb chmod 0755 "$bin/voffice-$name"
+	done
+
+	custom_manifest=$(root_path /var/lib/vinix-pkg/voffice.files)
+	(
+		cd "${ROOT:-/}"
+		printf '%s\n' ./usr/bin/voffice-writer ./usr/bin/voffice-calc
+		bb find ./usr/bin/assets ./usr/bin/translations -type f
+	) | LC_ALL=C sort -u >"$custom_manifest"
+	record_custom_files "$custom_manifest"
+
+	version=
+	if [ -f "$payload/VERSION" ]; then
+		version=$(sed -n '1p' "$payload/VERSION")
+	fi
+	rm -rf "$temp"
+	trap - EXIT INT TERM
+	echo "pkg: VOffice ${version:+$version }Writer and Calc installed"
+}
+
+remove_voffice() {
+	bb rm -f "$(root_path /usr/bin/voffice-writer)" \
+		"$(root_path /usr/bin/voffice-calc)" \
+		"$(root_path /var/lib/vinix-pkg/voffice.files)"
+	# Only VOffice installs below these directories.
+	bb rm -rf "$(root_path /usr/bin/assets)" "$(root_path /usr/bin/translations)"
+}
+
+remove_minecraft() {
+	manifest=$(root_path /var/lib/vinix-pkg/minecraft.files)
+	bb rm -rf "$(root_path /usr/share/minecraft)"
+	bb rm -f \
+		"$(root_path /usr/bin/minecraft)" \
+		"$(root_path /usr/bin/minecraft-login)" \
+		"$(root_path /usr/share/vinix/minecraft-xinitrc)" \
+		"$manifest"
+}
+
+remove_gtk_demo() {
+	if [ -n "$ROOT" ]; then
+		apk --no-progress --no-scripts del gtk+3.0-demo
+		return
+	fi
+
+	manifest=/var/lib/vinix-pkg/gtk+3.0-demo.files
+	[ -s "$manifest" ] || return 0
+	while IFS= read -r path; do
+		case "$path" in
+			./usr/*|./etc/*) rm -f "/${path#./}" ;;
+		esac
+	done <"$manifest"
+	rm -f "$manifest"
+}
+
+remove_sublime() {
+	manifest=$(root_path /var/lib/vinix-pkg/sublime-text.files)
+	if [ -s "$manifest" ]; then
+		while IFS= read -r path; do
+			case "$path" in
+				./opt/sublime_text/*|./usr/bin/subl|./usr/share/applications/sublime_text.desktop|./usr/share/icons/hicolor/*/apps/sublime-text.png)
+					rm -f "$(root_path "/${path#./}")"
+					;;
+			esac
+		done <"$manifest"
+	fi
+	rm -f "$manifest"
+	bb rm -rf "$(root_path /opt/sublime_text)"
+}
+
+remove_blender() {
+	launcher=$(root_path /usr/bin/blender)
+	real_binary=$(root_path /usr/libexec/vinix-blender)
+	if [ -s "$real_binary" ]; then
+		# Restore apk's owned path before deletion. If apk del fails, the original
+		# application remains runnable instead of leaving a broken wrapper.
+		bb rm -f "$launcher"
+		bb mv "$real_binary" "$launcher"
+	fi
+}
+
+if [ "$#" -eq 0 ]; then
+	usage
+	exit 1
+fi
+
+command_name=$1
+shift
+
+case "$command_name" in
+	help|-h|--help)
+		usage
+		;;
+	install|add)
+		[ "$#" -gt 0 ] || { echo "pkg: install needs a package name" >&2; exit 1; }
+		require_root
+		# VOffice is a release download that never touches apk, so installing it
+		# alone must not wait on the Alpine mirror or register the base packages.
+		needs_apk=false
+		for requested in "$@"; do
+			[ "$requested" = voffice ] || needs_apk=true
+		done
+		if [ "$needs_apk" = true ]; then
+			ensure_repository_indexes
+			bootstrap_database
+		fi
+		install_packages "$@"
+		;;
+	remove|delete|del)
+		[ "$#" -gt 0 ] || { echo "pkg: remove needs a package name" >&2; exit 1; }
+		require_root
+		ensure_repository_indexes
+		bootstrap_database
+		for requested in "$@"; do
+			case "$requested" in
+				minecraft) remove_minecraft ;;
+				voffice) remove_voffice ;;
+				firefox) bb rm -f "$(root_path /var/lib/vinix-pkg/firefox.files)" ;;
+				gtk|gtk+3.0-demo) remove_gtk_demo ;;
+				blender) remove_blender ;;
+				sublime|sublime-text) remove_sublime ;;
+			esac
+		done
+		packages=$(resolve_packages "$@")
+		if [ -n "$packages" ]; then
+			# shellcheck disable=SC2086
+			apk --no-progress --no-scripts del $packages
+		fi
+		;;
+	update)
+		[ "$#" -eq 0 ] || { echo "pkg: update takes no packages" >&2; exit 1; }
+		require_root
+		refresh_repository_indexes
+		;;
+	upgrade)
+		[ "$#" -eq 0 ] || { echo "pkg: upgrade takes no packages" >&2; exit 1; }
+		require_root
+		refresh_repository_indexes
+		bootstrap_database
+		apk_network --no-progress --no-scripts upgrade
+		materialize_runtime_library_links \
+			"$(root_path /var/lib/vinix-pkg/package-files)"
+		if [ -e "$(root_path /usr/bin/blender)" ] \
+			|| [ -e "$(root_path /usr/libexec/vinix-blender)" ]; then
+			finalize_blender
+		fi
+		if [ -e "$(root_path /usr/bin/gimp)" ]; then
+			finalize_gimp
+		fi
+		if [ -e "$(root_path /usr/lib/chromium/chrome)" ]; then
+			finalize_chromium
+		fi
+		if [ -e "$(root_path /usr/bin/ffmpeg)" ]; then
+			finalize_ffmpeg
+		fi
+		if [ -e "$(root_path /usr/bin/obs)" ]; then
+			finalize_obs
+		fi
+		if [ -e "$(root_path "/usr/lib/jvm/java-${MINECRAFT_JAVA_MAJOR}-openjdk/bin/java")" ]; then
+			finalize_java "$MINECRAFT_JAVA_MAJOR"
+		fi
+		;;
+	search)
+		[ "$#" -gt 0 ] || { echo "pkg: search needs a query" >&2; exit 1; }
+		ensure_repository_indexes
+		apk search "$@"
+		;;
+	info)
+		[ "$#" -gt 0 ] || { echo "pkg: info needs a package name" >&2; exit 1; }
+		apk info "$@"
+		;;
+	list)
+		[ "$#" -eq 0 ] || { echo "pkg: list takes no packages" >&2; exit 1; }
+		apk info
+		[ ! -s "$(root_path /var/lib/vinix-pkg/gtk+3.0-demo.files)" ] \
+			|| echo gtk+3.0-demo
+		[ ! -s "$(root_path /var/lib/vinix-pkg/sublime-text.files)" ] \
+			|| echo sublime-text
+		[ ! -s "$(root_path /var/lib/vinix-pkg/minecraft.files)" ] \
+			|| echo minecraft
+		[ ! -s "$(root_path /var/lib/vinix-pkg/voffice.files)" ] \
+			|| echo voffice
+		;;
+	*)
+		echo "pkg: unknown command: $command_name" >&2
+		usage >&2
+		exit 1
+		;;
+esac

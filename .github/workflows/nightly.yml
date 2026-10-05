@@ -1,39 +1,111 @@
 name: Nightly Vinix rebuild
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: '0 0 * * *'
 
+permissions:
+  contents: write
+
+env:
+  UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
+  V_COMMIT: 9bfa1dc3f3455d5733d5c226662b6aaba8544f2c
+
 jobs:
-  vinix-build:
+  check-build-needed:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Unshallow repo tags
-        run: git fetch --prune --unshallow --tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Check if build is necessary
         run: test "$(git tag --points-at HEAD)" = ""
 
+  vinix-build:
+    needs: check-build-needed
+    name: Build ${{ matrix.release_arch }} desktop ISO
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: x86_64
+            release_arch: amd64
+          - architecture: aarch64
+            release_arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install make diffutils curl git rsync xorriso -y
+        run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso xz-utils python3 pkg-config meson ninja-build bison flex
 
-      - name: Enable user namespaces
-        run: sudo sysctl kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Build pinned V compiler and ui2
+        run: |
+          git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
+          git -C "$RUNNER_TEMP/v" checkout "$V_COMMIT"
+          make -C "$RUNNER_TEMP/v"
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout "$UI2_COMMIT"
 
-      #- name: Build full distro and ISO
-      #  run: JINX_CLEAN_WORKDIRS=yes PKGS_TO_INSTALL='*' make all
+      - name: Build amd64 Alpine desktop ISO
+        if: matrix.architecture == 'x86_64'
+        shell: bash
+        run: V="$RUNNER_TEMP/v/v" ./build-desktop-amd64.sh
 
-      #- name: Rename vinix.iso
-      #  run: mv vinix.iso vinix-nightly-full-$(date +'%Y%m%d').iso
+      - name: Build aarch64 Alpine desktop ISO
+        if: matrix.architecture == 'aarch64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export V="$RUNNER_TEMP/v/v"
+          export LLVM_BIN=/usr/bin
+          ./build-aarch64.sh --no-iso
+          ./build-x11-aarch64.sh
+          ./build-network-tools-aarch64.sh
+          ./build-python-aarch64.sh
+          ./build-v-aarch64.sh
+          ./build-firefox-aarch64.sh
+          ./build-desktop-aarch64.sh --compact-initramfs
+          VINIX_AARCH64_KERNEL="$PWD/build-aarch64-kernel/bin/vinix" \
+          VINIX_AARCH64_INITRAMFS="$PWD/build-support/init-aarch64/initramfs-desktop.tar" \
+          VINIX_AARCH64_ISO="$PWD/vinix-aarch64.iso" \
+            ./build-support/build-aarch64-iso.sh
 
-      - name: Build base distro and ISO
-        run: JINX_CLEAN_WORKDIRS=yes make all
+      - name: Rename ISO
+        shell: bash
+        run: |
+          image=vinix.iso
+          if [ "${{ matrix.architecture }}" = x86_64 ]; then
+            image=vinix-desktop-amd64.iso
+          else
+            image=vinix-aarch64.iso
+          fi
+          mv "$image" "vinix-nightly-${{ matrix.release_arch }}-desktop-$(date +'%Y%m%d').iso"
 
-      - name: Rename vinix.iso
-        run: mv vinix.iso vinix-nightly-base-$(date +'%Y%m%d').iso
+      - name: Upload ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: vinix-${{ matrix.release_arch }}-desktop
+          path: vinix-nightly-${{ matrix.release_arch }}-desktop-*.iso
+          if-no-files-found: error
+
+  publish-nightly:
+    needs: vinix-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download desktop ISOs
+        uses: actions/download-artifact@v4
+        with:
+          path: nightly-artifacts
 
       - name: Set TAG_DATE variable
         run: echo "TAG_DATE=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
@@ -42,12 +114,11 @@ jobs:
         run: git tag nightly-$TAG_DATE && git push --tags
 
       - name: Create nightly release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
-          name: Nightly build ${{ env.TAG_DATE }}
+          name: Nightly desktop build ${{ env.TAG_DATE }}
           tag_name: nightly-${{ env.TAG_DATE }}
-          body: Image of an up to date Vinix nightly build.
-          files: |
-            vinix-nightly-*.iso
+          body: Desktop-enabled AMD64 and ARM64 images of the current Vinix nightly build.
+          files: nightly-artifacts/**/*.iso
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

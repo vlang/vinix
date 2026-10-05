@@ -1,0 +1,101 @@
+name: Build M1 installer
+
+on:
+  push:
+    paths:
+      - .github/workflows/macos-installer.yml
+      - build-macos-installer.sh
+      - build-support/find-v.sh
+      - installer/macos/**
+  pull_request:
+    paths:
+      - .github/workflows/macos-installer.yml
+      - build-macos-installer.sh
+      - build-support/find-v.sh
+      - installer/macos/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1-installer-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  INSTALLER_ASSET: Vinix-Installer-M1.dmg
+  INSTALLER_TAG: m1-installer-latest
+  PAYLOAD_ASSET: Vinix-M1-Payload.zip
+  PAYLOAD_CHECKSUM_ASSET: Vinix-M1-Payload.zip.sha256
+  UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
+  V_COMMIT: 9bfa1dc3f3455d5733d5c226662b6aaba8544f2c
+
+jobs:
+  build:
+    name: Build network installer DMG
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out Vinix
+        uses: actions/checkout@v6
+
+      - name: Build pinned V compiler and ui2
+        run: |
+          set -euo pipefail
+          git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
+          git -C "$RUNNER_TEMP/v" checkout "$V_COMMIT"
+          make -C "$RUNNER_TEMP/v"
+          git clone https://github.com/vlang/ui2 third_party/ui2
+          git -C third_party/ui2 checkout "$UI2_COMMIT"
+
+      - name: Test and build the installer app
+        env:
+          V: ${{ runner.temp }}/v/v
+        run: |
+          set -euo pipefail
+          ./installer/macos/test.sh
+          ./build-macos-installer.sh
+          test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/payload"
+          test "$(uname -m)" = arm64
+          file "build/vinix-installer/Vinix Installer.app/Contents/MacOS/vinix-installer" | grep -q arm64
+
+      - name: Create compressed DMG and checksum
+        run: |
+          set -euo pipefail
+          mkdir -p dist/dmg-root
+          ditto \
+            "build/vinix-installer/Vinix Installer.app" \
+            "dist/dmg-root/Vinix Installer.app"
+          cp "installer/macos/READ ME FIRST.txt" "dist/dmg-root/READ ME FIRST.txt"
+          hdiutil create \
+            -volname "Vinix Installer" \
+            -srcfolder "dist/dmg-root" \
+            -format UDZO \
+            "dist/$INSTALLER_ASSET"
+          shasum -a 256 "dist/$INSTALLER_ASSET" > "dist/$INSTALLER_ASSET.sha256"
+          test "$(stat -f %z "dist/$INSTALLER_ASSET")" -lt 50000000
+
+      - name: Publish rolling GitHub release
+        if: github.repository == 'vlang/vinix' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view "$INSTALLER_TAG" >/dev/null
+          release_assets=$(gh release view "$INSTALLER_TAG" --json assets --jq '.assets[].name')
+          grep -Fx "$PAYLOAD_ASSET" <<<"$release_assets"
+          grep -Fx "$PAYLOAD_CHECKSUM_ASSET" <<<"$release_assets"
+          expected_payload_sha=$(sed -n 's/^PAYLOAD_SHA256=//p' installer/macos/fetch-vinix-payload.sh)
+          published_payload_sha=$(curl --fail --location --silent --show-error \
+            "https://github.com/vlang/vinix/releases/download/$INSTALLER_TAG/$PAYLOAD_CHECKSUM_ASSET" | awk 'NR == 1 { print $1 }')
+          test "$published_payload_sha" = "$expected_payload_sha"
+          gh release edit "$INSTALLER_TAG" \
+            --title "Vinix Installer for Apple M1" \
+            --notes "Small network installer for original Apple M1 Macs. The app downloads and verifies the separate Vinix boot image before making disk changes. This free build is ad-hoc signed, not Apple-notarized. On first launch, try to open the app, then go to System Settings > Privacy & Security and click Open Anyway. See READ ME FIRST.txt in the DMG."
+          gh release upload "$INSTALLER_TAG" \
+            "dist/$INSTALLER_ASSET" \
+            "dist/$INSTALLER_ASSET.sha256" \
+            --clobber

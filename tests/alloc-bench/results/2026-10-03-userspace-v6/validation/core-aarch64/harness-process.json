@@ -1,0 +1,17 @@
+{
+  "pid": 60490,
+  "parent_pid": 50085,
+  "started_utc": "2026-10-02T22:52:25.436445+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/third_party/useralloc-speed-v5/tests/qemu-core/run_vm.py",
+    "--init",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/init",
+    "--initramfs",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/initramfs.tar",
+    "--state-dir",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-aarch64/vm",
+    "--timeout",
+    "900"
+  ]
+}

@@ -1,16 +1,20 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 @[has_globals]
 module main
 
 import ui2
 
-// Only the real Settings implementation and theme are staged for these tests.
-// This is the same interface as app.v, without the unrelated calculator model.
-interface HostedApp {
-mut:
-	build(size ui2.Rect) !ui2.Element
-	handle(event_id string) !
-}
+// The whole desktop is staged for these tests, so NativeApp and the rest come
+// from the application itself rather than being restated here.
+//
+// Display and Battery are two categories of the desktop's one Settings
+// application now. They report a device rather than changing the desktop, so
+// they build and handle with no desktop behind them, which is what lets these
+// tests drive them without standing a window manager up.
 
 __global (
 	fixture_state        BacklightState
@@ -18,6 +22,12 @@ __global (
 	fixture_write_result BacklightResult
 	fixture_writes       int
 	fixture_percent      int
+	fixture_wifi_state   WifiState
+	fixture_wifi_result  WifiResult
+	fixture_wifi_action  WifiResult
+	fixture_wifi_radios  int
+	fixture_wifi_enabled bool
+	fixture_wifi_scans   int
 )
 
 fn fixture_read(mut out BacklightState) BacklightResult {
@@ -37,6 +47,72 @@ fn fixture_write(percent int) BacklightResult {
 	return fixture_write_result
 }
 
+fn fixture_wifi_read(mut out WifiState) WifiResult {
+	if fixture_wifi_result == .ok {
+		out = fixture_wifi_state
+	}
+	return fixture_wifi_result
+}
+
+fn fixture_wifi_radio(enabled bool) WifiResult {
+	fixture_wifi_radios++
+	fixture_wifi_enabled = enabled
+	if fixture_wifi_action == .ok {
+		fixture_wifi_state.radio_on = enabled
+		if !enabled {
+			fixture_wifi_state.scanning = false
+		}
+	}
+	return fixture_wifi_action
+}
+
+fn fixture_wifi_scan() WifiResult {
+	fixture_wifi_scans++
+	if fixture_wifi_action == .ok {
+		fixture_wifi_state.scanning = true
+	}
+	return fixture_wifi_action
+}
+
+fn wifi_fixture_app() &SettingsApp {
+	mut app := fixture_app()
+	mut state := WifiState{
+		driver_state: 3
+		radio_on: true
+		writable: true
+		count: 2
+	}
+	state.networks[0] = WifiNetwork{ ssid_len: 4, secure: false, channel: 6, rssi: -70 }
+	state.networks[1] = WifiNetwork{ ssid_len: 6, secure: true, channel: 44, rssi: -38 }
+	for i, byte in 'Open'.bytes() {
+		state.networks[0].ssid[i] = byte
+	}
+	for i, byte in 'Strong'.bytes() {
+		state.networks[1].ssid[i] = byte
+	}
+	state.count = 7
+	for index in 2 .. state.count {
+		state.networks[index] = WifiNetwork{
+			ssid_len: 2
+			secure: index % 2 == 0
+			channel: index + 1
+			rssi: -80 - index
+		}
+		state.networks[index].ssid[0] = `N`
+		state.networks[index].ssid[1] = u8(`0` + index)
+	}
+	fixture_wifi_state = state
+	fixture_wifi_result = .ok
+	fixture_wifi_action = .ok
+	fixture_wifi_radios = 0
+	fixture_wifi_enabled = true
+	fixture_wifi_scans = 0
+	app.wifi_read = fixture_wifi_read
+	app.wifi_radio = fixture_wifi_radio
+	app.wifi_scan = fixture_wifi_scan
+	return app
+}
+
 fn fixture_app() &SettingsApp {
 	fixture_state = BacklightState{
 		requested_nits: 100
@@ -50,7 +126,12 @@ fn fixture_app() &SettingsApp {
 	fixture_write_result = .ok
 	fixture_writes = 0
 	fixture_percent = -1
-	mut app := &SettingsApp{ read_state: fixture_read, write_percent: fixture_write }
+	desktop_configure_scale(1920, 1080)
+	mut app := &SettingsApp{
+		category: .display
+		read_state: fixture_read
+		write_percent: fixture_write
+	}
 	app.refresh()
 	return app
 }
@@ -69,8 +150,12 @@ fn element_named(root ui2.Element, id string) ?ui2.Element {
 fn test_settings_display_controls_and_explicit_writes() {
 	mut app := fixture_app()
 	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
-	category := element_named(root, 'settings.display') or { panic('missing Display category') }
-	assert category.text == 'Display'
+	display_index := settings_categories.index(SettingsCategory.display)
+	assert display_index >= 0
+	element_named(root, '${settings_action_category}${display_index}') or {
+		panic('missing Display category')
+	}
+	assert SettingsCategory.display.title() == 'Display'
 	assert fixture_writes == 0
 	app.handle('settings.refresh') or { panic(err) }
 	assert fixture_writes == 0
@@ -81,6 +166,696 @@ fn test_settings_display_controls_and_explicit_writes() {
 	assert app.status_text().contains('pending')
 	app.handle('settings.brightness.invalid') or { panic(err) }
 	assert fixture_writes == 1
+}
+
+fn test_settings_scale_choices_and_stale_hits() {
+	mut app := fixture_app()
+	mut root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	scale_100 := element_named(root, settings_scale_100_action) or { panic('missing 100% scale') }
+	mut scale_200 := element_named(root, settings_scale_200_action) or { panic('missing 200% scale') }
+	assert scale_100.text == '100%'
+	assert scale_200.text == '200%'
+	assert scale_100.box.bg == app_accent
+	assert scale_200.box.bg == files_up
+
+	app.handle(settings_scale_200_action) or { panic(err) }
+	assert desktop_requested_scale() == desktop_scale_200
+	root = app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	scale_200 = element_named(root, settings_scale_200_action) or { panic('missing selected 200% scale') }
+	assert scale_200.box.bg == app_accent
+
+	battery_index := settings_categories.index(SettingsCategory.battery)
+	assert battery_index >= 0
+	app.handle('${settings_action_category}${battery_index}') or { panic(err) }
+	app.handle(settings_scale_100_action) or { panic(err) }
+	assert desktop_requested_scale() == desktop_scale_200
+}
+
+fn test_desktop_scale_defaults_and_extents() {
+	assert desktop_default_scale(2304, 1440) == desktop_scale_200
+	assert desktop_default_scale(2560, 1600) == desktop_scale_200
+	assert desktop_default_scale(3024, 1964) == desktop_scale_200
+	assert desktop_default_scale(1920, 1080) == desktop_scale_100
+	assert desktop_default_scale(1024, 768) == desktop_scale_100
+	assert desktop_scaled_extent(2560, desktop_scale_200) == 1280
+	assert desktop_scaled_extent(2559, desktop_scale_200) == 1280
+	assert desktop_scaled_extent(1920, desktop_scale_100) == 1920
+}
+
+fn test_200_percent_text_uses_native_resolution_glyphs() {
+	initial_scale := desktop_configure_scale(240, 60)
+	assert initial_scale == desktop_scale_100
+	mut desktop := Desktop{
+		canvas: new_scaled_canvas(240, 60, 240, 60, initial_scale)
+		fonts: load_fonts()
+	}
+	defer {
+		unsafe { free(voidptr(desktop.canvas.pixels)) }
+		desktop_configure_scale(1920, 1080)
+	}
+	desktop_request_scale(desktop_scale_200)
+	desktop.apply_requested_scale()
+	assert desktop.canvas.width == 120 && desktop.canvas.height == 30
+	assert desktop.canvas.physical_width == 240 && desktop.canvas.physical_height == 60
+	assert desktop.canvas.scale == desktop_scale_200
+	desktop.canvas.clear(0xffffff)
+	face := desktop.face_for(ui2.TextStyle{
+		size: 13
+	})
+	assert face.raster_scale == desktop_scale_200
+	desktop.canvas.draw_text(face, 2, 2, 'Settings', 0x000000)
+
+	// Enlarging a 1x mask makes both pixels in every physical pair identical.
+	// A glyph rasterised at the panel resolution has independent coverage at
+	// those pixels, which preserves its one-physical-pixel antialiased edge.
+	mut native_edge := false
+	for y := 0; y < desktop.canvas.physical_height && !native_edge; y++ {
+		for x := 0; x + 1 < desktop.canvas.physical_width; x += desktop_scale_200 {
+			left := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			right := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x + 1] }
+			if left != right {
+				native_edge = true
+				break
+			}
+		}
+	}
+	assert native_edge
+}
+
+fn test_200_percent_traffic_lights_use_native_resolution_circles() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(40, 20, 80, 40, desktop_scale_200)
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	defer {
+		unsafe { free(voidptr(desktop.canvas.pixels)) }
+	}
+	desktop.canvas.clear(0xffffff)
+	close := desktop.title_button('window.close', 'builtin:traffic_close', theme_macos.button_inset, true, false)
+	desktop.draw_button(&close, int(close.frame.x), int(close.frame.y), int(close.frame.width), int(close.frame.height))
+
+	// A logical-pixel circle would make every aligned 2x2 physical block the
+	// same colour. The native-rasterised arc has independent coverage within
+	// at least one of those blocks.
+	mut native_edge := false
+	for y := 0; y + 1 < desktop.canvas.physical_height && !native_edge; y += 2 {
+		for x := 0; x + 1 < desktop.canvas.physical_width; x += 2 {
+			base := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			right := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x + 1] }
+			below := unsafe { desktop.canvas.pixels[(y + 1) * desktop.canvas.stride + x] }
+			if base != right || base != below {
+				native_edge = true
+				break
+			}
+		}
+	}
+	assert native_edge
+}
+
+fn test_catalina_checkbox_uses_native_hidpi_curves_and_tick() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(40, 24, 80, 48, desktop_scale_200)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(0xffffff)
+	checkbox := ui2.Element{
+		kind:    .checkbox
+		id:      'files'
+		checked: true
+		enabled: true
+	}
+	desktop.draw_button(&checkbox, 4, 1, 32, 22)
+	desktop.draw_button(&ui2.Element{
+		...checkbox
+		id:      'empty'
+		checked: false
+	}, 22, 1, 18, 22)
+
+	// At least one logical corner pixel contains independent physical coverage.
+	// The old 1x raster repeated one value across every 2x2 block.
+	physical_left := 4 * desktop_scale_200
+	physical_top := 5 * desktop_scale_200
+	empty_left := 22 * desktop_scale_200
+	mut native_corner := false
+	for py := physical_top; py < physical_top + 28 && !native_corner; py += 2 {
+		for px := empty_left; px < empty_left + 28; px += 2 {
+			base := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px] }
+			right := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px + 1] }
+			below := unsafe { desktop.canvas.pixels[(py + 1) * desktop.canvas.stride + px] }
+			if base != right || base != below {
+				native_corner = true
+				break
+			}
+		}
+	}
+	assert native_corner
+
+	// The tick has partially covered edge pixels between its white core and
+	// blue face; a scaled logical DDA can produce only solid 2x2 white blocks.
+	mut antialiased_tick := false
+	for py := physical_top + 6; py < physical_top + 24 && !antialiased_tick; py++ {
+		for px := physical_left + 6; px < physical_left + 24; px++ {
+			pixel := unsafe { desktop.canvas.pixels[py * desktop.canvas.stride + px] }
+			if pixel != catalina_control_accent && pixel != u32(0xffffff) {
+				antialiased_tick = true
+				break
+			}
+		}
+	}
+	assert antialiased_tick
+}
+
+fn test_catalina_cursor_has_complete_native_resolution_masks() {
+	assert catalina_cursor_white_1x.len == catalina_cursor_height
+	assert catalina_cursor_black_1x.len == catalina_cursor_height
+	assert catalina_cursor_white_2x.len == catalina_cursor_height * desktop_scale_200
+	assert catalina_cursor_black_2x.len == catalina_cursor_height * desktop_scale_200
+	for row in catalina_cursor_white_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_black_1x {
+		assert row.len == catalina_cursor_width
+	}
+	for row in catalina_cursor_white_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+	for row in catalina_cursor_black_2x {
+		assert row.len == catalina_cursor_width * desktop_scale_200
+	}
+}
+
+fn test_catalina_cursor_uses_clean_hidpi_artwork() {
+	background := u32(0x202020)
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(20, 24, 40, 48, desktop_scale_200)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(background)
+	desktop.draw_cursor()
+
+	// The first two physical pixels belong to one logical pixel but have
+	// independent coverage in the native 2x mask. The old enlarged 1x capture
+	// repeated them and looked soft.
+	unsafe {
+		assert desktop.canvas.pixels[0] == background
+		assert desktop.canvas.pixels[1] != background
+	}
+	// The final cursor column is transparent on every row. A missing entry in
+	// the former flat alpha array shifted scanlines into this column, producing
+	// the reported black vertical line.
+	for y in 0 .. catalina_cursor_height * desktop_scale_200 {
+		unsafe {
+			assert desktop.canvas.pixels[y * desktop.canvas.stride + catalina_cursor_width * desktop_scale_200 - 1] == background
+		}
+	}
+}
+
+fn test_catalina_theme_uses_measured_window_chrome() {
+	assert theme_macos.title_height == 22
+	assert theme_macos.button_size == 12
+	assert theme_macos.button_size + theme_macos.button_gap == 20
+	assert theme_macos.button_inset == 8
+	assert theme_macos.title_active_bg == 0xe4e4e4
+	assert theme_macos.title_active_bg2 == 0xd1d1d1
+	assert theme_macos.title_highlight == 0xf3f3f3
+	assert theme_macos.title_divider == 0xababab
+	assert theme_macos.title_inactive_bg == 0xf6f6f6
+	assert theme_macos.title_inactive_bg2 == 0xf6f6f6
+	assert theme_macos.title_inactive_highlight == 0xfbfbfb
+	assert theme_macos.title_inactive_divider == 0xd1d1d1
+	assert theme_macos.window_body == 0xececec
+	mut gradient := new_scaled_canvas(1, 20, 1, 20, 1)
+	defer {
+		unsafe { free(gradient.pixels) }
+	}
+	gradient.vertical_gradient_inclusive(0, 0, 1, 20, theme_macos.title_active_bg, theme_macos.title_active_bg2)
+	for row in 0 .. 20 {
+		expected := u32(0xe4e4e4) - u32(row) * u32(0x010101)
+		unsafe {
+			assert gradient.pixels[row] == expected
+		}
+	}
+
+	d := Desktop{
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	close := d.title_button('close', 'builtin:traffic_close', theme_macos.button_inset, true, true)
+	minimize := d.title_button('minimize', 'builtin:traffic_minimize', 28, true, true)
+	zoom := d.title_button('zoom', 'builtin:zoom', 48, true, true)
+	assert int(close.frame.x) == 8 && int(close.frame.y) == 5
+	assert close.box.bg == 0xff5f57 && close.box.border_color == 0xe0463e
+	assert close.box.border_left == 1 && close.box.border_top == 1
+	assert close.box.border_right == 1 && close.box.border_bottom == 1
+	assert close.text_style.color == 0x4d0000
+	assert minimize.box.bg == 0xffbd2e && minimize.box.border_color == 0xdea123
+	assert minimize.text_style.color == 0x995700
+	assert zoom.box.bg == 0x28c940 && zoom.box.border_color == 0x1aab29
+	assert zoom.text_style.color == 0x006500
+	assert close.image_path == 'builtin:traffic_close'
+	assert zoom.image_path == 'builtin:zoom'
+
+	idle := d.title_button('idle', 'builtin:close', 8, false, false)
+	assert idle.box.bg == 0xdcdcdc && idle.box.border_color == 0xd1d1d1
+	assert idle.image_path == ''
+}
+
+fn test_settings_choices_request_native_catalina_buttons() {
+	idle := settings_choice('settings.theme.0', 'Default', 0, 0, 120, false)
+	selected := settings_choice('settings.theme.1', 'macOS', 128, 0, 120, true)
+	assert idle.native_style
+	assert selected.native_style
+	assert !idle.checked
+	assert selected.checked
+	assert selected.accessibility_role == 'radio'
+	assert selected.accessibility_value == 'selected'
+}
+
+fn test_catalina_native_button_uses_measured_normal_default_and_pressed_renditions() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(360, 80, 360, 80, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+
+	normal := ui2.Element{
+		kind:         .button
+		id:           'normal'
+		frame:        ui2.rect(10, 10, 100, 28)
+		native_style: true
+	}
+	desktop.draw_button(&normal, 10, 10, 100, 28)
+	// The 21-pixel bezel is centred in the 28-pixel hit target. Its top and
+	// bottom rows are the two independently measured Catalina edge colours.
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 30] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 30] == catalina_button_face
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 30] == catalina_button_normal_outer[20]
+	}
+
+	selected := ui2.Element{
+		kind:         .button
+		id:           'selected'
+		frame:        ui2.rect(126, 10, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(&selected, 126, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 146] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 146] == catalina_button_default_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 146] == catalina_button_default_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 146] == catalina_button_default_outer[20]
+	}
+
+	pressed := ui2.Element{
+		kind:         .button
+		id:           'pressed'
+		frame:        ui2.rect(242, 10, 100, 28)
+		native_style: true
+	}
+	desktop.hover = 'pressed'
+	desktop.buttons = button_left
+	desktop.draw_button(&pressed, 242, 10, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[13 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[0]
+		assert desktop.canvas.pixels[14 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[0]
+		assert desktop.canvas.pixels[32 * desktop.canvas.stride + 262] == catalina_button_pressed_inner[18]
+		assert desktop.canvas.pixels[33 * desktop.canvas.stride + 262] == catalina_button_pressed_outer[20]
+	}
+
+	// Catalina transfers the blue emphasis to the button under the mouse while
+	// it is held. The formerly selected/default button becomes white meanwhile.
+	suppressed_default := ui2.Element{
+		kind:         .button
+		id:           'another-default'
+		frame:        ui2.rect(126, 42, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(&suppressed_default, 126, 42, 100, 28)
+	unsafe {
+		assert desktop.canvas.pixels[45 * desktop.canvas.stride + 146] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[46 * desktop.canvas.stride + 146] == catalina_button_face
+	}
+}
+
+fn test_catalina_text_field_uses_measured_focus_ring_inset_and_caret() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(150, 60, 150, 60, 1)
+		fonts:    load_fonts()
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	field := ui2.Element{
+		kind:           .text_field
+		id:             'temperature'
+		text:           '4'
+		frame:          ui2.rect(10, 10, 120, 42)
+		text_style:     ui2.TextStyle{
+			color: 0x123456
+			size:  13
+		}
+		focused:        true
+		text_selection: ui2.TextSelection{
+			anchor: 1
+			caret:  1
+		}
+	}
+	desktop.draw_button(&field, 10, 10, 120, 42)
+	// The 22-pixel bezel is vertically centred at y=20. Its four straight
+	// rows are sampled directly from Catalina's native NSTextField.
+	unsafe {
+		assert desktop.canvas.pixels[17 * desktop.canvas.stride + 40] == catalina_text_focus_outer
+		assert desktop.canvas.pixels[18 * desktop.canvas.stride + 40] == catalina_text_focus_ring
+		assert desktop.canvas.pixels[19 * desktop.canvas.stride + 40] == catalina_text_focus_ring
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 40] == catalina_text_focus_edge
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 40] == catalina_control_face
+	}
+	face := desktop.face_for(field.text_style)
+	caret_x := 10 + catalina_text_input_inset + face.text_width('4')
+	unsafe {
+		assert desktop.canvas.pixels[24 * desktop.canvas.stride + caret_x] == field.text_style.color
+	}
+}
+
+fn test_application_protocol_preserves_text_focus_and_selection() {
+	root := ui2.screen(0xffffff, [ui2.Element{
+		kind:           .text_field
+		id:             'temperature'
+		text:           '4'
+		focused:        true
+		text_selection: ui2.TextSelection{
+			anchor: 0
+			caret:  1
+		}
+	}])
+	mut encoded := []u8{}
+	encode_app_element(root, mut encoded) or { panic(err) }
+	decoded := decode_app_tree(encoded) or { panic(err) }
+	field := decoded.children[0]
+	assert field.focused
+	assert field.text_selection.anchor == 0
+	assert field.text_selection.caret == 1
+	free_tree(root)
+	free_tree(decoded)
+	unsafe { encoded.free() }
+}
+
+fn test_catalina_native_button_rasterizes_curves_and_gradients_at_hidpi_scale() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(120, 40, 240, 80, 2)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	button := ui2.Element{
+		kind:         .button
+		id:           'default'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(&button, 10, 6, 100, 28)
+
+	// The two physical rows making up the first logical scanline are sampled
+	// independently. A scaled 1x rounded rectangle would repeat the same row.
+	bezel_top := 9 * 2
+	center_x := 30 * 2
+	unsafe {
+		assert desktop.canvas.pixels[bezel_top * desktop.canvas.stride + center_x] == catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 1) * desktop.canvas.stride + center_x] != catalina_button_default_outer[0]
+		assert desktop.canvas.pixels[(bezel_top + 2) * desktop.canvas.stride + center_x] == catalina_button_default_inner[0]
+	}
+}
+
+fn test_catalina_native_button_casts_a_shadow_and_rings_focus() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(260, 40, 260, 40, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	plain := ui2.Element{
+		kind:         .button
+		id:           'plain'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+	}
+	desktop.draw_button(&plain, 10, 6, 100, 28)
+	focused := ui2.Element{
+		kind:         .button
+		id:           'focused'
+		frame:        ui2.rect(140, 6, 100, 28)
+		native_style: true
+		focused:      true
+	}
+	desktop.draw_button(&focused, 140, 6, 100, 28)
+	// Both bezels span rows 9..29. The colours are those of
+	// docs/catalina-reference/push-buttons-focus-default.png.
+	stride := desktop.canvas.stride
+	unsafe {
+		assert desktop.canvas.pixels[8 * stride + 60] == theme_macos.window_body
+		assert desktop.canvas.pixels[30 * stride + 60] == 0xe5e5e5
+		assert desktop.canvas.pixels[31 * stride + 60] == theme_macos.window_body
+		for row in 6 .. 9 {
+			assert desktop.canvas.pixels[row * stride + 190] == 0x82a5e9
+		}
+		assert desktop.canvas.pixels[9 * stride + 190] == 0x7093d7
+		assert desktop.canvas.pixels[10 * stride + 190] == catalina_button_face
+		for column in 137 .. 140 {
+			assert desktop.canvas.pixels[19 * stride + column] == 0x82a5e9
+		}
+		assert desktop.canvas.pixels[19 * stride + 141] == catalina_button_face
+		assert desktop.canvas.pixels[33 * stride + 190] == theme_macos.window_body
+	}
+}
+
+fn test_catalina_inactive_window_drops_default_face_and_focus_ring() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(380, 40, 380, 40, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	desktop.inactive_window = true
+	default_button := ui2.Element{
+		kind:         .button
+		id:           'open'
+		frame:        ui2.rect(10, 6, 100, 28)
+		native_style: true
+		checked:      true
+		focused:      true
+	}
+	desktop.draw_button(&default_button, 10, 6, 100, 28)
+	// A selected choice is a state, not a default, and stays blue.
+	choice := ui2.Element{
+		kind:               .button
+		id:                 'choice'
+		frame:              ui2.rect(140, 6, 100, 28)
+		native_style:       true
+		checked:            true
+		accessibility_role: 'radio'
+	}
+	desktop.draw_button(&choice, 140, 6, 100, 28)
+	toggle := ui2.Element{
+		kind:         .toggle_button
+		id:           'toggle'
+		frame:        ui2.rect(270, 6, 100, 28)
+		native_style: true
+		checked:      true
+	}
+	desktop.draw_button(&toggle, 270, 6, 100, 28)
+	stride := desktop.canvas.stride
+	unsafe {
+		assert desktop.canvas.pixels[9 * stride + 60] == catalina_button_normal_outer[0]
+		assert desktop.canvas.pixels[10 * stride + 60] == catalina_button_face
+		assert desktop.canvas.pixels[8 * stride + 60] == theme_macos.window_body
+		assert desktop.canvas.pixels[19 * stride + 8] == theme_macos.window_body
+		assert desktop.canvas.pixels[10 * stride + 190] == catalina_button_default_inner[0]
+		assert desktop.canvas.pixels[10 * stride + 320] == catalina_button_default_inner[0]
+	}
+}
+
+fn test_catalina_window_frame_tells_its_buttons_whether_it_is_focused() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(160, 80, 160, 80, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	for active in [false, true] {
+		desktop.canvas.clear(theme_macos.window_body)
+		button := ui2.Element{
+			kind:         .button
+			id:           'open'
+			frame:        ui2.rect(10, 10, 100, 28)
+			native_style: true
+			checked:      true
+		}
+		window := ui2.Element{
+			...ui2.view('win.1', ui2.rect(10, 10, 130, 50), ui2.BoxStyle{
+				bg: theme_macos.window_body
+			}, [button])
+			focused: active
+		}
+		root := ui2.view('desktop', ui2.rect(0, 0, 160, 80), ui2.BoxStyle{
+			transparent: true
+		}, [window])
+		desktop.render_element(&root, 0, 0, 0)
+		// The bezel's top row is at 10 + 10 + 3.
+		expected := if active {
+			catalina_button_default_outer[0]
+		} else {
+			catalina_button_normal_outer[0]
+		}
+		unsafe {
+			assert desktop.canvas.pixels[23 * desktop.canvas.stride + 60] == expected
+		}
+		assert !desktop.inactive_window
+	}
+}
+
+fn test_catalina_directional_button_captions_are_visible_without_font_glyphs() {
+	mut desktop := Desktop{
+		canvas:   new_scaled_canvas(220, 44, 220, 44, 1)
+		settings: Settings{
+			theme: .macos
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.canvas.clear(theme_macos.window_body)
+	for index, caption in ['←', '↑', '→', '↓'] {
+		x := 4 + index * 54
+		button := ui2.Element{
+			kind:         .button
+			id:           'direction'
+			text:         caption
+			frame:        ui2.rect(f64(x), 8, 48, 28)
+			native_style: true
+		}
+		desktop.draw_button(&button, x, 8, 48, 28)
+		mut ink := 0
+		for y := 8; y < 36; y++ {
+			for sample_x := x; sample_x < x + 48; sample_x++ {
+				if unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + sample_x] } == catalina_button_text {
+					ink++
+				}
+			}
+		}
+		assert ink >= 12
+	}
+	desktop.hover = 'direction'
+	desktop.buttons = button_left
+	pressed := ui2.Element{
+		kind:         .button
+		id:           'direction'
+		text:         '↑'
+		native_style: true
+	}
+	desktop.draw_button(&pressed, 4, 8, 48, 28)
+	mut pressed_ink := 0
+	for y := 8; y < 36; y++ {
+		for x := 4; x < 52; x++ {
+			if unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] } == app_on_accent {
+				pressed_ink++
+			}
+		}
+	}
+	assert pressed_ink >= 12
+}
+
+fn test_catalina_chrome_renders_measured_rows() {
+	mut desktop := Desktop{
+		canvas: new_scaled_canvas(640, 480, 640, 480, 1)
+		fonts:  load_fonts()
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	defer {
+		unsafe { free(desktop.canvas.pixels) }
+	}
+	desktop.spawn('Inactive', .notes, 20, 20, 260, 160)
+	desktop.spawn('Active', .welcome, 320, 20, 260, 160)
+	root := desktop.build_tree()
+	desktop.render(root)
+	free_tree(root)
+
+	// Away from text and controls, every native 22-pixel title-bar row has a
+	// direct counterpart in the rendered frame.
+	unsafe {
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 420] == 0xf3f3f3
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 420] == 0xe4e4e4
+		assert desktop.canvas.pixels[40 * desktop.canvas.stride + 420] == 0xd1d1d1
+		assert desktop.canvas.pixels[41 * desktop.canvas.stride + 420] == 0xababab
+		assert desktop.canvas.pixels[20 * desktop.canvas.stride + 120] == 0xfbfbfb
+		assert desktop.canvas.pixels[21 * desktop.canvas.stride + 120] == 0xf6f6f6
+		assert desktop.canvas.pixels[40 * desktop.canvas.stride + 120] == 0xf6f6f6
+		assert desktop.canvas.pixels[41 * desktop.canvas.stride + 120] == 0xd1d1d1
+		assert desktop.canvas.pixels[31 * desktop.canvas.stride + 334] == 0xff5f57
+		assert desktop.canvas.pixels[31 * desktop.canvas.stride + 34] == 0xdcdcdc
+	}
+}
+
+fn test_selecting_catalina_theme_starts_with_controls_on_left() {
+	mut desktop := Desktop{
+		settings: Settings{
+			theme:       .default_
+			button_side: .right
+		}
+	}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	app.handle('${settings_action_theme}1') or { panic(err) }
+	assert desktop.settings.theme == .macos
+	assert desktop.settings.button_side == .left
 }
 
 fn test_settings_missing_offline_readonly_and_stale_hits() {
@@ -139,5 +914,58 @@ fn test_settings_steps_clamp_and_narrow_layout() {
 	root := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
 	if _ := element_named(root, 'settings.brightness.50') {
 		assert false, 'offscreen controls must not become hit targets'
+	}
+}
+
+fn test_settings_wifi_toggle_scan_and_network_list() {
+	mut app := wifi_fixture_app()
+	wifi_index := settings_categories.index(SettingsCategory.wifi)
+	assert wifi_index >= 0 && SettingsCategory.wifi.title() == 'Wi-Fi'
+	app.handle('${settings_action_category}${wifi_index}') or { panic(err) }
+	root := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	toggle := element_named(root, settings_wifi_toggle) or { panic('missing Wi-Fi toggle') }
+	scan := element_named(root, settings_wifi_scan) or { panic('missing Wi-Fi scan') }
+	strong := element_named(root, 'settings.wifi.network.0') or { panic('missing strongest network') }
+	detail := element_named(root, 'settings.wifi.detail.0') or { panic('missing network detail') }
+	assert toggle.enabled && toggle.text == 'Turn off' && scan.enabled
+	assert strong.text == 'Strong' && detail.text.contains('Secured') && detail.text.contains('-38 dBm')
+	next := element_named(root, settings_wifi_next) or { panic('missing Wi-Fi next button') }
+	assert next.enabled
+	app.handle(settings_wifi_next) or { panic(err) }
+	assert app.wifi_offset > 0
+	paged := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	previous := element_named(paged, settings_wifi_previous) or { panic('missing Wi-Fi previous button') }
+	assert previous.enabled
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	assert fixture_wifi_radios == 1 && !fixture_wifi_enabled && !app.wifi_state.radio_on
+	off := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	off_toggle := element_named(off, settings_wifi_toggle) or { panic('missing off toggle') }
+	off_scan := element_named(off, settings_wifi_scan) or { panic('missing disabled scan') }
+	assert off_toggle.text == 'Turn on' && !off_scan.enabled
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	app.handle(settings_wifi_scan) or { panic(err) }
+	assert fixture_wifi_radios == 2 && fixture_wifi_enabled && fixture_wifi_scans == 1
+	assert app.wifi_state.scanning
+}
+
+fn test_settings_wifi_failures_stale_targets_and_narrow_layout() {
+	mut app := wifi_fixture_app()
+	wifi_index := settings_categories.index(SettingsCategory.wifi)
+	app.handle('${settings_action_category}${wifi_index}') or { panic(err) }
+	fixture_wifi_state.writable = false
+	app.handle(settings_wifi_toggle) or { panic(err) }
+	assert fixture_wifi_radios == 0
+	fixture_wifi_state.writable = true
+	fixture_wifi_action = .io
+	app.handle(settings_wifi_scan) or { panic(err) }
+	assert fixture_wifi_scans == 1 && app.wifi_status_text().contains('failed')
+	fixture_wifi_result = .unavailable
+	app.handle(settings_wifi_refresh) or { panic(err) }
+	missing := app.build(ui2.rect(0, 0, 620, 376)) or { panic(err) }
+	toggle := element_named(missing, settings_wifi_toggle) or { panic('missing Wi-Fi toggle') }
+	assert !toggle.enabled && app.wifi_status_text().contains('vinix.apple_wifi=1')
+	narrow := app.build(ui2.rect(0, 0, 320, 200)) or { panic(err) }
+	if _ := element_named(narrow, settings_wifi_toggle) {
+		assert false, 'offscreen Wi-Fi controls must not become hit targets'
 	}
 }

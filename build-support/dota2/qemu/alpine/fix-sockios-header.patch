@@ -1,0 +1,12 @@
+diff --git a/linux-user/syscall.c b/linux-user/syscall.c
+index c46b0114e..de280af22 100644
+--- a/linux-user/syscall.c
++++ b/linux-user/syscall.c
+@@ -59,6 +59,7 @@
+ #include <linux/icmp.h>
+ #include <linux/icmpv6.h>
+ #include <linux/if_tun.h>
++#include <linux/sockios.h>
+ #include <linux/in6.h>
+ #include <linux/errqueue.h>
+ #include <linux/random.h>

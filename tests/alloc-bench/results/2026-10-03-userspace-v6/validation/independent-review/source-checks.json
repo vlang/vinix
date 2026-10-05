@@ -1,0 +1,32 @@
+{
+  "v5_source": "third_party/useralloc-libc/build/musl/x86_64/c97687ce9e5ca67f3acb8947bf28d3def2b044abf977e9e91ab8e8c767083b1c/musl-1.2.5",
+  "v6_source": "third_party/useralloc-libc/build/useralloc/v6-prototype/cache/x86_64/de81a5feb72ae379cc45ec4a46be7ac78b7342fd74a987fc527187b69fe7fdaa/musl-1.2.5",
+  "prototype_core_sources_match_canonical": true,
+  "malloc_slow_body_byte_identical_to_v5_malloc": true,
+  "malloc_slow_body_sha256": "2474b4496970bc03ca18bf13e977a8dca0edf586911808104aa1e9bf9be8a460",
+  "unchanged_helpers": {
+    "alloc_meta": true,
+    "try_avail": true,
+    "alloc_group": true,
+    "alloc_slot": true,
+    "is_allzero": true
+  },
+  "unchanged_file_glue.h": true,
+  "unchanged_file_aligned_alloc.c": true,
+  "unchanged_file_realloc.c": true,
+  "unchanged_file_calloc.c": true,
+  "unchanged_file_libc_calloc.c": true,
+  "unchanged_file_lite_malloc.c": true,
+  "unchanged_file_replaced.c": true,
+  "unchanged_file_memalign.c": true,
+  "unchanged_file_posix_memalign.c": true,
+  "leaf_size_domain": {
+    "first": 0,
+    "last": 131051,
+    "min_class": 0,
+    "max_class": 47,
+    "all_class_indexes_valid": true,
+    "all_strides_fit_request_plus_IB": true,
+    "exhaustive_python_model": true
+  }
+}

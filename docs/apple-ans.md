@@ -1,6 +1,7 @@
 > **Extension notice:** This document describes the original read-only ANS
-> bring-up baseline. The write/flush/shutdown extension and explicit read-only
-> ext2-root path are documented in [apple-ans-rw-root.md](apple-ans-rw-root.md).
+> bring-up baseline. The write/flush/shutdown extension, explicit read-only
+> ext2-root path, and writable `/root` data filesystem are documented in
+> [apple-ans-rw-root.md](apple-ans-rw-root.md).
 > Their write policy is opt-in; default probes remain read-only.
 
 # Apple M1 ANS2 internal SSD: experimental read-only bring-up

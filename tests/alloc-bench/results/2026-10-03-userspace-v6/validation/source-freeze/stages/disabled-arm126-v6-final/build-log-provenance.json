@@ -1,0 +1,7 @@
+{
+  "original_file": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/disabled-arm126-v6-final/inputs/build.log",
+  "full_build_log_sha256": "7e17ef075b7c334cf3778c7ed5c14f269418d40b0ff9e7c48f634736cc481923",
+  "full_build_log_bytes": 5957168,
+  "saved_excerpt": "allocator-build-excerpt.log",
+  "excerpt_scope": "Every mallocng/calloc compile line and last twelve full-log lines; full log remains in immutable source freeze and hash manifest."
+}

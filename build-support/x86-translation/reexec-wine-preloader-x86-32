@@ -1,0 +1,6 @@
+#!/bin/sh
+# Wine invokes this path when a PE child needs a fresh loader. Run the real
+# i386 preloader under QEMU so it can reserve the Windows address space before
+# mapping Wine itself.
+runtime="${VINIX_I386_ROOT:-/usr/libexec/vinix-i386/root}"
+exec /usr/bin/run-x86-32 "$runtime/usr/bin/wine-preloader-bin" "$@"

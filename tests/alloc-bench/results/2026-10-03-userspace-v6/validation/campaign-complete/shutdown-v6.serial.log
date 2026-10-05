@@ -1,0 +1,59 @@
+sync
+/sbinlocalhost:/ root# /sbin/shutdown -h now
+Shutdown NOW!
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 8 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+
+System shutdown time has arrived
+Kext loading now disabled.
+Kext unloading now disabled.
+Kext autounloading now disabled.
+Kernel requests now disabled.
+asp_sysctl_shutting_down called
+System is shutting down, preventing further ASP upcalls
+ASP: shutting down, drained
+localhost:/ root# Fri Oct  2 17:22:14 2026 localhost com.apple.xpc.launchd[1] (com.apple.xpc.launchd.domain.system) <Notice>: System shutdown initiated by: shutdown.44<-bash.2<-launchd.1
+Fri Oct  2 17:22:14 2026 localhost com.apple.xpc.launchd[1] (com.apple.xpc.launchd.domain.system) <Notice>: committing to system shutdown
+bash: /private/var/install/shutdown_installer_tasks: No such file or directory
+Fri Oct  2 17:22:15 2026 localhost com.apple.xpc.launchd[1] <Notice>: shutdown_installer_tasks: optional boot task not present
+bash: /private/var/install/deferred_install: No such file or directory
+Fri Oct  2 17:22:15 2026 localhost com.apple.xpc.launchd[1] <Notice>: deferred_install: optional boot task not present
+Fri Oct  2 17:22:15 2026 localhost com.apple.xpc.launchd[1] (com.apple.xpc.launchd.domain.system) <Notice>: Userspace teardown took: 74 ms
+Fri Oct  2 17:22:15 2026 localhost com.apple.xpc.launchd[1] (com.apple.xpc.launchd.domain.system) <Notice>: Will be calling reboot(2) with flags: 0x8
+Fri Oct  2 17:22:15 2026 localhost com.apple.xpc.launchd[1] <Notice>: bye
+IOConsoleUsers: gIOScreenLockState 3, hs 0, bs 0, now 0, sm 0xe0000255
+syncing disks... Killing all processes 
+
+continuing
+apfs_stop_bg_work:867: System is shutting down stop any bg work
+Can't load kext com.apple.driver.AppleXsanScheme - requests to user space are disabled.
+Couldn't alloc class "AppleXsanScheme"
+kern_close_file_for_direct_io(<ptr>)
+apfs_vfsop_unmount:1681: /dev/disk3: unmounting volume 'VM'
+apfs_vfsop_unmount:1712: waiting for cleaners to finish: purgatory 
+nx_volume_group_update:6352: Volume VM role 8 Not a System or data volume
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 12 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+apfs: total mem allocated: 5912987 (5 mb);
+apfs_vfsop_unmount:1929: all done.  going home.  (numMountedAPFSVolumes 2)
+apfs_vfsop_unmount:1681: /dev/disk3: unmounting volume 'vinix catalina - Data'
+apfs_vfsop_unmount:1712: waiting for cleaners to finish: purgatory 
+pause_encryption_rolling_thread:5957: Failed to got er state object: 22.
+nx_volume_group_update:6431: Set volume (role 0x40) to 0 xid 0
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 1 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 9 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+apfs: total mem allocated: 4487402 (4 mb);
+apfs_vfsop_unmount:1929: all done.  going home.  (numMountedAPFSVolumes 1)
+apfs_vfsop_unmount:1681: /dev/disk3: unmounting volume 'vinix catalina'
+apfs_vfsop_unmount:1712: waiting for cleaners to finish: purgatory 
+pause_encryption_rolling_thread:5957: Failed to got er state object: 22.
+nx_volume_group_update:6431: Set volume (role 0x1) to 0 xid 0
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 2 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+_vnode_dev_unmap_flush_and_unlock:1448: trim'ing 4 blocks from trim_list failed w/: 45 (entry 0:0 ; 0:0)
+apfs_release_objects:236: ROSV: Deleting the shadow_fs_root tree 0x<ptr>
+fs_destroy_shadow_fs_root_tree:1512: Deleted the shadow_fs_root tree <ptr>
+apfs: total mem allocated: 32 (0 mb);
+apfs_vfsop_unmount:1929: all done.  going home.  (numMountedAPFSVolumes 0)
+done
+CPU halted
+ASP: shutting down

@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/run.py", line 147, in <module>
+    for ordinal in [1, 2]: boot(ordinal)
+  File "/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/run.py", line 122, in boot
+    raise RuntimeError('Guest failure in ' + str(serial))
+RuntimeError: Guest failure in /Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-1/serial.log

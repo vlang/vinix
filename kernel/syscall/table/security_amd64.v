@@ -1,0 +1,35 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
+// SPDX-License-Identifier: GPL-2.0-or-later
+module table
+
+import errno
+import fs
+import memory.mmap
+
+// kernel/memory/mmap uses this bit only to account the reserved brk arena
+// differently from ordinary mappings. It is never part of either userspace ABI.
+const vinix_private_map_brk_reservation = u64(0x20000000)
+
+fn syscall_linux_mmap_hardened(gpr_state voidptr, addr voidptr, length u64, prot int,
+	flags int, fdnum int, offset i64) (u64, u64) {
+	if u64(u32(flags)) & vinix_private_map_brk_reservation != 0 {
+		return errno.err, errno.einval
+	}
+	return syscall_linux_mmap_aslr(gpr_state, addr, length, prot, flags, fdnum, offset)
+}
+
+// Run after the normal and ASLR syscall-table initialization so the final mmap
+// entry points enforce the private-flag check while retaining randomized hints.
+pub fn init_security_syscalls() {
+	syscall_table[9] = voidptr(syscall_linux_mmap_hardened)
+	// OpenBSD's mimmutable(2), pledge(2) and unveil(2). Linux leaves x86-64
+	// numbers past 462 unused for now; these sit well clear of them, below
+	// the 512 syscall_entry.S accepts.
+	syscall_table[500] = voidptr(mmap.syscall_mimmutable)
+	syscall_table[501] = voidptr(fs.syscall_pledge)
+	syscall_table[502] = voidptr(fs.syscall_unveil)
+	syscall_table[503] = voidptr(mmap.syscall_minherit)
+}

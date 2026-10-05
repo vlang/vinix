@@ -1,0 +1,93 @@
+module stubs
+
+import lib
+import sched
+import event
+import proc
+import katomic
+import errno
+
+struct C.__thread_data {}
+
+struct C.__threadattr {}
+
+@[export: 'pthread_create']
+pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine fn (voidptr) voidptr, arg voidptr) int {
+	if attr != unsafe { nil } {
+		lib.kpanic(unsafe { nil }, c'pthread_create() called with non-NULL attr')
+	}
+
+	mut thrd := sched.try_new_kernel_thread(voidptr(start_routine), arg) or {
+		return errno.eagain
+	}
+	proc.pin_thread(thrd)
+	thrd.pthread_joinable = 1
+	if !sched.enqueue_thread(thrd, false) {
+		proc.unpin_thread(thrd)
+		sched.discard_unstarted_thread(thrd)
+		return errno.eagain
+	}
+	unsafe {
+		mut ptr := &voidptr(t)
+		*ptr = thrd
+	}
+	return 0
+}
+
+@[export: 'pthread_detach']
+pub fn pthread_detach(t &C.__thread_data) int {
+	mut thrd := unsafe { &proc.Thread(t) }
+	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
+		return errno.einval
+	}
+	proc.unpin_thread(thrd)
+	sched.reap_deferred()
+	return 0
+}
+
+@[export: 'pthread_join']
+pub fn pthread_join(t &C.__thread_data, retval &voidptr) int {
+	mut thrd := unsafe { &proc.Thread(t) }
+	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
+		return errno.einval
+	}
+	value := event.pthread_wait(thrd)
+	// C's `void **retval`, which may be NULL when the result is not wanted.
+	if retval != unsafe { nil } {
+		unsafe {
+			*retval = value
+		}
+	}
+	return 0
+}
+
+@[export: 'pthread_exit']
+@[noreturn]
+pub fn pthread_exit(retval voidptr) {
+	event.pthread_exit(retval)
+	for {}
+}
+
+// V's generated thread runtime sets a stack size on an attribute object before
+// spawning. A kernel thread's stack is chosen by the scheduler, so the attribute
+// is accepted and ignored; reporting success keeps the runtime on its normal path
+// instead of aborting.
+@[export: 'pthread_attr_init']
+pub fn pthread_attr_init(attr &C.__threadattr) int {
+	return 0
+}
+
+@[export: 'pthread_attr_setstacksize']
+pub fn pthread_attr_setstacksize(attr &C.__threadattr, stacksize u64) int {
+	return 0
+}
+
+@[export: 'pthread_attr_destroy']
+pub fn pthread_attr_destroy(attr &C.__threadattr) int {
+	return 0
+}
+
+@[export: 'pthread_equal']
+pub fn pthread_equal(a &C.__thread_data, b &C.__thread_data) int {
+	return if a == b { 1 } else { 0 }
+}

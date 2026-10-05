@@ -1,0 +1,15 @@
+Patch-Source: https://github.com/chimera-linux/cports/blob/c5d29e34a6bdd4a320508a8cb092a7444a0fe466/contrib/qemu/patches/liburine.patch
+
+detection of this fails without gnusource
+--
+--- a/meson.build
++++ b/meson.build
+@@ -1004,7 +1004,7 @@
+   linux_io_uring = dependency('liburing', version: '>=0.3',
+                               required: get_option('linux_io_uring'),
+                               method: 'pkg-config')
+-  if not cc.links(linux_io_uring_test)
++  if not cc.links(linux_io_uring_test, args: ['-D_GNU_SOURCE'])
+     linux_io_uring = not_found
+   endif
+ endif

@@ -1,7 +1,12 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
 import os
+import term
 import term.termios
 
 // Only system declarations; the implementation under test is platform.c.v.
@@ -97,17 +102,42 @@ fn test_platform_terminal_raw_mode_and_restoration() {
 	assert saved.restore_attributes && saved.restore_flags
 	mut raw := termios.Termios{}
 	assert termios.tcgetattr(fd, mut raw) == 0
-	assert raw.c_lflag & termios.flag(C.ICANON | C.ECHO | C.ISIG) == 0
+	// Cast before combining, as terminal_input_raw does: the flags do not all
+	// carry the same C type on every host.
+	assert raw.c_lflag & termios.flag(int(C.ICANON) | int(C.ECHO) | int(C.ISIG)) == 0
 	assert raw.c_cc[C.VMIN] == 0 && raw.c_cc[C.VTIME] == 0
 	assert C.fcntl(fd, C.F_GETFL) == flags | C.O_NONBLOCK
 	desktop_terminal_restore(fd, mut saved)
 	mut restored := termios.Termios{}
 	assert termios.tcgetattr(fd, mut restored) == 0
-	assert restored.c_lflag == original.c_lflag
+	// PENDIN is the tty driver's own bookkeeping, not a setting: macOS raises
+	// it whenever canonical mode is switched back on, however faithfully the
+	// saved flags are written back. Compare the settings, not that.
+	settings := termios.invert(termios.flag(int(C.PENDIN)))
+	assert restored.c_lflag & settings == original.c_lflag & settings
 	assert restored.c_cc[C.VMIN] == original.c_cc[C.VMIN]
 	assert restored.c_cc[C.VTIME] == original.c_cc[C.VTIME]
 	assert C.fcntl(fd, C.F_GETFL) == flags
 	assert !saved.restore_attributes && !saved.restore_flags
+}
+
+fn test_platform_sets_pty_window_size() {
+	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
+	assert master >= 0
+	defer { desktop_close(master) }
+	assert C.grantpt(master) == 0 && C.unlockpt(master) == 0
+	name := C.ptsname(master)
+	assert name != unsafe { nil }
+	slave := C.open(name, C.O_RDWR | C.O_NOCTTY)
+	assert slave >= 0
+	defer { desktop_close(slave) }
+	// Darwin's /dev/ptmx only accepts this request through its slave. Vinix
+	// and Linux accept it through either end, and the desktop owns the master.
+	assert desktop_terminal_winsize(slave, 31, 97, 776, 496)
+	mut size := C.winsize{}
+	assert desktop_ioctl(slave, u64(u32(C.TIOCGWINSZ)), &size) == 0
+	assert size.ws_row == 31 && size.ws_col == 97
+	assert size.ws_xpixel == 776 && size.ws_ypixel == 496
 }
 
 fn test_platform_clocks_and_sleep() {
@@ -120,4 +150,41 @@ fn test_platform_clocks_and_sleep() {
 	assert end != ~u64(0) && end >= start
 	desktop_sleep_ms(0)
 	desktop_sleep_ms(-1)
+}
+
+fn test_terminal_command_path_contains_installed_userland_tools() {
+	parts := desktop_command_path.split(':')
+	assert '/usr/local/bin' in parts
+	assert '/usr/bin' in parts
+	assert '/bin' in parts
+}
+
+fn test_external_program_runner_reports_success_and_missing_commands() {
+	assert desktop_run_external('/usr/bin/true') == .success
+	assert desktop_run_external('/definitely/missing/vinix-program') == .unavailable
+}
+
+fn test_frame_wait_always_yields_after_an_overrun() {
+	assert desktop_frame_wait_ms(4, 16) == 12
+	// The same helper paces the compositor's quiet path at its longer default.
+	assert desktop_frame_wait_ms(4, 1000) == 996
+	assert desktop_frame_wait_ms(15, 16) == 1
+	assert desktop_frame_wait_ms(16, 16) == 1
+	assert desktop_frame_wait_ms(200, 16) == 1
+	// --frame-ms=0 deliberately remains the unpaced benchmarking mode.
+	assert desktop_frame_wait_ms(0, 0) == 0
+	assert desktop_frame_wait_ms(200, -1) == 0
+}
+
+fn test_platform_nonblocking_flag_helper() {
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer {
+		desktop_close(int(pair[0]))
+		desktop_close(int(pair[1]))
+	}
+	assert desktop_set_nonblocking(int(pair[0]), true)
+	assert C.fcntl(pair[0], C.F_GETFL) & C.O_NONBLOCK != 0
+	assert desktop_set_nonblocking(int(pair[0]), false)
+	assert C.fcntl(pair[0], C.F_GETFL) & C.O_NONBLOCK == 0
 }

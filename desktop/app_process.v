@@ -1,0 +1,1501 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Native application processes and the desktop protocol between them and the
+// compositor.
+//
+// The compositor is the display server: it alone owns the framebuffer and
+// input devices. Each application is nevertheless a real process. It builds
+// its ui2 tree on request and sends the small, platform-independent result to
+// the compositor, which paints it inside the application's window. Actions and
+// keyboard input travel in the other direction. This is the same boundary a
+// conventional display server provides, reduced to the controls this backend
+// can actually draw.
+module main
+
+import math.bits
+import ui2
+
+const app_protocol_magic = u32(0x56415050) // VAPP
+const app_protocol_version = u8(10)
+const app_request_header_size = 136
+const app_response_header_size = 128
+const app_protocol_max_payload = 16 * 1024 * 1024
+const app_protocol_max_string = 64 * 1024
+const app_protocol_max_elements = 16 * 1024
+const app_protocol_max_depth = 64
+// A native application runs in a separate process, so a lost child must not
+// park the compositor in a pipe read forever.
+const app_response_timeout_ms = 5000
+// A newly spawned app may do real cold-storage work before it can answer its
+// first protocol message. Files, for example, reads and stats the persistent
+// home directory. Give that one-time setup a larger budget during desktop
+// startup; all requests after the app is running retain the short recovery
+// timeout above.
+const app_startup_response_timeout_ms = 30000
+const remote_owned_element_key = '__vinix.remote.owned'
+// What a compositor draws beyond the elements themselves, in a request header
+// byte that was kept free. A compositor older than this sends 0 there, so an
+// application published to a running desktop on its own draws only what that
+// compositor can.
+const app_feature_toolbar = u8(1) // app_toolbar_id toolbars and Finder's glyphs
+const app_features = app_feature_toolbar
+
+// What the compositor at the other end of the pipe draws: this program's own
+// features until a request says otherwise.
+__global app_compositor_features = app_features
+const native_app_directory = '/usr/bin/'
+
+// A local PollingApp can cheaply answer "nothing changed" on every compositor
+// pass. Across the process boundary that same answer costs two pipe messages,
+// two blocking waits and several scheduler hand-offs. On ARM64 those hand-offs
+// are particularly visible because the scheduler's blocking path polls the
+// virtual timer. Pace remote clients before sending anything over the pipe.
+fn remote_app_poll_due(interval u64, sampled bool, last_poll_ms u64, now_ms u64) bool {
+	if interval == 0 || !sampled || now_ms == ~u64(0) || now_ms < last_poll_ms {
+		return true
+	}
+	return now_ms - last_poll_ms >= interval
+}
+
+enum AppCommand as u8 {
+	build = 1
+	handle
+	key_input
+	poll
+	pointer
+	close
+	paste_input
+}
+
+struct AppPointerPayload {
+	kind   i32
+	button i32
+	scroll i32
+	x      i32
+	y      i32
+	width  i32
+	height i32
+}
+
+struct AppProcessOptions {
+	name        string
+	request_fd  int
+	response_fd int
+	tz_offset   i64
+	language    DesktopLanguage
+}
+
+struct AppWireState {
+	settings        Settings
+	requested_scale int = desktop_scale_100
+	capture_request CaptureRequest
+	capture_report  CaptureReport
+}
+
+struct AppReply {
+	ok      bool
+	state   AppWireState
+	payload []u8
+}
+
+struct WireReader {
+	data []u8
+mut:
+	index    int
+	elements int
+}
+
+fn wire_put_u8(mut out []u8, value u8) {
+	out << value
+}
+
+fn wire_put_u32(mut out []u8, value u32) {
+	out << u8(value)
+	out << u8(value >> 8)
+	out << u8(value >> 16)
+	out << u8(value >> 24)
+}
+
+fn wire_put_i32(mut out []u8, value int) {
+	wire_put_u32(mut out, u32(value))
+}
+
+fn wire_put_u64(mut out []u8, value u64) {
+	for shift := 0; shift < 64; shift += 8 {
+		out << u8(value >> shift)
+	}
+}
+
+fn wire_put_f64(mut out []u8, value f64) {
+	wire_put_u64(mut out, bits.f64_bits(value))
+}
+
+fn wire_put_string(mut out []u8, value string) {
+	wire_put_u32(mut out, u32(value.len))
+	for byte in value {
+		out << byte
+	}
+}
+
+fn (mut r WireReader) take_u8() !u8 {
+	if r.index >= r.data.len {
+		return error('short application message')
+	}
+	value := r.data[r.index]
+	r.index++
+	return value
+}
+
+fn (mut r WireReader) take_u32() !u32 {
+	if r.index < 0 || r.index + 4 > r.data.len {
+		return error('short application message')
+	}
+	value := u32(r.data[r.index]) | (u32(r.data[r.index + 1]) << 8) | (u32(r.data[r.index + 2]) << 16) | (u32(r.data[r.index + 3]) << 24)
+	r.index += 4
+	return value
+}
+
+fn (mut r WireReader) take_i32() !int {
+	return int(i32(r.take_u32()!))
+}
+
+fn (mut r WireReader) take_u64() !u64 {
+	if r.index < 0 || r.index + 8 > r.data.len {
+		return error('short application message')
+	}
+	mut value := u64(0)
+	for shift := 0; shift < 64; shift += 8 {
+		value |= u64(r.data[r.index + shift / 8]) << shift
+	}
+	r.index += 8
+	return value
+}
+
+fn (mut r WireReader) take_f64() !f64 {
+	return bits.f64_from_bits(r.take_u64()!)
+}
+
+fn (mut r WireReader) take_string() !string {
+	length := int(r.take_u32()!)
+	if length < 0 || length > app_protocol_max_string || r.index + length > r.data.len {
+		return error('invalid application string')
+	}
+	if length == 0 {
+		return ''
+	}
+	value := r.data[r.index..r.index + length].bytestr()
+	r.index += length
+	return value
+}
+
+fn wire_put_state(mut out []u8, state AppWireState) {
+	wire_put_i32(mut out, int(state.settings.button_side))
+	wire_put_i32(mut out, int(state.settings.taskbar_mode))
+	wire_put_i32(mut out, int(state.settings.theme))
+	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_date { 1 } else { 0 })
+	wire_put_i32(mut out, if state.settings.clock_show_weekday { 1 } else { 0 })
+	wire_put_i32(mut out, state.settings.wallpaper_color)
+	wire_put_i32(mut out, state.settings.wallpaper_image)
+	wire_put_u32(mut out, state.settings.keyboard_layouts)
+	wire_put_i32(mut out, int(state.settings.keyboard_layout))
+	wire_put_i32(mut out, int(state.settings.language))
+	wire_put_i32(mut out, state.requested_scale)
+	wire_put_u32(mut out, state.capture_request.sequence)
+	wire_put_i32(mut out, int(state.capture_request.command))
+	wire_put_i32(mut out, state.capture_request.delay)
+	wire_put_i32(mut out, state.capture_request.fps)
+	wire_put_u32(mut out, state.capture_report.handled_sequence)
+	wire_put_i32(mut out, int(state.capture_report.phase))
+	wire_put_u64(mut out, state.capture_report.file_id)
+	wire_put_u64(mut out, state.capture_report.started_ms)
+	wire_put_u64(mut out, state.capture_report.elapsed_ms)
+	wire_put_i32(mut out, state.capture_report.frames)
+	wire_put_i32(mut out, state.capture_report.width)
+	wire_put_i32(mut out, state.capture_report.height)
+	wire_put_i32(mut out, state.capture_report.fps)
+}
+
+fn wire_take_state(mut reader WireReader) !AppWireState {
+	button_side := reader.take_i32()!
+	taskbar_mode := reader.take_i32()!
+	theme := reader.take_i32()!
+	clock_24_hour := reader.take_i32()!
+	clock_show_seconds := reader.take_i32()!
+	clock_show_date := reader.take_i32()!
+	clock_show_weekday := reader.take_i32()!
+	wallpaper_color := reader.take_i32()!
+	wallpaper_image := reader.take_i32()!
+	keyboard_mask := reader.take_u32()!
+	keyboard_layout := reader.take_i32()!
+	language := reader.take_i32()!
+	requested_scale := reader.take_i32()!
+	capture_sequence := reader.take_u32()!
+	capture_command := reader.take_i32()!
+	capture_delay := reader.take_i32()!
+	capture_fps := reader.take_i32()!
+	capture_handled_sequence := reader.take_u32()!
+	capture_phase := reader.take_i32()!
+	capture_file_id := reader.take_u64()!
+	capture_started_ms := reader.take_u64()!
+	capture_elapsed_ms := reader.take_u64()!
+	capture_frames := reader.take_i32()!
+	capture_width := reader.take_i32()!
+	capture_height := reader.take_i32()!
+	capture_report_fps := reader.take_i32()!
+	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
+		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
+		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
+		|| clock_24_hour < 0 || clock_24_hour > 1
+		|| clock_show_seconds < 0 || clock_show_seconds > 1
+		|| clock_show_date < 0 || clock_show_date > 1
+		|| clock_show_weekday < 0 || clock_show_weekday > 1
+		|| keyboard_layout < int(KeyboardLayout.us) || keyboard_layout > int(KeyboardLayout.portuguese)
+		|| !keyboard_settings_valid(keyboard_mask, unsafe { KeyboardLayout(keyboard_layout) })
+		|| language < 0 || language >= desktop_languages.len
+		|| !desktop_scale_valid(requested_scale)
+		|| capture_command < int(CaptureCommand.none_)
+		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
+		|| capture_delay > 10 || capture_fps < 0 || capture_fps > 30
+		|| capture_phase < int(CapturePhase.idle)
+		|| capture_phase > int(CapturePhase.cancelled) || capture_frames < 0
+		|| capture_width < 0 || capture_height < 0 || capture_report_fps < 0
+		|| capture_report_fps > 30 {
+		return error('invalid application state')
+	}
+	return AppWireState{
+		settings:        Settings{
+			button_side:        unsafe { ButtonSide(button_side) }
+			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode) }
+			theme:              unsafe { ThemeKind(theme) }
+			language:           unsafe { DesktopLanguage(language) }
+			clock_24_hour:      clock_24_hour == 1
+			clock_show_seconds: clock_show_seconds == 1
+			clock_show_date:    clock_show_date == 1
+			clock_show_weekday: clock_show_weekday == 1
+			wallpaper_color:    wallpaper_color
+			wallpaper_image:    wallpaper_image
+			keyboard_layouts:   keyboard_mask
+			keyboard_layout:    unsafe { KeyboardLayout(keyboard_layout) }
+		}
+		requested_scale: requested_scale
+		capture_request: CaptureRequest{
+			sequence: capture_sequence
+			command:  unsafe { CaptureCommand(capture_command) }
+			delay:    capture_delay
+			fps:      capture_fps
+		}
+		capture_report:  CaptureReport{
+			handled_sequence: capture_handled_sequence
+			phase:            unsafe { CapturePhase(capture_phase) }
+			file_id:          capture_file_id
+			started_ms:       capture_started_ms
+			elapsed_ms:       capture_elapsed_ms
+			frames:           capture_frames
+			width:            capture_width
+			height:           capture_height
+			fps:              capture_report_fps
+		}
+	}
+}
+
+// Keep every portable control field on the wire: slider values, switch state,
+// dropdown choices and text-input metadata all have to survive the process
+// boundary for the framebuffer backend to behave like the native backends.
+fn encode_app_element(element ui2.Element, mut out []u8) ! {
+	if out.len > app_protocol_max_payload {
+		return error('application tree is too large')
+	}
+	wire_put_u8(mut out, u8(element.kind))
+	mut flags := u8(0)
+	if element.box.transparent {
+		flags |= 1
+	}
+	if element.text_style.bold {
+		flags |= 2
+	}
+	if element.text_style.shadow {
+		flags |= 4
+	}
+	if element.clickable {
+		flags |= 8
+	}
+	if element.draggable {
+		flags |= 16
+	}
+	if element.hidden {
+		flags |= 32
+	}
+	if element.enabled {
+		flags |= 64
+	}
+	wire_put_u8(mut out, flags)
+	wire_put_u8(mut out, u8(element.text_style.align))
+	wire_put_u8(mut out, u8(element.orientation))
+	wire_put_u8(mut out, 0)
+	wire_put_u8(mut out, 0)
+	mut style_flags := u32(0)
+	if element.native_style {
+		style_flags |= 1
+	}
+	if element.checked {
+		style_flags |= 2
+	}
+	if element.text_style.italic {
+		style_flags |= 1 << 2
+	}
+	if element.text_style.underline {
+		style_flags |= 1 << 3
+	}
+	if element.text_style.strikethrough {
+		style_flags |= 1 << 4
+	}
+	if element.text_style.outline {
+		style_flags |= 1 << 5
+	}
+	if element.emit_change {
+		style_flags |= 1 << 6
+	}
+	if element.readonly {
+		style_flags |= 1 << 7
+	}
+	if element.disable_scroll {
+		style_flags |= 1 << 8
+	}
+	if element.persistent_scrollbars {
+		style_flags |= 1 << 9
+	}
+	if element.secure {
+		style_flags |= 1 << 10
+	}
+	if element.long_press {
+		style_flags |= 1 << 11
+	}
+	if element.swipe_left {
+		style_flags |= 1 << 12
+	}
+	if element.value_track {
+		style_flags |= 1 << 13
+	}
+	if element.toggle_allow_no_selection {
+		style_flags |= 1 << 14
+	}
+	if element.autocorrect {
+		style_flags |= 1 << 15
+	}
+	if element.focused {
+		style_flags |= 1 << 16
+	}
+	wire_put_u32(mut out, style_flags)
+	wire_put_f64(mut out, element.frame.x)
+	wire_put_f64(mut out, element.frame.y)
+	wire_put_f64(mut out, element.frame.width)
+	wire_put_f64(mut out, element.frame.height)
+	wire_put_u32(mut out, element.box.bg)
+	wire_put_f64(mut out, element.box.radius)
+	wire_put_u32(mut out, element.box.border_color)
+	wire_put_f64(mut out, element.box.border_left)
+	wire_put_f64(mut out, element.box.border_top)
+	wire_put_f64(mut out, element.box.border_right)
+	wire_put_f64(mut out, element.box.border_bottom)
+	wire_put_u32(mut out, element.text_style.color)
+	wire_put_u32(mut out, element.text_style.background_color)
+	wire_put_f64(mut out, element.text_style.size)
+	wire_put_f64(mut out, element.text_style.head_indent)
+	wire_put_f64(mut out, element.text_style.first_line_indent)
+	wire_put_f64(mut out, element.text_style.hyphenation_factor)
+	wire_put_i32(mut out, element.text_style.lines)
+	wire_put_i32(mut out, element.keyboard)
+	wire_put_i32(mut out, element.text_selection.anchor)
+	wire_put_i32(mut out, element.text_selection.caret)
+	wire_put_f64(mut out, element.padding_left)
+	wire_put_f64(mut out, element.value)
+	wire_put_f64(mut out, element.min_value)
+	wire_put_f64(mut out, element.max_value)
+	wire_put_f64(mut out, element.step)
+	wire_put_f64(mut out, element.padding)
+	wire_put_u32(mut out, element.slider_style.track_color)
+	wire_put_u32(mut out, element.slider_style.value_track_color)
+	wire_put_u32(mut out, element.slider_style.thumb_color)
+	wire_put_f64(mut out, element.slider_style.track_width)
+	wire_put_f64(mut out, element.slider_style.thumb_size)
+	wire_put_u32(mut out, element.switch_style.inactive_track_color)
+	wire_put_u32(mut out, element.switch_style.active_track_color)
+	wire_put_u32(mut out, element.switch_style.thumb_color)
+	wire_put_u32(mut out, element.switch_style.disabled_track_color)
+	wire_put_u32(mut out, element.switch_style.disabled_thumb_color)
+	wire_put_u32(mut out, element.toggle_down_box.bg)
+	wire_put_f64(mut out, element.toggle_down_box.radius)
+	wire_put_u32(mut out, element.toggle_down_box.border_color)
+	wire_put_u32(mut out, element.toggle_down_text_style.color)
+	wire_put_u32(mut out, element.toggle_down_text_style.background_color)
+	wire_put_f64(mut out, element.toggle_down_text_style.size)
+	wire_put_string(mut out, element.id)
+	wire_put_string(mut out, element.action_id)
+	wire_put_string(mut out, element.submit_id)
+	wire_put_string(mut out, element.text)
+	wire_put_string(mut out, element.image_path)
+	wire_put_string(mut out, element.tooltip)
+	wire_put_string(mut out, element.placeholder)
+	wire_put_string(mut out, element.cursor)
+	wire_put_string(mut out, element.toggle_group)
+	wire_put_string(mut out, element.text_style.font_family)
+	wire_put_string(mut out, element.text_style.vertical_align)
+	wire_put_string(mut out, element.text_style.link)
+	wire_put_u32(mut out, u32(element.menu.len))
+	for entry in element.menu {
+		wire_put_string(mut out, entry.id)
+		wire_put_string(mut out, entry.title)
+	}
+	wire_put_u32(mut out, u32(element.children.len))
+	for child in element.children {
+		encode_app_element(child, mut out)!
+	}
+}
+
+fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
+	if depth > app_protocol_max_depth || reader.elements >= app_protocol_max_elements {
+		return error('application tree exceeds protocol limits')
+	}
+	reader.elements++
+	kind_value := int(reader.take_u8()!)
+	flags := reader.take_u8()!
+	align_value := int(reader.take_u8()!)
+	orientation_value := int(reader.take_u8()!)
+	reader.take_u8()!
+	reader.take_u8()!
+	style_flags := reader.take_u32()!
+	if kind_value < int(ui2.Kind.screen) || kind_value > int(ui2.Kind.toggle_button)
+		|| align_value < int(ui2.Align.left) || align_value > int(ui2.Align.right)
+		|| orientation_value < int(ui2.Orientation.horizontal)
+		|| orientation_value > int(ui2.Orientation.vertical) {
+		return error('invalid application element')
+	}
+	frame := ui2.rect(reader.take_f64()!, reader.take_f64()!, reader.take_f64()!, reader.take_f64()!)
+	box_bg := reader.take_u32()!
+	box_radius := reader.take_f64()!
+	box_border_color := reader.take_u32()!
+	box_border_left := reader.take_f64()!
+	box_border_top := reader.take_f64()!
+	box_border_right := reader.take_f64()!
+	box_border_bottom := reader.take_f64()!
+	text_color := reader.take_u32()!
+	text_background := reader.take_u32()!
+	text_size := reader.take_f64()!
+	text_head_indent := reader.take_f64()!
+	text_first_line_indent := reader.take_f64()!
+	text_hyphenation_factor := reader.take_f64()!
+	text_lines := reader.take_i32()!
+	keyboard := reader.take_i32()!
+	selection_anchor := reader.take_i32()!
+	selection_caret := reader.take_i32()!
+	padding_left := reader.take_f64()!
+	value := reader.take_f64()!
+	min_value := reader.take_f64()!
+	max_value := reader.take_f64()!
+	step := reader.take_f64()!
+	padding := reader.take_f64()!
+	slider_track_color := reader.take_u32()!
+	slider_value_track_color := reader.take_u32()!
+	slider_thumb_color := reader.take_u32()!
+	slider_track_width := reader.take_f64()!
+	slider_thumb_size := reader.take_f64()!
+	switch_inactive_track_color := reader.take_u32()!
+	switch_active_track_color := reader.take_u32()!
+	switch_thumb_color := reader.take_u32()!
+	switch_disabled_track_color := reader.take_u32()!
+	switch_disabled_thumb_color := reader.take_u32()!
+	toggle_down_bg := reader.take_u32()!
+	toggle_down_radius := reader.take_f64()!
+	toggle_down_border_color := reader.take_u32()!
+	toggle_down_text_color := reader.take_u32()!
+	toggle_down_text_background := reader.take_u32()!
+	toggle_down_text_size := reader.take_f64()!
+	id := reader.take_string()!
+	action_id := reader.take_string()!
+	submit_id := reader.take_string()!
+	text := reader.take_string()!
+	image_path := reader.take_string()!
+	tooltip := reader.take_string()!
+	placeholder := reader.take_string()!
+	cursor := reader.take_string()!
+	toggle_group := reader.take_string()!
+	font_family := reader.take_string()!
+	vertical_align := reader.take_string()!
+	link := reader.take_string()!
+	menu_count := int(reader.take_u32()!)
+	if menu_count < 0 || menu_count > app_protocol_max_elements {
+		return error('invalid application menu count')
+	}
+	mut menu := []ui2.MenuEntry{cap: menu_count}
+	for _ in 0 .. menu_count {
+		menu << ui2.MenuEntry{
+			id:    reader.take_string()!
+			title: reader.take_string()!
+		}
+	}
+	child_count := int(reader.take_u32()!)
+	if child_count < 0 || child_count > app_protocol_max_elements - reader.elements {
+		return error('invalid application child count')
+	}
+	mut children := []ui2.Element{cap: child_count}
+	for _ in 0 .. child_count {
+		children << decode_app_element(mut reader, depth + 1)!
+	}
+	return ui2.Element{
+		kind:                      unsafe { ui2.Kind(kind_value) }
+		id:                        id
+		action_id:                 action_id
+		submit_id:                 submit_id
+		key:                       remote_owned_element_key
+		text:                      text
+		image_path:                image_path
+		tooltip:                   tooltip
+		placeholder:               placeholder
+		cursor:                    cursor
+		frame:                     frame
+		box:                       ui2.BoxStyle{
+			bg:            box_bg
+			radius:        box_radius
+			transparent:   flags & 1 != 0
+			border_color:  box_border_color
+			border_left:   box_border_left
+			border_top:    box_border_top
+			border_right:  box_border_right
+			border_bottom: box_border_bottom
+		}
+		text_style:                ui2.TextStyle{
+			color:              text_color
+			background_color:   text_background
+			size:               text_size
+			font_family:        font_family
+			bold:               flags & 2 != 0
+			shadow:             flags & 4 != 0
+			italic:             style_flags & (1 << 2) != 0
+			underline:          style_flags & (1 << 3) != 0
+			strikethrough:      style_flags & (1 << 4) != 0
+			outline:            style_flags & (1 << 5) != 0
+			align:              unsafe { ui2.Align(align_value) }
+			vertical_align:     vertical_align
+			link:               link
+			head_indent:        text_head_indent
+			first_line_indent:  text_first_line_indent
+			hyphenation_factor: text_hyphenation_factor
+			lines:              text_lines
+		}
+		clickable:                 flags & 8 != 0
+		draggable:                 flags & 16 != 0
+		hidden:                    flags & 32 != 0
+		enabled:                   flags & 64 != 0
+		native_style:              style_flags & 1 != 0
+		checked:                   style_flags & 2 != 0
+		emit_change:               style_flags & (1 << 6) != 0
+		readonly:                  style_flags & (1 << 7) != 0
+		disable_scroll:            style_flags & (1 << 8) != 0
+		persistent_scrollbars:     style_flags & (1 << 9) != 0
+		secure:                    style_flags & (1 << 10) != 0
+		long_press:                style_flags & (1 << 11) != 0
+		swipe_left:                style_flags & (1 << 12) != 0
+		value_track:               style_flags & (1 << 13) != 0
+		toggle_allow_no_selection: style_flags & (1 << 14) != 0
+		autocorrect:               style_flags & (1 << 15) != 0
+		focused:                   style_flags & (1 << 16) != 0
+		text_selection:            ui2.TextSelection{
+			anchor: selection_anchor
+			caret:  selection_caret
+		}
+		keyboard:                  keyboard
+		padding_left:              padding_left
+		value:                     value
+		min_value:                 min_value
+		max_value:                 max_value
+		step:                      step
+		orientation:               unsafe { ui2.Orientation(orientation_value) }
+		padding:                   padding
+		slider_style:              ui2.SliderStyle{
+			track_color:       slider_track_color
+			value_track_color: slider_value_track_color
+			thumb_color:       slider_thumb_color
+			track_width:       slider_track_width
+			thumb_size:        slider_thumb_size
+		}
+		switch_style:              ui2.SwitchStyle{
+			inactive_track_color: switch_inactive_track_color
+			active_track_color:   switch_active_track_color
+			thumb_color:          switch_thumb_color
+			disabled_track_color: switch_disabled_track_color
+			disabled_thumb_color: switch_disabled_thumb_color
+		}
+		toggle_down_box:           ui2.BoxStyle{
+			bg:           toggle_down_bg
+			radius:       toggle_down_radius
+			border_color: toggle_down_border_color
+		}
+		toggle_down_text_style:    ui2.TextStyle{
+			color:            toggle_down_text_color
+			background_color: toggle_down_text_background
+			size:             toggle_down_text_size
+		}
+		toggle_group:              toggle_group
+		menu:                      menu
+		children:                  children
+	}
+}
+
+fn decode_app_tree(payload []u8) !ui2.Element {
+	mut reader := WireReader{ data: payload }
+	tree := decode_app_element(mut reader, 0)!
+	if reader.index != payload.len {
+		free_tree(tree)
+		return error('application tree has trailing data')
+	}
+	return tree
+}
+
+fn app_process_options(args []string) ?AppProcessOptions {
+	mut name := ''
+	mut request_fd := -1
+	mut response_fd := -1
+	mut tz_offset := i64(0)
+	mut language := DesktopLanguage.en
+	for arg in args {
+		if arg.starts_with('--vinix-app=') {
+			name = arg['--vinix-app='.len..]
+		} else if arg.starts_with('--request-fd=') {
+			request_fd = arg['--request-fd='.len..].int()
+		} else if arg.starts_with('--response-fd=') {
+			response_fd = arg['--response-fd='.len..].int()
+		} else if arg.starts_with('--app-tz=') {
+			tz_offset = arg['--app-tz='.len..].i64()
+		} else if arg.starts_with('--app-lang=') {
+			language = desktop_language_from_code(arg['--app-lang='.len..]) or { DesktopLanguage.en }
+		}
+	}
+	if name == '' {
+		return none
+	}
+	if request_fd < 3 || response_fd < 3 || request_fd == response_fd {
+		return none
+	}
+	return AppProcessOptions{
+		name:        name
+		request_fd:  request_fd
+		response_fd: response_fd
+		tz_offset:   tz_offset
+		language:    language
+	}
+}
+
+fn app_factory_named(name string) ?AppFactory {
+	if name == files_settings_process_name {
+		return files_settings_factory()
+	}
+	for factory in available_apps {
+		if factory.process_name == name {
+			return factory
+		}
+	}
+	return none
+}
+
+fn app_current_state(desktop &Desktop) AppWireState {
+	return AppWireState{
+		settings:        desktop.settings
+		requested_scale: desktop_requested_scale()
+		capture_request: desktop.capture.request
+		capture_report:  desktop.capture.report
+	}
+}
+
+fn apply_app_state(mut desktop Desktop, state AppWireState) {
+	wallpaper_changed := desktop.settings.wallpaper_color != state.settings.wallpaper_color
+		|| desktop.settings.wallpaper_image != state.settings.wallpaper_image
+	clock_changed := desktop.settings.clock_24_hour != state.settings.clock_24_hour
+		|| desktop.settings.clock_show_seconds != state.settings.clock_show_seconds
+		|| desktop.settings.clock_show_date != state.settings.clock_show_date
+		|| desktop.settings.clock_show_weekday != state.settings.clock_show_weekday
+	if desktop.settings.keyboard_layout != state.settings.keyboard_layout {
+		// An accent typed in the old input source does not carry over.
+		desktop.keyboard.dead = 0
+	}
+	language_changed := desktop.settings.language != state.settings.language
+	desktop.settings = state.settings
+	desktop.accept_capture_request(state.capture_request)
+	if wallpaper_changed {
+		desktop.invalidate_wallpaper()
+	}
+	if clock_changed {
+		desktop.taskbar_clock_sampled = false
+		desktop.dirty = true
+	}
+	if language_changed {
+		desktop.language_changed()
+	}
+	if desktop_requested_scale() != state.requested_scale {
+		desktop_request_scale(state.requested_scale)
+		desktop.dirty = true
+	}
+}
+
+fn send_app_request(fd int, command AppCommand, width int, height int, state AppWireState, payload string) bool {
+	if payload.len > app_protocol_max_payload {
+		return false
+	}
+	mut header := []u8{cap: app_request_header_size}
+	wire_put_u32(mut header, app_protocol_magic)
+	wire_put_u8(mut header, app_protocol_version)
+	wire_put_u8(mut header, u8(command))
+	wire_put_u8(mut header, app_features)
+	wire_put_u8(mut header, 0)
+	wire_put_i32(mut header, width)
+	wire_put_i32(mut header, height)
+	wire_put_state(mut header, state)
+	wire_put_u32(mut header, u32(payload.len))
+	ok := header.len == app_request_header_size
+		&& desktop_write_all(fd, header.data, u64(header.len))
+		&& (payload.len == 0 || desktop_write_all(fd, payload.str, u64(payload.len)))
+	unsafe { header.free() }
+	return ok
+}
+
+fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
+	mut header := []u8{len: app_request_header_size}
+	if !desktop_read_all(fd, header.data, u64(header.len)) {
+		unsafe { header.free() }
+		return error('application request pipe closed')
+	}
+	mut reader := WireReader{ data: header }
+	magic := reader.take_u32()!
+	version := reader.take_u8()!
+	command_value := int(reader.take_u8()!)
+	features := reader.take_u8()!
+	reader.take_u8()!
+	width := reader.take_i32()!
+	height := reader.take_i32()!
+	state := wire_take_state(mut reader)!
+	payload_length := int(reader.take_u32()!)
+	unsafe { header.free() }
+	if magic != app_protocol_magic || version != app_protocol_version
+		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.paste_input)
+		|| payload_length < 0 || payload_length > app_protocol_max_payload {
+		return error('invalid application request')
+	}
+	mut payload := []u8{len: payload_length}
+	if payload_length > 0 && !desktop_read_all(fd, payload.data, u64(payload_length)) {
+		unsafe { payload.free() }
+		return error('short application request payload')
+	}
+	text := if payload_length > 0 { payload.bytestr() } else { '' }
+	if payload.cap > 0 {
+		unsafe { payload.free() }
+	}
+	app_compositor_features = features
+	return unsafe { AppCommand(command_value) }, width, height, state, text
+}
+
+fn send_app_response(fd int, ok bool, state AppWireState, payload []u8) bool {
+	if payload.len > app_protocol_max_payload {
+		return false
+	}
+	mut header := []u8{cap: app_response_header_size}
+	wire_put_u32(mut header, app_protocol_magic)
+	wire_put_u8(mut header, app_protocol_version)
+	wire_put_u8(mut header, if ok { u8(0) } else { u8(1) })
+	wire_put_u8(mut header, 0)
+	wire_put_u8(mut header, 0)
+	wire_put_state(mut header, state)
+	wire_put_u32(mut header, u32(payload.len))
+	written := header.len == app_response_header_size
+		&& desktop_write_all(fd, header.data, u64(header.len))
+		&& (payload.len == 0 || desktop_write_all(fd, payload.data, u64(payload.len)))
+	unsafe { header.free() }
+	return written
+}
+
+fn send_app_error(fd int, state AppWireState, message string) bool {
+	mut payload := message.bytes()
+	written := send_app_response(fd, false, state, payload)
+	unsafe { payload.free() }
+	return written
+}
+
+fn app_response_ready(fd int, timeout_ms int) bool {
+	if fd < 0 || timeout_ms < 0 {
+		return false
+	}
+	mut descriptor := C.pollfd{
+		fd:     fd
+		events: i16(C.POLLIN)
+	}
+	mut retried_after_pause := false
+	for {
+		started := desktop_monotonic_ms()
+		mut ready := C.poll(&descriptor, 1, timeout_ms)
+		if ready < 0 && C.errno == C.EINTR {
+			continue
+		}
+		// Under load the response and the deadline can both become ready before
+		// this process runs again. A timeout notification does not prove that
+		// the pipe is still empty: check its current state without waiting before
+		// terminating an application that already answered.
+		if ready == 0 {
+			ready = C.poll(&descriptor, 1, 0)
+			for ready < 0 && C.errno == C.EINTR {
+				ready = C.poll(&descriptor, 1, 0)
+			}
+			if ready > 0 && descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0 {
+				finished := desktop_monotonic_ms()
+				if started != ~u64(0) && finished != ~u64(0) && finished >= started {
+					eprintln('vinix-desktop: application response pipe fd ${fd} is ready after a ${finished - started} ms timed wait')
+				}
+			}
+		}
+		// A host sleep or a paused QEMU can advance the guest's monotonic
+		// clock far past this poll's deadline without scheduling the app at
+		// all. Let it run once after the VM resumes before declaring it dead.
+		if ready == 0 && !retried_after_pause && started != ~u64(0) {
+			finished := desktop_monotonic_ms()
+			if finished != ~u64(0) && finished >= started
+				&& finished - started > u64(timeout_ms) + 1000 {
+				retried_after_pause = true
+				continue
+			}
+		}
+		return ready > 0
+			&& descriptor.revents & i16(C.POLLIN | C.POLLHUP | C.POLLERR) != 0
+	}
+}
+
+fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
+	if !app_response_ready(fd, timeout_ms) {
+		return error('application response timed out')
+	}
+	mut header := []u8{len: app_response_header_size}
+	if !desktop_read_all_with_timeout(fd, header.data, u64(header.len), timeout_ms) {
+		unsafe { header.free() }
+		return error('application response header timed out or pipe closed')
+	}
+	mut reader := WireReader{ data: header }
+	magic := reader.take_u32()!
+	version := reader.take_u8()!
+	status := reader.take_u8()!
+	reader.take_u8()!
+	reader.take_u8()!
+	state := wire_take_state(mut reader)!
+	payload_length := int(reader.take_u32()!)
+	unsafe { header.free() }
+	if magic != app_protocol_magic || version != app_protocol_version || status > 1
+		|| payload_length < 0 || payload_length > app_protocol_max_payload {
+		return error('invalid application response')
+	}
+	mut payload := []u8{len: payload_length}
+	if payload_length > 0 && !desktop_read_all_with_timeout(fd, payload.data, u64(payload_length), timeout_ms) {
+		unsafe { payload.free() }
+		return error('application response payload timed out or pipe closed')
+	}
+	return AppReply{
+		ok:      status == 0
+		state:   state
+		payload: payload
+	}
+}
+
+fn receive_app_response(fd int) !AppReply {
+	return receive_app_response_with_timeout(fd, app_response_timeout_ms)
+}
+
+fn app_reply_error(reply AppReply) IError {
+	message := if reply.payload.len > 0 {
+		reply.payload.bytestr()
+	} else {
+		'application request failed'.clone()
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	return error(message)
+}
+
+fn free_app_payload(payload string) {
+	if payload.len > 0 {
+		unsafe { payload.free() }
+	}
+}
+
+// run_app_process is the client half of the display protocol. It is reached
+// before the normal desktop opens a framebuffer, so an app can never become a
+// second compositor by accident.
+fn run_app_process(options AppProcessOptions) {
+	desktop_set_cloexec(options.request_fd, true)
+	desktop_set_cloexec(options.response_fd, true)
+	// The user's folders are known in the desktop's process, not in this one.
+	desktop_use_user_home(desktop_find_user_home(desktop_home, desktop_users_directory))
+	mut desktop := Desktop{
+		tz_offset_seconds: options.tz_offset
+		settings:          Settings{
+			language: options.language
+		}
+	}
+	// What an app composes as it opens is in the desktop's language too, not
+	// only what it draws once the first request brings the settings.
+	set_desktop_language(options.language)
+	factory := app_factory_named(options.name) or {
+		send_app_error(options.response_fd, app_current_state(desktop), 'unknown application ${options.name}')
+		return
+	}
+	if factory.open == unsafe { nil } {
+		send_app_error(options.response_fd, app_current_state(desktop), '${factory.title} cannot run as a native app')
+		return
+	}
+	mut app := factory.open(mut desktop) or {
+		send_app_error(options.response_fd, app_current_state(desktop), err.msg())
+		return
+	}
+	native_app_apply_sandbox(options) or {
+		send_app_error(options.response_fd, app_current_state(desktop), 'application sandbox: ${err.msg()}')
+		return
+	}
+	if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+		return
+	}
+
+	mut encoded := []u8{cap: 16 * 1024}
+	for {
+		command, width, height, state, payload := receive_app_request(options.request_fd) or {
+			break
+		}
+		desktop.settings = state.settings
+		set_desktop_language(state.settings.language)
+		desktop.capture.request = state.capture_request
+		desktop.capture.report = state.capture_report
+		desktop_request_scale(state.requested_scale)
+		match command {
+			.build {
+				// Each application process owns its own frame-array pool. Make the
+				// preceding response's slots reusable before constructing this one;
+				// only the compositor's copy was reset previously, so every click
+				// left another set of child-process arrays committed.
+				begin_frame_elements()
+				tree := app.build(ui2.rect(0, 0, f64(width), f64(height))) or {
+					send_app_error(options.response_fd, app_current_state(desktop), err.msg())
+					free_app_payload(payload)
+					continue
+				}
+				encoded.clear()
+				encode_app_element(tree, mut encoded) or {
+					free_tree(tree)
+					send_app_error(options.response_fd, app_current_state(desktop), err.msg())
+					free_app_payload(payload)
+					continue
+				}
+				free_tree(tree)
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), encoded) {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.handle {
+				app.handle(payload) or {
+					send_app_error(options.response_fd, app_current_state(desktop), err.msg())
+					free_app_payload(payload)
+					continue
+				}
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.key_input {
+				if mut app is KeyboardApp {
+					app.key_input(payload)
+				}
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.paste_input {
+				if mut app is PastingApp {
+					app.paste_input(payload)
+				} else if mut app is KeyboardApp {
+					app.key_input(payload)
+				}
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.poll {
+				changed := if mut app is PollingApp { app.poll() } else { false }
+				mut poll_payload := [u8(if changed { 1 } else { 0 })]
+				// The reply's optional second field: how long until the next poll
+				// is worth making. A one-byte reply, which standalone applications
+				// send, keeps the application's fixed cadence.
+				if mut app is PollPacedApp {
+					wire_put_u32(mut poll_payload, u32(app.next_poll_ms()))
+				}
+				sent := send_app_response(options.response_fd, true, app_current_state(desktop),
+					poll_payload)
+				unsafe { poll_payload.free() }
+				if !sent {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.pointer {
+				if payload.len != int(sizeof(AppPointerPayload)) {
+					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer event')
+					free_app_payload(payload)
+					continue
+				}
+				mut pointer := AppPointerPayload{}
+				unsafe { C.memcpy(&pointer, payload.str, sizeof(AppPointerPayload)) }
+				if pointer.kind < int(AppPointerPhase.move)
+					|| pointer.kind > int(AppPointerPhase.scroll)
+					|| pointer.button < int(AppPointerButton.no_button)
+					|| pointer.button > int(AppPointerButton.back) || pointer.width <= 0
+					|| pointer.height <= 0 {
+					send_app_error(options.response_fd, app_current_state(desktop), 'invalid pointer geometry')
+					free_app_payload(payload)
+					continue
+				}
+				// Whether the event can have changed the application, asked before
+				// it is handled: a move that ends a drag still changed it.
+				mut changed := true
+				if pointer.kind == i32(AppPointerPhase.move) {
+					if mut app is PointerMoveApp {
+						changed = app.pointer_moves_matter()
+					}
+				}
+				if mut app is PointerApp {
+					app.pointer_event(unsafe { AppPointerPhase(pointer.kind) }, unsafe { AppPointerButton(pointer.button) }, int(pointer.scroll), int(pointer.x), int(pointer.y), int(pointer.width), int(pointer.height))
+				}
+				pointer_payload := [u8(if changed { 1 } else { 0 })]
+				sent := send_app_response(options.response_fd, true, app_current_state(desktop),
+					pointer_payload)
+				unsafe { pointer_payload.free() }
+				if !sent {
+					free_app_payload(payload)
+					break
+				}
+			}
+			.close {
+				if mut app is ClosingApp {
+					app.close_app()
+				}
+				send_app_response(options.response_fd, true, app_current_state(desktop), []u8{})
+				free_app_payload(payload)
+				break
+			}
+		}
+		free_app_payload(payload)
+	}
+	unsafe { encoded.free() }
+	desktop_close(options.request_fd)
+	desktop_close(options.response_fd)
+}
+
+@[heap]
+struct RemoteApp {
+mut:
+	title            string
+	pid              int
+	request_fd       int
+	response_fd      int
+	polling          bool
+	poll_interval_ms u64
+	// The application's own estimate, from its last poll reply, of when the
+	// next poll can find something new. Zero means use poll_interval_ms.
+	poll_hint_ms     u64
+	poll_sampled     bool
+	last_poll_ms     u64
+	keyboard         bool
+	standalone       bool
+	pointer          bool
+	us_keys          bool
+	closed           bool
+	failure_reason   string
+	desktop          &Desktop = unsafe { nil }
+	// The last tree the application sent, still encoded. The compositor
+	// rebuilds its element tree on every frame, and asking each application
+	// for its tree again meant two pipe messages, a rebuild in the child and
+	// two scheduler hand-offs per window per frame -- the whole cost of
+	// moving the pointer over the wallpaper. It is reused until anything the
+	// application's picture depends on can have changed: an event delivered to
+	// it, a poll that reports a change, a new size or desktop state, or -- for
+	// a frame that repaints everything -- remote_tree_max_age_ms passing, which
+	// bounds how stale a battery reading or a directory listing an
+	// application takes while building can get.
+	tree        []u8
+	tree_width  int
+	tree_height int
+	tree_state  AppWireState
+	tree_ms     u64
+	tree_stale  bool = true
+	// Whether the last pointer event delivered could have changed the
+	// application; see PointerMoveApp.
+	pointer_changed bool = true
+	// Whether the frame being built repaints everything. A partial frame
+	// repaints parts of windows around a change elsewhere, and a newer tree
+	// there would leave the window showing two versions of itself; whatever
+	// changed in the application itself has already made its tree stale and
+	// its whole window damaged.
+	tree_age_limited bool = true
+}
+
+const remote_tree_max_age_ms = u64(1000)
+
+/*
+fn start_remote_app(factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_with_timeout(factory, mut desktop, app_response_timeout_ms)
+}
+*/
+
+// Startup applications run while the persistent filesystem is still cold, so
+// their initial response has a distinct (and deliberately longer) deadline.
+// The returned app uses app_response_timeout_ms for every later transaction.
+fn start_remote_app_with_timeout(factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
+	// Files Settings has its own app identity but shares Files' installed binary.
+	path := native_app_directory + if factory.process_name == files_settings_process_name {
+		'vinix-files'
+	} else {
+		factory.process_name
+	}
+	app := start_remote_app_at_with_timeout(path, factory, mut desktop, timeout_ms) or {
+		unsafe { path.free() }
+		return err
+	}
+	unsafe { path.free() }
+	return app
+}
+
+/*
+// Kept separate from the installed-path wrapper so the protocol can be
+// exercised by a host integration binary that execs itself as the client.
+fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !NativeApp {
+	return start_remote_app_at_with_timeout(path, factory, mut desktop, app_response_timeout_ms)
+}
+*/
+
+fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
+	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds,
+		desktop.settings.language.code(),
+		factory.standalone, desktop.pending_status_path) or {
+		return error('cannot execute ${path}')
+	}
+	mut remote := &RemoteApp{
+		title:            factory.title
+		pid:              process.pid
+		request_fd:       process.to_child
+		response_fd:      process.from_child
+		polling:          factory.polling
+		poll_interval_ms: factory.poll_interval_ms
+		keyboard:         factory.keyboard
+		standalone:       factory.standalone
+		pointer:          factory.pointer
+		us_keys:          factory.us_keys
+		desktop:          desktop
+	}
+	reply := receive_app_response_with_timeout(remote.response_fd, timeout_ms) or {
+		remote.abort_transport()
+		return error('cannot start ${factory.title}: ${err}')
+	}
+	if !reply.ok {
+		remote.abort_transport()
+		return app_reply_error(reply)
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	// Opening each of these applications already performs its initial refresh.
+	// Start its next interval here instead of immediately sending a redundant
+	// poll on the compositor pass that follows the launch.
+	now := desktop_monotonic_ms()
+	if remote.poll_interval_ms > 0 && now != ~u64(0) {
+		remote.poll_sampled = true
+		remote.last_poll_ms = now
+	}
+	return remote
+}
+
+fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload string) !AppReply {
+	if a.closed || a.request_fd < 0 || a.response_fd < 0 {
+		return error(if a.failure_reason.len > 0 { a.failure_reason } else { 'application process has exited' })
+	}
+	state := if unsafe { a.desktop != nil } {
+		app_current_state(a.desktop)
+	} else {
+		AppWireState{}
+	}
+	started := desktop_monotonic_ms()
+	if !send_app_request(a.request_fd, command, width, height, state, payload) {
+		a.remember_transport_failure('application request pipe closed')
+		a.abort_transport()
+		return error(a.failure_reason)
+	}
+	reply := receive_app_response(a.response_fd) or {
+		finished := desktop_monotonic_ms()
+		if started != ~u64(0) && finished != ~u64(0) && finished >= started {
+			eprintln('vinix-desktop: ${a.title} (pid ${a.pid}) ${command} request failed after ${finished - started} ms')
+		}
+		a.remember_transport_failure(err.msg())
+		a.abort_transport()
+		return error(a.failure_reason)
+	}
+	if unsafe { a.desktop != nil } {
+		apply_app_state(mut a.desktop, reply.state)
+	}
+	return reply
+}
+
+fn (mut a RemoteApp) remember_transport_failure(reason string) {
+	if a.failure_reason.len == 0 {
+		a.failure_reason = reason.clone()
+		eprintln('vinix-desktop: ${a.title} (pid ${a.pid}) transport failed: ${reason}')
+	}
+}
+
+fn (mut a RemoteApp) build(size ui2.Rect) !ui2.Element {
+	width := int(size.width)
+	height := int(size.height)
+	state := if unsafe { a.desktop != nil } {
+		app_current_state(a.desktop)
+	} else {
+		AppWireState{}
+	}
+	now := desktop_monotonic_ms()
+	fresh := !a.tree_age_limited
+		|| (now != ~u64(0) && now >= a.tree_ms && now - a.tree_ms < remote_tree_max_age_ms)
+	a.tree_age_limited = true
+	if !a.tree_stale && a.tree.len > 0 && a.tree_width == width && a.tree_height == height
+		&& a.tree_state == state && fresh {
+		return decode_app_tree(a.tree)
+	}
+	a.drop_tree()
+	reply := a.transact(.build, width, height, '')!
+	if !reply.ok {
+		return app_reply_error(reply)
+	}
+	tree := decode_app_tree(reply.payload) or {
+		if reply.payload.cap > 0 {
+			unsafe { reply.payload.free() }
+		}
+		return err
+	}
+	a.tree = reply.payload
+	a.tree_width = width
+	a.tree_height = height
+	a.tree_state = state
+	a.tree_ms = now
+	a.tree_stale = now == ~u64(0)
+	return tree
+}
+
+// drop_tree forgets the cached tree, so the next build asks the application.
+fn (mut a RemoteApp) drop_tree() {
+	if a.tree.cap > 0 {
+		unsafe { a.tree.free() }
+	}
+	a.tree = []u8{}
+	a.tree_stale = true
+}
+
+// next_poll_interval is the application's hint, kept between a quarter of its
+// cadence and two seconds so neither a confused client nor a stale estimate
+// can make it spin or go quiet. A zero cadence is a hosted surface that is
+// polled every frame, and stays so.
+fn (a &RemoteApp) next_poll_interval() u64 {
+	if a.poll_interval_ms == 0 || a.poll_hint_ms == 0 {
+		return a.poll_interval_ms
+	}
+	lowest := a.poll_interval_ms / 4
+	if a.poll_hint_ms < lowest {
+		return lowest
+	}
+	if a.poll_hint_ms > remote_poll_hint_max_ms {
+		return remote_poll_hint_max_ms
+	}
+	return a.poll_hint_ms
+}
+
+const remote_poll_hint_max_ms = u64(2000)
+
+fn (mut a RemoteApp) handle(event_id string) ! {
+	a.tree_stale = true
+	reply := a.transact(.handle, 0, 0, event_id)!
+	if !reply.ok {
+		return app_reply_error(reply)
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+}
+
+fn (mut a RemoteApp) key_input(text string) {
+	if !a.keyboard {
+		return
+	}
+	a.tree_stale = true
+	reply := a.transact(.key_input, 0, 0, text) or { return }
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	// The terminal's slave will echo or answer this input asynchronously. Let
+	// the next compositor pass check for that output instead of making typed
+	// characters wait for the normal idle polling interval.
+	a.poll_sampled = false
+}
+
+fn (mut a RemoteApp) paste_input(text string) {
+	if !a.keyboard || text.len == 0 {
+		return
+	}
+	a.tree_stale = true
+	// Installed standalone clients may predate the dedicated paste command.
+	command := if a.standalone { AppCommand.key_input } else { AppCommand.paste_input }
+	reply := a.transact(command, 0, 0, text) or { return }
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	a.poll_sampled = false
+}
+
+fn (a &RemoteApp) pointer_input_enabled() bool {
+	return a.pointer && !a.closed
+}
+
+fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
+	if !a.pointer || a.closed {
+		return
+	}
+	pointer := AppPointerPayload{
+		kind:   i32(phase)
+		button: i32(button)
+		scroll: i32(scroll)
+		x:      i32(x)
+		y:      i32(y)
+		width:  i32(width)
+		height: i32(height)
+	}
+	payload := unsafe { tos(&u8(&pointer), int(sizeof(AppPointerPayload))) }
+	was_stale := a.tree_stale
+	a.pointer_changed = true
+	a.tree_stale = true
+	reply := a.transact(.pointer, 0, 0, payload) or { return }
+	// An empty reply, from an application that does not say, counts as a
+	// change.
+	if reply.payload.len >= 1 && reply.payload[0] == 0 {
+		a.pointer_changed = false
+		a.tree_stale = was_stale
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+}
+
+fn (mut a RemoteApp) poll() bool {
+	if !a.polling || a.closed {
+		return false
+	}
+	now := desktop_monotonic_ms()
+	if !remote_app_poll_due(a.next_poll_interval(), a.poll_sampled, a.last_poll_ms, now) {
+		return false
+	}
+	reply := a.transact(.poll, 0, 0, '') or {
+		a.tree_stale = true
+		return true
+	}
+	// Measure the next interval from the completed response. Activity and Clock
+	// also pace their work inside the child; starting before the request could
+	// make their next check land a few milliseconds early and skip a whole
+	// additional interval.
+	completed := desktop_monotonic_ms()
+	if a.poll_interval_ms > 0 && completed != ~u64(0) {
+		a.poll_sampled = true
+		a.last_poll_ms = completed
+	}
+	if !reply.ok {
+		if reply.payload.cap > 0 {
+			unsafe { reply.payload.free() }
+		}
+		a.tree_stale = true
+		return true
+	}
+	changed := reply.payload.len >= 1 && reply.payload[0] != 0
+	if changed {
+		a.tree_stale = true
+	}
+	a.poll_hint_ms = if reply.payload.len >= 5 {
+		u64(reply.payload[1]) | u64(reply.payload[2]) << 8 | u64(reply.payload[3]) << 16 | u64(reply.payload[4]) << 24
+	} else {
+		0
+	}
+	// A quiet interactive client can use a long interval without making command
+	// output crawl: typing already forces the first poll, and a changed reply
+	// keeps polling on subsequent rendered frames until the output is drained.
+	if changed && a.keyboard && a.poll_interval_ms > 0 {
+		a.poll_sampled = false
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	return changed
+}
+
+fn (mut a RemoteApp) close_transport() {
+	a.drop_tree()
+	if a.request_fd >= 0 {
+		desktop_close(a.request_fd)
+		a.request_fd = -1
+	}
+	if a.response_fd >= 0 {
+		desktop_close(a.response_fd)
+		a.response_fd = -1
+	}
+	if a.pid > 0 {
+		_ = desktop_wait_child(a.pid)
+		a.pid = -1
+	}
+	a.closed = true
+}
+
+// A failed transaction cannot assume the child reached its request loop. In
+// particular, merely closing its pipes does not stop a process hung while
+// opening an application, and waiting for that process would replace one
+// permanent compositor stall with another. Terminate it before reaping it.
+fn (mut a RemoteApp) abort_transport() {
+	a.drop_tree()
+	if a.request_fd >= 0 {
+		desktop_close(a.request_fd)
+		a.request_fd = -1
+	}
+	if a.response_fd >= 0 {
+		desktop_close(a.response_fd)
+		a.response_fd = -1
+	}
+	if a.pid > 0 {
+		pid := a.pid
+		status := desktop_terminate_child(pid)
+		desktop_log_app_exit(a.title, pid, status)
+		a.pid = -1
+	}
+	a.closed = true
+}
+
+fn (mut a RemoteApp) close() {
+	if a.closed {
+		return
+	}
+	reply := a.transact(.close, 0, 0, '') or {
+		a.close_transport()
+		return
+	}
+	if reply.payload.cap > 0 {
+		unsafe { reply.payload.free() }
+	}
+	a.close_transport()
+}

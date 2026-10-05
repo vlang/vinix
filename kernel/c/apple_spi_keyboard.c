@@ -1,6 +1,10 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Apple SPI boot-keyboard transport and console decoder.
+ * Apple SPI shared keyboard/touchpad transport and console decoder.
  * Register/protocol reference: U-Boot drivers/spi/apple_spi.c and
  * drivers/input/apple_spi_kbd.c, Copyright (C) 2021 Mark Kettenis and
  * Copyright The Asahi Linux Contributors, GPL-2.0-or-later.
@@ -14,6 +18,8 @@
 #include "apple_spi_keyboard.h"
 
 #if defined(__AARCH64__) || defined(VINIX_APPLE_SPI_TEST)
+
+#include "apple_spi_touchpad.h"
 
 #define SPI_CTRL       0x000
 #define SPI_CFG        0x004
@@ -40,13 +46,18 @@
 #define MESSAGE_SIZE   20u /* 8-byte header + 10-byte report + 2-byte CRC */
 #define TRANSFER_US    5000u
 #define POLL_US        2000u
-#define FALLBACK_US    20000u
+/* How long the transport stays down before it is brought back up. Long enough
+ * that genuinely dead hardware is not hammered, short enough that a user who
+ * looked away does not come back to a machine that takes no input. */
+#define REVIVE_US      2000000u
 #define FRAGMENT_US    100000u
 #define REPEAT_DELAY   500000u
 #define REPEAT_PERIOD  33333u
 
 struct key_bytes {
-    uint8_t data[8];
+    /* Long enough for the longest sequence a key can produce, which is the
+     * report that Cmd has been let go rather than anything on a keycap. */
+    uint8_t data[16];
     size_t len;
 };
 
@@ -56,6 +67,11 @@ struct decoder {
     uint8_t fn;
     uint8_t caps;
     uint8_t repeat_key;
+    /* Whether a chord was sent while Cmd was down. The desktop's window
+     * switcher is drawn for as long as Cmd is held, so unlike every other
+     * modifier this one's release has to be reported -- but only to someone
+     * who asked, which is what pressing Cmd-Tab counts as. */
+    uint8_t gui_chorded;
     uint64_t repeat_at;
     uint8_t message[MESSAGE_SIZE];
     size_t message_used;
@@ -80,10 +96,16 @@ struct spi_keyboard {
     int ready_low;
     int active;
     unsigned errors;
+    /* What start_keyboard was given, so the transport can be brought back
+     * without the device-tree work being done again. */
+    uint32_t input_hz;
+    uint32_t maximum_hz;
+    /* When to try that, or 0 for not scheduled. */
+    uint64_t revive_at;
     uint64_t next_poll;
     uint64_t next_transfer;
-    uint64_t last_transfer;
     struct decoder decoder;
+    struct touchpad touchpad;
 };
 
 static uint16_t read_le16(const uint8_t *p)
@@ -122,6 +144,7 @@ static void reset_input(struct decoder *d)
 {
     cancel_repeat(d);
     d->repeat_key = 0;
+    d->gui_chorded = 0;
     d->modifiers = 0;
     d->fn = 0;
     for (unsigned i = 0; i < 6; ++i)
@@ -135,6 +158,38 @@ static void sequence(struct key_bytes *out, const char *s)
         out->data[out->len++] = (uint8_t)*s++;
 }
 
+static void decimal(struct key_bytes *out, unsigned value)
+{
+    unsigned divisor = 1;
+    while (divisor <= value / 10)
+        divisor *= 10;
+    do {
+        if (out->len >= sizeof(out->data))
+            return;
+        out->data[out->len++] = (uint8_t)('0' + value / divisor % 10);
+        divisor /= 10;
+    } while (divisor);
+}
+
+static void csi_u(struct key_bytes *out, unsigned codepoint,
+    unsigned modifiers)
+{
+    sequence(out, "\033[");
+    decimal(out, codepoint);
+    sequence(out, ";");
+    decimal(out, 1 + modifiers);
+    sequence(out, "u");
+}
+
+static void modified_arrow(struct key_bytes *out, char final,
+    unsigned modifiers)
+{
+    sequence(out, "\033[1;");
+    decimal(out, 1 + modifiers);
+    if (out->len < sizeof(out->data))
+        out->data[out->len++] = (uint8_t)final;
+}
+
 static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int caps, int fn, int application_cursor)
 {
@@ -142,6 +197,7 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
     int shift = !!(modifiers & 0x22u);
     int ctrl = !!(modifiers & 0x11u);
     int alt = !!(modifiers & 0x44u);
+    int gui = !!(modifiers & 0x88u);
     uint8_t c = 0;
     int printable = 0;
     const char *s = NULL;
@@ -156,6 +212,20 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 82: key = 75; break; /* Fn-Up: Page Up */
         default: break;
         }
+    }
+
+    /* Preserve GUI chords in the console stream for graphical compositors. */
+    if (gui && key == 43) {
+        csi_u(&out, 9, 8u | (unsigned)shift);
+        return out;
+    }
+
+    if (gui && key >= 79 && key <= 82) {
+        static const char finals[] = {'C', 'D', 'B', 'A'};
+        unsigned mods = 8u | (unsigned)shift | ((unsigned)alt << 1) |
+            ((unsigned)ctrl << 2);
+        modified_arrow(&out, finals[key - 79], mods);
+        return out;
     }
 
     if (key >= 4 && key <= 29) {
@@ -175,7 +245,15 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 46: c = shift ? '+' : '='; printable = 1; break;
         case 47: c = shift ? '{' : '['; printable = 1; break;
         case 48: c = shift ? '}' : ']'; printable = 1; break;
-        case 49: case 100: c = shift ? '|' : '\\'; printable = 1; break;
+        case 49: c = shift ? '|' : '\\'; printable = 1; break;
+        /* The ISO key has no US character. It types the § and ± Apple's US
+         * layout prints on it, which name it uniquely for the desktop's
+         * keyboard layouts to put their own characters on. */
+        case 100:
+            if (gui)
+                return out;
+            s = shift ? "\xc2\xb1" : "\xc2\xa7";
+            break;
         case 50: c = shift ? '~' : '#'; printable = 1; break;
         case 51: c = shift ? ':' : ';'; printable = 1; break;
         case 52: c = shift ? '"' : '\''; printable = 1; break;
@@ -207,6 +285,12 @@ static struct key_bytes encode_key(uint8_t key, uint8_t modifiers,
         case 82: s = application_cursor ? "\033OA" : "\033[A"; break;
         default: return out; /* Unknown/reserved/lock/media keys */
         }
+    }
+    if (gui && c) {
+        unsigned mods = 8u | (unsigned)shift | ((unsigned)alt << 1) |
+            ((unsigned)ctrl << 2);
+        csi_u(&out, c, mods);
+        return out;
     }
     if (alt)
         out.data[out.len++] = 0x1b;
@@ -245,6 +329,16 @@ static size_t accept_report(struct decoder *d, const uint8_t report[10],
     d->modifiers = report[1];
     d->fn = !!report[9];
     ++d->reports;
+    /* Cmd let go. Nothing on a terminal has ever wanted to hear about a
+     * modifier's release, so this only goes out when a chord was sent while it
+     * was down. It is the left Super key in the CSI-u functional encoding,
+     * with an event type of 3, "released". */
+    if (d->gui_chorded && !(d->modifiers & 0x88u)) {
+        struct key_bytes release = {{0}, 0};
+        d->gui_chorded = 0;
+        sequence(&release, "\033[57444;1:3u");
+        append_key(out, capacity, &used, release);
+    }
     for (unsigned i = 0; i < 6; ++i) {
         uint8_t key = report[i + 3];
         /* ErrorRollOver, POSTFail, ErrorUndefined are not key releases.
@@ -270,6 +364,8 @@ static size_t accept_report(struct decoder *d, const uint8_t report[10],
         if (append_key(out, capacity, &used, bytes)) {
             d->repeat_key = key;
             d->repeat_at = now + REPEAT_DELAY;
+            if (d->modifiers & 0x88u)
+                d->gui_chorded = 1;
         }
     }
     for (unsigned i = 0; i < 6; ++i)
@@ -372,6 +468,8 @@ static int start_keyboard(struct spi_keyboard *k, uint32_t input_hz,
 {
     if (!input_hz || !maximum_hz || maximum_hz > 8000000u)
         return 0;
+    k->input_hz = input_hz;
+    k->maximum_hz = maximum_hz;
     uint64_t divider = ((uint64_t)input_hz + maximum_hz - 1) / maximum_hz;
     if (divider < 2) divider = 2;
     if (divider > 0x7ff) return 0; /* Do not silently exceed the DT maximum. */
@@ -403,89 +501,181 @@ static int start_keyboard(struct spi_keyboard *k, uint32_t input_hz,
     /* Let the controller boot without a 50-ms busy wait in kernel init. */
     k->next_poll = k->io.now_us(k->cookie) + 50000;
     k->next_transfer = k->next_poll;
-    k->last_transfer = 0;
     k->errors = 0;
     reset_input(&k->decoder);
+    tp_init(&k->touchpad, k->next_poll);
     k->active = 1;
     return 1;
 }
 
-static int read_packet(struct spi_keyboard *k, uint8_t packet[PACKET_SIZE])
+/* A single FIFO stage. CS belongs to the caller so a write and its status
+ * read can share one selection, with the required direction-change delay. */
+static int transfer_bytes(struct spi_keyboard *k, const uint8_t *output,
+    uint8_t *input, size_t length)
 {
     size_t tx = 0, rx = 0;
     int ok = 0;
-    reg_write(k, SPI_PIN, 0);
-    k->io.delay_us(k->cookie, 100);
+    if (!length || length > PACKET_SIZE) return 0;
     reg_write(k, SPI_CTRL, SPI_RESET);
-    reg_write(k, SPI_TXCNT, PACKET_SIZE);
-    reg_write(k, SPI_RXCNT, PACKET_SIZE);
-    for (; tx < FIFO_DEPTH; ++tx)
-        reg_write(k, SPI_TXDATA, 0);
+    reg_write(k, SPI_TXCNT, (uint32_t)length);
+    reg_write(k, SPI_RXCNT, (uint32_t)length);
+    for (; tx < FIFO_DEPTH && tx < length; ++tx)
+        reg_write(k, SPI_TXDATA, output ? output[tx] : 0);
     uint64_t start = k->io.now_us(k->cookie);
     reg_write(k, SPI_CTRL, SPI_RUN);
 
-    /* The iteration cap is a second bound in case an emulated timer stalls.
-     * Every FIFO count is checked before arithmetic or register accesses. */
     for (unsigned spins = 0; spins < 100000; ++spins) {
         uint32_t status = reg_read(k, SPI_FIFOSTAT);
         unsigned n = (status >> 24) & 0xffu;
-        if (n > FIFO_DEPTH || n > PACKET_SIZE - rx) break;
-        while (n--) packet[rx++] = (uint8_t)reg_read(k, SPI_RXDATA);
+        if (n > FIFO_DEPTH || n > length - rx) break;
+        while (n--) {
+            uint8_t byte = (uint8_t)reg_read(k, SPI_RXDATA);
+            if (input) input[rx] = byte;
+            ++rx;
+        }
         status = reg_read(k, SPI_FIFOSTAT);
         unsigned level = (status >> 8) & 0xffu;
         if (level > FIFO_DEPTH) break;
         n = FIFO_DEPTH - level;
-        while (n-- && tx < PACKET_SIZE) {
-            reg_write(k, SPI_TXDATA, 0);
+        while (n-- && tx < length) {
+            reg_write(k, SPI_TXDATA, output ? output[tx] : 0);
             ++tx;
         }
-        if (rx == PACKET_SIZE && tx == PACKET_SIZE) { ok = 1; break; }
+        if (rx == length && tx == length) { ok = 1; break; }
         if (k->io.now_us(k->cookie) - start >= TRANSFER_US) break;
     }
-    /* All paths stop the engine and release CS; the next poll enforces the
-     * inactive gap instead of busy-waiting while no useful work can happen. */
+    reg_write(k, SPI_CTRL, 0);
+    return ok;
+}
+
+static void end_transfer(struct spi_keyboard *k, int ok)
+{
     reg_write(k, SPI_CTRL, 0);
     k->io.delay_us(k->cookie, 100);
     reg_write(k, SPI_PIN, SPI_CS_HIGH);
     k->next_transfer = k->io.now_us(k->cookie) + 250;
     if (!ok) reg_write(k, SPI_CTRL, SPI_RESET);
+}
+
+static int read_packet(struct spi_keyboard *k, uint8_t packet[PACKET_SIZE])
+{
+    reg_write(k, SPI_PIN, 0);
+    k->io.delay_us(k->cookie, 100);
+    int ok = transfer_bytes(k, NULL, packet, PACKET_SIZE);
+    end_transfer(k, ok);
     return ok;
+}
+
+static void enable_touchpad(struct spi_keyboard *k, uint64_t now)
+{
+    uint8_t packet[PACKET_SIZE];
+    uint8_t status[4] = {0};
+    tp_mode_packet(&k->touchpad, packet, now);
+    reg_write(k, SPI_PIN, 0);
+    k->io.delay_us(k->cookie, 100);
+    int ok = transfer_bytes(k, packet, NULL, PACKET_SIZE);
+    if (ok) {
+        /* No CS edge here: Asahi's write and status are one SPI message. */
+        k->io.delay_us(k->cookie, 200);
+        ok = transfer_bytes(k, NULL, status, sizeof(status));
+    }
+    end_transfer(k, ok);
+    if (!ok || status[0] != 0xac || status[1] != 0x27 ||
+        status[2] != 0x68 || status[3] != 0xd5)
+        ++k->touchpad.mode_errors;
+    /* A failed feature write does NOT disable keyboard reads. Retries are
+     * bounded independently and native reports can arrive despite bad status. */
+}
+
+static int boot_packet(const uint8_t p[PACKET_SIZE])
+{
+    return read_le16(p + 2) == 0 && read_le16(p + 4) == 0 &&
+        read_le16(p + 6) == 4 && p[8] == 0xa0 && p[9] == 0x80 &&
+        p[10] == 0 && p[11] == 0 && crc16(p, PACKET_SIZE) == 0;
+}
+
+static int packet_envelope_valid(const uint8_t p[PACKET_SIZE])
+{
+    /* A completed PIO transaction is not necessarily a packet: an idle or
+     * wedged HID controller can clock a buffer full of zeroes. Keep unknown
+     * device/report IDs forward-compatible, but require the Apple read flag,
+     * a payload that fits this packet and a valid outer CRC. */
+    size_t n = read_le16(p + 6);
+    return p[0] == 0x20 && n != 0 && n <= PACKET_SIZE - 10 &&
+        crc16(p, PACKET_SIZE) == 0;
+}
+
+static int read_error(struct spi_keyboard *k)
+{
+    reset_input(&k->decoder);
+    tp_discontinuity(&k->touchpad);
+    if (++k->errors >= 3) {
+        /* Down, but not for good: both devices share this transport. */
+        k->active = 0;
+        k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
+        return -2;
+    }
+    k->next_poll = k->io.now_us(k->cookie) + 20000;
+    return -1;
 }
 
 static int poll_keyboard(struct spi_keyboard *k, uint8_t *out,
     size_t capacity, int application_cursor)
 {
-    if (!k->active || !out || capacity == 0)
+    if (!out || capacity == 0)
         return 0;
+    if (!k->active) {
+        /* Bring it back when the cool-off has passed. Re-running the start
+         * sequence reprograms a controller that may itself have reset. */
+        if (!k->revive_at || k->io.now_us(k->cookie) < k->revive_at)
+            return 0;
+        if (!start_keyboard(k, k->input_hz, k->maximum_hz)) {
+            k->revive_at = k->io.now_us(k->cookie) + REVIVE_US;
+            return 0;
+        }
+        k->revive_at = 0;
+        return -3;
+    }
     size_t used = 0;
     uint64_t now = k->io.now_us(k->cookie);
+    tp_tick(&k->touchpad, now);
     if (k->decoder.message_used && now - k->decoder.fragment_at >= FRAGMENT_US)
         cancel_repeat(&k->decoder);
     if (now >= k->next_poll && now >= k->next_transfer) {
         k->next_poll = now + POLL_US;
+        // Do not insert a feature command in the middle of either report.
+        if (!k->errors && !k->decoder.message_used && tp_mode_due(&k->touchpad, now)) {
+            enable_touchpad(k, now);
+            now = k->io.now_us(k->cookie);
+            return (int)repeat_key(&k->decoder, now, application_cursor, out, capacity);
+        }
         int ready = 1;
         if (k->ready) {
             uint32_t v = k->io.read32(k->cookie, k->ready);
             ready = !!(v & 1u) ^ !!k->ready_low;
         }
-        /* A slow unconditional read also tolerates a bootloader DT with an
-         * edge-triggered or stale ready line. U-Boot uses unconditional PIO. */
-        if (ready || now - k->last_transfer >= FALLBACK_US) {
+        /* The ready line is the HID interrupt. Do not periodically clock the
+         * controller while it is inactive; timer-only polling is reserved for
+         * device trees that do not supply the line at all. */
+        if (ready) {
             uint8_t packet[PACKET_SIZE];
-            k->last_transfer = now;
-            if (!read_packet(k, packet)) {
-                reset_input(&k->decoder);
-                if (++k->errors >= 3) {
-                    k->active = 0;
-                    return -2;
-                }
-                k->next_poll = k->io.now_us(k->cookie) + 1000000;
-                return -1;
-            }
+            if (!read_packet(k, packet))
+                return read_error(k);
+            /* With a ready line, a successful transfer that did not return a
+             * valid packet is a transport failure too. Previously all-zero
+             * reads cleared the error count and left input dead indefinitely. */
+            if (k->ready && !packet_envelope_valid(packet))
+                return read_error(k);
             k->errors = 0;
             now = k->io.now_us(k->cookie);
-            used = decode_packet(&k->decoder, packet, sizeof(packet), now,
-                application_cursor, out, capacity);
+            if (boot_packet(packet)) {
+                reset_input(&k->decoder);
+                tp_restart(&k->touchpad, now);
+            } else {
+                tp_decode(&k->touchpad, packet, sizeof(packet), now);
+                used = decode_packet(&k->decoder, packet, sizeof(packet), now,
+                    application_cursor, out, capacity);
+            }
         }
     }
     used += repeat_key(&k->decoder, now, application_cursor, out + used, capacity - used);
@@ -561,6 +751,22 @@ int vinix_apple_spi_keyboard_poll(uint8_t *out, size_t capacity, int app)
 uint64_t vinix_apple_spi_keyboard_reports(void)
 {
     return keyboard.decoder.reports;
+}
+
+int vinix_apple_spi_keyboard_caps_lock(void)
+{
+    return keyboard.decoder.caps;
+}
+
+uint64_t vinix_apple_spi_touchpad_reports(void)
+{
+    return keyboard.touchpad.reports;
+}
+
+int vinix_apple_spi_touchpad_read(int32_t out[8])
+{
+    if (out) keyboard.touchpad.requested = 1;
+    return tp_snapshot(&keyboard.touchpad, out);
 }
 #endif /* __AARCH64__ */
 #endif /* __AARCH64__ || VINIX_APPLE_SPI_TEST */
