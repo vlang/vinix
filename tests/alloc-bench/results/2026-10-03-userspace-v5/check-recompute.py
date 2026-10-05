@@ -71,7 +71,10 @@ def record(tag, key=None, value=None, *, remove=False, duplicate=False, drop=Fal
 
 def make_fixture(base):
     for name in ("recompute.py", "compare.py", "bench.c", "source-snapshots.json", "campaign-plan.json"):
-        shutil.copy2(HERE / name, base / name)
+        if name == "bench.c":
+            (base / name).write_bytes(report.preserved_source(name))
+        else:
+            shutil.copy2(HERE / name, base / name)
     (base / "validation").mkdir()
     for name in ("kernel-x86_64.json", "libc-builds.json", "libc.patch"):
         shutil.copy2(HERE / "validation" / name, base / "validation" / name)

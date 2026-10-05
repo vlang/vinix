@@ -54,8 +54,10 @@ requires precisely its four captures, actual exit-zero driver records,
 explicit UTC declaration/start/finish times, ABBA order and nonoverlap.
 The unchanged [strict validator](compare.py) requires complete metadata, all
 six workloads, 42 distinct samples per capture, payload checksums, consistent
-printed statistics and `ALLOC-DONE`. The unchanged [benchmark](bench.c) and
+printed statistics and `ALLOC-DONE`. The unchanged [benchmark source](../source-archive.json) and
 validator are pinned by [source fingerprints](source-snapshots.json).
+The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
+with zero translation credit.
 The kernel remains the approved v5 x86 kernel `16140916…`; final v6 loader,
 static archive and allocator patch are `ad78977e…`, `8d5c3dee…`, `ec459e48…`.
 Saved [kernel](validation/kernel-x86_64.json) and

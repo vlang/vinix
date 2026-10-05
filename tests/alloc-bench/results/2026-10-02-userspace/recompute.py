@@ -40,6 +40,19 @@ sys.modules[SPEC.name] = compare
 SPEC.loader.exec_module(compare)
 
 
+def preserved_source(name: str) -> bytes:
+    source = HERE / name
+    if source.exists() or name != "bench.c":
+        return source.read_bytes()
+    helper = HERE.parents[1] / "materialize-evidence.py"
+    spec = importlib.util.spec_from_file_location("allocation_source_archive", helper)
+    if not spec or not spec.loader:
+        raise OSError("Cannot load historical source archive helper")
+    archive = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(archive)
+    return archive.read_source("tests/alloc-bench/results/" + HERE.name + "/" + name)
+
+
 def numbered(prefix: str) -> dict[int, Path]:
     found = {}
     for path in HERE.iterdir():
@@ -161,7 +174,7 @@ def recompute() -> dict:
         record = snapshots.get(name)
         expected_sha = EXPECTED_SOURCE if name == "bench.c" else EXPECTED_COMPARE
         if (not isinstance(record, dict) or record.get("sha256") != expected_sha or
-                hashlib.sha256((COMPARE.parent / name).read_bytes()).hexdigest() != record.get("sha256")):
+                hashlib.sha256(preserved_source(name)).hexdigest() != record.get("sha256")):
             raise compare.InvalidRun(f"preserved {name} differs from source-snapshots.json")
     source_sha = snapshots["bench.c"]["sha256"]
     kernel = object_from(HERE / "validation/kernel-x86_64.json")

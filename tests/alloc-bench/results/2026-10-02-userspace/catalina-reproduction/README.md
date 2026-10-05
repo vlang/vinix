@@ -85,7 +85,8 @@ attached to this VM's serial socket.
 ## Prepare and compile inside the guest
 
 Stage the pinned GNU GCC 14.3.0 toolchain under `opt/local`, the compatible
-Darwin headers under `bench-sdk`, and the saved [bench.c](../bench.c) on the
+Darwin headers under `bench-sdk`, and the exact `bench.c` recovered through the
+[source archive](../../SOURCE-ARCHIVE.md) on the
 private FAT image before boot. Identify the attached transfer device using
 the guest's device list; it appeared as `/dev/disk0` in the recorded VM.
 Submit these guest commands through `commands.txt`:

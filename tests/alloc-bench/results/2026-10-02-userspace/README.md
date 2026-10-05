@@ -37,8 +37,10 @@ actual driver exit zero, explicit UTC start/end timestamps, predeclaration,
 ABBA order and nonoverlap. Each capture needs complete metadata, all six
 workloads, all 42 distinct raw samples, matching payload checksums, consistent
 printed statistics and a completion record. The preserved
-[strict validator](compare.py) and [benchmark](bench.c) are pinned to the
+[strict validator](compare.py) and [benchmark source](../source-archive.json) are pinned to the
 hashes in [source-snapshots.json](source-snapshots.json).
+The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
+with zero translation credit.
 
 The script checks identical common QEMU settings/compiler flags, actual
 QEMU argument lists matching those settings, 200,000 base iterations, seven

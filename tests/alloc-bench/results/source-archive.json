@@ -1,0 +1,2328 @@
+{
+  "schema": 1,
+  "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+  "translation_credit": 0,
+  "description": "Historical sources remain byte-for-byte recoverable from Git. Independent C fixtures are original evidence, not V translations. No implementation is hidden or relabeled as vendored.",
+  "files": [
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/bench.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "7d9068177d2c0fecedd968398c05e75e23299508",
+      "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "bytes": 14188,
+      "lines": 419,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/bench.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/launcher-probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "e812d15dc64009cdd418f48af63f4f6fb4c7a197",
+      "sha256": "59db2f6bb4d5f70d19e54054e41b628392bd1805a175391125aa14f3ebcec199",
+      "bytes": 1241,
+      "lines": 31,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/launcher-probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "99c5b629864df48f157bf38c77be2eb329a3ceca",
+      "sha256": "ca45be338f4720360d4cf43ae01580d23e20b3111a84533b8d27479396155361",
+      "bytes": 224,
+      "lines": 4,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/verify-original.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "9f54f9e401800b2f7ecb184b1131baa2e863938c",
+      "sha256": "80afae96dfe97bcf7fda9d39ebc7446027b7eab0138af8b4ec32bec4c8ecfd62",
+      "bytes": 8750,
+      "lines": 260,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/verify-original.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/launcher.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "31b999c18e5eae09c844334faad42e4eea036a8b",
+      "sha256": "27089c9a66b192d0318f2c1a5dd545397a9947527edb58984c6ae7e3a8607c70",
+      "bytes": 1489,
+      "lines": 37,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/launcher.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "070a8f3edb8890e06a936711d390bdcba99cce41",
+      "sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+      "bytes": 3045,
+      "lines": 91,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "9f54f9e401800b2f7ecb184b1131baa2e863938c",
+      "sha256": "80afae96dfe97bcf7fda9d39ebc7446027b7eab0138af8b4ec32bec4c8ecfd62",
+      "bytes": 8750,
+      "lines": 260,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "070a8f3edb8890e06a936711d390bdcba99cce41",
+      "sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+      "bytes": 3045,
+      "lines": 91,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-kernel-vinix.py",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "0234f6b0bc2a91661e9bc72be9c532e37376d5a8",
+      "sha256": "19055ddf2fe68030d6e1877c6e819498ad2daeed8ddb947958c614708986baeb",
+      "bytes": 6602,
+      "lines": 125,
+      "kind": "frozen benchmark runner containing first-party C init source",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-kernel-vinix.py"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/clock-baseline-2cpu/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/clock-baseline-2cpu/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/clock-final-2cpu/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/clock-final-2cpu/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f748456e57d7d4468ca33e20917b222793cdab92",
+      "sha256": "36fc5822d0f58ca84dff55ba025f98bedffabe2b75c0c3e85ac2764d7d19a32a",
+      "bytes": 113923,
+      "lines": 3370,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f9005239ece343b403e2a950c72ecff4f7e95fc4",
+      "sha256": "4aa7633bc9adeb098446ae4143dbe367cb485f5ed184674846cca012bfbfeb90",
+      "bytes": 115457,
+      "lines": 3417,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f748456e57d7d4468ca33e20917b222793cdab92",
+      "sha256": "36fc5822d0f58ca84dff55ba025f98bedffabe2b75c0c3e85ac2764d7d19a32a",
+      "bytes": 113923,
+      "lines": 3370,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f9005239ece343b403e2a950c72ecff4f7e95fc4",
+      "sha256": "4aa7633bc9adeb098446ae4143dbe367cb485f5ed184674846cca012bfbfeb90",
+      "bytes": 115457,
+      "lines": 3417,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/measure.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3bd84de317a3373efc8fca6529bb694041a02daf",
+      "sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+      "bytes": 22627,
+      "lines": 764,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/measure.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/measure.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3bd84de317a3373efc8fca6529bb694041a02daf",
+      "sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+      "bytes": 22627,
+      "lines": 764,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/measure.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-core-x86_64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f748456e57d7d4468ca33e20917b222793cdab92",
+      "sha256": "36fc5822d0f58ca84dff55ba025f98bedffabe2b75c0c3e85ac2764d7d19a32a",
+      "bytes": 113923,
+      "lines": 3370,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-core-x86_64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-socketbox-x86_64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "eff8122d2cb50de4a018a17f10b132d1710383bf",
+      "sha256": "8be73490add6279b3a579726d906e2d17cbec002864703de8f65a7f0db223f70",
+      "bytes": 114764,
+      "lines": 3391,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-socketbox-x86_64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_bool.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f5a4f79fd907d6b8145cbc6c8f056ee4019471b0",
+      "sha256": "29bd52e346240b1870f1722c3288731e9f75d0fd0e529f2ab53fa7d44c12d3f9",
+      "bytes": 1419,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_bool.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_i64.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "91ca36a9e832cebf8a3545c9bc28717b9fe486a0",
+      "sha256": "7d1a1a155bdfb223ea5e735cd97e24b4654e4a85eb248d88430ba57be0dffd5c",
+      "bytes": 1410,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_i64.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_ptr_Probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "57da911462dccc26e023dcdfa34b91f966426e3b",
+      "sha256": "92744d37b27fe3e2eeab4ed6e67a66cc15a4c252420d47c5e1cdf6e16ca38f6d",
+      "bytes": 1487,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_ptr_Probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u16.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "94bed8386ab7d12c63e2ac16c56393c222f9e1a7",
+      "sha256": "0cd1b6345bb66d3d2f54fe6c48bb9ecf4681a8d15cf14cf97caae501efce65d0",
+      "bytes": 1409,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u16.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u32.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "83e32ba7cd4a0972bfdf0e8f90410968e9f4ffc1",
+      "sha256": "4edd24962b8b79ed14f023bea5b5980c631a3957a8b2fcd8193f7b6877226dd3",
+      "bytes": 1410,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u32.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u64.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "36a37f30f4b0953ce4b046c1d39d9e1ffcece866",
+      "sha256": "70ae4fcc0d9d02fc394529292c076a3c6f4a10a0f920eb78e7dc3c4099f6cf06",
+      "bytes": 1410,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u64.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u8.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "d79c16dac13f3db21c96150ed3fd0467e8bd415d",
+      "sha256": "b8e3c8fff2c318dcd076a92fbaaa2a1faeca7d2d021d7a835b5653ad1a7929bb",
+      "bytes": 1401,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u8.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_v_int.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "df7f279c6754137f8b906d083f57a1329d5ab8a5",
+      "sha256": "4280e4ac93fb58e329eb694a79c135640b84c9f3de47ed82dc2edf91dae08b8b",
+      "bytes": 1412,
+      "lines": 71,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_v_int.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_bool.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "c597545cd6fbfe21be75daa7056f8862600c3bdf",
+      "sha256": "ce3bcb532742bdbde46208ab02cc307bca52f9b1c2c4ee6f235d4234f7b43a22",
+      "bytes": 186,
+      "lines": 10,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_bool.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u32.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f9b7095e673e7261df0658a78342bd198dedcb95",
+      "sha256": "5ca1fe507c1666f63b1d26579f283fe028c3c398214743816d5de7f17fc873ae",
+      "bytes": 183,
+      "lines": 10,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u32.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u64.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "ffd647f5d6cd569a17f1363113b79cc7f81ba52c",
+      "sha256": "e976148c2a4e952af6db3a558468d282c51a5bc85b845b878a8e0c950ba599ec",
+      "bytes": 183,
+      "lines": 10,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u64.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_release.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3cdd0dd8e5c19cad43fda0827b8150336e255b86",
+      "sha256": "4b07dc9e0337517861e09f9291be2a90294e25f8e6d5f6c717921e050dc4b0c5",
+      "bytes": 319,
+      "lines": 16,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_release.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__sync.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2ba3930449073b5f549b98cfbd7c2192e5fd5d58",
+      "sha256": "b7c0521083becd103adff56e90c1ba3d4bce2753b46255009526feca22b7b96e",
+      "bytes": 85,
+      "lines": 6,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__sync.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/klock__Lock__release.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "908412813e8b241b09e7a9744d434d16023cce1b",
+      "sha256": "cd11787a75f5f9944d8623dd99cb7cf094065bb292f20734f01c6ad346e6d452",
+      "bytes": 137,
+      "lines": 5,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/klock__Lock__release.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/memory-runtime/runtime.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "ea1d6f01d278c018060b093130657c6fc5e2afcb",
+      "sha256": "0bf772b0a0c5c5f64df62f6df37e87a5fcaaef346c069aa505a83b2bc6db869f",
+      "bytes": 3709,
+      "lines": 78,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/memory-runtime/runtime.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-extracted.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "afbf471ca47c0916b626e411d67cc32c271d8f3b",
+      "sha256": "64f0d1f48921e5295edb9c0dfa46344191004b67f1837c864783b8ffdfe4193c",
+      "bytes": 12041,
+      "lines": 600,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-extracted.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2d5db79d9ffdb030ed36e75f64412d14e43e9c26",
+      "sha256": "3a3ef2aeded061f72d226368ed8cd5449fd7dfd8412cf5fcc2e9b42f257f64e5",
+      "bytes": 403984,
+      "lines": 8462,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/receive_message-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "0bf496cd7c884ce1af12ba527a4975731d9fc0b2",
+      "sha256": "6f110a56852c18c4f8f351ec48a0e7e956dfe881f6a7dfc0facf051a7537f423",
+      "bytes": 6207,
+      "lines": 259,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/receive_message-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_datagram-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "958fb117ffe5176f6b19750a29bc21b717a35b83",
+      "sha256": "9bbf66db998f9f047a7e20bd13ec7b9ada0eddf426648495f0cfa7737e4dcaec",
+      "bytes": 3419,
+      "lines": 97,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_datagram-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_message-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f6f7c5f0f69889a543a2e347a03e7a1e6d8495f5",
+      "sha256": "046fb479c2dc271cc72aa33a37f7ab3d8801de06e9bb0f7f51f2f53a8144d9ee",
+      "bytes": 3753,
+      "lines": 141,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_message-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_with_control-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "c8c9a311b1e9404eac2812a1fb9f1348a402ce84",
+      "sha256": "161493037316a9744b35c9a467ae31a3c9966ac6976a01e77e6420d5b05e997c",
+      "bytes": 2638,
+      "lines": 108,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_with_control-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_bind-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "d113a8d5359a8eae75e2aa050895222dd539f25c",
+      "sha256": "5f1180ed9dca28e884b361cfbf2c9af459229c486f8f0216cd29ec68d565af34",
+      "bytes": 4600,
+      "lines": 162,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_bind-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_connect-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "1fdd13199f80558b0ee4f7d4cfbeb120b3f98e35",
+      "sha256": "9f68d2eb95c53b61056ebd9f2bc18552f9894927b37a60f0094756b8bcb758f4",
+      "bytes": 4609,
+      "lines": 162,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_connect-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getpeername-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "c2382d356b820d7a5955217944904d299d90750e",
+      "sha256": "4977d1f786b0028e0e2c5801e68018a0ddd6d1fa1254feeaad47dc494090e20b",
+      "bytes": 1702,
+      "lines": 54,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getpeername-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getsockname-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "a85403ccee94a1684723c64aef7c751ab2e44c47",
+      "sha256": "9cd4e069e37046d076aa315391679cb0338e58bb775b6e633779dee255f88a4c",
+      "bytes": 1702,
+      "lines": 54,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getsockname-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_recvfrom-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "8858eda2250b9f545b429b4fa4f613cbdf1cc477",
+      "sha256": "f7e37ee6c8415b68da78fc3a64cfc4fa971abdc630314a2ccce1f0fdbce92bdb",
+      "bytes": 2992,
+      "lines": 111,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_recvfrom-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendmsg-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "1778800438ba3595c61ae49739644be63114c8ce",
+      "sha256": "75e0c8061e19c6ad34a963499ba1ab762e54aa0fc6cdafb8484d1a9609437ccb",
+      "bytes": 454,
+      "lines": 10,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendmsg-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendto-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "55796766355466f6da3a749c7f3b9367eca60a9c",
+      "sha256": "21743a957f918809f68c2f6ca700ff52133dceaa75989c2f3bfbe006306319ac",
+      "bytes": 2739,
+      "lines": 115,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendto-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/write_with_fds-final.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "4f5145f23a8b2fc699a13771affbdb7d8aac64c7",
+      "sha256": "7e154e0766ea67c8d2208f9232fdfc0ca363e265ef8aa6d4f3bcbe782260ce7c",
+      "bytes": 4881,
+      "lines": 157,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/write_with_fds-final.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/aarch64/builder-source.sh",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b7b7069322f633c85d4ecf2737e9aecac210a56c",
+      "sha256": "ad60b48d2b74bd25ee4e8f43e9c9fa2deee56696b89b2424391fa50a445cdac1",
+      "bytes": 25591,
+      "lines": 662,
+      "kind": "frozen build script containing first-party C heredocs",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/aarch64/builder-source.sh"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/amd64/builder-source.sh",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "6284d97e461ff53ea49bfe0f9c1c80e6d5890c41",
+      "sha256": "0fc14c82aeb3ab19eea466977c27d63e78650adb8b7f7dd66b48b3359b7e6aca",
+      "bytes": 5773,
+      "lines": 160,
+      "kind": "frozen build script containing first-party C heredocs",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/amd64/builder-source.sh"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/aarch64/packaged-libc/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/aarch64/packaged-libc/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/amd64/packaged-libc/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/amd64/packaged-libc/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b73f635ef8068d478d120a42fbe40b7c0303e711",
+      "sha256": "f07bdc094600a02b592c961c546f0510caf6d36f6a943062a147318c093b91b8",
+      "bytes": 990,
+      "lines": 18,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-final/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b73f635ef8068d478d120a42fbe40b7c0303e711",
+      "sha256": "f07bdc094600a02b592c961c546f0510caf6d36f6a943062a147318c093b91b8",
+      "bytes": 990,
+      "lines": 18,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-final/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/close_endpoint-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "0dcdd86cc14a9589955b2a58328fd7f59f234dda",
+      "sha256": "899432be78c55592e0fdcb460abb760d7c4a1480e3e7905632ee1a167b566720",
+      "bytes": 2317,
+      "lines": 86,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/close_endpoint-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/read-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "0552dc24f83ae573c4e52689d140c0b78417b283",
+      "sha256": "9bfed0debb23013c998d9d776af37fac0b5f0646899245f4b3ae6d89026b969f",
+      "bytes": 3208,
+      "lines": 114,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/read-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recv_seqpacket-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "9f7299a2801015c177c7429034f2c837c312ad34",
+      "sha256": "b579e5141321fb7d11dde1502a74af0405f619cb7a4496c2754585b12c9bc627",
+      "bytes": 3952,
+      "lines": 128,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recv_seqpacket-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recvmsg-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "d2f8e86f6217cad3fecca599a86c69e86f7b55f5",
+      "sha256": "da09beb574254d3d53d646597aae575bc3f746c07a258fb03c6dc7fbf07fc706",
+      "bytes": 9906,
+      "lines": 306,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recvmsg-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/send_datagram-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "958fb117ffe5176f6b19750a29bc21b717a35b83",
+      "sha256": "9bbf66db998f9f047a7e20bd13ec7b9ada0eddf426648495f0cfa7737e4dcaec",
+      "bytes": 3419,
+      "lines": 97,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/send_datagram-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/write_with_fds-arm-v5.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "4f5145f23a8b2fc699a13771affbdb7d8aac64c7",
+      "sha256": "7e154e0766ea67c8d2208f9232fdfc0ca363e265ef8aa6d4f3bcbe782260ce7c",
+      "bytes": 4881,
+      "lines": 157,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/write_with_fds-arm-v5.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/baseline-complete/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "22d3d474b90293913535c8792612e81d14a8a53a",
+      "sha256": "762f5ecdc8d77713bd83ad791e1443ce879afdfb08eec130b15ea1869d65c7ac",
+      "bytes": 5149,
+      "lines": 67,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/baseline-complete/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/candidate-complete/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "22d3d474b90293913535c8792612e81d14a8a53a",
+      "sha256": "762f5ecdc8d77713bd83ad791e1443ce879afdfb08eec130b15ea1869d65c7ac",
+      "bytes": 5149,
+      "lines": 67,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/candidate-complete/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-baseline/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "8c0eae67c29ee8e013db411d5a3789bb2430224f",
+      "sha256": "12c0390e8e3442792eda99caea3311910e64af9de2de74c8b2d2d96f415f91f6",
+      "bytes": 5335,
+      "lines": 68,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-baseline/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-candidate/probe.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "8c0eae67c29ee8e013db411d5a3789bb2430224f",
+      "sha256": "12c0390e8e3442792eda99caea3311910e64af9de2de74c8b2d2d96f415f91f6",
+      "bytes": 5335,
+      "lines": 68,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-candidate/probe.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-baseline-4cpu/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "655738862f7591bd6131f91528be82ad75b9c73c",
+      "sha256": "cb3781f0ad65846cc7a919a9e305fe11bf3792844c6e4dec0a1911870e52e735",
+      "bytes": 114282,
+      "lines": 3375,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-baseline-4cpu/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-candidate-4cpu/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "655738862f7591bd6131f91528be82ad75b9c73c",
+      "sha256": "cb3781f0ad65846cc7a919a9e305fe11bf3792844c6e4dec0a1911870e52e735",
+      "bytes": 114282,
+      "lines": 3375,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-candidate-4cpu/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/bench.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "7d9068177d2c0fecedd968398c05e75e23299508",
+      "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "bytes": 14188,
+      "lines": 419,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/bench.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b5d2af31072fccd0070fffe9f465c7fb8f7ca335",
+      "sha256": "ff1c70e213886981e82451b714ca569911f1ad6950ef4a1d3700a6cf972f5157",
+      "bytes": 6698,
+      "lines": 179,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b5d2af31072fccd0070fffe9f465c7fb8f7ca335",
+      "sha256": "ff1c70e213886981e82451b714ca569911f1ad6950ef4a1d3700a6cf972f5157",
+      "bytes": 6698,
+      "lines": 179,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "44254f3395d4d1c5704d2b2c6288d57a9e64e14a",
+      "sha256": "e2b39fc74da25e30efcd7b9fcb810bc86f22e4489a2b4e52b5e3d2b1b5b4da0c",
+      "bytes": 6602,
+      "lines": 175,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/launcher.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "31b999c18e5eae09c844334faad42e4eea036a8b",
+      "sha256": "27089c9a66b192d0318f2c1a5dd545397a9947527edb58984c6ae7e3a8607c70",
+      "bytes": 1489,
+      "lines": 37,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/launcher.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "070a8f3edb8890e06a936711d390bdcba99cce41",
+      "sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+      "bytes": 3045,
+      "lines": 91,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "070a8f3edb8890e06a936711d390bdcba99cce41",
+      "sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+      "bytes": 3045,
+      "lines": 91,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fd544af85993f3249b3df173b846af95b768d88f",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "bytes": 7152,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fd544af85993f3249b3df173b846af95b768d88f",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "bytes": 7152,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/measure.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3bd84de317a3373efc8fca6529bb694041a02daf",
+      "sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+      "bytes": 22627,
+      "lines": 764,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/measure.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__Pagemap__unmap_page_unlocked.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "48fa2288a65dce47c44f1968518030b1efa78f87",
+      "sha256": "99c0ef5b906893b584960cd70e080938e3b5e5c3613f992b6a317660090e46f1",
+      "bytes": 3046,
+      "lines": 91,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__Pagemap__unmap_page_unlocked.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__table_empty_after_clear.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "59bb51d6ac47e3995fce0aac4291eec08e8b2914",
+      "sha256": "4a6b71bda1ea0a9d6e27ce1fb060a74641bd289354e6b990a6d60a3c1026eede",
+      "bytes": 180,
+      "lines": 6,
+      "kind": "generated V C / extracted codegen proof",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__table_empty_after_clear.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-final-reviewed.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fd544af85993f3249b3df173b846af95b768d88f",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "bytes": 7152,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-final-reviewed.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-reviewed.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b5d2af31072fccd0070fffe9f465c7fb8f7ca335",
+      "sha256": "ff1c70e213886981e82451b714ca569911f1ad6950ef4a1d3700a6cf972f5157",
+      "bytes": 6698,
+      "lines": 179,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-reviewed.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "62279701dba7ad02927e833d389b45837ac2ade8",
+      "sha256": "97aef066f63c291ea684986a3d106f97a360cd8c3139f2b28a3b8c1f934f8d97",
+      "bytes": 6839,
+      "lines": 234,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "001282c8afccd0852edff05f8ee259785c56843f",
+      "sha256": "2e7bb705ae085911120d127779324a3026685f1e94f7c855999dc5211b60a1ca",
+      "bytes": 11032,
+      "lines": 414,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2cd9acbadaa4ed464838fc94bb5edb6c95b00b90",
+      "sha256": "6df4cc727a5d30e7cd63131b787ee5f760d44326781c9893b76783b49089f294",
+      "bytes": 7713,
+      "lines": 329,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "62279701dba7ad02927e833d389b45837ac2ade8",
+      "sha256": "97aef066f63c291ea684986a3d106f97a360cd8c3139f2b28a3b8c1f934f8d97",
+      "bytes": 6839,
+      "lines": 234,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "001282c8afccd0852edff05f8ee259785c56843f",
+      "sha256": "2e7bb705ae085911120d127779324a3026685f1e94f7c855999dc5211b60a1ca",
+      "bytes": 11032,
+      "lines": 414,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2cd9acbadaa4ed464838fc94bb5edb6c95b00b90",
+      "sha256": "6df4cc727a5d30e7cd63131b787ee5f760d44326781c9893b76783b49089f294",
+      "bytes": 7713,
+      "lines": 329,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/kernel/c/memory.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "9582bf6e602d2cc5683c237915eeef3ccea66bc9",
+      "sha256": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+      "bytes": 3289,
+      "lines": 119,
+      "kind": "frozen first-party original implementation",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/kernel/c/memory.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "62279701dba7ad02927e833d389b45837ac2ade8",
+      "sha256": "97aef066f63c291ea684986a3d106f97a360cd8c3139f2b28a3b8c1f934f8d97",
+      "bytes": 6839,
+      "lines": 234,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "001282c8afccd0852edff05f8ee259785c56843f",
+      "sha256": "2e7bb705ae085911120d127779324a3026685f1e94f7c855999dc5211b60a1ca",
+      "bytes": 11032,
+      "lines": 414,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2cd9acbadaa4ed464838fc94bb5edb6c95b00b90",
+      "sha256": "6df4cc727a5d30e7cd63131b787ee5f760d44326781c9893b76783b49089f294",
+      "bytes": 7713,
+      "lines": 329,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "62279701dba7ad02927e833d389b45837ac2ade8",
+      "sha256": "97aef066f63c291ea684986a3d106f97a360cd8c3139f2b28a3b8c1f934f8d97",
+      "bytes": 6839,
+      "lines": 234,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "001282c8afccd0852edff05f8ee259785c56843f",
+      "sha256": "2e7bb705ae085911120d127779324a3026685f1e94f7c855999dc5211b60a1ca",
+      "bytes": 11032,
+      "lines": 414,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2cd9acbadaa4ed464838fc94bb5edb6c95b00b90",
+      "sha256": "6df4cc727a5d30e7cd63131b787ee5f760d44326781c9893b76783b49089f294",
+      "bytes": 7713,
+      "lines": 329,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/aarch64/packaged-libc/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/aarch64/packaged-libc/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/amd64/packaged-libc/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/amd64/packaged-libc/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/bench.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "7d9068177d2c0fecedd968398c05e75e23299508",
+      "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "bytes": 14188,
+      "lines": 419,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/bench.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/v5-diagnostic-preflight/sampler-before-hidden-and-header-warning-fix.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "28d53a89cf40c61ce550e427fe26d4311cc06bab",
+      "sha256": "3b01d77b2ddeb708888a3cfc7c8e02130d29b451e3effed4dfa293dee9ce5df9",
+      "bytes": 6462,
+      "lines": 175,
+      "kind": "frozen first-party diagnostic implementation",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/v5-diagnostic-preflight/sampler-before-hidden-and-header-warning-fix.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2dd04e27fe246771a091a7f89e270422808ca02a",
+      "sha256": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+      "bytes": 7105,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2dd04e27fe246771a091a7f89e270422808ca02a",
+      "sha256": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+      "bytes": 7105,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fd544af85993f3249b3df173b846af95b768d88f",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "bytes": 7152,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/pagetable.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fd544af85993f3249b3df173b846af95b768d88f",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d",
+      "bytes": 7152,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/pagetable.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/test.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f303257664ffd55f82140dc41f19b80117fa2084",
+      "sha256": "11457db3daa7a8cae068fca20764219424ca47c3cbf54c0612381d2665bc2492",
+      "bytes": 115524,
+      "lines": 3420,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/test.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/measure.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3bd84de317a3373efc8fca6529bb694041a02daf",
+      "sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+      "bytes": 22627,
+      "lines": 764,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/measure.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/aligned_alloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "e0862a83ae00444734417d97dea6b4a679e557df",
+      "sha256": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348",
+      "bytes": 1406,
+      "lines": 60,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/aligned_alloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f9eb0946fb594ea7149ca1a1953d533c11ad432e",
+      "sha256": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+      "bytes": 6857,
+      "lines": 235,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/glue.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "5de1bdf101c1993d28c0c49ae658a6d0ed6a053c",
+      "sha256": "99aab3632bed29fb76467b443847775b99e762fddd127fd20b5f130da484353c",
+      "bytes": 2192,
+      "lines": 99,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/glue.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3e42b097da52eb684e233cf24bc5c1705c9de051",
+      "sha256": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+      "bytes": 12034,
+      "lines": 443,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "e9bce2dc1648ac2649ba42bc489c1c1b16af341f",
+      "sha256": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+      "bytes": 8377,
+      "lines": 355,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/aligned_alloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "e0862a83ae00444734417d97dea6b4a679e557df",
+      "sha256": "8a1c955672db354c52fe3d743725d3a1dffd4d758ec792ff7a38c35fb9762348",
+      "bytes": 1406,
+      "lines": 60,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/aligned_alloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/free.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "f9eb0946fb594ea7149ca1a1953d533c11ad432e",
+      "sha256": "d0982162058ece8ec102df6cfa7fcf8b434fcd1387252c146160bb3712dcc82d",
+      "bytes": 6857,
+      "lines": 235,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/free.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/glue.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "c4578247478eb81073aff721473ce7cea6b0a295",
+      "sha256": "292c97bdb158e5cce1d05b084c55963e19c8ed9bb11f01ad4526b1441cc55d70",
+      "bytes": 2193,
+      "lines": 99,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/glue.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/malloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "3e42b097da52eb684e233cf24bc5c1705c9de051",
+      "sha256": "eb7afa3b2d3cc1ad86558cab21778322212be2d935a95a34ea2e9e9164e68cd0",
+      "bytes": 12034,
+      "lines": 443,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/malloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/meta.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "e9bce2dc1648ac2649ba42bc489c1c1b16af341f",
+      "sha256": "341bdf934be4a25ecb20722dbb48f94455321a43c99183bcd629cfcc8d776754",
+      "bytes": 8377,
+      "lines": 355,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/meta.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/realloc.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "18769f42d83ae71dabea1e7caf117fe4115af139",
+      "sha256": "b8ef6d11c48a1c188b8ba888b6d857c46f151f615612c014a2195944fbcbc858",
+      "bytes": 1318,
+      "lines": 51,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/realloc.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/aarch64/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/aarch64/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/amd64/malloc.h",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "b31e779210c768340a13f1145f372782956500b9",
+      "sha256": "35818c842153a0460e908cdf8e37c0b92f485a8de7877d8946797fbe1652b347",
+      "bytes": 387,
+      "lines": 26,
+      "kind": "patched third-party musl library snapshot",
+      "storage": "checkout-third-party",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/amd64/malloc.h"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/clock.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "fdc6a79af68b11a129183153074fd869e2b0a524",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "bytes": 4903,
+      "lines": 121,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/clock.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify-all-classes.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "2dd04e27fe246771a091a7f89e270422808ca02a",
+      "sha256": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+      "bytes": 7105,
+      "lines": 193,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify-all-classes.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "109e8723aaefdd09228639e6426117132f5d2ad3",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "bytes": 8922,
+      "lines": 266,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/bench.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "7d9068177d2c0fecedd968398c05e75e23299508",
+      "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+      "bytes": 14188,
+      "lines": 419,
+      "kind": "frozen independent fixture",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/bench.c"
+      ],
+      "mode": "100644"
+    },
+    {
+      "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/sampler.c",
+      "source_commit": "8f7239d1fd4c593746279699f6ff25df5f4dd7bd",
+      "blob_sha1": "17cc5d1274d9d520c4359efa1c64076bab7e5492",
+      "sha256": "584543c2a4175cd1d7c990baef765c1c88e453946ef053a714bf9c9a62e34e7a",
+      "bytes": 7362,
+      "lines": 189,
+      "kind": "frozen first-party diagnostic implementation",
+      "storage": "git-history",
+      "recover": [
+        "git",
+        "show",
+        "8f7239d1fd4c593746279699f6ff25df5f4dd7bd:tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/sampler.c"
+      ],
+      "mode": "100644"
+    }
+  ]
+}

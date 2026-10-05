@@ -50,8 +50,10 @@ python3 tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.py
 explicit UTC predeclaration/start/end times, ABBA order and nonoverlap. The
 preserved [strict validator](compare.py) requires complete metadata, all six
 workloads, 42 distinct samples, payload checksums, internally consistent
-printed statistics and `ALLOC-DONE`. The unchanged [benchmark](bench.c) and
+printed statistics and `ALLOC-DONE`. The unchanged [benchmark source](../source-archive.json) and
 validator are pinned by [source fingerprints](source-snapshots.json).
+The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
+with zero translation credit.
 The final kernel, loader, static archive and allocator patch are pinned to
 `16140916…`, `6cf9e5ea…`, `eb50810a…` and `5ff7f0e2…` in the saved
 [kernel](validation/kernel-x86_64.json) and
