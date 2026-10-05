@@ -282,3 +282,16 @@ task waits preserve locked unlinking, timer retirement waits until callbacks
 finish, and detached worker ownership follows the original implementation.
 The host sanitizer/alias fixtures, both builds and native guests passed with
 the same fully tested LinuxKPI kernel recorded above; lifetime review passed.
+
+Synchronization, SRCU and the workqueue engine now live in
+`compatcore/{sync,srcu,workqueue}.v`. The 2,724-line scope retains 146 sync and
+710 workqueue diagnostic lines byte-for-byte; subtracting all 164 native
+binding lines gives at least 1,704 translated original lines. C bindings keep
+Linux layouts/inlines and registered C wrapper addresses. V preserves FIFO
+handoffs, locked stack waiter removal, acquire/release orders, reader banks,
+grace periods, callback retirement, pool geometry, self-free work callbacks,
+ordered/delayed/bound/unbound/priority/system queues and OOM rollback. Host
+sanitizers, upstream/header checks, both builds and the full four-CPU guest
+passed; every measured batch returned to its exact free-page baseline.
+Independent lifetime reviews passed without changing diagnostic deadlines or
+assertions. The tested kernel hash is the same `9edf46d7…22bc7135` above.
