@@ -7,12 +7,15 @@ on:
   push:
     branches:
       - main
+      - master
     paths-ignore:
       - "**.md"
 
 jobs:
   vinix-build:
     runs-on: ubuntu-latest
+    env:
+      V_C_ERROR_BUG_REPORT_DISABLED: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -25,6 +28,21 @@ jobs:
       # compiler and is what the Wi-Fi build already uses. Bump the pin there.
       - name: Build the pinned V
         run: sh tools/m1-wifi/get-v.sh "$PWD/v"
+
+      # Userland utilities use the release compiler's libc bindings. The
+      # kernel compiler is pinned separately for its freestanding backend.
+      - name: Fetch the pinned utility compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            https://github.com/vlang/v/releases/download/0.5.2/v_linux.zip \
+            -o "$RUNNER_TEMP/v_util_linux.zip"
+          echo "86caf9e70c3342d48ef19eb4f6c47b709f18c90ae86255520d5c29df6b482e23  $RUNNER_TEMP/v_util_linux.zip" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/v-util"
+          unzip -q "$RUNNER_TEMP/v_util_linux.zip" -d "$RUNNER_TEMP/v-util"
+          chmod +x "$RUNNER_TEMP/v-util/v/v"
+          "$RUNNER_TEMP/v-util/v/v" version
 
       - name: Download kernel dependencies
         run: cd kernel && ./get-deps
@@ -50,19 +68,21 @@ jobs:
       - name: Attempt to build the util-vinix (debug)
         run: |
           set -e
+          export VEXE="$RUNNER_TEMP/v-util/v/v"
           cd util-vinix
           make PROD=false \
             VFLAGS="-os vinix -gc none" \
             CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
-            V="$(realpath ../v/v)"
+            V="$VEXE"
           make clean
 
       - name: Attempt to build the util-vinix (prod)
         run: |
           set -e
+          export VEXE="$RUNNER_TEMP/v-util/v/v"
           cd util-vinix
           make PROD=true \
             VFLAGS="-os vinix -gc none" \
             CFLAGS="-Ulinux -U__linux -U__linux__ -U__gnu_linux__ -D__vinix__ -O2 -g -pipe" \
-            V="$(realpath ../v/v)"
+            V="$VEXE"
           make clean
