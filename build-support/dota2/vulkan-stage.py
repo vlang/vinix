@@ -24,10 +24,13 @@ MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
                   "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
                   "-Wl,-soname,libvinix-dota2-mmap32.so"]
-EARLY_CLIENT_SOURCE = REPO / "build-support/dota2/early-client.c"
+EARLY_CLIENT_SOURCE = REPO / "build-support/dota2/earlycore/core.v"
 EARLY_CLIENT_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
 EARLY_CLIENT_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
-                        "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                        "-nostdlib", "-ffreestanding", "-O2", "-fvisibility=hidden",
+                        "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                        "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                        "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "build-support/dota2"),
                         "-Wl,-soname,libvinix-dota2-steam-loader.so"]
 MESA_BUILDER = REPO / "build-support/dota2/mesa-build.py"
 LAVAPIPE_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
@@ -52,6 +55,25 @@ def file_sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def early_client_inputs() -> dict:
+    paths = [EARLY_CLIENT_SOURCE, REPO / "build-support/dota2/early-client-abi.h",
+             REPO / "build-support/dota2/compile-v-compat.py",
+             REPO / "build-support/compile-v-module.py", REPO / "build-support/find-v.sh"]
+    inputs = {str(path.relative_to(REPO)): file_sha256(path) for path in paths}
+    inputs["v_compiler"] = subprocess.check_output([
+        "sh", "-c", '. "$1/build-support/find-v.sh"; "$V" -version',
+        "find-v", str(REPO)], text=True).strip()
+    return inputs
+
+
+def build_early_client(destination: Path, artifacts: Path) -> None:
+    artifacts.mkdir(parents=True, exist_ok=True)
+    generated = artifacts / "early-client-v.c"
+    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
+                    "early", str(generated), "--bare"], check=True)
+    subprocess.run([*EARLY_CLIENT_COMPILE, str(generated), "-o", str(destination)], check=True)
 
 
 def load_glibc_pin(path: Path = GLIBC_PIN) -> dict:
@@ -316,6 +338,7 @@ def main() -> None:
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
               "mmap32_compile": MMAP32_COMPILE,
               "early_client_source": hashlib.sha256(EARLY_CLIENT_SOURCE.read_bytes()).hexdigest(),
+              "early_client_v_inputs": early_client_inputs(),
               "early_client_compile": EARLY_CLIENT_COMPILE}
     generation = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
     stamp = root / ".vinix-dota2-vulkan-generation"
@@ -354,8 +377,7 @@ def main() -> None:
     # headers, startup files, or x86 development packages are required.
     subprocess.run([*MMAP32_COMPILE, str(MMAP32_SOURCE), "-o", str(pending / MMAP32_LIBRARY)],
                    check=True)
-    subprocess.run([*EARLY_CLIENT_COMPILE, str(EARLY_CLIENT_SOURCE),
-                    "-o", str(pending / EARLY_CLIENT_LIBRARY)], check=True)
+    build_early_client(pending / EARLY_CLIENT_LIBRARY, build / "native-v")
     public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
     if not public_certificates:
         raise SystemExit("ca-certificates package contains no public trust certificates")

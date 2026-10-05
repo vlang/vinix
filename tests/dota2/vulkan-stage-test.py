@@ -91,8 +91,19 @@ class StageTests(unittest.TestCase):
 
     def run_stage(self, extra=()):
         def compile_library(command, **kwargs):
+            if command[0] == "sh":
+                self.assertEqual(command, ["sh", "-c",
+                    '. "$1/build-support/find-v.sh"; "$V" -version', "find-v", str(REPO)])
+                return stage.subprocess.CompletedProcess(command, 0, stdout="fixture V compiler\n")
+            if command[0] == sys.executable:
+                self.assertEqual(command[1], str(REPO / "build-support/dota2/compile-v-compat.py"))
+                self.assertEqual(command[2], "early")
+                self.assertEqual(command[4:], ["--bare"])
+                self.write(Path(command[3]), b"generated V artifact")
+                return stage.subprocess.CompletedProcess(command, 0)
             self.assertEqual(command[0], "clang", "cached fixture must never fetch the network")
             self.write(Path(command[command.index("-o") + 1]), b"compiled private shim")
+            return stage.subprocess.CompletedProcess(command, 0)
         self.lavapipe_bases = []
         def build_lavapipe(base, work):
             # The real build links Bookworm's libc; record what it would see.
@@ -186,6 +197,24 @@ class StageTests(unittest.TestCase):
         with patch.object(stage, "file_sha256", side_effect=changed_builder):
             self.run_stage()
             self.assertNotEqual(stamp.read_text(), old)
+
+    def test_early_v_abi_and_generator_invalidate_cache(self):
+        self.run_stage()
+        stamp = self.root / ".vinix-dota2-vulkan-generation"
+        for relative in ("build-support/dota2/early-client-abi.h",
+                         "build-support/dota2/compile-v-compat.py",
+                         "build-support/compile-v-module.py", "build-support/find-v.sh"):
+            old = stamp.read_text()
+            original_digest = stage.file_sha256
+            def changed_input(path):
+                return "b" * 64 if path == REPO / relative else original_digest(path)
+            with patch.object(stage, "file_sha256", side_effect=changed_input), \
+                    patch.object(stage, "clone_tree", wraps=stage.clone_tree) as clone:
+                self.run_stage()
+                clone.assert_called_once()
+                self.assertNotEqual(stamp.read_text(), old)
+            self.run_stage()
+            self.assertEqual(stamp.read_text(), old)
 
     def test_baseline_option_keeps_the_steam_libc_without_overlay(self):
         self.run_stage(["--keep-steam-libc"])
