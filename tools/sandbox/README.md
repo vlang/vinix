@@ -7,12 +7,12 @@ stderr, locks an `unveil` filesystem view, and installs explicit pledge
 execpromises. A privileged caller also empties the capability bounding set.
 Any failed setup operation stops the launch with exit status 125.
 
-Build it with the target Linux ABI compiler; it has no library dependencies
-other than libc:
+The native V core uses a small C syscall adapter and has only libc runtime
+dependencies. Stage it with the target Linux ABI compiler:
 
 ```sh
-x86_64-linux-musl-gcc -static -O2 -Wall -Wextra -Werror \
-  tools/sandbox/vinix-sandbox.c -o vinix-sandbox
+python3 build-support/security-tools/stage.py --arch x86_64 \
+  --staging /path/to/root --cc x86_64-linux-musl-gcc
 ```
 
 For example, a static file reader can be launched with:

@@ -6,7 +6,9 @@ confined process remains subject to the matrix as UID 0 with full capabilities.
 The feature is separate from pledge/unveil and ordinary Unix mode bits; all
 applicable checks must allow an operation.
 
-Build `mac.c` as a normal static userspace utility. The private Vinix ABI is
+The native V core and small C syscall adapter are staged by
+`build-support/security-tools/stage.py` with the target musl compiler.
+The private Vinix ABI is
 `prctl(0x56584d41, command, domain, type, permissions)`; it is not Linux's LSM ABI.
 Domains are 1–15; domain 0 is trusted administration. Types 0–28 are canonical
 decimal `security.vinix` xattrs on tmpfs/ext2. Type 0 means an absent label. Type

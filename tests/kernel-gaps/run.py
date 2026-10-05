@@ -17,6 +17,7 @@ import subprocess
 import tarfile
 import tempfile
 import time
+import runpy
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -178,6 +179,24 @@ def main() -> int:
                    "-static", "-pthread", "-O2", "-Wall", "-Wextra", "-Werror",
                    str(Path(__file__).with_name("serial.c")),
                    str(args.source.resolve()), "-o", str(init)]
+    # These independent include-C fixtures exercise the production V cores
+    # through the same native ABI adapters as the installed utilities.
+    security_sources = {
+        ROOT / "tests/application-sandbox/guest.c": ("sandbox", "tools/sandbox"),
+        ROOT / "tests/security-audit/collector_vm_test.c": ("audit", "tools/security-audit"),
+    }
+    security = security_sources.get(args.source.resolve())
+    if security:
+        tool, include = security
+        core = state / f"{tool}-core.c"
+        obj = core.with_suffix(".o")
+        generate = runpy.run_path(str(ROOT / "build-support/security-tools/compile-v-core.py"))["generate"]
+        generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64")
+        # Reuse the selected compiler/target flags, omitting fixture and linker inputs.
+        source_index = command.index(str(Path(__file__).with_name("serial.c")))
+        subprocess.run(command[:source_index] + ["-DVINIX_V_RUNTIME", "-I", str(ROOT / include),
+                                                 "-c", str(core), "-o", str(obj)], check=True)
+        command.insert(command.index("-o"), str(obj))
     subprocess.run(command, check=True)
     rootfs = state / "rootfs"
     for directory in ("sbin", "dev", "proc", "sys", "tmp", "root"):

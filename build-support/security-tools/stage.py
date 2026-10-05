@@ -8,8 +8,10 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+import runpy
 
 ROOT = Path(__file__).resolve().parents[2]
+generate = runpy.run_path(str(Path(__file__).with_name("compile-v-core.py")))["generate"]
 
 
 def install(source: Path, destination: Path, mode: int) -> None:
@@ -42,13 +44,19 @@ def main() -> None:
     if not machine.startswith(args.arch + "-") or "linux" not in machine:
         parser.error(f"compiler target does not match --arch: {machine}")
     with tempfile.TemporaryDirectory(prefix="vinix-security-tools-") as directory:
-        for source, destination in (
-                ("tools/sandbox/vinix-sandbox.c", "usr/bin/vinix-sandbox"),
-                ("tools/security-mac/mac.c", "usr/sbin/vinix-mac"),
-                ("tools/security-audit/collector.c", "usr/sbin/vinix-security-audit")):
+        for tool, source, destination in (
+                ("sandbox", "tools/sandbox/vinix-sandbox.c", "usr/bin/vinix-sandbox"),
+                ("mac", "tools/security-mac/mac.c", "usr/sbin/vinix-mac"),
+                ("audit", "tools/security-audit/collector.c", "usr/sbin/vinix-security-audit")):
             binary = Path(directory) / Path(destination).name
-            subprocess.run(cc + ["-static", "-std=c11", "-O2", "-Wall", "-Wextra",
-                                 "-Werror", str(ROOT / source), "-o", str(binary)], check=True)
+            core = Path(directory) / f"{tool}.c"
+            obj = core.with_suffix(".o")
+            generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64")
+            flags = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
+            subprocess.run(cc + flags + ["-DVINIX_V_RUNTIME", "-I", str((ROOT / source).parent),
+                                         "-c", str(core), "-o", str(obj)], check=True)
+            subprocess.run(cc + ["-static"] + flags + [str(ROOT / source), str(obj),
+                                                       "-o", str(binary)], check=True)
             header = binary.read_bytes()[:64]
             expected = 183 if args.arch == "aarch64" else 62
             if header[:6] != b"\x7fELF\x02\x01" or int.from_bytes(header[18:20], "little") != expected:

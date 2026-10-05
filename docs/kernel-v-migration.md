@@ -218,3 +218,23 @@ complete fake-iBoot QEMU harness. Independent lifetime review verified monotonic
 physical ownership and permanent handoff arena copies. The tested loader SHA256
 is `029ccc584d10d99a8e558fe1d0a9d5602c26c0148ab0cf85bf62f0bcbfeb537a`.
 The real-ADT baseline limitation above still applies.
+
+| Stage | Native V location | Validation |
+| --- | --- | --- |
+| Security utilities | `tools/{sandbox,security-mac,security-audit}/core` | Complete: unchanged independent C host callers passed ASan/UBSan; all three static target utilities built for aarch64 and x86_64; original sandbox and audit collector QEMU guests passed on both architectures; kernel guest runner's 12 tests passed |
+
+This stage covers 869 original C lines and conservatively counts 665 translated
+implementation lines: 192 sandbox, 96 mandatory-policy CLI and 377 audit
+collector lines. Native syscall, stat, signal, clock and stdio adapters remain C,
+as do every original independent fixture and its native variadic helper. The
+build generates V core C into temporary output and links it with these adapters;
+generated C is not maintained source.
+
+The sandbox retains the original ordered, fail-closed credential/capability
+transitions, bounded arguments and explicit environment. The collector validates
+the entire bounded snapshot, reports lost sequences and unavailable outcomes,
+and publishes its next stack-owned state only after append and `fsync` succeed.
+Descriptor walking, directory/log ownership and permission checks, same-inode
+rotation through the existing flock description and error-preserving cleanup
+retain their original behavior. New stack-buffer and descriptor lifetimes
+received independent review; the V cores introduce no implicit allocations.

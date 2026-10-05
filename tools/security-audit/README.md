@@ -54,7 +54,9 @@ python3 tests/kernel-gaps/run.py --source tests/security-audit/collector_vm_test
 `--source` selects a snapshot source for controlled diagnostics and still
 requires authorization to read the canonical kernel audit endpoint. The helper
 `build-support/security-tools/stage.py --arch aarch64 --staging /path/to/root`
-packages a static collector and launcher using the target musl compiler. Both
+generates the native V cores and packages a static collector and launcher
+using the target musl compiler. C adapters retain libc stat, signal and syscall
+ABIs. Both
 userland and desktop image builders run this step.
 
 This adds durable collection of the existing selected seccomp events. It does
