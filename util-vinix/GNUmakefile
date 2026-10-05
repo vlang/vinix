@@ -34,16 +34,16 @@ override MOUNT_TARGET := $(MOUNT_DIR)/mount
 all: $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
 
 $(CHSH_TARGET): $(CHSH_DIR)/*
-	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
+	cd $(CHSH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(FETCH_TARGET): $(FETCH_DIR)/*
-	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
+	cd $(FETCH_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(LSCPU_TARGET): $(LSCPU_DIR)/*
-	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
+	cd $(LSCPU_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 $(MOUNT_TARGET): $(MOUNT_DIR)/*
-	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
+	cd $(MOUNT_DIR) && VCROSS_COMPILER_NAME="$(CC)" $(V) $(VFLAGS) -cc "$(CC)" -cflags "$(CFLAGS)" -ldflags "$(LDFLAGS)" .
 
 clean:
 	rm -rf $(CHSH_TARGET) $(FETCH_TARGET) $(LSCPU_TARGET) $(MOUNT_TARGET)
