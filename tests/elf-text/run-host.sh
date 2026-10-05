@@ -65,11 +65,11 @@ const prot_exec = 4
 const prot_write = 2
 fn range_lower_bound(pagemap &memory.Pagemap, address u64) &memory.Range {
     assert pagemap.l.held
-    for range in pagemap.ranges { if range.base >= address { return range } }
+    for range in pagemap.ranges { if range.base >= address { return unsafe { range } } }
     return unsafe { nil }
 }
 VEOF
 cp "$repo/tests/elf-text/dynamic_test.v" "$work/elf/"
 cp "$repo/tests/elf-text/immutable_test.v" "$work/mmap/"
-"$V" -prod -gc none test "$work/elf"
-"$V" -prod -gc none test "$work/mmap"
+VEXE="$V" V_MACOS_V3_NO_FALLBACK=1 V_C_ERROR_BUG_REPORT_DISABLED=1 "$V" -prod -gc none test "$work/elf"
+VEXE="$V" V_MACOS_V3_NO_FALLBACK=1 V_C_ERROR_BUG_REPORT_DISABLED=1 "$V" -prod -gc none test "$work/mmap"

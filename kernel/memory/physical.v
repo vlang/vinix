@@ -759,7 +759,7 @@ fn big_alloc_inner(size u64, panic_oom bool) voidptr {
 @[export: 'realloc']
 pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	if ptr == 0 {
-		return malloc(new_size)
+		return memory.malloc(new_size)
 	}
 
 	if u64(ptr) & (page_size - 1) == 0 {
@@ -778,7 +778,7 @@ pub fn realloc(ptr voidptr, new_size u64) voidptr {
 	mut slab := slab_hdr.slab
 
 	if new_size > slab.ent_size {
-		mut new_ptr := malloc(new_size)
+		mut new_ptr := memory.malloc(new_size)
 		if new_ptr == unsafe { nil } {
 			return unsafe { nil }
 		}
@@ -801,7 +801,7 @@ fn big_realloc(ptr voidptr, new_size u64) voidptr {
 		return ptr
 	}
 
-	new_ptr := unsafe { malloc(new_size) }
+	new_ptr := unsafe { memory.malloc(new_size) }
 	if new_ptr == 0 {
 		return 0
 	}
@@ -822,5 +822,5 @@ pub fn calloc(a u64, b u64) voidptr {
 	if b != 0 && a > u64(-1) / b {
 		return unsafe { nil }
 	}
-	return unsafe { malloc(a * b) }
+	return unsafe { memory.malloc(a * b) }
 }

@@ -287,7 +287,7 @@ fn xnu_heap_realloc(ptr voidptr, size u64) voidptr {
 	if size <= old_size {
 		return ptr
 	}
-	new_ptr := malloc(size)
+	new_ptr := memory.malloc(size)
 	if new_ptr == unsafe { nil } {
 		return unsafe { nil }
 	}

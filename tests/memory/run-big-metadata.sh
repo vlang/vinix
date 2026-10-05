@@ -10,5 +10,5 @@ for size in 4096 16384; do
 	cp "$repo/kernel/memory/big_metadata.v" "$repo/tests/memory/big_metadata_test.v" "$work/$size/memory/"
 	printf 'Module { name: "big_metadata_tests" }\n' > "$work/$size/v.mod"
 	printf 'module memory\nconst page_size = u64(%s)\n' "$size" > "$work/$size/memory/page_size.v"
-	"$V" -prod -gc none test "$work/$size/memory"
+	VEXE="$V" V_MACOS_V3_NO_FALLBACK=1 V_C_ERROR_BUG_REPORT_DISABLED=1 "$V" -prod -gc none test "$work/$size/memory"
 done
