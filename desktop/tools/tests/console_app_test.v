@@ -86,6 +86,40 @@ fn test_console_rejects_devices_links_directories_and_fifo_without_blocking() {
 	assert console_write_export(link, 'test') == 'console.export_exists'
 }
 
+fn test_console_shortened_export_path_does_not_use_old_buffer_suffix() {
+	home := console_test_directory('short-export')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() }
+	}
+	path := join_path(home, 'source.log')
+	long_path := join_path(home, 'export-with-a-long-name.txt')
+	short_path := join_path(home, 'x')
+	defer {
+		unsafe {
+			path.free()
+			long_path.free()
+			short_path.free()
+		}
+	}
+	os.write_file(path, 'real rows\n')!
+	mut app := new_console_app(path, long_path)
+	defer { app.close_app() }
+	app.handle('console.export_path')!
+	app.key_input('\x01')
+	app.paste_input(short_path)
+	assert editor_bytes_text(app.export_input) == short_path
+	// A stale non-NUL byte really remains beyond the shortened field.
+	assert unsafe { (&u8(app.export_input.data))[app.export_input.len] } != 0
+	app.export_visible()
+	assert app.export_status == 'console.export_saved'
+	assert os.exists(short_path)
+	assert !os.exists(long_path)
+	data := os.read_file(short_path)!
+	defer { unsafe { data.free() } }
+	assert data == 'real rows\n'
+}
+
 fn test_console_tail_bound_rotation_truncation_and_missing_file_clear_old_rows() {
 	home := console_test_directory('tail')
 	defer {
@@ -257,11 +291,12 @@ fn test_console_jump_open_empty_file_horizontal_view_and_build() {
 	assert app.page_rows > 1
 	oversized := '/'.repeat(console_field_limit + 1)
 	bad_event := jump_open_prefix + oversized
-	defer { unsafe {
-		oversized.free()
-		bad_event.free()
+	defer {
+		unsafe {
+			oversized.free()
+			bad_event.free()
+		}
 	}
-	 }
 	app.handle(bad_event)!
 	assert app.path == path && editor_bytes_text(app.path_input) == path
 	assert app.status_key == 'console.invalid_path'

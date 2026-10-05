@@ -127,7 +127,11 @@ fn console_sanitize(input string) string {
 
 fn console_write_export(path string, data string) string {
 	if !console_valid_path(path) { return 'console.invalid_path' }
-	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NONBLOCK |
+	// Editor fields borrow a byte buffer that may retain a longer old suffix.
+	// Give POSIX a terminated owned path rather than that borrowed view.
+	terminated_path := path.clone()
+	defer { unsafe { terminated_path.free() } }
+	fd := C.open(&char(terminated_path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NONBLOCK |
 		C.O_CLOEXEC | C.O_NOFOLLOW, 0o600)
 	if fd < 0 {
 		return if C.errno == C.EEXIST { 'console.export_exists' } else { 'console.export_failed' }
@@ -136,7 +140,7 @@ fn console_write_export(path string, data string) string {
 	closed := desktop_close(fd) == 0
 	if !written || !closed {
 		// Only this newly created export is removed after an incomplete write.
-		desktop_unlink(path)
+		desktop_unlink(terminated_path)
 		return 'console.export_failed'
 	}
 	return 'console.export_saved'
