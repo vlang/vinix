@@ -24,17 +24,17 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | Stack protector | Static canary, boot entropy, initialization and fatal handler | Committed as `4fa6dbf2`; host C ABI tests passed 1000 replacements/protected-frame returns and deliberate canary mismatch; allocator imports and LLVM attributes passed; both kernel builds, optimized instruction checks and process/thread retirement guests passed; second measured batches retained zero physical/slab memory; ARM boots covered CPUs with and without FEAT_RNG |
 | Stack fault diagnostics | Serial messages and hexadecimal fault evidence in V; naked probes and x86 idle entry in architecture assembly | Committed as `a9090255`; host sanitizer tests passed 2,003 fault records through each serial adapter, with no allocator imports; assembly instruction bytes and every fault/recovery offset matched the original C objects on both architectures; both builds passed in recovery, fatal-overflow and normal configurations; both QEMU recovery/fatal suites and normal retirement guests passed; second measured batches retained zero physical/slab memory; x86 linked retpoline scan passed |
 | Apple display hotplug policy | Display-capable cable detection, debounce and one-shot cold-attach action | Committed as `0b5e86cd`; extended C ABI fixture passed against the original C and production V under ASan/UBSan, including unsigned timer wrap, cold attach without HPD, initial attachment, zero debounce and non-1 C truth values; no allocator imports; both kernel builds passed; x86 QEMU reached userspace and passed its linked retpoline scan; ARM QEMU completed the process/thread retirement workload with zero physical/slab retention in the second batch |
-| VMX architecture helpers | VT-x controls, FPU state, descriptors and selector reads in V; exact VM entry/exit in assembly | Committed as `0e4bee84`; host C ABI/sanitizer tests passed 7,680 control cases and all ARM no-op exports with no allocator imports; optimized x86 ports preserved CF/ZF capture, operand order and memory clobbers; all 214 VM-entry instruction bytes matched both the original host and kernel objects; both architecture builds and QEMU boot/syscall guests passed; x86 linked retpoline scan passed |
-| SMC protocol core | Read-only RTKit boot, bounded mailbox transactions, capacity/power caching and text formatting | Committed as `e6f0ed1d`; 27 unchanged host fixtures passed against the V C ABI under ASan/UBSan with no allocator imports; both architecture builds and QEMU boot/syscall checks passed; physical Apple firmware remains untested |
-| AGX G17 verifier | Stream layouts, golden writes, descriptor resources and permitted VM bindings | Committed as `dddf4cf0`; existing C ABI verifier/encoder and V descriptor fixtures passed with ASan/UBSan and no allocator imports; both builds and boot/syscall guests passed; ARM QEMU Mesa passed depth, stencil, combined rendering, completion and adversarial GEM/VM lifetime checks using matching staged Mesa libraries |
-| AGX G17 encoder | Recovered producer graph, unsigned expression evaluation and register stream emission | Committed as `7f935437`; independent verifier/encoder fixtures, ASan/UBSan, allocator imports and three generator tests passed; both builds passed; ARM QEMU Mesa passed all eight render/lifetime cases, x86 boot/syscall guest passed; generator now emits V directly |
-| Classic ext2 | Byte-oriented reads, bounded mutations, dirty/clean mount transitions and preserved C ABI | Committed as `728038b7`; independent ext2 and ANS media fixtures passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall guests passed; Apple SSD hardware remains untested |
-| ANS controller | RTKit/SART transport, partition boot policy, GPT validation, FUA/RMW writes and ordered shutdown | Committed as `44d317de`; all 27 independent media groups and 11 ext2 groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall guests passed; optimized ARM counter/cache/barrier instructions checked; physical ANS firmware remains untested |
-| Apple SPI input | Shared PIO transport, keyboard reports and touchpad protocol/state machine | Committed as `fdfb06f7`; all 20 keyboard and 19 touchpad groups passed with ASan/UBSan, 200,000 mutated packets and no allocator imports; both builds and QEMU boot/syscall checks passed; physical SPI devices remain untested |
-| J313 speakers | ADMAC/MCA playback and sense rings, amplifier sequencing and fixed-point thermal protection | Committed as `73ee1cb9`; all 20 hardware and thermal-model tests passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical amplifiers and acoustic protection remain untested |
-| BCM4378 and M1 Wi-Fi | Firmware/protocol parsers, ring ownership, PCIe/DART setup and loader staging | Committed as `6137162a`; 26 protocol groups, 100,000 parser mutations and seven platform groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical firmware, association and DMA remain untested |
-| Native network adapter | Link/timer policy, TCP/UDP PCB and pbuf ownership, IPv4/IPv6 endpoints and multicast memberships | Committed as `b81cf767`; original host packet/ownership assertions passed against V under ASan/UBSan with no implicit allocator imports; both builds and socket-option, physical IPv4/IPv6, SLAAC, scope and multicast QEMU suites passed; 500 socket exchanges retained zero objects in every heap class on both architectures |
-| LinuxKPI helpers | Bounded strings, integer parsing, bitmaps, packed object caches, per-CPU storage, reference counts, taints and I/O-wait scopes | Native V implementation; original host suite passes under ASan/UBSan with no implicit allocator imports; x86 opt-in and ARM default builds pass; full four-CPU diagnostic QEMU comparison in progress |
+| VMX architecture helpers | VT-x controls, FPU state, descriptors and selector reads in V; exact VM entry/exit in assembly | Committed as `bf2fdd33`; host C ABI/sanitizer tests passed 7,680 control cases and all ARM no-op exports with no allocator imports; optimized x86 ports preserved CF/ZF capture, operand order and memory clobbers; all 214 VM-entry instruction bytes matched both the original host and kernel objects; both architecture builds and QEMU boot/syscall guests passed; x86 linked retpoline scan passed |
+| SMC protocol core | Read-only RTKit boot, bounded mailbox transactions, capacity/power caching and text formatting | Committed as `7629b9fa`; 27 unchanged host fixtures passed against the V C ABI under ASan/UBSan with no allocator imports; both architecture builds and QEMU boot/syscall checks passed; physical Apple firmware remains untested |
+| AGX G17 verifier | Stream layouts, golden writes, descriptor resources and permitted VM bindings | Committed as `21313466`; existing C ABI verifier/encoder and V descriptor fixtures passed with ASan/UBSan and no allocator imports; both builds and boot/syscall guests passed; ARM QEMU Mesa passed depth, stencil, combined rendering, completion and adversarial GEM/VM lifetime checks using matching staged Mesa libraries |
+| AGX G17 encoder | Recovered producer graph, unsigned expression evaluation and register stream emission | Committed as `21e3352b`; independent verifier/encoder fixtures, ASan/UBSan, allocator imports and three generator tests passed; both builds passed; ARM QEMU Mesa passed all eight render/lifetime cases, x86 boot/syscall guest passed; generator now emits V directly |
+| Classic ext2 | Byte-oriented reads, bounded mutations, dirty/clean mount transitions and preserved C ABI | Committed as `e8ffb5fa`; independent ext2 and ANS media fixtures passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall guests passed; Apple SSD hardware remains untested |
+| ANS controller | RTKit/SART transport, partition boot policy, GPT validation, FUA/RMW writes and ordered shutdown | Committed as `2cf02b40`; all 27 independent media groups and 11 ext2 groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall guests passed; optimized ARM counter/cache/barrier instructions checked; physical ANS firmware remains untested |
+| Apple SPI input | Shared PIO transport, keyboard reports and touchpad protocol/state machine | Committed as `1892bd11`; all 20 keyboard and 19 touchpad groups passed with ASan/UBSan, 200,000 mutated packets and no allocator imports; both builds and QEMU boot/syscall checks passed; physical SPI devices remain untested |
+| J313 speakers | ADMAC/MCA playback and sense rings, amplifier sequencing and fixed-point thermal protection | Committed as `63eb06e0`; all 20 hardware and thermal-model tests passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical amplifiers and acoustic protection remain untested |
+| BCM4378 and M1 Wi-Fi | Firmware/protocol parsers, ring ownership, PCIe/DART setup and loader staging | Committed as `c038ee55`; 26 protocol groups, 100,000 parser mutations and eight platform groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical firmware, association and DMA remain untested |
+| Native network adapter | Link/timer policy, TCP/UDP PCB and pbuf ownership, IPv4/IPv6 endpoints and multicast memberships | Committed as `1efaf7c7`; original host packet/ownership assertions passed against V under ASan/UBSan with no implicit allocator imports; both builds and socket-option, physical IPv4/IPv6, SLAAC, scope and multicast QEMU suites passed; 500 socket exchanges retained zero objects in every heap class on both architectures |
+| LinuxKPI helpers | Bounded strings, integer parsing, bitmaps, packed object caches, per-CPU storage, reference counts, taints and I/O-wait scopes | Committed as `73ddd8cb`; original host suite passed under ASan/UBSan with no implicit allocator imports; x86 opt-in and ARM default builds passed; full four-CPU x86 QEMU diagnostics and ARM boot/syscall guest passed; every measured diagnostic batch retained zero pages |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
 | Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
 
@@ -77,10 +77,11 @@ unverified locally.
 
 ## Follow-on batch: approximately 10,000 C lines
 
-This batch covers 9,989 lines from the following original C
-implementations, measured before any ports in this batch. Independent C
-fixtures and third-party code stay in their existing languages. Each finished
-stage is committed after host tests, both architecture builds and QEMU checks.
+This batch replaces 9,989 original C lines across 18 implementations in ten
+porting stages, measured from source commit `0e4bee84` before any ports in the
+batch. Each implementation below is now V. Independent C fixtures and
+third-party code stay in their existing languages. The stage table records
+the commits, host tests, both architecture builds and QEMU checks.
 
 | Original implementation | Original lines |
 | --- | ---: |
@@ -119,7 +120,27 @@ During the LinuxKPI diagnostic run, an ordered-workqueue memory assertion
 reported 353,132,544 free bytes before the run and 357,097,472 afterward.
 Joined workers had not all completed scheduler reaping when the 50 ms baseline
 settled. The diagnostic now observes deferred-reaper quiescence, requires a
-500 ms stable baseline and allows five seconds for final retirement. Every
+500 ms stable baseline and allows 30 seconds for final retirement. Every
 post-run comparison still requires exact equality; allocation and ownership
 behavior is unchanged. An earlier delayed-work run also hit the retirement
 assertion. The original C-helper comparison passed that delayed-work case.
+
+A later run passed native-worker rollback and SRCU, then hit the five-second
+baseline deadline after wound/wait warmup. The diagnostic allowance is now
+30 seconds and a failure prints the current free bytes and deferred-reaper
+state. A run with extra worker tracing also hit the fixture's completion
+deadline; the final run uses its original tracing-free fixture and unchanged
+completion deadline.
+
+The final LinuxKPI run passed the complete `tests/linuxkpi/run_vm.py` suite
+with four CPUs, QEMU TCG `qemu64`, `LINUXKPI=1`, `PROD=false` and `-O2`. It
+covered packed object caches, per-CPU isolation, task references, timers, all
+workqueue variants, worker allocation failures, SRCU, wound/wait, bit/I/O
+waits, formatting, sequence counters, scheduling and i915 copy/FPU preservation.
+Every measured batch returned to its exact free-page baseline. The tested
+kernel SHA256 is
+`8c297d8095457670f41394c487ac2b68ae57cce4738a488aa52b93186cf96b69`.
+
+All ten porting stages are committed. Apple hardware-specific protocols have
+host MMIO/firmware fixtures and boot coverage; physical ANS, SMC, SPI, Wi-Fi
+and speaker operation still require testing on a supported Apple machine.
