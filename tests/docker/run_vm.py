@@ -82,7 +82,7 @@ def main() -> int:
     if platform.system() != "Darwin":
         environment.setdefault("USE_TCG", "1")
 
-    command = [str(root / "run-aarch64.sh"), "--serial", "--no-persist",
+    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--no-persist",
                f"--mem={args.mem}", f"--guest-init={args.init.resolve()}"]
     if args.no_build:
         command.insert(1, "--no-build")

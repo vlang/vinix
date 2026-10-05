@@ -5,7 +5,7 @@
 # to download the new ISO when theirs is older (desktop/version_check.v).
 #
 # PID 1 starts this in the background at boot. Only release images carry
-# /etc/vinix-release (deploy-iso.sh sets VINIX_RELEASE for the desktop
+# /etc/vinix-release (scripts/deploy-iso.sh sets VINIX_RELEASE for the desktop
 # builds); a development build has nothing to compare, so nothing is asked.
 set -u
 

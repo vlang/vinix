@@ -74,7 +74,7 @@ Prepare an Alpine x86_64 root containing GCC and musl headers:
 
 ```sh
 VINIX_AMD64_USERLAND_BUILD_DIR="$PWD/build/alloc-userland" \
-  VINIX_ALPINE_DEVTOOLS=1 ./build-userland-amd64.sh
+  VINIX_ALPINE_DEVTOOLS=1 ./scripts/build-userland-amd64.sh
 ```
 
 Then run:

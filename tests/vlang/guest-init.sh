@@ -1,6 +1,6 @@
 #!/bin/sh
 # Automated AArch64 guest check for the native compiler and self-hosted
-# desktop build. Intended for run-aarch64.sh --guest-init.
+# desktop build. Intended for scripts/run-aarch64.sh --guest-init.
 set -eu
 
 export HOME=/root

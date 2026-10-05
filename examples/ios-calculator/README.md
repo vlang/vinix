@@ -51,9 +51,9 @@ UIKit, libobjc and libSystem. Vinix implements the subset needed by this app;
 its ARM64 Objective-C methods and target/action callbacks execute directly.
 
 ```sh
-./build-ios-aarch64.sh
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build
+./scripts/build-ios-aarch64.sh
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-build
 # Open "iOS Calculator".
 ```
 

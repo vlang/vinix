@@ -35,7 +35,7 @@ Attach the server to QEMU:
 
 Vinix's current QEMU persistence path can mount the export at `/root` if it is
 the sole readable ext2 disk and `vinix.qemu_persist=1` is in the kernel command
-line. `run-aarch64.sh` requires a local persistent filename; the test runner
+line. `scripts/run-aarch64.sh` requires a local persistent filename; the test runner
 supplies an unformatted 16 MiB sparse dummy disk to enable that command line,
 then attaches the NBD device using `VINIX_QEMU_EXTRA`. The kernel skips the
 dummy disk and mounts the exported one. Remount `/root` read-only before

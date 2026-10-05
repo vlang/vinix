@@ -3,7 +3,7 @@
 Run the complete local acceleration smoke test on Apple silicon with:
 
 ```sh
-./test-gpu-kekvm.sh
+./scripts/test-gpu-kekvm.sh
 ```
 
 The command uses KekVM's patched VirGL-enabled QEMU build. It boots the current

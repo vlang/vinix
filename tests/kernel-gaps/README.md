@@ -16,7 +16,7 @@ python3 tests/kernel-gaps/run.py \
 ```
 
 Use `--arch x86_64` for the second architecture. ARM64 needs the musl sysroot
-created by `build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`); x86-64 needs
+created by `scripts/build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`); x86-64 needs
 `x86_64-linux-musl-gcc`. Both need QEMU and the repository's boot-image tooling.
 The runner links a small constructor that redirects x86-64 test output to
 `/dev/com1`; ARM64 already writes guest console output to the captured port.

@@ -198,7 +198,7 @@ def main() -> int:
             env["VINIX_QEMU_NETWORK"] = "0"
         if platform.system() != "Darwin":
             env.setdefault("USE_TCG", "1")
-        command = [str(ROOT / "run-aarch64.sh"), "--no-build", "--serial",
+        command = [str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial",
                    "--no-persist", "--mem=1024", f"--guest-init={init}"]
     else:
         iso = state / "test.iso"

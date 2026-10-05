@@ -359,7 +359,7 @@ fn open_wine_word2013(mut _ Desktop) !NativeApp {
 }
 
 // Steam is Valve's x86 Linux client on the translators, staged by
-// build-steam-aarch64.sh. It is not in the default image.
+// scripts/build-steam-aarch64.sh. It is not in the default image.
 fn open_steam(mut _ Desktop) !NativeApp {
 	if C.access(c'/usr/bin/steam', C.X_OK) != 0 {
 		return &HostedX11App{

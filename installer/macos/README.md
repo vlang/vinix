@@ -27,9 +27,9 @@ for development. To create an offline app instead, build the ARM64 desktop and
 Limine and explicitly bundle the payload:
 
 ```sh
-./build-limine-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs
-./build-macos-installer.sh --with-payload
+./scripts/build-limine-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs
+./scripts/build-macos-installer.sh --with-payload
 ```
 
 Set `VINIX_INSTALLER_PAYLOAD_DIR` with `--with-payload` to bundle a previously
@@ -105,5 +105,5 @@ one stage, it offers a restart and still prints the startup-options instruction.
 
 ```sh
 V=/path/to/v ./installer/macos/test.sh
-./build-macos-installer.sh
+./scripts/build-macos-installer.sh
 ```

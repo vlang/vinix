@@ -1,6 +1,6 @@
 # Doom 3 demo on ARM64 QEMU
 
-`build-dhewm3-aarch64.sh` builds dhewm3 1.5.5 for ARM64/musl and downloads the
+`scripts/build-dhewm3-aarch64.sh` builds dhewm3 1.5.5 for ARM64/musl and downloads the
 original Linux Doom 3 demo data. The benchmark records one scene on Vinix,
 then replays that exact render-demo file on Vinix and Debian. No x86 game
 binary or CPU emulation is involved.
@@ -21,9 +21,9 @@ the `aarch64-linux-musl-gcc` / `aarch64-linux-musl-g++` cross compilers. Build
 the existing userland and X11 layers first if they are absent:
 
 ```sh
-./build-userland-aarch64.sh
-./build-x11-aarch64.sh
-./build-dhewm3-aarch64.sh
+./scripts/build-userland-aarch64.sh
+./scripts/build-x11-aarch64.sh
+./scripts/build-dhewm3-aarch64.sh
 python3 tests/dhewm3/prepare-debian.py
 ```
 

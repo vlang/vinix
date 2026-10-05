@@ -6,7 +6,7 @@ state=root/'build/useralloc-pipe/static-desktop-v5'
 private=root/'third_party/useralloc-pipe'
 env=os.environ.copy()
 env.update(V=str(root/'build/useralloc-final-audit/compiler/v'),VINIX_AARCH64_SYSROOT=str(state/'sysroot'),VINIX_AARCH64_APP_CACHE=str(state/'app-cache'),VINIX_MUSL_BUILD_DIR=str(state/'musl-cache'),VINIX_MUSL_CC_AARCH64='/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc',VINIX_UI2_SOURCE=str(state/'ui2'),LLVM_BIN=str(state/'llvm-bin'))
-command=['/bin/bash','-x',str(private/'build-desktop-aarch64.sh'),'--no-initramfs']
+command=['/bin/bash','-x',str(private/'scripts/build-desktop-aarch64.sh'),'--no-initramfs']
 with (state/'build.log').open('wb') as log:
     process=subprocess.Popen(command,cwd=private,env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     (state/'build.pid').write_text(str(process.pid)+'\n')

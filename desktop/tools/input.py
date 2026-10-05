@@ -19,7 +19,7 @@ been held past its own delay, so --hold is what tells a tap from a hold.
 X and Y are pixels on a display whose size is given by --size (default
 1024x768). The VM must have been started with a QMP socket:
 
-    VINIX_QEMU_EXTRA="-qmp unix:/tmp/vinix-qmp,server,nowait" ./run-aarch64.sh
+    VINIX_QEMU_EXTRA="-qmp unix:/tmp/vinix-qmp,server,nowait" ./scripts/run-aarch64.sh
 """
 
 import argparse

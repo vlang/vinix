@@ -153,7 +153,7 @@ def main() -> None:
         "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4", "VINIX_KEEP_TEMP_BOOT_DISK": "1",
         "VINIX_QEMU_EXTRA": "",
     }
-    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=4096"]
+    command = [str(REPO / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--no-persist", "--mem=4096"]
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(REPO)

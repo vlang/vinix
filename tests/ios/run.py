@@ -46,7 +46,7 @@ def main() -> int:
         parser.error("timeout must be positive")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
-        subprocess.run(["bash", str(ROOT / "build-ios-aarch64.sh")], check=True)
+        subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")], check=True)
     subprocess.run(["sh", str(ROOT / "tests/ios/build-fixture.sh"), str(build / "fixtures")], check=True)
     subprocess.run(["bash", str(ROOT / "examples/ios-calculator/build.sh")],
         env={**os.environ, "VINIX_IOS_CALCULATOR_BUILD_DIR": str(build / "objc")}, check=True)

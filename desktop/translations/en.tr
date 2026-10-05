@@ -1334,7 +1334,7 @@ surface.blender.exited
 Blender exited.
 -----
 surface.blender.not_staged
-Native Blender is not staged. Run build-blender-native-aarch64.sh.
+Native Blender is not staged. Run scripts/build-blender-native-aarch64.sh.
 -----
 surface.blender.starting
 Starting native Blender…
@@ -1673,7 +1673,7 @@ wine.doom.exited
 DOOM exited.
 -----
 wine.doom.missing
-DOOM is not installed. Run build-doom-aarch64.sh.
+DOOM is not installed. Run scripts/build-doom-aarch64.sh.
 -----
 wine.doom.starting
 Starting DOOM…
@@ -1706,7 +1706,7 @@ wine.gothic.exited
 Gothic II exited.
 -----
 wine.gothic.missing
-Gothic II is not installed. Run build-opengothic-aarch64.sh.
+Gothic II is not installed. Run scripts/build-opengothic-aarch64.sh.
 -----
 wine.gothic.starting
 Starting Gothic II…

@@ -6,9 +6,9 @@ emulation. Hardware virtualization is not required inside Vinix.
 On the build host, stage QEMU and build a desktop image containing it:
 
 ```sh
-./build-qemu-system-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-qemu-system
-./run-desktop-aarch64.sh --no-build
+./scripts/build-qemu-system-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-qemu-system
+./scripts/run-desktop-aarch64.sh --no-build
 ```
 
 The builder uses Alpine 3.21's native AArch64 QEMU package and copies the
@@ -20,7 +20,7 @@ Build a bootable raw image for the inner VM from the current kernel and base
 userland initramfs:
 
 ```sh
-./build-vinix-guest-disk.sh
+./scripts/build-vinix-guest-disk.sh
 ```
 
 The image is written to `build-aarch64-qemu-system/vinix-guest.img`. The
@@ -57,7 +57,7 @@ a fixed 1024×768 Vinix window and gives the inner VM 1024 MiB by default. The
 viewer accepts inner resolutions up to 1024×768. On the build host:
 
 ```sh
-./build-nested-desktop-aarch64.sh
+./scripts/build-nested-desktop-aarch64.sh
 python3 -m http.server 8765 --bind 127.0.0.1 --directory build-aarch64-qemu-system
 ```
 

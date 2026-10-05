@@ -109,7 +109,7 @@ def main() -> int:
             environment.pop("VINIX_QEMU_ROOT_DISK", None)
             if platform.system() != "Darwin":
                 environment.setdefault("USE_TCG", "1")
-            result = helper.boot([str(runner / "run-aarch64.sh"), "--no-build", "--serial", "--mem=1024",
+            result = helper.boot([str(runner / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--mem=1024",
                                   f"--guest-init={state / 'init'}"], environment, state,
                                  ["VIRTIO-RO PASS"], ["VIRTIO-RO FAIL:", "KERNEL PANIC", "FATAL EXCEPTION"],
                                  args.timeout)

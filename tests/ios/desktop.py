@@ -65,7 +65,7 @@ def main():
     args = parser.parse_args()
     build = ROOT/'build/ios'
     if not args.desktop.is_file():
-        parser.error('build the desktop with ./build-desktop-aarch64.sh first')
+        parser.error('build the desktop with ./scripts/build-desktop-aarch64.sh first')
     qmp_path = Path(f'/tmp/vinix-ios-{os.getpid()}.qmp')
     with tempfile.TemporaryDirectory(prefix='vinix-ios-desktop-') as directory:
         work = Path(directory)
@@ -98,7 +98,7 @@ def main():
         name = '2048' if args.app == '2048' else 'calculator'
         log_path = build/('2048-desktop.log' if args.app == '2048' else 'desktop.log')
         with log_path.open('wb') as log:
-            process = subprocess.Popen([str(ROOT/'run-aarch64.sh'), '--no-build', '--serial',
+            process = subprocess.Popen([str(ROOT/'scripts/run-aarch64.sh'), '--no-build', '--serial',
                 '--mem=2048', f'--guest-init={work}/init'], env=environment,
                 stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             try:

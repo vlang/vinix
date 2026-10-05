@@ -3,7 +3,7 @@ module ioctl
 // DRM ioctl definitions used by Mesa 25.0.5 and the Vinix Asahi driver.
 //
 // This is the exact downstream, unstable Asahi UAPI shipped in the Mesa
-// version pinned by MESA_VERSION in build-asahi-aarch64.sh. It must move in
+// version pinned by MESA_VERSION in scripts/build-asahi-aarch64.sh. It must move in
 // lockstep with that pin; advertising a different layout to Mesa can submit
 // corrupt GPU commands.
 

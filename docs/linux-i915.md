@@ -481,12 +481,12 @@ the complete i915 source tree is not evidence that the driver runs.
 The compatibility build is opt-in, x86-64 only:
 
 ```sh
-LINUXKPI=1 PROD=false ./build-amd64.sh --no-userland --no-iso
+LINUXKPI=1 PROD=false ./scripts/build-amd64.sh --no-userland --no-iso
 ```
 
 For a direct kernel build, pass `LINUXKPI=1` to `make -C kernel`; cross
 compilation on macOS also needs the compiler/linker settings used by
-`build-amd64.sh`. An out-of-tree build can set `LINUXKPI_SOURCE_DIR` to the
+`scripts/build-amd64.sh`. An out-of-tree build can set `LINUXKPI_SOURCE_DIR` to the
 absolute imported source directory. The default and arm64 builds do not
 enable the compatibility runtime. Enabling it currently runs self-tests and
 reports the target GPU as **not bound**, because i915 compatibility is

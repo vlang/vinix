@@ -1,6 +1,6 @@
 # Native Venus ABI and lifetime checks
 
-`build-venus-aarch64.sh` builds both tests into `/opt/venus/bin`; the native
+`scripts/build-venus-aarch64.sh` builds both tests into `/opt/venus/bin`; the native
 OpenGothic harness runs them before the desktop starts.
 
 `venus-abi` creates a Venus context and submits 1,032 empty ring-zero fences.

@@ -44,7 +44,7 @@ def main() -> None:
     if subprocess.check_output(["git", "-C", str(source), "rev-parse", "HEAD"], text=True).strip() != COMMIT:
         raise SystemExit("dhewm3 source is not the pinned 1.5.5 commit")
     if not (X11 / "sysroot/usr/include/GL/gl.h").is_file():
-        raise SystemExit("Build the X11 layer first with build-x11-aarch64.sh")
+        raise SystemExit("Build the X11 layer first with scripts/build-x11-aarch64.sh")
     command = ["python3", str(ROOT / "build-support/alpine-resolve.py")]
     for repo in ("main", "community"):
         archive = downloads / f"{repo}_APKINDEX.tar.gz"
