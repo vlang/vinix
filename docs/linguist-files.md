@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the staged kernel V migration (parent `b813017011ff671475ed64b11318fee1746b6378`),
+for the staged kernel V migration (parent `a90902559462e52cfcdc7910123aa9bed72be2c8`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 546 | 6,257,490 | 27.15% |
-| Python | 341 | 3,899,734 | 16.92% |
-| Shell | 280 | 1,232,620 | 5.35% |
+| C | 545 | 6,256,128 | 27.14% |
+| Python | 342 | 3,901,716 | 16.93% |
+| Shell | 280 | 1,232,418 | 5.35% |
 
-All `.v` files are classified as V. The resulting V share is 37.91%, with no
+All `.v` files are classified as V. The resulting V share is 37.92%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -111,8 +111,7 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/apple_ans_gpt.h` | 6,312 |
 | `kernel/c/apple_ans_policy.h` | 6,525 |
 | `kernel/c/apple_ans_rw.h` | 5,735 |
-| `kernel/c/apple_display_hotplug.c` | 2,982 |
-| `kernel/c/apple_display_hotplug.h` | 2,648 |
+| `kernel/c/apple_display_hotplug.h` | 2,865 |
 | `kernel/c/apple_smc.c` | 17,901 |
 | `kernel/c/apple_smc.h` | 2,634 |
 | `kernel/c/apple_speakers.c` | 63,808 |
@@ -424,7 +423,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/apple-speakers/test.c` | 40,704 |
 | `tests/apple-spi-keyboard/test.c` | 24,885 |
 | `tests/apple-spi-touchpad/test.c` | 23,630 |
-| `tests/apple_display_hotplug/test_hotplug.c` | 5,460 |
+| `tests/apple_display_hotplug/test_hotplug.c` | 6,863 |
 | `tests/apple_smc/test_smc.c` | 20,237 |
 | `tests/application-sandbox/guest.c` | 4,228 |
 | `tests/application-sandbox/host.c` | 6,329 |
@@ -763,6 +762,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/android/pointer-capture-test.py` | 3,578 |
 | `tests/android/run.py` | 62,192 |
 | `tests/android/split-test.py` | 8,799 |
+| `tests/apple_display_hotplug/run.py` | 1,982 |
 | `tests/block-storage/run.py` | 6,237 |
 | `tests/browsers/run_vm.py` | 13,754 |
 | `tests/build-cache/test_content_key.py` | 3,015 |
@@ -1110,7 +1110,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/apple-speakers/run.sh` | 735 |
 | `tests/apple-spi-keyboard/run.sh` | 660 |
 | `tests/apple-spi-touchpad/run.sh` | 753 |
-| `tests/apple_display_hotplug/run.sh` | 333 |
+| `tests/apple_display_hotplug/run.sh` | 131 |
 | `tests/apple_smc/run.sh` | 1,319 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
 | `tests/application-sandbox/test-host.sh` | 322 |

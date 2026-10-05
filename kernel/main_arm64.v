@@ -63,13 +63,9 @@ import time
 import userland
 import security
 
-#include "apple_display_hotplug.h"
 #include "pci_config_arm_test.h"
 
 fn C.vinix_pci_config_arm_context_selftest() int
-
-fn C.vinix_display_hotplug_choose_action(connected int, reboot_enabled int,
-	reboot_attempted int, framebuffer_width u64, framebuffer_height u64) int
 
 @[_linker_section: '.requests']
 @[cinit]
@@ -97,7 +93,7 @@ fn segfault_kill_process(gpr_state voidptr, status int) {
 
 fn apple_display_hotplug(connected bool) {
 	width, height := term.selected_framebuffer_dimensions()
-	action := C.vinix_display_hotplug_choose_action(int(connected), int(apple_display_coldplug_reboot), int(apple_display_reboot_attempted), width, height)
+	action := typec.hotplug_choose_action(i32(connected), i32(apple_display_coldplug_reboot), i32(apple_display_reboot_attempted), width, height)
 	if action == 2 {
 		apple_display_reboot_attempted = true
 		println('display: first post-boot Studio Display attach; rebooting once for firmware link training')
