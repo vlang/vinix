@@ -34,8 +34,15 @@ pub const at_random = 25
 pub const at_hwcap2 = 26
 
 pub const pt_load = 0x00000001
+pub const pt_dynamic = 0x00000002
 pub const pt_interp = 0x00000003
 pub const pt_phdr = 0x00000006
+
+const dt_null = i64(0)
+const dt_textrel = i64(22)
+const dt_flags = i64(30)
+const df_textrel = u64(4)
+const dynamic_scan_limit = u64(64 * 1024)
 
 const pie_base = u64(0x00200000)
 const interpreter_base = u64(0x40000000)
@@ -131,6 +138,41 @@ pub mut:
 	sh_info       u32
 	sh_addr_align u64
 	sh_entsize    u64
+}
+
+struct DynamicEntry {
+	d_tag i64
+	d_value u64
+}
+
+fn requires_text_relocation(dynamic DynamicEntry) bool {
+	return dynamic.d_tag == dt_textrel
+		|| (dynamic.d_tag == dt_flags && dynamic.d_value & df_textrel != 0)
+}
+
+// A malformed or oversized table stays mutable rather than preventing the
+// runtime linker from repairing text. Both ELF encodings of textrel count.
+fn dynamic_textrel(mut res resource.Resource, phdr ProgramHdr) !bool {
+	if phdr.p_offset > u64(res.stat.size)
+		|| phdr.p_filesz > u64(res.stat.size) - phdr.p_offset {
+		return error('elf: invalid DYNAMIC segment')
+	}
+	if phdr.p_filesz > dynamic_scan_limit {
+		return true
+	}
+	mut offset := u64(0)
+	for offset + sizeof(DynamicEntry) <= phdr.p_filesz {
+		mut dynamic := DynamicEntry{}
+		read_exact(mut res, unsafe { &dynamic }, phdr.p_offset + offset, sizeof(DynamicEntry))!
+		if requires_text_relocation(dynamic) {
+			return true
+		}
+		if dynamic.d_tag == dt_null {
+			return false
+		}
+		offset += sizeof(DynamicEntry)
+	}
+	return true
 }
 
 struct LoadedRange {
@@ -284,6 +326,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 	mut load_addr := u64(0)
 	mut load_addr_set := false
 	mut loaded_ranges := []LoadedRange{cap: int(header.ph_num)} @[freed]
+	mut textrel := false
 	mut committed := false
 	defer {
 		if !committed {
@@ -314,6 +357,11 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		}
 
 		match phdr.p_type {
+			pt_dynamic {
+				if dynamic_textrel(mut res, phdr)! {
+					textrel = true
+				}
+			}
 			pt_interp {
 				exec_trace(trace, image, 'reading interpreter path')
 				if ld_path != '' {
@@ -429,6 +477,13 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 		auxval.at_phdr = load_addr + header.phoff
 	}
 
+	// All fallible loading/validation has finished. The loader-only freeze
+	// cannot fail or split ranges, so rollback never meets immutable text.
+	if !textrel {
+		for range in loaded_ranges {
+			mmap.mimmutable_executable(mut pagemap, range.base, range.length)
+		}
+	}
 	committed = true
 	if trace {
 		C.kprintf(c'exec[gpu]/elf %.*s: committed entry=0x%llx phdr=0x%llx\n', i32(image.len),
