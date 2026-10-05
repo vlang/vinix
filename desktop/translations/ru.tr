@@ -3077,3 +3077,336 @@ archive.write_failed
 archive.source_unstable
 Архив изменился во время чтения. Откройте его снова.
 -----
+app.reminders
+Напоминания
+-----
+reminders.title
+Напоминания
+-----
+reminders.new
+Новая задача
+-----
+reminders.edit
+Изменить
+-----
+reminders.save
+Сохранить задачу
+-----
+reminders.cancel
+Отмена
+-----
+reminders.toggle
+Готово / вернуть
+-----
+reminders.delete
+Удалить
+-----
+reminders.delete_confirm
+Подтвердить удаление
+-----
+reminders.delete_cancel
+Оставить задачу
+-----
+reminders.reload
+Перезагрузить
+-----
+reminders.title_field
+Название задачи
+-----
+reminders.due_field
+Срок (ГГГГ-ММ-ДД или ГГГГ-ММ-ДД ЧЧ:ММ)
+-----
+reminders.search
+Поиск по названиям
+-----
+reminders.export_path
+Путь экспорта
+-----
+reminders.export_text
+Экспорт текста
+-----
+reminders.export_csv
+Экспорт CSV
+-----
+reminders.filter.all
+Все
+-----
+reminders.filter.open
+Незавершённые
+-----
+reminders.filter.completed
+Завершённые
+-----
+reminders.filter.overdue
+Просроченные
+-----
+reminders.previous
+Назад
+-----
+reminders.next
+Вперёд
+-----
+reminders.no_tasks
+В этом списке нет задач.
+-----
+reminders.no_due
+Без срока
+-----
+reminders.completed
+Завершено
+-----
+reminders.open
+Не завершено
+-----
+reminders.overdue
+Просрочено
+-----
+reminders.due_today
+Срок сегодня
+-----
+reminders.ready
+Задачи сохраняются при добавлении, изменении и завершении.
+-----
+reminders.saved
+Задачи сохранены.
+-----
+reminders.saved_unsynced
+Сохранено, но окончательная синхронизация папки не удалась.
+-----
+reminders.read_failed
+Не удалось загрузить задачи. Исправьте хранилище и перезагрузите список.
+-----
+reminders.changed
+Задачи изменены в другом окне. Перезагрузите список перед сохранением.
+-----
+reminders.busy
+Другое окно сохраняет задачи. Повторите попытку.
+-----
+reminders.save_failed
+Не удалось сохранить задачи. Ваши изменения сохранены в окне.
+-----
+reminders.title_required
+Введите название задачи.
+-----
+reminders.invalid_due
+Введите корректную дату ГГГГ-ММ-ДД и, при необходимости, время ЧЧ:ММ.
+-----
+reminders.limit
+Список вмещает 256 задач.
+-----
+reminders.select_task
+Сначала выберите задачу.
+-----
+reminders.confirm_delete
+Удалить выбранную задачу? Нажмите подтверждение удаления.
+-----
+reminders.export_saved
+Экспорт сохранён.
+-----
+reminders.export_exists
+Путь экспорта уже существует. Выберите новый путь.
+-----
+reminders.export_failed
+Не удалось сохранить экспорт.
+-----
+reminders.invalid_path
+Введите абсолютный путь экспорта без символических ссылок.
+-----
+reminders.hint
+Сроки указаны по местному времени. Статус обновляется, пока окно открыто.
+-----
+reminders.clock_unavailable
+Часы недоступны; невозможно определить просроченные задачи.
+-----
+app.notes
+Заметки
+-----
+notes.ready
+Локальные заметки
+-----
+notes.untitled
+Без названия
+-----
+notes.new
+Новая заметка
+-----
+notes.save
+Сохранить
+-----
+notes.refresh
+Обновить
+-----
+notes.delete
+Удалить
+-----
+notes.cancel_delete
+Оставить заметку
+-----
+notes.search
+Поиск
+-----
+notes.title
+Название
+-----
+notes.body
+Заметка
+-----
+notes.export_path
+Путь экспорта
+-----
+notes.export
+Экспорт текста
+-----
+notes.previous
+Назад
+-----
+notes.next
+Вперёд
+-----
+notes.search_hint
+Поиск по названиям и тексту (с учётом регистра)
+-----
+notes.empty
+Подходящих заметок нет. Создайте новую заметку.
+-----
+notes.hint
+Локальный текст. Автосохранение после ввода. Ctrl-N: новая · Ctrl-S: сохранить · Ctrl-A: всё
+-----
+notes.unsaved
+Есть несохранённые изменения — оставьте окно открытым до сохранения.
+-----
+notes.saved
+Сохранено
+-----
+notes.deleted
+Заметка удалена
+-----
+notes.read_failed
+Не удалось открыть хранилище заметок.
+-----
+notes.corrupt
+Хранилище заметок недоступно или повреждено. Существующие данные сохранены.
+-----
+notes.conflict
+Заметки изменены в другом окне. Экспортируйте черновик перед повторным открытием.
+-----
+notes.save_failed
+Сохранение не удалось. Черновик остаётся в этом окне.
+-----
+notes.durability_failed
+Сохранено, но окончательная синхронизация хранилища не удалась.
+-----
+notes.title_required
+Введите название перед сохранением.
+-----
+notes.confirm_delete
+Удалить сохранённую заметку? Нажмите «Удалить» ещё раз или «Оставить заметку».
+-----
+notes.limit
+Достигнут предел заметок или текста.
+-----
+notes.invalid_text
+Вставляемый текст должен быть корректным UTF-8.
+-----
+notes.export_invalid
+Введите абсолютный путь экспорта без компонентов «.» и «..».
+-----
+notes.export_exists
+Путь экспорта уже существует. Выберите другое имя.
+-----
+notes.export_failed
+Не удалось создать или завершить экспорт.
+-----
+notes.export_durability
+Экспорт записан, но синхронизация папки не удалась.
+-----
+notes.export_saved
+Текст экспортирован.
+-----
+reminders.csv_title
+Название
+-----
+reminders.csv_due
+Срок
+-----
+reminders.csv_completed
+Завершено (0 или 1)
+-----
+reminders.export_unsynced
+Экспорт сохранён, но окончательная синхронизация папки не удалась.
+-----
+app.grapher
+Графики
+-----
+grapher.plot
+Построить
+-----
+grapher.reset
+Сбросить вид
+-----
+grapher.zoom_in
+Приблизить
+-----
+grapher.zoom_out
+Отдалить
+-----
+grapher.export
+Экспорт CSV
+-----
+grapher.xmin_label
+Минимум X
+-----
+grapher.xmax_label
+Максимум X
+-----
+grapher.ymin_label
+Минимум Y
+-----
+grapher.ymax_label
+Максимум Y
+-----
+grapher.radians
+Углы в радианах
+-----
+grapher.syntax
+x, pi, e; + - * / ^; sin cos tan asin acos atan sqrt abs ln log exp floor ceil
+-----
+grapher.expression_invalid
+Некорректное выражение или превышен предел его размера.
+-----
+grapher.range_invalid
+Задайте возрастающие конечные пределы в пределах ±1e12 с шириной от 1e-9.
+-----
+grapher.no_values
+В этом диапазоне X нет определённых значений.
+-----
+grapher.domain_gaps
+График построен с разрывами вне области определения.
+-----
+grapher.ready
+513 точек. Мелкие или быстро меняющиеся детали могут быть пропущены.
+-----
+grapher.input_limit
+Достигнут предел ввода в этом поле.
+-----
+grapher.changed
+Нажмите «Построить», чтобы применить изменения.
+-----
+grapher.input_invalid
+Вставьте одну строку корректного текста; выражения и пределы используют ASCII.
+-----
+grapher.export_invalid
+Выберите новый абсолютный путь CSV без ссылок и компонентов с точками.
+-----
+grapher.export_failed
+Не удалось сохранить файл CSV.
+-----
+grapher.export_exists
+Путь назначения уже существует. Выберите новый файл.
+-----
+grapher.export_saved
+Точки CSV сохранены. Пустые ячейки Y обозначают неопределённые значения.
+-----
+grapher.equation_label
+y =
+-----

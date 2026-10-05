@@ -17,6 +17,7 @@ module main
 
 import math.bits
 import ui2
+import os
 
 const app_protocol_magic = u32(0x56415050) // VAPP
 const app_protocol_version = u8(10)
@@ -953,8 +954,15 @@ fn free_app_payload(payload string) {
 fn run_app_process(options AppProcessOptions) {
 	desktop_set_cloexec(options.request_fd, true)
 	desktop_set_cloexec(options.response_fd, true)
-	// The user's folders are known in the desktop's process, not in this one.
-	desktop_use_user_home(desktop_find_user_home(desktop_home, desktop_users_directory))
+	// The compositor supplies its active user's folder. A direct app launch
+	// without that environment still resolves the saved desktop profile.
+	user_home := os.getenv('VINIX_USER_HOME')
+	if user_home.len > 0 {
+		desktop_use_user_home(user_home)
+	} else {
+		unsafe { user_home.free() }
+		desktop_use_user_home(desktop_find_user_home(desktop_home, desktop_users_directory))
+	}
 	mut desktop := Desktop{
 		tz_offset_seconds: options.tz_offset
 		settings:          Settings{

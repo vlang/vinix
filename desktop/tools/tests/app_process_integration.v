@@ -323,6 +323,7 @@ fn main() {
 	close_remote(mut terminal)
 	check_new_utility_clients(mut desktop)
 	check_storage_utility_clients(mut desktop)
+	check_productivity_utility_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -515,4 +516,99 @@ fn check_storage_utility_clients(mut desktop Desktop) {
 	report := os.read_file(report_path) or { panic(err) }
 	assert report.contains('Disk Utility') && report.contains('Devices') && report.contains('Volumes')
 	unsafe { report.free() }
+}
+
+// Native clients receive the compositor's active user folder and reopen their
+// own durable records. No test data is written into the real desktop profile.
+fn check_productivity_utility_clients(mut desktop Desktop) {
+	base := os.real_path(os.temp_dir())
+	root := join_path(base, 'vinix-productivity-ipc-${os.getpid()}')
+	os.mkdir(root) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = root
+	defer {
+		desktop_user_home = previous_home
+		os.rmdir_all(root) or {}
+		unsafe { base.free(); root.free() }
+	}
+	note_export := join_path(root, 'note-Ж.txt')
+	task_export := join_path(root, 'tasks-Ж.csv')
+	graph_export := join_path(root, 'graph-Ж.csv')
+	defer { unsafe { note_export.free(); task_export.free(); graph_export.free() } }
+
+	notes_factory := app_factory_named('vinix-notes') or { panic('Notes is not registered') }
+	mut notes := start_remote_app_at_with_timeout(arguments()[0], notes_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	notes.handle('notes.new') or { panic(err) }
+	storage_remote_field(mut notes, 'notes.title', 'IPC note 😀')
+	storage_remote_field(mut notes, 'notes.body', 'Native note 日本語\nSecond line')
+	storage_remote_wait(mut notes, ui2.rect(0, 0, 820, 576), 'Saved')
+	storage_remote_field(mut notes, 'notes.export_path', note_export)
+	notes.handle('notes.export') or { panic(err) }
+	note_tree := notes.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(note_tree, 'Text exported.')
+	free_tree(note_tree)
+	close_remote(mut notes)
+	note_text := os.read_file(note_export) or { panic(err) }
+	assert note_text == 'IPC note 😀\n\nNative note 日本語\nSecond line'
+	unsafe { note_text.free() }
+	mut reopened_notes := start_remote_app_at_with_timeout(arguments()[0], notes_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	reloaded_notes := reopened_notes.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(reloaded_notes, 'IPC note 😀')
+	assert tree_contains_text(reloaded_notes, 'Native note 日本語')
+	free_tree(reloaded_notes)
+	close_remote(mut reopened_notes)
+
+	reminders_factory := app_factory_named('vinix-reminders') or { panic('Reminders is not registered') }
+	mut reminders := start_remote_app_at_with_timeout(arguments()[0], reminders_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	reminders.handle('reminders.new') or { panic(err) }
+	storage_remote_field(mut reminders, 'reminders.title', 'IPC task 日本語')
+	storage_remote_field(mut reminders, 'reminders.due', '2000-02-29 12:30')
+	reminders.handle('reminders.save') or { panic(err) }
+	task_tree := reminders.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	assert tree_contains_text(task_tree, 'Tasks saved.')
+	free_tree(task_tree)
+	reminders.handle('reminders.toggle') or { panic(err) }
+	reminders.handle('reminders.filter.completed') or { panic(err) }
+	storage_remote_field(mut reminders, 'reminders.export_path', task_export)
+	reminders.handle('reminders.export_csv') or { panic(err) }
+	export_tree := reminders.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	assert tree_contains_text(export_tree, 'Export saved.')
+	free_tree(export_tree)
+	close_remote(mut reminders)
+	task_text := os.read_file(task_export) or { panic(err) }
+	assert task_text.contains('IPC task 日本語') && task_text.contains('2000-02-29 12:30')
+	unsafe { task_text.free() }
+	mut reopened_tasks := start_remote_app_at_with_timeout(arguments()[0], reminders_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	reopened_tasks.handle('reminders.filter.completed') or { panic(err) }
+	reloaded_tasks := reopened_tasks.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	assert tree_contains_text(reloaded_tasks, 'IPC task 日本語')
+	free_tree(reloaded_tasks)
+	close_remote(mut reopened_tasks)
+
+	grapher_factory := app_factory_named('vinix-grapher') or { panic('Grapher is not registered') }
+	mut grapher := start_remote_app_at_with_timeout(arguments()[0], grapher_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	storage_remote_field(mut grapher, 'grapher.expression', 'sqrt(x)')
+	grapher.handle('grapher.plot') or { panic(err) }
+	graph_tree := grapher.build(ui2.rect(0, 0, 840, 636)) or { panic(err) }
+	assert tree_has_id(graph_tree, 'grapher.chart')
+	assert tree_contains_text(graph_tree, 'Plotted with gaps')
+	free_tree(graph_tree)
+	storage_remote_field(mut grapher, 'grapher.path', graph_export)
+	grapher.handle('grapher.export') or { panic(err) }
+	graph_text := os.read_file(graph_export) or { panic(err) }
+	assert graph_text.starts_with('x,y\n-10,\n')
+	assert graph_text.contains('\n0,0\n')
+	grapher.handle('grapher.export') or { panic(err) }
+	existing_tree := grapher.build(ui2.rect(0, 0, 840, 636)) or { panic(err) }
+	assert tree_contains_text(existing_tree, 'That destination already exists.')
+	free_tree(existing_tree)
+	unchanged_graph := os.read_file(graph_export) or { panic(err) }
+	assert unchanged_graph == graph_text
+	unsafe { graph_text.free(); unchanged_graph.free() }
+	close_remote(mut grapher)
 }

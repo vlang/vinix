@@ -69,14 +69,16 @@ const app_start_actions = ['start.launch.0', 'start.launch.1', 'start.launch.2',
 	'start.launch.19', 'start.launch.20', 'start.launch.21', 'start.launch.22', 'start.launch.23',
 	'start.launch.24', 'start.launch.25', 'start.launch.26', 'start.launch.27', 'start.launch.28', 'start.launch.29', 'start.launch.30',
 	'start.launch.31', 'start.launch.32', 'start.launch.33',
-	'start.launch.34', 'start.launch.35', 'start.launch.36']
+	'start.launch.34', 'start.launch.35', 'start.launch.36',
+	'start.launch.37', 'start.launch.38', 'start.launch.39']
 const app_shortcut_actions = ['shortcut.0', 'shortcut.1', 'shortcut.2', 'shortcut.3', 'shortcut.4',
 	'shortcut.5', 'shortcut.6', 'shortcut.7', 'shortcut.8', 'shortcut.9', 'shortcut.10', 'shortcut.11',
 	'shortcut.12', 'shortcut.13', 'shortcut.14', 'shortcut.15', 'shortcut.16', 'shortcut.17',
 	'shortcut.18', 'shortcut.19', 'shortcut.20', 'shortcut.21', 'shortcut.22', 'shortcut.23',
 	'shortcut.24', 'shortcut.25', 'shortcut.26', 'shortcut.27', 'shortcut.28', 'shortcut.29', 'shortcut.30',
 	'shortcut.31', 'shortcut.32', 'shortcut.33',
-	'shortcut.34', 'shortcut.35', 'shortcut.36']
+	'shortcut.34', 'shortcut.35', 'shortcut.36',
+	'shortcut.37', 'shortcut.38', 'shortcut.39']
 
 // available_apps is what the Start menu and wallpaper offer. The native
 // Calculator includes space below its ui2 keypad for memory and result history.
@@ -503,6 +505,38 @@ const available_apps = [
 		poll_interval_ms: 30
 		open: open_backup_app
 	},
+	AppFactory{
+		title: 'Notes'
+		icon: 'builtin:notes'
+		width: 820
+		height: 600
+		process_name: 'vinix-notes'
+		keyboard: true
+		pointer: true
+		polling: true
+		poll_interval_ms: 30
+		open: open_notes_app
+	},
+	AppFactory{
+		title: 'Reminders'
+		icon: 'builtin:reminders'
+		width: 800
+		height: 640
+		process_name: 'vinix-reminders'
+		keyboard: true
+		polling: true
+		poll_interval_ms: 1000
+		open: open_reminders_app
+	},
+	AppFactory{
+		title: 'Grapher'
+		icon: 'builtin:grapher'
+		width: 840
+		height: 660
+		process_name: 'vinix-grapher'
+		keyboard: true
+		open: open_grapher_app
+	},
 ]
 
 fn files_settings_factory() AppFactory {
@@ -546,6 +580,9 @@ fn app_title_text(title string) string {
 		'Archive Utility' { 'app.archive' }
 		'Disk Utility' { 'app.disk_utility' }
 		'Backup' { 'app.backup' }
+		'Notes' { 'app.notes' }
+		'Reminders' { 'app.reminders' }
+		'Grapher' { 'app.grapher' }
 		'Wine Calculator' { 'app.wine_calculator' }
 		'Wine Notepad' { 'app.wine_notepad' }
 		'Vinix in QEMU' { 'app.qemu' }
@@ -557,7 +594,6 @@ fn app_title_text(title string) string {
 		'Welcome' { 'window.welcome' }
 		'System' { 'window.system' }
 		'Palette' { 'window.palette' }
-		'Notes' { 'window.notes' }
 		else { '' }
 	}
 	return if key.len > 0 { tr(key) } else { title }

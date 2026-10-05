@@ -59,6 +59,9 @@ What it does:
 - **Archive Utility**, TAR browsing, creation and safe extraction with progress/cancel
 - **Disk Utility**, read-only block-device and mounted-volume inspection
 - **Backup**, versioned local folder copies and restore to a new folder
+- **Notes**, searchable local plain-text notes with autosave and text export
+- **Reminders**, persistent local tasks with due dates, completion and filters
+- **Grapher**, bounded mathematical function plots with axes, ranges and CSV export
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
@@ -120,6 +123,9 @@ typing any word with a q in it drop the user back to the console.
     archive_app*.v  bounded TAR browsing, creation and extraction
     disk_utility*.v  block-device and mounted-volume inspection
     backup_app*.v  versioned folder copies and restore
+    notes_app*.v  searchable local notes, autosave and text export
+    reminders_app*.v  persistent tasks and local due-state display
+    grapher_app*.v  bounded expression parsing, plotting and CSV samples
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
     taskbar_preview.v  thumbnails, the window picker, Aero Peek, Show Desktop

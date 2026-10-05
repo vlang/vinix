@@ -28,7 +28,8 @@ install -m644 "$repo"/desktop/assets/*.qoi \
 for app in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-preview vinix-console vinix-system-information \
-    vinix-archive vinix-disk-utility vinix-backup; do
+    vinix-archive vinix-disk-utility vinix-backup \
+    vinix-notes vinix-reminders vinix-grapher; do
     ln -sf vinix-desktop "$work/root/usr/bin/$app"
 done
 mkdir -p "$work/root/dev" "$work/root/proc" "$work/root/sys" \

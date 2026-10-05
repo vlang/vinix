@@ -852,6 +852,11 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 	home_entry := 'HOME=${desktop_home}'
 	request_env := 'VINIX_REQUEST_FD=${request[0]}'
 	response_env := 'VINIX_RESPONSE_FD=${response[1]}'
+	// Native clients use the same personal storage folder as their compositor.
+	// Keep HOME's existing command environment; the application-specific value
+	// avoids resolving the profile again after it changes while a window opens.
+	user_home_env := 'VINIX_USER_HOME=${desktop_user_home}'
+	defer { unsafe { home_entry.free(); user_home_env.free() } }
 	roblox_apk_env := desktop_roblox_environment(app_name == 'vinix-roblox', 'VINIX_ROBLOX_APK')
 	roblox_split_env := desktop_roblox_environment(app_name == 'vinix-roblox', 'VINIX_ROBLOX_SPLIT_APKS')
 	defer {
@@ -860,10 +865,11 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 			roblox_split_env.free()
 		}
 	}
-	mut envp := [&char(path_entry.str), &char(home_entry.str), c'TERM=dumb', c'USER=root',
+	mut envp := [&char(path_entry.str), &char(home_entry.str), &char(user_home_env.str), c'TERM=dumb', c'USER=root',
 		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
 		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
+	unsafe { envp.flags |= .noslices }
 	if roblox_apk_env.len > 0 {
 		envp << &char(roblox_apk_env.str)
 	}

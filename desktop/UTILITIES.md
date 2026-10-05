@@ -1,15 +1,17 @@
 # Desktop utility inventory and macOS feature gaps
 
-Original audit: 2026-10-05. Storage utility follow-up: 2026-10-06. This document
-records the original inventory, implemented utility work, and the remaining work.
+Original audit: 2026-10-05. Storage and productivity follow-ups: 2026-10-06.
+This document records the original inventory, implemented utility work,
+and the remaining work.
 It does not claim complete macOS parity.
 
 The native utilities are Files, Activity Monitor, Settings, Text Editor,
 Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console,
-System Information, Archive Utility, Disk Utility and Backup. Both desktop
-image builders install their executable names as clients of the multicall
-desktop. Files Settings, Quick Look, Quick Launch and the notification area are
-supporting surfaces rather than additional utility payloads.
+System Information, Archive Utility, Disk Utility, Backup, Notes, Reminders
+and Grapher. Both desktop image builders install their executable names as
+clients of the multicall desktop. Files Settings, Quick Look, Quick Launch
+and the notification area are supporting surfaces rather than additional
+utility payloads.
 
 The macOS comparison uses Apple's [included-app inventory](https://support.apple.com/en-gb/guide/mac-help/mchl110b00b7/26/mac/26)
 and the individual guides linked below. Priorities and implementation plans are
@@ -35,6 +37,9 @@ Vinix engineering proposals based on the inspected code.
 | Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and extraction with bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; selective extraction; encryption and larger archives |
 | Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
+| Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes, undo/recovery and close confirmation after failed saves; floating sticky windows |
+| Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
+| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset and sampled CSV export using the existing native UI protocol | Multiple/implicit/parametric equations, 3D plots, saved graph documents, image/vector export, animations, integration/intersection tools and graph styling |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
@@ -49,7 +54,10 @@ and [calendar interchange](https://support.apple.com/guide/calendar/import-or-ex
 and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac),
 [archive compression/extraction](https://support.apple.com/en-lk/guide/mac-help/mchlp2528/mac),
 [Disk Utility devices and volumes](https://support.apple.com/en-ca/guide/disk-utility/dskud6b39edb/mac)
-and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac).
+and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac),
+[Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac),
+[Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac)
+and [Grapher](https://support.apple.com/guide/grapher/welcome/mac).
 
 ### Hosted and installable applications
 
@@ -68,8 +76,8 @@ their third-party application internals are outside the native-utility changes.
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the sixteen native utilities account for the complete
-37-entry application catalog. Vim and shell tools installed in the userland
+These 21 entries plus the nineteen native utilities account for the complete
+40-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
 ## Missing utility applications to implement
@@ -77,17 +85,14 @@ are terminal programs, not additional native desktop applications.
 The macOS names below identify the comparison. The milestones are proposed
 Vinix applications, with dependencies made explicit. Existing terminal tools,
 Disk Usage, Quick Look or a browser do not supply the corresponding complete
-desktop workflow. Eighteen utility applications remain below. Notes/Stickies,
-Reminders and Grapher are the next milestones that can progress without new
-audio, device or credential services.
+desktop workflow. Fifteen utility applications remain below. Notes supplies
+the local note-taking milestone; independent floating Stickies windows remain
+a feature gap in that application.
 
 | Priority | Utility / macOS comparison | First useful milestone | Dependencies or boundary |
 | --- | --- | --- | --- |
-| P2 | Notes / Stickies | Persistent searchable notes with autosave and export | A local document store; sharing, rich text and sync can follow. |
-| P2 | Reminders | Persistent tasks, due dates and completion | A notification/scheduling service is required for alerts when the app is closed. |
 | P2 | Font Book | Preview installed fonts, inspect metadata and install/remove per-user fonts | Runtime font discovery/rendering; the desktop currently relies on baked coverage atlases. |
 | P2 | Digital Color Meter | Pick framebuffer colours, magnify the sample and copy RGB/hex values | Compositor sampling IPC and a guest clipboard copy service. |
-| P2 | Grapher | Plot mathematical functions with axes/ranges and export | Expression parser and plotting/export support. |
 | P2 | Audio MIDI Setup | Output/input devices, formats, levels and test recording | Real audio-device enumeration and mixer/recording APIs; MIDI is a later dependency. |
 | P2 | Voice Memos | Record, play, trim and save local audio | Capture/playback devices and codecs. |
 | P2 | Passwords / Keychain Access | Local encrypted credential store, lock/unlock and export | Threat model, vetted cryptography and secure unlock/key storage; avoid a plaintext credential database. |
@@ -169,10 +174,40 @@ not proposed as general Vinix utility ports.
   Cancel/failure keeps a visibly incomplete folder, never a completed version.
   No existing restore destination is overwritten. Paths and every traversed
   component refuse symbolic links.
+- **Notes:** choose New note, enter a title and write plain text. Search matches
+  titles and bodies with case sensitivity. Ctrl-N creates a note; Ctrl-S saves;
+  Ctrl-A selects the active field. Notes autosaves after a typing pause. A
+  failed save keeps the draft in the open window and blocks note switching;
+  export it before reopening after a conflict. Delete requires a second Delete
+  action, with Keep note to cancel. Export text creates a new file. Closing
+  tries one final save, but there is no recovery journal or close confirmation;
+  if that save fails, closing discards the draft. Export an unsaved draft
+  before closing.
+  Storage is limited to 128 notes, 160-byte titles, 16 KiB bodies and a 1 MiB
+  complete record. The user's home alias is resolved once and storage remains
+  anchored to that directory; record and lock names refuse symbolic links.
+- **Reminders:** choose New task, enter a title and optionally `YYYY-MM-DD` or
+  `YYYY-MM-DD HH:MM`, then Save task. Select a task to Edit, Complete/reopen or
+  confirm Delete. Search and filters apply to all retained tasks; export text
+  or CSV writes the complete current view to a new path. Dates use local time;
+  due-state display updates while the app is open. There are no background
+  notification, recurrence or synchronization services in this milestone.
+  Lists hold at most 256 tasks with 256-byte titles in a 128 KiB record. A
+  conflicting save or damaged record preserves the previously saved file.
+- **Grapher:** enter an explicit function of `x` and choose Plot. Arithmetic,
+  powers, parentheses, `pi`/`e` and supported standard functions use radians.
+  Edit finite x/y bounds or use Zoom/reset, then export samples to a new CSV.
+  Domain failures leave gaps; sampling is bounded and does not prove a
+  function is continuous between samples. Plots use the native child-process
+  UI protocol and resize with the window.
+  Expressions are limited to 256 bytes/operations, 32 parser levels and 16
+  floor/ceil calls. Each plot uses 513 samples. Range magnitudes cannot exceed
+  `1e12`, and each span must be at least `1e-9`.
 
 The image builders install `vinix-preview`, `vinix-console` and
 `vinix-system-information`, `vinix-archive`, `vinix-disk-utility` and
-`vinix-backup` as native multicall clients. Existing guest images
+`vinix-backup`, `vinix-notes`, `vinix-reminders` and `vinix-grapher` as native
+multicall clients. Existing guest images
 need the new executable names installed as well as the updated desktop
 binary before the new menu entries can launch them.
 
@@ -185,12 +220,13 @@ frontend with `-gc none -manualfree`. It is also called by
 Files, UTF-8 editing/terminal rendering and the application catalog. Run
 `desktop/tools/test-settings.sh` for preference/device and translation checks,
 and `desktop/tools/test-activity.sh` for process controls and resource lifetimes.
-`desktop/tools/test-new-utilities.sh` covers the six new utility models,
+`desktop/tools/test-new-utilities.sh` covers the nine new utility models,
 catalog/search integration, translations/fonts, owned-memory cleanup and real
 native-process IPC. It uses Clang for the image decoder and heap checks.
 `tests/desktop-perf/run.py --scenarios=utilities` adds a guest startup/rendering
 scenario for Preview, Console and System Information; `--scenarios=storage`
-starts Archive Utility, Disk Utility and Backup.
+starts Archive Utility, Disk Utility and Backup; `--scenarios=productivity`
+starts Notes, Reminders and Grapher.
 
 Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have
@@ -243,3 +279,14 @@ received and its screenshot confirms that the System window moved. These
 five-second guest samples are smoke checks; the copy/extract/restore behavior
 and owned-memory assertions above are host checks, not long-running guest
 performance measurements.
+
+The productivity follow-up passes 163 combined behavioral cases and 33 tracked
+memory cases, with zero retained owned bytes. Real native-process IPC exercises
+Notes autosave, UTF-8 text export and reopening; Reminders completion, CSV
+export and reopening; and Grapher domain gaps, samples and overwrite refusal.
+The child processes use an isolated active-user home forwarded by the
+compositor. Focused Notes resize checks cover widened and taller viewports,
+visible text/caret and a shallow window's minimum text row. Model tests cover
+malformed records, conflicting writers, anchored file paths, home aliases,
+task date validation and graph discontinuities. The runner's 22 Python cases
+and all modified shell-script syntax checks also pass.

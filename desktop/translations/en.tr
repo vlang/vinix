@@ -3077,3 +3077,336 @@ Could not write the output. Check the destination and free space.
 archive.source_unstable
 Archive changed while reading. Browse it again.
 -----
+app.reminders
+Reminders
+-----
+reminders.title
+Reminders
+-----
+reminders.new
+New task
+-----
+reminders.edit
+Edit
+-----
+reminders.save
+Save task
+-----
+reminders.cancel
+Cancel
+-----
+reminders.toggle
+Complete / reopen
+-----
+reminders.delete
+Delete
+-----
+reminders.delete_confirm
+Confirm delete
+-----
+reminders.delete_cancel
+Keep task
+-----
+reminders.reload
+Reload
+-----
+reminders.title_field
+Task title
+-----
+reminders.due_field
+Due date (YYYY-MM-DD or YYYY-MM-DD HH:MM)
+-----
+reminders.search
+Search titles
+-----
+reminders.export_path
+Export path
+-----
+reminders.export_text
+Export text
+-----
+reminders.export_csv
+Export CSV
+-----
+reminders.filter.all
+All
+-----
+reminders.filter.open
+Open
+-----
+reminders.filter.completed
+Completed
+-----
+reminders.filter.overdue
+Overdue
+-----
+reminders.previous
+Previous
+-----
+reminders.next
+Next
+-----
+reminders.no_tasks
+No tasks in this view.
+-----
+reminders.no_due
+No due date
+-----
+reminders.completed
+Completed
+-----
+reminders.open
+Open
+-----
+reminders.overdue
+Overdue
+-----
+reminders.due_today
+Due today
+-----
+reminders.ready
+Tasks are saved when you add, edit or complete them.
+-----
+reminders.saved
+Tasks saved.
+-----
+reminders.saved_unsynced
+Saved, but final directory synchronization failed.
+-----
+reminders.read_failed
+Cannot load task storage. Repair it and choose Reload.
+-----
+reminders.changed
+Tasks changed in another window. Choose Reload before saving.
+-----
+reminders.busy
+Another window is saving. Try again.
+-----
+reminders.save_failed
+Tasks could not be saved. Your edit is still here.
+-----
+reminders.title_required
+Enter a task title.
+-----
+reminders.invalid_due
+Use a valid YYYY-MM-DD date and optional HH:MM time.
+-----
+reminders.limit
+This list can hold 256 tasks.
+-----
+reminders.select_task
+Select a task first.
+-----
+reminders.confirm_delete
+Delete the selected task? Confirm delete to remove it.
+-----
+reminders.export_saved
+Export saved.
+-----
+reminders.export_exists
+That export path already exists. Choose a new path.
+-----
+reminders.export_failed
+Export could not be saved.
+-----
+reminders.invalid_path
+Enter an absolute export path without symlinks.
+-----
+reminders.hint
+Due dates use local time. Due status updates while this window is open.
+-----
+reminders.clock_unavailable
+The clock is unavailable; overdue dates cannot be determined.
+-----
+app.notes
+Notes
+-----
+notes.ready
+Local notes
+-----
+notes.untitled
+Untitled note
+-----
+notes.new
+New note
+-----
+notes.save
+Save
+-----
+notes.refresh
+Refresh
+-----
+notes.delete
+Delete
+-----
+notes.cancel_delete
+Keep note
+-----
+notes.search
+Search
+-----
+notes.title
+Title
+-----
+notes.body
+Note
+-----
+notes.export_path
+Export path
+-----
+notes.export
+Export text
+-----
+notes.previous
+Previous
+-----
+notes.next
+Next
+-----
+notes.search_hint
+Search titles and text (case sensitive)
+-----
+notes.empty
+No matching notes. Create a new note to begin.
+-----
+notes.hint
+Local plain text. Autosaves after typing. Ctrl-N: new · Ctrl-S: save · Ctrl-A: select all
+-----
+notes.unsaved
+Unsaved changes — keep this window open until saved.
+-----
+notes.saved
+Saved
+-----
+notes.deleted
+Note deleted
+-----
+notes.read_failed
+Cannot open the local notes store.
+-----
+notes.corrupt
+Notes store is unreadable or damaged. Existing data is preserved.
+-----
+notes.conflict
+Another window changed these notes. Export your draft before reopening.
+-----
+notes.save_failed
+Save failed. Your draft remains in this window.
+-----
+notes.durability_failed
+Saved, but final storage synchronization failed.
+-----
+notes.title_required
+Enter a title before saving.
+-----
+notes.confirm_delete
+Delete this saved note? Press Delete again, or Keep note.
+-----
+notes.limit
+Notes or text limit reached.
+-----
+notes.invalid_text
+Paste must contain valid UTF-8 plain text.
+-----
+notes.export_invalid
+Enter an absolute export path without dot or parent components.
+-----
+notes.export_exists
+Export destination already exists. Choose a new name.
+-----
+notes.export_failed
+Could not create or finish the export.
+-----
+notes.export_durability
+Export written, but directory synchronization failed.
+-----
+notes.export_saved
+Text exported.
+-----
+reminders.csv_title
+Title
+-----
+reminders.csv_due
+Due
+-----
+reminders.csv_completed
+Completed (0 or 1)
+-----
+reminders.export_unsynced
+Export saved, but final directory synchronization failed.
+-----
+app.grapher
+Grapher
+-----
+grapher.plot
+Plot
+-----
+grapher.reset
+Reset View
+-----
+grapher.zoom_in
+Zoom In
+-----
+grapher.zoom_out
+Zoom Out
+-----
+grapher.export
+Export CSV
+-----
+grapher.xmin_label
+X minimum
+-----
+grapher.xmax_label
+X maximum
+-----
+grapher.ymin_label
+Y minimum
+-----
+grapher.ymax_label
+Y maximum
+-----
+grapher.radians
+Angles in radians
+-----
+grapher.syntax
+x, pi, e; + - * / ^; sin cos tan asin acos atan sqrt abs ln log exp floor ceil
+-----
+grapher.expression_invalid
+Invalid expression or expression limit exceeded.
+-----
+grapher.range_invalid
+Use increasing finite ranges within ±1e12, with a span of at least 1e-9.
+-----
+grapher.no_values
+No defined values in this X range.
+-----
+grapher.domain_gaps
+Plotted with gaps where the function is undefined.
+-----
+grapher.ready
+513 samples. Very small or rapidly changing features may be missed.
+-----
+grapher.input_limit
+This field has reached its input limit.
+-----
+grapher.changed
+Press Plot to apply your changes.
+-----
+grapher.input_invalid
+Paste one line of valid text; expressions and ranges use ASCII.
+-----
+grapher.export_invalid
+Choose a new absolute CSV path without links or dot components.
+-----
+grapher.export_failed
+Could not save the CSV file.
+-----
+grapher.export_exists
+That destination already exists. Choose a new file.
+-----
+grapher.export_saved
+CSV samples saved. Empty Y cells mark undefined values.
+-----
+grapher.equation_label
+y =
+-----

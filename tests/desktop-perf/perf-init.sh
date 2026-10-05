@@ -147,12 +147,22 @@ run_case() {
 			ln -sf vinix-desktop "/usr/bin/$app"
 		done
 	fi
+	if [ "$scenario" = productivity ]; then
+		for app in vinix-notes vinix-reminders vinix-grapher; do
+			ln -sf vinix-desktop "/usr/bin/$app"
+		done
+	fi
 	rm -f /run/vinix-desktop-ready /tmp/perf-quit
 	sync
 	sleep 2
 	used_before=$("$perf/measure" used)
 	log=/tmp/desktop-$variant-$scenario-$round.log
 	case "$scenario" in
+		productivity)
+			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
+				/usr/bin/vinix-desktop $DESKTOP_ARGS --open=Notes \
+					--open=Reminders --open=Grapher >"$log" 2>&1 &
+			;;
 		storage)
 			{ while [ ! -e /tmp/perf-quit ]; do sleep 1; done; printf '\021'; sleep 20; } |
 				/usr/bin/vinix-desktop $DESKTOP_ARGS '--open=Archive Utility' \

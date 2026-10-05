@@ -3077,3 +3077,336 @@ No se pudo escribir el destino. Compruebe la ruta y el espacio libre.
 archive.source_unstable
 El archivo cambió durante la lectura. Vuelva a explorarlo.
 -----
+app.reminders
+Recordatorios
+-----
+reminders.title
+Recordatorios
+-----
+reminders.new
+Nueva tarea
+-----
+reminders.edit
+Editar
+-----
+reminders.save
+Guardar tarea
+-----
+reminders.cancel
+Cancelar
+-----
+reminders.toggle
+Completar / reabrir
+-----
+reminders.delete
+Eliminar
+-----
+reminders.delete_confirm
+Confirmar eliminación
+-----
+reminders.delete_cancel
+Conservar tarea
+-----
+reminders.reload
+Volver a cargar
+-----
+reminders.title_field
+Título de la tarea
+-----
+reminders.due_field
+Vencimiento (AAAA-MM-DD o AAAA-MM-DD HH:MM)
+-----
+reminders.search
+Buscar títulos
+-----
+reminders.export_path
+Ruta de exportación
+-----
+reminders.export_text
+Exportar texto
+-----
+reminders.export_csv
+Exportar CSV
+-----
+reminders.filter.all
+Todas
+-----
+reminders.filter.open
+Pendientes
+-----
+reminders.filter.completed
+Completadas
+-----
+reminders.filter.overdue
+Vencidas
+-----
+reminders.previous
+Anterior
+-----
+reminders.next
+Siguiente
+-----
+reminders.no_tasks
+No hay tareas en esta vista.
+-----
+reminders.no_due
+Sin vencimiento
+-----
+reminders.completed
+Completada
+-----
+reminders.open
+Pendiente
+-----
+reminders.overdue
+Vencida
+-----
+reminders.due_today
+Vence hoy
+-----
+reminders.ready
+Las tareas se guardan al añadirlas, editarlas o completarlas.
+-----
+reminders.saved
+Tareas guardadas.
+-----
+reminders.saved_unsynced
+Guardado, pero falló la sincronización final de la carpeta.
+-----
+reminders.read_failed
+No se pueden cargar las tareas. Repare el almacenamiento y vuelva a cargar.
+-----
+reminders.changed
+Las tareas cambiaron en otra ventana. Vuelva a cargar antes de guardar.
+-----
+reminders.busy
+Otra ventana está guardando. Inténtelo de nuevo.
+-----
+reminders.save_failed
+No se pudieron guardar las tareas. Sus cambios siguen en la ventana.
+-----
+reminders.title_required
+Introduzca un título de tarea.
+-----
+reminders.invalid_due
+Use una fecha válida AAAA-MM-DD y, opcionalmente, una hora HH:MM.
+-----
+reminders.limit
+Esta lista admite 256 tareas.
+-----
+reminders.select_task
+Seleccione una tarea primero.
+-----
+reminders.confirm_delete
+¿Eliminar la tarea seleccionada? Confirme la eliminación para quitarla.
+-----
+reminders.export_saved
+Exportación guardada.
+-----
+reminders.export_exists
+La ruta de exportación ya existe. Elija una ruta nueva.
+-----
+reminders.export_failed
+No se pudo guardar la exportación.
+-----
+reminders.invalid_path
+Introduzca una ruta absoluta de exportación sin enlaces simbólicos.
+-----
+reminders.hint
+Los vencimientos usan la hora local. Su estado se actualiza mientras la ventana está abierta.
+-----
+reminders.clock_unavailable
+El reloj no está disponible; no se pueden determinar las tareas vencidas.
+-----
+app.notes
+Notas
+-----
+notes.ready
+Notas locales
+-----
+notes.untitled
+Nota sin título
+-----
+notes.new
+Nueva nota
+-----
+notes.save
+Guardar
+-----
+notes.refresh
+Actualizar
+-----
+notes.delete
+Eliminar
+-----
+notes.cancel_delete
+Conservar nota
+-----
+notes.search
+Buscar
+-----
+notes.title
+Título
+-----
+notes.body
+Nota
+-----
+notes.export_path
+Ruta de exportación
+-----
+notes.export
+Exportar texto
+-----
+notes.previous
+Anterior
+-----
+notes.next
+Siguiente
+-----
+notes.search_hint
+Buscar títulos y texto (distingue mayúsculas)
+-----
+notes.empty
+No hay notas coincidentes. Cree una nota nueva para empezar.
+-----
+notes.hint
+Texto local. Guardado automático tras escribir. Ctrl-N: nueva · Ctrl-S: guardar · Ctrl-A: todo
+-----
+notes.unsaved
+Cambios sin guardar: mantenga esta ventana abierta hasta que se guarden.
+-----
+notes.saved
+Guardado
+-----
+notes.deleted
+Nota eliminada
+-----
+notes.read_failed
+No se puede abrir el almacenamiento local de notas.
+-----
+notes.corrupt
+El almacenamiento de notas es ilegible o está dañado. Los datos existentes se conservan.
+-----
+notes.conflict
+Otra ventana cambió estas notas. Exporte su borrador antes de volver a abrir.
+-----
+notes.save_failed
+Falló el guardado. Su borrador permanece en esta ventana.
+-----
+notes.durability_failed
+Guardado, pero falló la sincronización final del almacenamiento.
+-----
+notes.title_required
+Introduzca un título antes de guardar.
+-----
+notes.confirm_delete
+¿Eliminar esta nota guardada? Pulse Eliminar de nuevo o Conservar nota.
+-----
+notes.limit
+Se alcanzó el límite de notas o texto.
+-----
+notes.invalid_text
+El texto pegado debe ser texto plano UTF-8 válido.
+-----
+notes.export_invalid
+Introduzca una ruta absoluta de exportación sin componentes punto ni padre.
+-----
+notes.export_exists
+El destino de exportación ya existe. Elija otro nombre.
+-----
+notes.export_failed
+No se pudo crear o terminar la exportación.
+-----
+notes.export_durability
+Exportación escrita, pero falló la sincronización de la carpeta.
+-----
+notes.export_saved
+Texto exportado.
+-----
+reminders.csv_title
+Título
+-----
+reminders.csv_due
+Vencimiento
+-----
+reminders.csv_completed
+Completada (0 o 1)
+-----
+reminders.export_unsynced
+Exportación guardada, pero falló la sincronización final de la carpeta.
+-----
+app.grapher
+Gráficas
+-----
+grapher.plot
+Trazar
+-----
+grapher.reset
+Restablecer vista
+-----
+grapher.zoom_in
+Acercar
+-----
+grapher.zoom_out
+Alejar
+-----
+grapher.export
+Exportar CSV
+-----
+grapher.xmin_label
+Mínimo X
+-----
+grapher.xmax_label
+Máximo X
+-----
+grapher.ymin_label
+Mínimo Y
+-----
+grapher.ymax_label
+Máximo Y
+-----
+grapher.radians
+Ángulos en radianes
+-----
+grapher.syntax
+x, pi, e; + - * / ^; sin cos tan asin acos atan sqrt abs ln log exp floor ceil
+-----
+grapher.expression_invalid
+Expresión inválida o límite de expresión superado.
+-----
+grapher.range_invalid
+Use límites finitos crecientes entre ±1e12, con una amplitud mínima de 1e-9.
+-----
+grapher.no_values
+No hay valores definidos en este intervalo de X.
+-----
+grapher.domain_gaps
+Trazado con huecos donde la función no está definida.
+-----
+grapher.ready
+513 muestras. Pueden omitirse detalles muy pequeños o que cambian rápidamente.
+-----
+grapher.input_limit
+Este campo ha alcanzado su límite de entrada.
+-----
+grapher.changed
+Pulse Trazar para aplicar los cambios.
+-----
+grapher.input_invalid
+Pegue una línea de texto válido; las expresiones y los límites usan ASCII.
+-----
+grapher.export_invalid
+Elija una ruta absoluta nueva para CSV sin enlaces ni componentes punto.
+-----
+grapher.export_failed
+No se pudo guardar el archivo CSV.
+-----
+grapher.export_exists
+Ese destino ya existe. Elija un archivo nuevo.
+-----
+grapher.export_saved
+Muestras CSV guardadas. Las celdas Y vacías indican valores indefinidos.
+-----
+grapher.equation_label
+y =
+-----
