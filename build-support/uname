@@ -1,0 +1,32 @@
+#!/bin/sh
+# BusyBox's -o label is fixed at build time in Alpine's binary. Use the kernel
+# name for Vinix while keeping BusyBox's option parsing and field ordering.
+print_os=0
+for option do
+    case "$option" in
+        --) break ;;
+        --*)
+            # getopt_long also accepts unambiguous prefixes of these names.
+            option=${option#--}
+            case all in "$option"*) print_os=1 ;; esac
+            case operating-system in "$option"*) print_os=1 ;; esac
+            ;;
+        -*) case "$option" in *[ao]*) print_os=1 ;; esac ;;
+    esac
+done
+if [ "$print_os" = 0 ]; then
+    exec /bin/busybox uname "$@"
+fi
+
+output=$(/bin/busybox uname "$@") || exit "$?"
+# --help prints usage without a system-information line.
+[ -n "$output" ] || exit 0
+kernel=$(/bin/busybox uname -s) || exit "$?"
+if [ "$kernel" = Vinix ]; then
+    os=$(/bin/busybox uname -o) || exit "$?"
+    case "$output" in
+        "$os") output=$kernel ;;
+        *" $os") output=${output%"$os"}$kernel ;;
+    esac
+fi
+printf '%s\n' "$output"

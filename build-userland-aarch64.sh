@@ -642,6 +642,7 @@ echo "==> Packaging initramfs..."
 echo "==> Installing Vinix's optimized musl allocator..."
 python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$STAGING"
 python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 
 mkdir -p "$(dirname "$INITRAMFS")"
 cd "$STAGING"
