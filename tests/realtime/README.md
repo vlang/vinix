@@ -40,7 +40,7 @@ each CPU its own half of the interrupt controller, only CPU 0 could do that.
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 
 ```sh
-./build-userland-aarch64.sh
+./scripts/build-userland-aarch64.sh
 tests/realtime/run.sh
 ```
 

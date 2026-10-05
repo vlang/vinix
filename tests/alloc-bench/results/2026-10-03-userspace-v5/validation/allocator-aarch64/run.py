@@ -2,7 +2,7 @@ import os,pty,select,time,json,hashlib
 from pathlib import Path
 root=Path('/Users/alex/code/vinix');src=root/'third_party/useralloc-vm-next';state=root/'build/useralloc-arm-v5-final'
 env=dict(os.environ,VINIX_INITRAMFS=str(state/'initramfs.tar'),VINIX_KERNEL_DIR=str(state/'kernel'),VINIX_BOOT_DISK=str(state/'boot.img'),VINIX_BOOT_DISK_SIZE_MB='128',VINIX_EFIVARS=str(state/'vars.fd'),VINIX_QEMU_PACKAGE_STORE=str(state/'packages.tar'),VINIX_QEMU_PERSIST='0',VINIX_QEMU_HOST_SOURCE='0',VINIX_QEMU_AUDIO='off',VINIX_QEMU_SMP='2',VINIX_KEEP_TEMP_BOOT_DISK='1',USE_TCG='0')
-command=[str(src/'run-aarch64.sh'),'--no-build','--serial','--mem=2048','--guest-init='+str(state/'rootfs/sbin/init'),'--no-persist']
+command=[str(src/'scripts/run-aarch64.sh'),'--no-build','--serial','--mem=2048','--guest-init='+str(state/'rootfs/sbin/init'),'--no-persist']
 manifest={'command':command,'environment':{k:v for k,v in env.items() if k.startswith('VINIX_') or k=='USE_TCG'},'kernel_sha256':hashlib.sha256((state/'kernel/bin/vinix').read_bytes()).hexdigest(),'initramfs_sha256':hashlib.sha256((state/'initramfs.tar').read_bytes()).hexdigest()}
 (state/'run.json').write_text(json.dumps(manifest,indent=2)+'\n')
 pid,master=pty.fork()

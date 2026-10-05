@@ -142,7 +142,7 @@ def main() -> None:
     for path in (*files.values(), kernel_source, source, linker):
         if not path.is_file():
             parser.error("missing fixture input: " + str(path))
-    boot = args.boot_repo.resolve() / "run-aarch64.sh"
+    boot = args.boot_repo.resolve() / "scripts/run-aarch64.sh"
     if args.run and not boot.is_file():
         parser.error("missing VM runner: " + str(boot))
 

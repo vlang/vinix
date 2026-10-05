@@ -4,7 +4,7 @@
 # on average, or ten seconds at once. Each prints its worst and mean wait, with
 # nothing being written and while the stream runs.
 #
-#   ./build-userland-aarch64.sh        # once, for the musl test sysroot
+#   ./scripts/build-userland-aarch64.sh        # once, for the musl test sysroot
 #   tests/disk-writeback/run.sh
 #
 # VINIX_DISK_ROOT_NO_BUILD=1 reuses kernel/bin/vinix.
@@ -23,7 +23,7 @@ trap cleanup EXIT INT TERM
 for input in "$sysroot/include" "$sysroot/lib/crt1.o" "$sysroot/lib/libc.a"; do
 	if [ ! -e "$input" ]; then
 		echo "ERROR: AArch64 test sysroot input is missing: $input" >&2
-		echo "       Run ./build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
+		echo "       Run ./scripts/build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
 		exit 1
 	fi
 done

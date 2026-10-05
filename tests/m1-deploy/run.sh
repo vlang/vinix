@@ -9,7 +9,8 @@ esp="$work/esp"
 
 mkdir -p "$fixture/kernel/bin" "$fixture/build-support/init-aarch64" \
     "$fixture/boot-image/limine-bin" "$esp/boot"
-cp "$repo/deploy-m1-efi.sh" "$fixture/"
+mkdir -p "$fixture/scripts"
+cp "$repo/scripts/deploy-m1-efi.sh" "$fixture/scripts/"
 
 # A minimal ELF64/AArch64 header is enough for the deployment architecture
 # guard and keeps this test independent of generated kernel artifacts.
@@ -49,7 +50,7 @@ printf '%s\n' old > "$esp/boot/initramfs.tar"
 cp "$fixture/kernel/bin/vinix" "$work/vinix-with-mp"
 dd if="$work/vinix-with-mp" of="$fixture/kernel/bin/vinix" bs=64 count=1 \
     2>/dev/null
-if "$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" \
+if "$fixture/scripts/deploy-m1-efi.sh" --desktop-initramfs "$esp" \
     >"$work/single-core.log" 2>&1; then
     echo "deployment accepted an M1 kernel without the MP request" >&2
     exit 1
@@ -57,7 +58,7 @@ fi
 grep -Fq 'M1 kernel has no Limine MP request' "$work/single-core.log"
 cp "$work/vinix-with-mp" "$fixture/kernel/bin/vinix"
 
-"$fixture/deploy-m1-efi.sh" --desktop-initramfs "$esp" >"$work/deploy.log"
+"$fixture/scripts/deploy-m1-efi.sh" --desktop-initramfs "$esp" >"$work/deploy.log"
 grep -Fq 'native boot limit: 4 CPUs' "$work/deploy.log"
 cmp -s "$fixture/build-support/init-aarch64/initramfs-desktop.tar.gz" \
     "$esp/boot/initramfs.tar"

@@ -27,7 +27,7 @@ esac
 
 [ -s "$url_file" ] || {
 	echo "vinix-host-sync: this boot has no QEMU host source share" >&2
-	echo "vinix-host-sync: start it with ./run-desktop-aarch64.sh" >&2
+	echo "vinix-host-sync: start it with ./scripts/run-desktop-aarch64.sh" >&2
 	exit 1
 }
 [ -x "$curl" ] || {

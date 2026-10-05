@@ -489,7 +489,7 @@ FONTALIAS
     X11_SIZE=$(du -sh "$X11_STAGING" | cut -f1)
     echo "    X11 files integrated ($X11_SIZE)"
 else
-    echo "==> X11 staging not found, skipping (run build-x11-aarch64.sh first)"
+    echo "==> X11 staging not found, skipping (run scripts/build-x11-aarch64.sh first)"
 fi
 
 # Firefox brings its GTK/X11 client-side dependency closure. Merge it before
@@ -498,7 +498,7 @@ if [ -x "$FIREFOX_STAGING/usr/bin/run-firefox" ]; then
     echo "==> Integrating Firefox ESR runtime..."
     merge_staging_tree "$FIREFOX_STAGING"
 else
-    echo "==> Firefox staging not found, skipping (run build-firefox-aarch64.sh first)"
+    echo "==> Firefox staging not found, skipping (run scripts/build-firefox-aarch64.sh first)"
 fi
 
 # Minecraft renders with Mesa's software rasteriser. Merge it before Asahi so
@@ -507,7 +507,7 @@ if [ -x "$MINECRAFT_STAGING/usr/bin/minecraft" ]; then
     echo "==> Integrating Minecraft runtime..."
     merge_staging_tree "$MINECRAFT_STAGING"
 else
-    echo "==> Minecraft staging not found, skipping (run build-minecraft-aarch64.sh first)"
+    echo "==> Minecraft staging not found, skipping (run scripts/build-minecraft-aarch64.sh first)"
 fi
 
 # The native Asahi build is produced in the Debian ARM64 VM. Once its staging
@@ -549,70 +549,70 @@ if [ "${VINIX_WITH_ASAHI_GPU:-0}" = 1 ] && [ -x "$ASAHI_STAGING/usr/bin/gl-trian
         fi
     done
 else
-    echo "==> Asahi staging not found, skipping (run build-asahi-aarch64.sh in the ARM64 VM first)"
+    echo "==> Asahi staging not found, skipping (run scripts/build-asahi-aarch64.sh in the ARM64 VM first)"
 fi
 
 if [ -x "$PYTHON_STAGING/usr/bin/python3" ]; then
     echo "==> Integrating Python 3 runtime..."
     merge_staging_tree "$PYTHON_STAGING"
 else
-    echo "==> Python 3 staging not found, skipping (run build-python-aarch64.sh first)"
+    echo "==> Python 3 staging not found, skipping (run scripts/build-python-aarch64.sh first)"
 fi
 
 if [ -x "$RUBY_STAGING/usr/bin/ruby" ]; then
     echo "==> Integrating Ruby runtime..."
     merge_staging_tree "$RUBY_STAGING"
 else
-    echo "==> Ruby staging not found, skipping (run build-ruby-aarch64.sh first)"
+    echo "==> Ruby staging not found, skipping (run scripts/build-ruby-aarch64.sh first)"
 fi
 
 if [ -x "$GO_STAGING/usr/bin/go" ] || [ -x "$GO_STAGING/usr/lib/go/bin/go" ]; then
     echo "==> Integrating Go toolchain..."
     merge_staging_tree "$GO_STAGING"
 else
-    echo "==> Go staging not found, skipping (run build-go-aarch64.sh first)"
+    echo "==> Go staging not found, skipping (run scripts/build-go-aarch64.sh first)"
 fi
 
 if [ -x "$JAVA_STAGING/usr/bin/java" ] && [ -x "$JAVA_STAGING/usr/bin/javac" ]; then
     echo "==> Integrating OpenJDK runtime and toolchain..."
     merge_staging_tree "$JAVA_STAGING"
 else
-    echo "==> OpenJDK staging not found, skipping (run build-java-aarch64.sh first)"
+    echo "==> OpenJDK staging not found, skipping (run scripts/build-java-aarch64.sh first)"
 fi
 
 if [ -x "$NETWORK_TOOLS_STAGING/usr/bin/curl" ]; then
     echo "==> Integrating network developer tools..."
     merge_staging_tree "$NETWORK_TOOLS_STAGING"
 else
-    echo "==> Network tools staging not found, skipping (run build-network-tools-aarch64.sh first)"
+    echo "==> Network tools staging not found, skipping (run scripts/build-network-tools-aarch64.sh first)"
 fi
 
 if [ -x "$DEVELOPER_TOOLS_STAGING/usr/bin/cmake" ]; then
     echo "==> Integrating native developer tools..."
     merge_staging_tree "$DEVELOPER_TOOLS_STAGING"
 else
-    echo "==> Developer tools staging not found, skipping (run build-developer-tools-aarch64.sh first)"
+    echo "==> Developer tools staging not found, skipping (run scripts/build-developer-tools-aarch64.sh first)"
 fi
 
 if [ -x "$VLANG_STAGING/usr/lib/vlang/v" ]; then
     echo "==> Integrating the native V compiler..."
     merge_staging_tree "$VLANG_STAGING"
 else
-    echo "==> V staging not found, skipping (run build-v-aarch64.sh first)"
+    echo "==> V staging not found, skipping (run scripts/build-v-aarch64.sh first)"
 fi
 
 if [ -x "$CODEX_STAGING/usr/bin/codex" ]; then
     echo "==> Integrating Codex CLI runtime..."
     merge_staging_tree "$CODEX_STAGING"
 else
-    echo "==> Codex staging not found, skipping (run build-codex-aarch64.sh first)"
+    echo "==> Codex staging not found, skipping (run scripts/build-codex-aarch64.sh first)"
 fi
 
 if [ -x "$CLAUDE_STAGING/usr/bin/claude" ]; then
     echo "==> Integrating Claude Code CLI runtime..."
     merge_staging_tree "$CLAUDE_STAGING"
 else
-    echo "==> Claude Code staging not found, skipping (run build-claude-aarch64.sh first)"
+    echo "==> Claude Code staging not found, skipping (run scripts/build-claude-aarch64.sh first)"
 fi
 
 if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
@@ -632,7 +632,7 @@ if [ -x "$X86_TRANSLATION_STAGING/usr/bin/qemu-x86_64" ]; then
         rm -f "$office_vsta_metadata"
     fi
 else
-    echo "==> x86-64 translation staging not found, skipping (run build-x86-translation-aarch64.sh first)"
+    echo "==> x86-64 translation staging not found, skipping (run scripts/build-x86-translation-aarch64.sh first)"
 fi
 else
     echo "==> Skipping optional runtime overlays (VINIX_ALPINE_BASE_ONLY=1)"
@@ -659,4 +659,4 @@ echo "=== Build complete ==="
 echo "Initramfs: $INITRAMFS"
 echo "Busybox applets: $(find "$STAGING" -type l | wc -l | tr -d ' ')"
 echo ""
-echo "To boot: ./run-aarch64.sh"
+echo "To boot: ./scripts/run-aarch64.sh"

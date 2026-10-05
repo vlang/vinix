@@ -50,4 +50,4 @@ Staged Vinix sandbox, mandatory policy and audit utilities (aarch64).
 Initramfs: /Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc-production-v6/aarch64/initramfs.tar
 Busybox applets: 378
 
-To boot: ./run-aarch64.sh
+To boot: ./scripts/run-aarch64.sh

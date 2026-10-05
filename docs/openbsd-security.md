@@ -443,7 +443,7 @@ read  stubs__strlen < strlen < vstrlen < tos2 < cstring_to_vstring < fs__user_pa
 ```
 
 `VINIX_CMDLINE=vinix.user_access=audit` passes the option through
-`run-aarch64.sh` and the amd64 test ISO. A debug kernel (`PROD=false`) audits
+`scripts/run-aarch64.sh` and the amd64 test ISO. A debug kernel (`PROD=false`) audits
 unless told otherwise, since it traces each syscall's path argument where the
 process has it.
 

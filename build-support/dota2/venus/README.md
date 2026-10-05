@@ -1,6 +1,6 @@
 This is the x86-64 Mesa Venus driver in Dota's private runtime. It renders on
 the host GPU when Vinix runs on KekVM's GPU-enabled QEMU (`--venus`); the
-native ARM64 driver from `build-venus-aarch64.sh` cannot load into the
+native ARM64 driver from `scripts/build-venus-aarch64.sh` cannot load into the
 translated game. `venus-build.py` builds Mesa 25.0.5, the native driver's
 release, with its `vinix.patch` (render-node discovery without sysfs and
 X11 presentation through MIT-SHM). It uses the Debian sysroot that

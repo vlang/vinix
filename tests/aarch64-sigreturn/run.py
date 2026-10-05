@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--kernel-dir', type=Path, default=ROOT / 'kernel')
     parser.add_argument('--state-dir', type=Path, required=True)
     parser.add_argument('--runner-root', type=Path, default=ROOT,
-                        help='repository containing run-aarch64.sh and its boot dependencies')
+                        help='repository containing scripts/run-aarch64.sh and its boot dependencies')
     parser.add_argument('--musl', type=Path,
                         default=ROOT / 'build-aarch64-android/aarch64/staging/opt/vinix-android-aarch64/lib/ld-musl-aarch64.so.1',
                         help='genuine ARM64 musl loader/libc image to exercise dynamically')
@@ -38,7 +38,7 @@ def main():
     loader = args.musl.resolve()
     runner = args.runner_root.resolve()
     boot_helper = runner / 'tests/kernel-gaps/run.py'
-    script = runner / 'run-aarch64.sh'
+    script = runner / 'scripts/run-aarch64.sh'
     if not all(p.is_file() for p in (kernel, loader, boot_helper, script)) or args.timeout <= 0:
         parser.error('Built kernel, musl image, repository runner, and positive timeout required')
     cc = shutil.which(args.cc)

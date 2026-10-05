@@ -241,7 +241,7 @@ The fake render node is opt-in and software-only. Boot it with enough RAM for
 the desktop initramfs and the staged Mesa Asahi runtime:
 
 ```sh
-./run-aarch64.sh --serial --fake-g17 --mem=8192
+./scripts/run-aarch64.sh --serial --fake-g17 --mem=8192
 ```
 
 At the Vinix prompt, run the three lifecycle-only depth/stencil cases:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # End-to-end QEMU check for repeated host syncs and a native desktop build.
-# Intended for run-desktop-aarch64.sh --guest-init.
+# Intended for scripts/run-desktop-aarch64.sh --guest-init.
 set -eu
 
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin

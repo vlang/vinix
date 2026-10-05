@@ -492,7 +492,7 @@ static int development_desktop_requested(void) {
 }
 
 /* Hyprland is an optional alternate session. The QEMU runner adds this
- * per-boot marker for run-hyprland-aarch64.sh, so merely staging its runtime
+ * per-boot marker for scripts/run-hyprland-aarch64.sh, so merely staging its runtime
  * never replaces the native desktop with a full-screen terminal. */
 static int hyprland_requested(void) {
 	i64 fd = syscall4(56 /* openat */, (u64)(i64)-100 /* AT_FDCWD */,

@@ -33,7 +33,7 @@ signature against a certificate supplied separately from the output tree.
 
 Python 3.9+, Clang, LLVM (`ld.lld`, `llvm-ar`, `llvm-objcopy`), make and patch
 are needed to obtain a loader. `get-loader.py` downloads the same repository
-pinned Limine 12.8.0 source archive as `build-limine-aarch64.sh`, checks its
+pinned Limine 12.8.0 source archive as `scripts/build-limine-aarch64.sh`, checks its
 SHA-256 before extraction, and builds the UEFI port for either architecture.
 For aarch64 it applies the existing Vinix protocol base revision 2 patch.
 An offline archive may be supplied with `--source-archive`.

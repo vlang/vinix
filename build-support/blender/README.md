@@ -16,7 +16,7 @@ delta; keyboard records carry their UTF-8 byte count and payload.
 Build on Alpine 3.21/aarch64 with:
 
 ```sh
-./build-blender-native-aarch64.sh
+./scripts/build-blender-native-aarch64.sh
 ```
 
 The desktop image automatically stages

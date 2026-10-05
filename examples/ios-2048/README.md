@@ -20,9 +20,9 @@ distributed.
 With Clang and `ld64.lld` installed:
 
 ```sh
-./build-ios-aarch64.sh --with-2048
-./build-desktop-aarch64.sh
-./run-desktop-aarch64.sh --no-build
+./scripts/build-ios-aarch64.sh --with-2048
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-build
 ```
 
 Open **iOS 2048**, click **Play Game**, and drag horizontally or vertically to

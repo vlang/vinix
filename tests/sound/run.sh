@@ -19,7 +19,7 @@ trap cleanup EXIT INT TERM
 for input in "$sysroot/include" "$sysroot/lib/crt1.o" "$sysroot/lib/libc.a"; do
 	if [ ! -e "$input" ]; then
 		echo "ERROR: AArch64 test sysroot input is missing: $input" >&2
-		echo "       Run ./build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
+		echo "       Run ./scripts/build-userland-aarch64.sh first or set VINIX_AARCH64_SYSROOT." >&2
 		exit 1
 	fi
 done

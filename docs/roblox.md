@@ -46,10 +46,10 @@ Build the coherent native Android runtime described in [Android APKs](android.md
 then stage the Roblox launchers and include both layers in the desktop:
 
 ```sh
-./build-android-aarch64.sh --art-runtime /path/to/desugared-art-runtime \
+./scripts/build-android-aarch64.sh --art-runtime /path/to/desugared-art-runtime \
     --bionic-runtime /path/to/bionic-runtime --atl-runtime /path/to/atl-runtime
-./build-roblox-aarch64.sh
-./build-desktop-aarch64.sh --compact-initramfs --with-roblox
+./scripts/build-roblox-aarch64.sh
+./scripts/build-desktop-aarch64.sh --compact-initramfs --with-roblox
 ```
 
 `--with-roblox` includes the shared native Android layer. The Roblox builder

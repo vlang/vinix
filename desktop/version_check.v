@@ -118,7 +118,7 @@ fn outdated_page(width int, desktop &Desktop) []ui2.Element {
 	return children
 }
 
-// release_order ranks the tags deploy-iso.sh gives releases: iso-YYYY-MM-DD,
+// release_order ranks the tags scripts/deploy-iso.sh gives releases: iso-YYYY-MM-DD,
 // then -2, -3, ... for more releases on the same day. 0 is no such tag.
 fn release_order(tag string) i64 {
 	if tag.len < 14 || tag.len > 20 || !tag.starts_with('iso-') {

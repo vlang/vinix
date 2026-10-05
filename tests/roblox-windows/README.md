@@ -9,15 +9,15 @@ A test init runs Wine's Win64 smoke test, then `RobloxPlayerBeta.exe` on a
 private display, and watches it for `--seconds`.
 
 ```sh
-./build-x86-translation-aarch64.sh
+./scripts/build-x86-translation-aarch64.sh
 python3 tests/roblox-windows/run.py
 python3 tests/roblox-windows/run.py --strace
 ```
 
 It needs the X11 and userland layers (`build-aarch64-x11`,
 `build-aarch64-userland`) and a built kernel. `--repo` names another checkout
-to take the layers and `run-aarch64.sh` from, `--kernel-dir` another kernel,
-`--translation` another stage of `build-x86-translation-aarch64.sh` and
+to take the layers and `scripts/run-aarch64.sh` from, `--kernel-dir` another kernel,
+`--translation` another stage of `scripts/build-x86-translation-aarch64.sh` and
 `--version` a particular deployment. Everything is kept below `--work`
 (`build/roblox-windows`): the downloaded packages, the staged client,
 `vinix.log` with the serial console, and `uploads/` with Wine's log, any log

@@ -64,7 +64,7 @@ def main():
             "VINIX_OVMF_CODE": str(ROOT / "boot-image/edk2-aarch64-code-2048x1536.fd"),
         })
         process = subprocess.Popen([
-            str(ROOT / "run-desktop-aarch64.sh"), "--no-build", "--no-persist",
+            str(ROOT / "scripts/run-desktop-aarch64.sh"), "--no-build", "--no-persist",
             "--ephemeral", "--serial", "--mem=16384",
             f"--guest-init={ROOT}/tests/clipboard/guest-init.sh",
         ], env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)

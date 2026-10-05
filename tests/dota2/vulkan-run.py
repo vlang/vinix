@@ -231,7 +231,7 @@ def main() -> None:
         # stock firmware stopped at its splash with the Venus GPU attached.
         environment.update({"VINIX_QEMU_RESOLUTION": "2048x1536x32", "VINIX_OVMF_CODE": str(firmware)})
     # Accelerated QEMU needs a GL display; its serial console still uses stdio.
-    command = [str(REPO / "run-aarch64.sh"), "--no-build", "--no-persist", "--mem=8192",
+    command = [str(REPO / "scripts/run-aarch64.sh"), "--no-build", "--no-persist", "--mem=8192",
                *(["--venus"] if args.venus else ["--serial"])]
     pid, master = pty.fork()
     if pid == 0:

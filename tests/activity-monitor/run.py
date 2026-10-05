@@ -46,7 +46,7 @@ def main():
                         "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_HOST_SOURCE": "0",
                         "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": "4",
                         "VINIX_KEEP_TEMP_BOOT_DISK": "1"})
-            command = [str(repo / "run-aarch64.sh"), "--no-build", "--no-persist", "--serial",
+            command = [str(repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist", "--serial",
                        "--mem=2048", f"--guest-init={binary}"]
         else:
             subprocess.run([env.get("CC_AMD64", "x86_64-linux-musl-gcc"), "-static", "-O2",

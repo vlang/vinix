@@ -4,7 +4,7 @@
 #   ./desktop/tools/screenshot.sh out.png
 #
 # Requires the VM to have been started with a QMP socket, which
-# run-desktop-aarch64.sh --monitor sets up.
+# scripts/run-desktop-aarch64.sh --monitor sets up.
 #
 # This talks QMP rather than the human monitor. The human monitor is a
 # `server,nowait` socket that serves one client at a time, and a client that
@@ -18,7 +18,7 @@ SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
 if [ ! -S "$SOCKET" ]; then
     echo "ERROR: no QMP socket at $SOCKET" >&2
-    echo "Start the VM with ./run-desktop-aarch64.sh --monitor" >&2
+    echo "Start the VM with ./scripts/run-desktop-aarch64.sh --monitor" >&2
     exit 1
 fi
 

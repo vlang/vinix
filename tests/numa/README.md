@@ -37,7 +37,7 @@ hanging it.
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 
 ```sh
-./build-userland-aarch64.sh
+./scripts/build-userland-aarch64.sh
 tests/numa/run.sh
 ```
 

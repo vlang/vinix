@@ -103,7 +103,7 @@ def main() -> None:
             if platform.system() != "Darwin":
                 environment.setdefault("USE_TCG", "1")
             print(f"Guest artifacts: {state}; export: {uri}", flush=True)
-            result = helper.boot([str(ROOT / "run-aarch64.sh"), "--no-build", "--serial", "--mem=1024",
+            result = helper.boot([str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial", "--mem=1024",
                                   f"--guest-init={state / 'init'}"], environment, state,
                                  ["DOTA2 EXPORT: PASS"], ["DOTA2 EXPORT: FAIL", "KERNEL PANIC", "FATAL EXCEPTION"],
                                  args.timeout)

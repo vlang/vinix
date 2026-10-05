@@ -1,5 +1,5 @@
 #!/bin/sh
-# PID 1 for the automated Docker VM test (run-aarch64.sh --guest-init).
+# PID 1 for the automated Docker VM test (scripts/run-aarch64.sh --guest-init).
 export HOME=/root
 export PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export TERM=linux
