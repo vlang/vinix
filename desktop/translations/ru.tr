@@ -3410,3 +3410,171 @@ grapher.export_saved
 grapher.equation_label
 y =
 -----
+start.previous_page
+Назад
+-----
+start.next_page
+Вперёд
+-----
+notes.close_required
+Черновик не удалось сохранить. Продолжите редактирование, экспортируйте его или явно отмените изменения перед закрытием.
+-----
+notes.keep_editing
+Продолжить
+-----
+notes.discard
+Отменить черновик
+-----
+notes.confirm_discard
+Подтвердить отмену
+-----
+notes.confirm_discard_hint
+Отменить этот черновик? Сохранённые заметки останутся без изменений.
+-----
+notes.discard_ready
+При закрытии черновик будет отменён. Новые правки отменяют этот выбор.
+-----
+calculator.mode.basic
+Обычный
+-----
+calculator.mode.scientific
+Научный
+-----
+calculator.angle.degrees
+ГРАД
+-----
+calculator.angle.radians
+РАД
+-----
+calculator.scientific.sqrt
+sqrt
+-----
+calculator.scientific.reciprocal
+1/x
+-----
+calculator.scientific.square
+x^2
+-----
+calculator.scientific.sin
+sin
+-----
+calculator.scientific.cos
+cos
+-----
+calculator.scientific.tan
+tan
+-----
+calculator.scientific.asin
+asin
+-----
+calculator.scientific.acos
+acos
+-----
+calculator.scientific.atan
+atan
+-----
+calculator.scientific.ln
+ln
+-----
+calculator.scientific.log
+log10
+-----
+calculator.scientific.exp
+exp
+-----
+calculator.scientific.pi
+pi
+-----
+calculator.scientific.e
+e
+-----
+calculator.scientific.instructions
+Функции используют показанное число.
+-----
+calculator.scientific.resize
+Увеличьте окно для научных функций.
+-----
+calculator.scientific.shortcuts
+Ctrl-S: режим; Ctrl-D: единицы угла
+-----
+calculator.error
+Ошибка
+-----
+calculator.error.operation
+Не удалось выполнить эту операцию.
+-----
+calculator.error.domain
+Вне области определения функции.
+-----
+calculator.error.nonfinite
+Результат не является конечным числом.
+-----
+calculator.error.tangent
+Тангенс не определён для этого угла.
+-----
+app.color_meter
+Измеритель цвета
+-----
+color_meter.live
+Включить слежение
+-----
+color_meter.freeze
+Зафиксировать
+-----
+color_meter.sample
+Измерить
+-----
+color_meter.copy_hex
+Копировать HEX
+-----
+color_meter.copy_rgb
+Копировать RGB
+-----
+color_meter.x
+X (физический пиксель)
+-----
+color_meter.y
+Y (физический пиксель)
+-----
+color_meter.aperture
+Размер области
+-----
+color_meter.magnifier
+Лупа (9 x 9 пикселей)
+-----
+color_meter.value
+Значение RGB в кадровом буфере
+-----
+color_meter.ready
+Включите слежение за указателем или введите физические координаты и нажмите «Измерить».
+-----
+color_meter.live_status
+Слежение за указателем. Пробел или Escape фиксируют цвет, пока окно активно.
+-----
+color_meter.frozen
+Цвет зафиксирован.
+-----
+color_meter.copied
+Цвет скопирован в буфер гостевой системы. Ctrl-V вставляет его в текстовые поля.
+-----
+color_meter.unavailable
+Кадровый буфер рабочего стола недоступен.
+-----
+color_meter.invalid
+Выберите координаты внутри физического экрана.
+-----
+color_meter.invalid_input
+Введите координаты пикселей десятичными цифрами.
+-----
+color_meter.hint
+RGB — округлённое среднее по области. На краях учитываются только пиксели экрана.
+-----
+color_meter.clipboard_hint
+Ctrl-V: буфер гостя; Ctrl-Shift-V: буфер хоста. Значения RGB без цветовых профилей.
+-----
+color_meter.details
+Экран: {0}
+-----
+color_meter.resize
+Увеличьте окно для управления измерением цвета.
+-----

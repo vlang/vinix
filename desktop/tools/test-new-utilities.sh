@@ -25,7 +25,8 @@ import sys
 root, destination = Path(sys.argv[1]), Path(sys.argv[2])
 names = ['preview_app', 'console_app', 'system_information', 'utilities',
          'archive_app', 'disk_utility', 'backup_app', 'notes_app', 'reminders_app',
-         'grapher_app', 'quick_launch', 'i18n']
+         'grapher_app', 'calculator_features', 'color_meter', 'native_close',
+         'start_menu_paging', 'quick_launch', 'i18n']
 imports, bodies = set(), []
 for name in names:
     body = []
@@ -44,7 +45,8 @@ PY
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 for test in preview_app_memory console_app_memory system_information_memory native_paste_memory \
             archive_app_memory disk_utility_memory backup_app_memory native_poll_memory \
-            notes_app_memory reminders_app_memory grapher_app_memory; do
+            notes_app_memory reminders_app_memory grapher_app_memory calculator_features_memory \
+            color_meter_memory color_clipboard_memory native_close_memory start_menu_paging_memory; do
     cp "$root/desktop/tools/tests/${test}_test.v" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${test}_test.v"

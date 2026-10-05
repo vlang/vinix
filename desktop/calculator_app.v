@@ -112,6 +112,7 @@ fn build_native_calculator_layout(app &CalculatorApp) ui2.Element {
 				bold: text == '='
 				align: .center
 			})
+			action_id: text
 			native_style: true
 		}
 	}

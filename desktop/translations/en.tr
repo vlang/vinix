@@ -3410,3 +3410,171 @@ CSV samples saved. Empty Y cells mark undefined values.
 grapher.equation_label
 y =
 -----
+start.previous_page
+Previous
+-----
+start.next_page
+Next
+-----
+notes.close_required
+This draft could not be saved. Keep editing, export it, or explicitly discard it before closing.
+-----
+notes.keep_editing
+Keep editing
+-----
+notes.discard
+Discard draft
+-----
+notes.confirm_discard
+Confirm discard
+-----
+notes.confirm_discard_hint
+Discard this draft? Stored notes will stay unchanged.
+-----
+notes.discard_ready
+Draft will be discarded when you close. New edits cancel this choice.
+-----
+calculator.mode.basic
+Basic
+-----
+calculator.mode.scientific
+Scientific
+-----
+calculator.angle.degrees
+DEG
+-----
+calculator.angle.radians
+RAD
+-----
+calculator.scientific.sqrt
+sqrt
+-----
+calculator.scientific.reciprocal
+1/x
+-----
+calculator.scientific.square
+x^2
+-----
+calculator.scientific.sin
+sin
+-----
+calculator.scientific.cos
+cos
+-----
+calculator.scientific.tan
+tan
+-----
+calculator.scientific.asin
+asin
+-----
+calculator.scientific.acos
+acos
+-----
+calculator.scientific.atan
+atan
+-----
+calculator.scientific.ln
+ln
+-----
+calculator.scientific.log
+log10
+-----
+calculator.scientific.exp
+exp
+-----
+calculator.scientific.pi
+pi
+-----
+calculator.scientific.e
+e
+-----
+calculator.scientific.instructions
+Functions use the displayed number.
+-----
+calculator.scientific.resize
+Enlarge the window to show scientific controls.
+-----
+calculator.scientific.shortcuts
+Ctrl-S: mode; Ctrl-D: angle units
+-----
+calculator.error
+Error
+-----
+calculator.error.operation
+Cannot calculate this operation.
+-----
+calculator.error.domain
+Outside the function's domain.
+-----
+calculator.error.nonfinite
+Result is not finite.
+-----
+calculator.error.tangent
+Tangent is undefined at this angle.
+-----
+app.color_meter
+Color Meter
+-----
+color_meter.live
+Start Live
+-----
+color_meter.freeze
+Freeze
+-----
+color_meter.sample
+Sample
+-----
+color_meter.copy_hex
+Copy Hex
+-----
+color_meter.copy_rgb
+Copy RGB
+-----
+color_meter.x
+X (physical pixel)
+-----
+color_meter.y
+Y (physical pixel)
+-----
+color_meter.aperture
+Aperture
+-----
+color_meter.magnifier
+Magnifier (9 x 9 pixels)
+-----
+color_meter.value
+Framebuffer RGB value
+-----
+color_meter.ready
+Start Live to follow the pointer, or enter physical coordinates and Sample.
+-----
+color_meter.live_status
+Following the pointer. Space or Escape freezes the sample while focused.
+-----
+color_meter.frozen
+Sample frozen.
+-----
+color_meter.copied
+Colour copied to the guest clipboard. Ctrl-V pastes it in native text fields.
+-----
+color_meter.unavailable
+The desktop canvas is unavailable.
+-----
+color_meter.invalid
+Choose coordinates inside the physical display.
+-----
+color_meter.invalid_input
+Enter pixel coordinates using decimal digits.
+-----
+color_meter.hint
+RGB is the rounded mean of the aperture. Edge samples use only pixels on screen.
+-----
+color_meter.clipboard_hint
+Ctrl-V: guest clipboard; Ctrl-Shift-V: host clipboard. Values are framebuffer RGB, without colour profiles.
+-----
+color_meter.details
+Display: {0}
+-----
+color_meter.resize
+Enlarge the window to show sampling controls.
+-----

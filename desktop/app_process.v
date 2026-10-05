@@ -42,7 +42,9 @@ const remote_owned_element_key = '__vinix.remote.owned'
 // application published to a running desktop on its own draws only what that
 // compositor can.
 const app_feature_toolbar = u8(1) // app_toolbar_id toolbars and Finder's glyphs
-const app_features = app_feature_toolbar
+const app_feature_close_guard = u8(2)
+const app_feature_desktop_services = u8(4)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services
 
 // What the compositor at the other end of the pipe draws: this program's own
 // features until a request says otherwise.
@@ -69,9 +71,9 @@ fn native_app_poll_reply(mut app NativeApp) []u8 {
 		mut poller := PollingApp(app)
 		changed = poller.poll()
 	}
-	// The owned reply has at most five bytes. Preallocate it so appending the
-	// cadence never leaves earlier buffers behind under -manualfree.
-	mut poll_payload := []u8{cap: 5}
+	// Quiet replies have at most five bytes; a desktop service adds24 bytes.
+	// Preallocate both so appends retain no old buffers under -manualfree.
+	mut poll_payload := []u8{cap: 5 + color_meter_request_size}
 	unsafe { poll_payload.flags |= .noslices }
 	poll_payload << u8(if changed { 1 } else { 0 })
 	// Standalone applications can keep their fixed cadence with one byte.
@@ -79,6 +81,12 @@ fn native_app_poll_reply(mut app NativeApp) []u8 {
 		pacer := PollPacedApp(app)
 		wire_put_u32(mut poll_payload, u32(pacer.next_poll_ms()))
 	}
+	service := native_app_desktop_service_request(mut app)
+	if service.len > 0 {
+		if poll_payload.len == 1 { wire_put_u32(mut poll_payload, 0) }
+		for byte in service { poll_payload << byte }
+	}
+	if service.cap > 0 { unsafe { service.free() } }
 	return poll_payload
 }
 
@@ -90,6 +98,8 @@ enum AppCommand as u8 {
 	pointer
 	close
 	paste_input
+	prepare_close
+	desktop_service_reply
 }
 
 struct AppPointerPayload {
@@ -119,6 +129,7 @@ struct AppWireState {
 
 struct AppReply {
 	ok      bool
+	features u8
 	state   AppWireState
 	payload []u8
 }
@@ -669,7 +680,8 @@ fn decode_app_element(mut reader WireReader, depth int) !ui2.Element {
 }
 
 fn decode_app_tree(payload []u8) !ui2.Element {
-	mut reader := WireReader{ data: payload }
+	mut reader := &WireReader{ data: payload }
+	defer { unsafe { free(reader) } }
 	tree := decode_app_element(mut reader, 0)!
 	if reader.index != payload.len {
 		free_tree(tree)
@@ -790,7 +802,8 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 		unsafe { header.free() }
 		return error('application request pipe closed')
 	}
-	mut reader := WireReader{ data: header }
+	mut reader := &WireReader{ data: header }
+	defer { unsafe { free(reader) } }
 	magic := reader.take_u32()!
 	version := reader.take_u8()!
 	command_value := int(reader.take_u8()!)
@@ -802,7 +815,7 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	payload_length := int(reader.take_u32()!)
 	unsafe { header.free() }
 	if magic != app_protocol_magic || version != app_protocol_version
-		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.paste_input)
+		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.desktop_service_reply)
 		|| payload_length < 0 || payload_length > app_protocol_max_payload {
 		return error('invalid application request')
 	}
@@ -827,7 +840,7 @@ fn send_app_response(fd int, ok bool, state AppWireState, payload []u8) bool {
 	wire_put_u32(mut header, app_protocol_magic)
 	wire_put_u8(mut header, app_protocol_version)
 	wire_put_u8(mut header, if ok { u8(0) } else { u8(1) })
-	wire_put_u8(mut header, 0)
+	wire_put_u8(mut header, app_features)
 	wire_put_u8(mut header, 0)
 	wire_put_state(mut header, state)
 	wire_put_u32(mut header, u32(payload.len))
@@ -901,11 +914,12 @@ fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
 		unsafe { header.free() }
 		return error('application response header timed out or pipe closed')
 	}
-	mut reader := WireReader{ data: header }
+	mut reader := &WireReader{ data: header }
+	defer { unsafe { free(reader) } }
 	magic := reader.take_u32()!
 	version := reader.take_u8()!
 	status := reader.take_u8()!
-	reader.take_u8()!
+	features := reader.take_u8()!
 	reader.take_u8()!
 	state := wire_take_state(mut reader)!
 	payload_length := int(reader.take_u32()!)
@@ -921,6 +935,7 @@ fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
 	}
 	return AppReply{
 		ok:      status == 0
+		features: features
 		state:   state
 		payload: payload
 	}
@@ -1033,7 +1048,7 @@ fn run_app_process(options AppProcessOptions) {
 					free_app_payload(payload)
 					continue
 				}
-				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+				if !send_native_app_operation_response(options.response_fd, app_current_state(desktop), mut app) {
 					free_app_payload(payload)
 					break
 				}
@@ -1043,7 +1058,7 @@ fn run_app_process(options AppProcessOptions) {
 					mut keyboard := KeyboardApp(app)
 					keyboard.key_input(payload)
 				}
-				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+				if !send_native_app_operation_response(options.response_fd, app_current_state(desktop), mut app) {
 					free_app_payload(payload)
 					break
 				}
@@ -1058,7 +1073,7 @@ fn run_app_process(options AppProcessOptions) {
 					mut keyboard := KeyboardApp(app)
 					keyboard.key_input(payload)
 				}
-				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+				if !send_native_app_operation_response(options.response_fd, app_current_state(desktop), mut app) {
 					free_app_payload(payload)
 					break
 				}
@@ -1118,6 +1133,20 @@ fn run_app_process(options AppProcessOptions) {
 				free_app_payload(payload)
 				break
 			}
+			.prepare_close {
+				allowed := native_app_prepare_close(mut app)
+				answer := [u8(if allowed { 1 } else { 0 })]
+				sent := send_app_response(options.response_fd, true, app_current_state(desktop), answer)
+				unsafe { answer.free() }
+				if !sent { free_app_payload(payload) break }
+			}
+			.desktop_service_reply {
+				native_app_receive_desktop_service(mut app, payload)
+				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+					free_app_payload(payload)
+					break
+				}
+			}
 		}
 		free_app_payload(payload)
 	}
@@ -1142,6 +1171,9 @@ mut:
 	last_poll_ms     u64
 	keyboard         bool
 	standalone       bool
+	peer_features    u8
+	desktop_services bool
+	color_sample     ColorMeterReport
 	pointer          bool
 	us_keys          bool
 	closed           bool
@@ -1223,6 +1255,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		poll_interval_ms: factory.poll_interval_ms
 		keyboard:         factory.keyboard
 		standalone:       factory.standalone
+		desktop_services: factory.desktop_services
 		pointer:          factory.pointer
 		us_keys:          factory.us_keys
 		desktop:          desktop
@@ -1235,6 +1268,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		remote.abort_transport()
 		return app_reply_error(reply)
 	}
+	remote.peer_features = reply.features
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
@@ -1357,6 +1391,9 @@ fn (mut a RemoteApp) handle(event_id string) ! {
 	if !reply.ok {
 		return app_reply_error(reply)
 	}
+	if a.desktop_services && reply.payload.len > 0 {
+		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
@@ -1371,6 +1408,9 @@ fn (mut a RemoteApp) key_input(text string) {
 	}
 	a.tree_stale = true
 	reply := a.transact(.key_input, 0, 0, text) or { return }
+	if reply.ok && a.desktop_services && reply.payload.len > 0 {
+		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
@@ -1388,6 +1428,9 @@ fn (mut a RemoteApp) paste_input(text string) {
 	// Installed standalone clients may predate the dedicated paste command.
 	command := if a.standalone { AppCommand.key_input } else { AppCommand.paste_input }
 	reply := a.transact(command, 0, 0, text) or { return }
+	if reply.ok && a.desktop_services && reply.payload.len > 0 {
+		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
@@ -1455,7 +1498,11 @@ fn (mut a RemoteApp) poll() bool {
 		a.tree_stale = true
 		return true
 	}
-	changed := reply.payload.len >= 1 && reply.payload[0] != 0
+	client_changed := reply.payload.len >= 1 && reply.payload[0] != 0
+	mut changed := client_changed
+	if a.desktop_services && reply.payload.len == 5 + color_meter_request_size {
+		changed = a.handle_desktop_service(unsafe { tos(&reply.payload[5], color_meter_request_size) }) || changed
+	}
 	if changed {
 		a.tree_stale = true
 	}
@@ -1467,7 +1514,7 @@ fn (mut a RemoteApp) poll() bool {
 	// A quiet interactive client can use a long interval without making command
 	// output crawl: typing already forces the first poll, and a changed reply
 	// keeps polling on subsequent rendered frames until the output is drained.
-	if changed && a.keyboard && a.poll_interval_ms > 0 {
+	if client_changed && a.keyboard && a.poll_interval_ms > 0 {
 		a.poll_sampled = false
 	}
 	if reply.payload.cap > 0 {

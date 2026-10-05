@@ -601,7 +601,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 40
+	assert available_apps.len == 41
 	assert available_apps[31].process_name == 'vinix-preview'
 	assert available_apps[31].keyboard && available_apps[31].pointer
 	assert available_apps[32].process_name == 'vinix-console'
@@ -622,6 +622,9 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[38].keyboard && available_apps[38].polling
 	assert available_apps[39].process_name == 'vinix-grapher'
 	assert available_apps[39].keyboard && !available_apps[39].polling
+	assert available_apps[40].process_name == 'vinix-color-meter'
+	assert available_apps[40].keyboard && available_apps[40].polling && available_apps[40].desktop_services
+	assert available_apps[40].poll_interval_ms == 100
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -747,7 +750,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 40
+	assert available_apps.len == 41
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len
@@ -981,8 +984,17 @@ fn test_start_button_opens_a_windows_7_style_menu_and_searches_programs() {
 	assert desktop.start_menu_all_apps
 	all_programs := desktop.build_tree()
 	assert utility_tree_has_text(all_programs, '<  Back')
-	assert utility_tree_has_text(all_programs, 'Microsoft Word 2013')
+	assert utility_tree_has_text(all_programs, tr('start.next_page'))
 	free_tree(all_programs)
+	mut word_found := false
+	for _ in 0 .. available_apps.len {
+		desktop.handle_start_action(action_start_next)
+		page := desktop.build_tree()
+		word_found = utility_tree_has_text(page, 'Microsoft Word 2013')
+		free_tree(page)
+		if word_found { break }
+	}
+	assert word_found
 
 	desktop.start_menu_key_input('note')
 	assert desktop.start_menu_query.bytestr() == 'note'

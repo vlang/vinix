@@ -3410,3 +3410,171 @@ Muestras CSV guardadas. Las celdas Y vacías indican valores indefinidos.
 grapher.equation_label
 y =
 -----
+start.previous_page
+Anterior
+-----
+start.next_page
+Siguiente
+-----
+notes.close_required
+No se pudo guardar el borrador. Siga editando, expórtelo o descártelo explícitamente antes de cerrar.
+-----
+notes.keep_editing
+Seguir editando
+-----
+notes.discard
+Descartar borrador
+-----
+notes.confirm_discard
+Confirmar descarte
+-----
+notes.confirm_discard_hint
+¿Descartar este borrador? Las notas guardadas no cambiarán.
+-----
+notes.discard_ready
+El borrador se descartará al cerrar. Los cambios nuevos cancelan esta elección.
+-----
+calculator.mode.basic
+Básica
+-----
+calculator.mode.scientific
+Científica
+-----
+calculator.angle.degrees
+GRAD
+-----
+calculator.angle.radians
+RAD
+-----
+calculator.scientific.sqrt
+sqrt
+-----
+calculator.scientific.reciprocal
+1/x
+-----
+calculator.scientific.square
+x^2
+-----
+calculator.scientific.sin
+sin
+-----
+calculator.scientific.cos
+cos
+-----
+calculator.scientific.tan
+tan
+-----
+calculator.scientific.asin
+asin
+-----
+calculator.scientific.acos
+acos
+-----
+calculator.scientific.atan
+atan
+-----
+calculator.scientific.ln
+ln
+-----
+calculator.scientific.log
+log10
+-----
+calculator.scientific.exp
+exp
+-----
+calculator.scientific.pi
+pi
+-----
+calculator.scientific.e
+e
+-----
+calculator.scientific.instructions
+Las funciones usan el número mostrado.
+-----
+calculator.scientific.resize
+Amplíe la ventana para ver las funciones científicas.
+-----
+calculator.scientific.shortcuts
+Ctrl-S: modo; Ctrl-D: unidades angulares
+-----
+calculator.error
+Error
+-----
+calculator.error.operation
+No se puede calcular esta operación.
+-----
+calculator.error.domain
+Fuera del dominio de la función.
+-----
+calculator.error.nonfinite
+El resultado no es finito.
+-----
+calculator.error.tangent
+La tangente no está definida para este ángulo.
+-----
+app.color_meter
+Medidor de color
+-----
+color_meter.live
+Iniciar seguimiento
+-----
+color_meter.freeze
+Fijar
+-----
+color_meter.sample
+Medir
+-----
+color_meter.copy_hex
+Copiar hex
+-----
+color_meter.copy_rgb
+Copiar RGB
+-----
+color_meter.x
+X (píxel físico)
+-----
+color_meter.y
+Y (píxel físico)
+-----
+color_meter.aperture
+Área de medición
+-----
+color_meter.magnifier
+Lupa (9 x 9 píxeles)
+-----
+color_meter.value
+Valor RGB del búfer de imagen
+-----
+color_meter.ready
+Siga el puntero o introduzca coordenadas físicas y pulse Medir.
+-----
+color_meter.live_status
+Siguiendo el puntero. Espacio o Escape fijan la muestra con esta ventana activa.
+-----
+color_meter.frozen
+Muestra fijada.
+-----
+color_meter.copied
+Color copiado al portapapeles del sistema invitado. Ctrl-V lo pega en campos nativos.
+-----
+color_meter.unavailable
+El búfer del escritorio no está disponible.
+-----
+color_meter.invalid
+Elija coordenadas dentro de la pantalla física.
+-----
+color_meter.invalid_input
+Introduzca coordenadas de píxeles con dígitos decimales.
+-----
+color_meter.hint
+RGB es la media redondeada del área. En los bordes solo se usan píxeles de la pantalla.
+-----
+color_meter.clipboard_hint
+Ctrl-V: portapapeles invitado; Ctrl-Shift-V: anfitrión. Valores RGB sin perfiles de color.
+-----
+color_meter.details
+Pantalla: {0}
+-----
+color_meter.resize
+Amplíe la ventana para ver los controles de medición.
+-----

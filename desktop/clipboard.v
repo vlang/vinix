@@ -27,6 +27,18 @@ mut:
 	success    bool
 	data       []u8
 	pending    string
+	// Session-local colour values are short and need no allocating buffer.
+	local_bytes [64]u8
+	local_length int
+	local_available bool
+}
+
+fn (mut c HostClipboard) set_local_text(text string) bool {
+	if text.len == 0 || text.len > c.local_bytes.len { return false }
+	for index, byte in text { c.local_bytes[index] = byte }
+	c.local_length = text.len
+	c.local_available = true
+	return true
 }
 
 fn (mut c HostClipboard) configure() {
@@ -59,7 +71,7 @@ fn clipboard_text(input string) string {
 
 fn (mut d Desktop) take_paste_keys(keys string) string {
 	d.clipboard.configure()
-	if d.clipboard.url.len == 0 {
+	if d.clipboard.url.len == 0 && !d.clipboard.local_available {
 		return keys
 	}
 	if d.clipboard.pending.len == 0 && keys.index_u8(0x16) < 0 && keys.index_u8(0x1b) < 0 {
@@ -76,12 +88,14 @@ fn (mut d Desktop) take_paste_keys(keys string) string {
 	mut at := 0
 	for at < input.len {
 		mut length := if input[at] == 0x16 { 1 } else { 0 }
+		mut force_host := false
 		mut partial := false
 		if length == 0 && input[at] == 0x1b {
 			for chord in [key_cmd_v, key_ctrl_shift_v, key_shift_insert]! {
 				matched := match_at(input, at, chord)
 				if matched > 0 {
 					length = chord.len
+					force_host = chord == key_ctrl_shift_v
 					break
 				}
 				if matched == seq_partial {
@@ -90,7 +104,7 @@ fn (mut d Desktop) take_paste_keys(keys string) string {
 			}
 		}
 		if partial && length == 0 {
-			d.clipboard.pending = input[at..].clone()
+			d.clipboard.pending = unsafe { tos(&input.str[at], input.len - at).clone() }
 			break
 		}
 		if length > 0 {
@@ -104,7 +118,7 @@ fn (mut d Desktop) take_paste_keys(keys string) string {
 				}
 				kept.clear()
 			}
-			d.request_host_paste()
+			d.request_paste(force_host)
 			at += length
 		} else {
 			kept << input[at]
@@ -124,6 +138,17 @@ fn (mut d Desktop) take_paste_keys(keys string) string {
 }
 
 fn (mut d Desktop) request_host_paste() {
+	d.request_paste(false)
+}
+
+fn (mut d Desktop) request_paste(force_host bool) {
+	if !force_host && d.clipboard.local_available {
+		text := unsafe { tos(&d.clipboard.local_bytes[0], d.clipboard.local_length) }
+		if d.start_menu_open { d.start_menu_key_input(text) }
+		else if d.focused_app_takes_keys() { d.send_paste_to_focused(text) }
+		return
+	}
+	if d.clipboard.url.len == 0 { return }
 	if d.clipboard.pid > 0 || (!d.start_menu_open && !d.focused_app_takes_keys()) {
 		return
 	}

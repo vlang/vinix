@@ -1437,6 +1437,17 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			d.canvas.draw_line(cx, top + tall / 3, left + body * 4 / 5,
 				top + tall / 2, 0xffd96a, if w > 24 { 2 } else { 1 })
 		}
+		'color_meter' {
+			body := w * 3 / 4
+			tall := h * 3 / 4
+			left := cx - body / 2
+			top := cy - tall / 2
+			d.canvas.fill_round_rect(left, top, body, tall, 3, 0xe7edf4)
+			d.canvas.fill_rect(left + body / 6, top + tall / 5, body / 3, tall * 3 / 5, 0xe76568)
+			d.canvas.fill_rect(cx, top + tall / 5, body / 3, tall * 3 / 5, 0x62a6df)
+			d.canvas.draw_line(left + body / 4, top + tall * 4 / 5,
+				left + body * 4 / 5, top + tall / 6, 0x343b4b, if w > 24 { 3 } else { 2 })
+		}
 		'archive' {
 			body := w * 3 / 5
 			tall := h * 3 / 4

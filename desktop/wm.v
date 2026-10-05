@@ -184,6 +184,7 @@ mut:
 	start_menu_open      bool
 	start_menu_all_apps  bool
 	start_menu_searching bool
+	start_menu_page      int
 	start_menu_query     []u8
 	// Programs pinned to the Start menu and the most recently launched ones,
 	// both catalog indices persisted by process name.
@@ -291,7 +292,9 @@ fn (mut d Desktop) raise(id int) {
 	index := d.window_index(id) or { return }
 	window := d.windows[index]
 	d.windows.delete(index)
-	d.windows << window
+	// Transfer the deleted slot's owned strings and thumbnail to the tail.
+	// An ordinary append deep-clones the Window and strands its old payload.
+	unsafe { d.windows.push_many(&window, 1) }
 	d.focus = id
 	d.acknowledge_attention(id)
 	d.dirty = true
@@ -303,6 +306,11 @@ fn (mut d Desktop) close_window(id int) {
 	app_index := d.windows[index].app_index
 	if app_index >= 0 && app_index < d.apps.len {
 		mut app := d.apps[app_index]
+		if !native_app_prepare_close(mut app) {
+			d.activate(id)
+			d.dirty = true
+			return
+		}
 		if mut app is RemoteApp {
 			app.close()
 		}
@@ -959,7 +967,8 @@ fn (mut d Desktop) send_keys_to_focused(keys string) {
 		return
 	}
 	if mut app is KeyboardApp {
-		app.key_input(keys)
+		mut keyboard := KeyboardApp(app)
+		keyboard.key_input(keys)
 		d.dirty = true
 	}
 }
@@ -969,6 +978,18 @@ fn (mut d Desktop) send_keys_to_focused(keys string) {
 // ordinary process that happens to own the screen: there, ending the session
 // means giving the console back to that shell and nothing more.
 fn (mut d Desktop) end_session(action PowerAction) {
+	// Ask every live client before closing any transport. A failed save keeps
+	// the session running and brings its draft back into view.
+	for index in 0 .. d.apps.len {
+		mut app := d.apps[index]
+		if !native_app_prepare_close(mut app) {
+			for window in d.windows {
+				if window.app_index == index { d.activate(window.id) break }
+			}
+			d.dirty = true
+			return
+		}
+	}
 	if desktop_is_system_session() {
 		d.power = action
 	}
