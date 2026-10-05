@@ -279,7 +279,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 	for i in 0 .. events.len {
 		mut duplicate := false
 		for j in 0 .. i {
-			if events[i] == events[j] { duplicate = true; break }
+			if voidptr(events[i]) == voidptr(events[j]) { duplicate = true; break }
 		}
 		if !duplicate { needed_events++ }
 		if needed_events > proc.max_events { return errno.err, errno.einval }
