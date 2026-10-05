@@ -312,7 +312,9 @@ pub fn (image Image) execution_issues() []string {
 		issues << 'required load command 0x${command.hex()} is not implemented'
 	}
 	for library in image.libraries {
-		if library.name != '/usr/lib/libSystem.B.dylib' && !library.weak {
+		if library.name !in ['/usr/lib/libSystem.B.dylib', '/usr/lib/libobjc.A.dylib',
+			'/System/Library/Frameworks/Foundation.framework/Foundation',
+			'/System/Library/Frameworks/UIKit.framework/UIKit'] && !library.weak {
 			issues << 'framework/library is not implemented: ${library.name}'
 		}
 	}

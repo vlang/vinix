@@ -15,6 +15,8 @@ FEATURES = (
     b"iOS PASS: return status and unsupported imports",
     b"iOS PASS: universal executable selects ARM64",
     b"iOS PASS: ARM64e and malformed images rejected",
+    b"iOS PASS: UIKit Mach-O 27 button/action cases",
+    b"iOS PASS: UIKit resize, keyboard, 1000 updates and ARC teardown",
 )
 
 
@@ -45,6 +47,8 @@ def main() -> int:
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "build-ios-aarch64.sh")], check=True)
     subprocess.run(["sh", str(ROOT / "tests/ios/build-fixture.sh"), str(build / "fixtures")], check=True)
+    subprocess.run(["bash", str(ROOT / "examples/ios-calculator/build.sh")],
+        env={**os.environ, "VINIX_IOS_CALCULATOR_BUILD_DIR": str(build / "objc")}, check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
@@ -61,13 +65,14 @@ def main() -> int:
         shutil.copy2(build / "staging/usr/bin/run-ios", destination / "run-ios")
         for name in ("calculator", "unsupported"):
             shutil.copy2(build / "fixtures" / name, destination / name)
+        shutil.copy2(build / "objc/Calculator.app/Calculator", destination / "UIKitCalculator")
         prepare_images(build / "fixtures", destination)
         # Same small static musl sysroot used by the existing syscall tests.
         sysroot = Path(os.environ.get("VINIX_IOS_TEST_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
         subprocess.run([
             os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
             "-static", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-            str(ROOT / "tests/ios/guest.c"), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
+            str(ROOT / "tests/ios/guest.c"), str(ROOT / "tests/ios/uikit-guest.c"), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
             "-o", str(work / "init"),
         ], check=True)
         subprocess.run(["tar", "--format=ustar", "-cf", str(work / "initramfs.tar"),

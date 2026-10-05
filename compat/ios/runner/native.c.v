@@ -27,7 +27,9 @@ fn execute(image macho.Image, arguments []string) !int {
 	if mapping == unsafe { voidptr(-1) } { return error('iOS: cannot allocate image mapping') }
 	defer { C.munmap(mapping, usize(layout.size)) }
 	base := u64(mapping)
-	fixups := image.plan_fixups(layout, base, libsystem_symbol)!
+	objc_start()
+	defer { objc_stop() }
+	fixups := image.plan_fixups(layout, base, runtime_symbol)!
 	for segment in image.segments {
 		if segment.name == '__PAGEZERO' || segment.filesize == 0 { continue }
 		unsafe {
@@ -40,6 +42,7 @@ fn execute(image macho.Image, arguments []string) !int {
 		value := fixup.value
 		unsafe { C.memcpy(voidptr(base + fixup.offset), &value, 8) }
 	}
+	objc_register_image(image, layout, base)!
 	C.__builtin___clear_cache(mapping, unsafe { voidptr(base + layout.size) })
 	if C.mprotect(mapping, usize(layout.size), C.PROT_NONE) != 0 {
 		return error('iOS: cannot protect image gaps')

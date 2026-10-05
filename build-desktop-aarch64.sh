@@ -68,6 +68,7 @@ X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarc
 STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
+IOS_STAGING="${VINIX_IOS_STAGING:-$SCRIPT_DIR/build/ios/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -1223,6 +1224,13 @@ fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp" \
     "$STAGING/run"
+# The iOS compatibility layer is staged by ./build-ios-aarch64.sh.
+if [ -x "$IOS_STAGING/usr/bin/run-ios" ]; then
+    install -m755 "$IOS_STAGING/usr/bin/run-ios" "$STAGING/usr/bin/run-ios"
+    ln -sf run-ios "$STAGING/usr/bin/vinix-ios-calculator"
+    mkdir -p "$STAGING/usr/share/vinix/ios"
+    cp -R "$IOS_STAGING/usr/share/vinix/ios/Calculator.app" "$STAGING/usr/share/vinix/ios/"
+fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
 # files at the root of the image.
@@ -1654,6 +1662,8 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/musl/alpine"
     "$SCRIPT_DIR/build-support/musl/alpine-1.2.6"
     "$STAGING/usr/share/vinix/musl-build.json"
+    "$STAGING/usr/bin/run-ios"
+    "$STAGING/usr/share/vinix/ios"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

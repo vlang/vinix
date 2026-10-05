@@ -197,6 +197,13 @@ only after a successful compile and link, so an interrupted rebuild does not
 destroy the last complete cache entry. Set `VINIX_AARCH64_APP_CACHE` when CI or
 an isolated build needs a different cache root.
 
+The separate **iOS Calculator** runs an ARM64 iOS Mach-O through the V
+Objective-C/Foundation/UIKit compatibility layer. `./build-ios-aarch64.sh`
+stages its runner and unchanged app bundle; the next desktop build includes
+both. It is a standalone display client using the same pipe protocol as
+VOffice. See [iOS compatibility](../docs/ios.md) for the supported subset and
+QEMU tests.
+
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source

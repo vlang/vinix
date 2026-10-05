@@ -1,21 +1,17 @@
-# iOS compatibility: first executable milestone
+# iOS compatibility: Objective-C UIKit calculator
 
-`run-ios` is an experimental userspace compatibility runner written in V. It
-loads ARM64 iOS Mach-O instructions into a normal Vinix process, binds a small
-libSystem interface and calls the executable's `LC_MAIN` entry point. The
-instructions run on the guest CPU. The kernel continues to load the runner's
-ELF executable; it needs no new Mach-O execution mode.
+`run-ios` loads ordinary ARM64 iOS Mach-O executables in a Vinix userspace
+process. The [Objective-C UIKit calculator](../examples/ios-calculator/README.md)
+now runs unchanged in a desktop window. Its original ARM64 methods perform the
+arithmetic and receive UIKit target/action messages. V implements the required
+Objective-C, Foundation and UIKit subset; a small assembly trampoline preserves
+integer, floating-point and structure arguments during message dispatch.
 
-This milestone runs the original calculator **probe** in `tests/ios/calculator.c`,
-compiled for `arm64-apple-ios15.0`. It does **not** run Apple's Calculator, create
-a UIKit window, or support general iOS applications. The existing native desktop
-calculator is independent of this runtime.
-
-An original [Objective-C UIKit Calculator](../examples/ios-calculator/README.md)
-now provides a small GUI application for the next milestone. Its build produces
-an ARM64 iOS `.app` and `.ipa`, with 25 chained imports across Foundation, UIKit,
-libobjc and libSystem. It is inspectable here; launching it still requires the
-Objective-C/framework compatibility layer and compositor bridge.
+The UIKit view tree is rendered by Vinix's existing desktop compositor using
+the standalone application protocol. The kernel loads the runner's static ELF
+and needs no Mach-O or Darwin syscall changes. This supports this calculator's
+API set; general iOS applications and Apple's own Calculator remain outside
+the implemented subset. The existing native Vinix calculator is a separate app.
 
 ## Build and run
 
@@ -24,42 +20,28 @@ once, then:
 
 ```sh
 ./build-ios-aarch64.sh
-./tests/ios/build-fixture.sh
-python3 tests/ios/run.py
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-build
+# Open "iOS Calculator" from the desktop or Start menu.
 ```
 
-The runner is `build/ios/staging/usr/bin/run-ios`. The fixture is a real,
-dynamically linked iOS Mach-O executable at `build/ios/fixtures/calculator`.
-The fixture's `.tbd` file describes import names only; it contains no Apple
-library implementation. Its arithmetic runs in that executable, while V's
-libSystem adapter implements string/integer calls and uses the host libc for
-heap allocation, output and compatible memory calls.
+The iOS builder produces the static runner, `vinix-ios-calculator` launcher,
+`Calculator.app` and `Calculator.ipa` under `build/ios/`. The desktop builder
+includes the runner and bundle when `build/ios/staging` exists; `VINIX_IOS_STAGING`
+selects another staging directory. The launcher passes the installed Mach-O to
+the runtime at `/usr/share/vinix/ios/Calculator.app/Calculator`.
 
-To try it in an ordinary Vinix VM:
+`VINIX_IOS_BUILD_DIR`, `VINIX_AARCH64_SYSROOT`, `V` and `LLVM_BIN` select runner
+build inputs/output. `IOS_CLANG`, `IOS_LD`, `IOS_SDK` and
+`VINIX_IOS_CALCULATOR_BUILD_DIR` configure the app builder. An iOS SDK is optional:
+the minimal declarations and linker import stubs contain no Apple implementation.
+The tested build uses those declarations, Clang and `ld64.lld`.
 
-```sh
-mkdir -p build/ios/staging/opt/ios
-cp build/ios/fixtures/calculator build/ios/staging/opt/ios/
-VINIX_QEMU_OVERLAY="$PWD/build/ios/staging" ./run-aarch64.sh --no-build --serial
-```
-
-In the guest:
-
-```sh
-run-ios --inspect /opt/ios/calculator
-run-ios /opt/ios/calculator 7 + 5
-# IOS-CALCULATOR: 12
-run-ios /opt/ios/calculator 2147483647 '*' 2147483647
-# IOS-CALCULATOR: 4611686014132420609
-```
-
-The staging overlay is for that boot. The runtime is not yet in the default
-image or package catalog. `VINIX_IOS_BUILD_DIR`, `VINIX_AARCH64_SYSROOT`, `V`
-and `LLVM_BIN` select the build inputs/output; `IOS_CLANG` and `IOS_LD` select
-the fixture compiler and Mach-O linker (`clang` and `ld64.lld` by default).
-The fixture needs no iOS SDK. The VM test reuses the existing ARM64 kernel and
-creates disposable boot, package and persistent disks. `--no-build` reuses the
-runner; `--timeout=SECONDS` controls the VM deadline.
+`run-ios --inspect BINARY` reports metadata; `--imports` lists imports. The C
+Mach-O probe still works with `run-ios /opt/ios/calculator 7 + 5` after staging it.
+UIKit apps require the desktop's `VINIX_REQUEST_FD`/`VINIX_RESPONSE_FD` pipe pair;
+executing a GUI app directly from a shell does not create a window. Set
+`VINIX_IOS_TRACE=1` for UILabel update diagnostics.
 
 ## Supported ABI
 
@@ -70,7 +52,11 @@ runner; `--timeout=SECONDS` controls the VM deadline.
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3, addends, weak unresolved symbols |
-| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, `_memcpy`, `_memset` |
+| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, `_memcpy`, `_memset`, `_strtod`; Darwin ARM64 `snprintf("%.12g", double)` adapter |
+| Objective-C | Class/metaclass registration, superclass dispatch, absolute/relative method lists, checked metadata, nonfragile ivar adjustment, native method execution, nil returns, allocation/new, retain/release/strong stores, autorelease pools and ARC destructors |
+| Foundation | NSObject allocation/initialization; heap NSString objects created from UTF-8 |
+| UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController, UIView, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius |
+| Desktop | VAPP v10 view/button/label serialization, resize and layout callbacks, button actions, ASCII calculator keyboard input, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata and chained import names, including ARM64e images |
 
 Header, command and segment ranges are checked before loading. Chained pointers
@@ -81,12 +67,18 @@ runner releases its mapping on return or link failure and exits after one app.
 
 ARM64e/PAC, encrypted images, non-PIE binaries, image initializers/terminators,
 Darwin TLS, custom stack sizes, legacy dyld opcodes and multiple chain starts
-per page are rejected. Mach services, direct Darwin syscalls, dynamic framework
-loading, Objective-C, Swift, Foundation, UIKit, SwiftUI, resources/bundles and
-application lifecycle are not implemented. In particular, variadic functions
-such as `_printf` cannot be forwarded to musl because their Apple ARM64 calling
-convention differs. An unknown strong import fails with its library/symbol
-name instead of binding a dummy function.
+per page are rejected. Objective-C categories, +load/+initialize, exceptions,
+weak references, blocks and Swift metadata are unsupported. Mach services,
+direct Darwin syscalls, dynamic framework loading, Swift/SwiftUI, general
+Foundation/UIKit APIs, scenes, nibs and bundle resource loading are not
+implemented. View trees have bounded depth and at most 64 children per view;
+the current action bridge handles controls in the root content view.
+
+Unknown strong imports and unknown methods fail with a specific diagnostic.
+General Darwin variadic calls such as `_printf` cannot be forwarded to musl.
+Only the calculator's `snprintf` double format has a calling-convention adapter.
+UIKit typography/fit-to-width is approximate and UIKit accessibility labels
+are accepted but not exposed through a Vinix accessibility service.
 
 ## Local Apple Calculator inspection
 
@@ -113,7 +105,7 @@ the repository):
 
 ```sh
 mkdir -p build/ios
-v -cc clang -gc none -path "@vlib|$PWD/compat/ios|@vmodules" \
+v -enable-globals -cc clang -gc none -path "@vlib|$PWD/compat/ios|@vmodules" \
   -o build/ios/run-ios-host compat/ios/runner
 build/ios/run-ios-host --imports \
   /System/Applications/Calculator.app/Contents/MacOS/Calculator
@@ -130,8 +122,11 @@ missing iOS executable.
 ## Validation and format references
 
 ```sh
-VMODULES="$PWD/compat/ios" v -cc clang test compat/ios
+VMODULES="$PWD/compat/ios" v -enable-globals -cc clang test compat/ios
+./tests/ios/run-objc-calculator.sh
+python3 tests/ios/uikit.py # after building build/ios/run-ios-host above
 python3 tests/ios/run.py
+python3 tests/ios/desktop.py --desktop build/vinix-desktop
 ```
 
 Host tests cover malformed file/command/section/segment/chain ranges, universal
@@ -139,9 +134,22 @@ byte orders, relocation, import addends, unsupported features and libSystem
 semantics. The Vinix guest executes addition, subtraction, multiplication,
 division and remainder, checks zero-filled data, exercises heap/string calls,
 checks error/exit propagation, selects ARM64 from a universal executable, and
-rejects missing imports, ARM64e and truncated images.
+rejects missing imports, ARM64e and truncated images. Both the host protocol
+client and Vinix guest exercise the unchanged UIKit Mach-O through all 27
+calculator cases, resize, keyboard input, 1,000 update cycles and complete ARC
+object teardown. ASan/UBSan checks the host runtime as well as the model.
+The desktop test boots a minimal isolated image, clicks 7, +, 5, = through QEMU's
+virtual pointer, checks the resulting UILabel update and saves
+`build/ios/calculator.ppm`. It needs a desktop binary built with the new launcher.
+The VM tests reuse the kernel and use disposable boot/package/persistent disks;
+`run.py --no-build` reuses the runner, and `--timeout=SECONDS` sets the deadline.
 
 The independently written parser follows Apple's public
 [Mach-O load command definitions](https://github.com/apple-oss-distributions/xnu/blob/main/EXTERNAL_HEADERS/mach-o/loader.h)
 and [dyld chained fixup definitions](https://github.com/apple-oss-distributions/dyld/blob/main/include/mach-o/fixup-chains.h).
 No Apple implementation or proprietary app bytes are vendored.
+
+The runtime follows the published [Objective-C metadata layout](https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-runtime-new.h)
+and [Apple ARM64 calling conventions](https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms).
+Framework behavior here is independently implemented in V, without copying
+Apple runtime or framework implementations.

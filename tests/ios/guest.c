@@ -51,6 +51,8 @@ static void run(const char *image, const char *left, const char *op,
     printf("iOS RESULT: %s", output);
 }
 
+extern void test_uikit(void);
+
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     const char *calculator = "/opt/ios/calculator";
@@ -70,6 +72,7 @@ int main(void) {
     run("/opt/ios/calculator-arm64e", NULL, NULL, NULL, 1, "ARM64e requires pointer authentication support");
     run("/opt/ios/truncated", NULL, NULL, NULL, 1, "file range exceeds input");
     puts("iOS PASS: ARM64e and malformed images rejected");
+    test_uikit();
     puts("VINIX iOS GUEST: PASS");
     for (;;) pause();
 }

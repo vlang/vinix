@@ -36,6 +36,10 @@ fn inspect(image macho.Image, show_imports bool) ! {
 }
 
 fn main() {
+	if os.file_name(os.args[0]) == 'vinix-ios-calculator' {
+		run_binary('/usr/share/vinix/ios/Calculator.app/Calculator', ['/usr/share/vinix/ios/Calculator.app/Calculator'])
+		return
+	}
 	if os.args.len < 2 || os.args[1] in ['--help', '-h'] {
 		println('usage: run-ios [--inspect|--imports] <ARM64 Mach-O executable> [arguments...]')
 		if os.args.len < 2 { exit(2) }
@@ -63,6 +67,22 @@ fn main() {
 		return
 	}
 	status := execute(image, os.args[index..]) or {
+		eprintln(err)
+		exit(1)
+	}
+	exit(status)
+}
+
+fn run_binary(path string, arguments []string) {
+	data := os.read_bytes(path) or {
+		eprintln('iOS: ${err}')
+		exit(1)
+	}
+	image := macho.parse(data) or {
+		eprintln(err)
+		exit(1)
+	}
+	status := execute(image, arguments) or {
 		eprintln(err)
 		exit(1)
 	}

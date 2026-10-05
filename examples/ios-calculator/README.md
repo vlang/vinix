@@ -45,19 +45,29 @@ The second run also checks that the minimal NSObject declaration reserves its
 
 ## Vinix compatibility target
 
-This is an application to run through [the V Mach-O runtime](../../docs/ios.md),
-not a Vinix port of the UI. The build inspected here has 25 chained imports
-across four libraries, compared with the local Apple macOS Calculator's
-2,059. Its class/selector metadata and imported functions provide a small,
-reproducible target for the next Objective-C/Foundation/UIKit compatibility work.
+The same compiled `.app` executable runs on Vinix through
+[the V Mach-O runtime](../../docs/ios.md). It has 25 imports across Foundation,
+UIKit, libobjc and libSystem. Vinix implements the subset needed by this app;
+its ARM64 Objective-C methods and target/action callbacks execute directly.
 
 ```sh
-build/ios/run-ios-host --imports build/ios/objc/Calculator.app/Calculator
+./build-ios-aarch64.sh
+./build-desktop-aarch64.sh
+./run-desktop-aarch64.sh --no-build
+# Open "iOS Calculator".
 ```
 
-`run-ios` can inspect it, but cannot launch its UI until those runtimes and the
-compositor bridge exist. The existing C Mach-O arithmetic probe remains the
-Vinix execution test; the UIKit app is not substituted for that passing test.
+The first command builds and stages both the runtime and app. The desktop
+builder installs `/usr/bin/vinix-ios-calculator` and the unchanged bundle below
+`/usr/share/vinix/ios/`. The compositor draws UIKit's controls and delivers button
+and keyboard input. The runtime handles resize callbacks and ARC teardown.
+
+`python3 tests/ios/run.py` runs the C probe and UIKit binary in an isolated Vinix
+VM. The UIKit test clicks all 27 model cases through the desktop protocol,
+checks resize and keyboard input, and runs 1,000 update cycles before closing.
+`python3 tests/ios/desktop.py --desktop build/vinix-desktop` additionally verifies
+real QEMU pointer clicks and saves a screenshot. Unknown imports or selectors
+fail explicitly; this is not general iOS framework compatibility.
 
 The UI uses Apple's documented
 [UIButton interface](https://developer.apple.com/documentation/uikit/uibutton?language=objc)

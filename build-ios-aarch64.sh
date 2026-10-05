@@ -18,7 +18,7 @@ for input in "$SYSROOT/usr/lib/libc.a" "$SYSROOT/usr/lib/crt1.o" "$GCCLIB/libgcc
     fi
 done
 mkdir -p "$OUTPUT/staging/usr/bin"
-"$V" -os linux -arch arm64 -gc none -prod -d glibc -d no_backtrace \
+"$V" -os linux -arch arm64 -enable-globals -gc none -prod -d glibc -d no_backtrace \
     -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
     -o "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner"
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
@@ -26,7 +26,12 @@ mkdir -p "$OUTPUT/staging/usr/bin"
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$OUTPUT/run-ios.c" -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
+    "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
     -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" -o "$OUTPUT/staging/usr/bin/run-ios"
 echo "Built $OUTPUT/staging/usr/bin/run-ios"
+
+VINIX_IOS_CALCULATOR_BUILD_DIR="$OUTPUT/objc" bash "$SCRIPT_DIR/examples/ios-calculator/build.sh"
+mkdir -p "$OUTPUT/staging/usr/share/vinix/ios"
+cp -R "$OUTPUT/objc/Calculator.app" "$OUTPUT/staging/usr/share/vinix/ios/"
+ln -sf run-ios "$OUTPUT/staging/usr/bin/vinix-ios-calculator"
