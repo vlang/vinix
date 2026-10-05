@@ -80,11 +80,17 @@ fi
 cd "$SRC_DIR"
 for patch in "$PATCH_DIR"/${LIMINE_VERSION}-*.patch; do
     [ -f "$patch" ] || continue
-    if patch -p1 -R --dry-run -s -f < "$patch" >/dev/null 2>&1; then
+    # BSD patch can accept a reversed deletion hunk against unpatched source.
+    # Git checks the complete context and reliably distinguishes both states.
+    if git apply --check "$patch" 2>/dev/null; then
+        echo "==> applying $(basename "$patch")"
+        git apply "$patch"
+    elif git apply --reverse --check "$patch" 2>/dev/null; then
         echo "==> $(basename "$patch"): already applied"
     else
-        echo "==> applying $(basename "$patch")"
-        patch -p1 -N -s < "$patch"
+        echo "error: cannot apply $patch to $SRC_DIR" >&2
+        git apply --check "$patch" >&2 || true
+        exit 1
     fi
 done
 
@@ -103,7 +109,7 @@ make -j"$(sysctl -n hw.ncpu 2>/dev/null || echo 4)" > /tmp/vinix-limine-make.log
     || { echo "error: make failed, see /tmp/vinix-limine-make.log" >&2; exit 1; }
 
 if ! loader_is_expected_version bin/BOOTAA64.EFI; then
-    echo "error: built loader does not identify itself as $EXPECTED_LOADER_LABEL" >&2
+    echo "error: built loader is not $EXPECTED_LOADER_LABEL with Vinix base revision 2 compatibility" >&2
     exit 1
 fi
 
