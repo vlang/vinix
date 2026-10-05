@@ -274,8 +274,9 @@ fn (mut a ArchiveApp) create_archive() bool {
 	}
 	mut output_info := C.stat{}
 	if unsafe { C.fstat(fd, &output_info) } != 0 {
+		// With no captured identity, a concurrent replacement cannot be
+		// distinguished from our output. Preserve the named file on failure.
 		desktop_close(fd)
-		C.unlinkat(parent, &char(leaf.str), 0)
 		desktop_close(parent)
 		desktop_close(root)
 		unsafe { leaf.free() }
