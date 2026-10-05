@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `94ed1845f0499e2c5b84b00f83f8f9a262066611`,
+at source commit `db601f941aafd7a9335fd2b54cc3dfb41e12e468`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 539 | 5,900,717 | 25.32% |
-| Python | 359 | 3,947,662 | 16.94% |
-| Shell | 280 | 1,240,031 | 5.32% |
+| C | 557 | 5,641,624 | 23.71% |
+| Python | 385 | 4,040,474 | 16.98% |
+| Shell | 283 | 1,254,092 | 5.27% |
 
-All `.v` files are classified as V. The resulting V share is 39.97%, with no
+All `.v` files are classified as V. The resulting V share is 41.85%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -37,7 +37,7 @@ included in the lists below.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 94ed1845f0499e2c5b84b00f83f8f9a262066611 --breakdown --json
+github-linguist --rev db601f941aafd7a9335fd2b54cc3dfb41e12e468 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -49,22 +49,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | File | Bytes |
 | --- | ---: |
 | `apple-boot/report_init.c` | 1,697 |
-| `apple-boot/src/adt.c` | 9,650 |
 | `apple-boot/src/adt.h` | 3,097 |
-| `apple-boot/src/bootargs.c` | 2,689 |
-| `apple-boot/src/console.c` | 5,211 |
-| `apple-boot/src/elf.c` | 2,918 |
-| `apple-boot/src/fdt.c` | 11,648 |
 | `apple-boot/src/fdt.h` | 2,518 |
-| `apple-boot/src/lib.c` | 2,427 |
 | `apple-boot/src/lib.h` | 2,007 |
-| `apple-boot/src/limine.c` | 9,306 |
-| `apple-boot/src/loader.c` | 10,896 |
 | `apple-boot/src/loader.h` | 6,031 |
-| `apple-boot/src/memmap.c` | 4,962 |
-| `apple-boot/src/mm.c` | 4,048 |
-| `apple-boot/src/wdt.c` | 1,298 |
+| `apple-boot/src/v_abi.h` | 706 |
 | `apple-boot/tests/adt2fdt.c` | 3,045 |
+| `apple-boot/tests/boot-runtime.c` | 4,775 |
 | `base-files/root/hello.c` | 64 |
 | `base-files/usr/include/vinix/hypervisor.h` | 1,315 |
 | `build-support/aarch64-cc-shim/stdatomic.h` | 4,425 |
@@ -73,17 +64,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/runtime-compat.c` | 23,065 |
 | `build-support/dota2/early-client.c` | 2,167 |
 | `build-support/dota2/mmap32.c` | 8,464 |
-| `build-support/init-aarch64/desktop-init.c` | 21,352 |
-| `build-support/init-aarch64/full-init.c` | 1,843 |
-| `build-support/init-aarch64/init.c` | 3,828 |
+| `build-support/init-aarch64/syscall_abi.c` | 1,350 |
+| `build-support/init-aarch64/syscall_abi.h` | 613 |
 | `build-support/qemu-system/vinix-vnc-window.c` | 11,960 |
 | `build-support/steam/robust-list-i386.c` | 5,762 |
 | `build-support/steam/robust-list-x86_64.c` | 1,367 |
 | `build-support/venus/available.c` | 1,534 |
 | `build-support/x86-translation/sppc-office-compat.c` | 3,794 |
-| `build-support/xorg-server/vinix-clipboard.h` | 3,829 |
-| `build-support/xorg-server/vinix-wine-host.c` | 45,707 |
-| `build-support/xorg-server/vinix-xinput.c` | 14,308 |
+| `build-support/xorg-server/vinix-xinput.c` | 3,367 |
+| `build-support/xorg-server/wine-host-v-abi.c` | 961 |
+| `build-support/xorg-server/wine-host-v-abi.h` | 802 |
+| `build-support/xorg-server/xinput_abi.h` | 893 |
 | `compat/ios/runner/abi/dispatch.h` | 392 |
 | `desktop/execinfo_compat.c` | 5,086 |
 | `desktop/execinfo_compat.h` | 417 |
@@ -94,13 +85,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/quicklook_stb.h` | 454 |
 | `desktop/tools/tests/execinfo_compat_test.c` | 1,884 |
 | `desktop/tools/tests/heap_tracker.h` | 1,786 |
-| `gl-triangle/egl_triangle.c` | 19,597 |
-| `gl-triangle/triangle.c` | 1,640 |
+| `gl-triangle/gl_v.h` | 1,885 |
 | `kernel/asm/x86_64/speculation.h` | 2,150 |
 | `kernel/c/acpi_sync_test.c` | 154 |
 | `kernel/c/agx_fake_g17.h` | 7,541 |
 | `kernel/c/agx_fake_g17_encode.h` | 1,583 |
-| `kernel/c/alloc_track.c` | 5,727 |
+| `kernel/c/alloc_track.c` | 379 |
+| `kernel/c/alloc_track_v.h` | 260 |
 | `kernel/c/apple_ans.h` | 3,618 |
 | `kernel/c/apple_ans_ext2.h` | 2,708 |
 | `kernel/c/apple_display_hotplug.h` | 2,865 |
@@ -112,32 +103,38 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/brcm_m1.h` | 2,469 |
 | `kernel/c/brcm_wifi.h` | 5,877 |
 | `kernel/c/ctype.h` | 43 |
-| `kernel/c/heap_benchmark.c` | 11,953 |
 | `kernel/c/heap_benchmark.h` | 101 |
+| `kernel/c/heap_benchmark_v.h` | 1,399 |
 | `kernel/c/inttypes.h` | 69 |
-| `kernel/c/linuxkpi.c` | 25,673 |
 | `kernel/c/linuxkpi_cache_test.c` | 11,338 |
-| `kernel/c/linuxkpi_format.c` | 21,212 |
 | `kernel/c/linuxkpi_i915_policy_test.c` | 6,806 |
 | `kernel/c/linuxkpi_io_test.c` | 21,682 |
 | `kernel/c/linuxkpi_pci_config_test.c` | 14,017 |
-| `kernel/c/linuxkpi_printk.c` | 13,757 |
 | `kernel/c/linuxkpi_printk_test.c` | 24,193 |
+| `kernel/c/linuxkpi_printk_v_primitives.c` | 4,601 |
+| `kernel/c/linuxkpi_runtime_native_test.c` | 21,136 |
+| `kernel/c/linuxkpi_runtime_v_primitives.c` | 4,684 |
+| `kernel/c/linuxkpi_runtime_v_primitives.h` | 2,023 |
 | `kernel/c/linuxkpi_seqcount_test.c` | 12,766 |
-| `kernel/c/linuxkpi_srcu.c` | 17,942 |
 | `kernel/c/linuxkpi_srcu_test.c` | 23,566 |
-| `kernel/c/linuxkpi_sync.c` | 22,093 |
-| `kernel/c/linuxkpi_task.c` | 11,859 |
-| `kernel/c/linuxkpi_time.c` | 17,516 |
-| `kernel/c/linuxkpi_timer.c` | 15,420 |
+| `kernel/c/linuxkpi_srcu_v_primitives.c` | 4,522 |
+| `kernel/c/linuxkpi_srcu_v_primitives.h` | 3,531 |
+| `kernel/c/linuxkpi_sync_native_test.c` | 6,266 |
+| `kernel/c/linuxkpi_task_native_test.c` | 3,868 |
+| `kernel/c/linuxkpi_task_v_primitives.c` | 3,358 |
+| `kernel/c/linuxkpi_task_v_primitives.h` | 2,410 |
+| `kernel/c/linuxkpi_time_native_test.c` | 6,757 |
+| `kernel/c/linuxkpi_timer_native_test.c` | 5,082 |
 | `kernel/c/linuxkpi_usleep_test.c` | 13,915 |
 | `kernel/c/linuxkpi_v_primitives.c` | 2,955 |
 | `kernel/c/linuxkpi_v_primitives.h` | 1,587 |
-| `kernel/c/linuxkpi_wait_bit.c` | 7,138 |
 | `kernel/c/linuxkpi_wait_bit_test.c` | 15,687 |
+| `kernel/c/linuxkpi_wait_v_primitives.c` | 4,716 |
+| `kernel/c/linuxkpi_wait_v_primitives.h` | 5,106 |
 | `kernel/c/linuxkpi_worker_test.c` | 11,042 |
-| `kernel/c/linuxkpi_workqueue.c` | 71,294 |
-| `kernel/c/linuxkpi_ww_mutex.c` | 10,145 |
+| `kernel/c/linuxkpi_workqueue_native_test.c` | 35,439 |
+| `kernel/c/linuxkpi_workqueue_v_primitives.c` | 4,300 |
+| `kernel/c/linuxkpi_workqueue_v_primitives.h` | 2,244 |
 | `kernel/c/linuxkpi_ww_mutex_test.c` | 13,730 |
 | `kernel/c/locale.h` | 45 |
 | `kernel/c/lwipopts.h` | 3,213 |
@@ -147,8 +144,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.c` | 2,650 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
-| `kernel/c/printf.c` | 5,319 |
-| `kernel/c/printf_benchmark.c` | 986 |
+| `kernel/c/printf.c` | 1,824 |
+| `kernel/c/printf_benchmark.c` | 481 |
+| `kernel/c/printf_v.h` | 445 |
 | `kernel/c/pthread.h` | 1,298 |
 | `kernel/c/speculation.h` | 524 |
 | `kernel/c/stack_protector.h` | 762 |
@@ -233,8 +231,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/test.c` | 17,465 |
 | `tests/agx-fake-g17/test_encode.c` | 11,541 |
+| `tests/agx-trace/host.c` | 8,531 |
 | `tests/alloc-bench/bench.c` | 14,188 |
-| `tests/alloc-bench/kernel-bench.c` | 122 |
+| `tests/alloc-bench/kernel-bench.c` | 225 |
+| `tests/alloc-bench/kernel_sampler_test.c` | 3,295 |
 | `tests/alloc-bench/macos-kext-info.c` | 758 |
 | `tests/alloc-bench/results/2026-10-02-userspace/bench.c` | 14,188 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/clock.c` | 4,903 |
@@ -378,6 +378,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify.c` | 8,922 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/bench.c` | 14,188 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/sampler.c` | 7,362 |
+| `tests/alloc-track/guest.c` | 1,841 |
+| `tests/alloc-track/test.c` | 2,894 |
 | `tests/amd64-console/test.c` | 2,041 |
 | `tests/amd64-exceptions/test.c` | 4,154 |
 | `tests/amd64-poll/test.c` | 3,655 |
@@ -443,9 +445,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ext2-sparse/guest.c` | 7,595 |
 | `tests/ext2-xattr/test.c` | 17,267 |
 | `tests/fsync-scope/test.c` | 2,988 |
+| `tests/gl-triangle/guest_init.c` | 423 |
+| `tests/gl-triangle/native_fb.h` | 2,957 |
+| `tests/gl-triangle/native_fixture.c` | 10,868 |
 | `tests/hypervisor/abi_test.c` | 878 |
 | `tests/hypervisor/guest.c` | 2,981 |
 | `tests/hypervisor/vmx_test.c` | 4,436 |
+| `tests/init-policy/guest.c` | 4,400 |
+| `tests/init-policy/test.c` | 11,180 |
 | `tests/ios/calculator.c` | 2,085 |
 | `tests/ios/desktop-init.c` | 1,138 |
 | `tests/ios/guest.c` | 3,478 |
@@ -457,6 +464,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/serial.c` | 503 |
 | `tests/kernel-gaps/smoke.c` | 1,049 |
 | `tests/kernel-job-control/check.c` | 22,492 |
+| `tests/kernel-print/test.c` | 3,480 |
 | `tests/kernel-retention/test.c` | 4,416 |
 | `tests/kernel-stack-guards/guest.c` | 3,991 |
 | `tests/kernel-sysvmsg/check.c` | 22,016 |
@@ -499,6 +507,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/workqueue_test.h` | 13,658 |
 | `tests/linuxkpi/ww_mutex_test.h` | 20,972 |
 | `tests/listen-backlog/probe.c` | 5,610 |
+| `tests/m1-wifi/ctl_fixture.c` | 3,932 |
+| `tests/m1-wifi/ctl_guest.c` | 1,718 |
 | `tests/m1-wifi/platform_fixture.h` | 1,072 |
 | `tests/m1-wifi/platform_test.c` | 6,724 |
 | `tests/m1-wifi/test.c` | 17,433 |
@@ -577,27 +587,38 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/virtio-gpu-venus/smoke.c` | 6,502 |
 | `tests/virtio-gpu-virgl/map-lifetime.c` | 3,134 |
 | `tests/virtio-ro/test.c` | 5,862 |
+| `tests/wine-host/test.c` | 9,164 |
 | `tests/wine/calculator.c` | 5,253 |
 | `tests/wine/smoke.c` | 573 |
+| `tests/x11-input/expected.h` | 262 |
+| `tests/x11-input/fixture.c` | 5,603 |
+| `tests/x11-input/guest.c` | 1,447 |
 | `tests/xnualloc/reference.c` | 11,469 |
-| `tools/agx-re/agx_trace.c` | 19,264 |
+| `tools/agx-re/agx_trace.c` | 4,031 |
 | `tools/agx-re/agx_trace.h` | 298 |
-| `tools/m1-wifi/wifi-ctl.c` | 9,182 |
-| `tools/sandbox/vinix-sandbox.c` | 11,050 |
-| `tools/security-audit/collector.c` | 16,146 |
-| `tools/security-mac/mac.c` | 4,006 |
+| `tools/agx-re/agx_trace_v.h` | 2,133 |
+| `tools/m1-wifi/wifi_v.h` | 1,613 |
+| `tools/sandbox/sandbox_v.h` | 869 |
+| `tools/sandbox/vinix-sandbox.c` | 4,806 |
+| `tools/security-audit/collector.c` | 5,629 |
+| `tools/security-audit/collector_v.h` | 2,262 |
+| `tools/security-mac/mac.c` | 1,547 |
 | `tools/security-mac/mac.h` | 526 |
+| `tools/security-mac/mac_v.h` | 575 |
 
 ## Python files
 
 | File | Bytes |
 | --- | ---: |
 | `apple-boot/build.py` | 4,038 |
+| `apple-boot/compile-v.py` | 2,034 |
 | `apple-boot/pack.py` | 4,497 |
-| `apple-boot/tests/check_converter.py` | 3,004 |
+| `apple-boot/tests/check-v-abi.py` | 3,061 |
+| `apple-boot/tests/check_converter.py` | 3,285 |
 | `apple-boot/tests/fdt_check.py` | 5,286 |
 | `apple-boot/tests/ioreg_adt.py` | 3,303 |
 | `apple-boot/tests/qemu_iboot.py` | 16,226 |
+| `apple-boot/tests/run-v-core.py` | 2,656 |
 | `build-support/alpine-resolve.py` | 2,946 |
 | `build-support/android/art-bootclasspath.py` | 18,938 |
 | `build-support/android/art-runtime.py` | 18,995 |
@@ -607,13 +628,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/check-screenshot.py` | 5,382 |
 | `build-support/content-key.py` | 3,563 |
 | `build-support/debian-root.py` | 10,017 |
-| `build-support/desktop-build-key.py` | 11,235 |
+| `build-support/desktop-build-key.py` | 11,970 |
 | `build-support/dhewm3/build.py` | 7,608 |
 | `build-support/dota2/mesa-build.py` | 15,669 |
 | `build-support/dota2/qemu-stage.py` | 14,044 |
 | `build-support/dota2/venus-build.py` | 10,283 |
 | `build-support/dota2/vulkan-stage.py` | 20,201 |
 | `build-support/ext2-set-root-owner.py` | 3,743 |
+| `build-support/init-aarch64/compile-v.py` | 2,499 |
 | `build-support/java-cacerts.py` | 2,285 |
 | `build-support/link-duplicate-files.py` | 4,475 |
 | `build-support/make-docker-image.py` | 2,796 |
@@ -624,7 +646,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/opengothic/build.py` | 10,570 |
 | `build-support/patch-elf-interpreter.py` | 968 |
 | `build-support/roblox/build.py` | 7,918 |
-| `build-support/security-tools/stage.py` | 3,218 |
+| `build-support/security-tools/compile-v-core.py` | 1,805 |
+| `build-support/security-tools/stage.py` | 3,773 |
 | `build-support/staging-cache.py` | 3,403 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
@@ -635,6 +658,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/patch-wine-service-timeout.py` | 2,218 |
 | `build-support/x86-translation/patch-wine-x86_64-context.py` | 4,549 |
 | `build-support/x86-translation/patch-wine-x86_64-qemu.py` | 3,263 |
+| `build-support/xorg-server/compile-v-host.py` | 1,714 |
 | `desktop/tools/build_cache.py` | 4,257 |
 | `desktop/tools/build_voffice.py` | 16,429 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
@@ -642,6 +666,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/input.py` | 8,219 |
 | `desktop/tools/stage_app.py` | 8,150 |
 | `desktop/tools/stage_ui2.py` | 4,549 |
+| `gl-triangle/compile-v.py` | 2,353 |
+| `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 5,204 |
 | `kernel/linuxkpi/upstream.py` | 4,638 |
@@ -652,10 +678,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/run.py` | 2,202 |
 | `tests/agx-fake-g17/run_vm.py` | 10,384 |
-| `tests/alloc-bench/build-macos-kext.py` | 5,360 |
-| `tests/alloc-bench/compare-kernel.py` | 10,774 |
+| `tests/agx-trace/run.py` | 6,627 |
+| `tests/alloc-bench/build-macos-kext.py` | 5,725 |
+| `tests/alloc-bench/compare-kernel.py` | 11,492 |
 | `tests/alloc-bench/compare.py` | 17,094 |
 | `tests/alloc-bench/compare_test.py` | 14,596 |
+| `tests/alloc-bench/compile-v-sampler.py` | 1,913 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py` | 1,058 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py` | 2,225 |
 | `tests/alloc-bench/results/2026-10-02-userspace/check-recompute.py` | 14,061 |
@@ -738,10 +766,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-x86-driver.py` | 469 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run.py` | 8,275 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize.py` | 7,668 |
-| `tests/alloc-bench/run-kernel-vinix.py` | 6,602 |
+| `tests/alloc-bench/run-kernel-vinix.py` | 6,927 |
 | `tests/alloc-bench/run-macos.py` | 7,184 |
 | `tests/alloc-bench/run-vinix.py` | 9,404 |
-| `tests/alloc-bench/test_compare_kernel.py` | 13,108 |
+| `tests/alloc-bench/test_compare_kernel.py` | 13,510 |
+| `tests/alloc-bench/test_v_sampler.py` | 1,496 |
+| `tests/alloc-track/run.py` | 2,074 |
 | `tests/android/activity-lifecycle-test.py` | 4,770 |
 | `tests/android/art-runtime-test.py` | 26,090 |
 | `tests/android/autofill-test.py` | 4,886 |
@@ -754,7 +784,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/location-test.py` | 4,886 |
 | `tests/android/musl-runtime-test.py` | 7,834 |
 | `tests/android/pointer-capture-test.py` | 3,578 |
-| `tests/android/run.py` | 62,200 |
+| `tests/android/run.py` | 62,487 |
 | `tests/android/split-test.py` | 8,799 |
 | `tests/apple-ans/run.py` | 2,429 |
 | `tests/apple-ans/run.sh` | 61 |
@@ -767,7 +797,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/block-storage/run.py` | 6,237 |
 | `tests/browsers/run_vm.py` | 13,762 |
 | `tests/build-cache/test_content_key.py` | 3,015 |
-| `tests/build-cache/test_desktop_build_key.py` | 5,726 |
+| `tests/build-cache/test_desktop_build_key.py` | 5,744 |
 | `tests/build-cache/test_prune_build_artifacts.py` | 6,929 |
 | `tests/capability-exec/run.py` | 4,183 |
 | `tests/claude/smoke.py` | 7,250 |
@@ -780,8 +810,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/cpu-mitigations/check-policy.py` | 8,355 |
 | `tests/cpu-mitigations/run.py` | 4,795 |
 | `tests/desktop-bootstrap/test_prepare.py` | 9,429 |
+| `tests/desktop-bootstrap/test_recovery.py` | 8,983 |
 | `tests/desktop-bootstrap/test_runner.py` | 5,644 |
-| `tests/desktop-perf/run.py` | 26,258 |
+| `tests/desktop-perf/run.py` | 26,347 |
 | `tests/desktop-perf/test_runner.py` | 15,989 |
 | `tests/dhewm3/prepare-debian.py` | 2,639 |
 | `tests/dhewm3/run.py` | 12,457 |
@@ -796,7 +827,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/launcher-test.py` | 14,628 |
 | `tests/dota2/lavapipe-run.py` | 14,637 |
 | `tests/dota2/run-test.py` | 5,348 |
-| `tests/dota2/run.py` | 27,146 |
+| `tests/dota2/run.py` | 27,648 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
 | `tests/dota2/vulkan-run-test.py` | 2,434 |
 | `tests/dota2/vulkan-run.py` | 14,280 |
@@ -810,8 +841,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,343 |
 | `tests/fsync-scope/run.py` | 5,247 |
+| `tests/gl-triangle/run-vm.py` | 5,439 |
+| `tests/gl-triangle/run.py` | 2,728 |
 | `tests/hypervisor/check-vmx.py` | 7,924 |
 | `tests/hypervisor/run-vm.py` | 1,241 |
+| `tests/init-policy/run-vm.py` | 3,781 |
+| `tests/init-policy/run.py` | 5,570 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 5,440 |
@@ -823,16 +858,20 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/test_runner.py` | 4,875 |
 | `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
-| `tests/kernel-gaps/run.py` | 9,837 |
+| `tests/kernel-gaps/run.py` | 10,988 |
 | `tests/kernel-gaps/test_runner.py` | 4,085 |
 | `tests/kernel-job-control/run.py` | 5,293 |
 | `tests/kernel-link-layout/check.py` | 2,215 |
+| `tests/kernel-print/run.py` | 3,881 |
 | `tests/kernel-stack-guards/run.py` | 4,358 |
 | `tests/kernel-sysvmsg/run.py` | 4,812 |
 | `tests/krandom/run_native.py` | 2,466 |
+| `tests/limine-aarch64/test_patch.py` | 4,292 |
 | `tests/linuxkpi/compile-v-core.py` | 1,238 |
 | `tests/linuxkpi/run_vm.py` | 9,941 |
 | `tests/linuxkpi/upstream_test.py` | 3,013 |
+| `tests/m1-wifi/run-ctl-vm.py` | 4,388 |
+| `tests/m1-wifi/run-ctl.py` | 2,114 |
 | `tests/m1-wifi/run.py` | 2,297 |
 | `tests/m1-wifi/verify_build.py` | 5,663 |
 | `tests/m1-wifi/verify_test.py` | 2,428 |
@@ -851,7 +890,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/numa/run_vm.py` | 7,767 |
 | `tests/openbsd-security/run_vm.py` | 10,998 |
 | `tests/opengothic/kekvm-control.py` | 4,448 |
-| `tests/opengothic/run.py` | 14,838 |
+| `tests/opengothic/run.py` | 15,125 |
 | `tests/packages/test-qemu-package-store.py` | 10,170 |
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pagecache/check-generated.py` | 1,308 |
@@ -870,7 +909,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/run_vm.py` | 13,462 |
 | `tests/qemu-initramfs-split/test_split.py` | 6,018 |
 | `tests/qemu-module-iso/test_iso.py` | 1,677 |
-| `tests/qemu-ovmf/test_patch.py` | 12,171 |
+| `tests/qemu-ovmf/test_patch.py` | 16,807 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/reboot-persistence/run_vm.py` | 6,140 |
 | `tests/resource-accounting/check-generated.py` | 1,582 |
@@ -907,9 +946,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/verified-root/test.py` | 9,535 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 11,608 |
 | `tests/virtio-ro/run.py` | 6,225 |
+| `tests/wine-host/run-vm.py` | 3,005 |
+| `tests/x11-input/run-vm.py` | 2,666 |
+| `tests/x11-input/run.py` | 3,518 |
 | `tests/xnualloc/reference_test.py` | 15,234 |
 | `tests/xnualloc/zone_model_test.py` | 12,764 |
 | `tools/agx-re/check_g13_reference_contract.py` | 10,056 |
+| `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/compile_fake_g17_plan.py` | 49,765 |
 | `tools/agx-re/encode_fake_g17_3d.py` | 10,642 |
 | `tools/agx-re/extract_fileset.py` | 17,676 |
@@ -943,6 +986,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/build-qemu-module-iso.py` | 3,021 |
 | `tools/dota2/ext2_export.py` | 23,662 |
 | `tools/host_clipboard.py` | 1,332 |
+| `tools/m1-wifi/compile-v.py` | 1,430 |
 | `tools/m1-wifi/package.py` | 3,000 |
 | `tools/prune-build-artifacts.py` | 7,123 |
 | `tools/qemu-package-store.py` | 16,798 |
@@ -965,7 +1009,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/build-aarch64-iso.sh` | 4,137 |
 | `build-support/build-amd64-iso.sh` | 5,502 |
 | `build-support/build-amd64-uefi-disk.sh` | 3,064 |
-| `build-support/check-m1-gpu-image.sh` | 5,914 |
+| `build-support/check-m1-gpu-image.sh` | 6,323 |
 | `build-support/chromium/run-chromium` | 8,032 |
 | `build-support/dhewm3/run-dhewm3` | 571 |
 | `build-support/docker/vinix-dockerd` | 1,499 |
@@ -1004,7 +1048,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/v-command` | 1,409 |
 | `build-support/vinix-desktop-build` | 12,928 |
 | `build-support/vinix-desktop-reload` | 3,872 |
-| `build-support/vinix-files-sync` | 2,354 |
+| `build-support/vinix-files-sync` | 2,361 |
 | `build-support/vinix-host-sync` | 4,410 |
 | `build-support/vinix-persist-packages` | 5,219 |
 | `build-support/vinix-pkg` | 44,457 |
@@ -1018,17 +1062,19 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/run-wine-x86-64` | 11,702 |
 | `build-support/x86-translation/run-x86-32` | 1,837 |
 | `build-support/x86-translation/run-x86-64` | 2,298 |
-| `build-support/xorg-server/build-wine-host.sh` | 1,378 |
+| `build-support/xorg-server/build-wine-host.sh` | 1,777 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/screenshot.sh` | 2,055 |
 | `desktop/tools/test-activity.sh` | 2,083 |
 | `desktop/tools/test-battery.sh` | 575 |
 | `desktop/tools/test-clipboard.sh` | 1,756 |
 | `desktop/tools/test-execinfo.sh` | 437 |
+| `desktop/tools/test-new-utilities.sh` | 2,624 |
 | `desktop/tools/test-settings.sh` | 3,640 |
-| `desktop/tools/test-utilities.sh` | 10,035 |
-| `gl-triangle/run-gl-triangle` | 2,013 |
-| `gl-triangle/run-gl-triangle-agx` | 869 |
+| `desktop/tools/test-utilities.sh` | 10,233 |
+| `desktop/tools/test-utility-parity.sh` | 2,586 |
+| `gl-triangle/run-gl-triangle` | 2,400 |
+| `gl-triangle/run-gl-triangle-agx` | 1,255 |
 | `gl-triangle/run-m1-agx-smoke` | 820 |
 | `gl-triangle/run-virgl-smoke` | 676 |
 | `installer/macos/fetch-vinix-payload.sh` | 1,774 |
@@ -1039,13 +1085,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-all-aarch64.sh` | 6,845 |
 | `scripts/build-amd64.sh` | 3,270 |
 | `scripts/build-android-aarch64.sh` | 207 |
-| `scripts/build-asahi-aarch64.sh` | 11,716 |
+| `scripts/build-asahi-aarch64.sh` | 11,755 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
 | `scripts/build-chromium-aarch64.sh` | 5,506 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 86,923 |
-| `scripts/build-desktop-amd64.sh` | 13,996 |
+| `scripts/build-desktop-aarch64.sh` | 87,837 |
+| `scripts/build-desktop-amd64.sh` | 14,049 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,338 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,126 |
@@ -1058,40 +1104,40 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ios-aarch64.sh` | 2,506 |
 | `scripts/build-java-aarch64.sh` | 4,704 |
 | `scripts/build-libreoffice-aarch64.sh` | 6,474 |
-| `scripts/build-limine-aarch64.sh` | 4,444 |
+| `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
 | `scripts/build-minecraft-aarch64.sh` | 7,943 |
-| `scripts/build-nested-desktop-aarch64.sh` | 1,986 |
+| `scripts/build-nested-desktop-aarch64.sh` | 2,045 |
 | `scripts/build-network-tools-aarch64.sh` | 8,938 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-python-aarch64.sh` | 3,553 |
 | `scripts/build-python-amd64.sh` | 175 |
-| `scripts/build-qemu-ovmf-aarch64.sh` | 3,331 |
+| `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
 | `scripts/build-qemu-system-aarch64.sh` | 5,035 |
 | `scripts/build-roblox-aarch64.sh` | 139 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,275 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 25,788 |
+| `scripts/build-userland-aarch64.sh` | 24,888 |
 | `scripts/build-userland-amd64.sh` | 5,925 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,137 |
 | `scripts/build-vinix-guest-disk.sh` | 1,837 |
 | `scripts/build-voffice-aarch64.sh` | 6,899 |
-| `scripts/build-x11-aarch64.sh` | 20,152 |
+| `scripts/build-x11-aarch64.sh` | 20,826 |
 | `scripts/build-x11-amd64.sh` | 197 |
 | `scripts/build-x86-translation-aarch64.sh` | 22,902 |
 | `scripts/cross-compile-activity.sh` | 227 |
-| `scripts/cross-compile-app.sh` | 4,132 |
+| `scripts/cross-compile-app.sh` | 4,139 |
 | `scripts/cross-compile-files.sh` | 212 |
 | `scripts/cross-compile-settings.sh` | 217 |
 | `scripts/deploy-iso.sh` | 18,485 |
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
-| `scripts/run-aarch64.sh` | 61,965 |
+| `scripts/run-aarch64.sh` | 62,787 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
 | `scripts/run-desktop-aarch64.sh` | 16,605 |
 | `scripts/run-desktop-amd64.sh` | 2,931 |
@@ -1102,7 +1148,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run.sh` | 942 |
 | `tests/agx-g13-abi/run.sh` | 785 |
 | `tests/agx-g13-layouts/run.sh` | 796 |
-| `tests/agx-m1-image/run.sh` | 2,434 |
+| `tests/agx-m1-image/run.sh` | 3,165 |
 | `tests/agx-t8103-opp/run.sh` | 791 |
 | `tests/agx-vm/run.sh` | 159 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
@@ -1121,7 +1167,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_display_hotplug/run.sh` | 131 |
 | `tests/apple_smc/run.sh` | 158 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
-| `tests/application-sandbox/test-host.sh` | 322 |
+| `tests/application-sandbox/test-host.sh` | 612 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
@@ -1131,7 +1177,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 2,253 |
-| `tests/desktop-perf/perf-init.sh` | 6,852 |
+| `tests/desktop-perf/perf-init.sh` | 7,389 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
 | `tests/developer-tools/smoke.sh` | 4,577 |
 | `tests/devicetree-string-list/run.sh` | 240 |
@@ -1158,7 +1204,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/run.sh` | 4,069 |
 | `tests/krandom/run.sh` | 1,539 |
-| `tests/linuxkpi/run.sh` | 4,421 |
+| `tests/linuxkpi/run.sh` | 4,301 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
 | `tests/m1-wifi/run.sh` | 100 |
@@ -1189,7 +1235,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/gnumeric-smoke.sh` | 2,730 |
 | `tests/packages/gtk-smoke.sh` | 2,134 |
 | `tests/packages/obs-init.sh` | 6,626 |
-| `tests/packages/qemu-install-gtk.sh` | 441 |
+| `tests/packages/qemu-install-gtk.sh` | 452 |
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,670 |
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
@@ -1203,8 +1249,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 1,623 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
-| `tests/security-audit/collector-run.sh` | 745 |
-| `tests/security-mac/host-run.sh` | 284 |
+| `tests/security-audit/collector-run.sh` | 1,124 |
+| `tests/security-mac/host-run.sh` | 583 |
 | `tests/security-mac/run.sh` | 926 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/smt-policy/run-host.sh` | 1,181 |
@@ -1228,6 +1274,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/vlang/test-host-source-sync.sh` | 3,479 |
 | `tests/vlang/test-staging-cache.sh` | 1,155 |
 | `tests/vlang/test-voffice-cache.sh` | 4,845 |
+| `tests/wine-host/run.sh` | 1,546 |
 | `tests/wine/office2010-launchers-test.sh` | 1,830 |
 | `tests/wine/wine-smoke` | 929 |
 | `tests/wine/wine-smoke32` | 943 |
