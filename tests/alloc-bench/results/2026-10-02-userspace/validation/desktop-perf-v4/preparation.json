@@ -1,0 +1,7 @@
+{
+  "purpose": "Repeat required functional/memory desktop scenarios with final v4 ARM kernel and static/shared ff14 libc, before final timing campaign.",
+  "source": "Same frozen desktop perf workload sources; private harness replaces only actual libc stage paths.",
+  "frozen_image": "/Users/alex/code/vinix/build/useralloc-pipe/perf-final-preparation/initramfs-desktop-frozen.tar",
+  "final_desktop": "/Users/alex/code/vinix/build/useralloc-pipe/static-desktop-v4/vinix-desktop",
+  "final_kernel": "/Users/alex/code/vinix/build/useralloc-kernel-speed-v4/aarch64/vinix-aarch64"
+}

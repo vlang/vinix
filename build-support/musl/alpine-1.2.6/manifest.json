@@ -1,0 +1,27 @@
+[
+  {
+    "name": "handle-aux-at_base.patch",
+    "sha512": "a76f79b801497ad994746cf82bb6eaf86f9e1ae646e6819fbae8532a7f4eee53a96ac1d4e789ec8f66aea2a68027b0597f7a579b3369e01258da8accfce41370",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.24-stable/main/musl/handle-aux-at_base.patch"
+  },
+  {
+    "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+    "sha512": "83ec0f774dbb5d4f4d4b917d149ea0ef609d028d18ae7624e90fedda6e3174c91ade93751bfd376adfa2848155110fc4dd02b6790363b98e5395c4787e8731e8",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.24-stable/main/musl/0001-add-stub-for-pthread_mutexattr_setprioceiling.patch"
+  },
+  {
+    "name": "fix-loongarch64-zero-len-extcontext.patch",
+    "sha512": "6eae45aa82db69bc96386aedf3d1bfe83dfa0a7b4b824326c1c7e1bab31100d635ed0e8930c26a1694697fad59167a42e2b5f3a2ac51b07e36d85f047e268cff",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.24-stable/main/musl/fix-loongarch64-zero-len-extcontext.patch"
+  },
+  {
+    "name": "CVE-2026-6042.patch",
+    "sha512": "f7849abeab0e4eab992a80464afa07b9c8aae5cee76040523b9dbc0931435f28ea8f5792b8a4a0cd6d608ac2f37e3225e89afcb3171a0a6df44450ed57cee83b",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.24-stable/main/musl/CVE-2026-6042.patch"
+  },
+  {
+    "name": "CVE-2026-40200.patch",
+    "sha512": "a64ab7688d1a85e560b5687783df482d2467a79a74400da5a1601382847d6b4e6a79b7529a8dc80c46ddda8dc2a812f2261557fc8ee98dc3bdf7322761bd6d9c",
+    "source": "https://raw.githubusercontent.com/alpinelinux/aports/3.24-stable/main/musl/CVE-2026-40200.patch"
+  }
+]

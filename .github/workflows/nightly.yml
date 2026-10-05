@@ -10,14 +10,14 @@ permissions:
 
 env:
   UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
-  V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
+  V_COMMIT: 9bfa1dc3f3455d5733d5c226662b6aaba8544f2c
 
 jobs:
   check-build-needed:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -38,7 +38,7 @@ jobs:
             release_arch: arm64
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y clang lld llvm make diffutils curl git rsync xorriso xz-utils python3 pkg-config meson ninja-build bison flex
@@ -67,6 +67,7 @@ jobs:
           ./build-x11-aarch64.sh
           ./build-network-tools-aarch64.sh
           ./build-python-aarch64.sh
+          ./build-v-aarch64.sh
           ./build-firefox-aarch64.sh
           ./build-desktop-aarch64.sh --compact-initramfs
           VINIX_AARCH64_KERNEL="$PWD/build-aarch64-kernel/bin/vinix" \
@@ -97,7 +98,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -113,7 +114,7 @@ jobs:
         run: git tag nightly-$TAG_DATE && git push --tags
 
       - name: Create nightly release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: Nightly desktop build ${{ env.TAG_DATE }}
           tag_name: nightly-${{ env.TAG_DATE }}

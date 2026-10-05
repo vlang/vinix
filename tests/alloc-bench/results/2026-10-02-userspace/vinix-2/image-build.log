@@ -1,0 +1,69 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0 32  248k   32 82390    0     0   7762      0  0:00:32  0:00:10  0:00:22 20055 90  248k   90  223k    0     0  19674      0  0:00:12  0:00:11  0:00:01 55081100  248k  100  248k    0     0  21474      0  0:00:11  0:00:11 --:--:-- 76445
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:12 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:13 --:--:--     0  1 2880k    1 43559    0     0   2947      0  0:16:40  0:00:14  0:16:26  8697  7 2880k    7  207k    0     0  13445      0  0:03:39  0:00:15  0:03:24 42083 13 2880k   13  399k    0     0  24397      0  0:02:00  0:00:16  0:01:44 81820 19 2880k   19  559k    0     0  32144      0  0:01:31  0:00:17  0:01:14  110k 24 2880k   24  719k    0     0  39322      0  0:01:14  0:00:18  0:00:56  145k 28 2880k   28  815k    0     0  41814      0  0:01:10  0:00:19  0:00:51  148k 31 2880k   31  911k    0     0  44922      0  0:01:05  0:00:20  0:00:45  142k 37 2880k   37 1071k    0     0  50239      0  0:00:58  0:00:21  0:00:37  132k 43 2880k   43 1263k    0     0  56633      0  0:00:52  0:00:22  0:00:30  140k 50 2880k   50 1455k    0     0  62170      0  0:00:47  0:00:23  0:00:24  140k 56 2880k   56 1615k    0     0  66290      0  0:00:44  0:00:24  0:00:20  160k 60 2880k   60 1743k    0     0  69417      0  0:00:42  0:00:25  0:00:17  168k 67 2880k   67 1935k    0     0  73483      0  0:00:40  0:00:26  0:00:14  168k 70 2880k   70 2031k    0     0  74853      0  0:00:39  0:00:27  0:00:12  155k 70 2880k   70 2031k    0     0  72249      0  0:00:40  0:00:28  0:00:12  119k 70 2880k   70 2031k    0     0  69820      0  0:00:42  0:00:29  0:00:13 88027 73 2880k   73 2127k    0     0  70854      0  0:00:41  0:00:30  0:00:11 78205 77 2880k   77 2223k    0     0  71223      0  0:00:41  0:00:31  0:00:10 59014 80 2880k   80 2309k    0     0  72025      0  0:00:40  0:00:32  0:00:08 56419 84 2880k   84 2437k    0     0  73610      0  0:00:40  0:00:33  0:00:07 81295 89 2880k   89 2565k    0     0  74916      0  0:00:39  0:00:35  0:00:04  101k 92 2880k   92 2661k    0     0  75541      0  0:00:39  0:00:36  0:00:03  100k 94 2880k   94 2725k    0     0  75764      0  0:00:38  0:00:36  0:00:02  103k 97 2880k   97 2821k    0     0  76337      0  0:00:38  0:00:37  0:00:01  102k100 2880k  100 2880k    0     0  77436      0  0:00:38  0:00:38 --:--:--  105k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0 59 22528   59 13492    0     0   1980      0  0:00:11  0:00:06  0:00:05  2805100 22528  100 22528    0     0   3304      0  0:00:06  0:00:06 --:--:--  5925
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:12 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:13 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:14 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:15 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:16 --:--:--     0  9  207k    9 19666    0     0   1172      0  0:03:01  0:00:16  0:02:45  4648 51  207k   51  107k    0     0   6150      0  0:00:34  0:00:17  0:00:17 25372100  207k  100  207k    0     0  11482      0  0:00:18  0:00:18 --:--:-- 53996
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:11 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:12 --:--:--     0 11 49092   11  5615    0     0    420      0  0:01:56  0:00:13  0:01:43  1109100 49092  100 49092    0     0   3509      0  0:00:13  0:00:13 --:--:-- 10436
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:04 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:05 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:06 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:07 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:08 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:09 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:10 --:--:--     0 15  117k   15 18269    0     0   1603      0  0:01:15  0:00:11  0:01:04  3706 74  117k   74 89429    0     0   7293      0  0:00:16  0:00:12  0:00:04 18685100  117k  100  117k    0     0   9595      0  0:00:12  0:00:12 --:--:-- 29617
+==> Building the Limine host installer...
+==> Assembling /Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/vinix.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/.vinix-amd64.iso.e2yywX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 8619m free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/iso-build/.iso-staging.4K9HLd/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 64065 sectors
+Written to medium : 64065 sectors at LBA 0
+Writing to 'stdio:/Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/.vinix-amd64.iso.e2yywX' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0x3e903.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/vinix.iso (131205120 bytes)
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Copying of file objects from ISO image to disk filesystem is: Enabled
+xorriso : NOTE : Loading ISO image tree from LBA 0
+xorriso : UPDATE :      11 nodes read in 1 seconds
+xorriso : NOTE : Detected El-Torito boot information which currently is set to be discarded
+Drive current: -indev '/Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/vinix.iso'
+Media current: stdio file, overwriteable
+Media status : is written , is appendable
+Boot record  : El Torito , MBR cyl-align-off
+Media summary: 1 session, 64065 data blocks,  125m data, 8619m free
+Volume id    : 'ISOIMAGE'
+xorriso : UPDATE :       1 files restored (7367.7k) in 1 seconds = 5.4xD
+Extracted from ISO image: file '/boot/vinix'='/Users/alex/code/vinix/build/useralloc-vinix-v4-final-2/boot-kernel'

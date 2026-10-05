@@ -54,6 +54,8 @@ def _has_external_root(node: Any) -> bool:
     if not isinstance(node, dict):
         return False
     kind = node.get("kind")
+    if kind == "hardware_input":
+        return False
     if kind in ("virtual_load", "call_result", "channel_load", "accelerator_load"):
         return True
     if kind == "argument":
@@ -69,9 +71,35 @@ def _width(expression: str, byte_count: int) -> str:
     return f"g17_width(({expression}), {byte_count})"
 
 
+def _hardware_input_name(node: dict[str, Any]) -> str:
+    name = node.get("name")
+    if not isinstance(name, str) or not name.isidentifier():
+        raise fake.PlanError(f"invalid hardware input name {name!r}")
+    if _integer(node.get("bytes", 0), "hardware input bytes") != 4:
+        raise fake.PlanError(f"hardware input {name} is not 32 bits wide")
+    return name
+
+
+def _hardware_inputs(abi: dict[str, Any]) -> list[str]:
+    """Names of the hardware inputs the folded 3D producer reads."""
+    channels = abi["channels"]
+    roots = [
+        channels["register_selectors"]["producers"]["3D"],
+        channels["register_emission_cfg"]["producers"]["3D"]["decisions"],
+    ]
+    return sorted(
+        {
+            _hardware_input_name(item)
+            for item in _walk(roots)
+            if item.get("kind") == "hardware_input"
+        }
+    )
+
+
 def _predicate(
     predicate: dict[str, Any], condition: str, descriptor: str, command: str
 ) -> str:
+    predicate = fake.normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     source = _width(_expression(predicate["source"], descriptor, command), byte_count)
@@ -90,6 +118,10 @@ def _predicate(
             "nonzero": "!=",
             "hi": ">",
             "ls": "<=",
+            "cc": "<",
+            "lo": "<",
+            "cs": ">=",
+            "hs": ">=",
         }
         if condition not in operators:
             raise fake.PlanError(
@@ -134,6 +166,8 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
     if kind in ("stack_reload", "computed"):
         child = node["source"] if kind == "stack_reload" else node["expression"]
         return _expression(child, descriptor, command)
+    if kind == "hardware_input":
+        return f"((uint64_t)inputs->{_hardware_input_name(node)})"
     if kind == "object_load":
         if not _command_root(node.get("base")):
             raise fake.UnresolvedValue("generated object load has an external root")
@@ -257,6 +291,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
 def _evaluated_predicate(
     predicate: dict[str, Any], condition: str, descriptor: str, command: str
 ) -> str:
+    predicate = fake.normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     source = _evaluated_expression(predicate["source"], descriptor, command)
@@ -273,6 +308,10 @@ def _evaluated_predicate(
             "nonzero": "G17_COMPARE_NE",
             "hi": "G17_COMPARE_HI",
             "ls": "G17_COMPARE_LS",
+            "cc": "G17_COMPARE_LO",
+            "lo": "G17_COMPARE_LO",
+            "cs": "G17_COMPARE_HS",
+            "hs": "G17_COMPARE_HS",
         }
         if condition not in comparisons:
             raise fake.PlanError(
@@ -327,6 +366,8 @@ def _evaluated_expression(
     if kind in ("stack_reload", "computed"):
         child = node["source"] if kind == "stack_reload" else node["expression"]
         return _evaluated_expression(child, descriptor, command)
+    if kind == "hardware_input":
+        return f"g17_known((uint64_t)inputs->{_hardware_input_name(node)})"
     if kind == "object_load":
         if not _command_root(node.get("base")):
             return "g17_unknown()"
@@ -463,6 +504,8 @@ def _fingerprint(abi: dict[str, Any]) -> str:
         "inline": channels["inline_register_records"]["static_records"]["3D"],
         "cfg": channels["register_emission_cfg"]["producers"]["3D"],
     }
+    if "accelerator_inputs" in channels:
+        selected["accelerator"] = channels["accelerator_inputs"]
     encoded = json.dumps(selected, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
@@ -544,9 +587,7 @@ def _validate_abi(abi: dict[str, Any]) -> tuple[dict[int, dict[str, Any]], int]:
     graph = graph_root["producers"]["3D"]
     if not layout.get("record_framing_resolved"):
         raise fake.PlanError("3D command framing is incomplete")
-    if not graph_root.get("machine_order_complete") or not graph_root.get(
-        "predicate_expressions_complete"
-    ):
+    if not graph_root.get("machine_order_complete"):
         raise fake.PlanError("3D emission graph is incomplete")
     if not graph.get("predicates_complete"):
         raise fake.PlanError("3D predicates are incomplete")
@@ -616,14 +657,33 @@ def render_header(
     abi: dict[str, Any], fingerprint: str, external_events: list[int],
     external_decisions: list[int], max_writes: int
 ) -> str:
-    event_constants = "\n".join(
-        f"    VINIX_FAKE_G17_EXTERNAL_EVENT_{offset:04X} = {index},"
-        for index, offset in enumerate(external_events)
-    )
-    decision_constants = "\n".join(
-        f"    VINIX_FAKE_G17_EXTERNAL_DECISION_{offset:04X} = {index},"
-        for index, offset in enumerate(external_decisions)
-    )
+    enums = []
+    fields = []
+    if external_events:
+        constants = "\n".join(
+            f"    VINIX_FAKE_G17_EXTERNAL_EVENT_{offset:04X} = {index},"
+            for index, offset in enumerate(external_events)
+        )
+        enums.append(f"enum vinix_fake_g17_external_event {{\n{constants}\n}};\n")
+        fields.append(
+            "    uint64_t values[VINIX_FAKE_G17_REGISTER_PASSES]\n"
+            "                   [VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT];"
+        )
+    if external_decisions:
+        constants = "\n".join(
+            f"    VINIX_FAKE_G17_EXTERNAL_DECISION_{offset:04X} = {index},"
+            for index, offset in enumerate(external_decisions)
+        )
+        enums.append(f"enum vinix_fake_g17_external_decision {{\n{constants}\n}};\n")
+        fields.insert(
+            0,
+            "    uint8_t decisions[VINIX_FAKE_G17_REGISTER_PASSES]\n"
+            "                     [VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT];",
+        )
+    for name in _hardware_inputs(abi):
+        fields.append(f"    uint32_t {name};")
+    enum_text = "\n".join(enums)
+    field_text = "\n".join(fields)
     return f'''/* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Code generated by tools/agx-re/generate_fake_g17_3d_encoder.py. */
 /* Recovered G17 3D ABI SHA-256: {fingerprint} */
@@ -641,19 +701,9 @@ enum {{
     VINIX_FAKE_G17_MAX_WRITES = {max_writes},
 }};
 
-enum vinix_fake_g17_external_event {{
-{event_constants}
-}};
-
-enum vinix_fake_g17_external_decision {{
-{decision_constants}
-}};
-
+{enum_text}
 struct vinix_fake_g17_encoder_inputs {{
-    uint8_t decisions[VINIX_FAKE_G17_REGISTER_PASSES]
-                     [VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT];
-    uint64_t values[VINIX_FAKE_G17_REGISTER_PASSES]
-                   [VINIX_FAKE_G17_EXTERNAL_EVENT_COUNT];
+{field_text}
 }};
 
 enum vinix_fake_g17_encode_error {{
@@ -733,8 +783,25 @@ def render_source(abi: dict[str, Any], fingerprint: str) -> tuple[str, list[int]
     external_decisions = [
         offset for offset, _ in sorted(external_decision_map.items(), key=lambda x: x[1])
     ]
+    decision_check = ""
+    if external_decisions:
+        decision_check = """    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {
+        uint32_t decision;
+
+        for (decision = 0;
+             decision < VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT; decision++) {
+            if (inputs->decisions[pass][decision] > 1)
+                return VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT;
+        }
+    }
+
+"""
     max_writes = longest * 4
-    source = f'''/* SPDX-License-Identifier: GPL-2.0-or-later */
+    source = f'''// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
+/* SPDX-License-Identifier: GPL-2.0-or-later */
 /* Code generated by tools/agx-re/generate_fake_g17_3d_encoder.py. */
 /* Recovered G17 3D ABI SHA-256: {fingerprint} */
 #include "agx_fake_g17_encode.h"
@@ -861,19 +928,21 @@ enum g17_compare_operation {{
     G17_COMPARE_NE,
     G17_COMPARE_HI,
     G17_COMPARE_LS,
+    G17_COMPARE_LO,
+    G17_COMPARE_HS,
 }};
 
-static struct g17_eval g17_known(uint64_t value)
+static __attribute__((unused)) struct g17_eval g17_known(uint64_t value)
 {{
     return (struct g17_eval){{value, 1}};
 }}
 
-static struct g17_eval g17_unknown(void)
+static __attribute__((unused)) struct g17_eval g17_unknown(void)
 {{
     return (struct g17_eval){{0, 0}};
 }}
 
-static struct g17_eval g17_eval_width(struct g17_eval source,
+static __attribute__((unused)) struct g17_eval g17_eval_width(struct g17_eval source,
                                       unsigned int bytes)
 {{
     if (!source.resolved)
@@ -882,7 +951,7 @@ static struct g17_eval g17_eval_width(struct g17_eval source,
     return source;
 }}
 
-static struct g17_eval g17_eval_shift(struct g17_eval source,
+static __attribute__((unused)) struct g17_eval g17_eval_shift(struct g17_eval source,
                                       unsigned int kind,
                                       unsigned int amount,
                                       unsigned int bits)
@@ -893,7 +962,7 @@ static struct g17_eval g17_eval_shift(struct g17_eval source,
     return source;
 }}
 
-static struct g17_eval g17_eval_binary(struct g17_eval first,
+static __attribute__((unused)) struct g17_eval g17_eval_binary(struct g17_eval first,
                                        struct g17_eval second,
                                        enum g17_binary_operation operation,
                                        unsigned int bytes)
@@ -930,7 +999,7 @@ static struct g17_eval g17_eval_binary(struct g17_eval first,
     return g17_known(g17_width(value, bytes));
 }}
 
-static struct g17_eval g17_eval_bitfield(
+static __attribute__((unused)) struct g17_eval g17_eval_bitfield(
     struct g17_eval source, struct g17_eval destination,
     unsigned int rotate, unsigned int mask_end, unsigned int bits, int merge)
 {{
@@ -940,7 +1009,7 @@ static struct g17_eval g17_eval_bitfield(
                                   mask_end, bits, merge));
 }}
 
-static struct g17_eval g17_eval_movk(struct g17_eval source,
+static __attribute__((unused)) struct g17_eval g17_eval_movk(struct g17_eval source,
                                      struct g17_eval immediate,
                                      unsigned int shift, unsigned int bytes)
 {{
@@ -949,7 +1018,7 @@ static struct g17_eval g17_eval_movk(struct g17_eval source,
     return g17_known(g17_movk(source.value, immediate.value, shift, bytes));
 }}
 
-static struct g17_test g17_compare(struct g17_eval first,
+static __attribute__((unused)) struct g17_test g17_compare(struct g17_eval first,
                                    struct g17_eval second,
                                    enum g17_compare_operation operation,
                                    unsigned int bytes)
@@ -974,11 +1043,17 @@ static struct g17_test g17_compare(struct g17_eval first,
     case G17_COMPARE_LS:
         result.value = first.value <= second.value;
         break;
+    case G17_COMPARE_LO:
+        result.value = first.value < second.value;
+        break;
+    case G17_COMPARE_HS:
+        result.value = first.value >= second.value;
+        break;
     }}
     return result;
 }}
 
-static struct g17_test g17_test_mask(struct g17_eval first,
+static __attribute__((unused)) struct g17_test g17_test_mask(struct g17_eval first,
                                      struct g17_eval second,
                                      int want_nonzero, unsigned int bytes)
 {{
@@ -994,7 +1069,7 @@ static struct g17_test g17_test_mask(struct g17_eval first,
     return result;
 }}
 
-static struct g17_test g17_test_bit(struct g17_eval source,
+static __attribute__((unused)) struct g17_test g17_test_bit(struct g17_eval source,
                                     unsigned int bit, int want_set,
                                     unsigned int bytes)
 {{
@@ -1010,7 +1085,7 @@ static struct g17_test g17_test_bit(struct g17_eval source,
     return result;
 }}
 
-static struct g17_eval g17_select(struct g17_test test,
+static __attribute__((unused)) struct g17_eval g17_select(struct g17_test test,
                                   struct g17_eval first,
                                   struct g17_eval second)
 {{
@@ -1066,6 +1141,8 @@ static uint32_t g17_next(uint32_t event, const uint8_t *descriptor,
                          uint32_t pass)
 {{
     (void)command;
+    (void)inputs;
+    (void)pass;
     switch (event) {{
 {chr(10).join(node_cases)}
     default:
@@ -1098,17 +1175,7 @@ int vinix_fake_g17_encode_3d(
     *write_count = 0;
     if (write_capacity < VINIX_FAKE_G17_MAX_WRITES)
         return VINIX_FAKE_G17_ENCODE_WRITE_CAPACITY;
-    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {{
-        uint32_t decision;
-
-        for (decision = 0;
-             decision < VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT; decision++) {{
-            if (inputs->decisions[pass][decision] > 1)
-                return VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT;
-        }}
-    }}
-
-    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {{
+{decision_check}    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {{
         size_t base = (size_t)pass * VINIX_FAKE_G17_REGISTER_STRIDE;
         size_t stream_offset = base + VINIX_FAKE_G17_STREAM_OFFSET;
         size_t metadata_offset = base + VINIX_FAKE_G17_METADATA_OFFSET;
@@ -1177,6 +1244,9 @@ int vinix_fake_g17_encode_3d(
 
 
 def generate(abi: dict[str, Any]) -> tuple[str, str]:
+    # Accelerator members the producer reads become constants where the
+    # recovery proves them, and the power-column count a hardware input.
+    abi = fake.fold_accelerator_inputs(abi)
     fingerprint = _fingerprint(abi)
     source, external_events, external_decisions, max_writes = render_source(
         abi, fingerprint

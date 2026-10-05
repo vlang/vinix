@@ -1,0 +1,29 @@
+{
+  "at_utc": "2026-10-02T19:20:02.177633+00:00",
+  "reason": "Host disk exhaustion while preparing final verification; diagnostic completed exit 0 and QEMU was closed. Raw serial/config/runner/exit evidence and immutable libc stages retained. Images reproduce from saved inputs.",
+  "artifacts": [
+    {
+      "path": "vinix.iso",
+      "bytes": 131184640,
+      "sha256": "290b5e08b7d65749948cec928c330da974bf16b30a1826e7e8b4e5a7a810d31c"
+    },
+    {
+      "path": "initramfs.tar",
+      "bytes": 119818240,
+      "sha256": "799131df6e0ef358747bbc4c38e79ee2dacb21f699ba2b5f2b1828d01fa09b3e"
+    },
+    {
+      "path": "boot-kernel",
+      "bytes": 7513608,
+      "sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186"
+    },
+    {
+      "path": "rootfs",
+      "kind": "disposable directory"
+    },
+    {
+      "path": "iso-build",
+      "kind": "disposable directory"
+    }
+  ]
+}

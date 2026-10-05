@@ -1,0 +1,14 @@
+// The freely available demo lacks the full game's loading GUI, which
+// dhewm3's render-demo playback expects to exist.
+windowDef Desktop {
+    rect 0, 0, 640, 480
+    visible 1
+    backcolor 0, 0, 0, 1
+    windowDef Loading {
+        rect 0, 220, 640, 40
+        visible 1
+        text "Loading Doom 3 demo..."
+        textalign 1
+        forecolor 1, 1, 1, 1
+    }
+}

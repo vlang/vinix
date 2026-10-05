@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 #include "apple_smc.h"
 #include <assert.h>
@@ -11,6 +15,9 @@
 #define LAST (UINT64_C(1) << 51)
 #define KEY_BUIC UINT32_C(0x42554943)
 #define KEY_BRSC UINT32_C(0x42525343)
+#define KEY_B0AV UINT32_C(0x42304156)
+#define KEY_B0AC UINT32_C(0x42304143)
+#define KEY_B0AP UINT32_C(0x42304150)
 
 struct message { uint64_t word; uint8_t ep; };
 struct fake {
@@ -24,6 +31,10 @@ struct fake {
     int recv_error, send_error, flood, zero_buffer, override_length;
     int no_buic, no_brsc, iop_received, ap_received, app_started;
     int debug_started, boot_ack_first;
+    unsigned power_missing;
+    uint16_t voltage;
+    int16_t current;
+    int32_t power;
 };
 
 static void enqueue(struct fake *f, uint8_t ep, uint64_t word)
@@ -109,18 +120,24 @@ static int tx(void *context, uint64_t word, uint8_t ep)
         } else {
             uint32_t key = (uint32_t)(word >> 32);
             unsigned request_length = (unsigned)((word >> 16) & 0xff);
-            assert(key == KEY_BUIC || key == KEY_BRSC);
-            assert(request_length == (key == KEY_BUIC ? 1 : 2));
+            assert(key == KEY_BUIC || key == KEY_BRSC || key == KEY_B0AV ||
+                   key == KEY_B0AC || key == KEY_B0AP);
+            assert(request_length == (key == KEY_BUIC ? 1 : key == KEY_B0AP ? 4 : 2));
             ++f->reads;
             if (key == KEY_BUIC)
                 ++f->buic_reads;
-            else
+            else if (key == KEY_BRSC)
                 ++f->brsc_reads;
             f->last_id = (unsigned)((word >> 12) & 15);
             unsigned status = ((key == KEY_BUIC && f->no_buic) ||
                                (key == KEY_BRSC && f->no_brsc)) ? 0x84 : f->smc_status;
+            unsigned bit = key == KEY_B0AV ? 1 : key == KEY_B0AC ? 2 : key == KEY_B0AP ? 4 : 0;
+            if (f->power_missing & bit) status = 0x84;
+            uint32_t value = key == KEY_B0AV ? f->voltage :
+                key == KEY_B0AC ? (uint16_t)f->current :
+                key == KEY_B0AP ? (uint32_t)f->power : f->percent;
             unsigned length = f->override_length ? f->reply_length : request_length;
-            uint64_t reply = ((uint64_t)f->percent << 32) |
+            uint64_t reply = ((uint64_t)value << 32) |
                 ((uint64_t)f->reply_wsize << 24) | ((uint64_t)length << 16) |
                 ((uint64_t)f->last_id << 12) | status;
             if (f->wrong_id)
@@ -447,6 +464,43 @@ static void test_invalid_configuration(void)
 }
 
 #define RUN(name) do { name(); ++tests; printf("PASS %s\n", #name); } while(0)
+static void test_power_keys_cache_and_missing(void)
+{
+    struct fake f=defaults(); void *s=new_state();
+    f.voltage=12000; f.current=-2500; f.power=-30000;
+    assert(boot(s,&f)==0);
+    unsigned flags=0; int voltage=0, current=0, power=0;
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==0);
+    assert(flags==7 && voltage==12000 && current==-2500 && power==-30000);
+    unsigned reads=f.reads;
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==0 && f.reads==reads);
+    assert(vinix_smc_power_time(s)>0);
+    uint8_t text[128];
+    int size=vinix_smc_format_power(flags,voltage,current,power,text);
+    const char expected[]="voltage_mv: 12000\ncurrent_ma: -2500\npower_mw: -30000\n";
+    assert(size==(int)sizeof(expected)-1 && !memcmp(text,expected,(size_t)size));
+    f.ticks+=1001; f.power_missing=4;
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==0 && flags==3);
+    size=vinix_smc_format_power(flags,voltage,current,power,text);
+    const char partial[]="voltage_mv: 12000\ncurrent_ma: -2500\n";
+    assert(size==(int)sizeof(partial)-1 && !memcmp(text,partial,(size_t)size));
+    f.ticks+=1001; f.power_missing=7;
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==VINIX_SMC_NO_KEY && flags==0);
+    f.ticks+=1001; f.drop_read=1;
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==VINIX_SMC_TIMEOUT);
+    assert(vinix_smc_refresh_power(s,&flags,&voltage,&current,&power)==VINIX_SMC_TIMEOUT);
+    free(s);
+}
+
+static void test_power_format_signed_extremes(void)
+{
+    uint8_t text[128];
+    int size=vinix_smc_format_power(7,65535,-32768,INT32_MIN,text);
+    const char expected[]="voltage_mv: 65535\ncurrent_ma: -32768\npower_mw: -2147483648\n";
+    assert(size==(int)sizeof(expected)-1 && !memcmp(text,expected,(size_t)size));
+    assert(vinix_smc_format_power(0,0,0,0,text)==0);
+}
+
 int main(void)
 {
     unsigned tests=0;
@@ -475,6 +529,8 @@ int main(void)
     RUN(test_poll_budget);
     RUN(test_counter_and_message_id_wrap);
     RUN(test_invalid_configuration);
+    RUN(test_power_keys_cache_and_missing);
+    RUN(test_power_format_signed_extremes);
     printf("%u tests passed\n",tests);
     return 0;
 }

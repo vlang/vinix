@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: ISC
  * Root-only loader/control utility for the experimental Vinix raw interface.
  * No passphrase in argv, environment, configuration files, or diagnostic logs.

@@ -1,0 +1,10 @@
+#!/bin/sh
+# uname on Steam's PATH for a client started outside a UTS namespace. Steam's
+# scripts refuse any kernel that does not call itself Linux; the client is
+# an x86 Linux program, so answer for the machine it believes it is on.
+case "${1:-}" in
+    ''|-s) echo Linux ;;
+    -m) echo x86_64 ;;
+    -r) echo 5.15.0-vinix ;;
+    *) exec /bin/busybox uname "$@" ;;
+esac

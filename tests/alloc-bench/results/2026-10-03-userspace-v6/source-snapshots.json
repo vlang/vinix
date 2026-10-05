@@ -1,0 +1,12 @@
+{
+  "bench.c": {
+    "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+    "origin": "../2026-10-02-userspace/bench.c",
+    "unchanged": true
+  },
+  "compare.py": {
+    "sha256": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+    "origin": "../2026-10-02-userspace/compare.py",
+    "unchanged": true
+  }
+}

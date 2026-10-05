@@ -1,0 +1,31 @@
+{
+  "kernel_sha256": "b9ed08dd6855b41720165c62d3cf57fb2ba2fd00965029187090aa28a3b7c905",
+  "combined_patch_sha256": "b6fc4b129c5f3b4c8bdc7bea226bde2e029f426c3ad079977b5486a6f28eaaac",
+  "full_core_2cpu": "PASS, runner exit0, all required markers",
+  "full_core_4cpu": "No completed PASS; unchanged existing 80-waiter test stalls >64 thread creation. Exact baseline reproduces. Eight-worker new first-touch case itself passed on 4CPU.",
+  "pipe_live_count": 256,
+  "empty_pipe_retained_bytes": 1318912,
+  "first_write_backing_bytes": 18747392,
+  "closed_retained_bytes": 12288,
+  "checks": [
+    "default capacity",
+    "empty readiness",
+    "FIONREAD",
+    "nonblocking read EAGAIN",
+    "zero write",
+    "deferred resize to1MiB and4KiB",
+    "first write/read256pipes",
+    "writer close and EOF",
+    "complete reclamation",
+    "fork-shared empty pipe with blocked reader",
+    "existing large blocking transfer"
+  ],
+  "lifetime_review": "Independent review passed by /root/vm_allocation; no new object free/cache paths.",
+  "vm_lifetime_review": "Independent review passed by /root/pipe_allocation.",
+  "logs": {
+    "full2cpu": "/Users/alex/code/vinix/build/useralloc-pipe/core-final-2cpu/serial.log",
+    "baseline80": "/Users/alex/code/vinix/build/useralloc-pipe/waiters-baseline-4cpu/serial.log",
+    "candidate80": "/Users/alex/code/vinix/build/useralloc-pipe/waiters-candidate-4cpu/serial.log",
+    "eight_worker_firsttouch": "/Users/alex/code/vinix/build/useralloc-pipe/core-combined-barrier-x86_64.log"
+  }
+}

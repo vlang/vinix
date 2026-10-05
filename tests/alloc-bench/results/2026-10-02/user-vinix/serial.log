@@ -1,0 +1,115 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01HKALLOC-META schema=2 platform=vinix timer=x86-tsc samples=5 hot_pairs=100000 batch_rounds=48 batch_width=256 big_pairs=128 big_bytes=262144 sizes=16,32,48,64,96,128,192,256,384,512,768,1024,1536,2048 zero_validation=warmup_every_requested_byte payload_validation=endpoints operation=alloc_free_pair timed_zero_validation=0 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=1 pairs=100000 ticks=1668709000 ticks_per_pair=16687 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=2 pairs=100000 ticks=681322000 ticks_per_pair=6813 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=3 pairs=100000 ticks=425365000 ticks_per_pair=4253 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=4 pairs=100000 ticks=806489000 ticks_per_pair=8064 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=hot64 sample=5 pairs=100000 ticks=547653000 ticks_per_pair=5476 checksum=25486688
+KALLOC-RESULT platform=vinix phase=hot64 pairs=100000 samples=5 warmup_pairs=100000 median_ticks=681322000 min_ticks=425365000 max_ticks=1668709000 median_ticks_per_pair=6813 checksum=25486688
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=1 pairs=12288 ticks=154770000 ticks_per_pair=12595 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=2 pairs=12288 ticks=127558000 ticks_per_pair=10380 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=3 pairs=12288 ticks=453967000 ticks_per_pair=36943 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=4 pairs=12288 ticks=75950000 ticks_per_pair=6180 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=mixed256 sample=5 pairs=12288 ticks=262861000 ticks_per_pair=21391 checksum=1855488
+KALLOC-RESULT platform=vinix phase=mixed256 pairs=12288 samples=5 warmup_pairs=12288 median_ticks=154770000 min_ticks=75950000 max_ticks=453967000 median_ticks_per_pair=12595 checksum=1855488
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=1 pairs=128 ticks=173015000 ticks_per_pair=1351679 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=2 pairs=128 ticks=300324000 ticks_per_pair=2346281 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=3 pairs=128 ticks=339665000 ticks_per_pair=2653632 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=4 pairs=128 ticks=98237000 ticks_per_pair=767476 checksum=16256
+KALLOC-SAMPLE platform=vinix phase=big262144 sample=5 pairs=128 ticks=335439000 ticks_per_pair=2620617 checksum=16256
+KALLOC-RESULT platform=vinix phase=big262144 pairs=128 samples=5 warmup_pairs=128 median_ticks=300324000 min_ticks=98237000 max_ticks=339665000 median_ticks_per_pair=2346281 checksum=16256
+KALLOC-DONE platform=vinix phases=3 checksum=27358432
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./.PKGINFO sz=646
+!>+ [3] ./.SIGN.RSA.alpine-devel@lists.alpinelinux.org-6165ee59.rsa.pub sz=512
+!>+ [4] ./bin/ sz=0
+!>+ [5] ./bin/arch sz=0
+!>+ [6] ./bin/ash sz=0
+!>+ [7] ./bin/base64 sz=0
+!>+ [8] ./bin/bbconfig sz=0
+!>+ [9] ./bin/busybox sz=808712
+!>+ [10] ./bin/cat sz=0
+!>+ [11] ./bin/chattr sz=0
+!>+ [12] ./bin/chgrp sz=0
+!>+ [13] ./bin/chmod sz=0
+!>+ [14] ./bin/chown sz=0
+!>+ [15] ./bin/cp sz=0
+!>+ [16] ./bin/date sz=0
+!>+ [17] ./bin/dd sz=0
+!>+ [18] ./bin/df sz=0
+!>+ [19] ./bin/dmesg sz=0
+!>+ [20] ./bin/dnsdomainname sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [200] ./etc/terminfo/t/terminator sz=1802
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [400] ./root/.oh-my-zsh/plugins/bgnotify/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [600] ./root/.oh-my-zsh/plugins/emacs/emacs.plugin.zsh sz=2166
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [800] ./root/.oh-my-zsh/plugins/hcloud/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1000] ./root/.oh-my-zsh/plugins/mercurial/README.md sz=2872
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1200] ./root/.oh-my-zsh/plugins/rake-fast/README.md sz=1109
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1400] ./root/.oh-my-zsh/plugins/thefuck/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1600] ./root/.oh-my-zsh/plugins/zsh-navigation-tools/doc/znt-tmux.zsh sz=2147
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1800] ./root/.oh-my-zsh/themes/strug.zsh-theme sz=953
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2000] ./usr/bin/pgrep sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2200] ./usr/include/semaphore.h sz=810
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2400] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/include/immintrin.h sz=2888
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2600] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/config/initfini-array.h sz=1625
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [2800] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/lto-compress.h sz=1599
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [3000] ./usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0/plugin/include/typeclass.h sz=1547
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [3200] ./usr/x86_64-alpine-linux-musl/lib/ldscripts/elf32_x86_64.xc sz=9284
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff80017fffde00
+initramfs: Done (3357 entries)
+ALLOC-COMPILE-BEGIN
+gcc (Alpine 14.2.0) 14.2.0
+ALLOC-COMPILE-DONE
+ALLOC-META schema=1 label=vinix platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=1000000 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=1 pairs=200000 elapsed_ns=213000000 ns_per_pair=1065.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=2 pairs=200000 elapsed_ns=220000000 ns_per_pair=1100.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=3 pairs=200000 elapsed_ns=227000000 ns_per_pair=1135.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=4 pairs=200000 elapsed_ns=239000000 ns_per_pair=1195.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=5 pairs=200000 elapsed_ns=204000000 ns_per_pair=1020.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=6 pairs=200000 elapsed_ns=203000000 ns_per_pair=1015.000 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=7 pairs=200000 elapsed_ns=236000000 ns_per_pair=1180.000 checksum=51000000
+ALLOC-RESULT label=vinix workload=malloc_hot_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=64 batch=1 touch_stride=0 median_ns_per_pair=1100.000 min_ns_per_pair=1015.000 max_ns_per_pair=1195.000
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=1 pairs=200000 elapsed_ns=2027000000 ns_per_pair=10135.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=2 pairs=200000 elapsed_ns=1979000000 ns_per_pair=9895.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=3 pairs=200000 elapsed_ns=2140000000 ns_per_pair=10700.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=4 pairs=200000 elapsed_ns=2359000000 ns_per_pair=11795.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=5 pairs=200000 elapsed_ns=2214000000 ns_per_pair=11070.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=6 pairs=200000 elapsed_ns=1809000000 ns_per_pair=9045.000 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=7 pairs=200000 elapsed_ns=1785000000 ns_per_pair=8925.000 checksum=51000560
+ALLOC-RESULT label=vinix workload=malloc_mixed_batch_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=0 batch=64 touch_stride=0 median_ns_per_pair=10135.000 min_ns_per_pair=8925.000 max_ns_per_pair=11795.000
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=1 pairs=10000 elapsed_ns=6482000000 ns_per_pair=648200.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=2 pairs=10000 elapsed_ns=6621000000 ns_per_pair=662100.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=3 pairs=10000 elapsed_ns=6678000000 ns_per_pair=667800.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=4 pairs=10000 elapsed_ns=9400000000 ns_per_pair=940000.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=5 pairs=10000 elapsed_ns=8397000000 ns_per_pair=839700.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=6 pairs=10000 elapsed_ns=8890000000 ns_per_pair=889000.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=7 pairs=10000 elapsed_ns=8531000000 ns_per_pair=853100.000 checksum=81593856
+ALLOC-RESULT label=vinix workload=malloc_touch_262144 category=userspace operation=alloc_free_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=839700.000 min_ns_per_pair=648200.000 max_ns_per_pair=940000.000
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=1 pairs=10000 elapsed_ns=523000000 ns_per_pair=52300.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=2 pairs=10000 elapsed_ns=686000000 ns_per_pair=68600.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=3 pairs=10000 elapsed_ns=687000000 ns_per_pair=68700.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=4 pairs=10000 elapsed_ns=693000000 ns_per_pair=69300.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=5 pairs=10000 elapsed_ns=610000000 ns_per_pair=61000.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=6 pairs=10000 elapsed_ns=533000000 ns_per_pair=53300.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=7 pairs=10000 elapsed_ns=606000000 ns_per_pair=60600.000 checksum=0
+ALLOC-RESULT label=vinix workload=mmap_anon_4096 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=4096 batch=1 touch_stride=0 median_ns_per_pair=61000.000 min_ns_per_pair=52300.000 max_ns_per_pair=69300.000
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=1 pairs=10000 elapsed_ns=8068000000 ns_per_pair=806800.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=2 pairs=10000 elapsed_ns=8017000000 ns_per_pair=801700.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=3 pairs=10000 elapsed_ns=8194000000 ns_per_pair=819400.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=4 pairs=10000 elapsed_ns=8384000000 ns_per_pair=838400.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=5 pairs=10000 elapsed_ns=8304000000 ns_per_pair=830400.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=6 pairs=10000 elapsed_ns=7983000000 ns_per_pair=798300.000 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=7 pairs=10000 elapsed_ns=8664000000 ns_per_pair=866400.000 checksum=81593856
+ALLOC-RESULT label=vinix workload=mmap_touch_262144 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=819400.000 min_ns_per_pair=798300.000 max_ns_per_pair=866400.000
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=1 pairs=10000 elapsed_ns=964000000 ns_per_pair=96400.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=2 pairs=10000 elapsed_ns=1104000000 ns_per_pair=110400.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=3 pairs=10000 elapsed_ns=1106000000 ns_per_pair=110600.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=4 pairs=10000 elapsed_ns=956000000 ns_per_pair=95600.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=5 pairs=10000 elapsed_ns=1034000000 ns_per_pair=103400.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=6 pairs=10000 elapsed_ns=986000000 ns_per_pair=98600.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=7 pairs=10000 elapsed_ns=1227000000 ns_per_pair=122700.000 checksum=0
+ALLOC-RESULT label=vinix workload=pipe_create_close category=kernel_syscall operation=create_close_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=0 batch=1 touch_stride=0 median_ns_per_pair=103400.000 min_ns_per_pair=95600.000 max_ns_per_pair=122700.000
+ALLOC-DONE label=vinix workloads=6 checksum=0
+ALLOC-GUEST-DONE

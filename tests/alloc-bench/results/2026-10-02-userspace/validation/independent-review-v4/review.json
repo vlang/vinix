@@ -1,0 +1,136 @@
+{
+  "reviewer": "allocator_review_v4",
+  "at_utc": "2026-10-02T19:13:38.450835+00:00",
+  "status": "PASS independent source/lifetime/codegen review and 361,573-case memory sanitizer verification; guest allocator/kernel runtime suites pending",
+  "source_sha256": {
+    "build-support/musl/malloc-retain.patch": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+    "kernel/katomic/katomic_amd64.v": "ec2d130780fe2fe72bdff53013594e2bc5dbe671c10ab260412f0de8c19d1bf4",
+    "kernel/klock/klock_amd64.v": "3db4566c9a05ada0098109928957a56d8248f96a6da3ad95b555d8a35e89c4ee",
+    "kernel/c/memory.c": "5082c545e7c16318cceeb51bf280c356c6b9713c0de8b336290be165f2a42eb5",
+    "kernel/usercopy/usercopy.v": "63212b7fcef6d1666ec5d6e4c74f3caef37b84c50ed909ecb5b5a1c9bebcbf19",
+    "kernel/sched/tlb_amd64.v": "71f5340d328aa273b49f3a0e5aefad16f67872175cf9ea597270a2485c5a26f8",
+    "kernel/memory/virtual_amd64.v": "8bae69df978a2e94da3e74a3569091d39a01ab216adf77fde38e3cb3babb65e6",
+    "kernel/proc/thread_refs.v": "76d6055cd6c955de952e4b6ac9e08f52e5e70217d7b9e565beb4be51641aae02",
+    "kernel/file/locks.v": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+    "tests/qemu-core/test.c": "971cedaf59a81a5c96037e2c653d356931ee47cdff7e29b8833cc0987951d217",
+    "tests/user-alloc/verify-all-classes.c": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+    "tests/user-alloc/README.md": "562c91a8190a896ab4072c61aff5d50042e2291bcd450eca61f0f9a1eadadbb3"
+  },
+  "allocator_findings": [
+    {
+      "area": "need_locks publication",
+      "result": "pass",
+      "reason": "musl pthread_create sets need_locks=1 while holding the thread-list lock before __clone. The last terminating worker sets it to -1 only after allocator and other cleanup, then makes no further ordinary lock or allocator calls. Existing upstream free/avail mask paths already use plain updates when MT is exactly zero. New plain mask paths follow that same condition."
+    },
+    {
+      "area": "negative-to-zero transition and fork",
+      "result": "pass",
+      "reason": "__lock acquires the actual malloc lock before clearing negative need_locks to zero. New unlock reads the volatile lock word rather than MT, so it still releases that acquired lock. A multithreaded fork serializes with __malloc_atfork; the child resets its copied lock and retains complete owned allocator metadata, with need_locks negative until first ordinary lock acquisition."
+    },
+    {
+      "area": "nonzero bitscan",
+      "result": "pass",
+      "reason": "Both CTZ inputs are first bits selected from nonzero masks and guarded before the builtin. CLZ executes only after the scaled n>=10 check and increment. All callers bound size_to_class to below the direct-mapping threshold or to nested groups below half a page, so narrowing to 32-bit unsigned cannot turn its input into zero. GCC documents CTZ/CLZ zero as undefined, so those guards are essential."
+    },
+    {
+      "area": "retained sole-group free shortcut",
+      "result": "pass",
+      "reason": "get_meta validates header offset, slot bounds, live mask, metadata secret, stride/map bounds; get_nominal_size checks both redzones; header and offset are invalidated before the shortcut. It requires MT==0, ordinary full-stride storage, singleton active queue membership and the existing <=128KiB footprint. Publishing the freed bit preserves rotating activation. It creates no owner, allocation or reclamation lifetime, and bypasses no enabled madvise work (USE_MADV_FREE stays zero)."
+    },
+    {
+      "area": "coarse-class fallback",
+      "result": "pass",
+      "reason": "Original eligible classes are below 32 with maximum stride 8,176. The fixed retained budget gives all of them the capped minimum eight slots, making initial coarsening redundant when retention is enabled. Retention-disabled builds retain the original coarse-class path."
+    },
+    {
+      "area": "ownership, trim and bounds",
+      "result": "pass",
+      "reason": "Direct-cache owner transfer, per-bucket replacement, old-map unmap outside the lock, metadata recycling, child-first trimming, preservation of live allocations and errno remain unchanged. No quarantine, slot offset cycling, header or redzone validation is removed. Five buckets still cap free direct mappings at 3,968KiB; the conservative additional ordinary backing envelope remains 12MiB."
+    },
+    {
+      "area": "benchmark specificity",
+      "result": "pass",
+      "reason": "All policies use allocator-wide class, group, thread-state and footprint conditions; no workload identifier, requested benchmark size, process name or special timing switch is introduced."
+    },
+    {
+      "area": "supplemental public API regression",
+      "result": "PASS source review; execution pending",
+      "reason": "Permanent verify-all-classes.c shares the existing verify.c helpers, runs the all-48-boundary 72-live-object burst and live trim checks plus 24 pthread publication/teardown cycles separately, and prints a distinct supplement completion marker. Original 1,910-check verifier remains unchanged and must run separately in every final retention/linkage mode. Cross-thread pointers are accessed only after pthread_join, then freed once by their new owner; live objects remain checked after trimming."
+    }
+  ],
+  "kernel_findings": [
+    {
+      "area": "SC loads and stores",
+      "result": "PASS source plus actual final x86 generated-C/object proof",
+      "reason": "Generic SC store remains locked XCHG and all RMWs remain locked. Naturally aligned width-exact MOV loads plus compiler memory clobbers follow the x86 write-fencing SC mapping. Widths 2/4/8 use the original locked XADD fallback if not naturally aligned, preserving cross-cache-line atomicity. Integer pointer views address the original slot rather than dereferencing a pointer-valued payload."
+    },
+    {
+      "area": "lock release",
+      "result": "PASS source plus actual final x86 generated-C/object proof",
+      "reason": "The sole store_release caller is klock.release. It snapshots interrupt state before a byte MOV publishes false, with compiler memory clobber; x86 store ordering publishes preceding critical-section writes before unlock, and the acquiring CAS stays locked. Only then are interrupts restored. Generic stores and explicit MFENCE remain unchanged."
+    },
+    {
+      "area": "caller barriers",
+      "result": "pass for inspected ordering-sensitive callers",
+      "reason": "TLB page-table/active-CR3 handoff has explicit MFENCE on both publication/check paths, pending request publication and acknowledgment remain SC stores, and thread/process final-reference releases retain explicit katomic.sync before locked decrements/CAS. Event sleep transition uses scheduler SC state publication and locked queue/event acquisition. No reviewed caller uses a load as a named standalone StoreLoad barrier."
+    },
+    {
+      "area": "word memcpy/memset bounds and aliasing",
+      "result": "PASS source plus actual final x86 generated-C/object proof",
+      "reason": "Both functions byte-advance to natural alignment before converting pointers, guard word accesses by n>=8 and 64-byte accesses by n>=64, then process the remaining bytes. memcpy takes the word path only for matching low three source/destination bits. GNU may_alias supports arbitrary object representations; the repeated-byte fill is endian-independent. No read/write extends beyond the requested range. memmove overlap semantics are unchanged."
+    },
+    {
+      "area": "usercopy and lifetime",
+      "result": "pass",
+      "reason": "copy_pagemap_policy resolves/pins one physical page while holding the page-map lock and passes a chunk bounded by that page and remaining request; widened aligned word accesses remain inside that chunk. New code creates no metadata, owner or freed allocation and changes no reclamation/quarantine lifetime."
+    },
+    {
+      "area": "advisory-lock cleanup type guards",
+      "result": "pass at source level; actual core-test verification pending",
+      "reason": "release_posix_locks skips exactly the resource kinds rejected by fcntl_lock before insertion; release_flock skips exactly the resource kinds rejected by syscall_flock before insertion. All advisory table mutations are internal to that module. Both cleanup calls execute while the descriptor or final Handle still owns the Resource. Resource chmod implementations preserve S_IFMT, and permission/ACL changes cannot convert an acquired-lock resource into an unsupported type. Unsupported pipe/socket/character resources cannot own a stale advisory entry, so no waiter notification or table traversal is lost. Regular-file/directory cleanup is unchanged. No allocation or reclamation lifetime is introduced."
+    },
+    {
+      "area": "advisory lock close/dup regression semantics",
+      "result": "source review pass; execution pending",
+      "reason": "Unrelated pipe and socket closes occur while a parent POSIX write lock is live; a forked process subsequently must still encounter the lock, so skipping unsupported resources cannot silently discard supported entries. Closing a dup must release the parent PID-owned POSIX lock even while the original descriptor remains. For flock, closing the original leaves its shared Handle owned by the dup; a child drops its inherited reference then probes with a separate Handle, which must still block. After the parent closes the final dup a newly forked independent open must acquire successfully. Child close cannot mask a missing parent POSIX release because POSIX cleanup uses child PID; final process cleanup closes any child probe descriptors. reap_ok rejects failed forks and failed child exits."
+    }
+  ],
+  "primary_references": [
+    {
+      "url": "https://www.cl.cam.ac.uk/~pes20/cpp/cpp0xmappings.html",
+      "supports": "x86 write-fencing SC mapping: MOV load and XCHG store; release store MOV; warns against mixing mappings"
+    },
+    {
+      "url": "https://gcc.gnu.org/onlinedocs/gcc/Bit-Operation-Builtins.html",
+      "supports": "CLZ and CTZ input zero is undefined"
+    },
+    {
+      "url": "https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html",
+      "supports": "__builtin_trap emits an abnormal-termination operation"
+    }
+  ],
+  "supplemental_test": "build/useralloc-review-v4/supplemental-source.json",
+  "remaining_validation": [
+    "Final retained/disabled dynamic/static original and supplemental API tests on both architectures.",
+    "Complete corrected-kernel core suites with advisory lock, TLB, thread and memory reclamation coverage.",
+    "Complete measured final performance cohorts using validated final binaries."
+  ],
+  "benchmark_runs_performed_by_reviewer": 0,
+  "excluded_builds": [
+    {
+      "path": "build/useralloc-kernel-speed-v4/x86_64-mut-bool-error",
+      "reason": "V rejected concrete mutable bool signature; raw build failure retained.",
+      "booted": false
+    },
+    {
+      "path": "build/useralloc-kernel-speed-v4/x86_64-load-order-error",
+      "kernel_sha256": "b494567f13a17b704528017ae17e2cee0f88bc23129d2bbff3dcb64ab795ea5d",
+      "atomic_source_sha256": "6b6c3896d3c2947b1d37aff7d6392808c41243eccded6fafec4b5d09e8cabbf0",
+      "reason": "Generated-C MOV load direction was output-register to input-memory, corrupting the source instead of reading it. Independent review blocked the candidate before any guest boot. V load operands reversed in the revised source; exact final object proof remains required.",
+      "booted": false
+    }
+  ],
+  "actual_codegen_proof": "codegen-proof.json",
+  "reviewed_kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+  "aarch64_memory_kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9"
+}

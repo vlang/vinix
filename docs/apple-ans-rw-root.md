@@ -179,13 +179,19 @@ framework for future storage drivers. libc's `sync()` has a void interface;
 use `fsync()`/`fdatasync()` or an explicit flush ioctl to observe errors.
 Applications must also flush their own userspace buffers.
 
-The current Process model has no credentials/capabilities. The reboot handler
-therefore permits **PID 1 only**, checks Linux reboot magic values and supported
-commands, and calls PSCI only after successful ANS shutdown. This is not an
-implementation of CAP_SYS_BOOT. Normal init should stop applications before
-requesting reboot/poweroff; a non-PID-1 forced reboot request returns EPERM.
-If PSCI returns, the syscall reports EIO rather than claiming poweroff worked.
-No forced-reset bypass is provided after a failed storage shutdown.
+The current Process model has no credentials/capabilities, so every process
+already holds the privilege a CAP_SYS_BOOT check would look for. The reboot
+handler checks Linux reboot magic values and supported commands, and calls PSCI
+only after successful ANS shutdown, but does not restrict its caller: requiring
+**PID 1 only** merely made `reboot(2)` unreachable, because the desktop image's
+init execs the compositor and nothing a terminal runs is ever PID 1. This is not
+an implementation of CAP_SYS_BOOT. Applications should still be stopped before
+a reboot or poweroff, which is what going through init achieves: BusyBox's
+`reboot`, `poweroff` and `halt` sync and signal PID 1 rather than calling the
+syscall, and the compositor ends the session on that signal before making the
+call itself. If PSCI returns, the syscall reports EIO rather than claiming
+poweroff worked. No forced-reset bypass is provided after a failed storage
+shutdown.
 
 ## Filesystem and root contract
 

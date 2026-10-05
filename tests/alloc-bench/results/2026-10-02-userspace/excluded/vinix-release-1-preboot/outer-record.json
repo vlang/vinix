@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-final-driver.py",
+    "useralloc-vinix-release-1",
+    "optimized-v3",
+    "/Users/alex/code/vinix/build/useralloc-final-kernel-x86_64/vinix-x86_64"
+  ],
+  "started_utc": "2026-10-02T16:52:28.590056+00:00",
+  "finished_utc": "2026-10-02T16:52:40.640130+00:00",
+  "exit_code": 0
+}

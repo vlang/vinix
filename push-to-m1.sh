@@ -57,6 +57,11 @@ fi
 # desktop initramfs shows a live percentage instead of looking hung, and
 # --partial lets the next invocation resume after an interrupted Wi-Fi push.
 echo "==> Comparing files; changed files show a live percentage..."
+# Every top-level build-* directory but build-support is a workspace or cache
+# that no M1 deployment reads -- build-release alone had grown to 15 GB -- and
+# so is every ISO. Naming them one at a time let each new one through: the
+# M1's checkout had gathered 10 GB of Office installer probes and release
+# images that rsync, which deletes nothing, then kept.
 # The build workspaces are host-side intermediates, not boot inputs. The
 # kernel and selected initramfs remain included below, while their staging
 # trees are deliberately left out of an M1 deployment.  The boot-image disk
@@ -65,16 +70,28 @@ echo "==> Comparing files; changed files show a live percentage..."
 # M1 starts through its existing m1n1/U-Boot chain and deploy-m1-efi.sh only
 # needs the separately copied Limine EFI below.  Sending either artifact can
 # fill the Mac's data volume before the actual desktop initramfs is reached.
+# Image builders publish an ext2 volume by renaming an adjacent `*.tmp.*`
+# file. Exclude that transient name explicitly as well: otherwise rsync can
+# enumerate it and then fail when the atomic rename removes it mid-transfer.
 # The amd64 build trees and application-probe disk images are QEMU-only too;
 # in particular, partially transferring a multi-GB probe disk can strand an
-# M1 with no room for the deployment inputs that it actually needs.
+# M1 with no room for the deployment inputs that it actually needs.  The .ext2
+# volumes beside those disks are the same thing one layer down -- the persistent
+# roots QEMU boots against, several GB each -- and only boot*.img was named, so
+# every deployment was quietly dragging desktop-root.ext2 across the network at
+# link speed before reaching anything it would actually install.
 if ! rsync -a --partial --progress --stats \
     --exclude '.claude/' \
     --exclude '.git/' \
     --exclude 'vinix.iso' \
     --exclude 'boot-image/boot*.img' \
+    --exclude 'boot-image/*.ext2' \
+    --exclude 'boot-image/*.ext2.tmp.*' \
     --exclude 'boot-image/edk2-aarch64-code-*.fd' \
     --exclude 'build-*-probe/*.img' \
+    --include '/build-support/' \
+    --exclude '/build-*/' \
+    --exclude '*.iso' \
     --exclude 'build-amd64-*/' \
     --exclude 'boot-image/limine-src-*/' \
     --exclude 'tools/agx-re/build/' \

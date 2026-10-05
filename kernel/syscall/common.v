@@ -1,0 +1,60 @@
+module syscall
+
+import aarch64.cpu
+import aarch64.cpu.local as cpulocal
+import proc
+import sched
+import userland
+
+@[markused]
+fn leave(context &cpulocal.GPRState) {
+	userland.flush_owed_sync()
+	userland.settle_owed_memory()
+	// A call that broke a pledge(2) promise has unwound and holds nothing;
+	// the process dies here, before it can run another instruction.
+	if proc.pledge_violation_pending() {
+		userland.exit_on_pledge_violation()
+	}
+	cpu.interrupt_toggle(false)
+	userland.exit_if_told_to()
+	userland.prepare_syscall_restart(context)
+	userland.end_wait_mask_unless_interrupted(context.x0)
+	// Before a signal is dispatched, so one that arrived while the thread
+	// waited is delivered once its group may run again.
+	sched.park_for_cgroup()
+	userland.dispatch_a_signal(context)
+	userland.end_wait_mask()
+	proc.cpu_leave_kernel()
+}
+
+// On the way back to userspace from an interrupt. A thread that only computes
+// makes no syscall, and took no signal but a fatal one: a SIGALRM that
+// openssl speed times each run with, or the SIGURG Go preempts a busy
+// goroutine with, waited for good. It is delivered here as at a syscall's
+// end, its handler run on a frame that keeps the FP/SIMD registers the loop
+// had live.
+//
+// A thread its process has told to exit leaves here too, as it does at a
+// syscall's end. One that only computed made no syscall to leave at: the
+// sibling tearing the process down waited half a second for it, then
+// stopped it where it was and left its kernel stack allocated for good.
+@[export: 'interrupt__leave']
+fn interrupt_leave(context &cpulocal.GPRState) {
+	if context.pstate & 0xf != 0 {
+		return
+	}
+	defer { proc.cpu_leave_kernel() }
+	// Group stops may block. Redirect to the owned Thread kernel stack rather
+	// than dispatching a stop on a CPU's shared interrupt stack.
+	userland.interrupt_return(context)
+	if context.pstate & 0xf != 0 { return }
+	told_to_exit := userland.told_to_exit()
+	if !told_to_exit && !userland.async_signal_deliverable() {
+		return
+	}
+	cpu.interrupt_toggle(false)
+	if told_to_exit {
+		userland.exit_if_told_to()
+	}
+	userland.dispatch_a_signal(context)
+}

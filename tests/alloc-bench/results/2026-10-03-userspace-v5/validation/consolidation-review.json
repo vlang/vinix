@@ -1,0 +1,50 @@
+{
+  "passed": true,
+  "allocator": {
+    "x86_64": {
+      "checks": 98744,
+      "corruption_children": 16,
+      "all_abnormal": true,
+      "trim_deltas_bytes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "serial_sha256": "9db4046321e17379ad1d08a41e7f32b8a68d373b37cd917c3e875169c8cd0f27"
+    },
+    "aarch64": {
+      "checks": 98744,
+      "corruption_children": 16,
+      "all_abnormal": true,
+      "trim_deltas_bytes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "serial_sha256": "e3ea0d118b8cb377e1b452f23bb98fa3c82a05c563d1d16680c807ebba7f1b28"
+    }
+  },
+  "total_checks": 197488,
+  "corruption_children": 32,
+  "desktop_perf": {
+    "status": "PASS",
+    "checked_rows": 43,
+    "scenarios": [
+      "ops",
+      "churn",
+      "cache",
+      "idle",
+      "apps",
+      "drag"
+    ],
+    "runner_exit_code": 0,
+    "kernel_sha256": "3d721f3168a990373cb2549bd26322329923014ee4613cda2ae3d4f6884bf8f7",
+    "desktop_sha256": "30b4220180f1e44d01d457e8a6b9d2a0bab831847eba54feb892f65f2d9a970a",
+    "serial_sha256": "c30588b081877bf8e45d5ae05fe4f5cd779b86983e5175ded49ed6876ec21eee",
+    "harness_sha256": "b19935d5cfd0a2e68e1cea76b8bf9f634d0dcd67846efdc8fe626a483a5bbb18",
+    "notes": "Complete required functional/memory scenarios with unchanged workloads. Existing ops/churn growth remains visible; this is not a claim that kernel memory stays flat."
+  },
+  "method": "Independently checked actual raw transcript hashes, original/supplemental case totals, every16corruption records and4trim records per architecture; checked completed43row perf validation and exact raw hash."
+}

@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libSystem.B.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '_puts', '_strcmp', '_arc4random_uniform', '_floorf', '__NSConcreteStackBlock', '__NSConcreteGlobalBlock', '__Block_object_assign', '__Block_object_dispose', '__Block_copy', '__Block_release', '_memcpy', '_memset' ]
+...

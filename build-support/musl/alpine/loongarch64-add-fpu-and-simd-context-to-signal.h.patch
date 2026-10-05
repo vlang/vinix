@@ -1,0 +1,84 @@
+From cede2a329cca01e4b27bf30922bf411250db6d54 Mon Sep 17 00:00:00 2001
+From: JianTao Shan <shanjiantao@loongson.cn>
+Date: Mon, 23 Sep 2024 02:00:54 +0000
+Subject: [PATCH] loongarch64: add fpu and simd context to signal.h
+To: musl@lists.openwall.com
+
+The signal stack extension field of loongarch64 is mutable, and the types
+are distinguished according to some magic. The lack of this part of the uapi
+definition will cause some projects such as dotnet to fail to compile on musl.
+---
+ arch/loongarch64/bits/signal.h | 50 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+
+diff --git a/arch/loongarch64/bits/signal.h b/arch/loongarch64/bits/signal.h
+index 5a9ed8c9..1487c0d7 100644
+--- a/arch/loongarch64/bits/signal.h
++++ b/arch/loongarch64/bits/signal.h
+@@ -18,6 +18,14 @@
+ #endif
+ 
+ #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
++/* FP context was used */
++#define SC_USED_FP	(1 << 0)
++/* Address error was due to memory load */
++#define SC_ADDRERR_RD	(1 << 30)
++/* Address error was due to memory store */
++#define SC_ADDRERR_WR	(1 << 31)
++
++/* FPU context */
+ typedef unsigned long greg_t, gregset_t[32];
+ 
+ struct sigcontext {
+@@ -26,6 +34,48 @@ struct sigcontext {
+ 	unsigned sc_flags;
+ 	unsigned long sc_extcontext[] __attribute__((__aligned__(16)));
+ };
++
++#define CONTEXT_INFO_ALIGN 16
++struct sctx_info {
++	unsigned magic;
++	unsigned size;
++	unsigned long padding;        /* padding to 16 bytes */
++};
++
++#define FPU_CTX_MAGIC 0x46505501
++#define FPU_CTX_ALIGN 8
++struct fpu_context {
++	unsigned long regs[32];
++	unsigned long fcc;
++	unsigned fcsr;
++};
++
++/* LSX context */
++#define LSX_CTX_MAGIC 0x53580001
++#define LSX_CTX_ALIGN 16
++struct lsx_context {
++	unsigned long regs[2*32];
++	unsigned long fcc;
++	unsigned fcsr;
++};
++
++/* LASX context */
++#define LASX_CTX_MAGIC 0x41535801
++#define LASX_CTX_ALIGN 32
++struct lasx_context {
++	unsigned long regs[4*32];
++	unsigned long fcc;
++	unsigned fcsr;
++};
++
++/* LBT context */
++#define LBT_CTX_MAGIC 0x42540001
++#define LBT_CTX_ALIGN 8
++struct lbt_context {
++	unsigned long regs[4];
++	unsigned eflags;
++	unsigned ftop;
++};
+ #endif
+ 
+ typedef struct {
+-- 
+2.46.1
+

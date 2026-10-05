@@ -1,0 +1,52 @@
+{
+  "version": "1.2.6",
+  "alpine_package": "musl-1.2.6-r2",
+  "arch": "aarch64",
+  "source_url": "https://musl.libc.org/releases/musl-1.2.6.tar.gz",
+  "source_sha256": "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512a",
+  "patches": [
+    {
+      "name": "handle-aux-at_base.patch",
+      "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+    },
+    {
+      "name": "0001-add-stub-for-pthread_mutexattr_setprioceiling.patch",
+      "sha256": "b2067680c66af9eb9f4fdc1fa5d9337a9fd62bdab2c437b416aa97d79eb884ee"
+    },
+    {
+      "name": "fix-loongarch64-zero-len-extcontext.patch",
+      "sha256": "92c8e965798ed516c15cb2a4e7c4ac45ec1eb68b6abff16c73adff2a3bae1b14"
+    },
+    {
+      "name": "CVE-2026-6042.patch",
+      "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+    },
+    {
+      "name": "CVE-2026-40200.patch",
+      "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+    },
+    {
+      "name": "malloc-retain.patch",
+      "sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86"
+    }
+  ],
+  "cc": [
+    "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/aarch64-linux-musl-gcc"
+  ],
+  "compiler_version": "aarch64-linux-musl-gcc (GCC) 14.2.0",
+  "compiler_target": "aarch64-linux-musl",
+  "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+  "ldflags": "-Wl,-soname,libc.musl-aarch64.so.1",
+  "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+  "retention": 1,
+  "configure_argv": [
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/aarch64/8adbe7fc2d9d74c610f67eb2cab1fe514a0da223a0d1c9f5158aa5374a4282ad/musl-1.2.6/configure",
+    "--target=aarch64-linux-musl",
+    "--prefix=/usr",
+    "--syslibdir=/lib",
+    "--disable-wrapper",
+    "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+  ],
+  "libc_so_sha256": "d44a53ec14839e2f32b62e83d99603aa018a6367733905e4321e4c266ad944bd",
+  "libc_a_sha256": "690ede9a9960a50c99d56e824d21693824a5d38b06d6c6b7fbbf9b99dfc4ebb0"
+}

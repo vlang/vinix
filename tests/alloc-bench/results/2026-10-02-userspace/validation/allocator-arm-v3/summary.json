@@ -1,0 +1,29 @@
+{
+  "allocator_checks_per_variant": 1910,
+  "allocator_variants": [
+    "optimized dynamic",
+    "optimized static",
+    "disabled dynamic",
+    "disabled static"
+  ],
+  "clock_busy_to_sleep_counter_ratio": 1.027602,
+  "corruption_tests": {
+    "small double-free": "SIGSEGV11",
+    "large double-free": "SIGSEGV11",
+    "small redzone overwrite": "SIGTRAP5",
+    "large redzone overwrite": "SIGTRAP5"
+  },
+  "optimized_mapping_retention_bytes": [
+    3653632,
+    3751936
+  ],
+  "trimmed_extra_mapping_bytes": [
+    0,
+    0
+  ],
+  "source_sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+  "kernel_sha256": "8bddb5563df1aa0e7a5c224923687f90621148619d81b1d0b7797c916cabc5f2",
+  "compiler": "GNU GCC14.2 AArch64 cross compiler",
+  "qemu": "QEMU11.1.1 HVF, host CPU, 2 vCPUs, 2048MiB",
+  "scope": "Supplementary ARM runtime correctness; user performance comparison is separately measured natively compiled GCC C under matched x86 TCG settings."
+}

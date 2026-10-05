@@ -1,0 +1,84 @@
+# GIMP sessionrc
+#
+# Match Vinix's private 1280x900 X11 surface. There is no X11 window manager
+# in the hosted application, so GIMP cannot otherwise maximise itself and its
+# Alpine defaults leave the editor offset within a larger white root window.
+
+(session-info "toplevel"
+    (factory-entry "gimp-empty-image-window")
+    (position 0 0)
+    (size 1280 900))
+(session-info "toplevel"
+    (factory-entry "gimp-single-image-window")
+    (position 0 0)
+    (size 1280 900)
+    (open-on-exit)
+    (aux-info
+        (left-docks-width "188")
+        (right-docks-width "205")
+        (maximized "no"))
+    (gimp-toolbox
+        (side left)
+        (book
+            (current-page 0)
+            (dockable "gimp-tool-options"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-device-status"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-undo-history"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-image-list"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))))
+    (gimp-dock
+        (side right)
+        (book
+            (current-page 0)
+            (dockable "gimp-brush-grid"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-pattern-grid"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-font-list"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-document-list"
+                (tab-style automatic)
+                (aux-info
+                    (show-button-bar "true"))))
+        (book
+            (position 336)
+            (current-page 0)
+            (dockable "gimp-layer-list"
+                (tab-style automatic)
+                (preview-size 32)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-channel-list"
+                (tab-style automatic)
+                (preview-size 32)
+                (aux-info
+                    (show-button-bar "true")))
+            (dockable "gimp-vectors-list"
+                (tab-style automatic)
+                (preview-size 32)
+                (aux-info
+                    (show-button-bar "true"))))))
+
+(hide-docks no)
+(single-window-mode yes)
+(tabs-position 0)
+(last-tip-shown 0)
+
+# end of sessionrc

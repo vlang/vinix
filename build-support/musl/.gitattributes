@@ -1,0 +1,2 @@
+# Preserve pinned source patches byte for byte, including diff context.
+*.patch -text -whitespace

@@ -1,0 +1,17 @@
+{
+  "status": "PREPARED_NOT_STARTED",
+  "extra_pins": {
+    "tests/alloc-bench/results/2026-10-03-userspace-v6/campaign-plan.json": "df9db0e94ba5b9bce3ac71fbdfed469642b5b0a6492c764a44fd69df5e9ba012",
+    "tests/alloc-bench/run-vinix.py": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c",
+    "build/useralloc-final-driver.py": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8",
+    "build/useralloc-macos-final-driver.py": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48",
+    "build/useralloc-macos-runtime/measure.py": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1",
+    "tests/alloc-bench/results/2026-10-02/user-macos/config.json": "2207dc5b1c4d0782c94b813afd48b4a61a662147a1fc8c29f4a4ecaf8427ceb0",
+    "build/useralloc-macos-runtime/argv.json": "97b1c18ba48f89eb594fe1a7508e6f952824f934a616ec303596cd7e1cea3c60",
+    "build/alloc-bench-macos/alloc-bench-native": "aed1e90c728e56b77cbff31c62277eb80762b9a0f54b02e815ce581913352b97",
+    "build/alloc-bench-macos/bench-native.s": "ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd"
+  },
+  "source_sha256": "568d515c6843cc20b5e5042de2e086798cccd41cafb8b13779177dacfb36a8bd",
+  "scope": "Same4freshABBAcaptures, unchangedbench/kernel/QEMU. New final libcs and immutable private allocator patch snapshot; completed required readinessgates before start.",
+  "additional_capture_checks": "Every run must match declared source/flags/QEMU config and actualargv, expected guestrelease/GCC, executed artifacts, and both paired cohorts must be comparable."
+}

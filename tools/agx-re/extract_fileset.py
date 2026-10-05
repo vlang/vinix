@@ -19,7 +19,7 @@ import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from extract_firmware import der_item
+from extract_firmware import unwrap_im4p
 
 
 MACHO_MAGIC_64 = 0xFEEDFACF
@@ -96,26 +96,9 @@ def align_up(value: int, alignment: int) -> int:
 
 
 def kernel_im4p_payload(blob: bytes) -> bytes:
-    outer, end = der_item(blob, 0, 0x30)
-    if end != len(blob):
-        raise ValueError("trailing data after IMG4 DER sequence")
-    kind, offset = der_item(outer, 0, 0x16)
-    im4p, offset = der_item(outer, offset, 0x30)
-    if kind != b"IMG4":
-        raise ValueError(f"not an IMG4 container (kind={kind!r})")
-
-    inner_kind, inner_offset = der_item(im4p, 0, 0x16)
-    image_type, inner_offset = der_item(im4p, inner_offset, 0x16)
-    _description, inner_offset = der_item(im4p, inner_offset, 0x16)
-    payload, inner_offset = der_item(im4p, inner_offset, 0x04)
-    if inner_kind != b"IM4P" or image_type != b"krnl":
-        raise ValueError(
-            f"not a kernel IM4P (kind={inner_kind!r}, type={image_type!r})"
-        )
-    # Modern kernel IM4Ps append compression and payload-signature metadata.
-    # The signed OCTET STRING above is still the complete compressed payload;
-    # do not interpret or reproduce the trailing metadata in extracted files.
-    del offset, inner_offset
+    image_type, payload, _has_extra_fields = unwrap_im4p(blob)
+    if image_type != b"krnl":
+        raise ValueError(f"not a kernel IM4P (type={image_type!r})")
     return payload
 
 
@@ -356,6 +339,27 @@ def find_kernelcache(preboot: Path) -> Path:
     return candidates[0]
 
 
+def find_platform_kernelcache(preboot: Path, platform_name: str) -> Path:
+    """Locate the staged kernel collection for a platform other than this Mac.
+
+    The boot collection above holds only the kexts this machine boots, so an
+    AGXG13G on an M5 is not reachable through it.  A macOS install stages one
+    collection per supported Mac under Preboot for restore, and those carry the
+    per-SoC GPU drivers.  They are bare IM4Ps; unwrap_im4p() handles both.
+    """
+    candidates = sorted(
+        path
+        for path in preboot.glob(f"*/restore-staged/kernelcache.release.{platform_name}")
+        if path.is_file()
+    )
+    if len(candidates) != 1:
+        rendered = ", ".join(str(path) for path in candidates) or "none"
+        raise ValueError(
+            f"expected one staged {platform_name} kernel collection, found: {rendered}"
+        )
+    return candidates[0]
+
+
 def safe_filename(identifier: str) -> str:
     return identifier.removeprefix("com.apple.") + ".macho"
 
@@ -363,15 +367,32 @@ def safe_filename(identifier: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kernel", type=Path, help="override the boot kernel collection")
+    parser.add_argument(
+        "--platform",
+        help="staged collection for another Mac, e.g. mac13g for the base M1 (G13G)",
+    )
     parser.add_argument("--preboot", type=Path, default=DEFAULT_PREBOOT)
     parser.add_argument("--output", type=Path, default=Path("build/kext/g17c"))
     parser.add_argument("--entry", action="append", dest="entries")
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="print the collection's fileset entry identifiers and exit",
+    )
     args = parser.parse_args()
 
     try:
-        source = args.kernel or find_kernelcache(args.preboot)
+        if args.kernel:
+            source = args.kernel
+        elif args.platform:
+            source = find_platform_kernelcache(args.preboot, args.platform)
+        else:
+            source = find_kernelcache(args.preboot)
         collection = decompress_kernel(kernel_im4p_payload(source.read_bytes()))
         available = fileset_entries(collection)
+        if args.list:
+            print(json.dumps({"source": str(source), "entries": sorted(available)}, indent=2))
+            return 0
         identifiers = args.entries or list(DEFAULT_ENTRIES)
         extracted = []
         for identifier in identifiers:

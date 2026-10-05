@@ -1,0 +1,21 @@
+{
+  "pid": 73792,
+  "argv": [
+    "python3",
+    "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py",
+    "--kernel",
+    "/Users/alex/code/vinix/build/useralloc-final-kernel-x86_64/vinix-x86_64",
+    "--sysroot",
+    "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/optimized-v4",
+    "--state-dir",
+    "/Users/alex/code/vinix/build/useralloc-v4-diagnostic-1",
+    "--iterations",
+    "50000",
+    "--samples",
+    "7",
+    "--timeout",
+    "3600",
+    "--allocator-check",
+    "/Users/alex/code/vinix/tests/user-alloc/verify.c"
+  ]
+}

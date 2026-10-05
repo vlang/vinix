@@ -1,0 +1,1 @@
+The runner stopped before boot because the copied init file was not executable. The same init bytes were made executable, then the complete feature and persistence boots passed; both attempts are preserved.

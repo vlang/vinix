@@ -1,0 +1,81 @@
+--- a/linux-user/signal.c
++++ b/linux-user/signal.c
+@@ -800,11 +800,40 @@
+     if (pcreg > (uintptr_t)safe_syscall_start
+         && pcreg < (uintptr_t)safe_syscall_end) {
+         host_signal_set_pc(uc, (uintptr_t)safe_syscall_start);
++    }
++}
++
++#ifdef __aarch64__
++/*
++ * Vinix: name the translator code that faulted. The static translator keeps
++ * its symbols; the image address gives any load bias. Frame records are
++ * read last, so a corrupt chain loses nothing already reported.
++ */
++static void report_host_context(host_sigcontext *uc)
++{
++    CPUState *cpu = thread_cpu;
++    uintptr_t fp = uc->uc_mcontext.regs[29];
++
++    error_report("QEMU internal fault context: pc=0x%" PRIxPTR " lr=0x%llx "
++                 "sp=0x%llx image=%p helper_retaddr=0x%" PRIxPTR
++                 " guest_pc=0x%" VADDR_PRIx,
++                 host_signal_pc(uc), uc->uc_mcontext.regs[30],
++                 uc->uc_mcontext.sp, (void *)report_host_context,
++                 helper_retaddr, cpu ? cpu->cc->get_pc(cpu) : 0);
++    for (int i = 0; i < 16 && fp && !(fp & 15); i++) {
++        const uintptr_t *frame = (const uintptr_t *)fp;
++
++        error_report("QEMU internal fault frame %d: 0x%" PRIxPTR, i, frame[1]);
++        if (frame[0] <= fp) {
++            break;
++        }
++        fp = frame[0];
+     }
+ }
++#endif
+ 
+ static G_NORETURN
+-void die_from_signal(siginfo_t *info)
++void die_from_signal(siginfo_t *info, host_sigcontext *uc)
+ {
+     char sigbuf[4], codebuf[12];
+     const char *sig, *code = NULL;
+@@ -881,6 +910,9 @@
+ 
+     error_report("QEMU internal SIG%s {code=%s, addr=%p}",
+                  sig, code, info->si_addr);
++#ifdef __aarch64__
++    report_host_context(uc);
++#endif
+     die_with_signal(info->si_signo);
+ }
+ 
+@@ -914,7 +946,7 @@
+      */
+     if (access_type != MMU_INST_FETCH
+         && !in_code_gen_buffer((void *)(pc - tcg_splitwx_diff))) {
+-        die_from_signal(info);
++        die_from_signal(info, uc);
+     }
+ 
+     maperr = true;
+@@ -946,7 +978,7 @@
+      * mapping of the generated code buffer, then it is a host bug.
+      */
+     if (!in_code_gen_buffer((void *)(pc - tcg_splitwx_diff))) {
+-        die_from_signal(info);
++        die_from_signal(info, uc);
+     }
+ 
+     if (info->si_code == BUS_ADRALN) {
+@@ -990,7 +1022,7 @@
+         case SIGILL:
+         case SIGFPE:
+         case SIGTRAP:
+-            die_from_signal(info);
++            die_from_signal(info, uc);
+         }
+     }
+ 

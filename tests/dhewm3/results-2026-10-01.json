@@ -1,0 +1,188 @@
+{
+  "date": "2026-10-01",
+  "host": "Apple M5 Max",
+  "qemu": "11.1.1",
+  "acceleration": "HVF",
+  "arch": "aarch64",
+  "cpu": "host",
+  "vcpus": 4,
+  "ram_mib": 8192,
+  "resolution": [
+    640,
+    480
+  ],
+  "renderer": "llvmpipe",
+  "mesa": "24.0.9",
+  "llvm": "17.0.6",
+  "llvmpipe_threads": 4,
+  "sound": false,
+  "swap_interval": 0,
+  "warmup_runs": 1,
+  "measured_runs": 7,
+  "dhewm3": {
+    "tag": "1.5.5",
+    "commit": "455b88e8dff2be822f08eb498f51b383e851fa38",
+    "build_type": "Release",
+    "compiler": "aarch64-linux-musl-g++ 14.2.0"
+  },
+  "comparison": "Same engine, game module, musl, Xvfb and Mesa runtime; Debian kernel and base files.",
+  "debian_kernel": {
+    "package": "linux-image-6.12.107+deb13-cloud-arm64",
+    "version": "6.12.107-1",
+    "sha256": "a1bbfc22454e984feba6353f957152ef416728b627ec0cf94d3ac04b18c14d84"
+  },
+  "vinix_base_commit": "42af9743",
+  "vinix_kernel_sha256": "4a7b31d11b1ddb59264822c43288dee13ae757529a5080ff6c59d1da347672dd",
+  "demo": {
+    "map": "game/demo_mars_city2",
+    "frames": 353,
+    "sha256": "f323a1f6b6fa04cec151edbc5c3f71a2e2f98f562609b89b2b4cfa1b12e2c308",
+    "data_md5": "70c2c63ef1190158f1ebd6c255b22d8e"
+  },
+  "common_files_sha256": {
+    "usr/bin/dhewm3": "9550ed950b1c0b5b887e446ff95a49b7008d3a8111a1475306167657df9746e0",
+    "usr/lib/dhewm3/base.so": "5ff0c0f40d101c1a3d149d43a61e1b40b3c30a012e948666a3c311c0640a8b21",
+    "usr/lib/xorg/modules/dri/swrast_dri.so": "e41b8ee2ebf43d13017d2eff23d8a9755563435271c6ed232a4a7b5a0f334da9",
+    "usr/lib/libLLVM-17.so": "ce5c8415f076bf71444230fb0164463e8c742178717ad2d41bbdf56126a6876d",
+    "lib/ld-musl-aarch64.so.1": "32377e6d71725bb019e9ff6d5e9f16b4d5156d6f2c36504191c2d6a7c4d4a44d"
+  },
+  "clocks": {
+    "vinix": [
+      "DHEWM3-CLOCK clock=monotonic zero=0/100 backwards=0 hardware_ns=158966 clock_ns=138586 resolution_ns=42",
+      "DHEWM3-CLOCK clock=realtime zero=0/100 backwards=0 hardware_ns=156914 clock_ns=137043 resolution_ns=42",
+      "DHEWM3-CLOCK clock=raw zero=0/100 backwards=0 hardware_ns=156453 clock_ns=136710 resolution_ns=42",
+      "DHEWM3-CLOCK clock=boottime zero=0/100 backwards=0 hardware_ns=160211 clock_ns=139833 resolution_ns=42",
+      "DHEWM3-CLOCK clock=gettimeofday zero=0/100",
+      "DHEWM3-DEADLINE wait=clock_nanosleep hardware_ns=20054000 passed=1",
+      "DHEWM3-DEADLINE wait=futex hardware_ns=20058083 passed=1"
+    ],
+    "debian": [
+      "DHEWM3-CLOCK clock=monotonic zero=0/100 backwards=0 hardware_ns=146625 clock_ns=131579 resolution_ns=1",
+      "DHEWM3-CLOCK clock=realtime zero=0/100 backwards=0 hardware_ns=144367 clock_ns=130413 resolution_ns=1",
+      "DHEWM3-CLOCK clock=raw zero=0/100 backwards=0 hardware_ns=145123 clock_ns=130457 resolution_ns=1",
+      "DHEWM3-CLOCK clock=boottime zero=0/100 backwards=0 hardware_ns=145628 clock_ns=130960 resolution_ns=1",
+      "DHEWM3-CLOCK clock=gettimeofday zero=0/100",
+      "DHEWM3-DEADLINE wait=clock_nanosleep hardware_ns=21025166 passed=1",
+      "DHEWM3-DEADLINE wait=futex hardware_ns=20890500 passed=1"
+    ]
+  },
+  "results": [
+    {
+      "os": "vinix",
+      "warmup": {
+        "frames": 353,
+        "seconds": 29.7,
+        "fps": 11.9,
+        "process_seconds": 31.64560675
+      },
+      "runs": [
+        {
+          "frames": 353,
+          "seconds": 27.3,
+          "fps": 12.9,
+          "process_seconds": 28.997740583
+        },
+        {
+          "frames": 353,
+          "seconds": 27.1,
+          "fps": 13.0,
+          "process_seconds": 28.763718166
+        },
+        {
+          "frames": 353,
+          "seconds": 27.6,
+          "fps": 12.8,
+          "process_seconds": 29.206648875
+        },
+        {
+          "frames": 353,
+          "seconds": 27.2,
+          "fps": 13.0,
+          "process_seconds": 28.873990458
+        },
+        {
+          "frames": 353,
+          "seconds": 27.0,
+          "fps": 13.1,
+          "process_seconds": 28.659064083
+        },
+        {
+          "frames": 353,
+          "seconds": 27.2,
+          "fps": 13.0,
+          "process_seconds": 28.804293791
+        },
+        {
+          "frames": 353,
+          "seconds": 27.2,
+          "fps": 13.0,
+          "process_seconds": 28.804761541
+        }
+      ],
+      "median_fps": 13.0
+    },
+    {
+      "os": "debian",
+      "warmup": {
+        "frames": 353,
+        "seconds": 25.7,
+        "fps": 13.7,
+        "process_seconds": 27.29577675
+      },
+      "runs": [
+        {
+          "frames": 353,
+          "seconds": 24.4,
+          "fps": 14.5,
+          "process_seconds": 25.893829208
+        },
+        {
+          "frames": 353,
+          "seconds": 24.9,
+          "fps": 14.2,
+          "process_seconds": 26.3498075
+        },
+        {
+          "frames": 353,
+          "seconds": 24.4,
+          "fps": 14.5,
+          "process_seconds": 25.838555833
+        },
+        {
+          "frames": 353,
+          "seconds": 24.0,
+          "fps": 14.7,
+          "process_seconds": 25.451873541
+        },
+        {
+          "frames": 353,
+          "seconds": 24.8,
+          "fps": 14.2,
+          "process_seconds": 26.217926125
+        },
+        {
+          "frames": 353,
+          "seconds": 23.9,
+          "fps": 14.8,
+          "process_seconds": 25.336155583
+        },
+        {
+          "frames": 353,
+          "seconds": 24.6,
+          "fps": 14.4,
+          "process_seconds": 25.982158708
+        }
+      ],
+      "median_fps": 14.5
+    }
+  ],
+  "vinix_fps_below_debian_percent": 10.34,
+  "original_kernel_clock_probe": [
+    "DHEWM3-CLOCK clock=monotonic zero=100/100 backwards=0 hardware_ns=195629 clock_ns=0 resolution_ns=1",
+    "DHEWM3-CLOCK clock=realtime zero=99/100 backwards=0 hardware_ns=196127 clock_ns=405083 resolution_ns=1",
+    "DHEWM3-CLOCK clock=raw zero=99/100 backwards=0 hardware_ns=197583 clock_ns=400750 resolution_ns=1",
+    "DHEWM3-CLOCK clock=boottime zero=99/100 backwards=0 hardware_ns=198936 clock_ns=398458 resolution_ns=1",
+    "DHEWM3-CLOCK clock=gettimeofday zero=98/100"
+  ],
+  "limitations": "Shared host; sequential OS runs; a stationary render-demo scene using common musl/Mesa, not Debian packaged graphics. No causal several-fold speedup is claimed."
+}

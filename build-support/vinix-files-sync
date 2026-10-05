@@ -1,0 +1,60 @@
+#!/bin/sh
+# Install host cross-builds into the running QEMU guest without restarting it.
+#
+# Each application below is one exec name of the multicall desktop. The host
+# publishes a fresh build of it (./cross-compile-app.sh) and this replaces
+# just that name's link with the new executable, so reopening the app runs the
+# new code while the desktop and every other app keep running. The name is
+# Files' because Files was the first; init starts the helper by it. Keep the
+# list in step with live_apps in init-aarch64/desktop-init.c.
+set -eu
+
+url_file=/etc/vinix/qemu-host-source-url
+[ -s "$url_file" ] || exit 0
+base_url=$(cat "$url_file")
+case "$base_url" in http://10.0.2.2:*) ;; *) exit 0 ;; esac
+
+apps='vinix-files vinix-activity vinix-settings'
+
+# sync_app installs the host's build of one application when its version
+# differs from the one installed last. A version the host does not have yet,
+# or a download whose checksum does not match it, leaves the app as it is.
+sync_app() {
+    name=$1
+    destination=/usr/bin/$name
+    version_file=/run/$name-version
+    binary_url="${base_url%/}/$name"
+    installed=
+    [ ! -s "$version_file" ] || installed=$(cat "$version_file")
+
+    version=$(/usr/bin/curl --fail --silent --show-error --connect-timeout 2 \
+        --max-time 5 "$binary_url/version" 2>/dev/null || true)
+    if ! printf '%s\n' "$version" | /bin/busybox awk 'NF == 2 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ { valid = 1 } END { exit !valid }'; then
+        return 0
+    fi
+    [ "$version" != "$installed" ] || return 0
+
+    temporary="/usr/bin/.$name.new.$$"
+    if /usr/bin/curl --fail --silent --show-error --connect-timeout 2 \
+        --max-time 120 -o "$temporary" "$binary_url/binary"; then
+        if command -v cksum >/dev/null 2>&1; then
+            checksum=$(cksum "$temporary" | /bin/busybox awk '{print $1, $2}')
+        else
+            checksum=$(/bin/busybox cksum "$temporary" | /bin/busybox awk '{print $1, $2}')
+        fi
+        if [ "$checksum" = "$version" ]; then
+            chmod 755 "$temporary"
+            mv -f "$temporary" "$destination"
+            printf '%s\n' "$version" > "$version_file"
+            echo "vinix-files-sync: installed new $name binary"
+        fi
+    fi
+    rm -f "$temporary"
+}
+
+while :; do
+    for name in $apps; do
+        sync_app "$name"
+    done
+    sleep 2
+done

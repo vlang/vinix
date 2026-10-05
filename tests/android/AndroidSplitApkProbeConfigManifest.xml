@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.tests.split" android:versionCode="7007" split="config.arm64_v8a">
+    <application android:hasCode="false" android:extractNativeLibs="true" />
+</manifest>

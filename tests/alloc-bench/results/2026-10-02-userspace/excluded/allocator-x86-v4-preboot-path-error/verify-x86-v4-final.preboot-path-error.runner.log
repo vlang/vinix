@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py", line 129, in <module>
+    elif sys.argv[1]=='run':run(sys.argv[2])
+  File "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py", line 99, in run
+    config.update({'kernel_sha256':digest(STATE/'iso-build/iso-root/boot/vinix'),'qemu_version':subprocess.check_output([str(qemu),'--version'],text=True).splitlines()[0],'argv':command})
+  File "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py", line 10, in digest
+    def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1249, in read_bytes
+    with self.open(mode='rb') as f:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1242, in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1110, in _opener
+    return self._accessor.open(self, flags, mode)
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final/iso-build/iso-root/boot/vinix'

@@ -1,0 +1,7 @@
+ALLOC-RESULT label=macos workload=malloc_hot_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=64 batch=1 touch_stride=0 median_ns_per_pair=535.775 min_ns_per_pair=493.600 max_ns_per_pair=558.050
+ALLOC-RESULT label=macos workload=malloc_mixed_batch_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=0 batch=64 touch_stride=0 median_ns_per_pair=832.760 min_ns_per_pair=778.095 max_ns_per_pair=921.540
+ALLOC-RESULT label=macos workload=malloc_touch_262144 category=userspace operation=alloc_free_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=17547.800 min_ns_per_pair=15640.600 max_ns_per_pair=19078.000
+ALLOC-RESULT label=macos workload=mmap_anon_4096 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=4096 batch=1 touch_stride=0 median_ns_per_pair=27264.500 min_ns_per_pair=25081.500 max_ns_per_pair=28905.100
+ALLOC-RESULT label=macos workload=mmap_touch_262144 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=1641710.200 min_ns_per_pair=1439133.300 max_ns_per_pair=2256949.900
+ALLOC-RESULT label=macos workload=pipe_create_close category=kernel_syscall operation=create_close_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=0 batch=1 touch_stride=0 median_ns_per_pair=48899.400 min_ns_per_pair=46780.800 max_ns_per_pair=55900.500
+macOS benchmark complete

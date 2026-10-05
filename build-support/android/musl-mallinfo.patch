@@ -1,0 +1,465 @@
+--- a/include/malloc.h
++++ b/include/malloc.h
+@@ -19,6 +19,20 @@
+ size_t malloc_usable_size(void *);
+ int malloc_trim(size_t);
+ 
++/* Private Android runtime allocator accounting, excluding metadata arenas
++ * and borrowed ELF-page slack (image donation is disabled in this build).
++ * live_bytes counts payloads, free_bytes counts reusable slot regions, and
++ * mapped_bytes counts page-rounded owned backing of allocation groups. */
++#ifndef VINIX_ANDROID_MUSL_STATISTICS_H
++#define VINIX_ANDROID_MUSL_STATISTICS_H
++struct vinix_malloc_stats {
++	size_t mapped_bytes, live_bytes, free_bytes;
++	size_t peak_mapped_bytes, peak_live_bytes, live_blocks;
++	size_t free_blocks, mapped_blocks;
++};
++int __vinix_malloc_stats(struct vinix_malloc_stats *, size_t);
++#endif
++
+ #ifdef __cplusplus
+ }
+ #endif
+--- a/src/malloc/mallocng/meta.h
++++ b/src/malloc/mallocng/meta.h
+@@ -4,6 +4,7 @@
+ #include <stdint.h>
+ #include <errno.h>
+ #include <limits.h>
++#include <malloc.h>
+ #include "glue.h"
+ 
+ __attribute__((__visibility__("hidden")))
+@@ -67,6 +68,7 @@
+ 	uint8_t unmap_seq[32], bounces[32];
+ 	uint8_t seq;
+ 	uintptr_t brk;
++	struct vinix_malloc_stats stats;
+ };
+ 
+ __attribute__((__visibility__("hidden")))
+@@ -299,8 +301,63 @@
+ 		return 1;
+ 	}
+ 	return 0;
++}
++
++/* All accounting runs under the existing malloc lock (or while musl knows
++ * the process has one thread). Its atfork protocol therefore covers both
++ * allocator state and snapshots without introducing another inherited lock. */
++static inline size_t stats_mapping_size(size_t len)
++{
++	return (len + PGSZ - 1) & -PGSZ;
++}
++
++static inline void stats_mapping_add(size_t len)
++{
++	ctx.stats.mapped_bytes += stats_mapping_size(len);
++	ctx.stats.mapped_blocks++;
++	if (ctx.stats.mapped_bytes > ctx.stats.peak_mapped_bytes)
++		ctx.stats.peak_mapped_bytes = ctx.stats.mapped_bytes;
+ }
+ 
++static inline void stats_mapping_remove(size_t len)
++{
++	size_t bytes = stats_mapping_size(len);
++	assert(ctx.stats.mapped_bytes >= bytes && ctx.stats.mapped_blocks);
++	ctx.stats.mapped_bytes -= bytes;
++	ctx.stats.mapped_blocks--;
++}
++
++static inline void stats_mapping_resize(size_t old_len, size_t new_len)
++{
++	size_t old_bytes = stats_mapping_size(old_len);
++	size_t new_bytes = stats_mapping_size(new_len);
++	assert(ctx.stats.mapped_bytes >= old_bytes);
++	ctx.stats.mapped_bytes = ctx.stats.mapped_bytes - old_bytes + new_bytes;
++	if (ctx.stats.mapped_bytes > ctx.stats.peak_mapped_bytes)
++		ctx.stats.peak_mapped_bytes = ctx.stats.mapped_bytes;
++}
++
++static inline void stats_free_add(size_t bytes, size_t blocks)
++{
++	ctx.stats.free_bytes += bytes;
++	ctx.stats.free_blocks += blocks;
++}
++
++static inline void stats_free_remove(size_t bytes, size_t blocks)
++{
++	assert(ctx.stats.free_bytes >= bytes && ctx.stats.free_blocks >= blocks);
++	ctx.stats.free_bytes -= bytes;
++	ctx.stats.free_blocks -= blocks;
++}
++
++static inline void stats_payload_resize(size_t old_size, size_t new_size)
++{
++	assert(ctx.stats.live_bytes >= old_size);
++	ctx.stats.live_bytes = ctx.stats.live_bytes - old_size + new_size;
++	if (ctx.stats.live_bytes > ctx.stats.peak_live_bytes)
++		ctx.stats.peak_live_bytes = ctx.stats.live_bytes;
++}
++
+ /* One mapping in each power-of-two bucket, from 128 KiB to 2 MiB.
+  * Their combined upper bounds total 3968 KiB. A larger mapping is never
+  * cached. Metadata stays owned by the cache until it is reused or trimmed. */
+--- a/src/malloc/mallocng/malloc.c
++++ b/src/malloc/mallocng/malloc.c
+@@ -258,6 +258,7 @@
+ 			free_meta(m);
+ 			return 0;
+ 		}
++		stats_mapping_add(needed);
+ 		m->maplen = needed>>12;
+ 		ctx.mmap_counter++;
+ 		active_idx = (4096-UNIT)/size-1;
+@@ -287,18 +288,23 @@
+ 	m->last_idx = cnt-1;
+ 	m->freeable = 1;
+ 	m->sizeclass = sc;
++	stats_free_add(get_stride(m)*cnt, cnt);
+ 	return m;
+ }
+ 
+ static int alloc_slot(int sc, size_t req)
+ {
+ 	uint32_t first = try_avail(&ctx.active[sc]);
+-	if (first) return __builtin_ctz(first);
++	if (first) {
++		stats_free_remove(get_stride(ctx.active[sc]), 1);
++		return __builtin_ctz(first);
++	}
+ 
+ 	struct meta *g = alloc_group(sc, req);
+ 	if (!g) return -1;
+ 
+ 	g->avail_mask--;
++	stats_free_remove(get_stride(g), 1);
+ 	queue(&ctx.active[sc], g);
+ 	return 0;
+ }
+@@ -321,6 +327,7 @@
+ 			if (g && g->maplen*4096UL >= needed) {
+ 				ctx.large_cache[bucket] = 0;
+ 				g->freed_mask = 0;
++				stats_free_remove(get_stride(g), 1);
+ 				step_seq();
+ 				ctx.mmap_counter++;
+ 				idx = 0;
+@@ -328,15 +335,21 @@
+ 			}
+ 			unlock();
+ 		}
++		wrlock();
+ 		void *p = mmap(0, needed, PROT_READ|PROT_WRITE,
+ 			MAP_PRIVATE|MAP_ANON, -1, 0);
+-		if (p==MAP_FAILED) return 0;
+-		wrlock();
++		if (p==MAP_FAILED) {
++			unlock();
++			return 0;
++		}
++		stats_mapping_add(needed);
+ 		step_seq();
+ 		g = alloc_meta();
+ 		if (!g) {
++			int saved_errno = errno;
++			if (!munmap(p, needed)) stats_mapping_remove(needed);
+ 			unlock();
+-			munmap(p, needed);
++			errno = saved_errno;
+ 			return 0;
+ 		}
+ 		g->mem = p;
+@@ -387,6 +400,7 @@
+ 		else if (a_cas(&g->avail_mask, mask, mask-first)!=mask)
+ 			continue;
+ 		idx = __builtin_ctz(first);
++		stats_free_remove(get_stride(g), 1);
+ 		goto success;
+ 	}
+ 	upgradelock();
+@@ -400,8 +414,11 @@
+ 
+ success:
+ 	ctr = ctx.mmap_counter;
++	void *result = enframe(g, idx, n, ctr);
++	stats_payload_resize(0, n);
++	ctx.stats.live_blocks++;
+ 	unlock();
+-	return enframe(g, idx, n, ctr);
++	return result;
+ }
+ 
+ void *malloc(size_t n)
+@@ -426,13 +443,31 @@
+ 			if (mask) {
+ 				uint32_t first = mask & -mask;
+ 				g->avail_mask = mask-first;
+-				return enframe(g, __builtin_ctz(first), n, ctx.mmap_counter);
++				stats_free_remove(get_stride(g), 1);
++				void *p = enframe(g, __builtin_ctz(first), n, ctx.mmap_counter);
++				stats_payload_resize(0, n);
++				ctx.stats.live_blocks++;
++				return p;
+ 			}
+ 		}
+ 	}
+ 	return malloc_slow(n);
+ }
+ 
++int __vinix_malloc_stats(struct vinix_malloc_stats *out, size_t size)
++{
++	if (!out || size != sizeof(*out)) {
++		errno = EINVAL;
++		return -1;
++	}
++	int saved_errno = errno;
++	wrlock();
++	*out = ctx.stats;
++	unlock();
++	errno = saved_errno;
++	return 0;
++}
++
+ int is_allzero(void *p)
+ {
+ 	struct meta *g = get_meta(p);
+--- a/src/malloc/mallocng/free.c
++++ b/src/malloc/mallocng/free.c
+@@ -25,16 +25,18 @@
+ 				if (old) {
+ 					mi.base = old->mem;
+ 					mi.len = old->maplen*4096UL;
++					stats_free_remove(get_stride(old), 1);
+ 					free_meta(old);
+ 				}
+ 				/* free() validated and invalidated the caller's header.
+ 				 * Keep its metadata and mark the sole slot free. */
+ 				g->freed_mask = 1;
+ 				ctx.large_cache[bucket] = g;
+-				return mi; /* old mapping is unmapped after unlock */
++				return mi; /* caller releases the old map under the fork lock */
+ 			}
+ 		}
+ 	}
++	stats_free_remove(get_stride(g)*(g->last_idx+1), g->last_idx+1);
+ 	if (sc < 48) {
+ 		ctx.usage_by_class[sc] -= g->last_idx+1;
+ 	}
+@@ -48,6 +50,7 @@
+ 		struct meta *m = get_meta(p);
+ 		int idx = get_slot_index(p);
+ 		g->mem->meta = 0;
++		stats_free_add(get_stride(m), 1);
+ 		// not checking size/reserved here; it's intentionally invalid
+ 		mi = nontrivial_free(m, idx);
+ 	}
+@@ -131,14 +134,15 @@
+ {
+ 	if (!p) return;
+ 
++	wrlock();
+ 	struct slot_info info;
+ 	struct meta *g = get_meta_with_info(p, &info);
+ 	int idx = info.index;
+ 	size_t stride = info.stride;
+ 	unsigned char *start = g->mem->storage + stride*idx;
+ 	unsigned char *end = start + stride - IB;
+-	get_nominal_size(p, end);
+-	uint32_t self = 1u<<idx, all = (2u<<g->last_idx)-1;
++	size_t payload = get_nominal_size(p, end);
++	uint32_t self = 1u<<idx;
+ 	((unsigned char *)p)[-3] = 255;
+ 	// invalidate offset to group header, and cycle offset of
+ 	// used region within slot if current offset is zero.
+@@ -152,7 +156,12 @@
+ 	    stride >= info.class_stride &&
+ 	    (g->maplen ? g->maplen*4096UL : UNIT + stride*(g->last_idx+1))
+ 	    <= RETAIN_GROUP_MAX_BYTES) {
++		stats_payload_resize(payload, 0);
++		assert(ctx.stats.live_blocks);
++		ctx.stats.live_blocks--;
++		stats_free_add(stride, 1);
+ 		g->freed_mask |= self;
++		unlock();
+ 		return;
+ 	}
+ 
+@@ -168,28 +177,17 @@
+ 		}
+ 	}
+ 
+-	// atomic free without locking if this is neither first or last slot
+-	for (;;) {
+-		uint32_t freed = g->freed_mask;
+-		uint32_t avail = g->avail_mask;
+-		uint32_t mask = freed | avail;
+-		assert(!(mask&self));
+-		if (!freed || mask+self==all) break;
+-		if (!MT)
+-			g->freed_mask = freed+self;
+-		else if (a_cas(&g->freed_mask, freed, freed+self)!=freed)
+-			continue;
+-		return;
+-	}
+-
+-	wrlock();
++	/* Slot publication, mapping changes and counters share musl's fork
++	 * lock in this opt-in build. The common allocator keeps its fast path. */
++	stats_payload_resize(payload, 0);
++	assert(ctx.stats.live_blocks);
++	ctx.stats.live_blocks--;
++	stats_free_add(stride, 1);
+ 	struct mapinfo mi = nontrivial_free(g, idx);
++	int saved_errno = errno;
++	if (mi.len && !munmap(mi.base, mi.len)) stats_mapping_remove(mi.len);
+ 	unlock();
+-	if (mi.len) {
+-		int e = errno;
+-		munmap(mi.base, mi.len);
+-		errno = e;
+-	}
++	errno = saved_errno;
+ }
+ 
+ /* Compatible with the GNU extension: release free groups and cached direct
+@@ -206,8 +204,12 @@
+ 		ctx.large_cache[i] = 0;
+ 		void *base = g->mem;
+ 		size_t len = g->maplen*4096UL;
++		stats_free_remove(get_stride(g), 1);
+ 		free_meta(g);
+-		if (!munmap(base, len)) released = 1;
++		if (!munmap(base, len)) {
++			stats_mapping_remove(len);
++			released = 1;
++		}
+ 	}
+ 	/* Nested groups have a larger parent class, so release children first.
+ 	 * free_group() can make their parent free during this traversal. */
+@@ -226,7 +228,10 @@
+ 			if (ctx.active[sc] && !ctx.active[sc]->avail_mask)
+ 				activate_group(ctx.active[sc]);
+ 			struct mapinfo mi = free_group(g);
+-			if (mi.len && !munmap(mi.base, mi.len)) released = 1;
++			if (mi.len && !munmap(mi.base, mi.len)) {
++				stats_mapping_remove(mi.len);
++				released = 1;
++			}
+ 		}
+ 	}
+ 	unlock();
+--- a/src/malloc/mallocng/realloc.c
++++ b/src/malloc/mallocng/realloc.c
+@@ -21,7 +21,10 @@
+ 	// only resize in-place if size class matches
+ 	if (n <= avail_size && n<MMAP_THRESHOLD
+ 	    && size_to_class(n)+1 >= g->sizeclass) {
++		wrlock();
+ 		set_size(p, end, n);
++		stats_payload_resize(old_size, n);
++		unlock();
+ 		return p;
+ 	}
+ 
+@@ -30,7 +33,9 @@
+ 		assert(g->sizeclass==63);
+ 		size_t base = (unsigned char *)p-start;
+ 		size_t needed = (n + base + UNIT + IB + 4095) & -4096;
+-		new = g->maplen*4096UL == needed ? g->mem :
++		size_t old_len = g->maplen*4096UL;
++		wrlock();
++		new = old_len == needed ? g->mem :
+ 			mremap(g->mem, g->maplen*4096UL, needed, MREMAP_MAYMOVE);
+ 		if (new!=MAP_FAILED) {
+ 			g->mem = new;
+@@ -39,8 +44,12 @@
+ 			end = g->mem->storage + (needed - UNIT) - IB;
+ 			*end = 0;
+ 			set_size(p, end, n);
++			stats_mapping_resize(old_len, needed);
++			stats_payload_resize(old_size, n);
++			unlock();
+ 			return p;
+ 		}
++		unlock();
+ 	}
+ 
+ 	new = malloc(n);
+--- a/src/malloc/mallocng/aligned_alloc.c
++++ b/src/malloc/mallocng/aligned_alloc.c
+@@ -25,6 +25,7 @@
+ 	if (!p)
+ 		return 0;
+ 
++	wrlock();
+ 	struct meta *g = get_meta(p);
+ 	int idx = get_slot_index(p);
+ 	size_t stride = get_stride(g);
+@@ -34,6 +35,8 @@
+ 
+ 	if (!adj) {
+ 		set_size(p, end, len);
++		stats_payload_resize(len+align-UNIT, len);
++		unlock();
+ 		return p;
+ 	}
+ 	p += adj;
+@@ -56,5 +59,7 @@
+ 	// allocations anyway.
+ 	*(uint16_t *)(start - 2) = (size_t)(p-start)/UNIT;
+ 	start[-3] = 7<<5;
++	stats_payload_resize(len+align-UNIT, len);
++	unlock();
+ 	return p;
+ }
+--- a/src/malloc/mallocng/donate.c
++++ b/src/malloc/mallocng/donate.c
+@@ -1,39 +1,11 @@
+-#include <stdlib.h>
+-#include <stdint.h>
+-#include <limits.h>
+-#include <string.h>
+-#include <sys/mman.h>
+-#include <errno.h>
++#include "dynlink.h"
+ 
+-#include "meta.h"
+-
+-static void donate(unsigned char *base, size_t len)
+-{
+-	uintptr_t a = (uintptr_t)base;
+-	uintptr_t b = a + len;
+-	a += -a & (UNIT-1);
+-	b -= b & (UNIT-1);
+-	memset(base, 0, len);
+-	for (int sc=47; sc>0 && b>a; sc-=4) {
+-		if (b-a < (size_classes[sc]+1)*UNIT) continue;
+-		struct meta *m = alloc_meta();
+-		m->avail_mask = 0;
+-		m->freed_mask = 1;
+-		m->mem = (void *)a;
+-		m->mem->meta = m;
+-		m->last_idx = 0;
+-		m->freeable = 0;
+-		m->sizeclass = sc;
+-		m->maplen = 0;
+-		*((unsigned char *)m->mem+UNIT-4) = 0;
+-		*((unsigned char *)m->mem+UNIT-3) = 255;
+-		m->mem->storage[size_classes[sc]*UNIT-4] = 0;
+-		queue(&ctx.active[sc], m);
+-		a += (size_classes[sc]+1)*UNIT;
+-	}
+-}
+-
++/* The private Android heap accounts only owned anonymous allocation groups.
++ * Writable ELF-page gaps belong to the loaded image, so accepting them would
++ * mix borrowed backing with allocator mappings and require separate lifetime
++ * accounting. Leave that slack with the image instead of donating it. */
+ void __malloc_donate(char *start, char *end)
+ {
+-	donate((void *)start, end-start);
++	(void)start;
++	(void)end;
+ }

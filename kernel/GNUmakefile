@@ -11,6 +11,34 @@ PREFIX := /usr/local
 
 # Target architecture: x86_64 (default) or aarch64.
 ARCH ?= x86_64
+STACK_GUARD_TEST ?= 0
+
+# Opt-in until the complete i915 kernel API surface is implemented. The
+# imported Linux driver stays byte-for-byte upstream in third_party/.
+LINUXKPI ?= 0
+LINUXKPI_SOURCE_DIR ?= $(abspath ../third_party/linux-i915/linux-6.6.157)
+ifneq ($(LINUXKPI),0)
+ifneq ($(LINUXKPI),1)
+    $(error LINUXKPI must be 0 or 1)
+endif
+ifneq ($(ARCH),x86_64)
+    $(error LINUXKPI currently supports ARCH=x86_64 only)
+endif
+ifeq ($(wildcard $(LINUXKPI_SOURCE_DIR)/.vinix-upstream.json),)
+    $(error Run python3 linuxkpi/upstream.py fetch before enabling LINUXKPI)
+endif
+endif
+
+# Optional ARM transport validation; ordinary/default kernels leave it off.
+PCI_CONFIG_TEST ?= 0
+ifneq ($(PCI_CONFIG_TEST),0)
+ifneq ($(PCI_CONFIG_TEST),1)
+    $(error PCI_CONFIG_TEST must be 0 or 1)
+endif
+ifneq ($(ARCH),aarch64)
+    $(error PCI_CONFIG_TEST currently supports ARCH=aarch64 only)
+endif
+endif
 
 # User controllable C compiler command.
 CC := cc
@@ -47,6 +75,15 @@ LDFLAGS :=
 # empty to retain the compiler-driver link used by native builds.
 LD_X86_64 ?=
 
+# LLD can shuffle the generated C object's individual function sections.
+# Seed zero asks LLD for a fresh random seed; a positive seed reproduces an
+# exact layout for debugging. Native compiler-driver links remain compatible.
+KERNEL_LINK_RANDOMIZE ?= 1
+KERNEL_LINK_SEED ?= 0
+ifneq ($(filter $(KERNEL_LINK_RANDOMIZE),0 1),$(KERNEL_LINK_RANDOMIZE))
+    $(error KERNEL_LINK_RANDOMIZE must be 0 or 1)
+endif
+
 PROD :=
 
 # Ensure the dependencies have been obtained.
@@ -77,7 +114,8 @@ override CFLAGS += \
     -nostdinc \
     -ffreestanding \
     -fno-omit-frame-pointer \
-    -fno-stack-protector \
+    -fstack-protector-strong \
+    -mstack-protector-guard=global \
     -fno-stack-check \
     -fno-lto \
     -fno-PIC \
@@ -97,7 +135,7 @@ override LDFLAGS_DIRECT += \
     --build-id=none \
     --nostdlib \
     --static \
-    -z max-page-size=0x1000 \
+    -z max-page-size=0x4000 \
     --gc-sections \
     -T linker-aarch64.ld
 
@@ -120,7 +158,8 @@ override CFLAGS += \
     -nostdinc \
     -ffreestanding \
     -fno-omit-frame-pointer \
-    -fno-stack-protector \
+    -fstack-protector-strong \
+    -mstack-protector-guard=global \
     -fno-stack-check \
     -fno-lto \
     -fno-PIC \
@@ -135,6 +174,14 @@ override CFLAGS += \
     -mno-sse2 \
     -mno-red-zone \
     -mcmodel=kernel
+
+# Route every compiler-generated indirect call/jump through the same thunks
+# as handwritten dispatches. GNU CC uses the compatible external ABI.
+ifeq ($(CC_IS_CLANG),1)
+    override CFLAGS += -mretpoline-external-thunk
+else
+    override CFLAGS += -mindirect-branch=thunk-extern -mindirect-branch-register
+endif
 
 # Internal linker flags for x86_64.
 override LDFLAGS += \
@@ -157,6 +204,14 @@ override LDFLAGS_DIRECT_X86_64 += \
 
 endif # ARCH
 
+ifeq ($(KERNEL_LINK_RANDOMIZE),1)
+ifeq ($(ARCH),aarch64)
+override LDFLAGS_DIRECT += --shuffle-sections=.text.*=$(KERNEL_LINK_SEED)
+else ifneq ($(strip $(LD_X86_64)),)
+override LDFLAGS_DIRECT_X86_64 += --shuffle-sections=.text.*=$(KERNEL_LINK_SEED)
+endif
+endif
+
 # Internal C preprocessor flags that should not be changed by the user.
 override CPPFLAGS := \
     -I c \
@@ -174,23 +229,54 @@ override VFLAGS += \
     -enable-globals \
     -nofloat \
     -manualfree \
-    -experimental \
     -message-limit 10000 \
     -gc none \
+    -target-libc-headers \
+    -no-closures \
     -d no_backtrace
 
 ifeq ($(ARCH),aarch64)
-    override VFLAGS += -d aarch64
+    override VFLAGS += -arch arm64 -d aarch64
     ifeq ($(LIMINE_MP),1)
         override VFLAGS += -d limine_mp
     endif
+else
+    override VFLAGS += -arch amd64
 endif
 
 # V build tags change the generated kernel C even though no source timestamp
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-stack-guard-$(STACK_GUARD_TEST)
+
+ifeq ($(PCI_CONFIG_TEST),1)
+    override VFLAGS += -d pci_config_test
+    override CPPFLAGS += -DVINIX_PCI_CONFIG_TEST
+endif
+
+ifneq ($(STACK_GUARD_TEST),0)
+    override VFLAGS += -d kernel_stack_selftest
+endif
+ifeq ($(STACK_GUARD_TEST),2)
+    override VFLAGS += -d kernel_stack_overflowtest
+endif
+
+ifeq ($(LINUXKPI),1)
+    override VFLAGS += -d linuxkpi
+    override CPPFLAGS += -DVINIX_LINUXKPI
+    LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
+    LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
+    obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
+endif
+
+# ALLOC_TRACK=1 records the call chain of every live slab allocation, for
+# hunting leaks; see c/alloc_track.c. It costs a 7 MiB table and a lock on
+# every allocation, so it is off unless asked for.
+ifeq ($(ALLOC_TRACK),1)
+    override VFLAGS += -d alloc_track
+    override CPPFLAGS += -DVINIX_ALLOC_TRACK
+endif
 
 ifeq ($(PROD),false)
     override VFLAGS += -warn-about-allocs
@@ -210,37 +296,35 @@ override CPPFLAGS += -D__vinix__
 ifeq ($(ARCH),aarch64)
 override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'obj/*' \
-    ! -path 'modules/x86/*' \
-    ! -path 'modules/acpi/*' \
-    ! -path 'modules/uacpi/*' \
-    ! -path 'modules/dev/ata/*' \
-    ! -path 'modules/dev/console/console.v' \
-    ! -path 'modules/dev/hda/*' \
-    ! -path 'modules/dev/mouse/*' \
-    ! -path 'modules/dev/nvme/*' \
-    ! -path 'modules/dev/serial/*' \
-    ! -path 'modules/time/pit.v' \
-    ! -path 'modules/syscall/syscall.v' \
-    ! -path 'modules/syscall/table/syscall_table.v' \
-    ! -path 'modules/userland/userland.v' \
-    ! -path 'modules/event/event.v' \
+    ! -path 'x86/*' \
+    ! -path 'acpi/*' \
+    ! -path 'uacpi/*' \
+    ! -path 'dev/ata/*' \
+    ! -path 'dev/hda/*' \
+    ! -path 'dev/mouse/*' \
+    ! -path 'dev/nvme/*' \
+    ! -path 'dev/serial/*' \
+    ! -path 'time/pit.v' \
+    ! -path 'syscall/syscall.v' \
+    ! -path 'userland/userland.v' \
     ! -name 'katomic.v' \
     ! -name 'klock.v' \
     ! -name '*_amd64.v' \
     | LC_ALL=C sort)
 override ASFILES := $(shell cd asm && find -L * -type f -name '*.S' \
     ! -name 'int_thunks_asm.S' \
+    ! -path 'x86_64/*' \
     | LC_ALL=C sort)
 else
 override VFILES := $(shell find -L * -type f -name '*.v' \
     ! -path 'obj/*' \
-    ! -path 'modules/aarch64/*' \
-    ! -path 'modules/apple/*' \
-    ! -path 'modules/devicetree/*' \
-    ! -path 'modules/drm/*' \
-    ! -path 'modules/gpu/*' \
-    ! -path 'modules/dev/pointerdev/*' \
-    ! -path 'modules/syscall/common.v' \
+    ! -path 'aarch64/*' \
+    ! -path 'apple/*' \
+    ! -path 'devicetree/*' \
+    ! -path 'drm/*' \
+    ! -path 'gpu/*' \
+    ! -path 'dev/pointerdev/*' \
+    ! -path 'syscall/common.v' \
     ! -name '*_aarch64.v' \
     ! -name '*_arm64.v' \
     | LC_ALL=C sort)
@@ -252,18 +336,47 @@ endif
 override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort)
 # Keep generated C and assembly objects below distinct subdirectories. In
 # particular, c/uacpi used to create obj/uacpi, which V then mistook for the
-# imported modules/uacpi package while compiling obj/vsrc.
+# imported `uacpi` package while compiling obj/vsrc.
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
-override OBJ := $(COBJ) $(ASOBJ)
+override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ)
 override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/asm/,$(ASFILES:.S=.S.d))
 
 # Default target. This must come first, before header dependencies.
 .PHONY: all
 all: bin/$(OUTPUT)
+obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: $(V_CONFIG_STAMP)
+
+ifeq ($(LINUXKPI),1)
+.PHONY: linuxkpi-verify
+linuxkpi-verify:
+	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
+all: linuxkpi-verify
+
+$(LINUXKPI_OBJ) obj/c/linuxkpi.c.o obj/c/linuxkpi_refcount.c.o obj/c/linuxkpi_string.c.o obj/c/linuxkpi_percpu.c.o obj/c/linuxkpi_task.c.o obj/c/linuxkpi_sync.c.o obj/c/linuxkpi_time.c.o obj/c/linuxkpi_timer.c.o obj/c/linuxkpi_workqueue.c.o obj/c/linuxkpi_worker_test.c.o obj/c/linuxkpi_bitmap.c.o obj/c/linuxkpi_srcu.c.o obj/c/linuxkpi_srcu_test.c.o obj/c/linuxkpi_ww_mutex.c.o obj/c/linuxkpi_ww_mutex_test.c.o obj/c/linuxkpi_wait_bit.c.o obj/c/linuxkpi_wait_bit_test.c.o obj/c/linuxkpi_io.c.o obj/c/linuxkpi_io_test.c.o obj/c/linuxkpi_cache.c.o obj/c/linuxkpi_cache_test.c.o obj/c/linuxkpi_seqcount_test.c.o obj/c/linuxkpi_format.c.o obj/c/linuxkpi_printk.c.o obj/c/linuxkpi_printk_test.c.o obj/c/linuxkpi_taint.c.o obj/c/linuxkpi_i915_policy_test.c.o obj/c/linuxkpi_usleep_test.c.o obj/c/linuxkpi_kstrtox.c.o obj/c/linuxkpi_pci_config_test.c.o: | linuxkpi-verify
+
+# The original SipHash translation unit expects Kbuild export declarations.
+obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h
+
+obj/linuxkpi/%.o: $(LINUXKPI_SOURCE_DIR)/lib/%.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/i915_config.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_config.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/intel_qp_tables.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/display/intel_qp_tables.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/i915_memcpy.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_memcpy.c GNUmakefile $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
+endif
 
 # Include header dependencies.
--include obj/blob.c.d $(HEADER_DEPS)
+-include obj/blob.c.d $(HEADER_DEPS) $(LINUXKPI_OBJ:.o=.d)
 
 # Link rules for building the C compiler runtime.
 cc-runtime-$(ARCH)/cc-runtime.a: GNUmakefile cc-runtime/*
@@ -293,14 +406,23 @@ $(V_CONFIG_STAMP):
 	rm -f obj/.v-config-*
 	touch $@
 
+# The tracker's C half follows the same switch as its V half.
+obj/c/alloc_track.c.o: $(V_CONFIG_STAMP)
+obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
+
 obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
 	rm -rf obj/vsrc
 	for f in $(VFILES); do mkdir -p "obj/vsrc/$$(dirname $$f)" && ln -sf "$(CURDIR)/$$f" "obj/vsrc/$$f"; done
+# The modules live beside main.v, so V looks them up under the nearest v.mod.
+# Give the filtered tree its own v.mod, or that root would be $(CURDIR) and the
+# arch-specific files this build deliberately left out of VFILES would be read
+# back from the originals.
+	cp v.mod obj/vsrc/v.mod
 	$(V) $(VFLAGS) -o obj/blob.c obj/vsrc
 	sed 's/call 0(/call *(/g;/Wimplicit-function-declaration/d' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -DVINIX_V_RUNTIME -w -c obj/blob.c -o $@
 
 # Compilation rules for *.c files.
 obj/c/%.c.o: c/%.c GNUmakefile

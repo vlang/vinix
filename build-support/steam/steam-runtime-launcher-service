@@ -1,0 +1,11 @@
+#!/bin/sh
+# Steam's bootstrap links this command from the configured steamrt bin/ into
+# its legacy PATH. Run Valve's downloaded service outside the container; the
+# client uses it to start steamwebhelper and other companion processes.
+root="${VINIX_STEAM_DATA:-$HOME/.steam/root}"
+service="$root/steamrt64/pv-runtime/steam-runtime-steamrt/pressure-vessel/libexec/steam-runtime-tools-0/x86_64-linux-gnu-srt-launcher-service"
+if [ ! -x "$service" ]; then
+    echo "steam-runtime-launcher-service: missing $service" >&2
+    exit 127
+fi
+exec "$service" "$@"

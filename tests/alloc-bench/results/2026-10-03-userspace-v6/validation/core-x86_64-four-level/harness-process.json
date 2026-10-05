@@ -1,0 +1,21 @@
+{
+  "pid": 58841,
+  "parent_pid": 50085,
+  "started_utc": "2026-10-02T22:51:32.234103+00:00",
+  "command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64-four-level/run_vm.py",
+    "--arch",
+    "amd64",
+    "--iso",
+    "/Users/alex/code/vinix/build/useralloc-core-v6/core-x86_64/test.iso",
+    "--qemu",
+    "/opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64",
+    "--firmware",
+    "/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+    "--timeout",
+    "900",
+    "--cpus",
+    "2"
+  ]
+}

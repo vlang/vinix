@@ -1,0 +1,27 @@
+From d090ac2228678e124cb39f355d9f2979094fa197 Mon Sep 17 00:00:00 2001
+From: Ariadne Conill <ariadne@ariadne.space>
+Date: Sat, 26 Jul 2025 14:33:25 -0700
+Subject: [PATCH] add stub for pthread_mutexattr_setprioceiling
+
+this function has been in pthread.h for years, but not actually implemented.
+like pthread_mutex_setprioceiling, we make this a stub function.
+---
+ src/thread/pthread_mutexattr_setprioceiling.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+ create mode 100644 src/thread/pthread_mutexattr_setprioceiling.c
+
+diff --git a/src/thread/pthread_mutexattr_setprioceiling.c b/src/thread/pthread_mutexattr_setprioceiling.c
+new file mode 100644
+index 00000000..d543e169
+--- /dev/null
++++ b/src/thread/pthread_mutexattr_setprioceiling.c
+@@ -0,0 +1,6 @@
++#include "pthread_impl.h"
++
++int pthread_mutexattr_setprioceiling(pthread_mutexattr_t *a, int ceiling)
++{
++	return EINVAL;
++}
+-- 
+2.50.1
+

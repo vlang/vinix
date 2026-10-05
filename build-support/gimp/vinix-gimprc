@@ -1,0 +1,5 @@
+# Keep GIMP's first launch within Vinix's current process-reclaim limits.
+# File import/export remains available for the common desktop formats; set a
+# personal plug-in path after Vinix gains complete exited-process reclamation
+# to opt into the rest of Alpine's plug-in collection.
+(plug-in-path "/usr/lib/gimp/2.0/plug-ins/file-bmp:/usr/lib/gimp/2.0/plug-ins/file-gif-load:/usr/lib/gimp/2.0/plug-ins/file-gif-save:/usr/lib/gimp/2.0/plug-ins/file-jpeg:/usr/lib/gimp/2.0/plug-ins/file-pdf-load:/usr/lib/gimp/2.0/plug-ins/file-pdf-save:/usr/lib/gimp/2.0/plug-ins/file-png:/usr/lib/gimp/2.0/plug-ins/file-psd:/usr/lib/gimp/2.0/plug-ins/file-svg:/usr/lib/gimp/2.0/plug-ins/file-tiff:/usr/lib/gimp/2.0/plug-ins/file-webp:/usr/lib/gimp/2.0/plug-ins/help:/usr/lib/gimp/2.0/plug-ins/plugin-browser:/usr/lib/gimp/2.0/plug-ins/procedure-browser")

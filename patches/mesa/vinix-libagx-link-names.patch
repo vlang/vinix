@@ -2,10 +2,7 @@ diff --git a/src/compiler/nir/nir_precompiled.h b/src/compiler/nir/nir_precompil
 index c588452438f..fe005c0e7bf 100644
 --- a/src/compiler/nir/nir_precompiled.h
 +++ b/src/compiler/nir/nir_precompiled.h
-@@ -649,4 +649,7 @@ nir_precomp_print_nir(FILE *fp_c, FILE *fp_h, const nir_shader *nir,
- {
-    struct blob blob;
-    blob_init(&blob);
+@@ -652 +652,4 @@ nir_precomp_print_nir(FILE *fp_c, FILE *fp_h, const nir_shader *nir,
 -   nir_serialize(&blob, nir, true /* strip */);
 +   /* Asahi links libagx into runtime-generated NIR by function name.  Preserve
 +    * those names so nir_link_shader_functions can resolve every call before

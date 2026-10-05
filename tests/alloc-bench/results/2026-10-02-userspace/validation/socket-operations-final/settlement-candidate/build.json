@@ -1,0 +1,27 @@
+{
+  "command": [
+    "/opt/homebrew/opt/musl-cross/bin/aarch64-linux-musl-gcc",
+    "-static",
+    "-fuse-ld=lld",
+    "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized",
+    "-B/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/lib",
+    "-isystem",
+    "/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/include",
+    "-L/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/lib",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "-mno-outline-atomics",
+    "-pthread",
+    "/Users/alex/code/vinix/build/useralloc-socket-operations-v3/settlement-candidate/probe.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-socket-operations-v3/settlement-candidate/rootfs/sbin/init"
+  ],
+  "source_sha256": "12c0390e8e3442792eda99caea3311910e64af9de2de74c8b2d2d96f415f91f6",
+  "init_sha256": "f0a5dbfe2dd9576f9f1a144e2c187b1cc2ba995e31567b01b5a674fcd9d52494",
+  "initramfs_sha256": "b7c6005329e43112a105cd94bb33bd9cd9bcc7ce9ebcb5ed7b7b4fc6e8209799",
+  "static_libc_sha256": "2d7538f2fc2ca2c94493fc3d34cbc6bed5cf942063e7ccd365e922156ffdc0d9",
+  "notes": "Private5-case baseline diagnostic: unchanged8192calls,1secondsettlement snapshot afterbatch; no thresholds or kernel source changes."
+}

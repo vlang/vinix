@@ -1,0 +1,70 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   575k      0 --:--:-- --:--:-- --:--:--  575k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 13 2880k   13  392k    0     0   934k      0  0:00:03 --:--:--  0:00:03  932k100 2880k  100 2880k    0     0  2654k      0  0:00:01  0:00:01 --:--:-- 2656k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  69526      0 --:--:-- --:--:-- --:--:-- 69530
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   576k      0 --:--:-- --:--:-- --:--:--  577k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   138k      0 --:--:-- --:--:-- --:--:--  138k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   282k      0 --:--:-- --:--:-- --:--:--  282k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/vinix.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/.vinix-amd64.iso.t5XsT5'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 29.0g free
+Added to ISO image: directory '/'='/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/iso-build/.iso-staging.jlJ7V7/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  58.13% done
+ISO image produced: 64101 sectors
+Written to medium : 64101 sectors at LBA 0
+Writing to 'stdio:/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/.vinix-amd64.iso.t5XsT5' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0x3e993.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/vinix.iso (131278848 bytes)
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Copying of file objects from ISO image to disk filesystem is: Enabled
+xorriso : NOTE : Loading ISO image tree from LBA 0
+xorriso : UPDATE :      11 nodes read in 1 seconds
+xorriso : NOTE : Detected El-Torito boot information which currently is set to be discarded
+Drive current: -indev '/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/vinix.iso'
+Media current: stdio file, overwriteable
+Media status : is written , is appendable
+Boot record  : El Torito , MBR cyl-align-off
+Media summary: 1 session, 64101 data blocks,  125m data, 29.0g free
+Volume id    : 'ISOIMAGE'
+xorriso : UPDATE :       1 files restored (7369.6k) in 1 seconds = 5.4xD
+Extracted from ISO image: file '/boot/vinix'='/Users/alex/code/vinix/build/useralloc-hot-v5-diagnostic/boot-2/boot-kernel'

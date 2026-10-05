@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render in Vinix through VirtIO/VirGL and KekVM's macOS GPU backend."""
+"""Render in Vinix through VirtIO/VirGL and KekVM's host GPU backend."""
 
 from __future__ import annotations
 
@@ -18,12 +18,33 @@ import tempfile
 import time
 
 
-PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_PASS\r*(?:\n|$)")
-FAIL_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_FAIL:[0-9]+\r*(?:\n|$)")
+SMOKE_PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_PASS")
+SMOKE_FAIL_LINE = re.compile(rb"(?:^|\r*\n)VINIX_VIRGL_VM_FAIL:[0-9]+")
+DESKTOP_PASS_LINE = re.compile(
+    rb"(?:^|\r*\n)VINIX_GPU_DESKTOP_VM_PASS\r*(?:\n|$)"
+)
+DESKTOP_FAIL_LINE = re.compile(
+    rb"(?:^|\r*\n)VINIX_GPU_DESKTOP_VM_FAIL:[0-9]+\r*(?:\n|$)"
+)
 RENDERER = re.compile(rb"GL_RENDERER=[^\r\n]*virgl[^\r\n]*Apple", re.IGNORECASE)
+DESKTOP_RENDERER = re.compile(
+    rb"vinix-desktop: GPU presentation enabled on [^\r\n]*virgl[^\r\n]*Apple",
+    re.IGNORECASE,
+)
+DESKTOP_STAGE = re.compile(rb"vinix-desktop: GPU init: ([^\r\n]+)")
+DESKTOP_REQUIRED_STAGES = (
+    b"entered main",
+    b"using captured arguments without slicing",
+    b"command line parsed",
+    b"first frame ready; entering graphics mode",
+    b"first canvas presented",
+)
+DESKTOP_READY = b"vinix-desktop: ready"
 PIXELS = b"gl-triangle-agx: hardware frame rendered successfully"
 VIRGL_PASS = b"VINIX VIRGL RENDER TEST: PASS"
+NETWORK_PASS = b"VINIX_VIRGL_NETWORK_PASS"
 M1_HARDWARE_PASS = b"VINIX M1 AGX RENDER TEST: PASS"
+FOUR_CPUS_ONLINE = b"smp: 4 CPUs online"
 
 
 def child_exit_code(status: int) -> int:
@@ -47,31 +68,42 @@ def stop_child(pid: int, master: int) -> None:
             return
         time.sleep(0.05)
 
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
+    signal_child(pid, signal.SIGTERM)
     deadline = time.monotonic() + 2
     while time.monotonic() < deadline:
         waited, _status = os.waitpid(pid, os.WNOHANG)
         if waited == pid:
             return
         time.sleep(0.05)
+    signal_child(pid, signal.SIGKILL)
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            waited, _status = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if waited == pid:
+            return
+        time.sleep(0.05)
+
+
+def signal_child(pid: int, sig: signal.Signals) -> None:
     try:
-        os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+        os.killpg(pid, sig)
+    except (ProcessLookupError, PermissionError):
+        # The Cocoa QEMU process may exit between waitpid and killpg. macOS
+        # reports EPERM for the vanished PTY process group in that race.
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
 
 
 def qemu_path(root: Path) -> Path:
     override = os.environ.get("VINIX_VIRGL_QEMU")
     if override:
         return Path(override).expanduser().resolve()
-    return root.parent / "kekvm/.tools/qemu-virgl/bin/qemu-system-aarch64"
+    return root.parent / "kekvm/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64"
 
 
 def check_host(root: Path) -> tuple[Path, str | None]:
@@ -91,53 +123,74 @@ def check_host(root: Path) -> tuple[Path, str | None]:
     if devices.returncode != 0 or b"virtio-gpu-gl-device" not in devices.stdout:
         return qemu, "KekVM QEMU has no MMIO virtio-gpu-gl-device"
 
-    displays = subprocess.run(
-        [qemu, "-display", "help"], capture_output=True, check=False
-    )
-    display_help = displays.stdout + displays.stderr
-    if displays.returncode != 0 or b"cocoa" not in display_help:
-        return qemu, "KekVM QEMU has no Cocoa GL display backend"
     return qemu, None
 
 
-def run_vm(root: Path, timeout: int) -> int:
+def run_vm(root: Path, timeout: int, desktop_startup: bool) -> int:
     qemu, host_error = check_host(root)
     if host_error:
         print(f"ERROR: {host_error}", file=sys.stderr)
         return 2
 
     kernel = root / "kernel/bin/vinix"
-    image = root / "build-support/init-aarch64/initramfs-desktop.tar"
-    guest_init = root / "tests/virtio-gpu-virgl/guest-init.sh"
-    for label, path in (("kernel", kernel), ("desktop initramfs", image)):
+    if desktop_startup:
+        source_image = root / "build-support/init-aarch64/initramfs-desktop.tar"
+        guest_init = root / "tests/virtio-gpu-virgl/desktop-guest-init.sh"
+        pass_line = DESKTOP_PASS_LINE
+        fail_line = DESKTOP_FAIL_LINE
+    else:
+        source_image = root / "build-support/init-aarch64/initramfs.tar"
+        guest_init = root / "tests/virtio-gpu-virgl/guest-init.sh"
+        pass_line = SMOKE_PASS_LINE
+        fail_line = SMOKE_FAIL_LINE
+    for label, path in (("kernel", kernel), ("initramfs", source_image)):
         if not path.is_file():
             print(f"ERROR: Vinix {label} is missing: {path}", file=sys.stderr)
             return 2
 
-    # Leave 256 MiB for the kernel, loader, configuration and FAT metadata.
-    image_mb = (image.stat().st_size + 1024 * 1024 - 1) // (1024 * 1024)
-    disk_mb = max(2048, image_mb + 256)
-
     print(f"Host transport: {qemu}")
-    print("Path: Vinix VirtIO-GPU -> VirGL -> virglrenderer -> ANGLE/Metal")
+    print("Path: Vinix VirtIO-GPU -> VirGL -> virglrenderer -> host Apple GPU")
     print("Boundary: this does not emulate native AGX RTKit/UAT/firmware")
+    if desktop_startup:
+        print("Workload: full vinix-desktop-gpu startup through its first frame")
 
     with tempfile.TemporaryDirectory(prefix="vinix-virgl-vm.") as scratch:
         environment = os.environ.copy()
         environment["VINIX_VIRGL_QEMU"] = str(qemu)
-        environment["VINIX_INITRAMFS"] = str(image)
-        environment["VINIX_BOOT_DISK"] = str(Path(scratch) / "boot.img")
-        environment["VINIX_BOOT_DISK_SIZE_MB"] = str(disk_mb)
-        environment["VINIX_EFIVARS"] = str(Path(scratch) / "efivars.fd")
-        environment.setdefault("VINIX_QEMU_MEM", "8192")
+        environment["TMPDIR"] = scratch
+        # Exercise the runner's macOS core-profile default, independent of the
+        # caller's display setting.
+        environment.pop("QEMU_DISPLAY_BACKEND", None)
+        environment.pop("VINIX_QEMU_PERSIST", None)
+        environment.pop("VINIX_QEMU_PERSIST_DISK", None)
+        environment.pop("VINIX_QEMU_PERSIST_SEED", None)
+        environment.pop("VINIX_QEMU_PERSIST_SIZE_MB", None)
+        environment.pop("VINIX_QEMU_ROOT_DISK", None)
+        environment.pop("VINIX_QEMU_ROOT_IMAGE", None)
+        environment.pop("VINIX_BOOT_DISK", None)
+        environment.pop("VINIX_EFIVARS", None)
+        environment.pop("VINIX_QEMU_PACKAGE_STORE", None)
+        environment.setdefault("VINIX_QEMU_MEM", "12288" if desktop_startup else "8192")
 
-        command = [
-            str(root / "run-aarch64.sh"),
-            "--no-build",
-            "--virgl",
-            f"--guest-init={guest_init}",
-            f"--disk={disk_mb}",
-        ]
+        if desktop_startup:
+            command = [
+                str(root / "run-desktop-aarch64.sh"),
+                "--no-build",
+                "--no-disk-root",
+                "--ephemeral",
+                "gpuvm",
+                f"--guest-init={guest_init}",
+            ]
+        else:
+            environment["VINIX_INITRAMFS"] = str(source_image)
+            command = [
+                str(root / "run-aarch64.sh"),
+                "--no-build",
+                "--no-persist",
+                "--ephemeral",
+                "--virgl",
+                f"--guest-init={guest_init}",
+            ]
         pid, master = pty.fork()
         if pid == 0:
             os.chdir(root)
@@ -173,8 +226,8 @@ def run_vm(root: Path, timeout: int) -> int:
                 sys.stdout.buffer.flush()
 
                 recent = bytes(transcript[-131072:])
-                pass_seen = PASS_LINE.search(recent) is not None
-                fail_seen = FAIL_LINE.search(recent) is not None
+                pass_seen |= pass_line.search(recent) is not None
+                fail_seen |= fail_line.search(recent) is not None
                 if (pass_seen or fail_seen) and not shutdown_sent:
                     os.write(master, b"\x01x")
                     shutdown_sent = True
@@ -192,12 +245,26 @@ def run_vm(root: Path, timeout: int) -> int:
 
         output = bytes(transcript)
         missing = []
-        if not RENDERER.search(output):
-            missing.append("VirGL renderer backed by an Apple host GPU")
-        if output.count(PIXELS) != 1:
-            missing.append("validated rendered pixels")
-        if output.count(VIRGL_PASS) != 1:
-            missing.append("in-guest VirGL PASS marker")
+        if output.count(FOUR_CPUS_ONLINE) != 1:
+            missing.append("exactly four QEMU CPUs online")
+        if desktop_startup:
+            if not DESKTOP_RENDERER.search(output):
+                missing.append("desktop VirGL renderer backed by an Apple host GPU")
+            for stage in DESKTOP_REQUIRED_STAGES:
+                marker = b"vinix-desktop: GPU init: " + stage
+                if marker not in output:
+                    missing.append(f"desktop stage {stage.decode()!r}")
+            if DESKTOP_READY not in output:
+                missing.append("desktop ready marker")
+        else:
+            if output.count(NETWORK_PASS) != 1:
+                missing.append("DHCP and package server connectivity")
+            if not RENDERER.search(output):
+                missing.append("VirGL renderer backed by an Apple host GPU")
+            if output.count(PIXELS) != 1:
+                missing.append("validated rendered pixels")
+            if output.count(VIRGL_PASS) != 1:
+                missing.append("in-guest VirGL PASS marker")
         if M1_HARDWARE_PASS in output:
             missing.append("VM incorrectly claimed a native M1 AGX pass")
         if not pass_seen:
@@ -209,10 +276,17 @@ def run_vm(root: Path, timeout: int) -> int:
         if status is not None and child_exit_code(status) != 0:
             missing.append(f"VM exit status {child_exit_code(status)}")
         if missing:
-            print("\nFAIL KekVM VirGL smoke test: " + ", ".join(missing), file=sys.stderr)
+            label = "GPU desktop startup" if desktop_startup else "VirGL smoke test"
+            stages = DESKTOP_STAGE.findall(output)
+            if desktop_startup and stages:
+                missing.append(f"last desktop stage {stages[-1].decode(errors='replace')!r}")
+            print(f"\nFAIL KekVM {label}: " + ", ".join(missing), file=sys.stderr)
             return 1
 
-    print("\nPASS Vinix rendered validated pixels through KekVM and the host Apple GPU")
+    if desktop_startup:
+        print("\nPASS Vinix GPU desktop reached its first presented frame in KekVM")
+    else:
+        print("\nPASS Vinix rendered validated pixels through KekVM and the host Apple GPU")
     print("NOTE native Apple AGX firmware execution remains a physical-hardware test")
     return 0
 
@@ -222,13 +296,22 @@ def main() -> int:
     parser.add_argument(
         "--timeout",
         type=int,
-        default=int(os.environ.get("VINIX_VIRGL_VM_TIMEOUT", "240")),
-        help="maximum setup, boot and render time in seconds (default: 240)",
+        default=int(os.environ.get("VINIX_VIRGL_VM_TIMEOUT", "900")),
+        help="maximum setup, boot and render time in seconds (default: 900)",
+    )
+    parser.add_argument(
+        "--desktop-startup",
+        action="store_true",
+        help="run the full GPU compositor through its first presented frame",
     )
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
         parser.error("--timeout must be positive")
-    return run_vm(Path(__file__).resolve().parents[2], arguments.timeout)
+    return run_vm(
+        Path(__file__).resolve().parents[2],
+        arguments.timeout,
+        arguments.desktop_startup,
+    )
 
 
 if __name__ == "__main__":

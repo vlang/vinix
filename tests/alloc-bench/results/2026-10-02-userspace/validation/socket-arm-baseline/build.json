@@ -1,0 +1,26 @@
+{
+  "compile_command": [
+    "/opt/homebrew/opt/musl-cross/bin/aarch64-linux-musl-gcc",
+    "-static",
+    "-fuse-ld=lld",
+    "--sysroot=/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized",
+    "-B/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/lib",
+    "-isystem",
+    "/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/include",
+    "-L/Users/alex/code/vinix/build/useralloc-arm-v3/sysroot-optimized/lib",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fno-builtin",
+    "-mno-outline-atomics",
+    "-pthread",
+    "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/probe.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-arm-socket-baseline-v3/rootfs/sbin/init"
+  ],
+  "probe_sha256": "f07bdc094600a02b592c961c546f0510caf6d36f6a943062a147318c093b91b8",
+  "test_source_sha256": "9af087e9bae53b56f1e053932e2f379e20210267c882671f2c1feb8089b6bf7c",
+  "init_sha256": "13e2bed6722fd051b3194fc84c68c5f35f00735300724549c17b8e785e400dec",
+  "initramfs_sha256": "6f82dbb4d0af7cb8000e552d3f1df25bbea5c0eed016f1953dbb08fa8efea536"
+}

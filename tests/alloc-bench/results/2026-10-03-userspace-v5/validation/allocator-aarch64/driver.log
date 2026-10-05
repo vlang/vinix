@@ -1,0 +1,55 @@
+UALLOC-ARM-BEGIN program=/tests/clock
+UALLOC-ARM-PASS program=/tests/clock
+UALLOC-ARM-BEGIN program=/tests/verify-optimized-dynamic
+UALLOC-FOOTPRINT before=1031061405696 retained=1031065059328 trimmed=1031061405696
+UALLOC-CORRUPTION test=0 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ARM-PASS program=/tests/verify-optimized-dynamic
+UALLOC-ARM-BEGIN program=/tests/verify-all-classes-optimized-dynamic
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-ARM-PASS program=/tests/verify-all-classes-optimized-dynamic
+UALLOC-ARM-BEGIN program=/tests/verify-optimized-static
+UALLOC-FOOTPRINT before=1031060750336 retained=1031064502272 trimmed=1031060750336
+UALLOC-CORRUPTION test=0 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ARM-PASS program=/tests/verify-optimized-static
+UALLOC-ARM-BEGIN program=/tests/verify-all-classes-optimized-static
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-ARM-PASS program=/tests/verify-all-classes-optimized-static
+UALLOC-ARM-BEGIN program=/tests/verify-disabled-dynamic
+UALLOC-FOOTPRINT before=1031061389312 retained=1031061389312 trimmed=1031061389312
+UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ARM-PASS program=/tests/verify-disabled-dynamic
+UALLOC-ARM-BEGIN program=/tests/verify-all-classes-disabled-dynamic
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-ARM-PASS program=/tests/verify-all-classes-disabled-dynamic
+UALLOC-ARM-BEGIN program=/tests/verify-disabled-static
+UALLOC-FOOTPRINT before=1031060750336 retained=1031060750336 trimmed=1031060750336
+UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1
+UALLOC-CORRUPTION test=2 status=5 signal=5 exit=-1
+UALLOC-CORRUPTION test=3 status=5 signal=5 exit=-1
+UALLOC-DONE checks=1910
+UALLOC-ARM-PASS program=/tests/verify-disabled-static
+UALLOC-ARM-BEGIN program=/tests/verify-all-classes-disabled-static
+UALLOC-ALL-CLASSES classes=48 burst=72 rounds=3
+UALLOC-THREAD-TRANSITIONS cycles=24
+UALLOC-SUPPLEMENT-DONE checks=22776
+UALLOC-ARM-PASS program=/tests/verify-all-classes-disabled-static
+UALLOC-ARM-DONE

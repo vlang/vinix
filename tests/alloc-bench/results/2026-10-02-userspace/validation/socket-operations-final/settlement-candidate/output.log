@@ -1,0 +1,41 @@
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=before
+SOCKET-OPS-SLAB-END operation=11 phase=before
+SOCKET-OPS-RESULT operation=11 name=stream_read_discards_rights calls=8192 before=2027438080 after=2023112704 retained=4325376
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=after
+SOCKET-OPS-SLAB-END operation=11 phase=after
+SOCKET-OPS-SETTLED operation=11 name=stream_read_discards_rights calls=8192 retained=4325376
+SOCKET-OPS-SLAB-BEGIN operation=11 phase=settled
+SOCKET-OPS-SLAB-END operation=11 phase=settled
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=before
+SOCKET-OPS-SLAB-END operation=12 phase=before
+SOCKET-OPS-RESULT operation=12 name=datagram_read_discards_rights calls=8192 before=2023079936 after=2018754560 retained=4325376
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=after
+SOCKET-OPS-SLAB-END operation=12 phase=after
+SOCKET-OPS-SETTLED operation=12 name=datagram_read_discards_rights calls=8192 retained=4341760
+SOCKET-OPS-SLAB-BEGIN operation=12 phase=settled
+SOCKET-OPS-SLAB-END operation=12 phase=settled
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=before
+SOCKET-OPS-SLAB-END operation=13 phase=before
+SOCKET-OPS-RESULT operation=13 name=stream_close_queued_rights calls=8192 before=2018459648 after=1983643648 retained=34816000
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=after
+SOCKET-OPS-SLAB-END operation=13 phase=after
+SOCKET-OPS-SETTLED operation=13 name=stream_close_queued_rights calls=8192 retained=34816000
+SOCKET-OPS-SLAB-BEGIN operation=13 phase=settled
+SOCKET-OPS-SLAB-END operation=13 phase=settled
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=before
+SOCKET-OPS-SLAB-END operation=14 phase=before
+SOCKET-OPS-RESULT operation=14 name=datagram_close_queued_rights calls=8192 before=1983381504 after=1948581888 retained=34799616
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=after
+SOCKET-OPS-SLAB-END operation=14 phase=after
+SOCKET-OPS-SETTLED operation=14 name=datagram_close_queued_rights calls=8192 retained=34799616
+SOCKET-OPS-SLAB-BEGIN operation=14 phase=settled
+SOCKET-OPS-SLAB-END operation=14 phase=settled
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=before
+SOCKET-OPS-SLAB-END operation=15 phase=before
+SOCKET-OPS-RESULT operation=15 name=closed_stream_send calls=8192 before=1948303360 after=1915060224 retained=33243136
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=after
+SOCKET-OPS-SLAB-END operation=15 phase=after
+SOCKET-OPS-SETTLED operation=15 name=closed_stream_send calls=8192 retained=33243136
+SOCKET-OPS-SLAB-BEGIN operation=15 phase=settled
+SOCKET-OPS-SLAB-END operation=15 phase=settled
+SOCKET-OPS-DONE result=0 completed=5

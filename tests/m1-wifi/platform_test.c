@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-or-later
  * Native platform policy tests with MMIO replaced by an explicit register map.
  * These verify programmed values/ordering, not physical PCIe or IOMMU behavior.

@@ -1,0 +1,12 @@
+2026-10-02T19:48:58.296879+00:00 starting vinix-1
+Complete validated capture vinix-1
+Frozen input changed: kernel/file/locks.v
+
+Resuming unchanged frozen campaign after correcting source guards to isolated worktree.
+2026-10-02T19:57:03.520336+00:00 starting catalina-1
+Complete validated capture catalina-1
+2026-10-02T20:01:58.575051+00:00 starting catalina-2
+Complete validated capture catalina-2
+2026-10-02T20:06:46.534240+00:00 starting vinix-2
+Complete validated capture vinix-2
+All four predeclared fresh captures completed and validated.

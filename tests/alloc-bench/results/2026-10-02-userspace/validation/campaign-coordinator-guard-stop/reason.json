@@ -1,0 +1,10 @@
+{
+  "at_utc": "2026-10-02T19:57:03.401106+00:00",
+  "reason": "Coordinator checked a shared working-tree source after another session committed changes. Frozen f944 kernel, isolated source, ff14 libc and benchmark remain unchanged. No guest failed; first complete Vinix capture remains part of the declared campaign.",
+  "shared_path": "kernel/file/locks.v",
+  "shared_sha256": "6f48028c84939ebb926ea3323916bccd48b683f563bf17c6f05a703f3da528df",
+  "frozen_path": "third_party/useralloc-speed-v4/kernel/file/locks.v",
+  "frozen_sha256": "21937b5a7f0ee5d5bb233d855217d7c431b2793be40263b74f7073ead1327ac3",
+  "preserved_capture": "vinix-1",
+  "resumption": "Validate unchanged isolated sources/artifacts and existing complete capture, then continue Catalina1,Catalina2,Vinix2 in the same declared order."
+}

@@ -1,0 +1,26 @@
+{
+  "guest_version": "macOS 10.15.7 19H15",
+  "guest_kernel": "XNU6153.141.2.2~1",
+  "compiler": "gcc14.3.0 MacPorts Darwin19",
+  "build_mode": "native guest GNU GCC14.3 C to assembly; host Apple assembler/linker targeting x86_64-apple-macos10.15",
+  "build_method": "guest GCC C-to-assembly; host Apple assembler/linker",
+  "guest_compile_command": "DYLD_LIBRARY_PATH=/tmp/opt/local/lib /tmp/opt/local/bin/gcc-mp-14 -std=c11 -O2 -Wall -Wextra -Werror -fno-builtin -mmacosx-version-min=10.15 -isysroot /tmp/bench-sdk -nostdinc -isystem /tmp/opt/local/lib/gcc14/gcc/x86_64-apple-darwin19/14.3.0/include -isystem /tmp/bench-sdk/usr/include -S /tmp/bench.c -o /tmp/bench-native-fresh.s",
+  "host_link_command": [
+    "xcrun",
+    "clang",
+    "-target",
+    "x86_64-apple-macos10.15",
+    "-isysroot",
+    "/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk",
+    "/Users/alex/code/vinix/build/alloc-bench-macos/bench-native.s",
+    "-o",
+    "/Users/alex/code/vinix/build/alloc-bench-macos/alloc-bench-native"
+  ],
+  "sdk": "MacOSX15.4",
+  "source_sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9",
+  "assembly_sha256": "ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd",
+  "freshly_verified_assembly_sha256": "ff4f96b50b88ea1482866c7fed1bbc0750d46e47c0f984466332615439136bdd",
+  "binary_sha256": "aed1e90c728e56b77cbff31c62277eb80762b9a0f54b02e815ce581913352b97",
+  "binary_reused_after_matching_fresh_guest_codegen": true,
+  "proof": "The preserved serial preparation contains the guest compiler version, source/executable hashes and fresh GNU guest-generated assembly hash. Recorded host assembly and executable files were re-hashed before this snapshot."
+}

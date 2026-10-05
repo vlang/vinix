@@ -1,0 +1,54 @@
+{
+  "optimized-v5-final": {
+    "sources_verified": true,
+    "saved_assembly_verified": true,
+    "libraries_verified": true,
+    "objects_sha256": {
+      "realloc.o": "baf4b6614e93900d660f83e6996c63552449d642128e3e9f8925002135e7cd12",
+      "free.o": "8b5193d5b88051bbb6ee931ff68aaf4fda213e53f91f67443adc6a2d962fd319",
+      "malloc.o": "5636803540e02297c46dd274ccc906e4c85f7451aa013d5dfc20d9652eaf4658",
+      "malloc.lo": "84cd247da96b9778c7c2a37a0c9d146184e26b3fe3dac5e0b4561056437e501d",
+      "free.lo": "300ccb7bb6acc2c4a8c5bef2931b8562393ddab815a75d3f2175840922b82b04",
+      "realloc.lo": "0824d9b56b06849d9152568fa0cacd937db7c091bf4512a7b1fb9d6afb3425b1"
+    }
+  },
+  "disabled-v5-final": {
+    "sources_verified": true,
+    "saved_assembly_verified": true,
+    "libraries_verified": true,
+    "objects_sha256": {
+      "realloc.o": "baf4b6614e93900d660f83e6996c63552449d642128e3e9f8925002135e7cd12",
+      "free.o": "d79bca47818831740f588b65773a128eafd36585d8c7a453b902782e1588d3f7",
+      "malloc.o": "f593fc7d77c0722e49bd23d1c7c5baf76ac478b123f1114dc553ed623e7e1701",
+      "malloc.lo": "9e859ee79e6b4226fec6a575e672884d5bb981a1fd1bc6828d03d55665bd2259",
+      "free.lo": "a778e743e1b422d232f4613f2c15e82b40cc172783d0b54eb7696b445114eafe",
+      "realloc.lo": "0824d9b56b06849d9152568fa0cacd937db7c091bf4512a7b1fb9d6afb3425b1"
+    }
+  },
+  "optimized-arm126-v5-final": {
+    "sources_verified": true,
+    "saved_assembly_verified": true,
+    "libraries_verified": true,
+    "objects_sha256": {
+      "realloc.o": "bc89f0da45e1502010632dc003a59eb453ca7af64598f943e719bc6b2e92c098",
+      "free.o": "5162c3f3aecc206f7934c6369cab815e6d69d24fb3a3b3a94830c26971d763b6",
+      "malloc.o": "0f3877cfa2ca0f18e40b213ec88767b4f926fa1a87ed88154de0e7f7645e2a1a",
+      "malloc.lo": "a742d6a64b0f4e9a3aec90e6f7ad604e1943cd65b09e32792910100cc78e1313",
+      "free.lo": "a1c2ba623e4a4903c700f8ee0c20400d936b9824b2cf1471757e8b52c7f78aa0",
+      "realloc.lo": "7df223a7a7665647e728bca60e3deee7b1d5c3bc15c36521be9df939ae33c6a8"
+    }
+  },
+  "disabled-arm126-v5-final": {
+    "sources_verified": true,
+    "saved_assembly_verified": true,
+    "libraries_verified": true,
+    "objects_sha256": {
+      "realloc.o": "bc89f0da45e1502010632dc003a59eb453ca7af64598f943e719bc6b2e92c098",
+      "free.o": "00c822cb16ab5c626d26f220b6588f07ddb1f50faceafb8add5961cb610dee1f",
+      "malloc.o": "4db4542f24c1377978935ba5ef586fc06a54d0665e3c7fadcde35f6d548957e8",
+      "malloc.lo": "57face9720f01a8b8483e06e11668dba3eb3fb89c38cb836192808ae375b4cb2",
+      "free.lo": "782abca37355fcb644364f9344744d750da4eb2211e5418f96c7ae7228f50ed0",
+      "realloc.lo": "7df223a7a7665647e728bca60e3deee7b1d5c3bc15c36521be9df939ae33c6a8"
+    }
+  }
+}

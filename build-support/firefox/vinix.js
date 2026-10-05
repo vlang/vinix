@@ -8,9 +8,30 @@ pref("media.rdd-process.enabled", false);
 // Vinix has no desktop accessibility bus. Avoid asking GTK to create one.
 pref("accessibility.force_disabled", 1);
 
+// Firefox draws with software WebRender: Vinix has no GPU driver for it.
+// Keeping GL, EGL, DMA-BUF and VA-API out also keeps Mesa out of the
+// browser. Its libgallium links LLVM 19 while the DRI drivers link LLVM 17,
+// and musl, which ignores symbol versions, lets one LLVM's code run on the
+// other's objects: the parent process crashed in LLVM's constructors
+// before it drew a window.
+pref("gfx.webrender.software", true);
+pref("gfx.x11-egl.force-disabled", true);
+pref("layers.acceleration.disabled", true);
+pref("webgl.disabled", true);
+pref("widget.dmabuf.enabled", false);
+pref("widget.dmabuf-textures.enabled", false);
+pref("widget.dmabuf-webgl.enabled", false);
+pref("media.hardware-video-decoding.enabled", false);
+pref("media.ffmpeg.vaapi.enabled", false);
+// Content processes otherwise map their JIT code writable and executable at
+// once, which Vinix's W^X policy refuses; SpiderMonkey reported that as
+// running out of memory and every tab crashed. Flip the pages between
+// writable and executable instead, as the parent process already does.
+pref("javascript.options.content_process_write_protect_code", true);
+
 pref("browser.shell.checkDefaultBrowser", false);
 pref("browser.startup.homepage_override.mstone", "ignore");
-pref("browser.startup.homepage", "file:///root/firefox-smoke.html");
+pref("browser.startup.homepage", "file:///usr/share/vinix/firefox-smoke.html");
 // Vinix can browse normally, but its early pthread/VM implementation is not
 // ready for Firefox's periodic classifier/database maintenance workers. Keep
 // those optional background jobs off instead of letting them take down an

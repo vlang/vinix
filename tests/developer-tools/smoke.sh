@@ -42,6 +42,14 @@ make
 test "$(./hello)" = "hello from a Vinix native build"
 echo "PASS GNU make native C build"
 
+# Exercise radare2 against a binary produced inside Vinix. Version output only
+# proves that the loader can start it; analysis also covers its architecture
+# plugins, memory maps and random-access file I/O.
+r2 -v
+rabin2 -I ./hello | grep -Eq 'arch[[:space:]]+arm|arch[[:space:]]+aarch64'
+r2 -q -c 'aaa;afl~main' ./hello | grep -q main
+echo "PASS radare2 native binary analysis"
+
 git init -q
 git config user.name Vinix
 git config user.email developer@vinix.local
@@ -145,6 +153,6 @@ tmux -L "$tmux_socket" has-session -t smoke
 tmux -L "$tmux_socket" kill-server
 echo "PASS tmux server, UNIX socket, and PTY pane"
 
-echo "PASS file, GDB, and strace startup"
+echo "PASS file, GDB, strace, and radare2 startup"
 
 echo "VINIX NATIVE DEVELOPER TOOLS TEST: PASS"

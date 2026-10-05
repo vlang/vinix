@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // The Vinix wordmark, painted in the middle of a colour wallpaper.
 //
 // The repository's vinix-logo.svg is five shapes on a 200 x 61.9 canvas:
@@ -38,6 +41,15 @@ const logo_shapes = [
 
 const logo_color = u32(0xffffff)
 
+// The V is also used as the Start-button glyph. Keep its bounds in the
+// wordmark's coordinate space so that glyph is the actual first letter, not a
+// similar-looking character or a separately maintained drawing.
+const logo_v_left = 6.7
+const logo_v_top = 10.1
+const logo_v_right = 45.4
+const logo_v_bottom = 51.8
+const logo_v_subsamples = 4
+
 // A quarter of the screen across, and never taller than a fifth of it, so the
 // mark keeps its proportions on a framebuffer of any shape.
 const logo_width_fraction = 4.0
@@ -54,12 +66,19 @@ struct LogoCrossing {
 	winding int
 }
 
-// draw_logo paints the wordmark into the middle of a screen-sized buffer. It
-// goes into the cached wallpaper rather than onto the canvas: the mark never
-// moves, so it is rasterised with the backdrop and blitted with it after.
-fn draw_logo(mut pixels []u32, width int, height int, color u32) {
+// LogoBox is where the wordmark sits on a screen of a given size, and the
+// scale its view box is drawn at.
+struct LogoBox {
+	x     int
+	y     int
+	w     int
+	h     int
+	scale f64
+}
+
+fn logo_box(width int, height int) ?LogoBox {
 	if width <= 0 || height <= 0 {
-		return
+		return none
 	}
 	mut scale := f64(width) / logo_width_fraction / logo_view_width
 	fit_height := f64(height) / logo_height_fraction / logo_view_height
@@ -71,10 +90,28 @@ fn draw_logo(mut pixels []u32, width int, height int, color u32) {
 	box_w := int(logo_view_width * scale) + 2
 	box_h := int(logo_view_height * scale) + 2
 	if box_w < 8 || box_h < 8 || box_w > width || box_h > height {
+		return none
+	}
+	return LogoBox{
+		x:     (width - box_w) / 2
+		y:     (height - box_h) / 2
+		w:     box_w
+		h:     box_h
+		scale: scale
+	}
+}
+
+// draw_logo paints the wordmark over `pixels`, the box's own w x h pixels
+// holding the backdrop behind it. It goes into the cached wallpaper rather
+// than onto the canvas: the mark never moves, so it is rasterised with the
+// backdrop and blitted with it after.
+fn draw_logo(mut pixels []u32, logo LogoBox, color u32) {
+	box_w := logo.w
+	box_h := logo.h
+	scale := logo.scale
+	if pixels.len < box_w * box_h {
 		return
 	}
-	origin_x := (width - box_w) / 2
-	origin_y := (height - box_h) / 2
 
 	// The shapes are rasterised into a mask first, so a pixel two of them share
 	// an edge on is blended once and does not come out darker than the rest.
@@ -85,7 +122,7 @@ fn draw_logo(mut pixels []u32, width int, height int, color u32) {
 
 	for y in 0 .. box_h {
 		row := y * box_w
-		out_row := (origin_y + y) * width + origin_x
+		out_row := y * box_w
 		for x in 0 .. box_w {
 			cov := u32(coverage[row + x])
 			if cov == 0 {
@@ -100,6 +137,71 @@ fn draw_logo(mut pixels []u32, width int, height int, color u32) {
 		}
 	}
 	unsafe { coverage.free() }
+}
+
+// draw_vinix_v paints the V polygon from vinix-logo.svg into an icon-sized
+// rectangle. The Start button is small enough that drawing it as two thick
+// lines changes its taper and central notch noticeably, so sample the source
+// polygon directly instead. This is only a few dozen pixels and is drawn at
+// most twice per frame (the taskbar and an open Start menu).
+fn (mut c Canvas) draw_vinix_v(x int, y int, width int, height int, color u32) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+	inset := if width < height { width / 8 } else { height / 8 }
+	available_width := width - 2 * inset
+	available_height := height - 2 * inset
+	if available_width <= 0 || available_height <= 0 {
+		return
+	}
+	mut scale := f64(available_width) / (logo_v_right - logo_v_left)
+	height_scale := f64(available_height) / (logo_v_bottom - logo_v_top)
+	if scale > height_scale {
+		scale = height_scale
+	}
+	if scale <= 0 {
+		return
+	}
+	glyph_width := (logo_v_right - logo_v_left) * scale
+	glyph_height := (logo_v_bottom - logo_v_top) * scale
+	origin_x := f64(x) + (f64(width) - glyph_width) / 2 - logo_v_left * scale
+	origin_y := f64(y) + (f64(height) - glyph_height) / 2 - logo_v_top * scale
+
+	for py in y .. y + height {
+		for px in x .. x + width {
+			mut covered := 0
+			for sample_y in 0 .. logo_v_subsamples {
+				for sample_x in 0 .. logo_v_subsamples {
+					shape_x := (f64(px) + (f64(sample_x) + 0.5) / logo_v_subsamples - origin_x) / scale
+					shape_y := (f64(py) + (f64(sample_y) + 0.5) / logo_v_subsamples - origin_y) / scale
+					if vinix_v_contains(shape_x, shape_y) {
+						covered++
+					}
+				}
+			}
+			if covered > 0 {
+				c.blend_pixel(px, py, color, u32(covered * 255 / (logo_v_subsamples * logo_v_subsamples)))
+			}
+		}
+	}
+}
+
+// vinix_v_contains uses the usual even-odd polygon rule. logo_shapes[0] is
+// the V's untouched SVG point list, shared with draw_logo above.
+fn vinix_v_contains(x f64, y f64) bool {
+	points := logo_shapes[0]
+	mut inside := false
+	for i in 0 .. points.len / 2 {
+		j := if i == 0 { points.len / 2 - 1 } else { i - 1 }
+		x0 := points[i * 2]
+		y0 := points[i * 2 + 1]
+		x1 := points[j * 2]
+		y1 := points[j * 2 + 1]
+		if (y0 > y) != (y1 > y) && x < (x1 - x0) * (y - y0) / (y1 - y0) + x0 {
+			inside = !inside
+		}
+	}
+	return inside
 }
 
 // accumulate_polygon adds one shape to the mask. Every pixel row is sampled at

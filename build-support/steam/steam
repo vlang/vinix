@@ -1,0 +1,185 @@
+#!/bin/sh
+# Run Valve's Linux Steam client on Vinix/aarch64 through the x86 translators.
+#
+# Steam is what Valve ships for x86 Linux: a bash bootstrap script, a 32-bit
+# glibc client that updates itself from Valve's CDN, and a 64-bit web helper.
+# None of that is native here, so the whole tree runs as an x86 Debian userland
+# under qemu-i386 and qemu-x86_64: the kernel re-executes every x86 ELF through
+# the translator, and VINIX_I386_ROOT and VINIX_X86_64_ROOT point it at the
+# glibc root staged by build-steam-aarch64.sh instead of the musl roots the
+# Wine runtime uses.
+set -eu
+
+root="${VINIX_STEAM_ROOT:-/usr/libexec/vinix-steam/root}"
+helpers="${VINIX_STEAM_HELPERS:-/usr/libexec/vinix-steam/bin}"
+bootstrap="${VINIX_STEAM_BOOTSTRAP:-/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz}"
+unshare="${VINIX_STEAM_UNSHARE:-/usr/bin/unshare}"
+# The kernel starts x86 programs through these; the launcher only checks
+# that they are there.
+translator32="${VINIX_I386_EMULATOR:-/usr/bin/qemu-i386}"
+translator64="${VINIX_X86_64_EMULATOR:-/usr/bin/qemu-x86_64}"
+
+for translator in "$translator32" "$translator64"; do
+    if [ ! -x "$translator" ]; then
+        echo "steam: translator is not installed: $translator" >&2
+        echo "build the x86 layer with ./build-x86-translation-aarch64.sh" >&2
+        exit 127
+    fi
+done
+if [ ! -x "$root/usr/bin/bash" ] || [ ! -e "$root/lib/ld-linux.so.2" ]; then
+    echo "steam: the x86 glibc runtime is not installed: $root" >&2
+    echo "build it with ./build-steam-aarch64.sh" >&2
+    exit 127
+fi
+robust_shim="$root/usr/lib/i386-linux-gnu/libvinix-steam-robust.so"
+if [ ! -f "$robust_shim" ]; then
+    echo "steam: the i386 robust-list shim is missing: $robust_shim" >&2
+    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    exit 127
+fi
+xrandr_library="$root/usr/lib/i386-linux-gnu/libXrandr.so.2"
+if [ ! -f "$xrandr_library" ]; then
+    echo "steam: the i386 Xrandr library is missing: $xrandr_library" >&2
+    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    exit 127
+fi
+robust_shim64="$root/usr/lib/x86_64-linux-gnu/libvinix-steam-robust.so"
+if [ ! -f "$robust_shim64" ]; then
+    echo "steam: the x86-64 robust-list shim is missing: $robust_shim64" >&2
+    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    exit 127
+fi
+steamrt_direct="$helpers/steamrt-direct"
+if [ ! -x "$steamrt_direct/_v2-entry-point" ]; then
+    echo "steam: the direct web helper entry point is missing: $steamrt_direct" >&2
+    echo "rebuild the runtime with ./build-steam-aarch64.sh" >&2
+    exit 127
+fi
+if [ ! -f "$bootstrap" ]; then
+    echo "steam: Valve's bootstrap archive is missing: $bootstrap" >&2
+    exit 127
+fi
+
+export HOME="${HOME:-/root}"
+config="$HOME/.steam"
+data="${STEAM_DATA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}}/Steam"
+export VINIX_STEAM_DATA="$data"
+
+# Every x86 program started from here on, by this script or by Steam itself,
+# runs against the glibc root. The Debian tools come first on PATH so Steam's
+# scripts get GNU tar, xz and coreutils; the native Vinix tools stay behind
+# them for anything the root does not carry.
+export VINIX_I386_ROOT="$root"
+export VINIX_X86_64_ROOT="$root"
+# Ask the kernel's QEMU handoff to add the matching Debian multiarch library
+# directory to each x86 process without exposing it to the native translator.
+export VINIX_X86_MULTIARCH=1
+# QEMU linux-user has no get_robust_list implementation. Steam's i386 client
+# resolves XRRGetOutputInfo through RTLD_NEXT before it loads libXrandr itself,
+# so make that library visible at process startup. The kernel gives each
+# translated program only the preloads built for its architecture; the native
+# X11 host never loads these x86 libraries.
+export VINIX_I386_PRELOAD="$robust_shim:$xrandr_library"
+export VINIX_X86_64_PRELOAD="$robust_shim64"
+# On a 16 KiB host page, QEMU's i386 mremap path can return EFAULT for a
+# 4 KiB guest malloc mapping. Keep glibc's large allocations on brk instead.
+export MALLOC_MMAP_MAX_="${MALLOC_MMAP_MAX_:-0}"
+# QEMU's translator changes its generated-code buffer between writable and
+# executable protections. Its setup includes a temporary RWX mapping, which
+# Vinix only allows when the launcher explicitly opts this process tree in.
+export VINIX_ALLOW_WX=1
+export PATH="$helpers:$root/usr/bin:$root/bin:${PATH:-/usr/bin:/bin}"
+# QEMU user networking can hand out 10.0.2.3 while its DNS proxy remains
+# silent. The native helper checks an actual UDP answer and changes the
+# resolver only in that VM case, after the network has come up.
+if [ -x "$helpers/qemu-dns" ] && \
+    grep -Eq '^nameserver[[:space:]]+10\.0\.2\.3([[:space:]]|$)' /etc/resolv.conf 2>/dev/null; then
+    "$helpers/qemu-dns" || true
+fi
+# The translators start as a qemu64/qemu32 CPU, which predates the SSE4 and
+# CMPXCHG16B baseline the client and its Chromium helper are built for.
+export QEMU_CPU="${QEMU_CPU:-max}"
+# Steam's launcher records where it lives so the client can restart itself.
+export STEAMSCRIPT=/usr/bin/steam
+export STEAMSCRIPT_VERSION="${STEAMSCRIPT_VERSION:-1.0.0.87}"
+# Valve's scout setup and logger use /dev/fd for bash process substitution.
+# Vinix exposes the descriptors in procfs but does not create the usual /dev
+# alias at boot.
+if [ ! -e /dev/fd ] && [ -d /proc/self/fd ]; then
+    ln -s /proc/self/fd /dev/fd 2>/dev/null || true
+fi
+
+# Valve's namespace probe exits before its client can start. Vinix does not
+# yet provide the user namespaces its container runtime needs, so use the
+# staged glibc libraries directly and disable the CEF sandbox for this client.
+# Games that require Steam's container runtimes still need namespace support.
+export STEAM_RUNTIME="${STEAM_RUNTIME:-0}"
+export STEAM_RUNTIME_LOGGER="${STEAM_RUNTIME_LOGGER:-0}"
+# The installed steamwebhelper.sh always invokes steamrt's entry point. The
+# staged entry point passes its `--` and wrapper command through without a
+# container, which Vinix cannot host until it has user namespaces.
+export STEAM_RUNTIME_STEAMRT="${STEAM_RUNTIME_STEAMRT:-$steamrt_direct}"
+export TEXTDOMAIN=steam
+
+# Valve's launcher service and web helper use the session message bus. A
+# Vinix desktop may already provide one; otherwise start the staged daemon.
+# The machine ID is generated on first use, not baked into the image, so each
+# installed system gets its own ID.
+if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -x "$root/usr/bin/dbus-daemon" ]; then
+    # The minimal Vinix root has no account database, but D-Bus requires
+    # getpwuid/getgrgid to resolve its own credentials.
+    uid="$(id -u)"
+    gid="$(id -g)"
+    if ! grep -Eq "^[^:]*:[^:]*:${uid}:" /etc/passwd 2>/dev/null; then
+        account="vinix-steam-${uid}"
+        if [ "$uid" = 0 ]; then account=root; fi
+        printf '%s:x:%s:%s:Steam:%s:/bin/sh\n' \
+            "$account" "$uid" "$gid" "$HOME" >> /etc/passwd
+    fi
+    if ! grep -Eq "^[^:]*:[^:]*:${gid}:" /etc/group 2>/dev/null; then
+        group="vinix-steam-${gid}"
+        if [ "$gid" = 0 ]; then group=root; fi
+        printf '%s:x:%s:\n' "$group" "$gid" >> /etc/group
+    fi
+    if [ ! -s /etc/machine-id ] && [ ! -s /var/lib/dbus/machine-id ]; then
+        machine_id="$(od -An -tx1 -N16 /dev/urandom | tr -d '[:space:]')"
+        if [ "${#machine_id}" -ne 32 ]; then
+            echo "steam: could not generate a D-Bus machine ID" >&2
+            exit 1
+        fi
+        printf '%s\n' "$machine_id" > /etc/machine-id
+    fi
+    if ! bus_address="$("$root/usr/bin/dbus-daemon" --session --fork --print-address)"; then
+        echo "steam: could not start the D-Bus session bus" >&2
+        exit 1
+    fi
+    export DBUS_SESSION_BUS_ADDRESS="$bus_address"
+fi
+
+if [ ! -x "$data/steam.sh" ]; then
+    echo "steam: unpacking Valve's bootstrap into $data" >&2
+    mkdir -p "$data"
+    (umask 0077 && cd "$data" && "$helpers/tar" xJf "$bootstrap")
+fi
+mkdir -p "$config"
+ln -sfn "$data" "$config/steam"
+# steam.sh reinstalls from this copy when asked to reset the client.
+if ! cmp -s "$bootstrap" "$data/bootstrap.tar.xz"; then
+    cp "$bootstrap" "$data/bootstrap.tar.xz"
+fi
+
+checker="$data/ubuntu12_32/steam-runtime/amd64/usr/bin/steam-runtime-check-requirements"
+if [ -x "$checker" ]; then
+    chmod a-x "$checker"
+fi
+
+cd "$data"
+# Steam's scripts stop at once unless uname(2) says Linux. Vinix answers
+# Linux to whatever runs in its own UTS namespace, so start the client in one;
+# anything without the privilege to unshare gets the plain answer and the
+# helpers' uname on PATH covers the scripts.
+set -- "$root/usr/bin/bash" "$data/steam.sh" -no-cef-sandbox "$@"
+if [ -x "$unshare" ] && "$unshare" -u true 2>/dev/null; then
+    exec "$unshare" -u "$@"
+fi
+exec "$@"

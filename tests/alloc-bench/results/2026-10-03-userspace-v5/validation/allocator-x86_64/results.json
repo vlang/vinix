@@ -1,0 +1,391 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "suite": "supplemental",
+      "checks": 22776
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "suite": "original",
+      "checks": 1910
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "suite": "supplemental",
+      "checks": 22776
+    }
+  ],
+  "total_checks": 98744,
+  "footprints": [
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "before": 1031061319680,
+      "retained": 1031064895488,
+      "trimmed": 1031061319680,
+      "retained_delta": 3575808,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "before": 1031060676608,
+      "retained": 1031064260608,
+      "trimmed": 1031060676608,
+      "retained_delta": 3584000,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "before": 1031061311488,
+      "retained": 1031061311488,
+      "trimmed": 1031061311488,
+      "retained_delta": 0,
+      "trimmed_delta": 0
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "before": 1031060668416,
+      "retained": 1031060672512,
+      "trimmed": 1031060668416,
+      "retained_delta": 4096,
+      "trimmed_delta": 0
+    }
+  ],
+  "corruption": [
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=0 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=0 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "optimized",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "dynamic",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=0 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=1 status=11 signal=11 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=2 status=4 signal=4 exit=-1"
+    },
+    {
+      "policy": "disabled",
+      "mode": "static",
+      "line": "UALLOC-CORRUPTION test=3 status=4 signal=4 exit=-1"
+    }
+  ],
+  "clock_lines": [
+    "CLOCK-REFERENCE-BEGIN ns=1790976382854594000",
+    "CLOCK-REFERENCE-END ns=1790976383131464000 elapsed=276870000",
+    "CLOCK-COUNTER sleep_ns=52199000 sleep_ticks=52291000 busy_ns=276870000 busy_ticks=274244000 ratio=1.011355",
+    "CLOCK-DONE precise counter, coarse snapshots, absolute sleeps, timerfd and futex"
+  ],
+  "serial_sha256": "9db4046321e17379ad1d08a41e7f32b8a68d373b37cd917c3e875169c8cd0f27",
+  "driver_exit": {
+    "exit_code": 0,
+    "start": "2026-10-02T21:25:53.756387+00:00",
+    "finish": "2026-10-02T21:27:55.091454+00:00"
+  },
+  "config": {
+    "source_sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "supplemental_source_sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+    "clock_source_sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+    "compile_flags": [
+      "-std=c11",
+      "-O2",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-builtin",
+      "-pthread"
+    ],
+    "libc_builds": {
+      "optimized": {
+        "version": "1.2.5",
+        "alpine_package": "musl-1.2.5-r11",
+        "arch": "x86_64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+        "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "isatty-glibc-align.patch",
+            "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+          },
+          {
+            "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+            "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+          },
+          {
+            "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+            "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+          },
+          {
+            "name": "loongarch64-add-TLSDESC-support.patch",
+            "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+          },
+          {
+            "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+            "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+          },
+          {
+            "name": "loongarch64-add-bits-hwcap.h.patch",
+            "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+          },
+          {
+            "name": "CVE-2025-26519.patch",
+            "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc"
+        ],
+        "compiler_version": "x86_64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "x86_64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=1",
+        "ldflags": "-Wl,-soname,libc.musl-x86_64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 1,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/x86_64/c97687ce9e5ca67f3acb8947bf28d3def2b044abf977e9e91ab8e8c767083b1c/musl-1.2.5/configure",
+          "--target=x86_64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+        "libc_a_sha256": "eb50810aa7d3583f6469e23fce4c2f464a86197cfb2a0cdf5293b75baaedd90c"
+      },
+      "disabled": {
+        "version": "1.2.5",
+        "alpine_package": "musl-1.2.5-r11",
+        "arch": "x86_64",
+        "source_url": "https://musl.libc.org/releases/musl-1.2.5.tar.gz",
+        "source_sha256": "a9a118bbe84d8764da0ea0d28b3ab3fae8477fc7e4085d90102b8596fc7c75e4",
+        "patches": [
+          {
+            "name": "handle-aux-at_base.patch",
+            "sha256": "2a65e03b94217063d72fe998e5fb2e25cd01716078a3ba1b0ab574ab205111e6"
+          },
+          {
+            "name": "isatty-glibc-align.patch",
+            "sha256": "1321d542b40921a4c248bb2d15dbd03fcbbf008c8725eb2043d3cab62faeba48"
+          },
+          {
+            "name": "ldso-fix-non-functional-fix-to-early-dynamic-PAGE_SI.patch",
+            "sha256": "7f5806124d4a89536e53a07bfe95fcd0a8f1b7a27fc0dfc89c78c724dea1c924"
+          },
+          {
+            "name": "loongarch64-Add-lsx-and-lasx-vector-structure-defini.patch",
+            "sha256": "28efacd507c01b89e1725ed33723f3f9fdfe6cb83eb78ffea1e2acb7fda8a52c"
+          },
+          {
+            "name": "loongarch64-add-TLSDESC-support.patch",
+            "sha256": "1efb4604e0b28b84e10faf37d17bad448510e73f6a3db89c8be47d38b9e85138"
+          },
+          {
+            "name": "loongarch64-add-fpu-and-simd-context-to-signal.h.patch",
+            "sha256": "d73f85a90fe52930dd8b5d16cb7f3369a994918c0e41ae3c3dc9a25df4b45099"
+          },
+          {
+            "name": "loongarch64-add-bits-hwcap.h.patch",
+            "sha256": "8849080b49dff046b1f29db24e54ffe6262b5884078091994db77efdafca2505"
+          },
+          {
+            "name": "CVE-2025-26519.patch",
+            "sha256": "ab382da2bb5e1cc32d8904be28fb13f8ad3ce813967bd4bf7f5b1c6baee33e17"
+          },
+          {
+            "name": "CVE-2026-6042.patch",
+            "sha256": "1d0be2e72b9d5bd16546b923aa8af861d271322f01644716a81823bec4065c99"
+          },
+          {
+            "name": "CVE-2026-40200.patch",
+            "sha256": "1ee29f64f9ca8e8ad7c349779d661ff6b52126a27575d3586981357a52c406fb"
+          },
+          {
+            "name": "malloc-retain.patch",
+            "sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86"
+          }
+        ],
+        "cc": [
+          "/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc"
+        ],
+        "compiler_version": "x86_64-linux-musl-gcc (GCC) 14.2.0",
+        "compiler_target": "x86_64-linux-musl",
+        "cflags": "-fstack-protector-strong -DVINIX_MALLOC_RETAIN=0",
+        "ldflags": "-Wl,-soname,libc.musl-x86_64.so.1",
+        "optimize": "internal,malloc,malloc/mallocng/*.c,string",
+        "retention": 0,
+        "configure_argv": [
+          "/Users/alex/code/vinix/third_party/useralloc-libc/build/musl/x86_64/cd7e18f1889e62892a88526d44f09cb82b303437e0b02e71db4da7b0c79450ca/musl-1.2.5/configure",
+          "--target=x86_64-linux-musl",
+          "--prefix=/usr",
+          "--syslibdir=/lib",
+          "--disable-wrapper",
+          "--enable-optimize=internal,malloc,malloc/mallocng/*.c,string"
+        ],
+        "libc_so_sha256": "cb86f388583a2b73513bd51b74796fd8438f7d7d5a9876193350a0507477d90c",
+        "libc_a_sha256": "df27b7639c902e2d22ebb96a5139a7a249416047c6b9d8b75a16b991ac7114f4"
+      }
+    },
+    "kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+    "qemu_version": "QEMU emulator version 11.1.1",
+    "argv": [
+      "/opt/homebrew/Cellar/qemu/11.1.1/bin/qemu-system-x86_64",
+      "-machine",
+      "q35,vmport=off",
+      "-accel",
+      "tcg,thread=single,tb-size=1024",
+      "-cpu",
+      "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt",
+      "-smp",
+      "2,sockets=1,cores=2,threads=1",
+      "-m",
+      "4096",
+      "-display",
+      "none",
+      "-monitor",
+      "none",
+      "-drive",
+      "if=pflash,format=raw,readonly=on,file=/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+      "-cdrom",
+      "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v5-final/vinix.iso",
+      "-serial",
+      "file:/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v5-final/serial.log",
+      "-no-reboot"
+    ]
+  },
+  "embedded_input_check": {
+    "match": true,
+    "files_sha256": {
+      "sbin/init": "e690fd362c1b9606c61616982550d90b98d49abfc88b08cd624a1f0358442ce3",
+      "root/verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+      "root/verify-all-classes.c": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+      "root/clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+      "lib/ld-musl-x86_64.so.1": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+      "usr/lib/libc.a": "eb50810aa7d3583f6469e23fce4c2f464a86197cfb2a0cdf5293b75baaedd90c",
+      "root/libcs/optimized/libc.so": "6cf9e5ead03671c57dc0661e0fc02a675a34a5cf57826a09452001ded8932b03",
+      "root/libcs/optimized/libc.a": "eb50810aa7d3583f6469e23fce4c2f464a86197cfb2a0cdf5293b75baaedd90c",
+      "root/libcs/optimized/build.json": "02c05ac23e63bdc9b47398e4d34ffa04249eaea8b7d7a982d3be3b8601bef8bb",
+      "root/libcs/disabled/libc.so": "cb86f388583a2b73513bd51b74796fd8438f7d7d5a9876193350a0507477d90c",
+      "root/libcs/disabled/libc.a": "df27b7639c902e2d22ebb96a5139a7a249416047c6b9d8b75a16b991ac7114f4",
+      "root/libcs/disabled/build.json": "bc7e65f9b1b7675cdc536d33864e062affac2838c692e0a88864ff4648007206"
+    },
+    "kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+    "iso_sha256": "7c0da7068e5b3a86299991b0b5589977a38ce7e3a965cd5c0afe4663a8175f79"
+  }
+}

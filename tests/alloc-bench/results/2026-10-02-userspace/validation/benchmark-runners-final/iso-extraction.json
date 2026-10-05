@@ -1,0 +1,17 @@
+{
+  "command": [
+    "xorriso",
+    "-osirrox",
+    "on",
+    "-indev",
+    "/Users/alex/code/vinix/build/useralloc-vinix-release-1/vinix.iso",
+    "-extract",
+    "/boot/vinix",
+    "/Users/alex/code/vinix/build/useralloc-iso-reader-check/boot-kernel"
+  ],
+  "extracted_kernel_sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186",
+  "expected_kernel_sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186",
+  "staging_kernel_removed": true,
+  "result": "PASS",
+  "notes": "Actual completed ISO built by cleanup-enabled builder; xorriso extracts the exact frozen kernel after all staging files are removed. Both updated Python runners parse successfully."
+}

@@ -1,5 +1,8 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // A month calendar, built into the desktop with ui2.
 module main
 
@@ -10,7 +13,6 @@ const calendar_action_next = 'calendar.next'
 const calendar_action_today = 'calendar.today'
 const calendar_action_day = 'calendar.day.'
 
-const calendar_weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const calendar_days = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14',
 	'15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30',
 	'31']
@@ -38,6 +40,9 @@ mut:
 	tz_offset    i64
 	month_title  string
 	selection    string
+	// The language the two labels above were written in. build rewrites them
+	// after a change.
+	language DesktopLanguage
 }
 
 fn open_calendar(mut desktop Desktop) !NativeApp {
@@ -62,7 +67,7 @@ fn calendar_days_in_month(year int, month int) int {
 	}
 }
 
-// Sunday is zero, matching the clock's CivilTime and the column order above.
+// Sunday is zero, matching the clock's CivilTime.
 // This is the civil-to-days half of the same Gregorian algorithm clock.v uses.
 fn calendar_weekday(year int, month int, day int) int {
 	mut adjusted_year := year
@@ -78,24 +83,50 @@ fn calendar_weekday(year int, month int, day int) int {
 	return ((days % 7) + 11) % 7
 }
 
+// calendar_first_weekday is the weekday a week starts on where the desktop's
+// language is spoken: Sunday in the United States, Monday in Russia and Spain.
+fn calendar_first_weekday() int {
+	return match desktop_language {
+		.en { 0 }
+		.ru, .es { 1 }
+	}
+}
+
+// calendar_heading_month is a month's name standing on its own, as the
+// heading shows it; Russian's nominative, where a date takes the genitive.
+fn calendar_heading_month(month int) string {
+	return match month {
+		1 { tr('calendar.heading.month.jan') }
+		2 { tr('calendar.heading.month.feb') }
+		3 { tr('calendar.heading.month.mar') }
+		4 { tr('calendar.heading.month.apr') }
+		5 { tr('calendar.heading.month.may') }
+		6 { tr('calendar.heading.month.jun') }
+		7 { tr('calendar.heading.month.jul') }
+		8 { tr('calendar.heading.month.aug') }
+		9 { tr('calendar.heading.month.sep') }
+		10 { tr('calendar.heading.month.oct') }
+		11 { tr('calendar.heading.month.nov') }
+		else { tr('calendar.heading.month.dec') }
+	}
+}
+
 fn (mut a CalendarApp) refresh_labels() {
 	year := a.year.str()
-	next_title := '${month_names[a.month - 1]} ${year}'
+	next_title := tr_fill2('calendar.heading', calendar_heading_month(a.month), year)
 	if a.month_title.len > 0 {
 		unsafe { a.month_title.free() }
 	}
 	a.month_title = next_title
 
-	day := a.selected_day.str()
-	next_selection := '${weekday_names[calendar_weekday(a.year, a.month, a.selected_day)]}, ${month_names[a.month - 1]} ${day}, ${year}'
+	next_selection := date_long_text(a.year, a.month, a.selected_day, calendar_weekday(a.year,
+		a.month, a.selected_day))
 	if a.selection.len > 0 {
 		unsafe { a.selection.free() }
 	}
 	a.selection = next_selection
-	unsafe {
-		day.free()
-		year.free()
-	}
+	unsafe { year.free() }
+	a.language = desktop_language
 }
 
 fn (mut a CalendarApp) go_today() {
@@ -132,6 +163,9 @@ fn (mut a CalendarApp) change_month(delta int) {
 }
 
 fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
+	if a.language != desktop_language {
+		a.refresh_labels()
+	}
 	width := int(size.width)
 	height := int(size.height)
 	inner := width - 2 * calendar_padding
@@ -161,8 +195,10 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	})
 
 	cell_width := if inner > 7 { inner / 7 } else { 1 }
-	for column, weekday in calendar_weekdays {
-		children << ui2.label('', weekday, ui2.rect(f64(calendar_padding + column * cell_width), f64(calendar_header_height), f64(cell_width), f64(calendar_weekday_height)), ui2.TextStyle{
+	// Columns run from the language's first day of the week.
+	first_weekday := calendar_first_weekday()
+	for column in 0 .. 7 {
+		children << ui2.label('', date_weekday_short((first_weekday + column) % 7), ui2.rect(f64(calendar_padding + column * cell_width), f64(calendar_header_height), f64(cell_width), f64(calendar_weekday_height)), ui2.TextStyle{
 			color: body_muted
 			size: 11
 			bold: true
@@ -173,7 +209,7 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	grid_top := calendar_header_height + calendar_weekday_height
 	available_grid_height := height - grid_top - calendar_footer_height - calendar_padding
 	cell_height := if available_grid_height > 6 { available_grid_height / 6 } else { 1 }
-	first := calendar_weekday(a.year, a.month, 1)
+	first := (calendar_weekday(a.year, a.month, 1) - first_weekday + 7) % 7
 	days := calendar_days_in_month(a.year, a.month)
 	for day := 1; day <= days; day++ {
 		cell := first + day - 1
@@ -205,7 +241,7 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 		color: body_text
 		size: 12
 	})
-	children << ui2.button(calendar_action_today, 'Today', ui2.rect(f64(width - calendar_padding - 72), f64(footer_y + 5), 72, 24), ui2.BoxStyle{
+	children << ui2.button(calendar_action_today, tr('calendar.today'), ui2.rect(f64(width - calendar_padding - 72), f64(footer_y + 5), 72, 24), ui2.BoxStyle{
 		bg: calendar_button
 		radius: 5
 	}, ui2.TextStyle{

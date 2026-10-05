@@ -1,0 +1,34 @@
+--- a/linux-user/syscall.c
++++ b/linux-user/syscall.c
+@@ -7821,6 +7821,31 @@
+             : target_to_host_timespec(pts, timeout)) {
+             return -TARGET_EFAULT;
+         }
++    }
++    if (base_op == FUTEX_WAKE_OP) {
++        int ret;
++
++        if ((uaddr | uaddr2) & (sizeof(uint32_t) - 1)) {
++            return -TARGET_EINVAL;
++        }
++        /* TCG may protect an originally writable target word because its
++         * host page also contains translated code. Kernel writes do not run
++         * our SIGSEGV handler: validate the target permission and unprotect
++         * the page before the native atomic operation. Keep the memory lock
++         * until this nonblocking call returns so another translator cannot
++         * protect that host page again between the check and the write.
++         * Require write permission only: PROT_WRITE need not include the
++         * target PAGE_READ flag. Blocking futex operations must never take
++         * this path.
++         */
++        mmap_lock();
++        if (!access_ok(cpu, PAGE_WRITE, uaddr2, sizeof(uint32_t))) {
++            mmap_unlock();
++            return -TARGET_EFAULT;
++        }
++        ret = do_safe_futex(g2h(cpu, uaddr), op, val, pts, haddr2, val3);
++        mmap_unlock();
++        return ret;
+     }
+     return do_safe_futex(g2h(cpu, uaddr), op, val, pts, haddr2, val3);
+ }

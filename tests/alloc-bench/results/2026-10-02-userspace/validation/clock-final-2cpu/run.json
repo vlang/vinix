@@ -1,0 +1,25 @@
+{
+  "kernel_sha256": "c02560d2d4df8b9ff9952b5a2f83023743e8c2212309abe540bf69e076acc592",
+  "clock_patch_sha256": "19913e815109a3ca30b01536ced297501c47ea531ac177e8da6b0c73c063c234",
+  "test_sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+  "init_sha256": "83216fa1bce633352cf39e61ec1206e21a179e47fe07bc757c7453f86a7b3d8f",
+  "compiler": "x86_64-linux-musl-gcc14.2.0 (host cross compile, static stock libc)",
+  "qemu_config": [
+    "q35,smm=off",
+    "tcg",
+    "max",
+    "2048 MiB",
+    "2 vCPU"
+  ],
+  "timeout_seconds": 150,
+  "runner_exit_code": 0,
+  "result": "CLOCK-DONE, no failures; precise and coarse resolution, counter ratio, absolute realtime/monotonic timerfd, absolute clock_nanosleep and futex",
+  "counter": {
+    "sleep_ns": "51404000",
+    "sleep_ticks": "51445000",
+    "busy_ns": "543232000",
+    "busy_ticks": "540828000",
+    "ratio": "1.005246"
+  },
+  "serial_log": "/Users/alex/code/vinix/build/useralloc-pipe/clock-final-2cpu/serial.log"
+}

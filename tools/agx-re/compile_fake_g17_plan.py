@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import sys
@@ -102,9 +103,42 @@ def _buffer_reference(node: dict[str, Any], command: bytes) -> tuple[bytes, int]
     raise UnresolvedValue(f"object base rooted in {kind or 'unknown'}")
 
 
+def normalize_predicate(predicate: dict[str, Any]) -> dict[str, Any]:
+    """Give a register-register comparison the source/second shape.
+
+    Comparisons recovered from `CMP Wn, Wm{, shift}` carry `first` and a
+    possibly shifted `second`; the shifted operand becomes `0 | second`
+    with the shift, which every evaluator already understands.
+    """
+    if "source" in predicate or "first" not in predicate:
+        return predicate
+    normalized = {
+        key: value
+        for key, value in predicate.items()
+        if key not in ("first", "second", "shift", "modifier", "amount")
+    }
+    normalized["source"] = predicate["first"]
+    second = predicate["second"]
+    shift = predicate.get("shift", predicate.get("modifier"))
+    amount = _integer(predicate.get("amount", 0), "compare shift amount")
+    if amount:
+        second = {
+            "kind": "expression",
+            "operation": "orr",
+            "bytes": predicate.get("bytes", 8),
+            "first": {"kind": "constant", "value": 0},
+            "second": second,
+            "shift": shift,
+            "amount": amount,
+        }
+    normalized["second"] = second
+    return normalized
+
+
 def _condition(
     predicate: dict[str, Any], condition: str, descriptor: bytes, command: bytes
 ) -> bool:
+    predicate = normalize_predicate(predicate)
     operation = predicate.get("operation")
     byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
     mask = _width_mask(byte_count)
@@ -124,6 +158,10 @@ def _condition(
             "nonzero": source != other,
             "hi": source > other,
             "ls": source <= other,
+            "cc": source < other,
+            "lo": source < other,
+            "cs": source >= other,
+            "hs": source >= other,
         }
     elif operation == "tst":
         other = (
@@ -170,6 +208,8 @@ def _evaluate(node: dict[str, Any], descriptor: bytes, command: bytes) -> int:
         )
     if kind == "computed":
         return _evaluate(node["expression"], descriptor, command)
+    if kind == "hardware_input":
+        raise UnresolvedValue(f"value needs hardware input {node.get('name')!r}")
     if kind in (
         "argument",
         "virtual_load",
@@ -270,6 +310,470 @@ def _evaluate(node: dict[str, Any], descriptor: bytes, command: bytes) -> int:
     raise UnresolvedValue(f"unsupported expression operation {operation!r}")
 
 
+# The channel register producers reach the accelerator through the IOGPU
+# pointer that IOGPUChannel::init stores at channel +0x10.
+CHANNEL_ACCELERATOR_MEMBER = 0x10
+
+
+class _AcceleratorFacts:
+    """Recovered knowledge of the accelerator bytes the producers load."""
+
+    def __init__(self, inputs: dict[str, Any]) -> None:
+        flags = inputs["feature_flags"]
+        self.flags_member = _integer(flags["member"], "feature-flag member")
+        self.flags_bytes = _integer(flags["bytes"], "feature-flag bytes")
+        self.never_set = _integer(flags["never_set_mask"], "never-set mask")
+        chip = inputs["chip_information"]
+        self.override_member = _integer(chip["override_member"], "override member")
+        self.override = bytes.fromhex(chip["override_value"])
+        if len(self.override) != _integer(chip["override_bytes"], "override bytes"):
+            raise PlanError("chip-information override has the wrong length")
+        column = inputs["power_column_count"]
+        self.column_member = _integer(column["member"], "column member")
+        self.column_bytes = _integer(column["bytes"], "column bytes")
+        self.column_input = column["hardware_input"]
+        # Bytes of objects the accelerator points to, by (pointer member,
+        # object member): (value, known mask).
+        self.pointed: dict[tuple[int, int], tuple[int, int]] = {}
+        sampler = inputs.get("perf_counter_sampler")
+        if sampler is not None:
+            policy = sampler["vinix_policy"]
+            if _integer(sampler["running_bytes"], "sampler running bytes") != 1:
+                raise PlanError("sampler running state is not one byte")
+            self.pointed[
+                (
+                    _integer(sampler["pointer_member"], "sampler pointer"),
+                    _integer(sampler["running_member"], "sampler running member"),
+                )
+            ] = (_integer(policy["running"], "sampler running policy") & 0xFF, 0xFF)
+
+    def load_pointed(self, pointer: int, start: int, width: int) -> tuple[int, int]:
+        value = 0
+        known = 0
+        for index in range(width):
+            byte_value, byte_known = self.pointed.get((pointer, start + index), (0, 0))
+            value |= byte_value << (index * 8)
+            known |= byte_known << (index * 8)
+        return value, known
+
+    def load(self, start: int, width: int) -> tuple[int, int]:
+        """Little-endian (value, known-bit mask) of accelerator bytes."""
+        value = 0
+        known = 0
+        for index in range(width):
+            member = start + index
+            byte_value = 0
+            byte_known = 0
+            if 0 <= member - self.flags_member < self.flags_bytes:
+                shift = (member - self.flags_member) * 8
+                byte_known = (self.never_set >> shift) & 0xFF
+            elif 0 <= member - self.override_member < len(self.override):
+                byte_value = self.override[member - self.override_member]
+                byte_known = 0xFF
+            value |= byte_value << (index * 8)
+            known |= byte_known << (index * 8)
+        return value, known
+
+
+def _accelerator_offset(node: Any) -> int | None:
+    """Offset from the accelerator of a pointer expression, if it is one."""
+    if not isinstance(node, dict):
+        return None
+    kind = node.get("kind")
+    if kind == "stack_reload":
+        return _accelerator_offset(node.get("source"))
+    if kind == "expression" and node.get("operation") in ("copy", "register_copy"):
+        return _accelerator_offset(node.get("source", node.get("expression")))
+    if (
+        kind == "object_load"
+        and node.get("member") == CHANNEL_ACCELERATOR_MEMBER
+        and node.get("bytes") == 8
+        and isinstance(node.get("base"), dict)
+        and node["base"].get("kind") == "argument"
+        and node["base"].get("name") == "channel"
+    ):
+        return 0
+    if kind == "expression" and node.get("operation") == "add" and not node.get("amount"):
+        if "source" in node and "immediate" in node:
+            base = _accelerator_offset(node["source"])
+            if base is not None:
+                return base + _integer(node["immediate"], "pointer offset")
+        elif isinstance(node.get("second"), dict) and node["second"].get("kind") == "constant":
+            base = _accelerator_offset(node.get("first"))
+            if base is not None:
+                return base + _integer(node["second"]["value"], "pointer offset")
+    return None
+
+
+def _accelerator_pointer_member(node: Any) -> int | None:
+    """Accelerator member holding a pointer that `node` loads, if any."""
+    if not isinstance(node, dict):
+        return None
+    kind = node.get("kind")
+    if kind == "stack_reload":
+        return _accelerator_pointer_member(node.get("source"))
+    if kind == "expression" and node.get("operation") in ("copy", "register_copy"):
+        return _accelerator_pointer_member(node.get("source", node.get("expression")))
+    if kind == "object_load" and node.get("bytes") == 8:
+        base = _accelerator_offset(node.get("base"))
+        if base is not None:
+            return base + _integer(node["member"], "pointer member")
+    return None
+
+
+def _constant(value: int, origin: str) -> dict[str, Any]:
+    return {"kind": "constant", "value": value & UINT64_MASK, "folded": origin}
+
+
+def _shift_bits(
+    value: int, known: int, kind: str | int | None, amount: int, bits: int
+) -> tuple[int, int]:
+    mask = (1 << bits) - 1
+    value &= mask
+    known &= mask
+    if kind in (None, 0, "lsl"):
+        return (value << amount) & mask, ((known << amount) | ((1 << amount) - 1)) & mask
+    if kind == "lsr":
+        return value >> amount, (known >> amount) | (mask & ~(mask >> amount))
+    raise UnresolvedValue(f"unsupported shift {kind!r}")
+
+
+def _fold_condition(
+    predicate: dict[str, Any],
+    condition: str,
+    facts: _AcceleratorFacts,
+    hardware: dict[str, int],
+) -> tuple[dict[str, Any], bool | None]:
+    predicate = normalize_predicate(predicate)
+    operation = predicate.get("operation")
+    byte_count = _integer(predicate.get("bytes", 8), "predicate bytes")
+    mask = _width_mask(byte_count)
+    folded = dict(predicate)
+    folded["source"], value, known = _fold(predicate["source"], facts, hardware)
+    if "second" in predicate:
+        folded["second"], other, other_known = _fold(predicate["second"], facts, hardware)
+    elif operation == "test_bit":
+        other, other_known = 0, 0
+    else:
+        other = _integer(
+            predicate.get("immediate", 0), "predicate immediate"
+        ) & UINT64_MASK
+        other_known = UINT64_MASK
+    value &= mask
+    other &= mask
+    known &= mask
+    other_known &= mask
+    outcome: bool | None = None
+    if operation in ("cmp", "compare_zero"):
+        if known == mask and other_known == mask:
+            outcome = {
+                "eq": value == other,
+                "ne": value != other,
+                "zero": value == other,
+                "nonzero": value != other,
+                "hi": value > other,
+                "ls": value <= other,
+                "cc": value < other,
+                "lo": value < other,
+                "cs": value >= other,
+                "hs": value >= other,
+            }.get(condition)
+    elif operation == "tst":
+        zero = (known & ~value) | (other_known & ~other)
+        one = known & value & other_known & other
+        if one:
+            outcome = {"eq": False, "ne": True}.get(condition)
+        elif zero & mask == mask:
+            outcome = {"eq": True, "ne": False}.get(condition)
+    elif operation == "test_bit":
+        bit = _integer(predicate["bit"], "tested bit")
+        if known >> bit & 1:
+            set_ = bool(value >> bit & 1)
+            outcome = {"bit_set": set_, "bit_clear": not set_}.get(condition)
+    return folded, outcome
+
+
+def _fold(
+    node: dict[str, Any], facts: _AcceleratorFacts, hardware: dict[str, int]
+) -> tuple[dict[str, Any], int, int]:
+    """Fold recovered accelerator facts into a value expression.
+
+    Returns the rewritten node with the value and mask of bits known at
+    generation time. Descriptor and command loads stay symbolic; accelerator
+    loads become constants where the recovery proves every bit that matters,
+    and the power-column count becomes a named hardware input.
+    """
+    if not isinstance(node, dict):
+        raise PlanError("value expression node must be an object")
+    kind = node.get("kind")
+    if kind in ("constant", "constant_call"):
+        return node, _integer(node["value"], "constant value") & UINT64_MASK, UINT64_MASK
+    if kind == "hardware_input":
+        name = node.get("name")
+        if name in hardware:
+            value = hardware[name] & _width_mask(_integer(node["bytes"], "input bytes"))
+            return _constant(value, f"hardware:{name}"), value, UINT64_MASK
+        return node, 0, UINT64_MASK & ~_width_mask(_integer(node["bytes"], "input bytes"))
+    if kind == "object_load":
+        base = _accelerator_offset(node.get("base"))
+        if base is None:
+            pointer = _accelerator_pointer_member(node.get("base"))
+            if pointer is None or node.get("signed", False):
+                return node, 0, 0
+            width = _integer(node["bytes"], "object load width")
+            value, known = facts.load_pointed(
+                pointer, _integer(node["member"], "object member"), width
+            )
+            known |= UINT64_MASK & ~_width_mask(width)
+            if known == UINT64_MASK:
+                return _constant(value, f"accelerator[{pointer:#x}]+{node['member']:#x}"), value, known
+            return node, value, known
+        start = base + _integer(node["member"], "object member")
+        width = _integer(node["bytes"], "object load width")
+        if (start, width) == (facts.column_member, facts.column_bytes):
+            return _fold(
+                {"kind": "hardware_input", "name": facts.column_input, "bytes": width},
+                facts,
+                hardware,
+            )
+        value, known = facts.load(start, width)
+        mask = _width_mask(width)
+        if node.get("signed", False):
+            if known != mask:
+                return node, 0, 0
+            if value >> (width * 8 - 1):
+                value |= UINT64_MASK & ~mask
+            return _constant(value, f"accelerator+{start:#x}"), value, UINT64_MASK
+        known |= UINT64_MASK & ~mask
+        if known == UINT64_MASK:
+            return _constant(value, f"accelerator+{start:#x}"), value, UINT64_MASK
+        return node, value, known
+    if kind == "descriptor_load":
+        if node.get("signed", False):
+            return node, 0, 0
+        return node, 0, UINT64_MASK & ~_width_mask(_integer(node["bytes"], "load width"))
+    if kind in ("stack_reload", "computed"):
+        field = "source" if kind == "stack_reload" else "expression"
+        child, value, known = _fold(node[field], facts, hardware)
+        if known == UINT64_MASK:
+            return child, value, known
+        return {**node, field: child}, value, known
+    if kind != "expression":
+        return node, 0, 0
+
+    operation = node.get("operation")
+    if operation in (
+        "logical_immediate",
+        "logical_register",
+        "conditional",
+        "bitfield",
+        "register_copy",
+    ):
+        child, value, known = _fold(node["expression"], facts, hardware)
+        if known == UINT64_MASK:
+            return child, value, known
+        return {**node, "expression": child}, value, known
+
+    byte_count = _integer(node.get("bytes", 8), "expression bytes")
+    bits = byte_count * 8
+    mask = _width_mask(byte_count)
+    outside = UINT64_MASK & ~mask
+
+    def finish(rebuilt: dict[str, Any], value: int, known: int) -> tuple[dict[str, Any], int, int]:
+        value &= mask
+        known = (known & mask) | outside
+        if known == UINT64_MASK:
+            return _constant(value, "folded"), value, known
+        return rebuilt, value, known
+
+    if operation == "copy":
+        child, value, known = _fold(node["source"], facts, hardware)
+        return finish({**node, "source": child}, value, known)
+    if operation == "multiway_select":
+        selector, value, known = _fold(node["selector"], facts, hardware)
+        if known == UINT64_MASK:
+            for case in node["cases"]:
+                if value == _integer(case["equals"], "case value"):
+                    child, case_value, case_known = _fold(case["value"], facts, hardware)
+                    return finish(child, case_value, case_known)
+            child, value, known = _fold(node["default"], facts, hardware)
+            return finish(child, value, known)
+        cases = [
+            {**case, "value": _fold(case["value"], facts, hardware)[0]}
+            for case in node["cases"]
+        ]
+        default = _fold(node["default"], facts, hardware)[0]
+        return {**node, "selector": selector, "cases": cases, "default": default}, 0, outside
+    if operation in ("csel", "csinc", "branch_select"):
+        first_name, second_name = (
+            ("taken", "fallthrough") if operation == "branch_select" else ("first", "second")
+        )
+        predicate, outcome = _fold_condition(
+            node["predicate"], node["condition"], facts, hardware
+        )
+        first, first_value, first_known = _fold(node[first_name], facts, hardware)
+        second, second_value, second_known = _fold(node[second_name], facts, hardware)
+        if operation == "csinc":
+            if second_known == UINT64_MASK:
+                second_value = (second_value + 1) & mask
+                second = _constant(second_value, "folded")
+            else:
+                second = {
+                    "kind": "expression",
+                    "operation": "add",
+                    "bytes": byte_count,
+                    "source": second,
+                    "immediate": 1,
+                }
+                second_value, second_known = 0, 0
+        if outcome is True:
+            return finish(first, first_value, first_known)
+        if outcome is False:
+            return finish(second, second_value, second_known)
+        rebuilt = {
+            **node,
+            "predicate": predicate,
+            first_name: first,
+            second_name: second,
+        }
+        if operation == "csinc":
+            # The +1 now lives in the second operand.
+            rebuilt["operation"] = "csel"
+        known = first_known & second_known & ~(first_value ^ second_value)
+        return finish(rebuilt, first_value, known)
+    if operation == "movk":
+        source, value, known = _fold(node["source"], facts, hardware)
+        shift = _integer(node["shift"], "MOVK shift")
+        immediate = _integer(node["immediate"], "MOVK immediate") & 0xFFFF
+        field = 0xFFFF << shift
+        return finish(
+            {**node, "source": source},
+            (value & ~field) | (immediate << shift),
+            (known & ~field) | field,
+        )
+    if operation in ("ubfm", "bfm"):
+        source, value, known = _fold(node["source"], facts, hardware)
+        rotate = _integer(node["rotate"], "bitfield rotate")
+        wmask, tmask = _decode_bit_masks(
+            rotate, _integer(node["mask_end"], "bitfield mask end"), bits
+        )
+        rotated = _ror(value & mask, rotate, bits)
+        rotated_known = _ror(known & mask, rotate, bits)
+        rebuilt = {**node, "source": source}
+        if operation == "ubfm":
+            result = rotated & wmask & tmask
+            result_known = (~tmask | ~wmask | rotated_known) & mask
+            return finish(rebuilt, result, result_known)
+        destination, dest_value, dest_known = _fold(node["destination"], facts, hardware)
+        rebuilt["destination"] = destination
+        bottom = (dest_value & ~wmask) | (rotated & wmask)
+        bottom_known = (dest_known & ~wmask) | (rotated_known & wmask)
+        result = (dest_value & ~tmask) | (bottom & tmask)
+        result_known = (dest_known & ~tmask) | (bottom_known & tmask)
+        return finish(rebuilt, result, result_known)
+
+    if "source" in node:
+        first, first_value, first_known = _fold(node["source"], facts, hardware)
+        second_value = _integer(node.get("immediate", node.get("mask", 0)), "immediate")
+        second_known = UINT64_MASK
+        rebuilt = {**node, "source": first}
+    else:
+        first, first_value, first_known = _fold(node["first"], facts, hardware)
+        second, second_value, second_known = _fold(node["second"], facts, hardware)
+        second_value, second_known = _shift_bits(
+            second_value,
+            second_known,
+            node.get("shift", node.get("modifier")),
+            _integer(node.get("amount", 0), "shift amount"),
+            bits,
+        )
+        rebuilt = {**node, "first": first, "second": second}
+    first_value &= mask
+    second_value &= mask
+    both = first_known & second_known
+    if operation == "and":
+        zero = (first_known & ~first_value) | (second_known & ~second_value)
+        return finish(rebuilt, first_value & second_value, both | zero)
+    if operation == "orr":
+        one = (first_known & first_value) | (second_known & second_value)
+        return finish(rebuilt, first_value | second_value, both | one)
+    if operation == "bic":
+        zero = (first_known & ~first_value) | (second_known & second_value)
+        return finish(rebuilt, first_value & ~second_value, both | zero)
+    if operation == "orn":
+        one = (first_known & first_value) | (second_known & ~second_value)
+        return finish(rebuilt, first_value | ~second_value, both | one)
+    if operation in ("add", "sub", "multiply"):
+        if (first_known | outside) == UINT64_MASK and (second_known | outside) == UINT64_MASK:
+            if operation == "add":
+                result = first_value + second_value
+            elif operation == "sub":
+                result = first_value - second_value
+            else:
+                factor = _integer(node.get("factor", second_value), "multiply factor")
+                result = first_value * factor
+            return finish(rebuilt, result, UINT64_MASK)
+        return finish(rebuilt, 0, 0)
+    return rebuilt, 0, 0
+
+
+def _mentions_accelerator(node: Any) -> bool:
+    if isinstance(node, list):
+        return any(_mentions_accelerator(item) for item in node)
+    if not isinstance(node, dict):
+        return False
+    if node.get("kind") == "object_load" and _accelerator_offset(node.get("base")) is not None:
+        return True
+    return any(_mentions_accelerator(value) for value in node.values())
+
+
+def fold_accelerator_inputs(
+    abi: dict[str, Any], hardware: dict[str, int] | None = None
+) -> dict[str, Any]:
+    """Return a copy of `abi` with recovered accelerator facts folded in.
+
+    Every producer's value sources and branch predicates are rewritten. A
+    decision whose outcome the facts fix gets a constant predicate. With no
+    `accelerator_inputs` in the recovery the ABI is returned unchanged.
+    """
+    channels = abi.get("channels", {})
+    inputs = channels.get("accelerator_inputs")
+    if inputs is None:
+        return abi
+    facts = _AcceleratorFacts(inputs)
+    hardware = dict(hardware or {})
+    folded = copy.deepcopy(abi)
+    folded_channels = folded["channels"]
+    for producer in folded_channels["register_selectors"]["producers"].values():
+        for entry in producer.get("encoder_entries", []):
+            if _mentions_accelerator(entry["value_source"]):
+                entry["value_source"] = _fold(entry["value_source"], facts, hardware)[0]
+    for graph in folded_channels["register_emission_cfg"]["producers"].values():
+        for decision in graph.get("decisions", []):
+            if "predicate" not in decision or not _mentions_accelerator(decision["predicate"]):
+                continue
+            predicate, outcome = _fold_condition(
+                decision["predicate"], decision["condition"], facts, hardware
+            )
+            if outcome is None:
+                decision["predicate"] = predicate
+                continue
+            decision["folded_from"] = {
+                "predicate": decision["predicate"],
+                "condition": decision["condition"],
+            }
+            decision["predicate"] = {
+                "kind": "condition",
+                "operation": "cmp",
+                "bytes": 4,
+                "source": _constant(0, "folded"),
+                "immediate": 0,
+            }
+            decision["condition"] = "eq" if outcome else "ne"
+    folded_channels["accelerator_inputs_folded"] = sorted(hardware)
+    return folded
+
+
 def _event_catalog(abi: dict[str, Any], producer: str) -> dict[int, dict[str, Any]]:
     channels = abi["channels"]
     selectors = channels["register_selectors"]
@@ -279,6 +783,8 @@ def _event_catalog(abi: dict[str, Any], producer: str) -> dict[int, dict[str, An
         entries = selectors["producers"][producer]["encoder_entries"]
     except KeyError as error:
         raise PlanError(f"no recovered register producer {producer!r}") from error
+    if selectors["producers"][producer].get("dynamic_append_entries"):
+        raise PlanError(f"{producer} appends registers with runtime selectors")
 
     catalog: dict[int, dict[str, Any]] = {}
     for entry in entries:
@@ -288,7 +794,7 @@ def _event_catalog(abi: dict[str, Any], producer: str) -> dict[int, dict[str, An
             "selector": _integer(entry["selector"], "selector"),
             "mode": _integer(entry["mode"], "mode"),
             "value_source": entry["value_source"],
-            "form": "virtual",
+            "form": entry.get("form", "virtual"),
         }
 
     inline = channels["inline_register_records"]
@@ -499,9 +1005,7 @@ def compile_plan(
     cfg_root = channels.get("register_emission_cfg", {})
     if not layout.get("record_framing_resolved"):
         raise PlanError("3D register-list framing is incomplete")
-    if not cfg_root.get("machine_order_complete") or not cfg_root.get(
-        "predicate_expressions_complete"
-    ):
+    if not cfg_root.get("machine_order_complete"):
         raise PlanError("register emission graph is incomplete")
     graph = cfg_root["producers"]["3D"]
     if not graph.get("predicates_complete"):
@@ -672,11 +1176,16 @@ def main(argv: list[str] | None = None) -> int:
         help="raw 0x15b0-byte 3D descriptor",
     )
     parser.add_argument("--command-gpu-address", type=_parse_address, required=True)
+    parser.add_argument(
+        "--column-count", type=_parse_address,
+        help="GPU power-column count; values that need it stay unconstrained without it",
+    )
     parser.add_argument("--output", type=Path, help="output JSON (stdout when omitted)")
     args = parser.parse_args(argv)
 
     try:
-        abi = json.loads(args.abi.read_text())
+        hardware = {} if args.column_count is None else {"column_count": args.column_count}
+        abi = fold_accelerator_inputs(json.loads(args.abi.read_text()), hardware)
         plan = compile_plan(
             abi,
             args.command.read_bytes(),

@@ -1,0 +1,19 @@
+{
+  "match": true,
+  "files_sha256": {
+    "sbin/init": "e690fd362c1b9606c61616982550d90b98d49abfc88b08cd624a1f0358442ce3",
+    "root/verify.c": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+    "root/verify-all-classes.c": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9",
+    "root/clock.c": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71",
+    "lib/ld-musl-x86_64.so.1": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+    "usr/lib/libc.a": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+    "root/libcs/optimized/libc.so": "ad78977e92f55d85ace71f1ca43bf650d216923ed3cf6650dd29f22c1d70af9d",
+    "root/libcs/optimized/libc.a": "8d5c3deee3610c07c3f9bbfaee3b4fed244ef35051c3e2390e4452b13db34ace",
+    "root/libcs/optimized/build.json": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686",
+    "root/libcs/disabled/libc.so": "6823587a26b219dba2ebd9345228102a881998b4e627172fc6841b1731472e12",
+    "root/libcs/disabled/libc.a": "71791f9aa6942ab3ded61f20092d7ac9e8e978d38a263f593e12bb04892dd94d",
+    "root/libcs/disabled/build.json": "2a4e8b096711797d0f0d4e205914e590ad13cebad70a84309c7f923e8f94620d"
+  },
+  "kernel_sha256": "16140916ef5abca52cc6f0a8e80bb6dedc24b5e5f05efd747f57182523098e74",
+  "iso_sha256": "6059a307aa91f4c71ac8bbffa9f6d001db108beeb030a0dfd2445c91c5b036cf"
+}

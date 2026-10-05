@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libSystem.B.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _snprintf, _strtod, _memcpy, _memset ]
+...

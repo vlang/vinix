@@ -28,7 +28,7 @@ env:
   PAYLOAD_ASSET: Vinix-M1-Payload.zip
   PAYLOAD_CHECKSUM_ASSET: Vinix-M1-Payload.zip.sha256
   UI2_COMMIT: d13259f6167367ad8ebd6b2aa4a1f35c59bb1551
-  V_COMMIT: 9fd548810f09e5b49f0b06e500ef5d6845cc8142
+  V_COMMIT: 9bfa1dc3f3455d5733d5c226662b6aaba8544f2c
 
 jobs:
   build:

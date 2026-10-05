@@ -1,0 +1,5 @@
+{
+  "reason": "Rejected before boot by independent generated-C/object review: initial concrete mutable-bool signature did not compile; next candidate MOV loads had reversed operands. Raw build records and disassembly are preserved. The corrected f944 kernel is the final v4 candidate.",
+  "any_rejected_candidate_booted": false,
+  "final_kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733"
+}

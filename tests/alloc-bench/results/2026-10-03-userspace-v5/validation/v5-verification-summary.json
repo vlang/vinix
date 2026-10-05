@@ -1,0 +1,42 @@
+{
+  "x86_64": {
+    "results": "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v5-final/results.json",
+    "total_checks": 98744,
+    "corruption_children": 16,
+    "kernel_sha256": "f944412c7e30b2c3a25b2ef93938bdd21c311c6fa611ea08a76d45adfdd76733",
+    "retained_delta_bytes": [
+      3575808,
+      3584000,
+      0,
+      4096
+    ],
+    "trimmed_delta_bytes": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "aarch64": {
+    "results": "/Users/alex/code/vinix/build/useralloc-arm-v5-final/results.json",
+    "total_checks": 98744,
+    "corruption_children": 16,
+    "kernel_sha256": "c617cb9d695bccc3c7ada841fa60ac65fd45b942f45d3462b44c3f0378a995c9",
+    "retained_delta_bytes": [
+      3653632,
+      3751936,
+      0,
+      0
+    ],
+    "trimmed_delta_bytes": [
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "total_checks": 197488,
+  "total_corruption_children": 32,
+  "patch_sha256": "5ff7f0e2fdc9525d83b43fa98fdc27e34d5ef2e6d7f7b74e29c57113a34eca86",
+  "all_passed": true
+}

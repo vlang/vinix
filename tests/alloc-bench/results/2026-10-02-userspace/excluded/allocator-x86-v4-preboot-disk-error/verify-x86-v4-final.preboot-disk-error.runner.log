@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py", line 131, in <module>
+    elif sys.argv[1]=='run':run(sys.argv[2])
+  File "/Users/alex/code/vinix/third_party/useralloc-libc/build/useralloc/verify-x86-v4-final.py", line 96, in run
+    with (STATE/'image-build.log').open('wb') as out:subprocess.run([str(ROOT/'build-support/build-amd64-iso.sh')],env=env,check=True,stdout=out,stderr=out)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/Users/alex/code/vinix/build-support/build-amd64-iso.sh']' returned non-zero exit status 32.

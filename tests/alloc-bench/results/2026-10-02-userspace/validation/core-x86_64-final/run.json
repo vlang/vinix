@@ -1,0 +1,48 @@
+{
+  "kernel_sha256": "0d02357a37f47ecc7f95b5e0a88f7cf00ab73b4b2d8eba3e9fff552a8b583186",
+  "test_sha256": "9af087e9bae53b56f1e053932e2f379e20210267c882671f2c1feb8089b6bf7c",
+  "init_sha256": "d31deddb589fde9d4637100f0a5804d8081df609c8bb386653cd1d5dfc6339d8",
+  "iso_sha256": "e16349e6c16f2dd8e87eab1e850e427d19388f44725bbc2073aa12d035960511",
+  "runner_sha256": "3f3d4852c58548bc7ade08a1c8f4850c259f592f3816f71d78fda8c45d38eb8c",
+  "compile_command": [
+    "/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc",
+    "-static",
+    "-O2",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "/Users/alex/code/vinix/build/useralloc-final-core-x86_64/test.c",
+    "-o",
+    "/Users/alex/code/vinix/build/useralloc-final-core-x86_64/rootfs/sbin/init",
+    "-lpthread"
+  ],
+  "run_command": [
+    "/Library/Developer/CommandLineTools/usr/bin/python3",
+    "/Users/alex/code/vinix/build/useralloc-final-core-x86_64/run_vm.py",
+    "--arch",
+    "amd64",
+    "--iso",
+    "/Users/alex/code/vinix/build/useralloc-final-core-x86_64/test.iso",
+    "--qemu",
+    "/opt/homebrew/bin/qemu-system-x86_64",
+    "--firmware",
+    "/opt/homebrew/Cellar/qemu/11.1.1/share/qemu/edk2-x86_64-code.fd",
+    "--timeout",
+    "1800",
+    "--cpus",
+    "2"
+  ],
+  "qemu_config": [
+    "q35,smm=off",
+    "tcg",
+    "max",
+    "2048 MiB",
+    "2 vCPU"
+  ],
+  "timeout_seconds": 1800,
+  "test_source_variant": "final reviewed two-worker first-touch barrier and available-CPU-aware wakeup test",
+  "runner_exit_code": 0,
+  "serial_sha256": "58db7dbd19308457ea02e8180b8b07ce6b42f41ad1af40c1d4c14c5a831c057d",
+  "feature_pass_marker_count": 52,
+  "notes": "Complete final x86 core suite on2vCPU; original feature assertions and65536recvmsg memory reclamation threshold unchanged. Final reviewed socket stack slots and explicit queued FD ownership moves."
+}

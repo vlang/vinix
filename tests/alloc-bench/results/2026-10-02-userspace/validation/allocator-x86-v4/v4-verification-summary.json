@@ -1,0 +1,17 @@
+{
+  "patch_sha256": "ff14e55c5346e6add14c5bb085fcecb957c756b262231e21ee981a4b536d133e",
+  "original_verify_sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e",
+  "supplemental_verify_sha256": "77ab00f7bace9f654f5824a6fa64a6408daae4b2a84ccacd734ae07385af1db7",
+  "x86_passed": true,
+  "arm_passed": true,
+  "original_modes": 8,
+  "supplemental_modes": 8,
+  "original_checks": 15280,
+  "supplemental_checks": 182208,
+  "total_checks": 197488,
+  "corruption_children_rejected": 32,
+  "x86_results": "third_party/useralloc-libc/build/useralloc/verify-x86-v4-final/results.json",
+  "arm_results": "build/useralloc-arm-v4-final/results.json",
+  "readiness_manifest": "third_party/useralloc-libc/build/useralloc/v4-readiness.json",
+  "codegen_proof_manifest": "third_party/useralloc-libc/build/useralloc/v4-codegen-proof.json"
+}

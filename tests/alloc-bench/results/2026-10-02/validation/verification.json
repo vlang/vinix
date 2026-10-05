@@ -1,0 +1,80 @@
+{
+  "arm_build": {
+    "exit_code": 0,
+    "manifest": "arm-build.json",
+    "log": "arm-build.log"
+  },
+  "arm_core": {
+    "exit_code": 0,
+    "log": "core-aarch64.log",
+    "features_complete": true,
+    "persistence_reboot_complete": true,
+    "command": "VINIX_KERNEL_DIR=/Users/alex/code/vinix/third_party/alloc-bench-candidate/kernel VINIX_AARCH64_SYSROOT=/Users/alex/code/vinix/build-aarch64-userland/sysroot VINIX_QEMU_CORE_NO_BUILD=1 VINIX_QEMU_TIMEOUT=600 VINIX_QEMU_HOST_SOURCE=0 VINIX_QEMU_AUDIO=off VINIX_OVMF_CODE=/opt/homebrew/share/qemu/edk2-aarch64-code.fd tests/qemu-core/run.sh",
+    "working_directory": "/Users/alex/code/vinix/third_party/alloc-bench-candidate"
+  },
+  "x86_core": {
+    "exit_code": 0,
+    "log": "core-x86_64.log",
+    "features_complete": true,
+    "command": "VINIX_AMD64_KERNEL=/Users/alex/code/vinix/build/alloc-bench-validation/vinix-x86_64-bench CC_AMD64=/opt/homebrew/opt/musl-cross/bin/x86_64-linux-musl-gcc VINIX_QEMU_TIMEOUT=600 tests/qemu-core/run.sh amd64",
+    "working_directory": "/Users/alex/code/vinix/third_party/alloc-bench-candidate"
+  },
+  "heap_selftest": {
+    "enabled_both_architectures": true,
+    "serial_success_marker": false,
+    "proof": "actual ARM pmm_init unconditionally tail-calls memory__heap_selftest (arm-pmm-init.asm); it panics on failure and both ARM boots reach init and complete core checks. x86 snapshot built with heap_selftest and completes core test. Success printf goes to framebuffer."
+  },
+  "desktop_smoke": {
+    "exit_code": 0,
+    "log": "desktop-smoke.log",
+    "results": "desktop-smoke.json",
+    "command": "VINIX_KERNEL_DIR=/Users/alex/code/vinix/third_party/alloc-bench-candidate/kernel VINIX_AARCH64_SYSROOT=/Users/alex/code/vinix/build-aarch64-userland/staging python3 tests/desktop-perf/run.py new=build/vinix-desktop --scenarios=idle,apps,drag --rounds=1 --settle=2 --seconds=5 --timeout=900 --json=build/alloc-bench-validation/desktop-smoke.json",
+    "working_directory": "/Users/alex/code/vinix",
+    "scenarios_complete": [
+      "idle",
+      "apps",
+      "drag"
+    ]
+  },
+  "alloc_audit": {
+    "candidate_exit_code": 1,
+    "baseline_exit_code": 1,
+    "command": "V=/Users/alex/code/v/v tests/kernel-allocs/run.sh",
+    "working_directories": [
+      "/Users/alex/code/vinix/third_party/alloc-bench-candidate",
+      "/Users/alex/code/vinix/third_party/alloc-bench-worktree"
+    ],
+    "candidate_log": "alloc-audit.log",
+    "baseline_log": "alloc-audit-baseline.log",
+    "comparison": "alloc-audit-comparison.json",
+    "diagnostic_log": "audit-diagnostic-x86.log",
+    "arm_v_exit_code": 0,
+    "x86_v_exit_code": 1,
+    "arm_sites": 361,
+    "x86_sites": 253,
+    "combined_unique_sites": 425,
+    "file_kind_pairs": 182,
+    "allowlist_mismatches": 155,
+    "normalized_count_delta": {},
+    "complete": false,
+    "existing_x86_snapshot_errors": [
+      "dev/fbdev/simple/simple.v:5:1: builder error: cannot import module \"drm.simple\" (not found)",
+      "dev/fbdev/simple/simple.v:5:8: error: cannot import `drm.simple` into a module with the same name",
+      "resource/cache.v:56:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`",
+      "resource/cache.v:66:9: error: `MappingLifetimeResource` is not compatible with interface `resource.Resource`",
+      "resource/cache.v:221:9: error: `MappingAttributesResource` is not compatible with interface `resource.Resource`"
+    ],
+    "error_related_files_equal_to_unoptimized_baseline": {
+      "dev/fbdev/simple/simple.v": true,
+      "resource/cache.v": true,
+      "GNUmakefile": true,
+      "drm/simple/simple.v": true
+    },
+    "note": "Both runs fail the existing allowlist and the x86 warning snapshot compiler. Equal reported counts are a diagnostic comparison, not a clean full audit."
+  },
+  "review": {
+    "semantic_result": "No lifetime, locking, zeroing, poisoning, refcount or bitmap-publication semantics change. Slab classes and validated slot addresses are16-byte aligned; u64 stores cover exactly the same payload. PMM page_size is fixed at boot.",
+    "actual_arm_poison_stores": "scalar stp x15,x15 and8-byte str tail, see arm-slab-free.asm",
+    "new_allocations_in_modified_generated_functions": false
+  }
+}

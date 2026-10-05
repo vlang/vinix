@@ -1,0 +1,7 @@
+{
+  "previous": "/Users/alex/code/vinix/build/useralloc-pipe/perf-v4-preparation",
+  "harness_sha256": "b19935d5cfd0a2e68e1cea76b8bf9f634d0dcd67846efdc8fe626a483a5bbb18",
+  "measure_source_sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297",
+  "guest_init_sha256": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+  "changes": "Only final libc stage paths changed in private harness; identical workload sources and frozen desktop initramfs."
+}

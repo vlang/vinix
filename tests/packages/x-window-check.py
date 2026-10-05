@@ -3,6 +3,7 @@
 
 import ctypes
 import sys
+import time
 
 
 Display = ctypes.c_void_p
@@ -61,18 +62,59 @@ def configure_xlib(xlib):
     xlib.XFetchName.restype = ctypes.c_int
     xlib.XFree.argtypes = [ctypes.c_void_p]
     xlib.XFree.restype = ctypes.c_int
+    xlib.XInternAtom.argtypes = [Display, ctypes.c_char_p, ctypes.c_int]
+    xlib.XInternAtom.restype = ctypes.c_ulong
+    xlib.XGetWindowProperty.argtypes = [
+        Display,
+        Window,
+        ctypes.c_ulong,
+        ctypes.c_long,
+        ctypes.c_long,
+        ctypes.c_int,
+        ctypes.c_ulong,
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_ulong),
+        ctypes.POINTER(ctypes.c_void_p),
+    ]
+    xlib.XGetWindowProperty.restype = ctypes.c_int
     xlib.XCloseDisplay.argtypes = [Display]
     xlib.XCloseDisplay.restype = ctypes.c_int
 
 
-def window_title(xlib, display, window):
-    title = ctypes.c_void_p()
-    if not xlib.XFetchName(display, window, ctypes.byref(title)) or not title.value:
+def net_wm_name(xlib, display, window):
+    """The UTF-8 title. Chromium sets only this one, not the legacy WM_NAME."""
+    name_atom = xlib.XInternAtom(display, b"_NET_WM_NAME", True)
+    utf8_atom = xlib.XInternAtom(display, b"UTF8_STRING", True)
+    if not name_atom or not utf8_atom:
+        return ""
+    actual_type = ctypes.c_ulong()
+    actual_format = ctypes.c_int()
+    items = ctypes.c_ulong()
+    remaining = ctypes.c_ulong()
+    data = ctypes.c_void_p()
+    status = xlib.XGetWindowProperty(
+        display, window, name_atom, 0, 1024, False, utf8_atom,
+        ctypes.byref(actual_type), ctypes.byref(actual_format),
+        ctypes.byref(items), ctypes.byref(remaining), ctypes.byref(data),
+    )
+    if status != 0 or not data.value:
         return ""
     try:
-        return ctypes.string_at(title.value).decode("utf-8", "replace")
+        return ctypes.string_at(data.value, items.value).decode("utf-8", "replace")
     finally:
-        xlib.XFree(title)
+        xlib.XFree(data)
+
+
+def window_title(xlib, display, window):
+    title = ctypes.c_void_p()
+    if xlib.XFetchName(display, window, ctypes.byref(title)) and title.value:
+        try:
+            return ctypes.string_at(title.value).decode("utf-8", "replace")
+        finally:
+            xlib.XFree(title)
+    return net_wm_name(xlib, display, window)
 
 
 def find_window(xlib, display, window, expected, depth=0):
@@ -111,26 +153,37 @@ def find_window(xlib, display, window, expected, depth=0):
 
 
 def main():
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} DISPLAY TITLE", file=sys.stderr)
+    if len(sys.argv) not in (3, 4):
+        print(f"usage: {sys.argv[0]} DISPLAY TITLE [WAIT_SECONDS]", file=sys.stderr)
         return 2
+    try:
+        wait_seconds = float(sys.argv[3]) if len(sys.argv) == 4 else 0.0
+    except ValueError:
+        return 2
+    if wait_seconds < 0:
+        return 2
+    deadline = time.monotonic() + wait_seconds
 
     xlib = ctypes.CDLL("libX11.so.6")
     configure_xlib(xlib)
-    display = xlib.XOpenDisplay(sys.argv[1].encode("ascii"))
-    if not display:
-        return 1
-    try:
-        title = find_window(
-            xlib,
-            display,
-            xlib.XDefaultRootWindow(display),
-            sys.argv[2],
-        )
-        if not title:
+    display = None
+    while not display:
+        display = xlib.XOpenDisplay(sys.argv[1].encode("ascii"))
+        if display:
+            break
+        if time.monotonic() >= deadline:
             return 1
-        print(f"WINDOW={title}")
-        return 0
+        time.sleep(1)
+    try:
+        root = xlib.XDefaultRootWindow(display)
+        while True:
+            title = find_window(xlib, display, root, sys.argv[2])
+            if title:
+                print(f"WINDOW={title}")
+                return 0
+            if time.monotonic() >= deadline:
+                return 1
+            time.sleep(1)
     finally:
         xlib.XCloseDisplay(display)
 

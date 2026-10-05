@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py", line 179, in <module>
+    raise SystemExit(main())
+  File "/Users/alex/code/vinix/tests/alloc-bench/run-vinix.py", line 122, in main
+    "kernel_sha256": hashlib.sha256((state / "iso-build/iso-root/boot/vinix").read_bytes()).hexdigest(),
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1249, in read_bytes
+    with self.open(mode='rb') as f:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1242, in open
+    return io.open(self, mode, buffering, encoding, errors, newline,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/pathlib.py", line 1110, in _opener
+    return self._accessor.open(self, flags, mode)
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/alex/code/vinix/build/useralloc-vinix-release-1/iso-build/iso-root/boot/vinix'

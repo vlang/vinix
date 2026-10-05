@@ -1,0 +1,63 @@
+{
+  "status": "PASS",
+  "checks": [
+    {
+      "case": "two complete fixture cohorts keep all 14 samples per workload and guest",
+      "status": "PASS",
+      "note": "Fixtures duplicate earlier diagnostic captures; they are script validation only and are never published as final measurements."
+    },
+    {
+      "case": "different final kernel",
+      "status": "PASS",
+      "rejection": "vinix-2: kernel hash differs from saved final validation provenance"
+    },
+    {
+      "case": "actual QEMU argv disagrees with CPU manifest",
+      "status": "PASS",
+      "rejection": "vinix-2: actual QEMU -cpu disagrees with config cpu"
+    },
+    {
+      "case": "manifest iteration count disagrees with emitted metadata",
+      "status": "PASS",
+      "rejection": "vinix-2: config iterations disagrees with benchmark metadata"
+    },
+    {
+      "case": "loader manifest disagrees with retained loader fingerprint",
+      "status": "PASS",
+      "rejection": "vinix-2: libc file hashes disagree with build manifest"
+    },
+    {
+      "case": "different final Catalina executable",
+      "status": "PASS",
+      "rejection": "final cohorts differ in binary_sha256: catalina-1, catalina-2"
+    },
+    {
+      "case": "fresh guest-generated assembly differs from linked assembly",
+      "status": "PASS",
+      "rejection": "catalina-2: freshly generated guest assembly differs from linked assembly"
+    },
+    {
+      "case": "missing raw sample",
+      "status": "PASS",
+      "rejection": "vinix-2 malloc_hot_64: expected 7 samples, found 6"
+    },
+    {
+      "case": "preserved benchmark snapshot modified",
+      "status": "PASS",
+      "rejection": "preserved bench.c differs from source-snapshots.json"
+    },
+    {
+      "case": "one final cohort is missing",
+      "status": "PASS",
+      "rejection": "final vinix-N/catalina-N cohort numbers must match and be nonempty"
+    },
+    {
+      "case": "only one complete final cohort per guest",
+      "status": "PASS",
+      "rejection": "at least two complete final cohorts per guest are required"
+    }
+  ],
+  "script_sha256": "2c314cc00ecaf99d9484b36b25c5c3eea9c07ae951942e2feeea78b552f7d667",
+  "strict_validator_sha256": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+  "purpose": "Validate report integrity and failure rejection, separately from final runtime measurements."
+}

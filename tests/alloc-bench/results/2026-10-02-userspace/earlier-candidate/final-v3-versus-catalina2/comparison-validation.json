@@ -1,0 +1,14 @@
+{
+  "command": [
+    "python3",
+    "/Users/alex/code/vinix/tests/alloc-bench/results/2026-10-02-userspace/compare.py",
+    "/Users/alex/code/vinix/tests/alloc-bench/results/2026-10-02-userspace/earlier-candidate/final-v3-versus-catalina2/vinix/serial.log",
+    "/Users/alex/code/vinix/tests/alloc-bench/results/2026-10-02-userspace/earlier-candidate/final-v3-versus-catalina2/catalina/serial.log",
+    "--vinix-config",
+    "/Users/alex/code/vinix/tests/alloc-bench/results/2026-10-02-userspace/earlier-candidate/final-v3-versus-catalina2/vinix/config.json",
+    "--macos-config",
+    "/Users/alex/code/vinix/tests/alloc-bench/results/2026-10-02-userspace/earlier-candidate/final-v3-versus-catalina2/catalina/config.json"
+  ],
+  "exit_code": 0,
+  "stderr": ""
+}

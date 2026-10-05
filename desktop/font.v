@@ -1,14 +1,17 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Copyright (c) 2026 Alexander Medvednikov
 // Text rendering. The faces in font_data.v are 8-bit coverage atlases, so a
 // glyph is drawn by blending its coverage with the run's color — the same
 // antialiasing a desktop toolkit would give, without a rasteriser on the
 // target.
 //
 // Runs are decoded as UTF-8 and looked up by code point. The atlases carry
-// printable ASCII plus the handful of supplemental runes in font_extra_runes,
-// which is what lets an application like ui2's calculator, whose keys are
-// labelled with the real division and plus-minus signs, come out right.
+// printable ASCII plus the supplemental runes in font_extra_runes: the Latin-1
+// and Russian letters the keyboard layouts type, and signs such as the real
+// division and plus-minus that label ui2's calculator keys.
 module main
 
 import encoding.base64
@@ -27,49 +30,55 @@ struct Glyph {
 struct FontFace {
 mut:
 	// What the face was baked at, which is how a text style picks between them.
-	bold        bool
-	mono        bool
-	size        int
-	ascent      int
-	descent     int
-	line_height int
-	glyphs      []Glyph
-	pixels      []u8
+	bold         bool
+	mono         bool
+	size         int
+	raster_scale int
+	ascent       int
+	descent      int
+	line_height  int
+	glyphs       []Glyph
+	pixels       []u8
 }
 
 const glyph_header_size = 5
 
 fn load_face(data FaceBlob) FontFace {
-	raw := base64.decode(data.parts.join(''))
+	encoded := data.parts.join('')
+	raw := base64.decode(encoded)
+	unsafe { encoded.free() }
 	count := font_last_char - font_first_char + 1 + font_extra_runes.len
 	header_bytes := count * glyph_header_size
 
 	mut glyphs := []Glyph{cap: count}
-	mut offset := 0
+	// Coverage is read where it was decoded, just past the metrics header,
+	// rather than from a copy that would leave the decoded blob behind.
+	mut offset := header_bytes
 	for i := 0; i < count; i++ {
 		base := i * glyph_header_size
 		width := int(raw[base])
 		height := int(raw[base + 1])
 		glyphs << Glyph{
-			width: width
-			height: height
+			width:     width
+			height:    height
 			bearing_x: int(i8(raw[base + 2]))
 			bearing_y: int(raw[base + 3])
-			advance: int(raw[base + 4])
-			offset: offset
+			advance:   int(raw[base + 4])
+			offset:    offset
 		}
 		offset += width * height
 	}
 
 	return FontFace{
-		bold: data.bold
-		mono: data.mono
-		size: data.size
-		ascent: data.ascent
-		descent: data.descent
-		line_height: data.ascent + data.descent
-		glyphs: glyphs
-		pixels: raw[header_bytes..].clone()
+		bold:         data.bold
+		mono:         data.mono
+		size:         data.size
+		raster_scale: data.raster_scale
+		ascent:       data.ascent
+		descent:      data.descent
+		line_height:  data.ascent + data.descent
+		glyphs:       glyphs
+		pixels:       raw
 	}
 }
 
@@ -79,6 +88,34 @@ fn load_fonts() []FontFace {
 		faces << load_face(blob)
 	}
 	return faces
+}
+
+// load_fonts_for_scale loads only the faces rasterised for one display scale,
+// which is all face_for picks from while that scale is in use. The 2x faces
+// are most of the atlas data and a 100% desktop never draws with them.
+fn load_fonts_for_scale(scale int) []FontFace {
+	mut faces := []FontFace{cap: font_blobs.len}
+	for blob in font_blobs {
+		if blob.raster_scale == scale {
+			faces << load_face(blob)
+		}
+	}
+	if faces.len == 0 {
+		unsafe { faces.free() }
+		return load_fonts()
+	}
+	return faces
+}
+
+fn free_fonts(mut faces []FontFace) {
+	for face in faces {
+		unsafe {
+			face.glyphs.free()
+			face.pixels.free()
+		}
+	}
+	unsafe { faces.free() }
+	faces = []FontFace{}
 }
 
 // next_rune decodes one UTF-8 sequence and reports how many bytes it took. A
@@ -106,16 +143,25 @@ fn next_rune(text string, index int) (u32, int) {
 // glyph_for maps a code point to its slot. Anything the atlases do not carry
 // is drawn as a space rather than as a missing-glyph box, so an unexpected
 // character costs a gap and not a broken layout. The supplemental block is
-// short enough that scanning it beats carrying a map.
+// ascending, so a binary search finds a slot without carrying a map.
 @[inline]
 fn (f &FontFace) glyph_for(code_point u32) Glyph {
 	if code_point >= u32(font_first_char) && code_point <= u32(font_last_char) {
 		return f.glyphs[int(code_point) - font_first_char]
 	}
 	ascii_count := font_last_char - font_first_char + 1
-	for i, extra in font_extra_runes {
+	mut low := 0
+	mut high := font_extra_runes.len
+	for low < high {
+		middle := (low + high) / 2
+		extra := font_extra_runes[middle]
 		if extra == code_point {
-			return f.glyphs[ascii_count + i]
+			return f.glyphs[ascii_count + middle]
+		}
+		if extra < code_point {
+			low = middle + 1
+		} else {
+			high = middle
 		}
 	}
 	return f.glyphs[0]
@@ -126,7 +172,7 @@ fn (f &FontFace) text_width(text string) int {
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
-		width += f.glyph_for(code_point).advance
+		width += f.glyph_for(code_point).advance / f.raster_scale
 		i += size
 	}
 	return width
@@ -147,7 +193,7 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
-		advance := f.glyph_for(code_point).advance
+		advance := f.glyph_for(code_point).advance / f.raster_scale
 		if width + advance + tail > limit {
 			break
 		}
@@ -167,37 +213,37 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 // draw_text places the run's line box at (x, y) and returns the pen position
 // it ended at.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
-	mut pen := x
+	mut pen := x * c.scale
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
 		glyph := face.glyph_for(code_point)
 		if glyph.width > 0 && glyph.height > 0 {
-			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y + glyph.bearing_y, color)
+			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
 		}
 		pen += glyph.advance
 		i += size
 	}
-	return pen
+	return x + face.text_width(text)
 }
 
 fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u32) {
 	for row := 0; row < glyph.height; row++ {
 		py := y + row
-		if py < 0 || py >= c.height {
+		if py < 0 || py >= c.physical_height {
 			continue
 		}
 		src := glyph.offset + row * glyph.width
 		for col := 0; col < glyph.width; col++ {
 			px := x + col
-			if px < 0 || px >= c.width {
+			if px < 0 || px >= c.physical_width {
 				continue
 			}
 			coverage := u32(face.pixels[src + col])
 			if coverage == 0 {
 				continue
 			}
-			c.blend_pixel(px, py, color, coverage)
+			c.blend_physical_pixel(px, py, color, coverage)
 		}
 	}
 }

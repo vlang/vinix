@@ -1,0 +1,54 @@
+{
+  "result": "PASS",
+  "sources": {
+    "kernel/socket/socket.v": "c82e100d74c07f3fbd2ddd55a9b8ea54d963ddb7ce4ca2ce7d27d0d66f5881f0",
+    "kernel/socket/unix/unix.v": "24b8656b644f817bef99d21a19b6ac3b5b7fc424890eb4429f453a372ea4afb6"
+  },
+  "compiler_sha256": "80c39942a71a8323754159b37624b69fe9469ca90892e97ea721fa4d5ac86bf0",
+  "generated_c_sha256": "15b82763515c299642419f62877f084ce0131dace6a37871eeb67c31808f414a",
+  "functions": {
+    "close_endpoint": {
+      "body_sha256": "899432be78c55592e0fdcb460abb760d7c4a1480e3e7905632ee1a167b566720",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    },
+    "read": {
+      "body_sha256": "9bfed0debb23013c998d9d776af37fac0b5f0646899245f4b3ae6d89026b969f",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    },
+    "recv_seqpacket": {
+      "body_sha256": "b579e5141321fb7d11dde1502a74af0405f619cb7a4496c2754585b12c9bc627",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    },
+    "recvmsg": {
+      "body_sha256": "da09beb574254d3d53d646597aae575bc3f746c07a258fb03c6dc7fbf07fc706",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    },
+    "send_datagram": {
+      "body_sha256": "9bbf66db998f9f047a7e20bd13ec7b9ada0eddf426648495f0cfa7737e4dcaec",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    },
+    "write_with_fds": {
+      "body_sha256": "7e154e0766ea67c8d2208f9232fdfc0ca363e265ef8aa6d4f3bcbe782260ce7c",
+      "array_clone_mentions": 0,
+      "review": "PASS: PendingFdGroup/FD array accesses copy only headers; queues own allocated FD metadata until receive/discard/close."
+    }
+  },
+  "stack_lifetimes": [
+    "15 caller-stack slots are fixed size, allocated in syscall/transfer frames; frame stays alive across synchronous family calls and blocking waits.",
+    "Unix ring writes/reads and address copies complete while frame remains alive; inet TCP uses COPY, UDP pbuf_take, netlink copies synchronously. No family retains scratch/header pointer.",
+    "Original zero fills/0xff sentinels/whole MsgHdr zero initialization are preserved. Heap buffer allocation/free path for messages larger than 512 remains unchanged."
+  ],
+  "fd_queue_ownership": [
+    "collect_passed_fds owns acquired FD references; group.fds << fds allocates one independent backing array containing those pointers.",
+    "Both unsafe appends move that backing array header into the queue; emitted C uses plain struct assignment followed by array_push, never a clone. Success frees sender pointer metadata only.",
+    "Error, full-queue timeout/cancellation, invalid target, EPIPE and oversize exits occur before group allocation/enqueue; caller releases the original references. No fallible return follows queue transfer.",
+    "Receive installs accepted FD references in the process table; rejected/truncated/pledge-denied/failed installation references are unreferenced. The queue metadata is freed once and group removed.",
+    "Plain reads, record truncation and endpoint close unreference all undelivered refs, free group metadata once and remove/detach queue. Existing group locals and close iteration are shallow C copies.",
+    "Endpoint locks serialize append with reads/close; pending array is noslices and no group metadata is sliced, so queue reallocation can free old queue backing."
+  ]
+}

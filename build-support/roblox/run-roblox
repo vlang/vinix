@@ -1,0 +1,33 @@
+#!/bin/sh
+# Execute the unchanged Roblox APK through the native Android DEX runtime.
+set -eu
+if [ "$#" -eq 0 ]; then
+    echo 'usage: run-roblox APK [Android Translation Layer options]' >&2
+    exit 2
+fi
+case "$1" in
+    --help|-h) echo 'usage: run-roblox APK [Android Translation Layer options]'; exit 0 ;;
+esac
+apk=$1
+shift
+[ -r "$apk" ] || { echo "run-roblox: cannot read APK: $apk" >&2; exit 2; }
+[ -x /usr/bin/run-android ] \
+    || { echo 'run-roblox: native Android runtime launcher is missing' >&2; exit 127; }
+# The desktop can supply the unchanged configuration APKs beside the base APK.
+# Keep each path as its own argument, including paths containing spaces.
+split_apks=${VINIX_ROBLOX_SPLIT_APKS:-}
+while [ -n "$split_apks" ]; do
+    case "$split_apks" in
+        *:*)
+            split_apk=${split_apks%%:*}
+            split_apks=${split_apks#*:}
+            [ -n "$split_apks" ] \
+                || { echo 'run-roblox: empty split APK path' >&2; exit 2; }
+            ;;
+        *) split_apk=$split_apks; split_apks= ;;
+    esac
+    [ -f "$split_apk" ] && [ -r "$split_apk" ] \
+        || { echo "run-roblox: cannot read split APK: $split_apk" >&2; exit 2; }
+    set -- "$@" --split-apk "$split_apk"
+done
+exec /usr/bin/run-android "$apk" -l com/roblox/client/startup/ActivitySplash -w 1280 -h 720 "$@"

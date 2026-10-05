@@ -1,0 +1,94 @@
+#!/bin/sh
+# Atomically install a self-hosted desktop build and ask the PID 1 supervisor
+# to replace the running session. The old executable remains valid until its
+# process exits; every multicall application symlink sees the new inode.
+set -eu
+
+usage() {
+	echo "usage: vinix-desktop-reload BINARY" >&2
+	exit 2
+}
+
+[ "$#" -eq 1 ] || usage
+source_binary=$1
+[ -f "$source_binary" ] && [ -x "$source_binary" ] || {
+	echo "vinix-desktop-reload: not an executable file: $source_binary" >&2
+	exit 1
+}
+
+destination=/usr/bin/vinix-desktop
+temporary="/usr/bin/.vinix-desktop.new.$$"
+cleanup() {
+	rm -f "$temporary"
+}
+trap cleanup EXIT HUP INT TERM
+
+# On disk-root boots the build and installed executable share ext2. Linking
+# the complete inode avoids a second copy of the large multicall binary;
+# no-disk-root boots still take the cross-filesystem copy path.
+rm -f "$temporary"
+if ! ln "$source_binary" "$temporary" 2>/dev/null; then
+	cp "$source_binary" "$temporary"
+	chmod 755 "$temporary"
+fi
+mv -f "$temporary" "$destination"
+mkdir -p /run
+: > /run/vinix-desktop-development
+# A compositor process can exist while blocked in its first application
+# handshake. The replacement recreates this marker only once it has painted
+# and finished those handshakes, giving diagnostics a real readiness signal.
+# It is only that signal: on a disk-root machine /run is persistent, and a
+# marker the kernel failed to unlink at boot can refuse removal with ENOENT.
+rm -f /run/vinix-desktop-ready 2>/dev/null || \
+	echo "vinix-desktop-reload: could not clear /run/vinix-desktop-ready; reloading anyway" >&2
+trap - EXIT HUP INT TERM
+
+echo "vinix-desktop-reload: installed $destination; reloading the desktop"
+# Every multicall application runs the ordinary desktop executable, and pidof
+# also matches /proc/<pid>/exe, so it reports Files and Terminal too. A GPU
+# boot runs vinix-desktop-gpu instead. Check comm to keep only the compositor;
+# Linux-style comm can truncate the GPU name to vinix-desktop-g.
+desktop_pids=
+for desktop_name in vinix-desktop vinix-desktop-gpu; do
+	for pid in $(/bin/busybox pidof "$desktop_name" 2>/dev/null || true); do
+		case "$(cat "/proc/$pid/comm" 2>/dev/null)" in
+			vinix-desktop|vinix-desktop-g*) ;;
+			*) continue ;;
+		esac
+		case " $desktop_pids " in
+			*" $pid "*) ;;
+			*) desktop_pids="$desktop_pids $pid" ;;
+		esac
+	done
+done
+set -- $desktop_pids
+if [ "$#" -ne 1 ]; then
+	echo "vinix-desktop-reload: expected one running desktop, found $#: ${desktop_pids:-none}" >&2
+	exit 1
+fi
+rebuild_notice=/run/vinix-desktop-rebuild
+rebuild_notice_temp="$rebuild_notice.new.$$"
+rebuild_snapshot=/run/vinix-desktop-rebuild-terminal
+rebuild_started=${VINIX_DESKTOP_REBUILD_STARTED:-}
+rebuild_shell=${VINIX_DESKTOP_REBUILD_SHELL:-}
+# A matching Terminal writes a fresh snapshot during the orderly shutdown.
+# Clear any abandoned snapshot before publishing the marker that authorizes it.
+rm -f "$rebuild_snapshot" 2>/dev/null || true
+if [ -n "$rebuild_started" ]; then
+	# The fresh Terminal is a different process from the one running the build.
+	# Hand the old and new clients the compositor PID, start time, and initiating
+	# shell. The PIDs stop an unrelated Terminal or later session from consuming
+	# a stale result left by a failed restart.
+	printf '%s %s %s\n' "$1" "$rebuild_started" "$rebuild_shell" > "$rebuild_notice_temp"
+	mv -f "$rebuild_notice_temp" "$rebuild_notice"
+else
+	rm -f "$rebuild_notice" 2>/dev/null || true
+fi
+# Signal the compositor itself. It execs the newly installed inode in place,
+# preserving the framebuffer's graphics owner across the replacement. Sending
+# this through PID 1 made the old process exit first, which briefly restored
+# the full kernel boot console and looked like a machine crash/reboot.
+if ! kill -HUP "$1"; then
+	rm -f "$rebuild_notice" "$rebuild_notice_temp" "$rebuild_snapshot" 2>/dev/null || true
+	exit 1
+fi

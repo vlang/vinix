@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +26,7 @@ int main(void)
     CHECK(vinix_display_hotplug_sample(NULL, 0, 0, 0, 500) ==
           VINIX_DISPLAY_HOTPLUG_NONE);
     CHECK(!vinix_display_hotplug_connected(NULL));
+    vinix_display_hotplug_reset(NULL);
     vinix_display_hotplug_reset(&state);
 
     CHECK(!vinix_display_hotplug_candidate(0, 0));
@@ -110,6 +115,32 @@ int main(void)
           VINIX_DISPLAY_HOTPLUG_REPAINT);
     CHECK(vinix_display_hotplug_choose_action(1, 1, 0, 0, 0) ==
           VINIX_DISPLAY_HOTPLUG_REPAINT);
+
+    /* C truth values need not be 1, and action arguments are 32-bit ints. */
+    CHECK(vinix_display_hotplug_choose_action(INT32_MIN, -1, 0, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_REBOOT);
+    CHECK(vinix_display_hotplug_choose_action(INT32_MIN, -1, INT32_MIN, 2560, 1600) ==
+          VINIX_DISPLAY_HOTPLUG_REPAINT);
+
+    /* An already-attached display at initialization is baseline state, not
+     * a post-boot event. Preserve uninterpreted controller bits as evidence. */
+    vinix_display_hotplug_reset(&state);
+    CHECK(vinix_display_hotplug_sample(&state, UINT32_MAX, data, 0, 0) ==
+          VINIX_DISPLAY_HOTPLUG_NONE);
+    CHECK(vinix_display_hotplug_connected(&state) == 1);
+    CHECK(state.status == UINT32_MAX && state.data_status == data);
+    CHECK(vinix_display_hotplug_sample(&state, UINT32_MAX, data, 1, 0) ==
+          VINIX_DISPLAY_HOTPLUG_NONE);
+
+    /* Even zero debounce confirms a changed candidate in a second sample,
+     * and emits the transition only once. */
+    CHECK(vinix_display_hotplug_sample(&state, 0, 0, 2, 0) ==
+          VINIX_DISPLAY_HOTPLUG_NONE);
+    CHECK(vinix_display_hotplug_sample(&state, 0, 0, 2, 0) ==
+          VINIX_DISPLAY_HOTPLUG_DISCONNECTED);
+    CHECK(vinix_display_hotplug_sample(&state, 0, 0, 2, 0) ==
+          VINIX_DISPLAY_HOTPLUG_NONE);
+    CHECK(!vinix_display_hotplug_connected(&state));
 
     puts("apple display hotplug state tests passed");
     return 0;

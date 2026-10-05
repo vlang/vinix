@@ -1,3 +1,7 @@
+// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
+// Use of this source code is governed by a GPL v2 license
+// that can be found in the LICENSE file.
+
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Read-only M1 SMC client. Protocol references are recorded in docs/m1-battery.md.
  * This is deliberately a synchronous, SMC-only RTKit client: unlike AGX,
@@ -11,6 +15,9 @@
 #define EPMAP_LAST (UINT64_C(1) << 51)
 #define KEY_BUIC UINT32_C(0x42554943)
 #define KEY_BRSC UINT32_C(0x42525343)
+#define KEY_B0AV UINT32_C(0x42304156)
+#define KEY_B0AC UINT32_C(0x42304143)
+#define KEY_B0AP UINT32_C(0x42304150)
 #define CMD_READ 0x10u
 #define CMD_SRAM 0x17u
 #define NOTIFY 0x18u
@@ -31,6 +38,9 @@ struct smc_state {
     uint64_t sample_time;
     int sample, sampled, ready, failed;
     uint8_t next_id, capacity_length;
+    uint64_t power_time;
+    int power_sampled, power_result, voltage, current, power;
+    unsigned power_flags;
 };
 
 size_t vinix_smc_state_size(void) { return sizeof(struct smc_state); }
@@ -407,6 +417,72 @@ int vinix_smc_cached_capacity(void *state)
     if (s->clock(s->context) - s->sample_time >= 2 * s->frequency)
         return VINIX_SMC_TIMEOUT;
     return s->sample;
+}
+
+/* Key units and signedness follow upstream macsmc-power.c. Transactions only
+ * read keys; missing sensors are represented by absent validity bits.
+ */
+int vinix_smc_refresh_power(void *state, unsigned *flags, int *voltage,
+                            int *current, int *power)
+{
+    struct smc_state *s = state;
+    if (!s || !s->ready)
+        return s && s->failed ? s->failed : VINIX_SMC_NOT_READY;
+    if (!s->power_sampled || s->clock(s->context) - s->power_time >= s->frequency) {
+        static const uint32_t keys[3] = {KEY_B0AV, KEY_B0AC, KEY_B0AP};
+        s->power_flags = 0;
+        s->power_result = VINIX_SMC_NO_KEY;
+        for (unsigned i = 0; i < 3; ++i) {
+            uint64_t word = 0;
+            int result = transaction(s, CMD_READ, keys[i], i == 2 ? 4 : 2, &word);
+            if (s->failed)
+                return result;
+            if (result != 0)
+                continue;
+            uint32_t value = (uint32_t)(word >> 32);
+            if (i == 0) s->voltage = (uint16_t)value;
+            if (i == 1) s->current = (int16_t)value;
+            if (i == 2) s->power = (int32_t)value;
+            s->power_flags |= 1u << i;
+            s->power_result = 0;
+        }
+        s->power_time = s->clock(s->context);
+        s->power_sampled = 1;
+    }
+    *flags = s->power_flags;
+    *voltage = s->voltage;
+    *current = s->current;
+    *power = s->power;
+    return s->power_result;
+}
+
+uint64_t vinix_smc_power_time(const void *state)
+{
+    const struct smc_state *s = state;
+    return s ? s->power_time : 0;
+}
+
+static unsigned power_field(uint8_t *out, const char *key, int value)
+{
+    unsigned used = 0, count = 0;
+    uint8_t digits[10];
+    while (*key) out[used++] = (uint8_t)*key++;
+    uint32_t magnitude = value < 0 ? (uint32_t)(-(int64_t)value) : (uint32_t)value;
+    if (value < 0) out[used++] = '-';
+    do { digits[count++] = '0' + magnitude % 10; magnitude /= 10; } while (magnitude);
+    while (count) out[used++] = digits[--count];
+    out[used++] = '\n';
+    return used;
+}
+
+int vinix_smc_format_power(unsigned flags, int voltage, int current, int power,
+                           uint8_t output[128])
+{
+    unsigned used = 0;
+    if (flags & 1) used += power_field(output + used, "voltage_mv: ", voltage);
+    if (flags & 2) used += power_field(output + used, "current_ma: ", current);
+    if (flags & 4) used += power_field(output + used, "power_mw: ", power);
+    return (int)used;
 }
 
 uint64_t vinix_smc_sample_time(const void *state)

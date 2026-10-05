@@ -1,0 +1,19 @@
+--- a/linux-user/mmap.c
++++ b/linux-user/mmap.c
+@@ -877,6 +877,16 @@
+     int host_page_size = qemu_real_host_page_size();
+     int host_prot;
+ 
++    /* A partial host page can contain several guest pages. Validate the
++     * guest range under mmap_lock even without a reserved address space,
++     * before mmap_frag can reuse a host page and zero occupied guest bytes.
++     */
++    if ((flags & MAP_FIXED_NOREPLACE) &&
++        !page_check_range_empty(start, start + len - 1)) {
++        errno = EEXIST;
++        return -1;
++    }
++
+     /*
+      * For reserved_va, we are in full control of the allocation.
+      * Find a suitable hole and convert to MAP_FIXED.

@@ -56,6 +56,7 @@ static int run_test(void) {
     for(int i=0;i<33;i++){ CHECK(pipe(pipes[i])==0); many[i]=(struct pollfd){.fd=pipes[i][0],.events=POLLIN}; }
     CHECK(poll(many,33,0)==0);
     errno=0; CHECK(poll(many,33,1)==-1 && errno==EINVAL);
+    errno=0; CHECK(poll(many,32,1)==-1 && errno==EINVAL); /* timer is the 33rd event */
     for(int i=0;i<33;i++){close(pipes[i][0]);close(pipes[i][1]);}
     puts("TEST poll: timeouts, readiness, duplicate FDs, HUP and invalid inputs passed");
     return 0;

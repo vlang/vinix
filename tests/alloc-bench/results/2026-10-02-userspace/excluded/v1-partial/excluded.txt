@@ -1,0 +1,1 @@
+Incomplete diagnostic: stopped after mixed-allocation regression and ARM redzone validation failure established that this libc policy needs revision. Two mmap-touch samples were captured; no completed run or parity claim. Original workload unchanged.

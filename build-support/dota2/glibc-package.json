@@ -1,0 +1,9 @@
+{
+  "package": "libc6",
+  "version": "2.41-12+deb13u4",
+  "architecture": "amd64",
+  "mirror": "https://deb.debian.org/debian",
+  "filename": "pool/main/g/glibc/libc6_2.41-12+deb13u4_amd64.deb",
+  "sha256": "967aa62605721081c3eb2a17650611a792aa802d76a6511d1840242623d204c9",
+  "size": 2846580
+}

@@ -1,0 +1,56 @@
+Booting benchmark; output: /Users/alex/code/vinix/build/useralloc-vinix-v4-final-1/serial.log
+ALLOC-COMPILE-BEGIN
+ALLOC-COMPILE-DONE
+ALLOC-COMPILE-BEGIN
+ALLOC-COMPILE-DONE
+ALLOC-META schema=1 label=vinix platform=Vinix release=0.1.0 arch=x86_64 compiler=gcc compiler_major=14 compiler_minor=2 compiler_patch=0 compiler_version=14.2.0 pointer_bits=64 page_size=4096 clock=CLOCK_MONOTONIC clock_resolution_ns=10 threads=1 iterations=200000 samples=7 touch_stride=4096 large_bytes=262144 mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=1 pairs=200000 elapsed_ns=168660000 ns_per_pair=843.300 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=2 pairs=200000 elapsed_ns=73140000 ns_per_pair=365.700 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=3 pairs=200000 elapsed_ns=144141000 ns_per_pair=720.705 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=4 pairs=200000 elapsed_ns=107545000 ns_per_pair=537.725 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=5 pairs=200000 elapsed_ns=105628000 ns_per_pair=528.140 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=6 pairs=200000 elapsed_ns=80406000 ns_per_pair=402.030 checksum=51000000
+ALLOC-SAMPLE label=vinix workload=malloc_hot_64 sample=7 pairs=200000 elapsed_ns=77952000 ns_per_pair=389.760 checksum=51000000
+ALLOC-RESULT label=vinix workload=malloc_hot_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=64 batch=1 touch_stride=0 median_ns_per_pair=528.140 min_ns_per_pair=365.700 max_ns_per_pair=843.300
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=1 pairs=200000 elapsed_ns=98608000 ns_per_pair=493.040 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=2 pairs=200000 elapsed_ns=98494000 ns_per_pair=492.470 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=3 pairs=200000 elapsed_ns=102125000 ns_per_pair=510.625 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=4 pairs=200000 elapsed_ns=101725000 ns_per_pair=508.625 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=5 pairs=200000 elapsed_ns=100702000 ns_per_pair=503.510 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=6 pairs=200000 elapsed_ns=95636000 ns_per_pair=478.180 checksum=51000560
+ALLOC-SAMPLE label=vinix workload=malloc_mixed_batch_64 sample=7 pairs=200000 elapsed_ns=99344000 ns_per_pair=496.720 checksum=51000560
+ALLOC-RESULT label=vinix workload=malloc_mixed_batch_64 category=userspace operation=alloc_free_pair pairs=200000 samples=7 warmup_pairs=200000 bytes=0 batch=64 touch_stride=0 median_ns_per_pair=496.720 min_ns_per_pair=478.180 max_ns_per_pair=510.625
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=1 pairs=10000 elapsed_ns=19295000 ns_per_pair=1929.500 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=2 pairs=10000 elapsed_ns=21133000 ns_per_pair=2113.300 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=3 pairs=10000 elapsed_ns=20733000 ns_per_pair=2073.300 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=4 pairs=10000 elapsed_ns=19665000 ns_per_pair=1966.500 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=5 pairs=10000 elapsed_ns=21182000 ns_per_pair=2118.200 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=6 pairs=10000 elapsed_ns=22168000 ns_per_pair=2216.800 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=malloc_touch_262144 sample=7 pairs=10000 elapsed_ns=20432000 ns_per_pair=2043.200 checksum=81593856
+ALLOC-RESULT label=vinix workload=malloc_touch_262144 category=userspace operation=alloc_free_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=2073.300 min_ns_per_pair=1929.500 max_ns_per_pair=2216.800
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=1 pairs=10000 elapsed_ns=159900000 ns_per_pair=15990.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=2 pairs=10000 elapsed_ns=147798000 ns_per_pair=14779.800 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=3 pairs=10000 elapsed_ns=154929000 ns_per_pair=15492.900 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=4 pairs=10000 elapsed_ns=152250000 ns_per_pair=15225.000 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=5 pairs=10000 elapsed_ns=156112000 ns_per_pair=15611.200 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=6 pairs=10000 elapsed_ns=148381000 ns_per_pair=14838.100 checksum=0
+ALLOC-SAMPLE label=vinix workload=mmap_anon_4096 sample=7 pairs=10000 elapsed_ns=151603000 ns_per_pair=15160.300 checksum=0
+ALLOC-RESULT label=vinix workload=mmap_anon_4096 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=4096 batch=1 touch_stride=0 median_ns_per_pair=15225.000 min_ns_per_pair=14779.800 max_ns_per_pair=15990.000
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=1 pairs=10000 elapsed_ns=13610491000 ns_per_pair=1361049.100 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=2 pairs=10000 elapsed_ns=23162664000 ns_per_pair=2316266.400 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=3 pairs=10000 elapsed_ns=28015881000 ns_per_pair=2801588.100 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=4 pairs=10000 elapsed_ns=23533883000 ns_per_pair=2353388.300 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=5 pairs=10000 elapsed_ns=26189374000 ns_per_pair=2618937.400 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=6 pairs=10000 elapsed_ns=29293287000 ns_per_pair=2929328.700 checksum=81593856
+ALLOC-SAMPLE label=vinix workload=mmap_touch_262144 sample=7 pairs=10000 elapsed_ns=16638740000 ns_per_pair=1663874.000 checksum=81593856
+ALLOC-RESULT label=vinix workload=mmap_touch_262144 category=kernel_syscall operation=map_unmap_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=262144 batch=1 touch_stride=4096 median_ns_per_pair=2353388.300 min_ns_per_pair=1361049.100 max_ns_per_pair=2929328.700
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=1 pairs=10000 elapsed_ns=392959000 ns_per_pair=39295.900 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=2 pairs=10000 elapsed_ns=392983000 ns_per_pair=39298.300 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=3 pairs=10000 elapsed_ns=399052000 ns_per_pair=39905.200 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=4 pairs=10000 elapsed_ns=381654000 ns_per_pair=38165.400 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=5 pairs=10000 elapsed_ns=384479000 ns_per_pair=38447.900 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=6 pairs=10000 elapsed_ns=371694000 ns_per_pair=37169.400 checksum=0
+ALLOC-SAMPLE label=vinix workload=pipe_create_close sample=7 pairs=10000 elapsed_ns=353655000 ns_per_pair=35365.500 checksum=0
+ALLOC-RESULT label=vinix workload=pipe_create_close category=kernel_syscall operation=create_close_pair pairs=10000 samples=7 warmup_pairs=10000 bytes=0 batch=1 touch_stride=0 median_ns_per_pair=38447.900 min_ns_per_pair=35365.500 max_ns_per_pair=39905.200
+ALLOC-DONE label=vinix workloads=6 checksum=0
+ALLOC-GUEST-DONE

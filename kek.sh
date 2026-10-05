@@ -20,6 +20,18 @@
 #   sudo ~/code/kek.sh gpu-probe  kernel/RTKit probe only; allows an image
 #                               without Mesa for early bring-up diagnostics
 #   sudo ~/code/kek.sh desktop-gpu   desktop + experimental Apple GPU
+#   sudo ~/code/kek.sh desktop-sound desktop + M1 Air sound, no GPU or Wi-Fi
+#   sudo ~/code/kek.sh desktop-basic desktop alone: software rendering, no GPU,
+#                               Wi-Fi or speakers
+#   sudo ~/code/kek.sh fsck     check and repair the Vinix disk, deploy nothing
+#
+# Vinix's disk: vinix-disk.conf beside the checkout (~/code/vinix-disk.conf)
+# names one ext2 partition by its GPT unique GUID, as PARTUUID=<guid>. Desktop
+# modes mount it read-write over /root, where users and their files live.
+# Vinix will not mount it after a crash or forced power-off, so every
+# deployment first checks and repairs it here (e2fsck from Homebrew's
+# e2fsprogs); after such a stop, boot macOS and run this with `fsck`.
+#   sudo ~/code/kek.sh sound-diag    low-level speaker test, no GPU or Wi-Fi
 #   sudo ~/code/kek.sh desktop-wifi  desktop + experimental BCM4378 Wi-Fi
 #   sudo ~/code/kek.sh studio   desktop on a Studio Display selected by the
 #                               boot firmware; post-boot attach reboots once
@@ -56,6 +68,53 @@ if [ -z "$REPO" ]; then
 fi
 DISK="disk0s4"
 ESP="/Volumes/EFI - FEDOR"
+DISK_CONF="$(dirname "$REPO")/vinix-disk.conf"
+E2FSCK=/opt/homebrew/opt/e2fsprogs/sbin/e2fsck
+
+# The configured Vinix disk: prints its PARTUUID, or nothing without one.
+vinix_disk_partuuid() {
+    [ -f "$DISK_CONF" ] || return 0
+    local uuid
+    uuid="$(sed -n 's/^PARTUUID=\([0-9A-Fa-f-]*\)[[:space:]]*$/\1/p' "$DISK_CONF" | head -1)"
+    if ! [[ "$uuid" =~ ^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$ ]]; then
+        echo "error: $DISK_CONF must hold one line PARTUUID=<gpt-unique-guid>" >&2
+        exit 1
+    fi
+    printf '%s\n' "$uuid"
+}
+
+# Check the disk and repair what e2fsck can repair on its own, which includes
+# the dirty mark an unclean Vinix shutdown leaves. Anything worse stops here:
+# Vinix would only refuse the volume and stop its boot.
+vinix_disk_check() {
+    local uuid="$1" node rc
+    node="$(diskutil info "$uuid" 2>/dev/null | awk -F': *' '/Device Node/ {print $2}')" || node=""
+    if [ -z "$node" ]; then
+        echo "error: no partition has PARTUUID $uuid (from $DISK_CONF)" >&2
+        exit 1
+    fi
+    if [ ! -x "$E2FSCK" ]; then
+        echo "error: $E2FSCK is missing; install it with: brew install e2fsprogs" >&2
+        exit 1
+    fi
+    echo "==> checking the Vinix disk ($node)"
+    if "$E2FSCK" -p "$node"; then rc=0; else rc=$?; fi
+    if [ "$rc" -ge 4 ]; then
+        echo "error: the Vinix disk needs a manual repair: sudo $E2FSCK -f $node" >&2
+        exit 1
+    fi
+}
+
+if [ "${1:-}" = fsck ]; then
+    disk_uuid="$(vinix_disk_partuuid)"
+    if [ -z "$disk_uuid" ]; then
+        echo "error: no Vinix disk configured in $DISK_CONF" >&2
+        exit 1
+    fi
+    vinix_disk_check "$disk_uuid"
+    echo "OK. The Vinix disk is clean."
+    exit 0
+fi
 
 case "${1:-desktop}" in
     desktop)
@@ -90,9 +149,29 @@ case "${1:-desktop}" in
         FLAGS=(--apple-gpu --gpu-probe-only --native-resolution)
         MODE="shell + Apple GPU probe only"
         ;;
+    gpu-diag)
+        # The GPU probe with nothing else running. gpu-probe above boots the
+        # 2.9 GB base initramfs, which does not fit a 512 MB ESP; this one is a
+        # few KB. Unlike diag it keeps flanterm, because the point here is to
+        # read what the probe printed rather than to count stage bars.
+        FLAGS=(--apple-gpu --gpu-probe-only --native-resolution --minimal-initramfs)
+        MODE="diagnostic + Apple GPU probe"
+        ;;
     desktop-gpu)
         FLAGS=(--apple-gpu --native-resolution --desktop-initramfs)
         MODE="desktop + Apple GPU"
+        ;;
+    desktop-sound)
+        FLAGS=(--native-resolution --desktop-initramfs --apple-speakers)
+        MODE="desktop + M1 Air sound (software rendering)"
+        ;;
+    desktop-basic)
+        FLAGS=(--native-resolution --desktop-initramfs --no-apple-speakers)
+        MODE="desktop (software rendering, no GPU, Wi-Fi or speakers)"
+        ;;
+    sound-diag)
+        FLAGS=(--native-resolution --sound-initramfs)
+        MODE="M1 Air speaker test (no GPU or Wi-Fi)"
         ;;
     desktop-wifi)
         FLAGS=(--apple-wifi --native-resolution --desktop-initramfs)
@@ -128,10 +207,18 @@ case "${1:-desktop}" in
         exit 0
         ;;
     *)
-        echo "error: unknown mode '$1' (use: desktop | studio | full | gpu | gpu-probe | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
+        echo "error: unknown mode '$1' (use: desktop | desktop-basic | desktop-sound | sound-diag | fsck | studio | full | gpu | gpu-probe | gpu-diag | desktop-gpu | desktop-wifi | battery | dcp | storage | drivers | desktop-drivers | diag | halt N | selftest)" >&2
         exit 1
         ;;
 esac
+
+# The desktop's users and files live in /root: give it the Vinix disk.
+disk_uuid="$(vinix_disk_partuuid)"
+if [ -n "$disk_uuid" ] && [[ " ${FLAGS[*]} " == *" --desktop-initramfs "* ]]; then
+    vinix_disk_check "$disk_uuid"
+    FLAGS+=("--ans-persist=$disk_uuid")
+    MODE="$MODE, /root on the Vinix disk"
+fi
 
 # deploy-m1-efi.sh and kernel/bin/vinix are relative paths.
 cd "$REPO"
@@ -191,6 +278,23 @@ This mode owns one firmware framebuffer. Reconnecting that established output
 works live; switching between the internal and external outputs crosses a boot.
 STUDIO
     ;;
+diagnostic\ +\ Apple\ GPU\ probe)
+    cat <<'GPUDIAG'
+
+Nothing runs after the probe in this mode: what is on screen is the probe's own
+output. The M1 Air is handed m1n1's FDT, not Apple boot data, so the m1n1 branch
+runs and the operating-point table loads:
+
+  agx: Probing Apple GPU
+  agx: loaded 7 t8103 operating points (1 off, 396..1278 MHz, 19488 mW max)
+
+Seven states with one off, over 396..1278 MHz, is that machine's fused ladder.
+A different count, a missing "1 off", or a narrower range means the boot device
+tree changed. Any "G13 ABI self-check failed" line names a layout in this tree
+that no longer matches the recovered firmware ABI; see docs/m1-agx-bringup.md.
+Photograph the screen either way.
+GPUDIAG
+    ;;
 *Apple\ GPU*)
     cat <<'GPU'
 
@@ -209,11 +313,11 @@ hardware-only render test with:
 
 Only "VINIX M1 AGX RENDER TEST: PASS" is proof of native GPU execution: the
 test rejects software/VirGL/fake renderers and validates pixels after glFinish.
-The boot should also report exactly two Vinix CPUs online:
+The boot should also report exactly four Vinix CPUs online:
 
   smp: Discovered CPUs: 8
-  smp: Starting CPUs:   2
-  smp: 2 CPUs online
+  smp: Starting CPUs:   4
+  smp: 4 CPUs online
 
 Use `sudo ~/code/kek.sh desktop-wifi` if the GPU probe prevents the desktop
 from starting; that keeps Wi-Fi and the same desktop image but disables AGX.

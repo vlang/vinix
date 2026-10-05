@@ -1,0 +1,517 @@
+{
+  "copied_utc": "2026-10-02T23:13:16.252707+00:00",
+  "files": {
+    "vinix-1/config.json": {
+      "source": "build/useralloc-vinix-v6-final-1/config.json",
+      "sha256": "cdfa3c804e262376265d39e16c22912bd4e307f4fbf44bb08dbfeca6d805a332"
+    },
+    "vinix-1/serial.log": {
+      "source": "build/useralloc-vinix-v6-final-1/serial.log",
+      "sha256": "354b6baa649156c1f57cb68f5d8909cd974d36248778fae5f9d96a5452882e45"
+    },
+    "vinix-1/qemu.log": {
+      "source": "build/useralloc-vinix-v6-final-1/qemu.log",
+      "sha256": "014eca1217db44bca5d4df8795331990fd779bb6bda99132a145be13ba1e1cbe"
+    },
+    "vinix-1/image-build.log": {
+      "source": "build/useralloc-vinix-v6-final-1/image-build.log",
+      "sha256": "317540ed7d1393ccdd98b49242a87e5b4b8f9f753c7976466180d775cc3d8cf9"
+    },
+    "vinix-1/driver-exit.json": {
+      "source": "build/useralloc-vinix-v6-final-1.exit.json",
+      "sha256": "a55c7af95358698a0112daa835b77c473932741a770c9242102ec29677b10d5f"
+    },
+    "vinix-1/runner.log": {
+      "source": "build/useralloc-vinix-v6-final-1.runner.log",
+      "sha256": "f62b3ab0d7de8bd55dac7b97a2ffecf92454980d7529b9d485b1039cb7db34c5"
+    },
+    "catalina-1/config.json": {
+      "source": "build/useralloc-macos-v6-final-1/config.json",
+      "sha256": "66a2d425f4858f70ad576b0968275407fe68eb457b45335d06adba3e22c68005"
+    },
+    "catalina-1/serial.log": {
+      "source": "build/useralloc-macos-v6-final-1/serial.log",
+      "sha256": "6fdf0c2affde5e1781bcc7bf514f871975835b3f3b2fe75c00172d9c17ebd69c"
+    },
+    "catalina-1/driver-exit.json": {
+      "source": "build/useralloc-macos-v6-final-1.exit.json",
+      "sha256": "32cbfebc4a0145b8033c891d14a2f3a03d88a0904de739a74ebee75231c12fff"
+    },
+    "catalina-1/runner.log": {
+      "source": "build/useralloc-macos-v6-final-1.runner.log",
+      "sha256": "0f474c53f0c3fd7a92aabcfb55ebea4554f19f7f7d7296f443d14e381247b603"
+    },
+    "catalina-2/config.json": {
+      "source": "build/useralloc-macos-v6-final-2/config.json",
+      "sha256": "c4b618a03b5811cb1527f552350fb4114618673c220752a381e8b0f18fb92eec"
+    },
+    "catalina-2/serial.log": {
+      "source": "build/useralloc-macos-v6-final-2/serial.log",
+      "sha256": "0a33b479fbef39ba66ec580c4efe19db2c376ee107ea08f9cddfd35334ebcb0e"
+    },
+    "catalina-2/driver-exit.json": {
+      "source": "build/useralloc-macos-v6-final-2.exit.json",
+      "sha256": "91fbe27c658398ed0f678cfc843306e4154e560589aeec4f06566a553cea3fc0"
+    },
+    "catalina-2/runner.log": {
+      "source": "build/useralloc-macos-v6-final-2.runner.log",
+      "sha256": "80ee5bc1f5939d92e47ca3a4e7dfaf4528c9cf661048dbdf93382718bb496472"
+    },
+    "vinix-2/config.json": {
+      "source": "build/useralloc-vinix-v6-final-2/config.json",
+      "sha256": "a87c45d904c204e88f6c55f05ed884a5215885e2cb8be5982878039dda63968e"
+    },
+    "vinix-2/serial.log": {
+      "source": "build/useralloc-vinix-v6-final-2/serial.log",
+      "sha256": "344cfca15e1b29020b86ca8889d1e65de3bbbb95678f2788c76b5bc1840af8ed"
+    },
+    "vinix-2/qemu.log": {
+      "source": "build/useralloc-vinix-v6-final-2/qemu.log",
+      "sha256": "7d7bdb6d6b8a9ec7baaa1d5ba524747dbe94a83e1f420120799164b980b7a628"
+    },
+    "vinix-2/image-build.log": {
+      "source": "build/useralloc-vinix-v6-final-2/image-build.log",
+      "sha256": "0610592bc505c766425d0744a66acebb77b6ea58a202dff45529a96afcff22a2"
+    },
+    "vinix-2/driver-exit.json": {
+      "source": "build/useralloc-vinix-v6-final-2.exit.json",
+      "sha256": "b5679ec3d0def06ca344e8ba55f8a1afc83d849ec7216578d2caf41915749528"
+    },
+    "vinix-2/runner.log": {
+      "source": "build/useralloc-vinix-v6-final-2.runner.log",
+      "sha256": "b3ca574bceaa7e5f7a2cc526334654595537d27818d2f7a5ed229709b8d6b616"
+    },
+    "validation/campaign-complete/useralloc-v6-final-cohorts.py": {
+      "source": "build/useralloc-v6-final-cohorts.py",
+      "sha256": "568d515c6843cc20b5e5042de2e086798cccd41cafb8b13779177dacfb36a8bd"
+    },
+    "validation/campaign-complete/useralloc-v6-final-cohorts.json": {
+      "source": "build/useralloc-v6-final-cohorts.json",
+      "sha256": "70231196439a208579ba1a36aae5da7e5a7ea6aef4a51c38f25dc00a3733d65c"
+    },
+    "validation/campaign-complete/useralloc-v6-final-cohorts.driver.log": {
+      "source": "build/useralloc-v6-final-cohorts.driver.log",
+      "sha256": "c570c5b947027c87d02e7801d58176d4756d4edfcb73ed5be33e60cf0ea69f29"
+    },
+    "validation/campaign-complete/useralloc-v6-final-cohorts.exit.json": {
+      "source": "build/useralloc-v6-final-cohorts.exit.json",
+      "sha256": "c35c81bf4a1563021fd8c83d5ff6d799b7f2bfcabf676ce8b72774f6bb58c19d"
+    },
+    "validation/campaign-complete/useralloc-v6-final-controller.py": {
+      "source": "build/useralloc-v6-final-controller.py",
+      "sha256": "1cf252bdef2e20adadf302f4cda383da35324ee5bc9d50f2265adb1ec78f6a91"
+    },
+    "validation/campaign-complete/useralloc-v6-final-controller.log": {
+      "source": "build/useralloc-v6-final-controller.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "validation/campaign-complete/useralloc-v6-coordinator-preparation.json": {
+      "source": "build/useralloc-v6-coordinator-preparation.json",
+      "sha256": "3c9f2f2a328a3200cf6c517a5c31e66fab95daa2b4428973d39fc45218da8c4c"
+    },
+    "validation/campaign-complete/useralloc-v6-final-readiness.json": {
+      "source": "build/useralloc-v6-final-readiness.json",
+      "sha256": "3afb2b6816d8415a92744a5f564662a3609a162132e61191320467dc3724fb08"
+    },
+    "validation/campaign-complete/useralloc-v6-verify-readiness.py": {
+      "source": "build/useralloc-v6-verify-readiness.py",
+      "sha256": "83c7e7ae12d9b09f390d9a79cbc5a3389710e981c87f0b142db7983c68018cee"
+    },
+    "validation/campaign-complete/useralloc-v6-root-glue-review.json": {
+      "source": "build/useralloc-v6-root-glue-review.json",
+      "sha256": "2b8fcce79e17c9bbdbde87db4a89b8ab1f363e3923f59c83eb41b618f16ace65"
+    },
+    "validation/campaign-complete/useralloc-v6-root-outcome.json": {
+      "source": "build/useralloc-v6-root-outcome.json",
+      "sha256": "bcfbaeaedc4460827eff937558852e6f17c72ee389eed345e014122ed8460e9a"
+    },
+    "validation/campaign-complete/useralloc-final-driver.py": {
+      "source": "build/useralloc-final-driver.py",
+      "sha256": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+    },
+    "validation/campaign-complete/useralloc-macos-final-driver.py": {
+      "source": "build/useralloc-macos-final-driver.py",
+      "sha256": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48"
+    },
+    "validation/campaign-complete/catalina-measure.py": {
+      "source": "build/useralloc-macos-runtime/measure.py",
+      "sha256": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1"
+    },
+    "validation/campaign-complete/run-vinix.py": {
+      "source": "tests/alloc-bench/run-vinix.py",
+      "sha256": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c"
+    },
+    "validation/core/exit.json": {
+      "source": "build/useralloc-core-v6/exit.json",
+      "sha256": "3cf312895d034556a6492f4ac9b8b99c122868deba65eb7e2410ce6c5ad8b11d"
+    },
+    "validation/core/run.py": {
+      "source": "build/useralloc-core-v6/run.py",
+      "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+    },
+    "validation/core/checkpoint.json": {
+      "source": "build/useralloc-core-v6/checkpoint.json",
+      "sha256": "eb4f77b8f5ed868d88f8e0f79e42c31c7e203672bebc48385d8b0b95c8405db2"
+    },
+    "validation/core/final-gates.json": {
+      "source": "build/useralloc-core-v6/final-gates.json",
+      "sha256": "29a1a09b85dbb5cb01541628cb68a1f5f6a4e4f40ba4bbe2ab239c7cacff84cb"
+    },
+    "validation/core/evidence-audit.py": {
+      "source": "build/useralloc-core-v6/evidence-audit.py",
+      "sha256": "b8b20bd5f82eae7d65465d4d24dafcb96acc35eef178835bbe2fe514b443638d"
+    },
+    "validation/core/driver.log": {
+      "source": "build/useralloc-core-v6/driver.log",
+      "sha256": "48e7ceda35e95c806740dc97e1e297fe45ff4834561414bb82510bf6d0ef73dd"
+    },
+    "validation/core/driver.py": {
+      "source": "build/useralloc-core-v6/driver.py",
+      "sha256": "d9542c99bc2fbce40479776e9244ef92e72007effd8772dfa23e001c8711beba"
+    },
+    "validation/core/quiescence.json": {
+      "source": "build/useralloc-core-v6/quiescence.json",
+      "sha256": "cbea65c0568da62fa428778be76bf81d205abffe108c3fb04a4e150e8ebb2e77"
+    },
+    "validation/core/evidence-audit.json": {
+      "source": "build/useralloc-core-v6/evidence-audit.json",
+      "sha256": "b0d5fab923522a72d5391085227a230973d88a825ac8817b6acca8130b854f6a"
+    },
+    "validation/core-x86_64/exit.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/exit.json",
+      "sha256": "1f7386020cc807c983f206be2ec57b837dd2c1814cc36b3696eb8f1dbf000dc9"
+    },
+    "validation/core-x86_64/pagetable.c": {
+      "source": "build/useralloc-core-v6/core-x86_64/pagetable.c",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d"
+    },
+    "validation/core-x86_64/run.py": {
+      "source": "build/useralloc-core-v6/core-x86_64/run.py",
+      "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+    },
+    "validation/core-x86_64/qemu-observed.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/qemu-observed.json",
+      "sha256": "e7aded382a6fd15616a0b7c34e04cf56d59d32f73f0206256b9cbe554769e21c"
+    },
+    "validation/core-x86_64/musl-build.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/musl-build.json",
+      "sha256": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686"
+    },
+    "validation/core-x86_64/embedded-input-check.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/embedded-input-check.log",
+      "sha256": "898dac38f41a9ebac68829b85fbb9e3761465bed918ee85df8ff004f9a06a9a9"
+    },
+    "validation/core-x86_64/image-build.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/image-build.json",
+      "sha256": "b3af2e7dfda1db7c6ced0f1a43766a40bb172bf7aa84af34e3d114550ef23284"
+    },
+    "validation/core-x86_64/elf.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/elf.log",
+      "sha256": "111e88d721fd1103fdbfba95e7b6cb8d01dad91d0a3c88258989d8b53d0eef40"
+    },
+    "validation/core-x86_64/compile-exact-flags.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/compile-exact-flags.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "validation/core-x86_64/compile.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/compile.log",
+      "sha256": "96f79fd0279b4f3a92f9e0f3d57bbe01c3fdb7b51f157ab8f1953f07046662ef"
+    },
+    "validation/core-x86_64/serial.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/serial.log",
+      "sha256": "3635a64075d6e16f58b060d38a982f202f70df35378802969504d2bbc6b5a461"
+    },
+    "validation/core-x86_64/test.c": {
+      "source": "build/useralloc-core-v6/core-x86_64/test.c",
+      "sha256": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe"
+    },
+    "validation/core-x86_64/harness-process.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/harness-process.json",
+      "sha256": "0a6ad16c37c30fcf77bfd7bbbde479c81084cfcc4fba11c5afbaf9fe5a8ffaab"
+    },
+    "validation/core-x86_64/embedded-input-check.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/embedded-input-check.json",
+      "sha256": "549ec9eeaa51f9b18c8b62e7a78bc8a3eaa0c1b5bc30bb88364e50ffdd3157dd"
+    },
+    "validation/core-x86_64/link.map": {
+      "source": "build/useralloc-core-v6/core-x86_64/link.map",
+      "sha256": "876e0c7ae075d5735b1fade376a4e2abb135a5f16f39643ac52340b1e2cfe990"
+    },
+    "validation/core-x86_64/run.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/run.json",
+      "sha256": "0d36696a03b212b75e84f1bf3dacc06ec09259f2d630c518311ce914f60d8565"
+    },
+    "validation/core-x86_64/image-build.log": {
+      "source": "build/useralloc-core-v6/core-x86_64/image-build.log",
+      "sha256": "57cbd784d516d75f76c6cd5b1d0fdc5b73cad64042e1baf1c11f354c38e2c262"
+    },
+    "validation/core-x86_64/compile.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/compile.json",
+      "sha256": "05d4b7df720d16e1552e28a626edd8b4fe187fb2f47f11d53718579f4da6a1ac"
+    },
+    "validation/core-x86_64/compile-exact-flags.json": {
+      "source": "build/useralloc-core-v6/core-x86_64/compile-exact-flags.json",
+      "sha256": "1ffc2965aa39a01f9c02048683aca626d09f4d4180d0845aa7cdfd29216d2cb6"
+    },
+    "validation/core-x86_64-four-level/exit.json": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/exit.json",
+      "sha256": "66770555f977641251cca7312d63efb3d9f56f671e301b0b7b98643e19669a98"
+    },
+    "validation/core-x86_64-four-level/run.py": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/run.py",
+      "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+    },
+    "validation/core-x86_64-four-level/qemu-observed.json": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/qemu-observed.json",
+      "sha256": "f20acb5c1f331072b08be0228ae7f0ad910853e0ec79b7938423db5efeceacb9"
+    },
+    "validation/core-x86_64-four-level/serial.log": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/serial.log",
+      "sha256": "60ea36d2437ac8d8b64c397ab94c86964b41c300cdf18ad39bb84b37f21eb1c7"
+    },
+    "validation/core-x86_64-four-level/run_vm.py": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/run_vm.py",
+      "sha256": "5f3c543bffefc67219a30d5837042ef6a2a34f9850c0588132878d205792a797"
+    },
+    "validation/core-x86_64-four-level/harness-process.json": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/harness-process.json",
+      "sha256": "d99e1a451ab9c4a970f519394987538362132bf79a8e1a3e0459bf47d9630d45"
+    },
+    "validation/core-x86_64-four-level/run.json": {
+      "source": "build/useralloc-core-v6/core-x86_64-four-level/run.json",
+      "sha256": "bc8e5eb2f9e766d03232ca18addf7ff27d4696489fde69f6fbc6eb632b221c87"
+    },
+    "validation/core-aarch64/exit.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/exit.json",
+      "sha256": "e82b9b41d84aa7cfaba70af39ea1b7d2ed2e92c7bf04c36c763eb1b90940bffc"
+    },
+    "validation/core-aarch64/pagetable.c": {
+      "source": "build/useralloc-core-v6/core-aarch64/pagetable.c",
+      "sha256": "f71d45c78c2db0e1c198d2aa3443513a5fd2f51975a8209a8fdbf374dc7abf5d"
+    },
+    "validation/core-aarch64/run.py": {
+      "source": "build/useralloc-core-v6/core-aarch64/run.py",
+      "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+    },
+    "validation/core-aarch64/qemu-observed.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/qemu-observed.json",
+      "sha256": "dfca59ee122a2636deeb8b7f4c2c3aec0467c6725c993041f89ca4826ebd9952"
+    },
+    "validation/core-aarch64/embedded-arm-check.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/embedded-arm-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "validation/core-aarch64/musl-build.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/musl-build.json",
+      "sha256": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656"
+    },
+    "validation/core-aarch64/embedded-arm-runtime-check.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/embedded-arm-runtime-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "validation/core-aarch64/elf.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/elf.log",
+      "sha256": "78e6b60f6dbcd7d255db47f7321f8a6b9ed2ae3a7b080a7bea15805a23ae6396"
+    },
+    "validation/core-aarch64/compile-exact-flags.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/compile-exact-flags.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "validation/core-aarch64/compile.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/compile.log",
+      "sha256": "5c51b106b7b217786a613f1b5f49c07857f3b8edb1274ad539217fd4d9fa27f3"
+    },
+    "validation/core-aarch64/serial.log": {
+      "source": "build/useralloc-core-v6/core-aarch64/serial.log",
+      "sha256": "bec27b80377ff3a771b799737fca1bac8370336605c83cb859f2fc04a252b432"
+    },
+    "validation/core-aarch64/test.c": {
+      "source": "build/useralloc-core-v6/core-aarch64/test.c",
+      "sha256": "705b57f7ff40b934d438ff62187ca7bc9983839af8ee3ff0039ed59bcbd77abe"
+    },
+    "validation/core-aarch64/harness-process.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/harness-process.json",
+      "sha256": "a22a98f90e48b134b6b5dda3420ad4df114f7f0abbeca24328953f3602bebbd8"
+    },
+    "validation/core-aarch64/embedded-input-check.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/embedded-input-check.json",
+      "sha256": "4f582663e735a651b4e24e745b44f3b2347e9ba632bc132c6670d1cd0b51b7e0"
+    },
+    "validation/core-aarch64/link.map": {
+      "source": "build/useralloc-core-v6/core-aarch64/link.map",
+      "sha256": "753834e69f37f5181eb6b9cf809eaed4776b56e1096479a402762a860c0cf8d4"
+    },
+    "validation/core-aarch64/run.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/run.json",
+      "sha256": "b86766a22688b34c922ac72b837f5ed58eaa07534530adf61ac72b5227330448"
+    },
+    "validation/core-aarch64/compile.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/compile.json",
+      "sha256": "a83d47e837572be3297733096e0fc4f676f3a8b6adeeef40ab4fcf481e3d6776"
+    },
+    "validation/core-aarch64/compile-exact-flags.json": {
+      "source": "build/useralloc-core-v6/core-aarch64/compile-exact-flags.json",
+      "sha256": "ca8f34eeefde08b2941b34ce71b6cf25e9f66fa55d81c5df73e1c191b14807af"
+    },
+    "validation/desktop-perf/results.json": {
+      "source": "build/useralloc-desktop-perf-v6/results.json",
+      "sha256": "ce5715648583074c91da4a6710f948e65cc9ea5d093dc2468d9e79c17092b64e"
+    },
+    "validation/desktop-perf/serial.log": {
+      "source": "build/useralloc-desktop-perf-v6/serial.log",
+      "sha256": "c058525bc813d2493002a0c2039cd5d88890bda114dbf8708140f555fa40f8e8"
+    },
+    "validation/desktop-perf/validation.json": {
+      "source": "build/useralloc-desktop-perf-v6/validation.json",
+      "sha256": "22b95485fce140104367f2a006f6ee670cc959d6913d9c953e99dd99064818d5"
+    },
+    "validation/desktop-perf/driver.log": {
+      "source": "build/useralloc-desktop-perf-v6/driver.log",
+      "sha256": "4cf6683508425ea76b2985f6c74df45a3921168622c9e69c79a29ba6dbc33e5a"
+    },
+    "validation/desktop-perf/run.json": {
+      "source": "build/useralloc-desktop-perf-v6/run.json",
+      "sha256": "e3f76e62864152f6313f34822c1f49d4524afae882af2f02e8980acf5334051f"
+    },
+    "validation/desktop-perf/preparation/run-driver.py": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/run-driver.py",
+      "sha256": "45f886f4273c208cfbb36819c302ffe27a49900476f1c0bc7bf6d66b36e8061d"
+    },
+    "validation/desktop-perf/preparation/preparation.json": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/preparation.json",
+      "sha256": "6bc2d8ea2b3d666f57997f2653bf562518dd6b3fbfa8552aa264a026e342a041"
+    },
+    "validation/desktop-perf/preparation/run.py": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/run.py",
+      "sha256": "6c064e8740d79012c583b856426a56b00a68e87cf97732c53559bda5a39665cd"
+    },
+    "validation/desktop-perf/preparation/perf-init.sh": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/perf-init.sh",
+      "sha256": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5"
+    },
+    "validation/desktop-perf/preparation/pipeline-checkpoint.json": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/pipeline-checkpoint.json",
+      "sha256": "ee2f14ffc36e6067f1e26ba1f4792860ae8820c89502d584cedc0bae31e9437b"
+    },
+    "validation/desktop-perf/preparation/driver.exit.json": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/driver.exit.json",
+      "sha256": "41bc44bc6ce580d5eb1ad44dc26662c734e95c96161eda84ca903b694fdefab8"
+    },
+    "validation/desktop-perf/preparation/pipeline.log": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/pipeline.log",
+      "sha256": "5d92b63dad2b9df17d3d4c451fe4e0d3c05225b45fcdd72999949d832d1e6578"
+    },
+    "validation/desktop-perf/preparation/validate-completed.py": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/validate-completed.py",
+      "sha256": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9"
+    },
+    "validation/desktop-perf/preparation/pipeline.py": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/pipeline.py",
+      "sha256": "93b904de36ec6b7a6ee2c2f34aa8f53432fb0b3a91cde2b4ac07ea76ec21b283"
+    },
+    "validation/desktop-perf/preparation/measure.c": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/measure.c",
+      "sha256": "4d9143034e8c2ef2ee239d61d874ee365a72cc02c4a6c586ff56c275804f0297"
+    },
+    "validation/desktop-perf/preparation/recovery.json": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/recovery.json",
+      "sha256": "f68d6987cac623fdfe94fd157f7cd3a89849166baf91be14cec2e9cbfd60f485"
+    },
+    "excluded/desktop-perf-controller/pipeline.log": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/pipeline.log",
+      "sha256": "5d92b63dad2b9df17d3d4c451fe4e0d3c05225b45fcdd72999949d832d1e6578"
+    },
+    "excluded/desktop-perf-controller/recovery.json": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/recovery.json",
+      "sha256": "f68d6987cac623fdfe94fd157f7cd3a89849166baf91be14cec2e9cbfd60f485"
+    },
+    "excluded/desktop-perf-controller/validate-completed.py": {
+      "source": "build/useralloc-pipe/perf-v6-preparation/validate-completed.py",
+      "sha256": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9"
+    },
+    "validation/source-freeze/source-object-manifest-sha256.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/source-object-manifest-sha256.json",
+      "sha256": "5c314da81798eb0ed98992537c9ef342039954b1f134ed9ea14a0a63842bca1c"
+    },
+    "validation/source-freeze/owned-diff.patch": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/owned-diff.patch",
+      "sha256": "085ac8ad7fc3c90648368c4e2d55c5c5c33092b1d6a991b3f6f115bdd1cf1742"
+    },
+    "validation/source-freeze/independent-review.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/independent-review.json",
+      "sha256": "fa12911854c88f2a28dbd54de1989e539736b1e6469a15e992f5f4d2f3d8f0a8"
+    },
+    "validation/source-freeze/evidence/correctness-v6-x86-driver.py": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/evidence/correctness-v6-x86-driver.py",
+      "sha256": "b5e55d720dc344c2b93881393d5b7acc1b5f0c77208dd6862629b502b3153128"
+    },
+    "validation/source-freeze/evidence/correctness-v6-arm-driver.py": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/evidence/correctness-v6-arm-driver.py",
+      "sha256": "1e610f4410fe09a3adb72690e3aac7cde22aa73e4bbf60b0d9530c155a3edb8a"
+    },
+    "validation/source-freeze/evidence/v6-checkpoint.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/evidence/v6-checkpoint.json",
+      "sha256": "caf558a137b10d99de4b247f1a61e58af4342c387dc8c9cc512f79b3cb32b254"
+    },
+    "validation/source-freeze/evidence/collect-v6-verification.py": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/evidence/collect-v6-verification.py",
+      "sha256": "566538c067b7d255de97112a7b51208d8d18c091793df697b3ca71b8d906533f"
+    },
+    "validation/source-freeze/evidence/v6-verification-summary.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/evidence/v6-verification-summary.json",
+      "sha256": "2a1cdb85207a3fea7d45556b49a9d79647429889b27c7ad8b3066dfcccc1b05a"
+    },
+    "validation/source-freeze/stages/optimized-v6-final/musl-build.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/optimized-v6-final/musl-build.json",
+      "sha256": "b427527ad3aea9ec4bdd4df4ca3a01aec9d900dfb1a8ca0f7f46ee2117e95686"
+    },
+    "validation/source-freeze/stages/optimized-v6-final/config.mak": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/optimized-v6-final/inputs/objects/config.mak",
+      "sha256": "d85a54b254992f6d45f5853178ada344a72985d5bd768afc9faee223be35937f"
+    },
+    "validation/source-freeze/stages/disabled-v6-final/musl-build.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/disabled-v6-final/musl-build.json",
+      "sha256": "2a4e8b096711797d0f0d4e205914e590ad13cebad70a84309c7f923e8f94620d"
+    },
+    "validation/source-freeze/stages/disabled-v6-final/config.mak": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/disabled-v6-final/inputs/objects/config.mak",
+      "sha256": "34087fb7940b4422911315a2b9b75eef3d94e270ee42fc1af765ca9d0d8a0bca"
+    },
+    "validation/source-freeze/stages/optimized-arm126-v6-final/musl-build.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/optimized-arm126-v6-final/musl-build.json",
+      "sha256": "eb23e5cb22a4d9000ba025e931a247510c4e45747c70eabdc0b57695a758c656"
+    },
+    "validation/source-freeze/stages/optimized-arm126-v6-final/config.mak": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/optimized-arm126-v6-final/inputs/objects/config.mak",
+      "sha256": "2fa1c6dbb6350ec9bc76337ce7ba44eb30be5bd7dc0f39ccc5cb3b7ef81043cd"
+    },
+    "validation/source-freeze/stages/disabled-arm126-v6-final/musl-build.json": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/disabled-arm126-v6-final/musl-build.json",
+      "sha256": "ae39cc32810d60a98c6cedb786dfddea15182a42396e0597301a3fabd2495098"
+    },
+    "validation/source-freeze/stages/disabled-arm126-v6-final/config.mak": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/stages/disabled-arm126-v6-final/inputs/objects/config.mak",
+      "sha256": "d348733ffb6d40163b8af5a5d314aba22f8f0ed1eba6f52ede452ed322e195b3"
+    },
+    "validation/source-freeze/malloc-retain.patch": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/build-support/musl/malloc-retain.patch",
+      "sha256": "ec459e48e5c3c9946c91e805428149802d0ab1835c64e5e023811ab54a48af1d"
+    },
+    "validation/source-freeze/tests/user-alloc/verify.c": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/tests/user-alloc/verify.c",
+      "sha256": "9641312c3b7eba760ba1954577ba755fd5565d1832d8f99d21e282ee0a61239e"
+    },
+    "validation/source-freeze/tests/user-alloc/verify-all-classes.c": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/tests/user-alloc/verify-all-classes.c",
+      "sha256": "9ed35cea711394ed247f4b0671d02c6cd610ed7ce3e57d85b5d87407be2986e9"
+    },
+    "validation/source-freeze/tests/user-alloc/clock.c": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/tests/user-alloc/clock.c",
+      "sha256": "b8cd130a5b554ef41f5d84841373379409e6a163d6d1eaea5f59b2148a697a71"
+    },
+    "validation/source-freeze/tests/user-alloc/README.md": {
+      "source": "third_party/useralloc-libc/build/useralloc/v6-source-freeze/tests/user-alloc/README.md",
+      "sha256": "eb820769baa40323147476fa4d974e382c9e7aab125c0552ba34ed068edfe021"
+    }
+  }
+}

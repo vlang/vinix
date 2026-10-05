@@ -1,0 +1,26 @@
+{
+  "removed_utc": "2026-10-02T19:29:11.084891+00:00",
+  "reason": "Host disk exhaustion after production builder verification PASS. Packaged loader/static archive/header/manifest saved separately; raw logs, provenance, pinned inputs and cached musl remain.",
+  "artifacts": [
+    {
+      "path": "initramfs.tar",
+      "kind": "file",
+      "sha256": "bbba6646830132addf3e9f1d145dc4407c7c63ec4ea7d4d8eef065596a8cbdc6",
+      "size": 302231552
+    },
+    {
+      "path": "alpine-devtools.tar",
+      "kind": "file",
+      "sha256": "c978719a34d348fbe8a1a11f284c58a6c557967872dcdfa483019c18f7fa9ff2",
+      "size": 268376576
+    },
+    {
+      "path": "staging",
+      "kind": "directory"
+    },
+    {
+      "path": "alpine-devtools",
+      "kind": "directory"
+    }
+  ]
+}
