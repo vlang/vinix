@@ -5,6 +5,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef VINIX_V_RUNTIME
+#define VINIX_SMC_CONST
+#else
+#define VINIX_SMC_CONST const
+#endif
+
 /* No libc, allocation, MMIO, interrupts, or locks inside the protocol core.
  * The caller owns the opaque state, the mailbox, and serialization.
  * send: 1=sent, 0=failed. recv: 1=message, 0=empty, -1=failed.
@@ -38,18 +44,20 @@ int vinix_smc_refresh(void *state);
 /* No hardware access; errors and samples older than two seconds are rejected. */
 int vinix_smc_cached_capacity(void *state);
 /* Timestamp of the last completed sample; serialize access with refresh. */
-uint64_t vinix_smc_sample_time(const void *state);
+uint64_t vinix_smc_sample_time(VINIX_SMC_CONST void *state);
 /* Read-only battery telemetry. Bits 0/1/2 indicate voltage/current/power.
  * Values are mV, signed mA and signed mW, without estimating missing sensors.
  */
 int vinix_smc_refresh_power(void *state, unsigned *flags, int *voltage,
                             int *current, int *power);
-uint64_t vinix_smc_power_time(const void *state);
+uint64_t vinix_smc_power_time(VINIX_SMC_CONST void *state);
 int vinix_smc_format_power(unsigned flags, int voltage, int current, int power,
                            uint8_t output[128]);
 /* Produces "0\n" through "100\n", without a NUL terminator. */
 int vinix_smc_format_capacity(int percent, uint8_t output[4]);
-const char *vinix_smc_error(int result);
+VINIX_SMC_CONST char *vinix_smc_error(int result);
+
+#undef VINIX_SMC_CONST
 
 #if defined(__aarch64__)
 /* Accessible at EL1 on the same ARM generic-timer setup Vinix already uses. */

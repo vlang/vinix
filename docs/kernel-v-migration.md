@@ -24,7 +24,8 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | Stack protector | Static canary, boot entropy, initialization and fatal handler | Committed as `4fa6dbf2`; host C ABI tests passed 1000 replacements/protected-frame returns and deliberate canary mismatch; allocator imports and LLVM attributes passed; both kernel builds, optimized instruction checks and process/thread retirement guests passed; second measured batches retained zero physical/slab memory; ARM boots covered CPUs with and without FEAT_RNG |
 | Stack fault diagnostics | Serial messages and hexadecimal fault evidence in V; naked probes and x86 idle entry in architecture assembly | Committed as `a9090255`; host sanitizer tests passed 2,003 fault records through each serial adapter, with no allocator imports; assembly instruction bytes and every fault/recovery offset matched the original C objects on both architectures; both builds passed in recovery, fatal-overflow and normal configurations; both QEMU recovery/fatal suites and normal retirement guests passed; second measured batches retained zero physical/slab memory; x86 linked retpoline scan passed |
 | Apple display hotplug policy | Display-capable cable detection, debounce and one-shot cold-attach action | Committed as `0b5e86cd`; extended C ABI fixture passed against the original C and production V under ASan/UBSan, including unsigned timer wrap, cold attach without HPD, initial attachment, zero debounce and non-1 C truth values; no allocator imports; both kernel builds passed; x86 QEMU reached userspace and passed its linked retpoline scan; ARM QEMU completed the process/thread retirement workload with zero physical/slab retention in the second batch |
-| VMX architecture helpers | VT-x controls, FPU state, descriptors and selector reads in V; exact VM entry/exit in assembly | Host C ABI/sanitizer tests passed 7,680 control cases and all ARM no-op exports with no allocator imports; optimized x86 ports preserved CF/ZF capture, operand order and memory clobbers; all 214 VM-entry instruction bytes matched both the original host and kernel objects; both architecture builds and QEMU boot/syscall guests passed; x86 linked retpoline scan passed |
+| VMX architecture helpers | VT-x controls, FPU state, descriptors and selector reads in V; exact VM entry/exit in assembly | Committed as `0e4bee84`; host C ABI/sanitizer tests passed 7,680 control cases and all ARM no-op exports with no allocator imports; optimized x86 ports preserved CF/ZF capture, operand order and memory clobbers; all 214 VM-entry instruction bytes matched both the original host and kernel objects; both architecture builds and QEMU boot/syscall guests passed; x86 linked retpoline scan passed |
+| SMC protocol core | Read-only RTKit boot, bounded mailbox transactions, capacity/power caching and text formatting | 27 unchanged host fixtures passed against the V C ABI under ASan/UBSan with no allocator imports; both architecture builds and QEMU boot/syscall checks passed; physical Apple firmware remains untested |
 | Network and Apple drivers | lwIP bridge, ANS, SMC, speakers, keyboard, Wi-Fi and GPU helpers | Pending |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
 | Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
@@ -65,3 +66,31 @@ not verify VMXON or VMLAUNCH execution. On a suitable x86 host with nested
 VT-x, `tests/hypervisor/run-vm.py --require-vmx` requires five VM executions
 with IO/HLT exits and complete GPR preservation. That hardware path remains
 unverified locally.
+
+## Follow-on batch: approximately 10,000 C lines
+
+The next batch covers 9989 lines from the following original C
+implementations, measured before any ports in this batch. Independent C
+fixtures and third-party code stay in their existing languages. Each finished
+stage is committed after host tests, both architecture builds and QEMU checks.
+
+| Original implementation | Original lines |
+| --- | ---: |
+| `kernel/c/apple_ans.c` | 807 |
+| `kernel/c/apple_ans_ext2.c` | 792 |
+| `kernel/c/apple_smc.c` | 520 |
+| `kernel/c/apple_speakers.c` | 1,849 |
+| `kernel/c/apple_spi_keyboard.c` | 772 |
+| `kernel/c/brcm_m1.c` | 249 |
+| `kernel/c/brcm_wifi.c` | 641 |
+| `kernel/c/agx_fake_g17.c` | 313 |
+| `kernel/c/agx_fake_g17_encode.c` | 1,158 |
+| `kernel/c/vinix_net.c` | 1,375 |
+| `kernel/c/linuxkpi_string.c` | 181 |
+| `kernel/c/linuxkpi_kstrtox.c` | 398 |
+| `kernel/c/linuxkpi_bitmap.c` | 300 |
+| `kernel/c/linuxkpi_cache.c` | 298 |
+| `kernel/c/linuxkpi_percpu.c` | 136 |
+| `kernel/c/linuxkpi_refcount.c` | 63 |
+| `kernel/c/linuxkpi_taint.c` | 53 |
+| `kernel/c/linuxkpi_io.c` | 84 |

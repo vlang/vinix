@@ -4,6 +4,7 @@
 module smc
 
 import aarch64.cpu
+import apple.smc.core as smccore
 import apple.mailbox
 import devicetree
 import errno
@@ -21,19 +22,6 @@ import time
 
 #include "apple_smc.h"
 
-fn C.vinix_smc_state_size() u64
-fn C.vinix_smc_boot(state voidptr, context voidptr,
-	send fn (voidptr, u64, u8) int, recv fn (voidptr, &u64, &u8) int,
-	clock fn (voidptr) u64, relax fn (voidptr),
-	frequency u64, sram_base u64, sram_size u64) int
-fn C.vinix_smc_poll(state voidptr, budget u32) int
-fn C.vinix_smc_refresh(state voidptr) int
-fn C.vinix_smc_sample_time(state voidptr) u64
-fn C.vinix_smc_refresh_power(state voidptr, flags &u32, voltage &int, current &int, power &int) int
-fn C.vinix_smc_power_time(state voidptr) u64
-fn C.vinix_smc_format_power(flags u32, voltage int, current int, power int, output &u8) int
-fn C.vinix_smc_format_capacity(percent int, output &u8) int
-fn C.vinix_smc_error(result int) &char
 fn C.vinix_smc_counter() u64
 
 struct Snapshot {
@@ -71,7 +59,7 @@ __global (
 	battery_power_device = &Battery(unsafe { nil })
 )
 
-fn send(context voidptr, word u64, endpoint u8) int {
+fn send(context voidptr, word u64, endpoint u8) i32 {
 	mut dev := unsafe { &Battery(context) }
 	if dev.mbox.send(mailbox.MboxMsg{data0: word, data1: u64(endpoint)}) {
 		return 1
@@ -79,7 +67,7 @@ fn send(context voidptr, word u64, endpoint u8) int {
 	return 0
 }
 
-fn recv(context voidptr, word &u64, endpoint &u8) int {
+fn recv(context voidptr, word &u64, endpoint &u8) i32 {
 	mut dev := unsafe { &Battery(context) }
 	msg := dev.mbox.recv() or { return 0 }
 	unsafe {
@@ -174,13 +162,13 @@ pub fn initialise() {
 
 	mut dev := &Battery{
 		mbox: mailbox.new_mailbox(regs[0].base)
-		state: memory.malloc(C.vinix_smc_state_size())
+		state: memory.malloc(u64(smccore.vinix_smc_state_size()))
 		snapshots: map[u64]Snapshot{}
 	}
-	result := C.vinix_smc_boot(dev.state, voidptr(dev), send, recv, clock, relax,
+	result := smccore.vinix_smc_boot(dev.state, voidptr(dev), send, recv, clock, relax,
 		cpu.read_cntfrq_el0(), sram.base, sram.size)
 	if result < 0 {
-		C.printf(c'apple-smc: probe failed: %s\n', C.vinix_smc_error(result))
+		C.printf(c'apple-smc: probe failed: %s\n', smccore.vinix_smc_error(result))
 		// No DMA allocations were made and no firmware buffer points at dev.
 		unsafe {
 			free(dev.state)
@@ -189,9 +177,9 @@ pub fn initialise() {
 		return
 	}
 
-	initial := C.vinix_smc_refresh(dev.state)
+	initial := smccore.vinix_smc_refresh(dev.state)
 	dev.sample = initial
-	dev.sampled_at = C.vinix_smc_sample_time(dev.state)
+	dev.sampled_at = smccore.vinix_smc_sample_time(dev.state)
 	dev.frequency = cpu.read_cntfrq_el0()
 	battery_device = dev
 	if initial == -4 { // VINIX_SMC_NO_KEY: no supported battery on this machine.
@@ -222,7 +210,7 @@ pub fn initialise() {
 	if initial >= 0 {
 		C.printf(c'apple-smc: /dev/battery: %d%%\n', initial)
 	} else {
-		C.printf(c'apple-smc: /dev/battery: %s\n', C.vinix_smc_error(initial))
+		C.printf(c'apple-smc: /dev/battery: %s\n', smccore.vinix_smc_error(initial))
 	}
 }
 
@@ -236,20 +224,20 @@ fn service() {
 		timer.disarm()
 		// No Resource spinlock during firmware waits: Vinix spinlocks mask
 		// interrupts. This worker alone owns the mutable protocol state.
-		result := C.vinix_smc_poll(dev.state, 64)
-		capacity := if result >= 0 { C.vinix_smc_refresh(dev.state) } else { result }
-		sampled_at := C.vinix_smc_sample_time(dev.state)
+		result := smccore.vinix_smc_poll(dev.state, 64)
+		capacity := if result >= 0 { smccore.vinix_smc_refresh(dev.state) } else { result }
+		sampled_at := smccore.vinix_smc_sample_time(dev.state)
 		dev.l.acquire()
 		dev.sample = capacity
 		dev.sampled_at = sampled_at
 		dev.l.release()
 		if battery_power_device != unsafe { nil } && result >= 0 {
 			mut flags := u32(0)
-			mut voltage := 0
-			mut current := 0
-			mut watts := 0
-			power_result := C.vinix_smc_refresh_power(dev.state, &flags, &voltage, &current, &watts)
-			power_at := C.vinix_smc_power_time(dev.state)
+			mut voltage := i32(0)
+			mut current := i32(0)
+			mut watts := i32(0)
+			power_result := smccore.vinix_smc_refresh_power(dev.state, &flags, &voltage, &current, &watts)
+			power_at := smccore.vinix_smc_power_time(dev.state)
 			mut power := battery_power_device
 			power.l.acquire()
 			power.sample = power_result
@@ -261,7 +249,7 @@ fn service() {
 			power.l.release()
 		}
 		if result < 0 {
-			C.printf(c'apple-smc: battery service stopped: %s\n', C.vinix_smc_error(result))
+			C.printf(c'apple-smc: battery service stopped: %s\n', smccore.vinix_smc_error(result))
 			break
 		}
 		timer.when = time.TimeSpec{tv_nsec: 100_000_000}
@@ -294,9 +282,9 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 		}
 		mut value := Snapshot{}
 		value.length = if this.power_only {
-			C.vinix_smc_format_power(this.power_flags, this.voltage_mv, this.current_ma, this.power_mw, &value.bytes[0])
+			smccore.vinix_smc_format_power(this.power_flags, i32(this.voltage_mv), i32(this.current_ma), i32(this.power_mw), &value.bytes[0])
 		} else {
-			C.vinix_smc_format_capacity(percent, &value.bytes[0])
+			smccore.vinix_smc_format_capacity(i32(percent), &value.bytes[0])
 		}
 		if value.length < 0 {
 			errno.set(errno.eio)
