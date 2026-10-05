@@ -11,6 +11,7 @@ module main
 import os
 import ui2
 import encoding.base64
+import math
 
 fn tree_has_id(element ui2.Element, id string) bool {
 	if element.id == id {
@@ -321,6 +322,7 @@ fn main() {
 		}
 	}
 	close_remote(mut terminal)
+	check_scientific_calculator_client(mut desktop)
 	check_new_utility_clients(mut desktop)
 	check_storage_utility_clients(mut desktop)
 	check_productivity_utility_clients(mut desktop)
@@ -558,7 +560,8 @@ fn check_productivity_utility_clients(mut desktop Desktop) {
 	assert tree_contains_text(reloaded_notes, 'IPC note 😀')
 	assert tree_contains_text(reloaded_notes, 'Native note 日本語')
 	free_tree(reloaded_notes)
-	close_remote(mut reopened_notes)
+	check_notes_close_client(mut reopened_notes, notes_factory, mut desktop)
+	check_color_meter_client()
 
 	reminders_factory := app_factory_named('vinix-reminders') or { panic('Reminders is not registered') }
 	mut reminders := start_remote_app_at_with_timeout(arguments()[0], reminders_factory, mut desktop,
@@ -611,4 +614,279 @@ fn check_productivity_utility_clients(mut desktop Desktop) {
 	assert unchanged_graph == graph_text
 	unsafe { graph_text.free(); unchanged_graph.free() }
 	close_remote(mut grapher)
+}
+
+fn integration_tree_text(element ui2.Element, id string) ?string {
+	if element.id == id { return element.text }
+	for child in element.children {
+		if text := integration_tree_text(child, id) { return text }
+	}
+	return none
+}
+
+fn integration_calculator_display(mut app NativeApp, expected string) {
+	tree := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	value := integration_tree_text(tree, 'display') or { panic('missing Calculator display') }
+	assert value == expected, 'Calculator displayed ${value}, expected ${expected}'
+	free_tree(tree)
+}
+
+// Scientific controls, typed operators, pasted numeric operands and resize all
+// cross the same pipes as the installed multicall Calculator executable.
+fn check_scientific_calculator_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut calculator := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut calculator) }
+	basic := calculator.build(ui2.rect(0, 0, 340, 516)) or { panic(err) }
+	assert tree_has_id(basic, 'calculator.mode.scientific')
+	assert !tree_has_id(basic, 'calculator.scientific.sqrt')
+	free_tree(basic)
+	calculator.handle('calculator.mode.scientific') or { panic(err) }
+	if mut calculator is RemoteApp {
+		assert calculator.pid > 0 && calculator.keyboard
+		calculator.paste_input('9')
+	}
+	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
+	integration_calculator_display(mut calculator, '3')
+	calculator.handle('C') or { panic(err) }
+	if mut calculator is RemoteApp {
+		calculator.key_input('2+')
+		calculator.paste_input('9')
+	}
+	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
+	calculator.handle('=') or { panic(err) }
+	integration_calculator_display(mut calculator, '5')
+	calculator.handle('C') or { panic(err) }
+	calculator.handle('calculator.angle.degrees') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('30') }
+	calculator.handle('calculator.scientific.sin') or { panic(err) }
+	integration_calculator_display(mut calculator, '0.5')
+	calculator.handle('C') or { panic(err) }
+	calculator.handle('calculator.angle.radians') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('1.5707963267948966') }
+	calculator.handle('calculator.scientific.cos') or { panic(err) }
+	radians := calculator.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	cosine := integration_tree_text(radians, 'display') or { panic('missing radians result') }
+	assert math.abs(cosine.f64()) < 1e-12
+	assert tree_has_id(radians, 'calculator.angle.radians')
+	free_tree(radians)
+	calculator.handle('C') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('1e3') }
+	calculator.handle('calculator.scientific.reciprocal') or { panic(err) }
+	integration_calculator_display(mut calculator, '0.001')
+	calculator.handle('C') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('-1') }
+	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
+	domain := calculator.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	domain_display := integration_tree_text(domain, 'display') or { panic('missing error display') }
+	assert domain_display == tr('calculator.error')
+	assert tree_contains_text(domain, tr('calculator.error.domain'))
+	free_tree(domain)
+	calculator.handle('C') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('25') }
+	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
+	integration_calculator_display(mut calculator, '5')
+	narrow := calculator.build(ui2.rect(0, 0, 340, 516)) or { panic(err) }
+	assert tree_contains_text(narrow, tr('calculator.scientific.resize'))
+	assert !tree_has_id(narrow, 'calculator.scientific.sqrt')
+	free_tree(narrow)
+	calculator.handle('calculator.mode.basic') or { panic(err) }
+	restored := calculator.build(ui2.rect(0, 0, 340, 516)) or { panic(err) }
+	assert tree_has_id(restored, '5') && tree_has_id(restored, 'display')
+	assert !tree_has_id(restored, 'calculator.scientific.sqrt')
+	free_tree(restored)
+	assert native_app_prepare_close(mut calculator)
+	println('IPC scientific Calculator passed')
+}
+
+// An invalid draft must survive a real prepare-close request. Repair saves it;
+// the separate two-step discard only abandons the subsequent unsaved edit.
+fn check_notes_close_client(mut notes NativeApp, factory AppFactory, mut desktop Desktop) {
+	notes.handle('notes.title') or { panic(err) }
+	mut pid := -1
+	if mut notes is RemoteApp {
+		pid = notes.pid
+		assert notes.peer_features & app_feature_close_guard != 0
+		notes.key_input('\x01\x7f')
+	}
+	assert pid > 0
+	assert !native_app_prepare_close(mut notes)
+	if mut notes is RemoteApp {
+		assert !notes.closed && notes.pid == pid
+		assert C.fcntl(notes.request_fd, C.F_GETFD) >= 0
+		assert C.fcntl(notes.response_fd, C.F_GETFD) >= 0
+	}
+	assert C.kill(pid, 0) == 0
+	refused := notes.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_has_id(refused, 'notes.keep_editing') && tree_has_id(refused, 'notes.discard')
+	assert !tree_has_id(refused, 'notes.confirm_discard')
+	assert tree_contains_text(refused, 'Native note 日本語')
+	free_tree(refused)
+	notes.handle('notes.keep_editing') or { panic(err) }
+	storage_remote_field(mut notes, 'notes.title', 'IPC repaired note 😀')
+	assert native_app_prepare_close(mut notes)
+	close_remote(mut notes)
+
+	mut discard := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut discard) }
+	repaired := discard.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(repaired, 'IPC repaired note 😀')
+	assert tree_contains_text(repaired, 'Native note 日本語')
+	free_tree(repaired)
+	storage_remote_field(mut discard, 'notes.title', '')
+	if mut discard is RemoteApp { discard.key_input('\x7f') }
+	storage_remote_field(mut discard, 'notes.body', 'Discarded IPC text 日本語')
+	assert !native_app_prepare_close(mut discard)
+	// Confirm without the explicit first step cannot authorize closing.
+	discard.handle('notes.confirm_discard') or { panic(err) }
+	assert !native_app_prepare_close(mut discard)
+	discard.handle('notes.discard') or { panic(err) }
+	confirmation := discard.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_has_id(confirmation, 'notes.confirm_discard')
+	assert tree_contains_text(confirmation, 'Discarded IPC text 日本語')
+	free_tree(confirmation)
+	discard.handle('notes.confirm_discard') or { panic(err) }
+	assert native_app_prepare_close(mut discard)
+	close_remote(mut discard)
+	mut durable := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut durable) }
+	unchanged := durable.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(unchanged, 'IPC repaired note 😀')
+	assert tree_contains_text(unchanged, 'Native note 日本語')
+	assert !tree_contains_text(unchanged, 'Discarded IPC text 日本語')
+	free_tree(unchanged)
+	println('IPC Notes close guard passed')
+}
+
+fn integration_session_paste(mut desktop Desktop, mut recipient NativeApp, chord string) {
+	recipient.handle('notes.body') or { panic(err) }
+	if mut recipient is RemoteApp { recipient.key_input('\x01') }
+	rest := desktop.take_paste_keys(chord)
+	assert rest.len == 0
+	unsafe { rest.free() }
+	assert desktop.clipboard.pid == -1 && desktop.clipboard.fd == -1
+}
+
+// Only the compositor owns these pixels. Samples, pointer updates and copy
+// requests traverse a live child, and its copied text pastes into another one.
+fn check_color_meter_client() {
+	factory := app_factory_named('vinix-color-meter') or { panic('Color Meter is not registered') }
+	assert factory.desktop_services && factory.polling && factory.poll_interval_ms == 100
+	mut desktop := Desktop{
+		home: desktop_user_home
+		canvas: new_scaled_canvas(16, 12, 32, 24, 2)
+		pointer_x: 4
+		pointer_y: 3
+	}
+	pixels := desktop.canvas.pixels
+	defer {
+		desktop.clipboard.close_request()
+		unsafe {
+			free(pixels)
+			desktop.cursor_backing.pixels.free()
+			desktop.apps.free(); desktop.windows.free(); desktop.native_asset_icons.free()
+			desktop.clipboard.url.free(); desktop.clipboard.pending.free(); desktop.clipboard.data.free()
+		}
+	}
+	for index in 0 .. 32 * 24 { unsafe { pixels[index] = 0x112233 } }
+	unsafe { pixels[5 * 32 + 4] = 0x123456 }
+	mut meter := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut meter) }
+	storage_remote_field(mut meter, 'color_meter.x', '4')
+	storage_remote_field(mut meter, 'color_meter.y', '5')
+	meter.handle('color_meter.sample') or { panic(err) }
+	if mut meter is RemoteApp {
+		assert meter.pid > 0 && meter.peer_features & app_feature_desktop_services != 0
+		assert meter.color_sample.status == .sampled && meter.color_sample.rgb == 0x123456
+		assert meter.color_sample.width == 32 && meter.color_sample.height == 24
+		assert meter.color_sample.x == 4 && meter.color_sample.y == 5 && meter.color_sample.count == 1
+	}
+	sample := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
+	assert tree_has_id(sample, 'color_meter.magnifier') && tree_has_id(sample, 'color_meter.copy_hex')
+	assert tree_contains_text(sample, '#123456') && tree_contains_text(sample, 'rgb(18, 52, 86)')
+	free_tree(sample)
+	meter.handle('color_meter.aperture.3') or { panic(err) }
+	if mut meter is RemoteApp { assert meter.color_sample.count == 9 && meter.color_sample.rgb == 0x112437 }
+	meter.handle('color_meter.aperture.1') or { panic(err) }
+
+	notes_factory := app_factory_named('vinix-notes') or { panic('Notes is not registered') }
+	mut recipient := start_remote_app_at_with_timeout(arguments()[0], notes_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut recipient) }
+	recipient.handle('notes.new') or { panic(err) }
+	storage_remote_field(mut recipient, 'notes.title', 'IPC clipboard note')
+	desktop.apps << recipient
+	desktop.windows << Window{ id: 9100, title: 'Notes', page: .app, app_index: 0 }
+	desktop.focus = 9100
+	meter.handle('color_meter.copy_hex') or { panic(err) }
+	assert desktop.clipboard.local_available
+	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == '#123456'
+	integration_session_paste(mut desktop, mut recipient, key_cmd_v)
+	hex_pasted := recipient.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(hex_pasted, '#123456')
+	free_tree(hex_pasted)
+	meter.handle('color_meter.copy_rgb') or { panic(err) }
+	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == 'rgb(18, 52, 86)'
+	integration_session_paste(mut desktop, mut recipient, '\x16')
+	rgb_pasted := recipient.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_contains_text(rgb_pasted, 'rgb(18, 52, 86)') && !tree_contains_text(rgb_pasted, '#123456')
+	free_tree(rgb_pasted)
+	assert native_app_prepare_close(mut recipient)
+	close_remote(mut recipient)
+
+	// The cursor's painted white pixel is excluded through its saved backing;
+	// logical pointer coordinates select the centre of the physical HiDPI cell.
+	unsafe { pixels[7 * 32 + 9] = 0xffffff }
+	desktop.cursor_backing = CursorBacking{
+		box: DamageRect{ x: 4, y: 3, w: 1, h: 1, valid: true }
+		pixels: [u32(0xabcdef), 0xabcdef, 0xabcdef, 0xabcdef]
+	}
+	meter.handle('color_meter.live') or { panic(err) }
+	if mut meter is RemoteApp {
+		assert meter.color_sample.x == 9 && meter.color_sample.y == 7 && meter.color_sample.rgb == 0xabcdef
+		assert !meter.poll()
+		assert meter.poll_sampled && meter.next_poll_interval() == 100
+		sequence := meter.color_sample.sequence
+		desktop.cursor_backing.pixels[3] = 0xfedcba
+		meter.last_poll_ms = desktop_monotonic_ms()
+		assert !meter.poll()
+		assert meter.color_sample.sequence == sequence && meter.color_sample.rgb == 0xabcdef
+		meter.last_poll_ms = desktop_monotonic_ms() - 100
+		assert meter.poll()
+		assert meter.color_sample.rgb == 0xfedcba && meter.color_sample.sequence > sequence
+	}
+	live := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
+	assert tree_contains_text(live, '#FEDCBA')
+	assert tree_contains_text(live, tr('color_meter.live_status'))
+	free_tree(live)
+	meter.handle('color_meter.freeze') or { panic(err) }
+	desktop.cursor_backing.pixels[3] = 0x090807
+	if mut meter is RemoteApp {
+		sequence := meter.color_sample.sequence
+		assert !meter.poll()
+		assert meter.color_sample.sequence == sequence && meter.color_sample.rgb == 0xfedcba
+		assert meter.next_poll_interval() == 1000
+	}
+	frozen := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
+	assert tree_contains_text(frozen, '#FEDCBA') && tree_contains_text(frozen, tr('color_meter.frozen'))
+	free_tree(frozen)
+
+	desktop.canvas.pixels = unsafe { nil }
+	meter.handle('color_meter.sample') or { panic(err) }
+	if mut meter is RemoteApp {
+		assert meter.color_sample.status == .unavailable && meter.color_sample.count == 0
+		assert !meter.closed
+	}
+	unavailable := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
+	assert tree_contains_text(unavailable, tr('color_meter.unavailable'))
+	assert !tree_contains_text(unavailable, '#FEDCBA')
+	free_tree(unavailable)
+	meter.handle('color_meter.copy_hex') or { panic(err) }
+	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == 'rgb(18, 52, 86)'
+	desktop.canvas.pixels = pixels
+	println('IPC Color Meter sampling, clipboard and polling passed')
 }
