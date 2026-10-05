@@ -8,6 +8,46 @@ import os
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
+fn test_system_information_factory_interface_edits_and_exports_release_owned_memory() {
+	root := os.join_path(os.temp_dir(), 'vinix-system-information-native-heap-${os.getpid()}')
+	os.mkdir_all(root)!
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := system_information_join_path(root, 'report-Ж.txt')
+	defer { unsafe { path.free() } }
+	mut desktop := Desktop{}
+	// The factory model lives for the native process. Keep that fixture and
+	// the frame pool outside tracking; measure its repeatedly owned buffers.
+	mut app := open_system_information(mut desktop)!
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 780, 516))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		if mut app is SystemInformationApp {
+			app.initialize()
+			app.initialize()
+			app.close_app()
+			app.initialize()
+			app.refresh()
+		}
+		app.handle('system_information.path')!
+		mut pasted := false
+		if mut app is PastingApp {
+			mut paster := PastingApp(app)
+			paster.paste_input(path)
+			pasted = true
+		}
+		assert pasted
+		app.handle('system_information.export')!
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 780, 516))!)
+		assert C.unlink(&char(path.str)) == 0
+		if mut app is SystemInformationApp {
+			app.close_app()
+		}
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_system_information_refresh_report_frames_and_close_release_owned_memory() {
 	// Reading real host procfs may be unavailable; both the populated and
 	// unavailable paths are exercised by explicit bounded model data below.

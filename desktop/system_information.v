@@ -128,6 +128,10 @@ fn open_system_information(mut _ Desktop) !NativeApp {
 }
 
 fn (mut app SystemInformationApp) initialize() {
+	// V3 zero-initializes the array header in this heap-allocated model.
+	// Give it a byte element size before the first append.
+	if app.report_path.cap > 0 { unsafe { app.report_path.free() } }
+	app.report_path = []u8{cap: system_information_path_limit}
 	unsafe { app.report_path.flags |= .noslices }
 	home := if desktop_user_home.len > 0 { desktop_user_home } else { desktop_home }
 	path := system_information_join_path(home, 'system-information.txt')

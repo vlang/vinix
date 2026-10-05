@@ -41,6 +41,50 @@ fn system_information_test_has(section SystemInformationSection, key string, tex
 	return false
 }
 
+fn system_information_test_tree_has_text(tree ui2.Element, text string) bool {
+	if tree.text == text { return true }
+	for child in tree.children { if system_information_test_tree_has_text(child, text) { return true } }
+	return false
+}
+
+fn test_system_information_factory_preserves_destination_through_native_interfaces() {
+	previous := desktop_language
+	set_desktop_language(.en)
+	defer { set_desktop_language(previous) }
+	root := os.join_path(os.temp_dir(), 'vinix-system-information-native-${os.getpid()}')
+	os.mkdir_all(root)!
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := system_information_join_path(root, 'report-Ж.txt')
+	defer { unsafe { path.free() } }
+	mut desktop := Desktop{}
+	mut app := open_system_information(mut desktop)!
+	defer {
+		if mut app is ClosingApp { app.close_app() }
+	}
+	if mut app is SystemInformationApp {
+		assert disk_usage_buffer_text(app.report_path).ends_with('/system-information.txt')
+		app.initialize()
+		assert disk_usage_buffer_text(app.report_path).ends_with('/system-information.txt')
+	}
+	app.handle('system_information.path')!
+	mut pasted := false
+	if mut app is PastingApp {
+		mut paster := PastingApp(app)
+		paster.paste_input(path)
+		pasted = true
+	}
+	assert pasted
+	app.handle('system_information.export')!
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 780, 516))!
+	assert system_information_test_tree_has_text(tree, path)
+	assert system_information_test_tree_has_text(tree, 'Report saved')
+	free_tree(tree)
+	contents := os.read_file(path)!
+	assert contents.contains('System Information') && contents.contains('Installed packages')
+	unsafe { contents.free() }
+}
+
 fn test_system_information_refresh_collects_actual_sources_and_replaces_snapshot() {
 	root := os.join_path(os.temp_dir(), 'vinix-system-information-fixture-${os.getpid()}')
 	os.mkdir_all(root)!
