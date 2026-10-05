@@ -3578,3 +3578,273 @@ Display: {0}
 color_meter.resize
 Enlarge the window to show sampling controls.
 -----
+app.dictionary
+Dictionary
+-----
+dictionary.load
+Load
+-----
+dictionary.lookup
+Look up
+-----
+dictionary.back
+<
+-----
+dictionary.forward
+>
+-----
+dictionary.matches
+Headwords
+-----
+dictionary.previous
+Previous
+-----
+dictionary.next
+Next
+-----
+dictionary.up
+Page up
+-----
+dictionary.down
+Page down
+-----
+dictionary.offline
+WordNet 3.0 / offline
+-----
+dictionary.export
+Export definition
+-----
+dictionary.unavailable
+Cannot load a valid regular dictionary file. Existing lookup data is preserved.
+-----
+dictionary.read_failed
+Definition unavailable or dictionary file changed. Reload the source.
+-----
+dictionary.ready
+Enter a word or phrase. Prefix matches appear at left; Enter opens the first match on this page.
+-----
+dictionary.no_match
+No matching headword. The last definition is kept.
+-----
+dictionary.exported
+Definition exported.
+-----
+dictionary.export_exists
+Export path already exists. Choose a new path.
+-----
+dictionary.path_invalid
+Enter an absolute file path.
+-----
+dictionary.export_failed
+Could not export the definition.
+-----
+dictionary.resize
+Enlarge this window to at least 640 by 420 content pixels.
+-----
+editor.workflow.save_as
+Save As
+-----
+editor.workflow.save_as_hint
+Choose a new file. Existing files are preserved.
+-----
+editor.workflow.save_as_create
+Create file
+-----
+editor.workflow.cancel
+Cancel
+-----
+editor.workflow.unsaved_close
+Save this document before closing, keep editing, or explicitly discard your changes.
+-----
+editor.workflow.unsaved_new
+Save this document before creating a new one, keep editing, or explicitly discard your changes.
+-----
+editor.workflow.unsaved_open
+Save this document before opening another file, keep editing, or explicitly discard your changes.
+-----
+editor.workflow.keep_editing
+Keep editing
+-----
+editor.workflow.discard
+Discard changes
+-----
+editor.workflow.confirm_discard
+Confirm discard
+-----
+editor.workflow.confirm_hint
+Discard unsaved changes? This cannot be undone.
+-----
+editor.workflow.discard_ready
+Changes will be discarded when you close. New edits cancel this choice.
+-----
+editor.workflow.exists
+File already exists. Choose a new Save As path.
+-----
+editor.workflow.invalid_path
+Enter a valid file path (up to 512 bytes).
+-----
+calendar.ics.open
+Import / Export
+-----
+calendar.ics.title
+Calendar interchange
+-----
+calendar.ics.back
+Back
+-----
+calendar.ics.import_path
+Import ICS file
+-----
+calendar.ics.export_path
+New export ICS file
+-----
+calendar.ics.import
+Import ICS
+-----
+calendar.ics.export
+Export ICS
+-----
+calendar.ics.scope
+One-day all-day events or local times at minute precision. No timezones, recurrence, durations, alarms or extra event fields.
+-----
+calendar.ics.merge
+Merge without replacing events. Identical date/time/title/location events are skipped. UID and timestamps are validated but not stored.
+-----
+calendar.ics.ready
+Choose an ICS file to import or a new export path.
+-----
+calendar.ics.imported
+Imported events; exact duplicates skipped.
+-----
+calendar.ics.nothing
+No new events; identical events skipped.
+-----
+calendar.ics.invalid
+Invalid or damaged ICS file.
+-----
+calendar.ics.unsupported
+Unsupported ICS semantics. Use one-day all-day or floating local events without duration.
+-----
+calendar.ics.limit
+ICS exceeds file, line, event or calendar limits.
+-----
+calendar.ics.duplicate
+Conflicting events share one UID.
+-----
+calendar.ics.read_failed
+Cannot read a regular ICS file.
+-----
+calendar.ics.path_invalid
+Enter an absolute file path.
+-----
+calendar.ics.export_exists
+Export path already exists.
+-----
+calendar.ics.export_failed
+Could not export ICS.
+-----
+calendar.ics.exported
+Calendar exported.
+-----
+files.trash.open
+Trash
+-----
+files.trash.move
+Move to Trash
+-----
+files.trash.title
+Trash
+-----
+files.trash.back
+Back to Files
+-----
+files.trash.refresh
+Refresh
+-----
+files.trash.restore
+Restore Selected
+-----
+files.trash.empty
+Empty Trash…
+-----
+files.trash.confirm
+Permanently Empty
+-----
+files.trash.cancel
+Cancel
+-----
+files.trash.previous
+Previous
+-----
+files.trash.next
+Next
+-----
+files.trash.hint
+Trash accepts items in your Home on the same filesystem. Restore never replaces an existing item.
+-----
+files.trash.limited
+Emptying removes files, links and empty folders. Restore nonempty folders to manage their contents.
+-----
+files.trash.confirm_hint
+Permanently remove eligible items? This cannot be undone. Nonempty folders and damaged entries prevent emptying.
+-----
+files.trash.empty_list
+Trash is empty.
+-----
+files.trash.ready
+Select an item to restore it.
+-----
+files.trash.moved
+Moved to Trash.
+-----
+files.trash.restored
+Restored to the original location.
+-----
+files.trash.emptied
+Trash emptied.
+-----
+files.trash.select
+Select an item first.
+-----
+files.trash.unsafe
+Only ordinary items inside your Home can be trashed; protected paths and symlink parents are refused.
+-----
+files.trash.unavailable
+Trash could not be opened safely.
+-----
+files.trash.busy
+Trash is busy in another window. Try again.
+-----
+files.trash.damaged
+Trash contains damaged or unknown entries. They were preserved; emptying is refused.
+-----
+files.trash.changed
+The selected item changed. Refresh Trash before trying again.
+-----
+files.trash.failed
+The operation failed. Existing items were preserved.
+-----
+files.trash.cross_device
+Moving across filesystems is unsupported. The source was left unchanged.
+-----
+files.trash.conflict
+The original location already contains an item. Nothing was replaced.
+-----
+files.trash.parent_missing
+The original parent folder is missing or unsafe. The trashed item was preserved.
+-----
+files.trash.nonempty
+A nonempty folder prevents emptying. Restore it to manage its contents.
+-----
+files.trash.partial
+Emptying stopped after a filesystem change. Refresh to review the remaining items.
+-----
+files.trash.unsynced
+The item moved, but syncing or cleanup failed. Refresh to check its location.
+-----
+files.trash.changed_moved
+The source changed while moving. Its contents were preserved in Trash; metadata needs attention.
+-----
+files.trash.empty_unsynced
+Items were removed, but syncing failed. Refresh Trash to check remaining entries.
+-----

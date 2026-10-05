@@ -3578,3 +3578,273 @@ Pantalla: {0}
 color_meter.resize
 Amplíe la ventana para ver los controles de medición.
 -----
+app.dictionary
+Diccionario
+-----
+dictionary.load
+Cargar
+-----
+dictionary.lookup
+Buscar
+-----
+dictionary.back
+<
+-----
+dictionary.forward
+>
+-----
+dictionary.matches
+Palabras
+-----
+dictionary.previous
+Anterior
+-----
+dictionary.next
+Siguiente
+-----
+dictionary.up
+Página arriba
+-----
+dictionary.down
+Página abajo
+-----
+dictionary.offline
+WordNet 3.0 / sin conexión
+-----
+dictionary.export
+Exportar definición
+-----
+dictionary.unavailable
+No se puede cargar un diccionario válido. Se conservan los datos anteriores.
+-----
+dictionary.read_failed
+La definición no está disponible o el archivo cambió. Vuelva a cargarlo.
+-----
+dictionary.ready
+Introduzca una palabra o frase. Intro abre la primera coincidencia de esta página.
+-----
+dictionary.no_match
+No hay coincidencias. Se conserva la última definición.
+-----
+dictionary.exported
+Definición exportada.
+-----
+dictionary.export_exists
+El archivo ya existe. Elija otra ruta.
+-----
+dictionary.path_invalid
+Introduzca una ruta absoluta.
+-----
+dictionary.export_failed
+No se pudo exportar la definición.
+-----
+dictionary.resize
+Amplíe la ventana a un mínimo de 640 por 420 píxeles de contenido.
+-----
+editor.workflow.save_as
+Guardar como
+-----
+editor.workflow.save_as_hint
+Elige un archivo nuevo. Los archivos existentes se conservan.
+-----
+editor.workflow.save_as_create
+Crear archivo
+-----
+editor.workflow.cancel
+Cancelar
+-----
+editor.workflow.unsaved_close
+Guarda este documento antes de cerrar, sigue editando o descarta los cambios explícitamente.
+-----
+editor.workflow.unsaved_new
+Guarda este documento antes de crear uno nuevo, sigue editando o descarta los cambios explícitamente.
+-----
+editor.workflow.unsaved_open
+Guarda este documento antes de abrir otro archivo, sigue editando o descarta los cambios explícitamente.
+-----
+editor.workflow.keep_editing
+Seguir editando
+-----
+editor.workflow.discard
+Descartar cambios
+-----
+editor.workflow.confirm_discard
+Confirmar descarte
+-----
+editor.workflow.confirm_hint
+¿Descartar los cambios sin guardar? No se puede deshacer.
+-----
+editor.workflow.discard_ready
+Los cambios se descartarán al cerrar. Si vuelves a editar, se cancela esta decisión.
+-----
+editor.workflow.exists
+El archivo ya existe. Elige una ruta nueva para Guardar como.
+-----
+editor.workflow.invalid_path
+Introduce una ruta de archivo válida (hasta 512 bytes).
+-----
+calendar.ics.open
+Importar / Exportar
+-----
+calendar.ics.title
+Intercambio de calendarios
+-----
+calendar.ics.back
+Volver
+-----
+calendar.ics.import_path
+Archivo ICS para importar
+-----
+calendar.ics.export_path
+Nuevo archivo ICS de exportación
+-----
+calendar.ics.import
+Importar ICS
+-----
+calendar.ics.export
+Exportar ICS
+-----
+calendar.ics.scope
+Eventos de día completo de un solo día u horas locales con precisión de minutos. Sin zonas horarias, repeticiones, duraciones, alarmas ni campos adicionales.
+-----
+calendar.ics.merge
+Se añaden sin reemplazar eventos. Se omiten los que coinciden en fecha, hora, título y lugar. UID y marcas temporales se validan, pero no se guardan.
+-----
+calendar.ics.ready
+Elija un archivo ICS para importar o una nueva ruta para exportar.
+-----
+calendar.ics.imported
+Eventos importados; duplicados exactos omitidos.
+-----
+calendar.ics.nothing
+No hay eventos nuevos; se omitieron los idénticos.
+-----
+calendar.ics.invalid
+Archivo ICS no válido o dañado.
+-----
+calendar.ics.unsupported
+Características ICS no admitidas. Use eventos de día completo de un solo día o eventos locales sin duración.
+-----
+calendar.ics.limit
+El ICS supera los límites de archivo, línea, evento o calendario.
+-----
+calendar.ics.duplicate
+Eventos distintos comparten un mismo UID.
+-----
+calendar.ics.read_failed
+No se puede leer un archivo ICS normal.
+-----
+calendar.ics.path_invalid
+Introduzca una ruta absoluta.
+-----
+calendar.ics.export_exists
+La ruta de exportación ya existe.
+-----
+calendar.ics.export_failed
+No se pudo exportar el ICS.
+-----
+calendar.ics.exported
+Calendario exportado.
+-----
+files.trash.open
+Papelera
+-----
+files.trash.move
+Mover a la Papelera
+-----
+files.trash.title
+Papelera
+-----
+files.trash.back
+Volver a Archivos
+-----
+files.trash.refresh
+Actualizar
+-----
+files.trash.restore
+Restaurar selección
+-----
+files.trash.empty
+Vaciar Papelera…
+-----
+files.trash.confirm
+Eliminar definitivamente
+-----
+files.trash.cancel
+Cancelar
+-----
+files.trash.previous
+Anterior
+-----
+files.trash.next
+Siguiente
+-----
+files.trash.hint
+La Papelera acepta elementos de tu carpeta personal en el mismo sistema de archivos. Restaurar nunca reemplaza un elemento existente.
+-----
+files.trash.limited
+El vaciado elimina archivos, enlaces y carpetas vacías. Restaura las carpetas con contenido para gestionarlo.
+-----
+files.trash.confirm_hint
+¿Eliminar definitivamente los elementos admitidos? No se puede deshacer. Las carpetas con contenido y las entradas dañadas impiden el vaciado.
+-----
+files.trash.empty_list
+La Papelera está vacía.
+-----
+files.trash.ready
+Selecciona un elemento para restaurarlo.
+-----
+files.trash.moved
+Movido a la Papelera.
+-----
+files.trash.restored
+Restaurado en su ubicación original.
+-----
+files.trash.emptied
+Papelera vaciada.
+-----
+files.trash.select
+Selecciona primero un elemento.
+-----
+files.trash.unsafe
+Solo se admiten elementos normales de tu carpeta personal; se rechazan rutas protegidas y carpetas padre que sean enlaces simbólicos.
+-----
+files.trash.unavailable
+No se pudo abrir la Papelera de forma segura.
+-----
+files.trash.busy
+Otra ventana está usando la Papelera. Inténtalo de nuevo.
+-----
+files.trash.damaged
+La Papelera contiene entradas dañadas o desconocidas. Se han conservado; se rechaza el vaciado.
+-----
+files.trash.changed
+El elemento seleccionado ha cambiado. Actualiza la Papelera antes de intentarlo de nuevo.
+-----
+files.trash.failed
+La operación falló. Se conservaron los elementos existentes.
+-----
+files.trash.cross_device
+No se admite mover entre sistemas de archivos. El origen no se ha modificado.
+-----
+files.trash.conflict
+Ya hay un elemento en la ubicación original. No se reemplazó nada.
+-----
+files.trash.parent_missing
+La carpeta padre original no existe o no es segura. Se conservó el elemento de la Papelera.
+-----
+files.trash.nonempty
+Una carpeta con contenido impide el vaciado. Restáurala para gestionar su contenido.
+-----
+files.trash.partial
+El vaciado se detuvo tras un cambio en el sistema de archivos. Actualiza para revisar los elementos restantes.
+-----
+files.trash.unsynced
+El elemento se movió, pero falló la sincronización o la limpieza. Actualiza para comprobar su ubicación.
+-----
+files.trash.changed_moved
+El origen cambió durante el traslado. Su contenido se conservó en la Papelera; los metadatos requieren revisión.
+-----
+files.trash.empty_unsynced
+Se eliminaron los elementos, pero falló la sincronización. Actualiza la Papelera para revisar las entradas restantes.
+-----
