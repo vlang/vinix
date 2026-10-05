@@ -8,7 +8,11 @@
 void *kmalloc(size_t, unsigned int);
 void *kzalloc(size_t, unsigned int);
 void *kmalloc_array(size_t, size_t, unsigned int);
+#ifdef VINIX_V_RUNTIME
+void kfree(void *);
+#else
 void kfree(const void *);
+#endif
 #ifdef VINIX_V_RUNTIME
 void vinix_linuxkpi_bug(char *, int);
 #else

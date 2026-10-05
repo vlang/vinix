@@ -1,8 +1,35 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#ifdef VINIX_LINUXKPI
+#ifndef VINIX_LINUXKPI_SRCU_V_CONTRACT_H
+#define VINIX_LINUXKPI_SRCU_V_CONTRACT_H
+/* Linux and the V backend use distinct names for their native 64-bit typedefs.
+ * This changes names only; the upstream declarations/layouts stay intact. */
+/* C11 and Linux use the same spellings for different atomic interfaces. */
+#undef atomic_fetch_add
+#undef atomic_fetch_sub
+#undef atomic_fetch_and
+#undef atomic_fetch_or
+#undef atomic_fetch_xor
+#undef atomic_exchange
+#undef atomic_compare_exchange_strong
+#undef atomic_compare_exchange_weak
+#define u64 vkh_linux_u64
+#define timezone vkh_linux_timezone
+#define ffs vkh_linux_ffs
+#define fls vkh_linux_fls
+#if defined(__clang__) && defined(VINIX_LINUXKPI_HOST_TEST)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#endif
 #include <linux/srcu.h>
 #include <linux/percpu.h>
 #include <linux/sched.h>
+#if defined(__clang__) && defined(VINIX_LINUXKPI_HOST_TEST)
+#pragma clang diagnostic pop
+#endif
+#undef fls
+#undef ffs
+#undef timezone
+#undef u64
 #include "linuxkpi_srcu_v_primitives.h"
 #define VKS_SIZE(view, native) _Static_assert(sizeof(struct view) == sizeof(struct native), #view " size"); _Static_assert(_Alignof(struct view) == _Alignof(struct native), #view " alignment")
 #define VKS_FIELD(view, native, field) _Static_assert(offsetof(struct view, field) == offsetof(struct native, field), #view "." #field " offset")
@@ -66,18 +93,8 @@ VKS_FIELD(vks_srcu, srcu_struct, srcu_idx);
 VKS_FIELD(vks_srcu, srcu_struct, sda);
 VKS_FIELD(vks_srcu, srcu_struct, srcu_sup);
 _Static_assert(RCU_NUM_LVLS == 2 && RCU_CBLIST_NSEGS == 4, "pinned SRCU dimensions");
-void vks_init_work(void *p, void *f) { INIT_WORK((struct work_struct *)p, (work_func_t)f); }
-void vks_init_delayed_work(void *p, void *f) { INIT_DELAYED_WORK((struct delayed_work *)p, (work_func_t)f); }
+
+struct vks_data_alignment_probe { char prefix; struct srcu_data data; };
 void vinix_linuxkpi_srcu_gp_work(void *);
 void vinix_linuxkpi_srcu_callback_work(void *);
-void *vks_gp_callback(void) { return vinix_linuxkpi_srcu_gp_work; }
-void *vks_cblist_callback(void) { return vinix_linuxkpi_srcu_callback_work; }
-bool vks_unbound_ready(void) { return system_unbound_wq != NULL; }
-void vks_preempt_disable(void) { preempt_disable(); }
-void vks_preempt_enable(void) { preempt_enable(); }
-unsigned int vks_preempt_count(void) { return preempt_count(); }
-unsigned int vks_cpu_id(void) { return vinix_linuxkpi_cpu_id(); }
-size_t vks_data_alignment(void) { return _Alignof(struct srcu_data); }
-bool vks_queue_work(void *queue, void *work) { return queue_work(queue, work); }
-bool vks_queue_delayed_work(void *queue, void *work, unsigned long delay) { return queue_delayed_work(queue, work, delay); }
 #endif

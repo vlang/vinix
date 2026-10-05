@@ -9,13 +9,41 @@ python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source
 python3 "$repo/tests/linuxkpi/compile-v-core.py" "$work/compat.c"
 ${CC:-clang} -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -ffreestanding -fno-builtin \
-    -fwrapv -fno-strict-aliasing -DVINIX_V_RUNTIME -I"$repo/kernel/c" \
+    -fwrapv -fno-strict-aliasing -DVINIX_V_RUNTIME -DVINIX_LINUXKPI_HOST_TEST -I"$repo/kernel/c" \
     -c "$work/compat.c" -o "$work/compat.o"
 python3 - "$work/compat.o" <<'CHECK'
 import re, subprocess, sys
 symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
 assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
 print("LinuxKPI: V core has no implicit allocator imports")
+CHECK
+case $(uname -m) in
+    arm64|aarch64) native_asm=aarch64; native_v_arch=arm64 ;;
+    x86_64|amd64) native_asm=x86_64; native_v_arch=amd64 ;;
+    *) printf '%s\n' 'Unsupported LinuxKPI host assembly architecture' >&2; exit 1 ;;
+esac
+${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
+    -Dsnprintf=vinix_linuxkpi_format_test_snprintf \
+    -Dscnprintf=vinix_linuxkpi_format_test_scnprintf \
+    -Dsprintf=vinix_linuxkpi_format_test_sprintf \
+    -c "$repo/kernel/asm/$native_asm/linuxkpi_varargs.S" -o "$work/varargs.o"
+python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" "$work/headercore.c"
+# Keep upstream header algorithms in their native, separately compiled V object.
+# Darwin's fortified macros are incompatible with Linux's string declarations;
+# ASan/UBSan still cover every call and data access in this object.
+${CC:-clang} -std=gnu11 -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
+    -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function -D_FORTIFY_SOURCE=0 -D__sputc=vkh_header_sputc \
+    -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
+    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
+    -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
+    -iquote "$repo/kernel/c" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
+    -c "$work/headercore.c" -o "$work/headercore.o"
+python3 - "$work/headercore.o" <<'CHECK'
+import re, subprocess, sys
+symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
+assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
+print("LinuxKPI: native V header primitives have no implicit allocator imports")
 CHECK
 # Link production implementations/bindings and the preserved embedded fixtures.
 # Independent guest *_test.c fixtures are built only by the kernel.
@@ -34,7 +62,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/compat.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
