@@ -176,5 +176,5 @@ int bit_wait_timeout(struct wait_bit_key *key, int mode)
     return signal_pending_state(mode, current) ? -EINTR : 0;
 }
 
-/* I/O actions live in linuxkpi_io.c with native blocked-CPU accounting. */
+/* I/O actions live in linuxkpi/compatcore/io.v with native blocked-CPU accounting. */
 #endif

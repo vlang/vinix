@@ -16,6 +16,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_MARKER = "pci: ARM checked config widths, bounds and interrupt masks passed"
+MMAP_LEASE_MARKER = "mmap: retained fault owners, concurrent removal and deferred reclamation passed; no pages retained"
 INIT_MARKER = "PCI ARM GUEST: Linux ABI PID1 PASS"
 FAILURES = ("KERNEL PANIC", "FATAL EXCEPTION", "PCI ARM GUEST: FAIL")
 
@@ -53,6 +54,8 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=120)
     parser.add_argument("--no-config-test", action="store_true",
                         help="require fixture absence for a default ARM kernel")
+    parser.add_argument("--mmap-lease-test", action="store_true",
+                        help="require the opt-in native mapping lifetime fixture")
     args = parser.parse_args()
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--timeout must be finite and positive")
@@ -61,8 +64,13 @@ def main() -> int:
     state.mkdir(parents=True, exist_ok=False)
     report: dict = {"status": "preparing", "state_dir": str(state),
                     "config_test_expected": not args.no_config_test,
+                    "mmap_lease_test_expected": args.mmap_lease_test,
                     "configured_cpus": 4,
-                    "scope": "ARM ECAM reads and eight full-DAIF vectors run by the native controller; configured QEMU CPUs do not prove native SMP."}
+                    "scope": (("Native mapping races and temporary page/heap recovery with a resident actor; "
+                               if args.mmap_lease_test else "") +
+                              ("ECAM reads and full-DAIF controller vectors; "
+                               if not args.no_config_test else "Linux ABI startup; ") +
+                              "configured QEMU CPUs do not prove native SMP.")}
     report_path = state / "result.json"
     commands: list[list[str]] = []
     process: subprocess.Popen | None = None
@@ -169,12 +177,15 @@ def main() -> int:
                 failed = any(marker in output for marker in FAILURES)
                 if args.no_config_test and CONFIG_MARKER in output:
                     failed = True
+                if not args.mmap_lease_test and MMAP_LEASE_MARKER in output:
+                    failed = True
                 if failed or failure_started is not None:
                     if failure_started is None:
                         failure_started = time.monotonic()
                     if time.monotonic() - failure_started >= 1 or process.poll() is not None:
                         raise RuntimeError(f"ARM guest failed; see {serial}")
-                elif INIT_MARKER in output and (args.no_config_test or CONFIG_MARKER in output):
+                elif INIT_MARKER in output and (args.no_config_test or CONFIG_MARKER in output) and (
+                        not args.mmap_lease_test or MMAP_LEASE_MARKER in output):
                     # Let PID1 continue for a bounded second, observing panics
                     # after its marker rather than stopping at the first byte.
                     if passed_started is None:
@@ -188,7 +199,8 @@ def main() -> int:
                         stop_owned(process)
                         final_output = serial.read_text(errors="replace")
                         if any(marker in final_output for marker in FAILURES) or (
-                                args.no_config_test and CONFIG_MARKER in final_output):
+                                args.no_config_test and CONFIG_MARKER in final_output) or (
+                                not args.mmap_lease_test and MMAP_LEASE_MARKER in final_output):
                             raise RuntimeError(f"ARM guest failed during final drain; see {serial}")
                         report["serial_sha256"] = digest(serial)
                         report["status"] = "passed"

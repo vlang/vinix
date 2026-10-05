@@ -33,7 +33,8 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | Apple SPI input | Shared PIO transport, keyboard reports and touchpad protocol/state machine | Committed as `fdfb06f7`; all 20 keyboard and 19 touchpad groups passed with ASan/UBSan, 200,000 mutated packets and no allocator imports; both builds and QEMU boot/syscall checks passed; physical SPI devices remain untested |
 | J313 speakers | ADMAC/MCA playback and sense rings, amplifier sequencing and fixed-point thermal protection | Committed as `73ee1cb9`; all 20 hardware and thermal-model tests passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical amplifiers and acoustic protection remain untested |
 | BCM4378 and M1 Wi-Fi | Firmware/protocol parsers, ring ownership, PCIe/DART setup and loader staging | Committed as `6137162a`; 26 protocol groups, 100,000 parser mutations and seven platform groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical firmware, association and DMA remain untested |
-| Native network adapter | Link/timer policy, TCP/UDP PCB and pbuf ownership, IPv4/IPv6 endpoints and multicast memberships | Original host packet/ownership assertions passed against V under ASan/UBSan with no implicit allocator imports; both builds and socket-option, physical IPv4/IPv6, SLAAC, scope and multicast QEMU suites passed; 500 socket exchanges retained zero objects in every heap class on both architectures |
+| Native network adapter | Link/timer policy, TCP/UDP PCB and pbuf ownership, IPv4/IPv6 endpoints and multicast memberships | Committed as `b81cf767`; original host packet/ownership assertions passed against V under ASan/UBSan with no implicit allocator imports; both builds and socket-option, physical IPv4/IPv6, SLAAC, scope and multicast QEMU suites passed; 500 socket exchanges retained zero objects in every heap class on both architectures |
+| LinuxKPI helpers | Bounded strings, integer parsing, bitmaps, packed object caches, per-CPU storage, reference counts, taints and I/O-wait scopes | Native V implementation; original host suite passes under ASan/UBSan with no implicit allocator imports; x86 opt-in and ARM default builds pass; full four-CPU diagnostic QEMU comparison in progress |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
 | Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
 
@@ -76,7 +77,7 @@ unverified locally.
 
 ## Follow-on batch: approximately 10,000 C lines
 
-The next batch covers 9989 lines from the following original C
+This batch covers 9,989 lines from the following original C
 implementations, measured before any ports in this batch. Independent C
 fixtures and third-party code stay in their existing languages. Each finished
 stage is committed after host tests, both architecture builds and QEMU checks.
@@ -101,3 +102,24 @@ stage is committed after host tests, both architecture builds and QEMU checks.
 | `kernel/c/linuxkpi_refcount.c` | 63 |
 | `kernel/c/linuxkpi_taint.c` | 53 |
 | `kernel/c/linuxkpi_io.c` | 84 |
+
+The batch also moves 1,119 lines from the ANS policy/GPT/read-write headers,
+SPI touchpad header and IPv6 adapter include into V. The native implementations
+are in `kernel/apple/{smc,ans,spi_keyboard,speakers,wifi}`, `kernel/lib/agx_fake_g17*.v`,
+`kernel/netcore` and `kernel/linuxkpi/compatcore`. The AGX generator emits V directly.
+
+The network adapter still calls unmodified lwIP. `kernel/c/net_driver_abi.h`
+only adapts callback types and weak driver symbols. LinuxKPI retains its
+upstream Linux headers and a small `linuxkpi_v_primitives.c` binding for their
+inline locks, task fields, refcount decrement and scheduler primitives; parsing,
+bitmap operations, cache/per-CPU ownership and exported helper algorithms live
+in V. These bindings, C ABI headers and independent C tests remain counted as C.
+
+During the LinuxKPI diagnostic run, an ordered-workqueue memory assertion
+reported 353,132,544 free bytes before the run and 357,097,472 afterward.
+Joined workers had not all completed scheduler reaping when the 50 ms baseline
+settled. The diagnostic now observes deferred-reaper quiescence, requires a
+500 ms stable baseline and allows five seconds for final retirement. Every
+post-run comparison still requires exact equality; allocation and ownership
+behavior is unchanged. An earlier delayed-work run also hit the retirement
+assertion. The original C-helper comparison passed that delayed-work case.

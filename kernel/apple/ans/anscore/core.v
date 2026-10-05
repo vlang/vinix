@@ -1438,7 +1438,7 @@ pub fn a_shutdown(a &Ans) i32 {
 
 // SPDX-License-Identifier: GPL-2.0-or-later
 // *Private, byte-oriented GPT decoder for the ANS block views.
-// *Included by apple_ans.c; no packed-struct or unaligned integer accesses.
+// No packed-struct or unaligned integer accesses.
 //
 
 pub struct Ans_gpt {

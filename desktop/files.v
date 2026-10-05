@@ -475,7 +475,7 @@ mut:
 	tag_actions    map[int]string
 }
 
-fn open_files(mut _ Desktop) !NativeApp {
+/* fn open_files(mut _ Desktop) !NativeApp {
 	mut app := &FileBrowserApp{}
 	// Open on the home directory, the way every file manager does. It is also
 	// the only writable, persistent part of this machine -- the rest of the
@@ -492,7 +492,7 @@ fn open_files(mut _ Desktop) !NativeApp {
 		return error(app.browser.error)
 	}
 	return app
-}
+} */
 
 fn (mut a FileBrowserApp) new_miller_column(path string) MillerColumn {
 	id := a.next_column_id

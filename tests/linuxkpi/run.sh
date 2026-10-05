@@ -6,6 +6,17 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-linuxkpi-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
 python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source_dir")"
 "$repo/tests/pci-config/run.sh"
+python3 "$repo/tests/linuxkpi/compile-v-core.py" "$work/compat.c"
+${CC:-clang} -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
+    -fsanitize=address,undefined -fno-omit-frame-pointer -ffreestanding -fno-builtin \
+    -fwrapv -fno-strict-aliasing -DVINIX_V_RUNTIME -I"$repo/kernel/c" \
+    -c "$work/compat.c" -o "$work/compat.o"
+python3 - "$work/compat.o" <<'CHECK'
+import re, subprocess, sys
+symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
+assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
+print("LinuxKPI: V core has no implicit allocator imports")
+CHECK
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
@@ -13,12 +24,12 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$repo/kernel/c/linuxkpi.c" "$repo/kernel/c/linuxkpi_refcount.c" "$repo/kernel/c/linuxkpi_string.c" "$repo/kernel/c/linuxkpi_kstrtox.c" \
-    "$repo/kernel/c/linuxkpi_percpu.c" "$repo/kernel/c/linuxkpi_bitmap.c" "$repo/kernel/c/linuxkpi_task.c" \
+    "$work/compat.o" "$repo/kernel/c/linuxkpi_v_primitives.c" "$repo/kernel/c/linuxkpi.c" \
+    "$repo/kernel/c/linuxkpi_task.c" \
     "$repo/kernel/c/linuxkpi_sync.c" "$repo/kernel/c/linuxkpi_time.c" \
     "$repo/kernel/c/linuxkpi_timer.c" "$repo/kernel/c/linuxkpi_workqueue.c" \
-    "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_io.c" "$repo/kernel/c/linuxkpi_cache.c" "$repo/kernel/c/linuxkpi_format.c" \
-    "$repo/kernel/c/linuxkpi_printk.c" "$repo/kernel/c/linuxkpi_taint.c" "$repo/tests/linuxkpi/test.c" \
+    "$repo/kernel/c/linuxkpi_srcu.c" "$repo/kernel/c/linuxkpi_ww_mutex.c" "$repo/kernel/c/linuxkpi_wait_bit.c" "$repo/kernel/c/linuxkpi_format.c" \
+    "$repo/kernel/c/linuxkpi_printk.c" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \

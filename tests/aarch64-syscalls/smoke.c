@@ -1454,6 +1454,45 @@ static int unix_socket_timeouts(void) {
     return valid;
 }
 
+static void noop_handler(int signal) {
+    (void)signal;
+}
+
+// A signal the thread has already taken does not cut short its next wait: the
+// wake it asked for was spent, and wait4(2) and accept(2) returned EINTR at
+// once with nothing pending.
+static int wait_after_taken_signal(void) {
+    struct sigaction noop = {.sa_handler = noop_handler}, previous;
+    sigemptyset(&noop.sa_mask);
+    sigaction(SIGUSR2, &noop, &previous);
+    kill(getpid(), SIGUSR2);
+    pid_t child = fork();
+    if (child == 0) {
+        usleep(50000);
+        _exit(0);
+    }
+    pid_t reaped = waitpid(child, NULL, 0);
+    int wait_errno = errno;
+    kill(getpid(), SIGUSR2);
+    struct sockaddr_in address = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    int listener = socket(AF_INET, SOCK_STREAM, 0);
+    struct timeval wait = {0, 200000};
+    long accept_ms = -1;
+    if (listener >= 0 && bind(listener, (struct sockaddr *)&address, sizeof(address)) == 0 &&
+        listen(listener, 1) == 0 &&
+        setsockopt(listener, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait)) == 0)
+        accept_ms = TIMED_EAGAIN(accept(listener, NULL, NULL));
+    close(listener);
+    sigaction(SIGUSR2, &previous, NULL);
+    int valid = reaped == child && accept_ms >= 150;
+    if (!valid)
+        printf("wait after taken signal: reaped=%d (child %d, errno %d) accept=%ld ms\n", reaped,
+               child, wait_errno, accept_ms);
+    if (reaped != child)
+        waitpid(child, NULL, 0);
+    return valid;
+}
+
 static int handler_without_restorer(void) {
     struct {
         void (*handler)(int);
@@ -1808,6 +1847,7 @@ int main(int argc, char **argv, char **envp) {
     check(growing_stack(), "a 32 MiB deep recursion after raising RLIMIT_STACK");
     check(exit_past_busy_thread(), "exit_group does not wait for a thread that only computes");
     check(unix_socket_timeouts(), "SO_RCVTIMEO and SO_SNDTIMEO on unix sockets");
+    check(wait_after_taken_signal(), "a signal already taken does not end the next wait");
     int no_family[2];
     check(failed_with_errno(socket(AF_INET6, SOCK_STREAM, 0), EAFNOSUPPORT, "IPv6 socket") &&
               failed_with_errno(socketpair(AF_INET, SOCK_STREAM, 0, no_family), EOPNOTSUPP,

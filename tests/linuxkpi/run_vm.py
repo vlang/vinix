@@ -9,6 +9,7 @@ import tarfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+MMAP_LEASE_MARKER = "mmap: retained fault owners, concurrent removal and deferred reclamation passed; no pages retained"
 MARKERS = [
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained",
@@ -53,8 +54,10 @@ def main():
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--qemu", default="qemu-system-x86_64")
     parser.add_argument("--cc", default="clang")
+    parser.add_argument("--limine-dir", type=Path, help="copy an existing bootloader cache; the ISO builder verifies its pinned hashes")
     parser.add_argument("--cpu", default="max")
     parser.add_argument("--no-linuxkpi", action="store_true", help="check a default kernel without the API layer")
+    parser.add_argument("--mmap-lease-test", action="store_true", help="require the opt-in native mapping lifetime fixture")
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args()
     state = args.state_dir.resolve()
@@ -75,6 +78,8 @@ def main():
     with tarfile.open(initramfs, "w", format=tarfile.USTAR_FORMAT) as archive:
         archive.add(rootfs, arcname=".")
     iso = state / "test.iso"
+    if args.limine_dir:
+        shutil.copytree(args.limine_dir.resolve(), state / "iso-build/limine")
     env = dict(os.environ, VINIX_AMD64_ISO_BUILD_DIR=str(state / "iso-build"),
                VINIX_AMD64_KERNEL=str(args.kernel.resolve()),
                VINIX_AMD64_INITRAMFS=str(initramfs), VINIX_AMD64_ISO=str(iso))
@@ -102,9 +107,24 @@ def main():
                     time.sleep(0.1)
                     continue
                 expected = MARKERS[-1:] if args.no_linuxkpi else MARKERS
+                if args.mmap_lease_test:
+                    expected = expected + [MMAP_LEASE_MARKER]
+                elif MMAP_LEASE_MARKER in output:
+                    raise RuntimeError("mapping fixture unexpectedly enabled; see " + str(serial))
                 if all(marker in output for marker in expected):
                     if args.no_linuxkpi and "linuxkpi:" in output:
                         raise RuntimeError("API layer unexpectedly enabled; see " + str(serial))
+                    # Check the final bytes after stopping our own process,
+                    # including a panic emitted just after the PID1 marker.
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+                    final_output = serial.read_text(errors="replace")
+                    if any(marker in final_output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "self-test failed"]):
+                        raise RuntimeError("guest failed after startup; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
                           "LinuxKPI guest: PASS (4 CPUs, allocator/object caches, logging/formatting, locks, per-CPU storage, task waits/references, synchronization/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))

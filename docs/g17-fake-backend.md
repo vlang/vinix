@@ -57,7 +57,7 @@ does not acquire a backend mapping lock or decide when a mapping disappears.
 
 ## Verification contract
 
-`kernel/c/agx_fake_g17.c` checks the four-pass 3D register-list layout already
+`kernel/lib/agx_fake_g17.v` checks the four-pass 3D register-list layout already
 recovered and ported in `gpu.agx.fw`:
 
 - command and descriptor bounds;
@@ -130,7 +130,7 @@ fake execution only and is not evidence that those bits are valid on hardware.
 
 `tools/agx-re/generate_fake_g17_3d_encoder.py` translates that same recovered
 graph into the freestanding, allocation-free
-`kernel/c/agx_fake_g17_encode.c`. The generated encoder contains no JSON parser
+`kernel/lib/agx_fake_g17_encode.v`. The generated encoder contains no JSON parser
 or dynamic expression interpreter: descriptor/command expressions are emitted
 as checked integer operations, graph successors are direct branches, and the
 two external values (the parameter-management and USC private-memory pool

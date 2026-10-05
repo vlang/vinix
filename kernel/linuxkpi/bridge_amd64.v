@@ -418,11 +418,14 @@ fn C.vinix_linuxkpi_seqcount_native_selftest() int
 fn C.vinix_linuxkpi_printk_bootstrap_native_selftest() int
 fn C.vinix_linuxkpi_printk_native_selftest() int
 fn C.vinix_linuxkpi_i915_policy_native_selftest() int
+fn C.vinix_linuxkpi_test_reap_quiescent() bool
 
 // join/TASK_DEAD can precede the final switch away and scheduler reaping.
 // Taking a baseline immediately after warmup can count those dying stacks,
 // then report a mismatch when the measured run returns more pages than that
-// baseline. Require a stable count while giving every CPU time to reap.
+// baseline. Require deferred frees to finish and a stable count across several
+// scheduler ticks on all CPUs. Heavy host load can delay remote QEMU CPUs;
+// the bounded wait changes no ownership and still requires exact page equality.
 fn selftest_free_baseline() u64 {
 	started := hpet_clock.nanoseconds()
 	mut stable_since := started
@@ -432,14 +435,14 @@ fn selftest_free_baseline() u64 {
 		sched.reschedule()
 		now := hpet_clock.nanoseconds()
 		next := memory.free_bytes()
-		if next != free {
+		if next != free || !C.vinix_linuxkpi_test_reap_quiescent() {
 			free = next
 			stable_since = now
 		}
-		if now - stable_since >= 50000000 {
+		if now - stable_since >= 500000000 {
 			return free
 		}
-		if now - started >= 1000000000 {
+		if now - started >= 5000000000 {
 			lib.kpanic(unsafe { nil }, c'Linux self-test free-page baseline did not settle')
 		}
 	}
@@ -557,7 +560,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux synchronization self-test failed')
 		}
 		sync_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != sync_before && hpet_clock.nanoseconds() - sync_reap_start < 1000000000 {
+		for memory.free_bytes() != sync_before && hpet_clock.nanoseconds() - sync_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -576,7 +579,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux timed-wait self-test failed')
 		}
 		time_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != time_before && hpet_clock.nanoseconds() - time_reap_start < 1000000000 {
+		for memory.free_bytes() != time_before && hpet_clock.nanoseconds() - time_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -623,7 +626,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux timer callback self-test failed')
 		}
 		timer_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != timer_before && hpet_clock.nanoseconds() - timer_reap_start < 1000000000 {
+		for memory.free_bytes() != timer_before && hpet_clock.nanoseconds() - timer_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -642,7 +645,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux ordered workqueue self-test failed')
 		}
 		work_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != work_before && hpet_clock.nanoseconds() - work_reap_start < 1000000000 {
+		for memory.free_bytes() != work_before && hpet_clock.nanoseconds() - work_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -661,7 +664,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux delayed work self-test failed')
 		}
 		delayed_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != delayed_before && hpet_clock.nanoseconds() - delayed_reap_start < 1000000000 {
+		for memory.free_bytes() != delayed_before && hpet_clock.nanoseconds() - delayed_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -680,7 +683,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux concurrent unbound work self-test failed')
 		}
 		unbound_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != unbound_before && hpet_clock.nanoseconds() - unbound_reap_start < 1000000000 {
+		for memory.free_bytes() != unbound_before && hpet_clock.nanoseconds() - unbound_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -699,7 +702,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux bound and priority work self-test failed')
 		}
 		bound_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != bound_before && hpet_clock.nanoseconds() - bound_reap_start < 1000000000 {
+		for memory.free_bytes() != bound_before && hpet_clock.nanoseconds() - bound_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -718,7 +721,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux native worker failure self-test failed')
 		}
 		worker_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != worker_before && hpet_clock.nanoseconds() - worker_reap_start < 1000000000 {
+		for memory.free_bytes() != worker_before && hpet_clock.nanoseconds() - worker_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -737,7 +740,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux SRCU self-test failed')
 		}
 		srcu_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != srcu_before && hpet_clock.nanoseconds() - srcu_reap_start < 1000000000 {
+		for memory.free_bytes() != srcu_before && hpet_clock.nanoseconds() - srcu_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -756,7 +759,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux wound/wait mutex self-test failed')
 		}
 		ww_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != ww_before && hpet_clock.nanoseconds() - ww_reap_start < 1000000000 {
+		for memory.free_bytes() != ww_before && hpet_clock.nanoseconds() - ww_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -775,7 +778,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux bit/variable wait self-test failed')
 		}
 		bit_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != bit_before && hpet_clock.nanoseconds() - bit_reap_start < 1000000000 {
+		for memory.free_bytes() != bit_before && hpet_clock.nanoseconds() - bit_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -794,7 +797,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux I/O wait self-test failed')
 		}
 		io_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != io_before && hpet_clock.nanoseconds() - io_reap_start < 1000000000 {
+		for memory.free_bytes() != io_before && hpet_clock.nanoseconds() - io_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -814,7 +817,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux object cache self-test failed')
 		}
 		cache_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != cache_before && hpet_clock.nanoseconds() - cache_reap_start < 1000000000 {
+		for memory.free_bytes() != cache_before && hpet_clock.nanoseconds() - cache_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -833,7 +836,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux sequence counter self-test failed')
 		}
 		seqcount_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != seqcount_before && hpet_clock.nanoseconds() - seqcount_reap_start < 1000000000 {
+		for memory.free_bytes() != seqcount_before && hpet_clock.nanoseconds() - seqcount_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
@@ -852,7 +855,7 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux logging self-test failed')
 		}
 		printk_reap_start := hpet_clock.nanoseconds()
-		for memory.free_bytes() != printk_before && hpet_clock.nanoseconds() - printk_reap_start < 1000000000 {
+		for memory.free_bytes() != printk_before && hpet_clock.nanoseconds() - printk_reap_start < 5000000000 {
 			sched.reap_deferred()
 			sched.reschedule()
 		}
