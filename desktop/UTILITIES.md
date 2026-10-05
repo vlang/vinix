@@ -1,6 +1,7 @@
 # Desktop utility inventory and macOS feature gaps
 
-Original audit: 2026-10-05. Storage, productivity and tools follow-ups: 2026-10-06.
+Original audit: 2026-10-05. Storage, productivity, tools and document workflow
+follow-ups: 2026-10-06.
 This document records the original inventory, implemented utility work,
 and the remaining work.
 It does not claim complete macOS parity.
@@ -8,10 +9,10 @@ It does not claim complete macOS parity.
 The native utilities are Files, Activity Monitor, Settings, Text Editor,
 Calculator, Calendar, Clock, Capture, Disk Usage, Terminal, Preview, Console,
 System Information, Archive Utility, Disk Utility, Backup, Notes, Reminders,
-Grapher and Color Meter. Both desktop image builders install their executable
-names as clients of the multicall desktop. Files Settings, Quick Look, Quick Launch
-and the notification area are supporting surfaces rather than additional
-utility payloads.
+Grapher, Color Meter and Dictionary. Both desktop image builders install their
+executable names as clients of the multicall desktop. Files Settings, Quick Look,
+Quick Launch and the notification area are supporting surfaces rather than
+additional utility payloads.
 
 The macOS comparison uses Apple's [included-app inventory](https://support.apple.com/en-gb/guide/mac-help/mchl110b00b7/26/mac/26)
 and the individual guides linked below. Priorities and implementation plans are
@@ -21,12 +22,12 @@ Vinix engineering proposals based on the inspected code.
 
 | Vinix utility / macOS counterpart | Present before this change | Implemented in this change | Remaining gaps |
 | --- | --- | --- | --- |
-| Files / Finder | List, Finder and Miller-column views, dual-pane mode, sorting, current-folder search, navigation history, sidebar, tags, Quick Look, rename/copy/cut/paste/permanent delete and view preferences | Get Info for the selected file, including POSIX metadata and symbolic-link targets | Move to Trash, restore and empty Trash; multiple selection and batch operations; file-operation undo; tabs; recursive/content/metadata search; file associations and Open With; drag-and-drop file operations; permission editing; shared folders |
+| Files / Finder | List, Finder and Miller-column views, dual-pane mode, sorting, current-folder search, navigation history, sidebar, tags, Quick Look, rename/copy/cut/paste/permanent delete and view preferences | Get Info for the selected file, including POSIX metadata and symbolic-link targets; persistent personal Trash with move, browse, restore without overwriting and confirmed emptying | Trash for other volumes/outside Home and recursive emptying of nonempty folders; restoration of file tags; multiple selection and batch operations; file-operation undo; tabs; recursive/content/metadata search; file associations and Open With; drag-and-drop file operations; permission editing; shared folders |
 | Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog | Persistent view preferences; per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states | Settings search; clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
-| Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo | General selection/cut/copy, mouse caret/selection, Save As/file picker, unsaved-close/open confirmation, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
+| Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As | General selection/cut/copy, mouse caret/selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
 | Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square, trig/inverse trig, ln/log10/exp and pi/e, with domain/finite errors and scientific operation history | Further scientific controls (cube/nth-root, log2, hyperbolic/inverse-hyperbolic, random and EE entry); programmer bases/bitwise operations, RPN, expression parsing, unit/currency conversion, Math Notes integration, selectable/copyable results, configurable precision/grouping and history persistence |
-| Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda | Duration/multiday events, day/week/year views, recurrence, search, reminders/notifications, multiple calendars, ICS import/export, CalDAV/accounts and invitations |
+| Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, search, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
 | Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; countdown timer, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; multiple named timers; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection | Capacity/free-space/mount overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
@@ -41,6 +42,7 @@ Vinix engineering proposals based on the inspected code.
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
 | Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset and sampled CSV export using the existing native UI protocol | Multiple/implicit/parametric equations, 3D plots, saved graph documents, image/vector export, animations, integration/intersection tools and graph styling |
 | Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking and freeze, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, independent horizontal/vertical locking, image copy and host clipboard writing |
+| Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, and exclusive text export | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, selectable/copyable definitions, lookup from selected text and persistent history |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
@@ -59,8 +61,9 @@ and [System Information reports](https://support.apple.com/guide/system-informat
 and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac),
 [Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac),
 [Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac),
-[Grapher](https://support.apple.com/guide/grapher/welcome/mac)
-and [Digital Color Meter](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac).
+[Grapher](https://support.apple.com/guide/grapher/welcome/mac),
+[Digital Color Meter](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac)
+and [Dictionary](https://support.apple.com/en-hk/guide/dictionary/welcome/mac).
 
 ### Hosted and installable applications
 
@@ -79,8 +82,8 @@ their third-party application internals are outside the native-utility changes.
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the twenty native utilities account for the complete
-41-entry application catalog. Vim and shell tools installed in the userland
+These 21 entries plus the twenty-one native utilities account for the complete
+42-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
 The Start menu's All Programs and search results use readable 34-pixel rows
@@ -92,7 +95,7 @@ all catalog entries; Enter launches the first result on the visible page.
 The macOS names below identify the comparison. The milestones are proposed
 Vinix applications, with dependencies made explicit. Existing terminal tools,
 Disk Usage, Quick Look or a browser do not supply the corresponding complete
-desktop workflow. Fourteen utility applications remain below. Notes supplies
+desktop workflow. Thirteen utility applications remain below. Notes supplies
 the local note-taking milestone; independent floating Stickies windows remain
 a feature gap in that application.
 
@@ -111,7 +114,6 @@ a feature gap in that application.
 | P3 | Migration Assistant | Import supported user files and settings with a reviewable plan | Source-format adapters, conflict handling and rollback. |
 | P3 | Directory Utility | Manage directory-service identities | Identity service, authentication and network-directory protocols. |
 | P3 | VoiceOver Utility | Configure screen-reader/navigation behaviour | Accessibility tree exposure, focus navigation and speech output first. |
-| P3 | Dictionary | Offline definitions and lookup | Redistributable dictionaries, indexing and text-selection integration. |
 
 AirPort/base-station management, Apple account services, FaceTime, Find My and
 Boot Camp depend on vendor services or platform-specific hardware; they are
@@ -120,6 +122,14 @@ not proposed as general Vinix utility ports.
 ## Using the implemented workflows
 
 - **Files:** select an entry, use Get Info or Ctrl-G, and close with Escape.
+  Delete in Files or on the desktop now moves ordinary Home items to personal
+  Trash. Open Trash from the Files footer, select a row and Restore Selected
+  to its original location; an existing destination is preserved. Empty Trash
+  requires a second confirmation and removes only files, leaf links and empty
+  folders. A nonempty folder or damaged record blocks the whole preflight;
+  restore nonempty folders to manage their contents. Items outside Home,
+  protected app records, symlink parents and cross-filesystem moves are refused.
+  This milestone has 256 rows and uses atomic moves rather than copy/delete.
 - **Activity Monitor:** the filter control cycles the process groups. Export
   (Ctrl-E) writes `Activity-Monitor-Processes.csv` in the user's home. In tree
   mode it includes visible context ancestors. Clear History (Ctrl-L) resets
@@ -128,9 +138,21 @@ not proposed as general Vinix utility ports.
 - **Editor:** Ctrl-Z/Ctrl-Y undo/redo; Ctrl-F opens Find; Ctrl-G finds the next
   match. Find is an exact UTF-8 byte search at character boundaries. Replace
   All is one undoable action. History is bounded and not a recovery journal.
+  Close, New and Open protect dirty documents with Save, Keep editing and
+  two-step Discard choices. Save As creates a new file and refuses existing
+  paths, including leaf symlinks. A failed Open preserves the draft and the
+  original Save destination. Forced termination bypasses the close guard;
+  autosave/recovery, file pickers and general selection remain future work.
 - **Calendar:** select a date, choose New event, enter a title and optionally
   a time/location, then Save. Select an agenda event to edit/delete it. Events
-  are local to the user's home and do not sync or issue alerts.
+  are local to the user's home and do not sync or issue alerts. Import / Export
+  opens the ICS path fields. Import validates the whole file before additive
+  merge; identical date/time/title/location events are skipped. Accepted events
+  are one-day all-day dates or floating local times at minute precision, with
+  title and optional location. Unsupported timezone, recurrence, alarm, duration
+  or extra-field semantics are refused, preserving the saved calendar. UID and
+  UTC DTSTAMP are validated but not retained; exports generate fresh identities
+  and timestamps and never replace an existing file. See the onscreen scope.
 - **Clock:** record laps while the stopwatch runs; use the Timer tab for a
   countdown. Expiry is visible in this app; there is no background alarm.
 - **Calculator:** use digits/operators/Enter and Backspace, memory buttons,
@@ -231,12 +253,26 @@ not proposed as general Vinix utility ports.
   are displayed pixel values; colour-space/ICC conversion, image copy and
   host clipboard writing remain unavailable.
 
+- **Dictionary:** enter an English word or phrase and Look up (Enter). The
+  left column lists prefix matches; arrows/Previous/Next navigate the visible
+  matches, and Back/Forward follows at most 32 successful lookups. PageUp and
+  PageDown keys page prefix matches; the Page up and Page down buttons scroll
+  a wrapped definition. Export definition writes the current headword
+  and text to a new path. Data is installed offline with the complete WordNet
+  license; only its index, headwords and the current definition stay in memory.
+  Failed loads or changed/malformed sources preserve the last successful lookup.
+  Custom files must use the bounded VNXDICT1 format documented in
+  [the Dictionary data guide](../build-support/dictionary/README.md).
+
 The image builders install `vinix-preview`, `vinix-console` and
 `vinix-system-information`, `vinix-archive`, `vinix-disk-utility` and
-`vinix-backup`, `vinix-notes`, `vinix-reminders`, `vinix-grapher` and
-`vinix-color-meter` as native multicall clients. Existing guest images need
-the new executable names installed as well as the updated desktop
-binary before the new menu entries can launch them.
+`vinix-backup`, `vinix-notes`, `vinix-reminders`, `vinix-grapher`,
+`vinix-color-meter` and `vinix-dictionary` as native multicall clients.
+Dictionary also needs `/usr/share/vinix/dictionary/dictionary.vnd` and the
+neighboring `LICENSE.WordNet`; both image builders install them from a pinned,
+verified host archive. Existing guest images need the new executable names
+installed as well as the updated desktop binary before the new menu entries
+can launch them.
 
 ## Validation
 
@@ -247,15 +283,18 @@ frontend with `-gc none -manualfree`. It is also called by
 Files, UTF-8 editing/terminal rendering and the application catalog. Run
 `desktop/tools/test-settings.sh` for preference/device and translation checks,
 and `desktop/tools/test-activity.sh` for process controls and resource lifetimes.
-`desktop/tools/test-new-utilities.sh` covers the ten new utility models,
-catalog/search integration, translations/fonts, owned-memory cleanup and real
-native-process IPC. It uses Clang for the image decoder and heap checks.
+`desktop/tools/test-new-utilities.sh` covers the eleven new utility models and
+document workflows, catalog/search integration, translations/fonts, owned-memory
+cleanup and real native-process IPC. It uses Clang for the image decoder and heap
+checks.
 `tests/desktop-perf/run.py --scenarios=utilities` adds a guest startup/rendering
 scenario for Preview, Console and System Information; `--scenarios=storage`
 starts Archive Utility, Disk Utility and Backup; `--scenarios=productivity`
 starts Notes, Reminders and Grapher; `--scenarios=tools` starts Color Meter,
-Calculator and Notes. Each utility scenario requires the compositor and all
-three native clients, and installs its multicall aliases in older guest images.
+Calculator and Notes; `--scenarios=workflows` starts Dictionary, Text Editor,
+Calendar and Files and overlays explicitly supplied local Dictionary data.
+Each utility scenario requires the compositor and every requested native
+client, and installs its multicall aliases in older guest images.
 
 Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have
@@ -367,3 +406,42 @@ the Notes window; the drag screenshot confirms System-window movement.
 These five-second guest samples check startup and rendering. Persistence,
 clipboard behaviour and owned-memory cleanup are covered by the host and
 native-process IPC assertions above, rather than long-running guest samples.
+
+The document workflow follow-up passes 234 combined behavior cases and 68
+tracked-memory cases across 20 modules, with zero retained owned bytes. The
+prepared full WordNet corpus is exercised in the behavior suite; its host data
+encoder also passes five Python cases. The separate utility-parity suite passes
+60 behavior and six memory cases. Activity Monitor passes 53 behavior and seven
+memory cases, including startup toggles, reload/render and memory ownership for
+the last app in the complete 42-entry catalog. The Linux-only separate-device
+Trash fixture is skipped on the macOS host; cross-filesystem moves remain an
+explicitly refused operation.
+
+Real native-process IPC verifies Dictionary lookup/history/export and malformed
+source preservation; supported Calendar ICS import, exclusive export, rejected
+recurrence preserving both the live model and saved record, and reopened event
+semantics; editor window/session close refusal, Save As collision/retry and
+failed Open preserving the original Save destination; and Trash restore
+conflicts, confirmation/cancel, emptying and reopening. The host runners derive
+the software presenter's header and object from committed V sources using
+`stage_host_gpu.py`, so the headless tests also work after the presenter port.
+Clipboard/UTF-8 checks and all 29 Python performance-runner cases pass.
+
+The feature desktop (`995badf8`) cross-builds as a static AArch64 ELF and passes
+QEMU `idle,apps,workflows,drag` checks. Workflows measures exactly five native
+processes: the compositor, Dictionary, Text Editor, Calendar and Files. The
+prepared 147,306-headword corpus and unchanged license are overlaid into the
+cached guest image without guest network access. Additional screenshots verify
+the actual computer definition, individual windows, Save As, Calendar
+interchange and the Trash pane. These five-second guest samples verify startup
+and rendering; operation, persistence and repeated-use ownership are checked by
+the host and real-process assertions above.
+
+Calendar's final interchange explanations wrap into borrowed UTF-8 rows because
+the desktop label renderer draws only one line. Fourteen focused behavior cases
+and six tracked-memory cases pass, including every word in all three languages
+at supported window widths and repeated rendering with zero retained bytes.
+The final static AArch64 desktop (`5115a9e7`, including Calendar `189407bd`) is
+published for Files, Activity Monitor and Settings. Its QEMU workflows rerun
+passes with five native processes; final screenshots confirm the loaded corpus,
+Save As and Trash panes, and the complete wrapped Calendar explanations.
