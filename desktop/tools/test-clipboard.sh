@@ -33,6 +33,7 @@ python3 "$root/desktop/tools/stage_ui2.py" "$work/modules/ui2" \
     "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
 python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
+python3 "$root/desktop/tools/stage_host_gpu.py" "$work/ui" --v "$v"
 rm "$work/ui/main.v"
 for name in clipboard editor_utf8 terminal_utf8; do
     cp "$root/desktop/tools/tests/${name}_test.v" "$work/ui/"

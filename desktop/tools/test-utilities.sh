@@ -21,6 +21,7 @@ python3 "$root/desktop/tools/stage_ui2.py" \
 mkdir "$work/ui"
 python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
+python3 "$root/desktop/tools/stage_host_gpu.py" "$work/ui" --v "$v"
 rm -f "$work/ui/main.v"
 cp "$root/desktop/tools/tests/utilities_test.v" "$work/ui/"
 printf "Module { name: 'utility_tests' }\n" > "$work/ui/v.mod"
