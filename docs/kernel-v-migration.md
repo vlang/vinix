@@ -14,19 +14,19 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | Stage | Implementations | Status |
 | --- | --- | --- |
 | Memory runtime | `memcpy`, `memset`, `memmove`, `memcmp`, `atoi` | Committed as `6fd8cf1b`; 410,739 sanitizer cases and both architecture core suites passed |
-| Runtime and CPU helpers | Secret erasure, hardware random words, ARM granule switch | Host erasure/ChaCha/SHA-256 and network randomness tests passed; both builds, ARM core/persistence and both native reseeding tests passed |
-| Network randomness | Output pool, IP IDs, TCP ISNs, ephemeral ports, SipHash | Next |
+| Runtime and CPU helpers | Secret erasure, hardware random words, ARM granule switch | Committed as `7e996557`; host erasure/ChaCha/SHA-256, network randomness, both builds/core suites, ARM persistence and both native reseeding tests passed |
+| Network randomness | Output pool, IP IDs, TCP ISNs, ephemeral ports, SipHash | Host C ABI/sanitizer and allocator-import checks passed; both builds, network options and IPv4/IPv6 guest suites passed with zero retained objects over 500 socket exchanges |
 | Integrity helpers | Verity hashing, tree layout and verification | Pending |
 | Architecture glue | Stack protection, speculation, PCI access and virtualization | Pending |
 | Network and Apple drivers | lwIP bridge, ANS, SMC, speakers, keyboard, Wi-Fi and GPU helpers | Pending |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
 | Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
 
-The first x86 core attempts after the runtime/CPU-helper port hit the same
+The first two x86 core attempts after the runtime/CPU-helper port hit the same
 free-memory accounting assertion (`tests/qemu-core/test.c:275`) seen during
-the memory-runtime port. The untouched C baseline passed on rerun. Record
-the final migrated-kernel result here rather than treating targeted tests as
-a replacement for the full core suite.
+the memory-runtime port. The untouched C baseline passed on rerun, and the
+final migrated-kernel run passed the full core suite with four CPUs and the
+native reseeding self-test enabled.
 
 The reseeding test runs 10,000 production reseeds and partial reads, requires
 zero retained objects in every heap class and zero large pages, and reaches

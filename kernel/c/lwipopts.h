@@ -70,7 +70,7 @@
 #define LWIP_NETIF_TX_SINGLE_PBUF 0
 
 /* Initial sequence numbers as RFC 6528 has them, keyed by a secret, rather
- * than lwIP's sum of the ticks since boot: see net_random.c. */
+ * than lwIP's sum of the ticks since boot: see inet/net_random.v. */
 #include <stdint.h>
 uint32_t vinix_tcp_isn(uint32_t local_address, uint16_t local_port,
                        uint32_t remote_address, uint16_t remote_port);

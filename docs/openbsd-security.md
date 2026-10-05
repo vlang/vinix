@@ -214,7 +214,7 @@ to rekey instead of repeating its parent.
 
 The kernel's IP stack, lwIP, made up the numbers in its packets the
 predictable way. OpenBSD has made each of them random for more than twenty
-years, and so does Vinix now (`kernel/c/net_random.c`):
+years, and so does Vinix now (`kernel/socket/inet/net_random.v`):
 
 - **IP IDs.** lwIP numbered datagrams one after another, so anyone who saw
   two of them knew how much else the machine had sent in between, which is

@@ -131,7 +131,7 @@ const max_extra_nameservers = 2
 pub fn initialise() {
 	read_extra_nameservers()
 	// lwIP draws its ports, IDs and sequence numbers from the kernel's
-	// generator (c/net_random.c) from lwip_init() on, before /dev/random is
+	// generator (inet/net_random.v) from lwip_init() on, before /dev/random is
 	// set up.
 	krandom.initialise()
 	net_lock.acquire()
