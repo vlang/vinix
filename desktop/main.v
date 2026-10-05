@@ -284,6 +284,7 @@ fn main() {
 		pointer_dirty := desktop.dirty
 		desktop.dirty = false
 		desktop.pump_keyboard(mut keyboard)
+		desktop.poll_host_paste()
 		keyboard_dirty := desktop.dirty
 		desktop.dirty = false
 		desktop.capture_tick()
@@ -457,6 +458,7 @@ fn main() {
 	// Leave the console the way it was found rather than on top of a desktop
 	// that is no longer being redrawn.
 	desktop.close_apps()
+	desktop.clipboard.close_request()
 	desktop.capture_close()
 	if desktop.power == .reload_desktop {
 		// Close every inherited device before exec, but keep this process alive:
@@ -596,6 +598,11 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	// must close a terminal or editor window rather than inserting an escape
 	// sequence into it.
 	rest = d.take_window_shortcuts(rest)
+	if rest.len == 0 {
+		return
+	}
+
+	rest = d.take_paste_keys(rest)
 	if rest.len == 0 {
 		return
 	}

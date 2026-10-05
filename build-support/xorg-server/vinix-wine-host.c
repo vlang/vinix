@@ -31,7 +31,7 @@
 #include <unistd.h>
 
 #define WINE_HOST_EVENT_MAGIC UINT32_C(0x56574831) /* VWH1 */
-#define WINE_HOST_MAX_KEYS 4096
+#define WINE_HOST_MAX_KEYS (64 * 1024)
 #define OBS_SCREEN_LINK "/run/vinix-obs-screen"
 #define OBS_CAPTURE_GEOMETRY "1280x900x24"
 
@@ -46,6 +46,7 @@ enum wine_host_event_kind {
     WINE_HOST_RIGHT_UP,
     WINE_HOST_WHEEL_UP,
     WINE_HOST_WHEEL_DOWN,
+    WINE_HOST_PASTE,
 };
 
 struct wine_host_event {
@@ -201,9 +202,16 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     if (pid != 0)
         return pid;
 
-    setenv("LD_LIBRARY_PATH", "/usr/lib:/usr/lib/xorg/modules", 1);
+    /* The full desktop can carry a newer Mesa for native EGL applications.
+     * Xvfb's DRI driver comes from the X11 layer, so load that layer's GL
+     * libraries with it rather than mixing two Mesa/LLVM generations. */
+    setenv("LD_LIBRARY_PATH",
+           "/usr/lib/vinix-x11-software:/usr/lib:/usr/lib/xorg/modules", 1);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
-    setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
+    /* The desktop stages the matching software driver in /usr/lib/dri;
+     * another desktop layer can populate Xorg's module directory with its
+     * own Mesa generation. Prefer the matching driver here. */
+    setenv("LIBGL_DRIVERS_PATH", "/usr/lib/dri:/usr/lib/xorg/modules/dri", 1);
     setenv("GALLIUM_DRIVER", "softpipe", 1);
     /* Keep Roblox on the proven direct ATL server with its game input bridge.
      * The lean server crashes while drawing the current client's welcome UI. */
@@ -904,6 +912,8 @@ static void fill_top_window(Display *display) {
     XFlush(display);
 }
 
+#include "vinix-clipboard.h"
+
 static int process_event(Display *display, const struct wine_host_event *event,
                          const unsigned char *payload) {
     switch (event->kind) {
@@ -940,6 +950,10 @@ static int process_event(Display *display, const struct wine_host_event *event,
     case WINE_HOST_KEYS:
         focus_top_window(display);
         send_keys(display, payload, event->length);
+        break;
+    case WINE_HOST_PASTE:
+        focus_top_window(display);
+        paste_clipboard(display, payload, event->length);
         break;
     default:
         return 0;
@@ -1040,7 +1054,7 @@ static void stop_application(pid_t pid, pid_t group) {
 
 int main(int argc, char **argv) {
     struct sigaction action;
-    unsigned char input[8192];
+    unsigned char input[WINE_HOST_MAX_KEYS + sizeof(struct wine_host_event)];
     size_t used = 0;
     const char *display_name;
     char chosen_display[16];
@@ -1191,7 +1205,8 @@ int main(int argc, char **argv) {
             memcpy(&event, input, sizeof(event));
             if (event.magic != WINE_HOST_EVENT_MAGIC ||
                 event.length > WINE_HOST_MAX_KEYS ||
-                (event.kind != WINE_HOST_KEYS && event.length != 0)) {
+                (event.kind != WINE_HOST_KEYS && event.kind != WINE_HOST_PASTE &&
+                 event.length != 0)) {
                 running = 0;
                 break;
             }
@@ -1211,7 +1226,7 @@ int main(int argc, char **argv) {
         if (fill_surface && fill_tick++ % 10 == 0)
             fill_top_window(display);
 
-        if (damage != None) {
+        {
             int drawn = 0;
             /* XDamageReportNonEmpty stays quiet until the region is taken
              * back, so one subtract per pass is enough however much was
@@ -1219,7 +1234,9 @@ int main(int argc, char **argv) {
             while (XPending(display) > 0) {
                 XEvent event;
                 XNextEvent(display, &event);
-                if (event.type == damage_event_base + XDamageNotify)
+                if (event.type == SelectionRequest)
+                    clipboard_selection_request(display, &event.xselectionrequest);
+                if (damage != None && event.type == damage_event_base + XDamageNotify)
                     drawn = 1;
             }
             if (drawn) {

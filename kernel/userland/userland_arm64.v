@@ -91,8 +91,11 @@ fn take_sigframe_cookie(frame u64, cookie_address u64) bool {
 // over the frame's x0 slot on the way out.
 fn valid_sigreturn_context(context &cpulocal.GPRState) bool {
 	user_limit := memory.user_address_limit()
+	// Only the signal frame must be 16-byte aligned. An asynchronous signal
+	// can interrupt user code with a transiently unaligned SP; Linux resumes
+	// that context without requiring the interrupted SP to be aligned.
 	return context.pc != 0 && context.pc < user_limit && context.sp != 0
-		&& context.sp < user_limit && context.sp & 0xf == 0
+		&& context.sp < user_limit
 }
 
 fn sanitize_sigreturn_context(mut context cpulocal.GPRState) {

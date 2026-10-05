@@ -3,12 +3,15 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
 void *vinix_memcpy(void *restrict, const void *restrict, size_t);
 void *vinix_memset(void *, int, size_t);
 void *vinix_memmove(void *, const void *, size_t);
+int vinix_memcmp(const void *, const void *, size_t);
+int vinix_atoi(const char *);
 static size_t cases;
 static void check(int ok, const char *where, size_t n, size_t a, size_t b) {
     if (!ok) { fprintf(stderr, "FAIL %s n=%zu a=%zu b=%zu\n", where,n,a,b); exit(1); }
@@ -36,6 +39,23 @@ static void move_case(unsigned char *dst, size_t whole, size_t d, size_t s, size
         check(dst[i]==pattern(i>=d&&i-d<n?s+i-d:i),"memmove content/bounds",n,d,s);
     cases++;
 }
+static void compare_case(const unsigned char *a, const unsigned char *b, size_t n) {
+    int expected=memcmp(a,b,n), actual=vinix_memcmp(a,b,n);
+    check((actual>0)-(actual<0)==(expected>0)-(expected<0),"memcmp sign",n,0,0);
+    cases++;
+}
+static void atoi_cases(void) {
+    const struct { const char *text; int expected; } values[]={
+        {"",0}, {" \t\n\r\f\v",0}, {"+",0}, {"-",0}, {"word",0},
+        {"0",0}, {"00042",42}, {"-42",-42}, {"+42tail",42},
+        {" \t\n\r\f\v-123rest",-123}, {"+ 42",0},
+        {"2147483647",2147483647}, {"-2147483648",(-2147483647-1)}
+    };
+    for(size_t i=0;i<sizeof(values)/sizeof(values[0]);i++) {
+        check(vinix_atoi(values[i].text)==values[i].expected,"atoi",i,0,0);
+        cases++;
+    }
+}
 int main(void) {
     size_t page=(size_t)sysconf(_SC_PAGESIZE);
     unsigned char *sm=mmap(NULL,page*3,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
@@ -55,6 +75,13 @@ int main(void) {
             set_case(dst,512,d,n,values[c]);
     // Requests end precisely at a guard page: any widened final access faults.
     for(size_t n=0;n<=page;n++) {
+        for(size_t i=0;i<page;i++) dst[i]=pattern(i);
+        compare_case(src+page-n,dst+page-n,n);
+        if(n!=0) {
+            dst[page-1]^=0xff;
+            compare_case(src+page-n,dst+page-n,n);
+            compare_case(dst+page-n,src+page-n,n);
+        }
         copy_case(dst,src,page,page-n,page-n,n);
         if(n<=page-7) copy_case(dst,src,page,page-n,7,n);
         set_case(dst,page,page-n,n,-1);
@@ -72,6 +99,8 @@ int main(void) {
     check(vinix_memcpy(dm,sm,0)==dm,"zero memcpy",0,0,0);
     check(vinix_memset(dm,0,0)==dm,"zero memset",0,0,0);
     check(vinix_memmove(dm,sm,0)==dm,"zero memmove",0,0,0);
+    check(vinix_memcmp(dm,sm,0)==0,"zero memcmp",0,0,0);
+    atoi_cases();
     check(!munmap(sm,page*3)&&!munmap(dm,page*3),"munmap",0,0,0);
     printf("KERNEL MEMORY CHECK: PASS cases=%zu page=%zu\n",cases,page);
     return 0;

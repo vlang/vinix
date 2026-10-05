@@ -56,6 +56,10 @@ fi
 # the environment. Starting the guest loader explicitly preserves the same
 # x86 dependency resolution without contaminating native descendants.
 unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+# QEMU makes its generated-code buffer writable and executable while it sets
+# the translator up. Vinix allows that only for a process tree whose launcher
+# asks for it, and every Windows or Linux program started here runs in one.
+export VINIX_ALLOW_WX=1
 if [ "$direct" -eq 1 ]; then
     exec "$emulator" -B "$guest_base" -L "$runtime" -0 "$program" \
         "$program" "$@"

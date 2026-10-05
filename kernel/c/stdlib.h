@@ -8,12 +8,17 @@
 // it has to be declared here, with the standard signatures: V generates its own
 // prototypes only for functions no header of ours promises.
 //
-// `malloc`, `calloc`, `realloc`, `free` and `exit` are implemented in V and
+// `atoi`, `malloc`, `calloc`, `realloc`, `free` and `exit` are implemented in V and
 // exported under these names. `qsort`, `getenv` and `setenv` are reached only
 // from parts of V's runtime the kernel does not use; they are declared so the
 // generated C parses, and being unreferenced they never become link errors.
 
+// Match V's exported definition in its generated translation unit.
+#ifdef VINIX_V_RUNTIME
+int atoi(char *text);
+#else
 int atoi(const char *text);
+#endif
 
 void *malloc(size_t size);
 void *calloc(size_t nmemb, size_t size);

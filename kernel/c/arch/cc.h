@@ -19,7 +19,7 @@ void vinix_lwip_assert(const char *message, const char *file, int line);
 #define LWIP_PLATFORM_ASSERT(message) \
     vinix_lwip_assert((message), __FILE__, __LINE__)
 
-/* The kernel's ChaCha20 generator, through net_random.c. */
+/* The kernel's ChaCha20 generator, through inet/net_random.v. */
 uint32_t vinix_net_random(void);
 #define LWIP_RAND() vinix_net_random()
 

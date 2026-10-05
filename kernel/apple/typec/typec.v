@@ -25,19 +25,6 @@ import sched
 import stat
 import time
 
-#include "apple_display_hotplug.h"
-
-fn C.vinix_display_hotplug_reset(state voidptr)
-
-fn C.vinix_display_hotplug_state_size() u64
-
-fn C.vinix_display_hotplug_sample(state voidptr, status u32, data_status u32,
-	now_ms u64, debounce_ms u64) int
-
-fn C.vinix_display_hotplug_connected(state voidptr) int
-
-fn C.vinix_display_hotplug_candidate(status u32, data_status u32) int
-
 const fifo_tx = u32(0x00)
 const tx_read = u32(1 << 10)
 const tx_stop = u32(1 << 9)
@@ -84,7 +71,7 @@ mut:
 	port_status   [max_ports]u32
 	port_data     [max_ports]u32
 	port_seen     [max_ports]bool
-	state         voidptr
+	state         &C.vinix_display_hotplug_state
 	io_lock       klock.Lock
 	l             klock.Lock
 	failed        bool
@@ -95,7 +82,7 @@ fn (mut controller Controller) read(_handle voidptr, buffer voidptr, offset u64,
 	controller.l.acquire()
 	word := if controller.failed {
 		'unavailable\n'
-	} else if C.vinix_display_hotplug_connected(controller.state) != 0 {
+	} else if hotplug_connected(controller.state) != 0 {
 		'connected\n'
 	} else {
 		'disconnected\n'
@@ -415,7 +402,7 @@ fn (mut controller Controller) sample() int {
 		if changed {
 			C.printf(c'apple-typec: port 0x%x status=0x%08x data=0x%08x\n', controller.addresses[index], status, data)
 		}
-		if C.vinix_display_hotplug_candidate(status, data) != 0 {
+		if hotplug_candidate(status, data) != 0 {
 			attached = true
 		}
 	}
@@ -429,7 +416,7 @@ fn (mut controller Controller) sample() int {
 	// the controller for diagnostics.
 	aggregate_status := if attached { u32(1) } else { u32(0) }
 	aggregate_data := if attached { u32((1 << 0) | (1 << 8)) } else { u32(0) }
-	result := C.vinix_display_hotplug_sample(controller.state, aggregate_status, aggregate_data, now_ms, debounce_ms)
+	result := hotplug_sample(controller.state, aggregate_status, aggregate_data, now_ms, debounce_ms)
 	controller.l.release()
 	return result
 }
@@ -487,7 +474,7 @@ pub fn connected() bool {
 	}
 	mut controller := monitor
 	controller.l.acquire()
-	value := !controller.failed && C.vinix_display_hotplug_connected(controller.state) != 0
+	value := !controller.failed && hotplug_connected(controller.state) != 0
 	controller.l.release()
 	return value
 }
@@ -530,7 +517,7 @@ pub fn initialise() bool {
 		base: base
 		addresses: plan.addresses
 		address_count: plan.address_count
-		state: memory.malloc(C.vinix_display_hotplug_state_size())
+		state: unsafe { &C.vinix_display_hotplug_state(memory.malloc(u64(hotplug_state_size()))) }
 		status: file.pollin
 	}
 	if controller.state == unsafe { nil } {
@@ -538,7 +525,7 @@ pub fn initialise() bool {
 		unsafe { free(controller) }
 		return false
 	}
-	C.vinix_display_hotplug_reset(controller.state)
+	hotplug_reset(controller.state)
 	if controller.sample() < 0 {
 		println('apple-typec: initial CD321x status read failed')
 		unsafe {

@@ -60,6 +60,7 @@ pub fn register_cache(cache &Cache, context voidptr, store IO, flush Flush) bool
 		if !memory.register_reclaimer(reclaim_caches) {
 			return false
 		}
+		memory.register_reclaimable(clean_pages)
 		reclaimer_registered = true
 	}
 	mut target := unsafe { cache }
@@ -115,6 +116,23 @@ pub fn sync_all() bool {
 		}
 	}
 	return ok
+}
+
+// What reclaim_caches() could give back when it gets to run, in physical
+// pages: what the caches hold that is not waiting to be written. Read without
+// their locks, which is the point of it: memory asks when a lock was taken.
+fn clean_pages() u64 {
+	count := katomic.load(&registered_caches_len)
+	mut clean := u64(0)
+	for i := 0; i < count; i++ {
+		cache := registered_caches[i]
+		resident := cache.resident
+		dirty := cache.dirty_pages
+		if resident > dirty {
+			clean += u64(resident - dirty)
+		}
+	}
+	return clean / (page_size / page_bytes)
 }
 
 fn reclaim_caches(wanted u64) u64 {

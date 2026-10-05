@@ -255,6 +255,14 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 				C.vinix_linuxkpi_workqueue_task_resume(voidptr(&next_thread.linuxkpi_task[0]))
 			}
 		}
+		// From here GS finds this CPU rather than the thread, as it does on an
+		// idle one: gs:[0] has to go on naming the CPU until the next thread
+		// is in place. A lock taken on the way there answers a TLB shootdown
+		// while it spins, and asks GS which CPU it is on. Left on the thread,
+		// it read the -1 stored below and stopped the kernel on an index out
+		// of range, or, once another CPU had taken the thread up, answered
+		// for that CPU instead of this one.
+		cpu.set_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &current_thread.running_on, u64(-1))
 		// Capture the destination before releasing the thread: another CPU can
 		// take it immediately after the unlock. An earlier affinity IPI may have

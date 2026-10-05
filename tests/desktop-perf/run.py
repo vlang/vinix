@@ -68,7 +68,7 @@ DESKTOP_METRICS = ("desktop_cpu", "apps_cpu", "total_cpu", "physical_mb", "deskt
 # slab/site/meminfo line, which may legitimately appear any number of times.
 OPS_GENERAL = ("stat", "pipe", "socketpair", "inet_socket", "eventfd", "epoll",
                "timerfd", "poll", "proc_read", "proc_list", "readdir", "dup",
-               "mmap", "thread", "signal", "fork", "memfd")
+               "mmap", "thread", "signal", "fault", "fork", "memfd")
 OPS_FILES = ("file", "rename", "unlink_open", "rename_over", "hardlink", "mkdir",
              "symlink", "unix_connect", "unix_datagram")
 CHURN_PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version",

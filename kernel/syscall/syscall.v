@@ -11,6 +11,7 @@ import userland
 @[export: 'syscall_leave']
 fn leave(context &cpulocal.GPRState) {
 	userland.flush_owed_sync()
+	userland.settle_owed_memory()
 	// A call that broke a pledge(2) promise has unwound and holds nothing;
 	// the process dies here, before it can run another instruction.
 	if proc.pledge_violation_pending() {

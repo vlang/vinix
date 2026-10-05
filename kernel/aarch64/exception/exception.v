@@ -278,7 +278,11 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 		0x20, 0x24 { // Instruction or Data Abort from a lower EL: userspace
+			exhausted := memory.exhaustions()
 			mmap.pf_handler(gpr_state) or {
+				if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
+					return
+				}
 				if userland.dispatch_sync_fault(gpr_state, far, esr) {
 					return
 				}
@@ -294,7 +298,11 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			// on the current thread. On an idle CPU there is no current thread,
 			// so the report itself faulted and the original branch was never
 			// named. The exception class already says which EL faulted.
+			exhausted := memory.exhaustions()
 			mmap.pf_handler(gpr_state) or {
+				if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
+					return
+				}
 				fault_handler(ec, esr, far, gpr_state)
 			}
 		}
@@ -305,6 +313,31 @@ pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 			fault_handler(ec, esr, far, gpr_state)
 		}
 	}
+}
+
+// The page a fault needed could not be had, for lack of memory rather than of
+// a mapping. A process is killed for the memory (userland/oom.v) and the
+// access runs again, which is what true asks for; a thread of the process
+// killed ends here instead. A fault the kernel took on a process' page has to
+// be seen through: when it cannot wait, having interrupts off, or the process
+// is the one killed, its page comes out of the reserve.
+fn out_of_memory(gpr_state &cpulocal.GPRState) bool {
+	user := from_userspace(gpr_state)
+	// PSTATE.I, as the interrupted code had it.
+	if !user && gpr_state.pstate & (u64(1) << 7) != 0 {
+		return userland.grant_reserve_page()
+	}
+	previous := cpu.interrupt_toggle(true)
+	retry := memory.recover_from_exhaustion(true)
+	cpu.interrupt_toggle(previous)
+	if retry {
+		return true
+	}
+	if !user {
+		return userland.grant_reserve_page()
+	}
+	userland.exit_if_killed_for_memory()
+	return false
 }
 
 // An MRS of a register in the ID space (op0 3, op1 0, CRn 0) from EL0: put

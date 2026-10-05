@@ -173,6 +173,8 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         root / "build-support/vinix-host-sync",
         root / "build-support/xorg-server/startx",
         root / "build-support/xorg-server/vinix-wine-host.c",
+        root / "build-support/xorg-server/vinix-clipboard.h",
+        root / "build-support/xorg-server/build-wine-host.sh",
         root / "build-support/firefox",
         root / "build-support/gimp",
         root / "build-support/libreoffice",

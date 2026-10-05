@@ -4,15 +4,7 @@ module krandom
 import klock
 import katomic
 
-fn C.vinix_explicit_bzero(buf voidptr, len u64)
 fn C.vinix_hw_random64(out &u64) int
-
-// OpenBSD's explicit_bzero(3): clear memory that held a secret, with stores
-// the compiler may not drop as dead, which it may do to a memset() of a buffer
-// about to go out of scope.
-pub fn explicit_bzero(buf voidptr, len u64) {
-	C.vinix_explicit_bzero(buf, len)
-}
 
 struct Generator {
 mut:

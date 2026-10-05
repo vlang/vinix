@@ -48,6 +48,10 @@ guest_argv0="${VINIX_I386_ARGV0:-$program}"
 # spawn native Vinix helpers, and exporting this path makes the AArch64 loader
 # try to relocate guest libraries before a helper wrapper can sanitize it.
 unset LD_LIBRARY_PATH QEMU_LD_PREFIX QEMU_SET_ENV
+# QEMU makes its generated-code buffer writable and executable while it sets
+# the translator up. Vinix allows that only for a process tree whose launcher
+# asks for it, and every Windows or Linux program started here runs in one.
+export VINIX_ALLOW_WX=1
 exec "$emulator" -L "$runtime" "$loader" \
     --library-path "$guest_library_path" --argv0 "$guest_argv0" -- \
     "$program" "$@"

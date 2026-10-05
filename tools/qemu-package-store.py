@@ -18,6 +18,8 @@ import sys
 import tarfile
 import tempfile
 
+from host_clipboard import ClipboardError, read_clipboard
+
 
 # The guest downloads the whole shared checkout on every build. A stray build
 # artifact (an abandoned multi-gigabyte initramfs tar, a disk image) would make
@@ -75,6 +77,19 @@ class OverlayHandler(http.server.BaseHTTPRequestHandler):
     server_version = "VinixPackageStore/1"
 
     def do_GET(self) -> None:
+        if self.path == "/clipboard" and self.server.clipboard:
+            try:
+                text = read_clipboard()
+            except ClipboardError as error:
+                self.send_error(503, str(error))
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(text)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(text)
+            return
         if self.path == "/health":
             self.send_response(204)
             self.end_headers()
@@ -355,6 +370,7 @@ class OverlayServer(http.server.ThreadingHTTPServer):
         source_root: Path | None,
         source_extras: tuple[Path, ...],
         ui2_source: Path | None,
+        clipboard: bool = False,
     ):
         super().__init__(address, OverlayHandler)
         self.destination = destination
@@ -362,6 +378,7 @@ class OverlayServer(http.server.ThreadingHTTPServer):
         self.source_root = source_root
         self.source_extras = source_extras
         self.ui2_source = ui2_source
+        self.clipboard = clipboard
 
 
 def main() -> None:
@@ -373,6 +390,7 @@ def main() -> None:
     parser.add_argument("--source-root", type=Path)
     parser.add_argument("--source-extra", type=Path, action="append", default=[])
     parser.add_argument("--ui2-source", type=Path)
+    parser.add_argument("--clipboard", action="store_true")
     args = parser.parse_args()
 
     source_root = args.source_root.resolve() if args.source_root else None
@@ -402,6 +420,7 @@ def main() -> None:
         source_root,
         source_extras,
         ui2_source,
+        args.clipboard,
     )
     actual_port = server.server_address[1]
     if args.ready_file:

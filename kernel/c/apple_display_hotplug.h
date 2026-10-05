@@ -53,7 +53,14 @@ void vinix_display_hotplug_reset(struct vinix_display_hotplug_state *state);
 int vinix_display_hotplug_sample(struct vinix_display_hotplug_state *state,
                                  uint32_t status, uint32_t data_status,
                                  uint64_t now_ms, uint64_t debounce_ms);
-int vinix_display_hotplug_connected(const struct vinix_display_hotplug_state *state);
+/* V exports omit const; ordinary C callers retain the read-only contract. */
+#ifdef VINIX_V_RUNTIME
+#define VINIX_HOTPLUG_CONST
+#else
+#define VINIX_HOTPLUG_CONST const
+#endif
+int vinix_display_hotplug_connected(VINIX_HOTPLUG_CONST struct vinix_display_hotplug_state *state);
+#undef VINIX_HOTPLUG_CONST
 int vinix_display_hotplug_candidate(uint32_t status, uint32_t data_status);
 int vinix_display_hotplug_choose_action(int connected, int reboot_enabled,
                                         int reboot_attempted,

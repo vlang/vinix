@@ -422,7 +422,7 @@ obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	$(V) $(VFLAGS) -o obj/blob.c obj/vsrc
 	sed 's/call 0(/call *(/g;/Wimplicit-function-declaration/d' < obj/blob.c > obj/blob.c.tmp
 	mv obj/blob.c.tmp obj/blob.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -w -c obj/blob.c -o $@
+	$(CC) $(CFLAGS) $(CPPFLAGS) -DVINIX_V_RUNTIME -w -c obj/blob.c -o $@
 
 # Compilation rules for *.c files.
 obj/c/%.c.o: c/%.c GNUmakefile

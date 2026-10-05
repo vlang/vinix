@@ -47,7 +47,7 @@ class InteractiveTest(unittest.TestCase):
             runtime_arg=[], split_apk=[], split_apk_sha256=[],
             boot_probe=None, loader_probe=None, linker_diagnostics=False,
             tls_probe=None, layout_probe=None, pointer_probe=None, lifecycle_probe=None, cookie_probe=None,
-            autofill_probe=None, split_probe=None, egl_probe=None,
+            autofill_probe=None, location_probe=None, egl_queue_probe=None, split_probe=None, egl_probe=None,
         )
         self.args.state_dir.mkdir()
 
@@ -118,6 +118,52 @@ class InteractiveTest(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertTrue(result["autofill_probe_passed"])
         self.assertEqual(result["autofill_probe_sha256"], "fixture identity")
+        self.assertIsNone(result["passed"])
+        self.assertEqual(result["functionality"], "unchecked")
+
+    def test_optional_location_requires_its_verified_preflight(self):
+        self.args.location_probe = self.args.apk
+        self.args.location_probe_sha256 = "location fixture identity"
+        status, result, _output = self.run_session(
+            b"ANDROID-READY\nANDROID-OBSERVED seconds=30 functionality=unchecked\n"
+            b"diagnostic ANDROID-LOCATION-VERIFIED was not reached\n")
+        self.assertEqual(status, 1)
+        self.assertFalse(result["observed"])
+        self.assertFalse(result["location_probe_passed"])
+        self.assertIn("location providers probe did not pass", result["failure"])
+
+    def test_optional_location_preserves_unchecked_gameplay(self):
+        self.args.location_probe = self.args.apk
+        self.args.location_probe_sha256 = "location fixture identity"
+        status, result, _output = self.run_session(
+            b"ANDROID-LOCATION-VERIFIED\r\r\nANDROID-READY\n")
+        self.assertEqual(status, 0)
+        self.assertTrue(result["location_probe_passed"])
+        self.assertEqual(result["location_probe_sha256"], "location fixture identity")
+        self.assertIsNone(result["passed"])
+        self.assertEqual(result["functionality"], "unchecked")
+
+    def test_egl_queue_pass_text_requires_verified_child_completion(self):
+        self.args.egl_queue_probe = self.args.apk
+        self.args.egl_queue_probe_sha256 = "queue fixture identity"
+        status, result, _output = self.run_session(
+            b"ANDROID-EGL-QUEUE-PASS surface=production\n"
+            b"ANDROID-EGL-QUEUE-CHILD status=139\n"
+            b"diagnostic ANDROID-EGL-QUEUE-VERIFIED was not reached\nANDROID-READY\n")
+        self.assertEqual(status, 1)
+        self.assertFalse(result["observed"])
+        self.assertFalse(result["egl_queue_probe_passed"])
+        self.assertEqual(result["egl_queue_probe_exit_status"], 139)
+        self.assertIn("EGL buffer queue probe did not pass", result["failure"])
+
+    def test_egl_queue_verified_retains_fixture_identity_and_unchecked_gameplay(self):
+        self.args.egl_queue_probe = self.args.apk
+        self.args.egl_queue_probe_sha256 = "queue fixture identity"
+        status, result, _output = self.run_session(b"ANDROID-EGL-QUEUE-CHILD status=0\nANDROID-EGL-QUEUE-VERIFIED\r\r\nANDROID-READY\n")
+        self.assertEqual(status, 0)
+        self.assertTrue(result["egl_queue_probe_passed"])
+        self.assertEqual(result["egl_queue_probe_exit_status"], 0)
+        self.assertEqual(result["egl_queue_probe_sha256"], "queue fixture identity")
         self.assertIsNone(result["passed"])
         self.assertEqual(result["functionality"], "unchecked")
 

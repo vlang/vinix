@@ -79,7 +79,7 @@ fn sha256_compress(state &[8]u32, block &u8) {
 	explicit_bzero(unsafe { &words[0] }, sizeof(words))
 }
 
-fn sha256_digest(data &u8, length u64, output &[32]u8) {
+pub fn sha256_digest(data &u8, length u64, output &[32]u8) {
 	mut state := [u32(0x6a09e667), 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 		0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]!
 	mut at := u64(0)

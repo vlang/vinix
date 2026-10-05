@@ -216,7 +216,10 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 		}
 	}
 
-	physical := memory.pmm_alloc_fallible(1)
+	// A page that stays for as long as it is mapped, so the mapping process'
+	// to answer for, as an anonymous one is: not from the memory the kernel
+	// keeps for itself, and counted when there is none (memory/reserve.v).
+	physical := memory.pmm_alloc_user(1)
 	if physical == unsafe { nil } {
 		errno.set(errno.enomem)
 		return unsafe { nil }

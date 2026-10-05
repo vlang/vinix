@@ -171,7 +171,8 @@ mut:
 	settings Settings
 	// What typing goes through first: the input source's dead keys and the
 	// Ctrl-Space panel.
-	keyboard KeyboardInput
+	keyboard  KeyboardInput
+	clipboard HostClipboard
 	// Screenshot and video requests originate in the native Capture app, but
 	// the compositor owns the pixels and the output stream.
 	capture CaptureService
@@ -897,6 +898,9 @@ fn (mut d Desktop) poll_apps() {
 // opening a stopwatch or a continuously hosted framebuffer lowers the timeout
 // to that application's requested cadence.
 fn (d &Desktop) idle_wait_interval(maximum i64, frame_interval i64) i64 {
+	if d.clipboard.pid > 0 {
+		return frame_interval
+	}
 	mut interval := d.keyboard_hud_wait(maximum)
 	for window in d.windows {
 		if window.app_index < 0 || window.app_index >= d.apps.len {

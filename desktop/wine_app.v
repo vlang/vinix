@@ -27,10 +27,15 @@ const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
 const gimp_window_height = 900
-const obs_surface_width = 1280
-const obs_surface_height = 900
-const obs_window_width = 1280
-const obs_window_height = 900
+// OBS opens a 1088x730 control window. Match its first-screen root and native
+// frame so the desktop does not show an unused band around the controls.
+// The separate capture screen remains 1280x900.
+const obs_surface_width = 1088
+const obs_surface_height = 730
+const obs_window_width = 1088
+const obs_window_height = 730
+const obs_capture_width = 1280
+const obs_capture_height = 900
 // Writer lays a page out for the width it is given. 1280x900 is the same
 // surface the browsers use, and wide enough for a document page beside the
 // sidebar without the toolbars wrapping onto a third row.
@@ -84,6 +89,7 @@ enum WineHostEventKind as u32 {
 	right_up
 	wheel_up
 	wheel_down
+	paste
 }
 
 struct WineHostEvent {
@@ -566,7 +572,7 @@ fn (mut app HostedX11App) pointer_input_enabled() bool {
 }
 
 fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, keys string) {
-	if app.input_fd < 0 || keys.len > 4096 {
+	if app.input_fd < 0 || keys.len > clipboard_max_bytes {
 		return
 	}
 	event := WineHostEvent{
@@ -638,6 +644,12 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 fn (mut app HostedX11App) key_input(text string) {
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
+	}
+}
+
+fn (mut app HostedX11App) paste_input(text string) {
+	if text.len > 0 {
+		app.send_host_event(.paste, 0, 0, text)
 	}
 }
 

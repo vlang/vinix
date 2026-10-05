@@ -152,6 +152,12 @@ pub fn leave_graphics_mode() {
 	terminal_print_lock.release()
 }
 
+// The process that took the screen for its own drawing, or 0 when the
+// console has it.
+pub fn graphics_owner() int {
+	return if terminal_graphics_mode { terminal_graphics_owner } else { 0 }
+}
+
 // Called when a process exits: only the owner's exit restores text mode.
 pub fn leave_graphics_mode_if_owner(pid int) {
 	if terminal_graphics_mode && terminal_graphics_owner == pid {

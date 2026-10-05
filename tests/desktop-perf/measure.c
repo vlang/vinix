@@ -611,6 +611,34 @@ static void op_signal(int i) {
 	raise(SIGUSR1);
 }
 
+static char *fault_page;
+static size_t fault_page_size;
+
+static void on_fault(int number) {
+	(void)number;
+	mprotect(fault_page, fault_page_size, PROT_READ | PROT_WRITE);
+}
+
+/* A write to a read-only page that the handler then lets through: SIGSEGV as
+ * a translator or a collector with a write barrier uses it, as a matter of
+ * course rather than on the way to a crash. */
+static void op_fault(int i) {
+	(void)i;
+	if (fault_page == NULL) {
+		fault_page_size = (size_t)sysconf(_SC_PAGESIZE);
+		char *page = mmap(NULL, fault_page_size, PROT_READ | PROT_WRITE,
+		                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+		if (page == MAP_FAILED)
+			return;
+		fault_page = page;
+		struct sigaction action = {.sa_handler = on_fault};
+		sigaction(SIGSEGV, &action, NULL);
+	}
+	fault_page[0] = 1;
+	mprotect(fault_page, fault_page_size, PROT_READ);
+	*(volatile char *)fault_page = 2;
+}
+
 static void op_fork(int i) {
 	(void)i;
 	pid_t pid = fork();
@@ -689,8 +717,8 @@ static void ops(int count, const char *label) {
 		{"proc_read", op_proc_read},     {"proc_list", op_proc_list},
 		{"readdir", op_readdir},         {"dup", op_dup},
 		{"mmap", op_mmap},               {"thread", op_thread},
-		{"signal", op_signal},           {"fork", op_fork},
-		{"memfd", op_memfd},
+		{"signal", op_signal},           {"fault", op_fault},
+		{"fork", op_fork},               {"memfd", op_memfd},
 	};
 	/* The ones that make and remove names, on the RAM root and on ext2. */
 	static const struct op files[] = {

@@ -105,18 +105,19 @@ mut:
 	// The visible terminal is a fixed grid of code points, one per cell. Keeping
 	// it flat makes scrolling and erasing deterministic and avoids one
 	// allocation per cell.
-	screen         []rune
-	rendered_rows  []string
-	dirty_rows     []bool
-	rows           int
-	columns        int
-	cursor_row     int
-	cursor_column  int
-	cursor_visible bool = true
-	autowrap       bool = true
-	wrap_pending   bool
-	insert_mode    bool
-	last_printed   rune = ` `
+	screen          []rune
+	rendered_rows   []string
+	dirty_rows      []bool
+	rows            int
+	columns         int
+	cursor_row      int
+	cursor_column   int
+	cursor_visible  bool = true
+	autowrap        bool = true
+	wrap_pending    bool
+	insert_mode     bool
+	bracketed_paste bool
+	last_printed    rune = ` `
 
 	scroll_top          int
 	scroll_bottom       int
@@ -1086,6 +1087,7 @@ fn (mut a TerminalApp) leave_alternate_screen() {
 fn (mut a TerminalApp) set_private_mode(enabled bool) {
 	for index in 0 .. a.csi_count {
 		match a.csi_params[index] {
+			2004 { a.bracketed_paste = enabled }
 			7 {
 				a.autowrap = enabled
 			}
@@ -1193,6 +1195,7 @@ fn (mut a TerminalApp) apply_csi(command u8) {
 }
 
 fn (mut a TerminalApp) reset_active_screen() {
+	a.bracketed_paste = false
 	a.clear_cells(0, a.screen.len)
 	a.cursor_row = 0
 	a.cursor_column = 0
@@ -1251,6 +1254,19 @@ fn (mut a TerminalApp) key_input(text string) {
 	}
 	desktop_write_all(a.terminal, input.data, u64(input.len))
 	unsafe { input.free() }
+}
+
+fn (mut a TerminalApp) paste_input(text string) {
+	if a.terminal < 0 || a.exited || text.len == 0 {
+		return
+	}
+	if a.bracketed_paste {
+		desktop_write_all(a.terminal, c'\x1b[200~', 6)
+	}
+	desktop_write_all(a.terminal, text.str, u64(text.len))
+	if a.bracketed_paste {
+		desktop_write_all(a.terminal, c'\x1b[201~', 6)
+	}
 }
 
 fn (mut a TerminalApp) close_app() {

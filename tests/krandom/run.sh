@@ -11,8 +11,9 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 mkdir -p "$work/krandom" "$work/klock" "$work/katomic"
 printf "Module {\n name: 'vinix_krandom_host_tests'\n}\n" > "$work/v.mod"
-cp "$root/kernel/krandom/random.v" "$root/kernel/krandom/sha256.v" "$root/tests/krandom/krandom_test.v" \
+cp "$root/kernel/krandom/random.v" "$root/kernel/krandom/sha256.v" "$root/kernel/krandom/erase.v" "$root/tests/krandom/krandom_test.v" \
 	"$root/tests/krandom/sha256_test.v" \
+	"$root/tests/krandom/erase_test.v" \
 	"$root/tests/krandom/host_stubs.v" "$work/krandom/"
 # Single-threaded tests; this never goes near the kernel.
 cat > "$work/klock/klock.v" <<'STUB'
@@ -30,7 +31,7 @@ pub fn store[T](mut target T, value T) { target = value }
 STUB
 cp "$root/tests/krandom/host_stubs.h" "$work/"
 # One object: `v test` passes -ldflags through a shell unquoted.
-cat "$root/kernel/c/explicit_bzero.c" "$root/tests/krandom/host_stubs.c" > "$work/host.c"
+cp "$root/tests/krandom/host_stubs.c" "$work/host.c"
 "$cc" -O2 -c "$work/host.c" -o "$work/host.o"
 # From the module's own directory, whose v.mod lets krandom find klock.
 cd "$work"
