@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the V memory-runtime migration (parent `acd0e3cbd72f195dc123c2a324b4d43ce45fc261`),
+for the staged kernel V migration (parent `3f4280f79cda0956962258aa3c3b49002809be26`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 548 | 6,272,413 | 27.42% |
-| Python | 334 | 3,864,329 | 16.89% |
-| Shell | 273 | 1,220,154 | 5.33% |
+| C | 546 | 6,262,413 | 27.31% |
+| Python | 335 | 3,870,373 | 16.88% |
+| Shell | 276 | 1,225,677 | 5.35% |
 
-All `.v` files are classified as V. The resulting V share is 37.62%, with no
+All `.v` files are classified as V. The resulting V share is 37.77%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -97,7 +97,6 @@ deployed Linguist version and the default-branch revision.
 | `gl-triangle/egl_triangle.c` | 19,597 |
 | `gl-triangle/triangle.c` | 1,640 |
 | `kernel/asm/x86_64/speculation.h` | 2,150 |
-| `kernel/c/aarch64_paging.c` | 622 |
 | `kernel/c/acpi_sync_test.c` | 154 |
 | `kernel/c/agx_fake_g17.c` | 13,247 |
 | `kernel/c/agx_fake_g17.h` | 6,955 |
@@ -120,16 +119,14 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/apple_spi_keyboard.c` | 26,668 |
 | `kernel/c/apple_spi_keyboard.h` | 1,718 |
 | `kernel/c/apple_spi_touchpad.h` | 9,482 |
-| `kernel/c/arch/cc.h` | 781 |
+| `kernel/c/arch/cc.h` | 786 |
 | `kernel/c/brcm_m1.c` | 15,570 |
 | `kernel/c/brcm_m1.h` | 2,448 |
 | `kernel/c/brcm_wifi.c` | 35,373 |
 | `kernel/c/brcm_wifi.h` | 5,207 |
 | `kernel/c/ctype.h` | 43 |
-| `kernel/c/explicit_bzero.c` | 493 |
 | `kernel/c/heap_benchmark.c` | 11,953 |
 | `kernel/c/heap_benchmark.h` | 101 |
-| `kernel/c/hw_random.c` | 1,442 |
 | `kernel/c/inttypes.h` | 69 |
 | `kernel/c/linuxkpi.c` | 25,673 |
 | `kernel/c/linuxkpi_bitmap.c` | 10,678 |
@@ -162,9 +159,8 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_ww_mutex.c` | 10,145 |
 | `kernel/c/linuxkpi_ww_mutex_test.c` | 13,730 |
 | `kernel/c/locale.h` | 45 |
-| `kernel/c/lwipopts.h` | 3,094 |
+| `kernel/c/lwipopts.h` | 3,099 |
 | `kernel/c/math.h` | 486 |
-| `kernel/c/net_random.c` | 10,077 |
 | `kernel/c/net_random.h` | 1,582 |
 | `kernel/c/pci_config.c` | 3,417 |
 | `kernel/c/pci_config.h` | 2,255 |
@@ -187,8 +183,7 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/sys/types.h` | 51 |
 | `kernel/c/sys/wait.h` | 49 |
 | `kernel/c/unistd.h` | 45 |
-| `kernel/c/verity.c` | 7,558 |
-| `kernel/c/verity.h` | 1,254 |
+| `kernel/c/verity.h` | 1,518 |
 | `kernel/c/vinix_endpoint.h` | 349 |
 | `kernel/c/vinix_inet6.h` | 1,209 |
 | `kernel/c/vinix_net.c` | 47,124 |
@@ -466,6 +461,9 @@ deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/test.c` | 17,267 |
 | `tests/fsync-scope/test.c` | 2,988 |
 | `tests/hypervisor/abi_test.c` | 878 |
+| `tests/ios/calculator.c` | 2,085 |
+| `tests/ios/guest.c` | 3,215 |
+| `tests/ios/unsupported.c` | 166 |
 | `tests/ipv6-multicast/host.c` | 17,389 |
 | `tests/ipv6-multicast/test.c` | 15,331 |
 | `tests/kernel-cpu/check.c` | 11,557 |
@@ -523,7 +521,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/memory/runtime.c` | 4,898 |
 | `tests/mount-policy/test.c` | 27,539 |
 | `tests/mounted-disk-policy/guest.c` | 9,548 |
-| `tests/net-random/test.c` | 6,987 |
+| `tests/net-random/test.c` | 11,439 |
 | `tests/network-ipv6/guest.c` | 7,620 |
 | `tests/network-ipv6/host.c` | 9,932 |
 | `tests/network-options/guest.c` | 7,884 |
@@ -808,6 +806,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,335 |
 | `tests/fsync-scope/run.py` | 5,239 |
+| `tests/ios/run.py` | 4,186 |
 | `tests/ipv6-multicast/check-generated.py` | 1,613 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
 | `tests/kernel-allocs/copy_sources.py` | 1,632 |
@@ -886,7 +885,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/user-access/sites.py` | 3,169 |
 | `tests/verified-boot/runtime.py` | 8,363 |
 | `tests/verified-boot/test.py` | 13,268 |
-| `tests/verified-root/run-host.py` | 5,409 |
+| `tests/verified-root/run-host.py` | 7,267 |
 | `tests/verified-root/runtime.py` | 14,950 |
 | `tests/verified-root/test.py` | 9,535 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 11,592 |
@@ -963,6 +962,7 @@ deployed Linguist version and the default-branch revision.
 | `build-firefox-amd64.sh` | 170 |
 | `build-go-aarch64.sh` | 3,054 |
 | `build-hyprland-aarch64.sh` | 10,888 |
+| `build-ios-aarch64.sh` | 1,613 |
 | `build-java-aarch64.sh` | 4,701 |
 | `build-libreoffice-aarch64.sh` | 6,463 |
 | `build-limine-aarch64.sh` | 4,409 |
@@ -1025,7 +1025,7 @@ deployed Linguist version and the default-branch revision.
 | `build-support/vinix-files-sync` | 2,346 |
 | `build-support/vinix-host-sync` | 4,402 |
 | `build-support/vinix-persist-packages` | 5,211 |
-| `build-support/vinix-pkg` | 44,353 |
+| `build-support/vinix-pkg` | 44,441 |
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,583 |
 | `build-support/virglrenderer/build-host.sh` | 3,251 |
@@ -1132,11 +1132,13 @@ deployed Linguist version and the default-branch revision.
 | `tests/go/smoke.sh` | 558 |
 | `tests/hypervisor/run.sh` | 321 |
 | `tests/hyprland/smoke.sh` | 413 |
+| `tests/ios/build-fixture.sh` | 561 |
+| `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ipv6-multicast/run-host.sh` | 904 |
 | `tests/ipv6-multicast/run.sh` | 2,115 |
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/run.sh` | 4,069 |
-| `tests/krandom/run.sh` | 1,507 |
+| `tests/krandom/run.sh` | 1,539 |
 | `tests/linuxkpi/run.sh` | 3,971 |
 | `tests/m1-deploy/run.sh` | 2,626 |
 | `tests/m1-wifi/build.sh` | 2,625 |
@@ -1148,7 +1150,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,094 |
-| `tests/net-random/run.sh` | 650 |
+| `tests/net-random/run.sh` | 2,274 |
 | `tests/network-ipv6/run-host.sh` | 1,031 |
 | `tests/network-options/run-host.sh` | 906 |
 | `tests/network-tcp-lifetime/run-host.sh` | 1,059 |
@@ -1171,7 +1173,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,662 |
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
-| `tests/packages/test-vinix-pkg.sh` | 24,754 |
+| `tests/packages/test-vinix-pkg.sh` | 25,685 |
 | `tests/pagecache/run.sh` | 2,509 |
 | `tests/pci-config/run.sh` | 937 |
 | `tests/private-pages/run-host.sh` | 5,998 |

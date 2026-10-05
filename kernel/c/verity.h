@@ -17,12 +17,19 @@ struct vinix_verity {
     unsigned char root_hash[32];
 };
 typedef int (*vinix_verity_reader)(void *, uint64_t, void *);
-int vinix_verity_init(struct vinix_verity *, uint64_t, const char *, size_t);
+/* V exports omit C's const qualifiers; keep them for ordinary C callers. */
+#ifdef VINIX_V_RUNTIME
+#define VINIX_VERITY_CONST
+#else
+#define VINIX_VERITY_CONST const
+#endif
+int vinix_verity_init(struct vinix_verity *, uint64_t, VINIX_VERITY_CONST char *, size_t);
 /* 0 absent, 1 valid, -1 malformed/duplicate/conflicting root selection. */
-int vinix_verity_parse(const char *, struct vinix_verity *, char *, size_t);
+int vinix_verity_parse(VINIX_VERITY_CONST char *, struct vinix_verity *, char *, size_t);
 /* Never allocates or exposes data; caller keeps data stable until copying it.
  * reader must fill an entire 4096-byte block, returning zero only on success. */
-int vinix_verity_check(const struct vinix_verity *, uint64_t, const void *,
+int vinix_verity_check(VINIX_VERITY_CONST struct vinix_verity *, uint64_t, VINIX_VERITY_CONST void *,
                        vinix_verity_reader, void *, void *);
-void vinix_verity_sha256(const void *, size_t, unsigned char[32]);
+void vinix_verity_sha256(VINIX_VERITY_CONST void *, size_t, unsigned char[32]);
+#undef VINIX_VERITY_CONST
 #endif

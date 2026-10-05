@@ -15,8 +15,8 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | --- | --- | --- |
 | Memory runtime | `memcpy`, `memset`, `memmove`, `memcmp`, `atoi` | Committed as `6fd8cf1b`; 410,739 sanitizer cases and both architecture core suites passed |
 | Runtime and CPU helpers | Secret erasure, hardware random words, ARM granule switch | Committed as `7e996557`; host erasure/ChaCha/SHA-256, network randomness, both builds/core suites, ARM persistence and both native reseeding tests passed |
-| Network randomness | Output pool, IP IDs, TCP ISNs, ephemeral ports, SipHash | Host C ABI/sanitizer and allocator-import checks passed; both builds, network options and IPv4/IPv6 guest suites passed with zero retained objects over 500 socket exchanges |
-| Integrity helpers | Verity hashing, tree layout and verification | Pending |
+| Network randomness | Output pool, IP IDs, TCP ISNs, ephemeral ports, SipHash | Committed as `3f4280f7`; host C ABI/sanitizer and allocator-import checks passed; both builds, network options and IPv4/IPv6 guest suites passed with zero retained objects over 500 socket exchanges |
+| Integrity helpers | Verity hashing, tree layout and verification | Host C ABI/sanitizers, 267 SHA-256 lengths against hashlib, 139 geometries against the builder, both builds and all verified-root boot/corruption cases passed; 1000 verified reads and 1000 shared fault/unmap cycles retained zero objects/pages on both architectures |
 | Architecture glue | Stack protection, speculation, PCI access and virtualization | Pending |
 | Network and Apple drivers | lwIP bridge, ANS, SMC, speakers, keyboard, Wi-Fi and GPU helpers | Pending |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
