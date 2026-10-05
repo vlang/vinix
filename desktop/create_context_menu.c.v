@@ -103,7 +103,7 @@ fn context_entry_title(entry ui2.MenuEntry) string {
 		file_context_cut { tr('desktop_menu.cut') }
 		file_context_paste { tr('desktop_menu.paste') }
 		file_context_tags { tr('desktop_menu.tags') }
-		file_context_delete { tr('desktop_menu.delete') }
+		file_context_delete { tr('files.trash.move') }
 		tray_context_hide { tr('tray.menu.hide') }
 		tray_context_show { tr('tray.menu.show') }
 		else { entry.title }
@@ -326,6 +326,8 @@ mut:
 	rename_text         []u8
 	rename_select_all   bool
 	preview             FilesQuickLook
+	trash               FilesTrash
+	trash_open          bool
 }
 
 fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
@@ -663,7 +665,13 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	if a.settings_only {
 		return a.settings_window(size)
 	}
-	root := a.files.build(size)!
+	if a.trash_open { return a.trash.build(size) }
+	browser_height := if size.height > 34 { size.height - 34 } else { 1.0 }
+	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, browser_height))!
+	mut browser_children := frame_elements(browser_root.children.len + 3)
+	browser_children << browser_root.children
+	browser_children << a.trash_footer(size)
+	root := ui2.Element{ ...browser_root, children: browser_children }
 	if a.tag_picker {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
@@ -727,13 +735,14 @@ fn (mut a FilesContextApp) delete_selected() ! {
 		unsafe { next_current.free() }
 		next_current = parent_path(selected).clone()
 	}
-	file_context_remove_path(selected) or {
+	a.ensure_trash()
+	if !a.trash.move(selected) {
 		unsafe {
 			selected.free()
 			current.free()
 			next_current.free()
 		}
-		return err
+		return
 	}
 	a.files.settings.remove_path(selected)
 	a.files.settings.save(desktop_home)
@@ -816,6 +825,21 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 	a.follow_theme()
 	if event_id == files_settings_refresh {
 		a.reload_files_settings(desktop_home)
+		return
+	}
+	if !a.settings_only && event_id == 'files.trash.open' {
+		a.open_trash()
+		return
+	}
+	if a.trash_open {
+		if event_id == 'files.trash.back' {
+			a.trash_open = false
+			a.trash.confirming = false
+			current := a.files.current_path().clone()
+			a.refresh_to(current)
+		} else {
+			a.trash.action(event_id)
+		}
 		return
 	}
 	if a.files.info.open {
@@ -972,7 +996,7 @@ fn (mut a FilesContextApp) pointer_input_enabled() bool {
 
 // The settings pane, the tag picker and a preview only take scrolling.
 fn (a &FilesContextApp) pointer_moves_matter() bool {
-	if a.settings_only || a.tag_picker || a.preview.open || a.files.info.open {
+	if a.settings_only || a.tag_picker || a.preview.open || a.files.info.open || a.trash_open {
 		return false
 	}
 	return a.files.pointer_moves_matter()
@@ -981,6 +1005,14 @@ fn (a &FilesContextApp) pointer_moves_matter() bool {
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
 	a.follow_theme()
+	if a.trash_open {
+		if phase == .scroll {
+			a.trash.page -= scroll
+			a.trash.confirming = false
+			a.trash.clamp_page()
+		}
+		return
+	}
 	if a.settings_only {
 		if phase == .scroll && a.settings_tab == 1 {
 			a.settings_scroll = files_clamp(a.settings_scroll - scroll,
@@ -1021,6 +1053,10 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 
 fn (mut a FilesContextApp) key_input(input string) {
 	a.follow_theme()
+	if a.trash_open {
+		a.trash.key(input)
+		return
+	}
 	if a.settings_only {
 		a.settings_key_input(input)
 		return
@@ -1047,6 +1083,7 @@ fn (mut a FilesContextApp) key_input(input string) {
 }
 
 fn (mut a FilesContextApp) close_app() {
+	a.trash.close()
 	a.preview.close()
 	a.files.info.close()
 }
@@ -1301,7 +1338,22 @@ fn (mut d Desktop) desktop_context_action(action string, item_path string) ! {
 			if item_path.len == 0 {
 				return error('no file selected')
 			}
-			file_context_remove_path(item_path)!
+			mut trash := files_trash_new(desktop_user_home)
+			defer { trash.close() }
+			if !trash.move(item_path) {
+				// Open a visible failure report; the old desktop path only logged
+				// failed deletion to stderr.
+				for index, factory in available_apps {
+					if factory.process_name != 'vinix-files' { continue }
+					window := d.launch_index_window(index)
+					if window > 0 {
+						d.send_to_window(window, 'files.trash.open')
+						d.send_to_window(window, trash.status)
+					}
+					break
+				}
+				return
+			}
 			d.refresh_desktop_directory()
 		}
 		else {}
