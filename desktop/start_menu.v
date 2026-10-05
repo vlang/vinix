@@ -14,6 +14,8 @@ const action_start_toggle = 'start.toggle'
 const action_start_panel = 'start.panel'
 const action_start_all = 'start.all'
 const action_start_back = 'start.back'
+const action_start_previous = 'start.previous'
+const action_start_next = 'start.next'
 const action_start_search = 'start.search'
 const action_start_files = 'start.files'
 const action_start_settings = 'start.settings'
@@ -36,7 +38,7 @@ const app_start_jump_actions = ['start.jump.0', 'start.jump.1', 'start.jump.2', 
 	'start.jump.25', 'start.jump.26', 'start.jump.27', 'start.jump.28', 'start.jump.29', 'start.jump.30',
 	'start.jump.31', 'start.jump.32', 'start.jump.33',
 	'start.jump.34', 'start.jump.35', 'start.jump.36',
-	'start.jump.37', 'start.jump.38', 'start.jump.39']
+	'start.jump.37', 'start.jump.38', 'start.jump.39', 'start.jump.40']
 const start_recent_item_actions = ['start.recent.0', 'start.recent.1', 'start.recent.2',
 	'start.recent.3', 'start.recent.4', 'start.recent.5', 'start.recent.6', 'start.recent.7',
 	'start.recent.8', 'start.recent.9', 'start.recent.10', 'start.recent.11']
@@ -51,6 +53,8 @@ const start_menu_margin = 8
 const start_menu_left_width = 280
 const start_menu_row_height = 34
 const start_menu_search_height = 32
+const start_menu_page_height = 30
+const start_menu_page_gap = 6
 const start_menu_max_query = 48
 
 // A new profile has no history yet. Windows 7 seeded its recent-programs list
@@ -111,6 +115,7 @@ fn (mut d Desktop) toggle_start_menu() {
 	d.close_tray_flyout()
 	d.start_menu_open = true
 	d.start_menu_all_apps = false
+	d.start_menu_page = 0
 	d.start_menu_searching = false
 	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
@@ -127,6 +132,7 @@ fn (mut d Desktop) close_start_menu() {
 	}
 	d.start_menu_open = false
 	d.start_menu_all_apps = false
+	d.start_menu_page = 0
 	d.start_menu_searching = false
 	d.set_start_menu_recent(start_recent_none)
 	d.free_start_menu_query()
@@ -148,7 +154,7 @@ fn (d &Desktop) start_menu_query_text() string {
 	return unsafe { tos(d.start_menu_query.data, d.start_menu_query.len) }
 }
 
-fn (d &Desktop) start_menu_element() ui2.Element {
+fn (mut d Desktop) start_menu_element() ui2.Element {
 	frame := d.start_menu_rect()
 	width := int(frame.width)
 	height := int(frame.height)
@@ -168,14 +174,18 @@ fn (d &Desktop) start_menu_element() ui2.Element {
 	// The user tile occupies the place Windows 7 reserved above its system
 	// links. The same standalone V is used on the Start button itself.
 	badge_size := 48
-	children << ui2.view('start.user.badge', ui2.rect(f64(right_x + 8), 12, f64(badge_size), f64(badge_size)), ui2.BoxStyle{
-		bg: d.theme().accent
-		radius: 8
-	}, frame_child(ui2.button_with_image('', '', 'builtin:vinix', ui2.rect(0, 0, f64(badge_size), f64(badge_size)), ui2.BoxStyle{
+	// Append the constructor directly. frame_child's value parameter makes
+	// V3 clone image_path, which this borrowed compositor tree never owns.
+	mut badge_children := frame_elements(1)
+	badge_children << ui2.button_with_image('', '', 'builtin:vinix', ui2.rect(0, 0, f64(badge_size), f64(badge_size)), ui2.BoxStyle{
 		transparent: true
 	}, ui2.TextStyle{
 		color: 0xffffff
-	})))
+	})
+	children << ui2.view('start.user.badge', ui2.rect(f64(right_x + 8), 12, f64(badge_size), f64(badge_size)), ui2.BoxStyle{
+		bg: d.theme().accent
+		radius: 8
+	}, badge_children)
 	children << ui2.label('start.user.name', 'Vinix', ui2.rect(f64(right_x + 64), 22, f64(right_width - 66), 28), ui2.TextStyle{
 		color: start_menu_right_text
 		size: 15
@@ -228,7 +238,7 @@ fn (d &Desktop) start_menu_element() ui2.Element {
 	}, children)
 }
 
-fn (d &Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2.Element {
+fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2.Element {
 	mut children := frame_elements(24)
 	search_y := height - start_menu_search_height - 8
 	if d.start_menu_query.len > 0 {
@@ -308,55 +318,119 @@ fn (d &Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2
 	}, children)
 }
 
-fn (d &Desktop) start_menu_all_programs(mut children []ui2.Element, top int, bottom int, width int) {
-	count := available_apps.len
-	if count == 0 || bottom <= top {
-		return
+// A page keeps program rows readable instead of dividing the remaining height
+// by the size of the catalog. Very small screens omit rows that cannot fit.
+struct StartMenuPage {
+	capacity    int
+	page        int
+	pages       int
+	first       int
+	end         int
+	rows_bottom int
+	controls_y  int
+}
+
+fn start_menu_page_layout(top int, bottom int, count int, requested int) StartMenuPage {
+	available := if bottom > top { bottom - top } else { 0 }
+	mut capacity := available / start_menu_row_height
+	paged := count > capacity
+	mut rows_bottom := bottom
+	if paged {
+		rows_bottom -= start_menu_page_height + start_menu_page_gap
+		capacity = if rows_bottom > top { (rows_bottom - top) / start_menu_row_height } else { 0 }
 	}
-	mut row_height := (bottom - top) / count
-	if row_height > start_menu_row_height {
-		row_height = start_menu_row_height
+	if capacity < 1 { capacity = 1 }
+	pages := if count > 0 { (count - 1) / capacity + 1 } else { 1 }
+	page := if requested < 0 { 0 } else if requested >= pages { pages - 1 } else { requested }
+	first := page * capacity
+	end := if first + capacity < count { first + capacity } else { count }
+	return StartMenuPage{ capacity: capacity, page: page, pages: pages, first: first, end: end,
+		rows_bottom: rows_bottom, controls_y: bottom - start_menu_page_height }
+}
+
+fn (d &Desktop) start_menu_result_count() int {
+	if d.start_menu_query.len == 0 { return available_apps.len }
+	mut count := 0
+	for factory in available_apps {
+		if app_matches(factory.title, d.start_menu_query_text()) { count++ }
 	}
-	if row_height < 1 {
-		row_height = 1
-	}
-	mut row_y := top
-	for index in 0 .. count {
-		children << d.start_menu_app_button(index, 7, row_y, width - 14, row_height)
-		row_y += row_height
+	return count
+}
+
+fn (d &Desktop) start_menu_current_page() StartMenuPage {
+	height := int(d.start_menu_rect().height) - 14
+	top := if d.start_menu_query.len == 0 && d.start_menu_all_apps { 40 } else { 8 }
+	bottom := height - start_menu_search_height - 8 - 5
+	return start_menu_page_layout(top, bottom, d.start_menu_result_count(), d.start_menu_page)
+}
+
+fn (mut d Desktop) change_start_menu_page(delta int) {
+	if d.start_menu_query.len == 0 && !d.start_menu_all_apps { return }
+	page := d.start_menu_current_page()
+	mut next := page.page
+	if delta > 0 && next < page.pages - 1 { next++ }
+	if delta < 0 && next > 0 { next-- }
+	d.start_menu_page = next
+	d.set_start_menu_recent(start_recent_none)
+	d.dirty = true
+}
+
+fn (d &Desktop) start_menu_page_controls(mut children []ui2.Element, page StartMenuPage,
+	top int, width int) {
+	if page.pages <= 1 || page.controls_y < top { return }
+	button_width := (width - 20) / 2
+	if button_width < 1 { return }
+	for slot in 0 .. 2 {
+		id := if slot == 0 { action_start_previous } else { action_start_next }
+		title := if slot == 0 { tr('start.previous_page') } else { tr('start.next_page') }
+		enabled := if slot == 0 { page.page > 0 } else { page.page < page.pages - 1 }
+		children << ui2.button(id, title, ui2.rect(f64(7 + slot * (button_width + 6)),
+			f64(page.controls_y), f64(button_width), f64(start_menu_page_height)), ui2.BoxStyle{
+			bg: if enabled && d.hover == id { start_menu_item_hover } else { start_menu_left }
+			radius: 4
+		}, ui2.TextStyle{ color: if enabled { start_menu_text } else { start_menu_muted },
+			size: 12, align: .center })
 	}
 }
 
-fn (d &Desktop) start_menu_filtered_programs(mut children []ui2.Element, top int, bottom int,
-	width int) {
-	mut count := 0
-	for factory in available_apps {
-		if app_matches(factory.title, d.start_menu_query_text()) {
-			count++
-		}
+fn (mut d Desktop) start_menu_all_programs(mut children []ui2.Element, top int, bottom int, width int) {
+	page := start_menu_page_layout(top, bottom, available_apps.len, d.start_menu_page)
+	d.start_menu_page = page.page
+	mut row_y := top
+	for index in page.first .. page.end {
+		if row_y + start_menu_row_height > page.rows_bottom { break }
+		children << d.start_menu_app_button(index, 7, row_y, width - 14, start_menu_row_height)
+		row_y += start_menu_row_height
 	}
+	d.start_menu_page_controls(mut children, page, top, width)
+}
+
+fn (mut d Desktop) start_menu_filtered_programs(mut children []ui2.Element, top int, bottom int,
+	width int) {
+	count := d.start_menu_result_count()
+	page := start_menu_page_layout(top, bottom, count, d.start_menu_page)
+	d.start_menu_page = page.page
 	if count == 0 {
-		children << ui2.label('start.no_results', tr('start.no_results'), ui2.rect(18, f64(top + 12), f64(width - 36), 24), ui2.TextStyle{
-			color: start_menu_muted
-			size: 12
-		})
+		if bottom - top >= 36 {
+			children << ui2.label('start.no_results', tr('start.no_results'), ui2.rect(18, f64(top + 12), f64(width - 36), 24), ui2.TextStyle{
+				color: start_menu_muted
+				size: 12
+			})
+		}
 		return
 	}
-	mut row_height := (bottom - top) / count
-	if row_height > 38 {
-		row_height = 38
-	}
-	if row_height < 1 {
-		row_height = 1
-	}
+	mut slot := 0
 	mut row_y := top
 	for index, factory in available_apps {
-		if !app_matches(factory.title, d.start_menu_query_text()) {
-			continue
+		if !app_matches(factory.title, d.start_menu_query_text()) { continue }
+		if slot >= page.end || row_y + start_menu_row_height > page.rows_bottom { break }
+		if slot >= page.first {
+			children << d.start_menu_app_button(index, 7, row_y, width - 14, start_menu_row_height)
+			row_y += start_menu_row_height
 		}
-		children << d.start_menu_app_button(index, 7, row_y, width - 14, row_height)
-		row_y += row_height
+		slot++
 	}
+	d.start_menu_page_controls(mut children, page, top, width)
 }
 
 fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height int) ui2.Element {
@@ -628,9 +702,16 @@ fn start_menu_fold(r u32) u32 {
 }
 
 // While the menu is open, typing searches immediately, Backspace edits the
-// query, Return launches the first result and Escape dismisses the menu.
+// query, PageUp/PageDown browse results, Return launches the first visible
+// result and Escape dismisses the menu.
 fn (mut d Desktop) start_menu_key_input(keys string) {
 	for i := 0; i < keys.len; i++ {
+		if keys[i] == 0x1b && i + 3 < keys.len && keys[i + 1] == `[` && keys[i + 3] == `~`
+			&& (keys[i + 2] == `5` || keys[i + 2] == `6`) {
+			d.change_start_menu_page(if keys[i + 2] == `5` { -1 } else { 1 })
+			i += 3
+			continue
+		}
 		ch := keys[i]
 		match ch {
 			0x1b {
@@ -640,6 +721,7 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 			8, 127 {
 				if d.start_menu_query.len > 0 {
 					d.start_menu_query.delete_last()
+					d.start_menu_page = 0
 					d.start_menu_searching = true
 					d.dirty = true
 				}
@@ -648,17 +730,23 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 				if d.start_menu_query.len == 0 {
 					continue
 				}
+				page := d.start_menu_current_page()
+				d.start_menu_page = page.page
+				mut slot := 0
 				for index, factory in available_apps {
-					if app_matches(factory.title, d.start_menu_query_text()) {
+					if !app_matches(factory.title, d.start_menu_query_text()) { continue }
+					if slot == page.first {
 						d.close_start_menu()
 						d.launch_index(index)
 						return
 					}
+					slot++
 				}
 			}
 			else {
 				if ch >= 0x20 && ch < 0x7f && d.start_menu_query.len < start_menu_max_query {
 					d.start_menu_query << ch
+					d.start_menu_page = 0
 					d.start_menu_searching = true
 					d.start_menu_all_apps = false
 					d.dirty = true
@@ -674,12 +762,18 @@ fn (mut d Desktop) handle_start_action(action string) {
 			d.start_menu_searching = action == action_start_search
 			d.dirty = true
 		}
+		action_start_previous { d.change_start_menu_page(-1) }
+		action_start_next { d.change_start_menu_page(1) }
 		action_start_all {
+			d.start_menu_query.clear()
+			d.start_menu_page = 0
 			d.start_menu_all_apps = true
 			d.start_menu_searching = false
 			d.dirty = true
 		}
 		action_start_back {
+			d.start_menu_query.clear()
+			d.start_menu_page = 0
 			d.start_menu_all_apps = false
 			d.dirty = true
 		}
