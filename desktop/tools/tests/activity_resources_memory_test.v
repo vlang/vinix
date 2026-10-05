@@ -83,3 +83,41 @@ fn test_activity_many_core_tall_panes_keep_pool_buffer_owned() {
 		assert live == 0, '${core_count} cores retained ${live} bytes'
 	}
 }
+
+fn activity_startup_heap_model() ActivityStartup {
+	mut model := ActivityStartup{ loaded: true, language: desktop_language, home: '/tmp'.clone() }
+	for index in 0 .. available_apps.len {
+		number := index.str()
+		model.actions[index] = 'activity.startup.toggle.${number}'
+		unsafe { number.free() }
+		model.timing_known[index] = true
+		model.timing_ms[index] = u64(index)
+	}
+	model.refresh_timing_text()
+	return model
+}
+
+fn test_activity_startup_full_catalog_model_and_last_rows_release_owned_memory() {
+	mut warm := activity_startup_heap_model()
+	for width in [240, 900]! {
+		for scroll in [0, available_apps.len - 1]! {
+			warm.scroll = scroll
+			begin_frame_elements()
+			free_tree(warm.build(width, 572))
+		}
+	}
+	warm.free()
+	C.vinix_heap_begin()
+	for _ in 0 .. 50 {
+		mut model := activity_startup_heap_model()
+		for width in [240, 900]! {
+			model.scroll = available_apps.len - 1
+			model.refresh_timing_text()
+			begin_frame_elements()
+			free_tree(model.build(width, 572))
+		}
+		model.free()
+		model.free()
+	}
+	assert C.vinix_heap_end() == 0
+}

@@ -8,14 +8,17 @@ import ui2
 const activity_startup_filename = '.vinix-startup-apps'
 const activity_startup_limit = 16384
 const activity_startup_timings_filename = '.vinix-startup-timings'
+// V3 cannot use the runtime catalog's .len in a fixed-array dimension. Keep
+// a bounded reserve and let the catalog regression test catch its expansion.
+const activity_startup_app_limit = 64
 
 struct ActivityStartup {
 mut:
-	enabled      [32]bool
-	actions      [32]string
-	timing_ms    [32]u64
-	timing_known [32]bool
-	timing_text  [32]string
+	enabled      [activity_startup_app_limit]bool
+	actions      [activity_startup_app_limit]string
+	timing_ms    [activity_startup_app_limit]u64
+	timing_known [activity_startup_app_limit]bool
+	timing_text  [activity_startup_app_limit]string
 	home         string
 	language     DesktopLanguage
 	loaded       bool
@@ -215,7 +218,7 @@ fn (mut model ActivityStartup) handle(action string) bool {
 		return true
 	}
 	if action == 'activity.startup.down' {
-		if model.scroll < available_apps.len - 1 { model.scroll++ }
+		if model.scroll < available_apps.len - 1 && model.scroll < model.enabled.len - 1 { model.scroll++ }
 		return true
 	}
 	if !action.starts_with('activity.startup.toggle.') { return false }
@@ -223,7 +226,7 @@ fn (mut model ActivityStartup) handle(action string) bool {
 	if action.len <= 'activity.startup.toggle.'.len { return true }
 	for offset in 'activity.startup.toggle.'.len .. action.len {
 		byte := action[offset]
-		if byte < `0` || byte > `9` || index > 32 { return true }
+		if byte < `0` || byte > `9` || index >= model.enabled.len { return true }
 		index = index * 10 + int(byte - `0`)
 	}
 	if index < 0 || index >= available_apps.len || index >= model.enabled.len { return true }
@@ -247,9 +250,10 @@ fn (mut model ActivityStartup) build(width int, height int) ui2.Element {
 	}
 	fit := (height - header_height - footer_height) / row_height
 	visible := if fit > 0 { fit } else { 1 }
-	maximum := if available_apps.len > visible { available_apps.len - visible } else { 0 }
+	count := if available_apps.len < model.enabled.len { available_apps.len } else { model.enabled.len }
+	maximum := if count > visible { count - visible } else { 0 }
 	if model.scroll > maximum { model.scroll = maximum }
-	for index := model.scroll; index < available_apps.len && index < model.scroll + visible; index++ {
+	for index := model.scroll; index < count && index < model.scroll + visible; index++ {
 		app := available_apps[index]
 		y := header_height + (index - model.scroll) * row_height
 		title := app_title_text(app.title)
