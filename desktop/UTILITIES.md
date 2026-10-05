@@ -148,3 +148,8 @@ retain 10,206 bytes, and 100 idle polls retain 1,600 bytes. An isolated run of
 unchanged HEAD `823aeb11` reproduced the same byte counts and allocation-size
 maps. The new utility heap checks retain zero bytes; the compositor failures
 remain separate follow-up work.
+
+The unchanged Quick Look PNG-preview host test also crashes with exit 139
+after its text-preview case passes; the same test and normal compiler flags
+reproduce this on `823aeb11`. The remaining utility checks, native IPC checks
+and AArch64 QEMU idle/apps/drag smoke scenarios pass.

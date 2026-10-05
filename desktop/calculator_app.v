@@ -427,14 +427,15 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 	button_width := (width - 24) / 5
 	for index, action in ['calculator.memory.clear', 'calculator.memory.recall', 'calculator.memory.add',
 		'calculator.memory.subtract', 'calculator.backspace']! {
-		text := ['MC', 'MR', 'M+', 'M−', '⌫']![index]
+		// Use signs covered by the desktop's baked font atlases.
+		text := ['MC', 'MR', 'M+', 'M−', '<-']![index]
 		children << calculator_utility_button(action, text, x + f64(index) * (button_width + 6), 10, button_width)
 	}
 	children << ui2.label('', tr('calculator.history.title'), ui2.rect(x, 393, width - 116, 20),
 		ui2.TextStyle{ color: body_heading, size: 12, bold: true })
 	children << calculator_utility_button('calculator.history.clear', tr('calculator.history.clear'), x + width - 56, 390, 56)
-	children << calculator_utility_button('calculator.history.previous', '‹', x + width - 110, 390, 22)
-	children << calculator_utility_button('calculator.history.next', '›', x + width - 84, 390, 22)
+	children << calculator_utility_button('calculator.history.previous', '<', x + width - 110, 390, 22)
+	children << calculator_utility_button('calculator.history.next', '>', x + width - 84, 390, 22)
 	rows := int((size.height - 424) / 22)
 	app.history_rows = if rows > 5 {
 		5
