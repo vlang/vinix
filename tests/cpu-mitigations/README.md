@@ -2,12 +2,15 @@
 
 See [the policy contract and hardware limits](../../docs/x86-cpu-mitigations.md).
 
-`check-policy.py` compiles the actual production C policy under ASan/UBSan,
-replacing only the CPUID/RDMSR/WRMSR ports. It checks 12,288 vendor, leaf, subleaf,
+`check-policy.py` compiles the actual production V policy under ASan/UBSan,
+adapting only the CPUID/RDMSR/WRMSR ports. Independent C callers check its
+preserved ABI and 12,288 vendor, leaf, subleaf,
 and feature combinations, independent MSR capability gates, persistent and
 legacy control values, preservation of firmware bits, RFDS with MDS_NO, separate
 AMD IBPB/IBRS and architectural SSBD, invalid CPU indices, setup bounds, and an
-ineffective MSR write. It allocates and frees its own host policy array.
+ineffective MSR write. It checks setup allocation failure and retry, permits
+one successful boot allocation, and rejects unexpected allocator imports.
+It frees its own host policy array.
 
 `check-assembly.py` assembles and links the production x86 macros and thunks as
 ELF, then executes their instruction bytes under Rosetta. Only privileged ports
@@ -43,9 +46,9 @@ self-mount ELOOP on both the unchanged baseline and the feature kernel during
 initial fixture development. Those diagnostic logs are preserved separately.
 
 Both tracked production architecture builds pass. The capability helper and
-assembly helper pass, and the final ELF has no raw indirect CALL/JMP. A GNU CC
-14.2 smoke compilation of the production C policy with the GNU mitigation flags
-also passes; the full production builds here use Apple Clang 21.
+assembly helper pass, and the final ELF has no raw indirect CALL/JMP. Before
+the V migration, a GNU CC 14.2 smoke compilation of the C policy with the GNU
+mitigation flags also passed; production builds use Apple Clang 21.
 
 QEMU TCG filters requested `spec-ctrl`, `stibp`, `ssbd`, `md-clear`, and
 `arch-capabilities` bits. Tests using `max` and `qemu64` exercise the actual
@@ -64,7 +67,7 @@ Final production-source results:
 | Check | Result |
 |---|---|
 | Tracked x86-64 and AArch64 production builds | PASS |
-| Production C policy under ASan/UBSan | PASS, 12,288 capability cases |
+| Production V policy through C ABI callers under ASan/UBSan | PASS, 12,288 capability cases, allocation failure/retry and no per-CPU allocation |
 | Production assembly and scheduler epilogue adapters | PASS, 1,024 flag/CPU cases and all 15 thunk registers |
 | Linked x86 ELF | PASS, 755 thunk branches and zero raw indirect CALL/JMP |
 | `--cpu max` guest | PASS, retained Slab 1080 to 1080 KiB |

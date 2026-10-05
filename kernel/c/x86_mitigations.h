@@ -3,6 +3,7 @@
 #define VINIX_X86_MITIGATIONS_H
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 /* Keep the assembly offsets in speculation.h synchronized. */
 struct vinix_x86_mitigation_policy {
     uint64_t kernel_control;
@@ -10,6 +11,8 @@ struct vinix_x86_mitigation_policy {
     uint64_t flags;
     uint64_t reserved;
 };
+_Static_assert(sizeof(struct vinix_x86_mitigation_policy) == 32, "assembly stride");
+_Static_assert(offsetof(struct vinix_x86_mitigation_policy, flags) == 16, "assembly flags");
 #define VINIX_SPEC_IBPB    UINT64_C(1)
 #define VINIX_SPEC_LEGACY  UINT64_C(2)
 #define VINIX_SPEC_EIBRS   UINT64_C(4)

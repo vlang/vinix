@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the staged kernel V migration (parent `3f4280f79cda0956962258aa3c3b49002809be26`),
+for the staged kernel V migration (parent `6f38f210cc755f493a5fc62c72d31080110969ce`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 546 | 6,262,413 | 27.31% |
-| Python | 335 | 3,870,373 | 16.88% |
-| Shell | 276 | 1,225,677 | 5.35% |
+| C | 543 | 6,248,750 | 27.24% |
+| Python | 336 | 3,875,921 | 16.90% |
+| Shell | 279 | 1,229,845 | 5.36% |
 
-All `.v` files are classified as V. The resulting V share is 37.77%, with no
+All `.v` files are classified as V. The resulting V share is 37.81%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -162,14 +162,12 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/lwipopts.h` | 3,099 |
 | `kernel/c/math.h` | 486 |
 | `kernel/c/net_random.h` | 1,582 |
-| `kernel/c/pci_config.c` | 3,417 |
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.c` | 2,650 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
 | `kernel/c/printf.c` | 5,319 |
 | `kernel/c/printf_benchmark.c` | 986 |
 | `kernel/c/pthread.h` | 1,298 |
-| `kernel/c/speculation.c` | 4,304 |
 | `kernel/c/speculation.h` | 524 |
 | `kernel/c/stack_guards.c` | 3,881 |
 | `kernel/c/stack_protector.c` | 3,426 |
@@ -190,8 +188,7 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/vinix_net.h` | 2,259 |
 | `kernel/c/vmx.c` | 6,559 |
 | `kernel/c/vmx.h` | 1,241 |
-| `kernel/c/x86_mitigations.c` | 6,140 |
-| `kernel/c/x86_mitigations.h` | 900 |
+| `kernel/c/x86_mitigations.h` | 1,098 |
 | `kernel/linuxkpi/include/asm/atomic.h` | 4,539 |
 | `kernel/linuxkpi/include/asm/barrier.h` | 1,174 |
 | `kernel/linuxkpi/include/asm/bitops.h` | 301 |
@@ -776,7 +773,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/codex/smoke.py` | 4,944 |
 | `tests/cpu-mitigations/check-assembly.py` | 10,810 |
 | `tests/cpu-mitigations/check-linked.py` | 1,476 |
-| `tests/cpu-mitigations/check-policy.py` | 6,671 |
+| `tests/cpu-mitigations/check-policy.py` | 8,355 |
 | `tests/cpu-mitigations/run.py` | 4,795 |
 | `tests/desktop-perf/run.py` | 26,226 |
 | `tests/desktop-perf/test_runner.py` | 15,989 |
@@ -876,12 +873,13 @@ deployed Linguist version and the default-branch revision.
 | `tests/socket-io/check-generated.py` | 3,504 |
 | `tests/socket-io/run.py` | 3,907 |
 | `tests/sound/run_vm.py` | 9,559 |
-| `tests/speculation-policy/run.py` | 737 |
+| `tests/speculation-policy/run.py` | 1,750 |
 | `tests/stack-policy/run.py` | 3,792 |
 | `tests/storage/test_split_desktop_initramfs.py` | 3,623 |
 | `tests/syscall-policy/run-host.py` | 11,663 |
 | `tests/syscall-policy/run.py` | 3,864 |
 | `tests/terminal-jobs/run.py` | 3,802 |
+| `tests/uname/run.py` | 2,851 |
 | `tests/user-access/sites.py` | 3,169 |
 | `tests/verified-boot/runtime.py` | 8,363 |
 | `tests/verified-boot/test.py` | 13,268 |
@@ -951,8 +949,8 @@ deployed Linguist version and the default-branch revision.
 | `build-chromium-aarch64.sh` | 5,495 |
 | `build-claude-aarch64.sh` | 5,889 |
 | `build-codex-aarch64.sh` | 4,804 |
-| `build-desktop-aarch64.sh` | 85,712 |
-| `build-desktop-amd64.sh` | 13,827 |
+| `build-desktop-aarch64.sh` | 85,851 |
+| `build-desktop-amd64.sh` | 13,881 |
 | `build-developer-tools-aarch64.sh` | 4,335 |
 | `build-dhewm3-aarch64.sh` | 201 |
 | `build-docker-aarch64.sh` | 4,123 |
@@ -1011,6 +1009,7 @@ deployed Linguist version and the default-branch revision.
 | `build-support/roblox/run-roblox-client` | 182 |
 | `build-support/security-audit/run-collector` | 396 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
+| `build-support/stage-uname.sh` | 656 |
 | `build-support/steam/bash` | 433 |
 | `build-support/steam/ldd` | 1,459 |
 | `build-support/steam/steam` | 8,677 |
@@ -1019,6 +1018,7 @@ deployed Linguist version and the default-branch revision.
 | `build-support/steam/steamrt-entry-point` | 415 |
 | `build-support/steam/uname` | 373 |
 | `build-support/steam/zenity` | 653 |
+| `build-support/uname` | 1,025 |
 | `build-support/v-command` | 1,409 |
 | `build-support/vinix-desktop-build` | 12,928 |
 | `build-support/vinix-desktop-reload` | 3,872 |
@@ -1039,8 +1039,8 @@ deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/build-wine-host.sh` | 1,378 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `build-userland-aarch64-vm.sh` | 757 |
-| `build-userland-aarch64.sh` | 25,567 |
-| `build-userland-amd64.sh` | 5,868 |
+| `build-userland-aarch64.sh` | 25,621 |
+| `build-userland-amd64.sh` | 5,922 |
 | `build-v-aarch64.sh` | 12,091 |
 | `build-v-amd64.sh` | 152 |
 | `build-venus-aarch64.sh` | 5,134 |
@@ -1175,7 +1175,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
 | `tests/packages/test-vinix-pkg.sh` | 25,685 |
 | `tests/pagecache/run.sh` | 2,509 |
-| `tests/pci-config/run.sh` | 937 |
+| `tests/pci-config/run.sh` | 1,237 |
 | `tests/private-pages/run-host.sh` | 5,998 |
 | `tests/qemu-core/run.sh` | 2,668 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
@@ -1196,6 +1196,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/storage/run.sh` | 180 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
+| `tests/uname/guest-init.sh` | 1,886 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
 | `tests/virtio-gpu-virgl/guest-init.sh` | 1,456 |
 | `tests/vlang/desktop-runtime-guest-init.sh` | 1,758 |

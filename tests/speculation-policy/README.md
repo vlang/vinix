@@ -1,7 +1,9 @@
 # Initial x86 speculation controls
 
-`python3 tests/speculation-policy/run.py` executes the production C policy on
-the host with mocked CPUID and MSR instructions. It checks every combination
+`python3 tests/speculation-policy/run.py` executes the original helper's V
+implementation through independent C callers under ASan/UBSan, with mocked
+CPUID and MSR instructions. The active per-CPU policy is tested separately in
+[`tests/cpu-mitigations`](../cpu-mitigations/README.md). This helper checks every combination
 of IBRS/IBPB, STIBP, architectural-capability, SSBD and BHI control
 advertisement, enhanced versus legacy IBRS, BHI_NO, preservation of firmware
 controls, and absence of accesses to unsupported CPUID leaves, subleaves and
