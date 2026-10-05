@@ -161,7 +161,7 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
         ui2_source / "examples",
         root / "build-support/aarch64-cc-shim",
         root / "build-support/init-aarch64/initcore",
-        root / "build-support/init-aarch64/syscall_abi.c",
+        root / "build-support/init-aarch64/syscall_abi.S",
         root / "build-support/init-aarch64/syscall_abi.h",
         root / "build-support/init-aarch64/compile-v.py",
         root / "tools/m1-wifi/compile-v.py",

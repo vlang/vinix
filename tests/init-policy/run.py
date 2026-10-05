@@ -51,9 +51,10 @@ def main():
     with tempfile.TemporaryDirectory(prefix='vinix-init-fixture-') as directory:
         work=Path(directory)
         generated=work/'init.c'
-        run(['python3',INIT/'compile-v.py','desktop',generated,'--host'])
         common=['clang','-O1','-g','-fsanitize=address,undefined','-fno-omit-frame-pointer','-fno-builtin','-Wno-incompatible-pointer-types','-Wno-incompatible-library-redeclaration']
         for echo in (False,True):
+            run(['python3',INIT/'compile-v.py','desktop',generated,'--host']+
+                (['--busybox-echo-test'] if echo else []))
             defines=['-DVINIX_INIT_HOST_TEST']+(['-DVINIX_BUSYBOX_ECHO_TEST'] if echo else [])
             executable=work/('echo-test' if echo else 'test')
             run(common+defines+['-I'+str(INIT),generated,HERE/'test.c','-o',executable])
@@ -67,11 +68,13 @@ def main():
                 run([reference_exe]+(['echo'] if echo else []))
         for tool in ('shell','full','desktop'):
             source=work/(tool+'.c'); obj=work/(tool+'.o'); elf=work/tool
+            abi=work/(tool+'-abi.o')
             run(['python3',INIT/'compile-v.py',tool,source])
             run(['clang','--target=aarch64-linux-none','-nostdlib','-ffreestanding','-O2','-fno-stack-protector','-fno-builtin','-ffunction-sections','-fdata-sections','-I'+str(INIT),'-c',source,'-o',obj])
             linker=os.environ.get('LD_AARCH64','/opt/homebrew/bin/ld.lld' if Path('/opt/homebrew/bin/ld.lld').exists() else 'ld.lld')
-            run([linker,'-m','aarch64elf','--nostdlib','-static','--gc-sections','-o',elf,obj])
-            undefined=subprocess.check_output(['nm','-u',obj],text=True)
+            run(['clang','--target=aarch64-linux-none','-c',INIT/'syscall_abi.S','-o',abi])
+            run([linker,'-m','aarch64elf','--nostdlib','-static','--gc-sections','-o',elf,obj,abi])
+            undefined=subprocess.check_output(['nm','-u',elf],text=True)
             assert not undefined.strip(),undefined
             text=source.read_text()
             assert not re.search(r'\b(?:memdup|new_array\w*|malloc|realloc|calloc)\s*\(',text)

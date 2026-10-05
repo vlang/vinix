@@ -24,11 +24,12 @@ def main():
     args.state_dir.mkdir(parents=True,exist_ok=True)
     for policy in ('shell','full','desktop'):
         state=(args.state_dir/policy).resolve();state.mkdir()
-        core=state/'init.c';obj=state/'init.o';binary=state/'policy-init'
+        core=state/'init.c';obj=state/'init.o';binary=state/'policy-init';abi=state/'init-abi.o'
         run(['python3',INIT/'compile-v.py',policy,core])
         run(['clang','--target=aarch64-linux-none','-nostdlib','-ffreestanding','-O2','-fno-stack-protector','-fno-builtin','-ffunction-sections','-fdata-sections','-I'+str(INIT),'-c',core,'-o',obj])
         linker=os.environ.get('LD_AARCH64','/opt/homebrew/bin/ld.lld' if Path('/opt/homebrew/bin/ld.lld').exists() else 'ld.lld')
-        run([linker,'-m','aarch64elf','--nostdlib','-static','--gc-sections','-o',binary,obj])
+        run(['clang','--target=aarch64-linux-none','-c',INIT/'syscall_abi.S','-o',abi])
+        run([linker,'-m','aarch64elf','--nostdlib','-static','--gc-sections','-o',binary,obj,abi])
         fixture=state/'native-program'
         defines={'shell':'INIT_SHELL_DRIVER','full':'INIT_FULL_PROGRAM','desktop':'INIT_DESKTOP_PROGRAM'}
         run(['clang','--target=aarch64-linux-musl','--sysroot='+str(sysroot),'-static','-O2','-fno-stack-protector','-Wall','-Wextra','-Werror','-D'+defines[policy],HERE/'guest.c','-L'+str(sysroot/'lib'),'-fuse-ld=lld','-o',fixture])

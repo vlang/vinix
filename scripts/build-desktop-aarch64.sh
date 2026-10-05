@@ -788,19 +788,21 @@ python3 "$SCRIPT_DIR/tools/m1-wifi/compile-v.py" "$BUILD_DIR/wifi-ctl-v.c" --arc
 echo "    $BUILD_DIR/wifi-ctl ($(file_size "$BUILD_DIR/wifi-ctl") bytes)"
 
 echo "==> Building the desktop init..."
-INIT_DEFINES=()
+INIT_OPTIONS=()
 if [ -n "$WIFI_BUNDLE" ]; then
-    INIT_DEFINES=(-DVINIX_WIFI_BUNDLE=1)
+    INIT_OPTIONS=(--wifi-bundle)
 fi
-python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" desktop "$BUILD_DIR/desktop-init-v.c"
+python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" desktop "$BUILD_DIR/desktop-init-v.c" "${INIT_OPTIONS[@]}"
 "$LLVM_BIN/clang" --target=aarch64-linux-none -nostdlib -ffreestanding -O2 \
     -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections -c \
-    "${INIT_DEFINES[@]}" -I"$SCRIPT_DIR/build-support/init-aarch64" \
+    -I"$SCRIPT_DIR/build-support/init-aarch64" \
     -o "$BUILD_DIR/desktop-init.o" "$BUILD_DIR/desktop-init-v.c"
+"$LLVM_BIN/clang" --target=aarch64-linux-none -c \
+    "$SCRIPT_DIR/build-support/init-aarch64/syscall_abi.S" -o "$BUILD_DIR/desktop-init-abi.o"
 # lld is installed as a separate formula, so it is on PATH rather than in
 # the llvm keg the other tools come from.
 "${LD_LLD:-ld.lld}" -m aarch64elf --nostdlib -static --gc-sections \
-    -o "$BUILD_DIR/desktop-init" "$BUILD_DIR/desktop-init.o"
+    -o "$BUILD_DIR/desktop-init" "$BUILD_DIR/desktop-init.o" "$BUILD_DIR/desktop-init-abi.o"
 
 echo "==> Staging the desktop initramfs..."
 STAGING="$BUILD_DIR/initramfs-root"

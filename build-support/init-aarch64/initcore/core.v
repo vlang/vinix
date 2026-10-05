@@ -10,8 +10,10 @@ fn C.vinit_child_callback() voidptr
 fn C.vinit_restorer() voidptr
 fn C.vinit_wifi_enabled() i32
 fn C.vinit_echo_enabled() i32
-@[c_extern] __global C.vinit_power i32
-@[c_extern] __global C.vinit_reload i32
+@[export: 'vinit_power']
+__global volatile requested_power i32
+@[export: 'vinit_reload']
+__global volatile requested_reload i32
 __global vinit_environment [15]&char
 struct SignalAction { mut: handler voidptr flags u64 restorer voidptr mask u64 }
 struct Delay { mut: seconds i64 nanoseconds i64 }
@@ -48,20 +50,20 @@ fn report_desktop_exit(child i64, status i32) {
  init_print(c'; restarting in one second\n')
 }
 @[export: 'vinix_init_power_signal']
-pub fn power_signal(signal i32) { unsafe { if signal == 1 { C.vinit_reload = 1 } else { C.vinit_power = signal } } }
+pub fn power_signal(signal i32) { unsafe { if signal == 1 { requested_reload = 1 } else { requested_power = signal } } }
 @[export: 'vinix_init_child_signal']
 pub fn child_signal(signal i32) { _ = signal }
 fn install_power_signals() {
  unsafe { action := SignalAction{handler:C.vinit_power_callback(),restorer:C.vinit_restorer()}; for signal in [u64(1),u64(15),u64(10),u64(12)]! { call(134,signal,u64(&action),0,8,0) }; child := SignalAction{handler:C.vinit_child_callback(),restorer:C.vinit_restorer()}; call(134,17,u64(&child),0,8,0) }
 }
 fn apply_power_request() {
- unsafe { signal := C.vinit_power; if signal == 0 { return }; command := if signal == 15 { u64(0x01234567) } else if signal == 10 { u64(0xcdef0123) } else { u64(0x4321fedc) }; call(81,0,0,0,0,0); call(142,0xfee1dead,0x28121969,command,0,0); init_print(c'init: the kernel refused the power request\n'); C.vinit_power = 0 }
+ unsafe { signal := requested_power; if signal == 0 { return }; command := if signal == 15 { u64(0x01234567) } else if signal == 10 { u64(0xcdef0123) } else { u64(0x4321fedc) }; call(81,0,0,0,0,0); call(142,0xfee1dead,0x28121969,command,0,0); init_print(c'init: the kernel refused the power request\n'); requested_power = 0 }
 }
 fn pause_for(original Delay) {
- unsafe { mut delay := original; for call(115,1,0,u64(&delay),u64(&delay),0) == -4 && C.vinit_power == 0 && C.vinit_reload == 0 { continue } }
+ unsafe { mut delay := original; for call(115,1,0,u64(&delay),u64(&delay),0) == -4 && requested_power == 0 && requested_reload == 0 { continue } }
 }
 fn wait_for_child(child i64, status &i32) {
- unsafe { mut forwarded := i32(0); for { mut signal := C.vinit_power; if signal == 0 && C.vinit_reload != 0 { signal = 1 }; if signal != 0 && signal != forwarded { call(129,u64(child),u64(signal),0,0,0); forwarded = signal }; mut any_status := i32(0); if call(260,u64(i64(-1)),u64(&any_status),0,0,0) == child { *status = any_status; return } } }
+ unsafe { mut forwarded := i32(0); for { mut signal := requested_power; if signal == 0 && requested_reload != 0 { signal = 1 }; if signal != 0 && signal != forwarded { call(129,u64(child),u64(signal),0,0,0); forwarded = signal }; mut any_status := i32(0); if call(260,u64(i64(-1)),u64(&any_status),0,0,0) == child { *status = any_status; return } } }
 }
 fn spawn_program(arguments &&char, fallback &&char, own_group bool, status &i32, environment &&char, trace bool) i64 {
  unsafe {
@@ -143,26 +145,26 @@ pub fn desktop_start() {
    wifi := [&char(c'/usr/bin/wifi-ctl'),&char(c'load'),&char(c'/usr/share/vinix/wifi'),&char(nil)]!
    init_print(c'\nVinix: loading the selected Wi-Fi firmware\n')
    child := spawn_program(&wifi[0],&&char(nil),false,&status,&vinit_environment[0],false)
-   if C.vinit_power != 0 { apply_power_request() }
+   if requested_power != 0 { apply_power_request() }
    if child < 0 || status != 0 { init_print(c'init: Wi-Fi firmware load failed; continuing without wireless\n') }
   }
   if executable_available(c'/etc/vinix/boot-hyprland') && executable_available(hyprland[0]) {
    init_print(c'\nVinix: starting Hyprland\n'); spawn_program(&hyprland[0],&&char(nil),true,&status,&vinit_environment[0],false)
-   if C.vinit_power != 0 { apply_power_request() }; init_print(c'init: Hyprland exited; starting the native recovery desktop\n')
+   if requested_power != 0 { apply_power_request() }; init_print(c'init: Hyprland exited; starting the native recovery desktop\n')
   }
   for {
    mut selected := &desktop[0]; mut fallback := &&char(nil)
-   if C.vinit_power != 0 { apply_power_request() }
+   if requested_power != 0 { apply_power_request() }
    if gpu_available() && !executable_available(c'/run/vinix-desktop-development') { selected = &gpu[0]; fallback = &desktop[0]; init_print(c'\nVinix: starting the GPU-enabled desktop\n') }
    else { init_print(c'\nVinix: starting the desktop\n') }
    status = 0
    mut child := spawn_program(selected,fallback,true,&status,&vinit_environment[0],voidptr(selected) == voidptr(&gpu[0]))
-   if C.vinit_power != 0 { apply_power_request() }
-   if C.vinit_reload != 0 { C.vinit_reload = 0; init_print(c'init: desktop reload requested; starting the new binary\n'); stop_desktop_group(child); C.vinit_reload = 0; continue }
+   if requested_power != 0 { apply_power_request() }
+   if requested_reload != 0 { requested_reload = 0; init_print(c'init: desktop reload requested; starting the new binary\n'); stop_desktop_group(child); requested_reload = 0; continue }
    if child < 0 || status == 127 << 8 {
     init_print(c'init: could not start vinix-desktop; opening a recovery shell\n'); status = 0
     child = spawn_program(&shell[0],&&char(nil),false,&status,&vinit_environment[0],false)
-    if C.vinit_power != 0 { apply_power_request() }; if child < 0 { init_print(c'init: no recovery shell either; retrying the desktop\n') }; continue
+    if requested_power != 0 { apply_power_request() }; if child < 0 { init_print(c'init: no recovery shell either; retrying the desktop\n') }; continue
    }
    report_desktop_exit(child,status); stop_desktop_group(child); pause_for(Delay{seconds:1})
   }

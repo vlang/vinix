@@ -419,22 +419,25 @@ for module in "${EXTRA_MODULES[@]}"; do
     fi
 done
 vinix_build_minimal_init() {
-    local object binary source
+    local object binary source abi_object
     mkdir -p "$INIT_DIR"
     object="$(mktemp "$INIT_DIR/.init.o.XXXXXX")"
     binary="$(mktemp "$INIT_DIR/.init.XXXXXX")"
     source="$object.c"
+    abi_object="$object.abi.o"
     if ! python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" shell "$source" ||
        ! clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 \
         -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections \
         -I"$SCRIPT_DIR/build-support/init-aarch64" -c -o "$object" "$source" ||
-       ! ld.lld -m aarch64elf --nostdlib -static --gc-sections -o "$binary" "$object"; then
-        rm -f "$object" "$binary" "$source"
+       ! clang -target aarch64-linux-none -c \
+        "$SCRIPT_DIR/build-support/init-aarch64/syscall_abi.S" -o "$abi_object" ||
+       ! ld.lld -m aarch64elf --nostdlib -static --gc-sections -o "$binary" "$object" "$abi_object"; then
+        rm -f "$object" "$binary" "$source" "$abi_object"
         return 1
     fi
     chmod 755 "$binary"
     mv -f "$binary" "$INIT_DIR/init"
-    rm -f "$object" "$source"
+    rm -f "$object" "$source" "$abi_object"
 }
 
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
