@@ -13,8 +13,7 @@ OBJCOPY := $(LLVM)/llvm-objcopy
 HOSTCC ?= clang
 
 BUILD := build
-SOURCES := src/loader.c src/bootargs.c src/console.c src/mm.c src/elf.c src/limine.c \
-	src/wdt.c src/memmap.c
+SOURCES :=
 OBJECTS := $(patsubst src/%.c,$(BUILD)/obj/%.o,$(SOURCES)) $(BUILD)/obj/start.o $(BUILD)/obj/vcore.o
 
 CFLAGS := --target=aarch64-none-elf -std=gnu11 -O2 -g -Wall -Wextra -Werror \

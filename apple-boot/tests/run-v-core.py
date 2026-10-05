@@ -15,6 +15,7 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     work = Path(directory)
     source, object_file = work / "core.c", work / "core.o"
     subprocess.run(["python3", str(loader / "compile-v.py"), "--host", str(source)], check=True)
+    subprocess.run(["python3", str(here / "check-v-abi.py"), "--source", str(source)], check=True)
     flags = ["-O2", "-g", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
              "-fno-omit-frame-pointer"]
     subprocess.run([cc, "-std=gnu11", *flags, "-Wno-unused-function", "-Wno-unused-parameter",
@@ -38,3 +39,9 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
                     str(repo / "tests/memory/runtime.c"), str(object_file),
                     "-o", str(memory)], check=True)
     subprocess.run([str(memory)], check=True)
+
+    if (loader / "vcore/boot.v").exists():
+        boot = work / "boot-runtime"
+        subprocess.run([cc, *flags, gc, str(here / "boot-runtime.c"),
+                        str(object_file), "-o", str(boot)], check=True)
+        subprocess.run([str(boot)], check=True)

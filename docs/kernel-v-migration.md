@@ -205,3 +205,16 @@ absolute deadlines and actual C callback identities remain intact. Every stack
 waiter is removed under its queue lock before returning; direct mutex handoff
 publishes its saved context and task without reading a detached waiter after
 wakeup. Both lifetime paths received independent review.
+
+Apple loader stage 2 translates its remaining 1,059 C lines: boot argument
+parsing, framebuffer diagnostics, physical allocation/page tables, ELF loading,
+Limine responses, reserved-memory maps, watchdog and final handoff now live in
+`apple-boot/vcore/boot.v`. Assembly startup remains unchanged apart from an
+instruction-only 32-bit MMIO binding, also used for every volatile framebuffer
+store. Host ASan/UBSan passed boot revision, TCR, page-table, ELF and memory-map
+cases; 78 public structure field offsets plus sizes/alignment match C. The
+freestanding AArch64 loader builds without allocator imports and passes the
+complete fake-iBoot QEMU harness. Independent lifetime review verified monotonic
+physical ownership and permanent handoff arena copies. The tested loader SHA256
+is `029ccc584d10d99a8e558fe1d0a9d5602c26c0148ab0cf85bf62f0bcbfeb537a`.
+The real-ADT baseline limitation above still applies.

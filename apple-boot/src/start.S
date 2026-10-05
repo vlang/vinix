@@ -254,3 +254,9 @@ halt_forever:
 1:
     wfe
     b 1b
+
+/* Narrow MMIO instruction unavailable in the V compiler's ARM operands. */
+.globl apple_mmio_write32
+apple_mmio_write32:
+    str w1, [x0]
+    ret
