@@ -418,14 +418,26 @@ for module in "${EXTRA_MODULES[@]}"; do
         exit 1
     fi
 done
+vinix_build_minimal_init() {
+    local object binary
+    mkdir -p "$INIT_DIR"
+    object="$(mktemp "$INIT_DIR/.init.o.XXXXXX")"
+    binary="$(mktemp "$INIT_DIR/.init.XXXXXX")"
+    if ! clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
+        -o "$object" "$INIT_DIR/init.c" ||
+       ! ld.lld -m aarch64elf --nostdlib -static -o "$binary" "$object"; then
+        rm -f "$object" "$binary"
+        return 1
+    fi
+    chmod 755 "$binary"
+    mv -f "$binary" "$INIT_DIR/init"
+    rm -f "$object"
+}
+
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
     echo "==> Building minimal init program..."
     echo "    (Run ./scripts/build-userland-aarch64.sh for full busybox userland)"
-    mkdir -p "$INIT_DIR"
-    clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
-        -o /tmp/vinix-init.o "$INIT_DIR/init.c"
-    ld.lld -m aarch64elf --nostdlib -static \
-        -o "$INIT_DIR/init" /tmp/vinix-init.o
+    vinix_build_minimal_init
 fi
 
 # ── Build kernel ──
@@ -662,6 +674,11 @@ vinix_select_disk_root_payload() {
     local minimal="$INIT_DIR/initramfs-minimal.tar"
 
     [ "$DISK_ROOT_FALLBACK" = recovery ] || return 0
+
+    if [ ! -f "$minimal" ] && [ ! -x "$INIT_DIR/init" ]; then
+        echo "==> Building minimal recovery init..."
+        vinix_build_minimal_init
+    fi
 
     if [ -f "$minimal" ]; then
         INITRAMFS="$minimal"
