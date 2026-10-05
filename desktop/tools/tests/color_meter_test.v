@@ -109,7 +109,7 @@ fn test_color_meter_coordinates_selection_and_paste_are_decimal_only() {
 }
 
 fn test_color_meter_live_poll_freeze_and_copy_preserve_last_successful_sample() {
-	mut desktop := Desktop{ canvas: new_canvas(10, 10) }
+	mut desktop := Desktop{ canvas: new_canvas(10, 10), pointer_x: 5, pointer_y: 4 }
 	defer { unsafe { free(desktop.canvas.pixels) desktop.native_asset_icons.free() } }
 	desktop.canvas.clear(0x1278ef)
 	mut app := &ColorMeterApp{}
@@ -125,11 +125,14 @@ fn test_color_meter_live_poll_freeze_and_copy_preserve_last_successful_sample() 
 	assert !app.poll() && app.take_desktop_service_request().command == .pointer
 	app.key_input(' ')
 	assert !app.following && app.next_poll_ms() == 1000 && app.report.rgb == 0x1278ef
+	assert editor_bytes_text(app.x_input) == '5' && editor_bytes_text(app.y_input) == '4'
 	assert !app.poll() && app.take_desktop_service_request().command == .none_
 	app.key_input('\x03')
 	assert app.take_desktop_service_request().command == .copy_hex
 	app.handle('color_meter.aperture.9')!
-	assert app.aperture == 9 && app.take_desktop_service_request().aperture == 9
+	resampled := app.take_desktop_service_request()
+	assert app.aperture == 9 && resampled.aperture == 9
+	assert resampled.x == 5 && resampled.y == 4
 }
 
 fn test_color_meter_report_sequences_ignore_stale_samples_and_small_windows_explain_resize() {

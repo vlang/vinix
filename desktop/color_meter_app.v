@@ -53,6 +53,14 @@ fn color_meter_coordinate(bytes []u8) ?int {
 	return number
 }
 
+fn color_meter_set_coordinate(mut bytes []u8, coordinate int) {
+	mut buffer := [16]u8{}
+	length := unsafe { C.snprintf(&char(&buffer[0]), 16, c'%d', coordinate) }
+	if length <= 0 || length > 7 { return }
+	bytes.clear()
+	for index in 0 .. length { bytes << buffer[index] }
+}
+
 fn (mut app ColorMeterApp) queue(command ColorMeterCommand) {
 	app.initialize()
 	mut x := 0
@@ -105,7 +113,12 @@ fn (mut app ColorMeterApp) receive_desktop_service_reply(payload string) {
 fn (mut app ColorMeterApp) freeze() {
 	app.following = false
 	app.request = ColorMeterRequest{}
-	if app.report.count > 0 { app.status = 'color_meter.frozen' }
+	if app.report.count > 0 {
+		app.initialize()
+		color_meter_set_coordinate(mut app.x_input, app.report.x)
+		color_meter_set_coordinate(mut app.y_input, app.report.y)
+		app.status = 'color_meter.frozen'
+	}
 }
 
 fn (mut app ColorMeterApp) handle(action string) ! {
