@@ -5,7 +5,7 @@
 """Check the loader's ADT-to-FDT conversion against XNU on this Mac.
 
 The running Mac's tree is rebuilt from the IORegistry, converted by the
-loader's own C code (build/adt2fdt), and read back the way the kernel reads
+loader's own implementation (build/adt2fdt), and read back the way the kernel reads
 an FDT. Every node's reg, translated through its buses, must land on the
 register windows XNU mapped for it (IODeviceMemory). Nodes on buses the
 kernel's two-cell reader cannot express (PCI's three-cell addresses) are
@@ -14,6 +14,7 @@ counted and skipped.
 
 from __future__ import annotations
 
+import argparse
 import platform
 import subprocess
 import sys
@@ -32,8 +33,12 @@ def main() -> int:
     if platform.system() != "Darwin":
         print("SKIP: needs macOS's IORegistry")
         return 0
-    converter = HERE.parent / "build/adt2fdt"
-    subprocess.run(["make", "-C", str(HERE.parent), "-s", "build/adt2fdt"], check=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--converter", type=Path, help="already built independent C converter fixture")
+    arguments = parser.parse_args()
+    converter = arguments.converter or HERE.parent / "build/adt2fdt"
+    if not arguments.converter:
+        subprocess.run(["make", "-C", str(HERE.parent), "-s", "build/adt2fdt"], check=True)
     blob, windows = ioreg_adt.build()
     with tempfile.TemporaryDirectory() as work:
         adt_path, fdt_path = Path(work) / "adt.bin", Path(work) / "fdt.dtb"

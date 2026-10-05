@@ -35,5 +35,10 @@ SECTIONS
     . = ALIGN(0x4000);
     loader_end = .;
 
-    /DISCARD/ : { *(.comment) *(.note .note.*) *(.eh_frame .eh_frame_hdr) }
+    /* Exported V entries initialize their fixed globals on their first call.
+     * Hosted constructor arrays are never traversed by the iBoot startup. */
+    /DISCARD/ : {
+        *(.init_array .fini_array)
+        *(.comment) *(.note .note.*) *(.eh_frame .eh_frame_hdr)
+    }
 }

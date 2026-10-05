@@ -168,7 +168,9 @@ path remains unconditional and lock-free; each callback borrows its live stack
 context only during synchronous formatting. This lifetime was independently
 reviewed before committing. QEMU does not verify physical UART/terminal devices.
 
-| Allocation instrumentation | `kernel/alloctrack` | Complete: ASan/UBSan with 8,192 live records, deletion/replacement/restart and bounded output; no allocator imports; `ALLOC_TRACK=1` builds and native `/proc/allocsites` QEMU guests passed on both architectures |
+| Stage | Native V location | Validation |
+| --- | --- | --- |
+| Allocation instrumentation (`acad3b2a`) | `kernel/alloctrack` | Complete: ASan/UBSan with 8,192 live records, deletion/replacement/restart and bounded output; no allocator imports; `ALLOC_TRACK=1` builds and native `/proc/allocsites` QEMU guests passed on both architectures |
 
 The tracker retains its fixed table sizes, hash/probe/deletion behavior, aggregate keys,
 acquire/release lock and nonblocking recording policy. A native frame-capture entry
@@ -176,3 +178,19 @@ keeps the original call-chain origin; its compiler barrier prevents a tail call
 from retiring that frame during the synchronous V walk. Optimized x86 output
 retains the CR4 LA57 check. The tables allocate no heap objects, and the new
 frame lifetime received independent review.
+
+Apple loader stage 1 moves the ADT reader, FDT writer/converter and freestanding
+memory/string helpers (719 original implementation lines) into
+`apple-boot/vcore/tree.v`. The public C headers and independent converter
+fixtures remain unchanged. ASan/UBSan passed 410,739 memory cases and the
+converter matched 233 XNU register windows (four unsupported nodes skipped).
+The AArch64 loader linked with no undefined symbols or allocator imports and
+passed the fake-AICv3 QEMU boot, watchdog and firmware-reservation checks.
+Caller-provided buffers, recursive bounds, byte alignment with the MMU off and
+the static conversion scratch buffer retain their original lifetimes.
+
+Real-ADT QEMU with the frozen ARM kernel stopped after scheduler bootstrap
+(`spawn done, calling await...`) with both the unchanged C loader and the V
+port. Both comparison guests idled at the same point; this check remains
+unverified. Its markers and assertions were unchanged, and physical Apple
+boot remains untested.
