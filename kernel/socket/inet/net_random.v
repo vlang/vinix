@@ -43,8 +43,8 @@ fn net_cycle_counter() u64 {
 }
 
 fn net_refill() {
-	net_pool_left = sizeof(net_pool)
-	if C.krandom__fill(unsafe { &net_pool[0] }, sizeof(net_pool), true) {
+	net_pool_left = usize(net_pool.len)
+	if C.krandom__fill(unsafe { &net_pool[0] }, usize(net_pool.len), true) {
 		return
 	}
 	// Only used before inet.initialise() has initialized the generator.
@@ -70,7 +70,7 @@ fn net_random_bytes(out voidptr, length usize) {
 		}
 		take := if remaining < net_pool_left { remaining } else { net_pool_left }
 		unsafe {
-			from := &net_pool[sizeof(net_pool) - net_pool_left]
+			from := &net_pool[usize(net_pool.len) - net_pool_left]
 			C.memcpy(voidptr(target), from, take)
 			C.vinix_explicit_bzero(from, take)
 		}
@@ -143,7 +143,7 @@ fn net_ip_randomid() u16 {
 fn net_tuple_isn(now_ns u64, local voidptr, local_port u16, remote voidptr,
 	remote_port u16, length usize) u32 {
 	if !net_isn_keyed {
-		net_random_bytes(unsafe { &net_isn_key[0] }, sizeof(net_isn_key))
+		net_random_bytes(unsafe { &net_isn_key[0] }, usize(net_isn_key.len))
 		net_isn_keyed = true
 	}
 	mut tuple := [36]u8{}

@@ -44,6 +44,6 @@ git -C "$DEST/vc" remote add origin https://github.com/vlang/vc.git
 git -C "$DEST/vc" fetch --depth=1 origin "$VC_PIN"
 git -C "$DEST/vc" checkout --detach FETCH_HEAD
 test "$(git -C "$DEST/vc" rev-parse HEAD)" = "$VC_PIN"
-CC="$HOST_CC" make -C "$DEST" local=1
+CC="$HOST_CC" make -C "$DEST" local=1 VEXE="$DEST/v"
 "$DEST/v" version
 printf 'Compiler ready: %s/v\n' "$DEST"
