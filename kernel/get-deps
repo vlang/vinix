@@ -99,7 +99,7 @@ cp -rp uacpi-repository/source/* c/uacpi/
 # 2.2.1.  Keep the third-party tree generated so security updates remain a
 # one-line pin change and the Vinix-specific port stays reviewable.
 clone_repo_commit \
-    https://git.savannah.nongnu.org/git/lwip.git \
+    https://github.com/lwip-tcpip/lwip.git \
     lwip-repository \
     77dcd25a72509eb83f72b033d219b1d40cd8eb95
 rm -rf c/lwip

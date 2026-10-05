@@ -28,7 +28,7 @@ pub fn requested() bool {
 		kernel := limine.kernel_file()
 		if kernel != unsafe { nil } {
 			boot_selection = parse_policy(kernel.cmdline, &boot_geometry,
-				unsafe { &char(&boot_device[0]) }, sizeof(boot_device))
+				unsafe { &char(&boot_device[0]) }, usize(boot_device.len))
 		}
 	}
 	if boot_selection < 0 {
