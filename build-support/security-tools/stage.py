@@ -45,17 +45,15 @@ def main() -> None:
         parser.error(f"compiler target does not match --arch: {machine}")
     with tempfile.TemporaryDirectory(prefix="vinix-security-tools-") as directory:
         for tool, source, destination in (
-                ("sandbox", "tools/sandbox/vinix-sandbox.c", "usr/bin/vinix-sandbox"),
-                ("mac", "tools/security-mac/mac.c", "usr/sbin/vinix-mac"),
-                ("audit", "tools/security-audit/collector.c", "usr/sbin/vinix-security-audit")):
+                ("sandbox", "tools/sandbox", "usr/bin/vinix-sandbox"),
+                ("mac", "tools/security-mac", "usr/sbin/vinix-mac"),
+                ("audit", "tools/security-audit", "usr/sbin/vinix-security-audit")):
             binary = Path(directory) / Path(destination).name
             core = Path(directory) / f"{tool}.c"
-            obj = core.with_suffix(".o")
             generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64")
             flags = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"]
-            subprocess.run(cc + flags + ["-DVINIX_V_RUNTIME", "-I", str((ROOT / source).parent),
-                                         "-c", str(core), "-o", str(obj)], check=True)
-            subprocess.run(cc + ["-static"] + flags + [str(ROOT / source), str(obj),
+            subprocess.run(cc + ["-static"] + flags + ["-D_GNU_SOURCE", "-DVINIX_V_RUNTIME",
+                                                       "-I", str(ROOT / source), str(core),
                                                        "-o", str(binary)], check=True)
             header = binary.read_bytes()[:64]
             expected = 183 if args.arch == "aarch64" else 62

@@ -1,7 +1,31 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-#define main collector_main
-#include "../../tools/security-audit/collector.c"
-#undef main
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include "../../tools/security-audit/collector_v.h"
+#define number vka_number
+#define parse_snapshot vka_parse_snapshot
+#define collect vka_collect
+#define end_pending vka_end_pending
+#define log_stat vka_log_stat
+#define directory_stat vka_directory_stat
+#define open_log_at vka_open_log_at
+#define open_log vka_open_log
+#define append vka_append
+#define read_snapshot vka_read_snapshot
+#define collector_main vka_main
+#define add vka_add
+
 #include <sys/mount.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>

@@ -16,6 +16,7 @@ struct collector {
 };
 struct output { char bytes[OUTPUT_BYTES]; size_t used; };
 struct vka_stat { uint64_t mode, owner, links, device, inode; int regular, directory; };
+#ifndef VINIX_V_RUNTIME
 int vka_stat(int, struct vka_stat *);
 size_t vka_path_max(void);
 char *vka_token(char *, const char *, char **);
@@ -46,7 +47,7 @@ void vka_root_required(void);
 void vka_perror(const char *);
 void vka_collection_error(int);
 extern volatile int stopping, reopening;
-#ifndef VINIX_V_RUNTIME
+int vka_add(struct output *, const char *);
 int vka_number(const char *, uint64_t *);
 int vka_parse_snapshot(char *, struct snapshot *);
 int vka_collect(struct collector *, const struct snapshot *, struct output *);

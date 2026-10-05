@@ -9,7 +9,7 @@
 #include <unistd.h>
 static int calls, command, execution, labeling;
 static unsigned long domain, kind, mask;
-static int mock_prctl(int option, ...)
+int mock_prctl(int option, ...)
 {
     assert(option == 0x56584d41);
     va_list args;
@@ -22,7 +22,7 @@ static int mock_prctl(int option, ...)
     ++calls;
     return 0;
 }
-static int mock_lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags)
+int mock_lsetxattr(const char *path, const char *name, const void *value, size_t size, int flags)
 {
     assert(!strcmp(path, "/test") && !strcmp(name, "security.vinix"));
     assert(size == 2 && !memcmp(value, "28", 2) && flags == 0);
@@ -35,7 +35,11 @@ int mock_execvp(const char *path, char *const argv[]);
 #define lsetxattr mock_lsetxattr
 #define execvp mock_execvp
 #define main cli_main
-#include "../../tools/security-mac/mac.c"
+#include "../../tools/security-mac/mac.h"
+#include "../../tools/security-mac/mac_v.h"
+#define cli_main vm_main
+#define number vm_number
+#define permissions vm_permissions
 #undef main
 int mock_execvp(const char *path, char *const argv[])
 {

@@ -144,7 +144,10 @@ def verdict_policy(expected: list[str], failures: list[str], expect_panic: bool)
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, required=True)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--source", type=Path)
+    input_group.add_argument("--prebuilt-init", type=Path,
+                             help="Use an already compiled guest init executable")
     parser.add_argument("--arch", choices=("aarch64", "x86_64"), required=True)
     parser.add_argument("--kernel-dir", type=Path, default=ROOT / "kernel")
     parser.add_argument("--expect", action="append", required=True)
@@ -165,39 +168,49 @@ def main() -> int:
     if not kernel.is_file():
         parser.error(f"Build the requested kernel first: {kernel}")
     init = state / "init"
-    if args.arch == "aarch64":
-        sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT",
-                                     str(ROOT / "build-aarch64-userland/sysroot")))
-        command = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
-                   f"--sysroot={sysroot}", "-static", "-pthread", "-O2",
-                   "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                   str(Path(__file__).with_name("serial.c")),
-                   str(args.source.resolve()), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
-                   "-o", str(init)]
+    if args.prebuilt_init:
+        prebuilt = args.prebuilt_init.resolve()
+        header = prebuilt.read_bytes()[:64]
+        expected_machine = 183 if args.arch == "aarch64" else 62
+        if header[:6] != b"\x7fELF\x02\x01" or int.from_bytes(header[18:20], "little") != expected_machine:
+            parser.error("prebuilt init must be a little-endian ELF64 for the requested architecture")
+        if prebuilt != init.resolve():
+            shutil.copyfile(prebuilt, init)
+        init.chmod(0o755)
     else:
-        command = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc"),
-                   "-static", "-pthread", "-O2", "-Wall", "-Wextra", "-Werror",
-                   str(Path(__file__).with_name("serial.c")),
-                   str(args.source.resolve()), "-o", str(init)]
-    # These independent include-C fixtures exercise the production V cores
-    # through the same native ABI adapters as the installed utilities.
-    security_sources = {
-        ROOT / "tests/application-sandbox/guest.c": ("sandbox", "tools/sandbox"),
-        ROOT / "tests/security-audit/collector_vm_test.c": ("audit", "tools/security-audit"),
-    }
-    security = security_sources.get(args.source.resolve())
-    if security:
-        tool, include = security
-        core = state / f"{tool}-core.c"
-        obj = core.with_suffix(".o")
-        generate = runpy.run_path(str(ROOT / "build-support/security-tools/compile-v-core.py"))["generate"]
-        generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64")
-        # Reuse the selected compiler/target flags, omitting fixture and linker inputs.
-        source_index = command.index(str(Path(__file__).with_name("serial.c")))
-        subprocess.run(command[:source_index] + ["-DVINIX_V_RUNTIME", "-I", str(ROOT / include),
-                                                 "-c", str(core), "-o", str(obj)], check=True)
-        command.insert(command.index("-o"), str(obj))
-    subprocess.run(command, check=True)
+        if args.arch == "aarch64":
+            sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT",
+                                         str(ROOT / "build-aarch64-userland/sysroot")))
+            command = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
+                       f"--sysroot={sysroot}", "-static", "-pthread", "-O2",
+                       "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
+                       str(Path(__file__).with_name("serial.c")),
+                       str(args.source.resolve()), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
+                       "-o", str(init)]
+        else:
+            command = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc"),
+                       "-static", "-pthread", "-O2", "-Wall", "-Wextra", "-Werror",
+                       str(Path(__file__).with_name("serial.c")),
+                       str(args.source.resolve()), "-o", str(init)]
+        # These independent include-C fixtures exercise the production V cores
+        # through the same native ABI adapters as the installed utilities.
+        security_sources = {
+            ROOT / "tests/application-sandbox/guest.c": ("sandbox", "tools/sandbox"),
+            ROOT / "tests/security-audit/collector_vm_test.c": ("audit", "tools/security-audit"),
+        }
+        security = security_sources.get(args.source.resolve())
+        if security:
+            tool, include = security
+            core = state / f"{tool}-core.c"
+            obj = core.with_suffix(".o")
+            generate = runpy.run_path(str(ROOT / "build-support/security-tools/compile-v-core.py"))["generate"]
+            generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64", ("security_no_main",))
+            # Reuse the selected compiler/target flags, omitting fixture and linker inputs.
+            source_index = command.index(str(Path(__file__).with_name("serial.c")))
+            subprocess.run(command[:source_index] + ["-D_GNU_SOURCE", "-DVINIX_V_RUNTIME", "-I", str(ROOT / include),
+                                                     "-c", str(core), "-o", str(obj)], check=True)
+            command.insert(command.index("-o"), str(obj))
+        subprocess.run(command, check=True)
     rootfs = state / "rootfs"
     for directory in ("sbin", "dev", "proc", "sys", "tmp", "root"):
         (rootfs / directory).mkdir(parents=True, exist_ok=True)

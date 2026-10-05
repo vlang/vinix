@@ -22,8 +22,6 @@ mut:
 }
 struct C.output { mut: bytes [139264]char used usize }
 struct C.vka_stat { mut: mode u64 owner u64 links u64 device u64 inode u64 regular i32 directory i32 }
-@[c_extern] __global C.stopping i32
-@[c_extern] __global C.reopening i32
 fn C.strlen(&char) usize
 fn C.strcmp(&char, &char) i32
 fn C.strchr(&char, i32) &char
@@ -370,15 +368,15 @@ pub fn audit_main(argc i32, argv &&char) i32 {
    mut next := collector
    if collect(&next, &snapshot, &output) != 0 || append(fd, &output, 0) != 0 { failed = true; break }
    collector = next
-   if once || C.stopping != 0 { break }
+   if once || signal_stopping() != 0 { break }
    mut seconds := interval / 1000; mut nanoseconds := (interval % 1000) * 1000000
    for C.vka_sleep(&seconds, &nanoseconds) < 0 {
     if C.vka_is_error(0) == 0 { failed = true; break }
-    if C.stopping != 0 || C.reopening != 0 { break }
+    if signal_stopping() != 0 || signal_reopening() != 0 { break }
    }
    if failed { break }
-   if C.reopening != 0 {
-    C.reopening = 0
+   if signal_reopening() != 0 {
+    signal_clear_reopening()
     new_fd := open_log(path, fd); if new_fd < 0 { failed = true; break }
     C.vka_close(fd); fd = new_fd; output.used = 0
     if reopen_line(&output, &collector) != 0 || append(fd, &output, 0) != 0 { failed = true; break }

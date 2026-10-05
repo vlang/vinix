@@ -7,8 +7,8 @@ stderr, locks an `unveil` filesystem view, and installs explicit pledge
 execpromises. A privileged caller also empties the capability bounding set.
 Any failed setup operation stops the launch with exit status 125.
 
-The native V core uses a small C syscall adapter and has only libc runtime
-dependencies. Stage it with the target Linux ABI compiler:
+The native V implementation calls the target libc syscall ABI directly and
+has only libc runtime dependencies. Stage it with the target Linux ABI compiler:
 
 ```sh
 python3 build-support/security-tools/stage.py --arch x86_64 \

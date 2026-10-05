@@ -55,9 +55,9 @@ python3 tests/kernel-gaps/run.py --source tests/security-audit/collector_vm_test
 requires authorization to read the canonical kernel audit endpoint. The helper
 `build-support/security-tools/stage.py --arch aarch64 --staging /path/to/root`
 generates the native V cores and packages a static collector and launcher
-using the target musl compiler. C adapters retain libc stat, signal and syscall
-ABIs. Both
-userland and desktop image builders run this step.
+using the target musl compiler. V bindings use the target libc stat and signal
+layouts and call its syscall ABI directly. Both userland and desktop image
+builders run this step.
 
 This adds durable collection of the existing selected seccomp events. It does
 not implement the Linux audit ABI, login attribution, general security event

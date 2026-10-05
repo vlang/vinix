@@ -1,7 +1,21 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #define VINIX_SANDBOX_TEST
 #define VINIX_SANDBOX_NO_MAIN
-#include "../../tools/sandbox/vinix-sandbox.c"
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include "../../tools/sandbox/sandbox_v.h"
+int vinix_sandbox_main(int, char **);
 #include <assert.h>
 
 static int calls, fail_at, execs, groups, lying_nnp, lying_caps, lying_ids, lying_groups, lying_ambient;
@@ -26,7 +40,7 @@ static void reset(void)
 	memset(exec_argv, 0, sizeof(exec_argv));
 	memset(exec_env, 0, sizeof(exec_env));
 }
-static int sb_prctl(int option, unsigned long arg)
+int sb_prctl(int option, unsigned long arg)
 {
 	if (step()) return -1;
 	if (option == SB_PR_GET_NO_NEW_PRIVS) return lying_nnp ? 0 : 1;
@@ -36,44 +50,44 @@ static int sb_prctl(int option, unsigned long arg)
 	}
 	return 0;
 }
-static int sb_capget(struct sb_cap_data data[2])
+int sb_capget(struct sb_cap_data data[2])
 {
 	if (step()) return -1;
 	memcpy(data, current_caps, sizeof(current_caps));
 	return 0;
 }
-static int sb_capset(struct sb_cap_data data[2])
+int sb_capset(struct sb_cap_data data[2])
 {
 	if (step()) return -1;
 	if (!lying_caps) memcpy(current_caps, data, sizeof(current_caps));
 	return 0;
 }
-static int sb_verify_ambient(void)
+int sb_verify_ambient(void)
 {
 	if (step()) return -1;
 	return lying_ambient ? -1 : 0;
 }
-static int sb_getids(uint32_t uid[3], uint32_t gid[3])
+int sb_getids(uint32_t uid[3], uint32_t gid[3])
 {
 	if (step()) return -1;
 	memcpy(uid, uids, sizeof(uids));
 	memcpy(gid, gids, sizeof(gids));
 	return 0;
 }
-static int sb_setids(uint32_t uid, uint32_t gid)
+int sb_setids(uint32_t uid, uint32_t gid)
 {
 	if (step()) return -1;
 	if (!lying_ids) for (int i = 0; i < 3; i++) { uids[i] = uid; gids[i] = gid; }
 	return 0;
 }
-static int sb_groups(int clear)
+int sb_groups(int clear)
 {
 	if (step()) return -1;
 	if (clear && !lying_groups) groups = 0;
 	return clear ? 0 : groups;
 }
-static int sb_close_fds(void) { return step(); }
-static int sb_unveil(const char *path, const char *perms)
+int sb_close_fds(void) { return step(); }
+int sb_unveil(const char *path, const char *perms)
 {
 	if (step()) return -1;
 	if (!path) { assert(!perms); locked = 1; }
@@ -84,7 +98,7 @@ static int sb_unveil(const char *path, const char *perms)
 	}
 	return 0;
 }
-static int sb_pledge(const char *promises, const char *execpromises)
+int sb_pledge(const char *promises, const char *execpromises)
 {
 	if (step()) return -1;
 	assert(locked);
@@ -92,7 +106,7 @@ static int sb_pledge(const char *promises, const char *execpromises)
 	target_promises = execpromises;
 	return 0;
 }
-static int sb_exec(const char *path, char *const argv[], char *const envp[])
+int sb_exec(const char *path, char *const argv[], char *const envp[])
 {
 	assert(locked && target_promises);
 	execs++;

@@ -1,6 +1,26 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
 #define VINIX_SANDBOX_NO_MAIN
-#include "../../tools/sandbox/vinix-sandbox.c"
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <limits.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
+#include "../../tools/sandbox/sandbox_v.h"
+int vinix_sandbox_main(int, char **);
+#define sb_getids vksb_getids
+#define sb_prctl vksb_prctl
+#define sb_groups vksb_groups
+#define sb_capget vksb_capget
+#define sb_unveil vksb_unveil
+#define sb_pledge vksb_pledge
 #include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>

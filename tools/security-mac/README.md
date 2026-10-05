@@ -6,7 +6,7 @@ confined process remains subject to the matrix as UID 0 with full capabilities.
 The feature is separate from pledge/unveil and ordinary Unix mode bits; all
 applicable checks must allow an operation.
 
-The native V core and small C syscall adapter are staged by
+The native V implementation is staged by
 `build-support/security-tools/stage.py` with the target musl compiler.
 The private Vinix ABI is
 `prctl(0x56584d41, command, domain, type, permissions)`; it is not Linux's LSM ABI.
