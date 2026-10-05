@@ -132,7 +132,12 @@ struct vinix_fake_g17_expected_write {
 struct vinix_fake_g17_address_range {
     uint64_t address;
     uint64_t size;
+    /* V escapes access as v_access; both names share the existing ABI word. */
+#ifdef VINIX_V_RUNTIME
+    union { uint32_t access; uint32_t v_access; };
+#else
     uint32_t access;
+#endif
     uint32_t object_handle;
 };
 
@@ -147,7 +152,12 @@ struct vinix_fake_g17_resource_reference {
     uint32_t provenance;
     uint32_t descriptor_member;
     uint32_t descriptor_bytes;
+    /* V escapes access as v_access; both names share the existing ABI word. */
+#ifdef VINIX_V_RUNTIME
+    union { uint32_t access; uint32_t v_access; };
+#else
     uint32_t access;
+#endif
     uint32_t reserved;
 };
 
@@ -161,22 +171,31 @@ struct vinix_fake_g17_report {
     uint32_t expected_writes;
 };
 
+/* V emits unqualified pointers; C clients retain the borrowed const ABI. */
+#ifdef VINIX_V_RUNTIME
+#define VINIX_G17_CONST
+#else
+#define VINIX_G17_CONST const
+#endif
+
 size_t vinix_fake_g17_expected_write_size(void);
 size_t vinix_fake_g17_address_range_size(void);
 size_t vinix_fake_g17_resource_reference_size(void);
 size_t vinix_fake_g17_report_size(void);
 
-int vinix_fake_g17_verify(const void *command, size_t command_bytes,
-                          const void *descriptor, size_t descriptor_bytes,
+int vinix_fake_g17_verify(VINIX_G17_CONST void *command, size_t command_bytes,
+                          VINIX_G17_CONST void *descriptor, size_t descriptor_bytes,
                           uint64_t command_gpu_address,
-                          const struct vinix_fake_g17_expected_write *writes,
+                          VINIX_G17_CONST struct vinix_fake_g17_expected_write *writes,
                           uint32_t write_count,
-                          const struct vinix_fake_g17_address_range *ranges,
+                          VINIX_G17_CONST struct vinix_fake_g17_address_range *ranges,
                           uint32_t range_count,
-                          const struct vinix_fake_g17_resource_reference *resources,
+                          VINIX_G17_CONST struct vinix_fake_g17_resource_reference *resources,
                           uint32_t resource_count,
                           struct vinix_fake_g17_report *report);
 
-const char *vinix_fake_g17_error_string(int error);
+VINIX_G17_CONST char *vinix_fake_g17_error_string(int error);
+
+#undef VINIX_G17_CONST
 
 #endif

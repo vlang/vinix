@@ -7,6 +7,8 @@ module main
 
 import gpu.agx.fw
 
+fn C.kprintf(format &char, ...) i32
+
 fn read_le_u64(bytes []u8, offset u32) u64 {
 	mut value := u64(0)
 	for index := u32(0); index < 8; index++ {

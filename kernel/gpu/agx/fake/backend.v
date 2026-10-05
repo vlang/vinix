@@ -14,20 +14,20 @@ import gpu.agx.workqueue
 
 #include "agx_fake_g17_encode.h"
 
-fn C.vinix_fake_g17_expected_write_size() u64
+fn C.vinix_fake_g17_expected_write_size() usize
 
-fn C.vinix_fake_g17_address_range_size() u64
+fn C.vinix_fake_g17_address_range_size() usize
 
-fn C.vinix_fake_g17_resource_reference_size() u64
+fn C.vinix_fake_g17_resource_reference_size() usize
 
-fn C.vinix_fake_g17_report_size() u64
+fn C.vinix_fake_g17_report_size() usize
 
 fn C.vinix_fake_g17_encoder_inputs_size() u64
 
-fn C.vinix_fake_g17_verify(command voidptr, command_bytes u64,
-	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
-	writes voidptr, write_count u32, ranges voidptr, range_count u32,
-	resources voidptr, resource_count u32, report voidptr) int
+fn C.vinix_fake_g17_verify(command voidptr, command_bytes usize,
+	descriptor voidptr, descriptor_bytes usize, command_gpu_address u64,
+	writes &C.vinix_fake_g17_expected_write, write_count u32, ranges &C.vinix_fake_g17_address_range, range_count u32,
+	resources &C.vinix_fake_g17_resource_reference, resource_count u32, report &C.vinix_fake_g17_report) i32
 
 fn C.vinix_fake_g17_encode_3d(command voidptr, command_bytes u64,
 	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
@@ -187,13 +187,13 @@ pub fn encode_fake_g17_3d(command voidptr, command_bytes u64,
 	mut write_count := u32(0)
 	error := C.vinix_fake_g17_encode_3d(command, command_bytes, descriptor, descriptor_bytes, command_gpu_address, voidptr(inputs), write_pointer, u32(writes.len), &write_count)
 	return FakeG17Encoding{
-		error: u32(error)
+		error:       u32(error)
 		write_count: write_count
 	}
 }
 
 // Verify exactly the writes selected for this command's recovered execution
-// path.  The C core is allocation-free and is shared verbatim with the host
+// path.  The V core is allocation-free and is shared verbatim with the host
 // test harness, while these slices make it convenient for the V encoder to
 // provide its golden trace and live GPU address-space bounds.
 @[markused]
@@ -221,7 +221,7 @@ pub fn verify_fake_g17(submission &FakeG17Submission) FakeG17Verification {
 	if submission.resources.len != 0 {
 		resources = voidptr(&submission.resources[0])
 	}
-	C.vinix_fake_g17_verify(submission.command, submission.command_bytes, submission.descriptor, submission.descriptor_bytes, submission.command_gpu_address, writes, u32(submission.writes.len), ranges, u32(submission.address_ranges.len), resources, u32(submission.resources.len), voidptr(&report))
+	unsafe { C.vinix_fake_g17_verify(submission.command, usize(submission.command_bytes), submission.descriptor, usize(submission.descriptor_bytes), submission.command_gpu_address, &C.vinix_fake_g17_expected_write(writes), u32(submission.writes.len), &C.vinix_fake_g17_address_range(ranges), u32(submission.address_ranges.len), &C.vinix_fake_g17_resource_reference(resources), u32(submission.resources.len), &C.vinix_fake_g17_report(&report)) }
 	return report
 }
 
@@ -238,7 +238,7 @@ pub fn queue_fake_g17(mut queue workqueue.WorkQueue,
 		}
 		return FakeG17QueuedVerification{
 			report: FakeG17Verification{
-				error: fake_g17_queue_full
+				error:           fake_g17_queue_full
 				expected_writes: u32(submission.writes.len)
 			}
 		}
@@ -248,12 +248,12 @@ pub fn queue_fake_g17(mut queue workqueue.WorkQueue,
 		queue.complete(slot, workqueue.work_err_channel_error)
 		return FakeG17QueuedVerification{
 			report: report
-			slot: slot
+			slot:   slot
 		}
 	}
 	return FakeG17QueuedVerification{
-		report: report
-		slot: slot
+		report:  report
+		slot:    slot
 		pending: true
 	}
 }
