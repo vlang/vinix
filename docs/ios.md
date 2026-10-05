@@ -11,6 +11,12 @@ compiled for `arm64-apple-ios15.0`. It does **not** run Apple's Calculator, crea
 a UIKit window, or support general iOS applications. The existing native desktop
 calculator is independent of this runtime.
 
+An original [Objective-C UIKit Calculator](../examples/ios-calculator/README.md)
+now provides a small GUI application for the next milestone. Its build produces
+an ARM64 iOS `.app` and `.ipa`, with 25 chained imports across Foundation, UIKit,
+libobjc and libSystem. It is inspectable here; launching it still requires the
+Objective-C/framework compatibility layer and compositor bridge.
+
 ## Build and run
 
 Build the AArch64 Alpine development sysroot with `./build-userland-aarch64.sh`
