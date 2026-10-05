@@ -248,7 +248,8 @@ OBS Studio uses the same X11 host, with an additional 1280×900 screen. After
 `pkg install obs-studio`, open it from Start and add **Display Capture (XSHM)**
 with **Display 1** selected. The compositor writes each presented frame into
 that screen's Xvfb framebuffer. Display 0 contains the OBS UI, so the capture
-source shows the Vinix desktop without OBS recursively capturing itself.
+source shows the Vinix desktop. OBS appears in the preview while its window is
+visible on that desktop; minimize it to record the other windows alone.
 
 `pkg install minecraft` installs Alpine's OpenJDK 21 and native runtime, then
 downloads the newest compatible official Minecraft: Java Edition client from

@@ -202,9 +202,16 @@ static pid_t spawn_xvfb(const char *display_name, const char *directory,
     if (pid != 0)
         return pid;
 
-    setenv("LD_LIBRARY_PATH", "/usr/lib:/usr/lib/xorg/modules", 1);
+    /* The full desktop can carry a newer Mesa for native EGL applications.
+     * Xvfb's DRI driver comes from the X11 layer, so load that layer's GL
+     * libraries with it rather than mixing two Mesa/LLVM generations. */
+    setenv("LD_LIBRARY_PATH",
+           "/usr/lib/vinix-x11-software:/usr/lib:/usr/lib/xorg/modules", 1);
     setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
-    setenv("LIBGL_DRIVERS_PATH", "/usr/lib/xorg/modules/dri", 1);
+    /* The desktop stages the matching software driver in /usr/lib/dri;
+     * another desktop layer can populate Xorg's module directory with its
+     * own Mesa generation. Prefer the matching driver here. */
+    setenv("LIBGL_DRIVERS_PATH", "/usr/lib/dri:/usr/lib/xorg/modules/dri", 1);
     setenv("GALLIUM_DRIVER", "softpipe", 1);
     /* Keep Roblox on the proven direct ATL server with its game input bridge.
      * The lean server crashes while drawing the current client's welcome UI. */

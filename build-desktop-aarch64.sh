@@ -1264,6 +1264,23 @@ install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
+# Xvfb-glx needs the X11 layer's legacy GLX Mesa, while OBS creates its video
+# context through that layer's EGL Mesa on the same display. The full desktop
+# also carries native Mesa. Keep the X11 clients on the tested software stack.
+# install follows staging symlinks for Vinix's O_NOFOLLOW loader.
+x11_gl_runtime="$STAGING/usr/lib/vinix-x11-software"
+rm -rf "$x11_gl_runtime"
+if [ "$WITH_ASAHI_GPU" -eq 0 ] &&
+   [ -f "$X11_STAGING/usr/lib/libGL.so.1" ] &&
+   [ -f "$X11_STAGING/usr/lib/libglapi.so.0" ] &&
+   [ -f "$X11_STAGING/usr/lib/libEGL.so.1" ] &&
+   [ -f "$X11_STAGING/usr/lib/libgbm.so.1" ]; then
+    mkdir -p "$x11_gl_runtime/egl"
+    install -m755 "$X11_STAGING/usr/lib/libGL.so.1" "$x11_gl_runtime/libGL.so.1"
+    install -m755 "$X11_STAGING/usr/lib/libglapi.so.0" "$x11_gl_runtime/libglapi.so.0"
+    install -m755 "$X11_STAGING/usr/lib/libEGL.so.1" "$x11_gl_runtime/egl/libEGL.so.1"
+    install -m755 "$X11_STAGING/usr/lib/libgbm.so.1" "$x11_gl_runtime/egl/libgbm.so.1"
+fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
 install -m755 "$SCRIPT_DIR/build-support/obs/run-obs" "$STAGING/usr/bin/run-obs"
@@ -1518,7 +1535,7 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-disk-usage \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
-    vinix-wine-word2013 vinix-blender vinix-capture vinix-qemu-window vinix-steam; do
+    vinix-wine-word2013 vinix-blender vinix-capture vinix-obs vinix-qemu-window vinix-steam; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 

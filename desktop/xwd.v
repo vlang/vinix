@@ -219,8 +219,8 @@ fn obs_capture_presented(canvas &Canvas) {
 		return
 	}
 	surface := obs_capture_surface() or { return }
-	if !surface.direct || surface.width != obs_surface_width
-		|| surface.height != obs_surface_height {
+	if !surface.direct || surface.width != obs_capture_width
+		|| surface.height != obs_capture_height {
 		return
 	}
 	if surface.width == canvas.physical_width && surface.height == canvas.physical_height {

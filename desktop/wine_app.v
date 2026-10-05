@@ -27,10 +27,15 @@ const gimp_surface_width = 1280
 const gimp_surface_height = 900
 const gimp_window_width = 1280
 const gimp_window_height = 900
-const obs_surface_width = 1280
-const obs_surface_height = 900
-const obs_window_width = 1280
-const obs_window_height = 900
+// OBS opens a 1088x730 control window. Match its first-screen root and native
+// frame so the desktop does not show an unused band around the controls.
+// The separate capture screen remains 1280x900.
+const obs_surface_width = 1088
+const obs_surface_height = 730
+const obs_window_width = 1088
+const obs_window_height = 730
+const obs_capture_width = 1280
+const obs_capture_height = 900
 // Writer lays a page out for the width it is given. 1280x900 is the same
 // surface the browsers use, and wide enough for a document page beside the
 // sidebar without the toolbars wrapping onto a third row.
