@@ -64,9 +64,9 @@
 
 
 // Original tests for the translation, made available under APSL 2.0.
-// See kernel/modules/xnualloc/APPLE_LICENSE. Modified 2026-09-11.
+// See kernel/xnualloc/APPLE_LICENSE. Modified 2026-09-11.
 // Run from the repository root:
-// v -gc none -path "@vlib|@vmodules|$(pwd)/kernel/modules" test tests/xnualloc
+// v -gc none -path "@vlib|@vmodules|$(pwd)/kernel" test tests/xnualloc
 module main
 
 import xnualloc
@@ -303,16 +303,16 @@ fn test_depot_full_empty_partition_and_minima() {
 	assert minimum.full == 2 && a.full == 2 && b.full == 2
 	b.zone_depot_move_empty(mut a, 1, &minimum)
 	assert minimum.empty == 1 && b.empty == 1
-	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(&mags[0])
-	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(&mags[1])
-	assert b.full == 0 && u64(unsafe { *b.tail }) == u64(&mags[5])
-	assert u64(b.zone_depot_pop_head_empty(unsafe { nil })) == u64(&mags[5])
+	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(unsafe { &mags[0] })
+	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(unsafe { &mags[1] })
+	assert b.full == 0 && u64(unsafe { *b.tail }) == u64(unsafe { &mags[5] })
+	assert u64(b.zone_depot_pop_head_empty(unsafe { nil })) == u64(unsafe { &mags[5] })
 	b.zone_depot_insert_tail_full(mut mags[6])
 	b.zone_depot_move_full(mut a, 2, &minimum, true)
-	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(&mags[2])
-	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(&mags[3])
-	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(&mags[6])
-	assert u64(a.zone_depot_pop_head_empty(unsafe { nil })) == u64(&mags[4])
+	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(unsafe { &mags[2] })
+	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(unsafe { &mags[3] })
+	assert u64(b.zone_depot_pop_head_full(unsafe { nil })) == u64(unsafe { &mags[6] })
+	assert u64(a.zone_depot_pop_head_empty(unsafe { nil })) == u64(unsafe { &mags[4] })
 	assert a.head == unsafe { nil } && b.head == unsafe { nil }
 }
 

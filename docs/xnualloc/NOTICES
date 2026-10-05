@@ -59,4 +59,4 @@ Retained notices for the translated source and supporting documentation.
 Modified 2026-09-11: C-to-V translation and documented adaptations.
 Source: apple-oss-distributions/xnu f6217f891ac0bb64f3d375211650a4c1ff8ca1ea,
 osfmk/kern/zalloc.c. The exact upstream APPLE_LICENSE is included at
-kernel/modules/xnualloc/APPLE_LICENSE. These translations retain APSL 2.0.
+kernel/xnualloc/APPLE_LICENSE. These translations retain APSL 2.0.

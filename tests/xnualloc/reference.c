@@ -60,7 +60,7 @@
 // Modified 2026-09-11: C-to-V translation and explicitly documented adaptations.
 // Upstream: apple-oss-distributions/xnu f6217f891ac0bb64f3d375211650a4c1ff8ca1ea,
 // osfmk/kern/zalloc.c. See docs/xnualloc/PORT_STATUS.md and
-// kernel/modules/xnualloc/APPLE_LICENSE.
+// kernel/xnualloc/APPLE_LICENSE.
 // These translations retain APSL 2.0; they are NOT relicensed as GPL.
 
 /* C reference extracted from zalloc.c. Harness adaptations: prebacked arenas,

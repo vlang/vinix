@@ -291,10 +291,10 @@ class ProtocolTests(unittest.TestCase):
 
     def test_source_integration_contract(self):
         root = Path(__file__).resolve().parents[2]
-        zone = (root / 'kernel/modules/xnualloc/zone.v').read_text()
-        bitmap = (root / 'kernel/modules/xnualloc/bitmap.v').read_text()
-        bridge = (root / 'kernel/modules/memory/xnu_zone_heap.v').read_text()
-        physical = (root / 'kernel/modules/memory/physical.v').read_text()
+        zone = (root / 'kernel/xnualloc/zone.v').read_text()
+        bitmap = (root / 'kernel/xnualloc/bitmap.v').read_text()
+        bridge = (root / 'kernel/memory/xnu_zone_heap.v').read_text()
+        physical = (root / 'kernel/memory/physical.v').read_text()
         self.assertNotIn('mut rr u16', zone)
         self.assertIn('pub const no_element = u64(0xffffffffffffffff)', bitmap)
         self.assertNotIn('pub const no_element = u64(-1)', bitmap)
@@ -312,7 +312,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertIn('return xnu_heap_alloc(size)', physical)
         self.assertIn('return xnu_heap_realloc(ptr, new_size)', physical)
         for arch in ('x86', 'aarch64'):
-            smp = (root / f'kernel/modules/{arch}/smp/smp.v').read_text()
+            smp = (root / f'kernel/{arch}/smp/smp.v').read_text()
             self.assertLess(smp.index('for katomic.load(&cpu_local.online)'),
                             smp.index('memory.heap_enable_cpu_caches'))
 

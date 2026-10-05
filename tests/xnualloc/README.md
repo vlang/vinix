@@ -17,11 +17,18 @@ and 6 non-SMR zone-protocol/source tests. They do not execute V. The reference
 suite requires a C compiler with UBSan; set `CC` to its executable if necessary.
 The zone model uses four logical CPU caches, not concurrent hardware threads.
 
+CI retains the checksum-pinned V 0.5.2 release compiler for these host tests.
+Kernel smoke builds use `tools/m1-wifi/get-v.sh`, whose newer pinned compiler
+supports the current kernel build flags.
+
 Actual V host tests (18 functions):
 
 ```sh
-VMODULES="$(pwd)/kernel/modules" v -cc gcc -gc none test tests/xnualloc
-VMODULES="$(pwd)/kernel/modules" v -prod -cc gcc -gc none test tests/xnualloc
+v_host=/absolute/path/to/v-0.5.2/v
+export VEXE="$v_host"
+export V_C_ERROR_BUG_REPORT_DISABLED=1
+VMODULES="$(pwd)/kernel" "$v_host" -cc gcc -gc none test tests/xnualloc
+VMODULES="$(pwd)/kernel" "$v_host" -prod -cc gcc -gc none test tests/xnualloc
 ```
 
 On a normal Linux x86-64 Vinix build machine, with a compatible V compiler:

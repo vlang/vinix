@@ -5,15 +5,20 @@ on:
     paths:
       - 'kernel/c/printf_benchmark.c'
       - 'kernel/c/stdio.h'
-      - 'kernel/modules/xnualloc/**'
-      - 'kernel/modules/memory/**'
-      - 'kernel/modules/**/smp/smp.v'
+      - 'kernel/xnualloc/**'
+      - 'kernel/memory/**'
+      - 'kernel/**/smp/smp.v'
       - 'tests/xnualloc/**'
+      - 'tests/memory/**'
       - '.github/workflows/xnu-allocator-port.yml'
+      - 'tools/m1-wifi/get-v.sh'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  V_C_ERROR_BUG_REPORT_DISABLED: '1'
 
 jobs:
   host-tests:
@@ -52,7 +57,8 @@ jobs:
         run: |
           set -euo pipefail
           V="$RUNNER_TEMP/xnu-port-v/v/v"
-          export VMODULES="$GITHUB_WORKSPACE/kernel/modules"
+          export VEXE="$V"
+          export VMODULES="$GITHUB_WORKSPACE/kernel"
           "$V" -cc gcc -gc none test tests/xnualloc
           "$V" -prod -cc gcc -gc none test tests/xnualloc
 
@@ -67,20 +73,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: xnu-port-host-toolchain
-          path: ${{ runner.temp }}/xnu-port-archive
-      - name: Verify and unpack the pinned compiler
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/xnu-port-archive"
-          echo '86caf9e70c3342d48ef19eb4f6c47b709f18c90ae86255520d5c29df6b482e23  v_linux.zip' | sha256sum -c -
-          unzip -q v_linux.zip -d "$RUNNER_TEMP/xnu-port-v"
-          chmod +x "$RUNNER_TEMP/xnu-port-v/v/v"
       - name: Install native and cross-build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential clang lld llvm
+      - name: Build the pinned kernel compiler
+        run: sh tools/m1-wifi/get-v.sh "$RUNNER_TEMP/xnu-kernel-v"
       - name: Fetch kernel dependencies
         run: cd kernel && ./get-deps
       - name: Build flag-off, bitmap-only and zone kernels (debug)
@@ -89,7 +85,7 @@ jobs:
           TARGET_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          V="$RUNNER_TEMP/xnu-port-v/v/v"
+          V="$RUNNER_TEMP/xnu-kernel-v/v"
           cd kernel
           for mode in plain bitmap zone; do
             # Heap flags are not part of the upstream make config stamp.
