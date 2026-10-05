@@ -19,13 +19,15 @@ if [ ! -d "$SOURCE_DIR/.git" ]; then
         https://github.com/tianocore/edk2.git "$SOURCE_DIR"
 fi
 
-if git -C "$SOURCE_DIR" apply --check "$PATCH" 2>/dev/null; then
-    git -C "$SOURCE_DIR" apply "$PATCH"
-elif grep -q '2048, // HorizontalResolution' \
-    "$SOURCE_DIR/OvmfPkg/QemuRamfbDxe/QemuRamfb.c"; then
+# EDK2 uses CRLF line endings; the patch in this repository uses LF. Ignore
+# that difference in context lines when checking and applying the patch.
+if git -C "$SOURCE_DIR" apply --ignore-space-change --check "$PATCH" 2>/dev/null; then
+    git -C "$SOURCE_DIR" apply --ignore-space-change "$PATCH"
+elif git -C "$SOURCE_DIR" apply --ignore-space-change --reverse --check "$PATCH" 2>/dev/null; then
     echo "==> The 2048x1536 ramfb patch is already applied."
 else
     echo "ERROR: cannot apply $PATCH to $SOURCE_DIR" >&2
+    git -C "$SOURCE_DIR" apply --ignore-space-change --check "$PATCH" >&2 || true
     exit 1
 fi
 
