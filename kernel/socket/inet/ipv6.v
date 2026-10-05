@@ -7,7 +7,8 @@ import lib
 import socket.public as sock_pub
 import usercopy
 
-#include "vinix_inet6.h"
+// The full socket header defines the V ABI before the endpoint declarations.
+#include "vinix_net.h"
 
 struct C.vinix_net_endpoint {
 mut:
