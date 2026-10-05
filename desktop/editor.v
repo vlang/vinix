@@ -278,7 +278,10 @@ fn (mut a TextEditorApp) open_document() {
 		a.set_status('editor.status.enter_path')
 		return
 	}
-	path := editor_bytes_text(a.path)
+	// Editable buffers may retain an older suffix after shortening. POSIX
+	// needs a NUL-terminated copy, rather than the frame's borrowed view.
+	path := editor_bytes_text(a.path).clone()
+	defer { unsafe { path.free() } }
 	info := desktop_stat(path) or {
 		a.set_file_status('editor.status.cannot_open')
 		return
@@ -319,7 +322,8 @@ fn (mut a TextEditorApp) save_document() {
 		a.set_status('editor.status.enter_path')
 		return
 	}
-	path := editor_bytes_text(a.path)
+	path := editor_bytes_text(a.path).clone()
+	defer { unsafe { path.free() } }
 	mut data := voidptr(unsafe { nil })
 	if a.text.len > 0 {
 		data = voidptr(a.text.data)

@@ -129,6 +129,29 @@ fn test_editor_history_tracks_saved_state_and_open_new_clear_old_history() {
 	assert !editor.modified
 }
 
+fn test_editor_shortened_path_opens_and_saves_only_the_displayed_file() {
+	root := os.join_path(os.temp_dir(), 'vinix-editor-short-path-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	short_path := join_path(root, 'note.txt')
+	long_path := '${short_path}.long'
+	defer { unsafe { short_path.free(); long_path.free() } }
+	os.write_file(long_path, 'long document')!
+	os.write_file(short_path, 'short document')!
+	mut editor := TextEditorApp{}
+	defer { editor.close_app() }
+	editor.set_path(long_path)
+	editor.open_document()
+	assert editor_bytes_text(editor.text) == 'long document'
+	editor.set_path(short_path)
+	editor.open_document()
+	assert editor_bytes_text(editor.text) == 'short document'
+	editor.key_input('!')
+	editor.save_document()
+	assert os.read_file(short_path)! == 'short document!'
+	assert os.read_file(long_path)! == 'long document'
+}
+
 fn test_editor_find_wraps_forward_backward_and_respects_utf8_boundaries() {
 	mut editor := TextEditorApp{}
 	editor.key_input('йй abc йй\nend')
