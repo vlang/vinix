@@ -439,6 +439,7 @@ obj/asm/aarch64/printf_abi.S.o: asm/aarch64/varargs.inc
 obj/asm/x86_64/printf_abi.S.o: asm/x86_64/varargs.inc
 obj/asm/aarch64/linuxkpi_varargs.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_varargs.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
+obj/asm/aarch64/linuxkpi_storage.S.o obj/asm/x86_64/linuxkpi_storage.S.o: $(V_CONFIG_STAMP)
 
 # Compile the unchanged upstream implementation header directly. Its C source
 # remains third-party; all first-party output policy and ABI bridges are V/asm.
