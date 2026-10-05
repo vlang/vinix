@@ -52,6 +52,14 @@ static int run_test(void) {
     close(p[1]); f.fd=p[0]; f.events=0;
     CHECK(poll(&f, 1, 0) == 1 && (f.revents & POLLHUP));
     close(p[0]);
+    int first[2], second[2]; CHECK(pipe(first)==0 && pipe(second)==0);
+    struct pollfd distinct[2]={{.fd=first[0],.events=POLLIN},{.fd=second[0],.events=POLLIN}};
+    child=fork();CHECK(child>=0);
+    if(child==0){usleep(50000);_exit(write(second[1],"y",1)==1?0:1);}
+    CHECK(poll(distinct,2,1000)==1);
+    CHECK(distinct[0].revents==0 && (distinct[1].revents&POLLIN));
+    CHECK(reap(child)==0);
+    close(first[0]);close(first[1]);close(second[0]);close(second[1]);
     int pipes[33][2]; struct pollfd many[33];
     for(int i=0;i<33;i++){ CHECK(pipe(pipes[i])==0); many[i]=(struct pollfd){.fd=pipes[i][0],.events=POLLIN}; }
     CHECK(poll(many,33,0)==0);
