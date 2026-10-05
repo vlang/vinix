@@ -26,15 +26,15 @@ fn C.vinix_vmx_write(field u64, value u64) int
 
 fn C.vinix_vmx_read(field u64, value &u64) int
 
-fn C.vinix_vmx_enter(registers &Registers) int
+fn C.vinix_vmx_enter(registers &C.vinix_vmx_registers) int
 
 fn C.vinix_vmx_fxsave(state voidptr)
 
 fn C.vinix_vmx_fxrstor(state voidptr)
 
-fn C.vinix_vmx_sgdt(descriptor &Descriptor)
+fn C.vinix_vmx_sgdt(descriptor &C.vinix_vmx_descriptor)
 
-fn C.vinix_vmx_sidt(descriptor &Descriptor)
+fn C.vinix_vmx_sidt(descriptor &C.vinix_vmx_descriptor)
 
 fn C.vinix_vmx_read_cs() u16
 
@@ -655,8 +655,8 @@ fn segment_base(gdt Descriptor, selector u16) u64 {
 fn write_host_state() bool {
 	mut gdtr := Descriptor{}
 	mut idtr := Descriptor{}
-	C.vinix_vmx_sgdt(&gdtr)
-	C.vinix_vmx_sidt(&idtr)
+	C.vinix_vmx_sgdt(unsafe { &C.vinix_vmx_descriptor(&gdtr) })
+	C.vinix_vmx_sidt(unsafe { &C.vinix_vmx_descriptor(&idtr) })
 	tr := C.vinix_vmx_read_tr()
 	mut ok := true
 	ok = ok && vmwrite(vmcs_host_cr0, cpu.read_cr0())
@@ -774,7 +774,7 @@ pub fn (mut vm Vm) run() ?VmExit {
 	C.vinix_vmx_fxrstor(guest_fpu)
 	fs_selector := cpu.fs_selector()
 	gs_selector := cpu.gs_selector()
-	entry_result := C.vinix_vmx_enter(&vm.registers)
+	entry_result := C.vinix_vmx_enter(unsafe { &C.vinix_vmx_registers(&vm.registers) })
 	// A VM exit sets the GDT limit to 0xffff and leaves no LDT: this CPU's
 	// own go back, the LDT's descriptor still in the GDT. Then the FS and GS
 	// selectors the thread had, which loaded a moment ago from the same
