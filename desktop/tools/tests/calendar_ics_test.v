@@ -33,6 +33,32 @@ fn calendar_ics_test_element(root ui2.Element, id string) ?ui2.Element {
 	return none
 }
 
+fn calendar_ics_assert_explanation(tree ui2.Element, id string, text string, width int, top int, row_height int, maximum_rows int) {
+	mut at := 0
+	mut rows := 0
+	for child in tree.children {
+		if child.id != id { continue }
+		for at < text.len && text[at] == ` ` { at++ }
+		assert child.kind == .label
+		assert child.text.len > 0 && calendar_ics_utf8(child.text)
+		// Actual rendered rows must borrow the original translation and consume
+		// every word in order, rather than only matching a wrapping helper.
+		assert usize(child.text.str) == usize(text.str) + usize(at)
+		assert at + child.text.len <= text.len
+		assert child.text == calendar_borrow(text, at, at + child.text.len)
+		mut characters := 0
+		for byte in child.text { if byte < 0x80 || byte >= 0xc0 { characters++ } }
+		assert characters <= width / 7
+		assert child.frame.y == f64(top + rows * row_height)
+		assert child.frame.height == f64(row_height)
+		at += child.text.len
+		rows++
+	}
+	for at < text.len && text[at] == ` ` { at++ }
+	assert at == text.len
+	assert rows > 1 && rows <= maximum_rows
+}
+
 fn test_calendar_ics_supported_dates_text_folding_and_property_order() {
 	text := 'begin:vcalendar\nversion:2.0\nprodid:Tests\nBEGIN:VEVENT\nSUMMARY:Café\\, Привет\\; \\世界\nUID:one\nDTSTART;VALUE=DATE:20240229\nDTEND;VALUE=DATE:20240301\nDTSTAMP:20260101T235959Z\nLOCATION:Room\\; A\\, B\nEND:VEVENT\nBEGIN:VEVENT\nUID:two\nDTSTAMP:20261005T120000Z\nSUMMARY:Local meeting\nDTSTART;VALUE=DATE-TIME:20261231T234500\nEND:VEVENT\nEND:VCALENDAR\n'
 	// A literal backslash must be escaped independently of the Unicode text.
@@ -366,6 +392,19 @@ fn test_calendar_ics_native_panel_keyboard_paste_resize_and_registered_home_alia
 	app.handle('calendar.ics.open')!
 	assert app.interchange
 	assert editor_bytes_text(app.ics_export_path) == calendar_ics_home(home) + '/Calendar-export.ics'
+	saved_language := desktop_language
+	defer { desktop_language = saved_language }
+	for language in [DesktopLanguage.en, .es, .ru]! {
+		desktop_language = language
+		for width in [400, 640]! {
+			begin_frame_elements()
+			tree := app.build(ui2.rect(0, 0, f64(width), 476))!
+			calendar_ics_assert_explanation(tree, 'calendar.ics.scope.row', tr('calendar.ics.scope'), width - 36, 48, 13, 4)
+			calendar_ics_assert_explanation(tree, 'calendar.ics.merge.row', tr('calendar.ics.merge'), width - 36, 310, 12, 5)
+			free_tree(tree)
+		}
+	}
+	desktop_language = saved_language
 	for size in [ui2.rect(0, 0, 640, 476), ui2.rect(0, 0, 820, 560), ui2.rect(0, 0, 360, 300)]! {
 		begin_frame_elements()
 		tree := app.build(size)!

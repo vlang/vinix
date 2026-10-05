@@ -71,23 +71,49 @@ fn (mut a CalendarApp) ics_key_input(input string) {
 	}
 }
 
+// The desktop label renderer draws one line. Each row borrows a UTF-8 span of
+// the translation, whose storage outlives the frame; no copied text is needed.
+fn calendar_ics_explanation(mut children []ui2.Element, id string, text string, width int, top int, row_height int, maximum_rows int) {
+	columns := if width / 7 > 0 { width / 7 } else { 1 }
+	mut at := 0
+	for row in 0 .. maximum_rows {
+		for at < text.len && text[at] == ` ` { at++ }
+		if at == text.len { break }
+		start := at
+		mut end := at
+		mut last_space := -1
+		mut count := 0
+		for end < text.len && count < columns {
+			if text[end] == ` ` { last_space = end }
+			length := editor_utf8_length(text[end])
+			end += if length > 0 { length } else { 1 }
+			count++
+		}
+		if end < text.len && text[end] != ` ` && last_space > start { end = last_space }
+		// Preserve the remaining text even in a window below the usable size.
+		if row + 1 == maximum_rows { end = text.len }
+		children << ui2.label(id, calendar_borrow(text, start, end), ui2.rect(18, f64(top + row * row_height), f64(width), f64(row_height)), ui2.TextStyle{ size: 11, color: body_muted })
+		at = end
+	}
+}
+
 fn (mut a CalendarApp) build_interchange(size ui2.Rect) ui2.Element {
-	mut children := frame_elements(16)
+	mut children := frame_elements(24)
 	w := int(size.width)
 	children << ui2.label('', tr('calendar.ics.title'), ui2.rect(18, 12, f64(w - 180), 28), ui2.TextStyle{ size: 18, bold: true, color: body_heading })
 	children << calendar_event_button('calendar.ics.back', tr('calendar.ics.back'), w - 136, 12, 118, false)
 	if size.width < 400 || size.height < 430 {
-		children << ui2.label('', tr('calendar.ics.scope'), ui2.rect(18, 54, f64(w - 36), 140), ui2.TextStyle{ size: 12, color: body_muted, lines: 6 })
+		calendar_ics_explanation(mut children, 'calendar.ics.scope.row', tr('calendar.ics.scope'), w - 36, 54, 13, 10)
 		return ui2.screen(app_surface, children)
 	}
-	children << ui2.label('', tr('calendar.ics.scope'), ui2.rect(18, 48, f64(w - 36), 54), ui2.TextStyle{ size: 11, color: body_muted, lines: 3 })
+	calendar_ics_explanation(mut children, 'calendar.ics.scope.row', tr('calendar.ics.scope'), w - 36, 48, 13, 4)
 	children << ui2.label('', tr('calendar.ics.import_path'), ui2.rect(18, 110, f64(w - 36), 18), ui2.TextStyle{ size: 11, color: body_muted })
 	children << console_field('calendar.ics.import_path', editor_bytes_text(a.ics_import_path), 18, 132, w - 36, a.ics_focus == 0)
 	children << calendar_event_button('calendar.ics.import', tr('calendar.ics.import'), 18, 168, 154, false)
 	children << ui2.label('', tr('calendar.ics.export_path'), ui2.rect(18, 208, f64(w - 36), 18), ui2.TextStyle{ size: 11, color: body_muted })
 	children << console_field('calendar.ics.export_path', editor_bytes_text(a.ics_export_path), 18, 230, w - 36, a.ics_focus == 1)
 	children << calendar_event_button('calendar.ics.export', tr('calendar.ics.export'), 18, 266, 154, false)
-	children << ui2.label('', tr('calendar.ics.merge'), ui2.rect(18, 310, f64(w - 36), 60), ui2.TextStyle{ size: 11, color: body_muted, lines: 3 })
+	calendar_ics_explanation(mut children, 'calendar.ics.merge.row', tr('calendar.ics.merge'), w - 36, 310, 12, 5)
 	children << ui2.label('', tr(a.ics_status), ui2.rect(18, 382, f64(w - 36), 42), ui2.TextStyle{ size: 11, color: body_text, lines: 2 })
 	return ui2.screen(app_surface, children)
 }

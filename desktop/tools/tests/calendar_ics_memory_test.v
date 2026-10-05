@@ -71,9 +71,11 @@ fn test_calendar_ics_complete_init_panel_keyboard_resize_and_close_free_all_owne
 	alias := home + '-alias'
 	os.symlink(home, alias)!
 	defer { os.rm(alias) or {} os.rmdir_all(home) or {} unsafe { home.free() alias.free() } }
+	saved_language := desktop_language
+	defer { desktop_language = saved_language }
 	mut warm := calendar_ics_memory_app(alias)
 	warm.open_interchange()
-	for size in [ui2.rect(0, 0, 640, 476), ui2.rect(0, 0, 360, 300), ui2.rect(0, 0, 820, 560)]! {
+	for size in [ui2.rect(0, 0, 400, 476), ui2.rect(0, 0, 640, 476), ui2.rect(0, 0, 360, 300), ui2.rect(0, 0, 820, 560)]! {
 		begin_frame_elements()
 		free_tree(warm.build(size)!)
 	}
@@ -87,9 +89,12 @@ fn test_calendar_ics_complete_init_panel_keyboard_resize_and_close_free_all_owne
 		app.key_input('\x7f\xd0')
 		app.key_input('\x96\t\x01')
 		app.paste_input('/tmp/Привет\r\n\t')
-		for size in [ui2.rect(0, 0, 640, 476), ui2.rect(0, 0, 360, 300), ui2.rect(0, 0, 820, 560)]! {
-			begin_frame_elements()
-			free_tree(app.build(size)!)
+		for language in [DesktopLanguage.en, .es, .ru]! {
+			desktop_language = language
+			for size in [ui2.rect(0, 0, 400, 476), ui2.rect(0, 0, 640, 476), ui2.rect(0, 0, 360, 300), ui2.rect(0, 0, 820, 560)]! {
+				begin_frame_elements()
+				free_tree(app.build(size)!)
+			}
 		}
 		app.close_app()
 	}
