@@ -311,10 +311,15 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
     stage_vulkan_query(args.gldriverquery, root)
     verify_sdk_closure(root)
     runtime = root / "usr/libexec/vinix-dota2/root"
+    generated_probe = work / "mmap32-probe-v.c"
+    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
+                    "mmap-probe", str(generated_probe), "--bare"], check=True)
     subprocess.run(["clang", "--target=x86_64-linux-gnu", "-fPIE", "-pie",
-                    "-fno-stack-protector", "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                    "-ffreestanding", "-fno-stack-protector", "-nostdlib", "-fuse-ld=lld",
+                    "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-label",
+                    "-Wno-unused-parameter", "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "tests/dota2"),
                     "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2", "-Wl,-e,_start",
-                    str(REPO / "tests/dota2/mmap32-probe.c"),
+                    str(generated_probe), str(REPO / "tests/dota2/mmap-probe-start.S"),
                     str(runtime / "lib/x86_64-linux-gnu/libc.so.6"),
                     "-o", str(root / "usr/libexec/vinix-dota2/mmap32-probe")], check=True)
     game_environment = {

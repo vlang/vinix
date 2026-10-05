@@ -19,10 +19,14 @@ GLIBC_MARKER = ".vinix-dota2-glibc-package.json"
 GLIBC_ALIAS_POLICY = "bookworm-lib-to-usrmerged-libc-relative-v1"
 GLIBC_LIBRARIES = ("ld-linux-x86-64.so.2", "libc.so.6", "libm.so.6",
                    "libresolv.so.2", "libpthread.so.0", "libdl.so.2")
-MMAP32_SOURCE = REPO / "build-support/dota2/mmap32.c"
+MMAP32_SOURCE = REPO / "build-support/dota2/mmapcore/core.v"
 MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
 MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
-                  "-nostdlib", "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                  "-nostdlib", "-ffreestanding", "-O2", "-fvisibility=hidden",
+                  "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
+                  "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                  "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "build-support/dota2"),
+                  "-Wl,--version-script=" + str(REPO / "build-support/dota2/mmap32.exports"),
                   "-Wl,-soname,libvinix-dota2-mmap32.so"]
 EARLY_CLIENT_SOURCE = REPO / "build-support/dota2/earlycore/core.v"
 EARLY_CLIENT_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
@@ -57,8 +61,9 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def early_client_inputs() -> dict:
-    paths = [EARLY_CLIENT_SOURCE, REPO / "build-support/dota2/early-client-abi.h",
+def compatibility_inputs(module: str, header: str, extra=()) -> dict:
+    paths = [*sorted((REPO / "build-support/dota2" / module).glob("*.v")),
+             REPO / "build-support/dota2" / header, *extra,
              REPO / "build-support/dota2/compile-v-compat.py",
              REPO / "build-support/compile-v-module.py", REPO / "build-support/find-v.sh"]
     inputs = {str(path.relative_to(REPO)): file_sha256(path) for path in paths}
@@ -66,6 +71,23 @@ def early_client_inputs() -> dict:
         "sh", "-c", '. "$1/build-support/find-v.sh"; "$V" -version',
         "find-v", str(REPO)], text=True).strip()
     return inputs
+
+
+def early_client_inputs() -> dict:
+    return compatibility_inputs("earlycore", "early-client-abi.h")
+
+
+def mmap32_inputs() -> dict:
+    return compatibility_inputs("mmapcore", "mmap32-abi.h",
+                                [REPO / "build-support/dota2/mmap32.exports"])
+
+
+def build_mmap32(destination: Path, artifacts: Path) -> None:
+    artifacts.mkdir(parents=True, exist_ok=True)
+    generated = artifacts / "mmap32-v.c"
+    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
+                    "mmap32", str(generated), "--bare"], check=True)
+    subprocess.run([*MMAP32_COMPILE, str(generated), "-o", str(destination)], check=True)
 
 
 def build_early_client(destination: Path, artifacts: Path) -> None:
@@ -337,6 +359,7 @@ def main() -> None:
               "i386": (steam / "i386-packages").read_text(),
               "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
               "mmap32_compile": MMAP32_COMPILE,
+              "mmap32_v_inputs": mmap32_inputs(),
               "early_client_source": hashlib.sha256(EARLY_CLIENT_SOURCE.read_bytes()).hexdigest(),
               "early_client_v_inputs": early_client_inputs(),
               "early_client_compile": EARLY_CLIENT_COMPILE}
@@ -375,8 +398,7 @@ def main() -> None:
         stage_glibc_package(resolver, glibc_pin, cache, pending)
     # Resolve libc symbols only inside the translated process. No native
     # headers, startup files, or x86 development packages are required.
-    subprocess.run([*MMAP32_COMPILE, str(MMAP32_SOURCE), "-o", str(pending / MMAP32_LIBRARY)],
-                   check=True)
+    build_mmap32(pending / MMAP32_LIBRARY, build / "native-v")
     build_early_client(pending / EARLY_CLIENT_LIBRARY, build / "native-v")
     public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
     if not public_certificates:

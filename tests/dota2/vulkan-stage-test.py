@@ -97,7 +97,7 @@ class StageTests(unittest.TestCase):
                 return stage.subprocess.CompletedProcess(command, 0, stdout="fixture V compiler\n")
             if command[0] == sys.executable:
                 self.assertEqual(command[1], str(REPO / "build-support/dota2/compile-v-compat.py"))
-                self.assertEqual(command[2], "early")
+                self.assertIn(command[2], ("early", "mmap32"))
                 self.assertEqual(command[4:], ["--bare"])
                 self.write(Path(command[3]), b"generated V artifact")
                 return stage.subprocess.CompletedProcess(command, 0)
@@ -208,6 +208,22 @@ class StageTests(unittest.TestCase):
             original_digest = stage.file_sha256
             def changed_input(path):
                 return "b" * 64 if path == REPO / relative else original_digest(path)
+            with patch.object(stage, "file_sha256", side_effect=changed_input), \
+                    patch.object(stage, "clone_tree", wraps=stage.clone_tree) as clone:
+                self.run_stage()
+                clone.assert_called_once()
+                self.assertNotEqual(stamp.read_text(), old)
+            self.run_stage()
+            self.assertEqual(stamp.read_text(), old)
+
+    def test_mmap_v_abi_and_export_policy_invalidate_cache(self):
+        self.run_stage()
+        stamp = self.root / ".vinix-dota2-vulkan-generation"
+        for relative in ("build-support/dota2/mmap32-abi.h", "build-support/dota2/mmap32.exports"):
+            old = stamp.read_text()
+            original_digest = stage.file_sha256
+            def changed_input(path):
+                return "c" * 64 if path == REPO / relative else original_digest(path)
             with patch.object(stage, "file_sha256", side_effect=changed_input), \
                     patch.object(stage, "clone_tree", wraps=stage.clone_tree) as clone:
                 self.run_stage()

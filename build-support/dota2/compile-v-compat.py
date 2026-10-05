@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("module", choices=("early",))
+    parser.add_argument("module", choices=("early", "mmap32", "mmap-probe"))
     parser.add_argument("output", type=Path)
     parser.add_argument("--arch", choices=("amd64", "arm64"), default="amd64")
     parser.add_argument("--bare", action="store_true", help="Headerless Linux LP64 cross-build scaffold")
@@ -16,8 +16,10 @@ if __name__ == "__main__":
     spec = importlib.util.spec_from_file_location("compile_v_module", ROOT / "build-support/compile-v-module.py")
     compiler = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(compiler)
-    module = "earlycore"
-    compiler.generate(ROOT / "build-support/dota2" / module, args.output.resolve(), args.arch, ["nofloat"])
+    source = {"early": ROOT / "build-support/dota2/earlycore",
+              "mmap32": ROOT / "build-support/dota2/mmapcore",
+              "mmap-probe": ROOT / "tests/dota2/mmapprobe"}[args.module]
+    compiler.generate(source, args.output.resolve(), args.arch, ["nofloat"])
     if args.bare:
         # These modules use no printf integer macros. V3 nevertheless inserts
         # inttypes.h, whose system include_next is unavailable in a headerless
