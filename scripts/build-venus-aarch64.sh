@@ -95,7 +95,10 @@ for library in source.glob('*.so*'):
     else: shutil.copy2(library, target)
 PYLIB
 mkdir -p "$build/staging/opt/venus/bin"
-"$cc" -O2 -static -I"$source/include/drm-uapi" "$assets/available.c" \
+python3 "$repo/build-support/compile-v-module.py" "$assets/availablecore" \
+    "$build/available.c" --arch arm64
+"$cc" -O2 -static -Wall -Wextra -Werror -Wno-unused-function \
+    -Wno-unused-label -Wno-unused-parameter -I"$source/include/drm-uapi" "$build/available.c" \
     -o "$build/staging/opt/venus/bin/venus-available"
 "$cc" -O2 -static -I"$source/include/drm-uapi" "$repo/tests/virtio-gpu-venus/abi.c" \
     -o "$build/staging/opt/venus/bin/venus-abi"
