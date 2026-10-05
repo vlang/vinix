@@ -1003,7 +1003,7 @@ Build Mesa in the Debian ARM64 VM (install `clang`, `lld`, `meson`, `ninja`,
 
 Copy `build-aarch64-asahi/staging` back to the same path in the macOS checkout,
 then build the full ARM64 userland and kernel. The userland build needs the
-Homebrew LLVM tools (`brew install llvm`):
+Homebrew LLVM tools and linker (`brew install llvm lld`):
 
 ```sh
 ./scripts/build-userland-aarch64.sh

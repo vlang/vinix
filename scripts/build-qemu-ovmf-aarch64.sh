@@ -36,11 +36,43 @@ else
     exit 1
 fi
 
-if [ -d /opt/homebrew/opt/llvm/bin ]; then
-    export CLANGDWARF_BIN=/opt/homebrew/opt/llvm/bin/
-elif ! command -v clang >/dev/null || ! command -v llvm-ar >/dev/null; then
-    echo "ERROR: LLVM is required (on macOS: brew install llvm)." >&2
-    exit 1
+# Respect an explicit toolchain, otherwise use Homebrew's keg-only LLVM when
+# available. Query its prefix instead of assuming LLVM's installation path.
+if [ -z "${CLANGDWARF_BIN:-}" ] && command -v brew >/dev/null; then
+    LLVM_PREFIX=$(brew --prefix llvm 2>/dev/null || true)
+    if [ -n "$LLVM_PREFIX" ] && [ -x "$LLVM_PREFIX/bin/clang" ]; then
+        CLANGDWARF_BIN="$LLVM_PREFIX/bin/"
+    fi
+fi
+if [ -n "${CLANGDWARF_BIN:-}" ]; then
+    export CLANGDWARF_BIN="${CLANGDWARF_BIN%/}/"
+fi
+for tool in clang llvm-ar llvm-objcopy; do
+    if ! command -v "${CLANGDWARF_BIN:-}$tool" >/dev/null; then
+        echo "ERROR: EDK2 requires ${CLANGDWARF_BIN:-}$tool (on macOS: brew install llvm lld)." >&2
+        exit 1
+    fi
+done
+
+# RELEASE_CLANGDWARF links AArch64 ELF with -fuse-ld=lld. Homebrew ships
+# LLD separately from LLVM; it may also be installed without being on PATH.
+CLANG_DIR=$(dirname "$(command -v "${CLANGDWARF_BIN:-}clang")")
+if [ -x "$CLANG_DIR/ld.lld" ]; then
+    # Clang resolves symlinks before searching beside itself, so expose this
+    # directory on PATH too when the selected clang is a symlink.
+    export PATH="$CLANG_DIR:$PATH"
+elif ! command -v ld.lld >/dev/null; then
+    LLD_PREFIX=""
+    if command -v brew >/dev/null; then
+        LLD_PREFIX=$(brew --prefix lld 2>/dev/null || true)
+    fi
+    if [ -n "$LLD_PREFIX" ] && [ -x "$LLD_PREFIX/bin/ld.lld" ]; then
+        export PATH="$LLD_PREFIX/bin:$PATH"
+    else
+        echo "ERROR: EDK2 requires the LLVM linker ld.lld (on macOS: brew install llvm lld)." >&2
+        echo "Put ld.lld on PATH, or install it beside the selected clang." >&2
+        exit 1
+    fi
 fi
 
 echo "==> Building edk2 BaseTools..."

@@ -62,22 +62,24 @@ class FirmwarePatchTests(unittest.TestCase):
             ["git", "init", "-q", str(self.source)], check=True, capture_output=True
         )
 
-        commands = self.checkout / "test-bin"
-        commands.mkdir()
+        self.commands = self.checkout / "test-bin"
+        self.commands.mkdir()
         for name, body in {
             "make": f"echo 'test: reached BaseTools build'\nexit {BUILD_SENTINEL}\n",
             "clang": "exit 0\n",
             "llvm-ar": "exit 0\n",
+            "llvm-objcopy": "exit 0\n",
+            "ld.lld": "exit 0\n",
+            "brew": "exit 1\n",
             "sysctl": "echo 2\n",
             "nproc": "echo 2\n",
         }.items():
-            executable = commands / name
-            executable.write_text("#!/bin/sh\n" + body)
-            executable.chmod(0o755)
+            self.write_command(self.commands / name, body)
 
         self.environment = os.environ.copy()
         self.environment.update(
-            PATH=str(commands) + os.pathsep + os.environ.get("PATH", ""),
+            PATH=str(self.commands) + os.pathsep + os.environ.get("PATH", ""),
+            CLANGDWARF_BIN=str(self.commands) + "/",
             VINIX_EDK2_SOURCE=str(self.source),
             GIT_CONFIG_GLOBAL=os.devnull,
             GIT_CONFIG_NOSYSTEM="1",
@@ -87,6 +89,18 @@ class FirmwarePatchTests(unittest.TestCase):
             GIT_COMMITTER_EMAIL="firmware-test@example.invalid",
             LC_ALL="C",
         )
+
+    def write_command(self, path, body):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("#!/bin/sh\n" + body)
+        path.chmod(0o755)
+
+    def isolate_path(self):
+        # Keep the builder's shell and Git helpers, without letting a host
+        # LLVM/LLD installation conceal a missing dependency in the fixture.
+        for name in ("bash", "git", "dirname", "basename", "uname", "sed"):
+            (self.commands / name).symlink_to(shutil.which(name))
+        self.environment["PATH"] = str(self.commands)
 
     def git(self, repository, *arguments):
         return subprocess.run(
@@ -185,6 +199,99 @@ class FirmwarePatchTests(unittest.TestCase):
             "PYTHON_COMMAND", "WORKSPACE", "EDK_TOOLS_PATH", "PACKAGES_PATH", "CONF_PATH"
         ):
             self.environment.pop(name, None)
+
+    def prepare_toolchain_build(self):
+        self.prepare_setup(f"""
+build() {{
+    echo "test: compiler ${{CLANGDWARF_BIN}}clang"
+    echo "test: linker $(command -v ld.lld)"
+    return {BUILD_SENTINEL}
+}}
+""")
+
+    def assert_toolchain_build(self, result, compiler, linker):
+        self.assertEqual(
+            result.returncode, BUILD_SENTINEL, result.stdout + result.stderr
+        )
+        self.assertIn(f"test: compiler {compiler}", result.stdout)
+        self.assertIn(f"test: linker {linker}", result.stdout)
+
+    def test_explicit_toolchain_takes_precedence_and_normalizes_prefix(self):
+        self.prepare_toolchain_build()
+        self.isolate_path()
+        compiler_bin = self.checkout / "explicit-llvm/bin"
+        for name in ("clang", "llvm-ar", "llvm-objcopy", "ld.lld"):
+            (self.commands / name).unlink()
+            self.write_command(compiler_bin / name, "exit 0\n")
+        self.write_command(self.commands / "brew", "echo /unavailable/homebrew\n")
+        for suffix in ("", "/"):
+            with self.subTest(suffix=suffix):
+                self.environment["CLANGDWARF_BIN"] = str(compiler_bin) + suffix
+                self.assert_toolchain_build(
+                    self.run_builder(), compiler_bin / "clang",
+                    compiler_bin / "ld.lld"
+                )
+
+    def test_missing_llvm_tools_stop_before_basetools(self):
+        self.driver.write_bytes(UPSTREAM)
+        self.isolate_path()
+        for name in ("clang", "llvm-ar", "llvm-objcopy"):
+            with self.subTest(tool=name):
+                executable = self.commands / name
+                executable.unlink()
+                try:
+                    result = self.run_builder()
+                    self.assertEqual(
+                        result.returncode, 1, result.stdout + result.stderr
+                    )
+                    self.assertIn(name, result.stderr)
+                    self.assertIn("brew install llvm lld", result.stderr)
+                    self.assertNotIn("Building edk2 BaseTools", result.stdout)
+                finally:
+                    self.write_command(executable, "exit 0\n")
+
+    def test_missing_lld_reports_install_command_before_basetools(self):
+        self.driver.write_bytes(UPSTREAM)
+        self.isolate_path()
+        (self.commands / "ld.lld").unlink()
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("ld.lld", result.stderr)
+        self.assertIn("brew install llvm lld", result.stderr)
+        self.assertNotIn("Building edk2 BaseTools", result.stdout)
+
+    def test_separate_lld_on_path_is_available_to_build(self):
+        self.prepare_toolchain_build()
+        self.isolate_path()
+        (self.commands / "ld.lld").unlink()
+        linker_bin = self.checkout / "linker-bin"
+        self.write_command(linker_bin / "ld.lld", "exit 0\n")
+        self.environment["PATH"] += os.pathsep + str(linker_bin)
+        self.assert_toolchain_build(
+            self.run_builder(), self.commands / "clang", linker_bin / "ld.lld"
+        )
+
+    def test_homebrew_discovers_llvm_and_separate_keg_only_lld(self):
+        self.prepare_toolchain_build()
+        self.isolate_path()
+        self.environment.pop("CLANGDWARF_BIN")
+        llvm_prefix = self.checkout / "homebrew/opt/llvm"
+        lld_prefix = self.checkout / "homebrew/opt/lld"
+        for name in ("clang", "llvm-ar", "llvm-objcopy"):
+            (self.commands / name).unlink()
+            self.write_command(llvm_prefix / "bin" / name, "exit 0\n")
+        (self.commands / "ld.lld").unlink()
+        self.write_command(lld_prefix / "bin/ld.lld", "exit 0\n")
+        self.write_command(self.commands / "brew", f"""
+case "$*" in
+    '--prefix llvm') echo '{llvm_prefix}' ;;
+    '--prefix lld') echo '{lld_prefix}' ;;
+    *) exit 1 ;;
+esac
+""")
+        self.assert_toolchain_build(
+            self.run_builder(), llvm_prefix / "bin/clang", lld_prefix / "bin/ld.lld"
+        )
 
     def test_fresh_and_already_patched_checkouts(self):
         for newline in (b"\n", b"\r\n"):
