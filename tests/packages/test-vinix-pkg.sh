@@ -583,4 +583,49 @@ if run_pkg list | grep -qx voffice; then
 	exit 1
 fi
 
+# A root with no room left is not a mirror failure: the install says so once
+# and stops, rather than downloading everything again ten times over.
+full_marker="$work/install-failed-full"
+if VINIX_TEST_INSTALL_RETRY_MARKER="$full_marker" VINIX_PKG_MIN_FREE_KB=999999999999 \
+	VINIX_PKG_NETWORK_RETRY_DELAY=0 run_pkg install gnumeric \
+	>"$work/install-full.log" 2>&1; then
+	echo "ERROR: an install onto a full root reported success" >&2
+	exit 1
+fi
+grep -q "pkg: no space left on $root: " "$work/install-full.log"
+if grep -q 'refreshing downloads' "$work/install-full.log"; then
+	echo "ERROR: an install onto a full root was retried" >&2
+	cat "$work/install-full.log" >&2
+	exit 1
+fi
+unset VINIX_TEST_INSTALL_RETRY_MARKER
+
+# The same when it is the index refresh or the download that fails for lack
+# of room, which apk reports as it would a network error.
+for failing in VINIX_TEST_FAIL_UPDATE_ONCE:update VINIX_TEST_FAIL_FETCH_ONCE:install; do
+	variable=${failing%%:*}
+	command=${failing##*:}
+	full_log="$work/full-$command.log"
+	status=0
+	(
+		export "$variable=$work/full-$command-marker"
+		export VINIX_PKG_MIN_FREE_KB=999999999999 VINIX_PKG_NETWORK_RETRY_DELAY=0
+		if [ "$command" = update ]; then
+			run_pkg update
+		else
+			run_pkg install gnumeric
+		fi
+	) >"$full_log" 2>&1 || status=$?
+	if [ "$status" -eq 0 ]; then
+		echo "ERROR: pkg $command with no room on the root reported success" >&2
+		exit 1
+	fi
+	test "$(grep -c "pkg: no space left on $root: " "$full_log")" = 1
+	if grep -q 'retrying\|refreshing downloads' "$full_log"; then
+		echo "ERROR: pkg $command with no room on the root was retried" >&2
+		cat "$full_log" >&2
+		exit 1
+	fi
+done
+
 echo "VINIX PACKAGE COMMAND TEST: PASS"

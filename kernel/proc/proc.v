@@ -391,6 +391,9 @@ pub mut:
 	// Pages faulted in since memory.max was last checked for this process.
 	faults_since_memory_check u32
 	oom_score_adj   int
+	// Killed for the memory it held, and not to be chosen for that again;
+	// see userland/oom.v.
+	oom_killed bool
 	// The file the process is running. /proc/<pid>/exe leads here when
 	// followed, which is what makes an exec from a memfd resolvable.
 	exe_node voidptr

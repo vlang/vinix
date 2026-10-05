@@ -255,6 +255,14 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 				C.vinix_linuxkpi_workqueue_task_resume(voidptr(&next_thread.linuxkpi_task[0]))
 			}
 		}
+		// From here GS finds this CPU rather than the thread, as it does on an
+		// idle one: gs:[0] has to go on naming the CPU until the next thread
+		// is in place. A lock taken on the way there answers a TLB shootdown
+		// while it spins, and asks GS which CPU it is on. Left on the thread,
+		// it read the -1 stored below and stopped the kernel on an index out
+		// of range, or, once another CPU had taken the thread up, answered
+		// for that CPU instead of this one.
+		cpu.set_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &current_thread.running_on, u64(-1))
 		// Capture the destination before releasing the thread: another CPU can
 		// take it immediately after the unlock. An earlier affinity IPI may have
@@ -285,6 +293,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		kernel_pagemap.switch_to()
 		memory.note_active_pagemap(cpu_local.cpu_number, u64(kernel_pagemap.top_level))
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
+		cpu_local.tss.rsp0 = cpu_local.idle_int_stack
 		// No LDT for an idle CPU, so that one being freed is not held up
 		// waiting for this CPU to run something.
 		load_process_ldt(mut cpu_local, unsafe { nil })
@@ -329,10 +338,12 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// kernel stack, the one its syscalls use, rather than one shared by every
 	// thread on this CPU. Their handlers can then enable interrupts, be
 	// preempted and block, as syscalls do, without a thread switched in
-	// meanwhile starting its own entry on top of their live frames. Kernel
-	// threads have no kernel_stack and never enter from user mode.
-	if current_thread.kernel_stack != 0 {
-		cpu_local.tss.rsp0 = current_thread.kernel_stack
+	// meanwhile starting its own entry on top of their live frames. Restore
+	// the persistent CPU stack for contexts without a thread entry stack.
+	cpu_local.tss.rsp0 = if current_thread.kernel_stack != 0 {
+		current_thread.kernel_stack
+	} else {
+		cpu_local.idle_int_stack
 	}
 	reap_dead_threads(mut cpu_local)
 
@@ -869,7 +880,7 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr, arg voidptr)
 @[noreturn]
 pub fn enter_idle() {
 	asm volatile amd64 { cli }
-	top := cpulocal.current().tss.rsp0
+	top := cpulocal.current().idle_int_stack
 	C.vinix_enter_idle(top, voidptr(await), unsafe { nil })
 	for {}
 }

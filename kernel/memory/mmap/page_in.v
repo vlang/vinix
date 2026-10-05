@@ -62,8 +62,43 @@ fn resolve_missing_page(_pagemap &memory.Pagemap, address u64) bool {
 		return false
 	}
 	mut pagemap := unsafe { _pagemap }
-	page_in(mut pagemap, address, true) or { return false }
+	for {
+		exhausted := memory.exhaustions()
+		page_in(mut pagemap, address, true) or {
+			if out_of_memory_since(exhausted, false) {
+				continue
+			}
+			return false
+		}
+		break
+	}
 	return true
+}
+
+// Whether what just failed did so for lack of memory -- memory.exhaustions()
+// has moved on from `exhausted`, sampled before it -- and is worth trying
+// again, a process having been killed for the memory (userland/oom.v). False
+// when the calling process is the one killed. For a caller in a syscall; a
+// fault taken in userspace is its handler's to retry. `sleepable` is as for
+// memory.recover_from_exhaustion(): mmap() filling its own pages holds
+// nothing, and the kernel copying for some other syscall cannot tell.
+fn out_of_memory_since(exhausted u64, sleepable bool) bool {
+	return memory.exhaustions() != exhausted && memory.recover_from_exhaustion(sleepable)
+}
+
+// resolve_cow_fault() for the kernel writing to a process' page on its
+// behalf: a copy there is no memory for is waited for, as above.
+fn resolve_cow_waiting(pagemap &memory.Pagemap, address u64) bool {
+	for {
+		exhausted := memory.exhaustions()
+		if resolve_cow_fault(pagemap, address) {
+			return true
+		}
+		if !out_of_memory_since(exhausted, false) {
+			break
+		}
+	}
+	return false
 }
 
 fn register_page_in_resolver() {

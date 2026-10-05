@@ -68,6 +68,7 @@ X86_TRANSLATION_STAGING="${VINIX_X86_TRANSLATION_STAGING:-$SCRIPT_DIR/build-aarc
 STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
+IOS_STAGING="${VINIX_IOS_STAGING:-$SCRIPT_DIR/build/ios/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -577,6 +578,8 @@ if [ ! -x "$X11_STAGING/usr/bin/vinix-xinput" ] ||
     echo "Run ./build-x11-aarch64.sh first." >&2
     exit 1
 fi
+sh "$SCRIPT_DIR/build-support/xorg-server/build-wine-host.sh" aarch64 \
+    "$X11_STAGING" "$SYSROOT"
 if [ ! -x "$NETWORK_TOOLS_STAGING/usr/bin/pkg" ] ||
    [ ! -x "$NETWORK_TOOLS_STAGING/sbin/apk" ] ||
    [ ! -s "$NETWORK_TOOLS_STAGING/etc/vinix-pkg/base-world" ]; then
@@ -1221,6 +1224,17 @@ fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp" \
     "$STAGING/run"
+# The iOS compatibility layer is staged by ./build-ios-aarch64.sh.
+if [ -x "$IOS_STAGING/usr/bin/run-ios" ]; then
+    install -m755 "$IOS_STAGING/usr/bin/run-ios" "$STAGING/usr/bin/run-ios"
+    ln -sf run-ios "$STAGING/usr/bin/vinix-ios-calculator"
+    mkdir -p "$STAGING/usr/share/vinix/ios"
+    cp -R "$IOS_STAGING/usr/share/vinix/ios/Calculator.app" "$STAGING/usr/share/vinix/ios/"
+    if [ -f "$IOS_STAGING/usr/share/vinix/ios/NumberTileGame.app/NumberTileGame" ]; then
+        cp -R "$IOS_STAGING/usr/share/vinix/ios/NumberTileGame.app" "$STAGING/usr/share/vinix/ios/"
+        ln -sf run-ios "$STAGING/usr/bin/vinix-ios-2048"
+    fi
+fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
 # files at the root of the image.
@@ -1250,6 +1264,7 @@ done
 # source.
 # Refresh security utilities even with cached staging or a compact root.
 python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
 for minecraft_support in \
@@ -1262,6 +1277,23 @@ install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"
+# Xvfb-glx needs the X11 layer's legacy GLX Mesa, while OBS creates its video
+# context through that layer's EGL Mesa on the same display. The full desktop
+# also carries native Mesa. Keep the X11 clients on the tested software stack.
+# install follows staging symlinks for Vinix's O_NOFOLLOW loader.
+x11_gl_runtime="$STAGING/usr/lib/vinix-x11-software"
+rm -rf "$x11_gl_runtime"
+if [ "$WITH_ASAHI_GPU" -eq 0 ] &&
+   [ -f "$X11_STAGING/usr/lib/libGL.so.1" ] &&
+   [ -f "$X11_STAGING/usr/lib/libglapi.so.0" ] &&
+   [ -f "$X11_STAGING/usr/lib/libEGL.so.1" ] &&
+   [ -f "$X11_STAGING/usr/lib/libgbm.so.1" ]; then
+    mkdir -p "$x11_gl_runtime/egl"
+    install -m755 "$X11_STAGING/usr/lib/libGL.so.1" "$x11_gl_runtime/libGL.so.1"
+    install -m755 "$X11_STAGING/usr/lib/libglapi.so.0" "$x11_gl_runtime/libglapi.so.0"
+    install -m755 "$X11_STAGING/usr/lib/libEGL.so.1" "$x11_gl_runtime/egl/libEGL.so.1"
+    install -m755 "$X11_STAGING/usr/lib/libgbm.so.1" "$x11_gl_runtime/egl/libgbm.so.1"
+fi
 install -m755 "$SCRIPT_DIR/build-support/firefox/run-firefox" "$STAGING/usr/bin/run-firefox"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" "$STAGING/usr/bin/run-gimp"
 install -m755 "$SCRIPT_DIR/build-support/obs/run-obs" "$STAGING/usr/bin/run-obs"
@@ -1516,7 +1548,7 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-disk-usage \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice vinix-minecraft vinix-doom vinix-wine-calculator vinix-wine-notepad \
-    vinix-wine-word2013 vinix-blender vinix-capture vinix-qemu-window vinix-steam; do
+    vinix-wine-word2013 vinix-blender vinix-capture vinix-obs vinix-qemu-window vinix-steam; do
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 
@@ -1623,6 +1655,8 @@ CONTENT_KEY_INPUTS=(
     "$BUILD_DIR/wallpapers"
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/security-tools"
+    "$SCRIPT_DIR/build-support/stage-uname.sh"
+    "$SCRIPT_DIR/build-support/uname"
     "$SCRIPT_DIR/build-support/security-audit"
     "$SCRIPT_DIR/tools/security-audit"
     "$SCRIPT_DIR/tools/security-mac"
@@ -1632,6 +1666,8 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/musl/alpine"
     "$SCRIPT_DIR/build-support/musl/alpine-1.2.6"
     "$STAGING/usr/share/vinix/musl-build.json"
+    "$STAGING/usr/bin/run-ios"
+    "$STAGING/usr/share/vinix/ios"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

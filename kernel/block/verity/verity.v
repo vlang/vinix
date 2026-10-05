@@ -13,21 +13,6 @@ import memory
 import resource
 import stat
 
-#include <verity.h>
-
-struct C.vinix_verity {
-mut:
-	data_blocks u64
-	total_blocks u64
-	level_start [8]u64
-	levels u32
-	root_hash [32]u8
-}
-
-fn C.vinix_verity_parse(cmdline &char, geometry &C.vinix_verity, device &char, capacity usize) int
-fn C.vinix_verity_check(geometry &C.vinix_verity, block u64, data voidptr,
-	reader voidptr, context voidptr, scratch voidptr) int
-
 __global (
 	boot_geometry C.vinix_verity
 	boot_device [128]u8
@@ -42,7 +27,7 @@ pub fn requested() bool {
 		boot_parsed = true
 		kernel := limine.kernel_file()
 		if kernel != unsafe { nil } {
-			boot_selection = C.vinix_verity_parse(kernel.cmdline, &boot_geometry,
+			boot_selection = parse_policy(kernel.cmdline, &boot_geometry,
 				unsafe { &char(&boot_device[0]) }, sizeof(boot_device))
 		}
 	}
@@ -91,8 +76,8 @@ fn (mut device VerifiedDevice) read(_handle voidptr, output voidptr, offset u64,
 			errno.set(errno.eio)
 			return none
 		}
-		if read != 4096 || C.vinix_verity_check(&device.geometry, block, device.data,
-			voidptr(read_hash_block), voidptr(device), device.hashes) != 0 {
+		if read != 4096 || check_block(&device.geometry, block, device.data,
+			read_hash_block, voidptr(device), device.hashes) != 0 {
 			errno.set(errno.eio)
 			return none
 		}

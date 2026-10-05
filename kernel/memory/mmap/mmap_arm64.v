@@ -42,16 +42,12 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 		if resolved {
 			return
 		}
-		// Permission fault — trace details before crashing
-		print('PF_PERM: dfsc=0x')
-		print(dfsc.hex())
-		print(' addr=0x')
-		print(addr.hex())
-		print(' pc=0x')
-		print(gpr_state.pc.hex())
-		print(' wnr=')
-		println(wnr.str())
-		// It was a permission fault (protection violation), crash
+		// A protection violation. The caller reports it: as a kernel fault,
+		// or to the process as SIGSEGV. Nothing is printed here, because for
+		// some programs that signal is routine. A translator write-protects
+		// every page it has translated code from and takes this fault on each
+		// write to one. Under Wine that was hundreds of console lines a
+		// second, each built from strings that nothing freed.
 		return none
 	}
 

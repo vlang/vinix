@@ -568,6 +568,34 @@ fn (mut a TextEditorApp) key_input(input string) {
 	a.follow_cursor()
 }
 
+fn (mut a TextEditorApp) paste_input(text string) {
+	if text.len == 0 {
+		return
+	}
+	a.pending_len = 0
+	if a.focus == .path {
+		if a.path.len + text.len > editor_max_path {
+			return
+		}
+		for ch in text {
+			if ch >= 32 && ch != 127 {
+				a.path << ch
+			}
+		}
+		return
+	}
+	if a.text.len + text.len > editor_max_file_size {
+		a.set_status('editor.status.limit')
+		return
+	}
+	for ch in text {
+		a.insert_byte(ch)
+	}
+	a.modified = true
+	a.set_status('editor.status.unsaved')
+	a.follow_cursor()
+}
+
 fn (mut a TextEditorApp) follow_cursor() {
 	line := a.cursor_line()
 	if line < a.scroll {

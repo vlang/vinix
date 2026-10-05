@@ -256,6 +256,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
+	oom_victim_gone(current_process)
 
 	// The Thread structs are about to be recycled, so nothing may reach them
 	// through the zombie process that is left behind.

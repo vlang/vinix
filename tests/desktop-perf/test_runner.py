@@ -20,7 +20,7 @@ SPEC.loader.exec_module(runner)
 
 GENERAL_OPS = ("stat", "pipe", "socketpair", "inet_socket", "eventfd", "epoll",
                "timerfd", "poll", "proc_read", "proc_list", "readdir", "dup",
-               "mmap", "thread", "signal", "fork", "memfd")
+               "mmap", "thread", "signal", "fault", "fork", "memfd")
 FILE_OPS = ("file", "rename", "unlink_open", "rename_over", "hardlink", "mkdir",
             "symlink", "unix_connect", "unix_datagram")
 PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version", "/bin/busybox awk BEGIN{}")
@@ -66,7 +66,7 @@ class VerdictTests(unittest.TestCase):
         result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
                                           scenarios, ["before", "after"], 2)
         self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 184)
+        self.assertEqual(len(rows), 188)
         self.assertEqual(sum("report" not in row for row in rows), 16)
 
     def test_partial_ops_timeout_keeps_json_but_fails(self):
@@ -200,7 +200,7 @@ class VerdictTests(unittest.TestCase):
         shell = Path(__file__).with_name("perf-init.sh").read_text()
         for program in PROGRAMS:
             self.assertIn(program, shell)
-        self.assertEqual(len(runner.expected_measurements(["new"], ["ops"], 1)), 35)
+        self.assertEqual(len(runner.expected_measurements(["new"], ["ops"], 1)), 36)
 
 
 class MainTests(unittest.TestCase):
@@ -244,7 +244,7 @@ class MainTests(unittest.TestCase):
     def test_main_drains_done_already_queued_at_eof(self):
         result, rows, log = self.main_verdict(complete_lines(["new"], ["ops"], 1))
         self.assertEqual(result, 0)
-        self.assertEqual(len(rows), 35)
+        self.assertEqual(len(rows), 36)
         self.assertIn(runner.DONE, log)
 
     def test_main_timeout_preserves_partial_log_and_json(self):
@@ -258,13 +258,13 @@ class MainTests(unittest.TestCase):
         lines = complete_lines(["new"], ["ops"], 1)
         result, rows, log = self.main_verdict(lines, transcript=lines + ["KERNEL PANIC: late"])
         self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 35)
+        self.assertEqual(len(rows), 36)
         self.assertIn(b"KERNEL PANIC", log)
 
     def test_main_cannot_pass_before_console_finishes_draining(self):
         result, rows, log = self.main_verdict(complete_lines(["new"], ["ops"], 1), closed=False)
         self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 35)
+        self.assertEqual(len(rows), 36)
         self.assertIn(runner.DONE, log)
 
 

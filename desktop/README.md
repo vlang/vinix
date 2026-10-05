@@ -197,6 +197,13 @@ only after a successful compile and link, so an interrupted rebuild does not
 destroy the last complete cache entry. Set `VINIX_AARCH64_APP_CACHE` when CI or
 an isolated build needs a different cache root.
 
+The separate **iOS Calculator** runs an ARM64 iOS Mach-O through the V
+Objective-C/Foundation/UIKit compatibility layer. `./build-ios-aarch64.sh`
+stages its runner and unchanged app bundle; the next desktop build includes
+both. It is a standalone display client using the same pipe protocol as
+VOffice. See [iOS compatibility](../docs/ios.md) for the supported subset and
+QEMU tests.
+
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source
@@ -248,7 +255,8 @@ OBS Studio uses the same X11 host, with an additional 1280×900 screen. After
 `pkg install obs-studio`, open it from Start and add **Display Capture (XSHM)**
 with **Display 1** selected. The compositor writes each presented frame into
 that screen's Xvfb framebuffer. Display 0 contains the OBS UI, so the capture
-source shows the Vinix desktop without OBS recursively capturing itself.
+source shows the Vinix desktop. OBS appears in the preview while its window is
+visible on that desktop; minimize it to record the other windows alone.
 
 `pkg install minecraft` installs Alpine's OpenJDK 21 and native runtime, then
 downloads the newest compatible official Minecraft: Java Edition client from
@@ -661,6 +669,21 @@ Then, from the repository root, with Homebrew `llvm`, `lld` and `qemu`
 installed, one command builds the aarch64 image and boots into the desktop:
 
     ./run-desktop-aarch64.sh
+
+Copy text on the host, click a text field in the guest, and press **Ctrl+V**
+(**Ctrl+Shift+V** also works in Terminal). On macOS, **Cmd+V** works while QEMU
+has grabbed input; Ctrl+V also works without the grab. Unicode, tabs and multiple
+lines are supported in Terminal, Text Editor and hosted X11 applications such
+as Firefox and Wine Notepad. Terminal honors bracketed paste when the shell or
+editor enables it. Pasted text bypasses the guest keyboard layout.
+
+The aarch64 launcher enables the host clipboard service by default. It reads
+the clipboard only when the guest requests a paste, over the existing loopback
+host connection. macOS uses `pbpaste`; Linux needs `wl-paste` on Wayland, or
+`xclip`/`xsel` on X11. Text is limited to 64 KiB per paste. Pass
+`--no-clipboard` or set `VINIX_QEMU_CLIPBOARD=0` to disable it. Sharing requires
+QEMU user networking; images booted outside this launcher have no host clipboard
+until `/etc/vinix/host-clipboard-url` is configured.
 
 The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick

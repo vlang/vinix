@@ -8,6 +8,7 @@
 #   --no-desktop    skip the desktop build (the kernel is what you changed)
 #   --monitor       open a QEMU monitor and QMP socket, so the tools under
 #                   desktop/tools can drive and photograph the running desktop
+#   --no-clipboard  disable pasting text from the host clipboard
 #   --no-disk-root  keep the old layout: a RAM system with a persistent /root
 #   --reset-disk    reinstall the system volume from scratch, losing its data
 #   --no-persist    use the full RAM-backed desktop instead of persistent /root

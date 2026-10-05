@@ -1,0 +1,14 @@
+# All .v files in this repository are V source, including .c.v files.
+*.v linguist-language=V
+
+# Third-party C libraries and downloaded dependency trees.
+desktop/stb_image.h linguist-vendored
+third_party/** linguist-vendored
+kernel/freestnd-c-hdrs/** linguist-vendored
+kernel/cc-runtime/** linguist-vendored
+kernel/c/flanterm/** linguist-vendored
+kernel/c/nanoprintf*.h linguist-vendored
+kernel/c/uacpi/** linguist-vendored
+kernel/uacpi-repository/** linguist-vendored
+kernel/c/lwip/** linguist-vendored
+kernel/lwip-repository/** linguist-vendored

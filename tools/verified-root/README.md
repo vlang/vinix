@@ -142,7 +142,9 @@ truncation, extra bytes, mismatched roots and geometry, input bounds and
 command-line policy. The optional Linux check compares complete tree bytes
 and root hashes with authentic `veritysetup`, then has it verify our images.
 Host image tests are separate from kernel runtime enforcement tests.
-The C verifier regression runs normal and address/undefined-sanitized builds,
+The verifier in `kernel/block/verity/primitives.v` reuses the kernel's
+allocation-free SHA-256 implementation. Its C ABI regression runs normal
+and address/undefined-sanitized builds,
 independent SHA-256 and geometry comparisons, every data block at tree-depth
 boundaries, corrupt paths and short/error reads. It also checks the production
 object has no heap allocator imports.

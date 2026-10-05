@@ -78,7 +78,7 @@ fn config_limit(bus u32) u32 {
 	return if ecam_base != 0 && bus < ecam_buses { u32(4096) } else { u32(0) }
 }
 
-// Validated C-core callers hold the transport lock; addition keeps a merely
+// Validated transaction callers hold the transport lock; addition keeps a merely
 // page-aligned virtual base independent of the bus/device/function fields.
 fn ecam_address(bus u32, slot u32, function u32, offset u32) u64 {
 	return ecam_base + (u64(bus) << 20) + (u64(slot) << 15) + (u64(function) << 12) + offset

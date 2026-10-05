@@ -89,8 +89,9 @@ fn create_object(size u64, alignment u64, external bool) ?&GemObject {
 		return none // handle table exhausted
 	}
 
-	// Fallible allocation: a user-sized request must never panic the kernel.
-	phys := if external { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
+	// Fallible allocation: a user-sized request must never panic the kernel,
+	// nor take the memory it keeps for itself (memory/reserve.v).
+	phys := if external || !memory.user_room(pages) { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
 	if !external && phys == unsafe { nil } {
 		return none
 	}

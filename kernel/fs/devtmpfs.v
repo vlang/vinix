@@ -2,6 +2,7 @@
 module fs
 
 import stat
+import errno
 import klock
 import memory
 import memory.mmap
@@ -47,7 +48,12 @@ fn (mut this DevTmpFSResource) mmap(_handle voidptr, page u64, flags int) voidpt
 		}
 	}
 
-	copy_page := memory.pmm_alloc(1)
+	// The process' own copy; with none to be had the fault fails, and a
+	// process is killed for the memory rather than the kernel stopped.
+	copy_page := memory.pmm_alloc_user(1)
+	if copy_page == unsafe { nil } {
+		return unsafe { nil }
+	}
 
 	unsafe {
 		C.memcpy(voidptr(u64(copy_page) + higher_half), &this.storage[page * page_size], page_size)
@@ -88,9 +94,18 @@ fn (mut this DevTmpFSResource) write(_handle voidptr, buf voidptr, loc u64, coun
 			new_capacity *= 2
 		}
 
+		// A file in /dev is kept in memory as a tmpfs one is, and is refused
+		// what programs need to run in for the same reason: see
+		// memory/reserve.v. realloc() stops the kernel rather than fail.
+		if !memory.file_room(new_capacity / page_size + 1) {
+			this.l.release()
+			errno.set(errno.enospc)
+			return none
+		}
 		new_storage := memory.realloc(this.storage, new_capacity)
 
 		if new_storage == 0 {
+			this.l.release()
 			return none
 		}
 
@@ -164,6 +179,10 @@ fn (mut this DevTmpFSResource) grow(_handle voidptr, new_size u64) ? {
 		new_capacity *= 2
 	}
 
+	if new_capacity > this.capacity && !memory.file_room(new_capacity / page_size + 1) {
+		errno.set(errno.enospc)
+		return none
+	}
 	new_storage := memory.realloc(this.storage, new_capacity)
 
 	if new_storage == 0 {

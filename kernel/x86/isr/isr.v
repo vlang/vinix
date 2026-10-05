@@ -70,7 +70,41 @@ fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
 			lib.kpanic(gpr_state, c'Kernel stack guard')
 		}
 	}
-	mmap.pf_handler(gpr_state) or { exception_handler_at(num, mut gpr_state, fault_addr) }
+	exhausted := memory.exhaustions()
+	mmap.pf_handler(gpr_state) or {
+		if memory.exhaustions() != exhausted && out_of_memory(gpr_state) {
+			return
+		}
+		exception_handler_at(num, mut gpr_state, fault_addr)
+	}
+}
+
+// The page a fault needed could not be had, for lack of memory rather than of
+// a mapping. A process is killed for the memory (userland/oom.v) and the
+// access runs again, which is what true asks for; a thread of the process
+// killed ends here instead. A fault the kernel took on a process' page has to
+// be seen through: when it cannot wait, having interrupts off, or the process
+// is the one killed, its page comes out of the reserve.
+fn out_of_memory(gpr_state &cpulocal.GPRState) bool {
+	user := gpr_state.cs & 3 == 3
+	if !user && gpr_state.rflags & cpu.rflags_if == 0 {
+		return userland.grant_reserve_page()
+	}
+	asm volatile amd64 {
+		sti
+	}
+	retry := memory.recover_from_exhaustion(true)
+	asm volatile amd64 {
+		cli
+	}
+	if retry {
+		return true
+	}
+	if !user {
+		return userland.grant_reserve_page()
+	}
+	userland.exit_if_killed_for_memory()
+	return false
 }
 
 fn abort_handler(_num u32, _gpr_state &cpulocal.GPRState) {

@@ -1,34 +1,32 @@
 #!/usr/bin/env python3
 """Run exact production CPUID/MSR policy with only hardware-port adapters."""
 from pathlib import Path
+import os
 import re
+import shutil
 import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def replace_function(source, name, replacement):
-    match = re.search(r'(?m)^static [\w *]+ ' + name + r'\([^;]*?\) \{', source)
-    if not match:
-        raise RuntimeError(f'missing hardware adapter {name}')
-    start = source.index('{', match.start())
-    depth, end = 1, start + 1
-    while depth:
-        depth += (source[end] == '{') - (source[end] == '}')
-        end += 1
-    return source[:match.start()] + replacement + source[end:]
-
-
 ADAPTERS = r'''
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static unsigned vendor, max_leaf, max_subleaf, ext_max;
 static uint32_t leaf7, leaf72, amd_bits;
 static uint64_t arch_bits, control, expected_control;
 static unsigned arch_reads, ctrl_reads, ctrl_writes;
 static bool ignored_write;
-static void mitigation_cpuid(uint32_t leaf, uint32_t subleaf,
+static unsigned allocations;
+static bool fail_allocation;
+void *vinix_mitigation_test_calloc(size_t count, size_t size) {
+    allocations++;
+    assert(count == 2 && size == 32);
+    return fail_allocation ? NULL : calloc(count, size);
+}
+void vinix_mitigation_test_cpuid(uint32_t leaf, uint32_t subleaf,
                              uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
     *a = *b = *c = *d = 0;
     if (!leaf) {
@@ -41,11 +39,11 @@ static void mitigation_cpuid(uint32_t leaf, uint32_t subleaf,
     else if (leaf == 0x80000008) { assert(vendor == 2 && ext_max >= leaf); *b = amd_bits; }
     else assert(!"unexpected CPUID port");
 }
-static uint64_t mitigation_rdmsr(uint32_t msr) {
+uint64_t vinix_mitigation_test_rdmsr(uint32_t msr) {
     if (msr == 0x10a) { assert(vendor == 1 && (leaf7 & (1u << 29))); arch_reads++; return arch_bits; }
     assert(msr == 0x48 && expected_control); ctrl_reads++; return control;
 }
-static void mitigation_wrmsr(uint32_t msr, uint64_t value) {
+void vinix_mitigation_test_wrmsr(uint32_t msr, uint64_t value) {
     assert(msr == 0x48 && expected_control);
     assert(value == (UINT64_C(0x8000000000000000) | expected_control));
     ctrl_writes++; if (!ignored_write) control = value;
@@ -57,6 +55,12 @@ TESTS = r'''
 int main(void) {
     assert(!vinix_x86_mitigations_setup(0));
     assert(!vinix_x86_mitigations_setup(UINT64_MAX));
+    assert(!allocations);
+    fail_allocation = true;
+    assert(!vinix_x86_mitigations_setup(2));
+    assert(!vinix_x86_mitigation_policies);
+    assert(!vinix_x86_mitigations_initialise(0));
+    fail_allocation = false;
     assert(vinix_x86_mitigations_setup(2));
     assert(!vinix_x86_mitigations_setup(2));
     assert(!vinix_x86_mitigations_initialise(2));
@@ -111,6 +115,7 @@ int main(void) {
     expected_control = 1; control = UINT64_C(0x8000000000000000); ignored_write = true;
     /* A virtual CPU that enumerates a control but ignores it cannot report success. */
     assert(!vinix_x86_mitigations_initialise(0));
+    assert(allocations == 2); /* One failed attempt and one boot allocation. */
     free(vinix_x86_mitigation_policies);
     puts("CPU MITIGATION POLICY PASS: 12288 vendor/leaf/control cases, MSR gates and readback failure");
 }
@@ -118,20 +123,39 @@ int main(void) {
 
 
 def main():
-    source = (ROOT / 'kernel/c/x86_mitigations.c').read_text()
-    for name in ('mitigation_cpuid', 'mitigation_rdmsr', 'mitigation_wrmsr'):
-        source = replace_function(source, name, '')
-    source = source.replace('#include "x86_mitigations.h"', '')
-    source = source.replace('#if defined(__x86_64__)', '', 1)
-    if not source.rstrip().endswith('#endif'):
-        raise RuntimeError('unexpected architecture guard')
-    source = source.rstrip()[:-6]
-    header = (ROOT / 'kernel/c/x86_mitigations.h').read_text()
-    with tempfile.TemporaryDirectory(prefix='vinix-cpu-policy-') as directory:
+    with tempfile.TemporaryDirectory(prefix='vinix-cpu-policy-', dir='/tmp') as directory:
         work = Path(directory)
-        (work / 'test.c').write_text(header + ADAPTERS + source + TESTS)
-        subprocess.run(['clang', '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
-                        '-fsanitize=address,undefined', str(work / 'test.c'), '-o', str(work / 'test')], check=True)
+        # Compile the actual policy, adapting only privileged ports. Renaming
+        # these copies avoids host-architecture filtering of *_amd64.v files.
+        (work / 'v.mod').write_text("Module { name: 'vinix_cpu_policy_tests' }\n")
+        source = ROOT / 'kernel/x86/cpu/initialisation'
+        shutil.copy2(source / 'mitigations_amd64.v', work / 'policy.v')
+        shutil.copy2(source / 'mitigation_ports_amd64.v', work / 'ports.v')
+        v = subprocess.check_output([
+            'sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"',
+            'find-v', str(ROOT)], text=True)
+        subprocess.run([v, '-shared', '-no-builtin', '-os', 'vinix', '-target-libc-headers',
+                        '-nofloat', '-gc', 'none', '-manualfree', '-d', 'mitigation_test',
+                        '-o', str(work / 'policy.c'), str(work)], check=True,
+                       env={**os.environ, 'V_C_ERROR_BUG_REPORT_DISABLED': '1'})
+        compiler = os.environ.get('CC', 'clang')
+        (work / 'host_ports.h').write_text('#include <stddef.h>\nint kprintf(const char *, ...);\n'
+                                          'void *vinix_mitigation_test_calloc(size_t, size_t);\n')
+        common = [compiler, '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
+                  '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
+                  '-iquote', str(ROOT / 'kernel/c')]
+        subprocess.run(common + ['-I', str(ROOT / 'kernel/c'),
+                       '-Wno-unused-function', '-ffreestanding', '-fno-builtin',
+                       '-Dcalloc=vinix_mitigation_test_calloc',
+                       '-fno-strict-aliasing', '-include', str(work / 'host_ports.h'),
+                       '-c', str(work / 'policy.c'),
+                       '-o', str(work / 'policy.o')], check=True)
+        imports = subprocess.check_output(['nm', '-u', str(work / 'policy.o')], text=True)
+        if re.search(r'\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b', imports):
+            raise RuntimeError('unexpected allocator import in CPU policy:\n' + imports)
+        (work / 'test.c').write_text('#include "x86_mitigations.h"\n' + ADAPTERS + TESTS)
+        subprocess.run(common + [str(work / 'test.c'), str(work / 'policy.o'),
+                       '-o', str(work / 'test')], check=True)
         subprocess.run([str(work / 'test')], check=True)
     return 0
 

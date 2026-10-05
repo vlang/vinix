@@ -66,6 +66,7 @@ fn kmain_thread() {
 	table.init_clock_control_syscalls()
 	// cgroup.kill sends a signal, which lives above fs; hand it the entry point.
 	fs.set_cgroup_signal_hook(voidptr(userland.cgroup_kill_process))
+	userland.initialise_oom()
 	proc.register_cpu_signal_hook(voidptr(userland.cpu_signal_process))
 	proc.register_job_orphan_hook(voidptr(userland.signal_orphaned_job_group))
 	// What an interrupt returning to userspace does for a thread with a signal
@@ -157,7 +158,7 @@ fn kmain_thread() {
 }
 
 fn kmain() {
-	// Before anything that returns: see c/stack_protector.c.
+	// Before anything that returns: see lib/stack_protector.v.
 	C.vinix_stack_guard_init()
 	// Ensure the base revision is supported.
 	if limine_base_revision.revision != 0 {

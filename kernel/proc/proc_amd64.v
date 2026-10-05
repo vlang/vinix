@@ -184,6 +184,16 @@ pub mut:
 	// Set by a sibling's exit_group() or execve(): leave at the next return to
 	// userspace, once the syscall in progress has unwound.
 	must_exit bool
+	// How many pages this thread's process may be given from the memory the
+	// kernel keeps for itself, the kernel being the one waiting on them, and
+	// how many times it has been let in since it last left for userspace.
+	// See userland.grant_reserve_page().
+	reserve_pass   u32
+	reserve_grants u32
+	// A page could not be had where the thread could not wait for one, in a
+	// syscall that may have held a lock. Whether a process is to be killed
+	// for the memory is settled on the way out of the syscall instead.
+	owes_memory bool
 	// Whoever sets this owns taking the thread down: the thread itself on its
 	// way out, or a sibling tearing the process down. Never both, so nothing
 	// is released twice. A word, as katomic.cas works on 4 and 8 bytes only.

@@ -50,6 +50,7 @@
 #
 # VINIX_QEMU_NETWORK=0 omits the guest NIC; the default 1 enables networking.
 # Allocation tests can disable it to keep DHCP setup outside measurements.
+# --no-clipboard or VINIX_QEMU_CLIPBOARD=0 disables host text clipboard reads.
 #
 # VINIX_CMDLINE adds options to the kernel's command line, such as
 # vinix.user_access=audit (docs/openbsd-security.md).
@@ -168,11 +169,13 @@ REPLACE_RUNNING=0
 EPHEMERAL_BOOT=0
 PERSIST_ENABLED="${VINIX_QEMU_PERSIST:-1}"
 NETWORK_ENABLED="${VINIX_QEMU_NETWORK:-1}"
+CLIPBOARD_ENABLED="${VINIX_QEMU_CLIPBOARD:-1}"
 QEMU_MEM="${VINIX_QEMU_MEM:-2048}"
 for arg in "$@"; do
     case "$arg" in
         --no-build)   NO_BUILD=1 ;;
         --serial)     SERIAL_ONLY=1 ;;
+        --no-clipboard) CLIPBOARD_ENABLED=0 ;;
         --virtio-gpu) VIRTIO_GPU=1 ;;
         --virgl)      VIRTIO_GPU=2 ;;
         --venus)      VIRTIO_GPU=3 ;;
@@ -1016,8 +1019,13 @@ if ! command -v python3 >/dev/null 2>&1; then
     exit 1
 fi
 SOURCE_SERVER_ARGS=()
+case "$CLIPBOARD_ENABLED" in
+    0) ;;
+    1) SOURCE_SERVER_ARGS+=(--clipboard) ;;
+    *) echo "ERROR: VINIX_QEMU_CLIPBOARD must be 0 or 1" >&2; exit 1 ;;
+esac
 if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
-    SOURCE_SERVER_ARGS=(--source-root "$HOST_SOURCE_ROOT" \
+    SOURCE_SERVER_ARGS+=(--source-root "$HOST_SOURCE_ROOT" \
         --ui2-source "$HOST_UI2_SOURCE")
 fi
 python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
@@ -1223,6 +1231,14 @@ fi
 if [ "${VINIX_QEMU_PACKAGE_PERSIST:-1}" != 0 ]; then
     printf 'http://10.0.2.2:%s\n' "$PACKAGE_STORE_PORT" \
         > "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg/qemu-store-url"
+fi
+# Always overwrite the per-run value, including when disabled, so a persistent
+# root cannot retain the address of another VM's clipboard service.
+if [ "$CLIPBOARD_ENABLED" -eq 1 ] && [ "$NETWORK_ENABLED" -eq 1 ]; then
+    printf 'http://10.0.2.2:%s/clipboard\n' "$PACKAGE_STORE_PORT" \
+        > "$PACKAGE_RUNTIME_ROOT/etc/vinix/host-clipboard-url"
+else
+    : > "$PACKAGE_RUNTIME_ROOT/etc/vinix/host-clipboard-url"
 fi
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$PACKAGE_RUNTIME_TAR" \
     -C "$PACKAGE_RUNTIME_ROOT" .

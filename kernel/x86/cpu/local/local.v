@@ -70,6 +70,8 @@ pub mut:
 	// The page fault stack (IST3) this CPU uses while it runs no thread, so
 	// that it never points into the stack of one that has died.
 	idle_pf_stack u64
+	// Persistent CPU entry/idle stack, distinct from each thread's stack.
+	idle_int_stack u64
 	// A thread that has just left this CPU for good, whose stacks the
 	// scheduler gives back once it is off them. See sched.dequeue_and_die().
 	dying_thread voidptr

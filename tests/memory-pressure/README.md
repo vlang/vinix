@@ -5,8 +5,10 @@ watermark is 1/32 of usable memory, bounded to 16–128 MiB and at most 1/8
 of tiny machines' RAM. The critical watermark is 1/4 of low; recovery to normal
 requires 1.5 times low. Below low, each pass reclaims at most 4 MiB of clean
 backing-cache data. The existing five-second writeback pass makes successfully
-written dirty pages eligible on later passes. This is a soft reserve; allocation
-can still consume it. Anonymous pages and live file mappings are not evicted.
+written dirty pages eligible on later passes. This is a soft reserve for the
+kernel's own allocations, which can still consume it. What a process or a file
+may take stops at these same watermarks: see `tests/oom/README.md`. Anonymous
+pages and live file mappings are not evicted.
 
 Read `/proc/vmpressure` for normal/warning/critical state, transition generation,
 free/total bytes, watermarks, reclaim runs, dropped-cache physical-page
@@ -41,8 +43,9 @@ checks warning/critical readiness and a background reclaim attempt, then unmaps
 the allocation and verifies the normal recovery notification.
 
 This is partial VM3/VM4 coverage: there is no anonymous page-out/compressor/swap,
-essential-operation hard reserve, global OOM recovery, PSI stall-time sampling,
-per-cgroup pressure attribution or dirty mapped-file reclaim in this change.
+PSI stall-time sampling, per-cgroup pressure attribution or dirty mapped-file
+reclaim in this change. The reserve the kernel keeps and the recovery from
+running out came later and are described in `tests/oom/README.md`.
 
 ## Checkpoint validation (2026-10-02)
 

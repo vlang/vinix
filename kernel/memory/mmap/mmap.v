@@ -606,7 +606,7 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 }
 
 pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
-	memory.register_cow_resolver(resolve_cow_fault)
+	memory.register_cow_resolver(resolve_cow_waiting)
 	register_page_in_resolver()
 	mut old_pagemap := unsafe { _old_pagemap }
 	mut new_pagemap := memory.new_pagemap()
@@ -1180,7 +1180,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 
 	// Every user mapping, the program's own segments included, is made here,
 	// so the resolver is in place before anything can copy from one.
-	memory.register_cow_resolver(resolve_cow_fault)
+	memory.register_cow_resolver(resolve_cow_waiting)
 	register_page_in_resolver()
 
 	validate_protection(prot)?
@@ -1459,21 +1459,30 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			if flags & map_anonymous == 0 && u64(offset) + i >= u64(resource_.stat.size) {
 				continue
 			}
-			pagemap.l.acquire()
-			current, _, _ := addr2range(pagemap, base + i) or {
+			// More than once when memory runs out: a process is killed for
+			// it, and unless that is this one the page is tried again.
+			for {
+				exhausted := memory.exhaustions()
+				pagemap.l.acquire()
+				current, _, _ := addr2range(pagemap, base + i) or {
+					pagemap.l.release()
+					return none
+				}
+				if current.global.serial != mapping_serial {
+					pagemap.l.release()
+					return none
+				}
+				source := range_page_source(current, base + i)
 				pagemap.l.release()
-				return none
-			}
-			if current.global.serial != mapping_serial {
-				pagemap.l.release()
-				return none
-			}
-			source := range_page_source(current, base + i)
-			pagemap.l.release()
-			fill_range_page(mut pagemap, source, base + i, file_page) or {
-				unmap_created_range(mut pagemap, base, length, mapping_serial)
-				errno.set(errno.enomem)
-				return none
+				fill_range_page(mut pagemap, source, base + i, file_page) or {
+					if out_of_memory_since(exhausted, true) {
+						continue
+					}
+					unmap_created_range(mut pagemap, base, length, mapping_serial)
+					errno.set(errno.enomem)
+					return none
+				}
+				break
 			}
 		}
 	}
@@ -1648,26 +1657,35 @@ fn populate_missing_pages(mut pagemap memory.Pagemap, address u64, _length u64, 
 	skip_lazy_shared bool) ? {
 	length := lib.align_up(_length, page_size)
 	for virt := address; virt < address + length; virt += page_size {
-		pagemap.l.acquire()
-		local_range, _, file_page := addr2range(pagemap, virt) or {
-			pagemap.l.release()
-			errno.set(errno.enomem)
-			return none
-		}
-		if _ := pagemap.virt2phys(virt) {
-			pagemap.l.release()
-			continue
-		}
+		// More than once when memory runs out, as mmap() fills its own pages.
+		for {
+			exhausted := memory.exhaustions()
+			pagemap.l.acquire()
+			local_range, _, file_page := addr2range(pagemap, virt) or {
+				pagemap.l.release()
+				errno.set(errno.enomem)
+				return none
+			}
+			if _ := pagemap.virt2phys(virt) {
+				pagemap.l.release()
+				break
+			}
 
-		if skip_lazy_shared && local_range.flags & map_shared != 0 && local_range.global.lazy_file {
+			if skip_lazy_shared && local_range.flags & map_shared != 0
+				&& local_range.global.lazy_file {
+				pagemap.l.release()
+				break
+			}
+			source := range_page_source(local_range, virt)
 			pagemap.l.release()
-			continue
-		}
-		source := range_page_source(local_range, virt)
-		pagemap.l.release()
-		fill_range_page(mut pagemap, source, virt, file_page) or {
-			errno.set(errno.enomem)
-			return none
+			fill_range_page(mut pagemap, source, virt, file_page) or {
+				if out_of_memory_since(exhausted, true) {
+					continue
+				}
+				errno.set(errno.enomem)
+				return none
+			}
+			break
 		}
 	}
 }
