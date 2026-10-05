@@ -254,7 +254,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--kernel", type=Path, default=Path(
         os.environ.get("VINIX_KERNEL_DIR", REPO / "kernel")) / "bin/vinix")
-    parser.add_argument("--initramfs", type=Path, help="default: build.py's report_init.c")
+    parser.add_argument("--initramfs", type=Path, help="default: build.py's native V reporter")
     parser.add_argument("--cmdline", default="vinix.qemu_platform=1")
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--keep", type=Path, help="keep the work directory here")

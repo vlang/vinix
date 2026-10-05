@@ -9,7 +9,7 @@
 The loader, the kernel (built beforehand: make -C kernel ARCH=aarch64 ...),
 an initramfs and the command line, in one raw file for
 `kmutil configure-boot --raw`; README.md has the steps. Without --initramfs
-the image carries a one-program user space (report_init.c) that shows what
+the image carries a one-program V user space (reportcore) that shows what
 the kernel found and stays up."""
 
 from __future__ import annotations
@@ -34,16 +34,20 @@ DEFAULT_CMDLINE = "vinix.apple_speakers=0"
 
 
 def build_initramfs(work: Path) -> Path:
-    """A ustar archive holding report_init.c as /sbin/init."""
+    """A ustar archive holding the native V reporter as /sbin/init."""
     sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT",
                                   REPO / "build-aarch64-userland/sysroot"))
     root = work / "rootfs"
     (root / "sbin").mkdir(parents=True)
     (root / "dev").mkdir()
     (root / "proc").mkdir()
+    generated = work / "report_init.c"
+    subprocess.run([sys.executable, str(REPO / "build-support/compile-v-module.py"),
+                    str(HERE / "reportcore"), str(generated), "--arch", "arm64"], check=True)
     subprocess.run([str(LLVM / "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
                     "-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fuse-ld=lld",
-                    f"-L{sysroot}/lib", str(HERE / "report_init.c"), "-o",
+                    "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
+                    f"-L{sysroot}/lib", str(generated), "-o",
                     str(root / "sbin/init")], check=True)
     tar = work / "initramfs.tar"
     subprocess.run(["tar", "--format=ustar", "-cf", str(tar), "-C", str(root), "."],

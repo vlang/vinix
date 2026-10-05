@@ -36,7 +36,7 @@ apple-boot/build.py                 # -> apple-boot/build/vinix-apple.bin
 ```
 
 `build.py` takes `--kernel`, `--initramfs` (a ustar archive) and
-`--cmdline`. Without `--initramfs` the image carries `report_init.c` as
+`--cmdline`. Without `--initramfs` the image carries the native V `reportcore` as
 PID 1, which prints what the kernel found and stays up: the first boots on a
 new Mac have no keyboard to type at. It warns when the kernel binary is
 older than its sources.
