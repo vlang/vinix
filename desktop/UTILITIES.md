@@ -22,7 +22,7 @@ Vinix engineering proposals based on the inspected code.
 | Vinix utility / macOS counterpart | Present before this change | Implemented in this change | Remaining gaps |
 | --- | --- | --- | --- |
 | Files / Finder | List, Finder and Miller-column views, dual-pane mode, sorting, current-folder search, navigation history, sidebar, tags, Quick Look, rename/copy/cut/paste/permanent delete and view preferences | Get Info for the selected file, including POSIX metadata and symbolic-link targets | Move to Trash, restore and empty Trash; multiple selection and batch operations; file-operation undo; tabs; recursive/content/metadata search; file associations and Open With; drag-and-drop file operations; permission editing; shared folders |
-| Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines | Persistent view preferences; per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
+| Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog | Persistent view preferences; per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states | Settings search; clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo | General selection/cut/copy, mouse caret/selection, Save As/file picker, unsaved-close/open confirmation, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
 | Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, numeric paste validation, memory register, relative percentages, bounded result history with paging and recall | Scientific functions, programmer bases/bitwise operations, RPN, expression parsing, unit/currency conversion, selectable/copyable results, display precision/grouping and history persistence |
@@ -79,6 +79,10 @@ their third-party application internals are outside the native-utility changes.
 These 21 entries plus the nineteen native utilities account for the complete
 40-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
+
+The Start menu's All Programs pane still squeezes the full catalog into its
+preferred height. Pagination or scrolling remains launcher work; program
+search covers all catalog entries.
 
 ## Missing utility applications to implement
 
@@ -290,3 +294,20 @@ visible text/caret and a shallow window's minimum text row. Model tests cover
 malformed records, conflicting writers, anchored file paths, home aliases,
 task date validation and graph discontinuities. The runner's 22 Python cases
 and all modified shell-script syntax checks also pass.
+
+The startup catalog fix passes 53 Activity Monitor behavior cases and seven
+tracked-memory cases. Every installed application can be parsed, timed,
+toggled, saved, reloaded and rendered in Startup Apps, including the last
+catalog entry. Repeated full-catalog timing refresh, bottom-row rendering and
+model cleanup retain zero owned bytes. Fixed buffers reserve 64 entries, and
+a catalog-capacity regression guards future expansion.
+
+The committed productivity desktop (`67583889`) cross-builds as a static
+AArch64 ELF with Clang and passes QEMU `idle,apps,productivity,drag` checks.
+Productivity runs exactly four processes: the compositor and all three native
+clients. A separate screenshot run brings each utility to the front and
+verifies readable controls, Grapher's plotted curve and personal export paths
+for the registered guest user. The drag marker and screenshot confirm actual
+System-window movement. These five-second guest samples check startup and
+rendering; persistence/export correctness and owned-memory cleanup are the
+host assertions described above, not long-running guest performance results.
