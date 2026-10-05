@@ -59,7 +59,8 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	unsafe {
 		stack_size := u64(0x200000)
-		cpu_local.tss.rsp0 = cpu_stack_top(stack_size)
+		cpu_local.idle_int_stack = cpu_stack_top(stack_size)
+		cpu_local.tss.rsp0 = cpu_local.idle_int_stack
 		cpu_local.tss.ist1 = cpu_stack_top(stack_size)
 		// A fault while the page-fault stack itself is exhausted must still
 		// have an independent stack for the fatal double-fault report.
