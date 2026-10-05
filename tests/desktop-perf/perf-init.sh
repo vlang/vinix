@@ -183,7 +183,9 @@ run_case() {
 	sleep "$SETTLE"
 
 	case "$scenario" in
-		pointer|drag) echo "PERF-DRIVE $scenario $MEASURE" ;;
+		# Buffered printf keeps the host control marker together when kernel
+		# diagnostics are printed concurrently with the guest shell.
+		pointer|drag) printf 'PERF-DRIVE %s %s\n' "$scenario" "$MEASURE" ;;
 	esac
 	"$perf/measure" sample "$pid" "$MEASURE" "$used_before" "$label"
 	# The host photographs the screen, so a build that got faster by drawing

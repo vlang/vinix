@@ -169,8 +169,8 @@ Cross-build and guest smoke results are recorded in the change handoff. Local
 calendar records, timer expiry, undo/replace, exports and terminal search have
 behavioral coverage; host tests alone do not verify new driver/service features.
 
-The existing compositor `memory_test.v` has three baseline failures with the
-current compiler/ui2: eight idle redraws retain 8,960 bytes, Start-menu redraws
+The original compositor `memory_test.v` baseline with this compiler/ui2 found
+three failures: eight idle redraws retain 8,960 bytes, Start-menu redraws
 retain 10,206 bytes, and 100 idle polls retain 1,600 bytes. An isolated run of
 unchanged HEAD `823aeb11` reproduced the same byte counts and allocation-size
 maps. The new utility heap checks retain zero bytes; the compositor failures
@@ -179,7 +179,14 @@ remain separate follow-up work.
 The Quick Look PNG-preview host test crashes with exit 139 under the default
 host C backend, both before and after these changes. With `-cc clang`, the
 backend used by the production cross-build, all four Quick Look cases pass
-on both `823aeb11` and the updated sources. The remaining utility checks,
-native IPC checks and AArch64 QEMU idle/apps/drag smoke scenarios pass. A
-second apps smoke run verifies the final published build and Calculator's
-font-compatible controls.
+on both `823aeb11` and the updated sources. The image-decoding host runners now
+select Clang explicitly.
+
+The three new utilities pass 107 combined behavior cases and nine tracked
+memory cases, with zero retained owned bytes. Native-process IPC verifies image
+rotation/export, filtered log export and full system-report export. The
+committed AArch64 software desktop passes QEMU idle, existing-app and new-utility
+startup/rendering scenarios; an additional run verifies individual utility
+windows and actual window dragging. The utility scenario starts all three real
+native clients. PDF rendering, central log collection and broader hardware
+discovery remain the feature gaps listed above.
