@@ -130,6 +130,25 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 	}
 }
 
+// For ELF's already validated, page-aligned LOAD spans, after the last
+// fallible loader operation. mmap_file_segment leaves each final mapping
+// piece within an original LOAD span; it does not coalesce adjacent ranges.
+// Freeze whole final RX ranges only: writable replacements on overlapping
+// segment pages remain mutable. This never allocates, splits, or fails.
+pub fn mimmutable_executable(mut pagemap memory.Pagemap, base u64, length u64) {
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	end := base + length
+	mut local := range_lower_bound(pagemap, base)
+	for local != unsafe { nil } && local.base < end {
+		if local.length <= end - local.base && local.prot & prot_exec != 0
+			&& local.prot & prot_write == 0 {
+			local.immutable = true
+		}
+		local = range_lower_bound(pagemap, local.base + 1)
+	}
+}
+
 pub fn syscall_mimmutable(_ voidptr, addr voidptr, length u64) (u64, u64) {
 	mut process := proc.current_thread().process
 	mimmutable(mut process.pagemap, u64(addr), length) or {
