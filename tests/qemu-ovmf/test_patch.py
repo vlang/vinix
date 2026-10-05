@@ -1,4 +1,4 @@
-"""Exercise firmware patch preparation without downloading or building edk2."""
+"""Exercise firmware patching and setup without downloading or building edk2."""
 
 import os
 from pathlib import Path
@@ -107,6 +107,15 @@ class FirmwarePatchTests(unittest.TestCase):
         self.assertIn(str(DRIVER), result.stderr)
         self.assertNotIn("Building edk2 BaseTools", result.stdout)
 
+    def prepare_setup(self, script):
+        self.driver.write_bytes(UPSTREAM)
+        (self.checkout / "test-bin/make").write_text("#!/bin/sh\nexit 0\n")
+        (self.source / "edksetup.sh").write_text(script)
+        for name in (
+            "PYTHON_COMMAND", "WORKSPACE", "EDK_TOOLS_PATH", "PACKAGES_PATH", "CONF_PATH"
+        ):
+            self.environment.pop(name, None)
+
     def test_fresh_and_already_patched_checkouts(self):
         for newline in (b"\n", b"\r\n"):
             with self.subTest(newline=newline):
@@ -138,6 +147,69 @@ class FirmwarePatchTests(unittest.TestCase):
         self.driver.write_bytes(incompatible)
         self.assert_rejected(self.run_builder())
         self.assertEqual(self.driver.read_bytes(), incompatible)
+
+    def test_setup_accepts_unset_variables_and_restores_strict_mode(self):
+        # These optional-variable reads match edk2-stable202511's edksetup.sh
+        # and BaseTools/BuildEnv. They run before the build command is defined.
+        self.prepare_setup(f"""
+SetupPythonCommand() {{
+    if [ -n "$PYTHON_COMMAND" ]; then
+        return 0
+    fi
+    export PYTHON_COMMAND=python3
+}}
+SetupPythonCommand
+if [ -z "$WORKSPACE" ]; then
+    export WORKSPACE="$PWD"
+fi
+if [ -z "$EDK_TOOLS_PATH" ]; then
+    export EDK_TOOLS_PATH="$WORKSPACE/BaseTools"
+fi
+if [ -z "$CONF_PATH" ]; then
+    export CONF_PATH="$WORKSPACE/Conf"
+fi
+if [ -n "$PACKAGES_PATH" ]; then
+    echo 'test: unexpected packages path' >&2
+    return 72
+fi
+build() {{
+    case "$-" in
+        *u*) ;;
+        *) echo 'test: nounset was not restored' >&2; return 72 ;;
+    esac
+    case "$-" in
+        *e*) ;;
+        *) echo 'test: errexit was disabled' >&2; return 72 ;;
+    esac
+    echo "test: ramfb build $*"
+    return {BUILD_SENTINEL}
+}}
+""")
+        result = self.run_builder()
+        self.assertEqual(
+            result.returncode, BUILD_SENTINEL, result.stdout + result.stderr
+        )
+        self.assertIn("Building the AArch64 2048x1536 ramfb driver", result.stdout)
+        self.assertIn(
+            "test: ramfb build -a AARCH64 -b RELEASE -t CLANGDWARF "
+            "-p ArmVirtPkg/ArmVirtQemu.dsc "
+            "-m OvmfPkg/QemuRamfbDxe/QemuRamfbDxe.inf -n 2",
+            result.stdout,
+        )
+
+    def test_setup_failure_stops_before_driver_build(self):
+        self.prepare_setup("""
+build() {
+    echo 'test: unexpected ramfb build'
+    return 73
+}
+echo 'test: setup failed' >&2
+return 61
+""")
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 61, result.stdout + result.stderr)
+        self.assertIn("test: setup failed", result.stderr)
+        self.assertNotIn("test: unexpected ramfb build", result.stdout)
 
 
 if __name__ == "__main__":

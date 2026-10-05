@@ -44,8 +44,11 @@ make -C "$SOURCE_DIR/BaseTools" -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
 echo "==> Building the AArch64 2048x1536 ramfb driver..."
 (
     cd "$SOURCE_DIR"
+    # EDK2's setup probes optional variables that are unset on a fresh shell.
+    set +u
     # shellcheck disable=SC1091
     source edksetup.sh >/dev/null
+    set -u
     build -a AARCH64 -b RELEASE -t CLANGDWARF \
         -p ArmVirtPkg/ArmVirtQemu.dsc \
         -m OvmfPkg/QemuRamfbDxe/QemuRamfbDxe.inf \
