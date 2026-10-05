@@ -12,3 +12,10 @@ to ensure initialization and its C ABI wrapper remain unprotected. The productio
 kernel uses the same attribute-bearing declarations in `stack_protector.h`.
 Architecture entropy instructions additionally require both kernel builds and
 guest boots; host tests cannot access ARM privileged identification registers.
+
+`python3 diagnostic.py` tests both real V serial adapters through mocked byte
+outputs under ASan/UBSan. Independent C callers check borrowed NUL-terminated
+messages and 2,003 hexadecimal fault records against `snprintf`, including
+zero, all-one and high-bit values. Allocator imports are rejected. The actual
+fault probes and recovery labels live in architecture assembly files and are
+exercised by the opt-in kernel-stack-guards QEMU fixtures.

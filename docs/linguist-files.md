@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the staged kernel V migration (parent `62bdfc722b8e3e862c170cc84e2cab2c53593766`),
+for the staged kernel V migration (parent `b813017011ff671475ed64b11318fee1746b6378`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 543 | 6,248,042 | 27.23% |
-| Python | 337 | 3,879,212 | 16.91% |
-| Shell | 279 | 1,229,845 | 5.36% |
+| C | 546 | 6,257,490 | 27.15% |
+| Python | 341 | 3,899,734 | 16.92% |
+| Shell | 280 | 1,232,620 | 5.35% |
 
-All `.v` files are classified as V. The resulting V share is 37.81%, with no
+All `.v` files are classified as V. The resulting V share is 37.91%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -85,6 +85,7 @@ deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/vinix-clipboard.h` | 3,829 |
 | `build-support/xorg-server/vinix-wine-host.c` | 45,707 |
 | `build-support/xorg-server/vinix-xinput.c` | 14,308 |
+| `compat/ios/runner/abi/dispatch.h` | 392 |
 | `desktop/execinfo_compat.c` | 5,086 |
 | `desktop/execinfo_compat.h` | 417 |
 | `desktop/gpu_present.h` | 2,982 |
@@ -169,7 +170,6 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/printf_benchmark.c` | 986 |
 | `kernel/c/pthread.h` | 1,298 |
 | `kernel/c/speculation.h` | 524 |
-| `kernel/c/stack_guards.c` | 3,881 |
 | `kernel/c/stack_protector.h` | 762 |
 | `kernel/c/stack_slots.h` | 402 |
 | `kernel/c/stdio.h` | 501 |
@@ -458,7 +458,9 @@ deployed Linguist version and the default-branch revision.
 | `tests/fsync-scope/test.c` | 2,988 |
 | `tests/hypervisor/abi_test.c` | 878 |
 | `tests/ios/calculator.c` | 2,085 |
-| `tests/ios/guest.c` | 3,215 |
+| `tests/ios/desktop-init.c` | 1,138 |
+| `tests/ios/guest.c` | 3,478 |
+| `tests/ios/uikit-guest.c` | 9,708 |
 | `tests/ios/unsupported.c` | 166 |
 | `tests/ipv6-multicast/host.c` | 17,389 |
 | `tests/ipv6-multicast/test.c` | 15,331 |
@@ -562,6 +564,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/sound/test.c` | 7,406 |
 | `tests/speculation-policy/policy.c` | 5,294 |
 | `tests/stack-policy/guest.c` | 4,914 |
+| `tests/stack-protector/diagnostic.c` | 1,828 |
 | `tests/stack-protector/host.c` | 2,179 |
 | `tests/stat-buffer/guest.c` | 5,495 |
 | `tests/steam/madvise-x86_64.c` | 1,109 |
@@ -803,7 +806,10 @@ deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,335 |
 | `tests/fsync-scope/run.py` | 5,239 |
-| `tests/ios/run.py` | 4,186 |
+| `tests/ios/desktop.py` | 7,946 |
+| `tests/ios/game2048.py` | 3,080 |
+| `tests/ios/run.py` | 5,432 |
+| `tests/ios/uikit.py` | 5,993 |
 | `tests/ipv6-multicast/check-generated.py` | 1,613 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
 | `tests/kernel-allocs/copy_sources.py` | 1,632 |
@@ -875,6 +881,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/sound/run_vm.py` | 9,559 |
 | `tests/speculation-policy/run.py` | 1,750 |
 | `tests/stack-policy/run.py` | 3,792 |
+| `tests/stack-protector/diagnostic.py` | 2,257 |
 | `tests/stack-protector/run.py` | 3,291 |
 | `tests/storage/test_split_desktop_initramfs.py` | 3,623 |
 | `tests/syscall-policy/run-host.py` | 11,663 |
@@ -950,7 +957,7 @@ deployed Linguist version and the default-branch revision.
 | `build-chromium-aarch64.sh` | 5,495 |
 | `build-claude-aarch64.sh` | 5,889 |
 | `build-codex-aarch64.sh` | 4,804 |
-| `build-desktop-aarch64.sh` | 85,851 |
+| `build-desktop-aarch64.sh` | 86,624 |
 | `build-desktop-amd64.sh` | 13,881 |
 | `build-developer-tools-aarch64.sh` | 4,335 |
 | `build-dhewm3-aarch64.sh` | 201 |
@@ -961,7 +968,7 @@ deployed Linguist version and the default-branch revision.
 | `build-firefox-amd64.sh` | 170 |
 | `build-go-aarch64.sh` | 3,054 |
 | `build-hyprland-aarch64.sh` | 10,888 |
-| `build-ios-aarch64.sh` | 1,613 |
+| `build-ios-aarch64.sh` | 2,487 |
 | `build-java-aarch64.sh` | 4,701 |
 | `build-libreoffice-aarch64.sh` | 6,463 |
 | `build-limine-aarch64.sh` | 4,409 |
@@ -1133,6 +1140,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/go/smoke.sh` | 558 |
 | `tests/hypervisor/run.sh` | 321 |
 | `tests/hyprland/smoke.sh` | 413 |
+| `tests/ios/build-2048-model.sh` | 1,128 |
 | `tests/ios/build-fixture.sh` | 561 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ipv6-multicast/run-host.sh` | 904 |
