@@ -146,7 +146,7 @@ whatever was written there. The guard is global (`-mstack-protector-guard=global
 because the x86-64 default reads it through `%fs`, which in the kernel
 belongs to userspace.
 
-`kmain()` calls `vinix_stack_guard_init()` (`kernel/c/stack_protector.c`)
+`kmain()` calls `vinix_stack_guard_init()` (`kernel/lib/stack_protector.v`)
 before anything that will return. It mixes RDRAND (amd64) or RNDR (arm64,
 where the CPU has FEAT_RNG) with the cycle counter and the boot stack's
 address. The M1 has no RNDR, so there the guard depends on the counter's

@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the staged kernel V migration (parent `6f38f210cc755f493a5fc62c72d31080110969ce`),
+for the staged kernel V migration (parent `62bdfc722b8e3e862c170cc84e2cab2c53593766`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,8 +11,8 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 543 | 6,248,750 | 27.24% |
-| Python | 336 | 3,875,921 | 16.90% |
+| C | 543 | 6,248,042 | 27.23% |
+| Python | 337 | 3,879,212 | 16.91% |
 | Shell | 279 | 1,229,845 | 5.36% |
 
 All `.v` files are classified as V. The resulting V share is 37.81%, with no
@@ -170,8 +170,7 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/pthread.h` | 1,298 |
 | `kernel/c/speculation.h` | 524 |
 | `kernel/c/stack_guards.c` | 3,881 |
-| `kernel/c/stack_protector.c` | 3,426 |
-| `kernel/c/stack_protector.h` | 223 |
+| `kernel/c/stack_protector.h` | 762 |
 | `kernel/c/stack_slots.h` | 402 |
 | `kernel/c/stdio.h` | 501 |
 | `kernel/c/stdlib.h` | 1,224 |
@@ -563,6 +562,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/sound/test.c` | 7,406 |
 | `tests/speculation-policy/policy.c` | 5,294 |
 | `tests/stack-policy/guest.c` | 4,914 |
+| `tests/stack-protector/host.c` | 2,179 |
 | `tests/stat-buffer/guest.c` | 5,495 |
 | `tests/steam/madvise-x86_64.c` | 1,109 |
 | `tests/syscall-policy/guest.c` | 18,139 |
@@ -875,6 +875,7 @@ deployed Linguist version and the default-branch revision.
 | `tests/sound/run_vm.py` | 9,559 |
 | `tests/speculation-policy/run.py` | 1,750 |
 | `tests/stack-policy/run.py` | 3,792 |
+| `tests/stack-protector/run.py` | 3,291 |
 | `tests/storage/test_split_desktop_initramfs.py` | 3,623 |
 | `tests/syscall-policy/run-host.py` | 11,663 |
 | `tests/syscall-policy/run.py` | 3,864 |
