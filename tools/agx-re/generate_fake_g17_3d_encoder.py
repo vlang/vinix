@@ -16,7 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 DEFAULT_ABI = SCRIPT_DIR / "build/recovered-g17-abi.json"
 DEFAULT_HEADER = REPO_ROOT / "kernel/c/agx_fake_g17_encode.h"
-DEFAULT_SOURCE = REPO_ROOT / "kernel/c/agx_fake_g17_encode.c"
+DEFAULT_SOURCE = REPO_ROOT / "kernel/lib/agx_fake_g17_encode.v"
 
 
 def _integer(value: Any, name: str) -> int:
@@ -24,11 +24,11 @@ def _integer(value: Any, name: str) -> int:
 
 
 def _u64(value: int) -> str:
-    return f"UINT64_C(0x{value & fake.UINT64_MASK:x})"
+    return f"u64(0x{value & fake.UINT64_MASK:x})"
 
 
 def _u32(value: int) -> str:
-    return f"UINT32_C(0x{value & 0xFFFF_FFFF:x})"
+    return f"u32(0x{value & 0xFFFF_FFFF:x})"
 
 
 def _walk(node: Any):
@@ -127,7 +127,7 @@ def _predicate(
             raise fake.PlanError(
                 f"unsupported generated condition {condition!r} for {operation!r}"
             )
-        return f"(({source}) {operators[condition]} ({other}))"
+        return f"({source}) {operators[condition]} ({other})"
     if operation == "tst":
         if "second" in predicate:
             other_value = _expression(predicate["second"], descriptor, command)
@@ -137,7 +137,7 @@ def _predicate(
         if condition not in ("eq", "ne"):
             raise fake.PlanError(f"unsupported generated TST condition {condition!r}")
         operator = "==" if condition == "eq" else "!="
-        return f"((({source}) & ({other})) {operator} 0)"
+        return f"(({source}) & ({other})) {operator} 0"
     if operation == "test_bit":
         bit = _integer(predicate["bit"], "tested bit")
         if bit < 0 or bit >= byte_count * 8:
@@ -147,7 +147,7 @@ def _predicate(
                 f"unsupported generated bit condition {condition!r}"
             )
         operator = "!=" if condition == "bit_set" else "=="
-        return f"((({source}) & ({_u64(1)} << {bit})) {operator} 0)"
+        return f"(({source}) & ({_u64(1)} << {bit})) {operator} 0"
     raise fake.PlanError(f"unsupported generated predicate {operation!r}")
 
 
@@ -167,7 +167,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
         child = node["source"] if kind == "stack_reload" else node["expression"]
         return _expression(child, descriptor, command)
     if kind == "hardware_input":
-        return f"((uint64_t)inputs->{_hardware_input_name(node)})"
+        return f"u64(inputs.{_hardware_input_name(node)})"
     if kind == "object_load":
         if not _command_root(node.get("base")):
             raise fake.UnresolvedValue("generated object load has an external root")
@@ -207,7 +207,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
         for case in reversed(node["cases"]):
             value = _expression(case["value"], descriptor, command)
             equals = _u64(_integer(case["equals"], "case value"))
-            result = f"(({selector}) == {equals} ? ({value}) : ({result}))"
+            result = f"if ({selector}) == {equals} {{ ({value}) }} else {{ ({result}) }}"
         return _width(result, byte_count)
     if operation in ("csel", "csinc"):
         condition = _predicate(
@@ -217,7 +217,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
         second = _expression(node["second"], descriptor, command)
         if operation == "csinc":
             second = f"(({second}) + {_u64(1)})"
-        return _width(f"(({condition}) ? ({first}) : ({second}))", byte_count)
+        return _width(f"if {condition} {{ ({first}) }} else {{ ({second}) }}", byte_count)
     if operation == "branch_select":
         condition = _predicate(
             node["predicate"], node["condition"], descriptor, command
@@ -225,7 +225,7 @@ def _expression(node: dict[str, Any], descriptor: str, command: str) -> str:
         taken = _expression(node["taken"], descriptor, command)
         fallthrough = _expression(node["fallthrough"], descriptor, command)
         return _width(
-            f"(({condition}) ? ({taken}) : ({fallthrough}))", byte_count
+            f"if {condition} {{ ({taken}) }} else {{ ({fallthrough}) }}", byte_count
         )
     if operation == "movk":
         source = _expression(node["source"], descriptor, command)
@@ -302,16 +302,16 @@ def _evaluated_predicate(
             else f"g17_known({_u64(_integer(predicate.get('immediate', 0), 'compare immediate'))})"
         )
         comparisons = {
-            "eq": "G17_COMPARE_EQ",
-            "ne": "G17_COMPARE_NE",
-            "zero": "G17_COMPARE_EQ",
-            "nonzero": "G17_COMPARE_NE",
-            "hi": "G17_COMPARE_HI",
-            "ls": "G17_COMPARE_LS",
-            "cc": "G17_COMPARE_LO",
-            "lo": "G17_COMPARE_LO",
-            "cs": "G17_COMPARE_HS",
-            "hs": "G17_COMPARE_HS",
+            "eq": ".g17_compare_eq",
+            "ne": ".g17_compare_ne",
+            "zero": ".g17_compare_eq",
+            "nonzero": ".g17_compare_ne",
+            "hi": ".g17_compare_hi",
+            "ls": ".g17_compare_ls",
+            "cc": ".g17_compare_lo",
+            "lo": ".g17_compare_lo",
+            "cs": ".g17_compare_hs",
+            "hs": ".g17_compare_hs",
         }
         if condition not in comparisons:
             raise fake.PlanError(
@@ -367,7 +367,7 @@ def _evaluated_expression(
         child = node["source"] if kind == "stack_reload" else node["expression"]
         return _evaluated_expression(child, descriptor, command)
     if kind == "hardware_input":
-        return f"g17_known((uint64_t)inputs->{_hardware_input_name(node)})"
+        return f"g17_known(u64(inputs.{_hardware_input_name(node)}))"
     if kind == "object_load":
         if not _command_root(node.get("base")):
             return "g17_unknown()"
@@ -409,7 +409,7 @@ def _evaluated_expression(
         for case in reversed(node["cases"]):
             value = _evaluated_expression(case["value"], descriptor, command)
             equals = f"g17_known({_u64(_integer(case['equals'], 'case value'))})"
-            test = f"g17_compare(({selector}), ({equals}), G17_COMPARE_EQ, 8)"
+            test = f"g17_compare(({selector}), ({equals}), .g17_compare_eq, 8)"
             result = f"g17_select(({test}), ({value}), ({result}))"
         return f"g17_eval_width(({result}), {byte_count})"
     if operation in ("csel", "csinc"):
@@ -421,7 +421,7 @@ def _evaluated_expression(
         if operation == "csinc":
             second = (
                 f"g17_eval_binary(({second}), (g17_known({_u64(1)})), "
-                f"G17_BINARY_ADD, {byte_count})"
+                f".g17_binary_add, {byte_count})"
             )
         selected = f"g17_select(({test}), ({first}), ({second}))"
         return f"g17_eval_width(({selected}), {byte_count})"
@@ -474,13 +474,13 @@ def _evaluated_expression(
         )
 
     operations = {
-        "add": "G17_BINARY_ADD",
-        "sub": "G17_BINARY_SUB",
-        "and": "G17_BINARY_AND",
-        "orr": "G17_BINARY_ORR",
-        "orn": "G17_BINARY_ORN",
-        "bic": "G17_BINARY_BIC",
-        "multiply": "G17_BINARY_MULTIPLY",
+        "add": ".g17_binary_add",
+        "sub": ".g17_binary_sub",
+        "and": ".g17_binary_and",
+        "orr": ".g17_binary_orr",
+        "orn": ".g17_binary_orn",
+        "bic": ".g17_binary_bic",
+        "multiply": ".g17_binary_multiply",
     }
     if operation not in operations:
         return "g17_unknown()"
@@ -554,7 +554,7 @@ def _successor_expression(
     offset = _integer(decision["producer_offset"], "decision offset")
     if _has_external_root(decision["predicate"]):
         index = external_decisions.setdefault(offset, len(external_decisions))
-        condition = f"inputs->decisions[pass][{index}] != 0"
+        condition = f"inputs.decisions[pass][{index}] != 0"
     else:
         condition = _predicate(
             decision["predicate"], decision["condition"], "descriptor", "command"
@@ -576,7 +576,7 @@ def _successor_expression(
 
     taken = outcome_expression(decision["taken"])
     fallthrough = outcome_expression(decision["fallthrough"])
-    return f"(({condition}) ? {taken} : {fallthrough})"
+    return f"if {condition} {{ {taken} }} else {{ {fallthrough} }}"
 
 
 def _validate_abi(abi: dict[str, Any]) -> tuple[dict[int, dict[str, Any]], int]:
@@ -714,15 +714,23 @@ enum vinix_fake_g17_encode_error {{
     VINIX_FAKE_G17_ENCODE_GRAPH = 4,
 }};
 
+#ifdef VINIX_V_RUNTIME
+#define VINIX_G17_ENCODE_CONST
+#else
+#define VINIX_G17_ENCODE_CONST const
+#endif
+
 size_t vinix_fake_g17_encoder_inputs_size(void);
 
 int vinix_fake_g17_encode_3d(
     void *command, size_t command_bytes,
     void *descriptor, size_t descriptor_bytes,
     uint64_t command_gpu_address,
-    const struct vinix_fake_g17_encoder_inputs *inputs,
+    VINIX_G17_ENCODE_CONST struct vinix_fake_g17_encoder_inputs *inputs,
     struct vinix_fake_g17_expected_write *writes,
     uint32_t write_capacity, uint32_t *write_count);
+
+#undef VINIX_G17_ENCODE_CONST
 
 #endif
 '''
@@ -745,38 +753,29 @@ def render_source(abi: dict[str, Any], fingerprint: str) -> tuple[str, list[int]
     event_cases = []
     for offset, event in sorted(catalog.items()):
         if offset in external_event_index:
-            evaluated = _evaluated_expression(
-                event["value_source"], "descriptor", "command"
-            )
+            evaluated = _evaluated_expression(event["value_source"], "descriptor", "command")
             value_lines = (
-                f"        evaluated = {evaluated};\n"
-                "        *value = evaluated.resolved ? evaluated.value :\n"
-                f"                 inputs->values[pass][{external_event_index[offset]}];"
+                f"                evaluated = {evaluated}\n"
+                "                *value = if evaluated.resolved != 0 { evaluated.value } else {\n"
+                f"                    inputs.values[pass][{external_event_index[offset]}] }}"
             )
         else:
             value = _expression(event["value_source"], "descriptor", "command")
-            value_lines = f"        *value = {value};"
+            value_lines = f"                *value = {value}"
         event_cases.append(
-            f"    case {_u32(offset)}:\n"
-            f"        *selector = {_u32(event['selector'])};\n"
-            f"        *mode = {_u32(event['mode'])};\n"
-            f"{value_lines}\n"
-            "        return 1;"
+            f"            {_u32(offset)} {{\n"
+            f"                *selector = {_u32(event['selector'])}\n"
+            f"                *mode = {_u32(event['mode'])}\n"
+            f"{value_lines}\n                return 1\n            }}"
         )
 
     node_cases = []
     for node in sorted(graph["nodes"], key=lambda item: item["producer_offset"]):
         offset = _integer(node["producer_offset"], "node offset")
-        if node.get("can_return"):
-            successor = _u32(0)
-        else:
-            successor = _successor_expression(
-                set(node["next"]), offset, decisions, set(), external_decision_map
-            )
-        node_cases.append(
-            f"    case {_u32(offset)}:\n"
-            f"        return {successor};"
+        successor = _u32(0) if node.get("can_return") else _successor_expression(
+            set(node["next"]), offset, decisions, set(), external_decision_map
         )
+        node_cases.append(f"            {_u32(offset)} {{ return {successor} }}")
 
     if len(graph["entry"]) != 1:
         raise fake.PlanError("generated 3D graph needs one entry event")
@@ -785,461 +784,25 @@ def render_source(abi: dict[str, Any], fingerprint: str) -> tuple[str, list[int]
     ]
     decision_check = ""
     if external_decisions:
-        decision_check = """    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {
-        uint32_t decision;
-
-        for (decision = 0;
-             decision < VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT; decision++) {
-            if (inputs->decisions[pass][decision] > 1)
-                return VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT;
-        }
-    }
-
-"""
+        decision_check = """        for pass := u32(0); pass < u32(C.VINIX_FAKE_G17_REGISTER_PASSES); pass++ {
+            for decision := u32(0); decision < u32(C.VINIX_FAKE_G17_EXTERNAL_DECISION_COUNT); decision++ {
+                if inputs.decisions[pass][decision] > 1 { return C.VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT }
+            }
+        }"""
+    fields = []
+    if external_decisions:
+        fields.append(f"    decisions [4][{len(external_decisions)}]u8")
+    if external_events:
+        fields.append(f"    values [4][{len(external_events)}]u64")
+    fields.extend(f"    {name} u32" for name in _hardware_inputs(abi))
+    source = (SCRIPT_DIR / "templates/fake_g17_encoder.v.in").read_text()
+    for name, value in {
+        "fingerprint": fingerprint, "input_fields": "\n".join(fields),
+        "event_cases": "\n".join(event_cases), "node_cases": "\n".join(node_cases),
+        "decision_check": decision_check, "entry": _u32(graph['entry'][0]),
+    }.items():
+        source = source.replace(f"@{name}@", value)
     max_writes = longest * 4
-    source = f'''// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
-// Use of this source code is governed by a GPL v2 license
-// that can be found in the LICENSE file.
-
-/* SPDX-License-Identifier: GPL-2.0-or-later */
-/* Code generated by tools/agx-re/generate_fake_g17_3d_encoder.py. */
-/* Recovered G17 3D ABI SHA-256: {fingerprint} */
-#include "agx_fake_g17_encode.h"
-
-#include <string.h>
-
-static uint64_t g17_width(uint64_t value, unsigned int bytes)
-{{
-    if (bytes == 8)
-        return value;
-    return value & ((UINT64_C(1) << (bytes * 8)) - 1);
-}}
-
-static uint64_t g17_load(const uint8_t *buffer, size_t offset,
-                         unsigned int bytes, int is_signed)
-{{
-    uint64_t value = 0;
-
-    memcpy(&value, buffer + offset, bytes);
-    if (!is_signed || bytes == 8)
-        return g17_width(value, bytes);
-    if (bytes == 1)
-        return (uint64_t)(int64_t)(int8_t)value;
-    if (bytes == 2)
-        return (uint64_t)(int64_t)(int16_t)value;
-    return (uint64_t)(int64_t)(int32_t)value;
-}}
-
-static uint64_t g17_shift(uint64_t value, unsigned int kind,
-                          unsigned int amount, unsigned int bits)
-{{
-    value = bits == 64 ? value : value & ((UINT64_C(1) << bits) - 1);
-    if (kind)
-        return value >> amount;
-    value <<= amount;
-    return bits == 64 ? value : value & ((UINT64_C(1) << bits) - 1);
-}}
-
-static uint64_t g17_rotate_right(uint64_t value, unsigned int amount,
-                                 unsigned int bits)
-{{
-    uint64_t mask = bits == 64 ? UINT64_MAX : (UINT64_C(1) << bits) - 1;
-
-    value &= mask;
-    amount %= bits;
-    if (!amount)
-        return value;
-    return ((value >> amount) | (value << (bits - amount))) & mask;
-}}
-
-static uint64_t g17_replicate(uint64_t value, unsigned int element_bits,
-                              unsigned int total_bits)
-{{
-    uint64_t result = 0;
-    unsigned int offset;
-
-    for (offset = 0; offset < total_bits; offset += element_bits)
-        result |= value << offset;
-    return result;
-}}
-
-static uint64_t g17_bitfield(uint64_t source, uint64_t destination,
-                             unsigned int rotate, unsigned int mask_end,
-                             unsigned int bits, int merge)
-{{
-    unsigned int n_bit = bits == 64;
-    unsigned int concatenated = (n_bit << 6) | ((~mask_end) & 0x3f);
-    unsigned int length = 31u - (unsigned int)__builtin_clz(concatenated);
-    unsigned int levels = (1u << length) - 1;
-    unsigned int s = mask_end & levels;
-    unsigned int r = rotate & levels;
-    unsigned int diff = (s - r) & levels;
-    unsigned int element_bits = 1u << length;
-    uint64_t element_mask = s + 1 == 64 ? UINT64_MAX :
-                            (UINT64_C(1) << (s + 1)) - 1;
-    uint64_t truncate_mask = diff + 1 == 64 ? UINT64_MAX :
-                             (UINT64_C(1) << (diff + 1)) - 1;
-    uint64_t width_mask = bits == 64 ? UINT64_MAX :
-                          (UINT64_C(1) << bits) - 1;
-    uint64_t write_mask = g17_replicate(
-        g17_rotate_right(element_mask, r, element_bits), element_bits, bits);
-    uint64_t top_mask = g17_replicate(
-        truncate_mask, element_bits, bits);
-    uint64_t bottom = g17_rotate_right(source & width_mask, r, bits) & write_mask;
-
-    if (!merge)
-        return bottom & top_mask;
-    destination &= width_mask;
-    bottom = (destination & ~write_mask) | bottom;
-    return (destination & ~top_mask) | (bottom & top_mask);
-}}
-
-static __attribute__((unused)) uint64_t
-g17_movk(uint64_t source, uint64_t immediate,
-         unsigned int shift, unsigned int bytes)
-{{
-    uint64_t mask = UINT64_C(0xffff) << shift;
-
-    return g17_width((source & ~mask) | ((immediate & 0xffff) << shift), bytes);
-}}
-
-struct g17_eval {{
-    uint64_t value;
-    int resolved;
-}};
-
-struct g17_test {{
-    int value;
-    int resolved;
-}};
-
-enum g17_binary_operation {{
-    G17_BINARY_ADD,
-    G17_BINARY_SUB,
-    G17_BINARY_AND,
-    G17_BINARY_ORR,
-    G17_BINARY_ORN,
-    G17_BINARY_BIC,
-    G17_BINARY_MULTIPLY,
-}};
-
-enum g17_compare_operation {{
-    G17_COMPARE_EQ,
-    G17_COMPARE_NE,
-    G17_COMPARE_HI,
-    G17_COMPARE_LS,
-    G17_COMPARE_LO,
-    G17_COMPARE_HS,
-}};
-
-static __attribute__((unused)) struct g17_eval g17_known(uint64_t value)
-{{
-    return (struct g17_eval){{value, 1}};
-}}
-
-static __attribute__((unused)) struct g17_eval g17_unknown(void)
-{{
-    return (struct g17_eval){{0, 0}};
-}}
-
-static __attribute__((unused)) struct g17_eval g17_eval_width(struct g17_eval source,
-                                      unsigned int bytes)
-{{
-    if (!source.resolved)
-        return source;
-    source.value = g17_width(source.value, bytes);
-    return source;
-}}
-
-static __attribute__((unused)) struct g17_eval g17_eval_shift(struct g17_eval source,
-                                      unsigned int kind,
-                                      unsigned int amount,
-                                      unsigned int bits)
-{{
-    if (!source.resolved)
-        return source;
-    source.value = g17_shift(source.value, kind, amount, bits);
-    return source;
-}}
-
-static __attribute__((unused)) struct g17_eval g17_eval_binary(struct g17_eval first,
-                                       struct g17_eval second,
-                                       enum g17_binary_operation operation,
-                                       unsigned int bytes)
-{{
-    uint64_t value;
-
-    if (!first.resolved || !second.resolved)
-        return g17_unknown();
-    switch (operation) {{
-    case G17_BINARY_ADD:
-        value = first.value + second.value;
-        break;
-    case G17_BINARY_SUB:
-        value = first.value - second.value;
-        break;
-    case G17_BINARY_AND:
-        value = first.value & second.value;
-        break;
-    case G17_BINARY_ORR:
-        value = first.value | second.value;
-        break;
-    case G17_BINARY_ORN:
-        value = first.value | ~second.value;
-        break;
-    case G17_BINARY_BIC:
-        value = first.value & ~second.value;
-        break;
-    case G17_BINARY_MULTIPLY:
-        value = first.value * second.value;
-        break;
-    default:
-        return g17_unknown();
-    }}
-    return g17_known(g17_width(value, bytes));
-}}
-
-static __attribute__((unused)) struct g17_eval g17_eval_bitfield(
-    struct g17_eval source, struct g17_eval destination,
-    unsigned int rotate, unsigned int mask_end, unsigned int bits, int merge)
-{{
-    if (!source.resolved || !destination.resolved)
-        return g17_unknown();
-    return g17_known(g17_bitfield(source.value, destination.value, rotate,
-                                  mask_end, bits, merge));
-}}
-
-static __attribute__((unused)) struct g17_eval g17_eval_movk(struct g17_eval source,
-                                     struct g17_eval immediate,
-                                     unsigned int shift, unsigned int bytes)
-{{
-    if (!source.resolved || !immediate.resolved)
-        return g17_unknown();
-    return g17_known(g17_movk(source.value, immediate.value, shift, bytes));
-}}
-
-static __attribute__((unused)) struct g17_test g17_compare(struct g17_eval first,
-                                   struct g17_eval second,
-                                   enum g17_compare_operation operation,
-                                   unsigned int bytes)
-{{
-    struct g17_test result = {{0, 0}};
-
-    if (!first.resolved || !second.resolved)
-        return result;
-    first.value = g17_width(first.value, bytes);
-    second.value = g17_width(second.value, bytes);
-    result.resolved = 1;
-    switch (operation) {{
-    case G17_COMPARE_EQ:
-        result.value = first.value == second.value;
-        break;
-    case G17_COMPARE_NE:
-        result.value = first.value != second.value;
-        break;
-    case G17_COMPARE_HI:
-        result.value = first.value > second.value;
-        break;
-    case G17_COMPARE_LS:
-        result.value = first.value <= second.value;
-        break;
-    case G17_COMPARE_LO:
-        result.value = first.value < second.value;
-        break;
-    case G17_COMPARE_HS:
-        result.value = first.value >= second.value;
-        break;
-    }}
-    return result;
-}}
-
-static __attribute__((unused)) struct g17_test g17_test_mask(struct g17_eval first,
-                                     struct g17_eval second,
-                                     int want_nonzero, unsigned int bytes)
-{{
-    struct g17_test result = {{0, 0}};
-
-    if (!first.resolved || !second.resolved)
-        return result;
-    result.resolved = 1;
-    result.value = !!(g17_width(first.value, bytes) &
-                      g17_width(second.value, bytes));
-    if (!want_nonzero)
-        result.value = !result.value;
-    return result;
-}}
-
-static __attribute__((unused)) struct g17_test g17_test_bit(struct g17_eval source,
-                                    unsigned int bit, int want_set,
-                                    unsigned int bytes)
-{{
-    struct g17_test result = {{0, 0}};
-
-    if (!source.resolved)
-        return result;
-    result.resolved = 1;
-    result.value = !!(g17_width(source.value, bytes) &
-                      (UINT64_C(1) << bit));
-    if (!want_set)
-        result.value = !result.value;
-    return result;
-}}
-
-static __attribute__((unused)) struct g17_eval g17_select(struct g17_test test,
-                                  struct g17_eval first,
-                                  struct g17_eval second)
-{{
-    if (!test.resolved)
-        return g17_unknown();
-    return test.value ? first : second;
-}}
-
-static uint32_t g17_read32(const uint8_t *bytes)
-{{
-    return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 |
-           (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
-}}
-
-static void g17_write16(uint8_t *bytes, uint16_t value)
-{{
-    bytes[0] = (uint8_t)value;
-    bytes[1] = (uint8_t)(value >> 8);
-}}
-
-static void g17_write32(uint8_t *bytes, uint32_t value)
-{{
-    bytes[0] = (uint8_t)value;
-    bytes[1] = (uint8_t)(value >> 8);
-    bytes[2] = (uint8_t)(value >> 16);
-    bytes[3] = (uint8_t)(value >> 24);
-}}
-
-static void g17_write64(uint8_t *bytes, uint64_t value)
-{{
-    g17_write32(bytes, (uint32_t)value);
-    g17_write32(bytes + 4, (uint32_t)(value >> 32));
-}}
-
-static int g17_event(uint32_t event, const uint8_t *descriptor,
-                     const uint8_t *command,
-                     const struct vinix_fake_g17_encoder_inputs *inputs,
-                     uint32_t pass, uint32_t *selector, uint32_t *mode,
-                     uint64_t *value)
-{{
-    struct g17_eval evaluated;
-
-    switch (event) {{
-{chr(10).join(event_cases)}
-    default:
-        return 0;
-    }}
-}}
-
-static uint32_t g17_next(uint32_t event, const uint8_t *descriptor,
-                         const uint8_t *command,
-                         const struct vinix_fake_g17_encoder_inputs *inputs,
-                         uint32_t pass)
-{{
-    (void)command;
-    (void)inputs;
-    (void)pass;
-    switch (event) {{
-{chr(10).join(node_cases)}
-    default:
-        return UINT32_MAX;
-    }}
-}}
-
-size_t vinix_fake_g17_encoder_inputs_size(void)
-{{
-    return sizeof(struct vinix_fake_g17_encoder_inputs);
-}}
-
-int vinix_fake_g17_encode_3d(
-    void *command_pointer, size_t command_bytes,
-    void *descriptor_pointer, size_t descriptor_bytes,
-    uint64_t command_gpu_address,
-    const struct vinix_fake_g17_encoder_inputs *inputs,
-    struct vinix_fake_g17_expected_write *writes,
-    uint32_t write_capacity, uint32_t *write_count)
-{{
-    uint8_t *command = command_pointer;
-    uint8_t *descriptor = descriptor_pointer;
-    uint32_t produced = 0;
-    uint32_t pass;
-
-    if (!command || command_bytes < VINIX_FAKE_G17_COMMAND_BYTES ||
-        !descriptor || descriptor_bytes < VINIX_FAKE_G17_DESCRIPTOR_BYTES ||
-        !command_gpu_address || !inputs || !writes || !write_count)
-        return VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT;
-    *write_count = 0;
-    if (write_capacity < VINIX_FAKE_G17_MAX_WRITES)
-        return VINIX_FAKE_G17_ENCODE_WRITE_CAPACITY;
-{decision_check}    for (pass = 0; pass < VINIX_FAKE_G17_REGISTER_PASSES; pass++) {{
-        size_t base = (size_t)pass * VINIX_FAKE_G17_REGISTER_STRIDE;
-        size_t stream_offset = base + VINIX_FAKE_G17_STREAM_OFFSET;
-        size_t metadata_offset = base + VINIX_FAKE_G17_METADATA_OFFSET;
-        size_t summary_offset = VINIX_FAKE_G17_SUMMARY_OFFSET +
-                                (size_t)pass * VINIX_FAKE_G17_SUMMARY_STRIDE;
-        uint64_t stream_gpu_address;
-        uint32_t event = {_u32(graph['entry'][0])};
-        uint16_t count = 0;
-
-        if (command_gpu_address > UINT64_MAX - stream_offset)
-            return VINIX_FAKE_G17_ENCODE_INVALID_ARGUMENT;
-        stream_gpu_address = command_gpu_address + stream_offset;
-
-        while (event) {{
-            struct vinix_fake_g17_expected_write *expected;
-            uint8_t *entry;
-            uint32_t selector;
-            uint32_t selector_word;
-            uint32_t mode;
-            uint64_t value;
-            uint32_t next;
-
-            if ((size_t)(count + 1) * VINIX_FAKE_G17_ENTRY_BYTES >
-                VINIX_FAKE_G17_STREAM_BYTES)
-                return VINIX_FAKE_G17_ENCODE_STREAM_OVERFLOW;
-            if (!g17_event(event, descriptor, command, inputs, pass,
-                           &selector, &mode, &value))
-                return VINIX_FAKE_G17_ENCODE_GRAPH;
-            entry = command + stream_offset +
-                    (size_t)count * VINIX_FAKE_G17_ENTRY_BYTES;
-            selector_word = g17_read32(entry);
-            expected = &writes[produced++];
-            *expected = (struct vinix_fake_g17_expected_write){{
-                .value = value,
-                .value_mask = UINT64_MAX,
-                .selector = selector,
-                .template_bits = selector_word & VINIX_FAKE_G17_TEMPLATE_MASK,
-                .template_mask = VINIX_FAKE_G17_TEMPLATE_MASK,
-                .pass = pass,
-                .mode = mode,
-            }};
-            selector_word = (selector_word & VINIX_FAKE_G17_TEMPLATE_MASK) |
-                            selector | mode;
-            g17_write32(entry, selector_word);
-            g17_write64(entry + 4, value);
-            count++;
-            next = g17_next(event, descriptor, command, inputs, pass);
-            if (next == UINT32_MAX)
-                return VINIX_FAKE_G17_ENCODE_GRAPH;
-            event = next;
-        }}
-
-        g17_write64(command + metadata_offset, stream_gpu_address);
-        g17_write16(command + metadata_offset + 8, count);
-        g17_write16(command + metadata_offset + 10,
-                    count * VINIX_FAKE_G17_ENTRY_BYTES);
-        g17_write64(descriptor + summary_offset, stream_gpu_address);
-        g17_write16(descriptor + summary_offset + 8, count);
-        memset(descriptor + summary_offset + 10, 0, 6);
-    }}
-    *write_count = produced;
-    return VINIX_FAKE_G17_ENCODE_OK;
-}}
-'''
     return source, external_events, external_decisions, max_writes
 
 

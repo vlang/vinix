@@ -22,16 +22,16 @@ fn C.vinix_fake_g17_resource_reference_size() usize
 
 fn C.vinix_fake_g17_report_size() usize
 
-fn C.vinix_fake_g17_encoder_inputs_size() u64
+fn C.vinix_fake_g17_encoder_inputs_size() usize
 
 fn C.vinix_fake_g17_verify(command voidptr, command_bytes usize,
 	descriptor voidptr, descriptor_bytes usize, command_gpu_address u64,
 	writes &C.vinix_fake_g17_expected_write, write_count u32, ranges &C.vinix_fake_g17_address_range, range_count u32,
 	resources &C.vinix_fake_g17_resource_reference, resource_count u32, report &C.vinix_fake_g17_report) i32
 
-fn C.vinix_fake_g17_encode_3d(command voidptr, command_bytes u64,
-	descriptor voidptr, descriptor_bytes u64, command_gpu_address u64,
-	inputs voidptr, writes voidptr, write_capacity u32, write_count &u32) int
+fn C.vinix_fake_g17_encode_3d(command voidptr, command_bytes usize,
+	descriptor voidptr, descriptor_bytes usize, command_gpu_address u64,
+	inputs &C.vinix_fake_g17_encoder_inputs, writes &C.vinix_fake_g17_expected_write, write_capacity u32, write_count &u32) i32
 
 pub const fake_g17_ok = u32(0)
 pub const fake_g17_invalid_argument = u32(1)
@@ -185,7 +185,7 @@ pub fn encode_fake_g17_3d(command voidptr, command_bytes u64,
 		}
 	}
 	mut write_count := u32(0)
-	error := C.vinix_fake_g17_encode_3d(command, command_bytes, descriptor, descriptor_bytes, command_gpu_address, voidptr(inputs), write_pointer, u32(writes.len), &write_count)
+	error := unsafe { C.vinix_fake_g17_encode_3d(command, usize(command_bytes), descriptor, usize(descriptor_bytes), command_gpu_address, &C.vinix_fake_g17_encoder_inputs(inputs), &C.vinix_fake_g17_expected_write(write_pointer), u32(writes.len), &write_count) }
 	return FakeG17Encoding{
 		error:       u32(error)
 		write_count: write_count

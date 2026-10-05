@@ -90,6 +90,20 @@ def child_exit_code(status: int) -> int:
     return 1
 
 
+def quit_monitor(path: Path) -> bool:
+    try:
+        with socket.socket(socket.AF_UNIX) as monitor:
+            monitor.settimeout(2)
+            monitor.connect(str(path))
+            monitor.recv(4096)
+            monitor.sendall(b'{"execute":"qmp_capabilities"}\n')
+            monitor.recv(4096)
+            monitor.sendall(b'{"execute":"quit"}\n')
+        return True
+    except OSError:
+        return False
+
+
 def stop_child(pid: int, master: int) -> None:
     try:
         os.write(master, b"\x01x")
@@ -137,6 +151,10 @@ def run_vm(root: Path, timeout: int) -> int:
         environment.setdefault("VINIX_BOOT_DISK", str(Path(scratch) / "boot.img"))
         environment.setdefault("VINIX_EFIVARS", str(Path(scratch) / "efivars.fd"))
         environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
+
+        monitor_path = Path(scratch) / "qmp.sock"
+        environment["VINIX_QEMU_EXTRA"] = (environment.get("VINIX_QEMU_EXTRA", "")
+            + f" -qmp unix:{monitor_path},server=on,wait=off")
 
         command = [
             str(root / "scripts/run-aarch64.sh"),
@@ -188,6 +206,9 @@ def run_vm(root: Path, timeout: int) -> int:
                 pass_seen = PASS_LINE.search(recent) is not None
                 fail_seen = FAIL_LINE.search(recent) is not None
                 if (pass_seen or fail_seen) and not shutdown_sent:
+                    if quit_monitor(monitor_path):
+                        shutdown_sent = True
+                        continue
                     try:
                         os.write(master, b"\x01x")
                     except OSError as error:

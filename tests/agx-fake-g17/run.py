@@ -18,17 +18,18 @@ common = [os.environ.get("CC", "clang"), "-std=gnu11", "-O2", "-g",
 with tempfile.TemporaryDirectory(prefix="vinix-g17-", dir="/tmp") as directory:
     work = Path(directory)
     (work / "v.mod").write_text("Module { name: 'vinix_g17_tests' }\n")
-    shutil.copyfile(ROOT / "kernel/lib/agx_fake_g17.v", work / "core.v")
+    for source in ("agx_fake_g17.v", "agx_fake_g17_encode.v"):
+        shutil.copyfile(ROOT / "kernel/lib" / source, work / source)
     subprocess.run([v, "-shared", "-no-builtin", "-os", "vinix", "-target-libc-headers",
                     "-nofloat", "-gc", "none", "-manualfree", "-o", str(work / "core.c"),
                     str(work)], check=True, env={**os.environ, "V_C_ERROR_BUG_REPORT_DISABLED": "1"})
-    subprocess.run(common + ["-Wno-unused-function", "-ffreestanding", "-fno-builtin",
+    subprocess.run(common + ["-Wno-unused-function", "-Wno-unused-parameter", "-ffreestanding", "-fno-builtin",
                     "-fno-strict-aliasing", "-DVINIX_V_RUNTIME", "-I", str(ROOT / "kernel/c"),
                     "-c", str(work / "core.c"), "-o", str(work / "core.o")], check=True)
     imports = subprocess.check_output(["nm", "-u", str(work / "core.o")], text=True)
     if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
         raise RuntimeError("unexpected allocator import in G17 verifier:\n" + imports)
-    for fixture, sources in [("test.c", []), ("test_encode.c", [ROOT / "kernel/c/agx_fake_g17_encode.c"])]:
+    for fixture, sources in [("test.c", []), ("test_encode.c", [])]:
         subprocess.run(common + ["-iquote", str(ROOT / "kernel/c"),
                         str(ROOT / "tests/agx-fake-g17" / fixture), *map(str, sources), str(work / "core.o"),
                         "-o", str(work / "host")], check=True)

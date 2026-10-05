@@ -34,14 +34,22 @@ enum vinix_fake_g17_encode_error {
     VINIX_FAKE_G17_ENCODE_GRAPH = 4,
 };
 
+#ifdef VINIX_V_RUNTIME
+#define VINIX_G17_ENCODE_CONST
+#else
+#define VINIX_G17_ENCODE_CONST const
+#endif
+
 size_t vinix_fake_g17_encoder_inputs_size(void);
 
 int vinix_fake_g17_encode_3d(
     void *command, size_t command_bytes,
     void *descriptor, size_t descriptor_bytes,
     uint64_t command_gpu_address,
-    const struct vinix_fake_g17_encoder_inputs *inputs,
+    VINIX_G17_ENCODE_CONST struct vinix_fake_g17_encoder_inputs *inputs,
     struct vinix_fake_g17_expected_write *writes,
     uint32_t write_capacity, uint32_t *write_count);
+
+#undef VINIX_G17_ENCODE_CONST
 
 #endif
