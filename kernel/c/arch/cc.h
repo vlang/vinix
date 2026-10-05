@@ -15,7 +15,11 @@
 #define SZT_F "lu"
 
 #define LWIP_PLATFORM_DIAG(x) do { } while (0)
+#ifdef VINIX_V_RUNTIME
+void vinix_lwip_assert(char *message, char *file, int line);
+#else
 void vinix_lwip_assert(const char *message, const char *file, int line);
+#endif
 #define LWIP_PLATFORM_ASSERT(message) \
     vinix_lwip_assert((message), __FILE__, __LINE__)
 

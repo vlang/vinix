@@ -1,7 +1,9 @@
 # Network option behavior
 
 Run `./tests/network-options/run-host.sh` for ASan/UBSan coverage of the production
-lwIP glue. It checks TCP SYN SACK/timestamp options, an injected SYN-ACK, out-of-order data/SACK and gap recovery,
+native V adapter in `kernel/netcore/core.v`, linked to unmodified lwIP. The
+fixture keeps the original C layouts and assertions; the runner rejects implicit
+V allocator imports. It checks TCP SYN SACK/timestamp options, an injected SYN-ACK, out-of-order data/SACK and gap recovery,
 timer-driven keepalive probes and failed-peer teardown, listener inheritance,
 receive/send limits, empty UDP datagram accounting, TCP receive-buffer shrink
 and retry, send backpressure/output failures, and abort-close callback cleanup.

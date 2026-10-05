@@ -27,15 +27,15 @@ pub mut:
 	sin6_scope_id u32
 }
 
-fn C.vinix_socket_new_family(@type int, protocol int, family int) &C.vinix_socket
-fn C.vinix_socket_bind_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint) int
-fn C.vinix_socket_connect_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint) int
-fn C.vinix_socket_send_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint, has_address int) int
-fn C.vinix_socket_recv_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint) int
-fn C.vinix_socket_name_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, peer int) int
-fn C.vinix_socket_membership(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, interface_address u32, join int) int
-fn C.vinix_socket_multicast_interface(socket &C.vinix_socket, family int, index u32, interface_address u32) int
-fn C.vinix_net_ipv6_address(index u32, slot u32, endpoint &C.vinix_net_endpoint, state &u32, valid &u32, preferred &u32) int
+fn C.vinix_socket_new_family(@type i32, protocol i32, family i32) &C.vinix_socket
+fn C.vinix_socket_bind_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint) i32
+fn C.vinix_socket_connect_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint) i32
+fn C.vinix_socket_send_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint, has_address i32) i32
+fn C.vinix_socket_recv_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint) i32
+fn C.vinix_socket_name_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, peer i32) i32
+fn C.vinix_socket_membership(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, interface_address u32, join i32) i32
+fn C.vinix_socket_multicast_interface(socket &C.vinix_socket, family i32, index u32, interface_address u32) i32
+fn C.vinix_net_ipv6_address(index u32, slot u32, endpoint &C.vinix_net_endpoint, state &u32, valid &u32, preferred &u32) i32
 
 // Every endpoint lives in its public caller's stack slot. lwIP copies it
 // synchronously; a blocking retry never allocates another endpoint.

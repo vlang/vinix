@@ -106,3 +106,8 @@ ABI references: [Linux ipv6(7)](https://man7.org/linux/man-pages/man7/ipv6.7.htm
 [lwIP IPv6 reassembly](https://github.com/lwip-tcpip/lwip/blob/STABLE-2_2_1_RELEASE/src/include/lwip/ip6_frag.h).
 Receive register reference:
 [Linux e1000 definitions](https://github.com/torvalds/linux/blob/master/drivers/net/ethernet/intel/e1000/e1000_hw.h).
+
+The host runner links the original packet and ownership assertions against
+`kernel/netcore/core.v` and unmodified lwIP, with ASan/UBSan and a check for
+implicit V allocator imports. Its C fixture contains only layouts, declarations
+and borrowed views of the V adapter.

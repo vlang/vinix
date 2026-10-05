@@ -3,6 +3,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#ifdef VINIX_V_RUNTIME
+#define vinix_socket netcore__Vinix_socket
+#define VINIX_NET_CONST
+#else
+#define VINIX_NET_CONST const
+#endif
 
 struct vinix_socket;
 
@@ -22,9 +28,9 @@ enum {
 
 void vinix_net_init(void);
 void vinix_net_poll(uint32_t now_ms);
-int vinix_net_attach(const uint8_t mac[6], int driver);
+int vinix_net_attach(VINIX_NET_CONST uint8_t mac[6], int driver);
 void vinix_net_detach(void);
-int vinix_net_input(const void *frame, size_t length);
+int vinix_net_input(VINIX_NET_CONST void *frame, size_t length);
 int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
                      uint32_t dns[3]);
 int vinix_net_link(uint8_t mac[6], uint32_t *mtu);
@@ -37,7 +43,7 @@ int vinix_socket_bind(struct vinix_socket *socket, uint32_t address, uint16_t po
 int vinix_socket_connect(struct vinix_socket *socket, uint32_t address, uint16_t port);
 int vinix_socket_listen(struct vinix_socket *socket, int backlog);
 struct vinix_socket *vinix_socket_accept(struct vinix_socket *socket);
-int vinix_socket_send(struct vinix_socket *socket, const void *data, size_t length,
+int vinix_socket_send(struct vinix_socket *socket, VINIX_NET_CONST void *data, size_t length,
                       uint32_t address, uint16_t port, int has_address);
 int vinix_socket_recv(struct vinix_socket *socket, void *data, size_t length,
                       uint32_t *address, uint16_t *port);

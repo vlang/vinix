@@ -12,6 +12,7 @@ import klock
 import krandom
 import lib
 import limine
+import netcore as _
 import proc
 import resource
 import socket.public as sock_pub
@@ -23,28 +24,28 @@ struct C.vinix_socket {}
 
 fn C.vinix_net_init()
 fn C.vinix_net_poll(now_ms u32)
-fn C.vinix_net_attach(mac &u8, driver int) int
-fn C.vinix_net_link(mac &u8, mtu &u32) int
+fn C.vinix_net_attach(mac &u8, driver i32) i32
+fn C.vinix_net_link(mac &u8, mtu &u32) i32
 fn C.vinix_net_detach()
-fn C.vinix_net_input(frame voidptr, length u64) int
-fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) int
+fn C.vinix_net_input(frame voidptr, length u64) i32
+fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) i32
 fn C.vinix_socket_free(socket &C.vinix_socket)
-fn C.vinix_socket_pending(socket &C.vinix_socket) int
+fn C.vinix_socket_pending(socket &C.vinix_socket) i32
 fn C.vinix_socket_abort_close(socket &C.vinix_socket)
-fn C.vinix_socket_bind(socket &C.vinix_socket, address u32, port u16) int
-fn C.vinix_socket_connect(socket &C.vinix_socket, address u32, port u16) int
-fn C.vinix_socket_listen(socket &C.vinix_socket, backlog int) int
+fn C.vinix_socket_bind(socket &C.vinix_socket, address u32, port u16) i32
+fn C.vinix_socket_connect(socket &C.vinix_socket, address u32, port u16) i32
+fn C.vinix_socket_listen(socket &C.vinix_socket, backlog i32) i32
 fn C.vinix_socket_accept(socket &C.vinix_socket) &C.vinix_socket
-fn C.vinix_socket_send(socket &C.vinix_socket, data voidptr, length u64, address u32, port u16, has_address int) int
-fn C.vinix_socket_recv(socket &C.vinix_socket, data voidptr, length u64, address &u32, port &u16) int
-fn C.vinix_socket_shutdown(socket &C.vinix_socket, how int) int
-fn C.vinix_socket_local(socket &C.vinix_socket, address &u32, port &u16) int
-fn C.vinix_socket_peer(socket &C.vinix_socket, address &u32, port &u16) int
-fn C.vinix_socket_ready(socket &C.vinix_socket) int
-fn C.vinix_socket_error(socket &C.vinix_socket, clear int) int
-fn C.vinix_socket_available(socket &C.vinix_socket) int
-fn C.vinix_socket_set_option(socket &C.vinix_socket, level int, option int, value int) int
-fn C.vinix_socket_get_option(socket &C.vinix_socket, level int, option int, value &i32) int
+fn C.vinix_socket_send(socket &C.vinix_socket, data voidptr, length u64, address u32, port u16, has_address i32) i32
+fn C.vinix_socket_recv(socket &C.vinix_socket, data voidptr, length u64, address &u32, port &u16) i32
+fn C.vinix_socket_shutdown(socket &C.vinix_socket, how i32) i32
+fn C.vinix_socket_local(socket &C.vinix_socket, address &u32, port &u16) i32
+fn C.vinix_socket_peer(socket &C.vinix_socket, address &u32, port &u16) i32
+fn C.vinix_socket_ready(socket &C.vinix_socket) i32
+fn C.vinix_socket_error(socket &C.vinix_socket, clear i32) i32
+fn C.vinix_socket_available(socket &C.vinix_socket) i32
+fn C.vinix_socket_set_option(socket &C.vinix_socket, level i32, option i32, value i32) i32
+fn C.vinix_socket_get_option(socket &C.vinix_socket, level i32, option i32, value &i32) i32
 
 const max_sockets = 256
 const ready_read = 1
@@ -66,7 +67,7 @@ const ip_tos = 1
 const ip_ttl = 2
 const ip_recverr = 11
 
-// Driver identifiers shared with vinix_net.c.
+// Driver identifiers shared with netcore.
 pub const driver_virtio = 1
 pub const driver_apple_wifi = 2
 pub const driver_e1000 = 3

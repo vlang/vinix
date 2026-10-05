@@ -4,7 +4,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #define printf_panic printf
-#include "../../kernel/c/vinix_net.c"
+#include "core_fixture.h"
 
 uint32_t vinix_net_random(void) { return 0x12345678; }
 uint16_t vinix_ip_randomid(void) { return 1234; }

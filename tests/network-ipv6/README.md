@@ -33,7 +33,7 @@ tests/net-random/run.sh
 tests/krandom/run.sh /absolute/path/to/v
 ```
 
-The IPv6 host test compiles the actual adapter and pinned lwIP with AddressSanitizer
+The IPv6 host test compiles the native V adapter in `kernel/netcore` and pinned lwIP with AddressSanitizer
 and UndefinedBehaviorSanitizer. It exercises native IPv6 and mapped IPv4 UDP/TCP,
 IPv6-only refusal, scope errors, address-setting restrictions, timer processing,
 600 repeated UDP exchanges with no remaining UDP PCBs or retained lwIP heap

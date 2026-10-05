@@ -1,5 +1,5 @@
 Run `./tests/network-tcp-lifetime/run-host.sh` to exercise the production Vinix
-socket glue and lwIP 2.2.1 with ASan/UBSan. The fixture uses actual TCP packets
+native V socket adapter (`kernel/netcore`) and lwIP 2.2.1 with ASan/UBSan. The fixture uses actual TCP packets
 and timer processing; it does not mock shutdown, PCB allocation, or close.
 
 It checks full shutdown followed by close and PCB reuse, both half-shutdown
