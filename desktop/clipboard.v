@@ -195,11 +195,14 @@ fn (mut c HostClipboard) close_request() {
 fn (mut d Desktop) send_paste_to_focused(text string) {
 	index := d.focused_app_index() or { return }
 	mut app := d.apps[index]
+	// Avoid V3 heap-boxing the mutable smartcast receiver on every paste.
 	if mut app is PastingApp {
-		app.paste_input(text)
+		mut paster := PastingApp(app)
+		paster.paste_input(text)
 		d.dirty = true
 	} else if mut app is KeyboardApp {
-		app.key_input(text)
+		mut keyboard := KeyboardApp(app)
+		keyboard.key_input(text)
 		d.dirty = true
 	}
 }

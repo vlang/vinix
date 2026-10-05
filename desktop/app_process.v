@@ -1011,7 +1011,8 @@ fn run_app_process(options AppProcessOptions) {
 			}
 			.key_input {
 				if mut app is KeyboardApp {
-					app.key_input(payload)
+					mut keyboard := KeyboardApp(app)
+					keyboard.key_input(payload)
 				}
 				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
 					free_app_payload(payload)
@@ -1019,10 +1020,14 @@ fn run_app_process(options AppProcessOptions) {
 				}
 			}
 			.paste_input {
+				// Explicit interface locals keep V3's receivers on the stack;
+				// calling through the smartcast retains a heap wrapper per edit.
 				if mut app is PastingApp {
-					app.paste_input(payload)
+					mut paster := PastingApp(app)
+					paster.paste_input(payload)
 				} else if mut app is KeyboardApp {
-					app.key_input(payload)
+					mut keyboard := KeyboardApp(app)
+					keyboard.key_input(payload)
 				}
 				if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
 					free_app_payload(payload)

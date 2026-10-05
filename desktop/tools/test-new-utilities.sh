@@ -41,7 +41,7 @@ PY
 "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/native_utility_test.v"
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
-for test in preview_app_memory console_app_memory system_information_memory; do
+for test in preview_app_memory console_app_memory system_information_memory native_paste_memory; do
     cp "$root/desktop/tools/tests/${test}_test.v" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${test}_test.v"
