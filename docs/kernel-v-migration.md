@@ -223,7 +223,7 @@ The real-ADT baseline limitation above still applies.
 | --- | --- | --- |
 | Security utilities | `tools/{sandbox,security-mac,security-audit}/core` | Complete: unchanged independent C host callers passed ASan/UBSan; all three static target utilities built for aarch64 and x86_64; original sandbox and audit collector QEMU guests passed on both architectures; kernel guest runner's 12 tests passed |
 
-This stage covers 869 original C lines and conservatively counts 665 translated
+This stage covers 859 original C lines and conservatively counts 665 translated
 implementation lines: 192 sandbox, 96 mandatory-policy CLI and 377 audit
 collector lines. Native syscall, stat, signal, clock and stdio adapters remain C,
 as do every original independent fixture and its native variadic helper. The
@@ -295,3 +295,23 @@ sanitizers, upstream/header checks, both builds and the full four-CPU guest
 passed; every measured batch returned to its exact free-page baseline.
 Independent lifetime reviews passed without changing diagnostic deadlines or
 assertions. The tested kernel hash is the same `9edf46d7…22bc7135` above.
+
+The shared kernel heap sampler now lives in `kernel/heapbench`, covering 334
+original C lines with 273 translated workload/state/timing/kext-entry lines.
+Native platform symbols and compiler metadata remain in its small ABI header.
+Both platforms compile the same generated V artifact with the prescribed
+genuine GCC flags; committed benchmark snapshots and independent C fixtures
+remain intact. Build instructions settle the final kernel configuration before
+replacing the sampler object with GCC, then relink without rebuilding it.
+
+ASan/UBSan passed 674,496 allocation/free pairs, three-phase allocation and
+zeroing failure cleanup, nonmonotonic-clock rejection and the kext entry ABI;
+all 26 comparison validation tests passed. Both kernel architectures built
+and the ARM boot guest passed. The x86 native sampler completed all three
+phases and five samples with GCC 14.2.0, serialized `lfence`/`rdtsc`/`lfence`
+instructions and checksum 27,358,432. Its frozen and ISO-extracted kernel
+SHA256 is `1d36d30c4fb63886df8dd77f2f0e3124069d242726d87bc962ed53713f1e8cf5`.
+Generated code has no implicit allocation imports; stack buffers and explicit
+allocation rollback received independent lifetime review. The new sampler has
+not been executed inside XNU; historical macOS benchmark captures are preserved
+as evidence of their original C workload.

@@ -7,10 +7,10 @@ import lib
 #include "heap_benchmark.h"
 
 fn C.printf_benchmark(charptr, ...voidptr) i32
-fn C.alloc_kernel_bench() int
+fn C.alloc_kernel_bench() i32
 
-// The same freestanding C workload is compiled with GCC for both real kernels.
-// It is opt-in; its implementation is in c/heap_benchmark.c.
+// The same freestanding V workload is compiled with GCC for both real kernels.
+// It is opt-in; its implementation is in heapbench/core.v, generated as a separate GCC sampler.
 pub fn heap_c_benchmark() {
 	if C.alloc_kernel_bench() != 0 {
 		lib.kpanic(unsafe { nil }, c'C kernel heap benchmark failed')

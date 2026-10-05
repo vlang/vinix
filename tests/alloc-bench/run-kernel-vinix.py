@@ -35,7 +35,7 @@ def main() -> int:
     if args.timeout <= 0 or not 1 <= args.cpus <= 256:
         parser.error("timeout must be positive and cpus must be 1..256")
     kernel = args.kernel.resolve()
-    source = ROOT / "kernel/c/heap_benchmark.c"
+    source = ROOT / "kernel/heapbench/core.v"
     qemu = Path(shutil.which(args.qemu) or args.qemu).resolve()
     cc = Path(shutil.which(args.cc) or args.cc).resolve()
     firmware = (args.firmware or qemu.parent.parent / "share/qemu/edk2-x86_64-code.fd").resolve()
@@ -47,6 +47,9 @@ def main() -> int:
         parser.error("--cc must be genuine GNU GCC")
     state = args.state_dir.resolve()
     state.mkdir(parents=True, exist_ok=False)
+    generated = state / "heap_benchmark.c"
+    subprocess.run(["python3", str(ROOT / "tests/alloc-bench/compile-v-sampler.py"),
+                    str(generated)], check=True)
     rootfs = state / "rootfs"
     for name in ["sbin", "dev", "tmp", "proc"]:
         (rootfs / name).mkdir(parents=True, exist_ok=True)
@@ -83,7 +86,9 @@ def main() -> int:
     config = {
         "qemu_version": subprocess.check_output([str(qemu), "--version"], text=True).splitlines()[0],
         "machine": machine, "accelerator": accelerator, "cpu": cpu, "smp": smp,
-        "memory_mb": 4096, "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "memory_mb": 4096, "source_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
+        "sampler_header_sha256": hashlib.sha256((ROOT / "kernel/c/heap_benchmark_v.h").read_bytes()).hexdigest(),
+        "sampler_language": "V",
         "kernel_sha256": kernel_hash,
         "kernel_verification": "extracted from completed ISO and matched supplied kernel",
         "compile_flags": FLAGS, "platform_compile_flags": ["-fno-PIC", "-mcmodel=kernel"],

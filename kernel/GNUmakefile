@@ -341,6 +341,9 @@ override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
 override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ)
+ifeq ($(ARCH),x86_64)
+override OBJ += obj/heap_benchmark.c.o
+endif
 override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/asm/,$(ASFILES:.S=.S.d))
 
 # Default target. This must come first, before header dependencies.
@@ -376,8 +379,19 @@ obj/linuxkpi/i915_memcpy.o: $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915/i915_mem
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
 endif
 
+# Compile the maintained V sampler separately so benchmark callers can use
+# identical GCC flags for this object on Vinix and XNU.
+ifeq ($(ARCH),x86_64)
+obj/heap_benchmark.c: $(wildcard heapbench/*.v) ../tests/alloc-bench/compile-v-sampler.py c/heap_benchmark_v.h
+	mkdir -p obj
+	python3 ../tests/alloc-bench/compile-v-sampler.py $@
+
+obj/heap_benchmark.c.o: obj/heap_benchmark.c c/heap_benchmark_v.h GNUmakefile $(V_CONFIG_STAMP)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+endif
+
 # Include header dependencies.
--include obj/blob.c.d $(HEADER_DEPS) $(LINUXKPI_OBJ:.o=.d)
+-include obj/blob.c.d obj/heap_benchmark.c.d $(HEADER_DEPS) $(LINUXKPI_OBJ:.o=.d)
 
 # Link rules for building the C compiler runtime.
 cc-runtime-$(ARCH)/cc-runtime.a: GNUmakefile cc-runtime/*

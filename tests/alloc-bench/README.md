@@ -31,7 +31,9 @@ allocation and page faults. `pipe` includes syscall and kernel-object costs.
 These are useful allocation workloads, but none directly times XNU's `kalloc`
 or Vinix's kernel slab allocator.
 
-`kernel/c/heap_benchmark.c` supplies a separate, shared kernel workload. It
+`kernel/heapbench/core.v` supplies a separate, shared kernel workload.
+`compile-v-sampler.py` emits one freestanding C artifact for both platforms;
+its header selects native allocation/logging symbols and compiler metadata. It
 calls Vinix's kernel `malloc/free` and macOS's exported
 `kern_os_malloc/kern_os_free` through a diagnostic kext. Both must return
 zeroed memory; warmup checks every requested byte. Five recorded samples
@@ -145,26 +147,31 @@ mode is for smoke testing.
 
 ## Direct kernel workload
 
-The shared sampler uses only freestanding integer headers. Compile this
-translation unit with genuine GCC 14 on both targets. On Vinix, first clean
-the isolated kernel build, copy the sampler and wrapper changes into that
-worktree, and prebuild its C object with the cross compiler:
+The shared V sampler uses only freestanding integer headers and fixed
+stack buffers. Generate its C artifact with the same V compiler revision,
+then compile that artifact with genuine GCC 14 on both targets. On Vinix, copy
+the sampler and wrapper changes into the isolated worktree, then build the
+kernel with the final benchmark configuration before replacing its sampler
+object with the cross compiler:
 
 ```sh
 cd /absolute/worktree/kernel
 make clean
-mkdir -p obj/c
+make ARCH=x86_64 VFLAGS='-d heap_c_benchmark -d heap_selftest'
 x86_64-linux-musl-gcc -std=c11 -O2 -Wall -Wextra -Werror \
   -fno-builtin -ffreestanding -fno-stack-protector -mno-red-zone \
   -mno-80387 -mno-mmx -mno-sse -mno-sse2 -fno-PIC -mcmodel=kernel \
   -nostdinc -isystem freestnd-c-hdrs -MMD -MP \
-  -c c/heap_benchmark.c -o obj/c/heap_benchmark.c.o
+  -I c -c obj/heap_benchmark.c -o obj/heap_benchmark.c.o
 make ARCH=x86_64 VFLAGS='-d heap_c_benchmark -d heap_selftest'
 ```
 
-Use the repository's normal architecture-appropriate build tools for the
-rest of the kernel. The prebuilt object must remain newer than its source
-and `GNUmakefile`; verify `KALLOC-META compiler=gcc` in the resulting log.
+Use the repository's normal architecture-appropriate build tools for both
+`make` invocations, preserving every build option between them. The GCC object
+must remain newer than its generated source, header, `GNUmakefile` and active
+configuration stamp. A changed configuration can rebuild it with the normal
+kernel compiler. Inspect `make -n` before the final relink and retain the GCC
+command; verify `KALLOC-META compiler=gcc` in the resulting log.
 The runner accepts an already built kernel. Its source hash and prescribed
 flags are build requirements, not authenticated binary provenance; retain
 the compiler command and verify the kernel came from that build. The runner
@@ -183,9 +190,11 @@ scheduler during this boot-time test; two vCPUs under single-thread TCG cause
 large timing variance. `--cpus` can select another count, which must also be
 used by macOS. The runner boots a tiny untimed init and terminates its private
 VM after `KALLOC-DONE`. Its manifest records the
-sampler hash, kernel hash, common compiler flags, and execution context.
-On macOS, `kernel-bench.c` includes the exact same sampler and supplies kext
-start/stop functions. `macos-kext-info.c` supplies the kmod ABI descriptor,
+generated sampler hash, ABI-header hash, kernel hash, common compiler flags,
+and execution context. Comparisons reject a mismatched generated artifact
+or header.
+On macOS, the generated V sampler supplies kext start/stop functions;
+`kernel-bench.c` records their public ABI. `macos-kext-info.c` supplies the kmod ABI descriptor,
 and `build-macos-kext.py` creates the bundle and records exact build commands:
 
 ```sh
@@ -196,7 +205,8 @@ python3 tests/alloc-bench/build-macos-kext.py \
 ```
 
 This packager needs Apple's assembler/linker. If those are available only on
-the host, compile both C files to assembly with the guest's GCC and the
+the host, generate the sampler once and compile it plus the unchanged kmod ABI
+descriptor to assembly with the guest's GCC and the
 recorded common flags, transfer assembly while the guest disk is unmounted,
 then assemble/link on the host and return the kext to the disposable guest.
 Record target-specific assembly/link flags separately from common C flags.

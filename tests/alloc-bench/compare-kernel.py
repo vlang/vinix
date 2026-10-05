@@ -156,6 +156,15 @@ def check_configs(left: dict, right: dict) -> None:
         if left[key] != right[key]:
             raise InvalidRun(f"unmatched config {key}: {left[key]!r} versus {right[key]!r}")
 
+    if any("sampler_header_sha256" in config or "sampler_language" in config for config in (left, right)):
+        if left.get("sampler_language") != "V" or right.get("sampler_language") != "V":
+            raise InvalidRun("both V sampler manifests must identify sampler_language=V")
+        for name, config in (("Vinix", left), ("macOS", right)):
+            if not isinstance(config.get("sampler_header_sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", config["sampler_header_sha256"]):
+                raise InvalidRun(f"{name}: invalid shared sampler header hash")
+        if left["sampler_header_sha256"] != right["sampler_header_sha256"]:
+            raise InvalidRun("shared V sampler ABI headers differ")
+
 
 def compare(left: dict, right: dict, left_config: dict, right_config: dict) -> str:
     check_configs(left_config, right_config)

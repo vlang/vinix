@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Package the shared C sampler as a macOS diagnostic kext using genuine GCC."""
+"""Package the shared V sampler as a macOS diagnostic kext using genuine GCC."""
 from __future__ import annotations
 
 import argparse
@@ -68,9 +68,12 @@ def main() -> int:
         },
     }
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps(info))
-    sources = []
-    for original in [ROOT / "kernel/c/heap_benchmark.c",
-                     ROOT / "tests/alloc-bench/macos-kext-info.c"]:
+    generated = state / "heap_benchmark.c"
+    subprocess.run(["python3", str(ROOT / "tests/alloc-bench/compile-v-sampler.py"),
+                    str(generated)], check=True)
+    shutil.copyfile(ROOT / "kernel/c/heap_benchmark_v.h", state / "heap_benchmark_v.h")
+    sources = [generated]
+    for original in [ROOT / "tests/alloc-bench/macos-kext-info.c"]:
         staged = state / original.name
         staged.write_bytes(original.read_bytes())
         sources.append(staged)
@@ -99,10 +102,12 @@ def main() -> int:
         compile_flags=COMMON_FLAGS, platform_compile_flags=DARWIN_FLAGS,
         source_sha256=hashlib.sha256(sources[0].read_bytes()).hexdigest(),
         adapter_sha256=hashlib.sha256(sources[1].read_bytes()).hexdigest(),
+        sampler_header_sha256=hashlib.sha256((state / "heap_benchmark_v.h").read_bytes()).hexdigest(),
+        sampler_language="V",
         compiler=compiler_version, build_commands=commands,
         compiler_library_path=args.library_path,
         execution_context="kext", arch="x86_64",
-        build_method="GNU GCC C-to-assembly; Apple assembler/linker",
+        build_method="V generated C; GNU GCC C-to-assembly; Apple assembler/linker",
         compilation_host=dict(system=platform.system(), release=platform.release(),
                               machine=platform.machine()),
         binary_sha256=hashlib.sha256(executable.read_bytes()).hexdigest(),

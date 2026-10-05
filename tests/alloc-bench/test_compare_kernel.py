@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Failure-focused tests for complete, comparable direct kernel results."""
 import contextlib
+import ast
 import copy
 import importlib.util
 import io
@@ -110,19 +111,18 @@ class KernelComparisonTests(unittest.TestCase):
                                   "KALLOC-COMPILER platform=vinix timer=wall", 1))
 
     def test_metadata_record_lengths_fit_iolog(self):
-        # Check actual C format strings, not just hand-written fixture lengths.
-        source = Path(__file__).resolve().parents[2] / "kernel/c/heap_benchmark.c"
-        block = source.read_text().split("int alloc_kernel_bench(void) {", 1)[1]
-        calls = re.findall(r'kernel_log\(((?:"(?:[^"\\]|\\.)*"\s*)+),', block)
-        self.assertEqual(len(calls), 4)  # Three metadata records and DONE.
+        # Check the production V C-string literals, including IOLog's cap.
+        source = Path(__file__).resolve().parents[2] / "kernel/heapbench/core.v"
+        block = source.read_text().split("pub fn run() i32 {", 1)[1]
+        calls = re.findall(r"C\.vkb_log\(c('(?:[^'\\]|\\.)*')", block)
+        self.assertEqual(len(calls), 4)
         arguments = [
             ("vinix", 5, 100000, 48, 256, 128, 262144),
             ("vinix",),
             ("vinix", "clang", (1 << 64) - 1, (1 << 64) - 1, (1 << 64) - 1),
         ]
-        for tokens, values in zip(calls[:3], arguments):
-            literals = re.findall(r'"(?:[^"\\]|\\.)*"', tokens)
-            template = "".join(json.loads(literal) for literal in literals).replace("%llu", "%d")
+        for literal, values in zip(calls[:3], arguments):
+            template = ast.literal_eval(literal).replace("%llu", "%d")
             record = template % values
             self.assertTrue(record.endswith("\n"))
             self.assertLessEqual(len(record.encode()), 240, record)
@@ -216,6 +216,15 @@ class KernelComparisonTests(unittest.TestCase):
                         dict(config(), compile_flags=config()["compile_flags"] + ["-O2"])]:
             with self.subTest(config=altered), self.assertRaises(BENCH.InvalidRun):
                 BENCH.check_configs(config(), altered)
+
+    def test_v_sampler_header_and_language_must_match(self):
+        matching = dict(config(), sampler_language="V", sampler_header_sha256="c" * 64)
+        BENCH.check_configs(matching, matching)
+        for other in [config(), dict(matching, sampler_language="C"),
+                      dict(matching, sampler_header_sha256="d" * 64),
+                      dict(matching, sampler_header_sha256="invalid")]:
+            with self.subTest(other=other), self.assertRaises(BENCH.InvalidRun):
+                BENCH.check_configs(matching, other)
 
     def test_compiler_versions_and_flag_order(self):
         left = BENCH.parse_log(log(), "vinix")
