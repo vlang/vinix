@@ -126,6 +126,12 @@ wait_for_network() {
 apk_network() {
 	attempt=1
 	while ! apk "$@"; do
+		# A root with no room for what apk fetched is not the network's
+		# failure, though apk words it like one, and trying again cannot help.
+		if out_of_space; then
+			report_out_of_space
+			return 1
+		fi
 		if [ "$attempt" -ge "$NETWORK_RETRIES" ]; then
 			echo "pkg: package network operation failed after $attempt attempts" >&2
 			return 1
@@ -199,13 +205,7 @@ apk_install() (
 		# so the final offline transaction still has every selected archive.
 		# shellcheck disable=SC2086
 		apk_network --cache-dir "$cache" --no-progress cache download \
-			"$@" ${VINIX_PKG_CACHE_EXTRAS:-} || {
-			download_status=$?
-			if out_of_space; then
-				report_out_of_space
-			fi
-			return "$download_status"
-		}
+			"$@" ${VINIX_PKG_CACHE_EXTRAS:-}
 		if apk --cache-dir "$cache" --no-network --no-progress --no-scripts add "$@"; then
 			LC_ALL=C apk info | LC_ALL=C sort -u >"$installed_after"
 			LC_ALL=C comm -13 "$installed_before" "$installed_after" >"$new_packages"
