@@ -245,5 +245,11 @@ int brcm_m1_read(uint8_t *p,size_t n){
     memcpy(p,host.frames[host.head],len);host.head=(uint16_t)((host.head+1)%64);return (int)len;
 }
 int brcm_m1_write(const uint8_t *p,size_t n){return bw_transmit(&host.dev,p,n);}
-void brcm_m1_stop(void){if(host.prepared){if(host.dev.state>=BW_READY&&host.dev.state<BW_FAULT)(void)bw_disconnect(&host.dev);else bw_stop(&host.dev);}}
+void brcm_m1_stop(void){
+    if(!host.prepared)return;
+    /* DART may be prepared before bw_init installs the protocol callbacks. */
+    if(!host.dev.ops.stop_dma){stop_dma(NULL);return;}
+    if(host.dev.state>=BW_READY&&host.dev.state<BW_FAULT)(void)bw_disconnect(&host.dev);
+    else bw_stop(&host.dev);
+}
 #endif
