@@ -2,7 +2,6 @@
 module main
 
 import os
-import io.util
 import ui2
 
 const calendar_events_filename = '.vinix-calendar-events'
@@ -56,9 +55,10 @@ fn calendar_clean_field(text string, maximum int) bool {
 
 // Validate the entire record before allocating owned event strings. A damaged
 // record is never silently turned into an empty calendar and overwritten.
-fn calendar_parse_events(record string) !CalendarEvents {
+// Validation uses an Option so discarded failures do not allocate IError boxes.
+fn calendar_parse_events(record string) ?CalendarEvents {
 	if record.len > calendar_events_max_bytes || !record.starts_with('VINIX-CALENDAR 1\n') {
-		return error('Invalid calendar record')
+		return none
 	}
 	mut model := CalendarEvents{}
 	mut start := 'VINIX-CALENDAR 1\n'.len
@@ -67,30 +67,30 @@ fn calendar_parse_events(record string) !CalendarEvents {
 		if start < record.len { model.free_items() }
 	}
 	for start < record.len {
-		if model.count >= calendar_events_limit { return error('Too many calendar events') }
+		if model.count >= calendar_events_limit { return none }
 		mut end := start
 		for end < record.len && record[end] != `\n` { end++ }
-		if end == record.len { return error('Incomplete calendar record') }
+		if end == record.len { return none }
 		mut fields := [7]int{}
 		fields[0] = start
 		mut count := 1
 		for at in start .. end {
 			if record[at] == `\t` {
-				if count >= 6 { return error('Invalid calendar fields') }
+				if count >= 6 { return none }
 				fields[count] = at + 1
 				count++
 			}
 		}
-		if count != 6 { return error('Incomplete calendar fields') }
+		if count != 6 { return none }
 		fields[6] = end + 1
-		year := calendar_integer(calendar_borrow(record, fields[0], fields[1] - 1)) or { return error('Invalid year') }
-		month := calendar_integer(calendar_borrow(record, fields[1], fields[2] - 1)) or { return error('Invalid month') }
-		day := calendar_integer(calendar_borrow(record, fields[2], fields[3] - 1)) or { return error('Invalid day') }
+		year := calendar_integer(calendar_borrow(record, fields[0], fields[1] - 1)) or { return none }
+		month := calendar_integer(calendar_borrow(record, fields[1], fields[2] - 1)) or { return none }
+		day := calendar_integer(calendar_borrow(record, fields[2], fields[3] - 1)) or { return none }
 		time := calendar_borrow(record, fields[3], fields[4] - 1)
 		minutes := if time == '-1' {
 			-1
 		} else {
-			calendar_integer(time) or { return error('Invalid event time') }
+			calendar_integer(time) or { return none }
 		}
 		title := calendar_borrow(record, fields[4], fields[5] - 1)
 		location := calendar_borrow(record, fields[5], end)
@@ -98,7 +98,7 @@ fn calendar_parse_events(record string) !CalendarEvents {
 			|| day > calendar_days_in_month(year, month) || minutes < -1 || minutes >= 1440
 			|| title.len == 0 || !calendar_clean_field(title, calendar_event_title_limit)
 			|| !calendar_clean_field(location, calendar_event_location_limit) {
-			return error('Invalid calendar event')
+			return none
 		}
 		model.items[model.count] = CalendarEvent{
 			year:     year
@@ -215,23 +215,25 @@ fn (mut model CalendarEvents) save() bool {
 	}
 	data := model.encode()
 	defer { unsafe { data.free() } }
-	mut file, temporary := util.temp_file(path: model.home, pattern: '.vinix-calendar.*') or { return false }
+	fd, temporary := calendar_temporary_file(model.home)
+	if fd < 0 { return false }
 	mut published := false
 	defer {
-		file.close()
-		if !published { os.rm(temporary) or {} }
+		if !published { calendar_remove_temporary(fd, temporary) }
+		desktop_close(fd)
 		unsafe { temporary.free() }
 	}
-	if !desktop_write_all(file.fd, data.str, u64(data.len)) || !desktop_preferences_fsync(file.fd) {
+	if !desktop_write_all(fd, data.str, u64(data.len)) || !desktop_preferences_fsync(fd) {
 		return false
 	}
-	os.rename_dir(temporary, path) or { return false }
+	if !calendar_temporary_matches(fd, temporary) { return false }
+	if C.rename(&char(temporary.str), &char(path.str)) != 0 { return false }
 	published = true
 	unsafe { model.record.free() }
 	model.record = data.clone()
 	// Publication already succeeded. Keep the in-memory state consistent with
 	// the visible record even if the final directory durability check fails.
-	if !desktop_preferences_sync_directory(model.home, file.fd) {
+	if !desktop_preferences_sync_directory(model.home, fd) {
 		eprintln('vinix-calendar: events saved, but directory synchronization failed')
 	}
 	return true
@@ -266,7 +268,8 @@ fn calendar_event_button(action string, text string, x int, y int, width int, ac
 
 fn (mut a CalendarApp) append_agenda(mut children []ui2.Element, width int, top int) {
 	children << ui2.view('', ui2.rect(18, f64(top), f64(width - 36), 1), ui2.BoxStyle{ bg: body_rule }, [])
-	children << ui2.label('', tr('calendar.events'), ui2.rect(18, f64(top + 8), f64(width - 160), 24), ui2.TextStyle{ color: body_heading, size: 13, bold: true })
+	children << ui2.label('', tr('calendar.events'), ui2.rect(18, f64(top + 8), f64(width - 308), 24), ui2.TextStyle{ color: body_heading, size: 13, bold: true })
+	children << calendar_event_button('calendar.ics.open', tr('calendar.ics.open'), width - 276, top + 6, 144, false)
 	children << calendar_event_button('calendar.event.new', tr('calendar.event.new'), width - 124, top + 6, 106, false)
 	mut indices := [calendar_events_limit]int{}
 	mut count := 0
@@ -439,6 +442,7 @@ fn calendar_edit_bytes(mut bytes []u8, input u8, maximum int, select_all bool) {
 }
 
 fn (mut a CalendarApp) key_input(input string) {
+	if a.interchange { a.ics_key_input(input) return }
 	if !a.editing { return }
 	mut at := 0
 	for at < input.len {
@@ -538,6 +542,7 @@ fn calendar_paste_bytes(mut bytes []u8, text string, maximum int, select_all boo
 }
 
 fn (mut a CalendarApp) paste_input(text string) {
+	if a.interchange { a.ics_paste(text) return }
 	if !a.editing || text.len == 0 { return }
 	a.edit_pending_len = 0
 	pasted := match a.edit_focus {
@@ -618,5 +623,9 @@ fn (mut a CalendarApp) close_app() {
 		a.edit_title.free()
 		a.edit_time.free()
 		a.edit_location.free()
+		a.ics_import_path.free()
+		a.ics_export_path.free()
 	}
+	a.ics_import_path = []u8{}
+	a.ics_export_path = []u8{}
 }

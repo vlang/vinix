@@ -172,7 +172,7 @@ fn test_calendar_utf8_keyboard_is_bounded_and_backspaces_whole_characters() {
 }
 
 fn test_calendar_parser_validates_gregorian_dates_and_time() {
-	mut leap := calendar_parse_events('VINIX-CALENDAR 1\n2024\t2\t29\t1439\tLeap day\t\n') or { panic(err) }
+	mut leap := calendar_parse_events('VINIX-CALENDAR 1\n2024\t2\t29\t1439\tLeap day\t\n') or { panic('Valid Calendar fixture rejected') }
 	defer { leap.free_items() }
 	assert leap.count == 1
 	assert (calendar_parse_time('23:59') or { -1 }) == 1439

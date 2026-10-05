@@ -56,6 +56,14 @@ mut:
 	edit_pending     [4]u8
 	edit_pending_len int
 	status_key       string
+	interchange      bool
+	ics_import_path  []u8
+	ics_export_path  []u8
+	ics_focus        int
+	ics_selected     bool
+	ics_pending      [4]u8
+	ics_pending_len  int
+	ics_status       string = 'calendar.ics.ready'
 }
 
 fn open_calendar(mut desktop Desktop) !NativeApp {
@@ -188,6 +196,7 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	}
 	width := int(size.width)
 	height := int(size.height)
+	if a.interchange { return a.build_interchange(size) }
 	if a.editing { return a.build_event_editor(width, height) }
 	inner := width - 2 * calendar_padding
 	mut children := frame_elements(100)
@@ -288,6 +297,12 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a CalendarApp) handle(event_id string) ! {
 	match event_id {
+		'calendar.ics.open' { if !a.editing { a.open_interchange() } return }
+		'calendar.ics.back' { a.interchange = false a.ics_pending_len = 0 return }
+		'calendar.ics.import_path' { a.ics_focus = 0 a.ics_selected = true a.ics_pending_len = 0 return }
+		'calendar.ics.export_path' { a.ics_focus = 1 a.ics_selected = true a.ics_pending_len = 0 return }
+		'calendar.ics.import' { if a.interchange { a.import_ics(editor_bytes_text(a.ics_import_path)) } return }
+		'calendar.ics.export' { if a.interchange { a.export_ics(editor_bytes_text(a.ics_export_path)) } return }
 		'calendar.event.new' {
 			a.begin_event(-1)
 			return
