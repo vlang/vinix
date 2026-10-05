@@ -4,6 +4,7 @@
 /* Linux and the V backend use distinct names for their native 64-bit typedefs.
  * This changes names only; the upstream declarations/layouts stay intact. */
 /* C11 and Linux use the same spellings for different atomic interfaces. */
+#undef va_arg
 #undef atomic_fetch_add
 #undef atomic_fetch_sub
 #undef atomic_fetch_and
