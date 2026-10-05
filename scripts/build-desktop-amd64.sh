@@ -266,7 +266,7 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings vinix
     vinix-activity vinix-editor vinix-calendar vinix-clock \
     vinix-disk-usage vinix-preview vinix-console vinix-system-information \
     vinix-archive vinix-disk-utility vinix-backup \
-    vinix-notes vinix-reminders vinix-grapher \
+    vinix-notes vinix-reminders vinix-grapher vinix-color-meter \
     vinix-firefox vinix-chromium vinix-gimp vinix-libreoffice \
     vinix-minecraft vinix-wine-calculator vinix-wine-notepad vinix-wine-word2010 \
     vinix-capture; do
