@@ -326,7 +326,289 @@ fn main() {
 	check_new_utility_clients(mut desktop)
 	check_storage_utility_clients(mut desktop)
 	check_productivity_utility_clients(mut desktop)
+	check_current_utility_workflow_clients(mut desktop)
 	desktop_restore_requested_scale()
+}
+
+fn integration_assert_file(path string, expected string) {
+	actual := os.read_file(path) or { panic(err) }
+	defer { unsafe { actual.free() } }
+	assert actual == expected, path
+}
+
+fn integration_assert_text(mut app NativeApp, size ui2.Rect, expected string) {
+	tree := app.build(size) or { panic(err) }
+	defer { free_tree(tree) }
+	assert tree_contains_text(tree, expected), 'Missing ${expected}: ${tree_text_dump(tree)}'
+}
+
+// These workflows share a canonical temporary user home, so process-local
+// profile resolution and filesystem changes cannot reach a real user profile.
+fn check_current_utility_workflow_clients(mut desktop Desktop) {
+	base := os.real_path(os.temp_dir())
+	home := join_path(base, 'vinix-workflows-ipc-${os.getpid()}')
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_dictionary_workflow_client(home, mut desktop)
+	check_calendar_interchange_client(home, mut desktop)
+	check_editor_workflow_client(home, mut desktop)
+	check_files_trash_client(home, mut desktop)
+}
+
+// An independently packed tiny index keeps this IPC check offline and bounded.
+fn integration_dictionary_fixture() []u8 {
+	words := ['computer', 'computing', 'data structure']!
+	definitions := ['IPC electronic machine 日本語.', 'IPC computing definition.', 'IPC organized collection.']!
+	mut bytes := []u8{cap: 512}
+	unsafe { bytes.flags |= .noslices }
+	editor_append(mut bytes, 'VNXDICT1')
+	mut key_size := 0
+	mut definition_size := 0
+	for word in words { key_size += word.len }
+	for definition in definitions { definition_size += definition.len }
+	for value in [3, key_size, definition_size, 0]! { wire_put_u32(mut bytes, u32(value)) }
+	mut key_at := 0
+	mut definition_at := 0
+	for index, word in words {
+		for value in [key_at, word.len, definition_at, definitions[index].len]! { wire_put_u32(mut bytes, u32(value)) }
+		key_at += word.len
+		definition_at += definitions[index].len
+	}
+	for word in words { editor_append(mut bytes, word) }
+	for definition in definitions { editor_append(mut bytes, definition) }
+	return bytes
+}
+
+fn check_dictionary_workflow_client(home string, mut desktop Desktop) {
+	path := join_path(home, 'fixture.vnd')
+	export_path := join_path(home, 'definition-Ж.txt')
+	bad_path := join_path(home, 'broken.vnd')
+	bytes := integration_dictionary_fixture()
+	defer { unsafe { path.free(); export_path.free(); bad_path.free(); bytes.free() } }
+	os.write_file_array(path, bytes) or { panic(err) }
+	os.write_file(bad_path, 'truncated index') or { panic(err) }
+	factory := app_factory_named('vinix-dictionary') or { panic('Dictionary is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	storage_remote_field(mut app, 'dictionary.path', path)
+	app.handle('dictionary.load') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC electronic machine 日本語.')
+	storage_remote_field(mut app, 'dictionary.query', '  COMPUTER  ')
+	app.handle('dictionary.lookup') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), tr('dictionary.ready'))
+	storage_remote_field(mut app, 'dictionary.query', 'comp')
+	prefix := app.build(ui2.rect(0, 0, 880, 620)) or { panic(err) }
+	assert tree_has_id(prefix, 'dictionary.result.0') && tree_has_id(prefix, 'dictionary.result.1')
+	assert !tree_has_id(prefix, 'dictionary.result.2')
+	free_tree(prefix)
+	app.handle('dictionary.result.1') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC computing definition.')
+	storage_remote_field(mut app, 'dictionary.query', 'DATA_structure')
+	app.handle('dictionary.lookup') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC organized collection.')
+	app.handle('dictionary.back') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC computing definition.')
+	app.handle('dictionary.forward') or { panic(err) }
+	storage_remote_field(mut app, 'dictionary.export_path', export_path)
+	app.handle('dictionary.export') or { panic(err) }
+	integration_assert_file(export_path, 'data structure\n\nIPC organized collection.')
+	app.handle('dictionary.export') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), tr('dictionary.export_exists'))
+	integration_assert_file(export_path, 'data structure\n\nIPC organized collection.')
+	storage_remote_field(mut app, 'dictionary.path', bad_path)
+	app.handle('dictionary.load') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), tr('dictionary.unavailable'))
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC organized collection.')
+	println('IPC Dictionary lookup and exclusive export passed')
+}
+
+fn integration_assert_calendar_export(path string) {
+	record := os.read_file(path) or { panic(err) }
+	defer { unsafe { record.free() } }
+	mut model, status := calendar_ics_parse(record)
+	defer { model.free_items() }
+	assert status == '' && model.count == 2
+	for index in 0 .. model.count {
+		assert model.items[index].year == 2026 && model.items[index].month == 10 && model.items[index].day == 5
+	}
+	assert model.items[0].title == 'IPC all-day 日本語' && model.items[0].minutes == -1
+	assert model.items[0].location == 'Room, A'
+	assert model.items[1].title == 'IPC local meeting' && model.items[1].minutes == 870
+}
+
+fn check_calendar_interchange_client(home string, mut desktop Desktop) {
+	input := join_path(home, 'calendar-Ж.ics')
+	unsupported := join_path(home, 'unsupported.ics')
+	export_path := join_path(home, 'calendar-export.ics')
+	preserved_export := join_path(home, 'calendar-preserved.ics')
+	reopened_export := join_path(home, 'calendar-reopened.ics')
+	store := join_path(home, calendar_events_filename)
+	defer { unsafe { input.free(); unsupported.free(); export_path.free(); preserved_export.free(); reopened_export.free(); store.free() } }
+	ics := 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:Vinix IPC\r\nBEGIN:VEVENT\r\nUID:ipc-one\r\nDTSTAMP:20261005T120000Z\r\nDTSTART;VALUE=DATE:20261005\r\nSUMMARY:IPC all-day 日本語\r\nLOCATION:Room\\, A\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:ipc-two\r\nDTSTAMP:20261005T120000Z\r\nDTSTART:20261005T143000\r\nSUMMARY:IPC local meeting\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n'
+	os.write_file(input, ics) or { panic(err) }
+	bad_ics := ics.replace('SUMMARY:IPC local meeting', 'RRULE:FREQ=DAILY\r\nSUMMARY:IPC local meeting')
+	defer { unsafe { bad_ics.free() } }
+	os.write_file(unsupported, bad_ics) or { panic(err) }
+	factory := app_factory_named('vinix-calendar') or { panic('Calendar is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('calendar.ics.open') or { panic(err) }
+	storage_remote_field(mut app, 'calendar.ics.import_path', input)
+	app.handle('calendar.ics.import') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('calendar.ics.imported'))
+	stored := os.read_file(store) or { panic(err) }
+	defer { unsafe { stored.free() } }
+	assert stored.contains('IPC all-day 日本語') && stored.contains('IPC local meeting')
+	storage_remote_field(mut app, 'calendar.ics.export_path', export_path)
+	app.handle('calendar.ics.export') or { panic(err) }
+	exported := os.read_file(export_path) or { panic(err) }
+	defer { unsafe { exported.free() } }
+	assert exported.contains('DTSTART;VALUE=DATE:20261005\r\n')
+	assert exported.contains('DTSTART:20261005T143000\r\n')
+	assert exported.contains('SUMMARY:IPC all-day 日本語\r\n') && exported.contains('LOCATION:Room\\, A\r\n')
+	app.handle('calendar.ics.export') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('calendar.ics.export_exists'))
+	integration_assert_file(export_path, exported)
+	storage_remote_field(mut app, 'calendar.ics.import_path', unsupported)
+	app.handle('calendar.ics.import') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('calendar.ics.unsupported'))
+	integration_assert_file(store, stored)
+	storage_remote_field(mut app, 'calendar.ics.export_path', preserved_export)
+	app.handle('calendar.ics.export') or { panic(err) }
+	integration_assert_calendar_export(preserved_export)
+	close_remote(mut app)
+	mut reopened := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut reopened) }
+	reopened.handle('calendar.ics.open') or { panic(err) }
+	storage_remote_field(mut reopened, 'calendar.ics.export_path', reopened_export)
+	reopened.handle('calendar.ics.export') or { panic(err) }
+	integration_assert_calendar_export(reopened_export)
+	println('IPC Calendar interchange and reopen passed')
+}
+
+fn check_editor_workflow_client(home string, mut desktop Desktop) {
+	existing := join_path(home, 'existing.txt')
+	saved := join_path(home, 'draft-Ж.txt')
+	missing := disk_utility_join_path(home, 'missing/target.txt')
+	defer { unsafe { existing.free(); saved.free(); missing.free() } }
+	os.write_file(existing, 'preserved existing file') or { panic(err) }
+	factory := app_factory_named('vinix-editor') or { panic('Text Editor is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle(editor_action_document) or { panic(err) }
+	mut pid := -1
+	if mut app is RemoteApp {
+		pid = app.pid
+		assert app.peer_features & app_feature_close_guard != 0
+		app.paste_input('IPC unsaved 日本語')
+	}
+	assert pid > 0
+	mut session := Desktop{ running: true }
+	session.apps << app
+	session.windows << Window{ id: 9200, title: 'Text Editor', page: .app, app_index: 0 }
+	defer { unsafe { session.apps.free(); session.windows.free() } }
+	session.close_window(9200)
+	assert session.windows.len == 1 && session.focus == 9200
+	session.end_session(.keep_running)
+	assert session.running && session.windows.len == 1 && C.kill(pid, 0) == 0
+	integration_assert_text(mut app, ui2.rect(0, 0, 700, 500), 'IPC unsaved 日本語')
+	app.handle(editor_action_guard_save) or { panic(err) }
+	storage_remote_field(mut app, editor_action_save_as_path, existing)
+	app.handle(editor_action_save_as_create) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 700, 500), tr('editor.workflow.exists'))
+	integration_assert_file(existing, 'preserved existing file')
+	assert !native_app_prepare_close(mut app)
+	storage_remote_field(mut app, editor_action_save_as_path, saved)
+	app.handle(editor_action_save_as_create) or { panic(err) }
+	integration_assert_file(saved, 'IPC unsaved 日本語')
+	assert native_app_prepare_close(mut app)
+	app.handle(editor_action_document) or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('\nRetained after failed Open') }
+	storage_remote_field(mut app, editor_action_path, missing)
+	app.handle(editor_action_open) or { panic(err) }
+	app.handle(editor_action_discard) or { panic(err) }
+	app.handle(editor_action_confirm_discard) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 700, 500), 'Retained after failed Open')
+	integration_assert_text(mut app, ui2.rect(0, 0, 700, 500), tr('editor.status.cannot_open'))
+	assert !os.exists(missing)
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(saved, 'IPC unsaved 日本語\nRetained after failed Open')
+	assert !os.exists(missing)
+	app.handle(editor_action_document) or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('\nExplicitly discarded draft') }
+	assert !native_app_prepare_close(mut app)
+	app.handle(editor_action_confirm_discard) or { panic(err) }
+	assert !native_app_prepare_close(mut app)
+	app.handle(editor_action_discard) or { panic(err) }
+	confirmation := app.build(ui2.rect(0, 0, 700, 500)) or { panic(err) }
+	assert tree_has_id(confirmation, editor_action_confirm_discard)
+	free_tree(confirmation)
+	app.handle(editor_action_confirm_discard) or { panic(err) }
+	session.close_window(9200)
+	assert session.windows.len == 0
+	if mut app is RemoteApp { assert app.closed }
+	integration_assert_file(saved, 'IPC unsaved 日本語\nRetained after failed Open')
+	session.end_session(.keep_running)
+	assert !session.running
+	println('IPC Text Editor close, Save As, and failed Open passed')
+}
+
+fn check_files_trash_client(home string, mut desktop Desktop) {
+	path := join_path(home, 'Trash café 日本語.txt')
+	open_action := jump_open_prefix + path
+	defer { unsafe { path.free(); open_action.free() } }
+	os.write_file(path, 'IPC original trash contents') or { panic(err) }
+	factory := app_factory_named('vinix-files') or { panic('Files is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle(open_action) or { panic(err) }
+	app.handle(file_context_delete) or { panic(err) }
+	assert !os.exists(path)
+	app.handle('files.trash.open') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), 'Trash café 日本語.txt')
+	app.handle('files.trash.row.0') or { panic(err) }
+	os.write_file(path, 'IPC replacement must survive') or { panic(err) }
+	app.handle('files.trash.restore') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('files.trash.conflict'))
+	integration_assert_file(path, 'IPC replacement must survive')
+	os.rm(path) or { panic(err) }
+	app.handle('files.trash.restore') or { panic(err) }
+	integration_assert_file(path, 'IPC original trash contents')
+	app.handle('files.trash.back') or { panic(err) }
+	app.handle(open_action) or { panic(err) }
+	app.handle(file_context_delete) or { panic(err) }
+	assert !os.exists(path)
+	app.handle('files.trash.open') or { panic(err) }
+	app.handle('files.trash.confirm') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), 'Trash café 日本語.txt')
+	app.handle('files.trash.empty') or { panic(err) }
+	armed := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+	assert tree_has_id(armed, 'files.trash.confirm') && tree_has_id(armed, 'files.trash.cancel')
+	free_tree(armed)
+	app.handle('files.trash.cancel') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), 'Trash café 日本語.txt')
+	app.handle('files.trash.empty') or { panic(err) }
+	app.handle('files.trash.confirm') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('files.trash.empty_list'))
+	assert !os.exists(path)
+	close_remote(mut app)
+	mut reopened := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut reopened) }
+	reopened.handle('files.trash.open') or { panic(err) }
+	integration_assert_text(mut reopened, ui2.rect(0, 0, 740, 520), tr('files.trash.empty_list'))
+	println('IPC Files Trash restore and guarded empty passed')
 }
 
 // Open real documents, deliver edits and exports through the native protocol,
