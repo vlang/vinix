@@ -205,6 +205,19 @@ The same build works on Apple Silicon and cross-compiles the amd64 executable.
 
 ### Default software image on aarch64
 
+To build and boot the native desktop from a fresh checkout:
+
+```sh
+./scripts/run-desktop-aarch64.sh
+```
+
+The launcher fetches the pinned kernel and firmware dependencies and ui2,
+then builds the required Alpine userland, package tools, X11 and Firefox
+layers before compiling the desktop. Subsequent runs reuse those layers.
+The host needs a current V compiler with V3 support, LLVM/LLD,
+`aarch64-linux-musl-gcc`, `pkg-config`, QEMU, mtools and e2fsprogs, in addition
+to the general build prerequisites above.
+
 Build the languages, developer tools, X11 applications and alternate desktop
 into one image with a single command:
 

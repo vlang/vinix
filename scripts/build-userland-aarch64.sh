@@ -217,8 +217,8 @@ file "$STAGING/bin/busybox" "$STAGING/lib/ld-musl-aarch64.so.1"
 
 # ── Optional runtime overlays ──
 if [ "$ALPINE_BASE_ONLY" != 1 ]; then
-X11_STAGING="$SCRIPT_DIR/build-aarch64-x11/staging"
-X11_SYSROOT="$SCRIPT_DIR/build-aarch64-x11/sysroot"
+X11_STAGING="${VINIX_X11_STAGING:-$SCRIPT_DIR/build-aarch64-x11/staging}"
+X11_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
 if [ -d "$X11_STAGING/usr/bin" ] && [ -f "$X11_STAGING/usr/bin/Xorg" ]; then
     echo "==> Integrating X11..."
 

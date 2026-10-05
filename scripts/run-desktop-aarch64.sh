@@ -55,12 +55,6 @@ DESKTOP_BUILD_KEY="$SCRIPT_DIR/build/run-desktop-aarch64.key"
 # giving it a native 2048x1536 framebuffer without changing the standard
 # shell runner.
 export VINIX_QEMU_RESOLUTION="${VINIX_QEMU_RESOLUTION:-2048x1536x32}"
-if [ -z "${VINIX_OVMF_CODE:-}" ]; then
-    export VINIX_OVMF_CODE="$SCRIPT_DIR/boot-image/edk2-aarch64-code-2048x1536.fd"
-    if [ ! -f "$VINIX_OVMF_CODE" ]; then
-        "$SCRIPT_DIR/scripts/build-qemu-ovmf-aarch64.sh"
-    fi
-fi
 MONITOR_SOCKET="${VINIX_MONITOR_SOCKET:-/tmp/vinix-monitor}"
 QMP_SOCKET="${VINIX_QMP_SOCKET:-/tmp/vinix-qmp}"
 
@@ -146,9 +140,25 @@ if [ "$BUILD_KERNEL" -eq 1 ] || [ "$BUILD_DESKTOP" -eq 1 ]; then
     echo "==> V compiler: $V ($("$V" -version 2>/dev/null || echo unknown version))"
 fi
 
+if [ -z "${VINIX_OVMF_CODE:-}" ]; then
+    export VINIX_OVMF_CODE="$SCRIPT_DIR/boot-image/edk2-aarch64-code-2048x1536.fd"
+    if [ ! -f "$VINIX_OVMF_CODE" ]; then
+        "$SCRIPT_DIR/scripts/build-qemu-ovmf-aarch64.sh"
+    fi
+fi
+
 # ── The kernel ──
 # The desktop needs /dev/fb0 and /dev/pointer, both of which live in it.
 if [ "$BUILD_KERNEL" -eq 1 ]; then
+    if [ ! -d "$KERNEL_DIR/freestnd-c-hdrs" ] ||
+       [ ! -d "$KERNEL_DIR/cc-runtime" ] ||
+       [ ! -d "$KERNEL_DIR/c/flanterm" ] ||
+       [ ! -f "$KERNEL_DIR/c/nanoprintf.h" ] ||
+       [ ! -f "$KERNEL_DIR/c/uacpi/acpi.h" ] ||
+       [ ! -f "$KERNEL_DIR/c/lwip/include/lwip/init.h" ]; then
+        echo "==> Fetching the kernel's pinned dependencies..."
+        "$KERNEL_DIR/get-deps"
+    fi
     echo "==> Building the kernel..."
     make -C "$KERNEL_DIR" CC=clang ARCH=aarch64 V="$V" LIMINE_MP=1 \
         -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)"
@@ -244,6 +254,7 @@ prepare_qemu_initramfs() {
 }
 
 if [ "$BUILD_DESKTOP" -eq 1 ]; then
+    "$SCRIPT_DIR/build-support/prepare-desktop-aarch64.sh"
     DESKTOP_INPUT_KEY=""
     if [ "${VINIX_REFRESH_DESKTOP_STAGING:-0}" != 1 ] &&
        [ -f "$SCRIPT_DIR/build-support/desktop-build-key.py" ]; then

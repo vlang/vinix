@@ -9,7 +9,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BUILDER = ROOT / "build-qemu-ovmf-aarch64.sh"
+BUILDER = ROOT / "scripts/build-qemu-ovmf-aarch64.sh"
 PATCH = Path("patches/edk2/qemu-ramfb-2048x1536.patch")
 DRIVER = Path("OvmfPkg/QemuRamfbDxe/QemuRamfb.c")
 BUILD_SENTINEL = 73
@@ -49,7 +49,8 @@ class FirmwarePatchTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.checkout = Path(self.temporary.name) / "vinix"
         self.checkout.mkdir()
-        shutil.copyfile(BUILDER, self.checkout / BUILDER.name)
+        (self.checkout / "scripts").mkdir()
+        shutil.copyfile(BUILDER, self.checkout / "scripts" / BUILDER.name)
         (self.checkout / PATCH.parent).mkdir(parents=True)
         shutil.copyfile(ROOT / PATCH, self.checkout / PATCH)
 
@@ -154,7 +155,7 @@ class FirmwarePatchTests(unittest.TestCase):
 
     def run_builder(self):
         return subprocess.run(
-            ["bash", str(self.checkout / BUILDER.name)],
+            ["bash", str(self.checkout / "scripts" / BUILDER.name)],
             cwd=self.checkout,
             env=self.environment,
             capture_output=True,
