@@ -102,8 +102,8 @@ fn preempt_check_resched() {
 	}
 }
 
-fn C.vinix_linuxkpi_task_view(voidptr, voidptr, int, int, voidptr, u64, bool) voidptr
-fn C.vinix_linuxkpi_task_selftest() int
+fn C.vinix_linuxkpi_task_view(voidptr, voidptr, i32, i32, voidptr, u64, bool) voidptr
+fn C.vinix_linuxkpi_task_selftest() i32
 
 @[export: 'vinix_linuxkpi_current_task']
 fn current_task() voidptr {
@@ -113,8 +113,8 @@ fn current_task() voidptr {
 	}
 	name := t.comm
 	exiting := katomic.load(&t.must_exit) || katomic.load(&t.exit_claimed) != 0
-	return C.vinix_linuxkpi_task_view(voidptr(&t.linuxkpi_task[0]), voidptr(t), t.tid,
-		t.process.pid, name.str, u64(name.len), exiting)
+	return C.vinix_linuxkpi_task_view(voidptr(&t.linuxkpi_task[0]), voidptr(t), i32(t.tid),
+		i32(t.process.pid), name.str, u64(name.len), exiting)
 }
 
 @[export: 'vinix_linuxkpi_task_signal_pending']
@@ -224,7 +224,7 @@ fn need_resched() bool {
 }
 
 @[export: 'vinix_linuxkpi_cond_resched']
-fn cond_resched() int {
+fn cond_resched() i32 {
 	if !may_sleep() {
 		return 0
 	}

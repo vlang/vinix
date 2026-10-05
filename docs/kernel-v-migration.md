@@ -272,3 +272,13 @@ ARM boot pass. The complete four-CPU x86 LinuxKPI guest passed every required
 marker and exact free-page baseline, using kernel SHA256
 `9edf46d7d6f29de1f101567887879526c566dd5cc6e1c00564b5736b22bc7135`.
 New allocation and asynchronous record lifetimes received independent review.
+
+Linux task state, clocks/conversions/timed sleeps and timer ownership now live
+in `compatcore/{task,time,timer}.v`: at least 718 original lines out of the
+1,071-line scope, excluding 312 unchanged diagnostic lines and the entire
+41-line native binding. `jiffies` and `jiffies_64` retain identical storage,
+including the Darwin assembler alias. Public C integer arguments use `i32`;
+task waits preserve locked unlinking, timer retirement waits until callbacks
+finish, and detached worker ownership follows the original implementation.
+The host sanitizer/alias fixtures, both builds and native guests passed with
+the same fully tested LinuxKPI kernel recorded above; lifetime review passed.
