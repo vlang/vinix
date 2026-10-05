@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../kernel/c/apple_ans_ext2.c"
+#include "ext2_fixture.h"
 struct image { uint8_t *data; size_t bytes; unsigned bs, isize, reads, writes; int fail, fail_write; struct e2_fs fs; };
 static void p16(uint8_t *p, unsigned x) { p[0]=(uint8_t)x; p[1]=(uint8_t)(x>>8); }
 static void p32(uint8_t *p, uint32_t x) { p16(p,x); p16(p+2,x>>16); }

@@ -3,6 +3,8 @@
 @[has_globals]
 module ans
 
+import apple.ans.ext2core as _
+
 import resource
 import fs
 import stat
