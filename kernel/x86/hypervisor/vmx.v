@@ -14,19 +14,19 @@ import x86.msr
 
 #include "vmx.h"
 
-fn C.vinix_vmx_on(physical_address u64) int
+fn C.vinix_vmx_on(physical_address u64) i32
 
-fn C.vinix_vmx_off() int
+fn C.vinix_vmx_off() i32
 
-fn C.vinix_vmx_clear(physical_address u64) int
+fn C.vinix_vmx_clear(physical_address u64) i32
 
-fn C.vinix_vmx_load(physical_address u64) int
+fn C.vinix_vmx_load(physical_address u64) i32
 
-fn C.vinix_vmx_write(field u64, value u64) int
+fn C.vinix_vmx_write(field u64, value u64) i32
 
-fn C.vinix_vmx_read(field u64, value &u64) int
+fn C.vinix_vmx_read(field u64, value &u64) i32
 
-fn C.vinix_vmx_enter(registers &C.vinix_vmx_registers) int
+fn C.vinix_vmx_enter(registers &C.vinix_vmx_registers) i32
 
 fn C.vinix_vmx_fxsave(state voidptr)
 
@@ -176,13 +176,6 @@ __global (
 	vmx_enabled_cpus u64
 	boot_cpu_vmx     bool
 )
-
-@[packed]
-struct Descriptor {
-mut:
-	limit u16
-	base  u64
-}
 
 // Registers contains the guest general-purpose registers. RIP, RSP and
 // RFLAGS have explicit accessors because VMX stores them in the VMCS.
@@ -640,7 +633,7 @@ pub fn (mut vm Vm) get_registers() ?Registers {
 	return vm.registers
 }
 
-fn segment_base(gdt Descriptor, selector u16) u64 {
+fn segment_base(gdt C.vinix_vmx_descriptor, selector u16) u64 {
 	index := u64(selector & ~u16(7))
 	if index + 15 > u64(gdt.limit) {
 		return 0
@@ -653,10 +646,10 @@ fn segment_base(gdt Descriptor, selector u16) u64 {
 }
 
 fn write_host_state() bool {
-	mut gdtr := Descriptor{}
-	mut idtr := Descriptor{}
-	C.vinix_vmx_sgdt(unsafe { &C.vinix_vmx_descriptor(&gdtr) })
-	C.vinix_vmx_sidt(unsafe { &C.vinix_vmx_descriptor(&idtr) })
+	mut gdtr := C.vinix_vmx_descriptor{}
+	mut idtr := C.vinix_vmx_descriptor{}
+	C.vinix_vmx_sgdt(&gdtr)
+	C.vinix_vmx_sidt(&idtr)
 	tr := C.vinix_vmx_read_tr()
 	mut ok := true
 	ok = ok && vmwrite(vmcs_host_cr0, cpu.read_cr0())

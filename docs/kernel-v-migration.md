@@ -23,8 +23,8 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | CPU mitigation policies | Active per-CPU controls and original helper ABI | Committed as `62bdfc72`; host sanitizers passed 12,288 active-policy and 6,144 original-helper cases; allocation failure/retry and allocator-import checks passed; both builds, ARM boot, x86 compatibility guest, 1,024 assembly cases and linked retpoline scan passed |
 | Stack protector | Static canary, boot entropy, initialization and fatal handler | Committed as `4fa6dbf2`; host C ABI tests passed 1000 replacements/protected-frame returns and deliberate canary mismatch; allocator imports and LLVM attributes passed; both kernel builds, optimized instruction checks and process/thread retirement guests passed; second measured batches retained zero physical/slab memory; ARM boots covered CPUs with and without FEAT_RNG |
 | Stack fault diagnostics | Serial messages and hexadecimal fault evidence in V; naked probes and x86 idle entry in architecture assembly | Committed as `a9090255`; host sanitizer tests passed 2,003 fault records through each serial adapter, with no allocator imports; assembly instruction bytes and every fault/recovery offset matched the original C objects on both architectures; both builds passed in recovery, fatal-overflow and normal configurations; both QEMU recovery/fatal suites and normal retirement guests passed; second measured batches retained zero physical/slab memory; x86 linked retpoline scan passed |
-| Apple display hotplug policy | Display-capable cable detection, debounce and one-shot cold-attach action | Extended C ABI fixture passed against the original C and production V under ASan/UBSan, including unsigned timer wrap, cold attach without HPD, initial attachment, zero debounce and non-1 C truth values; no allocator imports; both kernel builds passed; x86 QEMU reached userspace and passed its linked retpoline scan; ARM QEMU completed the process/thread retirement workload with zero physical/slab retention in the second batch |
-| Architecture glue | Virtualization primitives and VM entry | Pending |
+| Apple display hotplug policy | Display-capable cable detection, debounce and one-shot cold-attach action | Committed as `0b5e86cd`; extended C ABI fixture passed against the original C and production V under ASan/UBSan, including unsigned timer wrap, cold attach without HPD, initial attachment, zero debounce and non-1 C truth values; no allocator imports; both kernel builds passed; x86 QEMU reached userspace and passed its linked retpoline scan; ARM QEMU completed the process/thread retirement workload with zero physical/slab retention in the second batch |
+| VMX architecture helpers | VT-x controls, FPU state, descriptors and selector reads in V; exact VM entry/exit in assembly | Host C ABI/sanitizer tests passed 7,680 control cases and all ARM no-op exports with no allocator imports; optimized x86 ports preserved CF/ZF capture, operand order and memory clobbers; all 214 VM-entry instruction bytes matched both the original host and kernel objects; both architecture builds and QEMU boot/syscall guests passed; x86 linked retpoline scan passed |
 | Network and Apple drivers | lwIP bridge, ANS, SMC, speakers, keyboard, Wi-Fi and GPU helpers | Pending |
 | Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
 | Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
@@ -53,3 +53,15 @@ The reseeding test runs 10,000 production reseeds and partial reads, requires
 zero retained objects in every heap class and zero large pages, and reaches
 userspace. ARM was tested both without FEAT_RNG (native M1 virtualization)
 and with it (QEMU `max` under TCG); x86 used QEMU `max` with RDSEED.
+
+The VMX port shares the packed descriptor from the existing C ABI header and
+uses `i32` for C `int` returns. It adds no allocations or ownership changes.
+The VM-entry routine keeps every guest GPR and the VMCS host stack in the
+same instructions as the original global assembly block.
+
+The local x86 QEMU TCG setup does not provide VT-x. Its hypervisor guest
+reports the absent device explicitly; passing that boot/syscall check does
+not verify VMXON or VMLAUNCH execution. On a suitable x86 host with nested
+VT-x, `tests/hypervisor/run-vm.py --require-vmx` requires five VM executions
+with IO/HLT exits and complete GPR preservation. That hardware path remains
+unverified locally.

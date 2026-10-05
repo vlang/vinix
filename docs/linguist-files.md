@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-for the staged kernel V migration (parent `a90902559462e52cfcdc7910123aa9bed72be2c8`),
+for the staged kernel V migration (parent `0b5e86cdf8f790b8f36122708cc6d4e2867ca57f`),
 with the accompanying root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,9 +11,9 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 545 | 6,256,128 | 27.14% |
-| Python | 342 | 3,901,716 | 16.93% |
-| Shell | 280 | 1,232,418 | 5.35% |
+| C | 546 | 6,257,139 | 27.12% |
+| Python | 344 | 3,910,881 | 16.95% |
+| Shell | 280 | 1,232,418 | 5.34% |
 
 All `.v` files are classified as V. The resulting V share is 37.92%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
@@ -184,8 +184,7 @@ deployed Linguist version and the default-branch revision.
 | `kernel/c/vinix_inet6.h` | 1,209 |
 | `kernel/c/vinix_net.c` | 47,124 |
 | `kernel/c/vinix_net.h` | 2,259 |
-| `kernel/c/vmx.c` | 6,559 |
-| `kernel/c/vmx.h` | 1,241 |
+| `kernel/c/vmx.h` | 1,394 |
 | `kernel/c/x86_mitigations.h` | 1,098 |
 | `kernel/linuxkpi/include/asm/atomic.h` | 4,539 |
 | `kernel/linuxkpi/include/asm/barrier.h` | 1,174 |
@@ -456,6 +455,8 @@ deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/test.c` | 17,267 |
 | `tests/fsync-scope/test.c` | 2,988 |
 | `tests/hypervisor/abi_test.c` | 878 |
+| `tests/hypervisor/guest.c` | 2,981 |
+| `tests/hypervisor/vmx_test.c` | 4,436 |
 | `tests/ios/calculator.c` | 2,085 |
 | `tests/ios/desktop-init.c` | 1,138 |
 | `tests/ios/guest.c` | 3,478 |
@@ -806,6 +807,8 @@ deployed Linguist version and the default-branch revision.
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,335 |
 | `tests/fsync-scope/run.py` | 5,239 |
+| `tests/hypervisor/check-vmx.py` | 7,924 |
+| `tests/hypervisor/run-vm.py` | 1,241 |
 | `tests/ios/desktop.py` | 7,946 |
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 5,432 |

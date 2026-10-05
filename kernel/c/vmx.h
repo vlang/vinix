@@ -34,7 +34,12 @@ int vinix_vmx_write(uint64_t field, uint64_t value);
 int vinix_vmx_read(uint64_t field, uint64_t *value);
 int vinix_vmx_enter(struct vinix_vmx_registers *registers);
 void vinix_vmx_fxsave(void *state);
+/* V emits unqualified pointers; ordinary C callers keep the const contract. */
+#ifdef VINIX_V_RUNTIME
+void vinix_vmx_fxrstor(void *state);
+#else
 void vinix_vmx_fxrstor(const void *state);
+#endif
 
 void vinix_vmx_sgdt(struct vinix_vmx_descriptor *descriptor);
 void vinix_vmx_sidt(struct vinix_vmx_descriptor *descriptor);
