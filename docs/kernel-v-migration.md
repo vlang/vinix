@@ -238,3 +238,23 @@ Descriptor walking, directory/log ownership and permission checks, same-inode
 rotation through the existing flock description and error-preserving cleanup
 retain their original behavior. New stack-buffer and descriptor lifetimes
 received independent review; the V cores introduce no implicit allocations.
+
+| Stage | Native V location | Validation |
+| --- | --- | --- |
+| AGX trace observation | `tools/agx-re/tracecore/core.v` | Complete: independent typed driver model passed ASan/UBSan and exact frozen-C JSON/allocation parity in four filter/byte-limit modes; arm64 and x86_64 macOS dylibs built with strict format warnings; physical Metal capture remains untested |
+
+This stage covers 480 original C lines and conservatively counts 420 translated
+implementation lines. V owns fixed connection/storage/resource tables, filtering,
+selector names, JSON emission and explicit temporary snapshots. Native Mach
+reads, the pthread initializer and typed dyld interposition remain a small C
+ABI adapter; the Objective-C resource hook and public header remain unchanged.
+The shared core is generated during the build, with no maintained generated C.
+
+The snapshots free their explicit allocations on failed reads, partial reads
+and success. Table entries retain borrowed object identities; observation holds
+the original mutex, and real driver hooks run after it is released, with the
+grow hook retaining its original call-first order. Stack scratch tables remain
+stack values and generated code imports no implicit allocator. These lifetimes
+received independent review. The original permanent trace-stream ownership is
+preserved; mocked Mach/driver calls do not verify private ABI behavior on Apple
+hardware.

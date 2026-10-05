@@ -1,17 +1,27 @@
 CC := xcrun clang
 CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
+V_ARCH ?= $(if $(filter arm64,$(shell uname -m)),arm64,amd64)
 
-.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test trace trace-resources trace-depth-resources trace-stencil-resources clean
+.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test test-trace-v trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
+
+test-trace-v:
+	python3 ../../tests/agx-trace/run.py
 
 $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/agx_trace.dylib: agx_trace.c agx_resource_trace.m agx_trace.h | $(BUILD)
+$(BUILD)/agx_trace_core.c: tracecore/core.v compile-v-trace.py | $(BUILD)
+	python3 compile-v-trace.py $@ --arch $(V_ARCH)
+
+$(BUILD)/agx_trace_core.o: $(BUILD)/agx_trace_core.c agx_trace_v.h
+	$(CC) $(CFLAGS) -DVINIX_V_RUNTIME -I. -c $< -o $@
+
+$(BUILD)/agx_trace.dylib: agx_trace.c agx_resource_trace.m agx_trace.h agx_trace_v.h $(BUILD)/agx_trace_core.o | $(BUILD)
 	$(CC) $(CFLAGS) -fobjc-arc -dynamiclib -framework Foundation -framework IOKit \
 		-F/System/Library/PrivateFrameworks -framework IOGPU -o $@ \
-		agx_trace.c agx_resource_trace.m
+		agx_trace.c agx_resource_trace.m $(BUILD)/agx_trace_core.o
 
 $(BUILD)/metal_triangle: metal_triangle.m | $(BUILD)
 	$(CC) $(CFLAGS) -fobjc-arc -framework Foundation -framework Metal -o $@ $<

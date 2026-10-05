@@ -32,8 +32,16 @@ clear/triangle pair. With an explicit resource opt-in, it also snapshots only
 CPU-visible allocations whose GPU virtual addresses occur in those segments.
 It never maps an unknown GPU address or accesses GPU MMIO.
 
+The tracer's native V core owns observation/filtering, fixed trace tables,
+JSON output and temporary snapshot allocation. A small C adapter preserves
+Mach, pthread initialization and the typed dyld interposition section; the
+Objective-C resource hook remains unchanged. `make test-trace-v` runs an
+independent driver model under ASan/UBSan and compares JSON with the frozen
+original C implementation, including failure cleanup and bounded tables.
+
 ```sh
 make -f GNUmakefile test
+make -f GNUmakefile test-trace-v
 make -f GNUmakefile inspect
 make -f GNUmakefile trace
 make -f GNUmakefile trace-resources
