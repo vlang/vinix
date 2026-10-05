@@ -147,3 +147,23 @@ kernel SHA256 is
 All ten porting stages are committed. Apple hardware-specific protocols have
 host MMIO/firmware fixtures and boot coverage; physical ANS, SMC, SPI, Wi-Fi
 and speaker operation still require testing on a supported Apple machine.
+
+## Next batch, started 2026-10-05
+
+The continuation starts from `823aeb116eb3b3ab20463ccb9b1c3fba6f0c41ae`.
+That revision has 6,488 lines in 16 top-level kernel C files, including the
+54-line existing Linux header binding. Embedded native diagnostic fixtures
+remain independent C callers and are recorded separately from translated
+implementation lines. The requested approximately 10,000-line scope extends
+beyond the remaining kernel implementations; subsequent stages are in progress.
+
+| Stage | Native V location | Validation |
+| --- | --- | --- |
+| Console policy | `kernel/kprint/printf_policy*.v` | Complete: independent debug/production C ABI callers passed ASan/UBSan across 1,026 buffer lengths, chunk flushes, integer endpoints, embedded NUL, panic/assertion and serial-only benchmark output; no implicit allocator imports; both architecture builds and QEMU boot/syscall guests passed |
+
+The console entries retain native C variadic/`va_list` access and the unchanged
+nanoprintf dependency. V owns output selection, ordinary-print locking, the
+256-byte stack buffer, chunk flushing and assertion text emission. The panic
+path remains unconditional and lock-free; each callback borrows its live stack
+context only during synchronous formatting. This lifetime was independently
+reviewed before committing. QEMU does not verify physical UART/terminal devices.
