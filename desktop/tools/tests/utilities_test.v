@@ -224,6 +224,11 @@ fn test_text_editor_inserts_and_navigates() {
 	assert editor.modified
 
 	editor.key_input('\x0e')
+	assert editor.pending_action == .new_document
+	assert editor_bytes_text(editor.text) == 'hllo!\nworld'
+	assert editor.modified
+	editor.handle(editor_action_discard)!
+	editor.handle(editor_action_confirm_discard)!
 	assert editor.text.len == 0
 	assert editor_bytes_text(editor.path) == editor_default_path
 	assert !editor.modified
