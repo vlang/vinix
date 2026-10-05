@@ -38,8 +38,8 @@ tests build in isolated worktrees to avoid incorporating concurrent changes.
 | BCM4378 and M1 Wi-Fi | Firmware/protocol parsers, ring ownership, PCIe/DART setup and loader staging | Committed as `c038ee55`; 26 protocol groups, 100,000 parser mutations and eight platform groups passed with ASan/UBSan and no allocator imports; both builds and QEMU boot/syscall checks passed; physical firmware, association and DMA remain untested |
 | Native network adapter | Link/timer policy, TCP/UDP PCB and pbuf ownership, IPv4/IPv6 endpoints and multicast memberships | Committed as `1efaf7c7`; original host packet/ownership assertions passed against V under ASan/UBSan with no implicit allocator imports; both builds and socket-option, physical IPv4/IPv6, SLAAC, scope and multicast QEMU suites passed; 500 socket exchanges retained zero objects in every heap class on both architectures |
 | LinuxKPI helpers | Bounded strings, integer parsing, bitmaps, packed object caches, per-CPU storage, reference counts, taints and I/O-wait scopes | Committed as `73ddd8cb`; original host suite passed under ASan/UBSan with no implicit allocator imports; x86 opt-in and ARM default builds passed; full four-CPU x86 QEMU diagnostics and ARM boot/syscall guest passed; every measured diagnostic batch retained zero pages |
-| Linux driver compatibility | LinuxKPI runtime, synchronization and work queues | Pending |
-| Benchmark and allocation instrumentation | Kernel benchmark and allocation tracking implementations | Pending |
+| Linux driver compatibility | Allocation, Linux formatting/logging, task state, time, timers, synchronization, SRCU and work queues | Completed in `61572a06`, `6b18ca9e`, `2172fb48`, `9b785b5f`; host sanitizers, both builds and full four-CPU QEMU diagnostics passed |
+| Benchmark and allocation instrumentation | Console policy, live allocation tracking and the shared kernel heap sampler | Completed in `3a2c4ed6`, `acad3b2a`, `069f76c3`; sanitizer fixtures, both builds and relevant native guests passed |
 
 The first two x86 core attempts after the runtime/CPU-helper port hit the same
 free-memory accounting assertion (`tests/qemu-core/test.c:275`) seen during
@@ -275,7 +275,7 @@ New allocation and asynchronous record lifetimes received independent review.
 
 Linux task state, clocks/conversions/timed sleeps and timer ownership now live
 in `compatcore/{task,time,timer}.v`: at least 718 original lines out of the
-1,071-line scope, excluding 312 unchanged diagnostic lines and the entire
+1,071-line scope, excluding 312 original diagnostic lines and the entire
 41-line native binding. `jiffies` and `jiffies_64` retain identical storage,
 including the Darwin assembler alias. Public C integer arguments use `i32`;
 task waits preserve locked unlinking, timer retirement waits until callbacks
@@ -315,3 +315,33 @@ Generated code has no implicit allocation imports; stack buffers and explicit
 allocation rollback received independent lifetime review. The new sampler has
 not been executed inside XNU; historical macOS benchmark captures are preserved
 as evidence of their original C workload.
+
+The boot/tools stage ports at least 1,712 original X11 bridge lines (1,807
+original lines less both complete 95-line C binding files), 731 ARM init policy
+lines (811 original lines less 80 native assembly/restorer lines), 110 Wi-Fi
+CLI lines and 557 EGL/GLUT sample lines. A separate 32-line GL C heredoc also
+became a native V variant and receives no credit in this conservative tally.
+Native headers/callbacks, fixed signal-safe state, terminal restoration,
+process/descriptor ownership and protocol layouts remain intact. Build scripts
+and content keys compile/hash the maintained V modules. Guest GCC rebuild
+examples contain generated C artifacts alongside their V source and ABI header;
+these artifacts are not committed as maintained implementation. Original C
+implementations were removed after validation. Shared script commits exclude
+another session's unrelated desktop app-link edits.
+
+Independent host ASan/UBSan fixtures and original-C traces passed. X11 input
+and Wine input/selection fixtures passed in both native architectures. Wi-Fi
+passed eleven native device-model cases on each architecture. ARM shell,
+full-userland and desktop init guests passed, including signal forwarding,
+restart and adopted-child process-group retirement; nineteen unchanged
+bootstrap assertions and seven content-key tests passed. Both kernel builds
+remain covered by the preceding stages. The complete eight-case ARM Mesa
+fake-G17 rendering/fence/resource/lifetime suite passed the V EGL binary with
+an exact dependency image (ELF SHA256
+`4c165b986d67c3230c6d6a75d3678c482379cc612ba8fef795fddacbfdcd15b0`). One
+repeat hit an intermittent queue-destroy/retirement timing expectation inside
+the unchanged ioctl fixture. The original C baseline and final unchanged V
+pipeline both passed; the failure and comparison logs remain preserved. No
+assertions or deadlines were weakened. Physical Apple graphics/Wi-Fi and
+optional hardware init branches remain untested. New lifetimes received
+independent review.

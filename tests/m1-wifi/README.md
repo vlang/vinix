@@ -99,13 +99,22 @@ Build the control utility with the compiler for the target ARM64 **userspace**
 sysroot, not the freestanding kernel compiler:
 
 ```sh
-cc -std=c11 -O2 -Wall -Wextra -Werror -iquote kernel/c tools/m1-wifi/wifi-ctl.c -o wifi-ctl
+python3 tools/m1-wifi/compile-v.py /tmp/wifi-ctl.c --arch arm64
+cc -std=gnu11 -O2 -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror \
+  -Itools/m1-wifi -iquote kernel/c /tmp/wifi-ctl.c -o wifi-ctl
 ```
 
 Here `cc` must target the userspace you intend to run. Include the utility and
 locally selected firmware in a test initramfs. The supplied ELF files are
 kernel-only build artifacts, not an installed boot image or hardware test.
 Keep your existing m1n1/U-Boot/Limine chain and a known-working boot entry.
+
+`python3 tests/m1-wifi/run-ctl.py` runs the maintained V utility against an
+independent native device fixture with ASan/UBSan. The same 11 scenarios run
+in ARM and x86 QEMU using `run-ctl-vm.py --arch aarch64|x86_64
+--kernel-dir <isolated-kernel> --state-dir <new-directory>`. These fixtures
+check control messages, polling, terminal restoration, credential wiping and
+file validation; physical firmware/association remain unverified.
 
 ## Firmware and association
 

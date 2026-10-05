@@ -92,8 +92,12 @@ def prepare(args, work: Path) -> Path:
     # The X11 layer may predate this checkout's input bridge: build the one
     # the desktop under test was written against.
     sysroot = args.repo / "build-aarch64-x11/sysroot"
+    host_core = root / "wine-host-core.c"
+    subprocess.run(["python3", str(ROOT / "build-support/xorg-server/compile-v-host.py"),
+                    "winehost", str(host_core), "--arch", "arm64"], check=True)
     subprocess.run(["aarch64-linux-musl-gcc", "-O2", "-w", "-D__vinix__", f"-I{sysroot}/usr/include",
-                    str(ROOT / "build-support/xorg-server/vinix-wine-host.c"),
+                    str(ROOT / "build-support/xorg-server/wine-host-v-abi.c"), str(host_core),
+                    f"-I{ROOT}/build-support/xorg-server",
                     f"-L{sysroot}/usr/lib", f"-L{sysroot}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(root / "usr/bin/vinix-wine-host")], check=True)

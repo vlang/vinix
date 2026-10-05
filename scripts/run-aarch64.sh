@@ -419,19 +419,22 @@ for module in "${EXTRA_MODULES[@]}"; do
     fi
 done
 vinix_build_minimal_init() {
-    local object binary
+    local object binary source
     mkdir -p "$INIT_DIR"
     object="$(mktemp "$INIT_DIR/.init.o.XXXXXX")"
     binary="$(mktemp "$INIT_DIR/.init.XXXXXX")"
-    if ! clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
-        -o "$object" "$INIT_DIR/init.c" ||
-       ! ld.lld -m aarch64elf --nostdlib -static -o "$binary" "$object"; then
-        rm -f "$object" "$binary"
+    source="$object.c"
+    if ! python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" shell "$source" ||
+       ! clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 \
+        -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections \
+        -I"$SCRIPT_DIR/build-support/init-aarch64" -c -o "$object" "$source" ||
+       ! ld.lld -m aarch64elf --nostdlib -static --gc-sections -o "$binary" "$object"; then
+        rm -f "$object" "$binary" "$source"
         return 1
     fi
     chmod 755 "$binary"
     mv -f "$binary" "$INIT_DIR/init"
-    rm -f "$object"
+    rm -f "$object" "$source"
 }
 
 if [ "$NO_BUILD" -eq 0 ] && [ ! -f "$INITRAMFS" ]; then
@@ -1148,7 +1151,7 @@ if [ "$FAKE_G17" -eq 1 ] \
     && ! tar -tf "$ACTIVE_INITRAMFS" \
         | sed 's#^\./##' \
         | grep -qx 'usr/lib/dri/asahi_dri.so'; then
-    ASAHI_RUNTIME="$SCRIPT_DIR/build-aarch64-asahi/staging/usr/lib"
+    ASAHI_RUNTIME="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}/usr/lib"
     if [ ! -f "$ASAHI_RUNTIME/libgallium-25.0.5.so" ] \
         || [ ! -f "$ASAHI_RUNTIME/dri/libdril_dri.so" ]; then
         echo "ERROR: --fake-g17 needs the staged Mesa Asahi runtime." >&2
@@ -1167,7 +1170,7 @@ fi
 # Keep the fake-backend lifecycle smoke test in sync with the kernel under
 # test, even when the selected desktop archive predates --submit-only.
 if [ "$FAKE_G17" -eq 1 ]; then
-    ASAHI_STAGING="$SCRIPT_DIR/build-aarch64-asahi/staging"
+    ASAHI_STAGING="${VINIX_ASAHI_STAGING:-$SCRIPT_DIR/build-aarch64-asahi/staging}"
     if [ ! -x "$ASAHI_STAGING/usr/bin/gl-triangle-agx" ] \
         || [ ! -f "$ASAHI_STAGING/usr/lib/libvinix-agx-fault.so" ]; then
         echo "ERROR: --fake-g17 needs the staged Mesa lifecycle test." >&2
@@ -1187,13 +1190,14 @@ if [ "$FAKE_G17" -eq 1 ]; then
         echo "       Re-run scripts/build-asahi-aarch64.sh in the ARM64 build VM." >&2
         exit 1
     fi
-    mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle"
+    mkdir -p "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle" \
+        "$PACKAGE_RUNTIME_ROOT/usr/lib"
     install -m755 "$ASAHI_STAGING/usr/bin/gl-triangle-agx" \
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"
     install -m755 "$ASAHI_STAGING/usr/lib/libvinix-agx-fault.so" \
         "$PACKAGE_RUNTIME_ROOT/usr/lib/"
-    install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
-        "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle/"
+    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+        "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle" --arch arm64
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"
 fi

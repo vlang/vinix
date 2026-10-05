@@ -761,13 +761,14 @@ fi
 # the opaque vendor files to identity captured from the target, and wifi-ctl
 # repeats that identity check on the M1 before uploading a byte.
 echo "==> Building wifi-ctl for aarch64-linux-musl..."
+python3 "$SCRIPT_DIR/tools/m1-wifi/compile-v.py" "$BUILD_DIR/wifi-ctl-v.c" --arch arm64
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$CC_SHIM" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
     -iquote "$SCRIPT_DIR/kernel/c" \
     -std=c11 -O2 -fno-stack-protector -Wall -Wextra -Werror \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
-    "$SCRIPT_DIR/tools/m1-wifi/wifi-ctl.c" \
+    "$BUILD_DIR/wifi-ctl-v.c" -I"$SCRIPT_DIR/tools/m1-wifi" -fwrapv -fno-strict-aliasing \
     -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lc -lgcc \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" \
@@ -780,13 +781,14 @@ INIT_DEFINES=()
 if [ -n "$WIFI_BUNDLE" ]; then
     INIT_DEFINES=(-DVINIX_WIFI_BUNDLE=1)
 fi
-"$LLVM_BIN/clang" --target=aarch64-linux-none -nostdlib -ffreestanding -O2 -c \
-    "${INIT_DEFINES[@]}" \
-    -o "$BUILD_DIR/desktop-init.o" \
-    "$SCRIPT_DIR/build-support/init-aarch64/desktop-init.c"
+python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" desktop "$BUILD_DIR/desktop-init-v.c"
+"$LLVM_BIN/clang" --target=aarch64-linux-none -nostdlib -ffreestanding -O2 \
+    -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections -c \
+    "${INIT_DEFINES[@]}" -I"$SCRIPT_DIR/build-support/init-aarch64" \
+    -o "$BUILD_DIR/desktop-init.o" "$BUILD_DIR/desktop-init-v.c"
 # lld is installed as a separate formula, so it is on PATH rather than in
 # the llvm keg the other tools come from.
-"${LD_LLD:-ld.lld}" -m aarch64elf --nostdlib -static \
+"${LD_LLD:-ld.lld}" -m aarch64elf --nostdlib -static --gc-sections \
     -o "$BUILD_DIR/desktop-init" "$BUILD_DIR/desktop-init.o"
 
 echo "==> Staging the desktop initramfs..."
@@ -1218,8 +1220,8 @@ if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
     mkdir -p "$STAGING/usr/share/examples/gl-triangle"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
-    install -m644 "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
-        "$STAGING/usr/share/examples/gl-triangle/egl_triangle.c"
+    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+        "$STAGING/usr/share/examples/gl-triangle" --arch arm64
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
     "$STAGING/root" "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp" \
@@ -1675,7 +1677,13 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/vinix-host-sync"
     "$SCRIPT_DIR/build-support/vinix-version-check"
     "$SCRIPT_DIR/build-support/xorg-server/startx"
-    "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c"
+    "$SCRIPT_DIR/build-support/xorg-server/winehost"
+    "$SCRIPT_DIR/build-support/xorg-server/wine-host-v-abi.c"
+    "$SCRIPT_DIR/build-support/xorg-server/wine-host-v-abi.h"
+    "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py"
+    "$SCRIPT_DIR/build-support/xorg-server/xinputcore"
+    "$SCRIPT_DIR/build-support/xorg-server/xinput_abi.h"
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c"
     "$SCRIPT_DIR/build-support/firefox"
     "$SCRIPT_DIR/build-support/gimp"
     "$SCRIPT_DIR/build-support/obs"
@@ -1684,7 +1692,12 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/hyprland"
     "$SCRIPT_DIR/build-support/steam"
     "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke"
-    "$SCRIPT_DIR/gl-triangle/egl_triangle.c"
+    "$SCRIPT_DIR/gl-triangle/eglcore"
+    "$SCRIPT_DIR/gl-triangle/glutcore"
+    "$SCRIPT_DIR/gl-triangle/legacycore"
+    "$SCRIPT_DIR/gl-triangle/gl_v.h"
+    "$SCRIPT_DIR/gl-triangle/compile-v.py"
+    "$SCRIPT_DIR/gl-triangle/stage.py"
     "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
     "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
     "$SCRIPT_DIR/tests/packages/x-window-check.py"

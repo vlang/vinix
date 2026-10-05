@@ -10,7 +10,15 @@ export EGL_PLATFORM=surfaceless
 triangle=/usr/bin/gl-triangle-agx
 if [ "${1:-}" = --rebuild ] || [ "${1:-}" = --compile ]; then
     echo "run-gl-triangle-agx: compiling the demo with Vinix GCC"
-    gcc /usr/share/examples/gl-triangle/egl_triangle.c -O2 \
+    example=/usr/share/examples/gl-triangle
+    source="$example/egl_triangle.c"
+    if command -v v >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        target_arch=arm64
+        [ "$(uname -m)" != x86_64 ] || target_arch=amd64
+        source=/tmp/gl-triangle-v.c
+        python3 "$example/compile-v.py" "$source" --kind egl --arch "$target_arch"
+    fi
+    gcc "$source" -std=gnu11 -fwrapv -fno-strict-aliasing -I"$example" -O2 \
         -o /tmp/gl-triangle-agx -lEGL -lGLESv2 -ldl -lpthread -lm
     triangle=/tmp/gl-triangle-agx
     shift

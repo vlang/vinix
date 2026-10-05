@@ -334,49 +334,11 @@ exec xclock -geometry 400x400+50+50
 XINITRC
     chmod +x "$STAGING/root/.xinitrc"
 
-    # OpenGL triangle sample
-    cat > "$STAGING/root/gl_triangle.c" << 'GLEOF'
-#if defined(__has_include)
-#  if __has_include(<GL/freeglut.h>)
-#    include <GL/freeglut.h>
-#  else
-#    include <GL/glut.h>
-#  endif
-#else
-#  include <GL/glut.h>
-#endif
-
-static void draw(void) {
-    glClearColor(0.08f, 0.08f, 0.10f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    glBegin(GL_TRIANGLES);
-        glColor3f(1.0f, 0.2f, 0.2f); glVertex2f(-0.65f, -0.45f);
-        glColor3f(0.2f, 1.0f, 0.2f); glVertex2f( 0.65f, -0.45f);
-        glColor3f(0.2f, 0.4f, 1.0f); glVertex2f( 0.00f,  0.65f);
-    glEnd();
-
-    glutSwapBuffers();
-}
-
-int main(int argc, char **argv) {
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
-    glutInitWindowSize(800, 600);
-    glutCreateWindow("Vinix OpenGL Triangle");
-    glutDisplayFunc(draw);
-    glutMainLoop();
-    return 0;
-}
-GLEOF
-
-    # Keep the exact EGL/GLES source in the image so --rebuild verifies that
-    # the Vinix-hosted GCC can compile and link against the Asahi userspace.
-    if [ -f "$SCRIPT_DIR/gl-triangle/egl_triangle.c" ]; then
-        mkdir -p "$STAGING/usr/share/examples/gl-triangle"
-        cp "$SCRIPT_DIR/gl-triangle/egl_triangle.c" \
-            "$STAGING/usr/share/examples/gl-triangle/"
-    fi
+    # Package maintained V demos and native C build artifacts for guest GCC.
+    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+        "$STAGING/usr/share/examples/gl-triangle" --arch arm64
+    cp "$STAGING/usr/share/examples/gl-triangle/legacy_triangle.c" \
+        "$STAGING/root/gl_triangle.c"
 
     # Helper that compiles and launches the triangle under Xorg.
 cat > "$STAGING/usr/bin/run-gl-triangle" << 'GLRUN'
@@ -402,7 +364,7 @@ fi
 
 if [ "$compile_source" -eq 1 ] && [ -f /root/gl_triangle.c ]; then
     echo "run-gl-triangle: compiling /root/gl_triangle.c ..."
-    if gcc /root/gl_triangle.c -O2 -I/usr/include -L/usr/lib -o /root/gl_triangle -lglut -lGL -lX11 -lm >"$compile_log" 2>&1; then
+    if gcc /root/gl_triangle.c -std=gnu11 -fwrapv -fno-strict-aliasing -O2 -I/usr/include -I/usr/share/examples/gl-triangle -L/usr/lib -o /root/gl_triangle -lglut -lGL -lX11 -lm >"$compile_log" 2>&1; then
         target="/root/gl_triangle"
     else
         echo "run-gl-triangle: guest linker cannot link Alpine RELR shared libs; falling back to /usr/bin/tri"

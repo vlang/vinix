@@ -15,7 +15,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "scripts/run-aarch64.sh"
-INIT_SOURCE = ROOT / "build-support/init-aarch64/init.c"
 
 TOOL_STUB = r'''
 import json
@@ -52,7 +51,6 @@ class RecoveryPayloadTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.init_dir = self.root / "init"
         self.init_dir.mkdir()
-        shutil.copy2(INIT_SOURCE, self.init_dir / "init.c")
         self.bin_dir = self.root / "bin"
         self.bin_dir.mkdir()
         for name in ["clang", "ld.lld"]:
@@ -67,6 +65,7 @@ class RecoveryPayloadTests(unittest.TestCase):
         self.fixture.write_text(
             "set -euo pipefail\n"
             'INIT_DIR="$TEST_INIT_DIR"\n'
+            'SCRIPT_DIR="$TEST_REPO_DIR"\n'
             'INITRAMFS="$TEST_FULL_IMAGE"\n'
             'INITRAMFS_COMPRESSED=1\n'
             'DISK_ROOT_FALLBACK="${TEST_FALLBACK:-recovery}"\n'
@@ -86,6 +85,7 @@ class RecoveryPayloadTests(unittest.TestCase):
             "PATH": str(self.bin_dir) + os.pathsep + os.environ["PATH"],
             "TMPDIR": str(self.root),
             "TEST_INIT_DIR": str(self.init_dir),
+            "TEST_REPO_DIR": str(ROOT),
             "TEST_FULL_IMAGE": str(self.full_image),
             "TEST_EVENTS": str(self.event_path),
             "TEST_STATE": str(self.state_path),

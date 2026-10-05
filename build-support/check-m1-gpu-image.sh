@@ -57,7 +57,8 @@ fi
 
 MANIFEST="$(mktemp "${TMPDIR:-/tmp}/vinix-m1-gpu-manifest.XXXXXX")"
 ARCHIVED_SOURCE="$(mktemp "${TMPDIR:-/tmp}/vinix-m1-gpu-source.XXXXXX")"
-trap 'rm -f "$MANIFEST" "$ARCHIVED_SOURCE"' EXIT
+EXPECTED_SOURCE="$(mktemp "${TMPDIR:-/tmp}/vinix-m1-gpu-expected.XXXXXX")"
+trap 'rm -f "$MANIFEST" "$ARCHIVED_SOURCE" "$EXPECTED_SOURCE"' EXIT
 if ! tar -tf "$IMAGE" | sed 's#^\./##' > "$MANIFEST"; then
     echo "error: cannot read initramfs archive: $IMAGE" >&2
     exit 1
@@ -115,6 +116,14 @@ if grep -Fqx "usr/lib/dri/asahi_dri.so" "$MANIFEST"; then
 fi
 
 if [ -n "$TRIANGLE_SOURCE" ]; then
+    case "$TRIANGLE_SOURCE" in
+        *.v)
+            CHECKER_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+            python3 "$CHECKER_ROOT/gl-triangle/compile-v.py" "$EXPECTED_SOURCE" \
+                --source "$TRIANGLE_SOURCE" --arch arm64
+            TRIANGLE_SOURCE="$EXPECTED_SOURCE"
+            ;;
+    esac
     if [ ! -f "$TRIANGLE_SOURCE" ]; then
         echo "error: expected M1 triangle source is missing: $TRIANGLE_SOURCE" >&2
         missing=1

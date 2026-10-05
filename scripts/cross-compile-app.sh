@@ -17,7 +17,7 @@ SYSROOT="${VINIX_AARCH64_SYSROOT:-$SCRIPT_DIR/build-aarch64-userland/staging}"
 
 # The applications a guest knows how to replace. Adding one here also needs it
 # in LIVE_APPS in tools/qemu-package-store.py, in build-support/vinix-files-sync
-# and in live_apps in build-support/init-aarch64/desktop-init.c.
+# and in LiveApp entries in build-support/init-aarch64/initcore/core.v.
 if [ "$#" -eq 0 ]; then
     echo "usage: $0 files|activity|settings..." >&2
     exit 2

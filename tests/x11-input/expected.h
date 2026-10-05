@@ -1,0 +1,2 @@
+/* Original C fixture stdout traces, FNV-1a; see run.py --baseline. */
+static const uint64_t expected_traces[6] = {5825170999894802790ull, 5132895275929870972ull, 10234679706595537033ull, 7722205730669997025ull, 8539270571232234525ull, 13757961447460471051ull};

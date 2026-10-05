@@ -268,7 +268,7 @@ if [ "$ENABLE_APPLE_GPU" -eq 1 ]; then
     else
         gpu_check=("$SCRIPT_DIR/build-support/check-m1-gpu-image.sh" \
             --kernel "$KERNEL" \
-            --triangle-source "$SCRIPT_DIR/gl-triangle/egl_triangle.c")
+            --triangle-source "$SCRIPT_DIR/gl-triangle/eglcore/core.v")
         if [ "$USE_DESKTOP_INITRAMFS" -eq 1 ]; then
             gpu_check+=(--desktop)
         fi

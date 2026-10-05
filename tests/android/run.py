@@ -270,8 +270,12 @@ def prepare(args: argparse.Namespace) -> Path | None:
                     str(ROOT / "tests/android/memory-probe.c"),
                     "-o", str(test / "memory-probe")], check=True)
     # Test the input bridge built with the compositor under test.
+    host_core = test / "wine-host-core.c"
+    subprocess.run(["python3", str(ROOT / "build-support/xorg-server/compile-v-host.py"),
+                    "winehost", str(host_core), "--arch", "arm64"], check=True)
     subprocess.run([compiler, "-O2", "-w", "-D__vinix__", f"-I{x11}/usr/include",
-                    str(ROOT / "build-support/xorg-server/vinix-wine-host.c"),
+                    str(ROOT / "build-support/xorg-server/wine-host-v-abi.c"), str(host_core),
+                    f"-I{ROOT}/build-support/xorg-server",
                     f"-L{x11}/usr/lib", f"-L{x11}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
                     "-o", str(overlay / "usr/bin/vinix-wine-host")], check=True)

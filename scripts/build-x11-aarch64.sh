@@ -519,8 +519,14 @@ install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/s
 # keyboard through the console. Translate both into XTEST events rather than
 # importing Linux's evdev/udev input stack just to run X11 applications.
 echo "  Building Vinix X11 input bridge..."
+python3 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py" xinputcore \
+    "$BUILD_DIR/vinix-xinput-core.c" --arch arm64
+$CC -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
+    -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
+    -I"$SCRIPT_DIR/build-support/xorg-server" -I"$SYSROOT/usr/include" \
+    -c "$BUILD_DIR/vinix-xinput-core.c" -o "$BUILD_DIR/vinix-xinput-core.o"
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
-    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c" \
+    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c" "$BUILD_DIR/vinix-xinput-core.o" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
     -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-xinput"
@@ -529,8 +535,11 @@ $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
 # companion owns that private X server and translates the compositor's scoped
 # input records into XTEST events; it never opens the physical input devices.
 echo "  Building Vinix embedded Wine host..."
+python3 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py" winehost \
+    "$BUILD_DIR/vinix-wine-host-core.c" --arch arm64
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
-    "$SCRIPT_DIR/build-support/xorg-server/vinix-wine-host.c" \
+    -I"$SCRIPT_DIR/build-support/xorg-server" \
+    "$SCRIPT_DIR/build-support/xorg-server/wine-host-v-abi.c" "$BUILD_DIR/vinix-wine-host-core.c" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
     -lXtst -lXdamage -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"

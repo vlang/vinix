@@ -32,6 +32,20 @@ tar --format=ustar -cf "$work/gpu.tar" -C "$root" .
 "$checker" --triangle-source \
     "$root/usr/share/examples/gl-triangle/egl_triangle.c" "$work/gpu.tar"
 
+# The maintained V module must identify exactly the generated C shipped in
+# the image; a change to V is stale even when its public C ABI is unchanged.
+python3 "$repo/gl-triangle/compile-v.py" \
+    "$root/usr/share/examples/gl-triangle/egl_triangle.c" --arch arm64
+tar --format=ustar -cf "$work/v-gpu.tar" -C "$root" .
+"$checker" --triangle-source "$repo/gl-triangle/eglcore/core.v" "$work/v-gpu.tar"
+cp "$repo/gl-triangle/eglcore/core.v" "$work/changed-core.v"
+printf '\n// Different maintained source revision.\n' >> "$work/changed-core.v"
+if "$checker" --triangle-source "$work/changed-core.v" "$work/v-gpu.tar" \
+    >/dev/null 2>&1; then
+    echo "M1 image test: checker accepted stale generated V source" >&2
+    exit 1
+fi
+
 for path in usr/bin/vinix-desktop-gpu usr/bin/Xorg usr/bin/Xvfb \
     usr/bin/startx usr/bin/run-firefox usr/bin/firefox-esr \
     usr/lib/firefox-esr/firefox-esr; do

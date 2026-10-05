@@ -18,7 +18,15 @@ export GALLIUM_DRIVER=softpipe
 triangle=/usr/bin/gl-triangle
 if test "${1:-}" = --rebuild; then
     echo "run-gl-triangle: compiling the demo with Vinix GCC"
-    gcc /usr/share/examples/gl-triangle/triangle.c \
+    example=/usr/share/examples/gl-triangle
+    source="$example/triangle.c"
+    if command -v v >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
+        target_arch=arm64
+        [ "$(uname -m)" != x86_64 ] || target_arch=amd64
+        source=/tmp/gl-triangle-v.c
+        python3 "$example/compile-v.py" "$source" --kind glut --arch "$target_arch"
+    fi
+    gcc "$source" -std=gnu11 -fwrapv -fno-strict-aliasing -I"$example" \
         -O2 -o /tmp/gl-triangle -lglut -lGL -lm
     triangle=/tmp/gl-triangle
     shift

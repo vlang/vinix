@@ -6,7 +6,7 @@
 # just that name's link with the new executable, so reopening the app runs the
 # new code while the desktop and every other app keep running. The name is
 # Files' because Files was the first; init starts the helper by it. Keep the
-# list in step with live_apps in init-aarch64/desktop-init.c.
+# list in step with LiveApp entries in init-aarch64/initcore/core.v.
 set -eu
 
 url_file=/etc/vinix/qemu-host-source-url

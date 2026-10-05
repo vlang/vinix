@@ -81,10 +81,10 @@ class DesktopBuildKeyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             v, env = self.fixture(root)
-            triangle = root / "gl-triangle/egl_triangle.c"
-            write(triangle, "int main(void) { return 0; }\n")
+            triangle = root / "gl-triangle/eglcore/core.v"
+            write(triangle, "module egltri\nfn main() { return 0 }\n")
             first = MODULE.compute_key(root, v, env)
-            write(triangle, "int main(void) { return 1; }\n")
+            write(triangle, "module egltri\nfn main() { return 1 }\n")
             self.assertNotEqual(first, MODULE.compute_key(root, v, env))
 
     def test_nested_x11_rewrite_invalidates_in_place(self) -> None:
