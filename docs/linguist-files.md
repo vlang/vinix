@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `73ddd8cb2b1781498248a23abf25cedbc3390454`,
+at source commit `94ed1845f0499e2c5b84b00f83f8f9a262066611`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -37,7 +37,7 @@ included in the lists below.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 73ddd8cb2b1781498248a23abf25cedbc3390454 --breakdown --json
+github-linguist --rev 94ed1845f0499e2c5b84b00f83f8f9a262066611 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
