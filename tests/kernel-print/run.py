@@ -16,6 +16,9 @@ with tempfile.TemporaryDirectory(prefix="vinix-print-") as directory:
     module.mkdir()
     policy = (ROOT / "kernel/kprint/printf_policy.v").read_text().replace("module kprint", "module policy")
     (module / "policy.v").write_text(policy)
+    entries = (ROOT / "kernel/kprint/printf_entries.v").read_text().replace("module kprint", "module policy")
+    (module / "entries.v").write_text(entries)
+    shutil.copytree(ROOT / "kernel/abiargs", work / "abiargs")
     (module / "host.v").write_text('''@[translated]
 @[has_globals]
 module policy
@@ -42,16 +45,6 @@ void fixture_release(void);
 ''')
     (work / "v.mod").write_text("Module { name: 'print_test' }\n")
     (work / "entry.v").write_text("module main\nimport policy as _\n")
-    shim = (ROOT / "kernel/c/printf.c").read_text()
-    # Keep sanitizer/libc printing symbols intact, including stderr's FILE type.
-    shim = shim.replace("#include <stdio.h>", "struct __file { int unused; };\ntypedef struct __file FILE;")
-    for original, alias in (("printf", "fixture_printf"), ("printf_panic", "fixture_panic"),
-                            ("kprintf", "fixture_kprintf"), ("fprintf", "fixture_fprintf"),
-                            ("stderr", "fixture_stderr")):
-        shim = re.sub(r"\b" + original + r"\b", alias, shim)
-    (work / "shim.c").write_text(shim)
-    bench = (ROOT / "kernel/c/printf_benchmark.c").read_text().replace("printf_benchmark", "fixture_benchmark")
-    (work / "bench.c").write_text(bench)
     for prod in (False, True):
         generated = work / "policy.c"
         subprocess.run([V, "-shared", "-no-builtin", "-no-closures", "-os", "vinix",
@@ -65,9 +58,25 @@ void fixture_release(void);
         subprocess.run([*flags, "-c", str(generated), "-o", str(obj)], check=True)
         symbols = subprocess.check_output(["nm", "-u", str(obj)], text=True)
         assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
+        native = work / "native.o"
+        aliases = ["-D" + original + "=" + alias for original, alias in (
+            ("printf", "fixture_printf"), ("printf_panic", "fixture_panic"),
+            ("kprintf", "fixture_kprintf"), ("fprintf", "fixture_fprintf"),
+            ("stderr", "fixture_stderr"), ("printf_benchmark", "fixture_benchmark"))]
+        arch = "aarch64" if os.uname().machine in ("arm64", "aarch64") else "x86_64"
+        subprocess.run([*flags, *aliases, "-c", str(ROOT / "kernel/asm" / arch / "printf_abi.S"),
+                        "-o", str(native)], check=True)
+        upstream = work / "nanoprintf.o"
+        options = ["-DNANOPRINTF_IMPLEMENTATION", *["-DNANOPRINTF_USE_" + option + "=" + value
+                   for option, value in (("FIELD_WIDTH_FORMAT_SPECIFIERS", "1"),
+                       ("PRECISION_FORMAT_SPECIFIERS", "1"), ("FLOAT_FORMAT_SPECIFIERS", "0"),
+                       ("LARGE_FORMAT_SPECIFIERS", "1"), ("BINARY_FORMAT_SPECIFIERS", "1"),
+                       ("WRITEBACK_FORMAT_SPECIFIERS", "1"))]]
+        subprocess.run([*flags, "-x", "c", *options, "-c", str(ROOT / "kernel/c/nanoprintf.h"),
+                        "-o", str(upstream)], check=True)
         executable = work / "test"
-        subprocess.run([*flags, *( ["-DPROD"] if prod else [] ), str(obj), str(work / "shim.c"),
-                        str(work / "bench.c"), str(ROOT / "tests/kernel-print/test.c"),
+        subprocess.run([*flags, *( ["-DPROD"] if prod else [] ), str(obj), str(native), str(upstream),
+                        str(ROOT / "tests/kernel-print/test.c"),
                         "-o", str(executable)], check=True)
         subprocess.run([str(executable)], check=True)
     print("Console policy: debug/production C ABI, 1,026 chunk lengths, panic/assertion/benchmark output; no implicit allocator imports")

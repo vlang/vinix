@@ -341,6 +341,7 @@ override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
 override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ)
+override OBJ += obj/nanoprintf.o
 ifeq ($(ARCH),x86_64)
 override OBJ += obj/heap_benchmark.c.o
 endif
@@ -424,6 +425,20 @@ $(V_CONFIG_STAMP):
 # The native capture entry follows the same switch as its V implementation.
 obj/asm/aarch64/alloc_track.S.o obj/asm/x86_64/alloc_track.S.o: $(V_CONFIG_STAMP)
 obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
+obj/asm/aarch64/printf_abi.S.o: asm/aarch64/varargs.inc
+obj/asm/x86_64/printf_abi.S.o: asm/x86_64/varargs.inc
+
+# Compile the unchanged upstream implementation header directly. Its C source
+# remains third-party; all first-party output policy and ABI bridges are V/asm.
+obj/nanoprintf.o: c/nanoprintf.h GNUmakefile
+	mkdir -p "$$(dirname $@)"
+	$(CC) $(CFLAGS) $(CPPFLAGS) -x c -DNANOPRINTF_IMPLEMENTATION \
+		-DNANOPRINTF_USE_FIELD_WIDTH_FORMAT_SPECIFIERS=1 \
+		-DNANOPRINTF_USE_PRECISION_FORMAT_SPECIFIERS=1 \
+		-DNANOPRINTF_USE_FLOAT_FORMAT_SPECIFIERS=0 \
+		-DNANOPRINTF_USE_LARGE_FORMAT_SPECIFIERS=1 \
+		-DNANOPRINTF_USE_BINARY_FORMAT_SPECIFIERS=1 \
+		-DNANOPRINTF_USE_WRITEBACK_FORMAT_SPECIFIERS=1 -c $< -o $@
 
 obj/blob.c.o: GNUmakefile $(VFILES) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
