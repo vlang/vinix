@@ -39,6 +39,12 @@ fn (mut a NotesApp) show_cursor() {
 	if row >= a.body_scroll + a.text_rows { a.body_scroll = row - a.text_rows + 1 }
 }
 
+fn (mut a NotesApp) clamp_body_scroll() {
+	maximum := if a.wrap_count > a.text_rows { a.wrap_count - a.text_rows } else { 0 }
+	if a.body_scroll < 0 { a.body_scroll = 0 }
+	if a.body_scroll > maximum { a.body_scroll = maximum }
+}
+
 fn (mut a NotesApp) focus_field(field int) {
 	a.focus = field
 	a.pending_len = 0
@@ -276,8 +282,7 @@ fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton
 			}
 		} else {
 			a.body_scroll -= scroll * 3
-			if a.body_scroll < 0 { a.body_scroll = 0 }
-			if a.body_scroll >= a.wrap_count { a.body_scroll = a.wrap_count - 1 }
+			a.clamp_body_scroll()
 		}
 	} else if phase == .down && button == .left && x >= 248 && y >= 101 && y < height - 118 && a.selected >= 0 {
 		row := a.body_scroll + (y - 101) / 18
@@ -292,9 +297,12 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	a.page_rows = if height > 250 { (height - 213) / 30 } else { 1 }
-	a.text_rows = if height > 240 { (height - 225) / 18 } else { 1 }
+	a.text_rows = if height >= 243 { (height - 225) / 18 } else { 1 }
 	a.text_columns = if width > 296 { (width - 276) / 8 } else { 1 }
 	a.rewrap()
+	// Resizing can remove wrapped rows or fit the whole note in one page.
+	// Keep the viewport inside that new range before rendering its text.
+	a.clamp_body_scroll()
 	mut children := frame_elements(24 + a.page_rows + a.text_rows)
 	for index, key in ['notes.new', 'notes.save', 'notes.refresh', 'notes.delete']! {
 		children << console_button(key, key, 12 + index * 112, 10, 104, a.delete_pending && index == 3)

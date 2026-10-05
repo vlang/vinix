@@ -326,3 +326,48 @@ fn test_notes_count_title_and_total_store_limits_preserve_saved_data() {
 		long_body.free()
 	}
 }
+
+fn test_notes_widening_and_tall_resize_preserve_visible_text_and_caret() {
+	home := notes_test_home('resize')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() }
+	}
+	mut a := new_notes_app(home)
+	a.new_note()
+	text := '日'.repeat(5000)
+	defer { unsafe { text.free() } }
+	a.focus_field(2)
+	a.paste_input(text)
+	begin_frame_elements()
+	narrow := a.build(ui2.rect(0, 0, 500, 300))!
+	free_tree(narrow)
+	a.body_scroll = a.wrap_count - a.text_rows
+	previous_scroll := a.body_scroll
+	begin_frame_elements()
+	wide := a.build(ui2.rect(0, 0, 1200, 600))!
+	assert a.body_scroll < previous_scroll && a.body_scroll > 0
+	assert a.cursor_row() >= a.body_scroll && a.cursor_row() < a.body_scroll + a.text_rows
+	mut text_visible := false
+	mut caret_visible := false
+	for panel in wide.children {
+		if panel.id != 'notes.body' { continue }
+		for child in panel.children {
+			if child.text.len > 0 { text_visible = true }
+			if child.frame.width == 1 && child.frame.height == 17 { caret_visible = true }
+		}
+	}
+	assert text_visible && caret_visible
+	free_tree(wide)
+	begin_frame_elements()
+	tall := a.build(ui2.rect(0, 0, 1200, 1400))!
+	assert a.wrap_count < a.text_rows && a.body_scroll == 0
+	free_tree(tall)
+	a.pointer_event(.scroll, .no_button, -100, 300, 120, 1200, 1400)
+	assert a.body_scroll == 0
+	begin_frame_elements()
+	shallow := a.build(ui2.rect(0, 0, 1200, 242))!
+	assert a.text_rows == 1 && a.body_scroll < a.wrap_count
+	free_tree(shallow)
+	a.close_app()
+}
