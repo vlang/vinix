@@ -321,7 +321,7 @@ fn (controller &Controller) write_bytes(address u8, bytes &u8, length int, start
 	return !stop || controller.wait_ended()
 }
 
-fn (controller &Controller) read_bytes(mut output &u8, length int) bool {
+fn (controller &Controller) read_bytes(output &u8, length int) bool {
 	for index in 0 .. length {
 		mut value := u32(0)
 		mut is_ready := false
@@ -346,7 +346,7 @@ fn (controller &Controller) read_bytes(mut output &u8, length int) bool {
 // CD321x SMBus registers put a byte count in front of their payload.  Reject
 // both short and long replies: consuming only part of an unexpected response
 // leaves the controller FIFO out of phase for the next status read.
-fn (mut controller Controller) smbus_read(address u8, reg u8, mut output &u8,
+fn (mut controller Controller) smbus_read(address u8, reg u8, output &u8,
 	length int) bool {
 	controller.io_lock.acquire()
 	defer { controller.io_lock.release() }
@@ -364,10 +364,10 @@ fn (mut controller Controller) smbus_read(address u8, reg u8, mut output &u8,
 	controller.write_reg(fifo_tx, tx_start | (u32(address) << 1) | 1)
 	controller.write_reg(fifo_tx, tx_read | tx_stop | u32(length + 1))
 	mut reply_length := u8(0)
-	if !controller.read_bytes(mut &reply_length, 1) || int(reply_length) != length {
+	if !controller.read_bytes(&reply_length, 1) || int(reply_length) != length {
 		return false
 	}
-	if !controller.read_bytes(mut output, length) {
+	if !controller.read_bytes(output, length) {
 		return false
 	}
 	return controller.wait_ended()
@@ -385,8 +385,8 @@ fn (mut controller Controller) sample() int {
 	for index in 0 .. controller.address_count {
 		mut status_bytes := [4]u8{}
 		mut data_bytes := [4]u8{}
-		if !controller.smbus_read(controller.addresses[index], cd321x_status, mut &status_bytes[0], 4)
-			|| !controller.smbus_read(controller.addresses[index], cd321x_data_status, mut &data_bytes[0], 4) {
+		if !controller.smbus_read(controller.addresses[index], cd321x_status, &status_bytes[0], 4)
+			|| !controller.smbus_read(controller.addresses[index], cd321x_data_status, &data_bytes[0], 4) {
 			continue
 		}
 		status := read_le32(&status_bytes[0])
