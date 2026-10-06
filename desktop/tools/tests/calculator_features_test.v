@@ -12,6 +12,173 @@ fn calculator_feature_find(tree ui2.Element, action string) ?ui2.Element {
 	return none
 }
 
+fn calculator_feature_random_write(fd int, bits u64) {
+	mut bytes := [8]u8{}
+	for index in 0 .. 8 { bytes[index] = u8(bits >> u32((7 - index) * 8)) }
+	assert desktop_write(fd, &bytes[0], 8) == 8
+}
+
+fn test_calculator_random_conversion_is_exact_bounded_and_endian_independent() {
+	assert calculator_random_value(0) == 0
+	assert calculator_random_value(2047) == 0
+	assert calculator_random_value(2048) == 1.0 / 9007199254740992.0
+	assert calculator_random_value(u64(1) << 63) == 0.5
+	assert calculator_random_value(calculator_programmer_max) == 1 - 1.0 / 9007199254740992.0
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer { desktop_close(pair[0]) desktop_close(pair[1]) }
+	assert C.fcntl(pair[0], C.F_SETFL, C.O_NONBLOCK) == 0
+	for bits in [u64(0), 2048, 0x0123456789abcdef, u64(1) << 63, calculator_programmer_max]! {
+		calculator_feature_random_write(pair[1], bits)
+		read := calculator_random_bits(pair[0]) or { panic('entropy read failed') }
+		assert read == bits
+		value := calculator_random_value(bits)
+		assert value >= 0 && value < 1 && math.is_finite(value)
+	}
+}
+
+fn test_calculator_random_empty_short_eof_and_bad_descriptors_fail_without_waiting() {
+	assert calculator_random_bits(-1) == none
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer { desktop_close(pair[0]) }
+	assert C.fcntl(pair[0], C.F_SETFL, C.O_NONBLOCK) == 0
+	assert calculator_random_bits(pair[0]) == none
+	bytes := [u8(255), 255, 255, 255]!
+	assert desktop_write(pair[1], &bytes[0], 4) == 4
+	assert calculator_random_bits(pair[0]) == none
+	assert desktop_write(pair[1], &bytes[0], 4) == 4
+	desktop_close(pair[1])
+	assert calculator_random_bits(pair[0]) == none
+	assert calculator_random_bits(pair[0]) == none
+}
+
+fn test_calculator_random_pending_arithmetic_repeat_memory_history_and_replacement() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.handle('calculator.angle.radians')!
+	app.key_input('7')
+	app.handle('calculator.memory.add')!
+	app.key_input('c2+')
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer { desktop_close(pair[0]) desktop_close(pair[1]) }
+	assert C.fcntl(pair[0], C.F_SETFL, C.O_NONBLOCK) == 0
+	calculator_feature_random_write(pair[1], u64(1) << 63)
+	app.scientific_random_from_fd(pair[0])
+	assert app.calculator.display == '0.5' && app.scientific_operand && app.calculator.replace_input
+	assert app.calculator.pending_operator == '+' && app.calculator.accumulator == 2
+	assert app.memory == 7 && app.has_memory && !app.degrees && app.scientific && !app.programmer
+	assert app.history.len == 1 && app.history[0].expression == tr('calculator.scientific.random')
+	assert app.history[0].result == '0.5'
+	app.key_input('==')
+	assert app.calculator.display == '3' && app.calculator.last_operand == 0.5
+	assert app.history.last().expression == '2.5 + 0.5'
+	calculator_feature_random_write(pair[1], u64(1) << 63)
+	app.scientific_random_from_fd(pair[0])
+	app.key_input('=')
+	assert app.calculator.display == '0.5' && app.calculator.last_operator == ''
+	app.key_input('9')
+	assert app.calculator.display == '9'
+	app.key_input('c200+10%')
+	calculator_feature_random_write(pair[1], u64(1) << 63)
+	app.scientific_random_from_fd(pair[0])
+	assert !app.input_percent && !app.last_percent
+	app.key_input('=')
+	assert app.calculator.display == '200.5'
+	app.handle('calculator.history.1')!
+	assert app.calculator.display == '0.5' && app.calculator.pending_operator == ''
+}
+
+fn test_calculator_random_upper_boundary_zero_exponent_error_recovery_and_mode_scope() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer { desktop_close(pair[0]) desktop_close(pair[1]) }
+	assert C.fcntl(pair[0], C.F_SETFL, C.O_NONBLOCK) == 0
+	calculator_feature_random_write(pair[1], calculator_programmer_max)
+	app.scientific_random_from_fd(pair[0])
+	assert app.calculator.display == '0.99999999999999989'
+	assert calculator_numeric_value(app.calculator.display) < 1 && app.copy_value() == app.calculator.display
+	app.key_input('c2+1e-')
+	calculator_feature_random_write(pair[1], 0)
+	app.scientific_random_from_fd(pair[0])
+	assert app.calculator.display == '0' && !app.exponent_input && !app.calculator.has_error
+	app.key_input('=')
+	assert app.calculator.display == '2'
+	app.key_input('c1/0=')
+	assert app.calculator.has_error
+	calculator_feature_random_write(pair[1], u64(1) << 63)
+	app.scientific_random_from_fd(pair[0])
+	assert app.calculator.display == '0.5' && !app.calculator.has_error
+	app.handle('calculator.mode.basic')!
+	before := app.history.len
+	app.scientific_random_from_fd(-1)
+	app.handle('calculator.scientific.random')!
+	assert app.calculator.display == '0.5' && app.history.len == before && app.scientific_status == ''
+	app.handle('calculator.mode.programmer')!
+	app.key_input('123')
+	app.scientific_random_from_fd(-1)
+	app.handle('calculator.scientific.random')!
+	assert app.integer.value == 123 && app.history.len == before && app.scientific_status == ''
+	app.handle('calculator.mode.scientific')!
+	app.scientific_random_from_fd(-1)
+	assert app.scientific_status == 'calculator.random.unavailable'
+}
+
+fn test_calculator_random_unavailable_preserves_draft_pending_memory_and_history() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('5')
+	app.handle('calculator.memory.add')!
+	app.key_input('+2=')
+	app.key_input('+1e-')
+	before_display := app.calculator.display.str
+	before_history := app.history.len
+	app.scientific_random_from_fd(-1)
+	assert app.calculator.display.str == before_display && app.calculator.display == '1e-'
+	assert app.exponent_input && !app.calculator.has_error && !app.calculator.replace_input
+	assert app.calculator.pending_operator == '+' && app.calculator.accumulator == 7
+	assert app.memory == 5 && app.has_memory && app.history.len == before_history
+	assert app.scientific_status == 'calculator.random.unavailable'
+	app.key_input('3=')
+	assert app.calculator.display == '7.001' && app.scientific_status == ''
+}
+
+fn test_calculator_random_control_wire_dispatch_real_entropy_and_bounded_history() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 540, 430))!
+	defer { free_tree(tree) }
+	mut encoded := []u8{cap: 65536}
+	unsafe { encoded.flags |= .noslices }
+	defer { unsafe { encoded.free() } }
+	encode_app_element(tree, mut encoded)!
+	mut reader := WireReader{ data: encoded }
+	decoded := decode_app_element(mut reader, 0)!
+	defer { free_tree(decoded) }
+	button := calculator_feature_find(decoded, 'calculator.scientific.random') or { panic('missing Rand') }
+	assert button.frame.y == 374 && button.frame.y + button.frame.height < 422
+	assert button.text == tr('calculator.scientific.random') && button.tooltip == tr('calculator.scientific.random.help')
+	for _ in 0 .. 30 {
+		app.key_input('c2+')
+		app.handle(if button.action_id.len > 0 { button.action_id } else { button.id })!
+		assert app.scientific_status == '' && !app.calculator.has_error
+		operand := calculator_numeric_value(app.calculator.display)
+		assert operand >= 0 && operand < 1 && app.calculator.pending_operator == '+'
+		assert app.copy_value() == app.calculator.display
+		app.key_input('=')
+		assert math.abs(calculator_numeric_value(app.calculator.display) - (2 + operand)) < 1e-14
+	}
+	assert app.history.len == calculator_history_limit
+}
+
 fn test_calculator_ee_keyboard_control_sign_backspace_and_decimal_state() {
 	mut app := new_calculator_app()
 	defer { app.close_app() }

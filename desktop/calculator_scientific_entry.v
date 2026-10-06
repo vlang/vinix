@@ -110,6 +110,7 @@ fn calculator_scientific_button(action string, index int, left f64) ui2.Element 
 			ui2.TextStyle{ size: 12, color: body_text, align: .center })
 		tooltip: tr(if action == 'calculator.scientific.ee' { 'calculator.scientific.ee.help' }
 			else if action == 'calculator.scientific.root' { 'calculator.scientific.root.help' }
+			else if action == 'calculator.scientific.random' { 'calculator.scientific.random.help' }
 			else { action })
 	}
 }

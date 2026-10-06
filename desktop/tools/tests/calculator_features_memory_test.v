@@ -8,6 +8,77 @@ import ui2
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
+fn calculator_memory_random_write(fd int, bits u64) {
+	mut bytes := [8]u8{}
+	for index in 0 .. 8 { bytes[index] = u8(bits >> u32((7 - index) * 8)) }
+	assert desktop_write(fd, &bytes[0], 8) == 8
+}
+
+fn test_calculator_random_repeated_entropy_failure_operand_history_and_wire_release_memory() {
+	mut app := new_calculator_app()
+	app.handle('calculator.mode.scientific')!
+	for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+		begin_frame_elements()
+		free_tree(app.build(size)!)
+	}
+	mut pair := [2]i32{}
+	assert C.pipe(&pair[0]) == 0
+	defer { desktop_close(pair[0]) desktop_close(pair[1]) }
+	assert C.fcntl(pair[0], C.F_SETFL, C.O_NONBLOCK) == 0
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for bits in [u64(0), u64(1) << 63, calculator_programmer_max]! {
+			app.key_input('c2+1e-')
+			app.scientific_random_from_fd(-1)
+			assert app.calculator.display == '1e-' && app.exponent_input
+			calculator_memory_random_write(pair[1], bits)
+			app.scientific_random_from_fd(pair[0])
+			assert !app.exponent_input && app.scientific_status == ''
+			assert calculator_numeric_value(app.calculator.display) >= 0 && calculator_numeric_value(app.calculator.display) < 1
+			app.key_input('==')
+			app.handle('calculator.memory.add')!
+			app.handle('calculator.history.1')!
+		}
+		app.scientific_random_from_fd(pair[0])
+		assert app.scientific_status == 'calculator.random.unavailable'
+		app.handle('calculator.scientific.random')!
+		assert app.scientific_status == ''
+		for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			mut encoded := []u8{cap: 65536}
+			unsafe { encoded.flags |= .noslices }
+			encode_app_element(tree, mut encoded)!
+			mut reader := WireReader{ data: encoded }
+			decoded := decode_app_element(mut reader, 0)!
+			free_tree(decoded)
+			free_tree(tree)
+			unsafe { encoded.free() }
+		}
+	}
+	app.close_app()
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_random_complete_init_entropy_and_close_release_all_memory() {
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut app := new_calculator_app()
+		app.handle('calculator.mode.scientific')!
+		app.scientific_random_from_fd(-1)
+		assert app.scientific_status == 'calculator.random.unavailable'
+		app.handle('calculator.scientific.random')!
+		assert app.scientific_status == ''
+		app.key_input('7')
+		assert app.calculator.display == '7'
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_calculator_ee_root_editing_domains_history_memory_and_wire_release_owned_memory() {
 	mut app := new_calculator_app()
 	app.handle('calculator.mode.scientific')!

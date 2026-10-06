@@ -35,7 +35,8 @@ const calculator_scientific_actions = ['calculator.scientific.sqrt', 'calculator
 	'calculator.scientific.cube', 'calculator.scientific.cbrt', 'calculator.scientific.log2',
 	'calculator.scientific.sinh', 'calculator.scientific.cosh', 'calculator.scientific.tanh',
 	'calculator.scientific.asinh', 'calculator.scientific.acosh', 'calculator.scientific.atanh']!
-const calculator_scientific_entry_actions = ['calculator.scientific.ee', 'calculator.scientific.root']!
+const calculator_scientific_entry_actions = ['calculator.scientific.ee', 'calculator.scientific.root',
+	'calculator.scientific.random']!
 
 struct CalculatorHistoryEntry {
 	expression string
@@ -856,7 +857,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 			...ui2.label('', tr(key), ui2.rect(left, 116, 232, 30),
 				ui2.TextStyle{
 					size:  11
-					color: if app.calculator.has_error {
+					color: if app.calculator.has_error || key == 'calculator.random.unavailable' {
 						files_error
 					} else {
 						body_muted
@@ -1002,6 +1003,10 @@ fn (mut app CalculatorApp) handle(event_id string) ! {
 	}
 	if event_id == 'calculator.scientific.root' {
 		if app.scientific { app.press('root') }
+		return
+	}
+	if event_id == 'calculator.scientific.random' {
+		app.scientific_random()
 		return
 	}
 	for action in calculator_scientific_actions {
