@@ -20,6 +20,17 @@ After building the ARM64 userland sysroot:
 ./scripts/run-desktop-aarch64.sh --no-build
 ```
 
+For a smaller image, use the compact desktop build. This example creates a
+separate image and boots an isolated session; its memory cards last for that
+session:
+
+```sh
+VINIX_DESKTOP_INITRAMFS="$PWD/build/ps1/initramfs-desktop.tar" \
+  ./scripts/build-desktop-aarch64.sh --compact-initramfs --without-firefox
+VINIX_DESKTOP_INITRAMFS="$PWD/build/ps1/initramfs-desktop.tar" \
+  ./scripts/run-desktop-aarch64.sh --no-build --no-persist --ephemeral
+```
+
 Open **PlayStation** from the desktop. Tetrade starts on its title screen;
 press **Start**, then **Cross** to select Marathon. The game counts down before
 the first piece falls. **Open game** accepts a path to another game: type or
