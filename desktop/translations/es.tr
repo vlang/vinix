@@ -4250,3 +4250,51 @@ clock.timer.legend
 clock.timer.scope
 Hasta cuatro temporizadores. Cerrar Reloj los cancela.
 -----
+window.layout.title
+Organizar ventana
+-----
+window.layout.hint
+Elige una distribución · Flechas e Intro
+-----
+window.layout.maximize
+Maximizar
+-----
+window.layout.left
+Mitad izquierda
+-----
+window.layout.right
+Mitad derecha
+-----
+window.layout.restore
+Restaurar
+-----
+window.layout.top_left
+Arriba a la izquierda
+-----
+window.layout.top_right
+Arriba a la derecha
+-----
+window.layout.bottom_left
+Abajo a la izquierda
+-----
+window.layout.bottom_right
+Abajo a la derecha
+-----
+desktop.overview.title
+Ventanas
+-----
+desktop.overview.empty
+No hay ventanas en este escritorio
+-----
+desktop.overview.hint
+Flechas para elegir. Intro abre. Esc cierra.
+-----
+desktop.overview.minimized
+Minimizada
+-----
+desktop.overview.previous
+Anterior
+-----
+desktop.overview.next
+Siguiente
+-----

@@ -264,7 +264,7 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	}
 	// Desktop file icons and context menus are painted after the tree, inside
 	// the same clip, so a partial frame does not blend them over themselves.
-	if desktop_overlays {
+	if desktop_overlays && !d.overview.active && !d.window_layout.active {
 		d.render_create_context_overlays()
 	}
 	d.save_cursor_backing(clip)
@@ -400,7 +400,7 @@ fn children_cover(el &ui2.Element, w int, h int) bool {
 			child := unsafe { &el.children[i] }
 			if child.hidden || child.box.transparent || child.box.radius != 0
 				|| (child.kind != .view && child.kind != .scroll) || child.id == peek_ghost_id
-				|| child.id == taskbar_progress_overlay_id {
+				|| child.id == taskbar_progress_overlay_id || child.id == window_placement_preview_id {
 				continue
 			}
 			left := int(child.frame.x)
@@ -483,6 +483,11 @@ fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, dep
 		return
 	}
 	radius := int(el.box.radius)
+	if el.id == window_placement_preview_id {
+		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, window_placement_preview_alpha)
+		d.canvas.stroke_round_rect(x, y, w, h, radius, el.box.bg, window_placement_preview_edge_alpha)
+		return
+	}
 	// Aero Peek's glass: a faint pane and a brighter rim where a window was.
 	if el.id == peek_ghost_id {
 		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, peek_ghost_alpha)
@@ -496,7 +501,8 @@ fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, dep
 	}
 	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id
 		|| el.id == action_start_panel || el.id == taskbar_preview_panel
-		|| el.id == action_tray_flyout || el.id == taskbar_tooltip_id)
+		|| el.id == action_tray_flyout || el.id == taskbar_tooltip_id
+		|| el.id == window_layout_panel_id || el.id == window_overview_panel)
 	// The switcher is drawn through: it covers the middle of the screen for as
 	// long as a key is held, and what it covers should stay legible behind it.
 	// Alpha is not something a ui2 box style can declare, so like the shadow
@@ -1549,6 +1555,16 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 			// A dog-ear, punched out of the corner in the surface behind it.
 			d.canvas.fill_rect(left + body - fold, top, fold, fold, d.surface_under(x, y))
 		}
+		'overview' {
+			cell_w := w / 4
+			cell_h := h / 4
+			for row in 0 .. 2 {
+				for col in 0 .. 2 {
+					d.canvas.fill_round_rect(cx - cell_w - 1 + col * (cell_w + 2),
+						cy - cell_h - 1 + row * (cell_h + 2), cell_w, cell_h, 1, color)
+				}
+			}
+		}
 		'window' {
 			// What stands for a window with no application behind it to lend
 			// an icon. A frame with a filled title bar: the least that reads as
@@ -1937,6 +1953,11 @@ const cursor_mask = [
 ]
 
 fn (mut d Desktop) draw_cursor() {
+	resize := d.window_resize_cursor_kind()
+	if resize != .none_ {
+		d.draw_window_resize_cursor(resize)
+		return
+	}
 	for i := d.windows.len - 1; i >= 0; i-- {
 		window := d.windows[i]
 		if window.workspace != d.current_workspace || window.minimized
@@ -1944,7 +1965,8 @@ fn (mut d Desktop) draw_cursor() {
 			|| d.pointer_y < window.y || d.pointer_y >= window.y + window.height {
 			continue
 		}
-		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height {
+		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height
+			&& !d.overview.active && !d.window_layout.active {
 			return
 		}
 		break

@@ -15,6 +15,10 @@ const key_super_up = '\x1b[1;9A'
 const key_super_down = '\x1b[1;9B'
 const key_super_right = '\x1b[1;9C'
 const key_super_left = '\x1b[1;9D'
+const key_super_m = '\x1b[109;9u'
+const key_super_shift_m = '\x1b[77;10u'
+const key_super_alt_h = '\x1b[104;11u'
+const key_super_home = '\x1b[1;9H'
 const key_super_workspaces = ['\x1b[49;9u', '\x1b[50;9u', '\x1b[51;9u', '\x1b[52;9u']
 // The keyboard protocol carries the shifted character as its codepoint, so
 // Shift+1..4 arrive as !, @, # and $ while the modifier still records Shift.
@@ -70,7 +74,7 @@ fn (mut d Desktop) tile_focused(direction TileDirection) {
 				.left, .top_left { d.snap_window(window.id, .bottom_left) }
 				.right, .top_right { d.snap_window(window.id, .bottom_right) }
 				.bottom_left, .bottom_right { d.restore_window(window.id) }
-				.none_ {}
+				.none_ { d.minimize(window.id) }
 			}
 		}
 	}
@@ -104,6 +108,27 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 		matched = match_at(keys, i, key_super_d)
 		if matched > seq_none {
 			d.toggle_show_desktop()
+			i += matched
+			continue
+		}
+		matched = match_at(keys, i, key_super_m)
+		if matched > seq_none {
+			d.minimize(d.focus)
+			i += matched
+			continue
+		}
+		matched = match_at(keys, i, key_super_shift_m)
+		if matched > seq_none {
+			d.restore_isolated_windows()
+			i += matched
+			continue
+		}
+		matched = match_at(keys, i, key_super_alt_h)
+		if matched <= seq_none {
+			matched = match_at(keys, i, key_super_home)
+		}
+		if matched > seq_none {
+			d.toggle_window_isolation(d.focus)
 			i += matched
 			continue
 		}
@@ -160,5 +185,11 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 		unsafe { kept.free() }
 		return keys
 	}
-	return kept.bytestr()
+	if kept.len == 0 {
+		unsafe { kept.free() }
+		return ''
+	}
+	text := kept.bytestr()
+	unsafe { kept.free() }
+	return text
 }

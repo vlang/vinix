@@ -125,7 +125,8 @@ fn (mut d Desktop) update_taskbar_hover() {
 // make every delay independent of how often that is.
 fn (mut d Desktop) update_taskbar_hover_at(now i64) {
 	if d.taskbar_press.dragging || d.start_menu_open || create_context_menu.visible
-		|| d.switcher.active || d.drag.kind != .none_ || d.tray.flyout != .none_ {
+		|| d.switcher.active || d.overview.active || d.window_layout.active
+		|| d.drag.kind != .none_ || d.tray.flyout != .none_ {
 		d.close_taskbar_preview()
 		d.end_peek()
 		d.hide_tooltip()
@@ -433,7 +434,8 @@ fn (d &Desktop) window_in_clear_view(index int) bool {
 // cursor is drawn, so pictures never contain the pointer. It samples on a slow
 // cadence, and every frame while the preview panel is showing its pictures.
 fn (mut d Desktop) capture_window_thumbnails() {
-	if d.peek_target() != 0 || d.start_menu_open || d.switcher.shown {
+	if d.peek_target() != 0 || d.start_menu_open || d.switcher.shown || d.overview.active
+		|| d.window_layout.active || d.drag.kind == .move {
 		return
 	}
 	now := monotonic_millis()

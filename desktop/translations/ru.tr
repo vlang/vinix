@@ -4250,3 +4250,51 @@ clock.timer.legend
 clock.timer.scope
 До четырёх таймеров. Закрытие часов отменяет их.
 -----
+window.layout.title
+Расположение окна
+-----
+window.layout.hint
+Выберите расположение · Стрелки и Enter
+-----
+window.layout.maximize
+Развернуть
+-----
+window.layout.left
+Левая половина
+-----
+window.layout.right
+Правая половина
+-----
+window.layout.restore
+Восстановить
+-----
+window.layout.top_left
+Слева вверху
+-----
+window.layout.top_right
+Справа вверху
+-----
+window.layout.bottom_left
+Слева внизу
+-----
+window.layout.bottom_right
+Справа внизу
+-----
+desktop.overview.title
+Окна
+-----
+desktop.overview.empty
+На этом рабочем столе нет окон
+-----
+desktop.overview.hint
+Стрелки — выбор. Enter — открыть. Esc — закрыть.
+-----
+desktop.overview.minimized
+Свёрнуто
+-----
+desktop.overview.previous
+Назад
+-----
+desktop.overview.next
+Далее
+-----

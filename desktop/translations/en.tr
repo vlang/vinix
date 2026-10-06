@@ -4250,3 +4250,51 @@ clock.timer.legend
 clock.timer.scope
 Up to four timers. Closing Clock cancels them.
 -----
+window.layout.title
+Arrange window
+-----
+window.layout.hint
+Choose a layout · Arrow keys and Enter
+-----
+window.layout.maximize
+Maximize
+-----
+window.layout.left
+Left half
+-----
+window.layout.right
+Right half
+-----
+window.layout.restore
+Restore
+-----
+window.layout.top_left
+Top left
+-----
+window.layout.top_right
+Top right
+-----
+window.layout.bottom_left
+Bottom left
+-----
+window.layout.bottom_right
+Bottom right
+-----
+desktop.overview.title
+Windows
+-----
+desktop.overview.empty
+No windows on this desktop
+-----
+desktop.overview.hint
+Arrow keys choose. Enter opens. Esc closes.
+-----
+desktop.overview.minimized
+Minimized
+-----
+desktop.overview.previous
+Previous
+-----
+desktop.overview.next
+Next
+-----

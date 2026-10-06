@@ -39,7 +39,7 @@ mut:
 	offset_y int
 	// A resize is measured from the frame at pointer-down, so grabbing anywhere
 	// in the corner does not make the edge jump under the pointer. The grabbed
-	// corner's two edges follow the pointer; the opposite corner stays put.
+	// edges follow the pointer; the opposite edges stay put.
 	start_pointer_x int
 	start_pointer_y int
 	start_x         int
@@ -48,11 +48,14 @@ mut:
 	start_height    int
 	resize_left     bool
 	resize_top      bool
+	resize_horizontal bool = true
+	resize_vertical   bool = true
 	// Edge placement is a drag gesture, not a side effect of clicking an
 	// already edge-touching title bar without moving it.
 	moved               bool
 	snap_on_release     WindowSnap
 	maximize_on_release bool
+	shake               WindowShake
 }
 
 // DamageRect describes the part of the composed canvas that differs from the
@@ -201,6 +204,10 @@ mut:
 	taskbar_press            TaskbarPress
 	taskbar_preview          TaskbarPreview
 	show_desktop             ShowDesktop
+	window_isolation         [workspace_count]WindowIsolation
+	overview                 WindowOverview
+	window_layout            WindowLayout
+	window_layout_right_release bool
 	tray                     TrayState
 	version_check            VersionCheck
 	next_status_token        int
@@ -253,6 +260,10 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 		id_resize_sw:   '${prefix}.resize_sw'
 		id_resize_nw:   '${prefix}.resize_nw'
 		id_resize_ne:   '${prefix}.resize_ne'
+		id_resize_n:    '${prefix}.resize_n'
+		id_resize_s:    '${prefix}.resize_s'
+		id_resize_e:    '${prefix}.resize_e'
+		id_resize_w:    '${prefix}.resize_w'
 		id_task:        'task.${id}'
 		task_rank:      id
 		id_preview:       '${taskbar_preview_prefix}${id}'
@@ -399,6 +410,7 @@ fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
 
 fn (mut d Desktop) minimize(id int) {
 	index := d.window_index(id) or { return }
+	d.windows[index].hidden_by_isolation = false
 	d.windows[index].minimized = true
 	d.dirty = true
 	if d.focus == id {
@@ -418,6 +430,7 @@ fn (mut d Desktop) activate(id int) {
 	if d.windows[index].minimized {
 		d.windows[index].minimized = false
 	}
+	d.windows[index].hidden_by_isolation = false
 	// Bringing a window back by hand ends the Show Desktop session for it.
 	for slot, hidden in d.show_desktop.hidden {
 		if hidden == id {
@@ -458,6 +471,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 		}
 		children << d.window_element(window_index)
 	}
+	if placement := d.window_placement_element() {
+		children << ui2.Element{ ...placement }
+	}
 	children << d.taskbar_element()
 	// Taskbar popups rise from the bar, over the windows but under the Start
 	// menu, which closes them when it opens anyway.
@@ -481,6 +497,12 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	}
 	if hud := d.keyboard_hud_element() {
 		children << hud
+	}
+	if layout := d.window_layout_element() {
+		children << ui2.Element{ ...layout }
+	}
+	if d.overview.active {
+		children << d.window_overview_element()
 	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
@@ -652,20 +674,28 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		bg: background
 	}, contents)
 
-	mut window_children := frame_elements(9)
+	mut window_children := frame_elements(13)
 	// The body goes first: a toolbar's title bar reaches down over its top.
 	// Transfer the app tree without cloning its borrowed text and pooled arrays.
 	window_children << ui2.Element{ ...body }
 	window_children << ui2.Element{ ...title_bar }
 	window_children << ui2.Element{ ...divider }
 	// Arranged windows already fill a desktop-defined region. A normal window
-	// retains an invisible target at each corner for pointer resizing, without
+	// retains an invisible target along every edge and corner for resizing, without
 	// adding chrome over the application's surface.
 	if !window.maximized && window.snap == .none_ {
 		grip := window_resize_grip_size
 		edge := window_resize_edge_size
 		right := window.width - grip
 		bottom := window.height - grip
+		window_children << resize_grip(window.id_resize_n, grip, 0, window.width - 2 * grip,
+			edge, ui2.cursor_resize_ns)
+		window_children << resize_grip(window.id_resize_s, grip, window.height - edge,
+			window.width - 2 * grip, edge, ui2.cursor_resize_ns)
+		window_children << resize_grip(window.id_resize_w, 0, grip, edge,
+			window.height - 2 * grip, ui2.cursor_resize_ew)
+		window_children << resize_grip(window.id_resize_e, window.width - edge, grip, edge,
+			window.height - 2 * grip, ui2.cursor_resize_ew)
 		window_children << resize_grip(window.id_resize, right, bottom, grip, grip, ui2.cursor_resize_nwse)
 		window_children << resize_grip(window.id_resize_sw, 0, bottom, grip, grip, ui2.cursor_resize_nesw)
 		// The upper corners are the title bar's, whose buttons sit a few pixels
@@ -688,7 +718,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}
 }
 
-// resize_grip is one invisible, draggable part of a corner's resize target.
+// resize_grip is one invisible, draggable part of an edge or corner target.
 fn resize_grip(id string, x int, y int, width int, height int, cursor string) ui2.Element {
 	return ui2.draggable_view_with_cursor(id, ui2.rect(f64(x), f64(y), f64(width), f64(height)),
 		ui2.BoxStyle{
@@ -696,13 +726,13 @@ fn resize_grip(id string, x int, y int, width int, height int, cursor string) ui
 		}, cursor, frame_elements(0))
 }
 
-// window_resize_action tells a corner grip's selector, 'win.<id>.resize' for
-// the lower right and 'win.<id>.resize_<corner>' for the others, from the rest
-// of a window's chrome.
+// window_resize_action recognizes the resize selectors of the window chrome.
 fn window_resize_action(action string) bool {
 	return action.starts_with('win.') && (action.ends_with('.resize')
 		|| action.ends_with('.resize_sw') || action.ends_with('.resize_nw')
-		|| action.ends_with('.resize_ne'))
+		|| action.ends_with('.resize_ne') || action.ends_with('.resize_n')
+		|| action.ends_with('.resize_s') || action.ends_with('.resize_e')
+		|| action.ends_with('.resize_w'))
 }
 
 // window_contents is the body's background colour and its children. A native
@@ -1366,6 +1396,16 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}, ui2.TextStyle{
 		color: theme.taskbar_text_active
 	})
+	children << ui2.button_with_image(action_window_overview, '', 'builtin:overview',
+		ui2.rect(f64(edge_padding + start_button_width + 8), f64(item_y),
+			f64(window_overview_button_width), f64(item_height)), ui2.BoxStyle{
+		bg: if d.overview.active || d.hover == action_window_overview {
+			theme.taskbar_item_hover
+		} else {
+			theme.taskbar_item_bg
+		}
+		radius: 5
+	}, ui2.TextStyle{ color: theme.taskbar_text_active })
 
 	layout := d.taskbar_layout(entries.len)
 	entries_left := layout.entries_left
@@ -1528,7 +1568,7 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	theme := d.theme()
 	dock := theme.dock
 	edge_padding := if dock { theme.dock_padding } else { taskbar_padding }
-	entries_left := edge_padding + start_button_width + 8
+	entries_left := edge_padding + start_button_width + 8 + window_overview_button_width + taskbar_item_gap
 	// Reserve the status area before sizing entries. The clock therefore stays
 	// in the physical lower-right corner, just inside Show Desktop, after 2x M1
 	// presentation as well as on an unscaled framebuffer.
@@ -1866,23 +1906,18 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 	d.pointer_x = x
 	d.pointer_y = y
+	if d.overview.active || d.window_layout.active {
+		d.set_hover(d.hit_action(x, y))
+		return
+	}
 	if d.drag.kind == .move && pointer_moved {
 		d.drag.moved = true
 	}
 	if d.drag.kind == .move && d.buttons & button_left != 0 {
-		// Keep the edge seen while the button is down. Some absolute-pointer
-		// backends report the button-up packet after wrapping a cursor that
-		// crossed the host's left or top edge to the opposite side.
-		d.drag.maximize_on_release = y <= 0
-		d.drag.snap_on_release = if y <= 0 {
-			.none_
-		} else if x <= 0 {
-			.left
-		} else if x >= d.canvas.width - 1 {
-			.right
-		} else {
-			.none_
+		if pointer_moved && d.drag.shake.sample(x, y, monotonic_millis()) {
+			d.toggle_window_isolation(d.drag.window_id)
 		}
+		d.update_window_placement(x, y)
 	}
 
 	if d.shortcut_press.app_index >= 0 && d.buttons & button_left != 0 {
@@ -1977,8 +2012,8 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 }
 
-// resize_window_to_pointer moves the two edges of the grabbed corner while
-// leaving the opposite corner fixed. The usable desktop bounds the growing
+// resize_window_to_pointer moves the grabbed edges while leaving the opposite
+// edges and the untouched dimension fixed. The usable desktop bounds the growing
 // edge, so a top edge never takes the title bar off the screen; a window
 // already positioned too near an edge still retains the global minimum size.
 fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
@@ -1990,17 +2025,25 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	dy := y - d.drag.start_pointer_y
 	right := d.drag.start_x + d.drag.start_width
 	bottom := d.drag.start_y + d.drag.start_height
-	mut width := if d.drag.resize_left { d.drag.start_width - dx } else { d.drag.start_width + dx }
-	mut height := if d.drag.resize_top {
+	mut width := if !d.drag.resize_horizontal {
+		d.drag.start_width
+	} else if d.drag.resize_left {
+		d.drag.start_width - dx
+	} else {
+		d.drag.start_width + dx
+	}
+	mut height := if !d.drag.resize_vertical {
+		d.drag.start_height
+	} else if d.drag.resize_top {
 		d.drag.start_height - dy
 	} else {
 		d.drag.start_height + dy
 	}
 	min_height := d.theme().title_height + window_min_body_height
-	if width < window_min_width {
+	if d.drag.resize_horizontal && width < window_min_width {
 		width = window_min_width
 	}
-	if height < min_height {
+	if d.drag.resize_vertical && height < min_height {
 		height = min_height
 	}
 	max_width := if d.drag.resize_left { right } else { d.canvas.width - d.drag.start_x }
@@ -2009,14 +2052,14 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	} else {
 		d.canvas.height - taskbar_height - d.drag.start_y
 	}
-	if max_width >= window_min_width && width > max_width {
+	if d.drag.resize_horizontal && max_width >= window_min_width && width > max_width {
 		width = max_width
 	}
-	if max_height >= min_height && height > max_height {
+	if d.drag.resize_vertical && max_height >= min_height && height > max_height {
 		height = max_height
 	}
-	new_x := if d.drag.resize_left { right - width } else { d.drag.start_x }
-	new_y := if d.drag.resize_top { bottom - height } else { d.drag.start_y }
+	new_x := if d.drag.resize_horizontal && d.drag.resize_left { right - width } else { d.drag.start_x }
+	new_y := if d.drag.resize_vertical && d.drag.resize_top { bottom - height } else { d.drag.start_y }
 	if width != d.windows[index].width || height != d.windows[index].height
 		|| new_x != d.windows[index].x || new_y != d.windows[index].y {
 		d.windows[index].x = new_x
@@ -2044,10 +2087,10 @@ fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
 	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
 	// The Catalina pointer includes a soft shadow to the right and below; this
 	// rectangle also covers the default pointer's one-pixel halo.
-	d.add_damage_rect(old_pointer_x - 1, old_pointer_y - 1, catalina_cursor_width + 2,
-		catalina_cursor_height + 2)
-	d.add_damage_rect(pointer_x - 1, pointer_y - 1, catalina_cursor_width + 2,
-		catalina_cursor_height + 2)
+	d.add_damage_rect(old_pointer_x - cursor_backing_inset, old_pointer_y - cursor_backing_inset,
+		cursor_backing_width, cursor_backing_height)
+	d.add_damage_rect(pointer_x - cursor_backing_inset, pointer_y - cursor_backing_inset,
+		cursor_backing_width, cursor_backing_height)
 }
 
 fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
@@ -2132,6 +2175,20 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	d.trace_selector(action, world)
 	d.set_hover(action)
 	d.dirty = true
+	if d.overview.active && d.window_overview_pointer_down(action, world) {
+		d.chrome_pointer_capture = true
+		return
+	}
+	if d.window_layout.active {
+		if world == .desktop && d.handle_window_layout_action(action) {
+			d.chrome_pointer_capture = true
+			return
+		}
+		d.close_window_layout()
+		// Clicking away dismisses the chooser without clicking through it.
+		d.chrome_pointer_capture = true
+		return
+	}
 
 	if d.switcher.active {
 		// A click on a tile switches to that window; a click anywhere else
@@ -2208,6 +2265,11 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 		d.switch_workspace(action[action_workspace_prefix.len..].int())
 		return
 	}
+	if action == action_window_overview {
+		d.toggle_window_overview()
+		d.chrome_pointer_capture = true
+		return
+	}
 
 	if taskbar_entry_action(action) {
 		d.taskbar_entry_click(action, x, y)
@@ -2247,11 +2309,12 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					window_id: id
 					offset_x:  x - d.windows[index].x
 					offset_y:  y - d.windows[index].y
+					shake:     new_window_shake(x, y, monotonic_millis())
 				}
 				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}
 			}
-			'resize', 'resize_sw', 'resize_nw', 'resize_ne' {
+			'resize', 'resize_sw', 'resize_nw', 'resize_ne', 'resize_n', 'resize_s', 'resize_e', 'resize_w' {
 				index := d.window_index(id) or { return }
 				if d.windows[index].maximized || d.windows[index].snap != .none_ {
 					return
@@ -2267,8 +2330,10 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 					start_y:         d.windows[resized].y
 					start_width:     d.windows[resized].width
 					start_height:    d.windows[resized].height
-					resize_left:     part == 'resize_sw' || part == 'resize_nw'
-					resize_top:      part == 'resize_nw' || part == 'resize_ne'
+					resize_left:     part == 'resize_sw' || part == 'resize_nw' || part == 'resize_w'
+					resize_top:      part == 'resize_nw' || part == 'resize_ne' || part == 'resize_n'
+					resize_horizontal: part != 'resize_n' && part != 'resize_s'
+					resize_vertical: part != 'resize_w' && part != 'resize_e'
 				}
 				d.chrome_pointer_capture = true
 				d.drag_damage = DamageRect{}
@@ -2310,6 +2375,15 @@ fn (d &Desktop) trace_selector(action string, world ActionWorld) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
+	if d.overview.active || d.window_layout.active {
+		// A chooser opened from the keyboard can cancel a held app gesture
+		// without receiving its press. Its release still belongs to the modal.
+		d.chrome_pointer_capture = false
+		d.pointer_capture = 0
+		d.drag = Drag{}
+		d.drag_damage = DamageRect{}
+		return
+	}
 	action, world := d.hit_action_world(x, y)
 	release_action := if world == .desktop { action } else { '' }
 	if d.shortcut_press.app_index >= 0 {
@@ -2352,26 +2426,17 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 	d.dirty = true
 }
 
-// finish_window_drag applies Windows 7-style edge placement when the title
-// bar is released against a display edge. The top edge takes precedence at a
-// corner; the side edges fill their respective half of the usable desktop.
+// Finish the placement preview's half, quarter or maximize gesture.
 fn (mut d Desktop) finish_window_drag(x int, y int) {
-	if d.drag.kind != .move || !d.drag.moved {
-		return
-	}
-	id := d.drag.window_id
-	if y <= 0 || (d.drag.maximize_on_release && y >= d.canvas.height - 1) {
-		d.maximize(id)
-	} else if x <= 0 {
-		d.snap_window(id, if d.drag.snap_on_release == .right { .right } else { .left })
-	} else if x >= d.canvas.width - 1 {
-		d.snap_window(id, if d.drag.snap_on_release == .left { .left } else { .right })
-	}
+	d.finish_window_placement(x, y)
 }
 
 // Non-primary buttons and the wheel have no desktop chrome meaning yet, but a
 // native pixel-surface client needs them for its own interaction model.
 fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, button AppPointerButton) {
+	if d.overview.active || d.window_layout.active {
+		return
+	}
 	if d.switcher.active || d.start_menu_open {
 		return
 	}
@@ -2381,6 +2446,9 @@ fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, bu
 }
 
 fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
+	if d.overview.active || d.window_layout.active {
+		return
+	}
 	if scroll == 0 || d.switcher.active || d.start_menu_open {
 		return
 	}

@@ -17,6 +17,9 @@ the proposed missing utility applications are in [UTILITIES.md](UTILITIES.md).
 The application catalog contains 42 entries: 21 native utilities and 21 hosted
 or installable integrations.
 
+The window-management comparison with macOS and Windows, implemented gestures
+and prioritized remaining gaps are in [WINDOW_EXPERIENCE.md](WINDOW_EXPERIENCE.md).
+
 What it does:
 
 - a wallpaper, and a taskbar with Start, open windows, the desktop build date
@@ -28,13 +31,18 @@ What it does:
   network, battery, display and Capture icons and an overflow panel, and
   progress bars, badges and attention flashes on buttons
 - windows with a title bar, a close, a maximise/restore and a minimise button
-- dragging a window by its title bar, including Windows 7-style top-edge
-  maximize and left/right half-screen snapping
+- dragging a window by its title bar, with top-edge maximize, side halves,
+  corner quarters and a translucent placement preview; shake the title bar to
+  hide other windows on its workspace, and shake again to restore them
 - four workspaces with a taskbar pager, isolated focus/task lists and
   Super+1..4 switching (Super+Shift+1..4 moves the focused window)
 - Linux-style Super+Arrow keyboard tiling into halves and quarters, with
-  Super+Up/Down maximizing and restoring floating windows
-- resizing a normal window by dragging its lower-right corner
+  Super+Up/Down maximizing, restoring and minimizing windows
+- resizing a normal window from any edge or corner, with directional cursors
+- a taskbar window-overview button and Super+Ctrl+Up thumbnail grid, with
+  workspace switching and keyboard selection, including minimized windows
+- an arrangement chooser on Super+Z or right-clicking Maximize, with visual
+  half/quarter layouts and maximize/restore
 - a **V Start button** and Windows 7-style two-column Start menu, with pinned
   and recently used programs, their recent items, Recent Items, All Programs,
   type-to-search, readable paged program/search rows, system links and a
@@ -115,7 +123,12 @@ What it does:
 Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
 application. `Super+Left/Right` tiles, `Super+Up/Down` maximizes or restores,
 `Super+1..4` switches workspace and `Super+Shift+1..4` moves the focused
-window. They are chords rather than bare letters because they fire
+window. `Super+M` minimizes the focused window; `Super+Alt+H` hides/restores
+other windows, and `Super+Shift+M` restores the windows hidden by that action.
+`Super+Down` also minimizes a floating window after restoring an arranged one.
+`Super+Ctrl+Up` opens the overview and `Super+Z` opens the layout chooser.
+On Mac keyboards, Super is Command and Alt is Option.
+They are chords rather than bare letters because they fire
 whenever no application holds the keyboard, which on a machine whose pointer
 does not work is most of the time -- and `q` meaning "close the desktop" makes
 typing any word with a q in it drop the user back to the console.
@@ -127,6 +140,11 @@ typing any word with a q in it drop the user back to the console.
     window.v       the Window model and the pages windows show
     workspace.v    four virtual desktops, focus and window migration
     window_shortcuts.v  Super-key tiling and workspace shortcuts
+    window_isolation.v  title-bar shake and workspace-local Hide Others
+    window_placement.v  pointer half/quarter placement and translucent preview
+    window_resize_cursor.v  edge/corner resize cursor shapes and backing bounds
+    window_overview.v  paged thumbnail overview and modal keyboard navigation
+    window_layout.v    visual arrangement chooser on window chrome and Super+Z
     app.v          native application metadata and factories
     app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
     native_surface_app.v  native external-client lifecycle and input transport

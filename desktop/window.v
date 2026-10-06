@@ -57,11 +57,15 @@ mut:
 	id_minimize string
 	id_divider  string
 	id_body     string
-	// One grip per corner; id_resize is the lower right.
+	// One grip per edge and corner; id_resize is the lower right.
 	id_resize    string
 	id_resize_sw string
 	id_resize_nw string
 	id_resize_ne string
+	id_resize_n  string
+	id_resize_s  string
+	id_resize_e  string
+	id_resize_w  string
 	id_task      string
 	// Geometry to come back to when a maximised window is restored.
 	restore_x      int
@@ -71,6 +75,8 @@ mut:
 	maximized      bool
 	snap           WindowSnap
 	minimized      bool
+	// Only a window hidden by Shake/Hide Others is restored by that gesture.
+	hidden_by_isolation bool
 	// Workspaces are zero-based internally and numbered from one in the UI.
 	// A window belongs to exactly one workspace; its application keeps running
 	// while another workspace is shown.

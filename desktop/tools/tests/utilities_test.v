@@ -1054,9 +1054,10 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 
 	root := desktop.build_tree()
 	taskbar := utility_element_named(root, 'taskbar') or { panic('missing taskbar') }
-	// Start, two windows, the pager, the tray's overflow chevron and network
+	// Start, Overview, two windows, the pager, the tray's overflow chevron and network
 	// icon, build date and clock, the top edge and Show Desktop.
-	assert taskbar.children.len == 11 + workspace_count
+	assert taskbar.children.len == 12 + workspace_count
+	assert utility_element_named(taskbar, action_window_overview) != none
 	assert utility_element_named(taskbar, action_show_desktop) != none
 	assert utility_element_named(taskbar, 'tray.icon.network') != none
 	assert utility_element_named(taskbar, action_tray_overflow) != none
@@ -1079,7 +1080,7 @@ fn test_taskbar_keeps_a_bottom_right_clock_and_open_windows() {
 	desktop.close_window(1)
 	empty := desktop.build_tree()
 	empty_taskbar := utility_element_named(empty, 'taskbar') or { panic('missing empty taskbar') }
-	assert empty_taskbar.children.len == 9 + workspace_count
+	assert empty_taskbar.children.len == 10 + workspace_count
 	assert utility_element_named(empty_taskbar, action_start_toggle) != none
 	assert utility_element_named(empty_taskbar, 'clock.time') != none
 	free_tree(empty)

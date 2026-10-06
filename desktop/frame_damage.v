@@ -232,14 +232,14 @@ mut:
 }
 
 // cursor_box is every logical pixel the pointer can paint when it is at (x,
-// y): the Catalina pointer with its shadow, which also covers the default
-// arrow and its one-pixel halo. Trimmed to the canvas.
+// y): the normal arrow and its shadow, or a resize arrow centered on the
+// pointer. Trimmed to the canvas.
 fn (d &Desktop) cursor_box(x int, y int) DamageRect {
 	return damage_intersection(DamageRect{
-		x:     x - 1
-		y:     y - 1
-		w:     catalina_cursor_width + 2
-		h:     catalina_cursor_height + 2
+		x:     x - cursor_backing_inset
+		y:     y - cursor_backing_inset
+		w:     cursor_backing_width
+		h:     cursor_backing_height
 		valid: true
 	}, d.canvas_damage())
 }
@@ -255,8 +255,7 @@ fn (mut d Desktop) copy_cursor_backing(box DamageRect, area DamageRect, to_backi
 		if d.cursor_backing.pixels.cap > 0 {
 			unsafe { d.cursor_backing.pixels.free() }
 		}
-		d.cursor_backing.pixels = []u32{len: (catalina_cursor_width + 2) * (catalina_cursor_height +
-			2) * scale * scale}
+		d.cursor_backing.pixels = []u32{len: cursor_backing_width * cursor_backing_height * scale * scale}
 	}
 	x0 := area.x * scale
 	x1 := if (area.x + area.w) * scale < d.canvas.physical_width {

@@ -508,6 +508,7 @@ fn (d &Desktop) tray_elements(mut children []ui2.Element, x int, y int, height i
 
 fn (d &Desktop) tooltip_text(action string) string {
 	return match action {
+		action_window_overview { tr('desktop.overview.title') }
 		action_show_desktop { tr('tray.show_desktop') }
 		action_tray_overflow { tr('tray.show_hidden_icons') }
 		action_tray_input { keyboard_layout_text(d.settings.keyboard_layout) }

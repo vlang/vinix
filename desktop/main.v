@@ -542,14 +542,18 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		d.on_app_pointer_button(pointer_x, pointer_y, .up, .middle)
 	}
 	if packet.pressed & button_right != 0 {
-		if d.open_create_context_menu(pointer_x, pointer_y) {
+		if d.window_layout_right_down(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else if d.open_create_context_menu(pointer_x, pointer_y) {
 			click = TitlebarClick{}
 		} else {
 			d.on_app_pointer_button(pointer_x, pointer_y, .down, .right)
 		}
 	}
 	if packet.released & button_right != 0 {
-		if !take_create_context_right_release() {
+		if d.window_layout_right_release {
+			d.window_layout_right_release = false
+		} else if !take_create_context_right_release() {
 			d.on_app_pointer_button(pointer_x, pointer_y, .up, .right)
 		}
 	}
@@ -574,10 +578,21 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		unsafe { raw.free() }
 	}
 
-	// Cmd-Tab is the window manager's whoever is typing, so it comes out of
-	// the stream first. An empty read goes through as well: a sequence the
-	// last read ended inside has to be let go when nothing completes it.
-	switched := d.take_switcher_keys(keys)
+	// Modal window controls own typing before Cmd-Tab or an application.
+	// Empty reads also settle an incomplete overview escape sequence.
+	viewed := d.take_window_overview_keys(keys)
+	defer {
+		if viewed.len > 0 && viewed.str != keys.str {
+			unsafe { viewed.free() }
+		}
+	}
+	arranged := d.take_window_layout_keys(viewed)
+	defer {
+		if arranged.len > 0 && arranged.str != viewed.str && arranged.str != keys.str {
+			unsafe { arranged.free() }
+		}
+	}
+	switched := d.take_switcher_keys(arranged)
 	if switched.len == 0 {
 		return
 	}

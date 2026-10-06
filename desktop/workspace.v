@@ -46,6 +46,8 @@ fn (mut d Desktop) switch_workspace(workspace int) {
 	// Modal compositor UI belongs to the old view. Dropping pointer capture also
 	// prevents a drag begun there from moving an invisible window afterwards.
 	d.switcher_close()
+	d.close_window_overview()
+	d.close_window_layout()
 	if d.start_menu_open {
 		d.close_start_menu()
 	}
@@ -79,6 +81,8 @@ fn (mut d Desktop) move_window_to_workspace(id int, workspace int) {
 		d.close_start_menu()
 	}
 	was_focused := d.focus == id
+	// Moving a hidden window elsewhere ends the old workspace's claim on it.
+	d.windows[index].hidden_by_isolation = false
 	d.windows[index].workspace = workspace
 	if d.drag.window_id == id {
 		d.drag = Drag{}
