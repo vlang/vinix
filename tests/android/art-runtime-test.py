@@ -345,7 +345,7 @@ class AtlTests(unittest.TestCase):
             "androidfw_configuration_api": 1,
             "androidfw_header_sha256": "a" * 64,
             "androidfw_library_sha256": "c" * 64,
-            "configuration_probe_sha256": art._digest(support / "atl-configuration-test.c"),
+            "configuration_probe_sha256": art.configuration_probe_digest(),
             "build_flags": ["--buildtype=release", "-Wl,-z,max-page-size=65536"],
             "builder_sha256": art._digest(support / "build-atl.sh"),
             "dex_adapter_sha256": art._digest(support / "atl-dex.py"),

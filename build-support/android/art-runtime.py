@@ -96,6 +96,19 @@ def _digest(path: Path) -> str:
     return result.hexdigest()
 
 
+def configuration_probe_digest() -> str:
+    """Bind ATL's native fixture provenance to all maintained V inputs."""
+    support = Path(__file__).parent
+    inputs = (support / "atlconfiguration/core.v", support / "atl-configuration-v-abi.h",
+              support / "compile-v-atl-configuration.py", support.parent / "compile-v-module.py",
+              support.parent / "find-v.sh")
+    result = hashlib.sha256()
+    for source in inputs:
+        result.update(str(source.relative_to(support.parent)).encode() + b"\0")
+        result.update(source.read_bytes())
+    return result.hexdigest()
+
+
 def _regular(path: Path) -> None:
     try:
         mode = path.lstat().st_mode
@@ -246,7 +259,7 @@ def _validate_atl_payloads(overlay: Path, manifest: dict, seen: set[str]) -> Non
             or any(not isinstance(manifest.get(key), str)
                    or re.fullmatch(r"[0-9a-f]{64}", manifest[key]) is None
                    for key in ("androidfw_header_sha256", "androidfw_library_sha256"))
-            or manifest.get("configuration_probe_sha256") != _digest(Path(__file__).with_name("atl-configuration-test.c"))
+            or manifest.get("configuration_probe_sha256") != configuration_probe_digest()
             or manifest.get("builder_sha256") != _digest(Path(__file__).with_name("build-atl.sh"))
             or manifest.get("dex_adapter_sha256") != _digest(Path(__file__).with_name("atl-dex.py"))
             or manifest.get("dex_compiler_sha256") != boot.INPUTS[2]["sha256"]

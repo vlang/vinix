@@ -90,7 +90,7 @@ for name, expected in ((r8, "900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0
         raise SystemExit(f"build-atl: pinned compiler input checksum mismatch: {name}")
 PY
 SOURCE_DIR="$BUILD_DIR/android_translation_layer-$COMMIT"
-INPUT_KEY=$(python3 - "$SOURCE_SHA512" "$ART_RUNTIME" "$0" "$SCRIPT_DIR/atl-dex.py" "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/atl-configuration-test.c" "$ART_RUNTIME/art-runtime-manifest.json" <<'PY'
+INPUT_KEY=$(python3 - "$SOURCE_SHA512" "$ART_RUNTIME" "$0" "$SCRIPT_DIR/atl-dex.py" "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/atlconfiguration/core.v" "$SCRIPT_DIR/atl-configuration-v-abi.h" "$SCRIPT_DIR/compile-v-atl-configuration.py" "$SCRIPT_DIR/../compile-v-module.py" "$SCRIPT_DIR/../find-v.sh" "$ART_RUNTIME/art-runtime-manifest.json" <<'PY'
 import hashlib, pathlib, sys
 digest = hashlib.sha256(sys.argv[1].encode())
 # Meson records absolute include/provider paths as well as their contents.
@@ -149,16 +149,25 @@ PY
 # a desktop; its freshly compiled configuration object needs neither.
 CONFIGURATION_TEST="$NEXT_OUTPUT/usr/libexec/vinix-android/atl-configuration-test"
 mkdir -p "$(dirname -- "$CONFIGURATION_TEST")"
-gcc -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=65536 -I"$ART_RUNTIME/usr/include" \
-    "$SCRIPT_DIR/atl-configuration-test.c" -o "$CONFIGURATION_TEST" \
+python3 "$SCRIPT_DIR/compile-v-atl-configuration.py" "$BUILD_DIR/atl-configuration-probe.c"
+gcc -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
+    -I"$ART_RUNTIME/usr/include" -I"$SCRIPT_DIR" \
+    -c "$BUILD_DIR/atl-configuration-probe.c" -o "$BUILD_DIR/atl-configuration-probe.o"
+gcc -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=65536 \
+    "$BUILD_DIR/atl-configuration-probe.o" -o "$CONFIGURATION_TEST" \
     "$BUILD_OUTPUT/libandroid.so.0.p/src_libandroid_configuration.c.o" \
     -L"$ART_RUNTIME/usr/lib/art" -landroidfw -lpng -Wl,-rpath-link,"$ART_RUNTIME/usr/lib/art"
 LD_LIBRARY_PATH="$ART_RUNTIME/usr/lib/art${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     "$CONFIGURATION_TEST"
+CONFIGURATION_PROBE_KEY=$(python3 - "$SCRIPT_DIR/art-runtime.py" <<'PY'
+import runpy, sys
+print(runpy.run_path(sys.argv[1])["configuration_probe_digest"]())
+PY
+)
 python3 - "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" "$R8_ARCHIVE" \
     "$CORE_CLASSES" "$SCRIPT_DIR/atl-dex.py" "$0" "$DEPENDENCY_CACHE" \
     "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/art16k.patch" \
-    "$ART_RUNTIME" "$SCRIPT_DIR/atl-configuration-test.c" <<'PY'
+    "$ART_RUNTIME" "$CONFIGURATION_PROBE_KEY" <<'PY'
 import hashlib, json, os, pathlib, struct, subprocess, sys, zipfile
 output, commit, url, archive, r8, core, adapter, builder, cache, patch, art_patch, art_runtime, probe = sys.argv[1:]
 root = pathlib.Path(output)
@@ -229,7 +238,7 @@ manifest = {"format": 1, "architecture": "aarch64", "page_size": 16384,
             "androidfw_configuration_api": 1,
             "androidfw_header_sha256": digest(pathlib.Path(art_runtime) / "usr/include/androidfw/androidfw_c_api.h"),
             "androidfw_library_sha256": digest(pathlib.Path(art_runtime) / "usr/lib/art/libandroidfw.so"),
-            "configuration_probe_sha256": digest(probe),
+            "configuration_probe_sha256": probe,
             "build_flags": ["--buildtype=release", "-Wl,-z,max-page-size=65536"],
             "builder_sha256": digest(builder), "dex_adapter_sha256": digest(adapter),
             "dex_compiler_sha256": digest(r8), "java_core_classes_sha256": digest(core),
