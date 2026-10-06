@@ -183,3 +183,60 @@ fn test_reminders_priority_legacy_parse_failure_and_draft_cancel_release_all_own
 	app.close_app()
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_reminders_full_bounded_sorting_filter_exports_and_draft_frames_retain_no_memory() {
+	home := reminders_heap_home('sort-full')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	mut app := new_reminders_app(home, 0)
+	mut bytes := []u8{cap: 16384}
+	unsafe { bytes.flags |= .noslices }
+	editor_append(mut bytes, reminders_record_header)
+	for index in 0 .. reminders_limit {
+		title := match index % 4 { 0 { 'Alpha' } 1 { 'alpha' } 2 { '日本語' } else { '😀' } }
+		due := match index % 4 { 0 { '' } 1 { '2028-02-29 09:00' } 2 { '2028-02-29' } else { '2027-01-01' } }
+		priority := match index % 4 { 0 { ReminderPriority.none } 1 { ReminderPriority.high } 2 { ReminderPriority.medium } else { ReminderPriority.low } }
+		reminders_append_row(mut bytes, title, due, false, priority)
+	}
+	assert app.publish(editor_bytes_text(bytes))
+	unsafe { bytes.free() }
+	app.selected = 0
+	app.begin_edit(0)
+	app.handle('reminders.priority.high')!
+	begin_frame_elements()
+	warm := app.build(ui2.rect(0, 0, 480, 616))!
+	free_tree(warm)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for order in [RemindersSort.manual, RemindersSort.priority, RemindersSort.due, RemindersSort.title]! {
+			app.handle(reminders_sort_key(order))!
+			assert app.sort == order && app.selected == 0
+			assert app.editing && app.edit_index == 0 && app.edit_priority == .high
+			assert editor_bytes_text(app.title_input) == 'Alpha' && app.data.items[0].priority == .none
+			assert app.match_count == reminders_limit
+			if order == .manual { assert app.matches[255] == 255 }
+			else if order == .priority { assert app.matches[0] == 1 && app.matches[63] == 253 && app.matches[255] == 252 }
+			else if order == .due { assert app.matches[0] == 3 && app.matches[63] == 255 && app.matches[255] == 252 }
+			else { assert app.matches[0] == 0 && app.matches[63] == 252 && app.matches[255] == 255 }
+			csv := app.visible_text(true)
+			text := app.visible_text(false)
+			assert csv.len > 4000 && text.len > 4000
+			unsafe { csv.free() text.free() }
+			begin_frame_elements()
+			tree := app.build(ui2.rect(0, 0, 480, 616))!
+			free_tree(tree)
+		}
+		app.handle('reminders.search')!
+		app.key_input('\x01')
+		app.paste_input('Alpha')
+		assert app.match_count == 64 && app.selected == 0
+		app.handle('reminders.sort.due')!
+		assert app.matches[0] == 0 && app.matches[63] == 252
+		app.handle('reminders.search')!
+		app.key_input('\x01\x7f')
+		app.handle('reminders.filter.open')!
+		assert app.match_count == reminders_limit && app.edit_index == 0
+		app.handle('reminders.filter.all')!
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}

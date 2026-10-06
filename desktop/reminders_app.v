@@ -35,6 +35,30 @@ mut:
 }
 
 enum RemindersFilter { all open completed overdue }
+enum RemindersSort { manual priority due title }
+
+fn reminders_sort_key(order RemindersSort) string {
+	return match order {
+		.manual { 'reminders.sort.manual' }
+		.priority { 'reminders.sort.priority' }
+		.due { 'reminders.sort.due' }
+		.title { 'reminders.sort.title' }
+	}
+}
+
+// UTF-8 byte order is deterministic and case-sensitive, without allocating
+// normalized copies. A shorter prefix sorts first; valid UTF-8 preserves code
+// point order. The same rule orders fixed-width dates and all-day prefixes.
+fn reminders_compare_text(left string, right string) int {
+	length := if left.len < right.len { left.len } else { right.len }
+	for at in 0 .. length {
+		if left[at] < right[at] { return -1 }
+		if left[at] > right[at] { return 1 }
+	}
+	if left.len < right.len { return -1 }
+	if left.len > right.len { return 1 }
+	return 0
+}
 
 struct RemindersApp {
 mut:
@@ -50,6 +74,7 @@ mut:
 	match_count int
 	count_text string
 	filter RemindersFilter
+	sort RemindersSort
 	selected int = -1
 	scroll int
 	page_rows int = 7
@@ -235,6 +260,7 @@ fn (mut app RemindersApp) refilter() {
 			if index == app.selected { selected_visible = true }
 		}
 	}
+	app.sort_matches()
 	if !selected_visible { app.selected = -1 app.confirming_delete = false }
 	unsafe { app.count_text.free() }
 	matched := app.match_count.str()
@@ -242,6 +268,60 @@ fn (mut app RemindersApp) refilter() {
 	app.count_text = '${matched} / ${total}'
 	unsafe { matched.free() total.free() }
 	app.clamp_scroll()
+}
+
+fn (app &RemindersApp) match_before(left int, right int) bool {
+	a := &app.data.items[left]
+	b := &app.data.items[right]
+	order := match app.sort {
+		.manual { 0 }
+		.priority { int(b.priority) - int(a.priority) }
+		.due {
+			if a.due.len == 0 && b.due.len > 0 { 1 }
+			else if a.due.len > 0 && b.due.len == 0 { -1 }
+			else { reminders_compare_text(a.due, b.due) }
+		}
+		.title { reminders_compare_text(a.title, b.title) }
+	}
+	return order < 0 || (order == 0 && left < right)
+}
+
+// Only the bounded view indices move. Persisted rows, editor indices and delete
+// guards retain their identities; equal keys retain original insertion order.
+fn (mut app RemindersApp) sort_matches() {
+	if app.sort == .manual { return }
+	for slot := 1; slot < app.match_count; slot++ {
+		index := app.matches[slot]
+		mut position := slot
+		for position > 0 && app.match_before(index, app.matches[position - 1]) {
+			app.matches[position] = app.matches[position - 1]
+			position--
+		}
+		app.matches[position] = index
+	}
+}
+
+fn (mut app RemindersApp) set_sort(order RemindersSort) {
+	if app.sort == order { return }
+	app.sort = order
+	app.refilter()
+	app.scroll = 0
+	for slot in 0 .. app.match_count {
+		if app.matches[slot] == app.selected {
+			if slot >= app.page_rows { app.scroll = slot - app.page_rows + 1 }
+			break
+		}
+	}
+	app.clamp_scroll()
+}
+
+fn (mut app RemindersApp) cycle_sort(backward bool) {
+	app.set_sort(match app.sort {
+		.manual { if backward { RemindersSort.title } else { RemindersSort.priority } }
+		.priority { if backward { RemindersSort.manual } else { RemindersSort.due } }
+		.due { if backward { RemindersSort.priority } else { RemindersSort.title } }
+		.title { if backward { RemindersSort.due } else { RemindersSort.manual } }
+	})
 }
 
 fn (mut app RemindersApp) clamp_scroll() {

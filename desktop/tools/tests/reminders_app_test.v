@@ -523,3 +523,276 @@ fn test_reminders_priority_exports_csv_text_and_list_badge_with_safe_editor_geom
 		free_tree(editor)
 	}
 }
+
+fn reminders_test_sort_record() string {
+	return 'VINIX-REMINDERS 2\n0\t0\t\tZeta\n0\t3\t2028-02-29 09:00\talpha\n1\t3\t2028-02-29\tAlpha\n0\t2\t2027-01-01\tÉclair\n0\t1\t2028-02-29 09:00\talpha\n1\t2\t\t日本語\n0\t3\t2028-02-29 00:00\t😀\n0\t2\t2028-02-29\tAl\n0\t0\t\tAlpha\n'
+}
+
+fn test_reminders_sorts_stable_keys_without_changing_rows_or_storage() {
+	home := reminders_test_home('sort-order')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	assert app.sort == .manual && app.match_count == 9
+	for slot in 0 .. 9 { assert app.matches[slot] == slot }
+	app.handle('reminders.sort.priority')!
+	for slot, index in [1, 2, 6, 3, 5, 7, 4, 0, 8]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.due')!
+	// Earlier date, all-day ties, midnight, timed ties, then undated ties.
+	for slot, index in [3, 2, 7, 6, 1, 4, 0, 5, 8]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.title')!
+	// Shorter prefix, uppercase, lowercase, then ascending Unicode code points.
+	for slot, index in [7, 2, 8, 0, 1, 4, 3, 5, 6]! { assert app.matches[slot] == index }
+	assert app.data.items[0].title == 'Zeta' && app.data.items[6].title == '😀'
+	assert app.record == reminders_test_sort_record()
+	stored := os.read_file(path)!
+	assert stored == reminders_test_sort_record()
+	unsafe { stored.free() }
+	app.reload()
+	assert app.sort == .title
+	for slot, index in [7, 2, 8, 0, 1, 4, 3, 5, 6]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.manual')!
+	for slot in 0 .. 9 { assert app.matches[slot] == slot }
+	mut reopened := new_reminders_app(home, 0)
+	defer { reopened.close_app() }
+	assert reopened.sort == .manual
+	for slot in 0 .. 9 { assert reopened.matches[slot] == slot }
+}
+
+fn test_reminders_sort_selection_paging_drafts_and_delete_keep_data_identity() {
+	home := reminders_test_home('sort-identities')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.page_rows = 2
+	app.selected = 0
+	app.handle('reminders.delete')!
+	app.handle('reminders.sort.title')!
+	assert app.selected == 0 && app.confirming_delete
+	assert app.scroll == 2 && app.matches[app.scroll + 1] == 0
+	app.handle('reminders.sort.due')!
+	assert app.selected == 0 && app.confirming_delete
+	assert app.scroll == 5 && app.matches[app.scroll + 1] == 0
+	app.handle('reminders.delete_confirm')!
+	assert app.data.count == 8 && app.selected == -1 && !app.confirming_delete
+	assert app.data.items[0].title == 'alpha' && app.data.items[1].title == 'Alpha'
+	assert !app.record.contains('Zeta')
+	app.selected = 0
+	app.begin_edit(0)
+	app.key_input('\x01')
+	app.paste_input('Draft remains attached')
+	app.handle('reminders.priority.low')!
+	app.handle('reminders.sort.priority')!
+	assert app.selected == 0 && app.edit_index == 0 && app.editing
+	assert editor_bytes_text(app.title_input) == 'Draft remains attached'
+	assert editor_bytes_text(app.due_input) == '2028-02-29 09:00'
+	assert app.edit_priority == .low && app.data.items[0].priority == .high
+	app.handle('reminders.delete')!
+	app.handle('reminders.delete_confirm')!
+	assert app.data.count == 8 && !app.confirming_delete
+	app.handle('reminders.cancel')!
+	assert app.data.items[0].title == 'alpha'
+	app.handle('reminders.filter.completed')!
+	assert app.match_count == 2 && app.selected == -1
+	assert app.matches[0] == 1 && app.matches[1] == 4
+	app.handle('reminders.filter.open')!
+	app.handle('reminders.search')!
+	app.paste_input('alpha')
+	app.handle('reminders.sort.due')!
+	assert app.match_count == 2 && app.matches[0] == 0 && app.matches[1] == 3
+	app.handle('reminders.row.3')!
+	app.handle('reminders.delete')!
+	app.handle('reminders.search')!
+	app.key_input('\x01')
+	app.paste_input('Al')
+	assert app.match_count == 2 && app.selected == -1 && !app.confirming_delete
+	app.handle('reminders.delete_confirm')!
+	assert app.data.count == 8
+	app.key_input('\x01\x7f')
+	app.handle('reminders.filter.all')!
+	app.page_rows = 2
+	app.key_input('\x1b[6~')
+	assert app.scroll == 2 && app.matches[app.scroll] == 6
+	app.key_input('\x1b[5~')
+	assert app.scroll == 0
+}
+
+fn test_reminders_sorted_exports_include_all_filtered_matches_beyond_current_page() {
+	home := reminders_test_home('sort-export')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, 'VINIX-REMINDERS 2\n0\t0\t2028-02-29\tvisible B\n1\t3\t\tvisible A\n0\t3\t2027-01-01\tHidden\n')!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.page_rows = 1
+	app.handle('reminders.search')!
+	app.paste_input('visible')
+	app.handle('reminders.sort.title')!
+	app.handle('reminders.next')!
+	assert app.scroll == 1 && app.matches[app.scroll] == 0
+	text := app.visible_text(false)
+	defer { unsafe { text.free() } }
+	assert text == '[x] visible A\tPriority: High\n[ ] visible B\t2028-02-29\tPriority: None\n'
+	app.handle('reminders.sort.due')!
+	app.handle('reminders.next')!
+	assert app.scroll == 1 && app.matches[app.scroll] == 1
+	csv := app.visible_text(true)
+	defer { unsafe { csv.free() } }
+	assert csv == '"Title","Due","Completed (0 or 1)","Priority"\n"visible B","2028-02-29",0,"None"\n"visible A","",1,"High"\n'
+	export_path := join_path(home, 'sorted.csv')
+	defer { unsafe { export_path.free() } }
+	app.handle('reminders.export_path')!
+	app.key_input('\x01')
+	app.paste_input(export_path)
+	app.export_visible(true)
+	assert app.status == 'reminders.export_saved'
+	saved := os.read_file(export_path)!
+	assert saved == csv
+	unsafe { saved.free() }
+}
+
+fn test_reminders_overdue_filter_composes_each_sort_and_clock_unavailability() {
+	home := reminders_test_home('sort-overdue')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.today = 20280229
+	app.minute_of_day = 600
+	app.clock_valid = true
+	app.handle('reminders.filter.overdue')!
+	assert app.match_count == 4
+	for slot, index in [1, 3, 4, 6]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.priority')!
+	for slot, index in [1, 6, 3, 4]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.due')!
+	for slot, index in [3, 6, 1, 4]! { assert app.matches[slot] == index }
+	app.handle('reminders.sort.title')!
+	for slot, index in [1, 4, 3, 6]! { assert app.matches[slot] == index }
+	app.selected = 6
+	app.handle('reminders.delete')!
+	app.clock_valid = false
+	app.refilter()
+	assert app.match_count == 0 && app.selected == -1 && !app.confirming_delete
+	app.handle('reminders.delete_confirm')!
+	assert app.data.count == 9 && app.record == reminders_test_sort_record()
+	app.clock_valid = true
+	app.minute_of_day = 0
+	app.refilter()
+	assert app.match_count == 1 && app.matches[0] == 3
+}
+
+fn test_reminders_sort_is_readonly_for_v1_and_preserves_busy_conflict_drafts() {
+	home := reminders_test_home('sort-conflict')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	legacy := 'VINIX-REMINDERS 1\n0\t2028-02-29\tZebra\n0\t\tApple\n'
+	os.write_file(path, legacy)!
+	mut first := new_reminders_app(home, 0)
+	mut second := new_reminders_app(home, 0)
+	defer { first.close_app() second.close_app() }
+	second.handle('reminders.sort.title')!
+	assert second.matches[0] == 1 && second.matches[1] == 0
+	unchanged := os.read_file(path)!
+	assert unchanged == legacy && second.record == legacy
+	unsafe { unchanged.free() }
+	second.selected = 0
+	second.begin_edit(0)
+	second.key_input('\x01')
+	second.paste_input('Pending identity')
+	second.handle('reminders.priority.high')!
+	first.selected = 1
+	first.toggle_selected()
+	second.handle('reminders.sort.priority')!
+	second.save_edit()
+	assert second.status == 'reminders.changed' && second.editing
+	assert second.edit_index == 0 && second.edit_priority == .high
+	assert editor_bytes_text(second.title_input) == 'Pending identity'
+	assert second.record == legacy && second.data.items[0].title == 'Zebra'
+	second.reload()
+	assert second.sort == .priority && !second.editing
+	second.selected = 0
+	second.begin_edit(0)
+	second.handle('reminders.priority.low')!
+	lock_fd := reminders_lock(second.home_fd)
+	assert lock_fd >= 0
+	second.handle('reminders.sort.due')!
+	second.save_edit()
+	assert second.status == 'reminders.busy' && second.editing
+	assert second.edit_index == 0 && second.edit_priority == .low
+	assert second.data.items[0].priority == .none
+	desktop_close(lock_fd)
+	second.save_edit()
+	assert !second.editing && second.data.items[0].title == 'Zebra'
+	assert second.data.items[0].priority == .low && second.data.items[1].completed
+}
+
+fn test_reminders_sort_keyboard_focus_and_bounded_controls_do_not_overlap_rows() {
+	saved_language := desktop_language
+	defer { desktop_language = saved_language }
+	mut desktop := Desktop{fonts: load_fonts()}
+	defer { free_fonts(mut desktop.fonts) }
+	home := reminders_test_home('sort-frame')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.key_input('\t\t\t')
+	assert app.focus == 4
+	app.key_input('\x1b[C')
+	assert app.sort == .priority
+	app.key_input('\x1b[D')
+	assert app.sort == .manual
+	app.key_input('\x1b[D')
+	assert app.sort == .title
+	app.key_input('\t')
+	assert app.focus == 2
+	app.key_input('\x1b[C')
+	assert app.sort == .title
+	app.begin_edit(0)
+	app.key_input('\t\t\t\t')
+	assert app.focus == 4 && app.editing && app.edit_index == 0
+	app.key_input('\x1b[C')
+	assert app.sort == .manual && editor_bytes_text(app.title_input) == 'Zeta'
+	app.key_input('\t')
+	assert app.focus == 0 && app.editing
+	for language in desktop_languages {
+		desktop_language = language
+		for width in [480, 800, 1000]! {
+			begin_frame_elements()
+			tree := app.build(ui2.rect(0, 0, width, 616))!
+			mut sorts := 0
+			mut previous_right := f64(106)
+			for child in tree.children {
+				if child.id.starts_with('reminders.sort.') {
+					assert child.frame.x >= previous_right && child.frame.width >= 80
+					assert child.frame.x + child.frame.width <= width - 14
+					assert child.frame.y == 84 && child.frame.y + child.frame.height <= 114
+					assert child.text == tr(child.id) && child.text != child.id
+					face := desktop.face_for(child.text_style)
+					assert face.text_width(child.text) <= int(child.frame.width) - 8
+					previous_right = child.frame.x + child.frame.width
+					sorts++
+				}
+				if child.id == 'reminders.new' { assert child.frame.y == 124 }
+				if child.id.starts_with('reminders.row.') {
+					assert child.frame.y >= 164 && child.frame.y + child.frame.height < 616 - 300
+				}
+			}
+			assert sorts == 4 && app.page_rows == 3
+			free_tree(tree)
+		}
+	}
+}
