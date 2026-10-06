@@ -1,37 +1,33 @@
 # AMD64 user exception stack regression
 
-`test.c` runs as PID 1 in an isolated QEMU guest. It faults 48 children while
+`exceptionfixture/core_amd64.v` runs as PID 1 in an isolated QEMU guest. It faults 48 children while
 file, pipe and UNIX socket descriptors remain open, then checks signal status
 and socket EOF. Two threads also raise 256 trap/illegal-instruction exceptions;
 their returning signal handlers block on a pipe while a peer releases them.
 Run with one CPU to force blocking context switches and four CPUs to exercise
 concurrent faults.
 
-Build the x86_64 kernel, then prepare an initramfs and ISO from this checkout:
+Build the x86_64 kernel, then run the fixture with a fresh build and guest
+directory for each CPU configuration:
 
 ```sh
-work=$(mktemp -d)
-mkdir -p "$work/rootfs"/{sbin,dev,proc,sys,tmp,mnt,root}
-x86_64-linux-musl-gcc -static -O2 -Wall -Wextra -Werror \
-  tests/amd64-exceptions/test.c -lpthread -o "$work/rootfs/sbin/init"
-COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" \
-  -C "$work/rootfs" .
-VINIX_AMD64_KERNEL="$PWD/kernel/bin/vinix" \
-VINIX_AMD64_INITRAMFS="$work/initramfs.tar" \
-VINIX_AMD64_ISO="$work/test.iso" \
-VINIX_AMD64_ISO_BUILD_DIR="$work/iso" \
-  sh build-support/build-amd64-iso.sh
+VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
+  python3 tests/amd64-exceptions/run.py --state-dir /tmp/exceptions-build-1 \
+  --kernel-dir kernel --guest-state-dir /tmp/exceptions-guest-1 --cpus 1
+VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
+  python3 tests/amd64-exceptions/run.py --state-dir /tmp/exceptions-build-4 \
+  --kernel-dir kernel --guest-state-dir /tmp/exceptions-guest-4 --cpus 4
 ```
 
-Boot the ISO with an x86_64 UEFI firmware image; repeat with `-smp 4`:
+The runner compiles a static musl executable with strict warnings and checks
+the fixture object for implicit allocator imports. It boots q35 with TCG,
+`max`, 1 GiB of memory, and the selected CPU count. The default outer budget is
+900 seconds; the workload has no internal deadline. `VINIX_OVMF_CODE` can
+select the UEFI firmware. `--original-reference` builds an immutable C control
+from a supplied file, and `--prebuilt-init` runs an already built executable.
 
-```sh
-qemu-system-x86_64 -machine q35,smm=off -accel tcg -cpu max -m 1024 \
-  -smp 1 -drive "if=pflash,format=raw,unit=0,readonly=on,file=$UEFI_FIRMWARE" \
-  -cdrom "$work/test.iso" -display none -monitor none -serial stdio -no-reboot
-```
-
-Success ends with `EXCEPTION TEST: PASS`. PID 1 then waits forever; stop QEMU
-after reading that marker. The test creates files on the initramfs tmpfs and
+Success ends with `EXCEPTION TEST: PASS`. PID 1 then waits forever; the runner
+stops its QEMU instance after every required marker. It records hashes of the
+kernel, executable, ISO and firmware beside the serial log. The test creates files on the initramfs tmpfs and
 requires no data disk. It covers descriptor teardown and blocking handlers;
 it does not exercise disk-backed writeback on fatal exit.
