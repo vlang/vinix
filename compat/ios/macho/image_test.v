@@ -117,6 +117,104 @@ fn test_arm64_metadata_layout_and_chains() {
 	}
 }
 
+fn fixture_symbol_imports() []u8 {
+	mut data := fixture_image()
+	put(mut data, 16, 8, 4)
+	put(mut data, 20, 424 - 32, 4)
+	put(mut data, 24, 0x200080, 4) // MH_PIE | MH_TWOLEVEL
+	for i in 352 .. 424 { data[i] = 0 }
+	put(mut data, 352, 2, 4) // LC_SYMTAB, replacing chained fixups
+	put(mut data, 356, 24, 4)
+	put(mut data, 360, 0x6000, 4)
+	put(mut data, 364, 8, 4)
+	put(mut data, 368, 0x6080, 4)
+	put(mut data, 376, 0x80000022, 4) // LC_DYLD_INFO_ONLY
+	put(mut data, 380, 48, 4)
+	put(mut data, 392, 0x6100, 4) // bind offset/size
+	put(mut data, 396, 1, 4)
+	mut cursor := 1
+	names := ['_puts', '_weak', '_flat', '_main', '_defined', '_local', '_debug', '_common']
+	kinds := [u8(1), 1, 1, 1, 0xf, 0, 0xe1, 1]
+	descriptions := [u16(0x100), 0x140, 0xfe00, 0xff00, 0x100, 0x100, 0x100, 0x100]
+	for i, name in names {
+		off := 0x6000 + i * 16
+		put(mut data, off, u64(cursor), 4)
+		put(mut data, off + 4, u64(kinds[i]), 1)
+		put(mut data, off + 6, u64(descriptions[i]), 2)
+		if i == 7 { put(mut data, off + 8, 8, 8) } // Common symbol, not an import.
+		put_string(mut data, 0x6080 + cursor, name)
+		cursor += name.len + 1
+	}
+	put(mut data, 372, u64(cursor), 4)
+	return data
+}
+
+fn test_legacy_symbol_imports_remain_inspectable() {
+	image := parse(fixture_symbol_imports())!
+	assert image.legacy_fixups
+	assert image.execution_issues().any(it.contains('legacy dyld'))
+	symbols := image.imported_symbols()!
+	assert symbols.len == 4
+	assert symbols[0].name == '_puts'
+	assert symbols[0].library == '/usr/lib/libSystem.B.dylib'
+	assert !symbols[0].weak
+	assert symbols[1].name == '_weak' && symbols[1].weak
+	assert symbols[1].library == '/usr/lib/libSystem.B.dylib'
+	assert symbols[2].library == '<flat lookup>'
+	assert symbols[3].library == '<main executable>'
+	mut data := fixture_symbol_imports()
+	put(mut data, 0x6006, 0, 2)
+	assert parse(data)!.imported_symbols()![0].library == '<self>'
+	put(mut data, 24, 0x200000, 4) // No MH_TWOLEVEL: every undefined import is flat.
+	assert parse(data)!.imported_symbols()!.all(it.library == '<flat lookup>')
+}
+
+fn test_symbol_table_and_import_names_are_bounded() {
+	for position, value in {
+		356: u64(32)
+		360: 0xffffffff
+		364: 1048577
+		368: 0xffffffff
+		372: 0xffffffff
+	} {
+		mut bad := fixture_symbol_imports()
+		put(mut bad, position, value, 4)
+		expect_parse_failure(bad)
+	}
+	mut bad := fixture_symbol_imports()
+	put(mut bad, 376, 2, 4)
+	put(mut bad, 380, 24, 4)
+	put(mut bad, 20, 400 - 32, 4)
+	expect_parse_failure(bad) // Duplicate LC_SYMTAB, even if the second table is empty.
+	for invalid in ['offset', 'empty', 'unterminated', 'ordinal'] {
+		bad = fixture_symbol_imports()
+		match invalid {
+			'offset' { put(mut bad, 0x6000, 0xffffffff, 4) }
+			'empty' { put(mut bad, 0x6000, 0, 4) }
+			'ordinal' { put(mut bad, 0x6006, 0x200, 2) }
+			else {
+				for i in 0x6080 .. 0x6100 { bad[i] = `x` }
+			}
+		}
+		image := parse(bad)!
+		if _ := image.imported_symbols() {
+			assert false, 'invalid symbol import accepted'
+		}
+	}
+}
+
+fn test_chained_imports_take_precedence_over_symbol_table() {
+	mut data := fixture_symbol_imports()
+	put(mut data, 376, 0x80000034, 4)
+	put(mut data, 380, 16, 4)
+	put(mut data, 384, 0x7000, 4)
+	put(mut data, 388, 128, 4)
+	put(mut data, 20, 392 - 32, 4)
+	symbols := parse(data)!.imported_symbols()!
+	assert symbols.len == 1
+	assert symbols[0].name == '_puts'
+}
+
 fn test_truncated_headers_and_commands_fail_without_reading_outside_input() {
 	data := fixture_image()
 	for size in 0 .. 368 { expect_parse_failure(data[..size]) }

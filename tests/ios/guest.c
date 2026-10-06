@@ -78,6 +78,11 @@ int main(void) {
         run("/opt/ios/model-tests", NULL, NULL, NULL, 0, "iOS PASS: upstream 2048 eight model merge tests");
         test_2048();
     }
+    if (!access("/opt/ios/PPSSPP", R_OK)) {
+        run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
+        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "legacy dyld rebase/bind opcodes are not implemented");
+        puts("iOS BLOCKED: upstream PPSSPP rejected before entry point");
+    }
     puts("VINIX iOS GUEST: PASS");
     for (;;) pause();
 }

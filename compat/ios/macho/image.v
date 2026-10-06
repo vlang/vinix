@@ -42,6 +42,10 @@ pub:
 	has_entry        bool
 	fixup_offset     u64
 	fixup_size       u64
+	symbol_offset    u64
+	symbol_count     u32
+	string_offset    u64
+	string_size      u64
 	encrypted        bool
 	legacy_fixups    bool
 	initializers     bool
@@ -123,6 +127,11 @@ pub fn parse(input []u8) !Image {
 	mut has_entry := false
 	mut fixup_offset := u64(0)
 	mut fixup_size := u64(0)
+	mut symbol_offset := u64(0)
+	mut symbol_count := u32(0)
+	mut string_offset := u64(0)
+	mut string_size := u64(0)
+	mut has_symtab := false
 	mut encrypted := false
 	mut legacy_fixups := false
 	mut initializers := false
@@ -135,6 +144,19 @@ pub fn parse(input []u8) !Image {
 			return error('Mach-O: invalid load command size')
 		}
 		match cmd {
+			0x2 {
+				if size != 24 || has_symtab {
+					return error('Mach-O: invalid or duplicate symbol table command')
+				}
+				has_symtab = true
+				symbol_offset = u64(r.u32(off + 8)!)
+				symbol_count = r.u32(off + 12)!
+				string_offset = u64(r.u32(off + 16)!)
+				string_size = u64(r.u32(off + 20)!)
+				if symbol_count > 1048576 { return error('Mach-O: symbol table exceeds limit') }
+				r.range(symbol_offset, u64(symbol_count) * 16)!
+				r.range(string_offset, string_size)!
+			}
 			0x19 {
 				if size < 72 {
 					return error('Mach-O: truncated segment command')
@@ -265,6 +287,10 @@ pub fn parse(input []u8) !Image {
 		has_entry:        has_entry
 		fixup_offset:     fixup_offset
 		fixup_size:       fixup_size
+		symbol_offset:    symbol_offset
+		symbol_count:     symbol_count
+		string_offset:    string_offset
+		string_size:      string_size
 		encrypted:        encrypted
 		legacy_fixups:    legacy_fixups
 		initializers:     initializers

@@ -69,7 +69,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
 | Resources | XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
-| Inspection | Platform/version, dependencies, unsupported metadata and chained import names, including ARM64e images |
+| Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
 
 Header, command and segment ranges are checked before loading. Chained pointers
 are checked against their file-backed segment and page before any memory is
@@ -95,6 +95,69 @@ The calculator's `snprintf` double format and NSString's supported substitutions
 have calling-convention adapters.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
+
+## Official PPSSPP iOS binary probe
+
+[PPSSPP](https://www.ppsspp.org/download/) is a substantial open-source PSP
+emulator with a publicly downloadable iOS IPA. The pinned
+[official 1.20.4 release](https://github.com/hrydgard/ppsspp/releases/tag/v1.20.4)
+requires no App Store authentication. Its executable and resources are downloaded
+into the ignored build directory, without modifying or vendoring app code:
+
+```sh
+python3 examples/ios-ppsspp/download.py
+v -enable-globals -cc clang -gc none \
+  -cflags '-fsanitize=address,undefined' -ldflags '-fsanitize=address,undefined' \
+  -path "@vlib|$PWD/compat/ios|@vmodules" \
+  -o build/ios/run-ios-ppsspp-host compat/ios/runner
+build/ios/run-ios-ppsspp-host --imports \
+  build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP
+build/ios/run-ios-ppsspp-host \
+  build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP
+
+# Inspect and attempt the identical executable in a real Vinix ARM64 guest:
+./scripts/build-ios-aarch64.sh
+python3 tests/ios/run.py --no-build --with-ppsspp
+```
+
+The downloader verifies the release's 31,124,277-byte IPA against the publisher's
+SHA-256, checks extraction paths and verifies the unpacked executable:
+
+```text
+IPA:        822c7042311ff47710c9148c8edb5aab649cf85ce6ba96b9e8190feb91f45a51
+Executable: 7c9456c3cdee44dc48eefde5454bffa7e0965a32aa32858a181a06fbffeacf6c
+Bundle:     org.ppsspp.ppsspp, version 1.20.4, minimum iOS 11.0
+```
+
+The 2026-10-06 probe found an unencrypted ordinary ARM64 Mach-O, 27 dependencies
+and 767 imports. The import names match LLVM's independent symbol-table listing.
+The largest groups are:
+
+| Dependency | Imports |
+| --- | ---: |
+| libSystem | 304 |
+| libc++ | 187 |
+| OpenGL ES | 99 |
+| UIKit | 29 |
+| Objective-C runtime | 26 |
+
+**PPSSPP does not launch on Vinix yet.** Both the host runner and the Vinix guest
+reject it before its entry point with exit status 1. It uses legacy dyld
+rebase/bind opcodes, image initializers and Darwin thread-local storage;
+it also requires C++/libSystem APIs and graphics/audio frameworks beyond the
+current subset, including OpenGL ES, Metal and AudioToolbox. The bundle contains
+an additional MoltenVK dylib. No app UI or emulation was reached.
+
+The guest regression explicitly prints `iOS BLOCKED: upstream PPSSPP rejected
+before entry point` after verifying the import count and rejection. Passing this
+regression verifies inspection and the rejection diagnostic, rather than app
+compatibility. `--with-2048` can be combined with `--with-ppsspp` to exercise the
+working app in the same guest. Host inspection/attempts also run under ASan/UBSan.
+
+Binaries without chained fixups previously reported no imports. `--imports` now
+reads bounded `LC_SYMTAB`/`nlist_64` records, filters defined/debug/local/common symbols,
+resolves library ordinals and preserves weak-reference flags. Legacy execution
+remains unsupported; the inspection fallback does not perform relocation.
 
 ## Local Apple Calculator inspection
 

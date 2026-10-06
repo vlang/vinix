@@ -40,6 +40,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-build", action="store_true", help="reuse build/ios/staging/usr/bin/run-ios")
     parser.add_argument("--with-2048", action="store_true", help="also build and run pinned upstream iOS-2048")
+    parser.add_argument("--with-ppsspp", action="store_true", help="probe the publisher's PPSSPP iOS binary (currently rejected)")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
@@ -54,6 +55,9 @@ def main() -> int:
         env = {**os.environ, "VINIX_IOS_2048_BUILD_DIR": str(build / "2048")}
         subprocess.run(["bash", str(ROOT / "examples/ios-2048/build.sh")], env=env, check=True)
         subprocess.run(["bash", str(ROOT / "tests/ios/build-2048-model.sh")], env=env, check=True)
+    if arguments.with_ppsspp:
+        subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download.py"),
+            "--output", str(build / "ppsspp")], check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
@@ -64,6 +68,8 @@ def main() -> int:
         b"iOS PASS: upstream 2048 eight model merge tests",
         b"iOS PASS: upstream 2048 launch, swipes, merges, timers and ARC teardown",
     ) if arguments.with_2048 else ())
+    if arguments.with_ppsspp:
+        runner.FEATURE_MARKERS += (b"iOS BLOCKED: upstream PPSSPP rejected before entry point",)
     with tempfile.TemporaryDirectory(prefix="vinix-ios-vm-") as directory:
         work = Path(directory)
         rootfs = work / "rootfs"
@@ -77,6 +83,9 @@ def main() -> int:
         if arguments.with_2048:
             shutil.copytree(build / "2048/NumberTileGame.app", destination / "NumberTileGame.app")
             shutil.copy2(build / "2048/model-tests", destination / "model-tests")
+        if arguments.with_ppsspp:
+            # Current blockers are checked before loading resources or opening UI.
+            shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP", destination / "PPSSPP")
         prepare_images(build / "fixtures", destination)
         # Same small static musl sysroot used by the existing syscall tests.
         sysroot = Path(os.environ.get("VINIX_IOS_TEST_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))

@@ -71,10 +71,44 @@ fn imports(r Reader) ![]Import {
 	return result
 }
 
-// Import names are independent of the pointer-chain format. This also works
-// for ARM64e images whose authenticated pointers cannot yet be executed.
+// Inspect legacy undefined nlist_64 symbols without attempting to bind them.
+// Defined, debug, local and common symbols are not dynamic imports.
+fn (image Image) symbol_imports() ![]ImportedSymbol {
+	r := Reader{image.data}
+	mut result := []ImportedSymbol{}
+	for i in 0 .. image.symbol_count {
+		off := image.symbol_offset + u64(i) * 16
+		kind := u8(r.u16(off + 4)! & 0xff)
+		if kind & 0xe0 != 0 || kind & 0x0e != 0 || kind & 1 == 0 || r.u64(off + 8)! != 0 {
+			continue
+		}
+		nameoff := u64(r.u32(off)!)
+		if nameoff >= image.string_size { return error('Mach-O: import name exceeds string table') }
+		name := r.string_at(image.string_offset + nameoff, image.string_size - nameoff)!
+		if name == '' { return error('Mach-O: empty import name') }
+		description := r.u16(off + 6)!
+		ordinal := int(description >> 8)
+		library := if image.flags & 0x80 == 0 {
+			'<flat lookup>'
+		} else if ordinal > 0 && ordinal <= image.libraries.len {
+			image.libraries[ordinal - 1].name
+		} else {
+			match ordinal {
+				0 { '<self>' }
+				0xfe { '<flat lookup>' }
+				0xff { '<main executable>' }
+				else { return error('Mach-O: invalid symbol library ordinal ${ordinal}') }
+			}
+		}
+		result << ImportedSymbol{library, name, description & 0x40 != 0}
+	}
+	return result
+}
+
+// Import names are independent of execution support. ARM64e and legacy dyld
+// images remain inspectable even though their pointers cannot yet be bound.
 pub fn (image Image) imported_symbols() ![]ImportedSymbol {
-	if image.fixup_size == 0 { return []ImportedSymbol{} }
+	if image.fixup_size == 0 { return image.symbol_imports() }
 	r := Reader{image.data[int(image.fixup_offset)..int(image.fixup_offset + image.fixup_size)]}
 	mut result := []ImportedSymbol{}
 	for item in imports(r)! {

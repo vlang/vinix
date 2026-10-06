@@ -17,7 +17,8 @@ fn inspect(image macho.Image, show_imports bool) ! {
 		println('Dependency: ${library.name}${if library.weak { ' (weak)' } else { '' }}')
 	}
 	symbols := image.imported_symbols()!
-	println('Chained imports: ${symbols.len}')
+	table := if image.fixup_size != 0 { 'chained fixups' } else { 'symbol table' }
+	println('Imports: ${symbols.len} (${table})')
 	if show_imports {
 		for symbol in symbols {
 			println('Import: ${symbol.library} ${symbol.name}${if symbol.weak {
