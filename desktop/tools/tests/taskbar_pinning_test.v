@@ -82,3 +82,26 @@ fn test_taskbar_right_click_opens_pin_menu_for_app() {
 	assert create_context_menu.y + context_menu_height(.taskbar, true) <= desktop.canvas.height
 	desktop.close_create_context_menu()
 }
+
+fn test_last_catalog_application_can_be_pinned_and_persists_its_identity() {
+	temporary := os.temp_dir()
+	home := os.join_path(temporary, 'vinix-last-app-pin-${os.getpid()}')
+	unsafe { temporary.free() }
+	os.mkdir_all(home)!
+	mut desktop := Desktop{canvas: Canvas{width: 1280, height: 720}}
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free(); desktop.pinned_apps.free(); desktop.native_asset_icons.free() }
+	}
+	index := available_apps.len - 1
+	assert available_apps[index].process_name == 'vinix-ios-ppsspp'
+	assert desktop.pin_taskbar_app_in(home, index)
+	loaded := load_taskbar_pins(home)
+	assert loaded.len == 1 && loaded[0] == index
+	unsafe { loaded.free() }
+	entries := desktop.taskbar_entries()
+	assert entries.len == 1 && entries[0].id == 'taskpin.42'
+	assert entries[0].app_index == index && entries[0].window_id == 0
+	unsafe { entries.free() }
+	assert desktop.unpin_taskbar_app_in(home, index)
+}
