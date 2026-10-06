@@ -5,6 +5,25 @@ tests and SHA-256 known answers, every padding position, unaligned binary
 input, seed-sized buffers and input/output guard checks against V's separate
 standard-library implementation.
 
+The deterministic hardware stand-in and printf output policy live in V under
+`hosthooks`. Its instruction-only printf entry captures the full native
+variadic ABI, including floating-point registers and overflow stack arguments;
+libc consumes the borrowed cursor before the producer returns. Run its native
+integer/float/long-double/stack oracle on either architecture:
+
+```sh
+python3 tests/krandom/run_hooks.py --arch aarch64 \
+  --kernel-dir /path/to/kernel --state-dir /path/to/new/guest
+```
+
+Set `CC_AMD64` to the native musl compiler for `--arch x86_64` and
+`VINIX_V_COMPILER` to a verified compiler. The 32-line original host model is
+recoverable at `e55f69e1c982708d8c9a256d897054b7fd229fb3:tests/krandom/host_stubs.c`.
+The optional `--c-reference` accepts that immutable materialized file for
+differential validation. The new ABI oracle is additional coverage and earns
+no original-C translation credit; three native va-list producer lines use
+assembly and also receive no V algorithm credit.
+
 Secret erasure uses a volatile byte field in V. The host tests also check
 every offset and length through 64 bytes, including empty and null requests,
 with guards on both sides of the erased range.
