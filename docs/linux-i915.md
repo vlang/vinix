@@ -41,7 +41,10 @@ the complete i915 source tree is not evidence that the driver runs.
 - Linux integer types, error pointers, overflow helpers and compiler macros.
   Original Linux `log2.h` and `minmax.h` supply power-of-two, logarithm,
   rounding and clamp operations. Native headers preserve the transitive
-  includes required by the unchanged DRM color LUT helpers.
+  includes required by the unchanged DRM color LUT helpers. The original
+  checked `u64_to_user_ptr` conversion, `pgoff_t` representation and pinned
+  integer type-limit/overflow macros are preserved. These compiler helpers
+  supply no Linux page ownership or address-space runtime.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -433,8 +436,23 @@ the complete i915 source tree is not evidence that the driver runs.
   retain their behavior. Faulting copies require ordinary task context with
   enabled IRQs and preemption, and use the current syscall's owned pagemap.
   The existing range-source pins and fresh identity checks protect backing
-  acquisition. Scalar, atomic/pagefault-disabled, unsafe-scope and noncached
-  APIs, dynamic hardened-usercopy checks and x86 LAM remain unresolved.
+  acquisition. On x86, each checked page chunk uses a single serialized,
+  exact-count `REP MOVSB` transfer while holding the pagemap lock. The portable
+  `CPUID` fallback avoids speculative width or count selection after permission
+  checks; it adds a serialization cost per chunk. Native vendor/feature-based
+  `LFENCE` selection and broader kernel speculation mitigation remain pending.
+  Atomic/pagefault-disabled, unsafe-scope and noncached APIs, dynamic hardened
+  usercopy checks and x86 LAM remain unresolved.
+- Ordinary `get_user` and `__get_user` read 1/2/4/8-byte scalars, evaluate their
+  source and output once, preserve source signedness on assignment and clear
+  the complete output on `-EFAULT`. Single-page reads use a width-specific,
+  read-only x86 `MOV` immediately after `CPUID` in the same assembly block;
+  naturally aligned loads retain the architecture's coherence guarantees.
+  Unaligned cross-page reads use protected page chunks and publish only after
+  every byte succeeds; they make no cross-page atomicity promise. Page faults
+  resolve outside the pagemap lock and retry against fresh permissions.
+  Both interfaces require ordinary faulting task context. Scalar stores remain
+  unresolved.
 - `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
   `strstrip` alias consume borrowed strings synchronously. Search results and
   tokens point into the caller's storage; splitting preserves empty tokens and
@@ -632,18 +650,54 @@ unchanged-import tests and actual native page-source host tests also passed.
 Enabled x86, default x86 and default ARM builds passed; both default guests
 completed Linux-ABI startup. The exact final enabled ELF
 `4534a060ef59c7865d9c5e4188ff6e188fcfa48a772e8ede0ef324d4388a9eeb`
-passed the full normal native suite. New copy tests exercise real page holes,
+passed the full normal and SSE native suites. New copy tests exercise real page holes,
 read-only/PROT_NONE pages, demand faults and COW; three warmups plus a measured
 batch return every physical page and live heap class to baseline. Independent
 source and final generated-C reviews found no retained borrows or hidden
 allocations. Earlier normal/SSE and clean-baseline runs exceeded the outer
 180-second limit; the final normal run used 600 seconds without changing any
-runtime callback deadline. SSE copy measurements also passed, while its full
-final suite check remains pending. The paired allocation gate has 414 sites,
+runtime callback deadline. The final SSE run also used that outer limit and
+completed the full suite. The paired allocation gate has 414 sites,
 192 groups and 158 pre-existing failing groups, with no added groups; this is
-not a global allocation pass. The full i915 audit remains 3/269. Evidence uses
+not a global allocation pass. The audit at that milestone passed 3/269. Evidence uses
 the `/tmp/vinix-linuxkpi-uaccess-oct06-` prefix, including source/provenance,
 allocation comparison, independent reviews and preserved failed guest logs.
+
+Scalar-read commit `c3ab77ea` adds ordinary faulting `get_user`/`__get_user`
+and serialized x86 page-copy transfers. Strict production-core/header host
+checks pass 1,033 assertions per GNU99/GNU11 build with ASan/UBSan. Enabled x86,
+default x86 and disabled ARM builds, plus both default Linux-ABI boots, pass.
+The same saved enabled ELF, SHA256
+`80b9288aaca113d487d90d286b0ae9d201b08ca5ac937298daca34dea9966f4a`,
+passes the complete normal and SSE native suites. Those guests take about
+700 and 973 seconds with a 1,200-second outer limit; the earlier 600-second
+timeout is preserved, and runtime callback deadlines are unchanged.
+
+Native scalar checks cover aligned/unaligned widths, cross-page faults,
+protection, demand faults and concurrent aligned-load coherence. Three complete
+worker-lifecycle warmups precede the fourth measurement; both resident batches
+and the complete joined/off-stack/reaped lifecycle recover exactly every page
+and live heap class. The first complete lifecycle retains 8 KiB of physical
+pages, recorded in both final logs; later lifecycles are flat. Its allocation
+sites are not established. Independent lifetime and actual optimized-object
+reviews verify width-local `CPUID`/`MOV`, checked chunk `CPUID`/`REP MOVSB`,
+lock placement and no hidden V allocation in the reviewed paths. This is scoped
+feature evidence, not a global allocation pass or an ARM LinuxKPI test.
+The compiler binary and its runtime library are private, frozen inputs:
+recovery of the library after a concurrent compiler update is recorded,
+with all 78 actual kernel builtin inputs matching the earlier captured hashes.
+Evidence is `/tmp/vinix-linuxkpi-scalar-oct06-final-validation.json` and
+`/tmp/vinix-linuxkpi-scalar-oct06-frozen-library-provenance.json`.
+
+Typed-pointer checks pass 25,603 strict sanitizer assertions per C standard;
+wrong integer types fail compilation. The page-offset type compiles for both
+architectures. Integer-limit tests compare the complete production and pinned
+headers over 454 boundaries and 4,099 runtime assertions per standard, including
+constant-expression and operand-evaluation behavior. The pinned overflow macros
+retain their local-name collision limitation for operands named `v`, and
+`overflows_type` itself is not a file-scope expression; `castable_to_type` supports
+that constant-expression use. Independent checks and exact artifacts use the
+`/tmp/vinix-linuxkpi-{user-pointer,overflow-types,page-offset}-oct06-*` prefixes.
 
 Minimum-duration sleep validation used five frozen kernel paths at isolated
 baseline `53f41b30`, enabled ELF SHA256
@@ -1071,10 +1125,14 @@ stack: entry now reserves a return-address word to satisfy SysV alignment.
 Kbuild Makefile, with ACPI and fbdev enabled and optional self-tests/GVT off.
 It attempts every translation unit and writes complete compiler diagnostics
 to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
-exit with status 1. The current result is **3/269** translation units passing.
-The policy/helper audit is recorded separately at
-`/tmp/vinix-linuxkpi-i915-policy-final-audit.json`; `i915_memcpy.c`,
-`i915_config.c` and `display/intel_qp_tables.c` pass syntax. Logging/WARN/taint,
+exit with status 1. The current result is **4/269** translation units passing.
+Each invocation generates real native ABI adapter headers from current metadata
+in its own temporary directory, ahead of other includes, and cleans up after
+all compiler jobs. Regression tests cover repeated real compilation and invalid
+metadata rejection before compilation. The current exact report is
+`/tmp/vinix-linuxkpi-audit-generated-oct06-native.json`; `i915_memcpy.c`,
+`i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
+syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
 blockers are cleared. Leading first errors now include missing
 `generated/bounds.h`, `asm/early_ioremap.h`, ordinary RCU pointer APIs

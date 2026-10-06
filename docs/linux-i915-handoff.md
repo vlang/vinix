@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`b9e2f45f`** (including shared native PCI configuration transactions). Recheck HEAD and the worktree before
+Committed implementation baseline: **`c3ab77ea`** (ordinary scalar reads and serialized x86 user-copy transfers). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -36,7 +36,7 @@ x86-64 only. Default x86-64 and arm64 kernels leave it disabled.
 
 **There is no working native i915 GPU driver yet.** The complete driver does
 not compile, link or bind; the firmware framebuffer remains the display
-backend. The latest full syntax audit passes **3/269** i915 translation units.
+backend. The latest full syntax audit passes **4/269** i915 translation units.
 The already-linked `i915_memcpy.c` is a CPU WC-copy helper, not GPU bringup.
 Unrelated OpenGothic/Venus/KekVM commits are not evidence of native i915 support.
 
@@ -68,7 +68,9 @@ Shared native PCI configuration transactions are committed and tested on
 actual x86 CF8/CFC and ARM ECAM transports. Linux PCI device registration,
 bus/device references and GPU binding remain unresolved. Ordinary user-copy
 remaining counts, zero-tail semantics and bounded user-string parsers are now
-implemented. The current native `RangePageSource` already pins backing storage
+implemented, together with ordinary scalar reads and checked serialized x86
+transfers. Scalar stores are the next implementation under review. The current
+native `RangePageSource` already pins backing storage
 and rechecks mapping identity after unlocked acquisition; the earlier proposed
 global fault-lease rewrite was not applied.
 
@@ -76,6 +78,12 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `c3ab77ea` | Fault-zero scalar reads, aligned read coherence and checked serialized x86 page-copy transfers |
+| `96f768b6` | Per-invocation real generated ABI adapters in full-driver audits and cleanup/error regression tests |
+| `d0a65f59` | Exact pinned integer type limits, overflow/cast predicates and independent boundary tests |
+| `bb37a234` | Original page-offset integer representation, checked on x86 and ARM |
+| `a070633d` | Original checked typed-user-pointer conversion and strict evaluation/type tests |
+| `5148f857` | Exact user-copy remaining counts, raw/zero-tail semantics, object bounds and bounded user-string parsers |
 | `b9e2f45f` | Shared checked PCI transactions, subword I/O, atomic sixteen-bit COMMAND updates and full ARM DAIF preservation |
 | `71426a7e` | Borrowed character search, empty-preserving tokens and bounded equivalent whitespace trimming |
 | `ce4606b3` | Pinned kernel-string integer/Boolean parsing, range errors and output ownership |
@@ -430,7 +438,7 @@ Independent remaining VM work includes mapping publication without a universal
 backing pin and DRM retain/release callbacks under `pagemap.l` that invert the
 virtio file-lock order. Virtio command submission can also demand-fault while
 holding the backing lock. Ordinary copies do not resolve those existing driver
-lock cycles. Scalar, atomic/pagefault-disabled, unsafe-scope and WC user-copy
+lock cycles. Scalar stores, atomic/pagefault-disabled, unsafe-scope and WC user-copy
 APIs require separate real implementations.
 
 The 2026-10-06 user-copy validation is isolated at `bea41f8e` with recorded
@@ -439,14 +447,68 @@ assertions per C standard; complete runtime/import and actual native
 page-source host checks pass. Enabled/default x86 and disabled ARM build,
 and both default Linux-ABI guests pass. Exact final enabled ELF
 `4534a060ef59c7865d9c5e4188ff6e188fcfa48a772e8ede0ef324d4388a9eeb`
-passes the full normal suite; the new native copy batches recover all pages
-and live heap objects. Full final SSE validation is still pending. Preserve
+passes the full normal and SSE suites; the new native copy batches recover all
+pages and live heap objects. Preserve
 the normal/SSE/clean-baseline 180-second timeout logs: the final normal run
 passes with a 600-second outer harness limit, with runtime deadlines unchanged.
 Paired default allocation reports contain 414 sites/192 groups and 158 existing
-failures with no added groups. Full i915 syntax still passes 3/269. Logs,
+failures with no added groups. That milestone passed 3/269 syntax units. Logs,
 source hashes and independent final generated-C reviews are under
 `/tmp/vinix-linuxkpi-uaccess-oct06-*`; they are scoped evidence, not GPU bringup.
+
+## Latest scalar and compiler-helper validation
+
+`c3ab77ea` is committed. Ordinary `get_user`/`__get_user` preserve width,
+signedness, single evaluation and fault-zero outputs. A single-page load is one
+plain width-specific `MOV`; cross-page loads publish only after every checked
+chunk succeeds and make no atomicity claim. Permission checks and width/count
+selection precede a portable `CPUID` in the same assembly block as each load or
+`REP MOVSB`. This adds per-access serialization cost; vendor/feature-based fence
+selection and broader kernel speculation mitigation remain unresolved.
+
+Strict production-core/header host checks pass 1,033 assertions per GNU99/GNU11
+sanitizer build. Isolated enabled/default x86 and disabled ARM builds and both
+default Linux-ABI guests pass. Final enabled ELF SHA256
+`80b9288aaca113d487d90d286b0ae9d201b08ca5ac937298daca34dea9966f4a`
+passes complete normal and SSE guest suites, about 700/973 seconds with a
+1,200-second outer limit. Preserve the final 600-second timeout and earlier
+cold-measurement diagnostics; runtime callback deadlines were not changed.
+
+Three complete actor lifecycles warm before the fourth exact physical-page and
+all-live-heap-class measurement. Resident fourth batches and the fully joined,
+off-stack, actually reaped fourth lifecycle recover exactly in both guests.
+The first complete lifecycle retains 8 KiB physical pages; both logs report it,
+and subsequent lifecycles are flat. Its allocation sites are not established.
+Independent reviewers inspect actual generated C, optimized object paths,
+controller/actor stack lifetimes, stop acknowledgement and both thread pins.
+Feature sources match the saved ELF's manifest. The private compiler binary
+and recovered private runtime library avoid ongoing changes in the shared V
+checkout; all 78 actual builtin inputs match previously captured hashes.
+Exact checks, hashes and scope are in
+`/tmp/vinix-linuxkpi-scalar-oct06-final-validation.json`, with library provenance
+in `/tmp/vinix-linuxkpi-scalar-oct06-frozen-library-provenance.json`.
+This does not establish a global allocation pass or LinuxKPI support on ARM.
+
+Typed user-pointer, original `pgoff_t` and pinned overflow/type predicates are
+also committed (`a070633d`, `bb37a234`, `d0a65f59`). Strict host and independent
+checks cover wrong types, single evaluation, both integer boundaries and
+constant expressions. Pinned overflow macros retain their local-name collision
+for an operand named `v`; `overflows_type` is not usable at file scope, whereas
+`castable_to_type` preserves that constant-expression case. No Linux page runtime
+is supplied by the page-offset representation.
+
+Audit commit `96f768b6` generates actual current ABI adapter headers privately
+per run, uses them before other include directories and cleans up after all
+compiler jobs. Invalid metadata rejects before compilation. Verified upstream
+files remain 7,668 unchanged; the full result is **4/269**, expected exit 1:
+`i915_memcpy.c`, `i915_config.c`, `display/intel_qp_tables.c` and
+`i915_user_extensions.c`. The last unit is syntax-only and not linked. Exact
+report: `/tmp/vinix-linuxkpi-audit-generated-oct06-native.json`. Genuine pinned
+`bounds.c` extraction was researched outside the import, but no production
+bounds header/config changes were made: current compatibility configuration
+omits `CONFIG_MMU` despite native paging. Review that contract before accepting
+any generated constants; subsequent missing page types require real ownership
+and address-space implementations.
 
 ## Bound and high-priority contracts
 
@@ -815,7 +877,7 @@ not a global allocation pass.
 
 The logging-milestone audit `/tmp/vinix-linuxkpi-printk-i915-audit.json` passed 2/269:
 `i915_memcpy.c` and `display/intel_qp_tables.c`. The latter is not yet linked at
-that baseline; it is now linked and the current result is 3/269. Remaining syntax paths include `generated/bounds.h`,
+that baseline; it is now linked and that subsequent result was 3/269. Remaining syntax paths include `generated/bounds.h`,
 `dev_t`, `asm/early_ioremap.h`, RCU pointer APIs and `call_single_data_t`.
 Logging does not provide NMI entry, panic bypass, device/facility records,
 per-caller continuation merging, rate limiting or complete lib/vsprintf closure.
