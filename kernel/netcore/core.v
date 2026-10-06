@@ -37,6 +37,40 @@ fn C.vinix_stack_alloc(size u64) voidptr
 fn C.vinix_lwip_set_output4(&C.netif, Netif_output_fn)
 fn C.vinix_lwip_set_output6(&C.netif, Netif_output_ip6_fn)
 
+// Native lwIP callback typedefs carry pointee const qualifiers that V's
+// function types omit. The borrowed callback address is unchanged by the cast.
+@[typedef]
+struct C.udp_recv_fn {}
+
+fn C.udp_recv(&C.udp_pcb, C.udp_recv_fn, voidptr)
+
+@[c_extern]
+__global C.tcp_pcb_lists [4]&&C.tcp_pcb
+
+@[export: 'vinix_lwip_tcp_lists']
+pub fn tcp_lists() voidptr {
+	return unsafe { voidptr(&C.tcp_pcb_lists[0]) }
+}
+
+@[export: 'vinix_lwip_set_output4']
+pub fn set_output4(n &C.netif, callback Netif_output_fn) {
+	unsafe { C.memcpy(&n.output, &callback, sizeof(Netif_output_fn)) }
+}
+
+@[export: 'vinix_lwip_set_output6']
+pub fn set_output6(n &C.netif, callback Netif_output_ip6_fn) {
+	unsafe { C.memcpy(&n.output_ip6, &callback, sizeof(Netif_output_ip6_fn)) }
+}
+
+@[export: 'vinix_lwip_udp_recv']
+pub fn udp_recv(p &C.udp_pcb, callback Udp_recv_fn, argument voidptr) {
+	unsafe {
+		mut native := C.udp_recv_fn{}
+		C.memcpy(&native, &callback, sizeof(Udp_recv_fn))
+		C.udp_recv(p, native, argument)
+	}
+}
+
 pub struct C.ip_globals {
 	//*The interface that accepted the packet for the current callback invocation.
 

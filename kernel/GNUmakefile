@@ -447,7 +447,6 @@ $(V_CONFIG_STAMP):
 
 # The native capture entry follows the same switch as its V implementation.
 obj/asm/aarch64/alloc_track.S.o obj/asm/x86_64/alloc_track.S.o: $(V_CONFIG_STAMP)
-obj/c/pci_config_arm_test.c.o: $(V_CONFIG_STAMP)
 obj/asm/aarch64/printf_abi.S.o: asm/aarch64/varargs.inc
 obj/asm/x86_64/printf_abi.S.o: asm/x86_64/varargs.inc
 obj/asm/aarch64/linuxkpi_varargs.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)

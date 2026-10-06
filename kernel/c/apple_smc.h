@@ -61,12 +61,7 @@ VINIX_SMC_CONST char *vinix_smc_error(int result);
 
 #if defined(__aarch64__)
 /* Accessible at EL1 on the same ARM generic-timer setup Vinix already uses. */
-static inline uint64_t vinix_smc_counter(void)
-{
-    uint64_t counter;
-    __asm__ volatile("isb; mrs %0, cntvct_el0" : "=r"(counter) : : "memory");
-    return counter;
-}
+uint64_t vinix_smc_counter(void);
 #endif
 
 #endif
