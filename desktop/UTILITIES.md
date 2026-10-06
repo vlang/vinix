@@ -28,7 +28,7 @@ Vinix engineering proposals based on the inspected code.
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As; UTF-8 document selection, mouse caret/drag selection, bounded guest clipboard copy and acknowledged cut, and selection replacement with undo | Field selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
 | Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, sinh/cosh/tanh and their inverses, with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Further scientific controls (nth-root, random and EE entry); signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events; bounded UTF-8 title/location search across all stored events with chronological results and navigation into the actual event editor | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
-| Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; countdown timer, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; multiple named timers; sound/notifications; persistence and a service that continues after the app closes |
+| Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; up to four independently named countdown timers, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; custom second-precision duration entry; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection; total/used/free/available snapshot for the filesystem containing the scan root, refreshed on each scan and included separately in CSV | Mounted-volume overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
 | Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Word/line/rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
@@ -38,10 +38,10 @@ Vinix engineering proposals based on the inspected code.
 | Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and whole/selected extraction with entry/folder checkboxes, choices fixed during extraction, bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; encryption and larger archives |
 | Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
-| Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and undo/recovery; floating sticky windows |
+| Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices; bounded current-note title/body Undo/Redo that survives autosave | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and recovery/versions; floating sticky windows |
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
-| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, and separate sampled CSV export using the existing native UI protocol | Autosave/recovery and file picker; multiple/implicit/parametric equations, 3D plots, PNG/vector export, animations, integration/intersection tools and graph styling |
-| Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking and freeze, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, independent horizontal/vertical locking, image copy and host clipboard writing |
+| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, separate sampled CSV export and exclusive 960×640 PNG image export with the same sampled curve/domain gaps and axes | Autosave/recovery, file picker and very-small-window layout; multiple/implicit/parametric equations, 3D plots, vector export, animations, integration/intersection tools and graph styling |
+| Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking, freeze and independent physical X/Y locks, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, image copy and host clipboard writing |
 | Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, exclusive text export and acknowledged guest clipboard copy of the full headword and unwrapped definition | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, definition selection, lookup from selected text and persistent history |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
@@ -54,7 +54,8 @@ and [scientific controls](https://support.apple.com/guide/calculator/use-the-sci
 [Calendar events](https://support.apple.com/en-gb/guide/calendar/icalwr13-events/mac),
 [Calendar search shortcuts](https://support.apple.com/en-sa/guide/calendar/ical002/mac)
 and [calendar interchange](https://support.apple.com/guide/calendar/import-or-export-calendars-icl1023/27.0/mac/27),
-[Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac),
+[Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac)
+and [multiple named timers](https://support.apple.com/guide/clock-mac/apdw3d5aebf9/mac),
 [Terminal shortcuts](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac),
 [screenshot targets](https://support.apple.com/en-ie/102646),
 [Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
@@ -66,9 +67,11 @@ and [System Information reports](https://support.apple.com/guide/system-informat
 [Disk Utility devices and volumes](https://support.apple.com/en-ca/guide/disk-utility/dskud6b39edb/mac),
 [filesystem capacity details](https://support.apple.com/en-ie/guide/disk-utility/dskutl1005/mac)
 and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac),
-[Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac),
+[Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac)
+and [standard Undo/Redo shortcuts](https://support.apple.com/en-us/102650),
 [Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac),
-[Grapher graphs and equations](https://support.apple.com/guide/grapher/create-a-graph-and-add-equations-gcalcd405d09/mac),
+[Grapher graphs and equations](https://support.apple.com/guide/grapher/create-a-graph-and-add-equations-gcalcd405d09/mac)
+and [image export](https://support.apple.com/pt-br/guide/grapher/gcalc31bd60f/mac),
 [Digital Color Meter](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac)
 and [Dictionary](https://support.apple.com/en-hk/guide/dictionary/welcome/mac).
 
@@ -87,10 +90,10 @@ their third-party application internals are outside the native-utility changes.
 | Blender, GIMP, OBS Studio | Graphics/media applications, rather than replacements for the small macOS utilities. Keep their upstream functionality; improve file dialogs, clipboard, audio and surface integration as those services become available. |
 | Minecraft, DOOM, Steam, Gothic II, Roblox, Dota 2 | Games and stores, without a matching macOS system utility. Installation, graphics, sound, controller input and compatibility belong to their existing ports. |
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
-| Android Calculator, iOS Calculator, iOS 2048 | Compatibility demonstrations. Platform API and lifecycle support belong to the Android/iOS layers. |
+| Android Calculator, iOS Calculator, iOS 2048, iOS PPSSPP | Compatibility demonstrations and mobile emulator integration. Platform API, graphics, input and lifecycle support belong to the Android/iOS layers. |
 
-These 21 entries plus the twenty-one native utilities account for the complete
-42-entry application catalog. Vim and shell tools installed in the userland
+These 22 entries plus the twenty-one native utilities account for the complete
+43-entry application catalog. Vim and shell tools installed in the userland
 are terminal programs, not additional native desktop applications.
 
 The Start menu's All Programs and search results use readable 34-pixel rows
@@ -177,7 +180,13 @@ not proposed as general Vinix utility ports.
   Clear or Escape returns to the month. Search does not interrupt editor or
   interchange drafts.
 - **Clock:** record laps while the stopwatch runs; use the Timer tab for a
-  countdown. Expiry is visible in this app; there is no background alarm.
+  countdown. Add timer creates another independent timer, up to four. Click its
+  numbered selector and name field to rename it (48 UTF-8 bytes); Start/Stop,
+  Reset and presets affect only that timer. `*` marks running timers and `!`
+  marks finished ones. Pause before changing its duration or removing it.
+  Every running timer continues while another timer or the stopwatch is shown.
+  Expiry is visible in this app; closing Clock cancels the timers. Names and
+  timers are session-only, with no background alarm or sound.
 - **Calculator:** use digits/operators/Enter and Backspace, memory buttons,
   or click a recent result to recall it. Select Scientific for unary functions
   including cube, cube root, log2, pi/e, sinh/cosh/tanh and their inverses;
@@ -245,7 +254,8 @@ not proposed as general Vinix utility ports.
   keeps the exact cached encoded input, including its metadata, even after
   cropping, manual rotations or a later source-file change. Enter a new output
   path because neither export overwrites. Successful opens appear in the app's
-  Recent Items. Crop undo/recovery, resampling and PDF support remain work.
+  Recent Items. Longer crop history/recovery, resampling and PDF support remain
+  work.
 - **Console:** choose a log preset or enter an absolute regular-file path.
   Follow Tail refreshes once per second; paging suspends follow. The exact,
   case-sensitive filter and Export Rows apply to all retained rows, including
@@ -287,7 +297,12 @@ not proposed as general Vinix utility ports.
   component refuse symbolic links.
 - **Notes:** choose New note, enter a title and write plain text. Search matches
   titles and bodies with case sensitivity. Ctrl-N creates a note; Ctrl-S saves;
-  Ctrl-A selects the active field. Notes autosaves after a typing pause. A
+  Ctrl-A selects the active field. Notes autosaves after a typing pause. Each
+  title/body edit can be undone with Undo or Ctrl-Z and redone with Redo or
+  Ctrl-Y. The current note retains its last 32 edits, including whole pastes
+  and selected deletions, across autosave. New edits replace the redo branch.
+  Successful note switching, New, deletion or Reload clears this session
+  history; failed saves and rejected text preserve it. A
   failed save keeps the draft in the open window and blocks note switching;
   export it before reopening after a conflict. Delete requires a second Delete
   action, with Keep note to cancel. Export text creates a new file. An ordinary
@@ -323,14 +338,27 @@ not proposed as general Vinix utility ports.
   Domain failures leave gaps; sampling is bounded and does not prove a
   function is continuous between samples. Plots use the native child-process
   UI protocol and resize with the window.
+  PNG destination is a third, independent output field, initially `graph.png`
+  in the canonical home directory. Export PNG or Enter in that field writes a
+  new opaque 960×640 image with the expression, range labels, axes and the same
+  sampled curve/domain gaps. Changed fields are replotted and validated first.
+  Existing paths and symbolic-link components are refused; failed streams
+  release their image/font buffers and remove only their own new file.
   Expressions are limited to 256 bytes/operations, 32 parser levels and 16
   floor/ceil calls. Each plot uses 513 samples. Range magnitudes cannot exceed
   `1e12`, and each span must be at least `1e-9`.
 - **Color Meter:** choose Live to follow the pointer at 100 ms intervals, or
   enter physical framebuffer X/Y coordinates and Sample (Enter). Freeze,
-  Space or Escape holds the current sample. The 9×9 magnifier marks the chosen
-  1×1, 3×3, 5×5 or 9×9 aperture; RGB channels average the valid pixels in that
-  aperture. The sampled pixels exclude the compositor's drawn cursor using
+  Space or Escape holds the current sample. Lock X or Lock Y captures that
+  physical coordinate from the last successful sample; Live follows only
+  unlocked axes. Both locks keep the sampled location fixed. They remain
+  independent across Freeze and Copy; manual Sample uses its entered
+  coordinates. Unlock an axis to resume pointer tracking on it. If the live
+  service does not reply within one second, Live stops with an explicit status
+  and preserves the last sample. An explicit unavailable-framebuffer reply
+  clears the sample. The 9×9 magnifier marks the
+  chosen 1×1, 3×3, 5×5 or 9×9 aperture; RGB channels average its valid pixels.
+  The sampled pixels exclude the compositor's drawn cursor using
   its saved backing pixels. Copy HEX (Ctrl-C) or Copy RGB freezes the sample
   and copies text within the current guest session. Ctrl-V, Cmd-V or
   Shift-Insert pastes this guest text into a supported focused field; use
@@ -738,3 +766,74 @@ hashes, test logs and screenshots are retained under
 `build/utility-recovery-validation/` and `build/utility-recovery-ipc-validation/`.
 The inventory still covers all 42 catalog entries and the thirteen missing
 utility proposals with their backend dependencies.
+
+### Coordinate locks, graph images, note history and named timers (2026-10-06)
+
+Color Meter now locks physical X and Y independently while Live follows each
+unlocked axis. Existing wire commands and sizes remain compatible; appended
+lock commands use the compositor's actual framebuffer and saved cursor backing.
+Freeze, changed locks and timeouts fence stale replies. A one-second no-reply
+timeout stops Live with a visible status and preserves the last successful
+sample; an explicit unavailable-framebuffer reply clears it.
+
+Grapher adds a separate PNG path and exclusive 960×640 export. The image uses
+the same sampled strokes, clipping, domain gaps and axes as the displayed chart,
+with expression, range and status labels. Dirty expression/range fields are
+validated and replotted before export. Existing destinations, links and special
+files are preserved; failed output removes only the newly created inode.
+
+Notes keeps the current note's last 32 title/body edits across autosave, sharing
+a bounded history between Undo and Redo. Paste and selected deletion each form
+one edit. Failed saves, conflicts, rejected text and no-op edits retain history;
+successful note changes and reload clear it. Undo/Redo controls remain bounded
+in small windows, alongside the existing failed-save close choices.
+
+Clock provides four independently named monotonic timers. Every running slot
+continues while another timer or the stopwatch is displayed. Pause, reset,
+duration changes and removal affect only the selected timer. Names accept up to
+48 UTF-8 bytes; invalid or oversized paste preserves both the prior name and
+its selection. Expiry never redirects an ongoing name edit. These timers remain
+session-only; sound, scheduled alarms, persistence and a background service are
+still gaps.
+
+The final combined suite passes 351 behavior groups, including the full catalog
+and last-entry taskbar pinning, and 109 zero-retention memory groups across 26
+fixtures. Parity passes 120 behavior and 29 memory groups; the Dictionary data
+encoder passes five Python cases. Validation uses an immutable production
+snapshot, preserving another session's unfinished window-manager/language/font
+edits. The final pin-table fix adds one static action for the previously added
+iOS PPSSPP entry; it introduces no allocation or lifetime change. The inventory
+now accounts for 43 entries: 21 native utilities and 22 integrations, with the
+same thirteen missing utility proposals and their backend dependencies.
+
+Both focused and complete host IPC workflows pass. The guest fixture is built
+without V's `-prod` flag, which removes assertion statements in the native
+compiler. Its generated C is checked for the required-Vinix assertion and
+representative PNG pixel/gap, Notes history, Clock expiry and coordinate-lock
+assertions before static linking. Earlier assertion-stripped guest builds and
+logs establish execution/startup but cannot substantiate their stated value
+checks; this assertion-enabled fixture supplies correctness evidence for the
+four features in this batch.
+
+The assertion-enabled static AArch64 fixture passes inside Vinix through actual
+app processes, including independent locks at 2× scale, PNG dimensions/alpha
+and domain-gap pixels, saved note history and independent named-timer expiry.
+The final QEMU replay also passes review of all 18 screenshots: X stays fixed
+while Y follows the pointer, both locks preserve the sampled location, PNG
+export succeeds and refuses an existing destination, a whole clipboard paste
+undoes/redoes atomically, and pausing Tea leaves Coffee running. The guest
+record contains the exact `Undo demo` title and `Base#324A71` body; its exported
+`/tmp/graph.png` is 2,458,493 bytes. The short process sample establishes
+startup/rendering, not a performance or long-running leak result.
+
+The published desktop build comes from production revision `2ccf7b3b`, is
+6,038,504 bytes and has SHA-256
+`eb7c4e8a36659319f0e557873deb7e89ab3a291d7851dd37d4ff3b2623dd82fa`.
+Files, Activity Monitor and Settings published copies match that build. The
+assertion-enabled guest fixture uses test revision `62815299`, is 5,768,856
+bytes and has SHA-256
+`7e244e28fa55272062cc284e37b8f42a0736cae8e9f1f3ec7abeadd8f53bbbbb`.
+Source manifests, generated C and assertion checks, build commands, host/guest
+logs, screenshot hashes and the independent review are retained under
+`build/utility-controls-validation/`. Earlier assertion-stripped artifacts are
+kept separately there as inconclusive correctness checks.
