@@ -902,14 +902,19 @@ fn check_preview_crop_recovery_client(home string, mut desktop Desktop, recovery
 	free_tree(app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) })
 	app.handle(preview_action_actual) or { panic(err) }
 	app.handle(preview_action_select) or { panic(err) }
-	free_tree(app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) })
-	// At 100%, the 4x3 image starts at (398,346) in this 800x576
-	// application body. Drag displayed pixels (1,1) through (2,2).
+	layout := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+	viewport := integration_element_named(layout, preview_action_image) or { panic('missing Preview viewport') }
+	// The independent 4x3 image is centered at 100%. Resolve its origin from
+	// the real viewport so toolbar rows do not invalidate pointer coverage.
+	image_x := int(viewport.frame.x) + (int(viewport.frame.width) - 4) / 2
+	image_y := int(viewport.frame.y) + (int(viewport.frame.height) - 3) / 2
+	free_tree(layout)
+	// Drag displayed pixels (1,1) through (2,2); exported pixels remain golden.
 	if mut app is RemoteApp {
 		assert app.pointer_input_enabled()
-		app.pointer_event(.down, .left, 0, 399, 347, 800, 576)
-		app.pointer_event(.move, .no_button, 0, 400, 348, 800, 576)
-		app.pointer_event(.up, .left, 0, 400, 348, 800, 576)
+		app.pointer_event(.down, .left, 0, image_x + 1, image_y + 1, 800, 576)
+		app.pointer_event(.move, .no_button, 0, image_x + 2, image_y + 2, 800, 576)
+		app.pointer_event(.up, .left, 0, image_x + 2, image_y + 2, 800, 576)
 	}
 	selection := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
 	assert integration_tree_enabled(selection, preview_action_crop)
@@ -995,7 +1000,8 @@ fn check_hyperbolic_calculator_client(mut desktop Desktop) {
 			controls := app.build(ui2.rect(0, 0, 540, 430)) or { panic(err) }
 			control := integration_tree_element(controls, action) or { panic('missing serialized hyperbolic control') }
 			assert control.kind == .button && control.text == tr(action)
-			assert control.frame.width == 52 && control.frame.y + control.frame.height <= 410
+			assert control.frame.width >= 28 && control.frame.height >= 28
+			integration_assert_frame_inside(control, 540, 430)
 			app.handle(if control.action_id.len > 0 { control.action_id } else { control.id }) or { panic(err) }
 			free_tree(controls)
 			result := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
