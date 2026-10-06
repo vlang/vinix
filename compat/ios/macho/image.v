@@ -27,6 +27,12 @@ pub:
 	weak bool
 }
 
+pub struct FileRange {
+pub:
+	offset u64
+	size   u64
+}
+
 pub struct Image {
 pub:
 	data             []u8
@@ -46,6 +52,12 @@ pub:
 	symbol_count     u32
 	string_offset    u64
 	string_size      u64
+	rebase_info      FileRange
+	bind_info        FileRange
+	weak_bind_info   FileRange
+	lazy_bind_info   FileRange
+	export_info      FileRange
+	routines         []u64
 	encrypted        bool
 	legacy_fixups    bool
 	initializers     bool
@@ -132,6 +144,10 @@ pub fn parse(input []u8) !Image {
 	mut string_offset := u64(0)
 	mut string_size := u64(0)
 	mut has_symtab := false
+	mut dyld_info := []FileRange{len: 5}
+	mut has_dyld_info := false
+	mut export_info := FileRange{}
+	mut routines := []u64{}
 	mut encrypted := false
 	mut legacy_fixups := false
 	mut initializers := false
@@ -249,19 +265,33 @@ pub fn parse(input []u8) !Image {
 				encrypted = encrypted || r.u32(off + 16)! != 0
 			}
 			0x22, 0x80000022 {
-				if size < 48 {
-					return error('Mach-O: truncated dyld info command')
+				if size != 48 || has_dyld_info {
+					return error('Mach-O: invalid or duplicate dyld info command')
 				}
-				for index in 0 .. 4 {
-					legacy_fixups = legacy_fixups || r.u32(off + 12 + u64(index) * 8)! != 0
+				has_dyld_info = true
+				for index in 0 .. 5 {
+					position := u64(r.u32(off + 8 + u64(index) * 8)!)
+					length := u64(r.u32(off + 12 + u64(index) * 8)!)
+					r.range(position, length)!
+					dyld_info[index] = FileRange{position, length}
+					if index < 4 { legacy_fixups = legacy_fixups || length != 0 }
 				}
+			}
+			0x80000033 {
+				if size != 16 || export_info.size != 0 {
+					return error('Mach-O: invalid or duplicate export trie command')
+				}
+				export_info = FileRange{u64(r.u32(off + 8)!), u64(r.u32(off + 12)!)}
+				r.range(export_info.offset, export_info.size)!
 			}
 			0x1a {
 				if size < 72 { return error('Mach-O: truncated routines command') }
-				initializers = initializers || r.u64(off + 8)! != 0
+				address := r.u64(off + 8)!
+				if address != 0 { routines << address }
+				initializers = initializers || address != 0
 			}
 			// Metadata consumed neither by instruction execution nor binding.
-			0x80000033, 0x8000001c {}
+			0x8000001c {}
 			else {
 				if cmd & 0x80000000 != 0 {
 					required_unknown << cmd
@@ -291,6 +321,12 @@ pub fn parse(input []u8) !Image {
 		symbol_count:     symbol_count
 		string_offset:    string_offset
 		string_size:      string_size
+		rebase_info:      dyld_info[0]
+		bind_info:        dyld_info[1]
+		weak_bind_info:   dyld_info[2]
+		lazy_bind_info:   dyld_info[3]
+		export_info:      if export_info.size != 0 { export_info } else { dyld_info[4] }
+		routines:         routines
 		encrypted:        encrypted
 		legacy_fixups:    legacy_fixups
 		initializers:     initializers
@@ -331,13 +367,13 @@ pub fn (image Image) execution_issues() []string {
 	if image.encrypted {
 		issues << 'encrypted executable; an unencrypted developer or simulator build is required'
 	}
-	if image.legacy_fixups { issues << 'legacy dyld rebase/bind opcodes are not implemented' }
-	if image.initializers { issues << 'image initializers/terminators are not implemented' }
-	if image.thread_locals { issues << 'Darwin thread-local storage is not implemented' }
 	for command in image.required_unknown {
 		issues << 'required load command 0x${command.hex()} is not implemented'
 	}
 	for library in image.libraries {
+		$if ios_cxx ? {
+			if library.name == '/usr/lib/libc++.1.dylib' { continue }
+		}
 		if library.name !in ['/usr/lib/libSystem.B.dylib', '/usr/lib/libobjc.A.dylib',
 			'/System/Library/Frameworks/Foundation.framework/Foundation',
 			'/System/Library/Frameworks/UIKit.framework/UIKit',

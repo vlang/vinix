@@ -5,9 +5,11 @@
 void ios_objc_msgsend(void);
 void ios_objc_super(void);
 void ios_snprintf(void);
+void ios_tlv_get_addr(void);
 #else
 static void ios_objc_msgsend(void) { abort(); }
 static void ios_objc_super(void) { abort(); }
 static void ios_snprintf(void) { abort(); }
+static void ios_tlv_get_addr(void) { abort(); }
 #endif
 #endif

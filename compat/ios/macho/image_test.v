@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module macho
 
+import os
+
 fn put(mut data []u8, off int, value u64, size int) {
 	for i in 0 .. size { data[off + i] = u8(value >> (i * 8)) }
 }
@@ -152,7 +154,7 @@ fn fixture_symbol_imports() []u8 {
 fn test_legacy_symbol_imports_remain_inspectable() {
 	image := parse(fixture_symbol_imports())!
 	assert image.legacy_fixups
-	assert image.execution_issues().any(it.contains('legacy dyld'))
+	assert !image.execution_issues().any(it.contains('legacy dyld'))
 	symbols := image.imported_symbols()!
 	assert symbols.len == 4
 	assert symbols[0].name == '_puts'
@@ -426,4 +428,92 @@ fn test_executables_must_allow_relocation_and_supported_segment_flags() {
 	bad = fixture_image()
 	put(mut bad, 176 + 68, 0x10, 4)
 	assert parse(bad)!.execution_issues().len == 0
+}
+fn legacy_fixture(rebase []u8, bind []u8, weak []u8, lazy []u8, exports []u8) []u8 {
+	mut data := fixture_image()
+	put(mut data, 20, 400 - 32, 4)
+	for i in 352 .. 400 { data[i] = 0 }
+	put(mut data, 352, 0x80000022, 4)
+	put(mut data, 356, 48, 4)
+	for index, stream in [rebase, bind, weak, lazy, exports] {
+		position := 0x6000 + index * 0x100
+		put(mut data, 360 + index * 8, u64(position), 4)
+		put(mut data, 364 + index * 8, u64(stream.len), 4)
+		for i, byte in stream { data[position + i] = byte }
+	}
+	put(mut data, 0x4000, 0x100000200, 8)
+	put(mut data, 0x4008, 0x100000204, 8)
+	return data
+}
+
+fn test_legacy_rebase_bind_lazy_and_signed_addends() {
+	rebase := [u8(0x11), 0x22, 0, 0x52, 0]
+	mut bind := [u8(0x11), 0x40]
+	bind << '_puts'.bytes()
+	bind << [u8(0), 0x51, 0x72, 0x10, 0x60, 0x7c, 0x90, 0] // -4
+	mut lazy := [u8(0x11), 0x40]
+	lazy << '_puts'.bytes()
+	lazy << [u8(0), 0x72, 0x18, 0x90, 0, 0x11, 0x40]
+	lazy << '_puts'.bytes()
+	lazy << [u8(0), 0x72, 0x20, 0x90, 0]
+	image := parse(legacy_fixture(rebase, bind, [], lazy, []))!
+	layout := image.layout(4096)!
+	plan := image.plan_fixups(layout, 0x900000000, fixture_resolver)!
+	assert plan == [Fixup{0x4000, 0x900000200}, Fixup{0x4008, 0x900000204},
+		Fixup{0x4010, 0x12345674}, Fixup{0x4018, 0x12345678}, Fixup{0x4020, 0x12345678}]
+}
+
+fn test_export_trie_and_weak_coalescing_override_rebase() {
+	// root -> "_local" -> terminal (weak definition, address 0x200).
+	exports := [u8(0), 1, `_`, `l`, `o`, `c`, `a`, `l`, 0, 10, 3, 4, 0x80, 4, 0]
+	mut weak := [u8(0x40)]
+	weak << '_local'.bytes()
+	weak << [u8(0), 0x72, 0, 0x90, 0]
+	image := parse(legacy_fixture([u8(0x11), 0x22, 0, 0x51, 0], [], weak, [], exports))!
+	layout := image.layout(4096)!
+	assert image.exported_address('_local', layout, 0x900000000)! == 0x900000200
+	assert image.exported_address('_absent', layout, 0x900000000)! == 0
+	plan := image.plan_fixups(layout, 0x900000000, fixture_resolver)!
+	assert plan.len == 2
+	assert plan[0] == plan[1]
+	mut cycle := exports.clone()
+	cycle[9] = 0
+	bad := parse(legacy_fixture([], [], [], [], cycle))!
+	if _ := bad.exported_address('_local', layout, 0x900000000) { assert false }
+}
+
+fn test_legacy_rejects_bad_ranges_types_counts_and_opcodes() {
+	for stream in [
+		[u8(0x11), 0x22, 0x80], // truncated ULEB
+		[u8(0x12), 0x22, 0, 0x51, 0], // text relocation
+		[u8(0x11), 0x20, 0, 0x51, 0], // PAGEZERO
+		[u8(0x11), 0x21, 0, 0x51, 0], // executable segment
+		[u8(0x11), 0x22, 0xff, 0x7f, 0x51, 0], // segment overrun
+		[u8(0x11), 0x22, 0, 0x60, 0xff, 0xff, 0xff, 0xff, 0x7f], // huge count
+		[u8(0x11), 0x22, 0, 0x30, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 2],
+		[u8(0xf0)],
+	] {
+		expect_fixup_failure(legacy_fixture(stream, [], [], [], []))
+	}
+	expect_fixup_failure(legacy_fixture([], [u8(0x72), 0, 0x90], [], [], []))
+	expect_fixup_failure(legacy_fixture([], [u8(0xd0)], [], [], []))
+	mut bad := legacy_fixture([], [], [], [], [])
+	put(mut bad, 360, 0xffffffff, 4)
+	put(mut bad, 364, 1, 4)
+	expect_parse_failure(bad)
+}
+
+fn probe_resolver(_ string, _ string) !u64 { return 0x12345678 }
+
+// Optional regression against the exact downloaded, unmodified upstream IPA.
+// Fake addresses are used only to validate the linker; no code is executed.
+fn test_upstream_ppsspp_streams_when_available() {
+	path := os.getenv('VINIX_IOS_PPSSPP_BINARY')
+	if path == '' { return }
+	image := parse(os.read_bytes(path)!)!
+	layout := image.layout(4096)!
+	plan := image.plan_fixups(layout, 0x900000000, probe_resolver)!
+	assert plan.len > 30000
+	assert plan.all(it.offset < layout.size - 7)
+	println('PPSSPP legacy relocation plan: ${plan.len} writes')
 }

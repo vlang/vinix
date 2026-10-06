@@ -29,6 +29,8 @@ fn execute(image macho.Image, arguments []string) !int {
 	defer { C.munmap(mapping, usize(layout.size)) }
 	base := u64(mapping)
 	objc_start()
+	image_runtime_start(image, layout, base)
+	defer { image_runtime_stop() }
 	ios_runtime.bundle = os.dir(os.real_path(arguments[0]))
 	defer { objc_stop() }
 	fixups := image.plan_fixups(layout, base, runtime_symbol)!
@@ -45,6 +47,9 @@ fn execute(image macho.Image, arguments []string) !int {
 		unsafe { C.memcpy(voidptr(base + fixup.offset), &value, 8) }
 	}
 	objc_register_image(image, layout, base)!
+	initializers := image_initializers()!
+	defer { unsafe { initializers.free() } }
+	image_tls_prepare()!
 	C.__builtin___clear_cache(mapping, unsafe { voidptr(base + layout.size) })
 	if C.mprotect(mapping, usize(layout.size), C.PROT_NONE) != 0 {
 		return error('iOS: cannot protect image gaps')
@@ -64,6 +69,11 @@ fn execute(image macho.Image, arguments []string) !int {
 	// A private null-terminated environment/Apple vector. No Darwin loader
 	// globals are advertised until they have a compatible implementation.
 	mut empty := [unsafe { &char(nil) }]!
+	image_runtime.started = true
+	for address in initializers {
+		initializer := unsafe { ImageInitializer(voidptr(address)) }
+		unsafe { initializer(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
+	}
 	entry := unsafe { AppMain(voidptr(base + layout.entry)) }
 	return unsafe { entry(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
 }

@@ -12,6 +12,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 FEATURES = (
     b"iOS PASS: Mach-O arithmetic and libSystem imports",
+    b"iOS PASS: legacy dyld imports and image/TLS lifecycle",
     b"iOS PASS: return status and unsupported imports",
     b"iOS PASS: universal executable selects ARM64",
     b"iOS PASS: ARM64e and malformed images rejected",
@@ -40,6 +41,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-build", action="store_true", help="reuse build/ios/staging/usr/bin/run-ios")
     parser.add_argument("--with-2048", action="store_true", help="also build and run pinned upstream iOS-2048")
+    parser.add_argument("--with-cxx", action="store_true", help="also build and execute native iOS C++ ABI fixtures")
     parser.add_argument("--with-ppsspp", action="store_true", help="probe the publisher's PPSSPP iOS binary (currently rejected)")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
@@ -47,8 +49,11 @@ def main() -> int:
         parser.error("timeout must be positive")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
-        subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")], check=True)
+        subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")]
+            + (["--with-cxx"] if arguments.with_cxx else []), check=True)
     subprocess.run(["sh", str(ROOT / "tests/ios/build-fixture.sh"), str(build / "fixtures")], check=True)
+    if arguments.with_cxx:
+        subprocess.run(["bash", str(ROOT / "tests/ios/build-cxx-fixture.sh"), str(build / "fixtures")], check=True)
     subprocess.run(["bash", str(ROOT / "examples/ios-calculator/build.sh")],
         env={**os.environ, "VINIX_IOS_CALCULATOR_BUILD_DIR": str(build / "objc")}, check=True)
     if arguments.with_2048:
@@ -70,6 +75,8 @@ def main() -> int:
     ) if arguments.with_2048 else ())
     if arguments.with_ppsspp:
         runner.FEATURE_MARKERS += (b"iOS BLOCKED: upstream PPSSPP rejected before entry point",)
+    if arguments.with_cxx:
+        runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
     with tempfile.TemporaryDirectory(prefix="vinix-ios-vm-") as directory:
         work = Path(directory)
         rootfs = work / "rootfs"
@@ -77,8 +84,10 @@ def main() -> int:
             (rootfs / name).mkdir(parents=True)
         destination = rootfs / "opt/ios"
         shutil.copy2(build / "staging/usr/bin/run-ios", destination / "run-ios")
-        for name in ("calculator", "unsupported"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle"):
             shutil.copy2(build / "fixtures" / name, destination / name)
+        if arguments.with_cxx:
+            shutil.copy2(build / "fixtures/cxx", destination / "cxx")
         shutil.copy2(build / "objc/Calculator.app/Calculator", destination / "UIKitCalculator")
         if arguments.with_2048:
             shutil.copytree(build / "2048/NumberTileGame.app", destination / "NumberTileGame.app")

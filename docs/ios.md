@@ -62,8 +62,11 @@ executing a GUI app directly from a shell does not create a window. Set
 | Universal binaries | 32/64-bit slice tables, both byte orders; prefer ordinary ARM64 over ARM64e |
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
-| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3, addends, weak unresolved symbols |
-| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, `_memcpy`, `_memset`, `_strtod`, `_floorf`, unbiased `_arc4random_uniform`; Darwin ARM64 `snprintf("%.12g", double)` adapter; block ABI helpers |
+| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy pointer rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; lazy slots resolved before execution |
+| Image lifecycle | Checked `LC_ROUTINES_64`, initializer pointers/offsets, module terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
+| Thread-local storage | Darwin TLV descriptors, initialized and zero-filled templates, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
+| C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t` and 32-bit ctype-mask layouts; native strings, streams, regex and shared ownership tested in Vinix |
+| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, memory copy/move/compare/search/zero, `_strtod`, `_floorf`, unbiased `_arc4random_uniform`; Darwin ARM64 `snprintf("%.12g", double)` adapter; block ABI helpers; pthread create/join with null attributes |
 | Objective-C | Class/metaclass registration, superclass dispatch, absolute/relative method lists, checked metadata, nonfragile ivar adjustment, native method execution, nil returns, allocation/new/class, retain/release/strong stores, autorelease pools, ARC destructors, zeroing weak references and copied block properties |
 | Foundation | NSObject; UTF-8/constant NSString and integer/object formatting; NSNumber integers, NSIndexPath value equality, NSArray/NSMutableArray, NSMutableDictionary, fast enumeration and NSTimer callbacks |
 | UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
@@ -77,8 +80,8 @@ rewritten. Every import is resolved before any chain is rewritten. Gaps
 are inaccessible and no segment is writable and executable together. The
 runner releases its mapping on return or link failure and exits after one app.
 
-ARM64e/PAC, encrypted images, non-PIE binaries, image initializers/terminators,
-Darwin TLS, custom stack sizes, legacy dyld opcodes and multiple chain starts
+ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyld
+binding opcodes, TLS pointer/initializer sections and multiple chain starts
 per page are rejected. Objective-C categories, +load/+initialize, exceptions,
 Swift metadata are unsupported. Blocks support object/block captures, but not
 `__block` by-reference captures. The runtime and weak tables are single-threaded.
@@ -142,9 +145,8 @@ The largest groups are:
 | Objective-C runtime | 26 |
 
 **PPSSPP does not launch on Vinix yet.** Both the host runner and the Vinix guest
-reject it before its entry point with exit status 1. It uses legacy dyld
-rebase/bind opcodes, image initializers and Darwin thread-local storage;
-it also requires C++/libSystem APIs and graphics/audio frameworks beyond the
+reject it before its entry point with exit status 1. The executable requires
+libSystem APIs and graphics/audio frameworks beyond the
 current subset, including OpenGL ES, Metal and AudioToolbox. The bundle contains
 an additional MoltenVK dylib. No app UI or emulation was reached.
 
@@ -154,10 +156,42 @@ regression verifies inspection and the rejection diagnostic, rather than app
 compatibility. `--with-2048` can be combined with `--with-ppsspp` to exercise the
 working app in the same guest. Host inspection/attempts also run under ASan/UBSan.
 
-Binaries without chained fixups previously reported no imports. `--imports` now
-reads bounded `LC_SYMTAB`/`nlist_64` records, filters defined/debug/local/common symbols,
-resolves library ordinals and preserves weak-reference flags. Legacy execution
-remains unsupported; the inspection fallback does not perform relocation.
+Binaries without chained fixups previously reported no imports. `--imports` reads
+bounded `LC_SYMTAB`/`nlist_64` records, filters defined/debug/local/common symbols,
+resolves library ordinals and preserves weak-reference flags.
+
+The legacy loader now validates all **50,782 relocation writes** in this exact
+PPSSPP binary, including lazy slots, weak coalescing, backwards address advances
+and tagged RTTI names. Initializers, terminators and Darwin TLS also execute in
+Vinix: a native iOS fixture checks initialized/zero-filled TLS across eight
+threads and runs a registered destructor after returning from `main`.
+
+The optional C++ build provides all 187 C++ symbols imported by PPSSPP. It uses
+pinned, SHA-256-verified LLVM/Alpine sources and archives, without copying Apple
+library implementations. The following regression executes native iOS C++
+constructors, string growth/erase, stream insertion/extraction, regex matching,
+shared ownership and destructors in the same Vinix guest as calculator/2048:
+
+```sh
+python3 tests/ios/run.py --with-cxx --with-2048 --with-ppsspp
+# Independently validate PPSSPP's actual linker streams without executing it:
+VINIX_IOS_PPSSPP_BINARY="$PWD/build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP" \
+  v -enable-globals -gc none test compat/ios/macho
+```
+
+`./scripts/build-ios-aarch64.sh --with-cxx` enables this library in the runner.
+The C++ fixture uses Apple's public C++ headers from `IOS_SDK` or the available
+command-line-tools SDK, compiles for **arm64-apple-ios15.0**, and links only the
+repository's import stubs. The library is rebuilt for Vinix with musl. C++
+exception unwinding through Mach-O frames and Darwin pthread mutex/condition
+layouts remain unsupported; this is a tested C++ subset, not a complete ABI.
+
+**These changes do not make PPSSPP launch yet.** The remaining rejection is for
+unimplemented frameworks/libraries, rather than legacy linking, initializers or
+TLS. PPSSPP still needs its GLKit/EAGL rendering and UIKit scene lifecycle,
+additional Foundation and Darwin libSystem APIs, plus audio and device services.
+The PPSSPP guest marker continues to report this failure explicitly. No PPSSPP
+menu or PSP game has been run.
 
 ## Local Apple Calculator inspection
 

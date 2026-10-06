@@ -308,6 +308,11 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	$if ios_cxx ? {
+		if library == '/usr/lib/libc++.1.dylib' || (library == '/usr/lib/libSystem.B.dylib' && symbol == '__Unwind_Resume') {
+			return cxx_symbol(symbol)
+		}
+	}
 	if library == '/usr/lib/libSystem.B.dylib' {
 		if address := block_symbol(symbol) { return address }
 		if symbol == '_strtod' { return u64(unsafe { voidptr(C.strtod) }) }

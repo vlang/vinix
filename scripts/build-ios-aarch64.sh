@@ -2,10 +2,12 @@
 # Build the V Mach-O compatibility runner as a static ARM64 Vinix executable.
 set -euo pipefail
 WITH_2048=0
+WITH_CXX=0
 for option in "$@"; do
     case "$option" in
         --with-2048) WITH_2048=1 ;;
-        --help|-h) echo 'Usage: scripts/build-ios-aarch64.sh [--with-2048]'; exit 0 ;;
+        --with-cxx) WITH_CXX=1 ;;
+        --help|-h) echo 'Usage: scripts/build-ios-aarch64.sh [--with-2048] [--with-cxx]'; exit 0 ;;
         *) echo "ERROR: unknown option: $option" >&2; exit 2 ;;
     esac
 done
@@ -26,7 +28,15 @@ for input in "$SYSROOT/usr/lib/libc.a" "$SYSROOT/usr/lib/crt1.o" "$GCCLIB/libgcc
     fi
 done
 mkdir -p "$OUTPUT/staging/usr/bin"
+VFLAGS=()
+CXXLIBS=()
+if [ "$WITH_CXX" = 1 ]; then
+    python3 "$SCRIPT_DIR/build-support/ios/build-cxx.py" --output "$OUTPUT/cxx" --sysroot "$SYSROOT"
+    VFLAGS+=(-d ios_cxx)
+    CXXLIBS+=("$OUTPUT/cxx/libcxx-ios.a" "$OUTPUT/cxx/sysroot/usr/lib/libc++abi.a" "$OUTPUT/cxx/sysroot/usr/lib/libunwind.a")
+fi
 "$V" -os linux -arch arm64 -enable-globals -gc none -prod -d glibc -d no_backtrace \
+    "${VFLAGS[@]}" \
     -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
     -o "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner"
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
@@ -35,7 +45,7 @@ mkdir -p "$OUTPUT/staging/usr/bin"
     -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
-    -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
+    "${CXXLIBS[@]}" -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -B"$LLVM_BIN" -o "$OUTPUT/staging/usr/bin/run-ios"
 echo "Built $OUTPUT/staging/usr/bin/run-ios"
 

@@ -63,6 +63,14 @@ int main(void) {
     run(calculator, "81", "/", "9", 0, "IOS-CALCULATOR: 9\n");
     run(calculator, "23", "%", "7", 0, "IOS-CALCULATOR: 2\n");
     puts("iOS PASS: Mach-O arithmetic and libSystem imports");
+    run("/opt/ios/calculator-legacy", "19", "+", "23", 0, "IOS-CALCULATOR: 42\n");
+    run("/opt/ios/lifecycle", NULL, NULL, NULL, 0, "IOS-LIFECYCLE: destructor\n");
+    puts("iOS PASS: legacy dyld imports and image/TLS lifecycle");
+    if (!access("/opt/ios/cxx", R_OK)) {
+        run("/opt/ios/cxx", NULL, NULL, NULL, 0, "IOS-CXX: destructor\n");
+        run("/opt/ios/cxx", "throw", NULL, NULL, 1, "C++ exception unwinding through Mach-O frames is not implemented");
+        puts("iOS PASS: native C++ strings, streams, regex and lifetime");
+    }
     run(calculator, "1", "/", "0", 3, "IOS-CALCULATOR: division by zero\n");
     run(calculator, "1", "?", "2", 2, "IOS-CALCULATOR: unknown operator\n");
     run(calculator, NULL, NULL, NULL, 2, "usage: calculator");
@@ -80,7 +88,7 @@ int main(void) {
     }
     if (!access("/opt/ios/PPSSPP", R_OK)) {
         run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
-        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "legacy dyld rebase/bind opcodes are not implemented");
+        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "framework/library is not implemented:");
         puts("iOS BLOCKED: upstream PPSSPP rejected before entry point");
     }
     puts("VINIX iOS GUEST: PASS");
