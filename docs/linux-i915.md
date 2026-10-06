@@ -452,8 +452,8 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `CPUID` fallback avoids speculative width or count selection after permission
   checks; it adds a serialization cost per chunk. Native vendor/feature-based
   `LFENCE` selection and broader kernel speculation mitigation remain pending.
-  Atomic/pagefault-disabled, unsafe-scope and noncached APIs, dynamic hardened
-  usercopy checks and x86 LAM remain unresolved.
+  Dynamic hardened usercopy checks, x86 LAM, unsafe-scope and noncached APIs
+  remain unresolved.
 - Ordinary `get_user` and `__get_user` read 1/2/4/8-byte scalars, evaluate their
   source and output once, preserve source signedness on assignment and clear
   the complete output on `-EFAULT`. Single-page reads use a width-specific,
@@ -462,14 +462,26 @@ after a filesystem failure. Mutable build inputs still require isolation.
   Unaligned cross-page reads use protected page chunks and publish only after
   every byte succeeds; they make no cross-page atomicity promise. Page faults
   resolve outside the pagemap lock and retry against fresh permissions.
-  Both interfaces require ordinary faulting task context.
+  Both interfaces use ordinary faulting task context, or resident-only access
+  when the current task disables fault resolution.
 - Ordinary `put_user` and `__put_user` store 1/2/4/8-byte scalars, convert the
   value to the destination type and evaluate each argument once. Single-page
   writes use one serialized width-specific x86 `MOV` under the checked map
   lock; aligned ordinary-RAM stores retain x86 coherence. COW and missing-page
   resolution occur outside that lock before fresh permission checks. Split-page
   writes may commit a protected prefix before `-EFAULT`; they promise neither
-  rollback nor cross-page atomicity. These APIs require ordinary task context.
+  rollback nor cross-page atomicity. Fault-disabled scopes preserve resident
+  accesses and reject missing or COW pages without resolving them.
+- Task-owned `pagefault_disable`/`pagefault_enable` nesting survives native
+  sleeps, preemption and CPU migration; new tasks start at zero. The operations
+  preserve IRQ and preemption state and place compiler barriers around depth
+  changes. `faulthandler_disabled` also checks native preemption pins. Checked
+  user copies and kernel fault handlers reject page-in/COW before allocation
+  when resolution is disabled. Unknown direct kernel faults remain fatal;
+  Linux exception-table fixups and IRQ/NMI context accounting remain pending.
+  `__copy_{from,to}_user_inatomic` always uses resident-only page chunks,
+  returns the exact uncopied suffix and leaves that suffix untouched, including
+  at task depth zero. NMI use remains unsupported.
 - `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
   `strstrip` alias consume borrowed strings synchronously. Search results and
   tokens point into the caller's storage; splitting preserves empty tokens and
@@ -545,6 +557,8 @@ incomplete.
 
 ```sh
 tests/linuxkpi/run.sh
+python3 tests/linuxkpi/pagefault_test.py
+python3 tests/linuxkpi/uaccess_test.py
 python3 tests/linuxkpi/bounds_generation_test.py
 python3 tests/linuxkpi/audit_generation_test.py
 python3 kernel/linuxkpi/audit.py
@@ -1231,3 +1245,21 @@ pass.
 References: [Linux 6.6 stable sources](https://cdn.kernel.org/pub/linux/kernel/v6.x/),
 [Linux kernel versus userspace interfaces](https://docs.kernel.org/process/stable-api-nonsense.html),
 [i915 documentation](https://docs.kernel.org/gpu/i915.html).
+
+Task-owned fault-control validation uses the isolated baseline `27aaf760` plus
+the owned feature overlay. The same saved enabled ELF
+`22979f43e8511c33097d69ef8537781da96831814896390bedd8ccc675ea6ce2` passes
+the complete normal and SSE guests, including actual task sleep/migration,
+new-task zero depth, resident access under IRQ/preemption guards, demand-page
+rejection and real COW rejection/recovery. Three full lifecycle warmups precede
+a fourth batch with equal physical free bytes and every live heap size class.
+The first normal run passed this feature but failed a later I/O fixture; its
+failed result remains recorded, and the cause has not been established. A fresh
+normal run of that same ELF passed the complete suite. Default x86 and arm64
+builds and Linux-ABI guest startup pass. Host GNU99/GNU11 checks exercise
+433,858 fault-depth assertions and eight fatal invariant cases per profile;
+separate user-copy checks pass 9,200 assertions per profile. Actual generated
+C and optimized objects received independent lifetime and ordering reviews.
+Evidence uses `/tmp/vinix-linuxkpi-pagefault-oct06-`, including
+`final-validation.json`. These measurements cover this feature and its complete
+actor lifecycle; they do not establish a global kernel allocation pass.

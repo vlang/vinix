@@ -9,5 +9,9 @@ unsigned long vinix_linuxkpi_raw_copy_from_user(void *to,
 		void *from, unsigned long size);
 unsigned long vinix_linuxkpi_raw_copy_to_user(void *to,
 		void *from, unsigned long size);
+unsigned long vinix_linuxkpi_raw_copy_from_user_inatomic(void *to,
+		void *from, unsigned long size);
+unsigned long vinix_linuxkpi_raw_copy_to_user_inatomic(void *to,
+		void *from, unsigned long size);
 unsigned long vinix_linuxkpi_user_address_limit(void);
 #endif

@@ -3,6 +3,7 @@
 #define VINIX_LINUX_UACCESS_H
 
 #include <linux/types.h>
+#include <linux/pagefault.h>
 
 /* Ordinary, faulting process-context copies. The native pagemap backend
  * returns the uncopied byte count and does not retain either buffer. */
@@ -16,6 +17,12 @@ unsigned long __must_check raw_copy_to_user(void __user *to,
 unsigned long __must_check __copy_from_user(void *to,
 		const void __user *from, unsigned long size);
 unsigned long __must_check __copy_to_user(void __user *to,
+		const void *from, unsigned long size);
+/* Resident-only page-chunk copies. Never page in or resolve COW and never
+ * clear the uncopied suffix. NMI use remains unsupported. */
+unsigned long __must_check __copy_from_user_inatomic(void *to,
+		const void __user *from, unsigned long size);
+unsigned long __must_check __copy_to_user_inatomic(void __user *to,
 		const void *from, unsigned long size);
 unsigned long __must_check _copy_from_user(void *to,
 		const void __user *from, unsigned long size);
@@ -95,6 +102,5 @@ int __must_check vinix_linuxkpi_put_user(void __user *destination,
  * Both interfaces retain ordinary faulting process-context semantics. */
 #define __put_user(x, ptr) put_user((x), (ptr))
 
-/* Atomic/pagefault-disabled, unsafe-scope and noncached copies still need
- * their own native contracts and are not declared here. */
+/* Unsafe-scope and noncached copies still need their own native contracts. */
 #endif

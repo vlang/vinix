@@ -101,6 +101,11 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// this thread's page map, found nothing there, and killed it with SIGSEGV
 	// for a page that was perfectly mappable.
 	addr := cpu.read_cr2()
+	// Also protect callers other than the top-level ISR. Userspace faults
+	// keep their ordinary page-in/COW behavior.
+	if gpr_state.cs & 3 == 0 && memory.fault_resolution_disabled() {
+		return none
+	}
 	if gpr_state.err & 1 != 0 {
 		// The kernel reached for a page userspace can reach, with SMAP on and
 		// AC clear: a path that still follows a user pointer rather than

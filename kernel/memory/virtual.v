@@ -47,14 +47,33 @@ pub __global (
 	cow_resolver     fn (&Pagemap, u64) bool
 	page_in_resolver fn (&Pagemap, u64) bool
 	locked_bytes_resolver fn (&Pagemap) u64
+	fault_resolution_guard u64
 )
+
+type FaultResolutionGuard = fn () bool
+
+// The compatibility runtime installs this once during boot, before publishing
+// its workers. This module cannot import its task/scheduler implementation.
+pub fn register_fault_resolution_guard(guard fn () bool) {
+	bits := u64(voidptr(guard))
+	if bits == 0 || !katomic.cas(mut &fault_resolution_guard, u64(0), bits) {
+		panic('fault-resolution guard already installed or invalid')
+	}
+}
+
+pub fn fault_resolution_disabled() bool {
+	bits := katomic.load(&fault_resolution_guard)
+	if bits == 0 { return false }
+	guard := unsafe { FaultResolutionGuard(voidptr(bits)) }
+	return guard()
+}
 
 pub fn register_cow_resolver(resolver fn (&Pagemap, u64) bool) {
 	cow_resolver = resolver
 }
 
 pub fn resolve_cow(pagemap &Pagemap, address u64) bool {
-	if cow_resolver == unsafe { nil } {
+	if fault_resolution_disabled() || cow_resolver == unsafe { nil } {
 		return false
 	}
 	return cow_resolver(pagemap, address)
@@ -69,7 +88,7 @@ pub fn register_page_in_resolver(resolver fn (&Pagemap, u64) bool) {
 // Page in the page of a user mapping that holds `address`, as a fault on it
 // would. True once the page is present, whoever put it there.
 pub fn resolve_missing_page(pagemap &Pagemap, address u64) bool {
-	if page_in_resolver == unsafe { nil } {
+	if fault_resolution_disabled() || page_in_resolver == unsafe { nil } {
 		return false
 	}
 	return page_in_resolver(pagemap, address)

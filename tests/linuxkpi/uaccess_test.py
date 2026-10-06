@@ -56,11 +56,11 @@ unsigned long vinix_linuxkpi_user_address_limit(void) {
 /* The bridge model is deliberately independent of the production range and
  * zero-tail algorithms. It copies only a configured, accessible prefix. */
 static unsigned long model_copy(void *kernel, void *user, unsigned long count,
-                                bool to_user) {
+                                bool to_user, bool allow_faults) {
     bridge_calls++;
     last_length = count;
     if (!count) return 0;
-    if (!can_sleep || !kernel) return count;
+    if ((allow_faults && !can_sleep) || !kernel) return count;
     uintptr_t value = (uintptr_t)user;
     if (value < USER_BASE || value - USER_BASE >= readable) return count;
     size_t offset = value - USER_BASE;
@@ -74,12 +74,22 @@ static unsigned long model_copy(void *kernel, void *user, unsigned long count,
 
 unsigned long vinix_linuxkpi_raw_copy_from_user(void *to, void *from,
                                                unsigned long count) {
-    return model_copy(to, from, count, false);
+    return model_copy(to, from, count, false, true);
 }
 
 unsigned long vinix_linuxkpi_raw_copy_to_user(void *to, void *from,
                                              unsigned long count) {
-    return model_copy(from, to, count, true);
+    return model_copy(from, to, count, true, true);
+}
+
+unsigned long vinix_linuxkpi_raw_copy_from_user_inatomic(void *to, void *from,
+                                                       unsigned long count) {
+    return model_copy(to, from, count, false, false);
+}
+
+unsigned long vinix_linuxkpi_raw_copy_to_user_inatomic(void *to, void *from,
+                                                     unsigned long count) {
+    return model_copy(from, to, count, true, false);
 }
 
 static void reset_model(void) {
@@ -200,11 +210,39 @@ static void prefix_tests(void) {
     CHECK(raw_copy_to_user((void *)UINTPTR_MAX, NULL, 0) == 0);
     CHECK(__copy_from_user(NULL, NULL, 0) == 0);
     CHECK(__copy_to_user(NULL, NULL, 0) == 0);
+    CHECK(__copy_from_user_inatomic(NULL, (void *)UINTPTR_MAX, 0) == 0);
+    CHECK(__copy_to_user_inatomic((void *)UINTPTR_MAX, NULL, 0) == 0);
     CHECK(_copy_from_user(NULL, NULL, 0) == 0);
     CHECK(_copy_to_user(NULL, NULL, 0) == 0);
     CHECK(copy_from_user(NULL, NULL, 0) == 0);
     CHECK(copy_to_user(NULL, NULL, 0) == 0);
     CHECK(bridge_calls == 0 && limit_calls == 0);
+}
+
+static void inatomic_tests(void) {
+    unsigned char destination[16];
+    const unsigned char source[8] = {0x29, 0x29, 0x29, 0x29, 0x29, 0x29, 0x29, 0x29};
+    for (size_t amount = 0; amount <= sizeof(source); amount++) {
+        reset_model();
+        can_sleep = false;
+        prefix = amount;
+        memset(destination, 0xa5, sizeof(destination));
+        CHECK(__copy_from_user_inatomic(destination, USER_POINTER, 8) == 8 - amount);
+        bytes_equal(destination, 0, amount, 0x73);
+        bytes_equal(destination, amount, sizeof(destination), 0xa5);
+        CHECK(bridge_calls == 1 && limit_calls == 0);
+        CHECK(__copy_to_user_inatomic(USER_POINTER, source, 8) == 8 - amount);
+        bytes_equal(user_bytes, 0, amount, 0x29);
+        bytes_equal(user_bytes, amount, sizeof(user_bytes), 0x73);
+        CHECK(bridge_calls == 2 && limit_calls == 0);
+    }
+    reset_model();
+    can_sleep = false;
+    memset(destination, 0xa5, sizeof(destination));
+    CHECK(__copy_from_user_inatomic(destination, (void *)UINTPTR_MAX, 8) == 8);
+    bytes_equal(destination, 0, sizeof(destination), 0xa5);
+    CHECK(__copy_to_user_inatomic((void *)UINTPTR_MAX, source, 8) == 8);
+    bytes_equal(user_bytes, 0, sizeof(user_bytes), 0x73);
 }
 
 static unsigned destination_evaluations, source_evaluations, size_evaluations;
@@ -368,6 +406,7 @@ static void parser_tests(void) {
 int main(void) {
     range_tests();
     prefix_tests();
+    inatomic_tests();
     macro_tests();
     parser_tests();
     printf("LinuxKPI usercopy and user parsers: %u assertions passed\n", assertions);

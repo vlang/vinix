@@ -456,6 +456,7 @@ fn selftest_free_baseline() u64 {
 
 pub fn initialise() {
 	$if linuxkpi ? {
+		initialise_pagefault_policy()
 		sched.register_preemption_guard(voidptr(may_preempt))
 		if C.vinix_linuxkpi_percpu_bootstrap(u32(cpu_locals.len)) != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility per-CPU initialization failed')
@@ -509,6 +510,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux scalar user-store self-test failed')
 		}
 		C.kprintf(c'linuxkpi: scalar user stores, fault prefixes, COW and aligned coherence passed; no pages or heap objects retained\n')
+		if !pagefault_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux task-local page-fault policy self-test failed')
+		}
+		C.kprintf(c'linuxkpi: task-local fault scopes, migration and resident-only user copies passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

@@ -8,7 +8,8 @@ fn C.vinix_linuxkpi_write_user_scalar(voidptr, usize, u64) i32
 
 // The C caller converts to its destination scalar type before passing bits.
 // Ordinary split-page writes may commit a prefix before returning -EFAULT;
-// no zeroing, rollback, atomic or pagefault-disabled contract is supplied.
+// no zeroing, rollback or split-page atomicity is supplied. The native bridge
+// also honors task-local disabled fault resolution for resident-only stores.
 @[export: 'vinix_linuxkpi_put_user']
 pub fn put_user_value(destination voidptr, size usize, value u64) i32 {
 	if size != 1 && size != 2 && size != 4 && size != 8 {

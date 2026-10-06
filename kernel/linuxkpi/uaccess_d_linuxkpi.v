@@ -12,7 +12,10 @@ fn native_user_address_limit() usize {
 }
 
 fn require_usercopy_context() {
-	if !may_sleep() {
+	// Disabled fault resolution permits resident-only copies even when the
+	// ordinary faulting context is unavailable. The memory resolvers consult
+	// this same task policy; changing it does not disable ordinary scheduling.
+	if !memory.fault_resolution_disabled() && !may_sleep() {
 		lib.kpanic(unsafe { nil }, c'linuxkpi: faulting user copy requires enabled interrupts and preemption')
 	}
 }
@@ -31,6 +34,16 @@ fn native_raw_to_user(destination voidptr, source voidptr, length usize) usize {
 	if length == 0 { return 0 }
 	require_usercopy_context()
 	return usize(usercopy.raw_copy_to_user(u64(destination), source, u64(length)))
+}
+
+@[export: 'vinix_linuxkpi_raw_copy_from_user_inatomic']
+fn native_raw_from_user_inatomic(destination voidptr, source voidptr, length usize) usize {
+	return usize(usercopy.raw_copy_from_user_inatomic(destination, u64(source), u64(length)))
+}
+
+@[export: 'vinix_linuxkpi_raw_copy_to_user_inatomic']
+fn native_raw_to_user_inatomic(destination voidptr, source voidptr, length usize) usize {
+	return usize(usercopy.raw_copy_to_user_inatomic(u64(destination), source, u64(length)))
 }
 
 fn uaccess_native_selftest() bool {

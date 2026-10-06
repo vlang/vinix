@@ -77,6 +77,9 @@ pub mut:
 	// Origin CPU + 1 for a Linux I/O block, protected by scheduler_queue_lock.
 	// Zero means no reservation; it occupies the existing alignment gap.
 	linuxkpi_iowait_cpu_plus_one u32
+	// Task-local nested no-fault scopes survive preemption and CPU migration.
+	// New threads start at zero; this owns no separately allocated state.
+	linuxkpi_fault_depth u32
 	process   &Process = unsafe { nil }
 	gpr_state cpulocal.GPRState
 	gs_base   u64

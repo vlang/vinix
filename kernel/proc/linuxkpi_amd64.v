@@ -17,6 +17,9 @@ pub fn linuxkpi_mark_task_dead(mut t Thread) {
 // snapshot from its running source rather than reading a mutable process name.
 pub fn linuxkpi_init_task(mut t Thread, source &Thread) {
 	$if linuxkpi ? {
+		// A clone inherits ordinary task attributes, never its parent's live
+		// kernel no-fault scope. Kernel workers and exec tasks also start clear.
+		t.linuxkpi_fault_depth = 0
 		storage := voidptr(&t.linuxkpi_task[0])
 		if source != unsafe { nil } {
 			mut parent := unsafe { source }

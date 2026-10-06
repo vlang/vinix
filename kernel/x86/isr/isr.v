@@ -69,6 +69,15 @@ fn pf_handler(num u32, mut gpr_state cpulocal.GPRState) {
 			C.printf_panic(c'kernel stack guard: address=0x%llx sp=0x%llx\n', fault_addr, gpr_state.rsp)
 			lib.kpanic(gpr_state, c'Kernel stack guard')
 		}
+		// Reject resolution before mmap can enable IRQs or allocate, and before
+		// the global exhaustion counter can trigger OOM handling because of an
+		// unrelated CPU. Checked usercopy reports EFAULT without taking this
+		// trap. Unknown direct kernel faults retain the existing fatal path;
+		// Linux exception-table recovery is not supplied by this guard.
+		if memory.fault_resolution_disabled() {
+			exception_handler_at(num, mut gpr_state, fault_addr)
+			return
+		}
 	}
 	exhausted := memory.exhaustions()
 	mmap.pf_handler(gpr_state) or {

@@ -7,6 +7,8 @@ module compatcore
 fn C.vinix_linuxkpi_user_address_limit() usize
 fn C.vinix_linuxkpi_raw_copy_from_user(voidptr, voidptr, usize) usize
 fn C.vinix_linuxkpi_raw_copy_to_user(voidptr, voidptr, usize) usize
+fn C.vinix_linuxkpi_raw_copy_from_user_inatomic(voidptr, voidptr, usize) usize
+fn C.vinix_linuxkpi_raw_copy_to_user_inatomic(voidptr, voidptr, usize) usize
 
 // The native user half is exclusive. As in generic Linux access_ok, a zero
 // size still checks the address, and NULL is a numerically valid user address.
@@ -25,9 +27,10 @@ pub fn check_copy_size(known_size usize, length usize) bool {
 		&& (known_size == usize(-1) || length <= known_size)
 }
 
-// All supported copies are ordinary faulting process-context operations.
-// The native bridge enforces the sleepable context before resolving pages.
-// Inatomic, fault-disabled, NMI and nocache variants remain unavailable.
+// Ordinary copies resolve pages only when the native task permits faults.
+// A disabled scope preserves resident prefixes and suppresses page-in/COW.
+// Explicit inatomic copies below use a resident-only native policy. NMI and
+// nocache variants remain separate unsupported APIs.
 @[export: 'raw_copy_from_user']
 pub fn raw_from_user(destination voidptr, source voidptr, length usize) usize {
 	if length == 0 { return 0 }
@@ -48,6 +51,18 @@ pub fn unchecked_from_user(destination voidptr, source voidptr, length usize) us
 @[export: '__copy_to_user']
 pub fn unchecked_to_user(destination voidptr, source voidptr, length usize) usize {
 	return raw_to_user(destination, source, length)
+}
+
+@[export: '__copy_from_user_inatomic']
+pub fn inatomic_from_user(destination voidptr, source voidptr, length usize) usize {
+	if length == 0 { return 0 }
+	return C.vinix_linuxkpi_raw_copy_from_user_inatomic(destination, source, length)
+}
+
+@[export: '__copy_to_user_inatomic']
+pub fn inatomic_to_user(destination voidptr, source voidptr, length usize) usize {
+	if length == 0 { return 0 }
+	return C.vinix_linuxkpi_raw_copy_to_user_inatomic(destination, source, length)
 }
 
 @[export: '_copy_from_user']

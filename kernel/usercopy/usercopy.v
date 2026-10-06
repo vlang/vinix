@@ -153,7 +153,7 @@ fn copy_pagemap_policy_remaining(_pagemap &memory.Pagemap, kernel_address voidpt
 	return 0
 }
 
-fn raw_copy_user(kernel_address voidptr, user_address u64, length u64, to_user bool) u64 {
+fn raw_copy_user(kernel_address voidptr, user_address u64, length u64, to_user bool, allow_faults bool) u64 {
 	// Zero-length copies must not inspect either pointer or the current task.
 	if length == 0 {
 		return 0
@@ -169,20 +169,30 @@ fn raw_copy_user(kernel_address voidptr, user_address u64, length u64, to_user b
 		return length
 	}
 	return copy_pagemap_policy_remaining(process.pagemap, kernel_address, user_address,
-		length, to_user, true, true)
+		length, to_user, allow_faults, allow_faults)
 }
 
 // Return the bytes that could not be read. Any copied prefix is preserved;
 // the uncopied destination suffix is left untouched. Missing pages may fault
 // in, so callers use ordinary kernel process context that permits faults.
 pub fn raw_copy_from_user(destination voidptr, source u64, length u64) u64 {
-	return raw_copy_user(destination, source, length, false)
+	return raw_copy_user(destination, source, length, false, true)
 }
 
 // Return the bytes that could not be written. Missing and COW pages resolve
 // through the native fault handlers, and an inaccessible suffix is untouched.
 pub fn raw_copy_to_user(destination u64, source voidptr, length u64) u64 {
-	return raw_copy_user(source, destination, length, true)
+	return raw_copy_user(source, destination, length, true, true)
+}
+
+// Explicit resident-only copies never invoke either page resolver, even when
+// the task has no disabled scope. Their uncopied suffix remains untouched.
+pub fn raw_copy_from_user_inatomic(destination voidptr, source u64, length u64) u64 {
+	return raw_copy_user(destination, source, length, false, false)
+}
+
+pub fn raw_copy_to_user_inatomic(destination u64, source voidptr, length u64) u64 {
+	return raw_copy_user(source, destination, length, true, false)
 }
 
 pub fn copy_from_user(destination voidptr, source u64, length u64) bool {
