@@ -26,12 +26,12 @@ Vinix engineering proposals based on the inspected code.
 | Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog; per-user saved sort/direction, filter, tree, columns, refresh interval, main view and resource tab | Per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states; localized search across 27 options with keyboard navigation into their actual panes | Clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As; UTF-8 document selection, mouse caret/drag selection, bounded guest clipboard copy and acknowledged cut, and selection replacement with undo | Field selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
-| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, sinh/cosh/tanh and their inverses, editable EE exponents and binary nth-root with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Random; signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
+| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, sinh/cosh/tanh and their inverses, editable EE exponents, binary nth-root and Rand operands in [0,1) with domain/finite or unavailable-source errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events; bounded UTF-8 title/location search across all stored events with chronological results and navigation into the actual event editor | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
 | Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; up to four independently named countdown timers, duration presets/adjustment and exact HH:MM:SS entry, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; sound/notifications; persistence and a service that continues after the app closes |
-| Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
+| Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel; pointer shown/hidden choice for PNG and AVI | Window/region selection, output-location chooser, clipboard capture, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection; total/used/free/available snapshot for the filesystem containing the scan root, refreshed on each scan and included separately in CSV | Mounted-volume overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
-| Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Word/line/rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
+| Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, double-click word/triple-click physical-line selection and drag expansion, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
 | Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations, rectangular cropping and alpha-weighted bilinear resizing with aspect lock and shared one-step Undo/Redo, alpha-preserving PNG export, and exact original-file copying without overwriting | Longer undo history/recovery; PDF rendering and page navigation; annotations, additional selection tools, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
 | Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
 | System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; bounded UTF-8 search across row values, translated labels and categories with token/case/accent matching; refresh, paging and complete text export without overwriting | Broader device/driver APIs, structured property inspection and remote reports; unavailable sources are labelled explicitly |
@@ -39,7 +39,7 @@ Vinix engineering proposals based on the inspected code.
 | Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
 | Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices; bounded current-note title/body Undo/Redo that survives autosave | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and recovery/versions; floating sticky windows |
-| Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
+| Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, editable None/Low/Medium/High priorities with list badges, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priority sorting, tags/subtasks, attachments, calendar integration and account sync/sharing |
 | Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, separate sampled CSV export and exclusive 960×640 PNG image export with the same sampled curve/domain gaps and axes; compact Graph/Document/CSV/PNG pages and bounded tiny-window guidance | Autosave/recovery and file picker; multiple/implicit/parametric equations, 3D plots, vector export, animations, integration/intersection tools and graph styling |
 | Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking, freeze and independent physical X/Y locks, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, image copy and host clipboard writing |
 | Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, exclusive text export and acknowledged guest clipboard copy of the full headword and unwrapped definition | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, definition selection, lookup from selected text and persistent history |
@@ -206,6 +206,10 @@ not proposed as general Vinix utility ports.
   A new digit replaces a scientific result; repeated equals repeats the last
   binary operation. Domain errors and non-finite results are shown explicitly.
   Scientific mode accepts a finite number pasted in exponent notation.
+  Rand generates a fresh operand in [0,1) from bounded nonblocking system
+  entropy reads. It preserves a pending calculation and memory, records history,
+  and starts a new operand when you type a digit. Unavailable entropy preserves
+  the current operand and shows a retry status.
   History is bounded to 20 results and includes function arguments/angle units.
   Select Programmer (Ctrl-P) for exact unsigned 64-bit values. Ctrl-B changes
   the input base; prefixed numeric paste accepts `0x`, `0o` and `0b`. Full-sized
@@ -230,7 +234,14 @@ not proposed as general Vinix utility ports.
   guest clipboard service; oversized copies are refused without truncation.
   When keyboard input is directed to the shell, Ctrl-C reaches the PTY for
   the shell/program to handle as an interrupt.
-  Output changes and resizing clear selection so stale cells are not copied.
+  Double-click selects a word; triple-click selects a physical row and its
+  newline when another row follows. Dragging extends whole words or rows,
+  including backwards. Words use Unicode letters/numbers, underscore and common
+  combining marks; whitespace forms runs, punctuation/symbols select one cell.
+  Recognition uses successive clicks within 500 ms and five pixels. Wrapped
+  output remains separate physical rows. Word-boundary preferences and
+  rectangular selection remain future work. Output changes and resizing clear
+  selection so stale cells are not copied.
 - **Disk Usage:** edit Folder and Scan; edit Report and Export CSV. Existing
   report files are preserved. Export a completed or cancelled scan; cancelled
   scans are explicitly marked partial by their phase. Reports contain the
@@ -240,7 +251,12 @@ not proposed as general Vinix utility ports.
   Available excludes reserved space. These filesystem counters are separate
   CSV rows and do not change the logical file-content total of the inventory.
 - **Capture:** Video now exposes the recording delay. Enter starts the chosen
-  operation and Escape stops/cancels it.
+  operation and Escape stops/cancels it. Click Pointer shown/hidden before
+  starting to choose whether PNG screenshots and AVI frames contain the pointer.
+  The choice is fixed during countdown/recording and applies to both pages;
+  saved pixels beneath the pointer come from the compositor backing without
+  erasing the live cursor. Older compositors keep the existing pointer-included
+  behavior and omit this unsupported control.
 - **Settings:** choose About and Refresh to read system-reported information.
   Missing data is labelled unavailable. Click Search or Ctrl-F, enter localized
   category/control words, and use arrows, page keys and Enter to open a matching
@@ -330,13 +346,18 @@ not proposed as general Vinix utility ports.
   complete record. The user's home alias is resolved once and storage remains
   anchored to that directory; record and lock names refuse symbolic links.
 - **Reminders:** choose New task, enter a title and optionally `YYYY-MM-DD` or
-  `YYYY-MM-DD HH:MM`, then Save task. Select a task to Edit, Complete/reopen or
-  confirm Delete. Search and filters apply to all retained tasks; export text
-  or CSV writes the complete current view to a new path. Dates use local time;
+  `YYYY-MM-DD HH:MM`, choose None/Low/Medium/High priority, then Save task.
+  Select a task to Edit, Complete/reopen or confirm Delete. Search and filters
+  apply to all retained tasks; export text or CSV writes the complete current
+  view to a new path. Dates use local time;
   due-state display updates while the app is open. There are no background
   notification, recurrence or synchronization services in this milestone.
   Lists hold at most 256 tasks with 256-byte titles in a 128 KiB record. A
   conflicting save or damaged record preserves the previously saved file.
+  Priority appears in each row and in text/CSV exports. Cancel keeps the saved
+  priority; completing/reopening a task preserves it. Legacy version-1 records
+  load with None and remain byte-identical until a successful task save, toggle
+  or deletion publishes strict version 2. Older Vinix builds cannot read v2.
 - **Grapher:** enter an explicit function of `x` and choose Plot. Arithmetic,
   powers, parentheses, `pi`/`e` and supported standard functions use radians.
   Edit finite x/y bounds or use Zoom/reset, then export samples to a new CSV.
@@ -918,3 +939,77 @@ behavior/memory/IPC logs, font comparisons, QMP actions, serial bytes and
 screenshot hashes/reviews are retained under `build/utility-next-validation/`.
 The inventory remains 43 entries (21 native utilities and 22 integrations),
 with thirteen missing utility proposals and their backend dependencies.
+
+### Word selection, random operands, priorities and pointer capture (2026-10-06)
+
+Terminal adds Unicode word and physical-row multi-click selection with whole
+word/row drag expansion. Calculator adds Rand operands through the existing
+pending arithmetic, memory, history and clipboard paths; bounded nonblocking
+entropy failures preserve the current operand. Reminders adds four priorities,
+list badges and export values. Strict version-1 records remain unchanged until
+a successful mutation publishes version 2, preserving existing conflict and
+corruption guards. Capture adds a shared pointer shown/hidden choice for PNG
+and AVI, fixed during countdown/recording. Its negotiated wire flag preserves
+the existing header sizes and pointer-included behavior on older compositors.
+The compositor borrows saved cursor pixels synchronously without changing the
+live canvas. Measured PNG-signature and grown AVI-index retention is also fixed.
+
+Independent immutable focused stages pass 180 executed behavior groups
+(2,740,688 assertions), including shared wire/catalog/language and native-close
+regressions, and 29 memory groups (19,673 assertions) with zero retained bytes.
+These totals count executed groups across the stages rather than a single
+combined suite. Generated C and independent lifetime reviews cover the cursor
+backing borrow, fixed PNG signature, single-owner AVI offsets, random operand
+storage, priority drafts and allocation-free selection helpers. The shared
+behavior fixture retains two existing deprecation warnings and one older
+unused-parameter notice; its memory fixture reports no compiler warnings or
+notices. Five font coverage cases pass: U+4E71 is added while all 20,448 existing
+glyph masks and metrics remain identical across 16 faces.
+
+Focused and complete host IPC pass through actual child processes. The fixture
+checks pending Rand arithmetic and copy, legacy Reminders bytes and strict v2
+priorities/exports, negotiated Capture flags and legacy peers, and Terminal
+word/row clipboard contents from a completed output row. Its generated C retains
+43 executable assertion failure guards across eight checked helpers. The guest
+fixture uses committed test revision `a0aec349` and is generated without V's
+assertion-stripping `-prod` flag.
+
+The assertion-enabled guest IPC passes through actual Vinix app processes,
+including exact Unicode word/physical-row clipboard contents and Cmd-C. The
+final fixture waits for a stable shell prompt and emits Unicode through ASCII
+printf escapes, retaining the independent byte expectations. This frozen
+kernel has no trusted entropy, so guest IPC and the Rand screenshot verify
+the recoverable unavailable-source path; the host checks the successful random
+operand path. The first guest fixture's output-wait failure is preserved.
+
+The QEMU replay records ten workflow screenshots plus the initial desktop:
+pointer shown/hidden and successful PNG save, explicit Rand unavailability,
+High priority draft/save, Medium draft/cancel retaining High, and exact word
+and physical-row highlights. The PNG is 2048×1536 and 9,439,508 bytes; the
+saved version-2 record contains the exact High-priority task. The compositor
+and four native clients are present; each client has the compositor parent.
+Terminal also starts Zsh.
+Short process samples establish startup/rendering, while the heap fixtures
+supply retained-memory evidence.
+
+The guest runner exits successfully. Its original observer reports one parsing
+failure because kernel exec/ELF diagnostics precede the reminder record header.
+Separate strict post-run analysis passes against the preserved serial bytes:
+it accepts only those known prefix lines before the header and requires the
+exact record afterward. Unknown prefixes, changed priority, extra records and
+diagnostics inside the record are rejected. The sealed observer and its failure
+remain archived; no further guest boot is needed for this parsing correction.
+
+The published production revision is `15c21a91`; its AArch64 desktop is
+25,502,664 bytes with SHA-256
+`dd7398f08bfe822ea0b332383505c1f9a2ab185e7f0df034ee3530e341b3eda7`.
+Files, Activity Monitor and Settings published copies match that build.
+The static assertion-enabled guest fixture is 25,208,288 bytes with SHA-256
+`8794a1151c79f830e56d8fafd4ddc7b70d52bc0d166c24918c946148b0a6962e`.
+Immutable source manifests, generated C and assertion guards, independent
+lifetime/visual reviews, build commands, host/guest logs, font comparisons,
+QMP actions, screenshot hashes and failed harness artifacts are retained under
+`build/utility-input-validation/`, with app-specific focused evidence in
+`build/calculator-random-validation/`, `build/reminders-priority-validation/`
+and `build/terminal-word-selection-validation/`. The inventory still covers
+43 entries and thirteen missing utility proposals with their dependencies.

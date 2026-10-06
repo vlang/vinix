@@ -74,7 +74,7 @@ What it does:
   machine, ranked and measured while the walk runs, plus filesystem capacity
 - a **clock** with local time, a stopwatch with laps and a countdown timer
 - **Preview**, an image viewer with zoom, pan, all eight JPEG EXIF orientations,
-  manual rotation, rectangular selection/cropping with Undo/Redo and
+  manual rotation, rectangular selection/cropping and resizing with Undo/Redo and
   PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
   filtering and matching-row export
@@ -86,7 +86,8 @@ What it does:
 - **Backup**, versioned local folder copies and restore to a new folder
 - **Notes**, searchable local plain-text notes with autosave, text export and
   close confirmation when a final save fails
-- **Reminders**, persistent local tasks with due dates, completion and filters
+- **Reminders**, persistent local tasks with due dates, priorities, completion
+  and filters
 - **Grapher**, bounded mathematical function plots with axes, ranges, saved graph
   documents and CSV export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
@@ -94,7 +95,8 @@ What it does:
 - **Dictionary**, offline WordNet lookup, suggestions, history, full-definition
   guest clipboard copy and text export
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
-  screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
+  screenshots, 5/10 fps AVI recording, pointer visibility, automatic self-hiding
+  and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
   window with a second screen that receives the native compositor image
 - a **settings application**: window button side, taskbar style, theme,
@@ -169,8 +171,9 @@ typing any word with a q in it drop the user back to the console.
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
-    calculator_app.v / calculator_programmer*.v  arithmetic modes, memory and history
-    terminal_selection.v  physical-row selection and Copy/Cmd-C handling
+    calculator_app.v / calculator_programmer*.v / calculator_random.c.v
+                      arithmetic modes, memory, history and random operands
+    terminal_selection.v  character/word/physical-row selection and Copy/Cmd-C handling
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     preview_app*.v  the standalone image viewer and export model
     console_app*.v  bounded log snapshots, filtering and tail following
@@ -442,18 +445,21 @@ display and adds a start/stop/reset stopwatch with tenth-second updates.
 
 Calculator offers Basic and Scientific modes. Scientific adds square root,
 reciprocal, square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e,
-plus sinh/cosh/tanh and their inverses, with selectable DEG/RAD units,
-explicit domain/finite errors and 15-significant-digit results. Hyperbolic
-functions are independent of the angle units.
+plus sinh/cosh/tanh and their inverses, with selectable DEG/RAD units and
+explicit domain/finite errors. Hyperbolic functions are independent of the
+angle units.
 Ctrl-S switches mode and Ctrl-D switches angle units in Scientific mode.
 Functions use the displayed operand, including a pending binary operation's
 right operand. Numeric paste accepts finite exponent notation in Scientific
 mode. Memory and repeated equals remain available; click a recent result to
 recall it from the bounded 20-entry history.
-Nth-root, random and EE entry remain future work. Cube root accepts negative
-operands; log2 requires a positive
-operand, and cube reports an error when its result is not finite. Copy result
-or Ctrl-C copies the displayed number in Basic or Scientific mode, or the
+EE, `e` or Shift-E starts an editable exponent. Nth-root uses the displayed
+radicand and the next operand as its degree; negative radicands require odd
+integer degrees. Rand generates an operand in [0,1), preserving pending
+arithmetic and memory. Unavailable entropy preserves the current operand and
+shows a retry status. Cube root accepts negative operands; log2 requires a
+positive operand, and cube reports an error when its result is not finite.
+Copy result or Ctrl-C copies the displayed number in Basic or Scientific mode, or the
 exact selected-base digits in Programmer mode.
 Arithmetic errors are not copied. The bounded guest clipboard service reports
 success only after acknowledgement; failed or unavailable copies preserve its
@@ -466,8 +472,10 @@ PTY for shell/program interrupt handling.
 Copy inserts a newline between physical rows and does not reassemble wrapped
 logical lines. Changed output or window geometry clears selection. Copies
 larger than 64 KiB are refused without truncating or replacing the clipboard.
-Wide and combining character cell widths, word/line selection and logical-line
-reflow remain future work.
+Double-click selects a word; triple-click selects a physical row and its
+newline when another row follows. Dragging extends whole words or rows in
+either direction. Wide and combining character cell widths, rectangular
+selection and logical-line reflow remain future work.
 The macOS comparison is [Apple's Terminal shortcut guide](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac).
 
 Preview applies all eight JPEG EXIF orientations, including mirrored forms,
@@ -476,13 +484,15 @@ and PNG export share the resulting pixel mapping. Choose Select (S), drag over
 the displayed image and choose Crop or Enter to keep that rectangle; Pan (P)
 restores drag-to-pan, and Clear or Escape removes the selection. Cropping
 replaces only the in-memory pixels, preserving alpha and the displayed EXIF/
-rotation mapping. Export PNG writes the current cropped/rotated image to a new
+rotation mapping. Export PNG writes the current edited/rotated image to a new
 path. Original Copy retains the exact cached source bytes and metadata after
-cropping, rotation or a later source-file change. Neither export overwrites an
-existing path. Undo crop/Ctrl-Z and Redo crop/Ctrl-Y restore the last crop and
-its orientation, zoom, pan and selection. A new crop replaces that one history
-step; a successful Open clears it, while failed Open/crop preserves it. Longer
-undo history, recovery, image resampling and PDF support remain future work.
+cropping, resizing, rotation or a later source-file change. Neither export
+overwrites an existing path. Width/Height and the aspect lock control bounded,
+alpha-weighted bilinear resizing in the displayed orientation. Crop and resize
+share one Undo/Ctrl-Z and Redo/Ctrl-Y step, restoring orientation, zoom, pan and
+selection. A new edit replaces that history step; a successful Open clears it,
+while failed Open/edit preserves it. Longer undo history, recovery and PDF
+support remain future work.
 The macOS comparison is [Apple's image-cropping guide](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac).
 Metadata parsing is bounded, accepts both TIFF byte orders and falls back to
 raw orientation for malformed or unsupported records. The format reference is
@@ -565,7 +575,10 @@ by three or five seconds and is written as `/root/Screenshot-<timestamp>.png`.
 Video uses a self-contained, uncompressed AVI writer at either 5 or 10 frames
 per second, scales large desktops to at most 640x480 while preserving their
 aspect ratio, and writes `/root/Recording-<timestamp>.avi`. Both modes include
-the compositor-drawn pointer. The Capture window hides before the first frame;
+the compositor-drawn pointer by default. Pointer shown/hidden controls whether
+it appears in saved pixels; choose before countdown/recording begins. Older
+compositors preserve pointer inclusion and omit the unsupported control.
+The Capture window hides before the first frame;
 it returns after a screenshot, while a recording is stopped by restoring its
 taskbar entry and pressing **Stop recording**. Closing Capture or leaving the
 desktop finalizes an active AVI so the recording remains playable. Audio is not
