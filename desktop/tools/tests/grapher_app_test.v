@@ -307,7 +307,7 @@ fn test_grapher_resize_and_native_wire_use_supported_finite_elements() {
 			if child.id != 'grapher.chart' { continue }
 			charts++
 			assert child.frame.width == tree.frame.width - 76
-			assert child.frame.height == tree.frame.height - 318
+			assert child.frame.height == tree.frame.height - 354
 			assert child.children.len <= grapher_sample_count + 24
 			for mark in child.children {
 				assert mark.kind == .view
@@ -560,4 +560,174 @@ fn test_grapher_document_controls_fit_default_and_minimum_layout() {
 		assert csv_y - document_y == 36
 		free_tree(tree)
 	}
+}
+
+fn grapher_test_png_pixels(path string) &u8 {
+	bytes := os.read_bytes(path) or { panic('read graph PNG') }
+	defer { unsafe { bytes.free() } }
+	mut dimensions := [3]int{}
+	pixels := unsafe { C.stbi_load_from_memory(bytes.data, bytes.len, &dimensions[0],
+		&dimensions[1], &dimensions[2], 4) }
+	assert pixels != unsafe { nil }
+	assert dimensions[0] == 960 && dimensions[1] == 640 && dimensions[2] == 4
+	return pixels
+}
+
+fn grapher_test_png_color(pixels &u8, x int, y int) u32 {
+	at := (y * 960 + x) * 4
+	return unsafe { u32(pixels[at]) << 16 | u32(pixels[at + 1]) << 8 | u32(pixels[at + 2]) }
+}
+
+fn test_grapher_png_decodes_and_matches_visible_samples_axes_and_domain_gaps() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-png-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.png')
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	for index, text in ['-1', '1', '-2', '2']! { app.set_field(index + 1, text) }
+	app.set_field(7, path)
+	for source in ['x', 'sqrt(x)', '1/(x-.123)', 'floor(x)', 'sqrt(-1)']! {
+		app.set_field(0, source)
+		app.export_png()
+		assert app.export_status == 'grapher.png_saved' && app.plotted && !app.dirty
+		pixels := grapher_test_png_pixels(path)
+		// Compare the decoded graph against the actual on-screen rectangle
+		// stream, independently rasterized into a simple byte mask.
+		mut mask := []u8{len: 822 * 440}
+		begin_frame_elements()
+		tree := app.chart(822, 440)
+		for child in tree.children {
+			if child.box.bg != app_accent { continue }
+			for y in int(child.frame.y) .. int(child.frame.y + child.frame.height) {
+				for x in int(child.frame.x) .. int(child.frame.x + child.frame.width) {
+					if x >= 0 && x < 822 && y >= 0 && y < 440 { mask[y * 822 + x] = 1 }
+				}
+			}
+		}
+		free_tree(tree)
+		mut curve_pixels := 0
+		for y in 0 .. 440 {
+			for x in 0 .. 822 {
+				curve := grapher_test_png_color(pixels, x + 110, y + 110) == grapher_png_curve
+				assert curve == (mask[y * 822 + x] == 1)
+				if curve { curve_pixels++ }
+				assert unsafe { pixels[((y + 110) * 960 + x + 110) * 4 + 3] } == 255
+				if source == 'sqrt(x)' && x < 400 { assert !curve }
+				if source == '1/(x-.123)' && y > 195 && y < 245 { assert !curve }
+			}
+		}
+		assert (curve_pixels == 0) == (source == 'sqrt(-1)')
+		assert grapher_test_png_color(pixels, 5, 5) == 0xffffff
+		assert grapher_test_png_color(pixels, 109, 300) == grapher_png_grid
+		mut title_pixels := 0
+		for y in 20 .. 44 { for x in 28 .. 220 {
+			if grapher_test_png_color(pixels, x, y) != 0xffffff { title_pixels++ }
+		} }
+		assert title_pixels > 30
+		unsafe { mask.free() }
+		C.stbi_image_free(pixels)
+		assert C.unlink(&char(path.str)) == 0
+	}
+}
+
+fn test_grapher_png_refuses_existing_paths_links_and_invalid_stale_fields() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-png-safe-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph.png')
+	link := disk_utility_join_path(root, 'link.png')
+	parent := disk_utility_join_path(root, 'parent')
+	through := disk_utility_join_path(parent, 'graph.png')
+	fresh := disk_utility_join_path(root, 'new.png')
+	fifo := disk_utility_join_path(root, 'pipe.png')
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() link.free() parent.free() through.free() fresh.free() fifo.free() }
+	}
+	os.write_file(path, 'keep this destination')!
+	os.symlink(path, link)!
+	os.symlink(root, parent)!
+	assert C.mkfifo(&char(fifo.str), 0o600) == 0
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	for destination in [path, link, root, fifo]! {
+		app.set_field(7, destination)
+		app.export_png()
+		assert app.export_status == 'grapher.png_exists'
+	}
+	app.set_field(7, through)
+	app.export_png()
+	assert app.export_status == 'grapher.png_failed'
+	for destination in ['', 'relative.png', '/tmp/../graph.png', '/tmp//graph.png', '/tmp/bad\xff.png', '/tmp/bad\x00.png']! {
+		app.set_field(7, destination)
+		app.export_png()
+		assert app.export_status == 'grapher.png_invalid'
+	}
+	app.set_field(7, fresh)
+	app.set_field(0, 'sin(')
+	app.export_png()
+	assert app.status == 'grapher.expression_invalid' && !app.plotted && !os.exists(fresh)
+	app.set_field(0, 'x')
+	app.set_field(1, '2')
+	app.set_field(2, '1')
+	app.export_png()
+	assert app.status == 'grapher.range_invalid' && !app.plotted && !os.exists(fresh)
+	preserved := os.read_file(path)!
+	assert preserved == 'keep this destination'
+	unsafe { preserved.free() }
+}
+
+fn test_grapher_png_keyboard_path_and_layout_preserve_document_and_csv_destinations() {
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	csv := app.field_text(5).clone()
+	document := app.field_text(6).clone()
+	defer { unsafe { csv.free() document.free() } }
+	assert app.field_text(7).ends_with('/graph.png') || app.field_text(7) == ''
+	app.handle('grapher.png_path')!
+	app.paste_input('/tmp/graph-Ж.png')
+	app.key_input('\x7f')
+	assert app.field_text(7) == '/tmp/graph-Ж.pn'
+	app.key_input('\x01relative.png\r')
+	assert app.export_status == 'grapher.png_invalid'
+	assert app.field_text(5) == csv && app.field_text(6) == document
+	for size in [ui2.rect(0, 0, 840, 636), ui2.rect(0, 0, 320, 452)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		mut controls := 0
+		mut png_y := f64(0)
+		mut csv_y := f64(0)
+		for child in tree.children {
+			if child.id in ['grapher.png_path', 'grapher.export_png'] {
+				controls++
+				assert child.frame.x >= 12 && child.frame.width > 0
+				assert child.frame.x + child.frame.width <= tree.frame.width - 12
+				assert child.frame.y + child.frame.height <= tree.frame.height - 27
+				png_y = child.frame.y
+			}
+			if child.id == 'grapher.path' { csv_y = child.frame.y }
+		}
+		assert controls == 2 && png_y - csv_y == 36
+		free_tree(tree)
+	}
+}
+
+fn test_grapher_png_writer_failure_preserves_plot_and_does_not_accept_stale_values() {
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	values := app.values
+	range := app.range
+	assert !app.write_graph_png(-1)
+	assert app.values == values && app.range == range && app.plotted
+	app.set_field(0, 'x')
+	assert app.dirty && !app.write_graph_png(-1)
 }

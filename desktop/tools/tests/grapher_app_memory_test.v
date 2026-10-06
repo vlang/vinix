@@ -179,3 +179,72 @@ fn test_grapher_repeated_document_open_save_and_failures_release_owned_memory() 
 	}
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_grapher_repeated_png_render_failed_stream_and_stale_model_release_owned_memory() {
+	long_expression := 'x+'.repeat(120) + 'x'
+	defer { unsafe { long_expression.free() } }
+	mut app := GrapherApp{}
+	app.initialize()
+	app.write_graph_png(-1)
+	C.vinix_heap_begin()
+	for _ in 0 .. 40 {
+		for expression in ['x', 'sqrt(x)', '1/(x-.123)', 'sqrt(-1)']! {
+			app.set_field(0, expression)
+			assert app.plot()
+			assert !app.write_graph_png(-1)
+		}
+		app.set_field(0, long_expression)
+		assert app.plot()
+		assert !app.write_graph_png(-1)
+		app.set_field(0, 'sin(')
+		assert !app.write_graph_png(-1)
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_grapher_repeated_png_exports_and_path_failures_release_owned_memory() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-png-memory-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.png')
+	link := disk_utility_join_path(root, 'link.png')
+	parent := disk_utility_join_path(root, 'parent')
+	through := disk_utility_join_path(parent, 'graph.png')
+	os.symlink(path, link)!
+	os.symlink(root, parent)!
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() link.free() parent.free() through.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	app.close_app()
+	C.vinix_heap_begin()
+	for _ in 0 .. 30 {
+		app.initialize()
+		app.set_field(7, path)
+		app.handle('grapher.expression')!
+		app.paste_input('sqrt(x)')
+		app.handle('grapher.export_png')!
+		assert app.export_status == 'grapher.png_saved'
+		app.handle('grapher.png_path')!
+		app.key_input('\r')
+		assert app.export_status == 'grapher.png_exists'
+		app.set_field(7, link)
+		app.export_png()
+		assert app.export_status == 'grapher.png_exists'
+		app.set_field(7, through)
+		app.export_png()
+		assert app.export_status == 'grapher.png_failed'
+		app.set_field(7, 'relative.png')
+		app.export_png()
+		assert app.export_status == 'grapher.png_invalid'
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 840, 636))!)
+		assert C.unlink(&char(path.str)) == 0
+		app.close_app()
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}

@@ -12,7 +12,11 @@ fn grapher_button(action string, key string, x int, y int, width int) ui2.Elemen
 
 fn (app &GrapherApp) field(index int, x int, y int, width int) ui2.Element {
 	count := files_rune_count(app.fields[index].bytes)
-	placeholder := if index == 6 { tr('grapher.document_path') } else { '' }
+	placeholder := if index == 6 {
+		tr('grapher.document_path')
+	} else if index == 7 {
+		tr('grapher.png_path')
+	} else { '' }
 	return ui2.Element{
 		...ui2.text_field(grapher_field_actions[index], placeholder, app.field_text(index), ui2.rect(f64(x), f64(y), f64(width), 28),
 			ui2.BoxStyle{ bg: body_panel, radius: 5 }, ui2.TextStyle{ size: 12, color: body_text }, 0)
@@ -32,6 +36,37 @@ fn grapher_project_y(value f64, minimum f64, maximum f64, height int) int {
 	if value <= minimum { return height - 1 }
 	if value >= maximum { return 0 }
 	return int((maximum - value) / (maximum - minimum) * f64(height - 1))
+}
+
+struct GrapherStroke {
+	x int
+	y int
+	width int
+	height int
+}
+
+// The frame and exported image consume the same bounded samples and connection
+// decisions, including off-range clipping and deliberately unconnected poles.
+fn (app &GrapherApp) chart_stroke(index int, width int, height int) ?GrapherStroke {
+	value := app.values[index]
+	if !value.valid { return none }
+	step := f64(width - 1) / f64(grapher_sample_count - 1)
+	x := int(f64(index) * step)
+	y := grapher_project_y(value.value, app.range[2], app.range[3], height)
+	if index > 0 && app.connect[index] {
+		previous := app.values[index - 1].value
+		if (previous < app.range[2] && value.value < app.range[2])
+			|| (previous > app.range[3] && value.value > app.range[3]) { return none }
+		previous_y := grapher_project_y(previous, app.range[2], app.range[3], height)
+		return GrapherStroke{
+			x: x
+			y: if y < previous_y { y } else { previous_y }
+			width: int(math.ceil(step)) + 1
+			height: math.abs(y - previous_y) + 2
+		}
+	}
+	if value.value < app.range[2] || value.value > app.range[3] { return none }
+	return GrapherStroke{ x: x, y: y, width: 2, height: 2 }
 }
 
 fn grapher_tick(value f64, x int, y int, width int, align ui2.Align) ui2.Element {
@@ -56,23 +91,9 @@ fn (app &GrapherApp) chart(width int, height int) ui2.Element {
 			y := grapher_project_y(0, app.range[2], app.range[3], height)
 			children << ui2.view('', ui2.rect(0, f64(y), f64(width), 1), ui2.BoxStyle{ bg: body_muted }, [])
 		}
-		step := f64(width - 1) / f64(grapher_sample_count - 1)
 		for index in 0 .. grapher_sample_count {
-			value := app.values[index]
-			if !value.valid { continue }
-			x := int(f64(index) * step)
-			y := grapher_project_y(value.value, app.range[2], app.range[3], height)
-			if index > 0 && app.connect[index] {
-				previous := app.values[index - 1].value
-				if (previous < app.range[2] && value.value < app.range[2]) || (previous > app.range[3] && value.value > app.range[3]) {
-					continue
-				}
-				previous_y := grapher_project_y(previous, app.range[2], app.range[3], height)
-				top := if y < previous_y { y } else { previous_y }
-				children << ui2.view('', ui2.rect(f64(x), f64(top), math.ceil(step) + 1, f64(math.abs(y - previous_y) + 2)), ui2.BoxStyle{ bg: app_accent }, [])
-			} else if value.value >= app.range[2] && value.value <= app.range[3] {
-				children << ui2.view('', ui2.rect(f64(x), f64(y), 2, 2), ui2.BoxStyle{ bg: app_accent }, [])
-			}
+			stroke := app.chart_stroke(index, width, height) or { continue }
+			children << ui2.view('', ui2.rect(f64(stroke.x), f64(stroke.y), f64(stroke.width), f64(stroke.height)), ui2.BoxStyle{ bg: app_accent }, [])
 		}
 	}
 	return ui2.view('grapher.chart', ui2.rect(52, 174, f64(width), f64(height)),
@@ -82,7 +103,7 @@ fn (app &GrapherApp) chart(width int, height int) ui2.Element {
 fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 	if !app.initialized { app.initialize() }
 	width := if int(size.width) > 320 { int(size.width) } else { 320 }
-	height := if int(size.height) > 416 { int(size.height) } else { 416 }
+	height := if int(size.height) > 452 { int(size.height) } else { 452 }
 	mut children := frame_elements(32)
 	children << ui2.label('', tr('app.grapher'), ui2.rect(12, 10, f64(width - 24), 26), ui2.TextStyle{ size: 18, bold: true, color: body_heading })
 	children << ui2.label('', tr('grapher.equation_label'), ui2.rect(12, 44, 38, 28), ui2.TextStyle{ size: 12, color: body_text })
@@ -101,7 +122,7 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << ui2.label('', tr('grapher.radians'), ui2.rect(310, 134, f64(width - 322), 28), ui2.TextStyle{ size: 11, color: body_muted })
 	}
 	chart_width := width - 76
-	chart_height := height - 318
+	chart_height := height - 354
 	children << app.chart(chart_width, chart_height)
 	if app.plotted {
 		children << grapher_tick(app.range[3], 2, 174, 44, .right)
@@ -109,12 +130,14 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << grapher_tick(app.range[0], 52, 176 + chart_height, chart_width / 2, .left)
 		children << grapher_tick(app.range[1], 52 + chart_width / 2, 176 + chart_height, chart_width / 2, .right)
 	}
-	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 122), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
-	children << app.field(6, 12, height - 98, width - 234)
-	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 98, 88)
-	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 98, 102)
-	children << app.field(5, 12, height - 62, width - 136)
-	children << grapher_button('grapher.export', 'grapher.export', width - 116, height - 62, 104)
+	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 158), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
+	children << app.field(6, 12, height - 134, width - 234)
+	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 134, 88)
+	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 134, 102)
+	children << app.field(5, 12, height - 98, width - 136)
+	children << grapher_button('grapher.export', 'grapher.export', width - 116, height - 98, 104)
+	children << app.field(7, 12, height - 62, width - 136)
+	children << grapher_button('grapher.export_png', 'grapher.export_png', width - 116, height - 62, 104)
 	status := if app.document_status.len > 0 {
 		app.document_status
 	} else if app.export_status.len > 0 {
