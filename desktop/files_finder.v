@@ -854,7 +854,7 @@ fn (mut a FileBrowserApp) build_finder_columns(width int, height int, mut childr
 		for entry_index := column.browser.scroll; entry_index < column.browser.entries.len
 			&& row_slot < a.visible_rows; entry_index++ {
 			entry := &column.browser.entries[entry_index]
-			entry_path := join_path(column.browser.path, entry.name)
+			entry_path := files_child_path(column.browser.path, entry.name)
 			tag_color := a.settings.first_color(entry_path)
 			unsafe { entry_path.free() }
 			selected := column.selected_row == entry_index
@@ -1068,7 +1068,7 @@ fn (mut a FileBrowserApp) build_finder_list(width int, height int, mut children 
 	mut row := 0
 	for index := a.browser.scroll; index < a.browser.entries.len && row < a.visible_rows; index++ {
 		entry := &a.browser.entries[index]
-		entry_path := join_path(a.browser.path, entry.name)
+		entry_path := files_child_path(a.browser.path, entry.name)
 		tag_color := a.settings.first_color(entry_path)
 		unsafe { entry_path.free() }
 		selected := a.browser.selected_row == index

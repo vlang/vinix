@@ -65,6 +65,12 @@ mut:
 // join builds a child path without the doubled slash that string concatenation
 // would give at the root.
 fn join_path(dir string, name string) string {
+	return files_child_path(dir, name)
+}
+
+// Keep repeated row paths distinct from V3's os.join_path intrinsic, whose
+// promoted builder header is not released by its manual-free implementation.
+fn files_child_path(dir string, name string) string {
 	if dir.ends_with('/') {
 		return dir + name
 	}
@@ -1063,7 +1069,7 @@ fn (mut a FileBrowserApp) build(size ui2.Rect) !ui2.Element {
 	mut row := 0
 	for index := a.browser.scroll; index < a.browser.entries.len && row < a.visible_rows; index++ {
 		entry := &a.browser.entries[index]
-		entry_path := join_path(a.browser.path, entry.name)
+		entry_path := files_child_path(a.browser.path, entry.name)
 		tag_color := a.settings.first_color(entry_path)
 		y := a.rows_top + row * files_row_height()
 		hovered := a.browser.hover_row == index || a.browser.selected_row == index
@@ -1210,7 +1216,7 @@ fn (mut a FileBrowserApp) build_miller_columns(width int, height int, mut childr
 			mut row_slot := 0
 			for entry_index := column.browser.scroll; entry_index < column.browser.entries.len && row_slot < a.visible_rows; entry_index++ {
 				entry := &column.browser.entries[entry_index]
-				entry_path := join_path(column.browser.path, entry.name)
+				entry_path := files_child_path(column.browser.path, entry.name)
 				tag_color := a.settings.first_color(entry_path)
 				y := rows_top + row_slot * files_row_height()
 				selected := column.selected_row == entry_index

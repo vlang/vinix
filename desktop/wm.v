@@ -611,7 +611,9 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		title_style)
 
 	mut title_children := frame_elements(6)
-	title_children << title
+	// These controls borrow persistent window ids, model strings and frame
+	// arrays. V3 deep-clones a named Element on append; transfer its fields.
+	title_children << ui2.Element{ ...title }
 	if title_icon_width > 0 {
 		text_width := d.face_for(title_style).text_width(title_text)
 		title_children << ui2.Element{
@@ -622,9 +624,9 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			}
 		}
 	}
-	title_children << minimize
-	title_children << maximize
-	title_children << close
+	title_children << ui2.Element{ ...minimize }
+	title_children << ui2.Element{ ...maximize }
+	title_children << ui2.Element{ ...close }
 	if toolbar_height > 0 {
 		title_children << ui2.Element{
 			...toolbar
@@ -654,8 +656,8 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// The body goes first: a toolbar's title bar reaches down over its top.
 	// Transfer the app tree without cloning its borrowed text and pooled arrays.
 	window_children << ui2.Element{ ...body }
-	window_children << title_bar
-	window_children << divider
+	window_children << ui2.Element{ ...title_bar }
+	window_children << ui2.Element{ ...divider }
 	// Arranged windows already fill a desktop-defined region. A normal window
 	// retains an invisible target at each corner for pointer resizing, without
 	// adding chrome over the application's surface.
@@ -713,7 +715,10 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 		return d.theme().window_body, window.content(window.width, body_height, d)
 	}
 	size := ui2.rect(0, 0, f64(window.width), f64(body_height))
-	mut app := d.apps[window.app_index]
+	// V3 promotes this dispatch wrapper because the returned tree escapes.
+	// Own the wrapper explicitly; the application and its strings stay in apps.
+	mut app := &NativeApp(d.apps[window.app_index])
+	defer { unsafe { free(app) } }
 	if mut app is RemoteApp {
 		app.tree_age_limited = d.paint_full
 	}

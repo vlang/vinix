@@ -90,8 +90,9 @@ fn test_an_idle_redraw_releases_all_temporary_allocations() {
 		for i := 0; i < desktop.windows.len; i++ {
 			desktop.windows[i].minimized = i >= visible
 		}
-		eprintln('visible ${visible}: ${measured_frame(mut desktop)} bytes')
-		print_heap_sizes('visible ${visible}')
+		live := measured_frame(mut desktop)
+		if live != 0 { print_heap_sizes('visible ${visible}') }
+		assert live == 0, '${visible} visible windows retained ${live} bytes'
 	}
 	for i := 0; i < desktop.windows.len; i++ {
 		desktop.windows[i].minimized = false
@@ -104,6 +105,41 @@ fn test_an_idle_redraw_releases_all_temporary_allocations() {
 	live := C.vinix_heap_end()
 	print_heap_sizes('live allocations by size')
 	assert live == 0, 'idle redraws retained ${live} bytes'
+}
+
+fn test_window_chrome_borrows_strings_when_toolbars_move_between_themes() {
+	mut desktop := memory_fixture_desktop()
+	// Both layouts retain different frame-pool capacities. Warm each before
+	// measuring title-bar transfer and use the hit table after the tree is freed.
+	for theme in [ThemeKind.default_, ThemeKind.macos]! {
+		desktop.settings.theme = theme
+		render_and_release(mut desktop)
+	}
+	C.vinix_heap_begin()
+	for iteration in 0 .. 40 {
+		desktop.settings.theme = if iteration % 2 == 0 { .default_ } else { .macos }
+		render_and_release(mut desktop)
+		mut chrome_targets := 0
+		for target in desktop.targets {
+			for window in desktop.windows {
+				if target.action_id == window.id_close || target.action_id == window.id_titlebar {
+					chrome_targets++
+				}
+			}
+		}
+		assert chrome_targets == 2 * desktop.windows.len
+	}
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('theme window chrome allocations by size') }
+	assert live == 0, 'window chrome theme redraws retained ${live} bytes'
+}
+
+fn test_files_child_paths_preserve_root_and_trailing_separator_semantics() {
+	for index, directory in ['/', '/home/user', '/home/user/']! {
+		path := files_child_path(directory, 'café 日本語.txt')
+		assert path == if index == 0 { '/café 日本語.txt' } else { '/home/user/café 日本語.txt' }
+		unsafe { path.free() }
+	}
 }
 
 fn test_start_menu_search_and_redraw_release_temporary_allocations() {
