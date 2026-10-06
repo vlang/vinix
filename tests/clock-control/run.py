@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Compile the clock ABI test and run it with the existing isolated VM driver."""
+"""Compile the independent V clock ABI fixture and run its isolated VM."""
 from pathlib import Path
 import importlib.util
 import os
+import runpy
 import subprocess
 import tempfile
 
@@ -24,10 +25,14 @@ def main():
     sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
     with tempfile.TemporaryDirectory(prefix="vinix-clock-vm-") as directory:
         work = Path(directory)
-        subprocess.run([os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
+        flags = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
             f"--sysroot={sysroot}", "-static", "-O2", "-fno-stack-protector",
-            "-Wall", "-Wextra", "-Werror", str(ROOT / "tests/clock-control/test.c"),
-            f"-L{sysroot / 'lib'}", "-fuse-ld=lld", "-o", str(work / "init")], check=True)
+            "-fno-strict-aliasing", "-D_GNU_SOURCE", "-Wall", "-Wextra", "-Werror"]
+        helper = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+        fixture = helper["compile_module"](ROOT / "tests/clock-control/clockfixture",
+                                           work / "fixture.o", "aarch64", flags)
+        subprocess.run(flags + [str(fixture), f"-L{sysroot / 'lib'}",
+            "-fuse-ld=lld", "-o", str(work / "init")], check=True)
         for name in ("root", "sbin", "proc", "sys"):
             (work / "rootfs" / name).mkdir(parents=True)
         subprocess.run(["tar", "--format=ustar", "-cf", str(work / "initramfs.tar"),

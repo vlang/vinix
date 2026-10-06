@@ -4,7 +4,8 @@
 including read-cadence independence, negative slews, frequency limits, and
 securelevel wall-step checks. It also runs the capability policy tests.
 
-`python3 tests/clock-control/run.py` builds a static AArch64 guest and uses the
+`python3 tests/clock-control/run.py` builds the independent V fixture as a
+static AArch64 guest and uses the
 existing isolated real-time VM driver. Set `VINIX_AARCH64_SYSROOT` for its musl
 sysroot; `VINIX_VM_RUNNER_ROOT` can select the original checkout's cached boot
 tools while `VINIX_KERNEL_DIR` selects a separately built worktree kernel.
