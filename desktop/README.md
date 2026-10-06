@@ -828,11 +828,12 @@ recorded in `SOURCES.txt` beside it on the image.
 ## Fonts
 
 Vinix has no font files and no rasteriser, so the glyphs travel inside the
-binary. `tools/genfont.py` rasterises several Roboto faces into 8-bit coverage
-atlases and writes them to `font_data.v` as base64; `font.v` decodes them at
-startup and blends the coverage, which is the same antialiasing a desktop
-toolkit would give. Roboto is licensed under the SIL Open Font License 1.1 —
-see `FONT-LICENSE.txt`.
+binary. `tools/genfont.py` rasterises several Roboto faces with Noto Sans CJK
+SC and Noto Sans JP fallback into 8-bit coverage atlases and writes them to
+`font_data.v` as base64; `font.v` decodes them at startup and blends the
+coverage, which is the same antialiasing a desktop toolkit would give.
+All three fonts use the SIL Open Font License 1.1; see
+`FONT-LICENSE.txt` and `FONT-SOURCES.md` for licensing and pinned sources.
 
 Each face is a weight and a pixel size, and the renderer picks the closest one
 to what a text style asks for rather than scaling, because a stretched bitmap
@@ -840,15 +841,25 @@ atlas looks far worse than one a couple of pixels off. The baked sizes are the
 ones the desktop's chrome uses plus those native applications ask for.
 
 Runs are decoded as UTF-8. Beyond printable ASCII each face carries the
-supplemental code points in the generator's `EXTRA_RUNES` — `÷` and `±` among
-them, which is what lets ui2's calculator label its keys properly. A candidate
-rune the font has no glyph for is dropped at generation time rather than baked
-as a `.notdef` box; the generator says which. Anything not baked draws as a
-space.
+supplemental code points in the generator's `EXTRA_RUNES`, plus characters
+used by the translation catalogs and native language names. Noto Sans CJK SC
+supplies Chinese catalog characters; bundled Noto Sans JP subsets supply
+Japanese-only characters. Every face has these glyphs at both display scales,
+aligned to Roboto's existing line height. Only the required repertoire is
+baked. A missing translation glyph fails generation; an optional candidate
+with no real glyph is dropped and reported. Anything not baked draws as a space.
 
-Regenerate after changing a size, a face or the rune list:
+Regenerate after changing a size, a face, or translation characters. The first
+run downloads and verifies the pinned Noto source fonts into a host cache:
 
     python3 desktop/tools/genfont.py
+
+When adding Japanese characters, update the bundled subsets as described in
+`fonts/README.md` before regenerating.
+
+Check every catalog character and both raster scales against the baked data:
+
+    python3 desktop/tools/tests/test_font_data.py
 
 ## Memory
 
