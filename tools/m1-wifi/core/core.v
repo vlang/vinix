@@ -17,8 +17,8 @@ fn C.vkw_terminal_restore(i32) i32
 fn C.vkw_errno() i32
 fn C.vkw_set_errno(i32)
 fn C.vkw_wipe_byte(voidptr)
-fn C.vkw_stderr() voidptr
-fn C.vkw_file_stat(voidptr, &i64, &i32) i32
+fn C.vkw_stderr() &C.FILE
+fn C.vkw_file_stat(&C.FILE, &i64, &i32) i32
 fn C.open(&char, i32, ...i32) i32
 fn C.dup(i32) i32
 fn C.read(i32, voidptr, usize) isize
@@ -286,7 +286,7 @@ fn load(fd i32, directory &char) {
 			if usize(files[i]) == 0 { die(names[i]) }
 			mut size := i64(0)
 			mut regular := i32(0)
-			if C.vkw_file_stat(files[i], &size, &regular) < 0 { die(c'firmware stat') }
+			if C.vkw_file_stat(&C.FILE(files[i]), &size, &regular) < 0 { die(c'firmware stat') }
 			if regular == 0 || size <= 0 || u64(size) > limits[i] {
 				C.fprintf(C.vkw_stderr(), c'Invalid size for %s.\n', names[i])
 				C.exit(1)

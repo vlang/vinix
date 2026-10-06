@@ -20,14 +20,21 @@ _Static_assert(BW_JOIN_SIZE == 104, "V join buffer ABI");
 _Static_assert(BW_UPLOAD_SIZE == 4112, "V upload buffer ABI");
 _Static_assert(BW_NETWORK_MAX == 32 && BW_NETWORK_ENTRY_SIZE == 48 &&
                BW_NETWORKS_SIZE == 1552, "V network buffer ABI");
-/* Opaque native terminal/stat fields and errno/volatile access only. */
-static struct termios vkw_saved_terminal;
-static inline int vkw_terminal_save(int fd) { return tcgetattr(fd, &vkw_saved_terminal); }
-static inline int vkw_terminal_hide(int fd) { struct termios state=vkw_saved_terminal; state.c_lflag &= (tcflag_t)~ECHO; return tcsetattr(fd,TCSANOW,&state); }
-static inline int vkw_terminal_restore(int fd) { return tcsetattr(fd,TCSANOW,&vkw_saved_terminal); }
-static inline int vkw_errno(void) { return errno; }
-static inline void vkw_set_errno(int value) { errno=value; }
-static inline void vkw_wipe_byte(void *p) { *(volatile uint8_t *)p=0; }
-static inline FILE *vkw_stderr(void) { return stderr; }
-static inline int vkw_file_stat(FILE *file, int64_t *size, int *regular) { struct stat st; int rc=fstat(fileno(file),&st); if(!rc) { *size=st.st_size; *regular=S_ISREG(st.st_mode); } return rc; }
+/* Native SDK declarations and a volatile byte view; algorithms live in V. */
+struct vkw_volatile_byte_view { volatile uint8_t value; };
+_Static_assert(sizeof(struct vkw_volatile_byte_view) == 1 &&
+               _Alignof(struct vkw_volatile_byte_view) == 1, "volatile byte ABI");
+#if defined(__APPLE__)
+#define vkw_native_errno __error
+#else
+#define vkw_native_errno __errno_location
+#endif
+int vkw_terminal_save(int);
+int vkw_terminal_hide(int);
+int vkw_terminal_restore(int);
+int vkw_errno(void);
+void vkw_set_errno(int);
+void vkw_wipe_byte(void *);
+FILE *vkw_stderr(void);
+int vkw_file_stat(FILE *, int64_t *, int *);
 #endif

@@ -131,6 +131,10 @@ The device model and guest controller now live in `ctlfixture/` as V; all
 exit codes, stdout and stderr with the immutable original C fixture on both
 host ABIs, then builds and runs the complete native model guest. The native
 `open`/`ioctl` entry adapter contains only ABI instructions.
+The terminal, errno, byte-wipe and file-stat helpers also live in native V.
+`run-helpers.py` compares their SDK behavior with the frozen header bodies,
+including full terminal state, output sentinels on failed `fstat` and exact
+volatile byte stores, and can run the same checks in both model guests.
 
 ## Firmware and association
 
