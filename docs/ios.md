@@ -218,8 +218,8 @@ The largest groups are:
 | UIKit | 29 |
 | Objective-C runtime | 26 |
 
-**The unchanged PPSSPP release binary renders its menus and executes a textured,
-rotating PSP cube demo on Vinix, with sound disabled.** With the optional runtime, it runs
+**The unchanged PPSSPP release binary renders its menus and runs PSP homebrew
+on Vinix, with sound disabled.** With the optional runtime, it runs
 `SceneDelegate +load`, its native C++ constructors and `main`, reads its actual
 entitlement data, reaches `UIApplicationMain`, registers notification observers,
 and enters the scene delegate declared in its binary `Info.plist`. Its own code
@@ -300,6 +300,55 @@ occupied fixed targets, real VM errors, positional-I/O offsets, pattern-fill
 boundaries, and file-URL encoding/ARC ownership. The VM, file-launch and stdio
 fixtures also pass the ARM64 host's ASan/UBSan checks.
 
+For a full 3D game, the regression downloads the developer's PSP build of
+[Nazi Zombies: Portable](https://docs.nzp.gay/landing/), a Quake-based survival
+shooter. Its engine is GPL-2.0 and its project assets are CC-BY-SA-4.0; the
+download retains the packaged licenses. The pinned
+[2026-09-24 nightly](https://github.com/nzp-team/nzportable/releases/tag/nightly)
+is `2.0.0-indev+20260924124055`:
+
+```text
+PSP ZIP:    64,412,845 bytes
+SHA-256:    2983183a7d7d6471e8ebf2c5c95290ddd558a1c44d46b9ba6a68e9987f02e89f
+EBOOT.PBP:  1,539,962 bytes
+SHA-256:    4b916c0b1d9f1607604623240b31c7291fcb9ec1585836d0a2eb3fcbd0e16d57
+```
+
+The upstream nightly URL changes when a new build is published. The downloader
+checks the pinned size and hash and rejects a changed release. Keep the verified
+`build/ios/nzportable/nzportable-psp.zip` cache to reproduce this exact build.
+Its 1,310 ZIP members expand to 98,449,920 bytes, including maps, models,
+textures, game code and sounds. Neither `EBOOT.PBP` nor PPSSPP's Mach-O is
+patched or rebuilt.
+
+```sh
+python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+  --with-ppsspp --ppsspp-muted --ppsspp-nzp --timeout 300 \
+  > build/ios/ppsspp-nzp-guest.log 2>&1
+python3 tests/ios/frame.py build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp-before.png --frame 0
+python3 tests/ios/frame.py build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp.png
+```
+
+The game is installed under the emulated memstick's `PSP/GAME/nzportable`,
+preserving its asset paths. The test presses PPSSPP's original touch controls
+to select **SOLO → Nacht der Untoten → START GAME**. It uses normal `setup.ini`
+arguments `-condebug +developer 1 +exec vinix-input.cfg`; the extra
+config binds SELECT to the engine's existing `edict 1` diagnostic command,
+followed by an `echo` marker so each report is read after all fields are written.
+This exposes the actual player's origin, health and magazine count in
+`nzp/condebug.log`. No engine test mode or substitute game implementation is
+used. The regression requires the game's `SpawnServer: ndu` and `Server spawned.`
+messages, movement of at least ten map units after holding Triangle, and a
+decreased magazine count after pressing the right shoulder button. It checks
+the emulator's own boot diagnostic, detailed changing pixels and process
+teardown, and exports full 390×680 gameplay frames before and after input.
+Success emits `iOS PASS: unchanged PPSSPP iOS binary plays NZP PSP shooter`.
+The 2026-10-06 ARM64 QEMU run reported position `(1194.1, 2103.7, 80.0)`
+changing to `(1024.0, 2076.7, 80.0)`, magazine `8 → 5`, health `100`, and
+84,592 changed framebuffer pixels. The full guest regression passed, including
+calculator, 2048, C++/UIKit/GLES and shutdown checks. This run uses the IR
+interpreter and software OpenGL rendering; sound remains disabled.
+
 `vinix-ios-ppsspp [PSP game file]` accepts a startup file;
 `VINIX_IOS_OPEN_FILE` supplies one when the launcher has no file argument. The
 file must exist in the guest. As with other GUI apps, the launching compositor
@@ -352,8 +401,8 @@ exception unwinding through Mach-O frames remains unsupported; this is a tested
 C++ subset, not a complete ABI. The stdio and scene fixtures also run under
 ASan/UBSan on the ARM64 host.
 
-The rotating-cube homebrew is verified; commercial PSP games have not been
-tested. Remaining work includes audio/device
+The rotating-cube homebrew and NZ:P's Nacht der Untoten gameplay are verified;
+commercial PSP games have not been tested. Remaining work includes audio/device
 services, additional Foundation/Darwin APIs, keyboard and multiple-touch input,
 and broader rendering coverage. Metal and the bundled MoltenVK dylib remain
 unsupported; the tested backend is OpenGL. Unsupported calls still diagnose the

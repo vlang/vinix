@@ -44,6 +44,15 @@ def prepare_images(fixtures: Path, destination: Path) -> None:
     (destination / "calculator-fat").write_bytes(fat)
 
 
+def stage_game_asset(source: str, destination: str) -> None:
+    # The host only archives these files; all game writes happen in guest RAM.
+    # Share the verified assets until then, saving a 98 MB temporary copy.
+    try:
+        os.link(source, destination)
+    except OSError:
+        shutil.copy2(source, destination)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--no-build", action="store_true", help="reuse build/ios/staging/usr/bin/run-ios")
@@ -53,6 +62,7 @@ def main() -> int:
     parser.add_argument("--with-ppsspp", action="store_true", help="probe native PPSSPP scene startup and report its unsupported API")
     parser.add_argument("--ppsspp-muted", action="store_true", help="test PPSSPP with its ordinary Sound/Enable=False preference")
     parser.add_argument("--ppsspp-cube", action="store_true", help="boot the pinned upstream PSP rotating-cube demo in the unchanged iOS app")
+    parser.add_argument("--ppsspp-nzp", action="store_true", help="play the pinned NZ:P 3D PSP shooter in the unchanged iOS app")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
@@ -63,6 +73,8 @@ def main() -> int:
         parser.error("--ppsspp-muted requires --with-ppsspp and --with-gles")
     if arguments.ppsspp_cube and not arguments.ppsspp_muted:
         parser.error("--ppsspp-cube requires --ppsspp-muted")
+    if arguments.ppsspp_nzp and (not arguments.ppsspp_muted or arguments.ppsspp_cube):
+        parser.error("--ppsspp-nzp requires --ppsspp-muted and cannot be combined with --ppsspp-cube")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")]
@@ -85,6 +97,9 @@ def main() -> int:
     if arguments.ppsspp_cube:
         subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download-cube.py"),
             "--output", str(build / "ppsspp/cube.pbp")], check=True)
+    if arguments.ppsspp_nzp:
+        subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download-nzp.py"),
+            "--output", str(build / "nzportable")], check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
@@ -99,6 +114,8 @@ def main() -> int:
         runner.FEATURE_MARKERS += (b"iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)",) if arguments.ppsspp_muted else (b"iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime",)
     if arguments.ppsspp_cube:
         runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary executes PSP cube homebrew",)
+    if arguments.ppsspp_nzp:
+        runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary plays NZP PSP shooter",)
     if arguments.with_cxx:
         runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
         runner.FEATURE_MARKERS += (b"iOS PASS: Objective-C image startup and C++ ivars",)
@@ -145,6 +162,14 @@ def main() -> int:
                 if arguments.ppsspp_cube:
                     shutil.copy2(build / "ppsspp/cube.pbp", destination / "cube.pbp")
                     (destination / "ppsspp-cube").touch()
+                if arguments.ppsspp_nzp:
+                    game = destination / "ppsspp-documents/PSP/GAME/nzportable"
+                    shutil.copytree(build / "nzportable/unpacked/nzportable", game, copy_function=stage_game_asset)
+                    # Ordinary engine arguments/configuration expose the real
+                    # player state without changing its executable or assets.
+                    (game / "setup.ini").write_text("-condebug +developer 1 +exec vinix-input.cfg\n")
+                    (game / "nzp/vinix-input.cfg").write_text('bind "SELECT" "edict 1; echo VINIX-NZP-STATE-DONE"\nbinddt "SELECT" ""\n')
+                    (destination / "ppsspp-nzp").touch()
             else:
                 shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app")
                 (destination / "PPSSPP").symlink_to("PPSSPP.app/PPSSPP")

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +45,12 @@ static uint32_t number(const void *pointer) { uint32_t value; memcpy(&value, poi
 static void transfer(int fd, void *pointer, size_t length, int writing) {
     size_t offset = 0;
     while (offset < length) {
+        if (!writing) {
+            struct pollfd waiting = {.fd = fd, .events = POLLIN};
+            int ready;
+            do { ready = poll(&waiting, 1, 30000); } while (ready < 0 && errno == EINTR);
+            if (ready <= 0) fail("application reply timeout");
+        }
         ssize_t count = writing ? write(fd, (char *)pointer + offset, length - offset) :
             read(fd, (char *)pointer + offset, length - offset);
         if (count < 0 && errno == EINTR) continue;
@@ -79,6 +86,12 @@ static void pointer(unsigned phase, int x, int y) {
     int32_t payload[7] = {(int32_t)phase, 1, 0, x, y, 390, 680};
     command_data(5, payload, sizeof(payload));
 }
+static void ticks(unsigned count) {
+    for (unsigned index = 0; index < count; ++index) { usleep(20000); command(4, ""); }
+}
+static void press(int x, int y) {
+    pointer(1, x, y); ticks(8); pointer(2, x, y); ticks(8);
+}
 static pid_t start(const char *path, const char *logfile) {
     log_path = logfile;
     startup_failed = 0;
@@ -99,7 +112,10 @@ static pid_t start(const char *path, const char *logfile) {
             setenv("VINIX_IOS_DOCUMENTS", "/opt/ios/ppsspp-documents", 1);
             setenv("VINIX_IOS_EXIT_ON_CLOSE", "1", 1);
             if (!access("/opt/ios/ppsspp-muted", F_OK)) {
-                if (!access("/opt/ios/ppsspp-cube", F_OK))
+                if (!access("/opt/ios/ppsspp-nzp", F_OK))
+                    execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp",
+                        "/opt/ios/ppsspp-documents/PSP/GAME/nzportable/EBOOT.PBP", (char *)NULL);
+                else if (!access("/opt/ios/ppsspp-cube", F_OK))
                     execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", "/opt/ios/cube.pbp", (char *)NULL);
                 else execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", (char *)NULL);
                 _exit(127);
@@ -139,6 +155,66 @@ static size_t parse(size_t offset, unsigned depth) {
 static void build(void) {
     command(1, ""); image[0] = 0; action[0] = 0;
     if (parse(0, 0) != byte_count || !image[0]) fail("shared surface view missing");
+}
+static void snapshot(uint32_t *surface, uint32_t *frame) {
+    unsigned active = __atomic_load_n(surface + 7, __ATOMIC_ACQUIRE);
+    if (active > 1) fail("PPSSPP snapshot buffer");
+    __atomic_store_n(surface + 8, active, __ATOMIC_RELEASE);
+    memcpy(frame, surface + 12 + active * 390 * 680, 390 * 680 * 4);
+    __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
+}
+static void export_frame(const uint32_t *frame, unsigned step) {
+    printf("IOS-PPSSPP-FRAME: %u %u\n", 390 / step, 680 / step);
+    for (unsigned y = 0; y < 680; y += step) {
+        fputs("IOS-PPSSPP-ROW: ", stdout);
+        for (unsigned x = 0; x < 390; x += step) printf("%06x", frame[y * 390 + x] & 0xffffff);
+        putchar('\n');
+    }
+}
+struct player_state { float origin[3], magazine, health; };
+static char *nzp_log(void) {
+    FILE *log = fopen("/opt/ios/ppsspp-documents/PSP/GAME/nzportable/nzp/condebug.log", "r");
+    static char diagnostics[131072];
+    if (!log) fail("NZP console log missing");
+    size_t length = fread(diagnostics, 1, sizeof(diagnostics) - 1, log);
+    fclose(log); diagnostics[length] = 0;
+    if (length == sizeof(diagnostics) - 1) fail("NZP console log exceeds limit");
+    return diagnostics;
+}
+static void nzp_ready(void) {
+    for (unsigned attempt = 0; attempt < 60; ++attempt) {
+        if (strstr(nzp_log(), "Server spawned.")) return;
+        ticks(50);
+    }
+    puts(nzp_log()); fail("NZP server startup timed out");
+}
+static struct player_state nzp_player(void) {
+    size_t previous = strlen(nzp_log());
+    press(194, 474); // SELECT: ordinary "edict 1" diagnostic binding.
+    char *diagnostics = nzp_log();
+    // ED_Print appends one field at a time from the emulation thread. Read
+    // only after the following ordinary echo command completes this record.
+    for (unsigned attempt = 0; ; ++attempt) {
+        if (strlen(diagnostics) > previous && strstr(diagnostics + previous, "\nVINIX-NZP-STATE-DONE ")) break;
+        if (attempt == 100) { puts(diagnostics); fail("NZP player report timed out"); }
+        ticks(5); diagnostics = nzp_log();
+    }
+    if (!strstr(diagnostics, "SpawnServer: ndu") || !strstr(diagnostics, "Server spawned.")) {
+        puts(diagnostics); fail("NZP Nacht der Untoten server did not start");
+    }
+    char *player = NULL, *cursor = diagnostics;
+    while ((cursor = strstr(cursor, "\nEDICT 1:\n"))) { player = cursor; ++cursor; }
+    struct player_state value = {0};
+    char *origin = player ? strstr(player, "\norigin ") : NULL;
+    char *magazine = player ? strstr(player, "\ncurrentmag ") : NULL;
+    char *health = player ? strstr(player, "\nhealth ") : NULL;
+    if (!origin || sscanf(origin, "\norigin '%f %f %f'", value.origin, value.origin + 1, value.origin + 2) != 3 ||
+        !health || sscanf(health, "\nhealth %f", &value.health) != 1 ||
+        (magazine && sscanf(magazine, "\ncurrentmag %f", &value.magazine) != 1)) {
+        puts(diagnostics); fail("NZP player diagnostics missing");
+    }
+    if (value.health <= 0) fail("NZP player is not alive");
+    return value;
 }
 void test_gles_ui(void) {
     pid_t child = start("/opt/ios/gles-app", "/tmp/ios-gles-app.log");
@@ -189,6 +265,7 @@ void test_gles_ui(void) {
 
 void test_ppsspp_ui(void) {
     int cube = access("/opt/ios/ppsspp-cube", F_OK) == 0;
+    int nzp = access("/opt/ios/ppsspp-nzp", F_OK) == 0;
     expected_audio_failure = access("/opt/ios/ppsspp-muted", F_OK) != 0;
     (void)start("/opt/ios/PPSSPP", "/tmp/ios-ppsspp-ui.log");
     if (expected_audio_failure) {
@@ -212,6 +289,26 @@ void test_ppsspp_ui(void) {
     memcpy(first, surface + 12 + active * pixels, pixels * 4);
     __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
     for (unsigned tick = 0; tick < 180; ++tick) { usleep(20000); command(4, ""); }
+    if (nzp) for (unsigned tick = 0; tick < 600; ++tick) { usleep(20000); command(4, ""); }
+    if (nzp) {
+        press(294, 426); ticks(100); // Cross: SOLO.
+        press(294, 426); ticks(100); // Cross: first stock map, Nacht der Untoten.
+        press(294, 426); ticks(600); // Cross: START GAME, countdown and level loading.
+        nzp_ready(); // Wait for the real server, including slower debug-log I/O.
+        press(294, 426); ticks(200); // Dismiss the game's "ready" loading screen.
+        struct player_state before = nzp_player();
+        snapshot(surface, first);
+        pointer(1, 294, 326); ticks(75); pointer(2, 294, 326); ticks(20); // Triangle: forward.
+        struct player_state moved = nzp_player();
+        press(330, 224); press(330, 224); press(330, 224); // R: fire three shots.
+        struct player_state fired = nzp_player();
+        float dx = moved.origin[0] - before.origin[0], dy = moved.origin[1] - before.origin[1];
+        printf("IOS-PSP-NZP: position=(%.1f,%.1f,%.1f)->(%.1f,%.1f,%.1f) magazine=%.0f->%.0f health=%.0f\n",
+            before.origin[0], before.origin[1], before.origin[2], moved.origin[0], moved.origin[1], moved.origin[2],
+            moved.magazine, fired.magazine, fired.health);
+        if (dx * dx + dy * dy < 100 || moved.magazine <= 0 || fired.magazine >= moved.magazine)
+            fail("NZP touch controls did not move the player and fire the weapon");
+    }
     if (cube) {
         // Compare two frames after boot, so the splash-to-game transition
         // alone cannot count as successful PSP execution or animation.
@@ -223,7 +320,7 @@ void test_ppsspp_ui(void) {
     }
     // The original menu's Settings gear: route a real UIKit touch pair to its
     // native controller, then render the resulting settings screen.
-    if (!cube) { pointer(1, 230, 34); pointer(2, 230, 34); }
+    if (!cube && !nzp) { pointer(1, 230, 34); pointer(2, 230, 34); }
     for (unsigned tick = 0; tick < 60; ++tick) { usleep(20000); command(4, ""); }
     active = __atomic_load_n(surface + 7, __ATOMIC_ACQUIRE);
     if (active > 1) fail("PPSSPP final active buffer");
@@ -262,13 +359,9 @@ void test_ppsspp_ui(void) {
         if (background[0] < 2000 || background[1] < 2000 || colored[0] < 2000 ||
             colored[1] < 2000 || animated < 1000) fail("PSP cube background, textured geometry or animation");
     }
-    // Export an actual framebuffer for visual review, sampled at two pixels.
-    puts("IOS-PPSSPP-FRAME: 195 340");
-    for (unsigned y = 0; y < 680; y += 2) {
-        fputs("IOS-PPSSPP-ROW: ", stdout);
-        for (unsigned x = 0; x < 390; x += 2) printf("%06x", last[y * 390 + x] & 0xffffff);
-        putchar('\n');
-    }
+    // Export native gameplay before/after input, or the existing sampled frame.
+    if (nzp) export_frame(first, 1);
+    export_frame(last, nzp ? 1 : 2);
     printf("IOS-PPSSPP-PIXELS: changed=%u lit=%u colors=%u\n", changed, lit, distinct);
     free(first); free(last);
     command(6, ""); close(request_fd); close(response_fd);
@@ -286,6 +379,12 @@ void test_ppsspp_ui(void) {
         if (!strstr(diagnostics, "startup path passed to argv: /opt/ios/cube.pbp") ||
             !strstr(diagnostics, "Booted /opt/ios/cube.pbp...")) fail("PSP homebrew native boot");
         puts("iOS PASS: unchanged PPSSPP iOS binary executes PSP cube homebrew");
+    }
+    if (nzp) {
+        if (!strstr(diagnostics, "startup path passed to argv: /opt/ios/ppsspp-documents/PSP/GAME/nzportable/EBOOT.PBP") ||
+            !strstr(diagnostics, "Booted /opt/ios/ppsspp-documents/PSP/GAME/nzportable/EBOOT.PBP..."))
+            fail("NZP native PSP boot");
+        puts("iOS PASS: unchanged PPSSPP iOS binary plays NZP PSP shooter");
     }
     puts("iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)");
 }

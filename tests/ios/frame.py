@@ -15,13 +15,19 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("log", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--frame", type=int, default=-1, help="frame index (default: last; negative indices count from the end)")
     args = parser.parse_args()
     text = args.log.read_text(errors="replace")
-    metadata = re.search(r"IOS-PPSSPP-FRAME: (\d+) (\d+)", text)
-    if metadata is None:
+    frames = list(re.finditer(r"IOS-PPSSPP-FRAME: (\d+) (\d+)", text))
+    if not frames:
         raise SystemExit("No native framebuffer in this log")
+    if not -len(frames) <= args.frame < len(frames):
+        raise SystemExit(f"Frame index out of range: this log has {len(frames)} frame(s)")
+    index = args.frame % len(frames)
+    metadata = frames[index]
     width, height = map(int, metadata.groups())
-    rows = re.findall(r"IOS-PPSSPP-ROW: ([0-9a-f]+)", text[metadata.end():])
+    end = frames[index + 1].start() if index + 1 < len(frames) else len(text)
+    rows = re.findall(r"IOS-PPSSPP-ROW: ([0-9a-f]+)", text[metadata.end():end])
     if not (0 < width <= 8192 and 0 < height <= 8192) or len(rows) != height or any(len(row) != width * 6 for row in rows):
         raise SystemExit("Incomplete native framebuffer in this log")
     raw = b"".join(b"\0" + bytes.fromhex(row) for row in rows)
