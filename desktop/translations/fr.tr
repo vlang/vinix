@@ -3305,7 +3305,7 @@ notes.limit
 Limite de notes ou de texte atteinte.
 -----
 notes.invalid_text
-Le texte collé doit être du texte brut UTF-8 valide.
+Le texte doit être du texte brut UTF-8 valide.
 -----
 notes.export_invalid
 Saisissez un chemin d'exportation absolu sans composants . ou ..

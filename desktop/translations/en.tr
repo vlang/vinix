@@ -3306,7 +3306,7 @@ notes.limit
 Notes or text limit reached.
 -----
 notes.invalid_text
-Paste must contain valid UTF-8 plain text.
+Text must be valid UTF-8 plain text.
 -----
 notes.export_invalid
 Enter an absolute export path without dot or parent components.

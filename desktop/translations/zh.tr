@@ -3305,7 +3305,7 @@ notes.limit
 已达到备忘录数量或文本长度限制。
 -----
 notes.invalid_text
-粘贴内容必须是有效的 UTF-8 纯文本。
+内容必须是有效的 UTF-8 纯文本。
 -----
 notes.export_invalid
 请输入不含 . 或 .. 的绝对导出路径。

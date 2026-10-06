@@ -3306,7 +3306,7 @@ notes.limit
 Se alcanzó el límite de notas o texto.
 -----
 notes.invalid_text
-El texto pegado debe ser texto plano UTF-8 válido.
+El texto debe ser texto plano UTF-8 válido.
 -----
 notes.export_invalid
 Introduzca una ruta absoluta de exportación sin componentes punto ni padre.
