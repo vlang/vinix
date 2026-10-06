@@ -556,3 +556,37 @@ Settings search opening Keyboard, all four exact maximum-integer readouts and
 wrap to zero, and a newly reopened Activity Monitor retaining Resources/Network.
 Build hashes, source revisions, test logs and guest screenshots are retained
 under `build/utility-view-validation/`.
+
+### Clipboard and image-orientation follow-up (2026-10-06)
+
+The combined utility suite passes 276 behavior cases and 86 tracked-memory
+cases across 23 modules; the parity suite passes 96 behavior and 21 memory
+cases. Settings passes 166 behavior/localization cases plus 12 memory cases.
+Every measured repeated-use group passes its zero-retention assertion. Clipboard/UTF-8 checks
+pass 27 cases, with another nine Terminal UTF-8/rebuild regressions passing.
+A separate seven-case Dictionary run executes the full 147,306-headword
+corpus and the new copy tests (109 assertions), without skipping corpus data.
+
+The complete host IPC fixture and its focused utility entry pass. The latter
+also runs as a static AArch64 executable inside Vinix with `--require-vinix`,
+requiring the actual `/dev/processes` device. It checks complete Dictionary
+copying, exact Calculator copies in all four integer bases and both decimal
+modes, scientific controls and error preservation, live Terminal UTF-8
+selection and independently seeded Cmd-C copying, and EXIF-oriented PNG
+exports, composed rotation and byte-exact Original Copy. New lifetimes and
+the IPC assertions received independent reviews.
+
+The static desktop from `cdcdcc4a` is published for Files, Activity Monitor
+and Settings. Its 5,903,976-byte artifact has SHA256
+`164e62067fddb6e1788e85b618e90ab90d6495a655952799d90e306d53bbafce`;
+all three published copies match. Production sources remain identical through
+the IPC test commit `5c942611`. A fresh QEMU utility scenario runs all five
+native app clients, the compositor and Terminal's shell. Inspected screenshots
+show Terminal, Calculator and Dictionary copies pasted into Editor, exact
+Programmer readouts with acknowledged copying, and an EXIF-oriented portrait
+composed with a manual quarter-turn. The cached test image emits its existing
+Zsh/ZLE module diagnostic; shell input and the Terminal IPC checks still pass.
+The final GUI run uses longer simulated key holds and paste settling after
+an initially inconclusive paste screenshot. Logs, both GUI observations,
+frozen source manifests, binary hashes and final screenshots are retained in
+`build/utility-copy-validation/`.
