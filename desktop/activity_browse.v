@@ -775,6 +775,7 @@ fn (mut a ActivityApp) search_key_input(input string) {
 }
 
 fn (mut a ActivityApp) key_input(input string) {
+	defer { a.save_view_preferences() }
 	if !a.search_focused && input == '\x05' { a.handle_utility(activity_action_export_list); return }
 	if !a.search_focused && input == '\x0c' { a.clear_histories(); return }
 	if a.columns_key_input(input) { return }
@@ -907,6 +908,8 @@ fn (a &ActivityApp) next_poll_ms() u64 {
 }
 
 fn (mut a ActivityApp) close_app() {
+	a.save_view_preferences()
+	a.preferences.close()
 	if a.utility_status.len > 0 { unsafe { a.utility_status.free() } }
 	a.inspector.close()
 	a.resources.free()

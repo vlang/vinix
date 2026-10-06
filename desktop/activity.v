@@ -771,6 +771,7 @@ mut:
 	startup           ActivityStartup
 	gpu               ActivityGpu
 	energy            ActivityEnergy
+	preferences       ActivityPreferenceStore
 	utility_status    string
 	view              ActivityView
 	kill_failed       bool
@@ -803,6 +804,7 @@ fn open_activity(mut _ Desktop) !NativeApp {
 	if app.monitor.error != '' {
 		return error(app.monitor.error)
 	}
+	app.load_view_preferences(if desktop_user_home != '' { desktop_user_home } else { desktop_home })
 	app.monitor.last_poll_ms = monotonic_millis()
 	app.sample_panels()
 	return app
@@ -877,7 +879,9 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 	a.build_browse_toolbar(mut children, width)
 	a.build_view_tabs(mut children, width)
 	if a.inspector_open || a.view != .processes {
-		a.build_view_body(mut children, width, height)
+		warning_height := if a.view_preferences_warning().len > 0 { activity_footer_height } else { 0 }
+		a.build_view_body(mut children, width, height - warning_height)
+		a.build_preferences_warning(mut children, width, height)
 		return ui2.screen(app_surface, children)
 	}
 
@@ -957,12 +961,14 @@ fn (mut a ActivityApp) build(size ui2.Rect) !ui2.Element {
 		}
 		children << ui2.label('', if a.kill_failed {
 			tr('activity.error.kill')
+		} else if a.view_preferences_warning().len > 0 {
+			a.view_preferences_warning()
 		} else if a.utility_status != '' {
 			a.utility_status
 		} else {
 			a.monitor.summary
 		}, ui2.rect(f64(activity_padding), f64(footer_y + 5), f64(summary_width), 16), ui2.TextStyle{
-			color: if a.kill_failed { files_error } else { body_muted }
+			color: if a.kill_failed || a.view_preferences_warning().len > 0 { files_error } else { body_muted }
 			size:  11
 		})
 	}
@@ -1139,6 +1145,7 @@ fn activity_row_cells(entry ActivityRow, width int) []ui2.Element {
 }
 
 fn (mut a ActivityApp) handle(event_id string) ! {
+	defer { a.save_view_preferences() }
 	if a.handle_view(event_id) { return }
 	if a.controls.handle(event_id, mut a.monitor) { return }
 	if a.handle_browse(event_id) {
