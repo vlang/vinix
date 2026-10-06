@@ -4,5 +4,5 @@ targets: [ arm64-ios ]
 install-name: '/System/Library/Frameworks/UIKit.framework/UIKit'
 exports:
   - targets: [ arm64-ios ]
-    symbols: [ _UIApplicationMain, '_OBJC_CLASS_$_UIViewController', '_OBJC_METACLASS_$_UIViewController', '_OBJC_CLASS_$_UILabel', '_OBJC_CLASS_$_UIButton', '_OBJC_CLASS_$_UIFont', '_OBJC_CLASS_$_UIColor', '_OBJC_CLASS_$_UIWindow', '_OBJC_CLASS_$_UIScreen' ]
+    symbols: [ _UIApplicationMain, '_OBJC_CLASS_$_UIApplication', '_OBJC_CLASS_$_UIWindowScene', '_OBJC_CLASS_$_UIViewController', '_OBJC_METACLASS_$_UIViewController', '_OBJC_CLASS_$_UILabel', '_OBJC_CLASS_$_UIButton', '_OBJC_CLASS_$_UIFont', '_OBJC_CLASS_$_UIColor', '_OBJC_CLASS_$_UIWindow', '_OBJC_CLASS_$_UIScreen' ]
 ...

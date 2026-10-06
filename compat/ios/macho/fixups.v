@@ -152,7 +152,13 @@ fn (image Image) contains_address(address u64) bool {
 // The chain words are read from the file, so failure cannot leave a partly
 // rewritten chain to be interpreted as more linker metadata.
 pub fn (image Image) plan_fixups(layout Layout, runtime_base u64, resolver Resolver) ![]Fixup {
-	if image.fixup_size == 0 { return image.plan_legacy_fixups(layout, runtime_base, resolver) }
+	return image.plan_fixups_with_lazy(layout, runtime_base, resolver, resolver)
+}
+
+// Data and chained imports are always resolved eagerly. Only validated legacy
+// lazy function slots may use a separate resolver (for first-call binding).
+pub fn (image Image) plan_fixups_with_lazy(layout Layout, runtime_base u64, resolver Resolver, lazy_resolver Resolver) ![]Fixup {
+	if image.fixup_size == 0 { return image.plan_legacy_fixups(layout, runtime_base, resolver, lazy_resolver) }
 	if image.legacy_fixups { return error('Mach-O: mixed chained and legacy fixups are not supported') }
 	r := Reader{image.data[int(image.fixup_offset)..int(image.fixup_offset + image.fixup_size)]}
 	imported := imports(r)!

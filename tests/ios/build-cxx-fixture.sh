@@ -12,3 +12,12 @@ mkdir -p "$OUTPUT"
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -no_fixup_chains -e _main "$OUTPUT/cxx.o" "$ROOT/tests/ios/libcxx.tbd" \
     "$ROOT/tests/ios/libSystem.tbd" -o "$OUTPUT/cxx"
+
+"${IOS_CLANGXX:-clang++}" -target arm64-apple-ios15.0 -isysroot "$SDK" \
+    -std=c++17 -fobjc-arc -fno-objc-exceptions -fno-exceptions -fno-stack-protector \
+    -O1 -Wall -Wextra -Werror -Wno-error=incompatible-sysroot \
+    -c "$ROOT/tests/ios/startup.mm" -o "$OUTPUT/startup.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$OUTPUT/startup.o" "$ROOT/tests/ios/libcxx.tbd" \
+    "$ROOT/tests/ios/libSystem.tbd" "$ROOT/tests/ios/startup.tbd" \
+    "$ROOT/examples/ios-calculator/api/Foundation.tbd" "$ROOT/tests/ios/GameController.tbd" -o "$OUTPUT/startup"

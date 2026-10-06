@@ -51,8 +51,44 @@ SYM(ios_objc_super):
  * fixed signature, so the host compiler supplies its own libc varargs ABI. */
 .global SYM(ios_snprintf)
 SYM(ios_snprintf):
-    ldr d0, [sp]
-    b SYM(ios_format_double)
+    mov x3, sp
+    b SYM(ios_snprintf_stack)
+.global SYM(ios_printf)
+SYM(ios_printf):
+    mov x1, sp
+    b SYM(ios_printf_stack)
+.global SYM(ios_fprintf)
+SYM(ios_fprintf):
+    mov x2, sp
+    b SYM(ios_fprintf_stack)
+.global SYM(ios_sprintf)
+SYM(ios_sprintf):
+    mov x2, sp
+    b SYM(ios_sprintf_stack)
+.global SYM(ios_sscanf)
+SYM(ios_sscanf):
+    mov x2, sp
+    b SYM(ios_sscanf_stack)
+.global SYM(ios_asprintf)
+SYM(ios_asprintf):
+    mov x2, sp
+    b SYM(ios_asprintf_stack)
+.global SYM(ios_open)
+SYM(ios_open):
+    mov x2, sp
+    b SYM(ios_open_stack)
+.global SYM(ios_snprintf_checked)
+SYM(ios_snprintf_checked):
+    mov x5, sp
+    b SYM(ios_snprintf_checked_stack)
+.global SYM(ios_sprintf_checked)
+SYM(ios_sprintf_checked):
+    mov x4, sp
+    b SYM(ios_sprintf_checked_stack)
+.global SYM(ios_nslog)
+SYM(ios_nslog):
+    mov x1, sp
+    b SYM(ios_nslog_stack)
 /* Darwin's TLV thunk preserves argument registers: a compiler may resolve
  * TLS after preparing the arguments to another call. Only x0 is the result. */
 .global SYM(ios_tlv_get_addr)
@@ -89,6 +125,34 @@ SYM(ios_tlv_get_addr):
     ldp q6, q7, [sp, #256]
     add sp, sp, #288
     ret
+/* A per-import thunk supplies its index in x16. Resolve without disturbing
+ * integer, HFA/vector, indirect-result, stack or link-register arguments. */
+.global SYM(ios_lazy_entry)
+SYM(ios_lazy_entry):
+    sub sp, sp, #224
+    stp x0, x1, [sp, #0]
+    stp x2, x3, [sp, #16]
+    stp x4, x5, [sp, #32]
+    stp x6, x7, [sp, #48]
+    stp x8, x30, [sp, #64]
+    stp q0, q1, [sp, #80]
+    stp q2, q3, [sp, #112]
+    stp q4, q5, [sp, #144]
+    stp q6, q7, [sp, #176]
+    mov x0, x16
+    bl SYM(ios_lazy_resolve)
+    mov x16, x0
+    ldp x0, x1, [sp, #0]
+    ldp x2, x3, [sp, #16]
+    ldp x4, x5, [sp, #32]
+    ldp x6, x7, [sp, #48]
+    ldp x8, x30, [sp, #64]
+    ldp q0, q1, [sp, #80]
+    ldp q2, q3, [sp, #112]
+    ldp q4, q5, [sp, #144]
+    ldp q6, q7, [sp, #176]
+    add sp, sp, #224
+    br x16
 #ifndef __APPLE__
 .section .note.GNU-stack,"",%progbits
 #endif

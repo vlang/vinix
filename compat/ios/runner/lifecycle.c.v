@@ -24,6 +24,7 @@ struct Destructor {
 struct ImageRuntime {
 mut:
 	base u64
+	path string
 	image macho.Image
 	layout macho.Layout
 	started bool

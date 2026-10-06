@@ -62,40 +62,52 @@ executing a GUI app directly from a shell does not create a window. Set
 | Universal binaries | 32/64-bit slice tables, both byte orders; prefer ordinary ARM64 over ARM64e |
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
-| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy pointer rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; lazy slots resolved before execution |
-| Image lifecycle | Checked `LC_ROUTINES_64`, initializer pointers/offsets, module terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
+| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in library `dlopen`/`dlsym`/`dlerror` |
+| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
 | Thread-local storage | Darwin TLV descriptors, initialized and zero-filled templates, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
-| C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t` and 32-bit ctype-mask layouts; native strings, streams, regex and shared ownership tested in Vinix |
-| libSystem | `_puts`, `_atoi`, `_malloc`, `_free`, `_strlen`, `_strcmp`, memory copy/move/compare/search/zero, `_strtod`, `_floorf`, unbiased `_arc4random_uniform`; Darwin ARM64 `snprintf("%.12g", double)` adapter; block ABI helpers; pthread create/join with null attributes |
-| Objective-C | Class/metaclass registration, superclass dispatch, absolute/relative method lists, checked metadata, nonfragile ivar adjustment, native method execution, nil returns, allocation/new/class, retain/release/strong stores, autorelease pools, ARC destructors, zeroing weak references and copied block properties |
-| Foundation | NSObject; UTF-8/constant NSString and integer/object formatting; NSNumber integers, NSIndexPath value equality, NSArray/NSMutableArray, NSMutableDictionary, fast enumeration and NSTimer callbacks |
-| UIKit | UIApplicationMain/delegate launch, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
-| Resources | XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
+| C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
+| libSystem | Memory/string/conversion/math subset; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
+| Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
+| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers and file-backed standard user defaults |
+| UIKit | UIApplicationMain with its principal class/application/delegate objects, single manifest window-scene connection, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
+| Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
 
 Header, command and segment ranges are checked before loading. Chained pointers
 are checked against their file-backed segment and page before any memory is
-rewritten. Every import is resolved before any chain is rewritten. Gaps
+rewritten. Chained and data imports are resolved before relocation. Legacy lazy
+function imports must occupy `S_LAZY_SYMBOL_POINTERS`, with no addend; missing
+weak imports remain null. Only those function slots may defer resolution. Gaps
 are inaccessible and no segment is writable and executable together. The
 runner releases its mapping on return or link failure and exits after one app.
 
 ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyld
 binding opcodes, TLS pointer/initializer sections and multiple chain starts
-per page are rejected. Objective-C categories, +load/+initialize, exceptions,
-Swift metadata are unsupported. Blocks support object/block captures, but not
+per page are rejected. Objective-C exceptions and Swift metadata are unsupported.
+Blocks support object/block captures, but not
 `__block` by-reference captures. The runtime and weak tables are single-threaded.
 Mach services,
 direct Darwin syscalls, dynamic framework loading, Swift/SwiftUI, general
-Foundation/UIKit APIs, scenes, compiled nibs/storyboards and Auto Layout are not
+Foundation/UIKit APIs, multiple scenes, compiled nibs/storyboards and Auto Layout are not
 implemented. View trees have bounded depth and at most 64 children per view.
 UIView animations execute their blocks/completions synchronously; only their
 final states are drawn, without sliding/pop interpolation or layer transforms.
 
 Unknown strong imports and unknown methods fail with a specific diagnostic.
-General Darwin variadic calls such as `_printf` cannot be forwarded to musl.
-The calculator's `snprintf` double format and NSString's supported substitutions
-have calling-convention adapters.
+Darwin varargs are converted explicitly to the host ABI; `long double` formats
+remain unsupported. Dynamic loading exposes built-in compatibility libraries;
+external Mach-O dylibs are not loaded. Non-default thread attributes and some
+Darwin flags/errno values still require translation. Property lists support
+strings, signed integers, reals, booleans, arrays, dictionaries and data, with
+size, nesting and object-count limits; dates, UID objects and mutable plist
+options are unsupported. The scene bridge connects one window delegate from
+`Info.plist`; foreground/background transitions and additional scene APIs remain
+unfinished. Framework class descriptors and constants do not imply that their
+graphics, audio, sensor or media methods are implemented.
+User defaults use an atomically replaced per-bundle plist under
+`Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
+App groups, custom preference suites and security-scoped bookmarks are unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 
@@ -115,12 +127,10 @@ v -enable-globals -cc clang -gc none \
   -o build/ios/run-ios-ppsspp-host compat/ios/runner
 build/ios/run-ios-ppsspp-host --imports \
   build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP
-build/ios/run-ios-ppsspp-host \
-  build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP
 
 # Inspect and attempt the identical executable in a real Vinix ARM64 guest:
-./scripts/build-ios-aarch64.sh
-python3 tests/ios/run.py --no-build --with-ppsspp
+./scripts/build-ios-aarch64.sh --with-cxx
+python3 tests/ios/run.py --no-build --with-cxx --with-ppsspp
 ```
 
 The downloader verifies the release's 31,124,277-byte IPA against the publisher's
@@ -144,17 +154,23 @@ The largest groups are:
 | UIKit | 29 |
 | Objective-C runtime | 26 |
 
-**PPSSPP does not launch on Vinix yet.** Both the host runner and the Vinix guest
-reject it before its entry point with exit status 1. The executable requires
-libSystem APIs and graphics/audio frameworks beyond the
-current subset, including OpenGL ES, Metal and AudioToolbox. The bundle contains
-an additional MoltenVK dylib. No app UI or emulation was reached.
+**PPSSPP executes native startup on Vinix, but its menu and emulation do not
+work yet.** With the optional C++ runtime, the unchanged release binary runs
+`SceneDelegate +load`, its native C++ constructors and `main`, reads its actual
+entitlement data, reaches `UIApplicationMain`, registers notification observers,
+and enters the scene delegate declared in its binary `Info.plist`. Its own code
+then starts the worker/UPnP threads, registers its VFS asset/document paths,
+reads configuration files and constructs its native view controller. The current
+guest stops at `NSOperationQueue setName:`, which is not implemented yet.
+Darwin private JIT probes fail normally; no successful entitlement or ptrace
+operation is fabricated.
 
-The guest regression explicitly prints `iOS BLOCKED: upstream PPSSPP rejected
-before entry point` after verifying the import count and rejection. Passing this
-regression verifies inspection and the rejection diagnostic, rather than app
-compatibility. `--with-2048` can be combined with `--with-ppsspp` to exercise the
-working app in the same guest. Host inspection/attempts also run under ASan/UBSan.
+The guest regression stages the whole upstream app bundle and reports
+`iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime`. It checks the
+767-import inspection, native `+load` and scene-launch messages, exit status 1
+and the explicit unsupported-API diagnostic. Passing this probe verifies that
+progress and failure, not a working PPSSPP UI. `--with-ppsspp` requires
+`--with-cxx`; add `--with-2048` to verify the working apps in the same guest.
 
 Binaries without chained fixups previously reported no imports. `--imports` reads
 bounded `LC_SYMTAB`/`nlist_64` records, filters defined/debug/local/common symbols,
@@ -169,29 +185,37 @@ threads and runs a registered destructor after returning from `main`.
 The optional C++ build provides all 187 C++ symbols imported by PPSSPP. It uses
 pinned, SHA-256-verified LLVM/Alpine sources and archives, without copying Apple
 library implementations. The following regression executes native iOS C++
-constructors, string growth/erase, stream insertion/extraction, regex matching,
-shared ownership and destructors in the same Vinix guest as calculator/2048:
+constructors, string growth/erase, streams, regex, shared ownership, eight-thread
+mutex/condition synchronization and concurrent once callbacks. Additional native
+Mach-O fixtures cover lazy unsupported imports, Darwin FILE/varargs/stat/mmap
+layouts, superclass/category load order, reentrant class initialization,
+Objective-C++ ivar lifetime, UTF-16 strings, notification removal/weak filtering,
+weak GameController notification constants, scene connection, and preferences
+across separate process executions. XML plist tests preserve whitespace and
+mixed text/CDATA order:
 
 ```sh
 python3 tests/ios/run.py --with-cxx --with-2048 --with-ppsspp
 # Independently validate PPSSPP's actual linker streams without executing it:
 VINIX_IOS_PPSSPP_BINARY="$PWD/build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP" \
   v -enable-globals -gc none test compat/ios/macho
+VINIX_IOS_PPSSPP_PLIST="$PWD/build/ios/ppsspp/unpacked/Payload/PPSSPP.app/Info.plist" \
+  v -cc clang -gc none test compat/ios/plist
 ```
 
 `./scripts/build-ios-aarch64.sh --with-cxx` enables this library in the runner.
 The C++ fixture uses Apple's public C++ headers from `IOS_SDK` or the available
 command-line-tools SDK, compiles for **arm64-apple-ios15.0**, and links only the
 repository's import stubs. The library is rebuilt for Vinix with musl. C++
-exception unwinding through Mach-O frames and Darwin pthread mutex/condition
-layouts remain unsupported; this is a tested C++ subset, not a complete ABI.
+exception unwinding through Mach-O frames remains unsupported; this is a tested
+C++ subset, not a complete ABI. The stdio and scene fixtures also run under
+ASan/UBSan on the ARM64 host.
 
-**These changes do not make PPSSPP launch yet.** The remaining rejection is for
-unimplemented frameworks/libraries, rather than legacy linking, initializers or
-TLS. PPSSPP still needs its GLKit/EAGL rendering and UIKit scene lifecycle,
-additional Foundation and Darwin libSystem APIs, plus audio and device services.
-The PPSSPP guest marker continues to report this failure explicitly. No PPSSPP
-menu or PSP game has been run.
+The remaining work includes additional Foundation and Darwin APIs, GLKit/EAGL
+and OpenGL ES rendering, audio/device services, and foreground/background scene
+events. Metal and the bundled MoltenVK dylib are also unsupported. No PPSSPP menu
+or PSP game has been run. The guest's diagnostic names the next API actually
+reached, so an unused framework import does not hide executable startup progress.
 
 ## Local Apple Calculator inspection
 

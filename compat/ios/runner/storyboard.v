@@ -5,6 +5,7 @@ module main
 
 import encoding.xml
 import os
+import plist
 
 fn xml_resource(path string) !xml.XMLDocument {
 	if os.file_size(path) > 1024 * 1024 { return error('XML resource exceeds limit') }
@@ -22,23 +23,6 @@ fn xml_resource(path string) !xml.XMLDocument {
 fn xml_child(node xml.XMLNode, name string) ?xml.XMLNode {
 	for child in node.children { if child is xml.XMLNode && child.name == name { return child } }
 	return none
-}
-
-fn xml_text(node xml.XMLNode) string {
-	for child in node.children { if child is string { return child } }
-	return ''
-}
-
-fn plist_string(document xml.XMLDocument, key string) string {
-	dictionary := xml_child(document.root, 'dict') or { return '' }
-	mut found := false
-	for child in dictionary.children {
-		if child is xml.XMLNode {
-			if found { return if child.name == 'string' { xml_text(child) } else { '' } }
-			found = child.name == 'key' && xml_text(child) == key
-		}
-	}
-	return ''
 }
 
 fn storyboard_view(node xml.XMLNode, controller u64, controller_id string, depth int) !u64 {
@@ -113,8 +97,9 @@ fn storyboard_view(node xml.XMLNode, controller u64, controller_id string, depth
 fn ui_load_storyboard(delegate u64) ! {
 	path := os.join_path(ios_runtime.bundle, 'Info.plist')
 	if !os.is_file(path) { return }
-	info := xml_resource(path)!
-	name := plist_string(info, 'UIMainStoryboardFile')
+	info := plist.parse(os.read_bytes(path)!)!
+	defer { info.free() }
+	name := info.fields['UIMainStoryboardFile'].text
 	if name == '' { return }
 	if name.contains('/') || name.contains('..') {
 		return error('invalid storyboard resource name')

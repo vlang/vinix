@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FEATURES = (
     b"iOS PASS: Mach-O arithmetic and libSystem imports",
     b"iOS PASS: legacy dyld imports and image/TLS lifecycle",
+    b"iOS PASS: lazy function imports defer unsupported calls",
+    b"iOS PASS: Darwin stdio, varargs and system queries",
+    b"iOS PASS: native UIKit scene and application launch",
     b"iOS PASS: return status and unsupported imports",
     b"iOS PASS: universal executable selects ARM64",
     b"iOS PASS: ARM64e and malformed images rejected",
@@ -42,11 +45,13 @@ def main() -> int:
     parser.add_argument("--no-build", action="store_true", help="reuse build/ios/staging/usr/bin/run-ios")
     parser.add_argument("--with-2048", action="store_true", help="also build and run pinned upstream iOS-2048")
     parser.add_argument("--with-cxx", action="store_true", help="also build and execute native iOS C++ ABI fixtures")
-    parser.add_argument("--with-ppsspp", action="store_true", help="probe the publisher's PPSSPP iOS binary (currently rejected)")
+    parser.add_argument("--with-ppsspp", action="store_true", help="probe native PPSSPP scene startup and report its unsupported API")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
         parser.error("timeout must be positive")
+    if arguments.with_ppsspp and not arguments.with_cxx:
+        parser.error("--with-ppsspp requires --with-cxx for PPSSPP's native C++ runtime")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")]
@@ -74,9 +79,10 @@ def main() -> int:
         b"iOS PASS: upstream 2048 launch, swipes, merges, timers and ARC teardown",
     ) if arguments.with_2048 else ())
     if arguments.with_ppsspp:
-        runner.FEATURE_MARKERS += (b"iOS BLOCKED: upstream PPSSPP rejected before entry point",)
+        runner.FEATURE_MARKERS += (b"iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime",)
     if arguments.with_cxx:
         runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
+        runner.FEATURE_MARKERS += (b"iOS PASS: Objective-C image startup and C++ ivars",)
     with tempfile.TemporaryDirectory(prefix="vinix-ios-vm-") as directory:
         work = Path(directory)
         rootfs = work / "rootfs"
@@ -84,17 +90,19 @@ def main() -> int:
             (rootfs / name).mkdir(parents=True)
         destination = rootfs / "opt/ios"
         shutil.copy2(build / "staging/usr/bin/run-ios", destination / "run-ios")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "lazy", "stdio"):
             shutil.copy2(build / "fixtures" / name, destination / name)
+        shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         if arguments.with_cxx:
             shutil.copy2(build / "fixtures/cxx", destination / "cxx")
+            shutil.copy2(build / "fixtures/startup", destination / "startup")
         shutil.copy2(build / "objc/Calculator.app/Calculator", destination / "UIKitCalculator")
         if arguments.with_2048:
             shutil.copytree(build / "2048/NumberTileGame.app", destination / "NumberTileGame.app")
             shutil.copy2(build / "2048/model-tests", destination / "model-tests")
         if arguments.with_ppsspp:
-            # Current blockers are checked before loading resources or opening UI.
-            shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP", destination / "PPSSPP")
+            shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app")
+            (destination / "PPSSPP").symlink_to("PPSSPP.app/PPSSPP")
         prepare_images(build / "fixtures", destination)
         # Same small static musl sysroot used by the existing syscall tests.
         sysroot = Path(os.environ.get("VINIX_IOS_TEST_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))

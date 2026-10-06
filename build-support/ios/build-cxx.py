@@ -77,6 +77,18 @@ def main() -> None:
         raise RuntimeError("libc++ ctype_base header changed")
     ctype_abi = (ROOT / "build-support/ios/cxx-ctype.inc").read_text()
     locale_header.write_text(text.replace(needle, "public:\n" + ctype_abi))
+    thread_header = headers / "__thread/support/pthread.h"
+    thread_text = thread_header.read_text()
+    old_tls = "typedef pthread_key_t __libcpp_tls_key;"
+    old_create = "return pthread_key_create(__key, __at_exit);"
+    if thread_text.count(old_tls) != 1 or thread_text.count(old_create) != 1:
+        raise RuntimeError("libc++ TLS key header changed")
+    # Darwin exposes an eight-byte key in __thread_specific_ptr. Convert the
+    # native four-byte musl key locally rather than changing pthread's ABI.
+    tls_patch = thread_text.replace(old_tls, "typedef uint64_t __libcpp_tls_key;").replace(old_create,
+        "pthread_key_t native_key; int result = pthread_key_create(&native_key, __at_exit); "
+        "if (!result) *__key = native_key; return result;")
+    thread_header.write_text(tls_patch)
     objects = output / "objects"
     objects.mkdir(exist_ok=True)
     flags = [str(llvm / "clang++"), "--target=aarch64-linux-musl", f"--sysroot={args.sysroot}",
@@ -86,7 +98,7 @@ def main() -> None:
         "-D_LIBCPP_ABI_ALTERNATE_STRING_LAYOUT", "-DVINIX_IOS_CXX_ABI", "-std=c++23", "-O2", "-fPIC", "-ffixed-x18",
         "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-c"]
     stamp = hashlib.sha256((repr(flags) + subprocess.check_output([str(llvm / "clang++"), "--version"]).decode()
-        + (ROOT / "build-support/ios/cxx-abi.h").read_text() + ctype_abi).encode()).hexdigest()
+        + (ROOT / "build-support/ios/cxx-abi.h").read_text() + ctype_abi + tls_patch).encode()).hexdigest()
     stamp_file = output / "build-stamp"
     cached = stamp_file.exists() and stamp_file.read_text() == stamp
     # libc++abi supplies new/delete and type_info, avoiding duplicate runtimes.

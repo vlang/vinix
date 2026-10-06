@@ -270,7 +270,9 @@ fn test_required_commands_and_unimplemented_platforms_are_explicit() {
 	assert parse(bad)!.execution_issues().len == 0
 	bad = fixture_image()
 	put_string(mut bad, 320, '/unimplemented/library.a')
-	assert parse(bad)!.execution_issues().any(it.contains('framework/library'))
+	assert parse(bad)!.execution_issues().len == 0
+	image := parse(bad)!
+	if _ := image.plan_fixups(image.layout(4096)!, 0x900000000, reject_resolver) { assert false }
 }
 
 fn test_library_strings_and_sections_are_bounded_by_their_command() {
@@ -443,6 +445,18 @@ fn legacy_fixture(rebase []u8, bind []u8, weak []u8, lazy []u8, exports []u8) []
 	}
 	put(mut data, 0x4000, 0x100000200, 8)
 	put(mut data, 0x4008, 0x100000204, 8)
+	// Add a real lazy pointer section to __DATA, moving later commands.
+	for i := 399; i >= 248; i-- { data[i + 80] = data[i] }
+	for i in 248 .. 328 { data[i] = 0 }
+	put(mut data, 20, 480 - 32, 4)
+	put(mut data, 180, 152, 4)
+	put(mut data, 240, 1, 4)
+	put_string(mut data, 248, '__la_symbol_ptr')
+	put_string(mut data, 264, '__DATA')
+	put(mut data, 280, 0x100004000, 8)
+	put(mut data, 288, 0x4000, 8)
+	put(mut data, 296, 0x4000, 4)
+	put(mut data, 312, 7, 4)
 	return data
 }
 
@@ -498,12 +512,36 @@ fn test_legacy_rejects_bad_ranges_types_counts_and_opcodes() {
 	expect_fixup_failure(legacy_fixture([], [u8(0x72), 0, 0x90], [], [], []))
 	expect_fixup_failure(legacy_fixture([], [u8(0xd0)], [], [], []))
 	mut bad := legacy_fixture([], [], [], [], [])
-	put(mut bad, 360, 0xffffffff, 4)
-	put(mut bad, 364, 1, 4)
+	put(mut bad, 440, 0xffffffff, 4)
+	put(mut bad, 444, 1, 4)
 	expect_parse_failure(bad)
 }
 
 fn probe_resolver(_ string, _ string) !u64 { return 0x12345678 }
+
+fn reject_resolver(_ string, _ string) !u64 { return error('unsupported import') }
+
+fn test_lazy_resolver_only_accepts_function_slots_and_preserves_missing_weak_null() {
+	mut stream := [u8(0x11), 0x40]
+	stream << '_unknown'.bytes()
+	stream << [u8(0), 0x72, 0x18, 0x90, 0]
+	image := parse(legacy_fixture([], [], [], stream, []))!
+	layout := image.layout(4096)!
+	assert image.plan_fixups_with_lazy(layout, 0x900000000, reject_resolver, probe_resolver)! == [Fixup{0x4018, 0x12345678}]
+	mut weak := stream.clone()
+	weak[1] = 0x41 // BIND_SYMBOL_FLAGS_WEAK_IMPORT
+	weak_image := parse(legacy_fixture([], [], [], weak, []))!
+	assert weak_image.plan_fixups_with_lazy(layout, 0x900000000, reject_resolver, probe_resolver)! == [Fixup{0x4018, 0}]
+	mut bad_data := legacy_fixture([], [], [], stream, [])
+	put(mut bad_data, 312, 0, 4) // S_REGULAR must never receive a function thunk.
+	bad := parse(bad_data)!
+	if _ := bad.plan_fixups_with_lazy(layout, 0x900000000, reject_resolver, probe_resolver) { assert false }
+	mut addend := [u8(0x11), 0x40]
+	addend << '_unknown'.bytes()
+	addend << [u8(0), 0x60, 1, 0x72, 0x18, 0x90, 0]
+	bad_addend := parse(legacy_fixture([], [], [], addend, []))!
+	if _ := bad_addend.plan_fixups_with_lazy(layout, 0x900000000, reject_resolver, probe_resolver) { assert false }
+}
 
 // Optional regression against the exact downloaded, unmodified upstream IPA.
 // Fake addresses are used only to validate the linker; no code is executed.

@@ -6,6 +6,7 @@ import time
 fn string_text(object u64) string {
 	if object == 0 { return '' }
 	if object in ios_runtime.constants {
+		if text := ios_runtime.constant_utf8[object] { return text }
 		return unsafe { tos(&u8(read64(object + 16)), int(read64(object + 24))) }
 	}
 	return ctext(u64(obj_header(object).text))
@@ -25,7 +26,12 @@ fn object_equal(left u64, right u64) bool {
 		'NSIndexPath' {
 			obj_header(left).number == obj_header(right).number && obj_header(left).section == obj_header(right).section
 		}
-		'NSNumber' { obj_header(left).number == obj_header(right).number }
+		'NSNumber' {
+			a := obj_header(left)
+			b := obj_header(right)
+			if a.is_real || b.is_real { (if a.is_real { a.real_number } else { f64(a.number) }) == (if b.is_real { b.real_number } else { f64(b.number) }) }
+			else { a.number == b.number }
+		}
 		'NSString' { string_text(left) == string_text(right) }
 		else { false }
 	}
@@ -56,6 +62,14 @@ fn collection_remove(mut header ObjHeader, index int) {
 }
 
 fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if selector == 'isKindOfClass:' {
+		frame.x[0] = u64(objc_is_kind(object, frame.x[2]))
+		return true
+	}
+	if selector == 'respondsToSelector:' {
+		frame.x[0] = u64(objc_responds(object, unsafe { &char(frame.x[2]) }))
+		return true
+	}
 	if selector == 'class' {
 		frame.x[0] = objc_class(object)
 		return true
@@ -119,8 +133,30 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		frame.x[0] = u64(string_text(object).str)
 		return true
 	}
+	if selector == 'length' && objc_is_kind(object, ios_runtime.names['NSString']) {
+		mut length := u64(0)
+		for byte in string_text(object) {
+			if byte & 0xc0 != 0x80 { length += if byte >= 0xf0 { u64(2) } else { u64(1) } }
+		}
+		frame.x[0] = length
+		return true
+	}
+	if selector == 'isEqualToString:' {
+		frame.x[0] = u64(frame.x[2] != 0 && string_text(object) == string_text(frame.x[2]))
+		return true
+	}
+	if selector == 'stringByAppendingString:' {
+		if frame.x[2] == 0 { panic('iOS: NSString append requires a string') }
+		text := string_text(object) + string_text(frame.x[2])
+		frame.x[0] = make_string(unsafe { &char(text.str) })
+		unsafe { text.free() }
+		return true
+	}
 	mut header := obj_header(object)
 	match selector {
+		'boolValue' { frame.x[0] = u64(header.number != 0 || header.real_number != 0) }
+		'integerValue', 'unsignedIntegerValue', 'intValue' { frame.x[0] = u64(if header.is_real { i64(header.real_number) } else { header.number }) }
+		'doubleValue' { frame_float_return(mut frame, 0, if header.is_real { header.real_number } else { f64(header.number) }) }
 		'row' { frame.x[0] = u64(header.number) }
 		'section' { frame.x[0] = u64(header.section) }
 		'stringValue' {
@@ -130,7 +166,7 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		}
 		'count' { frame.x[0] = u64(header.items.len) }
 		'firstObject' { frame.x[0] = if header.items.len == 0 { u64(0) } else { header.items[0] } }
-		'objectAtIndexedSubscript:' {
+		'objectAtIndex:', 'objectAtIndexedSubscript:' {
 			index := frame.x[2]
 			if index >= u64(header.items.len) { panic('iOS: array index out of range') }
 			frame.x[0] = header.items[int(index)]
@@ -142,7 +178,7 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		}
 		'addObject:' { array_append(mut header, frame.x[2]) }
 		'removeObjectAtIndex:' { collection_remove(mut header, int(frame.x[2])) }
-		'objectForKeyedSubscript:' {
+		'objectForKey:', 'objectForKeyedSubscript:' {
 			index := dictionary_index(header, frame.x[2])
 			frame.x[0] = if index < 0 { u64(0) } else { header.items[index] }
 		}

@@ -15,3 +15,24 @@ done
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -no_fixup_chains -e _main "$output/calculator.o" "$repo/tests/ios/libSystem.tbd" \
     -o "$output/calculator-legacy"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror -c "$repo/tests/ios/lazy.c" -o "$output/lazy.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$output/lazy.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/lazy.tbd" -o "$output/lazy"
+SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -isysroot "$SDK" -D_FORTIFY_SOURCE=0 \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror -Wno-error=incompatible-sysroot \
+    -c "$repo/tests/ios/stdio.c" -o "$output/stdio.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$output/stdio.o" "$repo/tests/ios/libSystem.tbd" -o "$output/stdio"
+
+mkdir -p "$output/SceneFixture.app"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/scene.m" -o "$output/scene.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$output/scene.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" \
+    "$repo/examples/ios-calculator/api/UIKit.tbd" -o "$output/SceneFixture.app/SceneFixture"
+cp "$repo/tests/ios/scene.plist" "$output/SceneFixture.app/Info.plist"

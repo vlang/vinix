@@ -34,6 +34,9 @@ mut:
 	meta    bool
 	methods map[string]u64
 	owned   bool
+	load_imp u64
+	initializing bool
+	initialized bool
 }
 
 // The header is private to Vinix. The returned object still begins with the
@@ -64,6 +67,13 @@ mut:
 	deadline    i64
 	repeat      bool
 	loaded      bool
+	data []u8
+	file voidptr
+	external_data u64
+	external_size u64
+	free_data bool
+	real_number f64
+	is_real bool
 }
 
 struct ObjRect {
@@ -91,12 +101,26 @@ mut:
 	live         int
 	trace        bool
 	constants    map[u64]bool
+	constant_utf8 map[u64]string
+	load_classes []u64
+	load_categories []ObjLoad
+	framework_data map[string]u64
+	framework_objects []u64
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
 	block_refs   map[u64]int
 	block_isa    [3]u64
 	transform    [6]f64
 	bundle       string
+	device u64
+	bundle_object u64
+	application u64
+	notification_center u64
+	audio_session u64
+	defaults u64
+	locale u64
+	empty_dictionary u64
+	observers []&NotificationObserver
 	selectors    []string
 	dirty        bool
 	pointer_down bool
@@ -110,15 +134,29 @@ fn objc_start() {
 	ios_runtime = &ObjRuntime{ trace: os.getenv('VINIX_IOS_TRACE') == '1' }
 	ios_runtime.pool.flags |= .noslices
 	ios_runtime.timers.flags |= .noslices
+	ios_runtime.observers.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
-		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView'] {
+		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
+        'NSData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
+        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'NSSet', 'UITraitCollection', 'UIImage', 'UIPasteboard',
+        'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
+        'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
+        'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
+        'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
+        'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary'] {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
-			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView' { ios_runtime.names['UIView'] }
+			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
+			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController' { ios_runtime.names['UIViewController'] }
+            'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
+            'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
+			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'NSMutableArray' { ios_runtime.names['NSArray'] }
 			'NSMutableDictionary' { ios_runtime.names['NSDictionary'] }
@@ -158,6 +196,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	objc_initialize(cls)
 	info := ios_runtime.classes[cls] or { panic('iOS: allocation of an unknown class') }
 	memory := C.calloc(1, sizeof(ObjHeader) + usize(info.size))
 	if memory == unsafe { nil } { panic('iOS: out of memory') }
@@ -169,13 +208,14 @@ fn objc_allocate(cls u64) u64 {
 	header.items = []u64{}
 	header.keys = []u64{}
 	header.gestures = []u64{}
+	header.data = []u8{}
 	header.items.flags |= .noslices
 	header.keys.flags |= .noslices
 	header.gestures.flags |= .noslices
 	object := u64(memory) + sizeof(ObjHeader)
 	unsafe { *(&u64(object)) = cls }
 	ios_runtime.live++
-	return object
+	return objc_construct(object, cls)
 }
 
 fn objc_retain(object u64) u64 {
@@ -220,6 +260,10 @@ fn objc_release(object u64) {
 			ios_runtime.weak[location] = 0
 		}
 	}
+	dealloc := native_method(read64(object), 'dealloc')
+	if dealloc != 0 {
+		unsafe { ObjVoid(voidptr(dealloc))(object, c'dealloc') }
+	}
 	// Invoke each class's compiler-generated ARC destructor once, derived first.
 	mut cls := read64(object)
 	for _ in 0 .. 128 {
@@ -244,7 +288,11 @@ fn objc_release(object u64) {
 		header.items.free()
 		header.keys.free()
 		header.gestures.free()
+		header.data.free()
 	}
+	if header.file != unsafe { nil } { C.fclose(header.file) }
+	if header.free_data { C.free(unsafe { voidptr(header.external_data) }) }
+	objc_destroy_weak(unsafe { &header.target })
 	C.free(header.text)
 	C.free(header)
 	ios_runtime.live--
@@ -289,11 +337,22 @@ fn objc_stop() {
 	ios_runtime.timers.clear()
 	objc_release(ios_runtime.window)
 	objc_release(ios_runtime.screen)
+	objc_release(ios_runtime.device)
+	objc_release(ios_runtime.bundle_object)
+	objc_release(ios_runtime.application)
+	notification_stop()
+	objc_release(ios_runtime.notification_center)
+	objc_release(ios_runtime.audio_session)
+	objc_release(ios_runtime.defaults)
+	objc_release(ios_runtime.locale)
+	for object in ios_runtime.framework_objects { objc_release(object) }
+	for _, address in ios_runtime.framework_data { C.free(unsafe { voidptr(address) }) }
 	objc_pool_pop(1)
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
+	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {
 		if info.owned { C.free(unsafe { voidptr(address) }) }
 	}
@@ -314,24 +373,36 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		}
 	}
 	if library == '/usr/lib/libSystem.B.dylib' {
+		if address := system_data_symbol(symbol) { return address }
 		if address := block_symbol(symbol) { return address }
 		if symbol == '_strtod' { return u64(unsafe { voidptr(C.strtod) }) }
-		if symbol == '_snprintf' { return u64(unsafe { voidptr(C.ios_snprintf) }) }
 		return libsystem_symbol(library, symbol)
 	}
 	if library == '/usr/lib/libobjc.A.dylib' {
+		if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
+		for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
+			if symbol.starts_with(prefix) {
+				cls := ios_runtime.names[symbol[prefix.len..]] or { break }
+				return if prefix == '_OBJC_CLASS_$_' { cls } else { read64(cls) }
+			}
+		}
 		address := match symbol {
 			'_objc_msgSend' { unsafe { voidptr(C.ios_objc_msgsend) } }
+			'_objc_getClass' { unsafe { voidptr(objc_get_class) } }
 			'_objc_msgSendSuper2' { unsafe { voidptr(C.ios_objc_super) } }
 			'_objc_retain', '_objc_retainAutoreleasedReturnValue' {
 				unsafe { voidptr(objc_retain) }
 			}
 			'_objc_release' { unsafe { voidptr(objc_release) } }
+			'_objc_retainAutorelease', '_objc_retainAutoreleaseReturnValue' { unsafe { voidptr(objc_retain_autorelease) } }
+			'_objc_setProperty_nonatomic' { unsafe { voidptr(objc_property_strong) } }
 			'_objc_autoreleaseReturnValue' { unsafe { voidptr(objc_autorelease) } }
 			'_objc_alloc' { unsafe { voidptr(objc_allocate) } }
 			'_objc_opt_new' { unsafe { voidptr(objc_new) } }
 			'_objc_alloc_init' { unsafe { voidptr(objc_new) } }
 			'_objc_opt_class' { unsafe { voidptr(objc_class) } }
+			'_objc_opt_isKindOfClass' { unsafe { voidptr(objc_is_kind) } }
+			'_objc_opt_respondsToSelector' { unsafe { voidptr(objc_responds) } }
 			'_objc_retainBlock' { unsafe { voidptr(block_copy) } }
 			'_objc_setProperty_nonatomic_copy' { unsafe { voidptr(objc_property_copy) } }
 			'_objc_initWeak', '_objc_storeWeak' { unsafe { voidptr(objc_store_weak) } }
@@ -347,6 +418,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		}
 		return u64(address)
 	}
+	if address := framework_symbol(library, symbol) { return address }
 	if library !in ['/System/Library/Frameworks/Foundation.framework/Foundation',
 		'/System/Library/Frameworks/UIKit.framework/UIKit',
 		'/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
@@ -435,9 +507,6 @@ fn (m ObjMetadata) methods(list u64) !map[string]u64 {
 			return error('iOS: method implementation is not executable')
 		}
 		selector := m.string_at(name)!
-		if selector in ['load', 'initialize'] {
-			return error('iOS: Objective-C +load/+initialize is not implemented')
-		}
 		methods[selector] = imp
 	}
 	return methods
@@ -482,12 +551,14 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 			size += delta
 		}
 	}
+	methods := m.methods(read64(ro + 32))!
 	ios_runtime.classes[cls] = &ObjClass{
 		name:    name
 		parent:  parent
 		size:    size
 		meta:    meta
-		methods: m.methods(read64(ro + 32))!
+		methods: methods
+		load_imp: if meta { methods['load'] } else { u64(0) }
 	}
 	if !meta { ios_runtime.names[name] = cls }
 }
@@ -503,20 +574,11 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 				m.range(start, section.size, false)!
 				for offset := u64(0); offset < section.size; offset += 32 {
 					address := start + offset
-					if read32(address + 8) != 0x7c8 {
-						return error('iOS: only UTF-8 constant strings are supported')
-					}
-					m.range(read64(address + 16), read64(address + 24) + 1, false)!
-					if unsafe { *(&u8(read64(address + 16) + read64(address + 24))) } != 0 {
-						return error('iOS: constant string is not terminated')
-					}
+					m.constant_string(address)!
 					ios_runtime.constants[address] = true
 				}
 			}
-			if section.name in ['__objc_catlist', '__objc_nlclslist', '__objc_nlcatlist'] && section.size != 0 {
-				return error('iOS: Objective-C categories/+load are not implemented')
-			}
-			if section.name != '__objc_classlist' { continue }
+			if section.name !in ['__objc_classlist', '__objc_nlclslist'] { continue }
 			if section.size % 8 != 0 || section.size > 32768 {
 				return error('iOS: invalid Objective-C class list')
 			}
@@ -529,4 +591,20 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 	}
 	for cls in classes { m.register(cls, 0)! }
 	for cls in classes { m.register(read64(cls), 0)! }
+	ios_runtime.load_classes = classes
+	mut attached := map[u64]bool{}
+	for segment in image.segments {
+		for section in segment.sections {
+			if section.name !in ['__objc_catlist', '__objc_nlcatlist'] { continue }
+			if section.size % 8 != 0 || section.size > 32768 { return error('iOS: invalid Objective-C category list') }
+			address := base + section.address - layout.base
+			m.range(address, section.size, false)!
+			for offset := u64(0); offset < section.size; offset += 8 {
+				category := read64(address + offset)
+				if category in attached { continue }
+				attached[category] = true
+				m.attach_category(category)!
+			}
+		}
+	}
 }

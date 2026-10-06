@@ -29,7 +29,7 @@ static void run(const char *image, const char *left, const char *op,
         _exit(127);
     }
     close(descriptors[1]);
-    char output[8192];
+    char output[32768];
     size_t length = 0;
     for (;;) {
         ssize_t count = read(descriptors[0], output + length, sizeof(output) - length - 1);
@@ -48,6 +48,9 @@ static void run(const char *image, const char *left, const char *op,
             left ? left : "", op ? op : "", right ? right : "", status, output);
         fail("Mach-O result/status mismatch");
     }
+    if (!strcmp(image, "/opt/ios/PPSSPP") && (!strstr(output, "SceneDelegate: Launching PPSSPP") ||
+        !strstr(output, "V panic: iOS:") || (!strstr(output, "unimplemented") && !strstr(output, "unsupported") && !strstr(output, "not implemented"))))
+        fail("PPSSPP did not reach scene launch or explicit unsupported API failure");
     printf("iOS RESULT: %s", output);
 }
 
@@ -66,15 +69,31 @@ int main(void) {
     run("/opt/ios/calculator-legacy", "19", "+", "23", 0, "IOS-CALCULATOR: 42\n");
     run("/opt/ios/lifecycle", NULL, NULL, NULL, 0, "IOS-LIFECYCLE: destructor\n");
     puts("iOS PASS: legacy dyld imports and image/TLS lifecycle");
+    run("/opt/ios/lazy", NULL, NULL, NULL, 0, "IOS-LAZY: unused unavailable framework call did not block entry");
+    run("/opt/ios/lazy", "call", NULL, NULL, 1, "unsupported API reached by app:");
+    puts("iOS PASS: lazy function imports defer unsupported calls");
+    run("/opt/ios/stdio", NULL, NULL, NULL, 0, "IOS-STDIO: FILE layout, buffers, varargs and sysctl queries");
+    puts("iOS PASS: Darwin stdio, varargs and system queries");
+    run("/opt/ios/SceneFixture.app/SceneFixture", NULL, NULL, NULL, 0,
+        "IOS-SCENE: native app delegate, manifest scene connection and window");
+    puts("iOS PASS: native UIKit scene and application launch");
+    if (!access("/opt/ios/PPSSPP", R_OK)) {
+        run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
+        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "SceneDelegate class was loaded!");
+        puts("iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime");
+    }
     if (!access("/opt/ios/cxx", R_OK)) {
         run("/opt/ios/cxx", NULL, NULL, NULL, 0, "IOS-CXX: destructor\n");
         run("/opt/ios/cxx", "throw", NULL, NULL, 1, "C++ exception unwinding through Mach-O frames is not implemented");
         puts("iOS PASS: native C++ strings, streams, regex and lifetime");
+        run("/opt/ios/startup", NULL, NULL, NULL, 0, "IOS-STARTUP: load, categories, initialize, ObjC++ lifetime and UTF-16");
+        run("/opt/ios/startup", "verify-preferences", NULL, NULL, 0, "IOS-STARTUP: preferences persisted across native Mach-O executions");
+        puts("iOS PASS: Objective-C image startup and C++ ivars");
     }
     run(calculator, "1", "/", "0", 3, "IOS-CALCULATOR: division by zero\n");
     run(calculator, "1", "?", "2", 2, "IOS-CALCULATOR: unknown operator\n");
     run(calculator, NULL, NULL, NULL, 2, "usage: calculator");
-    run("/opt/ios/unsupported", NULL, NULL, NULL, 1, "libSystem symbol is not implemented: _printf");
+    run("/opt/ios/unsupported", NULL, NULL, NULL, 1, "libSystem symbol is not implemented: _mach_msg_server");
     puts("iOS PASS: return status and unsupported imports");
     run("/opt/ios/calculator-fat", "19", "+", "23", 0, "IOS-CALCULATOR: 42\n");
     puts("iOS PASS: universal executable selects ARM64");
@@ -85,11 +104,6 @@ int main(void) {
     if (!access("/opt/ios/model-tests", R_OK)) {
         run("/opt/ios/model-tests", NULL, NULL, NULL, 0, "iOS PASS: upstream 2048 eight model merge tests");
         test_2048();
-    }
-    if (!access("/opt/ios/PPSSPP", R_OK)) {
-        run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
-        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "framework/library is not implemented:");
-        puts("iOS BLOCKED: upstream PPSSPP rejected before entry point");
     }
     puts("VINIX iOS GUEST: PASS");
     for (;;) pause();

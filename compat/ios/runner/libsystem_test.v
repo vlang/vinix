@@ -16,7 +16,7 @@ fn test_fixed_argument_libsystem_calls() {
 	assert darwin_atoi(c'-999999999999999999999999') == int(-2147483647 - 1)
 	assert darwin_atoi(c'hello') == 0
 	assert libsystem_symbol('/usr/lib/libSystem.B.dylib', '_puts')! != 0
-	if _ := libsystem_symbol('/usr/lib/libSystem.B.dylib', '_printf') {
+	if _ := libsystem_symbol('/usr/lib/libSystem.B.dylib', '_mach_msg_server') {
 		assert false
 	}
 	if _ := libsystem_symbol('/usr/lib/libobjc.A.dylib', '_puts') {

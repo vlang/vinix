@@ -214,7 +214,7 @@ fn (image Image) legacy_resolve(imported Import, weak_stream bool, layout Layout
 	}
 }
 
-fn (image Image) legacy_bindings(info FileRange, lazy bool, weak_stream bool, layout Layout, base u64, resolver Resolver) ![]Fixup {
+fn (image Image) legacy_bindings(info FileRange, lazy bool, weak_stream bool, layout Layout, base u64, resolver Resolver, lazy_resolver Resolver) ![]Fixup {
 	mut c := image.dyld_cursor(info)!
 	mut segment := -1
 	mut address := u64(0)
@@ -258,10 +258,17 @@ fn (image Image) legacy_bindings(info FileRange, lazy bool, weak_stream bool, la
 		if count == 0 { continue }
 		if count > 1048576 || u64(result.len) + count > 1048576 { return error('Mach-O: too many dyld bindings') }
 		if pointer_type != 1 { return error('Mach-O: only pointer bindings are supported') }
+		if lazy {
+			if addend != 0 { return error('Mach-O: lazy function binding has an addend') }
+			for i in u64(0) .. count {
+				image.legacy_lazy_pointer(layout, segment, address + i * (8 + skip))!
+			}
+		}
 		imported := Import{ordinal: ordinal, weak: weak, name: name}
 		key := '${ordinal}:${weak}:${name}'
 		value := if key in resolved { resolved[key] } else {
-			v := image.legacy_resolve(imported, weak_stream, layout, base, resolver)!
+			v := image.legacy_resolve(imported, weak_stream, layout, base,
+				if lazy && !weak { lazy_resolver } else { resolver })!
 			resolved[key] = v
 			v
 		}
@@ -279,12 +286,23 @@ fn (image Image) legacy_bindings(info FileRange, lazy bool, weak_stream bool, la
 	return result
 }
 
-fn (image Image) plan_legacy_fixups(layout Layout, base u64, resolver Resolver) ![]Fixup {
+fn (image Image) legacy_lazy_pointer(layout Layout, segment_index int, within u64) ! {
+	image.legacy_pointer(layout, segment_index, within)!
+	segment := image.segments[segment_index]
+	for section in segment.sections {
+		if section.flags & 0xff != 7 { continue } // S_LAZY_SYMBOL_POINTERS
+		address := segment.address + within
+		if address >= section.address && address - section.address <= section.size
+			&& section.size - (address - section.address) >= 8 { return }
+	}
+	return error('Mach-O: lazy function binding is outside a lazy pointer section')
+}
+
+fn (image Image) plan_legacy_fixups(layout Layout, base u64, resolver Resolver, lazy_resolver Resolver) ![]Fixup {
 	mut result := image.legacy_rebases(layout, base) or { return error('Mach-O rebases: ${err}') }
-	result << image.legacy_bindings(image.bind_info, false, false, layout, base, resolver) or { return error('Mach-O bindings: ${err}') }
-	// Resolve every lazy slot up front; no Darwin dyld_stub_binder is executed.
-	result << image.legacy_bindings(image.lazy_bind_info, true, false, layout, base, resolver) or { return error('Mach-O lazy bindings: ${err}') }
+	result << image.legacy_bindings(image.bind_info, false, false, layout, base, resolver, lazy_resolver) or { return error('Mach-O bindings: ${err}') }
+	result << image.legacy_bindings(image.lazy_bind_info, true, false, layout, base, resolver, lazy_resolver) or { return error('Mach-O lazy bindings: ${err}') }
 	// Coalescing intentionally overwrites rebased pointers to weak definitions.
-	result << image.legacy_bindings(image.weak_bind_info, false, true, layout, base, resolver) or { return error('Mach-O weak bindings: ${err}') }
+	result << image.legacy_bindings(image.weak_bind_info, false, true, layout, base, resolver, lazy_resolver) or { return error('Mach-O weak bindings: ${err}') }
 	return result
 }

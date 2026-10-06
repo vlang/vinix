@@ -5,7 +5,21 @@ install-name:    '/usr/lib/libSystem.B.dylib'
 current-version: 1
 exports:
   - targets:     [ arm64-ios ]
-    symbols:     [ _puts, _atoi, _malloc, _free, _strlen, _strcmp, _memcpy, _memset, _printf,
+    symbols:     [ _puts, _atoi, _malloc, _free, _strlen, _strcmp, _memcpy, _memset, _printf, _abort, _mach_msg_server,
                    __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder,
-                   _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume ]
+                   _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,
+                   _pthread_setspecific, _pthread_getspecific, _pthread_key_create,
+                   _pthread_key_delete, _pthread_self, _pthread_once,
+                   _pthread_mutex_lock, _pthread_mutex_unlock, _pthread_mutex_init,
+                   _pthread_mutex_destroy, _pthread_mutex_trylock,
+                   _pthread_cond_wait, _pthread_cond_timedwait, _pthread_cond_signal,
+                   _pthread_cond_broadcast, _pthread_cond_init, _pthread_cond_destroy,
+                   _snprintf, _vsnprintf, _sscanf, _fprintf, _fopen, _fwrite, _ftell,
+                   _rewind, ___srget, _ungetc, _fgets, _clearerr, _fseek, ___swbuf,
+                   _fflush, _fread, _fclose, ___stderrp, _sysctlbyname, ___error,
+                   _putc, _getc, _feof, _ferror, _dispatch_once_f,
+                   _asprintf, ___snprintf_chk, _clock_gettime, _gmtime_r, _strftime,
+                   _posix_spawnp, _dlopen, _dlsym, _dlerror, _dlclose,
+                   _open, _write, _close, _unlink, _shm_open, _shm_unlink,
+                   _ftruncate, _mmap, _munmap, _stat, _fstat ]
 ...

@@ -370,17 +370,8 @@ pub fn (image Image) execution_issues() []string {
 	for command in image.required_unknown {
 		issues << 'required load command 0x${command.hex()} is not implemented'
 	}
-	for library in image.libraries {
-		$if ios_cxx ? {
-			if library.name == '/usr/lib/libc++.1.dylib' { continue }
-		}
-		if library.name !in ['/usr/lib/libSystem.B.dylib', '/usr/lib/libobjc.A.dylib',
-			'/System/Library/Frameworks/Foundation.framework/Foundation',
-			'/System/Library/Frameworks/UIKit.framework/UIKit',
-			'/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] && !library.weak {
-			issues << 'framework/library is not implemented: ${library.name}'
-		}
-	}
+	// Compatibility is checked per import while binding. An unused lazy
+	// function in a dependency must not block supported startup instructions.
 	for segment in image.segments {
 		if segment.flags & ~u32(0x14) != 0 {
 			issues << 'segment flags 0x${segment.flags.hex()} are not implemented: ${segment.name}'

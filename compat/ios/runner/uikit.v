@@ -72,6 +72,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 		}
 		return 0
 	}
+	objc_initialize(if object in ios_runtime.classes { object } else { read64(object) })
 	imp := native_method(cls, selector)
 	if imp != 0 { return imp }
 	info := ios_runtime.classes[cls] or { panic('iOS: message to an unknown class') }
@@ -82,6 +83,8 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if selector == 'dealloc' { return true } // Disposal follows the native dealloc chain.
+	if platform_framework_dispatch(object, selector, mut frame) { return true }
 	if foundation_dispatch(object, selector, mut frame) { return true }
 	// Class methods are inherited through their metaclasses.
 	if object in ios_runtime.classes {
@@ -258,11 +261,16 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) int {
 	_ = argc
 	_ = argv
-	_ = principal
+	principal_name := if principal == 0 { 'UIApplication' } else { string_text(principal) }
+	principal_class := ios_runtime.names[principal_name] or { panic('iOS: application principal class is missing') }
+	if ios_runtime.application != 0 { panic('iOS: UIApplicationMain cannot be entered twice') }
+	ios_runtime.application = objc_new(principal_class)
 	name := string_text(delegate_name)
 	cls := ios_runtime.names[name] or { panic('iOS: application delegate class is missing') }
 	delegate := objc_new(cls)
 	defer { objc_release(delegate) }
+	store_field(ios_runtime.application, 0, delegate)
+	defer { store_field(ios_runtime.application, 0, 0) }
 	ui_load_storyboard(delegate) or {
 		eprintln('iOS: ${err}')
 		return 1
@@ -270,7 +278,9 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 	selector := c'application:didFinishLaunchingWithOptions:'
 	imp := native_method(cls, ctext(u64(selector)))
 	if imp == 0 { panic('iOS: application delegate launch method is missing') }
-	if !unsafe { ObjLaunch(voidptr(imp))(delegate, selector, 0, 0) } { return 1 }
+	if !unsafe { ObjLaunch(voidptr(imp))(delegate, selector, ios_runtime.application, 0) } { return 1 }
+	scene_delegate := ui_connect_scene() or { eprintln('iOS: ${err}'); return 1 }
+	defer { objc_release(scene_delegate) }
 	if ios_runtime.window == 0 { panic('iOS: application did not create a window') }
 	request := os.getenv('VINIX_REQUEST_FD')
 	response := os.getenv('VINIX_RESPONSE_FD')

@@ -9,6 +9,7 @@ import crypto.rand
 #include <errno.h>
 
 fn C.puts(&char) int
+fn C.abort()
 fn C.malloc(usize) voidptr
 fn C.free(voidptr)
 fn C.memcpy(voidptr, voidptr, usize) voidptr
@@ -86,7 +87,7 @@ fn darwin_free(pointer voidptr) {
 }
 
 fn darwin_lazy_binder() {
-	panic('iOS: unexpected lazy binding after eager relocation')
+	panic('iOS: unsupported invocation of dyld_stub_binder')
 }
 
 fn darwin_bzero(pointer voidptr, size usize) {
@@ -97,17 +98,27 @@ fn darwin_pthread_create(thread_id voidptr, attributes voidptr, start voidptr, a
 	// Darwin's opaque pthread_attr_t is not a musl pthread_attr_t. The
 	// default attributes need no conversion; other attributes fail explicitly.
 	if attributes != unsafe { nil } { return C.EINVAL }
-	return C.pthread_create(thread_id, attributes, start, argument)
+	return pthread_error(C.pthread_create(thread_id, attributes, start, argument))
 }
 
 // Fixed-argument AAPCS64 calls with compatible Apple and musl layouts.
-// Variadic calls (printf), Darwin FILE*, errno/TLS, and Objective-C dispatch
-// cannot be forwarded this way and deliberately have no symbol here.
+// Varargs, Darwin FILE*, errno/TLS and pthread objects use explicit adapters.
 fn libsystem_symbol(library string, symbol string) !u64 {
 	if library != '/usr/lib/libSystem.B.dylib' {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
+	if address := pthread_symbol(symbol) { return address }
+	if address := stdio_symbol(symbol) { return address }
+	if address := dyld_symbol(symbol) { return address }
+	if address := fixed_symbol(symbol) { return address }
+	if address := dispatch_symbol(symbol) { return address }
+	if address := time_symbol(symbol) { return address }
+	if address := files_symbol(symbol) { return address }
 	address := match symbol {
+		'_sysconf' { unsafe { voidptr(darwin_sysconf) } }
+		'_sysctlbyname' { unsafe { voidptr(darwin_sysctlbyname) } }
+		'___error' { unsafe { voidptr(darwin_errno) } }
+		'_abort' { unsafe { voidptr(C.abort) } }
 		'dyld_stub_binder' { unsafe { voidptr(darwin_lazy_binder) } }
 		'_pthread_create' { unsafe { voidptr(darwin_pthread_create) } }
 		'_pthread_join' { unsafe { voidptr(C.pthread_join) } }

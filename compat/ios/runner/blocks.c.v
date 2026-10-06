@@ -99,7 +99,16 @@ fn block_symbol(symbol string) ?u64 {
 }
 
 fn objc_class(object u64) u64 {
-	return if object == 0 || object in ios_runtime.classes { object } else { read64(object) }
+	cls := if object == 0 || object in ios_runtime.classes { object } else { read64(object) }
+	objc_initialize(cls)
+	return cls
+}
+
+fn objc_retain_autorelease(object u64) u64 { return objc_autorelease(objc_retain(object)) }
+
+fn objc_property_strong(object u64, selector u64, value u64, offset i64) {
+	_ = selector
+	objc_store_strong(unsafe { &u64(object + u64(offset)) }, value)
 }
 
 fn objc_property_copy(object u64, selector u64, value u64, offset i64) {
