@@ -3956,3 +3956,42 @@ activity.preferences.changed
 activity.preferences.unsynced
 Настройки вида сохранены, но подтвердить синхронизацию с накопителем не удалось.
 -----
+clipboard.copy.pending
+Копирование...
+-----
+clipboard.copy.copied
+Скопировано в буфер обмена Vinix.
+-----
+clipboard.copy.unavailable
+Буфер обмена Vinix недоступен.
+-----
+clipboard.copy.too_large
+Текст превышает предел буфера в 64 КиБ.
+-----
+clipboard.copy.empty
+Нет текста для копирования.
+-----
+clipboard.copy.failed
+Копирование не подтверждено.
+-----
+dictionary.copy
+Копировать
+-----
+terminal.selection.copy
+Копировать
+-----
+terminal.selection.hint
+Выделите текст мышью; Копировать или Cmd-C копирует. Ctrl-C прерывает команду.
+-----
+calculator.copy
+Копировать
+-----
+calculator.scientific.cube
+x^3
+-----
+calculator.scientific.cbrt
+cbrt
+-----
+calculator.scientific.log2
+log2
+-----

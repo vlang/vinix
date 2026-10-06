@@ -37,6 +37,7 @@ mut:
 	escape_len int
 	history []string
 	history_index int = -1
+	copy_client TextCopyClient
 }
 
 fn new_dictionary_app(path string, export_path string) DictionaryApp {
@@ -214,8 +215,37 @@ fn (mut app DictionaryApp) export_definition() {
 	}
 }
 
+fn (mut app DictionaryApp) copy_definition() {
+	if app.selected < 0 || app.definition.len == 0 {
+		app.copy_client.queue('')
+		return
+	}
+	word := app.source.word(app.selected)
+	if word.len > clipboard_max_bytes - 2
+		|| app.definition.len > clipboard_max_bytes - word.len - 2 {
+		app.copy_client.reject(.too_large)
+		return
+	}
+	// Preserve the full entry and line breaks, independent of wrapping/page.
+	mut bytes := []u8{cap: word.len + 2 + app.definition.len}
+	defer { unsafe { bytes.free() } }
+	editor_append(mut bytes, word)
+	editor_append(mut bytes, '\n\n')
+	editor_append(mut bytes, app.definition)
+	app.copy_client.queue(editor_bytes_text(bytes))
+}
+
+fn (mut app DictionaryApp) take_clipboard_copy_request() []u8 {
+	return app.copy_client.take_request()
+}
+
+fn (mut app DictionaryApp) receive_clipboard_copy_reply(payload string) {
+	app.copy_client.receive_reply(payload)
+}
+
 fn (mut app DictionaryApp) handle(event_id string) ! {
 	app.pending_len = 0
+	app.copy_client.clear_status()
 	if event_id.starts_with('dictionary.result.') {
 		for offset, action in dictionary_result_actions {
 			if event_id == action && offset < app.match_count { app.show(app.first + app.page + offset, true); return }
@@ -235,11 +265,13 @@ fn (mut app DictionaryApp) handle(event_id string) ! {
 		'dictionary.up' { app.scroll -= app.rows; app.clamp_scroll() }
 		'dictionary.down' { app.scroll += app.rows; app.clamp_scroll() }
 		'dictionary.export' { app.export_definition() }
+		'dictionary.copy' { app.copy_definition() }
 		else {}
 	}
 }
 
 fn (mut app DictionaryApp) paste_input(text string) {
+	app.copy_client.clear_status()
 	match app.focus {
 		0 { console_paste_field(mut app.path, text, dictionary_field_limit, app.select_all) }
 		1 { console_paste_field(mut app.query, text, dictionary_key_limit, app.select_all); app.refilter() }
@@ -251,6 +283,7 @@ fn (mut app DictionaryApp) paste_input(text string) {
 }
 
 fn (mut app DictionaryApp) key_input(input string) {
+	app.copy_client.clear_status()
 	mut at := 0
 	for at < input.len {
 		byte := input[at]
@@ -294,6 +327,7 @@ fn (mut app DictionaryApp) key_input(input string) {
 		}
 		match byte {
 			0x01 { app.select_all = true }
+			0x03 { app.copy_definition() }
 			0x1b { app.escape[0] = byte; app.escape_len = 1; app.pending_len = 0 }
 			`\t` { app.focus = (app.focus + 1) % 3; app.select_all = false }
 			`\r`, `\n` {
@@ -317,6 +351,7 @@ fn (mut app DictionaryApp) key_input(input string) {
 }
 
 fn (mut app DictionaryApp) close_app() {
+	app.copy_client.close()
 	app.source.close()
 	// V3's string-array free releases its elements as well as its buffer.
 	unsafe { app.history.free(); app.path.free(); app.query.free(); app.key.free(); app.export_path.free()

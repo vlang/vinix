@@ -118,6 +118,7 @@ const available_apps = [
 		height: 600
 		process_name: 'vinix-calculator'
 		keyboard: true
+		clipboard_copy: true
 		open: open_calculator
 	},
 	AppFactory{
@@ -132,6 +133,8 @@ const available_apps = [
 		// for the old one-second idle cadence.
 		poll_interval_ms: 100
 		keyboard: true
+		pointer: true
+		clipboard_copy: true
 		open: open_terminal
 	},
 	AppFactory{
@@ -569,6 +572,7 @@ const available_apps = [
 		height: 700
 		process_name: 'vinix-dictionary'
 		keyboard: true
+		clipboard_copy: true
 		open: open_dictionary_app
 	},
 ]

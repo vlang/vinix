@@ -16,6 +16,45 @@ fn dictionary_memory_pack() []u8 {
 		`c`, `o`, `m`, `p`, `u`, `t`, `e`, `r`, `o`, `n`, `e`]
 }
 
+fn test_dictionary_copy_complete_entry_ack_and_queued_close_release_owned_bytes() {
+	saved_features := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved_features }
+	base := reminders_canonical_home(os.temp_dir())
+	defer { unsafe { base.free() } }
+	path := os.join_path(base, 'vinix-dictionary-copy-cycle-${os.getpid()}.vnd')
+	defer { os.rm(path) or {}; unsafe { path.free() } }
+	bytes := dictionary_memory_pack()
+	defer { unsafe { bytes.free() } }
+	os.write_file(path, editor_bytes_text(bytes))!
+	mut warm := new_dictionary_app(path, '')
+	for size in [ui2.rect(0, 0, 860, 666), ui2.rect(0, 0, 640, 420)]! {
+		begin_frame_elements()
+		free_tree(warm.build(size)!)
+	}
+	warm.close_app()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut app := new_dictionary_app(path, '')
+		mut native := NativeApp(unsafe { &app })
+		app.handle('dictionary.copy')!
+		packet := native_app_text_copy_request(mut native)
+		assert packet.len == text_copy_header_size + 'computer\n\none'.len
+		ack := text_copy_reply(app.copy_client.sequence, true)
+		native_app_receive_text_copy(mut native, editor_bytes_text(ack))
+		assert app.copy_client.status == .copied
+		unsafe { packet.free(); ack.free() }
+		for size in [ui2.rect(0, 0, 860, 666), ui2.rect(0, 0, 640, 420)]! {
+			begin_frame_elements()
+			free_tree(app.build(size)!)
+		}
+		app.key_input('\x03')
+		app.close_app()
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_dictionary_owned_source_reload_history_export_and_frames_keep_heap_flat() {
 	base := reminders_canonical_home(os.temp_dir())
 	defer { unsafe { base.free() } }

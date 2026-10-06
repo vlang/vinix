@@ -47,8 +47,11 @@ fn (mut app DictionaryApp) build(size ui2.Rect) !ui2.Element {
 	children << console_button('dictionary.up', 'dictionary.up', 248, height - 112, 96, false)
 	children << console_button('dictionary.down', 'dictionary.down', 352, height - 112, 96, false)
 	children << ui2.label('', tr('dictionary.offline'), ui2.rect(460, f64(height - 110), f64(width - 474), 28), ui2.TextStyle{color: body_muted, size: 11})
-	children << console_field('dictionary.export_path', editor_bytes_text(app.export_path), 14, height - 74, width - 166, app.focus == 2)
+	children << console_field('dictionary.export_path', editor_bytes_text(app.export_path), 14, height - 74, width - 314, app.focus == 2)
+	children << console_button('dictionary.copy', 'dictionary.copy', width - 292, height - 73, 140, false)
 	children << console_button('dictionary.export', 'dictionary.export', width - 144, height - 73, 130, false)
-	children << ui2.label('', tr(app.status), ui2.rect(14, f64(height - 36), f64(width - 28), 24), ui2.TextStyle{color: body_muted, size: 11})
+	copy_status := app.copy_client.status_key()
+	children << ui2.label('', tr(if copy_status.len > 0 { copy_status } else { app.status }),
+		ui2.rect(14, f64(height - 36), f64(width - 28), 24), ui2.TextStyle{color: body_muted, size: 11})
 	return ui2.screen(app_surface, children)
 }

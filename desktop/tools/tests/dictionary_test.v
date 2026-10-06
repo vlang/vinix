@@ -41,6 +41,91 @@ fn dictionary_fixture_path(name string) string {
 	return os.join_path(base, 'vinix-dictionary-${name}-${os.getpid()}.vnd')
 }
 
+fn dictionary_copy_tree_has_id(tree ui2.Element, id string) bool {
+	if tree.id == id { return true }
+	for child in tree.children { if dictionary_copy_tree_has_id(child, id) { return true } }
+	return false
+}
+
+fn dictionary_copy_tree_has_text(tree ui2.Element, text string) bool {
+	if tree.text == text { return true }
+	for child in tree.children { if dictionary_copy_tree_has_text(child, text) { return true } }
+	return false
+}
+
+fn test_dictionary_copy_snapshots_complete_entry_without_editing_fields_or_history() {
+	saved_features := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved_features }
+	path := dictionary_fixture_path('copy')
+	defer { os.rm(path) or {}; unsafe { path.free() } }
+	bytes := dictionary_fixture_pack(['café', 'computer'], ['a café\nSecond line.', 'electronic machine'])
+	defer { unsafe { bytes.free() } }
+	os.write_file(path, editor_bytes_text(bytes))!
+	mut app := new_dictionary_app(path, '')
+	defer { app.close_app() }
+	app.handle('dictionary.query')!
+	app.key_input('\x01café\n')
+	assert app.selected == 0
+	query := editor_bytes_text(app.query).clone()
+	defer { unsafe { query.free() } }
+	before_history := app.history.len
+	app.key_input('\x03')
+	assert app.copy_client.status_key() == 'clipboard.copy.pending'
+	assert editor_bytes_text(app.query) == query && app.history.len == before_history
+	assert app.definition == 'a café\nSecond line.'
+	// Subsequent lookup/rendering cannot change the accepted snapshot.
+	app.key_input('\x01computer\n')
+	assert app.definition == 'electronic machine'
+	packet := app.take_clipboard_copy_request()
+	defer { unsafe { packet.free() } }
+	mut clipboard := HostClipboard{}
+	defer { clipboard.close_request() }
+	sequence := text_copy_into_session(mut clipboard, editor_bytes_text(packet)) or { panic('copy failed') }
+	assert unsafe { tos(&clipboard.local_bytes[0], clipboard.local_length) } == 'café\n\na café\nSecond line.'
+	ack := text_copy_reply(sequence, true)
+	defer { unsafe { ack.free() } }
+	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
+	assert app.copy_client.status_key() == 'clipboard.copy.copied'
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 860, 666))!
+	defer { free_tree(tree) }
+	assert dictionary_copy_tree_has_id(tree, 'dictionary.copy')
+	assert dictionary_copy_tree_has_text(tree, tr('clipboard.copy.copied'))
+}
+
+fn test_dictionary_copy_rejects_missing_capability_and_entries_over_clipboard_bound() {
+	saved_features := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved_features }
+	path := dictionary_fixture_path('copy-bounds')
+	defer { os.rm(path) or {}; unsafe { path.free() } }
+	maximum := 'a'.repeat(clipboard_max_bytes - 'computer'.len - 2)
+	too_large := 'a'.repeat(clipboard_max_bytes - 'computer'.len - 1)
+	defer { unsafe { maximum.free(); too_large.free() } }
+	bytes := dictionary_fixture_pack(['computer', 'computing'], [maximum, too_large])
+	defer { unsafe { bytes.free() } }
+	os.write_file(path, editor_bytes_text(bytes))!
+	mut app := new_dictionary_app(path, '')
+	defer { app.close_app() }
+	app.copy_definition()
+	assert app.copy_client.packet.len == clipboard_max_bytes + text_copy_header_size
+	app.show(1, true)
+	app.copy_definition()
+	assert app.copy_client.status_key() == 'clipboard.copy.too_large'
+	assert app.copy_client.packet.len == 0 && !app.copy_client.waiting
+	assert app.definition == too_large
+	app_compositor_features = 0
+	app.show(0, true)
+	app.copy_definition()
+	assert app.copy_client.status_key() == 'clipboard.copy.unavailable'
+	assert app.take_clipboard_copy_request().len == 0
+	app.selected = -1
+	app_compositor_features = app_features
+	app.copy_definition()
+	assert app.copy_client.status_key() == 'clipboard.copy.empty'
+}
+
 fn test_dictionary_exact_prefix_case_space_history_and_export() {
 	path := dictionary_fixture_path('lookup')
 	export_path := dictionary_fixture_path('export')

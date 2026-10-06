@@ -3956,3 +3956,42 @@ Otra ventana cambió los ajustes de vista guardados. Vuelva a abrir el Monitor d
 activity.preferences.unsynced
 Se guardaron los ajustes de vista, pero no se pudo confirmar la sincronización del almacenamiento.
 -----
+clipboard.copy.pending
+Copiando...
+-----
+clipboard.copy.copied
+Copiado al portapapeles de Vinix.
+-----
+clipboard.copy.unavailable
+Portapapeles de Vinix no disponible.
+-----
+clipboard.copy.too_large
+El texto supera el límite de 64 KiB.
+-----
+clipboard.copy.empty
+No hay texto para copiar.
+-----
+clipboard.copy.failed
+No se pudo confirmar la copia.
+-----
+dictionary.copy
+Copiar definición
+-----
+terminal.selection.copy
+Copiar
+-----
+terminal.selection.hint
+Arrastra para seleccionar; Copiar o Cmd-C copia. Ctrl-C interrumpe la terminal.
+-----
+calculator.copy
+Copiar resultado
+-----
+calculator.scientific.cube
+x^3
+-----
+calculator.scientific.cbrt
+cbrt
+-----
+calculator.scientific.log2
+log2
+-----

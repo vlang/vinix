@@ -3956,3 +3956,42 @@ Another window changed the saved view settings. Reopen Activity Monitor to use t
 activity.preferences.unsynced
 View settings were saved, but storage synchronization could not be confirmed.
 -----
+clipboard.copy.pending
+Copying...
+-----
+clipboard.copy.copied
+Copied to guest clipboard.
+-----
+clipboard.copy.unavailable
+Guest clipboard unavailable.
+-----
+clipboard.copy.too_large
+Text exceeds the 64 KiB clipboard limit.
+-----
+clipboard.copy.empty
+No text to copy.
+-----
+clipboard.copy.failed
+Copy could not be confirmed.
+-----
+dictionary.copy
+Copy definition
+-----
+terminal.selection.copy
+Copy
+-----
+terminal.selection.hint
+Drag to select; Copy or Cmd-C copies. Ctrl-C interrupts the shell.
+-----
+calculator.copy
+Copy result
+-----
+calculator.scientific.cube
+x^3
+-----
+calculator.scientific.cbrt
+cbrt
+-----
+calculator.scientific.log2
+log2
+-----
