@@ -4544,7 +4544,7 @@ reminders.sort.title
 Título
 -----
 reminders.sort_hint
-El orden dura en esta ventana; los empates mantienen la inserción. Los títulos distinguen mayúsculas. Tab y luego Izquierda/Derecha cambian el orden.
+Orden y dirección duran en esta ventana. Empates por creación; sin fecha al final. Tab: orden/dirección; flechas: elegir; Intro/Espacio: invertir.
 -----
 terminal.selection.text
 Texto
@@ -4557,4 +4557,109 @@ Elige una selección de texto o rectangular.
 -----
 terminal.selection.block.hint
 Arrastra para seleccionar un bloque; Copiar o Cmd-C copia. Ctrl-C interrumpe el shell.
+-----
+calculator.programmer.bits
+Bits
+-----
+calculator.programmer.keypad
+Teclado
+-----
+calculator.programmer.bits.help
+Pulse un bit para cambiarlo. El bit 0 es el menos significativo.
+-----
+calculator.programmer.bits.previous
+Bits anteriores
+-----
+calculator.programmer.bits.next
+Bits siguientes
+-----
+reminders.direction
+Dirección
+-----
+reminders.direction.oldest
+Más antiguos
+-----
+reminders.direction.newest
+Más recientes
+-----
+reminders.direction.high
+Alta primero
+-----
+reminders.direction.low
+Baja primero
+-----
+reminders.direction.earliest
+Antes primero
+-----
+reminders.direction.latest
+Después primero
+-----
+reminders.direction.az
+A–Z
+-----
+reminders.direction.za
+Z–A
+-----
+grapher.svg_path
+Ruta de imagen SVG
+-----
+grapher.export_svg
+Exportar SVG
+-----
+grapher.svg_invalid
+Escriba una ruta SVG absoluta sin enlaces.
+-----
+grapher.svg_exists
+El archivo SVG ya existe. Elija otra ruta.
+-----
+grapher.svg_failed
+No se pudo guardar la imagen SVG.
+-----
+grapher.svg_saved
+Imagen SVG exportada.
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+Exporte el gráfico trazado como imagen vectorial SVG.
+Los archivos existentes nunca se reemplazan.
+-----
+notes.import
+Importar
+-----
+notes.import_title
+Importar texto
+-----
+notes.import_scope
+Un archivo UTF-8 crea una nota (hasta 16 KiB).
+Su nombre será el título. Se conservan las notas.
+Se normalizan BOM y finales de línea.
+-----
+notes.import_path
+Ruta del archivo de texto
+-----
+notes.import_confirm
+Importar nota
+-----
+notes.import_cancel
+Cancelar
+-----
+notes.import_hint
+Ruta completa. Intro importa; Escape cancela.
+-----
+notes.import_invalid
+Escriba una ruta de texto absoluta sin enlaces.
+-----
+notes.import_failed
+No se pudo leer un archivo de texto normal.
+-----
+notes.import_saved
+Texto importado como una nueva nota.
+-----
+notes.import_durability
+Nota importada; falló la sincronización final.
+-----
+notes.import_enlarge
+Amplíe la ventana. Escape cancela la importación.
 -----

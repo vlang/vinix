@@ -4543,7 +4543,7 @@ reminders.sort.title
 标题
 -----
 reminders.sort_hint
-排序仅对当前窗口生效，相同值保留添加顺序。标题区分大小写。Tab移到排序后，左右键切换。
+排序和方向仅用于此窗口。相同值按添加顺序，无期限任务在最后。Tab 到排序或方向，方向键选择，Enter 或空格反转。
 -----
 terminal.selection.text
 文本
@@ -4556,4 +4556,109 @@ terminal.selection.mode.help
 -----
 terminal.selection.block.hint
 拖动选择矩形；点击复制或按 Cmd-C 复制。Ctrl-C 中断 shell。
+-----
+calculator.programmer.bits
+位
+-----
+calculator.programmer.keypad
+按键
+-----
+calculator.programmer.bits.help
+点击以切换位。第 0 位是最低有效位。
+-----
+calculator.programmer.bits.previous
+上一组位
+-----
+calculator.programmer.bits.next
+下一组位
+-----
+reminders.direction
+方向
+-----
+reminders.direction.oldest
+最早添加优先
+-----
+reminders.direction.newest
+最新添加优先
+-----
+reminders.direction.high
+高优先级在前
+-----
+reminders.direction.low
+低优先级在前
+-----
+reminders.direction.earliest
+到期早的在前
+-----
+reminders.direction.latest
+到期晚的在前
+-----
+reminders.direction.az
+A–Z
+-----
+reminders.direction.za
+Z–A
+-----
+grapher.svg_path
+SVG 图像路径
+-----
+grapher.export_svg
+导出 SVG
+-----
+grapher.svg_invalid
+请输入不含链接的 SVG 绝对路径。
+-----
+grapher.svg_exists
+SVG 文件已存在，请选择其他路径。
+-----
+grapher.svg_failed
+无法保存 SVG 图像。
+-----
+grapher.svg_saved
+SVG 图像已导出。
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+将已绘制的图形导出为 SVG 矢量图像。
+不会替换已有文件。
+-----
+notes.import
+导入
+-----
+notes.import_title
+导入文本文件
+-----
+notes.import_scope
+一个 UTF-8 文件创建一条笔记（最多 16 KiB）。
+文件名作为标题，保留已有笔记。
+规范化 BOM 和换行。
+-----
+notes.import_path
+文本文件路径
+-----
+notes.import_confirm
+导入笔记
+-----
+notes.import_cancel
+取消
+-----
+notes.import_hint
+输入完整路径，Enter 导入，Escape 取消。
+-----
+notes.import_invalid
+请输入不含链接的文本文件绝对路径。
+-----
+notes.import_failed
+无法读取普通文本文件。
+-----
+notes.import_saved
+文本已导入为新笔记。
+-----
+notes.import_durability
+笔记已导入，但最终存储同步失败。
+-----
+notes.import_enlarge
+放大窗口以导入文本。Escape 取消。
 -----

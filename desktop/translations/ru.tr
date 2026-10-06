@@ -4544,7 +4544,7 @@ reminders.sort.title
 Название
 -----
 reminders.sort_hint
-Порядок действует в этом окне; равные значения идут по добавлению. Названия учитывают регистр. Tab, затем влево/вправо меняют порядок.
+Порядок действует в этом окне. Равные задачи — по добавлению, без срока — в конце. Tab: сортировка/порядок; стрелки: выбор; Enter/пробел: разворот.
 -----
 terminal.selection.text
 Текст
@@ -4557,4 +4557,109 @@ terminal.selection.mode.help
 -----
 terminal.selection.block.hint
 Выделите блок перетаскиванием; «Копировать» или Cmd-C копирует. Ctrl-C прерывает команду.
+-----
+calculator.programmer.bits
+Биты
+-----
+calculator.programmer.keypad
+Клавиши
+-----
+calculator.programmer.bits.help
+Нажмите бит, чтобы изменить его. Бит 0 — младший.
+-----
+calculator.programmer.bits.previous
+Предыдущие биты
+-----
+calculator.programmer.bits.next
+Следующие биты
+-----
+reminders.direction
+Порядок
+-----
+reminders.direction.oldest
+Старые сначала
+-----
+reminders.direction.newest
+Новые сначала
+-----
+reminders.direction.high
+Высокие сначала
+-----
+reminders.direction.low
+Низкие сначала
+-----
+reminders.direction.earliest
+Ранние сначала
+-----
+reminders.direction.latest
+Поздние сначала
+-----
+reminders.direction.az
+А–Я
+-----
+reminders.direction.za
+Я–А
+-----
+grapher.svg_path
+Путь к SVG
+-----
+grapher.export_svg
+Экспорт SVG
+-----
+grapher.svg_invalid
+Введите абсолютный путь SVG без ссылок.
+-----
+grapher.svg_exists
+Файл SVG уже существует. Выберите другой путь.
+-----
+grapher.svg_failed
+Не удалось сохранить SVG.
+-----
+grapher.svg_saved
+Изображение SVG сохранено.
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+Сохраните построенный график как векторный SVG.
+Существующие файлы не заменяются.
+-----
+notes.import
+Импорт
+-----
+notes.import_title
+Импорт текста
+-----
+notes.import_scope
+Один файл UTF-8 создаёт заметку (до 16 КиБ).
+Имя файла станет заголовком. Заметки сохраняются.
+BOM и окончания строк нормализуются.
+-----
+notes.import_path
+Путь к текстовому файлу
+-----
+notes.import_confirm
+Импорт заметки
+-----
+notes.import_cancel
+Отмена
+-----
+notes.import_hint
+Введите полный путь. Enter — импорт, Escape — отмена.
+-----
+notes.import_invalid
+Введите абсолютный путь текста без ссылок.
+-----
+notes.import_failed
+Не удалось прочитать обычный текстовый файл.
+-----
+notes.import_saved
+Текст импортирован как новая заметка.
+-----
+notes.import_durability
+Заметка импортирована, но синхронизация не удалась.
+-----
+notes.import_enlarge
+Увеличьте окно для импорта. Escape — отмена.
 -----

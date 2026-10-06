@@ -4544,7 +4544,7 @@ reminders.sort.title
 Title
 -----
 reminders.sort_hint
-Sorting lasts for this window; ties keep added order. Titles are case-sensitive. Tab, then Left/Right changes sorting.
+Sort and direction last for this window. Ties keep added order; undated tasks stay last. Tab reaches Sort/Direction; arrows choose, Enter/Space reverses.
 -----
 terminal.selection.text
 Text
@@ -4557,4 +4557,109 @@ Choose text or rectangular selection.
 -----
 terminal.selection.block.hint
 Drag to select a block; Copy or Cmd-C copies. Ctrl-C interrupts the shell.
+-----
+calculator.programmer.bits
+Bits
+-----
+calculator.programmer.keypad
+Keypad
+-----
+calculator.programmer.bits.help
+Click a bit to toggle it. Bit 0 is the least significant bit.
+-----
+calculator.programmer.bits.previous
+Previous bits
+-----
+calculator.programmer.bits.next
+Next bits
+-----
+reminders.direction
+Direction
+-----
+reminders.direction.oldest
+Oldest first
+-----
+reminders.direction.newest
+Newest first
+-----
+reminders.direction.high
+High first
+-----
+reminders.direction.low
+Low first
+-----
+reminders.direction.earliest
+Earliest first
+-----
+reminders.direction.latest
+Latest first
+-----
+reminders.direction.az
+A–Z
+-----
+reminders.direction.za
+Z–A
+-----
+grapher.svg_path
+SVG image path
+-----
+grapher.export_svg
+Export SVG
+-----
+grapher.svg_invalid
+Enter an absolute SVG path without links.
+-----
+grapher.svg_exists
+SVG destination already exists; choose another path.
+-----
+grapher.svg_failed
+Could not save the SVG image.
+-----
+grapher.svg_saved
+SVG image exported.
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+Export the plotted graph as a vector SVG image.
+Existing files are never replaced.
+-----
+notes.import
+Import
+-----
+notes.import_title
+Import text file
+-----
+notes.import_scope
+One UTF-8 text file becomes a new note (up to 16 KiB).
+Its filename is the title. Existing notes are kept.
+BOM and line endings are normalized.
+-----
+notes.import_path
+Text file path
+-----
+notes.import_confirm
+Import note
+-----
+notes.import_cancel
+Cancel
+-----
+notes.import_hint
+Enter a full path. Enter imports; Escape cancels.
+-----
+notes.import_invalid
+Enter an absolute text-file path without links.
+-----
+notes.import_failed
+Could not read an ordinary text file.
+-----
+notes.import_saved
+Text file imported as a new note.
+-----
+notes.import_durability
+Note imported; final storage synchronization failed.
+-----
+notes.import_enlarge
+Enlarge this window to import text. Escape cancels.
 -----

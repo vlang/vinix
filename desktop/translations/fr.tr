@@ -4543,7 +4543,7 @@ reminders.sort.title
 Titre
 -----
 reminders.sort_hint
-Le tri dure pour cette fenêtre ; les égalités gardent les ajouts. Les titres distinguent la casse. Tab puis Gauche/Droite changent le tri.
+Tri et sens restent dans cette fenêtre. Égalités par ajout, sans date à la fin. Tab : Tri/Sens ; flèches : choisir ; Entrée/Espace : inverser.
 -----
 terminal.selection.text
 Texte
@@ -4556,4 +4556,109 @@ Choisir une sélection de texte ou rectangulaire.
 -----
 terminal.selection.block.hint
 Glisser pour sélectionner un bloc ; Copier ou Cmd-C copie. Ctrl-C interrompt le shell.
+-----
+calculator.programmer.bits
+Bits
+-----
+calculator.programmer.keypad
+Clavier
+-----
+calculator.programmer.bits.help
+Cliquez sur un bit pour le changer. Le bit 0 est le moins significatif.
+-----
+calculator.programmer.bits.previous
+Bits précédents
+-----
+calculator.programmer.bits.next
+Bits suivants
+-----
+reminders.direction
+Sens
+-----
+reminders.direction.oldest
+Plus anciens
+-----
+reminders.direction.newest
+Plus récents
+-----
+reminders.direction.high
+Élevée d’abord
+-----
+reminders.direction.low
+Faible d’abord
+-----
+reminders.direction.earliest
+Plus tôt
+-----
+reminders.direction.latest
+Plus tard
+-----
+reminders.direction.az
+A–Z
+-----
+reminders.direction.za
+Z–A
+-----
+grapher.svg_path
+Chemin de l’image SVG
+-----
+grapher.export_svg
+Exporter SVG
+-----
+grapher.svg_invalid
+Entrez un chemin SVG absolu sans liens.
+-----
+grapher.svg_exists
+Le fichier SVG existe déjà. Choisissez un autre chemin.
+-----
+grapher.svg_failed
+Impossible d’enregistrer l’image SVG.
+-----
+grapher.svg_saved
+Image SVG exportée.
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+Exportez le graphique tracé en image vectorielle SVG.
+Les fichiers existants ne sont jamais remplacés.
+-----
+notes.import
+Importer
+-----
+notes.import_title
+Importer du texte
+-----
+notes.import_scope
+Un fichier UTF-8 crée une note (16 Kio maximum).
+Son nom devient le titre. Les notes sont conservées.
+BOM et fins de ligne sont normalisés.
+-----
+notes.import_path
+Chemin du fichier texte
+-----
+notes.import_confirm
+Importer la note
+-----
+notes.import_cancel
+Annuler
+-----
+notes.import_hint
+Chemin complet. Entrée importe, Échap annule.
+-----
+notes.import_invalid
+Entrez un chemin texte absolu sans liens.
+-----
+notes.import_failed
+Impossible de lire un fichier texte ordinaire.
+-----
+notes.import_saved
+Fichier texte importé dans une nouvelle note.
+-----
+notes.import_durability
+Note importée, mais la synchronisation a échoué.
+-----
+notes.import_enlarge
+Agrandissez la fenêtre. Échap annule l’importation.
 -----

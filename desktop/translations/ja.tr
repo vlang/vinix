@@ -4543,7 +4543,7 @@ reminders.sort.title
 タイトル
 -----
 reminders.sort_hint
-並べ替えはこのウィンドウ内のみ。同じ値は追加順、タイトルは大文字小文字を区別。Tabで移動し、左右キーで変更します。
+並べ方と方向はこのウィンドウのみ。同じ値は追加順、期限なしは最後。Tab で並べ方と方向へ、矢印で選択、Enter/スペースで反転。
 -----
 terminal.selection.text
 テキスト
@@ -4556,4 +4556,109 @@ terminal.selection.mode.help
 -----
 terminal.selection.block.hint
 ドラッグして矩形を選択し、コピーまたは Cmd-C でコピーします。Ctrl-C はシェルを中断します。
+-----
+calculator.programmer.bits
+ビット
+-----
+calculator.programmer.keypad
+キー
+-----
+calculator.programmer.bits.help
+クリックでビットを切り替えます。ビット 0 は最下位です。
+-----
+calculator.programmer.bits.previous
+前のビット
+-----
+calculator.programmer.bits.next
+次のビット
+-----
+reminders.direction
+方向
+-----
+reminders.direction.oldest
+古い順
+-----
+reminders.direction.newest
+新しい順
+-----
+reminders.direction.high
+優先度が高い順
+-----
+reminders.direction.low
+優先度が低い順
+-----
+reminders.direction.earliest
+期限が早い順
+-----
+reminders.direction.latest
+期限が遅い順
+-----
+reminders.direction.az
+A–Z
+-----
+reminders.direction.za
+Z–A
+-----
+grapher.svg_path
+SVG 画像のパス
+-----
+grapher.export_svg
+SVG を書き出す
+-----
+grapher.svg_invalid
+リンクを含まない SVG の絶対パスを入力します。
+-----
+grapher.svg_exists
+SVG ファイルが存在します。別のパスを選んでください。
+-----
+grapher.svg_failed
+SVG 画像を保存できませんでした。
+-----
+grapher.svg_saved
+SVG 画像を書き出しました。
+-----
+grapher.page.svg
+SVG
+-----
+grapher.compact.svg
+描いたグラフを SVG ベクトル画像として書き出します。
+既存のファイルは置き換えません。
+-----
+notes.import
+読み込み
+-----
+notes.import_title
+テキストを読み込む
+-----
+notes.import_scope
+UTF-8 ファイルから新しいメモを作ります（最大 16 KiB）。
+ファイル名がタイトルになり、既存のメモは残ります。
+BOM と改行を正規化します。
+-----
+notes.import_path
+テキストファイルのパス
+-----
+notes.import_confirm
+メモを読み込む
+-----
+notes.import_cancel
+キャンセル
+-----
+notes.import_hint
+絶対パスを入力。Enter で読み込み、Escape で中止。
+-----
+notes.import_invalid
+リンクを含まないテキストの絶対パスを入力します。
+-----
+notes.import_failed
+通常のテキストファイルを読めませんでした。
+-----
+notes.import_saved
+テキストを新しいメモとして読み込みました。
+-----
+notes.import_durability
+メモを読み込みましたが、最終同期に失敗しました。
+-----
+notes.import_enlarge
+読み込むにはウィンドウを拡大。Escape で中止。
 -----
