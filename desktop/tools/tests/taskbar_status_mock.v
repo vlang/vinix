@@ -18,3 +18,6 @@ mut:
 fn (mut w TaskbarStatusWriter) resolve() {}
 
 __global taskbar_status_writer = TaskbarStatusWriter{}
+// Native-client launch code borrows the active profile from registration.
+// Device-only fixtures have no registered user.
+__global desktop_user_home = ''

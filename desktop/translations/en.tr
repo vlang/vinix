@@ -3876,7 +3876,7 @@ calculator.programmer.shifts
 Right shifts fill with zero; shift counts are 0..63.
 -----
 calculator.programmer.shortcuts
-Ctrl-P: Programmer. Ctrl-B: next base. & | ^ ~: bitwise. < >: shift.
+Ctrl-P: Programmer. Ctrl-B: next base. & / OR / ^ / ~: bitwise. < >: shift.
 -----
 calculator.programmer.resize
 Enlarge the window for the integer keypad, or use keyboard controls.

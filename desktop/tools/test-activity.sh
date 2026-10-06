@@ -8,6 +8,15 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 python3 "$root/desktop/tools/stage_ui2.py" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
 python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" "$root/third_party/ui2/examples/calculator" >/dev/null
 python3 "$root/desktop/tools/stage_host_gpu.py" "$work/ui" --v "$v"
+python3 - "$work/ui" <<'PYFREEZE'
+from pathlib import Path
+import sys
+for path in Path(sys.argv[1]).iterdir():
+    if path.is_symlink() and path.is_file():
+        contents = path.read_bytes()
+        path.unlink()
+        path.write_bytes(contents)
+PYFREEZE
 rm "$work/ui/main.v"
 printf "Module { name: 'activity_tests' }\n" > "$work/ui/v.mod"
 # Compile the related cases together to validate their shared integration and
@@ -36,7 +45,7 @@ PY
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/activity_test.v"
 
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
-for source in "$root/tests/activity_lifetime_test.v" "$root/desktop/tools/tests/activity_resources_memory_test.v"; do
+for source in "$root/tests/activity_lifetime_test.v" "$root/desktop/tools/tests/activity_resources_memory_test.v" "$root/desktop/tools/tests/activity_preferences_memory_test.v"; do
     cp "$source" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/$(basename "$source")"

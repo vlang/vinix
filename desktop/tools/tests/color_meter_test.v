@@ -182,7 +182,7 @@ fn test_color_meter_session_clipboard_pastes_native_text_and_keeps_host_override
 	assert remaining.len == 0 && receiver.calls == 3
 	unsafe { remaining.free() }
 	assert !desktop.clipboard.set_local_text('')
-	long := 'x'.repeat(65)
+	long := 'x'.repeat(clipboard_max_bytes + 1)
 	assert !desktop.clipboard.set_local_text(long)
 	unsafe { long.free() }
 	assert desktop.clipboard.local_length == 7

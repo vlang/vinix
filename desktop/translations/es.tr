@@ -3876,7 +3876,7 @@ calculator.programmer.shifts
 El desplazamiento derecho rellena con cero; pasos de 0 a 63.
 -----
 calculator.programmer.shortcuts
-Ctrl-P: Programador. Ctrl-B: siguiente base. & | ^ ~: bits. < >: desplazar.
+Ctrl-P: Programador. Ctrl-B: siguiente base. & / OR / ^ / ~: bits. < >: desplazar.
 -----
 calculator.programmer.resize
 Amplía la ventana para ver el teclado entero o usa el teclado físico.
