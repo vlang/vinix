@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current instruction-header feature: **`079e3ccd`** (bounded native PCI topology, maskable IRQ accounting, genuine Kbuild wrappers and checked user-copy services). Recheck HEAD and the worktree before
+Committed implementation baseline before the current CPU-policy feature: **`909f6a4b`** (original instruction-helper closure, bounded native PCI topology, maskable IRQ accounting and checked user-copy services). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `909f6a4b` | Original x86 instruction-helper include closure, unchanged MOVDIR operands/opcodes and genuine unresolved privileged references |
 | `079e3ccd` | Native bounded PCI/CardBus topology, permanent scalar boot publication and read-only capability validation |
 | `d6d62bcc` | Actual original CSD records/initializer compiler tests; SMP runtime remains unresolved |
 | `e2641335` | Actual maskable IRQ entry/exit ownership, scheduler handoff guards and measured complete actor lifetimes |
@@ -554,10 +555,11 @@ stamps. `CONFIG_MMU=1` matches native paging. The five-level-capable type profil
 is committed in `a88dcea7`, with original UAPI aliases and annotations rather
 than duplicate typedefs. Linux page ownership, PFN/descriptor services and
 runtime geometry globals remain unresolved. Latest frozen syntax report:
-`/tmp/vinix-linuxkpi-mmiowb-oct06-frozen-audit-report.json`, **4/269**,
-expected exit 1. Original page-table types and static-key declarations clear
-prior first errors; 199 units first fail on `rcu_read_lock`, followed by RCU
-pointer APIs, `movdir64b` and `call_single_data_t`. Original mmiowb tracking
+`/tmp/vinix-linuxkpi-movdir64b-oct06-full-audit-report.json`, **4/269**,
+expected exit 1. Original page-table types, static-key declarations and
+instruction-header closure clear prior first errors; 206 units first fail on
+`rcu_read_lock`, followed by RCU pointer APIs, `call_single_data_t` and
+`cpu_feature_enabled`. Full diagnostics contain no MOVDIR error. Original mmiowb tracking
 macros are disabled under this configuration; a forced tracking configuration
 still rejects the absent architecture barrier.
 
@@ -750,13 +752,38 @@ direct-store bit on this host and rejects forced positive exposure. Compiler
 closure is not positive instruction, device-portal or MMIO validation. Evidence:
 `/tmp/vinix-linuxkpi-movdir64b-oct06-final-validation.json`.
 
-Next runtime work samples only MOVDIRI/MOVDIR64B hardware bits on each actual
-native CPU before its online acknowledgement, then publishes one immutable
-all-online-CPU intersection before first compatibility users. Support exactly
-original feature IDs 539/540; leaf-seven ECX includes OS-state-sensitive features,
-so a blanket raw-word alias is incorrect. Queries must preserve caller state and
-remain valid across migration. Hotplug and policy replacement need a separate
-protocol. The existing word-zero/four queries are a legacy current-CPU subset.
+Native runtime now samples only MOVDIRI/MOVDIR64B hardware bits on each actual
+CPU before its online acknowledgement, then publishes one immutable boot-CPU
+intersection before first compatibility users. Support covers exactly original
+feature IDs 539/540; other leaf-seven ECX bits remain unsupported. Queries
+preserve caller state and remain valid across migration. Hotplug, concurrent
+initialization and policy replacement need a separate protocol. Existing
+word-zero/four queries retain their legacy current-CPU scope.
+
+Fresh isolated enabled/default x86 and disabled ARM builds pass at `079e3ccd`
+plus only six CPU-feature native paths and the processor prerequisite committed
+in `909f6a4b`. Complete normal/SSE suites use the same saved enabled ELF,
+SHA256 `4dd8a5f11371b90f69387fb446f4f0d8b2c54dc2a8aaf8cc452ec2daf986635f`.
+After three warmups, the fourth query batch preserves normal free bytes
+`390782976 -> 390782976` and SSE `390787072 -> 390787072`, with every live
+heap class equal. IRQ-on/off and nested preemption caller state also passes;
+four initialized CPUs publish a valid zero intersection. Default x86 and
+disabled ARM reach Linux-ABI PID 1 with LinuxKPI fixtures absent.
+
+The final strict GNU99/GNU11 host test passes 1,116,514 ASan/UBSan assertions
+per standard with unchanged generated bodies and genuine 64-bit native online
+and V array-length representations. Independent host and actual native
+source/C/object/ELF reviews approve ownership and publication. Earlier narrower
+private host records are superseded. Eighteen compiler objects and two cold
+original-header objects retain exact expected imports. No positive direct-store
+instruction or device MMIO execution is established.
+
+All six broader desktop scenarios complete on disabled ARM. Churn retains
+16–48 KiB per 300-process batch and positive syscall allocations remain. The
+allocation gate still fails with exactly the same 158 groups as its PCI
+baseline. Do not claim global allocation success. Full evidence:
+`/tmp/vinix-linuxkpi-directstore-policy-oct06-final-validation.json`.
+
 Original CSD tests now preserve records and genuine unresolved dispatcher/mask
 references, but production full-header integration and real IRQ dispatch still
 need implementation.

@@ -603,7 +603,14 @@ after a filesystem failure. Mutable build inputs still require isolation.
   exact-capacity vector have boot lifetime. There is no rescan/hotplug interface
   or Linux PCI/device/devres registration. BAR/resource ownership, extended
   capabilities and unknown capability payload validation remain pending.
-- Boolean static branches without text patching; CPUID feature words 0 and 4.
+- Boolean static branches without text patching; legacy CPUID feature words 0
+  and 4. Original MOVDIRI/MOVDIR64B IDs 539/540 use an immutable intersection
+  of the actual boot CPUs' hardware observations. Each CPU samples only these
+  two leaf-seven ECX bits before publishing its online acknowledgement. The
+  boot owner validates all members and publishes the intersection before
+  compatibility users, including a valid empty intersection. Queries allocate
+  nothing and preserve caller IRQ/preemption state across migration. Other
+  word-sixteen features, hotplug and policy replacement remain unsupported.
 - Kernel FPU borrowing that saves/restores the running thread's existing
   XSAVE/FXSAVE storage while preemption is disabled. The upstream i915 WC-copy
   component uses it for SSE4.1 copies; other CPU-feature words fail explicitly.
@@ -629,6 +636,7 @@ tests/linuxkpi/run.sh
 python3 tests/linuxkpi/nocache_test.py
 python3 tests/linuxkpi/asm_generated_headers_test.py
 python3 tests/linuxkpi/special_insns_test.py
+python3 tests/linuxkpi/cpu_feature_policy_test.py
 python3 tests/linuxkpi/smp_type_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
@@ -1264,16 +1272,17 @@ all compiler jobs. The same private include tree now contains genuine
 compiler-derived bounds. Regression tests cover repeated real compilation,
 invalid metadata and bounds-compiler rejection before driver compilation.
 The latest isolated report is
-`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
+`/tmp/vinix-linuxkpi-movdir64b-oct06-full-audit-report.json`; `i915_memcpy.c`,
 `i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
 syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
-blockers are cleared. The report uses committed baseline `27aaf760` plus the
-owned bounds/type/scope/declaration/nocache/wrapper overlays, rather than other sessions'
-changing metadata. Original page-table types and static-key declarations clear
-their prior first errors. Leading first errors now include `rcu_read_lock` in
-199 units, RCU pointer APIs, missing `asm/mmiowb.h` and
-`call_single_data_t`. These are syntax
+blockers are cleared. The report uses a frozen isolated source/profile rather
+than other sessions' changing metadata. Original page-table types, static-key
+declarations and instruction-header closure clear their prior first errors.
+Leading first errors include `rcu_read_lock` in 206 units, RCU pointer APIs,
+`call_single_data_t` and `cpu_feature_enabled`. All fifteen former MOVDIR
+declaration blockers advance; complete diagnostics contain no MOVDIR errors.
+These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
@@ -1493,3 +1502,35 @@ original CSD integration and other services still block the driver. QEMU TCG
 does not expose MOVDIRI/MOVDIR64B on this host and rejects forced feature exposure;
 positive instruction execution needs capable hardware. Evidence:
 `/tmp/vinix-linuxkpi-movdir64b-oct06-final-validation.json`.
+
+Native direct-store feature-policy validation uses fresh isolated worktrees at
+`079e3ccd` with only its six owned native paths and the processor-header
+prerequisite now committed in `909f6a4b`. Enabled x86, default x86 and disabled
+ARM builds pass. Both complete enabled guest suites boot the same saved ELF,
+SHA256 `4dd8a5f11371b90f69387fb446f4f0d8b2c54dc2a8aaf8cc452ec2daf986635f`.
+The fourth query batch preserves free bytes exactly: normal
+`390782976 -> 390782976`; SSE `390787072 -> 390787072`. Every measured heap
+class also matches, after three warmups. Queries run with IRQs enabled,
+disabled and two nested preemption pins; caller state is restored. Both guests
+observe a valid zero intersection across four actual initialized CPUs. Default
+x86 and disabled ARM reach Linux-ABI PID 1 with LinuxKPI fixtures absent.
+
+`tests/linuxkpi/cpu_feature_policy_test.py` executes unchanged generated policy
+and frontend bodies with explicit scalar CPU/atomic/fatal observers. GNU99 and
+GNU11 each pass 1,116,514 ASan/UBSan assertions, including all 256 member
+positions, genuine 64-bit online acknowledgements and 64-bit V array lengths,
+malformed membership, mixed feature intersections, unsupported IDs, immutable
+publication and eight concurrent query actors. Eighteen compiler objects and
+two genuine cold-header objects retain exact expected imports. Independent
+review checks the real full native Local layout, per-CPU sample before online
+publication, release/acquire ordering and generated C/object/ELF lifetimes.
+Earlier host attempts with narrower private fields are superseded by these
+final runs. QEMU exposes neither direct-store bit; this validates feature
+selection and query state, without positive MOVDIR execution or device MMIO.
+
+The broader allocation gate still fails with the same 158 groups as its PCI
+baseline; no group changes appear. Disabled ARM completes all six desktop
+scenarios. Churn retains 16–48 KiB per 300-process batch and some syscall
+measurements remain positive, so this is not a global leak-free claim.
+Aggregate evidence:
+`/tmp/vinix-linuxkpi-directstore-policy-oct06-final-validation.json`.

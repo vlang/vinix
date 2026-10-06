@@ -237,6 +237,16 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	apic.lapic_timer_calibrate(mut cpu_local)
 
+	// MOVDIRI/MOVDIR64B have no extended-register-state prerequisite. Record
+	// only their actual hardware bits, including zero for an absent leaf.
+	// Other leaf-seven ECX bits can require separately enabled OS state.
+	// IF is still clear and the online acknowledgement below publishes this
+	// CPU's immutable observation to the boot compatibility policy.
+	directstore_available, _, _, directstore_ecx, _ := cpu.cpuid(7, 0)
+	cpu_local.directstore_ecx = if directstore_available {
+		directstore_ecx & ((u32(1) << 27) | (u32(1) << 28))
+	} else { u32(0) }
+
 	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
 
 	katomic.inc(mut &cpu_local.online)

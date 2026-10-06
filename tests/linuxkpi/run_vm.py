@@ -13,6 +13,7 @@ MMAP_LEASE_MARKER = "mmap: retained fault owners, concurrent removal and deferre
 TOPOLOGY_MARKER = "pci: native bounded topology, read-only capabilities and rollback passed; no pages or heap objects retained"
 
 MARKERS = [
+    "linuxkpi: common MOVDIR CPU feature policy, caller state and query lifetimes passed; no pages or heap objects retained",
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained",
     "linuxkpi: raw locks, bitmaps, byte order and bounded strings passed",

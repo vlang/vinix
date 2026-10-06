@@ -92,6 +92,10 @@ pub mut:
 	maskable_irq_peak_depth          u32
 	maskable_irq_user_entries        u64
 	maskable_irq_scheduler_deferrals u64
+	// Hardware direct-store bits sampled by this CPU before online publication.
+	// Boot LinuxKPI intersects these immutable scalars across every online CPU;
+	// an instruction test must remain valid after a task migrates.
+	directstore_ecx u32
 }
 
 __global (

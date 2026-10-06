@@ -341,6 +341,7 @@ fn tick_deadlines() {
 
 @[export: 'vinix_linuxkpi_cpu_has']
 fn cpu_has(feature u32) bool {
+	if feature / 32 == 16 { return directstore_has(feature) }
 	// Linux's feature word 0 is leaf 1 EDX; word 4 is leaf 1 ECX.
 	ok, _, _, ecx, edx := cpu.cpuid(1, 0)
 	if !ok {
@@ -458,6 +459,11 @@ fn selftest_free_baseline() u64 {
 
 pub fn initialise() {
 	$if linuxkpi ? {
+		initialise_cpu_features()
+		if !cpu_features_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux CPU feature policy self-test failed')
+		}
+		C.kprintf(c'linuxkpi: common MOVDIR CPU feature policy, caller state and query lifetimes passed; no pages or heap objects retained\n')
 		initialise_pagefault_policy()
 		sched.register_preemption_guard(voidptr(may_preempt))
 		if C.vinix_linuxkpi_percpu_bootstrap(u32(cpu_locals.len)) != 0 {
