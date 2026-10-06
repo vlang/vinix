@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`9f47270ee3c6754312bc09fc74d8f77e2cfe2229`. Re-read HEAD, `AGENTS.md` and
+`ac285e4208116510d66a7ecb1eda75a40f495acc`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,9 +28,9 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,234 original production C lines**, **3,411 original fixture
+continuation adds **3,251 original production C lines**, **7,438 original fixture
 lines** and **248 header implementation lines** (111 desktop, 137 kernel),
-counted separately. Five stack-pointer boundary lines use instruction-only
+counted separately. Fourteen stack-pointer/syscall boundary lines use instruction-only
 assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
@@ -60,17 +60,27 @@ assembly and receive no V algorithm credit.
 | Kernel native headers / ARM PCI fixture (37 / 57 lines) | `6b3769f2` |
 | IPv6 / common serial / smoke fixtures (201 lines) | `7dfa57c5` |
 | LinuxKPI typed/generic header operations (100 lines) | `9f47270e` |
+| Hello and greeting builders (17 production lines) | `47be3479` |
+| Android ATL configuration fixture (71) | `5a8e6928` |
+| ACPI native fixture (206) and builtin exclusion | `18c49a10` |
+| Hypervisor/ARM PCI native fixtures (77 V lines; 9 assembly) | `d5591540` |
+| Hypervisor ABI entry (5 V lines; six native constraints retained) | `5daec594` |
+| Apple boot/converter fixtures (168) | `c93d331c` |
+| Duplicate Apple helpers retired (33; zero new V credit) | `6c351501` |
+| SMC independent fixture (536) | `9e09a18a` |
+| Tracker independent policy fixture (72) | `283e8276` |
+| Console independent policy fixture (90) | `80ae43a1` |
+| Remaining LinuxKPI kernel fixtures (2,687) | `33be42d7` |
+| x86 console syscall fixture (57) | `b3fdcb83` |
+| Native allocation-tracker guest fixture (58) | `ac285e42` |
 
-`kernel/c/*.c` now has **zero non-fixture maintained files**. Public header
-algorithms and independent fixtures still remain C. The instruction applies
-throughout the repository, including support utilities, tests and SDK headers.
-At the pinned source, the committed census contains 224 non-vendored `.c`
-paths / 51,215 lines (seven kernel fixtures / 2,691 lines, 213 test paths /
-48,280 lines, two Apple fixtures / 168 lines, one Android support fixture /
-71 lines and hello / five lines).
-This census is a scope guide, not a translation tally; genuine retained musl
-evidence requires provenance classification and headers/embedded sources are
-additional work. Recount before selecting the next stage.
+`kernel/c/*.c` now has **zero maintained first-party files**, including
+fixtures. Public header algorithms and independent host/native fixtures still
+remain C. The instruction applies throughout the repository. At the pinned
+source, the committed non-vendored `.c` census contains 204 test paths /
+47,155 lines, including genuine patched musl evidence. This is a scope guide,
+not a translation tally; headers and embedded sources are additional work.
+Do not mistake zero kernel C for completion of the repository-wide request.
 
 The immutable archive (`7ee28d8e`) pins 145 records by exact commit/path/blob,
 SHA256, bytes and mode. It recovers 108 frozen first-party/generated C snapshots
@@ -83,26 +93,25 @@ as maintained implementation.
 
 ## In progress at this handoff
 
-The shared checkout has uncommitted coordinated work. Re-read diffs before
-continuing and do not commit others' paths:
+The shared checkout has coordinated uncommitted work. Re-read diffs and each
+stage's input hashes before continuing; completed commits above are separate:
 
-- All remaining six LinuxKPI kernel fixtures (SRCU 541, worker 223, workqueue
-  742, usleep 312, wait-bit 355 and printk 514) are now V in the working tree.
-  Their 2,687 original lines, explicit native variadic assembly and exact
-  integration are **uncommitted pending native verification**. The full host
-  sanitizer/header/upstream suite passed; all 17 fixture objects have no hidden
-  allocator imports. Record layouts, actual C callback addresses and all
-  original deadline/retirement/assertion policies received independent review.
-  `fixture-final-proof/evidence.json` identifies every owned path and hash.
-- ACPI native fixture 206 is V in `tests/acpi-sync/nativefixture`, with an
-  explicit `ACPI_SYNC_TEST=1` option, separate native object and configuration
-  stamp. Both strict native objects/no-allocator checks and lifetime review
-  passed; both actual native ACPI guests and its own-path commit remain.
-- Hello's five original C lines and the 71-line Android configuration fixture
-  remain support scopes. Further first-party header algorithms (overflow,
-  pointer/preemption, barriers/RCU and others) and standalone/host/native test
-  sources remain to port. Do not mistake zero kernel implementation C for
-  completion of the repository-wide request.
+- LinuxKPI runtime pointer/preemption policies and native compiler-check
+  metadata are being validated. Preserve the complete newly committed
+  `type_min`/`type_max`/overflow/castability constexpr family; it is a separate
+  translation scope. Only the two runtime policy lines earn new algorithm
+  credit in the narrow stage.
+- LinuxKPI host fixtures, the pthread/TLS scheduler model and seven standalone
+  programs are being translated in parallel. Pending modules use `.pending`
+  suffixes until their actual complete independent workloads pass. The frozen
+  compiler ignores V `thread_local` under `-os vinix`; native TLS storage uses
+  instruction/declaration-only architecture assembly, retaining real pthread
+  isolation. Original assertions, failure cases, ownership and deadlines stay
+  intact.
+- Further first-party kernel/SDK headers, native guest programs and hardware
+  protocol fixtures remain to port. Keep immutable original Git references for
+  comparison. Declaration-only native ABI headers do not justify retaining
+  first-party C implementation bodies.
 
 ## Validation and evidence
 
@@ -111,6 +120,27 @@ Current local cache:
 The older 10,191-line batch cache is
 `/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/`.
 These are machine-local caches; the committed migration document is durable.
+
+The final six kernel fixtures passed the complete four-CPU qemu64 LinuxKPI
+guest with exact free-page equality. Tested ELF SHA256:
+`4e82332380efae4a53e266b3f97a0ec41ca7efdc42569d17e363bf0e7dd94fd3`.
+`fixture-final-source.json` pins base `9f47270e`, 788 source paths and 30
+owned changes. Its first V run failed the original worker check; untouched C
+passed, then the identical frozen V ELF passed on repeat. The cause remains
+unknown. Logs, private diagnostic objects and the failed attempt are retained;
+no assertions, deadlines or tracing policy changed. Both architecture builds,
+default x86 boot, both ACPI guests and ARM PCI passed.
+
+Tracker/console independent policy fixtures passed ASan/UBSan and both native
+guests, including console debug/production variants. The actual ALLOC_TRACK=1
+kernels passed original-C/V live-site guests on both architectures; all 16
+assertions and 128 pipe-pair closures remain. One ARM image stalled in firmware;
+a fresh-image repeat used identical kernel/init bytes and passed. x86 console
+original-C/V syscall guests matched all ten checks and worker collection.
+Apple boot/converter and SMC original-C/V sanitizer/native model fixtures passed;
+physical firmware remains unverified. Hypervisor model cases passed all five
+VM executions, but real native guests exercised absent-device behavior only;
+nested VT-x is still required to verify actual VMX entry.
 
 Completed kernel-native stages passed sanitizer fixtures, both builds and
 appropriate guests. Full LinuxKPI diagnostics passed four-CPU qemu64/TCG,
@@ -171,8 +201,14 @@ serial logs, ELFs, metadata and removal manifests remain.
 
 ## Build and test setup
 
-The verified tools remain `/Users/alex/code/v/v` (**V 0.5.2 e690943**), Apple
-Clang 21.0.0 and `/opt/homebrew/bin/ld.lld` (**LLD 23.1.0**). The genuine x86
+Freeze V and its vlib together: the displayed **V 0.5.2 e690943** version stayed
+unchanged while other sessions replaced source/library inputs. The final
+fixture stage uses cache `toolchain-v/v`, source
+`95136d4de1dabe575e37fc36b5a3e793580c8f72`, binary SHA256
+`335214a9c904435eb87e580948a7de76c2b4de03a65f0ee23babaa76981a7373`.
+The unconditional POSIX backtrace builtin is explicitly excluded by the kernel;
+an unchanged default control reproduced that toolchain failure. Recheck Clang
+and `/opt/homebrew/bin/ld.lld`; the frozen native fixture builds use LLVM tools. The genuine x86
 GCC sampler uses GCC 14.2.0 from
 `/opt/homebrew/Cellar/musl-cross/0.9.11/libexec/bin/x86_64-linux-musl-gcc`.
 Respect `build-support/find-v.sh` and recheck versions before a new stage.
@@ -188,23 +224,25 @@ runtime archive separately with LLVM ar; Darwin ar cannot index ELF runtime
 objects correctly. `kernel/get-deps` resets/cleans dependencies;
 do not run it through shared dependency symlinks.
 
-Set `port_arm` and `port_x86` to separate prepared worktrees, and guest
-variables to unused state directories. Build/test shapes remain:
+Set `port_arm` and `port_x86` to separate prepared worktrees, guest variables
+to unused state directories and `port_v` to a verified frozen compiler binary.
+Respect `find-v.sh`; pass `VINIX_V_COMPILER="$port_v"` to host generators.
+Build/test shapes remain:
 
 ```sh
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_arm/kernel" -j4 \
-  ARCH=aarch64 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v LIMINE_MP=1 STACK_GUARD_TEST=0 \
+  ARCH=aarch64 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V="$port_v" LIMINE_MP=1 STACK_GUARD_TEST=0 \
   LD_AARCH64=/opt/homebrew/bin/ld.lld
 
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_x86/kernel" -j4 \
-  ARCH=x86_64 LINUXKPI=0 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v \
+  ARCH=x86_64 LINUXKPI=0 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V="$port_v" \
   LIMINE_MP=1 STACK_GUARD_TEST=0 LD_X86_64=/opt/homebrew/bin/ld.lld
 
 python3 tests/hypervisor/run-vm.py --arch x86_64 \
   --kernel-dir "$port_x86/kernel" --state-dir "$port_x86_guest" --timeout 3600
 
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_x86/kernel" -j4 \
-  ARCH=x86_64 LINUXKPI=1 PROD=false CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v \
+  ARCH=x86_64 LINUXKPI=1 PROD=false CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V="$port_v" \
   LIMINE_MP=1 STACK_GUARD_TEST=0 LD_X86_64=/opt/homebrew/bin/ld.lld \
   LINUXKPI_SOURCE_DIR=/Users/alex/code/vinix/third_party/linux-i915/linux-6.6.157
 
@@ -290,12 +328,14 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`9f47270ee3c6754312bc09fc74d8f77e2cfe2229` reports **V 50.97%, C 12.25%**,
-440 C files, 418 Python files and 283 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,316 classified blobs
+`ac285e4208116510d66a7ecb1eda75a40f495acc` reports **V 71.45%, C 6.75%**,
+441 C files, 437 Python files and 284 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,388 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.
+Concurrent commits include a 17,850,662-byte `desktop/font_data.v` blob;
+the percentages describe the whole pinned source, not this port batch.
 
 Local Linguist runs in Lima VM `vlin`, using
 `/Users/alex/.cache/vinix-linguist/repository.git` with alternates to this

@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,234 original production/native-boundary C lines**, **3,411 original fixture
+**3,251 original production/native-boundary C lines**, **7,438 original fixture
 lines** and **248 header implementation lines** (111 desktop and 137 kernel).
-A further five original stack-pointer boundary lines now use instruction-only
+A further 14 original stack-pointer/syscall boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
 committed and validated; pending stages are excluded.
@@ -481,7 +481,8 @@ committed and validated; pending stages are excluded.
 | Android native runtime | 610 | `1d6730ac` |
 | Xinput native launcher and Wine host boundary | 95 | `bea41f8e` |
 | Office Windows PE API boundary | 123 | `7df94498` |
-| **Production/native total** | **3,234** | |
+| Hello and native greeting builder entries | 17 | `47be3479` |
+| **Production/native total** | **3,251** | |
 
 Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
 tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
@@ -500,6 +501,88 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | IPv6 native guest and common serial/smoke fixtures | 201 | `7dfa57c5` |
 | Kernel callback/UART/counter and lwIP header algorithms | 37 | `6b3769f2` |
 | LinuxKPI typed header helpers and generic exchange/CAS operations | 100 | `9f47270e` |
+| Android ATL configuration fixture | 71 | `5a8e6928` |
+| ACPI mutex/event native fixture | 206 | `18c49a10` |
+| Hypervisor guest and ARM PCI init fixture (V portions) | 77 | `d5591540` |
+| Hypervisor ABI fixture entry (V portion) | 5 | `5daec594` |
+| Apple boot/converter independent fixtures | 168 | `c93d331c` |
+| Apple SMC independent fixture | 536 | `9e09a18a` |
+| Allocation tracker independent policy fixture | 72 | `283e8276` |
+| Console independent policy fixture | 90 | `80ae43a1` |
+| Remaining six LinuxKPI kernel fixtures | 2,687 | `33be42d7` |
+| Native x86 console syscall fixture | 57 | `b3fdcb83` |
+| Native allocation tracker guest fixture | 58 | `ac285e42` |
+
+The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
+lines use instruction-only assembly and receive zero V algorithm credit. Its
+20-line ABI source retains six native static constraints in a declaration
+header; only five entry lines receive V fixture credit. The four-line ACPI
+include shim receives zero credit. Five duplicate Apple loader header helpers
+(33 lines, `6c351501`) now call the previously existing V implementations;
+retiring those duplicates receives zero new translation credit.
+
+ACPI preserves the 4 × 1,000 mutex workload, task identity, event deadlines,
+200 gates and exact 18-class residual assertions. Both actual ACPI guests,
+both kernel builds, default x86 boot and ARM PCI coverage passed. The current
+V library introduced unconditional POSIX backtrace includes despite
+`-no-backtrace`; an unchanged ACPI_SYNC_TEST=0 control reproduced the build failure.
+The kernel explicitly excludes that unused builtin. The compiler and vlib were
+frozen together: V source `95136d4de1dabe575e37fc36b5a3e793580c8f72`,
+binary SHA256
+`335214a9c904435eb87e580948a7de76c2b4de03a65f0ee23babaa76981a7373`.
+The displayed compiler version remains V 0.5.2 e690943 and does not identify
+those changing library inputs by itself.
+
+All six final LinuxKPI kernel fixtures passed the full host sanitizer/header/
+upstream suite, both architecture builds and complete four-CPU diagnostics.
+All 17 independent native fixture objects have no hidden allocator imports.
+SRCU, worker and workqueue record layouts, real callback wrapper addresses,
+stack-record lifetimes, wait cleanup and native variadic producers received
+independent review. Every measured batch returned to its exact free-page
+baseline. The tested LinuxKPI ELF SHA256 is
+`4e82332380efae4a53e266b3f97a0ec41ca7efdc42569d17e363bf0e7dd94fd3`;
+ARM is `265d6720e1cfe6068eb8e876b3e76253b7e3a0b34aa92584877d7e9327af746b`;
+default x86 is `a2fa885a872028008f603c2f11cd25b202e6ccc6a79a7f716c6876ea3feb3fed`.
+`fixture-final-source.json` pins base `9f47270e`, 788 source paths and 30
+explicit owned changes, excluding other sessions' uncommitted source. The
+first V guest failed the original worker test. An untouched-C fixture kernel
+passed, then the identical frozen V ELF passed on repeat. All logs are retained;
+the cause is unknown. Assertions, deadlines, worker tracing and exact memory
+retirement rules remain unchanged.
+
+The hypervisor fixture retains all 15 failure tags. Nineteen frozen-C/V model
+cases produced identical stdout and exit status under ASan/UBSan, including
+all five VM register/IO/HLT executions and failure paths. Both real native
+hypervisor guests passed their absent-device path, and ARM PCI init passed.
+Actual VMX entry still requires nested VT-x and is unverified locally. The
+Darwin variadic ioctl model boundary uses native instructions; mock output
+does not establish hardware VM execution.
+
+Apple boot/converter fixtures passed ten binary goldens, 78 ABI field checks,
+233 register-node cases and 410,739 memory cases under sanitizers, strict native
+objects, loader cross-build and fake-iBoot QEMU. SMC retained all 122 assertions
+in 27 cases and 32 explicit frees; frozen-C/V sanitizers and both native model
+guests passed. Physical Apple boot and SMC operation remain unverified.
+
+Tracker and console policy fixtures passed their original-C host baselines,
+V ASan/UBSan workloads, strict native objects and both architecture guests;
+console also passed both debug/production configurations. The actual
+ALLOC_TRACK=1 kernel guest preserves all 16 checks, native scanf widths,
+128 pipe pairs and descriptor cleanup. Original-C/V guests passed on both
+architectures. One V ARM image stalled in firmware before any kernel marker;
+the same immutable kernel/init passed with a fresh image. The x86 console
+syscall fixture preserved all ten checks, errno/fcntl behavior and worker
+collection; original-C/V native verdicts matched exactly. Tested tracker-kernel
+SHA256 values are
+`388fa8f702fd5e574610cb326f4e8948b3af669f750a6ac5f4602f72d98f6bdf` (ARM) and
+`38fd754c28595bfc7a9285fea37cac46bf8624a4acdb4e4eb0f120e4ebe370d2` (x86).
+
+At committed source `ac285e4208116510d66a7ecb1eda75a40f495acc`,
+`kernel/c/*.c` has zero maintained first-party files, including fixtures.
+The non-vendored `.c` census still contains 204 test paths / 47,155 lines,
+including genuine patched musl evidence. Maintained first-party host/native
+fixtures and header algorithms remain to port; zero kernel C is not completion
+of the repository-wide request. This census is not a translation tally.
 
 The first kernel-fixture guest failed the unchanged i915 device-encoding
 condition. Its cause was signed literals passed to the foreign `MKDEV` macro:
@@ -630,9 +713,12 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`9f47270ee3c6754312bc09fc74d8f77e2cfe2229` reports **V 50.97%, C 12.25%**,
-440 C files, 418 Python files and 283 shell files. All 2,316 classified blobs and
-the displayed inventory sizes were checked against Git. No Verilog or vendored
-trees appear and `.gitattributes` is unchanged. The archived source inventory
-reduction receives zero port credit; remaining first-party fixtures and headers
-are counted honestly.
+`ac285e4208116510d66a7ecb1eda75a40f495acc` reports **V 71.45%, C 6.75%**,
+441 C files, 437 Python files and 284 shell files. All 2,388 classified blob
+identities and sizes were checked against Git, including every inventory row.
+No Verilog or vendored trees appear and `.gitattributes` is unchanged.
+Concurrent commits include a 17,850,662-byte `desktop/font_data.v` blob;
+these graph percentages describe the whole pinned revision and are not a
+measure of this port batch. Archived source and duplicate-helper retirement
+receive zero new port credit; first-party fixtures and headers remain counted
+honestly.
