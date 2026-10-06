@@ -1249,6 +1249,15 @@ if [ -x "$IOS_STAGING/usr/bin/run-ios" ]; then
         cp -R "$IOS_STAGING/usr/share/vinix/ios/NumberTileGame.app" "$STAGING/usr/share/vinix/ios/"
         ln -sf run-ios "$STAGING/usr/bin/vinix-ios-2048"
     fi
+    if [ -x "$IOS_STAGING/usr/bin/run-ios-gles" ]; then
+        install -m755 "$IOS_STAGING/usr/bin/run-ios-gles" "$STAGING/usr/bin/run-ios-gles"
+        mkdir -p "$STAGING/usr/lib/vinix"
+        cp -R "$IOS_STAGING/usr/lib/vinix/ios-gles" "$STAGING/usr/lib/vinix/"
+        if [ -f "$IOS_STAGING/usr/share/vinix/ios/PPSSPP.app/PPSSPP" ]; then
+            cp -R "$IOS_STAGING/usr/share/vinix/ios/PPSSPP.app" "$STAGING/usr/share/vinix/ios/"
+            ln -sf run-ios-gles "$STAGING/usr/bin/vinix-ios-ppsspp"
+        fi
+    fi
 fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
@@ -1688,6 +1697,8 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/musl/alpine-1.2.6"
     "$STAGING/usr/share/vinix/musl-build.json"
     "$STAGING/usr/bin/run-ios"
+    "$STAGING/usr/bin/run-ios-gles"
+    "$STAGING/usr/lib/vinix/ios-gles"
     "$STAGING/usr/share/vinix/ios"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"

@@ -28,7 +28,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'NSString' { name in ['stringWithUTF8String:', 'stringWithFormat:'] }
 			'NSNumber' { name == 'numberWithInteger:' }
 			'NSArray', 'NSMutableArray' { name in ['array', 'arrayWithArray:', 'arrayWithCapacity:', 'arrayWithObjects:count:'] }
-			'NSDictionary', 'NSMutableDictionary' { name == 'dictionary' }
+			'NSDictionary', 'NSMutableDictionary' { name in ['dictionary', 'dictionaryWithObjects:forKeys:count:'] }
 			'NSUserDefaults' { name == 'standardUserDefaults' }
 			'NSNotificationCenter' { name == 'defaultCenter' }
 			'NSNotification' { name == 'notificationWithName:object:userInfo:' }
@@ -42,7 +42,8 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
 		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'doubleValue', 'stringValue']
 	}
-	if objc_is_kind(object, ios_runtime.names['NSString']) { return name in ['UTF8String', 'length', 'isEqualToString:', 'stringByAppendingString:'] }
+	if objc_is_kind(object, ios_runtime.names['NSString']) { return name in ['UTF8String', 'length', 'isEqualToString:', 'stringByAppendingString:', 'initWithBytes:length:encoding:'] }
+	if objc_is_kind(object, ios_runtime.names['NSAttributedString']) { return name == 'initWithString:attributes:' }
 	if objc_is_kind(object, ios_runtime.names['NSArray']) { return name in ['count', 'firstObject', 'objectAtIndex:', 'objectAtIndexedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSDictionary']) { return name in ['count', 'objectForKey:', 'objectForKeyedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSData']) { return name in ['bytes', 'length'] }
@@ -82,13 +83,17 @@ fn scene_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	}
 	if objc_is_kind(object, ios_runtime.names['UIWindowScene']) {
 		match selector {
-			'screen' { frame.x[0] = ios_runtime.screen }
+			'screen' { frame.x[0] = ui_main_screen() }
 			'coordinateSpace' { frame.x[0] = object }
 			'bounds' { return_rect(mut frame, ObjRect{0, 0, 390, 680}) }
 			'delegate' { frame.x[0] = obj_header(object).target }
 			'session' { frame.x[0] = obj_header(object).fields[1] }
 			else { return false }
 		}
+		return true
+	}
+	if objc_is_kind(object, ios_runtime.names['UIWindow']) && selector == 'windowScene' {
+		frame.x[0] = obj_header(object).fields[8]
 		return true
 	}
 	if objc_is_kind(object, ios_runtime.names['UIWindow']) && selector == 'initWithWindowScene:' {
@@ -99,6 +104,36 @@ fn scene_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		return true
 	}
 	return false
+}
+
+fn ui_main_screen() u64 {
+	if ios_runtime.screen == 0 {
+		ios_runtime.screen = objc_allocate(ios_runtime.names['UIScreen'])
+		mut header := obj_header(ios_runtime.screen)
+		header.frame = ObjRect{0, 0, 390, 680}
+	}
+	return ios_runtime.screen
+}
+
+fn ui_scene_action(delegate u64, selector &char) {
+	if delegate == 0 { return }
+	scene := obj_header(ios_runtime.window).fields[8]
+	if scene == 0 { return }
+	imp := native_method(read64(delegate), ctext(u64(selector)))
+	if imp != 0 { unsafe { ObjAction(voidptr(imp))(delegate, selector, scene) } }
+}
+
+fn ui_terminate(delegate u64, scene_delegate u64) {
+	ui_scene_action(scene_delegate, c'sceneWillResignActive:')
+	if ios_runtime.notification_center != 0 {
+		note := objc_allocate(ios_runtime.names['NSNotification'])
+		store_field(note, 0, make_string(c'UIApplicationWillTerminateNotification'))
+		store_field(note, 1, ios_runtime.application)
+		notification_post(ios_runtime.notification_center, note)
+		objc_release(note)
+	}
+	imp := native_method(read64(delegate), 'applicationWillTerminate:')
+	if imp != 0 { unsafe { ObjAction(voidptr(imp))(delegate, c'applicationWillTerminate:', ios_runtime.application) } }
 }
 
 type SceneConnect = fn (u64, &char, u64, u64, u64)

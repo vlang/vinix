@@ -84,6 +84,8 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if selector == 'dealloc' { return true } // Disposal follows the native dealloc chain.
+	$if ios_gles ? { if gles_dispatch(object, selector, mut frame) { return true } }
+	$if ios_text ? { if text_dispatch(object, selector, mut frame) { return true } }
 	if platform_framework_dispatch(object, selector, mut frame) { return true }
 	if foundation_dispatch(object, selector, mut frame) { return true }
 	// Class methods are inherited through their metaclasses.
@@ -118,6 +120,8 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 				header.color = u32(math.clamp(frame_double(frame, 0), 0, 1) * 255) << 16 |
 					u32(math.clamp(frame_double(frame, 1), 0, 1) * 255) << 8 |
 					u32(math.clamp(frame_double(frame, 2), 0, 1) * 255)
+				header.real_number = math.clamp(frame_double(frame, 3), 0, 1)
+				header.is_real = true
 				frame.x[0] = objc_autorelease(color)
 			}
 			'systemFontOfSize:weight:', 'fontWithName:size:' {
@@ -133,18 +137,52 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 				frame.x[0] = objc_autorelease(button)
 			}
 			'mainScreen' {
-				if ios_runtime.screen == 0 {
-					ios_runtime.screen = objc_allocate(object)
-					mut header := obj_header(ios_runtime.screen)
-					header.frame = ObjRect{0, 0, 390, 680}
-				}
-				frame.x[0] = ios_runtime.screen
+				frame.x[0] = ui_main_screen()
 			}
 			else { return false }
 		}
 		return true
 	}
 	mut header := obj_header(object)
+	if objc_is_kind(object, ios_runtime.names['UIView']) {
+		match selector {
+			'window' {
+				mut view := object
+				frame.x[0] = 0
+				for _ in 0 .. 128 {
+					if objc_is_kind(view, ios_runtime.names['UIWindow']) { frame.x[0] = view; break }
+					view = obj_header(view).parent_view
+					if view == 0 { break }
+				}
+				return true
+			}
+			'contentScaleFactor' { frame_float_return(mut frame, 0, header.content_scale); return true }
+			'setContentScaleFactor:' {
+				scale := frame_double(frame, 0)
+				if scale <= 0 || scale > 8 || !math.is_finite(scale) { panic('iOS: invalid UIView content scale') }
+				header.content_scale = scale; return true
+			}
+			'autoresizingMask' { frame.x[0] = header.autoresizing; return true }
+			'setAutoresizingMask:' { header.autoresizing = frame.x[2]; return true }
+			'isMultipleTouchEnabled' { frame.x[0] = u64(header.multiple_touch); return true }
+			'setMultipleTouchEnabled:' { header.multiple_touch = frame.x[2] != 0; return true }
+			else {}
+		}
+	}
+	if objc_is_kind(object, ios_runtime.names['UIScreen']) && selector in ['scale', 'nativeScale'] {
+		frame_float_return(mut frame, 0, 1)
+		return true
+	}
+	if objc_is_kind(object, ios_runtime.names['UIResponder']) {
+		match selector {
+			'isFirstResponder' { frame.x[0] = u64(ios_runtime.first_responder == object); return true }
+			'resignFirstResponder' {
+				if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
+				frame.x[0] = 1; return true
+			}
+			else {}
+		}
+	}
 	match selector {
 		'init' {}
 		'initWithFrame:' { header.frame = frame_rect(frame) }
@@ -288,9 +326,20 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 		eprintln('iOS: UIKit apps must be launched by the Vinix desktop (VINIX_REQUEST_FD/VINIX_RESPONSE_FD)')
 		return 1
 	}
+	ui_scene_action(scene_delegate, c'sceneWillEnterForeground:')
+	ui_scene_action(scene_delegate, c'sceneDidBecomeActive:')
+	defer { ui_terminate(delegate, scene_delegate) }
 	ui_event_loop(request.int(), response.int()) or {
 		eprintln('iOS: ${err}')
 		return 1
+	}
+	// iOS UIApplicationMain normally lives until process termination. Apps
+	// with persistent native workers can select that lifecycle on window close;
+	// returning through main would run their global C++ destructors prematurely.
+	if os.getenv('VINIX_IOS_EXIT_ON_CLOSE') == '1' {
+		ui_terminate(delegate, scene_delegate)
+		$if ios_gles ? { gles_unlink_surfaces(ios_runtime.window, 0) }
+		C._Exit(0)
 	}
 	return 0
 }

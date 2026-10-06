@@ -55,11 +55,16 @@ fn encode_view(mut bytes []u8, object u64, root bool, depth int) ! {
 		return error('UIKit view tree exceeds protocol limits')
 	}
 	header := obj_header(object)
-	button := header.target != 0
+	button := header.target != 0 && header.action != 0
+	mut image := ''
+	$if ios_gles ? { image = gles_image_path(object) }
+	defer { if image.len != 0 { unsafe { image.free() } } }
 	label := if button { obj_header(header.fields[5]) } else { header }
 	text := string_text(label.fields[0])
 	font := if label.fields[1] == 0 { f64(17) } else { obj_header(label.fields[1]).font_size }
-	kind := if root {
+	kind := if image.len != 0 {
+		u8(3)
+	} else if root {
 		u8(0)
 	} else if button {
 		u8(4)
@@ -121,7 +126,8 @@ fn encode_view(mut bytes []u8, object u64, root bool, depth int) ! {
 	wire_string(mut bytes, id)
 	wire_string(mut bytes, '')
 	wire_string(mut bytes, text)
-	for _ in 0 .. 6 { wire_string(mut bytes, '') }
+	wire_string(mut bytes, image)
+	for _ in 0 .. 5 { wire_string(mut bytes, '') }
 	wire_string(mut bytes, if kind == 2 && label.align == 2 { 'bottom' } else { 'middle' })
 	wire_string(mut bytes, '')
 	wire_u32(mut bytes, 0) // menu
@@ -176,7 +182,9 @@ fn ui_event_loop(request int, response int) ! {
 		}
 		unsafe { C.memcpy(state.data, &header[16], 116) }
 		pool := objc_pool_push()
+		ios_runtime.dirty = dispatch_main_drain() || ios_runtime.dirty
 		ios_runtime.dirty = timers_fire() || ios_runtime.dirty
+		ios_runtime.dirty = display_links_fire() || ios_runtime.dirty
 		encoded.clear()
 		command := header[5]
 		match command {
@@ -228,7 +236,9 @@ fn ui_event_loop(request int, response int) ! {
 				phase := wire_number(payload, 0)
 				x := int(i32(wire_number(payload, 12)))
 				y := int(i32(wire_number(payload, 16)))
-				if phase == 1 && wire_number(payload, 4) == 1 {
+				if ui_native_pointer(phase, wire_number(payload, 4), x, y) {
+					ios_runtime.dirty = true
+				} else if phase == 1 && wire_number(payload, 4) == 1 {
 					ios_runtime.pointer_down = true
 					ios_runtime.pointer_x = x
 					ios_runtime.pointer_y = y

@@ -29,11 +29,14 @@ fn execute(image macho.Image, arguments []string) !int {
 	defer { C.munmap(mapping, usize(layout.size)) }
 	base := u64(mapping)
 	objc_start()
+	$if ios_text ? { text_start()! }
+	$if ios_gles ? { gles_start()! }
 	if ios_runtime.trace { eprintln('iOS Mach-O mapping: 0x${base.hex()}') }
 	image_runtime_start(image, layout, base)
 	defer {
 		if image_runtime.started { image_cxa_finalize(0) }
 		objc_stop()
+		$if ios_gles ? { gles_stop() }
 		image_runtime_stop()
 		if lazy_runtime != unsafe { nil } { lazy_stop() }
 		system_data_stop()

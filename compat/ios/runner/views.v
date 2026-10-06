@@ -39,7 +39,19 @@ fn ui_load_controller(controller u64) {
 		header.loaded = true
 		invoke_void(controller, c'viewDidLoad')
 	}
+	if ios_runtime.window != 0 && obj_header(ios_runtime.window).fields[7] == controller {
+		window := obj_header(ios_runtime.window).frame
+		mut root := obj_header(header.fields[6])
+		root.frame = ObjRect{0, 0, window.width, window.height}
+	}
 	invoke_void(controller, c'viewDidLayoutSubviews')
+	// The window owns the root view just as it owns its root controller. The
+	// non-owning parent permits UIView.window to find the connected window scene.
+	view := header.fields[6]
+	if ios_runtime.window != 0 && obj_header(ios_runtime.window).fields[7] == controller
+		&& !ui_contains(ios_runtime.window, view, 0) {
+		ui_add_child(ios_runtime.window, view)
+	}
 }
 
 fn ui_remove_child(child u64) {

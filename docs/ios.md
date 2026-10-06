@@ -13,7 +13,7 @@ runner loads its launch storyboard source, presents the game controller and
 executes native swipe callbacks, tile merges, scoring and queued moves.
 
 The UIKit view tree is rendered by Vinix's existing desktop compositor using
-the standalone application protocol. The kernel loads the runner's static ELF
+the standalone application protocol. The kernel loads the runner's ELF
 and needs no Mach-O or Darwin syscall changes. This supports the implemented apps'
 API set; general iOS applications and Apple's own Calculator remain outside
 the implemented subset. The existing native Vinix calculator is a separate app.
@@ -114,7 +114,58 @@ App groups, custom preference suites and security-scoped bookmarks are unsupport
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
 
-## Official PPSSPP iOS binary probe
+## Native OpenGL ES and CoreText
+
+`./scripts/build-ios-aarch64.sh --with-gles` additionally builds `run-ios-gles`.
+It uses the ARM64 Mesa and FreeType libraries from `build-aarch64-x11/sysroot`
+(build them with `./scripts/build-x11-aarch64.sh`), falling back to the userland
+sysroot for dependencies. The dynamic runner uses a private musl interpreter,
+software DRI driver and dependency closure in `/usr/lib/vinix/ios-gles`; the
+existing desktop's graphics libraries and interpreter are preserved.
+
+V implements `EAGLContext`, thread-local current-context ownership and `GLKView`.
+The view allocates real Mesa RGBA8 framebuffers, depth/stencil attachments and
+resizes its drawable. Native iOS drawing callbacks compile and run GLES shaders.
+Readback preserves GL packing/framebuffer state, converts pixels to XRGB8888 and
+publishes the desktop's existing VSF1 shared surfaces. A claimed compositor buffer
+is never overwritten; resize and ordinary ARC teardown remove surface files.
+
+`CADisplayLink` and queued main-thread blocks execute on the desktop event loop.
+Scene activation/resignation and termination callbacks reach native app methods.
+One desktop left pointer becomes a stable `UITouch` through began/moved/ended
+callbacks, with `NSSet` enumeration, `UIEvent.allTouches`, timestamps and native
+`CGPoint` returns. Existing calculator actions and 2048 swipes remain supported.
+
+The CoreText subset registers bundled fonts, resolves PostScript and family
+names, selects actual bold/italic faces, measures glyph advances/kerning and
+rasterizes clipped premultiplied RGBA glyphs with FreeType. It uses independently
+written V layout/compositing code and small C accessors for FreeType's structs.
+UTF-8/ASCII strings, attributed strings, dictionary literals and the required
+CoreFoundation ownership/collection calls are implemented. Complex text shaping,
+font fallback, color emoji, general CoreGraphics drawing and multisampled GLK
+drawables remain unsupported.
+
+The optional runner also exposes tested native zlib entry points. An iOS fixture
+checks its 112-byte stream layout and callbacks into original Mach-O allocator
+functions. ARM64 native nonlocal jumps fit inside Darwin's opaque 192-byte buffer;
+guarded iOS tests check both jump variants and the zero-to-one return convention.
+Signal-mask restoration through jumps is not provided by the musl implementation.
+Atomic reference counts, synchronized weak/block ownership and per-thread
+autorelease pools allow Foundation work on native app threads. Tests race eight
+threads against weak loads/deallocation and verify thread-exit pool cleanup.
+
+```sh
+python3 tests/ios/run.py --with-cxx --with-gles --with-2048
+```
+
+These tests execute original ARM64 iOS instructions inside Vinix, checking shader
+pixels, 64 drawable resizes, depth/stencil state, EAGL thread cleanup, display-link
+timing/pause, nested main-queue blocks, native touch callbacks, shared-buffer
+ownership, real font pixels and zlib. Mesa's disk shader cache is disabled by
+default unless explicitly configured. No Apple framework or font implementation
+is copied into the runner.
+
+## Official PPSSPP iOS binary
 
 [PPSSPP](https://www.ppsspp.org/download/) is a substantial open-source PSP
 emulator with a publicly downloadable iOS IPA. The pinned
@@ -157,24 +208,60 @@ The largest groups are:
 | UIKit | 29 |
 | Objective-C runtime | 26 |
 
-**PPSSPP executes native startup on Vinix, but its menu and emulation do not
-work yet.** With the optional C++ runtime, the unchanged release binary runs
+**The unchanged PPSSPP release binary renders its main menu and responds to
+Settings clicks on Vinix, with sound disabled.** With the optional runtime, it runs
 `SceneDelegate +load`, its native C++ constructors and `main`, reads its actual
 entitlement data, reaches `UIApplicationMain`, registers notification observers,
 and enters the scene delegate declared in its binary `Info.plist`. Its own code
 then starts the worker/UPnP threads, registers its VFS asset/document paths,
 reads configuration files, constructs its native view controller, and enters
-`viewDidLoad`, including camera/location/motion helper setup. The current guest
-stops at `EAGLContext initWithAPI:`, the call that creates its OpenGL ES context.
+`viewDidLoad`, including camera/location/motion helper setup. It creates a real
+Mesa OpenGL ES context, enters its native emulation/rendering thread, registers
+all five bundled fonts and decodes its assets through native zlib. Its original
+code draws the splash screen, main menu and Graphics settings into a 390×680
+framebuffer. Mouse clicks reach its original UIKit touch handlers.
 Darwin private JIT probes fail normally; no successful entitlement or ptrace
 operation is fabricated.
 
-The guest regression stages the whole upstream app bundle and reports
-`iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime`. It checks the
-767-import inspection, native `+load` and scene-launch messages, exit status 1
-and the specific unimplemented `EAGLContext initWithAPI:` diagnostic. Passing this
-probe verifies that progress and failure, not a working PPSSPP UI. `--with-ppsspp` requires
-`--with-cxx`; add `--with-2048` to verify the working apps in the same guest.
+Build and stage the desktop launcher, then open **iOS PPSSPP**:
+
+```sh
+./scripts/build-ios-aarch64.sh --with-ppsspp
+./scripts/build-desktop-aarch64.sh
+./scripts/run-desktop-aarch64.sh --no-build
+```
+
+The build option enables C++/GLES, downloads the verified release and stages the
+whole bundle without rewriting its executable. The launcher initializes an
+ordinary `ppsspp.ini` with `[Sound] Enable=False` only when no preferences exist.
+Documents/preferences live under the active desktop user's
+`.local/share/vinix/ppsspp/Documents`; `VINIX_IOS_DOCUMENTS` selects another path.
+The desktop supplies the private Mesa library/driver paths and pointer events.
+
+For apps with persistent native C++ workers, `VINIX_IOS_EXIT_ON_CLOSE=1` sends
+scene resignation and termination notifications, unlinks shared surfaces and
+ends the process when its window closes. This is the PPSSPP launcher's mode:
+returning from `UIApplicationMain` would otherwise prematurely run its global
+thread destructors. Normal calculator/2048 teardown continues to check ARC.
+
+Reproduce the native menu/Settings test and capture its actual pixels:
+
+```sh
+python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+  --with-ppsspp --ppsspp-muted --timeout 300 > build/ios/ppsspp-guest.log 2>&1
+python3 tests/ios/frame.py build/ios/ppsspp-guest.log build/ios/ppsspp-settings.png
+```
+
+The test uses the installed launcher with fresh preferences, runs beyond the
+splash transition, clicks Settings through native UIKit, checks detailed changing
+pixels and verifies exit status zero and shared-surface removal. It emits
+`iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)`.
+
+Audio is still unsupported. With sound enabled the actual binary stops at
+`AVAudioSession setCategory:error:`; the unmuted probe checks that precise
+failure. Without `--with-gles`, the static probe still checks the unsupported
+`EAGLContext initWithAPI:` call. Both intentionally report
+`iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime`.
 
 Binaries without chained fixups previously reported no imports. `--imports` reads
 bounded `LC_SYMTAB`/`nlist_64` records, filters defined/debug/local/common symbols,
@@ -215,11 +302,11 @@ exception unwinding through Mach-O frames remains unsupported; this is a tested
 C++ subset, not a complete ABI. The stdio and scene fixtures also run under
 ASan/UBSan on the ARM64 host.
 
-The remaining work includes additional Foundation and Darwin APIs, GLKit/EAGL
-and OpenGL ES rendering, audio/device services, and foreground/background scene
-events. Metal and the bundled MoltenVK dylib are also unsupported. No PPSSPP menu
-or PSP game has been run. The guest's diagnostic names the next API actually
-reached, so an unused framework import does not hide executable startup progress.
+PSP game emulation has not been verified. Remaining work includes audio/device
+services, additional Foundation/Darwin APIs, keyboard and multiple-touch input,
+and broader rendering coverage. Metal and the bundled MoltenVK dylib remain
+unsupported; the tested backend is OpenGL. Unsupported calls still diagnose the
+actual API reached rather than silently pretending to implement it.
 
 ## Local Apple Calculator inspection
 

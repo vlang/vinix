@@ -38,6 +38,19 @@ fn inspect(image macho.Image, show_imports bool) ! {
 
 fn main() {
 	launcher := os.file_name(os.args[0])
+	if launcher == 'vinix-ios-ppsspp' {
+		documents := os.getenv('VINIX_IOS_DOCUMENTS')
+		user_home := os.getenv('VINIX_USER_HOME')
+		path := if documents.len > 0 { documents } else { os.join_path(if user_home.len > 0 { user_home } else { '/root' }, '.local', 'share', 'vinix', 'ppsspp', 'Documents') }
+		os.mkdir_all(os.join_path(path, 'PSP', 'SYSTEM')) or { eprintln('iOS: ${err}'); exit(1) }
+		preferences := os.join_path(path, 'PSP', 'SYSTEM', 'ppsspp.ini')
+		if !os.exists(preferences) { os.write_file(preferences, '[Sound]\nEnable=False\n') or { eprintln('iOS: ${err}'); exit(1) } }
+		C.setenv(c'VINIX_IOS_DOCUMENTS', unsafe { &char(path.str) }, 0)
+		C.setenv(c'VINIX_IOS_EXIT_ON_CLOSE', c'1', 0)
+		binary := '/usr/share/vinix/ios/PPSSPP.app/PPSSPP'
+		run_binary(binary, [binary])
+		return
+	}
 	if launcher in ['vinix-ios-calculator', 'vinix-ios-2048'] {
 		name := if launcher == 'vinix-ios-calculator' { 'Calculator' } else { 'NumberTileGame' }
 		path := '/usr/share/vinix/ios/${name}.app/${name}'

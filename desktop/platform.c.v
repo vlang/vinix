@@ -866,8 +866,9 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 		}
 	}
 	mut envp := [&char(path_entry.str), &char(home_entry.str), &char(user_home_env.str), c'TERM=dumb', c'USER=root',
-		c'LOGNAME=root', c'SHELL=/bin/zsh', c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules',
-		c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri',
+		c'LOGNAME=root', c'SHELL=/bin/zsh',
+		if app_name == 'vinix-ios-ppsspp' { c'LD_LIBRARY_PATH=/usr/lib/vinix/ios-gles:/usr/lib' } else { c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules' },
+		if app_name == 'vinix-ios-ppsspp' { c'LIBGL_DRIVERS_PATH=/usr/lib/vinix/ios-gles/dri' } else { c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri' },
 		c'SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt']
 	unsafe { envp.flags |= .noslices }
 	if roblox_apk_env.len > 0 {
@@ -876,7 +877,7 @@ fn desktop_spawn_app(path string, app_name string, tz_offset i64, language strin
 	if roblox_split_env.len > 0 {
 		envp << &char(roblox_split_env.str)
 	}
-	if app_name in ['vinix-ios-calculator', 'vinix-ios-2048'] {
+	if app_name in ['vinix-ios-calculator', 'vinix-ios-2048', 'vinix-ios-ppsspp'] {
 		trace := C.getenv(c'VINIX_IOS_TRACE')
 		if trace != unsafe { nil } && unsafe { trace[0] == 49 && trace[1] == 0 } {
 			envp << c'VINIX_IOS_TRACE=1'

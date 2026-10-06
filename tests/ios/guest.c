@@ -56,9 +56,29 @@ static void run(const char *image, const char *left, const char *op,
 
 extern void test_uikit(void);
 extern void test_2048(void);
+extern void test_gles_ui(void);
+extern void test_ppsspp_ui(void);
 
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
+    if (!access("/opt/ios/gles", R_OK)) {
+        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+        unsetenv("GALLIUM_DRIVER");
+        setenv("MESA_SHADER_CACHE_DISABLE", "true", 1);
+        run("/opt/ios/gles", NULL, NULL, NULL, 0,
+            "IOS-GLES: native ES3 shader pixels, GLKView resize, depth/stencil, TLS and ARC teardown");
+        puts("iOS PASS: native OpenGL ES shader rendering and GLKView lifecycle");
+        test_gles_ui();
+        run("/opt/ios/TextFixture.app/TextFixture", NULL, NULL, NULL, 0,
+            "IOS-TEXT: registered font, traits, UTF-8, real metrics and clipped premultiplied glyph pixels\n");
+        puts("iOS PASS: native CoreText fonts and bitmap glyph rendering");
+        run("/opt/ios/compression", NULL, NULL, NULL, 0,
+            "IOS-ZLIB: stream layout, native compression and iOS allocation callbacks\n");
+        puts("iOS PASS: native zlib and Mach-O callbacks");
+    }
+    run("/opt/ios/arc-threads", NULL, NULL, NULL, 0,
+        "IOS-ARC: eight threads, weak/deallocation races and isolated autorelease pools\n");
+    puts("iOS PASS: thread-safe ARC and autorelease pools");
     const char *calculator = "/opt/ios/calculator";
     run(calculator, "7", "+", "5", 0, "IOS-CALCULATOR: 12\n");
     run(calculator, "3", "-", "9", 0, "IOS-CALCULATOR: -6\n");
@@ -79,9 +99,10 @@ int main(void) {
     puts("iOS PASS: native UIKit scene and application launch");
     if (!access("/opt/ios/PPSSPP", R_OK)) {
         run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
-        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1,
-            "unimplemented Objective-C method EAGLContext initWithAPI:");
-        puts("iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime");
+        if (!access("/opt/ios/gles", R_OK)) test_ppsspp_ui();
+        else run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1,
+                "unimplemented Objective-C method EAGLContext initWithAPI:");
+        if (access("/opt/ios/ppsspp-muted", F_OK)) puts("iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime");
     }
     if (!access("/opt/ios/cxx", R_OK)) {
         run("/opt/ios/cxx", NULL, NULL, NULL, 0, "IOS-CXX: destructor\n");

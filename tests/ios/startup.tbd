@@ -10,5 +10,7 @@ exports:
                _objc_autoreleasePoolPush, _objc_autoreleasePoolPop, _objc_alloc,
                _objc_alloc_init, _objc_opt_new, _objc_opt_class, _objc_getClass,
                _objc_opt_isKindOfClass, _objc_opt_respondsToSelector,
-               _objc_setProperty_nonatomic ]
+               _objc_setProperty_nonatomic, _objc_initWeak, _objc_storeWeak,
+               _objc_loadWeakRetained, _objc_destroyWeak, _objc_unsafeClaimAutoreleasedReturnValue,
+               _objc_enumerationMutation ]
 ...

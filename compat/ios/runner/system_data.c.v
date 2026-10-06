@@ -27,6 +27,7 @@ mut:
 	page_size u64
 	task_self u32
 	main_queue [8]u64
+	main_jobs []u64
 	in6_any [16]u8
 	standard [3]u64
 	streams map[u64]voidptr
@@ -43,6 +44,7 @@ __global system_data = unsafe { &SystemData(nil) }
 
 fn system_data_start() ! {
 	system_data = &SystemData{page_size: u64(C.getpagesize()), task_self: 1}
+	system_data.main_jobs.flags |= .noslices
 	bytes := rand.bytes(8)!
 	unsafe { C.memcpy(&system_data.guard, bytes.data, 8); bytes.free() }
 	// Darwin FILE's public ARM64 ABI is 152 bytes. Zero-sized read/write
@@ -128,9 +130,6 @@ fn system_data_symbol(symbol string) ?u64 {
 		'_tan' { u64(unsafe { voidptr(C.tan) }) }
 		'_tanh' { u64(unsafe { voidptr(C.tanh) }) }
 		'_strcasecmp' { u64(unsafe { voidptr(C.strcasecmp) }) }
-		'_longjmp' { u64(unsafe { voidptr(darwin_longjmp) }) }
 		else { return none }
 	}
 }
-
-fn darwin_longjmp() { panic('iOS: Darwin longjmp context restoration is not implemented') }

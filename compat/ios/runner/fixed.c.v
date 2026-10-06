@@ -4,6 +4,17 @@ module main
 import time
 
 #include <locale.h>
+#include <wctype.h>
+#include <setjmp.h>
+fn C.setjmp(voidptr) i32
+fn C.longjmp(voidptr, i32)
+fn C._setjmp(voidptr) i32
+fn C._longjmp(voidptr, i32)
+fn C.towlower(u32) u32
+fn C.towupper(u32) u32
+
+fn darwin_rune_lower(value i32) i32 { return i32(C.towlower(u32(value))) }
+fn darwin_rune_upper(value i32) i32 { return i32(C.towupper(u32(value))) }
 fn C.setlocale(i32, &char) &char
 
 fn darwin_setlocale(category i32, locale &char) &char {
@@ -75,10 +86,22 @@ fn C.log10(f64) f64
 fn C.log10f(f32) f32
 fn C.exp2(f64) f64
 fn C.exp2f(f32) f32
+fn darwin_exp10(value f64) f64 { return C.pow(10, value) }
+fn darwin_exp10_float(value f32) f32 { return C.powf(10, value) }
 fn C.acosf(f32) f32
 fn C.asinf(f32) f32
 fn C.atanf(f32) f32
 fn C.cosf(f32) f32
+struct DarwinSinCosFloat {
+	sine f32
+	cosine f32
+}
+fn darwin_sincos_float(value f32) DarwinSinCosFloat { return DarwinSinCosFloat{C.sinf(value), C.cosf(value)} }
+struct DarwinSinCosDouble {
+	sine f64
+	cosine f64
+}
+fn darwin_sincos_double(value f64) DarwinSinCosDouble { return DarwinSinCosDouble{C.sin(value), C.cos(value)} }
 fn C.coshf(f32) f32
 fn C.expf(f32) f32
 fn C.fabsf(f32) f32
@@ -128,6 +151,17 @@ fn darwin_memset_checked(destination voidptr, value i32, size usize, capacity us
 fn darwin_stack_fail() { panic('iOS: native stack protector detected corruption') }
 fn fixed_symbol(symbol string) ?u64 {
     return match symbol {
+		// The ARM64 native routines touch only the first 176 bytes of their
+		// opaque buffer, inside Darwin's 192-byte jmp_buf. Resolve their entry
+		// points directly: a V wrapper would save a frame that has returned.
+		'_setjmp' { u64(unsafe { voidptr(C.setjmp) }) }
+		'_longjmp' { u64(unsafe { voidptr(C.longjmp) }) }
+		'__setjmp' { u64(unsafe { voidptr(C._setjmp) }) }
+		'__longjmp' { u64(unsafe { voidptr(C._longjmp) }) }
+		'___exp10' { u64(unsafe { voidptr(darwin_exp10) }) }
+		'___exp10f' { u64(unsafe { voidptr(darwin_exp10_float) }) }
+		'___sincosf_stret' { u64(unsafe { voidptr(darwin_sincos_float) }) }
+		'___sincos_stret' { u64(unsafe { voidptr(darwin_sincos_double) }) }
 		'_ldexp' { u64(unsafe { voidptr(C.ldexp) }) }
 		'_ldexpf' { u64(unsafe { voidptr(C.ldexpf) }) }
 		'_frexp' { u64(unsafe { voidptr(C.frexp) }) }

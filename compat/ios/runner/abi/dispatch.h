@@ -12,6 +12,19 @@
 #include <sys/types.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <dirent.h>
+static int ios_readdir_info(void *directory, char *name, uint64_t *fields) {
+    struct dirent *entry = readdir((DIR *)directory);
+    if (!entry) return 0;
+    size_t length = strlen(entry->d_name);
+    if (length >= 1024) { errno = ENAMETOOLONG; return -1; }
+    fields[0] = entry->d_ino;
+    fields[1] = (uint64_t)telldir((DIR *)directory);
+    fields[2] = entry->d_type;
+    fields[3] = length;
+    memcpy(name, entry->d_name, length + 1);
+    return 1;
+}
 /* Read native libc's structure in C; the Darwin layout conversion is in V. */
 static int ios_stat_info(const char *path, int fd, int kind, uint64_t *fields) {
     struct stat info;
@@ -113,6 +126,17 @@ static int ios_thread_name(const char *name) {
 static void *ios_host_stdio(int index) { return index == 0 ? stdin : index == 1 ? stdout : stderr; }
 static void ios_store_pointer(uint64_t *slot, uint64_t value) { __atomic_store_n(slot, value, __ATOMIC_RELEASE); }
 static uint64_t ios_load_pointer(uint64_t *slot) { return __atomic_load_n(slot, __ATOMIC_ACQUIRE); }
+static int64_t ios_ref_change(int64_t *slot, int64_t change) {
+    return __atomic_fetch_add(slot, change, __ATOMIC_ACQ_REL);
+}
+static int ios_ref_try_retain(int64_t *slot) {
+    int64_t value = __atomic_load_n(slot, __ATOMIC_ACQUIRE);
+    while (value > 0) {
+        if (__atomic_compare_exchange_n(slot, &value, value + 1, 0,
+                __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) return 1;
+    }
+    return 0;
+}
 static pthread_mutex_t ios_initialize_mutex;
 static pthread_once_t ios_initialize_once = PTHREAD_ONCE_INIT;
 static void ios_initialize_mutex_create(void) {

@@ -12,6 +12,8 @@ $if arm64 {
 #include "@VMODROOT/abi/dispatch.h"
 
 fn C.calloc(usize, usize) voidptr
+fn C.ios_ref_change(&i64, i64) i64
+fn C.ios_ref_try_retain(&i64) i32
 fn C.ios_objc_msgsend()
 fn C.ios_objc_super()
 fn C.ios_snprintf()
@@ -43,7 +45,7 @@ mut:
 // compiler's ordinary 8-byte isa and uses the Mach-O's nonfragile ivar offsets.
 struct ObjHeader {
 mut:
-	refs        int
+	refs        i64
 	text        &char = unsafe { nil }
 	frame       ObjRect
 	color       u32
@@ -74,6 +76,11 @@ mut:
 	free_data bool
 	real_number f64
 	is_real bool
+	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
+	font_face voidptr // Optional FreeType face, disposed before its descriptor.
+	autoresizing u64
+	multiple_touch bool
+	content_scale f64 = 1
 }
 
 struct ObjRect {
@@ -95,10 +102,10 @@ struct ObjRuntime {
 mut:
 	classes      map[u64]&ObjClass
 	names        map[string]u64
-	pool         []u64
+	pool_key u64
 	window       u64
 	screen       u64
-	live         int
+	live         i64
 	trace        bool
 	constants    map[u64]bool
 	constant_utf8 map[u64]string
@@ -108,6 +115,11 @@ mut:
 	framework_objects []u64
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
+	display_links []u64
+	run_loop u64
+	main_thread u64
+	first_responder u64
+	native_touch u64
 	block_refs   map[u64]int
 	block_isa    [3]u64
 	transform    [6]f64
@@ -132,8 +144,12 @@ __global ios_runtime = &ObjRuntime(unsafe { nil })
 
 fn objc_start() {
 	ios_runtime = &ObjRuntime{ trace: os.getenv('VINIX_IOS_TRACE') == '1' }
-	ios_runtime.pool.flags |= .noslices
+	if C.ios_key_create(unsafe { &ios_runtime.pool_key }, unsafe { voidptr(objc_pool_free) }) != 0 {
+		panic('iOS: cannot create autorelease TLS')
+	}
 	ios_runtime.timers.flags |= .noslices
+	ios_runtime.display_links.flags |= .noslices
+	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
@@ -143,12 +159,13 @@ fn objc_start() {
         'NSData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
-        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'NSSet', 'UITraitCollection', 'UIImage', 'UIPasteboard',
+        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
-        'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary'] {
+        'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
+		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor'] {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
@@ -203,6 +220,7 @@ fn objc_allocate(cls u64) u64 {
 	mut header := unsafe { &ObjHeader(memory) }
 	header.refs = 1
 	header.font_size = 17
+	header.content_scale = 1
 	// calloc does not initialize V array element sizes. Set them explicitly
 	// before any collection/gesture push can grow these buffers.
 	header.items = []u64{}
@@ -215,7 +233,7 @@ fn objc_allocate(cls u64) u64 {
 	object := u64(memory) + sizeof(ObjHeader)
 	unsafe { *(&u64(object)) = cls }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { header.number = -1 }
-	ios_runtime.live++
+	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
 	return objc_construct(object, cls)
 }
 
@@ -223,7 +241,7 @@ fn objc_retain(object u64) u64 {
 	if object != 0 && is_block(object) { return block_retain(object) }
 	if object != 0 && object !in ios_runtime.classes && object !in ios_runtime.constants {
 		mut header := obj_header(object)
-		header.refs++
+		if C.ios_ref_try_retain(unsafe { &header.refs }) == 0 { panic('iOS: retaining a deallocated object') }
 	}
 	return object
 }
@@ -251,16 +269,18 @@ fn objc_release(object u64) {
 		return
 	}
 	mut header := obj_header(object)
-	if header.refs <= 0 { panic('iOS: over-release') }
-	header.refs--
-	if header.refs != 0 { return }
+	previous := C.ios_ref_change(unsafe { &header.refs }, -1)
+	if previous <= 0 { panic('iOS: over-release') }
+	if previous != 1 { return }
 	// Zero weak slots before destructors can observe a dying object.
+	C.ios_objc_initialize_lock()
 	for location, referent in ios_runtime.weak {
 		if referent == object {
 			unsafe { *(&u64(location)) = 0 }
 			ios_runtime.weak[location] = 0
 		}
 	}
+	C.ios_objc_initialize_unlock()
 	dealloc := native_method(read64(object), 'dealloc')
 	if dealloc != 0 {
 		unsafe { ObjVoid(voidptr(dealloc))(object, c'dealloc') }
@@ -276,6 +296,8 @@ fn objc_release(object u64) {
 		}
 		cls = info.parent
 	}
+	$if ios_gles ? { gles_dispose(object) }
+	$if ios_text ? { text_dispose(object) }
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])
@@ -294,9 +316,10 @@ fn objc_release(object u64) {
 	if header.file != unsafe { nil } { C.fclose(header.file) }
 	if header.free_data { C.free(unsafe { voidptr(header.external_data) }) }
 	objc_destroy_weak(unsafe { &header.target })
+	if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
 	C.free(header.text)
 	C.free(header)
-	ios_runtime.live--
+	C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
 }
 
 fn objc_store_strong(location &u64, object u64) {
@@ -304,23 +327,6 @@ fn objc_store_strong(location &u64, object u64) {
 	objc_retain(object)
 	unsafe { *location = object }
 	objc_release(old)
-}
-
-fn objc_autorelease(object u64) u64 {
-	if object != 0 { ios_runtime.pool << object }
-	return object
-}
-
-fn objc_pool_push() u64 { return u64(ios_runtime.pool.len) + 1 }
-
-fn objc_pool_pop(token u64) {
-	if token == 0 || token > u64(ios_runtime.pool.len) + 1 {
-		panic('iOS: invalid autorelease pool')
-	}
-	for ios_runtime.pool.len >= int(token) {
-		object := ios_runtime.pool.pop()
-		objc_release(object)
-	}
 }
 
 fn objc_new(cls u64) u64 {
@@ -331,6 +337,11 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	$if ios_gles ? { gles_set_current(0) }
+	display_links_stop()
+	dispatch_main_stop()
+	objc_release(ios_runtime.native_touch)
+	ios_runtime.native_touch = 0
 	for timer in ios_runtime.timers {
 		timer_invalidate(timer)
 		objc_release(timer)
@@ -346,9 +357,14 @@ fn objc_stop() {
 	objc_release(ios_runtime.audio_session)
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.locale)
+	objc_release(ios_runtime.run_loop)
 	for object in ios_runtime.framework_objects { objc_release(object) }
 	for _, address in ios_runtime.framework_data { C.free(unsafe { voidptr(address) }) }
 	objc_pool_pop(1)
+	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
+	$if ios_text ? { text_stop() }
+	C.pthread_setspecific(ios_runtime.pool_key, unsafe { nil })
+	C.pthread_key_delete(ios_runtime.pool_key)
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
@@ -368,6 +384,17 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	$if ios_text ? {
+		if library in ['/System/Library/Frameworks/CoreText.framework/CoreText', '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
+			if address := text_symbol(symbol) { return address }
+		}
+	}
+	$if ios_gles ? {
+		if library == '/usr/lib/libz.1.dylib' { if address := gles_zlib_symbol(symbol) { return address } }
+		if library == '/System/Library/Frameworks/OpenGLES.framework/OpenGLES' {
+			if address := gles_symbol(symbol) { return address }
+		}
+	}
 	$if ios_cxx ? {
 		if library == '/usr/lib/libc++.1.dylib' || (library == '/usr/lib/libSystem.B.dylib' && symbol == '__Unwind_Resume') {
 			return cxx_symbol(symbol)
@@ -398,6 +425,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 			'_objc_retainAutorelease', '_objc_retainAutoreleaseReturnValue' { unsafe { voidptr(objc_retain_autorelease) } }
 			'_objc_setProperty_nonatomic' { unsafe { voidptr(objc_property_strong) } }
 			'_objc_autoreleaseReturnValue' { unsafe { voidptr(objc_autorelease) } }
+			'_objc_unsafeClaimAutoreleasedReturnValue' { unsafe { voidptr(objc_unsafe_claim) } }
 			'_objc_alloc' { unsafe { voidptr(objc_allocate) } }
 			'_objc_opt_new' { unsafe { voidptr(objc_new) } }
 			'_objc_alloc_init' { unsafe { voidptr(objc_new) } }

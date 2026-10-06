@@ -19,7 +19,13 @@ fn block_copy(block u64) u64 {
 	if block == 0 { return 0 }
 	flags := read32(block + 8)
 	if flags & (u32(1) << 28) != 0 { return block }
-	if block in ios_runtime.block_refs { return block_retain(block) }
+	C.ios_objc_initialize_lock()
+	if refs := ios_runtime.block_refs[block] {
+		ios_runtime.block_refs[block] = refs + 1
+		C.ios_objc_initialize_unlock()
+		return block
+	}
+	C.ios_objc_initialize_unlock()
 	descriptor := read64(block + 24)
 	size := read64(descriptor + 8)
 	if size < 32 || size > 1024 * 1024 { panic('iOS: invalid block size') }
@@ -29,7 +35,9 @@ fn block_copy(block u64) u64 {
 		C.memcpy(voidptr(copied), voidptr(block), usize(size))
 		*(&u64(copied)) = block_isa(2)
 	}
+	C.ios_objc_initialize_lock()
 	ios_runtime.block_refs[copied] = 1
+	C.ios_objc_initialize_unlock()
 	if flags & (u32(1) << 25) != 0 {
 		helper := unsafe { BlockCopyHelper(voidptr(read64(descriptor + 16))) }
 		helper(copied, block)
@@ -38,17 +46,22 @@ fn block_copy(block u64) u64 {
 }
 
 fn block_retain(block u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if refs := ios_runtime.block_refs[block] { ios_runtime.block_refs[block] = refs + 1 }
 	return block
 }
 
 fn block_release(block u64) {
-	refs := ios_runtime.block_refs[block] or { return } // Stack/global are immortal.
+	C.ios_objc_initialize_lock()
+	refs := ios_runtime.block_refs[block] or { C.ios_objc_initialize_unlock(); return } // Stack/global are immortal.
 	if refs > 1 {
 		ios_runtime.block_refs[block] = refs - 1
+		C.ios_objc_initialize_unlock()
 		return
 	}
 	ios_runtime.block_refs.delete(block)
+	C.ios_objc_initialize_unlock()
 	if read32(block + 8) & (u32(1) << 25) != 0 {
 		descriptor := read64(block + 24)
 		helper := unsafe { BlockDisposeHelper(voidptr(read64(descriptor + 24))) }
@@ -105,6 +118,9 @@ fn objc_class(object u64) u64 {
 }
 
 fn objc_retain_autorelease(object u64) u64 { return objc_autorelease(objc_retain(object)) }
+// This runtime always records autoreleased returns in the calling thread's
+// pool; it does not elide their release through Apple's caller handshake.
+fn objc_unsafe_claim(object u64) u64 { return object }
 
 fn objc_property_strong(object u64, selector u64, value u64, offset i64) {
 	_ = selector
@@ -121,19 +137,37 @@ fn objc_property_copy(object u64, selector u64, value u64, offset i64) {
 }
 
 fn objc_store_weak(location &u64, object u64) u64 {
-	ios_runtime.weak[u64(location)] = object
-	unsafe { *location = object }
-	return object
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	mut value := object
+	if value != 0 && value !in ios_runtime.classes && value !in ios_runtime.constants && !is_block(value) {
+		header := obj_header(value)
+		if C.ios_ref_change(unsafe { &header.refs }, 0) <= 0 { value = 0 }
+	}
+	ios_runtime.weak[u64(location)] = value
+	unsafe { *location = value }
+	return value
 }
 
 fn objc_destroy_weak(location &u64) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	ios_runtime.weak.delete(u64(location))
 	unsafe { *location = 0 }
 }
 
-fn objc_load_weak(location &u64) u64 { return objc_retain(unsafe { *location }) }
+fn objc_load_weak(location &u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	object := unsafe { *location }
+	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants || is_block(object) { return objc_retain(object) }
+	header := obj_header(object)
+	return if C.ios_ref_try_retain(unsafe { &header.refs }) != 0 { object } else { u64(0) }
+}
 
 fn objc_copy_weak(destination &u64, source &u64) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	objc_store_weak(destination, unsafe { *source })
 }
 

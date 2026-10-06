@@ -36,3 +36,10 @@ mkdir -p "$output/SceneFixture.app"
     "$repo/tests/ios/startup.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" \
     "$repo/examples/ios-calculator/api/UIKit.tbd" -o "$output/SceneFixture.app/SceneFixture"
 cp "$repo/tests/ios/scene.plist" "$output/SceneFixture.app/Info.plist"
+
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -isysroot "$SDK" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -Wno-error=incompatible-sysroot -c "$repo/tests/ios/arc-threads.m" -o "$output/arc-threads.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$output/arc-threads.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" -o "$output/arc-threads"

@@ -2,6 +2,7 @@
 module main
 
 import time
+import encoding.utf8
 
 fn string_text(object u64) string {
 	if object == 0 { return '' }
@@ -98,6 +99,20 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 				}
 				frame.x[0] = objc_autorelease(array)
 			}
+			'dictionaryWithObjects:forKeys:count:' {
+				if frame.x[4] > 65536 { panic('iOS: dictionary literal exceeds limit') }
+				dictionary := objc_allocate(object)
+				mut header := obj_header(dictionary)
+				for index := u64(0); index < frame.x[4]; index++ {
+					value := read64(frame.x[2] + index * 8)
+					key := read64(frame.x[3] + index * 8)
+					if key == 0 || value == 0 { panic('iOS: nil dictionary entry') }
+					position := dictionary_index(header, key)
+					if position >= 0 { objc_store_strong(unsafe { &header.items[position] }, value) }
+					else { header.keys << objc_retain(key); array_append(mut header, value) }
+				}
+				frame.x[0] = objc_autorelease(dictionary)
+			}
 			'indexPathForRow:inSection:' {
 				path := objc_allocate(object)
 				mut header := obj_header(path)
@@ -153,6 +168,26 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		return true
 	}
 	mut header := obj_header(object)
+	if selector == 'initWithBytes:length:encoding:' && objc_is_kind(object, ios_runtime.names['NSString']) {
+		if frame.x[3] > 16 * 1024 * 1024 { panic('iOS: NSString exceeds size limit') }
+		text := unsafe { tos(&u8(frame.x[2]), int(frame.x[3])) }
+		mut valid := true
+		if frame.x[4] == 4 { valid = utf8.validate_str(text) }
+		else if frame.x[4] == 1 { for byte in text { if byte >= 128 { valid = false; break } } }
+		else { panic('iOS: NSString encoding is unsupported') }
+		if !valid { objc_release(object); frame.x[0] = 0; return true }
+		C.free(header.text)
+		header.text = unsafe { &char(C.malloc(usize(text.len + 1))) }
+		if header.text == unsafe { nil } { panic('iOS: cannot allocate NSString') }
+		unsafe { C.memcpy(header.text, text.str, usize(text.len)); header.text[text.len] = 0 }
+		return true
+	}
+	if selector == 'initWithString:attributes:' && objc_is_kind(object, ios_runtime.names['NSAttributedString']) {
+		if frame.x[2] == 0 { objc_release(object); frame.x[0] = 0; return true }
+		store_field(object, 0, frame.x[2])
+		store_field(object, 1, frame.x[3])
+		return true
+	}
 	match selector {
 		'boolValue' { frame.x[0] = u64(header.number != 0 || header.real_number != 0) }
 		'integerValue', 'unsignedIntegerValue', 'intValue' { frame.x[0] = u64(if header.is_real { i64(header.real_number) } else { header.number }) }
@@ -234,53 +269,47 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	return true
 }
 
-// Darwin ARM64 puts the anonymous arguments of Objective-C variadic methods
-// on the original stack. This subset accepts integer and object substitutions.
+// Darwin ARM64 puts anonymous arguments on the original stack. Preserve
+// printf's flags/width/precision and native double layout; %@ remains an
+// Objective-C string/object substitution rather than a libc conversion.
 fn ns_format(format u64, stack u64) u64 {
 	text := string_text(format)
 	mut out := []u8{cap: text.len + 64}
 	out.flags |= .noslices
 	defer { unsafe { out.free() } }
-	mut i := 0
+	mut index := 0
 	mut argument := stack
-	for i < text.len {
-		if text[i] != `%` {
-			out << text[i]
-			i++
-			continue
+	for index < text.len {
+		if text[index] != `%` { out << text[index]; index++; continue }
+		start := index
+		index++
+		if index < text.len && text[index] == `%` { out << u8(`%`); index++; continue }
+		for index < text.len && text[index] in [`#`, `0`, `-`, ` `, `+`, `.`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `h`, `l`, `z`, `t`, `j`] {
+			index++
 		}
-		i++
-		if i < text.len && text[i] == `%` {
-			out << u8(`%`)
-			i++
-			continue
+		if index >= text.len { panic('iOS: incomplete NSString format') }
+		if index - start > 64 { panic('iOS: NSString conversion is too long') }
+		conversion := text[index]
+		index++
+		if conversion == `@` {
+			if index - start != 2 { panic('iOS: NSString object formatting flags are not implemented') }
+			rendered := string_text(read64(argument))
+			unsafe { out.push_many(rendered.str, rendered.len) }
+		} else {
+			if conversion !in [`d`, `i`, `u`, `x`, `X`, `o`, `f`, `F`, `e`, `E`, `g`, `G`, `a`, `A`, `c`, `s`, `p`] {
+				panic('iOS: unsupported NSString format')
+			}
+			mut specifier := [66]u8{}
+			unsafe { C.memcpy(&specifier[0], text.str + start, usize(index - start)) }
+			length := C.ios_vsnprintf(unsafe { nil }, 0, unsafe { &char(&specifier[0]) }, unsafe { voidptr(argument) })
+			if length < 0 || length > 1024 * 1024 { panic('iOS: invalid or excessive NSString formatted output') }
+			mut buffer := []u8{len: length + 1}
+			result := C.ios_vsnprintf(unsafe { &char(buffer.data) }, usize(buffer.len), unsafe { &char(&specifier[0]) }, unsafe { voidptr(argument) })
+			if result != length { panic('iOS: inconsistent NSString formatting') }
+			unsafe { out.push_many(buffer.data, length); buffer.free() }
 		}
-		mut wide := false
-		for i < text.len && text[i] == `l` {
-			wide = true
-			i++
-		}
-		if i >= text.len { panic('iOS: incomplete NSString format') }
-		value := read64(argument)
 		argument += 8
-		mut buffer := [64]u8{}
-		mut rendered := ''
-		match text[i] {
-			`d`, `i` {
-				number := if wide { i64(value) } else { i64(i32(value)) }
-				C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%lld', number)
-				rendered = ctext(u64(&buffer[0]))
-			}
-			`u` {
-				number := if wide { value } else { u64(u32(value)) }
-				C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%llu', number)
-				rendered = ctext(u64(&buffer[0]))
-			}
-			`@` { rendered = string_text(value) }
-			else { panic('iOS: unsupported NSString format') }
-		}
-		unsafe { out.push_many(rendered.str, rendered.len) }
-		i++
+		if out.len > 1024 * 1024 { panic('iOS: NSString formatted output exceeds limits') }
 	}
 	out << u8(0)
 	return make_string(unsafe { &char(out.data) })

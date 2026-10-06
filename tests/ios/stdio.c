@@ -10,6 +10,11 @@
 #include <spawn.h>
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <dirent.h>
+#include <math.h>
+#include <setjmp.h>
+extern int __tolower(int);
+extern int __toupper(int);
 #include <fcntl.h>
 #include <sys/stat.h>
 
@@ -27,6 +32,39 @@ static int format(char *output, size_t size, const char *pattern, ...) {
 }
 
 int main(void) {
+    _Static_assert(sizeof(jmp_buf) == 192, "Darwin ARM64 jump buffer");
+    struct { jmp_buf buffer; unsigned long guard; } jump = {.guard = 0x3141592653589793};
+    volatile int jumped = 0;
+    int result = setjmp(jump.buffer);
+    if (!result) { jumped = 1; longjmp(jump.buffer, 37); }
+    if (result != 37 || !jumped || jump.guard != 0x3141592653589793) return 78;
+    result = _setjmp(jump.buffer);
+    if (!result) _longjmp(jump.buffer, 0);
+    if (result != 1 || jump.guard != 0x3141592653589793) return 79;
+    volatile float angle_f = 0.5f;
+    volatile double angle_d = 0.5;
+    struct __float2 pair_f = __sincosf_stret(angle_f);
+    struct __double2 pair_d = __sincos_stret(angle_d);
+    if (pair_f.__sinval < 0.4794f || pair_f.__sinval > 0.4795f || pair_f.__cosval < 0.8775f || pair_f.__cosval > 0.8776f ||
+        pair_d.__sinval < 0.4794 || pair_d.__sinval > 0.4795 || pair_d.__cosval < 0.8775 || pair_d.__cosval > 0.8776 ||
+        __exp10(angle_d) < 3.1622 || __exp10(angle_d) > 3.1623 || __exp10f(angle_f) < 3.1622f || __exp10f(angle_f) > 3.1623f) return 77;
+    if (__tolower('A') != 'a' || __toupper('z') != 'Z' || __tolower(-1) != -1 || __toupper(-1) != -1) return 76;
+    FILE *directory_fixture = fopen("/tmp/ios-native-directory-test", "w");
+    if (!directory_fixture || fclose(directory_fixture)) return 74;
+    DIR *directory = opendir("/tmp");
+    if (!directory) return 70;
+    int found = 0;
+    struct dirent *entry;
+    errno = 0;
+    while ((entry = readdir(directory))) {
+        if (entry->d_namlen != strlen(entry->d_name) || entry->d_reclen < 21 + entry->d_namlen + 1) return 71;
+        if (!strcmp(entry->d_name, "ios-native-directory-test")) {
+            if (entry->d_type != DT_REG || !entry->d_ino) return 72;
+            found++;
+        }
+    }
+    if (errno || closedir(directory) || found != 1) return 73;
+    if (unlink("/tmp/ios-native-directory-test")) return 75;
     char buffer[128];
     if (snprintf(buffer, sizeof(buffer), "%d %lld %.3f %s %*.*f", -42, 1234567890123LL,
         3.125, "arm64", 8, 2, 7.5) != 38) return 31;

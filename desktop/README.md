@@ -259,6 +259,14 @@ both. It is a standalone display client using the same pipe protocol as
 VOffice. See [iOS compatibility](../docs/ios.md) for the supported subset and
 QEMU tests.
 
+`./scripts/build-ios-aarch64.sh --with-ppsspp` also stages the official PPSSPP
+1.20.4 iOS app and its private Mesa/FreeType runtime. After rebuilding the
+desktop, launch **iOS PPSSPP** from Start. Its native main menu and Graphics
+settings render in a Vinix window, with mouse input delivered as UIKit touches.
+New profiles start with sound disabled; audio is unsupported, and PSP game
+execution has not been verified. Its configuration lives under the active
+user's `.local/share/vinix/ppsspp/Documents` directory.
+
 The Calculator model comes from ui2's own example and is not copied into this
 repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source

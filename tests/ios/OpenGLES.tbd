@@ -1,0 +1,14 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/OpenGLES.framework/OpenGLES'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ '_OBJC_CLASS_$_EAGLContext', '_OBJC_METACLASS_$_EAGLContext',
+      _glGetString, _glCreateShader, _glShaderSource, _glCompileShader, _glGetShaderiv,
+      _glGetShaderInfoLog, _glCreateProgram, _glAttachShader, _glLinkProgram,
+      _glGetProgramiv, _glDeleteShader, _glGenVertexArrays, _glBindVertexArray,
+      _glClearColor, _glClearDepthf, _glClearStencil, _glClear, _glUseProgram,
+      _glDrawArrays, _glGetIntegerv, _glReadPixels, _glGetError, _glDeleteProgram,
+      _glDeleteVertexArrays, _glCheckFramebufferStatus ]
+...

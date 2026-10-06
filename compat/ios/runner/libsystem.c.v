@@ -8,8 +8,11 @@ import crypto.rand
 #include <stdio.h>
 #include <errno.h>
 
+fn C.posix_memalign(voidptr, usize, usize) i32
+
 fn C.puts(&char) int
 fn C.abort()
+fn C._Exit(i32)
 fn C.malloc(usize) voidptr
 fn C.free(voidptr)
 fn C.memcpy(voidptr, voidptr, usize) voidptr
@@ -104,6 +107,7 @@ fn darwin_pthread_create(thread_id voidptr, attributes voidptr, start voidptr, a
 // Fixed-argument AAPCS64 calls with compatible Apple and musl layouts.
 // Varargs, Darwin FILE*, errno/TLS and pthread objects use explicit adapters.
 fn libsystem_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/libSystem.B.dylib' && symbol == '_posix_memalign' { return u64(unsafe { voidptr(C.posix_memalign) }) }
 	if library != '/usr/lib/libSystem.B.dylib' {
 		return error('iOS: library is not implemented: ${library} (${symbol})')
 	}
@@ -115,6 +119,11 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := time_symbol(symbol) { return address }
 	if address := files_symbol(symbol) { return address }
 	address := match symbol {
+		'___tolower', '_tolower' { unsafe { voidptr(darwin_rune_lower) } }
+		'___toupper', '_toupper' { unsafe { voidptr(darwin_rune_upper) } }
+		'_opendir' { unsafe { voidptr(darwin_opendir) } }
+		'_readdir' { unsafe { voidptr(darwin_readdir) } }
+		'_closedir' { unsafe { voidptr(darwin_closedir) } }
 		'_sysconf' { unsafe { voidptr(darwin_sysconf) } }
 		'_sysctlbyname' { unsafe { voidptr(darwin_sysctlbyname) } }
 		'___error' { unsafe { voidptr(darwin_errno) } }

@@ -1,0 +1,9 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libz.1.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _crc32, _deflate, _deflateEnd, _deflateInit2_, _deflateReset,
+               _inflate, _inflateEnd, _inflateInit2_, _inflateInit_, _inflateReset, _inflateReset2, _uncompress ]
+...

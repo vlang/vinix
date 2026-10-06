@@ -5,10 +5,17 @@ import math.bits
 import os
 
 fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if touch_dispatch(object, selector, mut frame) { return true }
+	if display_link_dispatch(object, selector, mut frame) { return true }
 	if defaults_dispatch(object, selector, mut frame) { return true }
 	if notification_dispatch(object, selector, mut frame) { return true }
 	if propertylist_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
+	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['CMMotionManager']) {
+		if selector !in ['isAccelerometerAvailable', 'isAccelerometerActive', 'isGyroAvailable', 'isGyroActive'] { return false }
+		frame.x[0] = 0 // Vinix currently has no motion sensor provider.
+		return true
+	}
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['NSOperationQueue']) {
 		mut queue := obj_header(object)
 		match selector {
@@ -109,6 +116,19 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		'NSBundle' {
 			match selector {
+				'URLForResource:withExtension:subdirectory:', 'URLForResource:withExtension:' {
+					name := string_text(frame.x[2])
+					extension := string_text(frame.x[3])
+					subdirectory := if selector.ends_with('subdirectory:') { string_text(frame.x[4]) } else { '' }
+					if name.len == 0 { panic('iOS: bundle resource enumeration is not implemented') }
+					filename := if extension.len == 0 { name } else { '${name}.${extension}' }
+					path := os.join_path(ios_runtime.bundle, subdirectory, filename)
+					defer { if extension.len != 0 { unsafe { filename.free() } }; unsafe { path.free() } }
+					if !os.is_file(path) { frame.x[0] = 0; return true }
+					url := objc_allocate(ios_runtime.names['NSURL'])
+					store_field(url, 0, make_string(unsafe { &char(path.str) }))
+					frame.x[0] = objc_autorelease(url)
+				}
 				'resourcePath', 'bundlePath' { frame.x[0] = make_string(unsafe { &char(ios_runtime.bundle.str) }) }
 				'executablePath' { frame.x[0] = make_string(unsafe { &char(image_runtime.path.str) }) }
 				'executableURL', 'bundleURL' {

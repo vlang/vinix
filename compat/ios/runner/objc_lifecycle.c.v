@@ -91,7 +91,7 @@ fn objc_construct(object u64, cls u64) u64 {
 					}
 				}
 				C.free(obj_header(object))
-				ios_runtime.live--
+				C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
 				return 0
 			}
 			if result != object { panic('iOS: invalid Objective-C C++ constructor result') }
