@@ -274,7 +274,21 @@ fn test_settings_search_sidebar_fits_default_content_and_keeps_pane_control_ids(
 	tree := app.build(ui2.rect(0, 0, 620, 376))!
 	assert settings_search_contains(unsafe { &tree }, 'settings.search.field')
 	assert settings_search_contains(unsafe { &tree }, 'settings.side.0')
+	field := tree.children[0].children[0]
+	assert field.children[1].text == tr('settings.search.placeholder')
+	assert field.box.bg == body_rule
 	assert tree.children[0].children.last().frame.y + tree.children[0].children.last().frame.height <= 376
 	assert tree.children[2].frame.x == 133 && tree.children[2].frame.y == 0
 	free_tree(tree)
+	app.handle('settings.search.field')!
+	app.paste_input('brightness')
+	for theme in [ThemeKind.default_, ThemeKind.macos]! {
+		desktop.settings.theme = theme
+		begin_frame_elements()
+		search := app.build(ui2.rect(0, 0, 620, 376))!
+		focused := search.children[0].children[0]
+		assert focused.children[1].kind == .label && focused.children[1].text == 'brightness'
+		assert focused.box.bg == app_accent
+		free_tree(search)
+	}
 }

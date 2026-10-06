@@ -4,13 +4,17 @@ module main
 import ui2
 
 fn (a &SettingsApp) search_field() ui2.Element {
-	mut children := frame_elements(1)
-	children << ui2.text_field('', tr('settings.search.placeholder'), editor_bytes_text(a.search),
-		ui2.rect(7, 0, 102, 30), ui2.BoxStyle{ transparent: true },
-		ui2.TextStyle{ color: body_text, size: 12 }, 0)
+	mut children := frame_elements(2)
+	// The generic renderer does not draw text-field placeholders or borders.
+	// Both themes receive explicit borrowed text and a visible focus ring.
+	children << ui2.view('', ui2.rect(1, 1, 114, 28),
+		ui2.BoxStyle{ bg: body_panel, radius: 4 }, [])
+	children << ui2.label('', if a.search.len > 0 { editor_bytes_text(a.search) }
+		else { tr('settings.search.placeholder') }, ui2.rect(7, 0, 102, 30),
+		ui2.TextStyle{ color: if a.search.len > 0 { body_text } else { body_muted }, size: 12 })
 	return ui2.clickable_view('settings.search.field', ui2.rect(8, 12, 116, 30),
 		ui2.BoxStyle{
-			bg:            body_panel
+			bg:            if a.search_focused { app_accent } else { body_rule }
 			radius:        5
 			border_color:  if a.search_focused { app_accent } else { body_rule }
 			border_top:    1
