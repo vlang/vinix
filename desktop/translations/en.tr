@@ -3870,10 +3870,10 @@ calculator.mode.programmer
 Programmer
 -----
 calculator.programmer.rules
-Unsigned 64-bit integers. +, -, * and NOT wrap modulo 2^64.
+Unsigned integers; arithmetic and NOT wrap at the selected width.
 -----
 calculator.programmer.shifts
-Right shifts fill with zero; shift counts are 0..63.
+Right shifts fill with zero; shift counts must be smaller than the word width.
 -----
 calculator.programmer.shortcuts
 Ctrl-P: Programmer. Ctrl-B: next base. & / OR / ^ / ~: bitwise. < >: shift.
@@ -3888,7 +3888,7 @@ calculator.programmer.error.input
 Enter one unsigned integer; fractions, signs and commands are refused.
 -----
 calculator.programmer.error.range
-Integer is outside the 64-bit range; the previous value is preserved.
+Value exceeds the selected word width; previous value preserved.
 -----
 calculator.programmer.error.digit
 That digit is unavailable in the selected base; the value is preserved.
@@ -3897,7 +3897,7 @@ calculator.programmer.error.zero
 Integer division and remainder require a nonzero divisor.
 -----
 calculator.programmer.error.shift
-A shift count must be an integer from 0 to 63.
+Shift count must be smaller than the selected word width.
 -----
 calculator.programmer.base.dec
 DEC
@@ -4488,4 +4488,73 @@ Random operand from 0 up to 1 (excluding 1)
 -----
 calculator.random.unavailable
 Random source unavailable; try again
+-----
+console.severity.all
+All
+-----
+console.severity.error
+Errors
+-----
+console.severity.warning
+Warnings
+-----
+console.severity.info
+Info
+-----
+console.severity.debug
+Debug
+-----
+console.severity.unmarked
+Unmarked
+-----
+console.severity.help
+Filter explicit leading level markers; lines without one appear in Unmarked.
+-----
+console.resize
+Enlarge this window to view log controls.
+-----
+calculator.programmer.width.8
+8 bits
+-----
+calculator.programmer.width.16
+16 bits
+-----
+calculator.programmer.width.32
+32 bits
+-----
+calculator.programmer.width.64
+64 bits
+-----
+calculator.programmer.width.help
+Unsigned word width. Narrowing drops high bits of current, pending and repeat operands; history recall restores its saved width.
+-----
+reminders.sort
+Sort
+-----
+reminders.sort.manual
+Added order
+-----
+reminders.sort.priority
+Priority
+-----
+reminders.sort.due
+Due
+-----
+reminders.sort.title
+Title
+-----
+reminders.sort_hint
+Sorting lasts for this window; ties keep added order. Titles are case-sensitive. Tab, then Left/Right changes sorting.
+-----
+terminal.selection.text
+Text
+-----
+terminal.selection.block
+Block
+-----
+terminal.selection.mode.help
+Choose text or rectangular selection.
+-----
+terminal.selection.block.hint
+Drag to select a block; Copy or Cmd-C copies. Ctrl-C interrupts the shell.
 -----

@@ -3870,10 +3870,10 @@ calculator.mode.programmer
 Programador
 -----
 calculator.programmer.rules
-Enteros de 64 bits sin signo. +, -, * y NOT usan módulo 2^64.
+Enteros sin signo; la aritmética y NOT se ajustan al ancho elegido.
 -----
 calculator.programmer.shifts
-El desplazamiento derecho rellena con cero; pasos de 0 a 63.
+El desplazamiento derecho rellena con ceros; la cuenta debe ser menor que el ancho.
 -----
 calculator.programmer.shortcuts
 Ctrl-P: Programador. Ctrl-B: siguiente base. & / OR / ^ / ~: bits. < >: desplazar.
@@ -3888,7 +3888,7 @@ calculator.programmer.error.input
 Introduce un entero sin signo; no se admiten fracciones, signos ni órdenes.
 -----
 calculator.programmer.error.range
-El entero excede 64 bits; se conserva el valor anterior.
+El valor excede el ancho elegido; se conserva el anterior.
 -----
 calculator.programmer.error.digit
 Esa cifra no existe en la base elegida; se conserva el valor.
@@ -3897,7 +3897,7 @@ calculator.programmer.error.zero
 La división entera y el resto requieren un divisor distinto de cero.
 -----
 calculator.programmer.error.shift
-El número de pasos debe ser un entero entre 0 y 63.
+La cuenta de desplazamiento debe ser menor que el ancho elegido.
 -----
 calculator.programmer.base.dec
 DEC
@@ -4488,4 +4488,73 @@ Operando aleatorio entre 0 y 1 (sin incluir 1)
 -----
 calculator.random.unavailable
 Azar no disponible; reintenta
+-----
+console.severity.all
+Todos
+-----
+console.severity.error
+Errores
+-----
+console.severity.warning
+Avisos
+-----
+console.severity.info
+Información
+-----
+console.severity.debug
+Depuración
+-----
+console.severity.unmarked
+Sin marca
+-----
+console.severity.help
+Filtra marcas de nivel al principio; las líneas sin marca quedan en Sin marca.
+-----
+console.resize
+Amplía esta ventana para ver los controles del registro.
+-----
+calculator.programmer.width.8
+8 bits
+-----
+calculator.programmer.width.16
+16 bits
+-----
+calculator.programmer.width.32
+32 bits
+-----
+calculator.programmer.width.64
+64 bits
+-----
+calculator.programmer.width.help
+Ancho sin signo. Al reducirlo se descartan los bits altos de los operandos actuales, pendientes y repetidos; el historial restaura el ancho guardado.
+-----
+reminders.sort
+Orden
+-----
+reminders.sort.manual
+Añadido
+-----
+reminders.sort.priority
+Prioridad
+-----
+reminders.sort.due
+Fecha
+-----
+reminders.sort.title
+Título
+-----
+reminders.sort_hint
+El orden dura en esta ventana; los empates mantienen la inserción. Los títulos distinguen mayúsculas. Tab y luego Izquierda/Derecha cambian el orden.
+-----
+terminal.selection.text
+Texto
+-----
+terminal.selection.block
+Bloque
+-----
+terminal.selection.mode.help
+Elige una selección de texto o rectangular.
+-----
+terminal.selection.block.hint
+Arrastra para seleccionar un bloque; Copiar o Cmd-C copia. Ctrl-C interrumpe el shell.
 -----

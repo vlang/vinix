@@ -3869,10 +3869,10 @@ calculator.mode.programmer
 Programmeur
 -----
 calculator.programmer.rules
-Entiers non signés de 64 bits. +, -, * et NOT opèrent modulo 2^64.
+Entiers non signés ; l’arithmétique et NOT respectent la largeur choisie.
 -----
 calculator.programmer.shifts
-Les décalages à droite insèrent des zéros ; décalages de 0 à 63.
+Le décalage à droite insère des zéros ; sa valeur doit être inférieure à la largeur.
 -----
 calculator.programmer.shortcuts
 Ctrl-P : Programmeur. Ctrl-B : base suivante. & / OR / ^ / ~ : opérations sur bits. < > : décalage.
@@ -3887,7 +3887,7 @@ calculator.programmer.error.input
 Saisissez un entier non signé ; fractions, signes et commandes refusés.
 -----
 calculator.programmer.error.range
-Entier hors de la plage de 64 bits ; valeur précédente conservée.
+Valeur hors de la largeur choisie ; la précédente est conservée.
 -----
 calculator.programmer.error.digit
 Ce chiffre n'est pas disponible dans la base choisie ; valeur conservée.
@@ -3896,7 +3896,7 @@ calculator.programmer.error.zero
 La division entière et le reste nécessitent un diviseur non nul.
 -----
 calculator.programmer.error.shift
-Le décalage doit être un entier de 0 à 63.
+Le décalage doit être inférieur à la largeur choisie.
 -----
 calculator.programmer.base.dec
 DEC
@@ -4487,4 +4487,73 @@ Nombre aléatoire de 0 à 1 (1 exclu)
 -----
 calculator.random.unavailable
 Aléatoire indisponible ; réessayez
+-----
+console.severity.all
+Tous
+-----
+console.severity.error
+Erreurs
+-----
+console.severity.warning
+Avertissements
+-----
+console.severity.info
+Info
+-----
+console.severity.debug
+Débogage
+-----
+console.severity.unmarked
+Sans marque
+-----
+console.severity.help
+Filtrer les niveaux explicites en début de ligne ; les lignes sans niveau restent dans Sans marque.
+-----
+console.resize
+Agrandir cette fenêtre pour afficher les commandes du journal.
+-----
+calculator.programmer.width.8
+8 bits
+-----
+calculator.programmer.width.16
+16 bits
+-----
+calculator.programmer.width.32
+32 bits
+-----
+calculator.programmer.width.64
+64 bits
+-----
+calculator.programmer.width.help
+Largeur non signée. La réduire supprime les bits hauts des opérandes actuels, en attente et répétés ; l’historique restaure la largeur enregistrée.
+-----
+reminders.sort
+Tri
+-----
+reminders.sort.manual
+Ajout
+-----
+reminders.sort.priority
+Priorité
+-----
+reminders.sort.due
+Échéance
+-----
+reminders.sort.title
+Titre
+-----
+reminders.sort_hint
+Le tri dure pour cette fenêtre ; les égalités gardent les ajouts. Les titres distinguent la casse. Tab puis Gauche/Droite changent le tri.
+-----
+terminal.selection.text
+Texte
+-----
+terminal.selection.block
+Bloc
+-----
+terminal.selection.mode.help
+Choisir une sélection de texte ou rectangulaire.
+-----
+terminal.selection.block.hint
+Glisser pour sélectionner un bloc ; Copier ou Cmd-C copie. Ctrl-C interrompt le shell.
 -----

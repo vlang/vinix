@@ -3870,10 +3870,10 @@ calculator.mode.programmer
 Программист
 -----
 calculator.programmer.rules
-Беззнаковые целые 64 бит. +, -, * и NOT работают по модулю 2^64.
+Беззнаковые целые; арифметика и NOT ограничены выбранной разрядностью.
 -----
 calculator.programmer.shifts
-Сдвиг вправо заполняет нулями; число сдвигов от 0 до 63.
+Сдвиг вправо заполняется нулями; число сдвигов меньше разрядности.
 -----
 calculator.programmer.shortcuts
 Ctrl-P: Программист. Ctrl-B: сменить основание. & / OR / ^ / ~: биты. < >: сдвиг.
@@ -3888,7 +3888,7 @@ calculator.programmer.error.input
 Введите одно беззнаковое целое: дроби, знаки и команды не принимаются.
 -----
 calculator.programmer.error.range
-Число превышает диапазон 64 бит; прежнее значение сохранено.
+Значение превышает выбранную разрядность; прежнее сохранено.
 -----
 calculator.programmer.error.digit
 Этой цифры нет в выбранном основании; значение сохранено.
@@ -3897,7 +3897,7 @@ calculator.programmer.error.zero
 Для целого деления и остатка делитель должен быть ненулевым.
 -----
 calculator.programmer.error.shift
-Число сдвигов должно быть целым от 0 до 63.
+Число сдвигов должно быть меньше выбранной разрядности.
 -----
 calculator.programmer.base.dec
 DEC
@@ -4488,4 +4488,73 @@ calculator.scientific.random.help
 -----
 calculator.random.unavailable
 Источник случайности недоступен; повторите
+-----
+console.severity.all
+Все
+-----
+console.severity.error
+Ошибки
+-----
+console.severity.warning
+Предупреждения
+-----
+console.severity.info
+Сведения
+-----
+console.severity.debug
+Отладка
+-----
+console.severity.unmarked
+Без отметки
+-----
+console.severity.help
+Фильтр по явным отметкам уровня в начале строки; строки без отметки показаны отдельно.
+-----
+console.resize
+Увеличьте окно, чтобы видеть управление журналом.
+-----
+calculator.programmer.width.8
+8 бит
+-----
+calculator.programmer.width.16
+16 бит
+-----
+calculator.programmer.width.32
+32 бита
+-----
+calculator.programmer.width.64
+64 бита
+-----
+calculator.programmer.width.help
+Беззнаковая разрядность. При уменьшении старшие биты текущего и ожидающих операндов отбрасываются; история восстанавливает сохранённую разрядность.
+-----
+reminders.sort
+Порядок
+-----
+reminders.sort.manual
+Добавлены
+-----
+reminders.sort.priority
+Приоритет
+-----
+reminders.sort.due
+Срок
+-----
+reminders.sort.title
+Название
+-----
+reminders.sort_hint
+Порядок действует в этом окне; равные значения идут по добавлению. Названия учитывают регистр. Tab, затем влево/вправо меняют порядок.
+-----
+terminal.selection.text
+Текст
+-----
+terminal.selection.block
+Блок
+-----
+terminal.selection.mode.help
+Выберите текстовое или прямоугольное выделение.
+-----
+terminal.selection.block.hint
+Выделите блок перетаскиванием; «Копировать» или Cmd-C копирует. Ctrl-C прерывает команду.
 -----

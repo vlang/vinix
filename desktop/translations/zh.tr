@@ -3869,10 +3869,10 @@ calculator.mode.programmer
 程序员
 -----
 calculator.programmer.rules
-无符号 64 位整数。+、-、* 和 NOT 运算按模 2^64 回绕。
+无符号整数；算术和NOT运算按所选字宽回绕。
 -----
 calculator.programmer.shifts
-右移时补零；移位位数为 0..63。
+右移补零；移位数必须小于字宽。
 -----
 calculator.programmer.shortcuts
 Ctrl-P：程序员。Ctrl-B：下一进制。& / OR / ^ / ~：位运算。< >：移位。
@@ -3887,7 +3887,7 @@ calculator.programmer.error.input
 请输入一个无符号整数；不允许小数、符号或命令。
 -----
 calculator.programmer.error.range
-整数超出 64 位范围；原数值已保留。
+数值超出所选字宽；保留原值。
 -----
 calculator.programmer.error.digit
 所选进制不支持该数字；数值已保留。
@@ -3896,7 +3896,7 @@ calculator.programmer.error.zero
 整数除法和取余运算要求除数不为零。
 -----
 calculator.programmer.error.shift
-移位位数必须是 0 至 63 之间的整数。
+移位数必须小于所选字宽。
 -----
 calculator.programmer.base.dec
 DEC
@@ -4487,4 +4487,73 @@ calculator.scientific.random.help
 -----
 calculator.random.unavailable
 随机源不可用，请重试
+-----
+console.severity.all
+全部
+-----
+console.severity.error
+错误
+-----
+console.severity.warning
+警告
+-----
+console.severity.info
+信息
+-----
+console.severity.debug
+调试
+-----
+console.severity.unmarked
+未标记
+-----
+console.severity.help
+按行首的明确级别标记筛选；无标记的行列在“未标记”中。
+-----
+console.resize
+放大窗口以显示日志控件。
+-----
+calculator.programmer.width.8
+8 位
+-----
+calculator.programmer.width.16
+16 位
+-----
+calculator.programmer.width.32
+32 位
+-----
+calculator.programmer.width.64
+64 位
+-----
+calculator.programmer.width.help
+无符号字宽。缩小时丢弃当前、待运算和重复运算操作数的高位；调用历史记录会恢复其保存的字宽。
+-----
+reminders.sort
+排序
+-----
+reminders.sort.manual
+添加顺序
+-----
+reminders.sort.priority
+优先级
+-----
+reminders.sort.due
+到期
+-----
+reminders.sort.title
+标题
+-----
+reminders.sort_hint
+排序仅对当前窗口生效，相同值保留添加顺序。标题区分大小写。Tab移到排序后，左右键切换。
+-----
+terminal.selection.text
+文本
+-----
+terminal.selection.block
+矩形
+-----
+terminal.selection.mode.help
+选择文本或矩形选区。
+-----
+terminal.selection.block.hint
+拖动选择矩形；点击复制或按 Cmd-C 复制。Ctrl-C 中断 shell。
 -----
