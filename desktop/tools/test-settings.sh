@@ -67,6 +67,7 @@ done
 # Each area's translated text, beside i18n_test.v's checks that
 # every language is complete.
 for test in "$root"/desktop/tools/tests/i18n_*_test.v; do
+    case "$test" in *_memory_test.v) continue ;; esac
     cp "$test" "$work/ui/"
     "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/$(basename "$test")"
@@ -76,3 +77,7 @@ done
 
 "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/settings_search_memory_test.v"
+
+cp "$root/desktop/tools/tests/i18n_japanese_memory_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/i18n_japanese_memory_test.v"

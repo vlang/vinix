@@ -1,9 +1,9 @@
 # Desktop translations
 
 One file per language the desktop speaks, named by its code: `en.tr`
-(English, the reference), `ru.tr` (Russian), `es.tr` (Spanish) and `fr.tr`
-(French). They use the `.tr` format of V's `i18n` module: a key line, the text,
-and a `-----` line between entries.
+(English, the reference), `ru.tr` (Russian), `es.tr` (Spanish), `fr.tr`
+(French) and `ja.tr` (Japanese). They use the `.tr` format of V's `i18n`
+module: a key line, the text, and a `-----` line between entries.
 
 ```
 settings.category.language
@@ -27,14 +27,15 @@ them with `i18n.load_tr_map_from_files` and looks text up with `tr()`.
 - Text containing `|` is a plural: complete forms, chosen by the count.
   English and Spanish give two forms (one, other); French gives two (zero or
   one, other); Russian gives three (one, few, many: 1 and 21 элемент,
-  2–4 элемента, 5–20 элементов).
+  2–4 элемента, 5–20 элементов). Japanese uses one form for every count,
+  without `|`.
 - Keep entries on one line, and keep them about as short as the English: the
   desktop's labels have fixed widths.
 - Product names (Firefox, Wine, QEMU, macOS...) are not translated.
 
-The desktop's fonts carry ASCII, Latin-1 and Russian Cyrillic
-(`tools/genfont.py`). A translation needing other letters needs them added
-there first.
+The desktop's fonts carry ASCII, Latin-1, Russian Cyrillic and the Japanese
+characters used by the translation (`tools/genfont.py`). A translation needing
+other letters needs them added there first.
 
 `tools/tests/i18n_test.v` checks that every file defines exactly the English
 keys, that placeholders and plural forms match, that every key the sources use

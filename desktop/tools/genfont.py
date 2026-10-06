@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterise the Roboto faces the desktop draws with into a V source file.
+"""Rasterise the desktop's Roboto faces and Japanese fallback into V source.
 
 Vinix has no font files and no rasteriser, so the glyphs travel with the
 binary: every face is baked here into an 8-bit coverage atlas and emitted as
@@ -10,22 +10,34 @@ Each face is a (weight, pixel size) pair. The desktop picks the closest one to
 what a text style asks for rather than scaling, because a stretched bitmap
 atlas looks worse than one a couple of pixels off.
 
-Every face carries the printable ASCII block followed by the supplemental code
-points in EXTRA_RUNES that the font actually has a glyph for. A candidate the
-font is missing is dropped here rather than baked as a .notdef box, which is
-why the list can name more than Roboto covers.
+Every face carries printable ASCII, the supported supplemental code points in
+EXTRA_RUNES, and the characters used by the Japanese translation. Noto Sans JP
+supplies Japanese glyphs without replacing any existing Roboto glyphs.
 
 Run from the repository root after changing a size, a face or the rune list:
 
     python3 desktop/tools/genfont.py
 
-Roboto is licensed under the SIL Open Font License 1.1; the atlas is a
-derivative of it and carries the same license (see desktop/FONT-LICENSE.txt).
+After adding Japanese characters, rebuild the bundled font subsets as well:
+
+    python3 desktop/tools/genfont.py --update-japanese-subsets
+
+The subset update needs fontTools and downloads a pinned, hash-checked upstream
+font; normal atlas generation uses only Pillow and the bundled subsets. See
+desktop/fonts/README.md for source provenance and reproducible dependencies.
+Roboto and Noto Sans JP are licensed under the SIL Open Font License 1.1; the
+atlases carry that license too (see desktop/FONT-LICENSE.txt).
 """
 
+import argparse
 import base64
+import functools
+import hashlib
+import io
 import os
+from pathlib import Path
 import sys
+import urllib.request
 
 from PIL import ImageFont
 
@@ -100,12 +112,93 @@ FACES = [
 
 RASTER_SCALES = [1, 2]
 
+DESKTOP_DIR = Path(__file__).resolve().parent.parent
+JAPANESE_FONT_DIR = DESKTOP_DIR / "fonts"
+JAPANESE_CATALOG = DESKTOP_DIR / "translations" / "ja.tr"
+JAPANESE_FONT_COMMIT = "295d98a7a0c17c68f1341eaeea354e7960ea70d3"
+JAPANESE_FONT_URL = (
+    "https://raw.githubusercontent.com/google/fonts/"
+    + JAPANESE_FONT_COMMIT + "/ofl/notosansjp/NotoSansJP%5Bwght%5D.ttf"
+)
+JAPANESE_FONT_SHA256 = "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f"
 
+
+def japanese_runes():
+    """The catalog and its native language name define the Japanese subset."""
+    if not JAPANESE_CATALOG.exists():
+        sys.exit("Japanese catalog not found: %s" % JAPANESE_CATALOG)
+    text = JAPANESE_CATALOG.read_text(encoding="utf-8") + "日本語"
+    return sorted({ord(ch) for ch in text if ord(ch) > LAST_CHAR})
+
+
+def japanese_font_path(bold):
+    return JAPANESE_FONT_DIR / ("VinixJapanese-%s.ttf" % ("Bold" if bold else "Regular"))
+
+
+def update_japanese_subsets(runes, source_path=None):
+    """Make small static regular/bold fonts from the pinned upstream variable font."""
+    try:
+        from fontTools import subset
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib.instancer import instantiateVariableFont
+    except ImportError:
+        sys.exit("subset regeneration needs fontTools; see desktop/fonts/README.md")
+
+    if source_path:
+        source = Path(source_path).read_bytes()
+    else:
+        print("Downloading pinned Noto Sans JP source...")
+        with urllib.request.urlopen(JAPANESE_FONT_URL, timeout=60) as response:
+            source = response.read()
+    if hashlib.sha256(source).hexdigest() != JAPANESE_FONT_SHA256:
+        sys.exit("Noto Sans JP source SHA-256 does not match the pinned font")
+
+    font = TTFont(io.BytesIO(source), recalcTimestamp=False)
+    missing = set(runes) - font.getBestCmap().keys()
+    if missing:
+        sys.exit("upstream Japanese font lacks: " + ", ".join("U+%04X" % cp for cp in sorted(missing)))
+    options = subset.Options()
+    options.name_IDs += [13, 14, 16, 17]  # license, URL, typographic family/style
+    # These are standalone masks: no runtime shaping or OpenType layout uses
+    # the features, and keeping their alternate glyphs would inflate subsets.
+    options.layout_features = []
+    subsetter = subset.Subsetter(options=options)
+    subsetter.populate(unicodes=runes)
+    subsetter.subset(font)
+    JAPANESE_FONT_DIR.mkdir(exist_ok=True)
+    for weight, bold in [(400, False), (700, True)]:
+        static = instantiateVariableFont(font, {"wght": weight}, inplace=False)
+        style = "Bold" if bold else "Regular"
+        # Name the modified subsets clearly; keep upstream copyright/license
+        # records. The original license reserves the name 'Source'.
+        names = {
+            1: "Vinix Japanese", 2: style, 3: "VinixJapanese-" + style,
+            4: "Vinix Japanese " + style, 6: "VinixJapanese-" + style,
+            16: "Vinix Japanese", 17: style,
+        }
+        for record in static["name"].names:
+            if record.nameID in names:
+                static["name"].setName(names[record.nameID], record.nameID,
+                                       record.platformID, record.platEncID, record.langID)
+        path = japanese_font_path(bold)
+        static.save(path)
+        print("wrote %s (%d bytes, %d characters)" % (path, path.stat().st_size, len(runes)))
+
+
+@functools.lru_cache(maxsize=None)
 def open_font(file_name, size):
     path = os.path.join(FONT_DIR, file_name)
     if not os.path.exists(path):
         sys.exit("font not found: %s" % path)
     return ImageFont.truetype(path, size)
+
+
+@functools.lru_cache(maxsize=None)
+def open_japanese_font(bold, size):
+    path = japanese_font_path(bold)
+    if not path.exists():
+        sys.exit("Japanese subset not found: %s; run with --update-japanese-subsets" % path)
+    return ImageFont.truetype(str(path), size)
 
 
 def rasterise(font, code_point):
@@ -122,7 +215,21 @@ def rasterise(font, code_point):
     return width, height, bbox[0], bbox[1], advance, bytes(mask)
 
 
-def supported_extras(faces):
+@functools.lru_cache(maxsize=None)
+def has_glyph(font, code_point):
+    candidate = rasterise(font, code_point)
+    notdef = rasterise(font, NOTDEF_PROBE)
+    return (candidate != notdef and (candidate[0] != 0 or candidate[1] != 0))
+
+
+def glyph_font(file_name, size, bold, code_point, japanese):
+    font = open_font(file_name, size)
+    if code_point in japanese and not has_glyph(font, code_point):
+        return open_japanese_font(bold, size)
+    return font
+
+
+def supported_extras(faces, japanese):
     """Runes every face has a real glyph for.
 
     A rune is kept only if no face falls back to .notdef for it, so the same
@@ -131,26 +238,24 @@ def supported_extras(faces):
     """
     kept = []
     # Ascending, because the renderer binary-searches the list.
-    for code_point in sorted(set(EXTRA_RUNES)):
+    for code_point in sorted(set(EXTRA_RUNES) | japanese):
         ok = True
-        for _, file_name, size, _ in faces:
-            font = open_font(file_name, size)
-            notdef = rasterise(font, NOTDEF_PROBE)
-            candidate = rasterise(font, code_point)
-            if candidate[5] == notdef[5] and candidate[:5] == notdef[:5]:
-                ok = False
-                break
-            if candidate[0] == 0 and candidate[1] == 0:
-                ok = False
-                break
+        for _, file_name, size, bold in faces:
+            for raster_scale in RASTER_SCALES:
+                font = glyph_font(file_name, size * raster_scale, bold, code_point, japanese)
+                if not has_glyph(font, code_point):
+                    ok = False
+                    break
         if ok:
             kept.append(code_point)
+        elif code_point in japanese:
+            sys.exit("Japanese character U+%04X is missing; run with --update-japanese-subsets" % code_point)
         else:
             print("  dropped U+%04X (not in every face)" % code_point)
     return kept
 
 
-def build_face(file_name, size, raster_scale, extras):
+def build_face(file_name, size, bold, raster_scale, extras, japanese):
     logical_font = open_font(file_name, size)
     font = open_font(file_name, size * raster_scale)
     ascent, descent = logical_font.getmetrics()
@@ -158,13 +263,29 @@ def build_face(file_name, size, raster_scale, extras):
     header = bytearray()
     pixels = bytearray()
     for code_point in list(range(FIRST_CHAR, LAST_CHAR + 1)) + extras:
-        width, height, bx, by, _, mask = rasterise(font, code_point)
+        raster_font = glyph_font(file_name, size * raster_scale, bold, code_point, japanese)
+        advance_font = glyph_font(file_name, size, bold, code_point, japanese)
+        width, height, bx, by, _, mask = rasterise(raster_font, code_point)
         # Keep layout exactly the same at both scales. FreeType hinting can
         # otherwise make a run baked at 26 px a different logical width from
         # the same run baked at 13 px.
-        advance = int(round(logical_font.getlength(chr(code_point)))) * raster_scale
+        logical_advance = int(round(advance_font.getlength(chr(code_point))))
+        advance = logical_advance * raster_scale
+        if raster_font is not font:
+            # Match Roboto's baseline and keep its existing line height. Noto's
+            # own ascender would otherwise put Japanese text below the run.
+            by += font.getmetrics()[0] - raster_font.getmetrics()[0]
+            if "Mono" in file_name:
+                # Japanese characters take two terminal cells, centered in
+                # that space; ASCII and the other existing glyphs stay fixed.
+                advance = 2 * int(round(logical_font.getlength("M"))) * raster_scale
+                bx += (advance - logical_advance * raster_scale) // 2
+            if by < 0 or by + height > (ascent + descent) * raster_scale:
+                sys.exit("Japanese glyph U+%04X exceeds the %dpx line box" % (code_point, size))
         if bx < -128 or bx > 127:
             sys.exit("left bearing out of range for U+%04X" % code_point)
+        if not all(0 <= value <= 255 for value in [width, height, advance]):
+            sys.exit("glyph metrics out of range for U+%04X" % code_point)
         header += bytes([width, height, bx & 0xFF, by & 0xFF, advance & 0xFF])
         pixels += mask
 
@@ -180,9 +301,20 @@ def wrap(text, width=100):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--update-japanese-subsets", action="store_true",
+                        help="download the pinned source and update Japanese font subsets")
+    parser.add_argument("--japanese-source", metavar="TTF",
+                        help="use a local copy of the pinned upstream font for subset regeneration")
+    args = parser.parse_args()
+    if args.japanese_source and not args.update_japanese_subsets:
+        parser.error("--japanese-source requires --update-japanese-subsets")
+    japanese = set(japanese_runes())
+    if args.update_japanese_subsets:
+        update_japanese_subsets(japanese, args.japanese_source)
     print("Checking supplemental runes...")
-    extras = supported_extras(FACES)
-    print("  kept %d of %d" % (len(extras), len(EXTRA_RUNES)))
+    extras = supported_extras(FACES, japanese)
+    print("  kept %d supplemental runes, including %d Japanese catalog characters" % (len(extras), len(japanese)))
 
     out = []
     out.append("// Copyright (c) 2026 Alexander Medvednikov. All rights reserved.")
@@ -191,9 +323,9 @@ def main():
     out.append("")
     out.append("// Generated by desktop/tools/genfont.py. Do not edit by hand.")
     out.append("//")
-    out.append("// Coverage atlases for the Roboto faces the desktop draws with, so the")
-    out.append("// binary needs no font file on a system that has none. Roboto is licensed")
-    out.append("// under the SIL Open Font License 1.1; see desktop/FONT-LICENSE.txt.")
+    out.append("// Coverage atlases for Roboto with Noto Sans JP Japanese fallback, so the")
+    out.append("// binary needs no font file on a system that has none. Both fonts and these")
+    out.append("// derivatives use the SIL Open Font License 1.1; see desktop/FONT-LICENSE.txt.")
     out.append("module main")
     out.append("")
     out.append("// FaceBlob is one rasterised face. `bold`, logical `size` and `raster_scale`")
@@ -229,7 +361,7 @@ def main():
     names = []
     for raster_scale in RASTER_SCALES:
         for name, file_name, size, bold in FACES:
-            face = build_face(file_name, size, raster_scale, extras)
+            face = build_face(file_name, size, bold, raster_scale, extras, japanese)
             scaled_name = "%s_%dx" % (name, raster_scale)
             names.append(scaled_name)
             out.append("// %s: %s at %dpx (%dx raster)" %

@@ -146,8 +146,14 @@ fn files_list_modified_text(epoch i64, tz_offset_seconds i64) string {
 	year := civil.year.str()
 	hour := pad2(civil.hour)
 	minute := pad2(civil.minute)
-	result := '${day} ${date_month_short(civil.month)} ${year} ${hour}:${minute}'
+	date := if desktop_language == .ja {
+		tr_fill3('date.long.day_month_year', day, date_month_short(civil.month), year)
+	} else {
+		'${day} ${date_month_short(civil.month)} ${year}'
+	}
+	result := '${date} ${hour}:${minute}'
 	unsafe {
+		date.free()
 		day.free()
 		year.free()
 		hour.free()

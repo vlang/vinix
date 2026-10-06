@@ -20,9 +20,9 @@
 //     so each language orders a sentence its own way.
 //   - Text containing `|` is a plural: complete forms, `one|other` in English
 //     and Spanish, `zero-or-one|other` in French and `one|few|many` in Russian,
-//     chosen by tr_count. i18n's own tr_plural appends a suffix to the first
-//     form instead, which cannot spell окно/окна/окон, and it applies the
-//     Russian rule to every language.
+//     chosen by tr_count. Japanese uses one form for every count. i18n's own
+//     tr_plural appends a suffix to the first form instead, which cannot spell
+//     окно/окна/окон, and it applies the Russian rule to every language.
 //
 // Vinix runs without a garbage collector, and the renderer frees only the text
 // it is told it owns. tr() therefore returns the table's own strings, which
@@ -50,6 +50,9 @@ fn set_desktop_language(language DesktopLanguage) {
 fn split_desktop_plurals(translations map[string]map[string]string) map[string]map[string][]string {
 	mut plurals := map[string]map[string][]string{}
 	for code, table in translations {
+		// Keep an entry even for languages that have no multi-form plurals.
+		// A missing outer map would allocate an empty map on every lookup.
+		plurals[code] = map[string][]string{}
 		for key, text in table {
 			if text.contains('|') {
 				plurals[code][key] = text.split('|')
@@ -108,6 +111,11 @@ fn tr_plural_form(key string, count i64) string {
 	mut language := desktop_language
 	mut forms := desktop_plural_forms[language.code()][key]
 	if forms.len == 0 {
+		// Languages such as Japanese use a single complete form without `|`.
+		text := desktop_translations[language.code()][key]
+		if text.len > 0 {
+			return text
+		}
 		language = .en
 		forms = desktop_plural_forms['en'][key]
 	}
@@ -122,7 +130,7 @@ fn tr_plural_form(key string, count i64) string {
 // desktop_plural_index is which of a language's plural forms a count takes.
 // English and Spanish have one and other; French has zero-or-one and other.
 // Russian has one (1, 21, 101), few (2-4, 22-24) and many (0, 5-20, 25-30,
-// 11-14 of every hundred).
+// 11-14 of every hundred). Japanese uses the same form for every count.
 fn desktop_plural_index(language DesktopLanguage, count i64) int {
 	n := if count < 0 { -count } else { count }
 	return match language {
@@ -141,6 +149,7 @@ fn desktop_plural_index(language DesktopLanguage, count i64) int {
 		.fr {
 			if n <= 1 { 0 } else { 1 }
 		}
+		.ja { 0 }
 	}
 }
 

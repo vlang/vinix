@@ -89,7 +89,11 @@ fn test_translations_keep_placeholders_and_plural_forms() {
 			assert i18n_placeholders(text) == i18n_placeholders(english), '${language.code()} ${key} changes its placeholders'
 			if english.contains('|') {
 				forms := text.split('|')
-				want := if language == .ru { 3 } else { 2 }
+				want := match language {
+					.ru { 3 }
+					.ja { 1 }
+					.en, .es, .fr { 2 }
+				}
 				assert forms.len == want, '${language.code()} ${key} needs ${want} plural forms'
 			} else {
 				assert !text.contains('|'), '${language.code()} ${key} is a plural only in translation'
@@ -203,7 +207,7 @@ fn test_ui_helpers_are_not_given_literal_words() {
 					literal := i18n_literal_after(text, start) or { continue }
 					if i18n_shows_words(literal) && literal !in i18n_untranslated_names {
 						line := text[..call].count('\n') + 1
-						found << '${name}:${line}: ${helper} shows \'${literal}\''
+						found << "${name}:${line}: ${helper} shows '${literal}'"
 					}
 				}
 			}
@@ -217,6 +221,12 @@ fn test_ui_helpers_are_not_given_literal_words() {
 fn test_fonts_draw_every_translated_rune() {
 	fonts := load_fonts()
 	for language in desktop_languages {
+		for r in language.native_name().runes() {
+			for face in fonts {
+				glyph := face.glyph_for(u32(r))
+				assert glyph.width > 0 && glyph.height > 0, '${language.code()}: no glyph for ${r}'
+			}
+		}
 		for key, text in desktop_translations[language.code()] {
 			for r in text.runes() {
 				if r == ` ` || r == ` ` {
@@ -283,6 +293,9 @@ fn test_plural_rules_per_language() {
 		assert desktop_plural_index(.ru, count) == 2, '${count}'
 	}
 	assert desktop_plural_index(.ru, -21) == 0
+	for count in [i64(-21), -1, 0, 1, 2, 11, 100, 1001] {
+		assert desktop_plural_index(.ja, count) == 0
+	}
 }
 
 fn test_language_crosses_the_application_process_boundary() {
@@ -415,6 +428,10 @@ fn test_program_search_ignores_case_and_accents_in_every_script() {
 	set_desktop_language(.fr)
 	assert app_matches('Text Editor', 'EDITEUR')
 	assert app_matches('Settings', 'parametres')
+	set_desktop_language(.ja)
+	assert app_matches('Calculator', '電卓')
+	assert app_matches('Calculator', 'calc')
+	assert start_menu_matches('日本語', '日本')
 }
 
 // Settings' Jump List tasks name categories, not positions in the sidebar,
@@ -441,7 +458,7 @@ fn test_keyboard_pane_names_layouts_in_the_language() {
 	desktop.settings.keyboard_layouts = keyboard_layout_all_mask
 	desktop.settings.keyboard_layout = .russian
 	mut app := SettingsApp{
-		desktop: &desktop
+		desktop:  &desktop
 		category: .keyboard
 	}
 	set_desktop_language(.ru)

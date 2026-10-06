@@ -1,4 +1,9 @@
 Copyright 2011 The Roboto Project Authors (https://github.com/googlefonts/roboto-classic)
+Copyright 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'
+
+The desktop atlases derive from Roboto and Noto Sans JP. The bundled
+VinixJapanese font subsets derive from Noto Sans JP. Source provenance and
+regeneration instructions are in desktop/fonts/README.md.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

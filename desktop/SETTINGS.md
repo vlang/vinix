@@ -334,9 +334,10 @@ the status of physical brightness adjustment.
 ## System language
 
 Settings → Language chooses the language of the desktop and of the Vinix
-applications it runs: English, Russian (Русский), Spanish (Español) or French
-(Français). Each is listed in its own name. The choice takes effect on the next
-frame everywhere, including windows that are already open, and is saved as
+applications it runs: English, Russian (Русский), Spanish (Español), French
+(Français) or Japanese (日本語). Each is listed in its own name. The choice
+takes effect on the next frame everywhere, including windows that are already
+open, and is saved as
 `language=` above.
 Applications that are not part of Vinix (Firefox, LibreOffice, Wine...) choose
 their language themselves.

@@ -10,8 +10,8 @@
 //
 // Runs are decoded as UTF-8 and looked up by code point. The atlases carry
 // printable ASCII plus the supplemental runes in font_extra_runes: the Latin-1
-// and Russian letters the keyboard layouts type, and signs such as the real
-// division and plus-minus that label ui2's calculator keys.
+// and Russian letters the keyboard layouts type, Japanese translation text,
+// and signs such as the real division and plus-minus on calculator keys.
 module main
 
 import encoding.base64
