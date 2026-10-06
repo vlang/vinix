@@ -12,8 +12,9 @@ fn grapher_button(action string, key string, x int, y int, width int) ui2.Elemen
 
 fn (app &GrapherApp) field(index int, x int, y int, width int) ui2.Element {
 	count := files_rune_count(app.fields[index].bytes)
+	placeholder := if index == 6 { tr('grapher.document_path') } else { '' }
 	return ui2.Element{
-		...ui2.text_field(grapher_field_actions[index], '', app.field_text(index), ui2.rect(f64(x), f64(y), f64(width), 28),
+		...ui2.text_field(grapher_field_actions[index], placeholder, app.field_text(index), ui2.rect(f64(x), f64(y), f64(width), 28),
 			ui2.BoxStyle{ bg: body_panel, radius: 5 }, ui2.TextStyle{ size: 12, color: body_text }, 0)
 		focused:        app.focus == index
 		text_selection: ui2.TextSelection{
@@ -81,7 +82,7 @@ fn (app &GrapherApp) chart(width int, height int) ui2.Element {
 fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 	if !app.initialized { app.initialize() }
 	width := if int(size.width) > 320 { int(size.width) } else { 320 }
-	height := if int(size.height) > 380 { int(size.height) } else { 380 }
+	height := if int(size.height) > 416 { int(size.height) } else { 416 }
 	mut children := frame_elements(32)
 	children << ui2.label('', tr('app.grapher'), ui2.rect(12, 10, f64(width - 24), 26), ui2.TextStyle{ size: 18, bold: true, color: body_heading })
 	children << ui2.label('', tr('grapher.equation_label'), ui2.rect(12, 44, 38, 28), ui2.TextStyle{ size: 12, color: body_text })
@@ -100,7 +101,7 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << ui2.label('', tr('grapher.radians'), ui2.rect(310, 134, f64(width - 322), 28), ui2.TextStyle{ size: 11, color: body_muted })
 	}
 	chart_width := width - 76
-	chart_height := height - 282
+	chart_height := height - 318
 	children << app.chart(chart_width, chart_height)
 	if app.plotted {
 		children << grapher_tick(app.range[3], 2, 174, 44, .right)
@@ -108,10 +109,19 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << grapher_tick(app.range[0], 52, 176 + chart_height, chart_width / 2, .left)
 		children << grapher_tick(app.range[1], 52 + chart_width / 2, 176 + chart_height, chart_width / 2, .right)
 	}
-	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 86), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
+	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 122), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
+	children << app.field(6, 12, height - 98, width - 234)
+	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 98, 88)
+	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 98, 102)
 	children << app.field(5, 12, height - 62, width - 136)
 	children << grapher_button('grapher.export', 'grapher.export', width - 116, height - 62, 104)
-	status := if app.export_status.len > 0 { app.export_status } else { app.status }
+	status := if app.document_status.len > 0 {
+		app.document_status
+	} else if app.export_status.len > 0 {
+		app.export_status
+	} else {
+		app.status
+	}
 	children << ui2.Element{
 		...ui2.label('', tr(status), ui2.rect(12, f64(height - 27), f64(width - 24), 22), ui2.TextStyle{ size: 11, color: body_muted })
 		tooltip: tr(status)

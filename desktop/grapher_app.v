@@ -4,7 +4,7 @@ module main
 #include <stdio.h>
 
 const grapher_field_actions = ['grapher.expression', 'grapher.xmin', 'grapher.xmax', 'grapher.ymin',
-	'grapher.ymax', 'grapher.path']!
+	'grapher.ymax', 'grapher.path', 'grapher.document_path']!
 const grapher_field_limit = 512
 
 struct GrapherField {
@@ -14,7 +14,7 @@ mut:
 
 struct GrapherApp {
 mut:
-	fields         [6]GrapherField
+	fields         [7]GrapherField
 	initialized    bool
 	focus          int = -1
 	selected       bool
@@ -28,6 +28,7 @@ mut:
 	dirty          bool
 	status         string
 	export_status  string
+	document_status string
 }
 
 fn open_grapher_app(mut _ Desktop) !NativeApp {
@@ -49,10 +50,17 @@ fn (mut app GrapherApp) initialize() {
 	path := grapher_default_export_path(home)
 	app.set_field(5, path)
 	unsafe { path.free() }
+	document := grapher_default_path(home, 'graph.vgraph')
+	app.set_field(6, document)
+	unsafe { document.free() }
 	app.plot()
 }
 
 fn grapher_default_export_path(home string) string {
+	return grapher_default_path(home, 'graph.csv')
+}
+
+fn grapher_default_path(home string, name string) string {
 	if home.len == 0 || home.len > 4096 || home.index_u8(0) >= 0 { return '' }
 	// Resolve the compositor's trusted personal folder alias once. Typed export
 	// paths still refuse links in every component. V3's os.real_path promotes
@@ -65,10 +73,10 @@ fn grapher_default_export_path(home string) string {
 	}
 	mut length := 0
 	for length < bytes.len && bytes[length] != 0 { length++ }
-	if length == bytes.len || length + 10 > grapher_field_limit { return '' }
+	if length == bytes.len || length + name.len + 1 > grapher_field_limit { return '' }
 	canonical := unsafe { tos(&bytes[0], length) }.clone()
 	defer { unsafe { canonical.free() } }
-	return disk_utility_join_path(canonical, 'graph.csv')
+	return disk_utility_join_path(canonical, name)
 }
 
 fn (app &GrapherApp) field_text(index int) string {
@@ -78,8 +86,9 @@ fn (app &GrapherApp) field_text(index int) string {
 fn (mut app GrapherApp) set_field(index int, text string) {
 	app.fields[index].bytes.clear()
 	for ch in text { app.fields[index].bytes << ch }
-	app.dirty = true
+	if index < 5 { app.dirty = true }
 	app.export_status = ''
+	app.document_status = ''
 }
 
 fn (mut app GrapherApp) reset_ranges() {
@@ -88,6 +97,7 @@ fn (mut app GrapherApp) reset_ranges() {
 
 fn (mut app GrapherApp) plot() bool {
 	app.export_status = ''
+	app.document_status = ''
 	program := grapher_parse(app.field_text(0)) or {
 		app.plotted = false
 		app.status = 'grapher.expression_invalid'
@@ -177,6 +187,8 @@ fn (mut app GrapherApp) handle(id string) ! {
 		'grapher.zoom_in' { app.zoom(0.5) }
 		'grapher.zoom_out' { app.zoom(2) }
 		'grapher.export' { app.export_csv() }
+		'grapher.document_open' { app.open_graph_document() }
+		'grapher.document_save_as' { app.save_graph_document() }
 		else {}
 	}
 }
@@ -185,7 +197,7 @@ fn (mut app GrapherApp) input_text(text string) {
 	if app.focus < 0 || app.focus >= app.fields.len { return }
 	limit := if app.focus == 0 {
 		grapher_expression_limit
-	} else if app.focus == 5 {
+	} else if app.focus >= 5 {
 		grapher_field_limit
 	} else {
 		64
@@ -193,6 +205,7 @@ fn (mut app GrapherApp) input_text(text string) {
 	current := if app.selected { 0 } else { app.fields[app.focus].bytes.len }
 	if current + text.len > limit {
 		app.export_status = ''
+		app.document_status = ''
 		app.status = 'grapher.input_limit'
 		return
 	}
@@ -201,11 +214,12 @@ fn (mut app GrapherApp) input_text(text string) {
 		app.selected = false
 	}
 	for ch in text { app.fields[app.focus].bytes << ch }
-	if app.focus != 5 {
+	if app.focus < 5 {
 		app.dirty = true
 		app.status = 'grapher.changed'
 	}
 	app.export_status = ''
+	app.document_status = ''
 }
 
 fn (mut app GrapherApp) input_byte(ch u8) {
@@ -231,14 +245,15 @@ fn (mut app GrapherApp) input_byte(ch u8) {
 			for end > 0 && app.fields[app.focus].bytes[end] & 0xc0 == 0x80 { end-- }
 			if end >= 0 { app.fields[app.focus].bytes.trim(end) }
 		}
-		if app.focus != 5 {
+		if app.focus < 5 {
 			app.dirty = true
 			app.status = 'grapher.changed'
 		}
 		app.export_status = ''
+		app.document_status = ''
 	} else if ch >= 32 && ch < 127 {
 		app.input_text(unsafe { tos(&ch, 1) })
-	} else if app.focus == 5 && editor_utf8_length(ch) > 1 {
+	} else if app.focus >= 5 && editor_utf8_length(ch) > 1 {
 		app.pending[0] = ch
 		app.pending_length = 1
 	}
@@ -270,7 +285,13 @@ fn (mut app GrapherApp) key_input(text string) {
 			}
 			`\r`, `\n` {
 				app.pending_length = 0
-				if app.focus == 5 { app.export_csv() } else { app.plot() }
+				if app.focus == 6 {
+					app.open_graph_document()
+				} else if app.focus == 5 {
+					app.export_csv()
+				} else {
+					app.plot()
+				}
 			}
 			else {
 				if app.focus >= 0 { app.input_byte(ch) }
@@ -284,12 +305,14 @@ fn (mut app GrapherApp) paste_input(text string) {
 	// Reject rather than merge pasted multi-line expressions or invalid UTF-8.
 	if !grapher_valid_utf8(text) {
 		app.export_status = ''
+		app.document_status = ''
 		app.status = 'grapher.input_invalid'
 		return
 	}
 	for ch in text {
-		if ch < 32 || ch == 127 || (app.focus != 5 && ch >= 128) {
+		if ch < 32 || ch == 127 || (app.focus < 5 && ch >= 128) {
 			app.export_status = ''
+			app.document_status = ''
 			app.status = 'grapher.input_invalid'
 			return
 		}
@@ -332,6 +355,7 @@ fn (app &GrapherApp) csv() []u8 {
 }
 
 fn (mut app GrapherApp) export_csv() {
+	app.document_status = ''
 	if app.dirty || !app.plotted {
 		if !app.plot() { return }
 	}
@@ -391,4 +415,5 @@ fn (mut app GrapherApp) close_app() {
 	app.plotted = false
 	app.status = ''
 	app.export_status = ''
+	app.document_status = ''
 }

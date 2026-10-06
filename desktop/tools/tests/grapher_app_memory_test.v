@@ -115,3 +115,67 @@ fn test_grapher_registered_home_alias_resolution_and_default_export_release_owne
 	}
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_grapher_repeated_document_parser_and_serialization_release_owned_memory() {
+	fields := ['sin(x)+x^2', '-pi', 'pi', '-e', 'e']!
+	C.vinix_heap_begin()
+	for _ in 0 .. 1000 {
+		bytes := grapher_document_bytes(fields)
+		data := editor_bytes_text(bytes)
+		document := grapher_document_parse(data) or { panic('expected document') }
+		assert document.fields == fields
+		assert grapher_document_parse(unsafe { tos(data.str, data.len - 1) }) == none
+		assert grapher_document_parse('VINIX-GRAPH 1\nexpression=sin(\nxmin=-1\nxmax=1\nymin=-1\nymax=1\n') == none
+		unsafe { bytes.free() }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_grapher_repeated_document_open_save_and_failures_release_owned_memory() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-doc-memory-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.vgraph')
+	bad_path := disk_utility_join_path(root, 'invalid.vgraph')
+	missing := disk_utility_join_path(root, 'missing.vgraph')
+	os.write_file(bad_path, 'VINIX-GRAPH 1\nexpression=sin(\nxmin=-1\nxmax=1\nymin=-1\nymax=1\n')!
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() bad_path.free() missing.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	app.close_app()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		app.initialize()
+		app.set_field(0, 'sqrt(x)+sin(x)')
+		app.set_field(1, '-pi')
+		app.set_field(2, 'pi')
+		app.set_field(6, path)
+		app.save_graph_document()
+		assert app.document_status == 'grapher.document_saved'
+		app.save_graph_document()
+		assert app.document_status == 'grapher.document_exists'
+		app.set_field(0, 'x')
+		app.open_graph_document()
+		assert app.document_status == 'grapher.document_opened'
+		assert app.field_text(0) == 'sqrt(x)+sin(x)' && app.plotted
+		app.set_field(6, bad_path)
+		app.open_graph_document()
+		assert app.document_status == 'grapher.document_invalid'
+		assert app.field_text(0) == 'sqrt(x)+sin(x)' && app.plotted
+		app.set_field(6, missing)
+		app.open_graph_document()
+		assert app.document_status == 'grapher.document_open_failed'
+		app.set_field(6, 'relative.vgraph')
+		app.save_graph_document()
+		assert app.document_status == 'grapher.document_invalid_path'
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 840, 636))!)
+		assert C.unlink(&char(path.str)) == 0
+		app.close_app()
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}
