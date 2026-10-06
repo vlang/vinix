@@ -166,14 +166,28 @@ def call_adapter(record, exported):
 # Native compiler primitives and integer constant expressions are compile-time
 # ABI boundaries, not V algorithm ports. Their schema contains typed expression
 # nodes, never maintained C snippets or a finite native integer type table.
-OPERATORS = {"+", "-", "*", "<<", "<", "<=", "&&"}
+OPERATORS = {"+", "-", "*", "<<", "<", "<=", ">", "&&", "||"}
+PARAMETER_KINDS = {"value", "type", "operand"}
 BUILTINS = {"__builtin_add_overflow": 3, "__builtin_sub_overflow": 3,
             "__builtin_mul_overflow": 3, "__builtin_constant_p": 1,
             "__builtin_choose_expr": 3}
 NATIVE_SCALARS = {"int", "uintptr_t"}
 
 
+def native_operand(node, parameters):
+    if set(node) == {"operand"}:
+        name = identifier(node["operand"])
+        if name not in parameters:
+            raise ValueError(f"Unknown native type-or-expression operand: {name}")
+        return name
+    if set(node) == {"type"}:
+        return expression_type(node["type"], parameters)
+    raise ValueError(f"Unsupported native type-or-expression operand: {node!r}")
+
+
 def expression_type(node, parameters):
+    if set(node) == {"typeof"}:
+        return "typeof(" + native_operand(node["typeof"], parameters) + ")"
     if set(node) == {"parameter"}:
         name = identifier(node["parameter"])
         if parameters.get(name) != "type":
@@ -184,7 +198,8 @@ def expression_type(node, parameters):
     raise ValueError(f"Unsupported native expression type: {node!r}")
 
 
-def native_expression(node, parameters, symbols):
+def native_expression(node, parameters, symbols, locals_=None):
+    locals_ = locals_ or set()
     if set(node) in ({"literal"}, {"literal", "suffix"}):
         value = node["literal"]
         suffix = node.get("suffix", "")
@@ -193,22 +208,54 @@ def native_expression(node, parameters, symbols):
         return str(value) + suffix
     if set(node) == {"argument"}:
         name = identifier(node["argument"])
-        if parameters.get(name) != "value":
+        if parameters.get(name) not in ("value", "operand"):
             raise ValueError(f"Unknown native expression parameter: {name}")
         return "(" + name + ")"
+    if set(node) == {"local"}:
+        name = identifier(node["local"])
+        if name not in locals_:
+            raise ValueError(f"Unknown native capture local: {name}")
+        return "(" + name + ")"
+    if set(node) == {"address"}:
+        return "(&" + native_expression(node["address"], parameters, symbols, locals_) + ")"
+    if set(node) == {"unary", "value"} and node["unary"] in ("-", "!"):
+        return "(" + node["unary"] + native_expression(node["value"], parameters, symbols, locals_) + ")"
+    if set(node) == {"condition", "yes", "no"}:
+        return "(" + native_expression(node["condition"], parameters, symbols, locals_) + " ? " + native_expression(node["yes"], parameters, symbols, locals_) + " : " + native_expression(node["no"], parameters, symbols, locals_) + ")"
+    if set(node) == {"native_result_capture", "intrinsic_expression"}:
+        capture = node["native_result_capture"]
+        if set(capture) != {"name", "type", "initial"}:
+            raise ValueError(f"Invalid native result capture: {capture!r}")
+        name = identifier(capture["name"])
+        if name in parameters or name in locals_:
+            raise ValueError(f"Duplicate native result capture: {name}")
+        expression = node["intrinsic_expression"]
+        if set(expression) != {"call", "arguments"} or symbols.get(expression["call"], (None, None, None))[2] != "overflow_intrinsic":
+            raise ValueError("A native result capture may only bind a compiler overflow intrinsic")
+        if capture["initial"] != {"literal": 0}:
+            raise ValueError("Native overflow output capture must start at zero")
+        arguments = expression["arguments"]
+        if len(arguments) != 3 or arguments[1] != {"local": name} or arguments[2] != {"address": {"local": name}}:
+            raise ValueError("Native overflow capture must bind its typed input/output local")
+        native = expression_type(capture["type"], parameters)
+        initial = native_expression(capture["initial"], parameters, symbols, locals_)
+        operation = native_expression(expression, parameters, symbols, locals_ | {name})
+        return "({ " + native + " " + name + " = " + initial + "; " + operation + "; })"
     if set(node) == {"cast", "value"}:
-        return "((" + expression_type(node["cast"], parameters) + ")(" + native_expression(node["value"], parameters, symbols) + "))"
+        return "((" + expression_type(node["cast"], parameters) + ")(" + native_expression(node["value"], parameters, symbols, locals_) + "))"
     if set(node) == {"sizeof"}:
         return "sizeof(" + expression_type(node["sizeof"], parameters) + ")"
     if set(node) == {"operator", "left", "right"} and node["operator"] in OPERATORS:
-        return "(" + native_expression(node["left"], parameters, symbols) + " " + node["operator"] + " " + native_expression(node["right"], parameters, symbols) + ")"
+        return "(" + native_expression(node["left"], parameters, symbols, locals_) + " " + node["operator"] + " " + native_expression(node["right"], parameters, symbols, locals_) + ")"
     if set(node) == {"call", "arguments"}:
         name = identifier(node["call"])
         arguments = node["arguments"]
         if name not in symbols or len(arguments) != symbols[name][0]:
             raise ValueError(f"Unknown native expression call/arity: {name}")
         kinds = symbols[name][1]
-        values = [expression_type(value, parameters) if kind == "type" else native_expression(value, parameters, symbols)
+        values = [expression_type(value, parameters) if kind == "type" else
+                  native_operand(value, parameters) if kind == "operand" else
+                  native_expression(value, parameters, symbols, locals_)
                   for value, kind in zip(arguments, kinds)]
         return name + "(" + ", ".join(values) + ")"
     raise ValueError(f"Unsupported native expression node: {node!r}")
@@ -217,7 +264,7 @@ def native_expression(node, parameters, symbols):
 def expression_adapter(record, symbols):
     name = identifier(record["name"])
     parameters = {identifier(value["name"]): value["kind"] for value in record["parameters"]}
-    if len(parameters) != len(record["parameters"]) or any(kind not in ("value", "type") for kind in parameters.values()):
+    if len(parameters) != len(record["parameters"]) or any(kind not in PARAMETER_KINDS for kind in parameters.values()):
         raise ValueError(f"Invalid native expression parameters: {name}")
     return "#define " + name + "(" + ", ".join(parameters) + ") " + native_expression(record["expression"], parameters, symbols)
 
@@ -250,18 +297,29 @@ def generate(schema_path, source_root, output):
     text = ["// Generated from V declarations and structured ABI metadata; do not maintain.",
             f"#ifndef {guard}", f"#define {guard}",
             "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>"]
-    symbols = {name: (arity, ["value"] * arity) for name, arity in BUILTINS.items()}
-    symbols.update({name: (value[1], ["value"] * value[1]) for name, value in exported.items()})
+    symbols = {name: (arity, ["value"] * arity, "overflow_intrinsic" if name in ("__builtin_add_overflow", "__builtin_sub_overflow", "__builtin_mul_overflow") else "intrinsic") for name, arity in BUILTINS.items()}
+    symbols.update({name: (value[1], ["value"] * value[1], "function") for name, value in exported.items()})
+    for record in intrinsics:
+        intrinsic_adapter(record)  # Validate before exposing the native alias.
+        symbols[identifier(record["name"])] = (len(record["parameters"]), ["value"] * len(record["parameters"]), "overflow_intrinsic" if record["intrinsic"] in ("__builtin_add_overflow", "__builtin_sub_overflow", "__builtin_mul_overflow") else "intrinsic")
+    for record in expressions:
+        name = identifier(record["name"])
+        if name in symbols:
+            raise ValueError(f"Duplicate native expression symbol: {name}")
+        kinds = [value["kind"] for value in record["parameters"]]
+        if any(kind not in PARAMETER_KINDS for kind in kinds):
+            raise ValueError(f"Invalid native expression parameter kind: {name}")
+        symbols[name] = (len(kinds), kinds, "expression")
     for record in config.get("native_expression_imports", []):
         name = identifier(record["name"])
         header = record["header"]
         parameters = record["parameters"]
         if not re.fullmatch(r"[A-Za-z0-9_./-]+\.h", header) or ".." in header.split("/"):
             raise ValueError(f"Invalid native expression import header: {header}")
-        if name in symbols or any(kind not in ("value", "type") for kind in parameters):
+        if name in symbols or any(kind not in PARAMETER_KINDS for kind in parameters):
             raise ValueError(f"Invalid native expression import: {name}")
         text.append("#include <" + header + ">")
-        symbols[name] = (len(parameters), parameters)
+        symbols[name] = (len(parameters), parameters, "native_helper")
     text += [value[0] for value in exported.values()]
     text += [adapter(record, exported) for record in atomic_adapters]
     text += [call_adapter(record, exported) for record in call_adapters]

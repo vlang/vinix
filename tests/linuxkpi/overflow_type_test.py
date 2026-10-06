@@ -3,8 +3,8 @@
 """Check the pinned overflow type macros against independent integer bounds.
 
 These compiler expressions allocate nothing and perform no kernel operation.
-The host test includes the full production header and the exact pinned header
-in separate translation units, with GNU99/GNU11 and ASan/UBSan.
+The host test includes generated production compiler adapters and the exact
+pinned header in separate translation units, with GNU99/GNU11 and ASan/UBSan.
 """
 import argparse
 import hashlib
@@ -21,6 +21,8 @@ HEADER = ROOT / "kernel/linuxkpi/include/linux/overflow.h"
 MACROS = ("__type_half_max", "__type_max", "type_max", "__type_min", "type_min",
           "__overflows_type_constexpr", "__overflows_type", "overflows_type",
           "castable_to_type")
+ORIGINAL = "d0a65f5953058f4f7542cd588acbb38039491c04"
+ORIGINAL_PATH = "kernel/linuxkpi/include/linux/overflow.h"
 TYPES = tuple((prefix + str(width), width, signed)
               for width in (8, 16, 32, 64)
               for prefix, signed in (("s", True), ("u", False)))
@@ -157,9 +159,24 @@ def run(keep_directory=None):
         "LINUXKPI_SOURCE_DIR", ROOT / "third_party/linux-i915/linux-6.6.157"))
     original = linux / "include/linux/overflow.h"
     production_text, original_text = HEADER.read_text(), original.read_text()
+    schema = json.loads((ROOT / "kernel/linuxkpi/abi/overflow.json").read_text())
+    boundary = schema["boundary"]
+    if (boundary["original_revision"], boundary["original_path"]) != (ORIGINAL, ORIGINAL_PATH):
+        raise AssertionError("Original compiler-contract provenance changed")
+    immutable = subprocess.check_output(["git", "show", ORIGINAL + ":" + ORIGINAL_PATH], cwd=ROOT)
+    blob = subprocess.check_output(["git", "rev-parse", ORIGINAL + ":" + ORIGINAL_PATH], cwd=ROOT, text=True).strip()
+    if blob != boundary["original_blob"] or hashlib.sha256(immutable).hexdigest() != boundary["original_sha256"]:
+        raise AssertionError("Original compiler-contract source fingerprint changed")
+    fingerprints = {record["name"]: record["sha256"]
+                    for record in boundary["native_constant_expression_macros"]}
+    if set(fingerprints) != set(MACROS):
+        raise AssertionError("Original compiler-contract macro inventory changed")
     for name in MACROS:
-        if macro(production_text, name) != macro(original_text, name):
-            raise AssertionError(name + " differs from the pinned original")
+        pinned = macro(original_text, name)
+        if macro(immutable.decode(), name) != pinned or hashlib.sha256(pinned.encode()).hexdigest() != fingerprints[name]:
+            raise AssertionError(name + " differs from the immutable pinned original")
+        if re.search(r"^#define " + re.escape(name) + r"\(", production_text, re.M):
+            raise AssertionError(name + " is still a maintained C implementation")
     for declaration in ("size_t array_size(size_t, size_t);",
                         "size_t size_add(size_t, size_t);",
                         "size_t size_mul(size_t, size_t);"):
@@ -233,15 +250,16 @@ def run(keep_directory=None):
                                 "probe_runtime_imports": imports,
                                 "original_file_scope_limitation": invalid.returncode}
         provenance = {
-            "scope": "Full production and exact pinned headers, GNU99/GNU11 strict host "
+            "scope": "Generated production and exact pinned headers, GNU99/GNU11 strict host "
                      "ASan/UBSan independent boundary matrix, ICE and evaluation checks. "
                      "Compiler-only feature: no allocation, native or GPU support claim.",
             "host": platform.machine(), "header_sha256": sha256(HEADER),
             "pinned_header_sha256": sha256(original), "test_sha256": sha256(Path(__file__)),
+            "native_metadata_sha256": sha256(ROOT / "kernel/linuxkpi/abi/overflow.json"),
             "exact_pinned_macros": MACROS, "boundary_cases": cases, "results": results,
         }
         (work / "result.json").write_text(json.dumps(provenance, indent=2) + "\n")
-        print("LinuxKPI overflow types: exact pinned macros, " + str(cases) +
+        print("LinuxKPI overflow types: immutable pinned macro provenance, " + str(cases) +
               " independent boundary cases; single evaluation and ICE contracts passed")
     finally:
         if temporary:

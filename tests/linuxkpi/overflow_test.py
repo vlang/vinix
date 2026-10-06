@@ -25,6 +25,20 @@ def load(name, path):
     return module
 
 
+def remove_original_macros(text, names):
+    for name in names:
+        match = re.search(r"^#define " + re.escape(name) + r"\(", text, re.M)
+        if not match:
+            raise AssertionError("Missing immutable original macro: " + name)
+        body = []
+        for line in text[match.start():].splitlines(keepends=True):
+            body.append(line)
+            if not line.rstrip("\n").endswith("\\"):
+                break
+        text = text.replace("".join(body), "", 1)
+    return text
+
+
 def prepare(work, arch, suffix=""):
     compiler = load("overflow_compiler", ROOT / "build-support/compile-v-module.py")
     abi = load("overflow_abi", ROOT / ("kernel/linuxkpi/generate-abi.py" + suffix))
@@ -42,13 +56,13 @@ def prepare(work, arch, suffix=""):
         path = original / header
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(subprocess.check_output(["git", "show", ORIGINAL + ":kernel/linuxkpi/include/" + header], cwd=ROOT))
-    # Keep the pinned type-or-expression/constant family byte-for-byte. Only
-    # compiler builtin bindings move to the generated declaration adapter.
+    # The original side retains exact immutable headers. The generated side
+    # uses declaration-only wrappers around reviewed native compiler metadata.
     overflow = (original / "linux/overflow.h").read_text()
-    matches = re.findall(r"^#define check_(?:add|sub|mul)_overflow[^\n]*\n", overflow, re.M)
-    if len(matches) != 3:
-        raise AssertionError("Expected exactly three pinned compiler bindings")
-    replacement = re.sub(r"^#define check_(?:add|sub|mul)_overflow[^\n]*\n", "", overflow, flags=re.M)
+    schema = json.loads((ROOT / ("kernel/linuxkpi/abi/overflow.json" + suffix)).read_text())
+    names = [record["name"] for record in schema["native_intrinsic_bindings"]]
+    names += [record["name"] for record in schema["boundary"]["native_constant_expression_macros"]]
+    replacement = remove_original_macros(overflow, names)
     replacement = replacement.replace("#include <linux/const.h>\n",
                                       "#include <linux/const.h>\n#include <vinix/integer_policy.h>\n", 1)
     target = work / "V/include/linux/overflow.h"

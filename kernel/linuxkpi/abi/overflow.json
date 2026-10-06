@@ -5,14 +5,84 @@
     "headercore/policy.v"
   ],
   "boundary": {
-    "kind": "native_compiler_primitive_and_operand_adapter",
+    "kind": "native_compiler_primitive_constant_expression_and_operand_adapter",
     "v_algorithm_credit": 0,
     "original_revision": "d0a65f5953058f4f7542cd588acbb38039491c04",
     "original_path": "kernel/linuxkpi/include/linux/overflow.h",
     "original_lines": [
       7,
       8,
-      9
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39
+    ],
+    "original_blob": "26a8e9d8f6b0ed75e1a91f68a075c7c231168d89",
+    "original_sha256": "4e629555b1e9122462e780091a0ef8540e9a6453adc38ae0e925481c1c56d0bc",
+    "native_constant_expression_macros": [
+      {
+        "name": "__type_half_max",
+        "sha256": "374870c3158be32ab2bef7efc16306ecdd98e4bd4cffe9fa1a1202015614d4a5"
+      },
+      {
+        "name": "__type_max",
+        "sha256": "ddbc8b863c8670c1d3fd9b804187897a1ec3f0f921cd2ce399508a8cfe37c299"
+      },
+      {
+        "name": "type_max",
+        "sha256": "7674ca28eab1555cc55f36523e9fc74370890cc85229d25bc5b378f39419de13"
+      },
+      {
+        "name": "__type_min",
+        "sha256": "3ba50d1468919ac3a9db9326ac15f2771570833199f8a0584e2b96e6d4c79a46"
+      },
+      {
+        "name": "type_min",
+        "sha256": "d0e4322296ff361b90656db80b65e2b5eb01bd4fbd0e06cf5a481a64037d94ff"
+      },
+      {
+        "name": "__overflows_type_constexpr",
+        "sha256": "59f678532f5ec274e424b11dc5636748d56354af6569b5b23029d1267c346e0c"
+      },
+      {
+        "name": "__overflows_type",
+        "sha256": "269c7b859ab320c9f4a22b9fb44beb5f791ce3dc70d7d5b036f6d33f8cd70b8d"
+      },
+      {
+        "name": "overflows_type",
+        "sha256": "cd9c7f45d8f4d0f1abe427205b0362bdf4e77df5ba52fead3bfa983f8e47052a"
+      },
+      {
+        "name": "castable_to_type",
+        "sha256": "991a4ef3cb509405f3ab5e5b6188cc64915ecc8d312902564d1389a3200176f9"
+      }
     ]
   },
   "native_intrinsic_bindings": [
@@ -121,6 +191,452 @@
           "arguments": []
         }
       }
+    },
+    {
+      "name": "__type_half_max",
+      "parameters": [
+        {
+          "name": "type",
+          "kind": "type"
+        }
+      ],
+      "expression": {
+        "operator": "<<",
+        "left": {
+          "cast": {
+            "parameter": "type"
+          },
+          "value": {
+            "literal": 1
+          }
+        },
+        "right": {
+          "operator": "-",
+          "left": {
+            "operator": "-",
+            "left": {
+              "operator": "*",
+              "left": {
+                "literal": 8
+              },
+              "right": {
+                "sizeof": {
+                  "parameter": "type"
+                }
+              }
+            },
+            "right": {
+              "literal": 1
+            }
+          },
+          "right": {
+            "call": "is_signed_type",
+            "arguments": [
+              {
+                "parameter": "type"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "__type_max",
+      "parameters": [
+        {
+          "name": "T",
+          "kind": "type"
+        }
+      ],
+      "expression": {
+        "cast": {
+          "parameter": "T"
+        },
+        "value": {
+          "operator": "+",
+          "left": {
+            "operator": "-",
+            "left": {
+              "call": "__type_half_max",
+              "arguments": [
+                {
+                  "parameter": "T"
+                }
+              ]
+            },
+            "right": {
+              "literal": 1
+            }
+          },
+          "right": {
+            "call": "__type_half_max",
+            "arguments": [
+              {
+                "parameter": "T"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "type_max",
+      "parameters": [
+        {
+          "name": "t",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "call": "__type_max",
+        "arguments": [
+          {
+            "typeof": {
+              "operand": "t"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "__type_min",
+      "parameters": [
+        {
+          "name": "T",
+          "kind": "type"
+        }
+      ],
+      "expression": {
+        "cast": {
+          "parameter": "T"
+        },
+        "value": {
+          "operator": "-",
+          "left": {
+            "cast": {
+              "parameter": "T"
+            },
+            "value": {
+              "unary": "-",
+              "value": {
+                "call": "type_max",
+                "arguments": [
+                  {
+                    "operand": "T"
+                  }
+                ]
+              }
+            }
+          },
+          "right": {
+            "cast": {
+              "parameter": "T"
+            },
+            "value": {
+              "literal": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "type_min",
+      "parameters": [
+        {
+          "name": "t",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "call": "__type_min",
+        "arguments": [
+          {
+            "typeof": {
+              "operand": "t"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "__overflows_type_constexpr",
+      "parameters": [
+        {
+          "name": "x",
+          "kind": "value"
+        },
+        {
+          "name": "T",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "condition": {
+          "call": "is_unsigned_type",
+          "arguments": [
+            {
+              "typeof": {
+                "operand": "x"
+              }
+            }
+          ]
+        },
+        "yes": {
+          "operator": ">",
+          "left": {
+            "argument": "x"
+          },
+          "right": {
+            "call": "type_max",
+            "arguments": [
+              {
+                "operand": "T"
+              }
+            ]
+          }
+        },
+        "no": {
+          "condition": {
+            "call": "is_unsigned_type",
+            "arguments": [
+              {
+                "typeof": {
+                  "operand": "T"
+                }
+              }
+            ]
+          },
+          "yes": {
+            "operator": "||",
+            "left": {
+              "operator": "<",
+              "left": {
+                "argument": "x"
+              },
+              "right": {
+                "literal": 0
+              }
+            },
+            "right": {
+              "operator": ">",
+              "left": {
+                "argument": "x"
+              },
+              "right": {
+                "call": "type_max",
+                "arguments": [
+                  {
+                    "operand": "T"
+                  }
+                ]
+              }
+            }
+          },
+          "no": {
+            "operator": "||",
+            "left": {
+              "operator": "<",
+              "left": {
+                "argument": "x"
+              },
+              "right": {
+                "call": "type_min",
+                "arguments": [
+                  {
+                    "operand": "T"
+                  }
+                ]
+              }
+            },
+            "right": {
+              "operator": ">",
+              "left": {
+                "argument": "x"
+              },
+              "right": {
+                "call": "type_max",
+                "arguments": [
+                  {
+                    "operand": "T"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "__overflows_type",
+      "parameters": [
+        {
+          "name": "x",
+          "kind": "value"
+        },
+        {
+          "name": "T",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "native_result_capture": {
+          "name": "v",
+          "type": {
+            "typeof": {
+              "operand": "T"
+            }
+          },
+          "initial": {
+            "literal": 0
+          }
+        },
+        "intrinsic_expression": {
+          "call": "check_add_overflow",
+          "arguments": [
+            {
+              "argument": "x"
+            },
+            {
+              "local": "v"
+            },
+            {
+              "address": {
+                "local": "v"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "overflows_type",
+      "parameters": [
+        {
+          "name": "n",
+          "kind": "value"
+        },
+        {
+          "name": "T",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "call": "__builtin_choose_expr",
+        "arguments": [
+          {
+            "call": "__is_constexpr",
+            "arguments": [
+              {
+                "argument": "n"
+              }
+            ]
+          },
+          {
+            "call": "__overflows_type_constexpr",
+            "arguments": [
+              {
+                "argument": "n"
+              },
+              {
+                "operand": "T"
+              }
+            ]
+          },
+          {
+            "call": "__overflows_type",
+            "arguments": [
+              {
+                "argument": "n"
+              },
+              {
+                "operand": "T"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "castable_to_type",
+      "parameters": [
+        {
+          "name": "n",
+          "kind": "value"
+        },
+        {
+          "name": "T",
+          "kind": "operand"
+        }
+      ],
+      "expression": {
+        "call": "__builtin_choose_expr",
+        "arguments": [
+          {
+            "call": "__is_constexpr",
+            "arguments": [
+              {
+                "argument": "n"
+              }
+            ]
+          },
+          {
+            "unary": "!",
+            "value": {
+              "call": "__overflows_type_constexpr",
+              "arguments": [
+                {
+                  "argument": "n"
+                },
+                {
+                  "operand": "T"
+                }
+              ]
+            }
+          },
+          {
+            "call": "__same_type",
+            "arguments": [
+              {
+                "operand": "n"
+              },
+              {
+                "operand": "T"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "native_expression_imports": [
+    {
+      "name": "is_signed_type",
+      "header": "linux/compiler.h",
+      "parameters": [
+        "type"
+      ]
+    },
+    {
+      "name": "is_unsigned_type",
+      "header": "linux/compiler.h",
+      "parameters": [
+        "type"
+      ]
+    },
+    {
+      "name": "__is_constexpr",
+      "header": "linux/const.h",
+      "parameters": [
+        "value"
+      ]
+    },
+    {
+      "name": "__same_type",
+      "header": "linux/compiler_types.h",
+      "parameters": [
+        "operand",
+        "operand"
+      ]
     }
   ]
 }
