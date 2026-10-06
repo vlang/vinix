@@ -36,12 +36,14 @@ mut:
 	lap_number         int
 	last_lap_ms        u64
 	lap_text           [clock_lap_limit]string
-	timer_duration_ms  u64 = 300_000
-	timer_remaining_ms u64 = 300_000
-	timer_started_ms   u64
-	timer_running      bool
-	timer_done         bool
 	timer_text         string
+	timers             [clock_timer_limit]ClockTimer
+	timer_count        int
+	selected_timer     int
+	name_focus         bool
+	name_selected      bool
+	name_pending       [4]u8
+	name_pending_len   int
 }
 
 fn open_clock(mut desktop Desktop) !NativeApp {
@@ -87,6 +89,7 @@ fn clock_replace_text(old string, next string) string {
 }
 
 fn (mut a ClockApp) refresh() {
+	a.initialize_timers()
 	seconds, _ := desktop_realtime()
 	if seconds < 0 {
 		a.time_text = clock_replace_text(a.time_text, '--:--:--'.clone())
@@ -120,7 +123,7 @@ fn (mut a ClockApp) poll() bool {
 	if now == ~u64(0) {
 		return false
 	}
-	if !a.running && !a.timer_running {
+	if !a.running && !a.any_timer_running() {
 		// Only the seconds can have changed, so there is nothing to redraw
 		// until the wall clock reaches the next one.
 		seconds, _ := desktop_realtime()
@@ -142,7 +145,7 @@ fn (mut a ClockApp) poll() bool {
 // for the moment the next wall-clock second begins, so the time turns over
 // on the second rather than up to one poll interval after it.
 fn (a &ClockApp) next_poll_ms() u64 {
-	if a.running || a.timer_running {
+	if a.running || a.any_timer_running() {
 		return clock_running_poll_ms
 	}
 	_, nanoseconds := desktop_realtime()
@@ -186,6 +189,7 @@ fn (mut a ClockApp) reset_stopwatch() {
 }
 
 fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
+	a.initialize_timers()
 	if a.language != desktop_language {
 		a.refresh()
 	}
@@ -194,6 +198,13 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	pad := 24
 	inner := width - 2 * pad
 	mut children := frame_elements(24)
+	if width < 400 || height < 370 {
+		children << ui2.label('', tr('clock.enlarge'), ui2.rect(12, 12,
+			f64(if width > 24 { width - 24 } else { 0 }),
+			f64(if height > 24 { height - 24 } else { 0 })),
+			ui2.TextStyle{color: body_muted, size: 12, lines: 3})
+		return ui2.screen(app_surface, children)
+	}
 
 	children << ui2.label('', a.time_text, ui2.rect(f64(pad), 12, f64(inner), 60), ui2.TextStyle{
 		color: body_heading
@@ -209,7 +220,7 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 	children << clock_control('clock.tab.stopwatch', tr('clock.stopwatch'), pad, 110, inner / 2 - 5, a.tab == 0)
 	children << clock_control('clock.tab.timer', tr('clock.timer'), width / 2 + 5, 110, inner / 2 - 5, a.tab == 1)
 	if a.tab == 1 {
-		a.append_timer(mut children, width, height)
+		a.append_timer(mut children, width)
 		return ui2.screen(app_surface, children)
 	}
 
@@ -274,9 +285,33 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a ClockApp) handle(event_id string) ! {
+	a.initialize_timers()
+	if event_id == 'clock.timer.name' {
+		a.name_focus = true
+		a.name_selected = true
+		a.name_pending_len = 0
+		return
+	}
+	a.name_focus = false
+	a.name_pending_len = 0
+	for index, action in clock_timer_actions {
+		if event_id == action && index < a.timer_count {
+			a.selected_timer = index
+			a.refresh()
+			return
+		}
+	}
 	match event_id {
 		'clock.tab.stopwatch' { a.tab = 0 }
 		'clock.tab.timer' { a.tab = 1 }
+		'clock.timer.add' {
+			if a.add_timer() {
+				a.name_focus = true
+				a.name_selected = true
+			}
+			a.refresh()
+		}
+		'clock.timer.remove' { a.remove_timer(); a.refresh() }
 		clock_action_toggle { a.toggle_stopwatch() }
 		clock_action_reset { a.reset_stopwatch() }
 		clock_action_lap { a.add_lap_at(desktop_monotonic_ms()) }
@@ -332,57 +367,6 @@ fn clock_timer_text(milliseconds u64) string {
 	return result
 }
 
-fn (a &ClockApp) timer_remaining(now u64) u64 {
-	if !a.timer_running || now == ~u64(0) || now < a.timer_started_ms {
-		return a.timer_remaining_ms
-	}
-	elapsed := now - a.timer_started_ms
-	return if elapsed >= a.timer_remaining_ms { u64(0) } else { a.timer_remaining_ms - elapsed }
-}
-
-fn (mut a ClockApp) update_timer(now u64) {
-	if a.timer_running && a.timer_remaining(now) == 0 {
-		a.timer_running = false
-		a.timer_remaining_ms = 0
-		a.timer_done = true
-		a.tab = 1
-	}
-}
-
-fn (mut a ClockApp) toggle_timer_at(now u64) {
-	if now == ~u64(0) { return }
-	a.update_timer(now)
-	if a.timer_running {
-		a.timer_remaining_ms = a.timer_remaining(now)
-		a.timer_running = false
-	} else {
-		if a.timer_remaining_ms == 0 { a.timer_remaining_ms = a.timer_duration_ms }
-		a.timer_started_ms = now
-		a.timer_running = true
-		a.timer_done = false
-	}
-}
-
-fn (mut a ClockApp) reset_timer() {
-	a.timer_remaining_ms = a.timer_duration_ms
-	a.timer_running = false
-	a.timer_done = false
-}
-
-fn (mut a ClockApp) set_timer_duration(milliseconds u64) {
-	if a.timer_running || milliseconds < 1000 || milliseconds > 86_400_000 { return }
-	a.timer_duration_ms = milliseconds
-	a.reset_timer()
-}
-
-fn (mut a ClockApp) adjust_timer(delta i64) {
-	if a.timer_running { return }
-	mut duration := i64(a.timer_duration_ms) + delta
-	if duration < 1000 { duration = 1000 }
-	if duration > 86_400_000 { duration = 86_400_000 }
-	a.set_timer_duration(u64(duration))
-}
-
 fn (mut a ClockApp) clear_laps() {
 	for index in 0 .. a.lap_count {
 		unsafe { a.lap_text[index].free() }
@@ -425,38 +409,6 @@ fn clock_control(action string, text string, x int, y int, width int, active boo
 	}, ui2.TextStyle{ color: if active { app_on_accent } else { body_text }, size: 12, align: .center })
 }
 
-fn (mut a ClockApp) append_timer(mut children []ui2.Element, width int, height int) {
-	pad := 24
-	inner := width - 2 * pad
-	children << ui2.label('', a.timer_text, ui2.rect(f64(pad), 156, f64(inner), 52), ui2.TextStyle{ color: clock_stopwatch, font_family: 'mono', size: 28, bold: true, align: .center })
-	center := width / 2
-	children << clock_control('clock.timer.less', '-1', center - 148, 214, 44, false)
-	children << clock_control('clock.timer.preset.1', tr('clock.timer.preset.1'), center - 96, 214, 58, false)
-	children << clock_control('clock.timer.preset.5', tr('clock.timer.preset.5'), center - 30, 214, 58, false)
-	children << clock_control('clock.timer.preset.15', tr('clock.timer.preset.15'), center + 36, 214, 66, false)
-	children << clock_control('clock.timer.more', '+1', center + 110, 214, 44, false)
-	children << clock_control('clock.timer.toggle', if a.timer_running {
-		tr('clock.stop')
-	} else {
-		tr('clock.start')
-	}, center - 118, 260, 112, true)
-	children << clock_control('clock.timer.reset', tr('clock.reset'), center + 6, 260, 112, false)
-	children << ui2.label('', if a.timer_done {
-		tr('clock.timer.finished')
-	} else {
-		tr('clock.timer.adjust')
-	}, ui2.rect(f64(pad), 302, f64(inner), f64(if height > 338 { height - 320 } else { 24 })), ui2.TextStyle{
-		color: if a.timer_done {
-			clock_stop
-		} else {
-			body_muted
-		}
-		size:  12
-		bold:  a.timer_done
-		align: .center
-	})
-}
-
 fn (mut a ClockApp) close_app() {
 	a.clear_laps()
 	unsafe {
@@ -465,4 +417,14 @@ fn (mut a ClockApp) close_app() {
 		a.stopwatch_text.free()
 		a.timer_text.free()
 	}
+	a.time_text = ''
+	a.date_text = ''
+	a.stopwatch_text = ''
+	a.timer_text = ''
+	a.timers = [clock_timer_limit]ClockTimer{}
+	a.timer_count = 0
+	a.selected_timer = 0
+	a.name_focus = false
+	a.name_pending_len = 0
+	a.running = false
 }

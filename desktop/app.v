@@ -190,6 +190,7 @@ const available_apps = [
 		width: 560
 		height: 410
 		process_name: 'vinix-clock'
+		keyboard: true
 		polling: true
 		poll_interval_ms: 100
 		open: open_clock
