@@ -27,6 +27,7 @@ const capture_action_fps_10 = 'capture.fps.10'
 const capture_action_take_screenshot = 'capture.screenshot'
 const capture_action_start_video = 'capture.video.start'
 const capture_action_stop = 'capture.stop'
+const capture_action_cursor = 'capture.cursor'
 
 const capture_video_max_width = 640
 const capture_video_max_height = 480
@@ -72,6 +73,7 @@ struct CaptureRequest {
 	command  CaptureCommand
 	delay    int
 	fps      int
+	hide_cursor bool
 }
 
 struct CaptureReport {
@@ -184,10 +186,38 @@ fn capture_png_chunk(mut out []u8, kind string, data []u8) {
 	capture_put_be32(mut out, capture_crc32(out[crc_start..]))
 }
 
+// Both encoders borrow the compositor's saved pixels under the pointer. They
+// never erase it from the live canvas or retain the backing after this frame.
+fn capture_backing_valid(canvas &Canvas, backing &CursorBacking) bool {
+	if backing == unsafe { nil } { return true }
+	box := backing.box
+	return canvas.scale > 0 && box.valid && box.x >= 0 && box.y >= 0
+		&& box.w > 0 && box.h > 0 && box.x + box.w <= canvas.width
+		&& box.y + box.h <= canvas.height
+		&& i64(box.w) * box.h * canvas.scale * canvas.scale <= backing.pixels.len
+}
+
+fn capture_pixel(canvas &Canvas, backing &CursorBacking, x int, y int) u32 {
+	if backing != unsafe { nil } {
+		box := backing.box
+		left := box.x * canvas.scale
+		top := box.y * canvas.scale
+		width := box.w * canvas.scale
+		if x >= left && x < left + width && y >= top && y < top + box.h * canvas.scale {
+			return backing.pixels[(y - top) * width + x - left]
+		}
+	}
+	return unsafe { canvas.pixels[y * canvas.stride + x] }
+}
+
 fn capture_png_bytes(canvas &Canvas) ![]u8 {
+	return capture_png_bytes_with_backing(canvas, unsafe { nil })
+}
+
+fn capture_png_bytes_with_backing(canvas &Canvas, backing &CursorBacking) ![]u8 {
 	if canvas.pixels == unsafe { nil } || canvas.physical_width <= 0
 		|| canvas.physical_height <= 0 || canvas.physical_width > 16384
-		|| canvas.physical_height > 16384 {
+		|| canvas.physical_height > 16384 || !capture_backing_valid(canvas, backing) {
 		return error('invalid capture canvas')
 	}
 	row_size := canvas.physical_width * 3 + 1
@@ -200,7 +230,7 @@ fn capture_png_bytes(canvas &Canvas) ![]u8 {
 		row := y * row_size
 		raw[row] = 0 // PNG filter: None
 		for x := 0; x < canvas.physical_width; x++ {
-			pixel := unsafe { canvas.pixels[y * canvas.stride + x] }
+			pixel := capture_pixel(canvas, backing, x, y)
 			offset := row + 1 + x * 3
 			raw[offset] = u8(pixel >> 16)
 			raw[offset + 1] = u8(pixel >> 8)
@@ -243,7 +273,7 @@ fn capture_png_bytes(canvas &Canvas) ![]u8 {
 	ihdr << u8(0) // no interlace
 
 	mut png := []u8{cap: 8 + 25 + compressed.len + 24}
-	png << [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`]
+	for byte in [u8(0x89), `P`, `N`, `G`, `\r`, `\n`, 0x1a, `\n`]! { png << byte }
 	capture_png_chunk(mut png, 'IHDR', ihdr)
 	capture_png_chunk(mut png, 'IDAT', compressed)
 	capture_png_chunk(mut png, 'IEND', []u8{})
@@ -251,7 +281,11 @@ fn capture_png_bytes(canvas &Canvas) ![]u8 {
 }
 
 fn capture_write_png(path string, canvas &Canvas) bool {
-	bytes := capture_png_bytes(canvas) or { return false }
+	return capture_write_png_with_backing(path, canvas, unsafe { nil })
+}
+
+fn capture_write_png_with_backing(path string, canvas &Canvas, backing &CursorBacking) bool {
+	bytes := capture_png_bytes_with_backing(canvas, backing) or { return false }
 	ok := desktop_write_file(path, bytes.data, u64(bytes.len))
 	unsafe { bytes.free() }
 	return ok
@@ -383,6 +417,8 @@ fn capture_open_avi(path string, canvas &Canvas, fps int) !AviWriter {
 	header_length := header.len
 	unsafe { header.free() }
 	max_frames_u64 := (capture_avi_file_limit - u64(header_length)) / u64(frame_size + 24)
+	mut offsets := []u32{cap: 1024}
+	unsafe { offsets.flags |= .noslices }
 	return AviWriter{
 		fd:                   fd
 		width:                width
@@ -396,13 +432,18 @@ fn capture_open_avi(path string, canvas &Canvas, fps int) !AviWriter {
 		total_frames_offset:  total_frames_offset
 		stream_length_offset: stream_length_offset
 		movi_size_offset:     movi_size_offset
-		frame_offsets:        []u32{cap: 1024}
+		frame_offsets:        offsets
 		frame:                []u8{len: frame_size}
 	}
 }
 
 fn (mut writer AviWriter) add_frame(canvas &Canvas) bool {
-	if writer.fd < 0 || writer.frames >= writer.max_frames || canvas.pixels == unsafe { nil } {
+	return writer.add_frame_with_backing(canvas, unsafe { nil })
+}
+
+fn (mut writer AviWriter) add_frame_with_backing(canvas &Canvas, backing &CursorBacking) bool {
+	if writer.fd < 0 || writer.frames >= writer.max_frames || canvas.pixels == unsafe { nil }
+		|| !capture_backing_valid(canvas, backing) {
 		return false
 	}
 	for destination_y := 0; destination_y < writer.height; destination_y++ {
@@ -410,7 +451,7 @@ fn (mut writer AviWriter) add_frame(canvas &Canvas) bool {
 		row := destination_y * writer.row_stride
 		for destination_x := 0; destination_x < writer.width; destination_x++ {
 			source_x := destination_x * canvas.physical_width / writer.width
-			pixel := unsafe { canvas.pixels[source_y * canvas.stride + source_x] }
+			pixel := capture_pixel(canvas, backing, source_x, source_y)
 			offset := row + destination_x * 3
 			writer.frame[offset] = u8(pixel)
 			writer.frame[offset + 1] = u8(pixel >> 8)
@@ -678,11 +719,17 @@ fn (mut d Desktop) capture_presented(canvas &Canvas) {
 		return
 	}
 	d.capture.pending_frame = .none_
+	backing := if d.capture.request.hide_cursor { unsafe { &d.cursor_backing } }
+		else { unsafe { &CursorBacking(nil) } }
+	if !capture_backing_valid(canvas, backing) {
+		d.capture_fail()
+		return
+	}
 	match kind {
 		.screenshot {
 			id := d.capture.next_file_id(.screenshot, d.tz_offset_seconds)
 			path := capture_file_path(.screenshot, id)
-			ok := capture_write_png(path, canvas)
+			ok := capture_write_png_with_backing(path, canvas, backing)
 			unsafe { path.free() }
 			if !ok {
 				d.capture_fail()
@@ -718,7 +765,7 @@ fn (mut d Desktop) capture_presented(canvas &Canvas) {
 				width:            d.capture.writer.width
 				height:           d.capture.writer.height
 			}
-			if !d.capture.writer.add_frame(canvas) {
+			if !d.capture.writer.add_frame_with_backing(canvas, backing) {
 				d.capture_fail()
 				return
 			}
@@ -727,7 +774,7 @@ fn (mut d Desktop) capture_presented(canvas &Canvas) {
 			d.dirty = true
 		}
 		.video_frame {
-			if !d.capture.writer.add_frame(canvas) {
+			if !d.capture.writer.add_frame_with_backing(canvas, backing) {
 				if d.capture.writer.frames >= d.capture.writer.max_frames {
 					d.capture_finish_video(true)
 				} else {
@@ -782,6 +829,7 @@ mut:
 	page            CapturePage
 	delay           int = 3
 	fps             int = 10
+	hide_cursor     bool
 	seen_phase      CapturePhase
 	seen_sequence   u32
 	seen_frames     int
@@ -897,6 +945,7 @@ fn (mut app CaptureApp) request(command CaptureCommand) {
 		command:  command
 		delay:    app.delay
 		fps:      app.fps
+		hide_cursor: app.hide_cursor && app_compositor_features & app_feature_capture_cursor != 0
 	}
 }
 
@@ -954,8 +1003,18 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 	}
 	active := report.phase == .recording || report.phase == .screenshot_countdown
 		|| report.phase == .video_countdown
+	cursor_option := app_compositor_features & app_feature_capture_cursor != 0 && width >= 480
+	if cursor_option {
+		children << ui2.Element{
+			...capture_choice(capture_action_cursor,
+				tr(if app.hide_cursor { 'capture.cursor.hidden' } else { 'capture.cursor.shown' }),
+				width - 200, 115, 180, !app.hide_cursor)
+			tooltip: tr('capture.cursor.help')
+			enabled: !active
+		}
+	}
 	if app.page == .screenshot {
-		children << ui2.label('', tr('capture.screenshot.heading'), ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
+		children << ui2.label('', tr('capture.screenshot.heading'), ui2.rect(20, 119, f64(width - if cursor_option { 228 } else { 40 }), 22), ui2.TextStyle{
 			color: body_heading
 			size:  14
 			bold:  true
@@ -969,7 +1028,8 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 		children << capture_choice(capture_action_delay_0, tr('capture.delay.none'), 20, 175, choice_width, app.delay == 0)
 		children << capture_choice(capture_action_delay_3, tr('capture.delay.three_seconds'), 28 + choice_width, 175, choice_width, app.delay == 3)
 		children << capture_choice(capture_action_delay_5, tr('capture.delay.five_seconds'), 36 + 2 * choice_width, 175, choice_width, app.delay == 5)
-		children << capture_owned_label(tr_fill('capture.screenshot.facts', capture_fact_separator), ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
+		children << capture_owned_label(tr_fill(if app.hide_cursor { 'capture.screenshot.facts.hidden' }
+			else { 'capture.screenshot.facts' }, capture_fact_separator), ui2.rect(20, 218, f64(width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
@@ -993,7 +1053,7 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 			align: .center
 		})
 	} else {
-		children << ui2.label('', tr('capture.video.heading'), ui2.rect(20, 119, f64(width - 40), 22), ui2.TextStyle{
+		children << ui2.label('', tr('capture.video.heading'), ui2.rect(20, 119, f64(width - if cursor_option { 228 } else { 40 }), 22), ui2.TextStyle{
 			color: body_heading
 			size:  14
 			bold:  true
@@ -1017,7 +1077,8 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 		children << capture_choice(capture_action_delay_0, tr('capture.delay.none'), 84, 214, delay_width, app.delay == 0)
 		children << capture_choice(capture_action_delay_3, tr('capture.delay.three_seconds'), 92 + delay_width, 214, delay_width, app.delay == 3)
 		children << capture_choice(capture_action_delay_5, tr('capture.delay.five_seconds'), 100 + delay_width * 2, 214, delay_width, app.delay == 5)
-		children << capture_owned_label(tr_fill('capture.video.facts', capture_fact_separator), ui2.rect(20, 246, f64(width - 40), 18), ui2.TextStyle{
+		children << capture_owned_label(tr_fill(if app.hide_cursor { 'capture.video.facts.hidden' }
+			else { 'capture.video.facts' }, capture_fact_separator), ui2.rect(20, 246, f64(width - 40), 18), ui2.TextStyle{
 			color: body_muted
 			size:  11
 		})
@@ -1062,6 +1123,12 @@ fn (mut app CaptureApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut app CaptureApp) handle(event_id string) ! {
 	match event_id {
+		capture_action_cursor {
+			if app_compositor_features & app_feature_capture_cursor == 0 { return }
+			if app.desktop != unsafe { nil } && app.desktop.capture.report.phase in
+				[CapturePhase.recording, .screenshot_countdown, .video_countdown]! { return }
+			app.hide_cursor = !app.hide_cursor
+		}
 		capture_action_screenshot_tab {
 			app.page = .screenshot
 		}

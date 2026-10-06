@@ -45,7 +45,12 @@ const app_feature_toolbar = u8(1) // app_toolbar_id toolbars and Finder's glyphs
 const app_feature_close_guard = u8(2)
 const app_feature_desktop_services = u8(4)
 const app_feature_text_copy = u8(8)
-const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy
+const app_feature_capture_cursor = u8(16)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor
+// Header byte 7 was reserved and zero in version 10. Bit 0 now requests a
+// cursor-free Capture frame, with the unchanged header/state sizes. Older
+// compositors do not advertise the feature, so new Capture clients send zero.
+const app_state_hide_cursor = u8(1)
 
 // What the compositor at the other end of the pipe draws: this program's own
 // features until a request says otherwise.
@@ -255,6 +260,10 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 }
 
 fn wire_take_state(mut reader WireReader) !AppWireState {
+	return wire_take_state_flags(mut reader, 0)
+}
+
+fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 	button_side := reader.take_i32()!
 	taskbar_mode := reader.take_i32()!
 	theme := reader.take_i32()!
@@ -322,6 +331,7 @@ fn wire_take_state(mut reader WireReader) !AppWireState {
 			command:  unsafe { CaptureCommand(capture_command) }
 			delay:    capture_delay
 			fps:      capture_fps
+			hide_cursor: state_flags & app_state_hide_cursor != 0
 		}
 		capture_report:  CaptureReport{
 			handled_sequence: capture_handled_sequence
@@ -785,7 +795,7 @@ fn send_app_request(fd int, command AppCommand, width int, height int, state App
 	wire_put_u8(mut header, app_protocol_version)
 	wire_put_u8(mut header, u8(command))
 	wire_put_u8(mut header, app_features)
-	wire_put_u8(mut header, 0)
+	wire_put_u8(mut header, if state.capture_request.hide_cursor { app_state_hide_cursor } else { u8(0) })
 	wire_put_i32(mut header, width)
 	wire_put_i32(mut header, height)
 	wire_put_state(mut header, state)
@@ -809,13 +819,15 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	version := reader.take_u8()!
 	command_value := int(reader.take_u8()!)
 	features := reader.take_u8()!
-	reader.take_u8()!
+	state_flags := reader.take_u8()!
 	width := reader.take_i32()!
 	height := reader.take_i32()!
-	state := wire_take_state(mut reader)!
+	state := wire_take_state_flags(mut reader, state_flags)!
 	payload_length := int(reader.take_u32()!)
 	unsafe { header.free() }
 	if magic != app_protocol_magic || version != app_protocol_version
+		|| state_flags & ~app_state_hide_cursor != 0
+		|| (state_flags != 0 && features & app_feature_capture_cursor == 0)
 		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.desktop_service_reply)
 		|| payload_length < 0 || payload_length > app_protocol_max_payload {
 		return error('invalid application request')
@@ -842,7 +854,7 @@ fn send_app_response(fd int, ok bool, state AppWireState, payload []u8) bool {
 	wire_put_u8(mut header, app_protocol_version)
 	wire_put_u8(mut header, if ok { u8(0) } else { u8(1) })
 	wire_put_u8(mut header, app_features)
-	wire_put_u8(mut header, 0)
+	wire_put_u8(mut header, if state.capture_request.hide_cursor { app_state_hide_cursor } else { u8(0) })
 	wire_put_state(mut header, state)
 	wire_put_u32(mut header, u32(payload.len))
 	written := header.len == app_response_header_size
@@ -921,11 +933,13 @@ fn receive_app_response_with_timeout(fd int, timeout_ms int) !AppReply {
 	version := reader.take_u8()!
 	status := reader.take_u8()!
 	features := reader.take_u8()!
-	reader.take_u8()!
-	state := wire_take_state(mut reader)!
+	state_flags := reader.take_u8()!
+	state := wire_take_state_flags(mut reader, state_flags)!
 	payload_length := int(reader.take_u32()!)
 	unsafe { header.free() }
 	if magic != app_protocol_magic || version != app_protocol_version || status > 1
+		|| state_flags & ~app_state_hide_cursor != 0
+		|| (state_flags != 0 && features & app_feature_capture_cursor == 0)
 		|| payload_length < 0 || payload_length > app_protocol_max_payload {
 		return error('invalid application response')
 	}
