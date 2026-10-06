@@ -1,9 +1,44 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import ui2
+
 #include "@VMODROOT/heap_tracker.h"
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+
+fn test_disk_usage_capacity_read_views_reports_and_refresh_do_not_retain_heap() {
+	previous := desktop_language
+	defer { set_desktop_language(previous) }
+	mut app := DiskUsageApp{capacity_view: true}
+	for language in [DesktopLanguage.en, .es, .ru]! {
+		set_desktop_language(language)
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 880, 546))!)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		app.scanner.capacity = disk_usage_read_capacity('/')
+		for language in [DesktopLanguage.en, .es, .ru]! {
+			set_desktop_language(language)
+			for size in [ui2.rect(0, 0, 880, 546), ui2.rect(0, 0, 400, 250), ui2.rect(0, 0, 180, 96)]! {
+				begin_frame_elements()
+				free_tree(app.build(size)!)
+			}
+		}
+		data := app.scanner.report_csv()
+		unsafe { data.free() }
+		app.scanner.capacity = disk_usage_read_capacity('/vinix-capacity-missing')
+		assert !app.scanner.capacity.valid
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 400, 250))!)
+		missing := app.scanner.report_csv()
+		unsafe { missing.free() }
+	}
+	app.close_app()
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
 
 fn test_activity_csv_repeated_exports_release_every_formatting_allocation() {
 	monitor := ActivityMonitor{

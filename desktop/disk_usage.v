@@ -238,6 +238,7 @@ mut:
 	seen_dirs   DiskUsageIdentitySet
 	seen_links  DiskUsageIdentitySet
 	total_bytes u64
+	capacity    DiskUsageCapacity
 	files       u64
 	directories u64
 	unreadable  u64
@@ -257,6 +258,7 @@ fn (mut s DiskUsageScanner) begin(path string) {
 	s.reset()
 	unsafe { s.root.free() }
 	s.root = next
+	s.capacity = disk_usage_read_capacity(s.root)
 	s.seen_dirs.reset()
 	s.seen_links.reset()
 	s.started_ms = desktop_monotonic_ms()
@@ -417,6 +419,7 @@ fn (mut s DiskUsageScanner) reset() {
 	s.files_rank.release()
 	s.dirs_rank.release()
 	s.total_bytes = 0
+	s.capacity = DiskUsageCapacity{}
 	s.files = 0
 	s.directories = 0
 	s.unreadable = 0
@@ -612,6 +615,8 @@ const disk_usage_action_dirs_back = 'disk_usage.dirs.back'
 const disk_usage_action_dirs_next = 'disk_usage.dirs.next'
 const disk_usage_action_files_back = 'disk_usage.files.back'
 const disk_usage_action_files_next = 'disk_usage.files.next'
+const disk_usage_action_inventory = 'disk_usage.view.inventory'
+const disk_usage_action_capacity = 'disk_usage.view.capacity'
 
 // The scopes the standalone program's Whole disk and Home buttons stand for,
 // plus the one directory on a Vinix image that is worth a button of its own.
@@ -651,6 +656,7 @@ mut:
 	focus           DiskUsageFocus
 	path_select_all bool
 	report_status   string
+	capacity_view   bool
 }
 
 fn open_disk_usage(mut _ Desktop) !NativeApp {
@@ -703,6 +709,16 @@ fn (mut a DiskUsageApp) scan(path string) {
 
 fn (mut a DiskUsageApp) handle(event_id string) ! {
 	match event_id {
+		disk_usage_action_inventory {
+			a.capacity_view = false
+			a.focus = .none_
+			return
+		}
+		disk_usage_action_capacity {
+			a.capacity_view = true
+			a.focus = .none_
+			return
+		}
 		disk_usage_action_root {
 			a.focus = .root
 			a.path_select_all = true
@@ -1013,6 +1029,7 @@ fn (a &DiskUsageApp) panel(title string, ranking &DiskUsageRanking, page int, ro
 }
 
 fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
+	if a.capacity_view { return a.build_capacity(size) }
 	if a.scanner.phase == .failed && a.scanner.error_language != desktop_language {
 		a.scanner.word_error()
 	}
@@ -1091,6 +1108,7 @@ fn (mut a DiskUsageApp) build(size ui2.Rect) !ui2.Element {
 		disk_usage_pad + 62, 104, inner - 148, a.focus == .report)
 	children << disk_usage_button(disk_usage_action_export, tr('disk_usage.button.export'),
 		width - disk_usage_pad - 78, 104, 78, !scanning && a.scanner.phase != .failed)
+	a.view_buttons(mut children, 130)
 
 	// The hairline under the controls is the whole progress display: a walk
 	// cannot know how much is left, so it says only that it is moving.
@@ -1274,6 +1292,14 @@ fn (s &DiskUsageScanner) report_csv() []u8 {
 	disk_usage_csv_row(mut out, 'file_count', '', s.files)
 	disk_usage_csv_row(mut out, 'directory_count', '', s.directories)
 	disk_usage_csv_row(mut out, 'skipped_count', '', s.unreadable)
+	if s.capacity.valid {
+		disk_usage_csv_row(mut out, 'filesystem_total', s.root, s.capacity.total)
+		disk_usage_csv_row(mut out, 'filesystem_used', s.root, s.capacity.used)
+		disk_usage_csv_row(mut out, 'filesystem_free', s.root, s.capacity.free)
+		disk_usage_csv_row(mut out, 'filesystem_available', s.root, s.capacity.available)
+	} else {
+		disk_usage_csv_row(mut out, 'filesystem_capacity_unavailable', s.root, 0)
+	}
 	for entry in s.dirs_rank.entries {
 		disk_usage_csv_row(mut out, 'directory', entry.path, entry.bytes)
 	}
