@@ -126,6 +126,11 @@ in ARM and x86 QEMU using `run-ctl-vm.py --arch aarch64|x86_64
 --kernel-dir <isolated-kernel> --state-dir <new-directory>`. These fixtures
 check control messages, polling, terminal restoration, credential wiping and
 file validation; physical firmware/association remain unverified.
+The device model and guest controller now live in `ctlfixture/` as V; all
+33 original assertions and 11 scenarios remain. `run-control.py` compares
+exit codes, stdout and stderr with the immutable original C fixture on both
+host ABIs, then builds and runs the complete native model guest. The native
+`open`/`ioctl` entry adapter contains only ABI instructions.
 
 ## Firmware and association
 
