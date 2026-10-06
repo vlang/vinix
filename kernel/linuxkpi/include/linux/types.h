@@ -37,6 +37,7 @@ typedef u16 __be16;
 typedef u32 __be32;
 typedef u64 __be64;
 typedef unsigned int gfp_t;
+#define pgoff_t unsigned long
 typedef u64 phys_addr_t;
 typedef u64 dma_addr_t;
 typedef u64 resource_size_t;
