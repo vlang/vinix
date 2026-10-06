@@ -81,6 +81,13 @@ fn main() {
 		check_utility_document_clients(mut desktop)
 		return
 	}
+	if arguments().contains('--utility-recovery-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_recovery_clients(mut desktop)
+		return
+	}
 	// Standalone applications receive their pipe descriptors through the
 	// environment, leaving argv empty for applications that open argv[1].
 	if os.getenv('VINIX_RESPONSE_FD') != '' {
@@ -341,6 +348,7 @@ fn main() {
 	check_productivity_utility_clients(mut desktop)
 	check_current_utility_workflow_clients(mut desktop)
 	check_utility_document_clients(mut desktop)
+	check_utility_recovery_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -434,6 +442,35 @@ fn check_utility_document_clients(mut desktop Desktop) {
 	println('IPC utility document workflows passed')
 }
 
+fn check_utility_recovery_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	mut canonical := [4096]u8{}
+	assert unsafe { C.realpath(&char(temporary.str), &char(&canonical[0])) } != unsafe { nil }
+	unsafe { temporary.free() }
+	mut length := 0
+	for length < canonical.len && canonical[length] != 0 { length++ }
+	assert length > 0 && length < canonical.len
+	base := unsafe { tos(&canonical[0], length) }.clone()
+	pid := os.getpid().str()
+	name := 'vinix-recovery-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_preview_crop_recovery_client(home, mut desktop, true)
+	check_hyperbolic_calculator_client(mut desktop)
+	check_calendar_search_client(home, mut desktop)
+	check_disk_usage_capacity_client(home, mut desktop)
+	println('IPC utility recovery workflows passed')
+}
+
 fn integration_tree_enabled(element ui2.Element, id string) bool {
 	if element.id == id { return element.enabled }
 	for child in element.children {
@@ -443,14 +480,35 @@ fn integration_tree_enabled(element ui2.Element, id string) bool {
 }
 
 fn check_preview_crop_client(home string, mut desktop Desktop) {
+	check_preview_crop_recovery_client(home, mut desktop, false)
+}
+
+fn integration_assert_same_image_pixels(path string, expected_path string, width int, height int) {
+	bytes := os.read_bytes(path) or { panic(err) }
+	expected_bytes := os.read_bytes(expected_path) or { panic(err) }
+	defer { unsafe { bytes.free(); expected_bytes.free() } }
+	mut actual_dimensions := [3]int{}
+	mut expected_dimensions := [3]int{}
+	pixels := unsafe { C.stbi_load_from_memory(bytes.data, bytes.len, &actual_dimensions[0], &actual_dimensions[1], &actual_dimensions[2], 4) }
+	expected := unsafe { C.stbi_load_from_memory(expected_bytes.data, expected_bytes.len, &expected_dimensions[0], &expected_dimensions[1], &expected_dimensions[2], 4) }
+	assert pixels != unsafe { nil } && expected != unsafe { nil }
+	defer { C.stbi_image_free(pixels); C.stbi_image_free(expected) }
+	assert actual_dimensions[0] == width && actual_dimensions[1] == height
+	assert expected_dimensions[0] == width && expected_dimensions[1] == height
+	for index in 0 .. width * height * 4 { assert unsafe { pixels[index] } == unsafe { expected[index] } }
+}
+
+fn check_preview_crop_recovery_client(home string, mut desktop Desktop, recovery bool) {
 	// An independent 4x3 RGBA PNG has different colors in every row and column.
 	image := base64.decode('iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAN0lEQVR4nA3IsQ0AIAgAQRtDoqDjMAWDMA8lw75eeWPKwmWTorQYY8bGQ8kwOs6PUryMrEPX5QG/NBPnu9fREQAAAABJRU5ErkJggg==')
 	path := system_information_join_path(home, 'crop-日本語.png')
 	export_path := system_information_join_path(home, 'cropped-Ж.png')
 	original_path := system_information_join_path(home, 'crop-original.png')
+	undo_path := system_information_join_path(home, 'crop-undone.png')
+	redo_path := system_information_join_path(home, 'crop-redone.png')
 	open_action := jump_open_prefix + path
 	defer { unsafe {
-		image.free(); path.free(); export_path.free(); original_path.free(); open_action.free()
+		image.free(); path.free(); export_path.free(); original_path.free(); undo_path.free(); redo_path.free(); open_action.free()
 	} }
 	os.write_file_array(path, image) or { panic(err) }
 	factory := app_factory_named('vinix-preview') or { panic('Preview is not registered') }
@@ -484,21 +542,271 @@ fn check_preview_crop_client(home string, mut desktop Desktop) {
 	integration_assert_image_size(export_path, 2, 2)
 	bytes := os.read_bytes(export_path) or { panic(err) }
 	defer { unsafe { bytes.free() } }
-	mut width := 0
-	mut height := 0
-	mut channels := 0
-	pixels := C.stbi_load_from_memory(bytes.data, bytes.len, &width, &height, &channels, 4)
+	mut dimensions := [3]int{}
+	pixels := unsafe { C.stbi_load_from_memory(bytes.data, bytes.len, &dimensions[0], &dimensions[1], &dimensions[2], 4) }
 	assert pixels != unsafe { nil }
 	defer { C.stbi_image_free(pixels) }
-	assert width == 2 && height == 2
+	assert dimensions[0] == 2 && dimensions[1] == 2
 	expected := [u8(55), 77, 12, 255, 105, 77, 13, 255, 55, 147, 13, 255, 105, 147, 14, 255]!
 	for index, byte in expected { assert unsafe { pixels[index] } == byte }
+	if recovery {
+		ready := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+		assert integration_tree_enabled(ready, preview_action_undo_crop)
+		free_tree(ready)
+		if mut app is RemoteApp { app.key_input('\x1a') }
+		undone := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+		assert tree_contains_text(undone, '4 × 3 px')
+		assert tree_contains_text(undone, 'Crop undone. Redo restores it.')
+		assert integration_tree_enabled(undone, preview_action_redo_crop)
+		assert !integration_tree_enabled(undone, preview_action_undo_crop)
+		free_tree(undone)
+		storage_remote_field(mut app, preview_action_export_path, undo_path)
+		app.handle(preview_action_export_png) or { panic(err) }
+		integration_assert_same_image_pixels(undo_path, path, 4, 3)
+		if mut app is RemoteApp { app.key_input('\x19') }
+		redone := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+		assert tree_contains_text(redone, '2 × 2 px')
+		assert tree_contains_text(redone, 'Crop restored. Export PNG to save.')
+		assert integration_tree_enabled(redone, preview_action_undo_crop)
+		assert !integration_tree_enabled(redone, preview_action_redo_crop)
+		free_tree(redone)
+		storage_remote_field(mut app, preview_action_export_path, redo_path)
+		app.handle(preview_action_export_png) or { panic(err) }
+		integration_assert_same_image_pixels(redo_path, export_path, 2, 2)
+	}
 	storage_remote_field(mut app, preview_action_export_path, original_path)
 	app.handle(preview_action_export_copy) or { panic(err) }
 	original := os.read_bytes(original_path) or { panic(err) }
 	defer { unsafe { original.free() } }
 	assert original == image
-	println('IPC Preview pointer selection, exact 2x2 crop, PNG and original bytes passed')
+	println(if recovery { 'IPC Preview crop, Undo/Redo, exact original/cropped PNG pixels and source bytes passed' }
+		else { 'IPC Preview pointer selection, exact 2x2 crop, PNG and original bytes passed' })
+}
+
+fn integration_tree_element(element ui2.Element, id string) ?ui2.Element {
+	if element.id == id || element.action_id == id { return element }
+	for child in element.children {
+		if found := integration_tree_element(child, id) { return found }
+	}
+	return none
+}
+
+fn check_hyperbolic_calculator_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('calculator.mode.scientific') or { panic(err) }
+	actions := ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+		'calculator.scientific.tanh', 'calculator.scientific.asinh',
+		'calculator.scientific.acosh', 'calculator.scientific.atanh']!
+	inputs := ['1', '-1', '1', '-1', '2', '-.5']!
+	expected := [1.1752011936438014, 1.5430806348152437, .7615941559557649,
+		-.881373587019543, 1.3169578969248166, -.5493061443340548]!
+	mut degrees := [6]f64{}
+	for angular_mode, angle in ['calculator.angle.degrees', 'calculator.angle.radians']! {
+		app.handle(angle) or { panic(err) }
+		for index, action in actions {
+			app.handle('C') or { panic(err) }
+			if mut app is RemoteApp { app.paste_input(inputs[index]) }
+			controls := app.build(ui2.rect(0, 0, 540, 430)) or { panic(err) }
+			control := integration_tree_element(controls, action) or { panic('missing serialized hyperbolic control') }
+			assert control.kind == .button && control.text == tr(action)
+			assert control.frame.width == 52 && control.frame.y + control.frame.height <= 410
+			app.handle(if control.action_id.len > 0 { control.action_id } else { control.id }) or { panic(err) }
+			free_tree(controls)
+			result := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+			text := integration_tree_text(result, 'display') or { panic('missing hyperbolic result') }
+			assert math.abs(text.f64() - expected[index]) < 1e-14
+			assert !tree_contains_text(result, '[DEG]') && !tree_contains_text(result, '[RAD]')
+			if angular_mode == 0 { degrees[index] = text.f64() }
+			else { assert text.f64() == degrees[index] }
+			free_tree(result)
+		}
+	}
+	for index, action in ['calculator.scientific.acosh', 'calculator.scientific.atanh',
+		'calculator.scientific.atanh', 'calculator.scientific.sinh']! {
+		app.handle('C') or { panic(err) }
+		if mut app is RemoteApp { app.paste_input(['0', '1', '-1', '711']![index]) }
+		app.handle(action) or { panic(err) }
+		integration_calculator_display(mut app, tr('calculator.error'))
+		integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr(if index < 3 {
+			'calculator.error.domain'
+		} else { 'calculator.error.nonfinite' }))
+		if mut app is RemoteApp { app.key_input('7') }
+		integration_calculator_display(mut app, '7')
+	}
+	for action in ['calculator.scientific.sinh', 'calculator.scientific.cosh']! {
+		app.handle('C') or { panic(err) }
+		if mut app is RemoteApp { app.paste_input('710') }
+		app.handle(action) or { panic(err) }
+		result := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+		text := integration_tree_text(result, 'display') or { panic('missing large hyperbolic result') }
+		assert math.is_finite(text.f64()) && math.abs(text.f64() / 1.1169973830808557e308 - 1) < 1e-14
+		free_tree(result)
+	}
+	app.handle('C') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('2+0') }
+	app.handle('calculator.scientific.cosh') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('==') }
+	integration_calculator_display(mut app, '4')
+	app.handle('calculator.mode.programmer') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('0xFF'); app.key_input('+1=') }
+	app.handle('calculator.mode.scientific') or { panic(err) }
+	integration_calculator_display(mut app, '4')
+	app.handle('C') or { panic(err) }
+	app.handle('calculator.scientific.cosh') or { panic(err) }
+	app.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, '1')
+	println('IPC Calculator six hyperbolic controls, angular independence, domains, finite boundary and state passed')
+}
+
+fn check_calendar_search_client(home string, mut desktop Desktop) {
+	store := system_information_join_path(home, calendar_events_filename)
+	defer { unsafe { store.free() } }
+	// Store order deliberately differs from chronological results, including
+	// all-day/timed events and equal-time records that must retain their order.
+	record := 'VINIX-CALENDAR 1\n2031\t3\t4\t600\tIPC 日本語 meeting late\tCafé Ж north\n2030\t2\t3\t600\tIPC 日本語 meeting timed\tCafé Ж north\n2030\t2\t3\t-1\tIPC 日本語 meeting all-day\tCafé Ж north\n2029\t12\t31\t540\tIPC 日本語 meeting early\tCafé Ж north\n2030\t2\t3\t600\tIPC 日本語 meeting tied\tCafé Ж north\n2030\t2\t2\t-1\tUnmatched event\tElsewhere\n'
+	os.write_file(store, record) or { panic(err) }
+	factory := app_factory_named('vinix-calendar') or { panic('Calendar is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	query := '日本語 cafe ж'
+	if mut app is RemoteApp { assert app.keyboard && app.polling; app.key_input('\x06'); app.paste_input(query) }
+	results := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+	assert (integration_tree_text(results, 'calendar.search') or { panic('missing Calendar search') }) == query
+	assert tree_contains_text(results, '5 matching events')
+	for row, action in ['calendar.event.row.3', 'calendar.event.row.2',
+		'calendar.event.row.1', 'calendar.event.row.4', 'calendar.event.row.0']! {
+		control := integration_tree_element(results, action) or { panic('missing chronological result') }
+		assert control.frame.y == f64(142 + row * 60)
+	}
+	assert !tree_has_id(results, 'calendar.event.row.5')
+	assert tree_contains_text(results, '2029-12-31') && tree_contains_text(results, '2031-03-04')
+	free_tree(results)
+	app.handle('calendar.event.row.0') or { panic(err) }
+	editor := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+	date := date_long_text(2031, 3, 4, calendar_weekday(2031, 3, 4))
+	assert tree_contains_text(editor, date)
+	unsafe { date.free() }
+	assert tree_contains_text(editor, 'IPC 日本語 meeting late') && tree_contains_text(editor, '10:00')
+	assert tree_contains_text(editor, 'Café Ж north') && tree_has_id(editor, 'calendar.event.save')
+	free_tree(editor)
+	storage_remote_field(mut app, 'calendar.event.title', 'IPC 日本語 meeting late edited')
+	app.handle('calendar.event.save') or { panic(err) }
+	persisted := os.read_file(store) or { panic(err) }
+	defer { unsafe { persisted.free() } }
+	mut model := calendar_parse_events(persisted) or { panic('damaged saved Calendar record') }
+	assert model.count == 6 && model.items[0].year == 2031 && model.items[0].month == 3 && model.items[0].day == 4
+	assert model.items[0].minutes == 600 && model.items[0].title == 'IPC 日本語 meeting late edited'
+	model.free_items()
+	saved := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+	assert (integration_tree_text(saved, 'calendar.search') or { panic('lost Calendar search after save') }) == query
+	assert tree_contains_text(saved, 'IPC 日本語 meeting late edited')
+	free_tree(saved)
+	// One visible result makes actual paging observable over fragmented requests.
+	free_tree(app.build(ui2.rect(0, 0, 400, 210)) or { panic(err) })
+	if mut app is RemoteApp { app.key_input('\x1b'); app.key_input('['); app.key_input('6~') }
+	next := app.build(ui2.rect(0, 0, 400, 210)) or { panic(err) }
+	assert (integration_tree_text(next, 'calendar.search') or { panic('missing paged query') }) == query
+	assert tree_has_id(next, 'calendar.event.row.2') && !tree_has_id(next, 'calendar.event.row.3')
+	free_tree(next)
+	if mut app is RemoteApp { app.key_input('\x1bO'); app.key_input('B') }
+	ss3 := app.build(ui2.rect(0, 0, 400, 210)) or { panic(err) }
+	assert (integration_tree_text(ss3, 'calendar.search') or { panic('missing SS3 query') }) == query
+	assert tree_has_id(ss3, 'calendar.event.row.1') && !tree_has_id(ss3, 'calendar.event.row.2')
+	free_tree(ss3)
+	if mut app is RemoteApp { app.key_input('\x1b') }
+	mut escaped := false
+	for _ in 0 .. 100 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+		escaped = !tree_has_id(tree, 'calendar.search.back') && tree_has_id(tree, calendar_action_today)
+		free_tree(tree)
+		if escaped { break }
+		desktop_sleep_ms(20)
+	}
+	assert escaped
+	if mut app is RemoteApp { app.key_input('\x06'); app.paste_input('no-match-Ж😀-987654') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 740, 520), tr('calendar.search.empty'))
+	app.handle('calendar.search.clear') or { panic(err) }
+	month := app.build(ui2.rect(0, 0, 740, 520)) or { panic(err) }
+	assert !tree_has_id(month, 'calendar.search.back') && tree_has_id(month, calendar_action_today)
+	free_tree(month)
+	println('IPC Calendar Unicode token search, chronological dates, saved editor navigation, fragmented paging and Escape passed')
+}
+
+fn integration_csv_counter(record string, kind string) ?u64 {
+	mut start := 0
+	for end in 0 .. record.len + 1 {
+		if end < record.len && record[end] != `\n` { continue }
+		line := calendar_borrow(record, start, end)
+		if line.len > kind.len && line.starts_with(kind) && line[kind.len] == `,` {
+			mut separator := line.len - 1
+			for separator > 0 && line[separator] != `,` { separator-- }
+			value := calendar_borrow(line, separator + 1, line.len)
+			if value.len == 0 { return none }
+			for byte in value { if !byte.is_digit() { return none } }
+			return value.u64()
+		}
+		start = end + 1
+	}
+	return none
+}
+
+fn check_disk_usage_capacity_client(home string, mut desktop Desktop) {
+	root := system_information_join_path(home, 'capacity-Ж')
+	file := system_information_join_path(root, 'five-bytes.txt')
+	path := system_information_join_path(home, 'capacity.csv')
+	missing := system_information_join_path(home, 'capacity-missing')
+	defer { unsafe { root.free(); file.free(); path.free(); missing.free() } }
+	os.mkdir(root) or { panic(err) }
+	os.write_file(file, '12345') or { panic(err) }
+	expected := disk_usage_read_capacity(root)
+	assert expected.valid
+	factory := app_factory_named('vinix-disk-usage') or { panic('Disk Usage is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	storage_remote_field(mut app, disk_usage_action_root, root)
+	app.handle(disk_usage_action_scan_path) or { panic(err) }
+	for _ in 0 .. 100 {
+		if mut app is RemoteApp { app.poll() }
+	}
+	storage_remote_field(mut app, disk_usage_action_report_path, path)
+	app.handle(disk_usage_action_export) or { panic(err) }
+	saved_report := tr_fill('disk_usage.report.saved', path)
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 546), saved_report)
+	unsafe { saved_report.free() }
+	record := os.read_file(path) or { panic(err) }
+	defer { unsafe { record.free() } }
+	assert (integration_csv_counter(record, 'root') or { panic('missing logical root bytes') }) == 5
+	assert (integration_csv_counter(record, 'file_count') or { panic('missing file count') }) == 1
+	total := integration_csv_counter(record, 'filesystem_total') or { panic('missing filesystem total') }
+	used := integration_csv_counter(record, 'filesystem_used') or { panic('missing filesystem used') }
+	free := integration_csv_counter(record, 'filesystem_free') or { panic('missing filesystem free') }
+	available := integration_csv_counter(record, 'filesystem_available') or { panic('missing filesystem available') }
+	assert total == expected.total && total > 5 && used <= total && free == total - used && available <= free
+	app.handle(disk_usage_action_capacity) or { panic(err) }
+	for size in [ui2.rect(0, 0, 880, 546), ui2.rect(0, 0, 400, 250)]! {
+		capacity := app.build(size) or { panic(err) }
+		assert tree_has_id(capacity, disk_usage_action_inventory) && tree_has_id(capacity, disk_usage_action_capacity)
+		for key in ['disk_usage.capacity.total', 'disk_usage.capacity.used',
+			'disk_usage.capacity.free', 'disk_usage.capacity.available']! { assert tree_contains_text(capacity, tr(key)) }
+		for value in [total, used, free, available]! {
+			formatted := disk_usage_size_text(value)
+			assert tree_contains_text(capacity, formatted)
+			unsafe { formatted.free() }
+		}
+		free_tree(capacity)
+	}
+	app.handle(disk_usage_action_inventory) or { panic(err) }
+	storage_remote_field(mut app, disk_usage_action_root, missing)
+	app.handle(disk_usage_action_scan_path) or { panic(err) }
+	app.handle(disk_usage_action_capacity) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 250), tr('disk_usage.capacity.unavailable'))
+	println('IPC Disk Usage filesystem cards and raw CSV snapshot distinct from five inventory bytes, unavailable root passed')
 }
 
 fn integration_grapher_chart_signature(element ui2.Element) ?u64 {
@@ -692,11 +1000,9 @@ fn integration_terminal_cells(text string, end int) int {
 fn integration_assert_image_size(path string, width int, height int) {
 	bytes := os.read_bytes(path) or { panic(err) }
 	defer { unsafe { bytes.free() } }
-	mut actual_width := 0
-	mut actual_height := 0
-	mut channels := 0
-	assert C.stbi_info_from_memory(bytes.data, bytes.len, &actual_width, &actual_height, &channels) != 0
-	assert actual_width == width && actual_height == height
+	mut dimensions := [3]int{}
+	assert unsafe { C.stbi_info_from_memory(bytes.data, bytes.len, &dimensions[0], &dimensions[1], &dimensions[2]) } != 0
+	assert dimensions[0] == width && dimensions[1] == height
 }
 
 fn check_preview_orientation_client(home string, mut desktop Desktop) {
