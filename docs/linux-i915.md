@@ -63,6 +63,11 @@ after a filesystem failure. Mutable build inputs still require isolation.
   aligned types have one owner, avoiding duplicate GNU99 typedefs and include
   order conflicts. Linux page ownership, descriptor/PFN services and runtime
   page-table geometry bindings remain unresolved.
+- Generated x86 `asm/early_ioremap.h` and `asm/kmap_size.h` wrappers forward
+  to the original generic headers selected by the pinned Kbuild. Mapping
+  references retain their genuine unresolved symbols; no early-MMIO, fixmap or
+  kmap runtime is supplied. Configuration-disabled initialization follows the
+  original inline behavior.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -585,6 +590,7 @@ incomplete.
 ```sh
 tests/linuxkpi/run.sh
 python3 tests/linuxkpi/nocache_test.py
+python3 tests/linuxkpi/asm_generated_headers_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1218,19 +1224,30 @@ all compiler jobs. The same private include tree now contains genuine
 compiler-derived bounds. Regression tests cover repeated real compilation,
 invalid metadata and bounds-compiler rejection before driver compilation.
 The latest isolated report is
-`/tmp/vinix-linuxkpi-compiler-next-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
+`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
 `i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
 syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
 blockers are cleared. The report uses committed baseline `27aaf760` plus the
-owned bounds/type/scope/declaration overlays, rather than other sessions'
+owned bounds/type/scope/declaration/nocache/wrapper overlays, rather than other sessions'
 changing metadata. Original page-table types and static-key declarations clear
 their prior first errors. Leading first errors now include `rcu_read_lock` in
-199 units, RCU pointer APIs, missing `asm/early_ioremap.h` and
+199 units, RCU pointer APIs, missing `asm/mmiowb.h` and
 `call_single_data_t`. These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
+
+Generated-wrapper validation executes the actual pinned Kbuild scripts and
+compiles twelve strict GNU99/GNU11 objects with genuine private bounds and ABI
+headers. Declaration-only objects emit no symbols; mapping consumers import
+exactly the six original services. The extra original-header configuration
+retains all four initializer/copy externs. Independent replay produces identical
+objects and wrappers. The isolated enabled kernel links; its native V C/object
+are byte-identical to the fully passed nocache ELF. No guest boot is claimed for
+the separately linked wrapper ELF. These compiler checks supply no mapping or
+cache runtime. Evidence:
+`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-final-validation.json`.
 
 Bounds checks compile four real GNU99/GNU11 profiles against the original
 enums and `sizeof` values, reject eleven invalid or changing-input cases,

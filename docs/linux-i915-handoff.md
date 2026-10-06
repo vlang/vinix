@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`0e35bb9a`** (task-owned fault controls, resident-only copies, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
+Committed implementation baseline: **`e393312a`** (resident non-temporal copies, task-owned fault controls, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `e393312a` | Resident non-temporal user copies, exact page prefixes, completion fences and measured mapping lifetimes |
 | `0e35bb9a` | Generic checked user-access scopes and `unsafe_put_user` cleanup control flow |
 | `376b5d66` | Genuine typed static-key extern declarations, preserving existing boolean branches |
 | `a88dcea7` | Original page-table/UAPI type representations and five-level-capable compiler profile |
@@ -547,7 +548,7 @@ stamps. `CONFIG_MMU=1` matches native paging. The five-level-capable type profil
 is committed in `a88dcea7`, with original UAPI aliases and annotations rather
 than duplicate typedefs. Linux page ownership, PFN/descriptor services and
 runtime geometry globals remain unresolved. Latest frozen syntax report:
-`/tmp/vinix-linuxkpi-compiler-next-oct06-frozen-audit-report.json`, **4/269**,
+`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-frozen-audit-report.json`, **4/269**,
 expected exit 1. Original page-table types and static-key declarations clear
 prior first errors; 199 units first fail on `rcu_read_lock`, followed by RCU
 pointer APIs, `asm/early_ioremap.h` and `call_single_data_t`.
@@ -602,6 +603,14 @@ and disabled ARM builds/startup pass. Host GNU99/GNU11 checks each pass
 25,299,139 sanitizer assertions; actual generated C, optimized object and linked
 ELF receive independent lifetime/ordering review. Tests use ordinary RAM, not a
 GPU aperture. Evidence: `/tmp/vinix-linuxkpi-nocache-oct06-final-validation.json`.
+
+Generated x86 early-ioremap/kmap wrappers now forward to genuine headers
+selected by the original Kbuild. Actual pinned wrapper generation, twelve
+strict object probes and independent byte-identical replays pass. Real mapping
+symbols remain unresolved. Enabled compiler-only integration links and retains
+the passed nocache V C/object exactly; its separately linked ELF has no new
+guest-boot claim. Evidence:
+`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-final-validation.json`.
 
 ## Bound and high-priority contracts
 
