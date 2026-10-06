@@ -52,6 +52,7 @@
 #include "touchfixture-api.h"
 #include "restartfixture-api.h"
 #include "nanosleepfixture-api.h"
+#include "blockedfixture-api.h"
 #line 51 "test.c"
 
 #define CHECK(expression) do {                                               \
@@ -430,44 +431,7 @@ static int test_forked_cow_memory_reclamation(void)
 	return 0;
 }
 #line 671 "test.c"
-static void *block_in_read(void *argument)
-{
-	int fd = *(int *)argument;
-	char byte;
-	read(fd, &byte, 1);
-	return NULL;
-}
-
-/* A process with a thread asleep in the kernel still ends when another of its
- * threads calls exit_group(2), and still execs: the sleeper is told to go and
- * woken, leaves through its syscall's exit, and the status the caller gave is
- * the one wait() reports. */
-static int test_exit_takes_down_blocked_threads(void)
-{
-	for (int exec_instead = 0; exec_instead < 2; exec_instead++) {
-		pid_t child = fork();
-		CHECK(child >= 0);
-		if (child == 0) {
-			static int channel[2];
-			if (pipe(channel) != 0)
-				_exit(2);
-			pthread_t sleeper;
-			if (pthread_create(&sleeper, NULL, block_in_read, &channel[0]) != 0)
-				_exit(3);
-			struct timespec settle = { .tv_sec = 0, .tv_nsec = 100000000 };
-			nanosleep(&settle, NULL);
-			if (exec_instead) {
-				char *const argv[] = {"/sbin/init", "--exec-memory-probe", NULL};
-				execv(argv[0], argv);
-				_exit(4);
-			}
-			_exit(0);
-		}
-		CHECK(reap_ok(child) == 0);
-	}
-	puts("QEMU CORE PASS: exit and exec take down threads blocked in the kernel");
-	return 0;
-}
+#line 709 "test.c"
 
 #line 744 "test.c"
 

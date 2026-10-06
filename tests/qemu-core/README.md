@@ -33,11 +33,11 @@ V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
 tests/qemu-core/run.sh amd64
 ```
 
-The signal-disposition, first-touch, interrupted-read and nanosleep-remainder
-fixtures are compiled from `signalfixture`, `touchfixture`, `restartfixture`
-and `nanosleepfixture` V modules. The normal
+The signal-disposition, first-touch, interrupted-read, nanosleep-remainder and
+blocked-thread exit/exec fixtures are compiled from `signalfixture`,
+`touchfixture`, `restartfixture`, `nanosleepfixture` and `blockedfixture` V modules. The normal
 builder generates their ephemeral C and declaration headers outside the
-checkout and links them with the remaining test program. All 70 original
+checkout and links them with the remaining test program. All 72 original
 `CHECK` sites keep their predicates and logical source line numbers; the shared
 `reap_ok` body remains unchanged.
 
@@ -51,6 +51,7 @@ python3 tests/qemu-core/test-signalfixture.py /tmp/qemu-signal --arch arm64
 python3 tests/qemu-core/test-touchfixture.py /tmp/qemu-touch --arch arm64
 python3 tests/qemu-core/test-restartfixture.py /tmp/qemu-restart --arch arm64
 python3 tests/qemu-core/test-nanosleepfixture.py /tmp/qemu-nanosleep --arch arm64
+python3 tests/qemu-core/test-blockedfixture.py /tmp/qemu-blocked --arch arm64
 ```
 
 The host touch comparison uses real mappings, forks, pipes, protection and
@@ -79,4 +80,9 @@ fork count, so matching original `QEMU CORE FAIL` diagnostics are expected for
 those inputs. The final differential verdict and assertions determine success.
 The nanosleep comparison also injects `EIO` at signal registration and `EAGAIN`
 at fork, then compares its original checks, return value, errno and API counts.
+The blocked-thread comparison retains real blocked reads, process exit and exec,
+the original 100-ms settle and unchanged exec-memory probe. Six independent cases
+compare fork/pipe/thread/exec failure statuses as well as return values and errno.
+On the host, only Linux auxv inputs and the executable path are supplied by the
+provider; native guests use actual `/sbin/init`, `/proc/self/auxv` and `getauxval`.
 These bounded comparisons supplement the full feature and persistence runner.
