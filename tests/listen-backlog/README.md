@@ -1,6 +1,6 @@
 # Linux listen backlog regression
 
-`probe.c` exercises the backlog values used by Linux applications, including
+`backlogfixture/core.v` exercises the backlog values used by Linux applications, including
 Rust's `listen(fd, -1)`. Negative values and `INT_MAX` must return promptly,
 with the kernel limiting allocation to its supported maximum. Previously a
 negative value became an invalid UNIX socket queue capacity and hung startup.
@@ -13,14 +13,25 @@ It calls `listen` again with `-1` and `0` while the connection is queued, then
 accepts that connection and verifies bytes in both directions. Every descriptor
 is closed and every socket pathname removed after each case.
 
-Build a static ARM64 helper from the repository root:
+Build the static ARM64 fixture from the repository root:
 
 ```sh
-aarch64-linux-musl-gcc -std=c11 -O2 -Wall -Wextra -Werror -static \
-  tests/listen-backlog/probe.c -o /tmp/vinix-listen-backlog-probe
+CC=clang python3 tests/listen-backlog/run.py --arch aarch64 --build-only \
+  --state-dir /tmp/vinix-listen-backlog-build
 ```
 
-Copy the helper into a Vinix test guest and execute it. Success ends with:
+The runner uses the native libc declarations in `backlog-native-abi.h` and
+adds a PID1 driver that waits after the original probe returns. Run it in an
+isolated guest with a separately built kernel:
+
+```sh
+python3 tests/listen-backlog/run.py --arch aarch64 \
+  --state-dir /tmp/vinix-listen-backlog-build-2 \
+  --kernel-dir /path/to/worktree/kernel --guest-state-dir /tmp/vlb-arm
+```
+
+Use `--arch x86_64` with `CC_AMD64=x86_64-linux-musl-gcc` for the other
+architecture. Success includes:
 
 ```text
 LISTEN-BACKLOG-PASS cases=7
