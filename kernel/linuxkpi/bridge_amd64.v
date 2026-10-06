@@ -514,6 +514,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux task-local page-fault policy self-test failed')
 		}
 		C.kprintf(c'linuxkpi: task-local fault scopes, migration and resident-only user copies passed; no pages or heap objects retained\n')
+		if !nocache_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux resident non-temporal user-copy self-test failed')
+		}
+		C.kprintf(c'linuxkpi: resident non-temporal user copies, page prefixes and fences passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

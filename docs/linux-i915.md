@@ -459,7 +459,7 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `CPUID` fallback avoids speculative width or count selection after permission
   checks; it adds a serialization cost per chunk. Native vendor/feature-based
   `LFENCE` selection and broader kernel speculation mitigation remain pending.
-  Dynamic hardened usercopy checks, x86 LAM and noncached APIs remain
+  Dynamic hardened usercopy checks, x86 LAM and flush-cache variants remain
   unresolved.
 - Ordinary `get_user` and `__get_user` read 1/2/4/8-byte scalars, evaluate their
   source and output once, preserve source signedness on assignment and clear
@@ -489,6 +489,18 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `__copy_{from,to}_user_inatomic` always uses resident-only page chunks,
   returns the exact uncopied suffix and leaves that suffix untouched, including
   at task depth zero. NMI use remains unsupported.
+- `__copy_from_user_inatomic_nocache` preserves the pinned x86 unsigned
+  32-bit size and signed 32-bit residual bits. It reads only resident user
+  mappings, uses actual aligned integer `MOVNTI` stores for 4/8-byte kernel
+  destinations, and uses cached stores for page/alignment edges. Each exact
+  source load follows `CPUID` in the same assembly block; `SFENCE` completes
+  stores before each source-map unlock, including a later mapping failure.
+  The exact uncopied suffix remains untouched. It allocates nothing, resolves
+  no missing/COW pages and preserves task-fault, IRQ and preemption state.
+  Callers own accessible kernel destination storage through the synchronous
+  call. Kernel/WC destination exception and machine-check recovery, actual GPU
+  aperture mapping and physical WC validation remain pending. Protected-page
+  prefix boundaries may differ from Linux's virtual-copy exception fixups.
 - `user_access_begin` and its read/write aliases use the generic numerical
   `access_ok` check; end operations supply a compiler barrier. `unsafe_put_user`
   preserves the existing checked scalar conversion/evaluation rules and
@@ -572,6 +584,7 @@ incomplete.
 
 ```sh
 tests/linuxkpi/run.sh
+python3 tests/linuxkpi/nocache_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1309,3 +1322,26 @@ C and optimized objects received independent lifetime and ordering reviews.
 Evidence uses `/tmp/vinix-linuxkpi-pagefault-oct06-`, including
 `final-validation.json`. These measurements cover this feature and its complete
 actor lifecycle; they do not establish a global kernel allocation pass.
+
+Resident non-temporal user-copy validation uses the same isolated baseline and
+owned overlays. The saved enabled ELF
+`ebecc3ef0e7127f73cec652266dc00572e18eadf41cd88e1998c7c328e8ff783`
+passes complete four-CPU normal and SSE guests. Actual separated physical
+pages, every source/destination alignment, protected and absent suffixes,
+read-only/COW sources and eight native IRQ/preemption/fault-depth combinations
+pass. Three complete map-lifecycle warmups precede a fourth with exact physical
+free-byte and every live heap size-class equality in both guests. Default x86
+and disabled arm64 builds and Linux-ABI startup also pass.
+
+Strict GNU99/GNU11 host checks each pass 25,299,139 ASan/UBSan assertions using
+the actual V frontend and public ABI. Eight frontend, eight ABI and six primitive
+compiler profiles retain 32-bit size/result types and real integer non-temporal
+instructions; independent negative checks reject widened ABI declarations.
+Independent review of the actual saved generated C, optimized object and linked
+ELF confirms distinct assembly address operands, fences before unlocks, fixed
+stack buffers and complete map/COW cleanup without hidden V allocation. Tests
+use ordinary RAM; they establish no GPU WC-memory or display/rendering result.
+Existing partial map/fork OOM rollback remains outside this feature. The first
+compile rejected a reserved V identifier; the reviewed identifier-only correction
+and failed result are preserved. Aggregate evidence:
+`/tmp/vinix-linuxkpi-nocache-oct06-final-validation.json`.

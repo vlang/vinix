@@ -71,8 +71,11 @@ remaining counts, zero-tail semantics and bounded user-string parsers are now
 implemented, together with ordinary scalar reads and checked serialized x86
 transfers. Ordinary scalar stores, task-local fault-control nesting and resident-only
 atomic copies are implemented and validated. Checked user-write scopes and
-original page-table/UAPI type representations are committed. The current
-native `RangePageSource` already pins backing storage
+original page-table/UAPI type representations are committed. Resident
+non-temporal user copies are also implemented and validated; complete normal/SSE
+guests recover every measured page and live heap object. Actual GPU WC mapping
+and kernel destination fixups remain pending. The current native
+`RangePageSource` already pins backing storage
 and rechecks mapping identity after unlocked acquisition; the earlier proposed
 global fault-lease rewrite was not applied.
 
@@ -448,8 +451,9 @@ backing pin and DRM retain/release callbacks under `pagemap.l` that invert the
 virtio file-lock order. Virtio command submission can also demand-fault while
 holding the backing lock. Ordinary copies do not resolve those existing driver
 lock cycles. Ordinary scalar stores, task-owned fault controls, resident-only
-atomic copies and checked write scopes are now implemented. Noncached user-copy
-validation is in progress; it is not a committed native feature yet.
+atomic copies and checked write scopes are now implemented. Resident non-temporal
+user copies are implemented and validated in complete fresh normal/SSE guests.
+Actual GPU WC mappings and hardware validation remain pending.
 
 The 2026-10-06 user-copy validation is isolated at `bea41f8e` with recorded
 feature hashes and a frozen compiler. Host copy/parser checks pass 6,440
@@ -586,6 +590,18 @@ byte-for-byte; no full guest boot is claimed for this separately linked ELF.
 Aggregate evidence: `/tmp/vinix-linuxkpi-compiler-next-oct06-final-validation.json`.
 These are scoped runtime/compiler results, not GPU bringup or a global allocation
 pass. Upstream remains unchanged.
+
+Resident non-temporal copies use actual aligned integer `MOVNTI` with cached
+page/alignment edges, serializing source loads and `SFENCE` before every source
+unlock. Exact resident prefixes leave later destination bytes untouched without
+page-in/COW or context changes. The pinned x86 size/result ABI remains 32 bits.
+Saved ELF `ebecc3ef0e7127f73cec652266dc00572e18eadf41cd88e1998c7c328e8ff783`
+passes both complete four-CPU guests. The fourth complete map lifecycle recovers
+exact physical bytes and all live heap classes after three warmups. Default x86
+and disabled ARM builds/startup pass. Host GNU99/GNU11 checks each pass
+25,299,139 sanitizer assertions; actual generated C, optimized object and linked
+ELF receive independent lifetime/ordering review. Tests use ordinary RAM, not a
+GPU aperture. Evidence: `/tmp/vinix-linuxkpi-nocache-oct06-final-validation.json`.
 
 ## Bound and high-priority contracts
 

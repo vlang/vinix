@@ -24,6 +24,12 @@ unsigned long __must_check __copy_from_user_inatomic(void *to,
 		const void __user *from, unsigned long size);
 unsigned long __must_check __copy_to_user_inatomic(void __user *to,
 		const void *from, unsigned long size);
+/* Pinned x86 unsigned-size/int-result ABI. Resident-only reads use actual
+ * aligned integer non-temporal stores and fence before each source unlock.
+ * Cached page/alignment edges are permitted; kernel/WC destination ownership
+ * and accessibility remain the caller's synchronous responsibility. */
+int __copy_from_user_inatomic_nocache(void *to,
+		const void __user *from, unsigned size);
 unsigned long __must_check _copy_from_user(void *to,
 		const void __user *from, unsigned long size);
 unsigned long __must_check _copy_to_user(void __user *to,
@@ -104,5 +110,5 @@ int __must_check vinix_linuxkpi_put_user(void __user *destination,
 
 #include <vinix/user_access_scope.h>
 
-/* Unsafe reads/copies and noncached copies need their own native contracts. */
+/* Unsafe reads/copies and flush-cache variants need their own contracts. */
 #endif
