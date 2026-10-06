@@ -108,6 +108,13 @@ fn main() {
 		check_utility_precision_clients(mut desktop)
 		return
 	}
+	if arguments().contains('--utility-organize-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_organize_clients(mut desktop)
+		return
+	}
 	if arguments().contains('--utility-input-integration') {
 		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
 		desktop_ignore_broken_pipe()
@@ -379,6 +386,7 @@ fn main() {
 	check_utility_controls_clients(mut desktop)
 	check_utility_precision_clients(mut desktop)
 	check_utility_input_clients(mut desktop)
+	check_utility_organize_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -578,6 +586,221 @@ fn check_utility_input_clients(mut desktop Desktop) {
 	println('IPC utility input workflows passed')
 }
 
+fn check_utility_organize_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	base := os.real_path(temporary)
+	pid := os.getpid().str()
+	name := 'vinix-organize-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { temporary.free(); pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_calculator_width_client(mut desktop)
+	check_reminders_sort_client(home, mut desktop)
+	check_console_severity_client(home, mut desktop)
+	check_terminal_block_client(mut desktop)
+	println('IPC utility organize workflows passed')
+}
+
+fn check_calculator_width_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	if mut app is RemoteApp { app.key_input('2+3\x10') }
+	app.handle('calculator.programmer.width.8') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('255'); app.key_input('+1=') }
+	integration_assert_integer(mut app, ['0', '0', '0', '0']!)
+	app.handle('calculator.programmer.not') or { panic(err) }
+	integration_assert_integer(mut app, ['255', 'FF', '377', '11111111']!)
+	app.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, '255')
+	if mut app is RemoteApp { app.paste_input('256') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('calculator.programmer.error.range'))
+	integration_assert_integer(mut app, ['255', 'FF', '377', '11111111']!)
+	app.handle('calculator.programmer.clear') or { panic(err) }
+	app.handle('calculator.programmer.width.16') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('65535'); app.key_input('+1=') }
+	app.handle('calculator.programmer.not') or { panic(err) }
+	app.handle('calculator.programmer.width.8') or { panic(err) }
+	integration_assert_integer(mut app, ['255', 'FF', '377', '11111111']!)
+	app.handle('calculator.programmer.history.0') or { panic(err) }
+	integration_assert_integer(mut app, ['65535', 'FFFF', '177777', '1111111111111111']!)
+	tree := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	width := integration_element_named(tree, 'calculator.programmer.width.16') or { panic('missing width choice') }
+	assert width.checked && width.text == tr('calculator.programmer.width.16')
+	free_tree(tree)
+	app.handle('calculator.programmer.width.8') or { panic(err) }
+	app.handle('calculator.programmer.width.64') or { panic(err) }
+	integration_assert_integer(mut app, ['255', 'FF', '377', '11111111']!)
+	app.handle('calculator.mode.basic') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('=') }
+	integration_assert_calculator_display(mut app, '5')
+	println('IPC Calculator widths, modular results, narrowing, history restore, Copy and Basic state passed')
+}
+
+fn integration_assert_reminders_order(mut app NativeApp, expected [3]string) {
+	tree := app.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	defer { free_tree(tree) }
+	mut row := 0
+	for child in tree.children {
+		if !child.id.starts_with('reminders.row.') { continue }
+		assert row < expected.len && child.id == expected[row]
+		row++
+	}
+	assert row == expected.len
+}
+
+fn check_reminders_sort_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, '.vinix-reminders')
+	export := system_information_join_path(home, 'sorted.csv')
+	defer { unsafe { path.free(); export.free() } }
+	record := 'VINIX-REMINDERS 2\n0\t1\t2026-10-08\tZebra\n0\t3\t2026-10-07 09:00\tBeta\n0\t3\t2026-10-07\tAlpha\n'
+	os.write_file(path, record) or { panic(err) }
+	factory := app_factory_named('vinix-reminders') or { panic('Reminders is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	integration_assert_reminders_order(mut app, ['reminders.row.0', 'reminders.row.1', 'reminders.row.2']!)
+	app.handle('reminders.row.0') or { panic(err) }
+	app.handle('reminders.sort.priority') or { panic(err) }
+	integration_assert_reminders_order(mut app, ['reminders.row.1', 'reminders.row.2', 'reminders.row.0']!)
+	app.handle('reminders.edit') or { panic(err) }
+	editor := app.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	title_field := integration_element_named(editor, 'reminders.title') or { panic('missing title editor') }
+	assert title_field.children.len == 1 && title_field.children[0].kind == .text_field
+	assert title_field.children[0].text == 'Zebra'
+	free_tree(editor)
+	storage_remote_field(mut app, 'reminders.title', 'unsaved draft')
+	app.handle('reminders.sort.due') or { panic(err) }
+	integration_assert_reminders_order(mut app, ['reminders.row.2', 'reminders.row.1', 'reminders.row.0']!)
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 616), 'unsaved draft')
+	app.handle('reminders.cancel') or { panic(err) }
+	app.handle('reminders.sort.title') or { panic(err) }
+	integration_assert_reminders_order(mut app, ['reminders.row.2', 'reminders.row.1', 'reminders.row.0']!)
+	storage_remote_field(mut app, 'reminders.export_path', export)
+	app.handle('reminders.export_csv') or { panic(err) }
+	csv := os.read_file(export) or { panic(err) }
+	defer { unsafe { csv.free() } }
+	assert csv.ends_with('"Alpha","2026-10-07",0,"High"\n"Beta","2026-10-07 09:00",0,"High"\n"Zebra","2026-10-08",0,"Low"\n')
+	integration_assert_file(path, record)
+	app.handle('reminders.sort.title') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('\x1b[C') }
+	integration_assert_reminders_order(mut app, ['reminders.row.0', 'reminders.row.1', 'reminders.row.2']!)
+	close_remote(mut app)
+	mut reopened := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut reopened) }
+	integration_assert_reminders_order(mut reopened, ['reminders.row.0', 'reminders.row.1', 'reminders.row.2']!)
+	integration_assert_file(path, record)
+	println('IPC Reminders stable sort modes, row identity, draft preservation, ordered CSV and unchanged record passed')
+}
+
+fn check_console_severity_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'levels.log')
+	export := system_information_join_path(home, 'errors.txt')
+	defer { unsafe { path.free(); export.free() } }
+	os.write_file(path, 'INFO keep\nERROR keep caf\xc3\xa9\nWARN retry\nplain ERROR keep\nDEBUG keep\n') or { panic(err) }
+	factory := app_factory_named('vinix-console') or { panic('Console is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	storage_remote_field(mut app, 'console.path', path)
+	app.handle('console.load') or { panic(err) }
+	storage_remote_field(mut app, 'console.filter', 'keep')
+	app.handle('console.severity.error') or { panic(err) }
+	tree := app.build(ui2.rect(0, 0, 800, 536)) or { panic(err) }
+	assert tree_contains_text(tree, 'ERROR keep caf\xc3\xa9') && !tree_contains_text(tree, 'INFO keep')
+	assert !tree_contains_text(tree, 'plain ERROR keep') && !tree_contains_text(tree, 'DEBUG keep')
+	free_tree(tree)
+	storage_remote_field(mut app, 'console.export_path', export)
+	app.handle('console.export') or { panic(err) }
+	integration_assert_file(export, 'ERROR keep caf\xc3\xa9\n')
+	app.handle('console.severity.unmarked') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 536), 'plain ERROR keep')
+	app.handle('console.export') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 536), tr('console.export_exists'))
+	integration_assert_file(export, 'ERROR keep caf\xc3\xa9\n')
+	os.write_file(path, '[WARN] keep replacement\n') or { panic(err) }
+	app.handle('console.refresh') or { panic(err) }
+	app.handle('console.severity.warning') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 380, 400), '[WARN] keep replacement')
+	tiny := app.build(ui2.rect(0, 0, 240, 180)) or { panic(err) }
+	assert tree_has_id(tiny, 'console.resize')
+	for child in tiny.children { integration_assert_frame_inside(child, 240, 180) }
+	free_tree(tiny)
+	println('IPC Console explicit levels, text intersection, exact UTF-8 export, protected output and refresh passed')
+}
+
+fn check_terminal_block_client(mut desktop Desktop) {
+	assert os.exists(terminal_shell), 'Terminal block selection needs the installed shell'
+	factory := app_factory_named('vinix-terminal') or { panic('Terminal is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	free_tree(app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) })
+	integration_wait_terminal_prompt(mut app)
+	if mut app is RemoteApp { app.key_input("\x15printf 'blockA caf\\303\\251\\n\\nblockC Z\\n'\r") }
+	mut first_y := 0
+	mut last_y := 0
+	mut stable := 0
+	mut found := false
+	for _ in 0 .. 300 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		mut next_first := 0
+		mut next_last := 0
+		for child in tree.children {
+			if child.text == 'blockA caf\xc3\xa9' { next_first = int(child.frame.y) + 4 }
+			if child.text == 'blockC Z' { next_last = int(child.frame.y) + 4 }
+		}
+		free_tree(tree)
+		stable = if next_first > 0 && next_last == next_first + 2 * terminal_row_height
+			&& next_first == first_y && next_last == last_y { stable + 1 } else { 0 }
+		first_y = next_first
+		last_y = next_last
+		found = stable >= 3
+		if found { break }
+		desktop_sleep_ms(100)
+	}
+	if !found {
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		eprintln('IPC Terminal block rows did not settle; rendered text follows:')
+		for child in tree.children { if child.text.len > 0 { eprintln(child.text) } }
+		free_tree(tree)
+	}
+	assert found
+	app.handle(terminal_action_selection_mode) or { panic(err) }
+	if mut app is RemoteApp {
+		app.pointer_event(.down, .left, 0, terminal_padding + 7 * terminal_column_width, first_y, 560, 316)
+		app.pointer_event(.move, .no_button, 0, terminal_padding + 11 * terminal_column_width, last_y, 560, 316)
+		app.pointer_event(.up, .left, 0, terminal_padding + 11 * terminal_column_width, last_y, 560, 316)
+	}
+	app.handle(terminal_action_copy) or { panic(err) }
+	integration_assert_clipboard(&desktop, 'caf\xc3\xa9\n    \nZ   ')
+	app.handle(terminal_action_selection_mode) or { panic(err) }
+	text := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+	mode := integration_element_named(text, terminal_action_selection_mode) or { panic('missing selection mode') }
+	assert !mode.checked && mode.text == tr('terminal.selection.text')
+	assert !integration_tree_enabled(text, terminal_action_copy)
+	free_tree(text)
+	if mut app is RemoteApp {
+		for _ in 0 .. 2 {
+			app.pointer_event(.down, .left, 0, terminal_padding + 8 * terminal_column_width, first_y, 560, 316)
+			app.pointer_event(.up, .left, 0, terminal_padding + 8 * terminal_column_width, first_y, 560, 316)
+		}
+		app.key_input(terminal_key_cmd_copy)
+	}
+	integration_assert_clipboard(&desktop, 'caf\xc3\xa9')
+	println('IPC Terminal block UTF-8/blank-row padding, clipboard acknowledgement and restored word selection passed')
+}
+
 fn check_calculator_random_client(mut desktop Desktop) {
 	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
 	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
@@ -675,7 +898,7 @@ fn check_reminders_priority_client(home string, mut desktop Desktop) {
 		app_response_timeout_ms) or { panic(err) }
 	defer { close_remote(mut reopened) }
 	for priority in ['reminders.priority.low', 'reminders.priority.medium', 'reminders.priority.none']! {
-		integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 616), tr(priority))
+		integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 656), tr(priority))
 	}
 	reopened.handle('reminders.filter.completed') or { panic(err) }
 	integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 616), tr('reminders.priority.high'))
@@ -767,17 +990,7 @@ fn check_capture_cursor_client(mut desktop Desktop) {
 	println('IPC Capture cursor flag request/reply, frozen active choice and old-compositor fallback passed')
 }
 
-fn check_terminal_word_line_client(mut desktop Desktop) {
-	assert os.exists(terminal_shell), 'Terminal selection needs the installed shell'
-	factory := app_factory_named('vinix-terminal') or { panic('Terminal is not registered') }
-	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
-		app_response_timeout_ms) or { panic(err) }
-	defer { close_remote(mut app) }
-	free_tree(app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) })
-	word := 'café_42'
-	if mut app is RemoteApp {
-		assert app.clipboard_copy && app.pointer && app.keyboard
-	}
+fn integration_wait_terminal_prompt(mut app NativeApp) {
 	// The installed interactive shell loads its startup files before reading
 	// keys. Its initial termios setup can flush input queued immediately after
 	// fork, so wait for a settled prompt before entering the output command.
@@ -815,6 +1028,20 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 		free_tree(tree)
 	}
 	assert ready
+}
+
+fn check_terminal_word_line_client(mut desktop Desktop) {
+	assert os.exists(terminal_shell), 'Terminal selection needs the installed shell'
+	factory := app_factory_named('vinix-terminal') or { panic('Terminal is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	free_tree(app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) })
+	word := 'café_42'
+	if mut app is RemoteApp {
+		assert app.clipboard_copy && app.pointer && app.keyboard
+	}
+	integration_wait_terminal_prompt(mut app)
 	if mut app is RemoteApp {
 		// ASCII octal escapes produce the same independent Unicode output even
 		// when the shell line editor starts in the C locale. Ctrl-U clears any
@@ -1826,7 +2053,9 @@ fn check_terminal_copy_client(mut desktop Desktop) {
 }
 
 fn integration_programmer_readout(element ui2.Element, row int) ?string {
-	if element.kind == .label && element.frame.x == 78 && element.frame.y == 106 + row * 28 {
+	if row >= 0 && row < 4 && element.id == ['calculator.programmer.readout.dec',
+		'calculator.programmer.readout.hex', 'calculator.programmer.readout.oct',
+		'calculator.programmer.readout.bin']![row] {
 		return element.text
 	}
 	for child in element.children {
