@@ -677,3 +677,64 @@ checks. Corrected pointer coordinates and key mapping resolve the initial
 inconclusive Grapher screenshots. Logs, both GUI observations, frozen source
 manifests, binary hashes and final screenshots are retained in
 `build/utility-document-validation/`.
+
+### Crop recovery, event search and capacity follow-up (2026-10-06)
+
+Preview has one-step crop Undo/Redo, restoring the pixels, orientation, zoom,
+pan and selection without copying pixels during recovery. A new crop replaces
+that history step. Successful Open releases it; failed Open/crop preserves it.
+Calendar searches all stored event titles/locations with bounded UTF-8 input,
+Latin/Cyrillic case and accent folding, chronological results, paging and
+navigation into the actual event date/editor. Calculator adds six hyperbolic
+and inverse-hyperbolic functions with domain/finite checks, independent of
+DEG/RAD. Disk Usage reads total/used/free/available bytes from the filesystem
+containing its scan root, refreshing the snapshot on scan and exporting these
+counters separately from logical file-content totals.
+
+The combined utility suite passes 319 behavior cases and 102 tracked-memory
+cases across 25 modules. The parity suite passes 115 behavior and 28 memory
+cases; the Dictionary data encoder passes five Python cases. Every measured
+repeated-use group passes its zero-retention assertion after warming persistent
+frame capacities. The shared compositor suite also passes nine checks,
+including idle redraws, both window themes, Start-menu rendering, native polls
+and remote trees.
+
+Calendar's measured month/editor workflow initially retained 129 bytes per
+fixture iteration: nested frame declarations deep-cloned borrowed strings when
+appended as named values.
+Generated C identified the shared `frame_child` append. Transferring declaration
+fields preserves the existing ownership contract and reduces retention to
+zero. The regression checks borrowed model text and owned frame labels retain
+their pointer identity and are released by their existing owner. All helper
+call sites and the new image-buffer lifetimes received independent
+reviews.
+
+The complete host IPC fixture and its focused recovery entry pass against the
+final production source. The same focused entry, from test commit `666c5256`,
+runs as a static AArch64 executable inside Vinix with `--require-vinix`. It
+checks every original/cropped pixel after Undo/Redo and preserves exact source
+bytes; all six scientific controls, domains, finite overflow boundaries and
+mode state; Unicode event queries, chronological results, saved editor dates,
+fragmented navigation and polled Escape; and capacity cards/raw CSV counters
+separate from an isolated five-byte inventory, including unavailable sources.
+
+The static AArch64 desktop (`1943e3dc`) is published for Files, Activity Monitor
+and Settings. Its 5,997,720-byte artifact has SHA256
+`8e8543bfd886de2a6c11fbc14c6b5cf97559ec6460cdfad9dc8aa13f87b21623`;
+all three published copies match. Production inputs remain unchanged through
+the regression-runner commit `811a090a`. A fresh QEMU scenario runs the
+compositor and four real app processes. Nineteen reviewed screenshots show a
+200×120 crop restored to 400×240 and redone, all three PNG exports, two matching
+events in chronological order, the actual leap-day editor and preserved query,
+empty results and Escape, correct cosh/asinh results, and filesystem capacity
+with an unchanged five-byte inventory and saved report.
+
+These five-second samples verify startup and rendering; the operation and
+repeated-use assertions supply the functional and memory checks. The final
+GUI harness checks the exact Calendar fixture in the user's persistent home
+before startup and uses commands available in the cached guest image. Earlier
+inconclusive seed observations, the final replay, source manifests, build
+hashes, test logs and screenshots are retained under
+`build/utility-recovery-validation/` and `build/utility-recovery-ipc-validation/`.
+The inventory still covers all 42 catalog entries and the thirteen missing
+utility proposals with their backend dependencies.
