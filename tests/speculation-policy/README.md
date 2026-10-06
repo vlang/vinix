@@ -1,7 +1,7 @@
 # Initial x86 speculation controls
 
 `python3 tests/speculation-policy/run.py` executes the original helper's V
-implementation through independent C callers under ASan/UBSan, with mocked
+implementation through an independent V oracle under ASan/UBSan, with mocked
 CPUID and MSR instructions. The active per-CPU policy is tested separately in
 [`tests/cpu-mitigations`](../cpu-mitigations/README.md). This helper checks every combination
 of IBRS/IBPB, STIBP, architectural-capability, SSBD and BHI control
@@ -41,3 +41,21 @@ References: [Intel CPUID/MSR enumeration](https://www.intel.com/content/www/us/e
 [Linux Spectre guidance](https://docs.kernel.org/admin-guide/hw-vuln/spectre.html),
 [Intel BHI guidance and hardware-control enumeration](https://www.intel.com/content/www/us/en/developer/articles/technical/software-security-guidance/technical-documentation/branch-history-injection.html),
 [Linux return-stack guidance](https://docs.kernel.org/admin-guide/hw-vuln/rsb.html).
+
+The oracle is maintained in `fixture/core.v`; its CPUID/MSR callbacks retain
+native `uint32_t`/`uint64_t` widths and borrow the production initializer's
+output pointers synchronously. All 21 assertions, including their original
+expressions and line numbers, and every 6,144-case loop dimension remain.
+Fixed maxima/firmware tables stay on the stack; no fixture or policy object
+imports an allocator. Only the native assertion entry point is adapted by the
+platform declaration header.
+
+Use `--host-arch arm64` or `--host-arch amd64` for the actual host ABI.
+`--original-reference /path/to/frozen/policy.c` runs the unchanged C oracle
+against the identical production policy, comparing complete output, status
+and sanitizer diagnostics. `--state-dir /unused/path` retains source and
+executable manifests. A native run selects `--arch aarch64` or `--arch x86_64`
+and requires an isolated `--kernel-dir` plus fresh `--state-dir` and
+`--guest-state-dir`; C and V controls share a 3,600-second outer budget. Both
+native models mock privileged instructions, so neither claims hardware
+mitigation efficacy.
