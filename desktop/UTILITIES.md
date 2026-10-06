@@ -26,13 +26,13 @@ Vinix engineering proposals based on the inspected code.
 | Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog; per-user saved sort/direction, filter, tree, columns, refresh interval, main view and resource tab | Per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states; localized search across 27 options with keyboard navigation into their actual panes | Clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As; UTF-8 document selection, mouse caret/drag selection, bounded guest clipboard copy and acknowledged cut, and selection replacement with undo | Field selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
-| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square, trig/inverse trig, ln/log10/exp and pi/e, with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory | Further scientific controls (cube/nth-root, log2, hyperbolic/inverse-hyperbolic, random and EE entry); signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, selectable/copyable results, configurable precision/grouping and history persistence |
+| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Further scientific controls (nth-root, hyperbolic/inverse-hyperbolic, random and EE entry); signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, search, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
 | Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; countdown timer, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; multiple named timers; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection | Capacity/free-space/mount overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
-| Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents | Selection and copy, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
-| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, PNG export and original-file copying without overwriting | PDF rendering and page navigation; annotations, selections/cropping, EXIF orientation, colour profiles/adjustments, metadata, additional formats, printing and a file picker |
+| Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Word/line/rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
+| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations and PNG export, and exact original-file copying without overwriting | PDF rendering and page navigation; annotations, selections/cropping, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
 | Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
 | System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; refresh, paging and text export without overwriting | Broader device/driver APIs, searchable structured properties and remote reports; unavailable sources are labelled explicitly |
 | Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and extraction with bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; selective extraction; encryption and larger archives |
@@ -42,7 +42,7 @@ Vinix engineering proposals based on the inspected code.
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
 | Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset and sampled CSV export using the existing native UI protocol | Multiple/implicit/parametric equations, 3D plots, saved graph documents, image/vector export, animations, integration/intersection tools and graph styling |
 | Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking and freeze, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, independent horizontal/vertical locking, image copy and host clipboard writing |
-| Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, and exclusive text export | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, selectable/copyable definitions, lookup from selected text and persistent history |
+| Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, exclusive text export and acknowledged guest clipboard copy of the full headword and unwrapped definition | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, definition selection, lookup from selected text and persistent history |
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
@@ -54,8 +54,10 @@ and [scientific controls](https://support.apple.com/guide/calculator/use-the-sci
 [Calendar events](https://support.apple.com/en-gb/guide/calendar/icalwr13-events/mac)
 and [calendar interchange](https://support.apple.com/guide/calendar/import-or-export-calendars-icl1023/27.0/mac/27),
 [Clock](https://support.apple.com/en-mide/guide/clock-mac/welcome/mac),
+[Terminal shortcuts](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac),
 [screenshot targets](https://support.apple.com/en-ie/102646),
 [Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
+[CIPA EXIF layout and orientation](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf),
 [Console log messages](https://support.apple.com/guide/console/log-messages-cnsl1012/mac)
 and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac),
 [archive compression/extraction](https://support.apple.com/en-lk/guide/mac-help/mchlp2528/mac),
@@ -170,9 +172,10 @@ not proposed as general Vinix utility ports.
   countdown. Expiry is visible in this app; there is no background alarm.
 - **Calculator:** use digits/operators/Enter and Backspace, memory buttons,
   or click a recent result to recall it. Select Scientific for unary functions
-  and pi/e; choose DEG or RAD for trig and inverse trig. Ctrl-S switches modes
-  and Ctrl-D switches angle units in Scientific mode. Functions transform the
-  displayed operand, including the right operand of a pending calculation.
+  including cube, cube root and log2, and pi/e; choose DEG or RAD for trig and
+  inverse trig. Ctrl-S switches modes and Ctrl-D switches angle units in
+  Scientific mode. Functions transform the displayed operand, including the
+  right operand of a pending calculation.
   A new digit replaces a scientific result; repeated equals repeats the last
   binary operation. Domain errors and non-finite results are shown explicitly.
   Scientific mode accepts a finite number pasted in exponent notation.
@@ -185,11 +188,22 @@ not proposed as general Vinix utility ports.
   counts 0–63. Overflowing input and division by zero preserve the value and
   report an error. Programmer history is separate; Basic/Scientific state and
   memory are preserved while switching modes. Signed arithmetic and variable
-  bit widths remain work.
+  bit widths remain work. Copy result or Ctrl-C snapshots the displayed number
+  in Basic/Scientific, or the exact selected-base digits in Programmer.
+  Copy is limited to 64 KiB and shows success only after the compositor
+  acknowledges it; unavailable, invalid or failed copies preserve the guest
+  clipboard. It does not write the host clipboard.
 - **Terminal:** click Find, type an exact query, use the arrows or Enter to
   advance, and Escape to return keyboard input to the shell. Matches are
   physical output rows, including scrollback; Clear scrollback keeps the
-  current terminal screen.
+  current terminal screen. Drag over output to select UTF-8 cells, then choose
+  Copy or Cmd-C. Selection covers physical rows, including the alternate
+  screen; copied rows are separated by newlines rather than joined into
+  logical wrapped lines. Copies are bounded to 64 KiB and acknowledged by the
+  guest clipboard service; oversized copies are refused without truncation.
+  When keyboard input is directed to the shell, Ctrl-C reaches the PTY for
+  the shell/program to handle as an interrupt.
+  Output changes and resizing clear selection so stale cells are not copied.
 - **Disk Usage:** edit Folder and Scan; edit Report and Export CSV. Existing
   report files are preserved. Export a completed or cancelled scan; cancelled
   scans are explicitly marked partial by their phase. Reports contain the
@@ -203,8 +217,14 @@ not proposed as general Vinix utility ports.
   percentages are included. Escape clears/dismisses search. Search operates on
   the implemented controls rather than external or unavailable settings.
 - **Preview:** enter an image path and Open; choose Fit, 100%, zoom or Rotate.
-  Export PNG saves the current rotation with alpha; Original Copy keeps the
-  exact encoded input. Enter a new output path because neither overwrites.
+  JPEG EXIF orientation applies automatically, including all mirrored forms.
+  Fit, pan and manual rotations use the oriented image; Export PNG writes that
+  orientation plus the current rotation with alpha. Decoded source dimensions
+  and pixels stay unchanged. Bounded metadata parsing supports both TIFF byte
+  orders and ignores malformed/unsupported orientation records. Original Copy
+  keeps the exact cached encoded input, including its metadata, even after
+  manual rotations or a later source-file change. Enter a new output path
+  because neither export overwrites.
   Successful opens appear in the app's Recent Items. PDF support remains work.
 - **Console:** choose a log preset or enter an absolute regular-file path.
   Follow Tail refreshes once per second; paging suspends follow. The exact,
@@ -284,8 +304,13 @@ not proposed as general Vinix utility ports.
   matches, and Back/Forward follows at most 32 successful lookups. PageUp and
   PageDown keys page prefix matches; the Page up and Page down buttons scroll
   a wrapped definition. Export definition writes the current headword
-  and text to a new path. Data is installed offline with the complete WordNet
-  license; only its index, headwords and the current definition stay in memory.
+  and text to a new path. Copy definition or Ctrl-C copies the full headword,
+  a blank line and the complete unwrapped definition, independent of paging.
+  This acknowledged guest clipboard copy is limited to 64 KiB; an oversized
+  entry is refused as a whole and preserves the previous clipboard. Success,
+  failure and unavailable-service states are visible. Data is installed offline
+  with the complete WordNet license; only its index, headwords and the current
+  definition stay in memory.
   Failed loads or changed/malformed sources preserve the last successful lookup.
   Custom files must use the bounded VNXDICT1 format documented in
   [the Dictionary data guide](../build-support/dictionary/README.md).

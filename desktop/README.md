@@ -54,13 +54,15 @@ What it does:
   save-aware closing and exclusive Save As
 - a **Calculator** with Basic/Scientific modes, DEG/RAD functions, memory,
   validated numeric paste, bounded calculation history and exact unsigned
-  64-bit Programmer mode with four bases and bitwise operations
+  64-bit Programmer mode with four bases and bitwise operations; acknowledged
+  result copy to the guest session clipboard
 - a **calendar** with month navigation, persistent local events and bounded
   ICS import/export
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs
 - a **clock** with local time, a stopwatch with laps and a countdown timer
-- **Preview**, an image viewer with zoom, pan, rotation and PNG/original export
+- **Preview**, an image viewer with zoom, pan, all eight JPEG EXIF orientations,
+  manual rotation and PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
   filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
@@ -74,7 +76,8 @@ What it does:
 - **Grapher**, bounded mathematical function plots with axes, ranges and CSV export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
   and hex/RGB text copy to the guest session clipboard
-- **Dictionary**, offline WordNet lookup, suggestions, history and text export
+- **Dictionary**, offline WordNet lookup, suggestions, history, full-definition
+  guest clipboard copy and text export
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
@@ -91,7 +94,8 @@ What it does:
   the VOffice releases and running as native ui2 clients inside ordinary Vinix
   windows
 - a **VT-compatible built-in terminal** with a real PTY, alternate-screen and
-  cursor-addressed rendering for editing files in the preinstalled Vim
+  cursor-addressed rendering for editing files in the preinstalled Vim, plus
+  UTF-8 output selection and guest clipboard Copy/Cmd-C preserving Ctrl-C
 - embedded **Wine Calculator and Notepad**: their translated Win64 processes
   render into private Xvfb displays and are composited as normal Vinix windows
   without hiding the desktop
@@ -131,6 +135,7 @@ typing any word with a q in it drop the user back to the console.
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
     calculator_app.v / calculator_programmer*.v  arithmetic modes, memory and history
+    terminal_selection.v  physical-row selection and Copy/Cmd-C handling
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     preview_app*.v  the standalone image viewer and export model
     console_app*.v  bounded log snapshots, filtering and tail following
@@ -144,6 +149,7 @@ typing any word with a q in it drop the user back to the console.
     color_meter_app.v / color_meter_service.v  colour samples and guest text copy
     native_close.v  save-aware window/session close requests
     clipboard_copy.v  acknowledged text copy to the bounded guest clipboard
+    text_copy_client.v  bounded copy snapshots and acknowledgement state
     dictionary_app*.v  offline lookup, suggestions, history and export
     clipboard.v    guest text paste and asynchronous host clipboard requests
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
@@ -392,13 +398,49 @@ current month. The Clock expands the same local time into an across-the-room
 display and adds a start/stop/reset stopwatch with tenth-second updates.
 
 Calculator offers Basic and Scientific modes. Scientific adds square root,
-reciprocal, square, trig/inverse trig, ln/log10/exp and pi/e, with selectable
-DEG/RAD units, explicit domain/finite errors and 15-significant-digit results.
+reciprocal, square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e,
+with selectable DEG/RAD units, explicit domain/finite errors and
+15-significant-digit results.
 Ctrl-S switches mode and Ctrl-D switches angle units in Scientific mode.
 Functions use the displayed operand, including a pending binary operation's
 right operand. Numeric paste accepts finite exponent notation in Scientific
 mode. Memory and repeated equals remain available; click a recent result to
 recall it from the bounded 20-entry history.
+Nth-root, hyperbolic/inverse-hyperbolic functions, random and EE entry remain
+future work. Cube root accepts negative operands; log2 requires a positive
+operand, and cube reports an error when its result is not finite. Copy result
+or Ctrl-C copies the displayed number in Basic or Scientific mode, or the
+exact selected-base digits in Programmer mode.
+Arithmetic errors are not copied. The bounded guest clipboard service reports
+success only after acknowledgement; failed or unavailable copies preserve its
+previous contents.
+
+Terminal supports mouse selection of UTF-8 cells across physical output rows,
+including scrollback and the alternate screen. Drag to select, then choose
+Copy or Cmd-C. When input is directed to the shell, Ctrl-C continues to the
+PTY for shell/program interrupt handling.
+Copy inserts a newline between physical rows and does not reassemble wrapped
+logical lines. Changed output or window geometry clears selection. Copies
+larger than 64 KiB are refused without truncating or replacing the clipboard.
+Wide and combining character cell widths, word/line selection and logical-line
+reflow remain future work.
+The macOS comparison is [Apple's Terminal shortcut guide](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac).
+
+Preview applies all eight JPEG EXIF orientations, including mirrored forms,
+without duplicating the decoded image. Fit, pan, manual quarter-turn rotations
+and PNG export share the resulting pixel mapping. Raw decoded dimensions and
+pixels remain unchanged; exported PNG pixels reflect both EXIF orientation and
+manual rotation. Original Copy retains the exact cached source bytes and
+metadata, even if the source file changes after opening. Metadata parsing is
+bounded, accepts both TIFF byte orders and falls back to raw orientation for
+malformed or unsupported records. The format reference is
+[CIPA's EXIF specification](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf).
+
+Dictionary's Copy definition button or Ctrl-C copies the full headword, a blank
+line and the complete unwrapped definition rather than only the visible page.
+The total is limited to 64 KiB; oversized entries are refused as a whole.
+Copy status distinguishes acknowledged success, failure and an unavailable
+guest clipboard service. Copying does not write the host clipboard.
 
 Notes keeps local UTF-8 titles and plain-text bodies with search, debounced
 autosave and exclusive text export. If a final save fails, ordinary window
@@ -760,9 +802,10 @@ lines are supported in Terminal, Text Editor and hosted X11 applications such
 as Firefox and Wine Notepad. Terminal honors bracketed paste when the shell or
 editor enables it. Pasted text bypasses the guest keyboard layout.
 
-After Color Meter copies a value, **Ctrl+V**, **Cmd+V** and **Shift+Insert**
-prefer the guest session clipboard. **Ctrl+Shift+V** always requests the host
-clipboard instead. Guest copies stay inside the current desktop session and
+After copying in Text Editor, Terminal, Calculator, Dictionary or Color Meter,
+**Ctrl+V**, **Cmd+V** and **Shift+Insert** prefer the guest session clipboard.
+**Ctrl+Shift+V** always requests the host clipboard instead. Guest copies stay
+inside the current desktop session and
 do not write the host clipboard.
 
 The aarch64 launcher enables the host clipboard service by default. It reads
