@@ -32,15 +32,15 @@ Vinix engineering proposals based on the inspected code.
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection | Capacity/free-space/mount overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
 | Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Word/line/rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
-| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations and PNG export, and exact original-file copying without overwriting | PDF rendering and page navigation; annotations, selections/cropping, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
+| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations, rectangular selection/cropping with alpha-preserving PNG export, and exact original-file copying without overwriting | Crop undo/recovery and image resampling; PDF rendering and page navigation; annotations, additional selection tools, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
 | Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
-| System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; refresh, paging and text export without overwriting | Broader device/driver APIs, searchable structured properties and remote reports; unavailable sources are labelled explicitly |
-| Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and extraction with bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; selective extraction; encryption and larger archives |
+| System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; bounded UTF-8 search across row values, translated labels and categories with token/case/accent matching; refresh, paging and complete text export without overwriting | Broader device/driver APIs, structured property inspection and remote reports; unavailable sources are labelled explicitly |
+| Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and whole/selected extraction with entry/folder checkboxes, choices fixed during extraction, bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; encryption and larger archives |
 | Disk Utility / Disk Utility | Disk Usage rankings and System Information mount reports | Read-only block-device and mounted-volume inventory, selectable details, valid capacity, refresh/paging and exclusive report export | Physical device/partition hierarchy, health/SMART, disk images, mount/unmount privilege workflow; formatting, repair and partition changes need filesystem tools and explicit destructive-operation UI |
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
 | Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and undo/recovery; floating sticky windows |
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
-| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset and sampled CSV export using the existing native UI protocol | Multiple/implicit/parametric equations, 3D plots, saved graph documents, image/vector export, animations, integration/intersection tools and graph styling |
+| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, and separate sampled CSV export using the existing native UI protocol | Autosave/recovery and file picker; multiple/implicit/parametric equations, 3D plots, PNG/vector export, animations, integration/intersection tools and graph styling |
 | Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking and freeze, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, independent horizontal/vertical locking, image copy and host clipboard writing |
 | Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, exclusive text export and acknowledged guest clipboard copy of the full headword and unwrapped definition | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, definition selection, lookup from selected text and persistent history |
 
@@ -57,6 +57,7 @@ and [calendar interchange](https://support.apple.com/guide/calendar/import-or-ex
 [Terminal shortcuts](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac),
 [screenshot targets](https://support.apple.com/en-ie/102646),
 [Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
+[Preview image cropping](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac),
 [CIPA EXIF layout and orientation](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf),
 [Console log messages](https://support.apple.com/guide/console/log-messages-cnsl1012/mac)
 and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac),
@@ -65,7 +66,7 @@ and [System Information reports](https://support.apple.com/guide/system-informat
 and [Time Machine restore](https://support.apple.com/en-au/guide/mac-help/mh11422/mac),
 [Notes import/export](https://support.apple.com/en-asia/guide/notes/not201900c07/mac),
 [Reminders tasks and due dates](https://support.apple.com/en-ie/guide/reminders/remndc729e28/mac),
-[Grapher](https://support.apple.com/guide/grapher/welcome/mac),
+[Grapher graphs and equations](https://support.apple.com/guide/grapher/create-a-graph-and-add-equations-gcalcd405d09/mac),
 [Digital Color Meter](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac)
 and [Dictionary](https://support.apple.com/en-hk/guide/dictionary/welcome/mac).
 
@@ -218,26 +219,40 @@ not proposed as general Vinix utility ports.
   the implemented controls rather than external or unavailable settings.
 - **Preview:** enter an image path and Open; choose Fit, 100%, zoom or Rotate.
   JPEG EXIF orientation applies automatically, including all mirrored forms.
-  Fit, pan and manual rotations use the oriented image; Export PNG writes that
-  orientation plus the current rotation with alpha. Decoded source dimensions
-  and pixels stay unchanged. Bounded metadata parsing supports both TIFF byte
-  orders and ignores malformed/unsupported orientation records. Original Copy
+  Fit, pan and manual rotations use the oriented image. Choose Select (S), drag
+  a rectangle over the displayed image and choose Crop or Enter to keep it.
+  Selection follows the displayed orientation, zoom and pan. Pan (P) restores
+  drag-to-pan; Clear or Escape removes the selection, and Ctrl-A selects the
+  whole image. Crop changes the in-memory pixels and preserves alpha; Export
+  PNG writes the current crop and rotation. The source file is preserved.
+  Bounded metadata parsing supports both TIFF byte orders and ignores
+  malformed/unsupported orientation records. Original Copy
   keeps the exact cached encoded input, including its metadata, even after
-  manual rotations or a later source-file change. Enter a new output path
-  because neither export overwrites.
-  Successful opens appear in the app's Recent Items. PDF support remains work.
+  cropping, manual rotations or a later source-file change. Enter a new output
+  path because neither export overwrites. Successful opens appear in the app's
+  Recent Items. Crop undo/recovery, resampling and PDF support remain work.
 - **Console:** choose a log preset or enter an absolute regular-file path.
   Follow Tail refreshes once per second; paging suspends follow. The exact,
   case-sensitive filter and Export Rows apply to all retained rows, including
   those outside the viewport. Snapshots keep at most the last 128 KiB.
   Missing logs stay unavailable until their producer creates them.
 - **System Information:** choose a report category and Refresh to collect
-  current system data. Enter a new export path to save the report. Data comes
+  current system data. Click Search or Ctrl-F and enter a bounded UTF-8 query.
+  Space-separated words match across row values, translated labels and category
+  names with case/accent folding; matching rows retain paging. Escape clears
+  and dismisses search. Refresh reapplies the query to current data, and
+  changing language updates translated matches. Enter a new export path to
+  save the complete report across all categories. Data comes
   from Vinix's procfs, CPU topology, GPU reports, mount capacity and package
-  databases; absent facilities are reported as unavailable.
+  databases; absent facilities are reported as unavailable. Broader device and
+  driver inventory still needs real backend sources.
 - **Archive Utility:** enter an uncompressed TAR path and Browse. Enter a new
-  Extract folder and Extract, or enter a regular-file/folder Source and new
-  Output TAR and Create TAR. Cancel removes an unfinished TAR output; an
+  Extract folder and Extract for the whole archive, or toggle entry checkboxes
+  and choose Extract selected. A folder checkbox also selects its descendants;
+  Select all and Clear operate across pages. Choices are fixed once extraction
+  starts. With no selected entries, Extract selected creates no destination.
+  To create an archive, enter a regular-file/folder Source and new Output TAR
+  and Create TAR. Cancel removes an unfinished TAR output; an
   unfinished extraction keeps its partial files and reports that state. TAR
   snapshots are immutable after loading, bounded to 64 MiB and 2,048 entries.
   Traversal, links, special entries and conflicting names are refused. ZIP,
@@ -280,6 +295,16 @@ not proposed as general Vinix utility ports.
 - **Grapher:** enter an explicit function of `x` and choose Plot. Arithmetic,
   powers, parentheses, `pi`/`e` and supported standard functions use radians.
   Edit finite x/y bounds or use Zoom/reset, then export samples to a new CSV.
+  The graph-document path is a separate field, initially `graph.vgraph` in the
+  canonical home directory. Enter a new absolute path and Save As to store the
+  current expression and four range fields in a versioned record. Existing
+  paths are refused; choose a new name for each saved revision. Open or Enter
+  in the document-path field validates the whole record and all five fields
+  before replacing and plotting the graph. Missing, truncated, malformed or
+  oversized records, invalid expression syntax and invalid ranges preserve
+  the current fields and plot. Typed paths refuse symbolic links in every
+  component. Documents are bounded to 1 KiB; this is a Vinix format, and graph
+  edits are not autosaved. Save changes before opening another document.
   Domain failures leave gaps; sampling is bounded and does not prove a
   function is continuous between samples. Plots use the native child-process
   UI protocol and resize with the window.

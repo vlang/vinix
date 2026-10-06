@@ -62,18 +62,20 @@ What it does:
   machine, ranked and measured while the walk runs
 - a **clock** with local time, a stopwatch with laps and a countdown timer
 - **Preview**, an image viewer with zoom, pan, all eight JPEG EXIF orientations,
-  manual rotation and PNG/original export
+  manual rotation, rectangular selection/cropping and PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
   filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
-  reports with refresh and export
-- **Archive Utility**, TAR browsing, creation and safe extraction with progress/cancel
+  reports with localized search, refresh and export
+- **Archive Utility**, TAR browsing, creation and safe whole/selected extraction
+  with progress/cancel
 - **Disk Utility**, read-only block-device and mounted-volume inspection
 - **Backup**, versioned local folder copies and restore to a new folder
 - **Notes**, searchable local plain-text notes with autosave, text export and
   close confirmation when a final save fails
 - **Reminders**, persistent local tasks with due dates, completion and filters
-- **Grapher**, bounded mathematical function plots with axes, ranges and CSV export
+- **Grapher**, bounded mathematical function plots with axes, ranges, saved graph
+  documents and CSV export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
   and hex/RGB text copy to the guest session clipboard
 - **Dictionary**, offline WordNet lookup, suggestions, history, full-definition
@@ -428,13 +430,46 @@ The macOS comparison is [Apple's Terminal shortcut guide](https://support.apple.
 
 Preview applies all eight JPEG EXIF orientations, including mirrored forms,
 without duplicating the decoded image. Fit, pan, manual quarter-turn rotations
-and PNG export share the resulting pixel mapping. Raw decoded dimensions and
-pixels remain unchanged; exported PNG pixels reflect both EXIF orientation and
-manual rotation. Original Copy retains the exact cached source bytes and
-metadata, even if the source file changes after opening. Metadata parsing is
-bounded, accepts both TIFF byte orders and falls back to raw orientation for
-malformed or unsupported records. The format reference is
+and PNG export share the resulting pixel mapping. Choose Select (S), drag over
+the displayed image and choose Crop or Enter to keep that rectangle; Pan (P)
+restores drag-to-pan, and Clear or Escape removes the selection. Cropping
+replaces only the in-memory pixels, preserving alpha and the displayed EXIF/
+rotation mapping. Export PNG writes the current cropped/rotated image to a new
+path. Original Copy retains the exact cached source bytes and metadata after
+cropping, rotation or a later source-file change. Neither export overwrites an
+existing path. Crop undo, image resampling and PDF support remain future work.
+The macOS comparison is [Apple's image-cropping guide](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac).
+Metadata parsing is bounded, accepts both TIFF byte orders and falls back to
+raw orientation for malformed or unsupported records. The format reference is
 [CIPA's EXIF specification](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf).
+
+Grapher's graph-document path is separate from its CSV sample-export path and
+defaults to `graph.vgraph` in the canonical home folder. Enter a new absolute
+document path and choose Save As to store the current expression and four
+x/y bounds. Save As creates a new file and refuses existing files or symbolic
+links; choose another name for a later revision. Open or Enter in that path
+field validates the whole bounded, versioned document before replacing and
+plotting the graph. Failed opens preserve the current fields and plot. Save
+changes before opening another
+document; Grapher has no autosave or recovery journal. Multiple equations,
+3D graphs and PNG/vector export remain separate work. The macOS comparison is
+[Apple's graph and equation guide](https://support.apple.com/guide/grapher/create-a-graph-and-add-equations-gcalcd405d09/mac).
+
+Archive Utility browses uncompressed TAR snapshots. Toggle the entry checkboxes
+and choose Extract selected to a new folder; selecting a folder also selects
+its descendants. Select all and Clear update the choices across all pages.
+Extract still extracts the whole archive. Choices are fixed when extraction
+starts, while progress and Cancel remain available. Cancelled or failed
+extractions retain visibly partial output. ZIP/gzip and other compressed
+formats remain unsupported.
+
+System Information searches the collected report rows with a bounded UTF-8
+query. Click Search or Ctrl-F and enter words from values, translated labels or
+category names; every word must match, with case/accent folding. Matching rows
+retain paging, and Escape clears and dismisses search. Refresh recollects data
+and reapplies the query; changing language updates translated matches. Report
+export includes all collected categories. Device/driver inventory still needs
+the corresponding kernel sources; absent data remains labelled unavailable.
 
 Dictionary's Copy definition button or Ctrl-C copies the full headword, a blank
 line and the complete unwrapped definition rather than only the visible page.
