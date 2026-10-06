@@ -36,16 +36,27 @@ def main() -> int:
     parser.add_argument("--kernel-dir", type=Path, default=ROOT / "kernel")
     parser.add_argument("--runner-root", type=Path, default=ROOT)
     parser.add_argument("--timeout", type=int, default=240)
+    parser.add_argument("--prebuilt-init", type=Path)
     args = parser.parse_args()
     state = args.work.resolve()
     state.mkdir(parents=True, exist_ok=True)
     kernel = args.kernel_dir.resolve()
     runner = args.runner_root.resolve()
     sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", str(runner / "build-aarch64-userland/sysroot")))
-    subprocess.run([os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
-                    f"-L{sysroot / 'lib'}", "-fuse-ld=lld", "-static", "-O2", "-fno-stack-protector",
-                    "-Wall", "-Wextra", "-Werror", str(ROOT / "tests/fsync-scope/test.c"),
-                    "-o", str(state / "init")], check=True)
+    if args.prebuilt_init:
+        shutil.copy2(args.prebuilt_init, state / "init")
+    else:
+        compiler = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}"]
+        gcc_root = runner / "build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl"
+        if gcc_root.exists():
+            compiler.append(f"--gcc-install-dir={sorted(gcc_root.iterdir())[-1]}")
+        flags = compiler + ["-O2", "-fno-stack-protector", "-D_GNU_SOURCE", "-fno-strict-aliasing",
+                            "-Wall", "-Wextra", "-Werror"]
+        fixture = module("fsync_scope_compile", ROOT / "tests/kernel-gaps/compile-v-fixture.py")
+        object_file = fixture.compile_module(ROOT / "tests/fsync-scope/syncfixture", state / "fixture.o",
+                                             "aarch64", flags)
+        subprocess.run(compiler + [f"-L{sysroot / 'lib'}", "-fuse-ld=lld", "-static",
+                                   str(object_file), "-o", str(state / "init")], check=True)
     rootfs = state / "rootfs"
     for directory in ("root", "sbin", "tmp", "dev", "proc", "sys", "run"):
         (rootfs / directory).mkdir(parents=True, exist_ok=True)
