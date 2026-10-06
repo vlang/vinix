@@ -269,6 +269,10 @@ ifeq ($(LINUXKPI),1)
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
     LINUXKPI_OBJ += obj/linuxkpi/headercore.o
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture
+    LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
+    LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
+    LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)
     $(LINUXKPI_COBJ): override CPPFLAGS += $(LINUXKPI_CPPFLAGS)
 endif
 
@@ -373,6 +377,15 @@ obj/linuxkpi/headercore.c: $(wildcard linuxkpi/headercore/*.v) $(wildcard c/linu
 obj/linuxkpi/headercore.o: obj/linuxkpi/headercore.c GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -std=gnu11 -c $< -o $@
 
+# Independent diagnostic V fixtures call the actual upstream header ABI in
+# separate objects. The frozen original C goldens remain in Git history.
+$(LINUXKPI_FIXTURE_C): obj/linuxkpi/%.c: linuxkpi/%/core.v $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile-v-fixture.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+	mkdir -p "$$(dirname $@)"
+	python3 ../tests/linuxkpi/compile-v-fixture.py $* $@
+
+$(LINUXKPI_FIXTURE_OBJ): obj/linuxkpi/%.o: obj/linuxkpi/%.c GNUmakefile $(V_CONFIG_STAMP)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -std=gnu11 -c $< -o $@
+
 obj/linuxkpi/%.o: $(LINUXKPI_SOURCE_DIR)/lib/%.c GNUmakefile $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11 -c $< -o $@
@@ -440,6 +453,7 @@ obj/asm/x86_64/printf_abi.S.o: asm/x86_64/varargs.inc
 obj/asm/aarch64/linuxkpi_varargs.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_varargs.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_storage.S.o obj/asm/x86_64/linuxkpi_storage.S.o: $(V_CONFIG_STAMP)
+obj/asm/x86_64/linuxkpi_fixture_abi.S.o: $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_workqueue_abi.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_workqueue_abi.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 

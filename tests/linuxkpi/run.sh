@@ -48,7 +48,35 @@ symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
 assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
 print("LinuxKPI: native V header primitives have no implicit allocator imports")
 CHECK
-# Link production implementations/bindings and the preserved embedded fixtures.
+# Compile every independent fixture with native header layouts and sanitizers.
+# GNU inline semantics keep Darwin libc's external inlines in libc when several
+# separately generated V objects include its headers. Native builds use the
+# kernel's unchanged GNU11/general-register flags.
+for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfixture; do
+    python3 "$repo/tests/linuxkpi/compile-v-fixture.py" "$fixture_module" \
+        --host --arch "$native_v_arch" "$work/$fixture_module.c"
+    ${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
+        -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function -Wno-deprecated-declarations \
+        -D_FORTIFY_SOURCE=0 -D__sputc=vkf_${fixture_module}_sputc \
+        -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
+        -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ \
+        -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
+        -iquote "$repo/kernel/c" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+        -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" -I"$source_dir/drivers/gpu/drm/i915" \
+        -c "$work/$fixture_module.c" -o "$work/$fixture_module.o"
+done
+${CC:-clang} -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST \
+    -c "$repo/kernel/asm/x86_64/linuxkpi_fixture_abi.S" -o "$work/fixture_storage.o"
+python3 "$repo/tests/linuxkpi/fixture-goldens.py"
+# Execute the native policy fixture too: compiling alone misses C macro
+# expression signedness, since a foreign declaration cannot coerce macro args.
+python3 "$repo/build-support/compile-v-module.py" "$repo/tests/linuxkpi/policyhost" \
+    "$work/policyhost.c" --arch "$native_v_arch" -d nofloat
+${CC:-clang} -std=gnu11 -O1 -g -ffreestanding -fno-builtin \
+    -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -c "$work/policyhost.c" -o "$work/policyhost.o"
+# Link production implementations/bindings and the independent fixtures.
 # Independent guest *_test.c fixtures are built only by the kernel.
 set --
 for source in "$repo"/kernel/c/linuxkpi*.c; do
@@ -61,11 +89,11 @@ done
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
-    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ \
+    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ -Dmain=vinix_linuxkpi_host_original_main \
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
