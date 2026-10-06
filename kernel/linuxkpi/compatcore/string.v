@@ -170,10 +170,10 @@ pub fn sysfs_match_string(array &&char, n usize, str &char) i32 {
 }
 
 @[export: 'strreplace']
-pub fn strreplace(str &char, old i8, new i8) &char {
+pub fn strreplace(str &char, old char, new char) &char {
 	unsafe {
 		for s := str; (*s); s = s + 1 {
-			if i32((*s)) == i32(old) {
+			if u8(*s) == u8(old) {
 				*s = new
 			}
 		}
@@ -184,7 +184,7 @@ pub fn strreplace(str &char, old i8, new i8) &char {
 @[export: 'strchr']
 pub fn strchr(s &char, c i32) &char {
 	unsafe {
-		for ; i32((*s)) != i32(i8(c)); s = s + 1 {
+		for ; u8(*s) != u8(c); s = s + 1 {
 			if i32((*s)) == i8(`\0`) {
 				return nil
 			}
