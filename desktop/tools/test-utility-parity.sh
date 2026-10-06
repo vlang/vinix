@@ -50,7 +50,7 @@ PY
 
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
 for test in calculator_features_memory utility_parity_memory calendar_search_memory editor_selection_memory \
-            text_copy_client_memory terminal_selection_memory; do
+            text_copy_client_memory terminal_selection_memory clock_utility_memory; do
     cp "$root/desktop/tools/tests/${test}_test.v" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${test}_test.v"
