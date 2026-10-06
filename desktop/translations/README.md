@@ -1,9 +1,9 @@
 # Desktop translations
 
 One file per language the desktop speaks, named by its code: `en.tr`
-(English, the reference), `ru.tr` (Russian) and `es.tr` (Spanish). They use
-the `.tr` format of V's `i18n` module: a key line, the text, and a `-----`
-line between entries.
+(English, the reference), `ru.tr` (Russian), `es.tr` (Spanish) and `fr.tr`
+(French). They use the `.tr` format of V's `i18n` module: a key line, the text,
+and a `-----` line between entries.
 
 ```
 settings.category.language
@@ -25,8 +25,9 @@ them with `i18n.load_tr_map_from_files` and looks text up with `tr()`.
 - `{0}`, `{1}` and `{2}` are where values go. A translation keeps the same
   placeholders but may reorder them.
 - Text containing `|` is a plural: complete forms, chosen by the count.
-  English and Spanish give two forms (one, other); Russian gives three (one,
-  few, many: 1 and 21 элемент, 2–4 элемента, 5–20 элементов).
+  English and Spanish give two forms (one, other); French gives two (zero or
+  one, other); Russian gives three (one, few, many: 1 and 21 элемент,
+  2–4 элемента, 5–20 элементов).
 - Keep entries on one line, and keep them about as short as the English: the
   desktop's labels have fixed widths.
 - Product names (Firefox, Wine, QEMU, macOS...) are not translated.

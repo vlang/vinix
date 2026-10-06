@@ -1,0 +1,4299 @@
+activity.column.cpu
+% CPU
+-----
+activity.column.memory
+Mo
+-----
+activity.column.name
+Nom
+-----
+activity.column.pid
+PID
+-----
+activity.cpu.decimal
+{0},{1}
+-----
+activity.error.kill
+Impossible de tuer le processus sélectionné.
+-----
+activity.error.missing
+{0} est introuvable.
+-----
+activity.error.missing_note
+Ce noyau ne fournit pas la liste des processus.
+-----
+activity.error.read
+Impossible de lire {0}.
+-----
+activity.error.version
+{0} utilise la version {1}, au lieu de {2}.
+-----
+activity.kill
+Tuer le processus
+-----
+activity.memory.mb
+{0} Mo
+-----
+activity.memory.mb_decimal
+{0},{1} Mo
+-----
+activity.sort_by.cpu
+Trier par CPU
+-----
+activity.sort_by.memory
+Trier par mémoire
+-----
+activity.sort_by.name
+Trier par nom
+-----
+activity.sort_by.pid
+Trier par PID
+-----
+activity.summary
+{0} processus   {1} sur {2} utilisés|{0} processus   {1} sur {2} utilisés
+-----
+activity.cached
+{0} de fichiers en cache
+-----
+activity.unnamed
+(sans nom)
+-----
+app.activity_monitor
+Moniteur d'activité
+-----
+app.calculator
+Calculatrice
+-----
+app.calendar
+Calendrier
+-----
+app.capture
+Capture
+-----
+app.clock
+Horloge
+-----
+app.files
+Fichiers
+-----
+app.files_settings
+Paramètres de Fichiers
+-----
+app.qemu
+Vinix dans QEMU
+-----
+app.settings
+Paramètres
+-----
+app.terminal
+Terminal
+-----
+app.text_editor
+Éditeur de texte
+-----
+app.wine_calculator
+Calculatrice Wine
+-----
+app.wine_notepad
+Bloc-notes Wine
+-----
+app_selection.chromium.detail
+Le navigateur web libre à l'origine de Chrome
+-----
+app_selection.continue
+Continuer
+-----
+app_selection.firefox.detail
+Navigateur web de Mozilla
+-----
+app_selection.heading
+Choisissez vos applications
+-----
+app_selection.install.done
+Les applications choisies sont installées. Ouvrez-les depuis le bureau ou le menu Démarrer.
+-----
+app_selection.install.failed
+Non installées :{0}. Exécutez pkg install{0} pour réessayer.
+-----
+app_selection.install.started
+Installation des applications choisies à la configuration : {0}
+-----
+app_selection.install_1
+Installer 1 application
+-----
+app_selection.install_2
+Installer 2 applications
+-----
+app_selection.install_3
+Installer 3 applications
+-----
+app_selection.install_4
+Installer 4 applications
+-----
+app_selection.installed
+Installé
+-----
+app_selection.intro
+Choisissez les applications à télécharger et à installer.
+-----
+app_selection.minecraft.detail
+Java Edition, avec un compte Microsoft
+-----
+app_selection.note
+Installez-en d'autres plus tard avec pkg install dans Terminal.
+-----
+app_selection.voffice.detail
+Documents Writer et feuilles de calcul Calc
+-----
+battery.remaining.about_hours
+Environ {0} heure|Environ {0} heures
+-----
+battery.remaining.calculating
+Calcul…
+-----
+battery.remaining.charging
+En charge
+-----
+battery.remaining.full
+Charge complète
+-----
+battery.remaining.less_than_hour
+Moins d'une heure
+-----
+battery.remaining.unavailable
+Indisponible
+-----
+battery.status.failed
+Échec de lecture de la batterie ou mesure trop ancienne.
+-----
+battery.status.invalid
+Réponse de la batterie invalide.
+-----
+battery.status.permission
+Accès refusé à la lecture de la batterie.
+-----
+battery.status.reported
+Pourcentage fourni par le pilote de la batterie.
+-----
+battery.status.unavailable
+Pilote de la batterie indisponible.
+-----
+calendar.heading
+{0} {1}
+-----
+calendar.heading.month.apr
+avril
+-----
+calendar.heading.month.aug
+août
+-----
+calendar.heading.month.dec
+décembre
+-----
+calendar.heading.month.feb
+février
+-----
+calendar.heading.month.jan
+janvier
+-----
+calendar.heading.month.jul
+juillet
+-----
+calendar.heading.month.jun
+juin
+-----
+calendar.heading.month.mar
+mars
+-----
+calendar.heading.month.may
+mai
+-----
+calendar.heading.month.nov
+novembre
+-----
+calendar.heading.month.oct
+octobre
+-----
+calendar.heading.month.sep
+septembre
+-----
+calendar.today
+Aujourd'hui
+-----
+capture.cancel
+Annuler
+-----
+capture.delay.five_seconds
+5 secondes
+-----
+capture.delay.none
+Sans délai
+-----
+capture.delay.three_seconds
+3 secondes
+-----
+capture.eyebrow
+CAPTURE
+-----
+capture.heading
+Captures et enregistrements d'écran
+-----
+capture.page.screenshot
+Capture d'écran
+-----
+capture.page.video
+Vidéo
+-----
+capture.screenshot.delay
+Délai
+-----
+capture.screenshot.facts
+PNG{0}bureau entier{0}pointeur inclus
+-----
+capture.screenshot.heading
+Capture du bureau entier
+-----
+capture.screenshot.take
+Capturer l'écran
+-----
+capture.status.cancel_hint
+Restaurez cette fenêtre pour annuler.
+-----
+capture.status.cancelled
+Capture annulée
+-----
+capture.status.cancelled_detail
+Rien n'a été enregistré.
+-----
+capture.status.failed
+Échec de la capture
+-----
+capture.status.failed_detail
+Impossible d'écrire le fichier dans /root.
+-----
+capture.status.fps
+{0} ips
+-----
+capture.status.frames
+{0} image|{0} images
+-----
+capture.status.ready
+Prêt à capturer
+-----
+capture.status.ready_detail
+Les fichiers sont enregistrés dans /root.
+-----
+capture.status.recording
+Enregistrement  {0}
+-----
+capture.status.recording_in
+Enregistrement dans {0} seconde|Enregistrement dans {0} secondes
+-----
+capture.status.recording_saved
+Enregistrement sauvegardé  {0}
+-----
+capture.status.screenshot_in
+Capture dans {0} seconde|Capture dans {0} secondes
+-----
+capture.status.screenshot_saved
+Capture enregistrée  {0}
+-----
+capture.stop_recording
+Arrêter l'enregistrement
+-----
+capture.video.compact
+Compact  5 ips
+-----
+capture.video.facts
+Vidéo AVI{0}jusqu'à 640 x 480{0}pointeur inclus{0}sans audio
+-----
+capture.video.frame_rate
+Fréquence d'images
+-----
+capture.video.heading
+Enregistrer le bureau
+-----
+capture.video.smooth
+Fluide  10 ips
+-----
+capture.video.start
+Démarrer l'enregistrement
+-----
+clock.built
+Compilé à {0}
+-----
+clock.date_unavailable
+Date indisponible
+-----
+clock.reset
+Réinitialiser
+-----
+clock.start
+Démarrer
+-----
+clock.stop
+Arrêter
+-----
+clock.stopwatch
+CHRONOMÈTRE
+-----
+clock.unavailable
+Horloge indisponible
+-----
+date.day_month
+{0} {1}
+-----
+date.long
+{0} {1}
+-----
+date.long.day_month_year
+{0} {1} {2}
+-----
+date.long.month.apr
+avril
+-----
+date.long.month.aug
+août
+-----
+date.long.month.dec
+décembre
+-----
+date.long.month.feb
+février
+-----
+date.long.month.jan
+janvier
+-----
+date.long.month.jul
+juillet
+-----
+date.long.month.jun
+juin
+-----
+date.long.month.mar
+mars
+-----
+date.long.month.may
+mai
+-----
+date.long.month.nov
+novembre
+-----
+date.long.month.oct
+octobre
+-----
+date.long.month.sep
+septembre
+-----
+date.long.weekday.fri
+vendredi
+-----
+date.long.weekday.mon
+lundi
+-----
+date.long.weekday.sat
+samedi
+-----
+date.long.weekday.sun
+dimanche
+-----
+date.long.weekday.thu
+jeudi
+-----
+date.long.weekday.tue
+mardi
+-----
+date.long.weekday.wed
+mercredi
+-----
+date.month.short.apr
+avr.
+-----
+date.month.short.aug
+août
+-----
+date.month.short.dec
+déc.
+-----
+date.month.short.feb
+févr.
+-----
+date.month.short.jan
+janv.
+-----
+date.month.short.jul
+juil.
+-----
+date.month.short.jun
+juin
+-----
+date.month.short.mar
+mars
+-----
+date.month.short.may
+mai
+-----
+date.month.short.nov
+nov.
+-----
+date.month.short.oct
+oct.
+-----
+date.month.short.sep
+sept.
+-----
+date.time_am
+{0} AM
+-----
+date.time_pm
+{0} PM
+-----
+date.weekday.short.fri
+ven.
+-----
+date.weekday.short.mon
+lun.
+-----
+date.weekday.short.sat
+sam.
+-----
+date.weekday.short.sun
+dim.
+-----
+date.weekday.short.thu
+jeu.
+-----
+date.weekday.short.tue
+mar.
+-----
+date.weekday.short.wed
+mer.
+-----
+date.weekday_day_month
+{0} {1} {2}
+-----
+desktop_menu.copy
+Copier
+-----
+desktop_menu.cut
+Couper
+-----
+desktop_menu.delete
+Supprimer
+-----
+desktop_menu.new_file
+Nouveau fichier
+-----
+desktop_menu.new_folder
+Nouveau dossier
+-----
+desktop_menu.paste
+Coller
+-----
+desktop_menu.rename
+Renommer
+-----
+desktop_menu.tags
+Étiquettes…
+-----
+editor.new
+Nouveau
+-----
+editor.open
+Ouvrir
+-----
+editor.save
+Enregistrer
+-----
+editor.status.cannot_open
+Impossible d'ouvrir
+-----
+editor.status.cannot_read
+Impossible de lire
+-----
+editor.status.cannot_save
+Impossible d'enregistrer
+-----
+editor.status.enter_path
+Saisissez d'abord un chemin
+-----
+editor.status.is_directory
+Le chemin est un dossier :
+-----
+editor.status.limit
+Limite du document : 64 Ko
+-----
+editor.status.new_document
+Nouveau document
+-----
+editor.status.opened
+Ouvert
+-----
+editor.status.saved
+Enregistré
+-----
+editor.status.too_large
+Le fichier dépasse 64 Ko
+-----
+editor.status.unsaved
+Modifications non enregistrées
+-----
+files.cannot_open
+impossible d'ouvrir {0}
+-----
+files.column.empty
+Vide
+-----
+files.copy_name
+{0} copie
+-----
+files.copy_name_numbered
+{0} copie ({1})
+-----
+files.empty_directory
+Ce dossier est vide.
+-----
+files.kind.bmp
+Image BMP
+-----
+files.kind.c_header
+En-tête C
+-----
+files.kind.c_source
+Source C
+-----
+files.kind.document
+Document
+-----
+files.kind.extension_file
+Fichier {0}
+-----
+files.kind.folder
+Dossier
+-----
+files.kind.gif
+Image GIF
+-----
+files.kind.jpeg
+Image JPEG
+-----
+files.kind.json
+Document JSON
+-----
+files.kind.log
+Fichier journal
+-----
+files.kind.plain_text
+Texte brut
+-----
+files.kind.png
+Image PNG
+-----
+files.kind.python
+Script Python
+-----
+files.kind.tar
+Archive tar
+-----
+files.kind.v_source
+Source V
+-----
+files.list.ascending
+croissant
+-----
+files.list.descending
+décroissant
+-----
+files.list.kind
+Type
+-----
+files.list.modified
+Date de modification
+-----
+files.list.name
+Nom
+-----
+files.list.size
+Taille
+-----
+files.list.sort_by_kind
+Trier par type
+-----
+files.list.sort_by_modified
+Trier par date de modification
+-----
+files.list.sort_by_name
+Trier par nom
+-----
+files.list.sort_by_size
+Trier par taille
+-----
+files.location.computer
+Ordinateur
+-----
+files.location.desktop
+Bureau
+-----
+files.location.documents
+Documents
+-----
+files.location.downloads
+Téléchargements
+-----
+files.location.home
+Dossier personnel
+-----
+files.location.music
+Musique
+-----
+files.location.pictures
+Images
+-----
+files.new_file
+Nouveau fichier
+-----
+files.new_folder
+Nouveau dossier
+-----
+files.quicklook.cannot_preview
+Impossible de prévisualiser ce fichier.
+-----
+files.quicklook.truncated
+Affichage du début du fichier
+-----
+files.settings.done
+Terminé
+-----
+files.settings.favorite_tags
+Étiquettes favorites (cliquez pour activer) :
+-----
+files.settings.file_visibility
+Visibilité des fichiers
+-----
+files.settings.general
+Général
+-----
+files.settings.new_tag
+Nouvelle étiquette
+-----
+files.settings.rename
+Renommer
+-----
+files.settings.show_hidden
+Afficher les fichiers et dossiers cachés
+-----
+files.settings.show_hidden_note
+Inclut les noms commençant par un point, comme .local.
+-----
+files.settings.show_tag_in_sidebar
+Afficher {0} dans la barre latérale
+-----
+files.settings.sidebar_tags
+Afficher ces étiquettes dans la barre latérale :
+-----
+files.settings.tags
+Étiquettes
+-----
+files.settings.tint_folders
+Colorer les dossiers selon leurs étiquettes
+-----
+files.sidebar.favorites
+Favoris
+-----
+files.sidebar.locations
+Emplacements
+-----
+files.size.bytes
+{0} o
+-----
+files.size.decimal
+{0},{1} {2}
+-----
+files.size.whole
+{0} {1}
+-----
+files.tag.blue
+Bleu
+-----
+files.tag.gray
+Gris
+-----
+files.tag.green
+Vert
+-----
+files.tag.home
+Maison
+-----
+files.tag.important
+Important
+-----
+files.tag.orange
+Orange
+-----
+files.tag.purple
+Violet
+-----
+files.tag.red
+Rouge
+-----
+files.tag.work
+Travail
+-----
+files.tag.yellow
+Jaune
+-----
+files.tag_results.empty
+Aucun fichier ne porte cette étiquette.
+-----
+files.toolbar.back
+Précédent
+-----
+files.toolbar.columns
+Vue en colonnes
+-----
+files.toolbar.commander
+Vue à deux volets
+-----
+files.toolbar.forward
+Suivant
+-----
+files.toolbar.list
+Vue en liste
+-----
+files.toolbar.search
+Rechercher
+-----
+files.toolbar.settings
+Paramètres de Fichiers (Cmd+,)
+-----
+files.toolbar.tags
+Modifier les étiquettes
+-----
+files.toolbar.up
+Dossier parent
+-----
+files.unit.gb
+Go
+-----
+files.unit.kb
+Ko
+-----
+files.unit.mb
+Mo
+-----
+files.unit.tb
+To
+-----
+jump.close_all
+Fermer toutes les fenêtres
+-----
+jump.close_window
+Fermer la fenêtre
+-----
+jump.computer
+Ordinateur
+-----
+jump.documents
+Documents
+-----
+jump.downloads
+Téléchargements
+-----
+jump.home
+Dossier personnel
+-----
+jump.new_document
+Nouveau document
+-----
+jump.new_window
+Nouvelle fenêtre
+-----
+jump.pin
+Épingler ce programme à la barre des tâches
+-----
+jump.recent
+Récents
+-----
+jump.take_screenshot
+Capturer l'écran
+-----
+jump.tasks
+Tâches
+-----
+jump.unpin
+Détacher ce programme de la barre des tâches
+-----
+quick_launch.empty
+Aucune application trouvée
+-----
+quick_launch.search
+Rechercher des applications
+-----
+registration.button.create
+Créer le compte
+-----
+registration.error.mismatch
+Les mots de passe ne correspondent pas.
+-----
+registration.error.no_name
+Saisissez un nom.
+-----
+registration.error.no_password
+Saisissez un mot de passe.
+-----
+registration.error.save_failed
+Impossible d'enregistrer le compte. Réessayez.
+-----
+registration.field.confirm
+Confirmer le mot de passe
+-----
+registration.field.name
+Nom
+-----
+registration.field.password
+Mot de passe
+-----
+registration.heading
+Créez votre compte
+-----
+registration.intro
+Terminez la configuration pour utiliser Vinix.
+-----
+registration.placeholder.confirm
+Répétez le mot de passe
+-----
+registration.placeholder.name
+Saisissez votre nom
+-----
+registration.placeholder.password
+Saisissez un mot de passe
+-----
+settings.appearance.buttons
+Boutons des fenêtres
+-----
+settings.appearance.buttons_note
+Côté des boutons de fermeture et d'agrandissement.
+-----
+settings.appearance.combined
+Groupée
+-----
+settings.appearance.combined_note
+Style Windows 7 : un bouton par application.
+-----
+settings.appearance.left
+Gauche (macOS)
+-----
+settings.appearance.right
+Droite
+-----
+settings.appearance.standard
+Standard
+-----
+settings.appearance.standard_note
+Style Windows XP : un bouton par fenêtre.
+-----
+settings.appearance.taskbar
+Barre des tâches
+-----
+settings.appearance.taskbar_note
+Une entrée par fenêtre ou par application.
+-----
+settings.battery.built_in
+Batterie intégrée
+-----
+settings.battery.check_smc
+Consultez les diagnostics de démarrage d'apple-smc.
+-----
+settings.battery.current_charge
+Charge actuelle
+-----
+settings.battery.day_ago
+Il y a 24 heures
+-----
+settings.battery.enlarge
+Agrandissez Paramètres pour afficher les commandes.
+-----
+settings.battery.estimated_remaining
+Autonomie estimée
+-----
+settings.battery.footer
+Lecture seule · /dev/battery · actualisation toutes les 5 s.
+-----
+settings.battery.history
+Niveau de batterie — dernières 24 heures
+-----
+settings.battery.now
+Maintenant
+-----
+settings.battery.refresh
+Actualiser
+-----
+settings.battery.unavailable
+Indisponible
+-----
+settings.category.appearance
+Apparence
+-----
+settings.category.battery
+Batterie
+-----
+settings.category.date_time
+Date et heure
+-----
+settings.category.display
+Écran
+-----
+settings.category.keyboard
+Clavier
+-----
+settings.category.language
+Langue
+-----
+settings.category.theme
+Thème
+-----
+settings.category.wallpaper
+Fond d'écran
+-----
+settings.category.wifi
+Wi-Fi
+-----
+settings.choice.not_selected
+non sélectionné
+-----
+settings.choice.selected
+sélectionné
+-----
+settings.date_time.12_hour
+12 heures
+-----
+settings.date_time.24_hour
+24 heures
+-----
+settings.date_time.date_line
+Ligne de date
+-----
+settings.date_time.date_line_note
+Choisissez ce qui apparaît sous l'heure de la barre des tâches.
+-----
+settings.date_time.format
+Format de l'heure
+-----
+settings.date_time.format_note
+Choisissez le format 24 heures ou 12 heures avec AM/PM.
+-----
+settings.date_time.hide
+Masquer
+-----
+settings.date_time.hide_date
+Masquer la date
+-----
+settings.date_time.hide_weekday
+Masquer le jour
+-----
+settings.date_time.seconds
+Secondes
+-----
+settings.date_time.seconds_note
+Afficher les secondes dans la barre des tâches.
+-----
+settings.date_time.show
+Afficher
+-----
+settings.date_time.show_date
+Afficher la date
+-----
+settings.date_time.show_weekday
+Afficher le jour
+-----
+settings.display.actual_nits
+Réelle : {0} nits (rapport du pilote)
+-----
+settings.display.actual_unknown
+Réelle : inconnue
+-----
+settings.display.actual_waiting
+Réelle : en attente du rapport du pilote
+-----
+settings.display.bar_hint
+Cliquez sur la barre pour régler la luminosité par pas de 5 %.
+-----
+settings.display.brightness
+Luminosité
+-----
+settings.display.built_in
+Écran intégré
+-----
+settings.display.dcp_required
+L'intégration du moteur DCP reste nécessaire.
+-----
+settings.display.enlarge
+Agrandissez Paramètres pour afficher les commandes.
+-----
+settings.display.error.invalid
+Réponse de luminosité invalide.
+-----
+settings.display.error.io
+Échec d'E/S de luminosité. Actualisez pour réessayer.
+-----
+settings.display.error.offline
+Le périphérique de luminosité est hors ligne.
+-----
+settings.display.error.permission
+Accès refusé. Le réglage de luminosité exige un accès en écriture.
+-----
+settings.display.error.unavailable
+Pilote de luminosité indisponible.
+-----
+settings.display.pending
+Demande de luminosité en attente dans le pilote d'écran.
+-----
+settings.display.range
+{0} - {1} nits ; 0 % garde l'écran allumé.
+-----
+settings.display.range_unavailable
+La plage de luminosité de l'écran est indisponible.
+-----
+settings.display.read_from
+Luminosité lue depuis /dev/apple-panel-bl.
+-----
+settings.display.read_only
+Lecture seule ; les réglages de luminosité sont désactivés.
+-----
+settings.display.refresh
+Actualiser
+-----
+settings.display.requested_nits
+Demandée : {0} nits
+-----
+settings.display.requested_unchanged
+Demandée : inchangée depuis le démarrage
+-----
+settings.display.requested_unknown
+Demandée : inconnue
+-----
+settings.display.scale
+Échelle
+-----
+settings.display.unavailable
+Indisponible
+-----
+settings.display.unknown
+Inconnu
+-----
+settings.keyboard.layout.french
+Français
+-----
+settings.keyboard.layout.german
+Allemand
+-----
+settings.keyboard.layout.portuguese
+Portugais
+-----
+settings.keyboard.layout.russian
+Russe
+-----
+settings.keyboard.layout.spanish
+Espagnol
+-----
+settings.keyboard.layout.us
+Anglais (US)
+-----
+settings.keyboard.menu_hint
+Ctrl-Espace : source de saisie suivante
+-----
+settings.keyboard.menu_settings
+Paramètres du clavier
+-----
+settings.keyboard.off
+désactivé
+-----
+settings.keyboard.on
+activé
+-----
+settings.keyboard.sources
+Sources de saisie
+-----
+settings.keyboard.sources_note
+Ctrl-Espace parcourt les dispositions activées ici.
+-----
+settings.language.apps_note
+Les autres applications choisissent elles-mêmes leur langue.
+-----
+settings.language.heading
+Langue du système
+-----
+settings.language.note
+La langue des menus, des fenêtres et des applications Vinix.
+-----
+settings.theme.default
+Par défaut
+-----
+settings.theme.default_note_1
+Fenêtres arrondies avec ombres et couleur unie,
+-----
+settings.theme.default_note_2
+et une barre des tâches en bas de l'écran.
+-----
+settings.theme.heading
+Thème
+-----
+settings.theme.macos
+macOS
+-----
+settings.theme.macos_note_1
+Fenêtres gris clair au titre centré, trois
+-----
+settings.theme.macos_note_2
+pastilles colorées sur le bord gauche et un dock.
+-----
+settings.theme.note
+Aspect des fenêtres et de la barre des tâches.
+-----
+settings.wallpaper.colour
+Couleur
+-----
+settings.wallpaper.no_photos_1
+Aucune photo dans cette image. La compilation les
+-----
+settings.wallpaper.no_photos_2
+télécharge ; ni réseau ni cache n'étaient disponibles.
+-----
+settings.wallpaper.photo
+Photo
+-----
+settings.wifi.available
+Réseaux disponibles
+-----
+settings.wifi.channel
+canal {0}
+-----
+settings.wifi.enlarge
+Agrandissez Paramètres pour afficher les commandes.
+-----
+settings.wifi.error.disabled
+Activez le Wi-Fi avant de rechercher.
+-----
+settings.wifi.error.invalid
+Réponse du pilote Wi-Fi invalide.
+-----
+settings.wifi.error.io
+Échec d'E/S Wi-Fi. Actualisez pour réessayer.
+-----
+settings.wifi.error.not_ready
+Chargez le micrologiciel BCM4378 adapté avant d'activer le Wi-Fi.
+-----
+settings.wifi.error.permission
+Accès refusé. Les commandes Wi-Fi exigent un accès en écriture.
+-----
+settings.wifi.error.unavailable
+Périphérique Wi-Fi indisponible. Démarrez avec vinix.apple_wifi=1.
+-----
+settings.wifi.hidden_network
+<Réseau masqué>
+-----
+settings.wifi.list.driver_error
+Wi-Fi arrêté après une erreur du pilote ; redémarrez pour réessayer.
+-----
+settings.wifi.list.no_device
+La recherche de réseaux exige la présence du périphérique Wi-Fi.
+-----
+settings.wifi.list.no_firmware
+Chargez le micrologiciel Wi-Fi adapté pour rechercher des réseaux.
+-----
+settings.wifi.list.none_found
+Aucun réseau sans fil trouvé. Sélectionnez Rechercher.
+-----
+settings.wifi.list.searching
+Recherche de réseaux sans fil…
+-----
+settings.wifi.list.turn_on
+Activez le Wi-Fi pour rechercher des réseaux.
+-----
+settings.wifi.next_button
+Suivant
+-----
+settings.wifi.open
+Ouvert
+-----
+settings.wifi.page
+{0}-{1} sur {2}
+-----
+settings.wifi.previous_button
+Précédent
+-----
+settings.wifi.radio
+Wi-Fi
+-----
+settings.wifi.read_only
+Lecture seule ; les commandes Wi-Fi sont désactivées.
+-----
+settings.wifi.refresh_button
+Actualiser
+-----
+settings.wifi.scan_button
+Rechercher
+-----
+settings.wifi.scan_failed
+La dernière recherche de réseaux a échoué ({0}).
+-----
+settings.wifi.scanning_button
+Recherche…
+-----
+settings.wifi.secured
+Sécurisé
+-----
+settings.wifi.signal
+{0} dBm
+-----
+settings.wifi.state.authenticated
+Liaison Wi-Fi authentifiée.
+-----
+settings.wifi.state.connecting
+Connexion à un réseau Wi-Fi…
+-----
+settings.wifi.state.detected
+BCM4378 détecté ; chargez le micrologiciel adapté avec wifi-ctl.
+-----
+settings.wifi.state.driver_error
+Wi-Fi arrêté après une erreur du pilote ({0}).
+-----
+settings.wifi.state.hardware_off
+Le matériel Wi-Fi est éteint.
+-----
+settings.wifi.state.off
+Le Wi-Fi est désactivé.
+-----
+settings.wifi.state.on
+Le Wi-Fi est activé.
+-----
+settings.wifi.state.starting
+Démarrage du micrologiciel Wi-Fi.
+-----
+settings.wifi.subtitle
+Sans fil Broadcom BCM4378
+-----
+settings.wifi.turn_off
+Désactiver
+-----
+settings.wifi.turn_on
+Activer
+-----
+start.all_programs
+Tous les programmes  >
+-----
+start.back
+<  Retour
+-----
+start.context.forget
+Retirer de cette liste
+-----
+start.context.open
+Ouvrir
+-----
+start.context.pin_start
+Épingler au menu Démarrer
+-----
+start.context.pin_taskbar
+Épingler à la barre des tâches
+-----
+start.context.unpin_start
+Détacher du menu Démarrer
+-----
+start.context.unpin_taskbar
+Détacher de la barre des tâches
+-----
+start.documents
+Documents
+-----
+start.help
+Aide
+-----
+start.no_results
+Aucun programme trouvé
+-----
+start.recent_empty
+Rien d'ouvert pour le moment
+-----
+start.recent_items
+Éléments récents
+-----
+start.search
+Rechercher programmes et fichiers
+-----
+start.shut_down
+Éteindre
+-----
+surface.blender.client_failed
+Vinix n'a pas pu démarrer le client Blender natif.
+-----
+surface.blender.data_missing
+Les données de Blender sont absentes. Exécutez pkg install blender dans Terminal.
+-----
+surface.blender.exited
+Blender s'est fermé.
+-----
+surface.blender.not_staged
+Blender natif n'est pas préparé. Exécutez scripts/build-blender-native-aarch64.sh.
+-----
+surface.blender.starting
+Démarrage de Blender natif…
+-----
+terminal.cannot_start
+impossible de démarrer {0}
+-----
+tray.battery.charging
+En charge
+-----
+tray.battery.heading
+Batterie
+-----
+tray.battery.settings
+Paramètres d'alimentation
+-----
+tray.battery.tip_charging
+Batterie : {0}, en charge
+-----
+tray.battery.tip_remaining
+Batterie : {0} restants
+-----
+tray.capture.note
+Captures et enregistrements d'écran
+-----
+tray.capture.open
+Ouvrir Capture
+-----
+tray.capture.recording
+Enregistrement de l'écran
+-----
+tray.capture.screenshot
+Capturer l'écran
+-----
+tray.capture.tip_recording
+Capture : enregistrement
+-----
+tray.display.brighter
+Plus clair
+-----
+tray.display.brightness
+Luminosité {0} %
+-----
+tray.display.dimmer
+Plus sombre
+-----
+tray.display.heading
+Écran
+-----
+tray.display.no_backlight
+Cet écran n'a pas de rétroéclairage réglable.
+-----
+tray.display.settings
+Paramètres de l'écran
+-----
+tray.display.tip_brightness
+Luminosité : {0} %
+-----
+tray.ethernet.acquiring
+Ethernet : attribution d'une adresse
+-----
+tray.ethernet.checking
+Ethernet : vérification
+-----
+tray.ethernet.connected
+Ethernet : connecté
+-----
+tray.ethernet.no_adapter
+Ethernet : aucun adaptateur
+-----
+tray.menu.hide
+Masquer dans le menu de débordement
+-----
+tray.menu.show
+Afficher dans la barre des tâches
+-----
+tray.network.ethernet_address
+Ethernet : {0}
+-----
+tray.network.heading
+Réseau
+-----
+tray.network.ipv4_address
+Adresse IPv4 {0}
+-----
+tray.network.no_ipv4
+Aucune adresse IPv4
+-----
+tray.network.not_connected
+Non connecté
+-----
+tray.network.settings
+Paramètres réseau
+-----
+tray.overflow.hint
+Clic droit pour déplacer
+-----
+tray.show_desktop
+Afficher le bureau
+-----
+tray.show_hidden_icons
+Afficher les icônes masquées
+-----
+tray.wifi.networks_nearby
+Wi-Fi : activé, {0} réseau à proximité|Wi-Fi : activé, {0} réseaux à proximité
+-----
+tray.wifi.no_adapter
+Wi-Fi : aucun adaptateur
+-----
+tray.wifi.not_connected
+Wi-Fi : non connecté
+-----
+tray.wifi.off
+Wi-Fi : désactivé
+-----
+disk_usage.button.rescan
+Réanalyser
+-----
+disk_usage.button.stop
+Arrêter
+-----
+disk_usage.button.up
+Haut
+-----
+disk_usage.duration.milliseconds
+{0} ms
+-----
+disk_usage.duration.minutes
+{0} min {1} s
+-----
+disk_usage.duration.seconds
+{0},{1} s
+-----
+disk_usage.error.cannot_open
+impossible d'ouvrir {0}
+-----
+disk_usage.metric.files
+FICHIERS
+-----
+disk_usage.metric.folders
+DOSSIERS
+-----
+disk_usage.metric.size
+TAILLE INDEXÉE
+-----
+disk_usage.metric.skipped
+IGNORÉS
+-----
+disk_usage.panel.empty
+Les résultats apparaissent ici pendant l'analyse du disque.
+-----
+disk_usage.panel.files
+Fichiers les plus volumineux
+-----
+disk_usage.panel.folders
+Dossiers les plus volumineux
+-----
+disk_usage.panel.nothing_yet
+aucun résultat
+-----
+disk_usage.panel.ranked
+{0} classé|{0} classés
+-----
+disk_usage.phase.complete
+TERMINÉ
+-----
+disk_usage.phase.scanning
+ANALYSE EN COURS
+-----
+disk_usage.phase.stopped
+ARRÊTÉ
+-----
+disk_usage.phase.unreadable
+ILLISIBLE
+-----
+disk_usage.scope.home
+Dossier personnel
+-----
+disk_usage.scope.system
+Système
+-----
+disk_usage.scope.whole_disk
+Disque entier
+-----
+disk_usage.size.bytes
+{0} o
+-----
+disk_usage.size.decimal
+{0},{1} {2}
+-----
+disk_usage.size.whole
+{0} {1}
+-----
+disk_usage.status.scanned
+Analyse de {0} terminée en {1}.
+-----
+disk_usage.status.scanned_skipped
+Analyse de {1} terminée en {2}. {0} élément protégé ou illisible a été ignoré.|Analyse de {1} terminée en {2}. {0} éléments protégés ou illisibles ont été ignorés.
+-----
+disk_usage.status.stopped
+Arrêté. Les classements ci-dessous conservent les éléments comptés.
+-----
+disk_usage.status.walking
+Analyse de {0}
+-----
+disk_usage.subtitle
+Inventaire du disque
+-----
+disk_usage.unit.gb
+Go
+-----
+disk_usage.unit.kb
+Ko
+-----
+disk_usage.unit.mb
+Mo
+-----
+disk_usage.unit.pb
+Po
+-----
+disk_usage.unit.tb
+To
+-----
+window.external_app
+Application externe
+-----
+window.notes
+Notes
+-----
+window.notes.line_1
+Le compositeur dessine chaque pixel :
+-----
+window.notes.line_2
+fond d'écran, cadres, texte et curseur.
+-----
+window.notes.line_3
+La disposition et la détection des clics
+-----
+window.notes.line_4
+viennent d'un arbre ui2 recréé à chaque image.
+-----
+window.outdated
+Mise à jour de Vinix
+-----
+window.outdated.heading
+Votre Vinix n'est plus à jour
+-----
+window.outdated.line_1
+Cette version de Vinix n'est plus à jour.
+-----
+window.outdated.line_2
+Vinix évolue vite : chaque version ajoute de nombreuses
+-----
+window.outdated.line_3
+fonctions et corrige de nombreux bugs.
+-----
+window.outdated.line_4
+Allez sur vinix-os.org et téléchargez la dernière ISO.
+-----
+window.outdated.versions
+Installée : {0}    Dernière : {1}
+-----
+window.palette
+Palette
+-----
+window.system
+Système
+-----
+window.system.backlight_absent
+Rétroéclairage absent (non enregistré par le pilote)
+-----
+window.system.backlight_present
+Rétroéclairage présent sur {0}
+-----
+window.system.battery_absent
+Batterie   absente (non enregistrée par le pilote)
+-----
+window.system.battery_present
+Batterie   présente sur {0}
+-----
+window.system.display
+Écran     {0} x {1}
+-----
+window.system.frames
+Images    {0}
+-----
+window.system.no_pointer
+indisponible
+-----
+window.system.pointer
+Pointeur  {0}
+-----
+window.system.shortcuts
+Super+Flèches juxtapose ; Super+1..4 change d'espace.
+-----
+window.system.windows
+Fenêtres  {0} ouvertes, {1} à l'écran
+-----
+window.welcome
+Bienvenue
+-----
+window.welcome.heading
+Bienvenue dans Vinix
+-----
+window.welcome.hint_1
+Glissez une barre de titre pour déplacer une fenêtre.
+-----
+window.welcome.hint_2
+La barre des tâches affiche tout ce qui est ouvert.
+-----
+window.welcome.line_1
+Un bureau entièrement écrit en V,
+-----
+window.welcome.line_2
+qui dessine directement dans le framebuffer.
+-----
+wine.chromium.exited
+Chromium s'est fermé.
+-----
+wine.chromium.missing
+Chromium n'est pas installé. Exécutez pkg install chromium dans Terminal.
+-----
+wine.chromium.starting
+Démarrage de Chromium…
+-----
+wine.dota2.exited
+Dota 2 s'est fermé.
+-----
+wine.dota2.missing
+Dota 2 n'est pas installé.
+-----
+wine.dota2.starting
+Démarrage de Dota 2…
+-----
+wine.doom.exited
+DOOM s'est fermé.
+-----
+wine.doom.missing
+DOOM n'est pas installé. Exécutez scripts/build-doom-aarch64.sh.
+-----
+wine.doom.starting
+Démarrage de DOOM…
+-----
+wine.doom.wad_missing
+Le WAD de DOOM est absent. Définissez VINIX_DOOM_WAD et reconstruisez l'image.
+-----
+wine.firefox.exited
+Firefox s'est fermé.
+-----
+wine.firefox.missing
+Firefox n'est pas installé. Exécutez pkg install firefox dans Terminal.
+-----
+wine.firefox.starting
+Démarrage de Firefox…
+-----
+wine.gimp.exited
+GIMP s'est fermé.
+-----
+wine.gimp.missing
+GIMP n'est pas installé. Exécutez pkg install gimp dans Terminal.
+-----
+wine.gimp.starting
+Démarrage de GIMP…
+-----
+wine.gothic.data_missing
+Les données de Gothic II sont absentes. Copiez Data, _work et System dans /usr/share/games/gothic2.
+-----
+wine.gothic.exited
+Gothic II s'est fermé.
+-----
+wine.gothic.missing
+Gothic II n'est pas installé. Exécutez scripts/build-opengothic-aarch64.sh.
+-----
+wine.gothic.starting
+Démarrage de Gothic II…
+-----
+wine.host_failed
+Vinix n'a pas pu démarrer l'hôte X11 intégré.
+-----
+wine.libreoffice.exited
+LibreOffice s'est fermé.
+-----
+wine.libreoffice.missing
+LibreOffice n'est pas installé. Exécutez pkg install libreoffice-writer dans Terminal.
+-----
+wine.libreoffice.starting
+Démarrage de LibreOffice…
+-----
+wine.minecraft.exited
+Minecraft s'est fermé.
+-----
+wine.minecraft.missing
+Minecraft n'est pas installé. Exécutez pkg install minecraft dans Terminal.
+-----
+wine.minecraft.starting
+Démarrage de Minecraft…
+-----
+wine.obs.exited
+OBS Studio s'est fermé.
+-----
+wine.obs.missing
+OBS Studio n'est pas installé. Exécutez pkg install obs-studio dans Terminal.
+-----
+wine.obs.starting
+Démarrage d'OBS Studio…
+-----
+wine.qemu.exited
+QEMU s'est fermé.
+-----
+wine.qemu.missing
+QEMU n'est pas installé. Compilez le bureau avec --with-qemu-system.
+-----
+wine.qemu.starting
+Démarrage de Vinix dans QEMU…
+-----
+wine.steam.exited
+Steam s'est fermé.
+-----
+wine.steam.installing
+Installation du client Steam…
+-----
+wine.steam.missing
+Steam n'est pas installé dans cette image du bureau.
+-----
+wine.windows.exited
+L'application Windows s'est fermée.
+-----
+wine.windows.missing
+L'environnement Wine avec traduction n'est pas installé.
+-----
+wine.windows.starting
+Démarrage de l'application Windows…
+-----
+wine.word.exited
+Microsoft Word 2013 s'est fermé.
+-----
+wine.word.media_missing
+Préparez les fichiers d'installation sous licence de Word 2013 x64, puis relancez Word.
+-----
+wine.word.missing
+L'environnement Wine Win64 avec traduction n'est pas installé.
+-----
+wine.word.setup_closed
+L'installation de Word 2013 s'est fermée. Relancez Word après l'installation.
+-----
+wine.word.setup_starting
+Démarrage de l'installation de Word 2013 64 bits…
+-----
+wine.word.starting
+Démarrage de Microsoft Word 2013…
+-----
+wine.xvfb_missing
+Xvfb n'est pas installé. Reconstruisez la couche X11 de Vinix.
+-----
+wm.app_failed
+Cette application n'a pas pu s'afficher :
+-----
+wm.external.failed
+{0} ou Xorg s'est fermé avec une erreur.
+-----
+wm.external.hint
+Compilez Firefox/Xorg, puis reconstruisez l'espace utilisateur et l'image du bureau.
+-----
+wm.external.note
+{0} utilise une session X11 exclusive ; le bureau natif reprend à sa fermeture.
+-----
+wm.external.spawn_failed
+Vinix n'a pas pu créer le processus de lancement de {0}.
+-----
+wm.external.title
+{0} n'a pas pu démarrer
+-----
+wm.external.unavailable
+{0} n'est pas installé dans cette image du bureau.
+-----
+wm.external.wait_failed
+Vinix a perdu la trace du processus de lancement de {0}.
+-----
+wm.not_installed.command
+Exécutez pkg install {0} dans Terminal pour l'installer.
+-----
+wm.not_installed.hint
+Rouvrez l'application ici une fois l'installation terminée.
+-----
+wm.not_installed.note
+L'image de Vinix n'inclut pas cette application.
+-----
+wm.not_installed.title
+{0} n'est pas installé
+-----
+wm.taskbar.group
+{0}  ({1})
+-----
+app.android_calculator
+Calculatrice Android
+-----
+android.starting
+Démarrage de l'APK Android…
+-----
+android.missing
+L'environnement Android ou l'APK de la calculatrice est absent de cette image.
+-----
+android.exited
+L'APK Android s'est fermé.
+-----
+activity.column.cpu_time
+Temps CPU (s)
+-----
+activity.column.ppid
+PID parent
+-----
+activity.column.state
+État
+-----
+activity.column.threads
+Threads
+-----
+activity.column.user
+ID utilisateur
+-----
+activity.columns
+Colonnes
+-----
+activity.control.continue
+Reprendre
+-----
+activity.control.failed
+Échec de l'action
+-----
+activity.control.gone
+Processus terminé
+-----
+activity.control.kill_tree
+Terminer l'arbre
+-----
+activity.control.nice
+Nice
+-----
+activity.control.permission
+Permission refusée
+-----
+activity.control.priority_down
+Priorité -
+-----
+activity.control.priority_up
+Priorité +
+-----
+activity.control.quit
+Quitter
+-----
+activity.control.sent
+Demandé
+-----
+activity.control.suspend
+Suspendre
+-----
+activity.energy.application_note
+L'impact énergétique par application est indisponible. L'historique de la batterie couvre les dernières 24 heures.
+-----
+activity.energy.battery
+Charge de la batterie : {0}
+-----
+activity.energy.current
+Intensité : {0} A
+-----
+activity.energy.power
+Puissance de la batterie : {0} W
+-----
+activity.energy.sign_note
+Les mesures signées sont fournies par le contrôleur de batterie. Le graphique est centré sur zéro.
+-----
+activity.energy.voltage
+Tension : {0} V
+-----
+activity.filter.active
+Processus actifs
+-----
+activity.filter.all
+Tous
+-----
+activity.filter.applications
+Applications
+-----
+activity.filter.user
+Mes processus
+-----
+activity.gpu.drivers
+Pilotes GPU : {0}
+-----
+activity.gpu.rate
+Soumissions par seconde : {0}
+-----
+activity.gpu.sensors_unavailable
+Les mesures d'utilisation du GPU, de mémoire dédiée et de puissance sont indisponibles. Le graphique montre les commandes acceptées.
+-----
+activity.gpu.submissions
+Soumissions acceptées : {0}
+-----
+activity.gpu.unavailable
+L'activité du GPU est indisponible sur ce système.
+-----
+activity.inspect
+Inspecter le processus sélectionné
+-----
+activity.inspector.close
+Fermer l'inspecteur
+-----
+activity.inspector.command
+Commande et arguments :
+-----
+activity.inspector.executable
+Exécutable :
+-----
+activity.inspector.export
+Enregistrer
+-----
+activity.inspector.export_failed
+Impossible d'enregistrer le rapport.
+-----
+activity.inspector.exported
+Enregistré dans {0}
+-----
+activity.inspector.fd_unavailable
+Indisponible (fermé ou permission refusée)
+-----
+activity.inspector.files
+Fichiers / Sockets
+-----
+activity.inspector.files_unavailable
+Fichiers ouverts indisponibles (processus terminé ou accès refusé).
+-----
+activity.inspector.maps
+Mappages mémoire :
+-----
+activity.inspector.memory
+Mémoire
+-----
+activity.inspector.memory_unavailable
+Mappages mémoire indisponibles (processus terminé ou accès refusé).
+-----
+activity.inspector.no_files
+Aucun descripteur de fichier ouvert
+-----
+activity.inspector.not_available
+Indisponible
+-----
+activity.inspector.overview
+Vue d'ensemble
+-----
+activity.inspector.smaps
+Détails mémoire (Ko) :
+-----
+activity.inspector.socket
+socket
+-----
+activity.inspector.status_unavailable
+État du processus indisponible.
+-----
+activity.inspector.title
+Inspecteur de processus
+-----
+activity.inspector.truncated
+Instantané limité ; certains détails ont été omis.
+-----
+activity.inspector.unavailable
+Processus terminé ou accès refusé.
+-----
+activity.interval.fast
+0,5 s
+-----
+activity.interval.normal
+1 s
+-----
+activity.interval.slow
+2 s
+-----
+activity.interval.slowest
+5 s
+-----
+activity.no_matches
+Aucun processus correspondant
+-----
+activity.pause_refresh
+Pause
+-----
+activity.resources.cached
+Cache de fichiers : {0}
+-----
+activity.resources.core
+CPU {0} · {1}
+-----
+activity.resources.cpu
+CPU
+-----
+activity.resources.disk
+Disque
+-----
+activity.resources.disk.note
+Octets transférés sur le disque physique. Les lectures du cache et des fichiers en mémoire n'accèdent pas au stockage.
+-----
+activity.resources.free
+Libre : {0}
+-----
+activity.resources.io_totals
+Totaux depuis le démarrage : {0} entrants · {1} sortants
+-----
+activity.resources.memory
+Mémoire
+-----
+activity.resources.memory.note
+La pression mémoire vient du noyau. Le swap et la compression ne sont pas pris en charge.
+-----
+activity.resources.network
+Réseau
+-----
+activity.resources.network.note
+Octets de données IPv4/IPv6, boucle locale incluse ; hors sockets Unix et surcoût des protocoles.
+-----
+activity.resources.pressure
+Pression : {0}
+-----
+activity.resources.pressure.critical
+Critique
+-----
+activity.resources.pressure.high
+Élevée
+-----
+activity.resources.pressure.normal
+Normale
+-----
+activity.resources.rate
+{0}/s
+-----
+activity.resources.read
+Lus : {0}
+-----
+activity.resources.received
+Reçus : {0}
+-----
+activity.resources.sent
+Envoyés : {0}
+-----
+activity.resources.slab
+Tas du noyau : {0}
+-----
+activity.resources.total
+Mémoire physique : {0}
+-----
+activity.resources.unavailable
+Indisponible
+-----
+activity.resources.used
+Utilisée : {0}
+-----
+activity.resources.written
+Écrits : {0}
+-----
+activity.resume_refresh
+Reprendre
+-----
+activity.search
+Chercher un nom ou un PID
+-----
+activity.sort_by.cpu_time
+Trier par temps CPU
+-----
+activity.sort_by.ppid
+Trier par PID parent
+-----
+activity.sort_by.state
+Trier par état
+-----
+activity.sort_by.threads
+Trier par nombre de threads
+-----
+activity.sort_by.user
+Trier par ID utilisateur
+-----
+activity.startup.description
+Choisissez les applications à ouvrir à la connexion. Les changements s'appliquent à la prochaine session du bureau.
+-----
+activity.startup.disabled
+Désactivé
+-----
+activity.startup.enabled
+Activé
+-----
+activity.startup.impact_unavailable
+L'impact CPU au démarrage n'a pas été mesuré.
+-----
+activity.startup.save_failed
+Impossible d'enregistrer les paramètres de démarrage.
+-----
+activity.state.exited
+Terminé
+-----
+activity.state.running
+En cours
+-----
+activity.state.sleeping
+En sommeil
+-----
+activity.state.stopped
+Arrêté
+-----
+activity.state.zombie
+Zombie
+-----
+activity.tree
+Arborescence
+-----
+activity.view.energy
+Énergie
+-----
+activity.view.gpu
+GPU
+-----
+activity.view.processes
+Processus
+-----
+activity.view.resources
+Ressources
+-----
+activity.view.startup
+Démarrage
+-----
+activity.startup.launch_ms
+{0} ms
+-----
+activity.startup.launch_note
+Dernier temps de lancement réussi, jusqu'à la réponse de la première fenêtre. L'impact CPU au démarrage est indisponible.
+-----
+activity.startup.not_measured
+Non mesuré
+-----
+activity.filter.system
+Système (root)
+-----
+activity.scroll_down
+Défiler vers le bas
+-----
+activity.scroll_up
+Défiler vers le haut
+-----
+activity.view.next
+Changer de vue
+-----
+activity.inspector.io
+E/S
+-----
+activity.inspector.io.counter
+{0} : {1} octets au total, {2}
+-----
+activity.inspector.io.disk_read
+Lectures du disque
+-----
+activity.inspector.io.disk_write
+Écritures sur le disque
+-----
+activity.inspector.io.logical_read
+Lectures de fichiers
+-----
+activity.inspector.io.logical_write
+Écritures de fichiers
+-----
+activity.inspector.io.net_recv
+Reçus
+-----
+activity.inspector.io.net_send
+Envoyés
+-----
+activity.inspector.io.scope
+Les débits nécessitent deux mesures. Les totaux des fichiers incluent le cache et les fichiers en mémoire ; ceux du disque comptent le stockage physique. Le réseau compte les données INET, boucle locale incluse. L'écriture différée est imputée au thread qui l'a demandée.
+-----
+activity.inspector.io.unavailable
+Les compteurs d'E/S du processus sont indisponibles.
+-----
+activity.inspector.io.unknown
+Inconnu
+-----
+activity.search.done
+Fermer la recherche
+-----
+roblox.starting
+Démarrage de Roblox…
+-----
+roblox.missing
+L'environnement Roblox est absent. Reconstruisez le bureau avec --with-roblox.
+-----
+roblox.apk_missing
+Copiez votre APK Roblox dans ~/Roblox.apk, ou définissez VINIX_ROBLOX_APK avec son chemin.
+-----
+roblox.exited
+Roblox s'est fermé. Consultez le journal de l'application pour plus de détails.
+-----
+activity.list.export
+Exporter les processus (Ctrl-E)
+-----
+activity.list.exported
+Liste des processus enregistrée : {0}
+-----
+activity.history.clear
+Effacer l'historique (Ctrl-L)
+-----
+activity.history.cleared
+Historique des ressources effacé
+-----
+activity.filter.inactive
+Processus inactifs
+-----
+activity.filter.other_users
+Autres utilisateurs
+-----
+activity.filter.selected
+Sélectionné
+-----
+editor.undo
+Annuler
+-----
+editor.redo
+Rétablir
+-----
+editor.find
+Rechercher
+-----
+editor.replace
+Remplacer
+-----
+editor.find.previous
+Précédent
+-----
+editor.find.next
+Suivant
+-----
+editor.replace.all
+Tout remplacer
+-----
+editor.find.close
+Fermer
+-----
+editor.status.no_match
+Aucun texte correspondant
+-----
+editor.status.match
+Texte correspondant trouvé
+-----
+editor.status.replaced
+Texte remplacé
+-----
+calendar.events
+Événements
+-----
+calendar.events.empty
+Aucun événement à cette date
+-----
+calendar.event.new
+Nouvel événement
+-----
+calendar.event.all_day
+Toute la journée
+-----
+calendar.event.title
+Titre
+-----
+calendar.event.time
+Heure (HH:MM)
+-----
+calendar.event.location
+Lieu
+-----
+calendar.event.save
+Enregistrer
+-----
+calendar.event.cancel
+Annuler
+-----
+calendar.event.delete
+Supprimer
+-----
+calendar.event.invalid_time
+Saisissez une heure entre 00:00 et 23:59
+-----
+calendar.event.title_required
+Saisissez un titre d'événement
+-----
+calendar.event.save_failed
+Impossible d'enregistrer les événements. Vos modifications restent affichées
+-----
+calendar.event.read_failed
+Impossible de lire les événements enregistrés. Le fichier existant a été conservé
+-----
+calendar.event.limit
+Le calendrier peut contenir 128 événements
+-----
+clock.timer
+Minuteur
+-----
+clock.lap
+Tour
+-----
+clock.laps
+Tour / Intermédiaire / Total
+-----
+clock.timer.preset.1
+1 min
+-----
+clock.timer.preset.5
+5 min
+-----
+clock.timer.preset.15
+15 min
+-----
+clock.timer.finished
+Le temps est écoulé
+-----
+clock.timer.adjust
+Réglez les minutes avant de démarrer
+-----
+calculator.history.title
+Historique
+-----
+calculator.history.clear
+Effacer
+-----
+disk_usage.path.root
+Dossier
+-----
+disk_usage.path.report
+Rapport
+-----
+disk_usage.button.scan
+Analyser
+-----
+disk_usage.button.export
+Exporter en CSV
+-----
+disk_usage.report.saved
+Rapport enregistré : {0}
+-----
+disk_usage.report.failed
+Impossible d'enregistrer le rapport : {0}
+-----
+disk_usage.report.exists
+Un fichier existe déjà : {0}
+-----
+settings.category.about
+À propos
+-----
+settings.about.kernel
+Système d'exploitation et noyau
+-----
+settings.about.cpu
+Processeur
+-----
+settings.about.memory
+Mémoire physique
+-----
+settings.about.uptime
+Durée de fonctionnement (s)
+-----
+settings.about.unavailable
+Non indiqué par ce système
+-----
+settings.about.refresh
+Actualiser
+-----
+terminal.find
+Rechercher
+-----
+terminal.history.clear
+Effacer l'historique
+-----
+terminal.find.placeholder
+Rechercher dans la sortie
+-----
+terminal.find.previous
+Occurrence précédente
+-----
+terminal.find.next
+Occurrence suivante
+-----
+terminal.find.no_match
+Aucun texte correspondant
+-----
+calendar.event.changed
+Les événements ont changé dans une autre fenêtre. Rouvrez Calendrier avant d'enregistrer
+-----
+files.info.title
+Informations
+-----
+files.info.close
+Fermer
+-----
+files.info.kind
+Type
+-----
+files.info.size
+Taille
+-----
+files.info.permissions
+Permissions
+-----
+files.info.owner
+ID propriétaire / groupe
+-----
+files.info.modified
+Modifié
+-----
+files.info.accessed
+Dernier accès
+-----
+files.info.changed
+Métadonnées modifiées
+-----
+files.info.target
+Cible du lien
+-----
+files.info.symbolic_link
+Lien symbolique
+-----
+files.info.special_file
+Fichier spécial
+-----
+files.info.unavailable
+Informations du fichier indisponibles
+-----
+calendar.event.invalid_location
+Le lieu doit tenir sur une seule ligne
+-----
+files.info.symbol
+i
+-----
+calculator.memory.indicator
+M
+-----
+console.source.xorg
+Journal Xorg
+-----
+console.source.firefox
+Journal Firefox
+-----
+console.source.chromium
+Journal Chromium
+-----
+console.load
+Ouvrir
+-----
+console.refresh
+Actualiser
+-----
+console.follow
+Suivre les ajouts
+-----
+console.matches
+Lignes correspondantes
+-----
+console.filter
+Filtre exact
+-----
+console.empty
+Ce journal est vide.
+-----
+console.no_matches
+Aucune ligne ne correspond au filtre exact.
+-----
+console.no_file
+Le journal n'existe pas. Choisissez un autre chemin ou démarrez l'application qui l'écrit.
+-----
+console.not_regular
+Seuls les fichiers ordinaires sont pris en charge. Périphériques, liens, dossiers et tubes ne peuvent pas être affichés.
+-----
+console.read_failed
+Impossible de lire le journal.
+-----
+console.invalid_path
+Saisissez un chemin de fichier absolu sans caractères de contrôle.
+-----
+console.up
+Précédent
+-----
+console.down
+Suivant
+-----
+console.left
+Gauche
+-----
+console.right
+Droite
+-----
+console.limited
+Derniers 128 Kio
+-----
+console.export
+Exporter
+-----
+console.export_exists
+Le chemin d'export existe déjà. Choisissez un nouveau nom de fichier.
+-----
+console.export_failed
+Impossible d'exporter les lignes correspondantes.
+-----
+console.export_saved
+Lignes correspondantes exportées.
+-----
+console.hint
+Le filtre cherche du texte exact et respecte la casse. L'export enregistre toutes les lignes correspondantes sans écraser de fichiers.
+-----
+app.system_information
+Informations système
+-----
+system_information.overview
+Vue d'ensemble
+-----
+system_information.hardware
+Matériel
+-----
+system_information.storage
+Stockage
+-----
+system_information.packages
+Paquets installés
+-----
+system_information.unavailable
+Indisponible
+-----
+system_information.kernel
+Noyau
+-----
+system_information.cpu
+Modèle du CPU
+-----
+system_information.architecture
+Architecture CPU indiquée
+-----
+system_information.cpu_online
+Processeurs actifs
+-----
+system_information.memory_total
+Mémoire totale
+-----
+system_information.memory_available
+Mémoire disponible
+-----
+system_information.memory_cached
+Mémoire en cache
+-----
+system_information.uptime
+Durée de fonctionnement (s)
+-----
+system_information.cpu_report
+Rapport CPU
+-----
+system_information.numa_nodes
+Nœuds mémoire actifs
+-----
+system_information.gpu_report
+Rapport des pilotes GPU
+-----
+system_information.network_report
+Rapport des interfaces réseau
+-----
+system_information.device_inventory_unavailable
+Inventaire des périphériques PCI / USB et de leurs pilotes indisponible
+-----
+system_information.custom_package
+Paquet personnalisé (version indisponible)
+-----
+system_information.source
+Source
+-----
+system_information.mount
+Montage (chemin ; système de fichiers ; source ; options)
+-----
+system_information.capacity
+Total / utilisé / disponible (octets)
+-----
+system_information.capacity_unavailable
+Capacité indisponible pour ce système de fichiers
+-----
+system_information.package_version_unavailable
+Paquet (version indisponible)
+-----
+system_information.packages_empty
+Aucun paquet APK installé enregistré
+-----
+system_information.read_failed
+Impossible de terminer la lecture du rapport
+-----
+system_information.refresh
+Actualiser
+-----
+system_information.previous
+Précédent
+-----
+system_information.next
+Suivant
+-----
+system_information.limited
+Rapport limité ; certaines informations ont été omises
+-----
+system_information.destination
+Destination du rapport · Ctrl-L pour remplacer
+-----
+system_information.export
+Exporter
+-----
+system_information.item
+{0} : {1}
+-----
+system_information.report.invalid
+Saisissez une destination absolue pour le rapport
+-----
+system_information.report.exists
+Un fichier existe déjà à cette destination
+-----
+system_information.report.saved
+Rapport enregistré
+-----
+system_information.report.failed
+Impossible d'enregistrer le rapport
+-----
+app.preview
+Aperçu
+-----
+app.console
+Console
+-----
+preview.open
+Ouvrir
+-----
+preview.fit
+Ajuster
+-----
+preview.actual
+100 %
+-----
+preview.zoom.out
+-
+-----
+preview.zoom.in
++
+-----
+preview.rotate.left
+Tourner à gauche
+-----
+preview.rotate.right
+Tourner à droite
+-----
+preview.export.png
+Exporter en PNG
+-----
+preview.export.copy
+Copie de l'original
+-----
+preview.export.to
+Exporter vers
+-----
+preview.path.open.placeholder
+Chemin d'un PNG ou JPEG
+-----
+preview.path.export.placeholder
+Nouveau chemin de sortie
+-----
+preview.zoom.percent
+{0} %
+-----
+preview.details
+{0} × {1} px · {2}
+-----
+preview.status.choose
+Ouvrez une image PNG ou JPEG pour commencer.
+-----
+preview.status.enter_path
+Saisissez d'abord un chemin d'image.
+-----
+preview.status.cannot_open
+Impossible d'ouvrir cette image.
+-----
+preview.status.source_limit
+L'image dépasse la limite de 40 Mio.
+-----
+preview.status.unsupported
+Aperçu prend en charge les images PNG et JPEG.
+-----
+preview.status.pdf_unavailable
+L'affichage des PDF n'est pas encore disponible.
+-----
+preview.status.cannot_decode
+L'image est endommagée ou impossible à décoder.
+-----
+preview.status.pixel_limit
+L'image dépasse 8 millions de pixels ou 8192 pixels par côté.
+-----
+preview.status.opened
+Image ouverte.
+-----
+preview.status.surface_failed
+Impossible d'afficher l'image.
+-----
+preview.status.no_image
+Ouvrez une image avant d'exporter.
+-----
+preview.status.export_path
+Saisissez d'abord un chemin d'export.
+-----
+preview.status.exists
+Ce chemin de sortie existe déjà. Choisissez-en un autre.
+-----
+preview.status.export_failed
+Impossible d'exporter l'image.
+-----
+preview.status.copied
+Image originale copiée.
+-----
+preview.status.exported
+Image PNG exportée.
+-----
+app.archive
+Utilitaire d'archivage
+-----
+app.disk_utility
+Utilitaire de disque
+-----
+app.backup
+Sauvegarde
+-----
+backup.title
+Sauvegarde
+-----
+backup.source
+Dossier source
+-----
+backup.store
+Dossier de sauvegarde
+-----
+backup.restore_path
+Nouveau dossier de restauration
+-----
+backup.start
+Sauvegarder
+-----
+backup.refresh
+Versions
+-----
+backup.restore
+Restaurer
+-----
+backup.cancel
+Annuler
+-----
+backup.previous
+Précédent
+-----
+backup.next
+Suivant
+-----
+backup.ready
+Choisissez des dossiers source et de sauvegarde existants.
+-----
+backup.running
+Copie des fichiers…
+-----
+backup.complete
+Sauvegarde terminée.
+-----
+backup.restored
+Restauration terminée.
+-----
+backup.cancelled
+Annulé. Le dossier incomplet a été conservé.
+-----
+backup.invalid_path
+Saisissez un chemin absolu sans segments . ou .. ni caractères de contrôle.
+-----
+backup.overlap
+Les dossiers source, de sauvegarde et de restauration ne doivent pas se chevaucher.
+-----
+backup.source_failed
+Impossible d'ouvrir le dossier source de manière sûre.
+-----
+backup.store_failed
+Impossible d'ouvrir le dossier de sauvegarde de manière sûre.
+-----
+backup.exists
+La destination de restauration existe déjà.
+-----
+backup.copy_failed
+Échec de la copie. Le dossier incomplet a été conservé.
+-----
+backup.special
+Les liens et fichiers spéciaux sont refusés. Le dossier incomplet a été conservé.
+-----
+backup.changed
+La source a changé pendant la copie. Le dossier incomplet a été conservé.
+-----
+backup.limit
+La limite de profondeur, de chemin ou de nombre de fichiers a été atteinte.
+-----
+backup.no_versions
+Aucune sauvegarde terminée trouvée.
+-----
+backup.select_version
+Choisissez une sauvegarde terminée à restaurer.
+-----
+backup.versions
+Versions terminées
+-----
+backup.progress
+Fichiers copiés / octets copiés
+-----
+backup.hint
+Contenu des fichiers uniquement. Les permissions et dates ne sont pas conservées.
+-----
+backup.version_limit
+128 versions affichées au maximum.
+-----
+backup.manifest_failed
+Impossible d'enregistrer la confirmation de sauvegarde.
+-----
+backup.incomplete
+Un dossier incomplet est conservé après annulation ou échec.
+-----
+disk_utility.devices
+Périphériques
+-----
+disk_utility.volumes
+Volumes
+-----
+disk_utility.refresh
+Actualiser
+-----
+disk_utility.read_only
+Vue du stockage en lecture seule
+-----
+disk_utility.device
+Périphérique
+-----
+disk_utility.kind
+Type
+-----
+disk_utility.block_device
+Périphérique bloc (disque ou partition)
+-----
+disk_utility.size
+Taille
+-----
+disk_utility.mount
+Point de montage
+-----
+disk_utility.source
+Source
+-----
+disk_utility.filesystem
+Système de fichiers
+-----
+disk_utility.options
+Options de montage
+-----
+disk_utility.total
+Capacité
+-----
+disk_utility.used
+Utilisé
+-----
+disk_utility.available
+Disponible
+-----
+disk_utility.unavailable
+Indisponible
+-----
+disk_utility.metadata_unavailable
+Ce noyau ne fournit ni le partitionnement ni l'état des disques.
+-----
+disk_utility.devices_unavailable
+Inventaire des périphériques indisponible
+-----
+disk_utility.devices_empty
+Aucun périphérique bloc signalé
+-----
+disk_utility.mounts_unavailable
+Rapport des montages indisponible
+-----
+disk_utility.mounts_empty
+Aucun volume monté signalé
+-----
+disk_utility.previous
+Précédent
+-----
+disk_utility.next
+Suivant
+-----
+disk_utility.limited
+Inventaire limité à 256 lignes et rapports de taille limitée.
+-----
+disk_utility.destination
+Destination du rapport
+-----
+disk_utility.export
+Exporter le rapport
+-----
+disk_utility.item
+{0} : {1}
+-----
+disk_utility.size_bytes
+Taille (octets)
+-----
+disk_utility.total_bytes
+Capacité (octets)
+-----
+disk_utility.used_bytes
+Utilisé (octets)
+-----
+disk_utility.available_bytes
+Disponible (octets)
+-----
+disk_utility.report.invalid
+Saisissez un chemin de destination absolu
+-----
+disk_utility.report.exists
+La destination existe déjà
+-----
+disk_utility.report.saved
+Rapport enregistré
+-----
+disk_utility.report.failed
+Impossible d'enregistrer le rapport
+-----
+archive.subtitle
+Parcourir, extraire et créer des archives TAR non compressées
+-----
+archive.path_label
+Archive
+-----
+archive.destination_label
+Dossier d'extraction
+-----
+archive.source_label
+Source
+-----
+archive.output_label
+TAR de sortie
+-----
+archive.browse
+Parcourir
+-----
+archive.extract
+Extraire
+-----
+archive.create
+Créer un TAR
+-----
+archive.cancel
+Annuler
+-----
+archive.up
+Page précédente
+-----
+archive.down
+Page suivante
+-----
+archive.directory
+Dossier
+-----
+archive.empty
+Archive vide
+-----
+archive.limits
+TAR uniquement · 64 Mio maximum · 2 048 entrées · sorties existantes refusées
+-----
+archive.hint
+Saisissez des chemins absolus. L'extraction crée un dossier ; la création accepte un fichier ou dossier.
+-----
+archive.loading
+Lecture de l'archive...
+-----
+archive.loaded
+Archive validée. Choisissez un nouveau dossier d'extraction.
+-----
+archive.extracting
+Extraction dans le nouveau dossier...
+-----
+archive.extracted
+Archive extraite.
+-----
+archive.creating
+Création du TAR...
+-----
+archive.created
+TAR créé.
+-----
+archive.cancelled
+Annulé.
+-----
+archive.cancelled_partial
+Annulé. Des fichiers partiels restent dans le nouveau dossier d'extraction.
+-----
+archive.partial
+Impossible d'ouvrir le nouveau dossier. Le dossier vide est conservé.
+-----
+archive.extract_failed
+Échec de l'extraction. Des fichiers partiels restent dans le nouveau dossier.
+-----
+archive.exists
+La sortie existe déjà. Choisissez un nouveau chemin.
+-----
+archive.invalid_path
+Saisissez des chemins absolus sans parents symboliques, composants . ou .. ni caractères de contrôle.
+-----
+archive.read_failed
+Impossible de lire la source. Les liens symboliques sont refusés.
+-----
+archive.not_regular
+L'archive doit être un fichier ordinaire.
+-----
+archive.source_limit
+La source dépasse la limite de 64 Mio.
+-----
+archive.entry_limit
+La source dépasse 2 048 entrées ou 32 niveaux de dossiers.
+-----
+archive.name_limit
+Un nom d'entrée dépasse les champs de nom TAR.
+-----
+archive.invalid_tar
+TAR invalide ou tronqué : en-tête, somme de contrôle ou blocs de fin incomplets.
+-----
+archive.unsupported
+Seul le TAR non compressé est pris en charge. ZIP, gzip et TAR étendu sont indisponibles.
+-----
+archive.unsafe_entry
+Entrée dangereuse : liens, fichiers spéciaux, sorties de dossier et chemins en conflit refusés.
+-----
+archive.source_changed
+La source a changé pendant la création. Le TAR incomplet a été supprimé.
+-----
+archive.write_failed
+Impossible d'écrire la sortie. Vérifiez la destination et l'espace libre.
+-----
+archive.source_unstable
+L'archive a changé pendant la lecture. Parcourez-la à nouveau.
+-----
+app.reminders
+Rappels
+-----
+reminders.title
+Rappels
+-----
+reminders.new
+Nouvelle tâche
+-----
+reminders.edit
+Modifier
+-----
+reminders.save
+Enregistrer
+-----
+reminders.cancel
+Annuler
+-----
+reminders.toggle
+Terminer / rouvrir
+-----
+reminders.delete
+Supprimer
+-----
+reminders.delete_confirm
+Confirmer la suppression
+-----
+reminders.delete_cancel
+Garder la tâche
+-----
+reminders.reload
+Recharger
+-----
+reminders.title_field
+Titre de la tâche
+-----
+reminders.due_field
+Échéance (AAAA-MM-JJ ou AAAA-MM-JJ HH:MM)
+-----
+reminders.search
+Rechercher titres
+-----
+reminders.export_path
+Chemin d'exportation
+-----
+reminders.export_text
+Exporter le texte
+-----
+reminders.export_csv
+Exporter en CSV
+-----
+reminders.filter.all
+Toutes
+-----
+reminders.filter.open
+En cours
+-----
+reminders.filter.completed
+Terminées
+-----
+reminders.filter.overdue
+En retard
+-----
+reminders.previous
+Précédent
+-----
+reminders.next
+Suivant
+-----
+reminders.no_tasks
+Aucune tâche dans cette vue.
+-----
+reminders.no_due
+Sans échéance
+-----
+reminders.completed
+Terminée
+-----
+reminders.open
+En cours
+-----
+reminders.overdue
+En retard
+-----
+reminders.due_today
+À faire aujourd'hui
+-----
+reminders.ready
+Les tâches sont enregistrées à chaque ajout, modification ou achèvement.
+-----
+reminders.saved
+Tâches enregistrées.
+-----
+reminders.saved_unsynced
+Enregistré, mais la synchronisation finale du dossier a échoué.
+-----
+reminders.read_failed
+Impossible de charger les tâches. Réparez leur stockage puis choisissez Recharger.
+-----
+reminders.changed
+Les tâches ont changé dans une autre fenêtre. Rechargez avant d'enregistrer.
+-----
+reminders.busy
+Une autre fenêtre enregistre les tâches. Réessayez.
+-----
+reminders.save_failed
+Impossible d'enregistrer les tâches. Vos modifications sont conservées ici.
+-----
+reminders.title_required
+Saisissez un titre de tâche.
+-----
+reminders.invalid_due
+Utilisez une date AAAA-MM-JJ valide et, si besoin, une heure HH:MM.
+-----
+reminders.limit
+Cette liste peut contenir 256 tâches.
+-----
+reminders.select_task
+Sélectionnez d'abord une tâche.
+-----
+reminders.confirm_delete
+Supprimer la tâche choisie ? Confirmez la suppression pour la retirer.
+-----
+reminders.export_saved
+Exportation enregistrée.
+-----
+reminders.export_exists
+Ce chemin d'exportation existe déjà. Choisissez un nouveau chemin.
+-----
+reminders.export_failed
+Impossible d'enregistrer l'exportation.
+-----
+reminders.invalid_path
+Saisissez un chemin d'exportation absolu sans liens symboliques.
+-----
+reminders.hint
+Les échéances utilisent l'heure locale. Leur état se met à jour tant que cette fenêtre est ouverte.
+-----
+reminders.clock_unavailable
+L'horloge est indisponible ; impossible de déterminer les retards.
+-----
+app.notes
+Notes
+-----
+notes.ready
+Notes locales
+-----
+notes.untitled
+Note sans titre
+-----
+notes.new
+Nouvelle note
+-----
+notes.save
+Enregistrer
+-----
+notes.refresh
+Actualiser
+-----
+notes.delete
+Supprimer
+-----
+notes.cancel_delete
+Garder la note
+-----
+notes.search
+Rechercher
+-----
+notes.title
+Titre
+-----
+notes.body
+Note
+-----
+notes.export_path
+Chemin d'exportation
+-----
+notes.export
+Exporter le texte
+-----
+notes.previous
+Précédent
+-----
+notes.next
+Suivant
+-----
+notes.search_hint
+Rechercher dans les titres et le texte (sensible à la casse)
+-----
+notes.empty
+Aucune note correspondante. Créez une note pour commencer.
+-----
+notes.hint
+Texte brut local, enregistré après la saisie. Ctrl-N : nouveau · Ctrl-S : enregistrer · Ctrl-A : tout sélectionner
+-----
+notes.unsaved
+Modifications non enregistrées — gardez cette fenêtre ouverte jusqu'à l'enregistrement.
+-----
+notes.saved
+Enregistré
+-----
+notes.deleted
+Note supprimée
+-----
+notes.read_failed
+Impossible d'ouvrir le stockage local des notes.
+-----
+notes.corrupt
+Le stockage des notes est illisible ou endommagé. Les données sont conservées.
+-----
+notes.conflict
+Une autre fenêtre a modifié ces notes. Exportez votre brouillon avant de rouvrir.
+-----
+notes.save_failed
+Échec de l'enregistrement. Votre brouillon reste dans cette fenêtre.
+-----
+notes.durability_failed
+Enregistré, mais la synchronisation finale du stockage a échoué.
+-----
+notes.title_required
+Saisissez un titre avant d'enregistrer.
+-----
+notes.confirm_delete
+Supprimer cette note enregistrée ? Cliquez à nouveau sur Supprimer ou sur Garder la note.
+-----
+notes.limit
+Limite de notes ou de texte atteinte.
+-----
+notes.invalid_text
+Le texte collé doit être du texte brut UTF-8 valide.
+-----
+notes.export_invalid
+Saisissez un chemin d'exportation absolu sans composants . ou ..
+-----
+notes.export_exists
+La destination d'exportation existe déjà. Choisissez un autre nom.
+-----
+notes.export_failed
+Impossible de créer ou de terminer l'exportation.
+-----
+notes.export_durability
+Exportation écrite, mais la synchronisation du dossier a échoué.
+-----
+notes.export_saved
+Texte exporté.
+-----
+reminders.csv_title
+Titre
+-----
+reminders.csv_due
+Échéance
+-----
+reminders.csv_completed
+Terminée (0 ou 1)
+-----
+reminders.export_unsynced
+Exportation enregistrée, mais la synchronisation finale du dossier a échoué.
+-----
+app.grapher
+Traceur de courbes
+-----
+grapher.plot
+Tracer
+-----
+grapher.reset
+Réinitialiser
+-----
+grapher.zoom_in
+Zoom avant
+-----
+grapher.zoom_out
+Zoom arrière
+-----
+grapher.export
+Exporter en CSV
+-----
+grapher.xmin_label
+X minimum
+-----
+grapher.xmax_label
+X maximum
+-----
+grapher.ymin_label
+Y minimum
+-----
+grapher.ymax_label
+Y maximum
+-----
+grapher.radians
+Angles en radians
+-----
+grapher.syntax
+x, pi, e; + - * / ^; sin cos tan asin acos atan sqrt abs ln log exp floor ceil
+-----
+grapher.expression_invalid
+Expression invalide ou limite d'expression dépassée.
+-----
+grapher.range_invalid
+Utilisez des plages finies croissantes dans ±1e12, d'une étendue d'au moins 1e-9.
+-----
+grapher.no_values
+Aucune valeur définie dans cette plage de X.
+-----
+grapher.domain_gaps
+Courbe interrompue là où la fonction n'est pas définie.
+-----
+grapher.ready
+513 échantillons. Les variations très petites ou rapides peuvent être omises.
+-----
+grapher.input_limit
+Ce champ a atteint sa limite de saisie.
+-----
+grapher.changed
+Cliquez sur Tracer pour appliquer vos modifications.
+-----
+grapher.input_invalid
+Collez une ligne de texte valide ; les expressions et plages utilisent l'ASCII.
+-----
+grapher.export_invalid
+Choisissez un nouveau chemin CSV absolu sans liens ni composants . ou ..
+-----
+grapher.export_failed
+Impossible d'enregistrer le fichier CSV.
+-----
+grapher.export_exists
+Cette destination existe déjà. Choisissez un nouveau fichier.
+-----
+grapher.export_saved
+Échantillons CSV enregistrés. Les cellules Y vides marquent les valeurs non définies.
+-----
+grapher.equation_label
+y =
+-----
+start.previous_page
+Précédent
+-----
+start.next_page
+Suivant
+-----
+notes.close_required
+Impossible d'enregistrer ce brouillon. Modifiez-le, exportez-le ou abandonnez-le avant de fermer.
+-----
+notes.keep_editing
+Continuer à modifier
+-----
+notes.discard
+Abandonner
+-----
+notes.confirm_discard
+Confirmer l'abandon
+-----
+notes.confirm_discard_hint
+Abandonner ce brouillon ? Les notes enregistrées restent inchangées.
+-----
+notes.discard_ready
+Le brouillon sera abandonné à la fermeture. Toute modification annule ce choix.
+-----
+calculator.mode.basic
+Standard
+-----
+calculator.mode.scientific
+Scientifique
+-----
+calculator.angle.degrees
+DEG
+-----
+calculator.angle.radians
+RAD
+-----
+calculator.scientific.sqrt
+sqrt
+-----
+calculator.scientific.reciprocal
+1/x
+-----
+calculator.scientific.square
+x^2
+-----
+calculator.scientific.sin
+sin
+-----
+calculator.scientific.cos
+cos
+-----
+calculator.scientific.tan
+tan
+-----
+calculator.scientific.asin
+asin
+-----
+calculator.scientific.acos
+acos
+-----
+calculator.scientific.atan
+atan
+-----
+calculator.scientific.ln
+ln
+-----
+calculator.scientific.log
+log10
+-----
+calculator.scientific.exp
+exp
+-----
+calculator.scientific.pi
+pi
+-----
+calculator.scientific.e
+e
+-----
+calculator.scientific.instructions
+Les fonctions utilisent le nombre affiché.
+-----
+calculator.scientific.resize
+Agrandissez la fenêtre pour afficher les commandes scientifiques.
+-----
+calculator.scientific.shortcuts
+Ctrl-S : mode ; Ctrl-D : unités d'angle
+-----
+calculator.error
+Erreur
+-----
+calculator.error.operation
+Impossible de calculer cette opération.
+-----
+calculator.error.domain
+Hors du domaine de la fonction.
+-----
+calculator.error.nonfinite
+Le résultat n'est pas fini.
+-----
+calculator.error.tangent
+La tangente n'est pas définie pour cet angle.
+-----
+app.color_meter
+Colorimètre
+-----
+color_meter.live
+Suivi en direct
+-----
+color_meter.freeze
+Figer
+-----
+color_meter.sample
+Mesurer
+-----
+color_meter.copy_hex
+Copier en hex.
+-----
+color_meter.copy_rgb
+Copier RVB
+-----
+color_meter.x
+X (pixel physique)
+-----
+color_meter.y
+Y (pixel physique)
+-----
+color_meter.aperture
+Ouverture
+-----
+color_meter.magnifier
+Loupe (9 x 9 pixels)
+-----
+color_meter.value
+Valeur RVB du tampon d'image
+-----
+color_meter.ready
+Activez le suivi du pointeur, ou saisissez des coordonnées physiques puis cliquez sur Mesurer.
+-----
+color_meter.live_status
+Suivi du pointeur. Espace ou Échap fige la mesure lorsque la fenêtre est active.
+-----
+color_meter.frozen
+Mesure figée.
+-----
+color_meter.copied
+Couleur copiée dans le presse-papiers invité. Ctrl-V la colle dans les champs natifs.
+-----
+color_meter.unavailable
+La surface du bureau est indisponible.
+-----
+color_meter.invalid
+Choisissez des coordonnées dans l'écran physique.
+-----
+color_meter.invalid_input
+Saisissez les coordonnées des pixels en chiffres décimaux.
+-----
+color_meter.hint
+RVB est la moyenne arrondie sur l'ouverture. Aux bords, seuls les pixels à l'écran sont utilisés.
+-----
+color_meter.clipboard_hint
+Ctrl-V : presse-papiers invité ; Ctrl-Maj-V : hôte. Valeurs RVB du tampon d'image, sans profils colorimétriques.
+-----
+color_meter.details
+Écran : {0}
+-----
+color_meter.resize
+Agrandissez la fenêtre pour afficher les commandes de mesure.
+-----
+app.dictionary
+Dictionnaire
+-----
+dictionary.load
+Charger
+-----
+dictionary.lookup
+Rechercher
+-----
+dictionary.back
+<
+-----
+dictionary.forward
+>
+-----
+dictionary.matches
+Entrées
+-----
+dictionary.previous
+Précédent
+-----
+dictionary.next
+Suivant
+-----
+dictionary.up
+Page précédente
+-----
+dictionary.down
+Page suivante
+-----
+dictionary.offline
+WordNet 3.0 / hors ligne
+-----
+dictionary.export
+Exporter la définition
+-----
+dictionary.unavailable
+Impossible de charger un fichier de dictionnaire ordinaire valide. Les données de recherche sont conservées.
+-----
+dictionary.read_failed
+Définition indisponible ou dictionnaire modifié. Rechargez la source.
+-----
+dictionary.ready
+Saisissez un mot ou une expression. Les mots correspondants sont à gauche ; Entrée ouvre le premier de la page.
+-----
+dictionary.no_match
+Aucune entrée correspondante. La dernière définition est conservée.
+-----
+dictionary.exported
+Définition exportée.
+-----
+dictionary.export_exists
+Le chemin d'exportation existe déjà. Choisissez un nouveau chemin.
+-----
+dictionary.path_invalid
+Saisissez un chemin de fichier absolu.
+-----
+dictionary.export_failed
+Impossible d'exporter la définition.
+-----
+dictionary.resize
+Agrandissez le contenu de cette fenêtre à au moins 640 par 420 pixels.
+-----
+editor.workflow.save_as
+Enregistrer sous
+-----
+editor.workflow.save_as_hint
+Choisissez un nouveau fichier. Les fichiers existants sont conservés.
+-----
+editor.workflow.save_as_create
+Créer le fichier
+-----
+editor.workflow.cancel
+Annuler
+-----
+editor.workflow.unsaved_close
+Enregistrez ce document avant de fermer, continuez à modifier ou abandonnez vos modifications.
+-----
+editor.workflow.unsaved_new
+Enregistrez ce document avant d'en créer un autre, continuez à modifier ou abandonnez vos modifications.
+-----
+editor.workflow.unsaved_open
+Enregistrez ce document avant d'en ouvrir un autre, continuez à modifier ou abandonnez vos modifications.
+-----
+editor.workflow.keep_editing
+Continuer à modifier
+-----
+editor.workflow.discard
+Abandonner
+-----
+editor.workflow.confirm_discard
+Confirmer l'abandon
+-----
+editor.workflow.confirm_hint
+Abandonner les modifications non enregistrées ? Cette action est irréversible.
+-----
+editor.workflow.discard_ready
+Les modifications seront abandonnées à la fermeture. Toute nouvelle modification annule ce choix.
+-----
+editor.workflow.exists
+Le fichier existe déjà. Choisissez un autre chemin pour Enregistrer sous.
+-----
+editor.workflow.invalid_path
+Saisissez un chemin de fichier valide (512 octets maximum).
+-----
+calendar.ics.open
+Importer / Exporter
+-----
+calendar.ics.title
+Échange de calendriers
+-----
+calendar.ics.back
+Retour
+-----
+calendar.ics.import_path
+Fichier ICS à importer
+-----
+calendar.ics.export_path
+Nouveau fichier ICS à exporter
+-----
+calendar.ics.import
+Importer ICS
+-----
+calendar.ics.export
+Exporter ICS
+-----
+calendar.ics.scope
+Événements d'une journée entière ou heures locales à la minute. Sans fuseaux, récurrence, durées, alarmes ni champs supplémentaires.
+-----
+calendar.ics.merge
+Fusion sans remplacement. Mêmes date/heure/titre/lieu ignorés. UID et horodatages validés, non conservés.
+-----
+calendar.ics.ready
+Choisissez un fichier ICS à importer ou un nouveau chemin d'exportation.
+-----
+calendar.ics.imported
+Événements importés ; doublons exacts ignorés.
+-----
+calendar.ics.nothing
+Aucun nouvel événement ; événements identiques ignorés.
+-----
+calendar.ics.invalid
+Fichier ICS invalide ou endommagé.
+-----
+calendar.ics.unsupported
+Sémantique ICS non prise en charge. Utilisez une seule journée entière ou des heures locales sans durée.
+-----
+calendar.ics.limit
+L'ICS dépasse les limites de fichier, de ligne, d'événements ou du calendrier.
+-----
+calendar.ics.duplicate
+Des événements en conflit partagent un même UID.
+-----
+calendar.ics.read_failed
+Impossible de lire un fichier ICS ordinaire.
+-----
+calendar.ics.path_invalid
+Saisissez un chemin de fichier absolu.
+-----
+calendar.ics.export_exists
+Le chemin d'exportation existe déjà.
+-----
+calendar.ics.export_failed
+Impossible d'exporter l'ICS.
+-----
+calendar.ics.exported
+Calendrier exporté.
+-----
+files.trash.open
+Corbeille
+-----
+files.trash.move
+Mettre à la corbeille
+-----
+files.trash.title
+Corbeille
+-----
+files.trash.back
+Retour à Fichiers
+-----
+files.trash.refresh
+Actualiser
+-----
+files.trash.restore
+Restaurer la sélection
+-----
+files.trash.empty
+Vider la corbeille…
+-----
+files.trash.confirm
+Vider définitivement
+-----
+files.trash.cancel
+Annuler
+-----
+files.trash.previous
+Précédent
+-----
+files.trash.next
+Suivant
+-----
+files.trash.hint
+Éléments de votre dossier personnel, sur le même système de fichiers. La restauration ne remplace rien.
+-----
+files.trash.limited
+Le vidage retire fichiers, liens et dossiers vides. Restaurez les dossiers pleins pour gérer leur contenu.
+-----
+files.trash.confirm_hint
+Supprimer définitivement les éléments admissibles ? Irréversible. Dossiers pleins ou entrées endommagées bloquent le vidage.
+-----
+files.trash.empty_list
+La corbeille est vide.
+-----
+files.trash.ready
+Sélectionnez un élément à restaurer.
+-----
+files.trash.moved
+Mis à la corbeille.
+-----
+files.trash.restored
+Restauré à l'emplacement d'origine.
+-----
+files.trash.emptied
+Corbeille vidée.
+-----
+files.trash.select
+Sélectionnez d'abord un élément.
+-----
+files.trash.unsafe
+Seuls les éléments ordinaires du dossier personnel sont admis ; chemins protégés et parents symboliques refusés.
+-----
+files.trash.unavailable
+Impossible d'ouvrir la corbeille en toute sécurité.
+-----
+files.trash.busy
+La corbeille est occupée dans une autre fenêtre. Réessayez.
+-----
+files.trash.damaged
+La corbeille contient des entrées endommagées ou inconnues. Elles sont conservées ; vidage refusé.
+-----
+files.trash.changed
+L'élément choisi a changé. Actualisez la corbeille avant de réessayer.
+-----
+files.trash.failed
+L'opération a échoué. Les éléments existants sont conservés.
+-----
+files.trash.cross_device
+Le déplacement entre systèmes de fichiers n'est pas pris en charge. La source reste inchangée.
+-----
+files.trash.conflict
+L'emplacement d'origine contient déjà un élément. Rien n'a été remplacé.
+-----
+files.trash.parent_missing
+Le dossier parent d'origine est absent ou non sûr. L'élément reste dans la corbeille.
+-----
+files.trash.nonempty
+Un dossier non vide bloque le vidage. Restaurez-le pour gérer son contenu.
+-----
+files.trash.partial
+Vidage arrêté après un changement du système de fichiers. Actualisez pour voir les éléments restants.
+-----
+files.trash.unsynced
+Élément déplacé, mais synchronisation ou nettoyage échoué. Actualisez pour vérifier son emplacement.
+-----
+files.trash.changed_moved
+La source a changé pendant le déplacement. Contenu conservé dans la corbeille ; métadonnées à vérifier.
+-----
+files.trash.empty_unsynced
+Éléments supprimés, mais synchronisation échouée. Actualisez la corbeille pour vérifier ce qui reste.
+-----
+editor.selection.all
+Tout sélectionner
+-----
+editor.selection.copy
+Copier
+-----
+editor.selection.cut
+Couper
+-----
+editor.selection.selected
+Glissez pour sélectionner. Ctrl-A : tout. Ctrl-B : marquer avec les flèches. Ctrl-C/X/V : copier/couper/coller.
+-----
+editor.selection.copied
+Sélection copiée dans le presse-papiers invité.
+-----
+editor.selection.unavailable
+La copie vers le presse-papiers invité est indisponible. Le document est conservé.
+-----
+calculator.mode.programmer
+Programmeur
+-----
+calculator.programmer.rules
+Entiers non signés de 64 bits. +, -, * et NOT opèrent modulo 2^64.
+-----
+calculator.programmer.shifts
+Les décalages à droite insèrent des zéros ; décalages de 0 à 63.
+-----
+calculator.programmer.shortcuts
+Ctrl-P : Programmeur. Ctrl-B : base suivante. & / OR / ^ / ~ : opérations sur bits. < > : décalage.
+-----
+calculator.programmer.resize
+Agrandissez la fenêtre pour afficher le clavier d'entiers, ou utilisez les touches.
+-----
+calculator.programmer.input_hint
+Choisissez DEC, HEX, OCT ou BIN avant la saisie. Échap efface.
+-----
+calculator.programmer.error.input
+Saisissez un entier non signé ; fractions, signes et commandes refusés.
+-----
+calculator.programmer.error.range
+Entier hors de la plage de 64 bits ; valeur précédente conservée.
+-----
+calculator.programmer.error.digit
+Ce chiffre n'est pas disponible dans la base choisie ; valeur conservée.
+-----
+calculator.programmer.error.zero
+La division entière et le reste nécessitent un diviseur non nul.
+-----
+calculator.programmer.error.shift
+Le décalage doit être un entier de 0 à 63.
+-----
+calculator.programmer.base.dec
+DEC
+-----
+calculator.programmer.base.hex
+HEX
+-----
+calculator.programmer.base.oct
+OCT
+-----
+calculator.programmer.base.bin
+BIN
+-----
+calculator.programmer.and
+AND
+-----
+calculator.programmer.or
+OR
+-----
+calculator.programmer.xor
+XOR
+-----
+calculator.programmer.not
+NOT
+-----
+settings.search.placeholder
+Rechercher
+-----
+settings.search.heading
+Résultats de recherche
+-----
+settings.search.empty
+Aucun paramètre correspondant.
+-----
+settings.search.hint
+Choisissez un résultat pour ouvrir ses paramètres.
+-----
+settings.search.clear
+Effacer
+-----
+settings.search.previous
+Précédent
+-----
+settings.search.next
+Suivant
+-----
+activity.preferences.read_failed
+Impossible de lire les préférences de vue. Valeurs par défaut utilisées ; fichier conservé.
+-----
+activity.preferences.save_failed
+Impossible d'enregistrer les préférences de vue. La vue actuelle reste disponible.
+-----
+activity.preferences.changed
+Une autre fenêtre a modifié les préférences de vue. Rouvrez le Moniteur d'activité pour les utiliser.
+-----
+activity.preferences.unsynced
+Préférences de vue enregistrées, mais synchronisation du stockage non confirmée.
+-----
+clipboard.copy.pending
+Copie en cours...
+-----
+clipboard.copy.copied
+Copié dans le presse-papiers invité.
+-----
+clipboard.copy.unavailable
+Presse-papiers invité indisponible.
+-----
+clipboard.copy.too_large
+Le texte dépasse la limite de 64 Kio du presse-papiers.
+-----
+clipboard.copy.empty
+Aucun texte à copier.
+-----
+clipboard.copy.failed
+Impossible de confirmer la copie.
+-----
+dictionary.copy
+Copier la définition
+-----
+terminal.selection.copy
+Copier
+-----
+terminal.selection.hint
+Glissez pour sélectionner ; Copier ou Cmd-C copie. Ctrl-C interrompt le shell.
+-----
+calculator.copy
+Copier le résultat
+-----
+calculator.scientific.cube
+x^3
+-----
+calculator.scientific.cbrt
+cbrt
+-----
+calculator.scientific.log2
+log2
+-----
+preview.pan
+Déplacer
+-----
+preview.select
+Sélectionner
+-----
+preview.crop
+Recadrer
+-----
+preview.selection.clear
+Effacer
+-----
+preview.status.select
+Glissez sur l'image pour sélectionner une zone.
+-----
+preview.status.selection
+Sélection prête. Recadrer l'applique ; Effacer l'annule.
+-----
+preview.status.selection_empty
+Sélectionnez d'abord une zone en glissant.
+-----
+preview.status.cropped
+Image recadrée. Exportez en PNG pour l'enregistrer.
+-----
+preview.status.crop_failed
+Impossible de recadrer l'image.
+-----
+preview.status.pan
+Glissez pour déplacer ; utilisez Sélectionner pour recadrer.
+-----
+grapher.document_path
+Chemin du document graphique
+-----
+grapher.document_open
+Ouvrir
+-----
+grapher.document_save_as
+Enregistrer sous
+-----
+grapher.document_invalid_path
+Saisissez un chemin absolu de document graphique.
+-----
+grapher.document_open_failed
+Impossible d'ouvrir ce document graphique.
+-----
+grapher.document_invalid
+Document graphique invalide ou non pris en charge.
+-----
+grapher.document_opened
+Document graphique ouvert.
+-----
+grapher.document_save_failed
+Impossible d'enregistrer ce document graphique.
+-----
+grapher.document_exists
+Ce chemin existe déjà. Choisissez un autre nom.
+-----
+grapher.document_saved
+Document graphique enregistré.
+-----
+archive.select_all
+Tout sélectionner
+-----
+archive.clear_selection
+Effacer
+-----
+archive.extract_selected
+Extraire la sélection
+-----
+archive.no_selection
+Sélectionnez au moins une entrée avant l'extraction.
+-----
+archive.selection_hint
+Sélectionnez les entrées ci-dessous ; les dossiers sélectionnés incluent leur contenu.
+-----
+system_information.search.placeholder
+Rechercher dans les rapports · Ctrl-F
+-----
+system_information.search.clear
+Effacer
+-----
+system_information.search.hint
+Recherchez noms et valeurs dans les quatre sections. Le rapport exporté contient toutes les lignes.
+-----
+system_information.search.empty
+Aucune ligne correspondante dans cette section.
+-----
+system_information.search.count
+{0} ligne correspondante|{0} lignes correspondantes
+-----
+system_information.search.count_short
+{0} ligne|{0} lignes
+-----
+system_information.search.label
+Rechercher
+-----
+preview.undo
+Annuler
+-----
+preview.redo
+Rétablir
+-----
+preview.status.crop_undone
+Recadrage annulé. Rétablir le restaure.
+-----
+preview.status.crop_redone
+Recadrage rétabli. Exportez en PNG pour l'enregistrer.
+-----
+calendar.search.label
+Rechercher
+-----
+calendar.search.title
+Rechercher des événements
+-----
+calendar.search.hint
+Rechercher par titre ou lieu
+-----
+calendar.search.clear
+Effacer
+-----
+calendar.search.back
+Calendrier
+-----
+calendar.search.empty
+Aucun événement correspondant
+-----
+calendar.search.count
+{0} événement correspondant|{0} événements correspondants
+-----
+calendar.search.page
+Page {0} sur {1}
+-----
+disk_usage.view.inventory
+Inventaire
+-----
+disk_usage.view.capacity
+Système de fichiers
+-----
+disk_usage.capacity.total
+TOTAL
+-----
+disk_usage.capacity.used
+UTILISÉ
+-----
+disk_usage.capacity.free
+LIBRE
+-----
+disk_usage.capacity.available
+DISPONIBLE
+-----
+disk_usage.capacity.unavailable
+Indisponible
+-----
+disk_usage.capacity.scope
+Système de fichiers contenant le dossier analysé.
+-----
+disk_usage.capacity.refresh
+Une nouvelle analyse actualise ces chiffres.
+-----
+disk_usage.capacity.available_note
+L'espace disponible exclut l'espace réservé du système de fichiers.
+-----
+disk_usage.capacity.inventory_note
+L'inventaire compte le contenu des fichiers de l'arborescence analysée.
+-----
+calculator.scientific.sinh
+sinh
+-----
+calculator.scientific.cosh
+cosh
+-----
+calculator.scientific.tanh
+tanh
+-----
+calculator.scientific.asinh
+asinh
+-----
+calculator.scientific.acosh
+acosh
+-----
+calculator.scientific.atanh
+atanh
+-----
+disk_usage.capacity.resize
+Agrandissez la fenêtre pour afficher les détails de capacité.
+-----
+calendar.search.enlarge
+Agrandissez la fenêtre pour voir le calendrier et les résultats de recherche.
+-----
+color_meter.lock_x
+Verrouiller X
+-----
+color_meter.lock_y
+Verrouiller Y
+-----
+color_meter.lock_hint
+Les verrous fixent une coordonnée physique tandis que le suivi suit l'autre axe.
+-----
+color_meter.lock_requires_sample
+Mesurez une couleur avant de verrouiller une coordonnée.
+-----
+color_meter.live_unavailable
+Le suivi en direct est indisponible. La dernière mesure est inchangée.
+-----
+grapher.png_path
+Destination PNG
+-----
+grapher.export_png
+Exporter en PNG
+-----
+grapher.png_saved
+Graphique PNG exporté
+-----
+grapher.png_invalid
+Choisissez une destination PNG absolue en UTF-8
+-----
+grapher.png_exists
+La destination PNG existe déjà
+-----
+grapher.png_failed
+Impossible d'exporter le graphique PNG
+-----
+notes.undo
+Annuler
+-----
+notes.redo
+Rétablir
+-----
+notes.history_scope
+32 dernières modifications de cette note. Ctrl-Z / Ctrl-Y.
+-----
+notes.enlarge
+Agrandissez la fenêtre pour modifier les notes.
+-----
+clock.enlarge
+Agrandissez la fenêtre pour utiliser Horloge.
+-----
+clock.timer.number
+Minuteur {0}
+-----
+clock.timer.name
+Nom du minuteur
+-----
+clock.timer.add
+Ajouter
+-----
+clock.timer.remove
+Retirer
+-----
+clock.timer.legend
+* en cours · ! terminé · pause pour régler ou retirer
+-----
+clock.timer.scope
+Quatre minuteurs maximum. Fermer Horloge les annule.
+-----
+window.layout.title
+Organiser la fenêtre
+-----
+window.layout.hint
+Choisissez une disposition · Flèches et Entrée
+-----
+window.layout.maximize
+Agrandir
+-----
+window.layout.left
+Moitié gauche
+-----
+window.layout.right
+Moitié droite
+-----
+window.layout.restore
+Restaurer
+-----
+window.layout.top_left
+En haut à gauche
+-----
+window.layout.top_right
+En haut à droite
+-----
+window.layout.bottom_left
+En bas à gauche
+-----
+window.layout.bottom_right
+En bas à droite
+-----
+desktop.overview.title
+Fenêtres
+-----
+desktop.overview.empty
+Aucune fenêtre sur ce bureau
+-----
+desktop.overview.hint
+Flèches pour choisir. Entrée pour ouvrir. Échap pour fermer.
+-----
+desktop.overview.minimized
+Réduite
+-----
+desktop.overview.previous
+Précédent
+-----
+desktop.overview.next
+Suivant
+-----

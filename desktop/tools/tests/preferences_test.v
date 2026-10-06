@@ -153,7 +153,7 @@ fn test_preferences_reject_invalid_versions_fields_duplicates_and_overflow() {
 		'version=1\nscale=0', 'version=1\nscale=200', 'version=1\nscale=2junk',
 		'version=1\nscale=1\nscale=2', 'version=1\nbutton_side=up',
 		'version=1\ntaskbar_mode=9', 'version=1\ntheme=other',
-		'version=1\nlanguage=fr', 'version=1\nlanguage=RU', 'version=1\nlanguage=',
+		'version=1\nlanguage=zz', 'version=1\nlanguage=RU', 'version=1\nlanguage=',
 		'version=1\nlanguage=en\nlanguage=es',
 		'version=1\nwallpaper_color=-1', 'version=1\nwallpaper_color=${wallpaper_colors.len}',
 		'version=1\nwallpaper_image=-2', 'version=1\nwallpaper_image=1junk',

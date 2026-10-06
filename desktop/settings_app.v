@@ -57,7 +57,8 @@ const settings_action_language = 'settings.language.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
-const settings_language_actions = ['settings.language.0', 'settings.language.1', 'settings.language.2']!
+const settings_language_actions = ['settings.language.0', 'settings.language.1', 'settings.language.2',
+	'settings.language.3']!
 
 const settings_sidebar_width = 132
 const settings_padding = 16

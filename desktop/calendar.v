@@ -121,11 +121,12 @@ fn calendar_weekday(year int, month int, day int) int {
 }
 
 // calendar_first_weekday is the weekday a week starts on where the desktop's
-// language is spoken: Sunday in the United States, Monday in Russia and Spain.
+// language is spoken: Sunday in the United States, Monday in Russia, Spain
+// and France.
 fn calendar_first_weekday() int {
 	return match desktop_language {
 		.en { 0 }
-		.ru, .es { 1 }
+		.ru, .es, .fr { 1 }
 	}
 }
 

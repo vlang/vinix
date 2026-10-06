@@ -46,7 +46,7 @@ fn test_settings_search_repeated_localized_query_render_navigation_and_resize_re
 	}
 	C.vinix_heap_begin()
 	for index in 0 .. 200 {
-		set_desktop_language(desktop_languages[index % 3])
+		set_desktop_language(desktop_languages[index % desktop_languages.len])
 		app.key_input('\x06')
 		app.paste_input('a')
 		settings_search_heap_frame(mut app, 620, 376)!

@@ -67,6 +67,7 @@ fn test_settings_search_folds_case_accents_and_matches_native_language_names() {
 		DesktopLanguage.en: 'BRIGHTNESS'
 		.es:                'BRILLO'
 		.ru:                'ЯРКОСТЬ'
+		.fr:                'LUMINOSITE'
 	} {
 		set_desktop_language(language)
 		app.key_input('\x06')
@@ -74,7 +75,7 @@ fn test_settings_search_folds_case_accents_and_matches_native_language_names() {
 		assert settings_search_has_result(app, 'settings.display.brightness')
 	}
 	set_desktop_language(.en)
-	for query in ['ESPANOL', 'русский', 'english']! {
+	for query in ['ESPANOL', 'русский', 'english', 'FRANCAIS']! {
 		app.key_input('\x06')
 		app.paste_input(query)
 		assert settings_search_has_result(app, 'settings.language.heading')

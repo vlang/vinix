@@ -536,11 +536,11 @@ fn disk_usage_size_text(bytes u64) string {
 }
 
 // disk_usage_group_separator is what a language writes between groups of three
-// digits: Russian and Spanish write a comma as their decimal point.
+// digits: French and Russian use spaces, Spanish uses dots, English uses commas.
 fn disk_usage_group_separator() u8 {
 	return match desktop_language {
 		.en { `,` }
-		.ru { ` ` }
+		.ru, .fr { ` ` }
 		.es { `.` }
 	}
 }

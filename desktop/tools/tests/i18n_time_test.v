@@ -32,6 +32,17 @@ fn i18n_time_element(root ui2.Element, id string) ?ui2.Element {
 	return none
 }
 
+fn i18n_time_weekdays(root ui2.Element) []string {
+	mut weekdays := []string{}
+	for child in root.children {
+		if child.kind == .label && int(child.frame.y) == calendar_header_height
+			&& int(child.frame.height) == calendar_weekday_height {
+			weekdays << child.text
+		}
+	}
+	return weekdays
+}
+
 fn test_taskbar_clock_in_russian_and_spanish() {
 	defer {
 		set_desktop_language(.en)
@@ -126,6 +137,33 @@ fn test_long_dates_use_each_languages_grammar() {
 	assert date_long_text(2026, 3, 4, 3) == 'miércoles, 4 de marzo de 2026'
 }
 
+fn test_french_clock_dates_and_calendar_week() {
+	defer {
+		set_desktop_language(.en)
+	}
+	set_desktop_language(.fr)
+	mut desktop := Desktop{}
+	_, date := desktop.taskbar_clock_strings_at(i18n_time_monday)
+	assert date == 'lun. 28 sept.'
+	assert date_long_text(2026, 9, 28, 1) == 'lundi 28 septembre 2026'
+	assert calendar_first_weekday() == 1
+	mut calendar := CalendarApp{
+		year:         2026
+		month:        9
+		selected_day: 28
+	}
+	tree := calendar.build(ui2.rect(0, 0, 640, 500))!
+	defer { free_tree(tree) }
+	assert calendar.month_title == 'septembre 2026'
+	assert calendar.selection == 'lundi 28 septembre 2026'
+	mut texts := []string{}
+	i18n_time_texts(tree, mut texts)
+	assert i18n_time_weekdays(tree) == ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.']
+	assert "Aujourd'hui" in texts
+	monday := i18n_time_element(tree, 'calendar.day.28') or { panic('missing day 28') }
+	assert int(monday.frame.x) == calendar_padding + 2
+}
+
 fn test_calendar_retranslates_and_starts_the_week_on_monday() {
 	defer {
 		set_desktop_language(.en)
@@ -145,8 +183,7 @@ fn test_calendar_retranslates_and_starts_the_week_on_monday() {
 	english := calendar.build(size)!
 	mut texts := []string{}
 	i18n_time_texts(english, mut texts)
-	// The previous button, the heading and the next button, then the week.
-	assert texts[3] == 'Sun' && texts[4] == 'Mon' && texts[9] == 'Sat'
+	assert i18n_time_weekdays(english) == ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 	assert 'Today' in texts
 	// 1 September 2026 is a Tuesday: the third column from Sunday.
 	first := i18n_time_element(english, 'calendar.day.1') or { panic('missing day 1') }
@@ -161,7 +198,7 @@ fn test_calendar_retranslates_and_starts_the_week_on_monday() {
 	i18n_time_texts(russian, mut texts)
 	assert 'Сегодня' in texts
 	// The week runs from Monday to Sunday.
-	assert texts[3] == 'пн' && texts[4] == 'вт' && texts[8] == 'сб' && texts[9] == 'вс'
+	assert i18n_time_weekdays(russian) == ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
 	tuesday := i18n_time_element(russian, 'calendar.day.1') or { panic('missing day 1') }
 	assert int(tuesday.frame.x) == calendar_padding + cell_width + 2
 	monday := i18n_time_element(russian, 'calendar.day.28') or { panic('missing day 28') }
@@ -190,7 +227,7 @@ fn test_calendar_retranslates_and_starts_the_week_on_monday() {
 	i18n_time_texts(spanish, mut texts)
 	assert 'Hoy' in texts
 	assert texts[1] == 'marzo de 2026'
-	assert texts[3] == 'lun' && texts[5] == 'mié' && texts[9] == 'dom'
+	assert i18n_time_weekdays(spanish) == ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
 	free_tree(spanish)
 }
 

@@ -64,7 +64,7 @@ for name in settings settings_search switcher settings_persistence clock_setting
     "$v" -new-compiler -nocache -gc none -manualfree -enable-globals -stats -d ui2_headless \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${name}_test.v"
 done
-# Each area's text in Russian and Spanish, beside i18n_test.v's checks that
+# Each area's translated text, beside i18n_test.v's checks that
 # every language is complete.
 for test in "$root"/desktop/tools/tests/i18n_*_test.v; do
     cp "$test" "$work/ui/"

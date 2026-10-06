@@ -247,6 +247,9 @@ fn test_tr_follows_the_desktop_language() {
 	set_desktop_language(.es)
 	assert tr('settings.category.language') == 'Idioma'
 	assert app_title_text(capture_app_title) == 'Captura'
+	set_desktop_language(.fr)
+	assert tr('settings.category.language') == 'Langue'
+	assert app_title_text('Files') == 'Fichiers'
 }
 
 fn test_tr_fill_places_arguments_in_one_allocation() {
@@ -264,6 +267,12 @@ fn test_plural_rules_per_language() {
 	}
 	assert desktop_plural_index(.en, 1) == 0
 	assert desktop_plural_index(.es, 1) == 0
+	for count in [i64(-1), 0, 1] {
+		assert desktop_plural_index(.fr, count) == 0
+	}
+	for count in [i64(-2), 2, 5, 11, 21, 100, 101, 1_000_000] {
+		assert desktop_plural_index(.fr, count) == 1
+	}
 	for count in [i64(1), 21, 31, 101, 1001] {
 		assert desktop_plural_index(.ru, count) == 0, '${count}'
 	}
@@ -300,7 +309,7 @@ fn test_language_crosses_the_application_process_boundary() {
 		requested_scale: desktop_scale_100
 	})
 	// The language follows the nine Settings fields and the two keyboard ones.
-	encoded[44] = 3
+	encoded[44] = u8(desktop_languages.len)
 	mut reader := WireReader{
 		data: encoded
 	}
@@ -353,10 +362,17 @@ fn test_settings_language_pane_switches_the_language() {
 	i18n_collect_text(translated, mut labels)
 	assert 'Язык системы' in labels
 	// Languages keep their own names whichever is chosen.
-	assert 'English' in labels && 'Español' in labels
+	assert 'English' in labels && 'Español' in labels && 'Français' in labels
+	app.handle('${settings_action_language}${desktop_languages.index(DesktopLanguage.fr)}')!
+	assert desktop.settings.language == .fr
+	assert desktop_language == .fr
+	french := app.build(ui2_rect_for_i18n_test())!
+	labels.clear()
+	i18n_collect_text(french, mut labels)
+	assert 'Langue du système' in labels
 	// Out-of-range choices are ignored.
 	app.handle('${settings_action_language}9')!
-	assert desktop.settings.language == .ru
+	assert desktop.settings.language == .fr
 }
 
 // An application process learns the language as it starts, before its first
@@ -372,7 +388,7 @@ fn test_app_processes_start_in_the_desktop_language() {
 		assert chosen.language == language
 	}
 	mut unknown := base.clone()
-	unknown << '--app-lang=fr'
+	unknown << '--app-lang=zz'
 	fallback := app_process_options(unknown) or { panic('options rejected') }
 	assert fallback.language == .en
 }
@@ -396,6 +412,9 @@ fn test_program_search_ignores_case_and_accents_in_every_script() {
 	assert !app_matches('Calculator', 'терм')
 	set_desktop_language(.es)
 	assert app_matches('Calendar', 'calendario')
+	set_desktop_language(.fr)
+	assert app_matches('Text Editor', 'EDITEUR')
+	assert app_matches('Settings', 'parametres')
 }
 
 // Settings' Jump List tasks name categories, not positions in the sidebar,

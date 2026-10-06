@@ -138,6 +138,12 @@ fn test_disk_usage_formats_numbers_the_way_each_language_writes_them() {
 	assert disk_usage_size_text(1536) == '1,50 KB'
 	assert disk_usage_count_text(1234567) == '1.234.567'
 	assert disk_usage_duration_text(1500) == '1,5 s'
+	set_desktop_language(.fr)
+	assert disk_usage_size_text(1023) == '1023 o'
+	assert disk_usage_size_text(1536) == '1,50 Ko'
+	assert disk_usage_size_text(u64(3) * 1024 * 1024 * 1024) == '3,00 Go'
+	assert disk_usage_count_text(1234567) == '1 234 567'
+	assert disk_usage_duration_text(1500) == '1,5 s'
 	set_desktop_language(.en)
 	assert disk_usage_size_text(1536) == '1.50 KB'
 	assert disk_usage_count_text(1234567) == '1,234,567'

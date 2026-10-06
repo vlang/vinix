@@ -19,9 +19,10 @@
 //   - `{0}`, `{1}`, `{2}` mark where tr_fill and friends put their arguments,
 //     so each language orders a sentence its own way.
 //   - Text containing `|` is a plural: complete forms, `one|other` in English
-//     and Spanish and `one|few|many` in Russian, chosen by tr_count. i18n's own
-//     tr_plural appends a suffix to the first form instead, which cannot spell
-//     окно/окна/окон, and it applies the Russian rule to every language.
+//     and Spanish, `zero-or-one|other` in French and `one|few|many` in Russian,
+//     chosen by tr_count. i18n's own tr_plural appends a suffix to the first
+//     form instead, which cannot spell окно/окна/окон, and it applies the
+//     Russian rule to every language.
 //
 // Vinix runs without a garbage collector, and the renderer frees only the text
 // it is told it owns. tr() therefore returns the table's own strings, which
@@ -119,8 +120,9 @@ fn tr_plural_form(key string, count i64) string {
 }
 
 // desktop_plural_index is which of a language's plural forms a count takes.
-// English and Spanish have one and other; Russian has one (1, 21, 101), few
-// (2-4, 22-24) and many (0, 5-20, 25-30, 11-14 of every hundred).
+// English and Spanish have one and other; French has zero-or-one and other.
+// Russian has one (1, 21, 101), few (2-4, 22-24) and many (0, 5-20, 25-30,
+// 11-14 of every hundred).
 fn desktop_plural_index(language DesktopLanguage, count i64) int {
 	n := if count < 0 { -count } else { count }
 	return match language {
@@ -135,6 +137,9 @@ fn desktop_plural_index(language DesktopLanguage, count i64) int {
 		}
 		.en, .es {
 			if n == 1 { 0 } else { 1 }
+		}
+		.fr {
+			if n <= 1 { 0 } else { 1 }
 		}
 	}
 }
