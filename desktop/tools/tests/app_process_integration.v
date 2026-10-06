@@ -74,6 +74,13 @@ fn main() {
 		check_utility_copy_clients()
 		return
 	}
+	if arguments().contains('--utility-document-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_document_clients(mut desktop)
+		return
+	}
 	// Standalone applications receive their pipe descriptors through the
 	// environment, leaving argv empty for applications that open argv[1].
 	if os.getenv('VINIX_RESPONSE_FD') != '' {
@@ -333,6 +340,7 @@ fn main() {
 	check_storage_utility_clients(mut desktop)
 	check_productivity_utility_clients(mut desktop)
 	check_current_utility_workflow_clients(mut desktop)
+	check_utility_document_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -394,6 +402,280 @@ fn check_utility_copy_clients() {
 	check_preview_orientation_client(home, mut desktop)
 	if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
 	println('IPC utility copy workflows passed')
+}
+
+// A focused entry point runs the same real child processes on the host and
+// in Vinix. Its temporary home and all output paths are owned by this wrapper.
+fn check_utility_document_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	mut canonical := [4096]u8{}
+	assert unsafe { C.realpath(&char(temporary.str), &char(&canonical[0])) } != unsafe { nil }
+	unsafe { temporary.free() }
+	mut length := 0
+	for length < canonical.len && canonical[length] != 0 { length++ }
+	assert length > 0 && length < canonical.len
+	base := unsafe { tos(&canonical[0], length) }.clone()
+	pid := os.getpid().str()
+	name := 'vinix-documents-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_preview_crop_client(home, mut desktop)
+	check_grapher_document_client(home, mut desktop)
+	check_archive_selection_client(home, mut desktop)
+	check_system_information_search_client(home, mut desktop)
+	println('IPC utility document workflows passed')
+}
+
+fn integration_tree_enabled(element ui2.Element, id string) bool {
+	if element.id == id { return element.enabled }
+	for child in element.children {
+		if integration_tree_enabled(child, id) { return true }
+	}
+	return false
+}
+
+fn check_preview_crop_client(home string, mut desktop Desktop) {
+	// An independent 4x3 RGBA PNG has different colors in every row and column.
+	image := base64.decode('iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAYAAAC09K7GAAAAN0lEQVR4nA3IsQ0AIAgAQRtDoqDjMAWDMA8lw75eeWPKwmWTorQYY8bGQ8kwOs6PUryMrEPX5QG/NBPnu9fREQAAAABJRU5ErkJggg==')
+	path := system_information_join_path(home, 'crop-日本語.png')
+	export_path := system_information_join_path(home, 'cropped-Ж.png')
+	original_path := system_information_join_path(home, 'crop-original.png')
+	open_action := jump_open_prefix + path
+	defer { unsafe {
+		image.free(); path.free(); export_path.free(); original_path.free(); open_action.free()
+	} }
+	os.write_file_array(path, image) or { panic(err) }
+	factory := app_factory_named('vinix-preview') or { panic('Preview is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle(open_action) or { panic(err) }
+	free_tree(app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) })
+	app.handle(preview_action_actual) or { panic(err) }
+	app.handle(preview_action_select) or { panic(err) }
+	free_tree(app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) })
+	// At 100%, the 4x3 image starts at (398,346) in this 800x576
+	// application body. Drag displayed pixels (1,1) through (2,2).
+	if mut app is RemoteApp {
+		assert app.pointer_input_enabled()
+		app.pointer_event(.down, .left, 0, 399, 347, 800, 576)
+		app.pointer_event(.move, .no_button, 0, 400, 348, 800, 576)
+		app.pointer_event(.up, .left, 0, 400, 348, 800, 576)
+	}
+	selection := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+	assert integration_tree_enabled(selection, preview_action_crop)
+	free_tree(selection)
+	app.handle(preview_action_crop) or { panic(err) }
+	cropped := app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) }
+	assert tree_contains_text(cropped, '2 × 2 px')
+	assert tree_contains_text(cropped, 'Image cropped.')
+	assert !integration_tree_enabled(cropped, preview_action_crop)
+	free_tree(cropped)
+	storage_remote_field(mut app, preview_action_export_path, export_path)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_image_size(export_path, 2, 2)
+	bytes := os.read_bytes(export_path) or { panic(err) }
+	defer { unsafe { bytes.free() } }
+	mut width := 0
+	mut height := 0
+	mut channels := 0
+	pixels := C.stbi_load_from_memory(bytes.data, bytes.len, &width, &height, &channels, 4)
+	assert pixels != unsafe { nil }
+	defer { C.stbi_image_free(pixels) }
+	assert width == 2 && height == 2
+	expected := [u8(55), 77, 12, 255, 105, 77, 13, 255, 55, 147, 13, 255, 105, 147, 14, 255]!
+	for index, byte in expected { assert unsafe { pixels[index] } == byte }
+	storage_remote_field(mut app, preview_action_export_path, original_path)
+	app.handle(preview_action_export_copy) or { panic(err) }
+	original := os.read_bytes(original_path) or { panic(err) }
+	defer { unsafe { original.free() } }
+	assert original == image
+	println('IPC Preview pointer selection, exact 2x2 crop, PNG and original bytes passed')
+}
+
+fn integration_grapher_chart_signature(element ui2.Element) ?u64 {
+	if element.id == 'grapher.chart' {
+		assert element.children.len > 100
+		mut signature := u64(1469598103934665603)
+		for child in element.children {
+			for coordinate in [child.frame.x, child.frame.y, child.frame.width, child.frame.height]! {
+				signature = (signature ^ u64(i64(coordinate * 1024))) * u64(1099511628211)
+			}
+		}
+		return signature
+	}
+	for child in element.children {
+		if signature := integration_grapher_chart_signature(child) { return signature }
+	}
+	return none
+}
+
+fn check_grapher_document_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'graph-日本語.vgraph')
+	defer { unsafe { path.free() } }
+	factory := app_factory_named('vinix-grapher') or { panic('Grapher is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	fields := ['sin(x)+x/2', '-3', '3', '-4', '4']!
+	for index, text in fields { storage_remote_field(mut app, grapher_field_actions[index], text) }
+	app.handle('grapher.plot') or { panic(err) }
+	storage_remote_field(mut app, 'grapher.document_path', path)
+	before := app.build(ui2.rect(0, 0, 840, 636)) or { panic(err) }
+	assert tree_has_id(before, 'grapher.document_save_as') && tree_has_id(before, 'grapher.document_open')
+	signature := integration_grapher_chart_signature(before) or { panic('missing serialized chart') }
+	free_tree(before)
+	app.handle('grapher.document_save_as') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 840, 636), 'Graph document saved.')
+	expected := 'VINIX-GRAPH 1\nexpression=sin(x)+x/2\nxmin=-3\nxmax=3\nymin=-4\nymax=4\n'
+	integration_assert_file(path, expected)
+	app.handle('grapher.document_save_as') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 840, 636), 'This path already exists.')
+	integration_assert_file(path, expected)
+	for index, text in ['x*x', '-2', '2', '-1', '5']! {
+		storage_remote_field(mut app, grapher_field_actions[index], text)
+	}
+	app.handle('grapher.plot') or { panic(err) }
+	changed := app.build(ui2.rect(0, 0, 840, 636)) or { panic(err) }
+	changed_signature := integration_grapher_chart_signature(changed) or { panic('missing changed chart') }
+	assert changed_signature != signature
+	free_tree(changed)
+	app.handle('grapher.document_open') or { panic(err) }
+	opened := app.build(ui2.rect(0, 0, 840, 636)) or { panic(err) }
+	for index, text in fields {
+		assert (integration_tree_text(opened, grapher_field_actions[index]) or { panic('missing graph field') }) == text
+	}
+	assert (integration_tree_text(opened, 'grapher.document_path') or { panic('missing document path') }) == path
+	assert tree_contains_text(opened, 'Graph document opened.')
+	assert (integration_grapher_chart_signature(opened) or { panic('missing restored chart') }) == signature
+	free_tree(opened)
+	println('IPC Grapher exclusive Save As, Open, restored fields and serialized chart passed')
+}
+
+fn integration_archive_selection_fixture() []u8 {
+	mut bytes := []u8{cap: 8192}
+	unsafe { bytes.flags |= .noslices }
+	names := ['documents', 'documents/日本語.txt', 'documents/nested', 'documents/nested/empty.txt',
+		'documents-copy', 'documents-copy/other.txt']!
+	for index, name in names {
+		payload := if index == 1 { 'selected 😀\n' } else if index == 5 { 'omitted sibling' } else { '' }
+		header := archive_tar_header(ArchiveEntry{name: name, size: u64(payload.len), directory: index in [0, 2, 4]!})
+		for byte in header { bytes << byte }
+		for byte in payload { bytes << byte }
+		for _ in 0 .. (512 - payload.len % 512) % 512 { bytes << u8(0) }
+	}
+	for _ in 0 .. 1024 { bytes << u8(0) }
+	return bytes
+}
+
+fn check_archive_selection_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'selected-日本語.tar')
+	destination := system_information_join_path(home, 'extracted-Ж')
+	member := system_information_join_path(destination, 'documents/日本語.txt')
+	empty_member := system_information_join_path(destination, 'documents/nested/empty.txt')
+	omitted := system_information_join_path(destination, 'documents-copy')
+	bytes := integration_archive_selection_fixture()
+	defer { unsafe {
+		path.free(); destination.free(); member.free(); empty_member.free(); omitted.free(); bytes.free()
+	} }
+	os.write_file_array(path, bytes) or { panic(err) }
+	factory := app_factory_named('vinix-archive') or { panic('Archive Utility is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	storage_remote_field(mut app, 'archive.path', path)
+	app.handle('archive.browse') or { panic(err) }
+	storage_remote_wait(mut app, ui2.rect(0, 0, 800, 656), 'Archive validated.')
+	storage_remote_field(mut app, 'archive.destination', destination)
+	app.handle('archive.extract_selected') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 656), 'Select at least one entry')
+	assert !os.exists(destination)
+	app.handle('archive.row.0') or { panic(err) }
+	selected := app.build(ui2.rect(0, 0, 800, 656)) or { panic(err) }
+	assert (integration_tree_text(selected, 'archive.row.0') or { panic('missing folder toggle') }) == '[x]'
+	assert (integration_tree_text(selected, 'archive.row.1') or { panic('missing member toggle') }) == '[x]'
+	assert (integration_tree_text(selected, 'archive.row.4') or { panic('missing sibling toggle') }) == '[ ]'
+	assert tree_contains_text(selected, 'documents/日本語.txt')
+	free_tree(selected)
+	app.handle('archive.extract_selected') or { panic(err) }
+	storage_remote_wait(mut app, ui2.rect(0, 0, 800, 656), 'Archive extracted.')
+	integration_assert_file(member, 'selected 😀\n')
+	integration_assert_file(empty_member, '')
+	assert !os.exists(omitted)
+	println('IPC Archive visible directory selection, exact members and omitted sibling passed')
+}
+
+fn check_system_information_search_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'system-search-Ж.txt')
+	defer { unsafe { path.free() } }
+	factory := app_factory_named('vinix-system-information') or { panic('System Information is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	free_tree(app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) })
+	if mut app is RemoteApp { app.key_input('\x06'); app.paste_input('kernel') }
+	matching := app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+	assert (integration_tree_text(matching, 'system_information.search') or { panic('missing report search') }) == 'kernel'
+	assert tree_contains_text(matching, 'Kernel') && !tree_has_id(matching, 'system_information.search.empty')
+	free_tree(matching)
+	query := 'vinix-no-such-report-Ж😀-987654'
+	if mut app is RemoteApp { app.key_input('\x06'); app.paste_input(query) }
+	empty := app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+	assert (integration_tree_text(empty, 'system_information.search') or { panic('missing report search') }) == query
+	assert tree_has_id(empty, 'system_information.search.empty')
+	free_tree(empty)
+	storage_remote_field(mut app, 'system_information.path', path)
+	app.handle('system_information.export') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 780, 516), 'Report saved')
+	report := os.read_file(path) or { panic(err) }
+	defer { unsafe { report.free() } }
+	for section in ['\nOverview\n', '\nHardware\n', '\nStorage\n', '\nInstalled packages\n']! {
+		assert report.contains(section)
+	}
+	assert report.contains('Kernel') && !report.contains(query)
+	if mut app is RemoteApp {
+		app.key_input('\x06')
+		app.paste_input(query)
+		// Split CSI and SS3 navigation over several real request packets.
+		app.key_input('\x1b')
+		app.key_input('[')
+		app.key_input('B')
+		app.key_input('\x1bO')
+		app.key_input('A')
+	}
+	navigated := app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+	assert (integration_tree_text(navigated, 'system_information.search') or { panic('missing navigated search') }) == query
+	assert tree_has_id(navigated, 'system_information.search.empty')
+	free_tree(navigated)
+	if mut app is RemoteApp {
+		assert app.polling
+		app.key_input('\x1b')
+	}
+	mut escaped := false
+	for _ in 0 .. 100 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+		escaped = (integration_tree_text(tree, 'system_information.search') or { panic('missing Escape search') }) == ''
+		free_tree(tree)
+		if escaped { break }
+		desktop_sleep_ms(20)
+	}
+	assert escaped
+	if mut app is RemoteApp { app.key_input('\x06'); app.paste_input('kernel') }
+	app.handle('system_information.search.clear') or { panic(err) }
+	cleared := app.build(ui2.rect(0, 0, 780, 516)) or { panic(err) }
+	assert (integration_tree_text(cleared, 'system_information.search') or { panic('missing cleared search') }) == ''
+	assert !tree_has_id(cleared, 'system_information.search.empty')
+	free_tree(cleared)
+	println('IPC System Information Ctrl-F, fragmented navigation, Escape and full report export passed')
 }
 
 fn integration_terminal_cells(text string, end int) int {
