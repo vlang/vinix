@@ -144,18 +144,8 @@ for case in ("reversed", "huge", "clock-horizon", "absolute-overflow", "state", 
         assert "usleep boundary BUG with no published records or pages" in result.stderr, (case, result.stderr)
 print("LinuxKPI: invalid sleep ranges, contexts and signed clock boundaries passed")
 PY
-# Each translation unit keeps its public Linux/DRM header first. Building
-# separately catches missing transitive includes that the runtime test's
-# broader include list would conceal.
-for helper in helper_kernel helper_drm_color task_header_sched task_header_ww compiler_header spinlock_header preempt_header; do
-    ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
-        -fsanitize=address,undefined -fno-omit-frame-pointer \
-        -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
-        -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-        -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
-        -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-        "$repo/tests/linuxkpi/${helper}_test.c" "$work/headerimpl.o" "$header_link_gc" -o "$work/$helper"
-    "$work/$helper"
-done
+# Each independent V fixture still imports its original public header first.
+python3 "$repo/tests/linuxkpi/standalone_test.py" --arch "$native_v_arch" \
+    --header-impl "$work/headerimpl.o" --include "$work/include"
 printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'
 python3 -B "$repo/tests/linuxkpi/upstream_test.py"

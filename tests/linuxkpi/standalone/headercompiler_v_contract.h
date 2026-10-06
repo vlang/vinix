@@ -1,3 +1,20 @@
+/* V backend scalar names differ from the unchanged Linux native typedefs. */
+#undef atomic_fetch_add
+#undef atomic_fetch_sub
+#undef atomic_fetch_and
+#undef atomic_fetch_or
+#undef atomic_fetch_xor
+#undef atomic_exchange
+#undef atomic_compare_exchange_strong
+#undef atomic_compare_exchange_weak
+#define u64 vks_linux_u64
+#define timezone vks_linux_timezone
+#define ffs vks_linux_ffs
+#define fls vks_linux_fls
+#if defined(__clang__) && defined(VINIX_LINUXKPI_HOST_TEST)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#endif
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Linux Kbuild preincludes compiler_types.h before this unchanged DRM header.
  * Keep it first: it has no includes and immediately uses __must_check. */
@@ -19,7 +36,10 @@ _Static_assert(__same_type(&drm_atomic_set_fb_for_plane,
     (void (*)(struct drm_plane_state *, struct drm_framebuffer *))0),
     "original framebuffer declaration");
 
-int main(void)
-{
-    return 0;
-}
+#if defined(__clang__) && defined(VINIX_LINUXKPI_HOST_TEST)
+#pragma clang diagnostic pop
+#endif
+#undef fls
+#undef ffs
+#undef timezone
+#undef u64
