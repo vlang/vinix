@@ -16,8 +16,10 @@ void cpu_relax(void);
 /* Preserve the original x86 instruction helpers and their real dependencies.
  * Privileged writers and alternative patching keep their upstream externs;
  * CPU capability, mapping and device transport remain separate contracts. */
+#ifndef VINIX_LINUXKPI_HOST_TEST
 #include <linux/errno.h>
 #include <asm/cpufeatures.h>
 #include <asm/alternative.h>
 #include <asm/special_insns.h>
+#endif
 #endif
