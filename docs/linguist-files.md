@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `7ebf1a385c0d09a40ff29a7715238be3756d5361`,
+at source commit `bc0b9a77b50922bc52654e1ed6b965217fd88e05`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 441 | 2,542,113 | 6.35% |
-| Python | 456 | 4,528,411 | 11.31% |
-| Shell | 285 | 1,254,561 | 3.13% |
+| C | 453 | 2,508,229 | 6.20% |
+| Python | 471 | 4,694,831 | 11.60% |
+| Shell | 285 | 1,254,561 | 3.10% |
 
-All `.v` files are classified as V. The resulting V share is 71.79%, with no
+All `.v` files are classified as V. The resulting V share is 71.76%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 7ebf1a385c0d09a40ff29a7715238be3756d5361 --breakdown --json
+github-linguist --rev bc0b9a77b50922bc52654e1ed6b965217fd88e05 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -75,9 +75,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `compat/ios/runner/abi/dispatch.h` | 8,836 |
 | `compat/ios/runner/abi/gles-surface.h` | 387 |
 | `compat/ios/runner/abi/text.h` | 1,848 |
+| `desktop/calculator_heap_test_guard.h` | 548 |
+| `desktop/grapher_heap_test_guard.h` | 601 |
 | `desktop/libc_compat.h` | 1,911 |
 | `desktop/network_status.h` | 1,315 |
+| `desktop/notes_heap_test_guard.h` | 527 |
 | `desktop/quicklook_stb.h` | 454 |
+| `desktop/reminders_heap_test_guard.h` | 618 |
 | `desktop/tools/tests/heap_tracker.h` | 1,786 |
 | `games/ps1/abi.h` | 1,098 |
 | `gl-triangle/gl_v.h` | 1,885 |
@@ -94,7 +98,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/apple_spi_keyboard.h` | 1,718 |
 | `kernel/c/arch/cc.h` | 883 |
 | `kernel/c/brcm_m1.h` | 2,469 |
-| `kernel/c/brcm_wifi.h` | 5,877 |
+| `kernel/c/brcm_wifi.h` | 5,988 |
 | `kernel/c/ctype.h` | 43 |
 | `kernel/c/heap_benchmark.h` | 101 |
 | `kernel/c/heap_benchmark_v.h` | 1,399 |
@@ -104,6 +108,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_header_primitive_v_contract.h` | 903 |
 | `kernel/c/linuxkpi_i915_policy_v_contract.h` | 820 |
 | `kernel/c/linuxkpi_io_fixture_v_contract.h` | 532 |
+| `kernel/c/linuxkpi_nocache_v_contract.h` | 497 |
+| `kernel/c/linuxkpi_pagefault_v_contract.h` | 1,246 |
 | `kernel/c/linuxkpi_pci_fixture_v_contract.h` | 629 |
 | `kernel/c/linuxkpi_printk_fixture_v_contract.h` | 1,555 |
 | `kernel/c/linuxkpi_runtime_fixture_v_contract.h` | 1,375 |
@@ -121,7 +127,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_task_v_primitives.h` | 2,410 |
 | `kernel/c/linuxkpi_time_fixture_v_contract.h` | 602 |
 | `kernel/c/linuxkpi_timer_fixture_v_contract.h` | 390 |
-| `kernel/c/linuxkpi_uaccess_v_contract.h` | 502 |
+| `kernel/c/linuxkpi_uaccess_v_contract.h` | 704 |
 | `kernel/c/linuxkpi_usleep_fixture_v_contract.h` | 819 |
 | `kernel/c/linuxkpi_v_primitives.h` | 1,643 |
 | `kernel/c/linuxkpi_wait_bit_fixture_v_contract.h` | 826 |
@@ -169,30 +175,33 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/current.h` | 288 |
 | `kernel/linuxkpi/include/asm/delay.h` | 210 |
 | `kernel/linuxkpi/include/asm/div64.h` | 79 |
+| `kernel/linuxkpi/include/asm/early_ioremap.h` | 155 |
 | `kernel/linuxkpi/include/asm/errno.h` | 79 |
 | `kernel/linuxkpi/include/asm/fpu/api.h` | 408 |
 | `kernel/linuxkpi/include/asm/ioctl.h` | 79 |
+| `kernel/linuxkpi/include/asm/kmap_size.h` | 157 |
 | `kernel/linuxkpi/include/asm/param.h` | 138 |
 | `kernel/linuxkpi/include/asm/percpu.h` | 434 |
 | `kernel/linuxkpi/include/asm/posix_types.h` | 450 |
-| `kernel/linuxkpi/include/asm/processor.h` | 323 |
+| `kernel/linuxkpi/include/asm/processor.h` | 594 |
 | `kernel/linuxkpi/include/asm/rwonce.h` | 80 |
 | `kernel/linuxkpi/include/asm/string.h` | 260 |
 | `kernel/linuxkpi/include/asm/swab.h` | 181 |
 | `kernel/linuxkpi/include/asm/types.h` | 79 |
 | `kernel/linuxkpi/include/asm/unaligned.h` | 177 |
-| `kernel/linuxkpi/include/generated/autoconf.h` | 1,681 |
+| `kernel/linuxkpi/include/generated/autoconf.h` | 1,946 |
 | `kernel/linuxkpi/include/generated/timeconst.h` | 1,100 |
 | `kernel/linuxkpi/include/linux/bug.h` | 1,481 |
 | `kernel/linuxkpi/include/linux/compiler_attributes.h` | 869 |
 | `kernel/linuxkpi/include/linux/err.h` | 301 |
 | `kernel/linuxkpi/include/linux/export.h` | 250 |
 | `kernel/linuxkpi/include/linux/irqflags.h` | 940 |
-| `kernel/linuxkpi/include/linux/jump_label.h` | 1,068 |
+| `kernel/linuxkpi/include/linux/jump_label.h` | 1,216 |
 | `kernel/linuxkpi/include/linux/kernel.h` | 804 |
 | `kernel/linuxkpi/include/linux/limits.h` | 747 |
 | `kernel/linuxkpi/include/linux/mutex.h` | 1,761 |
-| `kernel/linuxkpi/include/linux/overflow.h` | 1,269 |
+| `kernel/linuxkpi/include/linux/overflow.h` | 331 |
+| `kernel/linuxkpi/include/linux/pagefault.h` | 540 |
 | `kernel/linuxkpi/include/linux/percpu-defs.h` | 1,424 |
 | `kernel/linuxkpi/include/linux/percpu.h` | 532 |
 | `kernel/linuxkpi/include/linux/poison.h` | 236 |
@@ -210,12 +219,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/linux/string.h` | 627 |
 | `kernel/linuxkpi/include/linux/time.h` | 461 |
 | `kernel/linuxkpi/include/linux/timex.h` | 247 |
-| `kernel/linuxkpi/include/linux/types.h` | 2,599 |
-| `kernel/linuxkpi/include/linux/uaccess.h` | 4,484 |
+| `kernel/linuxkpi/include/linux/types.h` | 2,255 |
+| `kernel/linuxkpi/include/linux/uaccess.h` | 5,243 |
 | `kernel/linuxkpi/include/vinix/format.h` | 2,001 |
 | `kernel/linuxkpi/include/vinix/gfp.h` | 503 |
 | `kernel/linuxkpi/include/vinix/printk.h` | 2,368 |
 | `kernel/linuxkpi/include/vinix/runtime.h` | 4,990 |
+| `kernel/linuxkpi/include/vinix/user_access_scope.h` | 1,233 |
 | `tests/aarch64-sigreturn/init.c` | 1,335 |
 | `tests/aarch64-sigreturn/probe.c` | 5,638 |
 | `tests/aarch64-syscalls/smoke.c` | 80,734 |
@@ -226,7 +236,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/encodefixture/encoder-native-abi.h` | 853 |
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/verifyfixture/verifier-native-abi.h` | 609 |
-| `tests/alloc-bench/bench.c` | 14,188 |
+| `tests/alloc-bench/benchcore/bench-native-abi.h` | 1,785 |
+| `tests/alloc-bench/benchfixture/fixture-native-abi.h` | 624 |
 | `tests/alloc-bench/macos-kext-info.c` | 758 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/aarch64/packaged-libc/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/amd64/packaged-libc/malloc.h` | 387 |
@@ -396,15 +407,16 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/workqueue_test.h` | 13,658 |
 | `tests/linuxkpi/ww_mutex_test.h` | 20,972 |
 | `tests/listen-backlog/probe.c` | 5,610 |
-| `tests/m1-wifi/ctl_fixture.c` | 3,932 |
-| `tests/m1-wifi/ctl_guest.c` | 1,718 |
-| `tests/m1-wifi/platform_fixture.h` | 1,072 |
-| `tests/m1-wifi/platform_test.c` | 6,724 |
-| `tests/m1-wifi/test.c` | 17,433 |
+| `tests/m1-wifi/ctl-native-abi.h` | 707 |
+| `tests/m1-wifi/helper-native-abi.h` | 298 |
+| `tests/m1-wifi/platform-native-abi.h` | 564 |
+| `tests/m1-wifi/platform_fixture.h` | 782 |
+| `tests/m1-wifi/protocol-native-abi.h` | 1,014 |
 | `tests/mapped-writeback/guest.c` | 10,688 |
 | `tests/memlock/test.c` | 21,658 |
 | `tests/memory-pressure/guest.c` | 4,490 |
-| `tests/memory/big_io_guest.c` | 2,210 |
+| `tests/memory/bigio/big-io-native-abi.h` | 475 |
+| `tests/memory/bigiomodel/big-io-model-abi.h` | 830 |
 | `tests/memory/pagetable.c` | 7,152 |
 | `tests/memory/runtime.c` | 4,898 |
 | `tests/mount-policy/test.c` | 27,539 |
@@ -487,7 +499,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/xnualloc/reference.c` | 11,469 |
 | `tools/agx-re/agx_trace.h` | 298 |
 | `tools/agx-re/agx_trace_v.h` | 2,133 |
-| `tools/m1-wifi/wifi_v.h` | 1,613 |
+| `tools/m1-wifi/wifi_v.h` | 1,331 |
 | `tools/sandbox/sandbox_v.h` | 1,593 |
 | `tools/security-audit/collector_v.h` | 2,306 |
 | `tools/security-mac/mac.h` | 526 |
@@ -577,7 +589,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
-| `kernel/linuxkpi/generate-abi.py` | 14,932 |
+| `kernel/linuxkpi/generate-abi.py` | 18,887 |
 | `kernel/linuxkpi/generate-bounds.py` | 20,254 |
 | `kernel/linuxkpi/upstream.py` | 4,638 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
@@ -592,8 +604,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-trace/run.py` | 10,891 |
 | `tests/alloc-bench/build-macos-kext.py` | 5,725 |
 | `tests/alloc-bench/compare-kernel.py` | 11,492 |
-| `tests/alloc-bench/compare.py` | 17,094 |
-| `tests/alloc-bench/compare_test.py` | 14,596 |
+| `tests/alloc-bench/compare.py` | 18,260 |
+| `tests/alloc-bench/compare_test.py` | 15,731 |
+| `tests/alloc-bench/compile-v-bench.py` | 2,110 |
 | `tests/alloc-bench/compile-v-sampler.py` | 2,480 |
 | `tests/alloc-bench/materialize-evidence.py` | 7,895 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py` | 1,058 |
@@ -678,9 +691,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run.py` | 8,275 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize.py` | 7,668 |
 | `tests/alloc-bench/run-kernel-vinix.py` | 6,927 |
-| `tests/alloc-bench/run-macos.py` | 7,184 |
-| `tests/alloc-bench/run-vinix.py` | 9,404 |
+| `tests/alloc-bench/run-macos.py` | 7,482 |
+| `tests/alloc-bench/run-vinix.py` | 9,619 |
 | `tests/alloc-bench/test_compare_kernel.py` | 13,510 |
+| `tests/alloc-bench/test_v_bench.py` | 10,787 |
 | `tests/alloc-bench/test_v_sampler.py` | 7,089 |
 | `tests/alloc-track/run.py` | 2,493 |
 | `tests/alloc-track/run_guest.py` | 1,101 |
@@ -800,6 +814,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
+| `tests/linuxkpi/asm_generated_headers_test.py` | 11,884 |
 | `tests/linuxkpi/audit_generation_test.py` | 8,245 |
 | `tests/linuxkpi/bounds_generation_test.py` | 22,687 |
 | `tests/linuxkpi/compile-v-core.py` | 1,629 |
@@ -807,24 +822,36 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
-| `tests/linuxkpi/overflow_test.py` | 11,209 |
-| `tests/linuxkpi/overflow_type_test.py` | 12,285 |
-| `tests/linuxkpi/run_vm.py` | 10,331 |
+| `tests/linuxkpi/nocache_test.py` | 26,985 |
+| `tests/linuxkpi/overflow_test.py` | 11,741 |
+| `tests/linuxkpi/overflow_type_test.py` | 13,758 |
+| `tests/linuxkpi/pagefault_test.py` | 21,239 |
+| `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
+| `tests/linuxkpi/run_vm.py` | 10,574 |
 | `tests/linuxkpi/scalar_store_test.py` | 21,614 |
 | `tests/linuxkpi/scalar_uaccess_test.py` | 17,555 |
 | `tests/linuxkpi/spin_test.py` | 5,602 |
 | `tests/linuxkpi/standalone_test.py` | 4,640 |
-| `tests/linuxkpi/uaccess_test.py` | 21,478 |
+| `tests/linuxkpi/static_key_declaration_test.py` | 12,107 |
+| `tests/linuxkpi/uaccess_test.py` | 23,353 |
 | `tests/linuxkpi/upstream_test.py` | 3,013 |
+| `tests/linuxkpi/user_access_scope_test.py` | 22,877 |
 | `tests/linuxkpi/user_pointer_test.py` | 9,179 |
-| `tests/m1-wifi/run-ctl-vm.py` | 4,491 |
-| `tests/m1-wifi/run-ctl.py` | 2,114 |
-| `tests/m1-wifi/run.py` | 2,297 |
+| `tests/m1-wifi/compile-fixture.py` | 1,221 |
+| `tests/m1-wifi/compile-provider.py` | 2,106 |
+| `tests/m1-wifi/run-control.py` | 9,066 |
+| `tests/m1-wifi/run-ctl-vm.py` | 811 |
+| `tests/m1-wifi/run-ctl.py` | 300 |
+| `tests/m1-wifi/run-helpers.py` | 7,462 |
+| `tests/m1-wifi/run-platform.py` | 8,713 |
+| `tests/m1-wifi/run-protocol.py` | 7,983 |
+| `tests/m1-wifi/run.py` | 426 |
 | `tests/m1-wifi/verify_build.py` | 5,663 |
 | `tests/m1-wifi/verify_test.py` | 2,428 |
 | `tests/mapped-writeback/run.py` | 7,942 |
 | `tests/memlock/run_vm.py` | 1,113 |
 | `tests/memory/heap_model_test.py` | 13,042 |
+| `tests/memory/test-big-io.py` | 6,072 |
 | `tests/minecraft/test-fetcher.py` | 4,085 |
 | `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
 | `tests/mount-policy/run_vm.py` | 1,615 |

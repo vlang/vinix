@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`7ebf1a385c0d09a40ff29a7715238be3756d5361`. Re-read HEAD, `AGENTS.md` and
+`bc0b9a77b50922bc52654e1ed6b965217fd88e05`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,9 +28,10 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **11,049 original fixture
-lines** and **250 header implementation lines** (111 desktop, 139 kernel),
-counted separately. Twenty stack-pointer/syscall/variadic boundary lines use
+continuation adds **3,251 original production C lines**, **11,881 original fixture/benchmark
+lines** and **258 header implementation lines** (111 desktop, 139 kernel, eight
+Wi-Fi tool lines),
+counted separately. Twenty-one stack-pointer/syscall/variadic boundary lines use
 instruction-only assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
@@ -88,12 +89,21 @@ instruction-only assembly and receive no V algorithm credit.
 | Speaker transport/thermal fixture (1,234) | `3ab257ae` |
 | Raw stat retention guest (88) | `09d3db88` |
 | Sampler ownership fixture (72 V; three variadic lines excluded) | `7ebf1a38` |
+| Wi-Fi protocol fixture (178) | `afa873f9` |
+| Wi-Fi platform fixture (80) | `3baf57e1` |
+| Wi-Fi control fixtures (99 V; one variadic line excluded) | `8c9ddf47` |
+| Wi-Fi tool native header policies (8) | `46ea29c7` |
+| Portable allocation benchmark (419) | `5b37c952` |
+| Large-I/O lifetime guest (56) | `bc0b9a77` |
+| Distinct benchmark differential output archive (zero credit) | `944c12e1` |
+| Native integer constant-expression metadata (zero credit) | `0fe3679c` |
+| Native high-byte string semantics correction (zero credit) | `bc9a5ea4` |
 
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 184 test paths /
-44,223 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 178 test paths /
+43,390 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -111,41 +121,66 @@ as maintained implementation.
 The shared checkout has coordinated uncommitted work. Re-read diffs and each
 stage's input hashes before continuing; completed commits above are separate:
 
-- Pointer/preemption runtime policies and the seven standalone programs are
-  committed. The broader native constexpr/type family is being represented in
-  checked compiler metadata with zero new V algorithm credit. Preserve all
-  4,099 assertions, single-evaluation/ICE behavior, rejection domains and
-  arbitrary native integer widths. Both fresh debug default kernels booted;
-  the first complete compatibility guest failed the unchanged SRCU deadlines on
-  immutable ELF `8e5a969a929f38418b9d7f65ec21050bc7e701dee1d8e2f29040b7a9265fe15f`.
-  An exact original-header control has identical instructions in all 105 linked
-  objects and 161 archive members and passed the entire compatibility guest.
-  The unchanged new ELF is repeating in a fresh image. Preserve the initial
-  failure, control and repeat; no assertions or deadlines have been weakened.
+- Pointer/preemption runtime policies, standalone programs and the broader native
+  integer constexpr/type metadata are committed (`0fe3679c`). All 4,099 original
+  assertions remain; metadata receives zero V algorithm credit. Both default
+  builds/boots and host checks passed. Initial SRCU failure, exact-instruction
+  original-header full PASS and identical V ELF repeat full PASS remain preserved
+  in `constexpr-final-validation.json`; no intrinsic deadline or assertion changed.
 - LinuxKPI host fixtures and the pthread/TLS scheduler model passed a complete
   private true-V ARM sanitizer workload and all original boundary cases.
   Actual x86 tests and an immutable original-C control both exposed the same
   void-pointer/native-typed callback sanitizer mismatches. Native ARM original
   C/V controls both exposed high-byte strchr and strreplace signedness bugs.
-  Narrow canonical callback contracts and byte fixes are being validated separately; all original checks remain. The fixed native
-  ARM V workload now passes all 26 groups and seven child boundary modes; its
-  original-C control also passed. Final production checks and a clean x86
-  proof are pending.
+  The high-byte correction is committed as `bc9a5ea4` after both fresh builds/boots
+  and the complete four-CPU compatibility guest. Canonical native callback and
+  const string/log-record contracts remain a separate pending 23-path stage;
+  actual x86 original-C sanitizers now pass without those function diagnostics.
+  The fixed native ARM V workload passes all 26 groups and seven child boundary
+  modes; its original-C control passed too. Both original-C and V native x86 workloads
+  failed with the same generic
+  child verdict under two CPUs; the original-C run took about 38 minutes.
+  Fresh four-CPU C/V runs retain all 3,600-second deadlines and original checks
+  and add only failure-status diagnostics. The complete V and immutable original-C x86 host sanitizer proofs now both
+  pass with halt-on-error and no function diagnostics; the native x86 proof and
+  composed production builds/full compatibility guest remain pending. Preserve both initial failures.
   This broader stage still receives no credit. The frozen compiler
   ignores V `thread_local` under `-os vinix`; native TLS storage retains real
   pthread isolation. Preserve all original assertions, ownership and deadlines.
-- Speaker, ANS and both independent AGX fixtures are committed. Wi-Fi and
-  QEMU-core independent fixtures are being ported in bounded stages. Wi-Fi host
-  testing found an existing native const callback mismatch; its narrow ABI fix
-  is separately committed as `e89f3526` after both fresh builds and boot checks.
-  It receives zero translation credit and is outside the pinned language snapshot. Native model success does not establish physical
-  hardware operation.
+- Speaker, ANS, both independent AGX and all three Wi-Fi fixture scopes are
+  committed. The Wi-Fi const callback ABI fix (`e89f3526`) passed both fresh
+  builds/boots and receives zero credit. QEMU-core partial fixture work retains
+  all original checks and receives no credit yet. ARM original-C/V full feature
+  and persistence guests passed on normal PROD=true. Original debug controls and
+  the normal x86 control expired at their 300/900-second outer limits, without
+  weakening assertions. Fresh x86 original-C/V runs use the same documented
+  3,600-second outer allowance equally; all intrinsic deadlines/counts/assertions
+  remain. Preserve old failure evidence and record the explicit configuration.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
   first-party C implementation bodies.
 
 ## Validation and evidence
+
+The portable benchmark (`5b37c952`) passed all 272 original-C/V host sanitizer
+cases, four native musl guests and genuine guest GCC 14.2.0 compilation through
+its maintained Vinix runner. All six workloads, failure cleanup and checksum
+453 remain; permanent fixed table initialization replaces an uncalled dynamic
+initializer. Its retained earlier failure and help-only exact instruction proof
+are in `alloc-bench-validation.json`. No new paired timing ratio is claimed.
+The Wi-Fi scopes retain all protocol/platform/control checks; original-C/V host
+sanitizers and native guests passed. Only 357 of 358 removed fixture lines earn
+V credit; one variadic extraction line is native assembly. Eight tool header
+helpers passed both host ABIs and all four native C/V boundary guests. Native
+models do not establish physical hardware operation.
+
+The large-I/O guest (`bc0b9a77`) passed all 44 original-C/V host fault cases
+and four native guests, preserving all 17 original checks, 300 rounds and
+seven-second settling. ARM pages stayed 46→46; x86 stayed 132→132 with exact
+C/V measurement/verdict parity. Its 240-second outer allowance is unchanged.
+`big-io-validation.json` records no allocator imports and peer lifetime review;
+the separate forced-vmap configuration was not rerun.
 
 Current local cache:
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
@@ -395,9 +430,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`7ebf1a385c0d09a40ff29a7715238be3756d5361` reports **V 71.79%, C 6.35%**,
-441 C files, 456 Python files and 285 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,458 classified blobs
+`bc0b9a77b50922bc52654e1ed6b965217fd88e05` reports **V 71.76%, C 6.20%**,
+453 C files, 471 Python files and 285 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,513 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

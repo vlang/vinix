@@ -452,9 +452,10 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **11,049 original fixture
-lines** and **250 header implementation lines** (111 desktop and 139 kernel).
-A further 20 original stack-pointer/syscall/variadic boundary lines now use instruction-only
+**3,251 original production/native-boundary C lines**, **11,881 original fixture/benchmark
+lines** and **258 header implementation lines** (111 desktop, 139 kernel and
+eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
+boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
 committed and validated; pending stages are excluded.
@@ -526,6 +527,12 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Speaker independent transport/thermal fixture | 1,234 | `3ab257ae` |
 | Raw stat exact-retention guest | 88 | `09d3db88` |
 | Kernel sampler ownership fixture (three variadic boundary lines excluded) | 72 | `7ebf1a38` |
+| Wi-Fi protocol independent fixture | 178 | `afa873f9` |
+| Wi-Fi platform independent fixture | 80 | `3baf57e1` |
+| Wi-Fi native control fixtures (one variadic line excluded) | 99 | `8c9ddf47` |
+| Wi-Fi native tool header policies | 8 | `46ea29c7` |
+| Portable allocation benchmark workloads | 419 | `5b37c952` |
+| Large-I/O exact-page lifetime guest | 56 | `bc0b9a77` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -667,9 +674,65 @@ clocks provide ownership evidence, not comparative performance measurements.
 Local receipts are `speakers-stage-validation.json`, `stat-buffer-validation.json`
 and `sampler-fixture-validation.json`. All new lifetimes received peer review.
 
-At committed source `7ebf1a385c0d09a40ff29a7715238be3756d5361`,
+The Wi-Fi protocol/platform fixtures retain 98/29 assertions, 26/eight model
+groups and 100,000 parser mutations. Original-C/V sanitizers passed on both
+actual host ABIs; both native musl model guests passed. The native control
+fixtures retain all 33 assertions/11 scenarios and match original-C host
+return values and output; both native V guests passed. One original variadic
+extraction line becomes native assembly and receives no V credit: these three
+scopes remove 358 original C lines and credit 357 to V. Eight native tool
+header helpers preserve all termios bytes, errno/TLS, volatile wiping and
+stat/FILE contracts; all four native C/V boundary guests and both host
+sanitizer runs passed. Native const callback correction `e89f3526` passed
+both fresh kernel builds/boots and receives zero translation credit. No
+physical Wi-Fi or firmware operation is established.
+
+The portable allocation benchmark preserves six workloads, CLI behavior,
+5–31 samples, odd/even medians, volatile payload accesses and the original
+failure cleanup order. On each actual Darwin ARM/x86 host ABI, all 136
+original-C/V controlled-clock/fault cases passed ASan/UBSan, including every
+mixed-batch allocation-failure prefix. All four native C/V guests passed
+with six results and final checksum 453. An end-to-end Vinix runner also
+generated and compiled the artifact with genuine guest GCC 14.2.0 and passed
+all six workloads. Its initial shared-artifact dynamic constant table stayed
+zero because `_vinit` was not called; maintained V now initializes its
+permanent fixed table once. That failure is preserved. Final help text adds
+`-I .` to the generated-artifact build command; both SDK executable instruction
+bytes remain identical. The evidence filename repair `944c12e1` preserves all
+136 distinct output pairs per host ABI. Existing archived results remain
+immutable; no new paired Vinix/macOS timing campaign or ratio is claimed.
+Local receipts include `alloc-bench-validation.json` and the Wi-Fi stage
+receipts. All new lifetime boundaries received peer review.
+
+The large-I/O guest (`bc0b9a77`) preserves all 17 original check sites,
+300 rounds of 65,536-byte transfers and byte checks, failed read/write-copy
+EFAULT checks, three warm snapshots and seven-second settling. Both actual
+host ABIs passed all 22 original-C/V fault cases under ASan/UBSan. All four
+native C/V guests passed within their unchanged 240-second outer allowance:
+ARM large pages stayed 46→46 and x86 stayed 132→132, with identical control
+and V measurement/verdict lines. Generated output retains two permanent
+buffers and native ULL stack records; both SDK objects have no allocator
+imports. `big-io-validation.json` records peer lifetime review and immutable
+kernels. This fixture-only stage does not establish the separate forced-vmap
+self-test configuration.
+
+Native integer constant-expression metadata (`0fe3679c`) preserves all 4,099
+assertions, arbitrary native integer widths and single evaluation, with zero
+V algorithm credit. Both fresh default builds/boots and the full host checks
+passed. Its initial compatibility guest failed the unchanged SRCU deadline;
+an exact original-header control had identical executable instructions in
+all 105 linked objects and 161 archive members and passed. The identical V
+ELF then passed the complete guest with exact page equality. The unresolved
+failure, control and repeat remain recorded. The separately committed
+high-byte string correction (`bc9a5ea4`) passed signed/unsigned-char original-C
+regressions on both host ABIs, both fresh builds/boots and the complete
+four-CPU compatibility guest with exact page equality; its tested ELF is
+`0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
+It receives zero additional port credit.
+
+At committed source `bc0b9a77b50922bc52654e1ed6b965217fd88e05`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 184 test paths / 44,223 lines,
+The non-vendored `.c` census still contains 178 test paths / 43,390 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
 of the repository-wide request. This census is not a translation tally.
@@ -803,8 +866,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`7ebf1a385c0d09a40ff29a7715238be3756d5361` reports **V 71.79%, C 6.35%**,
-441 C files, 456 Python files and 285 shell files. All 2,458 classified blob
+`bc0b9a77b50922bc52654e1ed6b965217fd88e05` reports **V 71.76%, C 6.20%**,
+453 C files, 471 Python files and 285 shell files. All 2,513 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
