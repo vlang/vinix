@@ -10,6 +10,12 @@ module main
 import compress.zlib
 import os
 
+#flag -I @VMODROOT
+#include "app_icon_data.h"
+
+fn C.vinix_app_icon_data(&char, &usize) voidptr
+fn C.vinix_app_icon_size(&char) usize
+
 const app_icon_dir = '/usr/share/vinix/icons'
 
 struct AppIcon {
@@ -36,7 +42,17 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 	width := int(qoi_u32_be(bytes, 4)?)
 	height := int(qoi_u32_be(bytes, 8)?)
 	channels := bytes[12]
-	if width <= 0 || height <= 0 || width > 2048 || height > 2048 || channels < 3 || channels > 4 {
+	if width <= 0 || height <= 0 || width > 2048 || height > 2048 || channels < 3 || channels > 4
+		|| bytes[13] > 1 {
+		return none
+	}
+	end := bytes.len - 8
+	for i in end .. bytes.len - 1 {
+		if bytes[i] != 0 {
+			return none
+		}
+	}
+	if bytes[bytes.len - 1] != 1 {
 		return none
 	}
 	pixel_count := width * height
@@ -44,6 +60,12 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 		return none
 	}
 	mut pixels := []u32{len: pixel_count}
+	mut decoded := false
+	defer {
+		if !decoded {
+			unsafe { pixels.free() }
+		}
+	}
 	mut index := [64]u32{}
 	mut at := 14
 	mut r := u8(0)
@@ -55,13 +77,13 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 		if run > 0 {
 			run--
 		} else {
-			if at >= bytes.len {
+			if at >= end {
 				return none
 			}
 			op := bytes[at]
 			at++
 			if op == 0xfe {
-				if at + 3 > bytes.len {
+				if at + 3 > end {
 					return none
 				}
 				r = bytes[at]
@@ -69,7 +91,7 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 				b = bytes[at + 2]
 				at += 3
 			} else if op == 0xff {
-				if at + 4 > bytes.len {
+				if at + 4 > end {
 					return none
 				}
 				r = bytes[at]
@@ -88,7 +110,7 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 				g = u8(int(g) + int(op >> 2 & 0x03) - 2)
 				b = u8(int(b) + int(op & 0x03) - 2)
 			} else if op & 0xc0 == 0x80 {
-				if at >= bytes.len {
+				if at >= end {
 					return none
 				}
 				next := bytes[at]
@@ -105,6 +127,10 @@ fn decode_qoi(bytes []u8) ?AppIcon {
 		index[(u32(r) * 3 + u32(g) * 5 + u32(b) * 7 + u32(a) * 11) % 64] = packed
 		pixels[pixel] = u32(a) << 24 | u32(r) << 16 | u32(g) << 8 | u32(b)
 	}
+	if run != 0 || at != end {
+		return none
+	}
+	decoded = true
 	return AppIcon{
 		width:  width
 		height: height
@@ -249,17 +275,39 @@ fn decode_png(bytes []u8) ?AppIcon {
 }
 
 fn load_app_icon(name string) AppIcon {
-	bytes := os.read_bytes('${app_icon_dir}/${name}.qoi') or { return AppIcon{} }
+	return load_app_icon_from_dir(name, app_icon_dir)
+}
+
+// Installed artwork can override the defaults, but a missing or damaged file
+// must never leave a desktop shortcut blank. Every build carries the defaults.
+fn load_app_icon_from_dir(name string, directory string) AppIcon {
+	path := '${directory}/${name}.qoi'
+	defer {
+		unsafe { path.free() }
+	}
+	bytes := os.read_bytes(path) or { return embedded_app_icon(name) }
 	defer {
 		if bytes.cap > 0 {
 			unsafe { bytes.free() }
 		}
 	}
+	return decode_qoi(bytes) or { embedded_app_icon(name) }
+}
+
+fn embedded_app_icon(name string) AppIcon {
+	size := C.vinix_app_icon_size(unsafe { &char(name.str) })
+	if size == 0 {
+		return AppIcon{}
+	}
+	data := C.vinix_app_icon_data(unsafe { &char(name.str) }, unsafe { nil })
+	// This view borrows immutable bytes from the executable. Only the decoded
+	// pixels are owned by the caller; the source storage must never be freed.
+	bytes := unsafe { (&u8(data)).vbytes(int(size)) }
 	return decode_qoi(bytes) or { AppIcon{} }
 }
 
 // The bundled icons, by the image path the desktop's elements name them with.
-// Their artwork is /usr/share/vinix/icons/<name>.qoi.
+// Their artwork is embedded, with /usr/share/vinix/icons/<name>.qoi overrides.
 const bundled_icon_paths = ['asset:firefox', 'asset:chromium', 'asset:blender', 'asset:minecraft',
 	'asset:doom', 'asset:steam', 'asset:terminal', 'asset:settings', 'asset:activity',
 	'asset:calculator', 'asset:disk_usage', 'asset:editor', 'asset:files', 'asset:clock',
@@ -285,7 +333,7 @@ fn bundled_icon_path(path string) bool {
 }
 
 // sized_bundled_icon returns the bundled icon at exactly width x height
-// physical pixels, or nil when the image has no artwork installed.
+// physical pixels, or nil when the image has no recognised artwork.
 fn (mut d Desktop) sized_bundled_icon(path string, width int, height int) &AppIcon {
 	for i in 0 .. d.sized_icons.len {
 		if d.sized_icons[i].icon.width == width && d.sized_icons[i].icon.height == height

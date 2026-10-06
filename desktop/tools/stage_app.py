@@ -22,6 +22,10 @@ embeds under -prod, and the development builds Vinix runs on itself would
 otherwise read the files from wherever their sources were when the desktop
 next starts.
 
+The same applies to icon artwork. app_icon_data.h contains the canonical QOI
+bytes as static C arrays, so every compiled desktop can recover a missing or
+corrupt installed icon without reading files from its source directory.
+
     stage_app.py <staging-dir> <desktop-dir> <example-dir>...
 """
 
@@ -41,6 +45,7 @@ EMBEDDED_VIEW_PATTERN = re.compile(
 )
 TRANSLATIONS_DIR = "translations"
 TRANSLATIONS_SOURCE = "translations_data.v"
+ICON_DATA_HEADER = "app_icon_data.h"
 LEGACY_LICENSE_PREAMBLE = re.compile(
     r"\A// Copyright \(c\) [^\n]+\. All rights reserved\.\n"
     r"// Use of this source code is governed by a GPL v2 license\n"
@@ -122,6 +127,75 @@ def stage_translations(staging, desktop_dir):
         handle.write("\n".join(out))
 
 
+def stage_icon_data(staging, desktop_dir):
+    """Compile canonical QOI bytes into borrowed, read-only C storage."""
+    directory = os.path.join(desktop_dir, "assets")
+    try:
+        names = sorted(name for name in os.listdir(directory) if name.endswith(".qoi"))
+    except OSError as error:
+        sys.exit("%s: cannot read icon artwork: %s" % (directory, error))
+    if not names:
+        sys.exit("%s: no .qoi icon artwork" % directory)
+    out = [
+        "// Generated from desktop/assets/*.qoi by desktop/tools/stage_app.py.",
+        "// Edit the QOI files, not this.",
+        "// Returned bytes belong to static read-only storage. Never modify or free them.",
+        "#ifndef VINIX_APP_ICON_DATA_H",
+        "#define VINIX_APP_ICON_DATA_H",
+        "#include <stddef.h>",
+        "#include <string.h>",
+        "",
+    ]
+    icons = []
+    for name in names:
+        stem = name[:-4]
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", stem):
+            sys.exit("%s: icon filename is not a C identifier" % name)
+        path = os.path.join(directory, name)
+        try:
+            with open(path, "rb") as handle:
+                data = handle.read()
+        except OSError as error:
+            sys.exit("%s: cannot read icon artwork: %s" % (path, error))
+        if not data:
+            sys.exit("%s: empty icon artwork" % path)
+        symbol = "vinix_app_icon_%s" % stem
+        icons.append((stem, symbol))
+        out.append("static const unsigned char %s[] = {" % symbol)
+        for offset in range(0, len(data), 16):
+            out.append("    %s," % ", ".join("0x%02x" % byte for byte in data[offset:offset + 16]))
+        out.extend(["};", ""])
+    out.extend([
+        "static inline void *vinix_app_icon_data(const char *name, size_t *size) {",
+        "    if (size != NULL) *size = 0;",
+        "    if (name == NULL) return NULL;",
+    ])
+    for stem, symbol in icons:
+        out.extend([
+            '    if (strcmp(name, "%s") == 0) {' % stem,
+            "        if (size != NULL) *size = sizeof(%s);" % symbol,
+            "        return (void *)%s;" % symbol,
+            "    }",
+        ])
+    out.extend([
+        "    return NULL;",
+        "}",
+        "",
+        "static inline size_t vinix_app_icon_size(const char *name) {",
+        "    size_t size = 0;",
+        "    vinix_app_icon_data(name, &size);",
+        "    return size;",
+        "}",
+        "#endif",
+        "",
+    ])
+    destination = os.path.join(staging, ICON_DATA_HEADER)
+    if os.path.lexists(destination):
+        os.remove(destination)
+    with open(destination, "w", encoding="ascii") as handle:
+        handle.write("\n".join(out))
+
+
 def strip_main(text, origin):
     match = MAIN_PATTERN.search(text)
     if not match:
@@ -187,6 +261,7 @@ def main():
 
     stage_desktop(staging, desktop_dir)
     stage_translations(staging, desktop_dir)
+    stage_icon_data(staging, desktop_dir)
     for example in examples:
         stage_example(staging, example)
     print("    staged %d example(s) into %s" % (len(examples), staging))

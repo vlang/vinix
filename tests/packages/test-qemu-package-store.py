@@ -48,6 +48,11 @@ class PackageStoreTests(unittest.TestCase):
         (self.source / "desktop/translations/en.tr").write_text(
             "app.files\nFiles\n", encoding="utf-8"
         )
+        (self.source / "desktop/assets").mkdir()
+        (self.source / "desktop/assets/terminal.qoi").write_bytes(
+            b"qoif" + (1).to_bytes(4, "big") * 2 + bytes([4, 0, 0xff, 17, 34, 51, 255])
+            + b"\0" * 7 + b"\1"
+        )
         (self.source / "desktop/tools").mkdir()
         for name in ("stage_app.py", "stage_ui2.py", "ui2_headless_bounds.v"):
             shutil.copyfile(
@@ -153,6 +158,10 @@ class PackageStoreTests(unittest.TestCase):
             self.assertIn("desktop/local.v", snapshot.getnames())
             self.assertIn(".vinix-build/desktop/app_calculator.v", snapshot.getnames())
             self.assertIn(".vinix-build/desktop/translations_data.v", snapshot.getnames())
+            self.assertTrue(snapshot.getmember(".vinix-build/desktop/app_icon_data.h").isfile())
+            icon_header = snapshot.extractfile(".vinix-build/desktop/app_icon_data.h").read()
+            self.assertIn(b"static const unsigned char vinix_app_icon_terminal[]", icon_header)
+            self.assertIn(b"0xff, 0x11, 0x22, 0x33, 0xff", b" ".join(icon_header.split()))
             self.assertIn(".vinix-build/vmodules/ui2/v.mod", snapshot.getnames())
             self.assertIn(
                 ".vinix-build/vmodules/ui2/ui/vinix_headless_backend.v",

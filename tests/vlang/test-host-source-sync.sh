@@ -17,6 +17,15 @@ mkdir -p "$source_root/desktop/tools" "$ui2_root/ui" \
 printf 'module main\nconst host_revision = 1\n' > "$source_root/desktop/main.v"
 mkdir -p "$source_root/desktop/translations"
 printf 'app.files\nFiles\n' > "$source_root/desktop/translations/en.tr"
+mkdir -p "$source_root/desktop/assets"
+python3 - "$source_root/desktop/assets/terminal.qoi" <<'PY'
+import sys
+from pathlib import Path
+Path(sys.argv[1]).write_bytes(
+    b"qoif" + (1).to_bytes(4, "big") * 2 + bytes([4, 0, 0xff, 17, 34, 51, 255])
+    + b"\0" * 7 + b"\1"
+)
+PY
 cp "$repo/desktop/tools/stage_app.py" "$source_root/desktop/tools/stage_app.py"
 cp "$repo/desktop/tools/stage_ui2.py" "$source_root/desktop/tools/stage_ui2.py"
 cp "$repo/desktop/tools/ui2_headless_bounds.v" \
@@ -54,6 +63,10 @@ VINIX_HOST_TAR=$(command -v tar) \
 grep -q 'host_revision = 1' "$work/mnt/vinix/desktop/main.v"
 test -f "$work/mnt/vinix/.vinix-build/desktop/app_calculator.v"
 grep -q "'Files'," "$work/mnt/vinix/.vinix-build/desktop/translations_data.v"
+test -f "$work/mnt/vinix/.vinix-build/desktop/app_icon_data.h"
+test ! -L "$work/mnt/vinix/.vinix-build/desktop/app_icon_data.h"
+grep -q 'static const unsigned char vinix_app_icon_terminal\[\]' \
+    "$work/mnt/vinix/.vinix-build/desktop/app_icon_data.h"
 test -f "$work/mnt/vinix/.vinix-build/vmodules/ui2/v.mod"
 test ! -e "$work/mnt/vinix/.vinix-build/vmodules/ui2/ui/scratch_tmp.v"
 test -L "$work/mnt/vinix"
