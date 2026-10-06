@@ -108,6 +108,13 @@ fn main() {
 		check_utility_precision_clients(mut desktop)
 		return
 	}
+	if arguments().contains('--utility-refinement-integration') {
+		if arguments().contains('--require-vinix') { integration_refinement_require(os.exists('/dev/processes'), 'Refinement fixture must run inside Vinix') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_refinement_clients(mut desktop)
+		return
+	}
 	if arguments().contains('--utility-organize-integration') {
 		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
 		desktop_ignore_broken_pipe()
@@ -385,6 +392,7 @@ fn main() {
 	check_utility_recovery_clients(mut desktop)
 	check_utility_controls_clients(mut desktop)
 	check_utility_precision_clients(mut desktop)
+	check_utility_refinement_clients(mut desktop)
 	check_utility_input_clients(mut desktop)
 	check_utility_organize_clients(mut desktop)
 	desktop_restore_requested_scale()
@@ -563,6 +571,286 @@ fn check_utility_precision_clients(mut desktop Desktop) {
 	println('IPC utility precision workflows passed')
 }
 
+// Critical golden checks remain executable independently of V assertions.
+// The suite also rejects production builds, where ordinary assertions vanish.
+fn integration_refinement_require(condition bool, message string) {
+	if !condition { eprintln(message) C.exit(97) }
+	assert condition, message
+}
+
+fn integration_refinement_file(path string, expected string) {
+	actual := os.read_file(path) or { panic(err) }
+	defer { unsafe { actual.free() } }
+	integration_refinement_require(actual == expected, 'IPC refinement file bytes differ')
+}
+
+fn check_utility_refinement_clients(mut desktop Desktop) {
+	$if prod { eprintln('Utility refinement integration requires enabled assertions') C.exit(96) }
+	temporary := os.temp_dir()
+	base := os.real_path(temporary)
+	pid := os.getpid().str()
+	name := 'vinix-refinement-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { temporary.free(); pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_calculator_bits_client(mut desktop)
+	check_reminders_direction_client(home, mut desktop)
+	check_grapher_svg_client(home, mut desktop)
+	check_notes_import_client(home, mut desktop)
+	println('IPC utility refinement workflows passed')
+}
+
+fn check_calculator_bits_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	if mut app is RemoteApp { assert app.pid > 0 && app.keyboard; app.key_input('2+3') }
+	app.handle('calculator.mode.programmer') or { panic(err) }
+	app.handle('calculator.programmer.width.8') or { panic(err) }
+	app.handle('calculator.programmer.base.hex') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('0xA'); app.key_input('+') }
+	app.handle('calculator.programmer.bits') or { panic(err) }
+	bits := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	bit := integration_element_named(bits, 'calculator.programmer.bit.3') or { panic('missing serialized bit 3') }
+	integration_refinement_require(bit.text == '1' && bit.checked, 'Initial programmer bit 3 must be set')
+	assert !tree_has_id(bits, 'calculator.programmer.bit.8')
+	app.handle(if bit.action_id.len > 0 { bit.action_id } else { bit.id }) or { panic(err) }
+	free_tree(bits)
+	integration_assert_integer(mut app, ['2', '2', '2', '10']!)
+	if mut app is RemoteApp { app.key_input('=') }
+	integration_assert_integer(mut app, ['12', 'C', '14', '1100']!)
+	app.handle('calculator.programmer.bit.0') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('=') }
+	integration_assert_integer(mut app, ['15', 'F', '17', '1111']!)
+	app.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, 'F')
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('clipboard.copy.copied'))
+	app.handle('calculator.programmer.width.64') or { panic(err) }
+	for _ in 0 .. 7 { app.handle('calculator.programmer.bits.next') or { panic(err) } }
+	high := app.build(ui2.rect(0, 0, 180, 300)) or { panic(err) }
+	integration_refinement_require((integration_tree_text(high, 'calculator.programmer.bits.range') or { panic('missing high byte range') }) == '63 - 56', 'Compact bit page must show the high byte')
+	assert tree_has_id(high, 'calculator.programmer.bit.63') && !tree_has_id(high, 'calculator.programmer.bit.0')
+	for child in high.children { integration_assert_frame_inside(child, 180, 300) }
+	free_tree(high)
+	app.handle('calculator.programmer.bit.63') or { panic(err) }
+	wide := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	integration_refinement_require((integration_programmer_readout(wide, 0) or { panic('missing wide integer') }) == '9223372036854775823', 'Bit 63 must retain all lower bits exactly')
+	free_tree(wide)
+	app.handle('calculator.programmer.history.1') or { panic(err) }
+	integration_assert_integer(mut app, ['12', 'C', '14', '1100']!)
+	recalled := app.build(ui2.rect(0, 0, 180, 300)) or { panic(err) }
+	integration_refinement_require((integration_tree_text(recalled, 'calculator.programmer.bits.range') or { panic('missing restored byte range') }) == '7 - 0', 'History must restore width and clamp the compact bit page')
+	assert tree_has_id(recalled, 'calculator.programmer.bit.7') && !tree_has_id(recalled, 'calculator.programmer.bit.63')
+	free_tree(recalled)
+	app.handle('calculator.programmer.bit.63') or { panic(err) }
+	integration_assert_integer(mut app, ['12', 'C', '14', '1100']!)
+	app.handle('calculator.programmer.bits') or { panic(err) }
+	app.handle('calculator.programmer.bits') or { panic(err) }
+	app.handle('calculator.mode.basic') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('=') }
+	integration_assert_calculator_display(mut app, '5')
+	println('IPC Calculator Bits, pending/repeated operands, high bit, width/page/history, Copy and Basic state passed')
+}
+
+fn integration_refinement_reminders_rows(mut app NativeApp, expected [5]int) {
+	tree := app.build(ui2.rect(0, 0, 800, 736)) or { panic(err) }
+	defer { free_tree(tree) }
+	mut row := 0
+	for child in tree.children {
+		if !child.id.starts_with('reminders.row.') { continue }
+		index := calendar_integer(console_borrow(child.id, 14, child.id.len)) or { panic('invalid serialized task identity') }
+		integration_refinement_require(row < expected.len && index == expected[row], 'Reminders visible row order differs from the golden order')
+		assert child.frame.y == f64(200 + row * 40)
+		row++
+	}
+	integration_refinement_require(row == expected.len, 'Reminders must show every expected task')
+}
+
+fn check_reminders_direction_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, '.vinix-reminders')
+	export := system_information_join_path(home, 'directions.csv')
+	defer { unsafe { path.free(); export.free() } }
+	record := 'VINIX-REMINDERS 2\n0\t0\t\tZeta\n0\t3\t2028-02-29 09:00\talpha\n1\t3\t2028-02-29\tAlpha\n0\t1\t2028-02-29 09:00\talpha\n0\t2\t\tUndated\n'
+	os.write_file(path, record) or { panic(err) }
+	factory := app_factory_named('vinix-reminders') or { panic('Reminders is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	integration_refinement_reminders_rows(mut app, [0, 1, 2, 3, 4]!)
+	app.handle('reminders.direction.toggle') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [4, 3, 2, 1, 0]!)
+	app.handle('reminders.sort.priority') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [1, 2, 4, 3, 0]!)
+	app.handle('reminders.direction.toggle') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [0, 3, 4, 1, 2]!)
+	app.handle('reminders.row.3') or { panic(err) }
+	app.handle('reminders.edit') or { panic(err) }
+	storage_remote_field(mut app, 'reminders.title', 'Direction draft stays attached')
+	app.handle('reminders.priority.high') or { panic(err) }
+	app.handle('reminders.sort.due') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [2, 1, 3, 0, 4]!)
+	app.handle('reminders.direction.toggle') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [1, 3, 2, 0, 4]!)
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 736), 'Direction draft stays attached')
+	app.handle('reminders.sort.title') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [2, 4, 0, 1, 3]!)
+	app.handle('reminders.direction.toggle') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [1, 3, 0, 4, 2]!)
+	app.handle('reminders.cancel') or { panic(err) }
+	app.handle('reminders.sort.due') or { panic(err) }
+	integration_refinement_reminders_rows(mut app, [1, 3, 2, 0, 4]!)
+	storage_remote_field(mut app, 'reminders.export_path', export)
+	app.handle('reminders.export_csv') or { panic(err) }
+	integration_refinement_file(export, '"Title","Due","Completed (0 or 1)","Priority"\n"alpha","2028-02-29 09:00",0,"High"\n"alpha","2028-02-29 09:00",0,"Low"\n"Alpha","2028-02-29",1,"High"\n"Zeta","",0,"None"\n"Undated","",0,"Medium"\n')
+	integration_refinement_file(path, record)
+	app.handle('reminders.export_csv') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 736), tr('reminders.export_exists'))
+	integration_refinement_file(path, record)
+	println('IPC Reminders four directions, stable ties, undated-last, retained draft, exact ordered CSV and unchanged record passed')
+}
+
+fn check_grapher_svg_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'vector-Ж.svg')
+	document := system_information_join_path(home, 'vector.vgraph')
+	escaped := system_information_join_path(home, 'vector-text.xml')
+	defer { unsafe { path.free(); document.free(); escaped.free() } }
+	factory := app_factory_named('vinix-grapher') or { panic('Grapher is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	for index, value in ['sqrt(x)', '-2', '2', '-1', '2']! { storage_remote_field(mut app, grapher_field_actions[index], value) }
+	app.handle('grapher.plot') or { panic(err) }
+	storage_remote_field(mut app, 'grapher.document_path', document)
+	app.handle('grapher.document_save_as') or { panic(err) }
+	storage_remote_field(mut app, 'grapher.svg_path', path)
+	page := app.build(ui2.rect(0, 0, 320, 340)) or { panic(err) }
+	assert tree_has_id(page, 'grapher.svg_path') && tree_has_id(page, 'grapher.export_svg')
+	for child in page.children { integration_assert_frame_inside(child, 320, 340) }
+	free_tree(page)
+	app.handle('grapher.export_svg') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 320, 340), tr('grapher.svg_saved'))
+	svg := os.read_file(path) or { panic(err) }
+	defer { unsafe { svg.free() } }
+	integration_refinement_require(svg.starts_with('<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">\n') && svg.ends_with('</g></svg>\n'), 'Grapher must write a standalone SVG document')
+	integration_refinement_require(svg.contains('<desc>y = sqrt(x)</desc>') && svg.contains('<path id="curve"') && svg.contains('clip-path="url(#plot)"'), 'Grapher SVG must contain the plotted expression and clipped vector curve')
+	assert !svg.contains('nan') && !svg.contains('NaN') && !svg.contains('Infinity')
+	app.handle('grapher.export_svg') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 320, 340), tr('grapher.svg_exists'))
+	integration_refinement_file(path, svg)
+	integration_refinement_file(document, 'VINIX-GRAPH 1\nexpression=sqrt(x)\nxmin=-2\nxmax=2\nymin=-1\nymax=2\n')
+	// Math expression syntax has no XML metacharacters. Exercise the same
+	// streaming text method separately with an immutable escaped UTF-8 golden.
+	fd := C.open(&char(escaped.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC, 0o600)
+	integration_refinement_require(fd >= 0, 'Cannot create SVG escaping fixture')
+	mut stream := GrapherSvgStream{fd: fd}
+	stream.append('<text>')
+	stream.text('& < > " \' Ж 日本語')
+	stream.append('</text>\n')
+	stream.flush()
+	written := stream.ok
+	closed := desktop_close(fd) == 0
+	integration_refinement_require(written && closed, 'Grapher text streaming failed')
+	integration_refinement_file(escaped, '<text>&amp; &lt; &gt; &quot; &apos; Ж 日本語</text>\n')
+	println('IPC Grapher SVG standalone vector, UTF-8 XML escaping, exclusive export and unchanged vgraph passed')
+}
+
+fn integration_refinement_notes_body(mut app NativeApp, expected string) {
+	tree := app.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	defer { free_tree(tree) }
+	body := integration_element_named(tree, 'notes.body') or { panic('missing Notes body') }
+	mut bytes := []u8{cap: notes_body_limit}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	mut rows := 0
+	for child in body.children {
+		if child.kind != .label { continue }
+		if rows > 0 { bytes << `\n` }
+		editor_append(mut bytes, child.text)
+		rows++
+	}
+	integration_refinement_require(editor_bytes_text(bytes) == expected, 'Notes body differs from the preserved UTF-8 draft')
+}
+
+fn check_notes_import_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, 'Imported café 日本語.TXT')
+	invalid := system_information_join_path(home, 'invalid.txt')
+	store := system_information_join_path(home, '.vinix-notes')
+	defer { unsafe { path.free(); invalid.free(); store.free() } }
+	os.write_file(path, '\xef\xbb\xbfImported café 日本語\r\nsecond\rthird\n') or { panic(err) }
+	os.write_file(invalid, '\xff') or { panic(err) }
+	factory := app_factory_named('vinix-notes') or { panic('Notes is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('notes.new') or { panic(err) }
+	storage_remote_field(mut app, 'notes.title', 'Draft kept')
+	storage_remote_field(mut app, 'notes.body', 'Original body')
+	app.handle('notes.save') or { panic(err) }
+	storage_remote_field(mut app, 'notes.body', 'Unsaved café 日本語\nsecond line')
+	app.handle('notes.import') or { panic(err) }
+	storage_remote_field(mut app, 'notes.import_path', path)
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), tr('notes.import_saved'))
+	integration_refinement_notes_body(mut app, 'Imported café 日本語\nsecond\nthird\n')
+	expected := 'VINIX-NOTES 1\n3\n1 10 35\nDraft keptUnsaved café 日本語\nsecond line\n2 24 38\nImported café 日本語Imported café 日本語\nsecond\nthird\n\n'
+	integration_refinement_file(store, expected)
+	imported := app.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert tree_has_id(imported, 'notes.row.0') && tree_has_id(imported, 'notes.row.1') && !tree_has_id(imported, 'notes.row.2')
+	assert !integration_tree_enabled(imported, 'notes.undo') && !integration_tree_enabled(imported, 'notes.redo')
+	free_tree(imported)
+	storage_remote_field(mut app, 'notes.body', 'Kept body and history')
+	app.handle('notes.import') or { panic(err) }
+	storage_remote_field(mut app, 'notes.import_path', path)
+	app.handle('notes.import_cancel') or { panic(err) }
+	// A stale confirm with a valid retained source must not add a third note.
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Kept body and history')
+	integration_refinement_file(store, expected)
+	app.handle('notes.import') or { panic(err) }
+	storage_remote_field(mut app, 'notes.import_path', invalid)
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), tr('notes.invalid_text'))
+	integration_refinement_file(store, expected)
+	app.handle('notes.import_cancel') or { panic(err) }
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Kept body and history')
+	app.handle('notes.undo') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Imported café 日本語\nsecond\nthird\n')
+	app.handle('notes.redo') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Kept body and history')
+	mut writer := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut writer) }
+	writer.handle('notes.row.1') or { panic(err) }
+	storage_remote_field(mut writer, 'notes.body', 'Other window')
+	writer.handle('notes.save') or { panic(err) }
+	changed := 'VINIX-NOTES 1\n3\n1 10 35\nDraft keptUnsaved café 日本語\nsecond line\n2 24 12\nImported café 日本語Other window\n'
+	integration_refinement_file(store, changed)
+	app.handle('notes.import') or { panic(err) }
+	storage_remote_field(mut app, 'notes.import_path', path)
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), tr('notes.conflict'))
+	integration_refinement_file(store, changed)
+	app.handle('notes.import_cancel') or { panic(err) }
+	app.handle('notes.import_confirm') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Kept body and history')
+	app.handle('notes.undo') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Imported café 日本語\nsecond\nthird\n')
+	app.handle('notes.redo') or { panic(err) }
+	integration_refinement_notes_body(mut app, 'Kept body and history')
+	integration_refinement_file(store, changed)
+	println('IPC Notes UTF-8 BOM/CRLF import, atomic draft/new note, invalid/conflicting import, history and stale confirmation passed')
+}
+
 fn check_utility_input_clients(mut desktop Desktop) {
 	temporary := os.temp_dir()
 	base := os.real_path(temporary)
@@ -647,7 +935,8 @@ fn check_calculator_width_client(mut desktop Desktop) {
 }
 
 fn integration_assert_reminders_order(mut app NativeApp, expected [3]string) {
-	tree := app.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	// The Direction row leaves three task slots at height 656 (two at 616).
+	tree := app.build(ui2.rect(0, 0, 800, 656)) or { panic(err) }
 	defer { free_tree(tree) }
 	mut row := 0
 	for child in tree.children {
@@ -898,7 +1187,7 @@ fn check_reminders_priority_client(home string, mut desktop Desktop) {
 		app_response_timeout_ms) or { panic(err) }
 	defer { close_remote(mut reopened) }
 	for priority in ['reminders.priority.low', 'reminders.priority.medium', 'reminders.priority.none']! {
-		integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 656), tr(priority))
+		integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 696), tr(priority))
 	}
 	reopened.handle('reminders.filter.completed') or { panic(err) }
 	integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 616), tr('reminders.priority.high'))
