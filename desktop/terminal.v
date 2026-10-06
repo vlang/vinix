@@ -145,6 +145,10 @@ mut:
 	selection_anchor TerminalSelectionPoint
 	selection_head TerminalSelectionPoint
 	selection_dragging bool
+	selection_unit TerminalSelectionUnit
+	selection_origin_start TerminalSelectionPoint
+	selection_origin_end TerminalSelectionPoint
+	selection_click TerminalSelectionClick
 	view_width int
 	view_height int
 	copy_client TextCopyClient

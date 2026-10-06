@@ -3,11 +3,30 @@
 module main
 
 import ui2
+import encoding.utf8
 
 const terminal_action_copy = 'term.selection.copy'
 const terminal_selection_status_height = 22
 const terminal_key_cmd_copy = '\x1b[99;9u'
 const terminal_key_cmd_copy_caps = '\x1b[67;9u'
+const terminal_selection_click_interval_ms = u64(500)
+const terminal_selection_click_slop = 5
+
+enum TerminalSelectionUnit {
+	character
+	word
+	line
+}
+
+// Click recognition and drag origins contain only values; no view or text is
+// retained across output, scrollback eviction or a change of terminal screen.
+struct TerminalSelectionClick {
+	count int
+	x int
+	y int
+	row int = -1
+	at_ms u64
+}
 
 struct TerminalSelectionPoint {
 	row int = -1
@@ -32,6 +51,76 @@ fn (mut a TerminalApp) clear_selection() {
 	a.selection_anchor = TerminalSelectionPoint{}
 	a.selection_head = TerminalSelectionPoint{}
 	a.selection_dragging = false
+	a.selection_unit = .character
+	a.selection_origin_start = TerminalSelectionPoint{}
+	a.selection_origin_end = TerminalSelectionPoint{}
+	a.selection_click = TerminalSelectionClick{}
+}
+
+fn terminal_selection_click_near(previous TerminalSelectionClick, x int, y int) bool {
+	return x >= previous.x - terminal_selection_click_slop && x <= previous.x + terminal_selection_click_slop
+		&& y >= previous.y - terminal_selection_click_slop && y <= previous.y + terminal_selection_click_slop
+}
+
+fn terminal_selection_click_count(previous TerminalSelectionClick, point TerminalSelectionPoint, x int, y int, now u64) int {
+	if previous.count == 0 || previous.count == 3 || previous.row != point.row
+		|| now == ~u64(0) || previous.at_ms == ~u64(0) || now < previous.at_ms
+		|| now - previous.at_ms > terminal_selection_click_interval_ms
+		|| !terminal_selection_click_near(previous, x, y) { return 1 }
+	return previous.count + 1
+}
+
+// Treat Unicode letters/numbers and underscore as words. Marks follow the
+// surrounding letters in the common combining-mark blocks; every cell still
+// represents one code point, as it does in the terminal display.
+fn terminal_selection_word_class(ch rune) int {
+	if utf8.is_space(ch) { return 0 }
+	if ch == `_` || utf8.is_letter(ch) || utf8.is_number(ch)
+		|| (ch >= 0x0300 && ch <= 0x036f) || (ch >= 0x1ab0 && ch <= 0x1aff)
+		|| (ch >= 0x1dc0 && ch <= 0x1dff) || (ch >= 0x20d0 && ch <= 0x20ff)
+		|| (ch >= 0xfe20 && ch <= 0xfe2f) { return 1 }
+	return 2
+}
+
+fn (a &TerminalApp) selection_line_bounds(row int) (TerminalSelectionPoint, TerminalSelectionPoint) {
+	first := TerminalSelectionPoint{row: row}
+	row_count := if a.alternate_screen { a.rows } else { a.lines.len + a.rows }
+	last := if row + 1 < row_count { TerminalSelectionPoint{row: row + 1} }
+		else { TerminalSelectionPoint{row: row, column: a.selection_row_cells(row)} }
+	return first, last
+}
+
+fn (a &TerminalApp) selection_word_bounds(point TerminalSelectionPoint) (TerminalSelectionPoint, TerminalSelectionPoint) {
+	cells := a.selection_row_cells(point.row)
+	if cells == 0 { return a.selection_line_bounds(point.row) }
+	if point.column >= cells { return point, point }
+	history := !a.alternate_screen && point.row >= 0 && point.row < a.lines.len
+	text := if history { a.lines[point.row] } else { '' }
+	screen_row := if a.alternate_screen { point.row } else { point.row - a.lines.len }
+	mut byte_offset := 0
+	mut first := 0
+	mut previous_class := -1
+	mut target_class := -1
+	mut last := cells
+	// Scan a UTF-8 history row once, rather than repeatedly finding byte
+	// offsets while walking backwards through a long word.
+	for column in 0 .. cells {
+		ch := if history { utf8.get_rune(text, byte_offset) } else { a.screen[screen_row * a.columns + column] }
+		if history {
+			length := editor_utf8_length(text[byte_offset])
+			byte_offset += if length > 0 && byte_offset + length <= text.len { length } else { 1 }
+		}
+		class := terminal_selection_word_class(ch)
+		if column <= point.column {
+			if class != previous_class || class == 2 { first = column }
+			previous_class = class
+			if column == point.column {
+				target_class = class
+				if class == 2 { last = column + 1; break }
+			}
+		} else if class != target_class { last = column; break }
+	}
+	return TerminalSelectionPoint{row: point.row, column: first}, TerminalSelectionPoint{row: point.row, column: last}
 }
 
 fn terminal_text_cell_offset(text string, column int) int {
@@ -72,14 +161,41 @@ fn (a &TerminalApp) pointer_selection_point(x int, y int) TerminalSelectionPoint
 	return TerminalSelectionPoint{row: row, column: terminal_clamp(column, 0, a.selection_row_cells(row))}
 }
 
+fn (a &TerminalApp) pointer_selection_cell(x int, y int) TerminalSelectionPoint {
+	point := a.pointer_selection_point(x, y)
+	column := if x > terminal_padding { (x - terminal_padding) / terminal_column_width } else { 0 }
+	return TerminalSelectionPoint{row: point.row, column: terminal_clamp(column, 0, a.selection_row_cells(point.row))}
+}
+
+fn (mut a TerminalApp) expand_selection_to(x int, y int) {
+	if a.selection_unit == .character {
+		a.selection_head = a.pointer_selection_point(x, y)
+		return
+	}
+	point := a.pointer_selection_cell(x, y)
+	first, last := if a.selection_unit == .line { a.selection_line_bounds(point.row) } else { a.selection_word_bounds(point) }
+	if terminal_point_before(first, a.selection_origin_start) {
+		a.selection_anchor = a.selection_origin_end
+		a.selection_head = first
+	} else {
+		a.selection_anchor = a.selection_origin_start
+		a.selection_head = if terminal_point_before(last, a.selection_origin_end) { a.selection_origin_end } else { last }
+	}
+}
+
 fn (a &TerminalApp) pointer_input_enabled() bool { return true }
 fn (a &TerminalApp) pointer_moves_matter() bool { return a.selection_dragging }
 
 fn (mut a TerminalApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
+	a.selection_pointer_event_at(phase, button, scroll, x, y, width, height, desktop_monotonic_ms())
+}
+
+fn (mut a TerminalApp) selection_pointer_event_at(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int, now u64) {
 	if width <= 0 || height <= 0 || a.rows <= 0 || a.columns <= 0 { return }
 	bottom := height - terminal_selection_status_height
 	max_scroll := if a.alternate_screen { 0 } else { a.lines.len }
 	if phase == .scroll && y >= terminal_toolbar_height && y < bottom {
+		a.selection_click = TerminalSelectionClick{}
 		a.scroll = terminal_clamp(a.scroll - scroll * 3, 0, max_scroll)
 		return
 	}
@@ -88,14 +204,25 @@ fn (mut a TerminalApp) pointer_event(phase AppPointerPhase, button AppPointerBut
 		a.search_open = false
 		a.search_pending_len = 0
 		a.search_escape_state = 0
-		a.selection_anchor = a.pointer_selection_point(x, y)
-		a.selection_head = a.selection_anchor
+		point := a.pointer_selection_point(x, y)
+		count := terminal_selection_click_count(a.selection_click, point, x, y, now)
+		a.selection_click = TerminalSelectionClick{count: count, x: x, y: y, row: point.row, at_ms: now}
+		a.selection_unit = if count == 2 { TerminalSelectionUnit.word } else if count == 3 { TerminalSelectionUnit.line } else { TerminalSelectionUnit.character }
+		first, last := if count == 3 { a.selection_line_bounds(point.row) }
+			else if count == 2 { a.selection_word_bounds(a.pointer_selection_cell(x, y)) } else { point, point }
+		a.selection_origin_start = first
+		a.selection_origin_end = last
+		a.selection_anchor = first
+		a.selection_head = last
 		a.selection_dragging = true
 	} else if a.selection_dragging && (phase == .move || phase == .up) {
+		if !terminal_selection_click_near(a.selection_click, x, y) { a.selection_click = TerminalSelectionClick{} }
 		if y < terminal_toolbar_height + terminal_padding { a.scroll = terminal_clamp(a.scroll + 1, 0, max_scroll) }
 		else if y >= bottom - terminal_padding { a.scroll = terminal_clamp(a.scroll - 1, 0, max_scroll) }
-		a.selection_head = a.pointer_selection_point(x, y)
+		a.expand_selection_to(x, y)
 		if phase == .up { a.selection_dragging = false }
+	} else if phase == .down || phase == .scroll {
+		a.selection_click = TerminalSelectionClick{}
 	}
 }
 

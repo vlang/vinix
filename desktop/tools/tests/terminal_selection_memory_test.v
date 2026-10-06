@@ -6,15 +6,17 @@ import ui2
 #include "@VMODROOT/heap_tracker.h"
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+fn C.vinix_heap_size_at(u32) u64
 
 fn terminal_selection_memory_output(mut app TerminalApp, text string) {
 	app.ingest_output(unsafe { text.str.vbytes(text.len) })
 }
 
 fn terminal_selection_memory_frames(mut app TerminalApp) {
-	for language in [DesktopLanguage.en, .es, .ru]! {
+	for language in desktop_languages {
 		desktop_language = language
-		for size in [ui2.rect(0, 0, 560, 340), ui2.rect(0, 0, 640, 380)]! {
+		for size in [ui2.rect(0, 0, 272, 118), ui2.rect(0, 0, 560, 340), ui2.rect(0, 0, 640, 380)]! {
 			begin_frame_elements()
 			free_tree(app.build(size) or { panic(err) })
 			app.pointer_event(.down, .left, 0, 8, 42, int(size.width), int(size.height))
@@ -152,4 +154,73 @@ fn test_terminal_selection_fragmented_copy_keys_literal_paste_and_escape_expiry_
 		assert unsafe { tos(&buffer[0], int(got)) } == '\x03\x1b[D\x1b[99;6u\x1b\x1b[99;9u\x1b['
 	}
 	assert C.vinix_heap_end() == 0
+}
+
+fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render_retain_zero_bytes() {
+	features := app_compositor_features
+	language := desktop_language
+	defer { app_compositor_features = features; desktop_language = language }
+	app_compositor_features |= app_feature_text_copy
+	// Warm the shared translation/frame arenas before measuring app ownership.
+	mut warm := TerminalApp{exited: true}
+	terminal_selection_memory_frames(mut warm)
+	warm.close_app()
+	C.vinix_heap_begin()
+	for iteration in 0 .. 100 {
+		mut app := TerminalApp{exited: true}
+		app.set_geometry(3, 32)
+		app.visible_rows = 3
+		terminal_selection_memory_output(mut app, 'old cafe\u0301 й😀\r\n\r\nthird\r\nlast')
+		app.scroll = app.lines.len
+		for count in 0 .. 3 {
+			app.selection_pointer_event_at(.down, .left, 0, 50, 42, 272, 118, u64(1000 + count * 100))
+			app.selection_pointer_event_at(.up, .left, 0, 50, 42, 272, 118, u64(1020 + count * 100))
+			if count > 0 {
+				app.copy_selection()
+				request := app.take_clipboard_copy_request()
+				assert request.len > text_copy_header_size
+				unsafe { request.free() }
+			}
+		}
+		app.selection_pointer_event_at(.down, .left, 0, 50, 58, 272, 118, 2000)
+		app.selection_pointer_event_at(.up, .left, 0, 50, 58, 272, 118, 2020)
+		app.selection_pointer_event_at(.down, .left, 0, 50, 58, 272, 118, 2100)
+		app.selection_pointer_event_at(.move, .no_button, 0, 10, 42, 272, 118, 2200)
+		app.selection_pointer_event_at(.move, .no_button, 0, 50, 95, 272, 118, 2300)
+		app.selection_pointer_event_at(.up, .left, 0, 50, 95, 272, 118, 2400)
+		app.copy_selection()
+		app.copy_selection()
+		request := app.take_clipboard_copy_request()
+		assert request.len > text_copy_header_size
+		unsafe { request.free() }
+		for lang in desktop_languages {
+			desktop_language = lang
+			begin_frame_elements()
+			free_tree(app.build(ui2.rect(0, 0, 272, 118)) or { panic(err) })
+		}
+		terminal_selection_memory_output(mut app, 'changed')
+		assert app.selection_click.count == 0 && !app.has_selection()
+		app.enter_alternate_screen()
+		terminal_selection_memory_output(mut app, 'alternate й\r\nrow')
+		for count in 0 .. 3 {
+			app.selection_pointer_event_at(.down, .left, 0, 18, 42, 272, 118, u64(3000 + count * 100))
+			app.selection_pointer_event_at(.up, .left, 0, 18, 42, 272, 118, u64(3020 + count * 100))
+		}
+		app.copy_selection()
+		alternate_request := app.take_clipboard_copy_request()
+		assert alternate_request.len > text_copy_header_size
+		unsafe { alternate_request.free() }
+		app.leave_alternate_screen()
+		if iteration % 2 == 0 { app.set_geometry(2, 24) } else { app.clear_scrollback() }
+		assert app.selection_click.count == 0
+		app.close_app()
+	}
+	retained := C.vinix_heap_end()
+	if retained > 0 {
+		count := C.vinix_heap_count()
+		for index in u32(0) .. if count < 16 { count } else { 16 } {
+			eprintln('Terminal retained allocation: ${C.vinix_heap_size_at(index)} bytes')
+		}
+	}
+	assert retained == 0
 }
