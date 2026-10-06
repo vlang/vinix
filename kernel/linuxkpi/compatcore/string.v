@@ -14,7 +14,6 @@ module compatcore
 // *Copyright (C) 1991, 1992 Linus Torvalds
 //
 
-@[export: 'memchr']
 pub fn memchr(s voidptr, c i32, n usize) voidptr {
 	unsafe {
 		bytes := &u8(s)
@@ -27,7 +26,6 @@ pub fn memchr(s voidptr, c i32, n usize) voidptr {
 	}
 }
 
-@[export: 'memchr_inv']
 pub fn memchr_inv(s voidptr, c i32, n usize) voidptr {
 	unsafe {
 		bytes := &u8(s)
@@ -40,7 +38,6 @@ pub fn memchr_inv(s voidptr, c i32, n usize) voidptr {
 	}
 }
 
-@[export: 'strnlen']
 pub fn strnlen(s &char, n usize) usize {
 	unsafe {
 		len := usize(0)
@@ -181,7 +178,6 @@ pub fn strreplace(str &char, old char, new char) &char {
 	}
 }
 
-@[export: 'strchr']
 pub fn strchr(s &char, c i32) &char {
 	unsafe {
 		for ; u8(*s) != u8(c); s = s + 1 {
@@ -193,7 +189,6 @@ pub fn strchr(s &char, c i32) &char {
 	}
 }
 
-@[export: 'strpbrk']
 pub fn strpbrk(cs &char, ct &char) &char {
 	unsafe {
 		sc := &char(0)
@@ -206,7 +201,6 @@ pub fn strpbrk(cs &char, ct &char) &char {
 	}
 }
 
-@[export: 'strsep']
 pub fn strsep(s &&char, ct &char) &char {
 	unsafe {
 		sbegin := *s
@@ -221,7 +215,6 @@ pub fn strsep(s &&char, ct &char) &char {
 	}
 }
 
-@[export: 'skip_spaces']
 pub fn skip_spaces(str &char) &char {
 	unsafe {
 		for native_isspace(i32((*str))) {
@@ -250,4 +243,47 @@ pub fn strim(s &char) &char {
 		*end = i8(`\0`)
 		return skip_spaces(s)
 	}
+}
+
+// Public Linux types retain native const qualifiers. The byte algorithms above
+// consume these synchronous borrows through their existing pointer views.
+@[typedef]
+struct C.vks_const_char {}
+
+@[typedef]
+struct C.vks_const_void {}
+
+@[export: 'memchr']
+pub fn native_memchr(s &C.vks_const_void, c i32, n usize) voidptr {
+ return unsafe { memchr(voidptr(s), c, n) }
+}
+
+@[export: 'memchr_inv']
+pub fn native_memchr_inv(s &C.vks_const_void, c i32, n usize) voidptr {
+ return unsafe { memchr_inv(voidptr(s), c, n) }
+}
+
+@[export: 'strnlen']
+pub fn native_strnlen(s &C.vks_const_char, n usize) usize {
+ return unsafe { strnlen(&char(s), n) }
+}
+
+@[export: 'strchr']
+pub fn native_strchr(s &C.vks_const_char, c i32) &char {
+ return unsafe { strchr(&char(s), c) }
+}
+
+@[export: 'strpbrk']
+pub fn native_strpbrk(cs &C.vks_const_char, ct &C.vks_const_char) &char {
+ return unsafe { strpbrk(&char(cs), &char(ct)) }
+}
+
+@[export: 'strsep']
+pub fn native_strsep(s &&char, ct &C.vks_const_char) &char {
+ return unsafe { strsep(s, &char(ct)) }
+}
+
+@[export: 'skip_spaces']
+pub fn native_skip_spaces(s &C.vks_const_char) &char {
+ return unsafe { skip_spaces(&char(s)) }
 }

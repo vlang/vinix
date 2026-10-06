@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 /* Opaque Linux header primitives. Algorithms and ownership live in V. */
+typedef const char vks_const_char;
+typedef const void vks_const_void;
 void *kmalloc(size_t, unsigned int);
 void *kzalloc(size_t, unsigned int);
 void *kmalloc_array(size_t, size_t, unsigned int);

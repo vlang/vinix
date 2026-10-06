@@ -388,6 +388,6 @@ pub fn native_printk_shutdown() i32 { return vkr_log_shutdown() }
 @[export: 'vinix_linuxkpi_printk_test_pause']
 pub fn native_printk_pause(pause bool, timeout u32) i32 { return vkr_log_pause(pause, timeout) }
 @[export: 'vinix_linuxkpi_printk_test_sink']
-pub fn native_printk_sink(sink voidptr, arg voidptr) i32 { return vkr_log_sink(sink, arg) }
+pub fn native_printk_sink(sink LogSinkABI, arg voidptr) i32 { return unsafe { vkr_log_sink(voidptr(sink), arg) } }
 @[export: 'vinix_linuxkpi_printk_test_fail_create']
 pub fn native_printk_fail(fail bool) { vkr_log_fail(fail) }

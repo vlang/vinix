@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 /* Native ABI declarations only; implementations and cursor access are V. */
+struct vinix_linuxkpi_printk_record;
+typedef const struct vinix_linuxkpi_printk_record vkr_const_printk_record;
 #ifndef VINIX_V_RUNTIME
 int vkr_arg_int(void *);
 unsigned int vkr_arg_uint(void *);

@@ -13,7 +13,10 @@ fn C.vinix_linuxkpi_host_logger_leave()
 fn C.vkr_native_thread_exit(voidptr)
 fn C._printk(&char, ...voidptr) i32
 
-type LogSinkABI = fn (voidptr, voidptr)
+@[typedef]
+struct C.vkr_const_printk_record {}
+
+type LogSinkABI = fn (&C.vkr_const_printk_record, voidptr)
 
 @[export: 'console_printk']
 __global vkr_native_log_levels = [i32(7), i32(4), i32(1), i32(7)]!
@@ -71,7 +74,7 @@ pub fn vkr_log_suppress() i32 { unsafe { return C.vkp_load_signed(&vkr_native_su
 pub fn vkr_log_console(index u32) i32 { unsafe { return C.vkp_load_signed(&vkr_native_log_levels[index], 0) } }
 @[export: 'vkr_log_call_sink']
 pub fn vkr_log_call_sink(sink voidptr, record voidptr, arg voidptr) {
- unsafe { call := LogSinkABI(sink); call(record, arg) }
+ unsafe { call := LogSinkABI(sink); call(&C.vkr_const_printk_record(record), arg) }
 }
 @[export: 'vkr_log_write']
 pub fn vkr_log_write(text voidptr, size usize) { unsafe { C.vinix_linuxkpi_log_write(&char(text), size) } }
