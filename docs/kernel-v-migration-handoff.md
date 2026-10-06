@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`5ecc81c0fd8c341a2b57d60badf84e853b747e8c`. Re-read HEAD, `AGENTS.md` and
+`60f5c267fc4fc2b4484379dc51eace713ec27b44`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **12,442 original fixture/benchmark
+continuation adds **3,251 original production C lines**, **13,079 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel, eight
 Wi-Fi tool lines),
 counted separately. Twenty-one stack-pointer/syscall/variadic boundary lines use
@@ -98,6 +98,13 @@ instruction-only assembly and receive no V algorithm credit.
 | Network randomness independent oracle (320) | `b39872cf` |
 | Memory primitive independent oracle (107) | `42ed5d38` |
 | Speculation policy independent oracle (134) | `5ecc81c0` |
+| Sparse page-table lifetime independent oracle (193) | `439e6c12` |
+| QEMU signal/first-touch/restart independent scopes (241) | `fb74d12a` |
+| Native clock-control independent oracle (163) | `7ddfcb65` |
+| QEMU interrupted nanosleep independent scope (40) | `60f5c267` |
+| Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
+| Canonical callback contracts (zero credit) | `03ad7bb3` |
+| Const string/log-record contracts (zero credit) | `e79802e4` |
 | Distinct benchmark differential output archive (zero credit) | `944c12e1` |
 | Native integer constant-expression metadata (zero credit) | `0fe3679c` |
 | Native high-byte string semantics correction (zero credit) | `bc9a5ea4` |
@@ -105,8 +112,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 175 test paths /
-42,829 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 172 test paths /
+42,182 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -136,9 +143,10 @@ stage's input hashes before continuing; completed commits above are separate:
   void-pointer/native-typed callback sanitizer mismatches. Native ARM original
   C/V controls both exposed high-byte strchr and strreplace signedness bugs.
   The high-byte correction is committed as `bc9a5ea4` after both fresh builds/boots
-  and the complete four-CPU compatibility guest. Canonical native callback and
-  const string/log-record contracts remain a separate pending 23-path stage;
-  actual x86 original-C sanitizers now pass without those function diagnostics.
+  and the complete four-CPU compatibility guest. Canonical native callback
+  (`03ad7bb3`) and const string/log-record contracts (`e79802e4`) are committed
+  separately with zero algorithm credit; actual x86 original-C sanitizers now
+  pass without those function diagnostics.
   The fixed native ARM V workload passes all 26 groups and seven child boundary
   modes; its original-C control passed too. Both original-C and V native x86 workloads
   failed with the same generic
@@ -151,16 +159,17 @@ stage's input hashes before continuing; completed commits above are separate:
   x86 `max`/TCG control expired at its unchanged 3,600-second allowance with no
   fixture verdict. A correctly labelled per-CPU QMP snapshot shows kernel TLB
   polling; interrupt-disabled polling alone does not establish deadlock.
-  Fresh paired `qemu64` controls are prepared and held pending production
-  contract validation. They retain four CPUs, exact assertions, workloads and
-  3,600-second budgets, recording CPU/kernel configuration changes without
-  claiming the earlier failures resolved. Both fresh default architecture
-  builds/boots and the opt-in build pass for the composed 23-path contract stage.
-  Its complete four-CPU compatibility guest passed worker OOM, SRCU, wound/wait
-  and keyed-bit groups with exact page baselines, then failed the unchanged
-  I/O timeout/early/signal assertion. The failed ELF and log are preserved;
-  matching baseline and immutable-repeat validation remain pending. Preserve
-  every initial failure; this broader fixture stage receives no credit. The frozen compiler
+  The fresh original-C `qemu64` control failed with child wait status nine
+  (SIGKILL); the cause remains unknown and its evidence is preserved. Its V pair
+  is running. Both retain four CPUs, exact assertions, workloads and 3,600-second budgets,
+  recording CPU/kernel configuration changes without claiming earlier failures
+  resolved. Both fresh default architecture builds/boots and the opt-in build
+  pass for the composed 23-path contract stage. Its complete guest initially
+  failed the unchanged I/O timeout/early/signal assertion. The identical ELF
+  repeat and matching old-ABI control both then passed all 38 required groups,
+  16 exact free-page baselines and 25 no-pages-retained markers. The first
+  failure's cause remains unknown; all evidence is preserved. The broader host
+  fixture stage still receives no credit pending native x86 completion. The frozen compiler
   ignores V `thread_local` under `-os vinix`; native TLS storage retains real
   pthread isolation. Preserve all original assertions, ownership and deadlines.
 - Speaker, ANS, both independent AGX and all three Wi-Fi fixture scopes are
@@ -176,9 +185,17 @@ stage's input hashes before continuing; completed commits above are separate:
   with the corrected default kernel passed the 270-line scope's memory groups,
   then failed an untouched alarm assertion: nine 50-ms timer firings in a second
   against the required ten. Its V pair has not launched. CPU/kernel changes are
-  explicit, the failure is preserved, and no causal resolution is claimed. Pending signal,
-  first-touch and restart scopes remain separate, uncommitted and uncredited.
-  Preserve old failure evidence and record the explicit configuration.
+  explicit, the failure is preserved, and no causal resolution is claimed.
+  Separate signal (77), first-touch (113) and restart (51) scopes are committed
+  as `fb74d12a`: both host sanitizer ABIs, strict complete adapted SDK links and
+  six paired native guests pass all 61 original checks with original reap-body
+  lifetimes. A separate 40-line interrupted nanosleep scope (`60f5c267`) passed both
+  host sanitizer ABIs, strict SDK links and paired native cases with nine original
+  checks. Only those 281 lines receive credit; the broader 270-line stage
+  remains pending. Preserve old failure evidence and explicit configurations.
+- The SPI keyboard/touchpad fixtures (564/505), blocked-thread scope (38) and
+  POSIX timer oracle (230) are in progress. They receive no credit until complete
+  native comparisons and exact-path commits; preserve their original controls.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
@@ -221,6 +238,39 @@ assertion, intrinsic deadline or workload was weakened. These fixture-only
 stages add no new kernel build or physical mitigation claim. Receipts are
 `net-random-validation.json`, `memory-runtime-validation.json` and
 `speculation-policy-validation.json`, with peer lifetime review.
+
+The page-table oracle (`439e6c12`) passed all four strict SDK C/V native
+controls with 45 original checks. ARM covers both 16 KiB probe boundaries;
+x86 covers all four 4 KiB probes including LA57 at 256 TiB. Jump-buffer
+`returns_twice`, native volatile accesses, actual signal-wrapper identity,
+pipe/COW/reap/unmap order, four reuse rounds and the original 1 MiB tolerance
+remain. It reuses immutable ALLOC_TRACK kernels and adds no host sanitizer or
+new kernel-build claim; targeted LA57 success does not resolve other full
+`max`/TCG failures. `pagetable-validation.json` records peer lifetime review.
+
+The V kmod descriptor (`ad0ba5d0`) removes 29 metadata-only C lines with zero
+algorithm credit. Static generated data preserves every 196-byte record offset,
+alignment and native start/stop relocation. Both native Mach-O objects and the
+complete linked x86 kext are byte-identical to original C; both strict musl SDK
+data/import checks pass. `kmod-info-validation.json` preserves the limits:
+no new genuine Darwin GCC compilation or kext execution is claimed.
+
+The clock-control oracle (`7ddfcb65`, 163) passed strict SDK builds, all four
+C/V native controls and its maintained ARM runner with the original 300-second
+budget. All 53 checks and timex 208-byte/offset-72 constraints remain, along
+with timer/FD/child cleanup and 100×50-ms completion polling. The initial x86
+setup omitted serial redirection; its framebuffer success and failed harness
+attempt are preserved before the fresh shared-serial C/V controls passed.
+`clock-control-fixture/validation.json` records the unchanged production host
+arithmetic/security tests, peer lifetime review and immutable reused kernels.
+
+The interrupted nanosleep scope (`60f5c267`, 40) retains all nine original
+checks, one-second sleep, 20-ms interruption and remainder bounds. Its native
+volatile signal counter and actual exported callback preserve signal identity.
+Both actual host sanitizer ABIs, both strict four-module SDK links and three
+paired native cases per architecture passed against reused immutable kernels.
+`qemu-nanosleep40-final-validation.json` records peer lifetime review; the
+remaining QEMU source has 3,140 original lines plus ten integration lines.
 
 Current local cache:
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
@@ -470,9 +520,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`5ecc81c0fd8c341a2b57d60badf84e853b747e8c` reports **V 71.77%, C 6.14%**,
-454 C files, 473 Python files and 285 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,520 classified blobs
+`60f5c267fc4fc2b4484379dc51eace713ec27b44` reports **V 71.62%, C 6.08%**,
+465 C files, 485 Python files and 285 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,563 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

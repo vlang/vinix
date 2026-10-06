@@ -452,7 +452,7 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **12,442 original fixture/benchmark
+**3,251 original production/native-boundary C lines**, **13,079 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel and
 eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
 boundary lines now use instruction-only
@@ -536,6 +536,10 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Network randomness independent oracle | 320 | `b39872cf` |
 | Memory primitive independent oracle | 107 | `42ed5d38` |
 | Speculation policy independent oracle | 134 | `5ecc81c0` |
+| Sparse page-table lifetime independent oracle | 193 | `439e6c12` |
+| QEMU signal, first-touch and restart independent scopes | 241 | `fb74d12a` |
+| Native clock-control independent oracle | 163 | `7ddfcb65` |
+| QEMU interrupted nanosleep independent scope | 40 | `60f5c267` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -753,6 +757,77 @@ mitigation claim. Local receipts are `net-random-validation.json`,
 `memory-runtime-validation.json` and `speculation-policy-validation.json`;
 all new lifetime boundaries received independent review.
 
+The sparse page-table oracle (`439e6c12`) preserves all 45 original check
+expressions and line tags, native signal-mask jump buffers, volatile fault
+loads, pipe-synchronized fork/COW lifetimes and four reuse rounds. Both strict
+SDK pairs and all four complete C/V native guests passed against immutable
+ALLOC_TRACK kernels: ARM exercises the original 128 MiB/512 GiB probe addresses,
+and x86 all four addresses through 256 TiB with LA57. Native IR retains the SDK's
+`returns_twice` declaration and volatile byte/signal operations; no allocator
+imports appear. This native VM fixture adds 193 lines, with no host sanitizer
+or new kernel-build claim. `pagetable-validation.json` records peer review;
+these targeted LA57 passes do not resolve other full `max`/TCG workloads.
+
+Three separate QEMU fixture scopes (`fb74d12a`) add 241 original lines:
+signals 77, first-touch 113 and syscall restart 51. All 61 original check
+expressions and logical lines remain. Both actual host ASan/UBSan workloads,
+both complete adapted SDK links and six paired native guests passed; each
+architecture covers six signal, two first-touch child and three restart cases.
+The native inputs retain the original reap helper body, with external linkage
+only and zero extra credit. All 18 canonical fixture/oracle/control objects
+match the guest-tested executable sections. Normal generation reads maintained
+V only; immutable C recovery is confined to explicit oracle validation. The
+source at that stage contained 3,180 original lines plus six integration lines.
+The broader pending 270-line stage remains uncredited, including the untouched
+original-C alarm failure. `qemu-scoped241-final-validation.json` records scope,
+input identity, exact checks, cleanup lifetimes and independent review.
+
+The clock-control oracle (`7ddfcb65`) adds 163 original lines, preserving all
+53 checks, the native 208-byte timex layout/time offset 72, wall-clock and
+uptime independence, privilege/securelevel rules, timerfd/POSIX timer ownership
+and absolute sleep adjustment. Both genuine SDK builds have no allocator
+imports; all four complete C/V native guests and the maintained ARM runner
+passed with the unchanged 300-second budget. Original FD cleanup, timer deletion
+and the 100×50-ms completion poll remain. The initial x86 setup omitted the
+shared serial adapter; framebuffer
+success and that failed harness attempt remain preserved before fresh identical
+C/V serial-enabled controls passed. `clock-control-fixture/validation.json`
+records peer lifetime review and reuse of immutable production kernels.
+
+The separate interrupted nanosleep scope (`60f5c267`) adds 40 original lines,
+including its signal counter and handler. All nine original check expressions
+and logical lines, the one-second sleep, 20-ms interruption delay and native
+volatile signal counter remain. Both actual host sanitizer ABIs, both strict
+four-module SDK links and three paired native cases per architecture passed.
+Normal builds use maintained V without recovering original C. The current QEMU
+source contains 3,140 original lines plus ten integration lines; the broader
+270-line stage remains uncredited. `qemu-nanosleep40-final-validation.json`
+records the immutable inputs, cleanup/callback review and reused kernels.
+
+Native callback contracts (`03ad7bb3`, 18 paths) and const string/log-record
+contracts (`e79802e4`, five paths) receive zero algorithm credit. They preserve
+actual C-wrapper identity, field storage, ordering and ownership while matching
+native function types. Both actual host halt-on-error sanitizer suites, strict
+SDK ABI probes, both fresh default builds/boots and the opt-in build passed.
+The composed four-CPU guest initially failed the unchanged I/O timeout/early/
+signal group; the same immutable ELF then passed all 38 required groups, as did
+a matching old-ABI control from committed `770ba039`. Both successful guests
+returned all 16 measured batches to exact page baselines and emitted 25
+no-pages-retained markers. The initial failure's cause remains unknown and its
+raw evidence is preserved. Tested candidate ELF SHA256:
+`8a657993816f5f0b04dd6bac7dcc99f1acfc882f42b3df0e16d2113b714938a0`;
+control: `8c54e1fab6779abd29d3627b85a8f4032516fede7bcc75f4cdaf44afebcf4e83`.
+`callback-const-production-validation.json` pins the frozen source and toolchain.
+
+The kmod descriptor (`ad0ba5d0`) retires 29 metadata-only C lines with zero
+algorithm credit. V owns the fixed 196-byte record; its generator promotes the
+compiler's aggregate and two literal arrays to static loader-visible data.
+Every native offset, four-byte alignment and both actual start/stop relocations
+match the original. ARM/x86 Mach-O objects and the complete linked x86 kext are
+byte-identical C/V; both strict musl SDK data/import checks passed. The sampler
+is unchanged. `kmod-info-validation.json` records independent review and the
+limits: no new genuine Darwin GCC compilation or kext execution was performed.
+
 Native integer constant-expression metadata (`0fe3679c`) preserves all 4,099
 assertions, arbitrary native integer widths and single evaluation, with zero
 V algorithm credit. Both fresh default builds/boots and the full host checks
@@ -767,12 +842,14 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `5ecc81c0fd8c341a2b57d60badf84e853b747e8c`,
+At committed source `60f5c267fc4fc2b4484379dc51eace713ec27b44`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 175 test paths / 42,829 lines,
+The non-vendored `.c` census still contains 172 test paths / 42,182 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
-of the repository-wide request. This census is not a translation tally.
+of the repository-wide request. This census is not a translation tally. The
+concurrent IRQ diagnostic added nine C guest-init lines; they receive no
+translation credit.
 
 The first kernel-fixture guest failed the unchanged i915 device-encoding
 condition. Its cause was signed literals passed to the foreign `MKDEV` macro:
@@ -903,8 +980,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`5ecc81c0fd8c341a2b57d60badf84e853b747e8c` reports **V 71.77%, C 6.14%**,
-454 C files, 473 Python files and 285 shell files. All 2,520 classified blob
+`60f5c267fc4fc2b4484379dc51eace713ec27b44` reports **V 71.62%, C 6.08%**,
+465 C files, 485 Python files and 285 shell files. All 2,563 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
