@@ -4181,3 +4181,6 @@ atanh
 disk_usage.capacity.resize
 Enlarge the window to show capacity details.
 -----
+calendar.search.enlarge
+Enlarge the window to see the calendar and search results.
+-----
