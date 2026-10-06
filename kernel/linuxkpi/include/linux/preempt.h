@@ -21,6 +21,6 @@ bool in_nmi(void);
 #define preempt_enable_notrace() preempt_enable()
 #define preempt_enable_no_resched_notrace() preempt_enable_no_resched()
 #define preempt_count() vinix_linuxkpi_preempt_count()
-#define preemptible() (!preempt_count() && !irqs_disabled())
+#include <vinix/integer_policy.h>
 #define preempt_check_resched() vinix_linuxkpi_preempt_check_resched()
 #endif

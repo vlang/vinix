@@ -179,6 +179,11 @@ def run(keep_directory=None):
         (work / "test.c").write_text(source)
         (work / "probe.c").write_text(PROBE)
         (work / "file-scope.c").write_text(FILE_SCOPE)
+        subprocess.run([
+            "python3", str(ROOT / "kernel/linuxkpi/generate-abi.py"),
+            str(ROOT / "kernel/linuxkpi/abi/overflow.json"),
+            str(work / "include/vinix/integer_policy.h"),
+        ], check=True)
         common = [
             os.environ.get("CC", "clang"), "-O1", "-g", "-ffreestanding",
             "-fno-builtin", "-fno-strict-aliasing", "-Wall", "-Wextra", "-Werror",
@@ -186,6 +191,7 @@ def run(keep_directory=None):
             "-DVINIX_LINUXKPI_HOST_TEST", "-D__KERNEL__", "-D_FORTIFY_SOURCE=0",
             "-include", str(preload), "-include", "linux/kconfig.h", "-include",
             str(linux / "include/linux/compiler_types.h"),
+            "-I" + str(work / "include"),
             "-I" + str(ROOT / "kernel/linuxkpi/include"),
             "-I" + str(linux / "include"), "-I" + str(linux / "include/uapi"),
             "-I" + str(linux / "arch/x86/include"),

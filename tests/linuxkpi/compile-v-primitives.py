@@ -31,6 +31,7 @@ if __name__ == "__main__":
             isolated = Path(directory) / "headercore"
             isolated.mkdir()
             (isolated / "primitive.v").write_bytes((source / "primitive.v").read_bytes())
+            (isolated / "policy.v").write_bytes((source / "policy.v").read_bytes())
             declarations = []
             for filename, names in (("common.v", ("spinlock_t", "task_struct")),
                                     ("wait.v", ("atomic_t",))):

@@ -60,6 +60,8 @@ def run():
             (overlay / "linux").mkdir(parents=True)
             abi.generate(ROOT / "kernel/linuxkpi/abi/atomic-exchange.json", ROOT / "kernel/linuxkpi",
                          overlay / "vinix/atomic_exchange.h")
+            abi.generate(ROOT / "kernel/linuxkpi/abi/overflow.json", ROOT / "kernel/linuxkpi",
+                         overlay / "vinix/integer_policy.h")
             if kind == "original":
                 header = subprocess.check_output(["git", "show", ORIGINAL + ":" + ORIGINAL_PATH], cwd=ROOT)
             else:

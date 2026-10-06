@@ -4,9 +4,7 @@
 #include <linux/types.h>
 #include <linux/compiler.h>
 #include <linux/const.h>
-#define check_add_overflow(a, b, d) __builtin_add_overflow((a), (b), (d))
-#define check_sub_overflow(a, b, d) __builtin_sub_overflow((a), (b), (d))
-#define check_mul_overflow(a, b, d) __builtin_mul_overflow((a), (b), (d))
+#include <vinix/integer_policy.h>
 #define __type_half_max(type) ((type)1 << (8*sizeof(type) - 1 - is_signed_type(type)))
 #define __type_max(T) ((T)((__type_half_max(T) - 1) + __type_half_max(T)))
 #define type_max(t)	__type_max(typeof(t))

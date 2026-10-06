@@ -74,7 +74,7 @@ unsigned int kmem_cache_size(struct kmem_cache *);
 void *kmem_cache_zalloc(struct kmem_cache *, gfp_t);
 
 #define ZERO_SIZE_PTR ((void *)16UL)
-#define ZERO_OR_NULL_PTR(p) ((uintptr_t)(p) <= 16UL)
+#include <vinix/integer_policy.h>
 void *kmalloc(size_t, gfp_t) __must_check;
 void *kzalloc(size_t, gfp_t) __must_check;
 void *kmalloc_array(size_t, size_t, gfp_t) __must_check;

@@ -32,6 +32,8 @@ ${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
 ${CC:-clang} -DVINIX_LINUXKPI -c "$repo/kernel/asm/$native_asm/linuxkpi_storage.S" -o "$work/storage.o"
 python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/spinlock.json" "$work/include/vinix/spinlock_adapters.h"
 python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/atomic-exchange.json" "$work/include/vinix/atomic_exchange.h"
+python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/overflow.json" "$work/include/vinix/integer_policy.h"
+python3 "$repo/tests/linuxkpi/overflow_test.py"
 python3 "$repo/tests/linuxkpi/exchange_test.py"
 python3 "$repo/tests/linuxkpi/spin_test.py"
 python3 "$repo/build-support/compile-v-module.py" "$repo/kernel/linuxkpi/exchangecore" "$work/exchangecore.c" --arch "$native_v_arch" -d nofloat

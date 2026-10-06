@@ -286,7 +286,7 @@ ifeq ($(LINUXKPI),1)
     LINUXKPI_OBJ += obj/linuxkpi/headercore.o obj/linuxkpi/exchangecore.o
     # Keep the native 128-bit helper dormant until a caller selects that width.
     LINUXKPI_LIB := obj/linuxkpi/exchange128.a
-    LINUXKPI_GENERATED_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h
+    LINUXKPI_GENERATED_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h obj/linuxkpi/include/vinix/integer_policy.h
     LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
@@ -403,6 +403,9 @@ obj/linuxkpi/include/vinix/spinlock_adapters.h: linuxkpi/abi/spinlock.json linux
 	python3 linuxkpi/generate-abi.py $< $@
 
 obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json linuxkpi/generate-abi.py linuxkpi/exchangecore/core.v linuxkpi/exchange128core/core.v
+	python3 linuxkpi/generate-abi.py $< $@
+
+obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json linuxkpi/generate-abi.py linuxkpi/headercore/policy.v
 	python3 linuxkpi/generate-abi.py $< $@
 
 obj/linuxkpi/exchangecore.c obj/linuxkpi/exchange128core.c: obj/linuxkpi/%.c: linuxkpi/%/core.v ../build-support/compile-v-module.py $(V_CONFIG_STAMP)

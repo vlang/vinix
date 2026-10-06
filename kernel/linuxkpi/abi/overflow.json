@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "guard": "VINIX_GENERATED_INTEGER_POLICY_H",
+  "sources": [
+    "headercore/policy.v"
+  ],
+  "boundary": {
+    "kind": "native_compiler_primitive_and_operand_adapter",
+    "v_algorithm_credit": 0,
+    "original_revision": "d0a65f5953058f4f7542cd588acbb38039491c04",
+    "original_path": "kernel/linuxkpi/include/linux/overflow.h",
+    "original_lines": [
+      7,
+      8,
+      9
+    ]
+  },
+  "native_intrinsic_bindings": [
+    {
+      "name": "check_add_overflow",
+      "intrinsic": "__builtin_add_overflow",
+      "parameters": [
+        "left",
+        "right",
+        "result"
+      ]
+    },
+    {
+      "name": "check_sub_overflow",
+      "intrinsic": "__builtin_sub_overflow",
+      "parameters": [
+        "left",
+        "right",
+        "result"
+      ]
+    },
+    {
+      "name": "check_mul_overflow",
+      "intrinsic": "__builtin_mul_overflow",
+      "parameters": [
+        "left",
+        "right",
+        "result"
+      ]
+    }
+  ],
+  "native_expression_exports": [
+    "vinix_zero_or_null_ptr",
+    "vinix_preemptible"
+  ],
+  "native_expression_adapters": [
+    {
+      "name": "ZERO_OR_NULL_PTR",
+      "parameters": [
+        {
+          "name": "pointer",
+          "kind": "value"
+        }
+      ],
+      "expression": {
+        "call": "__builtin_choose_expr",
+        "arguments": [
+          {
+            "call": "__builtin_constant_p",
+            "arguments": [
+              {
+                "cast": {
+                  "native": "uintptr_t"
+                },
+                "value": {
+                  "argument": "pointer"
+                }
+              }
+            ]
+          },
+          {
+            "operator": "<=",
+            "left": {
+              "cast": {
+                "native": "uintptr_t"
+              },
+              "value": {
+                "argument": "pointer"
+              }
+            },
+            "right": {
+              "literal": 16,
+              "suffix": "UL"
+            }
+          },
+          {
+            "cast": {
+              "native": "int"
+            },
+            "value": {
+              "call": "vinix_zero_or_null_ptr",
+              "arguments": [
+                {
+                  "cast": {
+                    "native": "uintptr_t"
+                  },
+                  "value": {
+                    "argument": "pointer"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "preemptible",
+      "parameters": [],
+      "expression": {
+        "cast": {
+          "native": "int"
+        },
+        "value": {
+          "call": "vinix_preemptible",
+          "arguments": []
+        }
+      }
+    }
+  ]
+}

@@ -163,14 +163,85 @@ def call_adapter(record, exported):
 
 
 
+# Native compiler primitives and integer constant expressions are compile-time
+# ABI boundaries, not V algorithm ports. Their schema contains typed expression
+# nodes, never maintained C snippets or a finite native integer type table.
+OPERATORS = {"+", "-", "*", "<<", "<", "<=", "&&"}
+BUILTINS = {"__builtin_add_overflow": 3, "__builtin_sub_overflow": 3,
+            "__builtin_mul_overflow": 3, "__builtin_constant_p": 1,
+            "__builtin_choose_expr": 3}
+NATIVE_SCALARS = {"int", "uintptr_t"}
+
+
+def expression_type(node, parameters):
+    if set(node) == {"parameter"}:
+        name = identifier(node["parameter"])
+        if parameters.get(name) != "type":
+            raise ValueError(f"Unknown native type parameter: {name}")
+        return name
+    if set(node) == {"native"} and node["native"] in NATIVE_SCALARS:
+        return node["native"]
+    raise ValueError(f"Unsupported native expression type: {node!r}")
+
+
+def native_expression(node, parameters, symbols):
+    if set(node) in ({"literal"}, {"literal", "suffix"}):
+        value = node["literal"]
+        suffix = node.get("suffix", "")
+        if type(value) is not int or value < 0 or suffix not in ("", "UL"):
+            raise ValueError(f"Invalid native constant: {node!r}")
+        return str(value) + suffix
+    if set(node) == {"argument"}:
+        name = identifier(node["argument"])
+        if parameters.get(name) != "value":
+            raise ValueError(f"Unknown native expression parameter: {name}")
+        return "(" + name + ")"
+    if set(node) == {"cast", "value"}:
+        return "((" + expression_type(node["cast"], parameters) + ")(" + native_expression(node["value"], parameters, symbols) + "))"
+    if set(node) == {"sizeof"}:
+        return "sizeof(" + expression_type(node["sizeof"], parameters) + ")"
+    if set(node) == {"operator", "left", "right"} and node["operator"] in OPERATORS:
+        return "(" + native_expression(node["left"], parameters, symbols) + " " + node["operator"] + " " + native_expression(node["right"], parameters, symbols) + ")"
+    if set(node) == {"call", "arguments"}:
+        name = identifier(node["call"])
+        arguments = node["arguments"]
+        if name not in symbols or len(arguments) != symbols[name][0]:
+            raise ValueError(f"Unknown native expression call/arity: {name}")
+        kinds = symbols[name][1]
+        values = [expression_type(value, parameters) if kind == "type" else native_expression(value, parameters, symbols)
+                  for value, kind in zip(arguments, kinds)]
+        return name + "(" + ", ".join(values) + ")"
+    raise ValueError(f"Unsupported native expression node: {node!r}")
+
+
+def expression_adapter(record, symbols):
+    name = identifier(record["name"])
+    parameters = {identifier(value["name"]): value["kind"] for value in record["parameters"]}
+    if len(parameters) != len(record["parameters"]) or any(kind not in ("value", "type") for kind in parameters.values()):
+        raise ValueError(f"Invalid native expression parameters: {name}")
+    return "#define " + name + "(" + ", ".join(parameters) + ") " + native_expression(record["expression"], parameters, symbols)
+
+
+def intrinsic_adapter(record):
+    name, target = identifier(record["name"]), identifier(record["intrinsic"])
+    parameters = [identifier(value) for value in record["parameters"]]
+    if target not in BUILTINS or len(parameters) != BUILTINS[target] or len(set(parameters)) != len(parameters):
+        raise ValueError(f"Invalid native intrinsic binding: {name}")
+    return "#define " + name + "(" + ", ".join(parameters) + ") " + target + "(" + ", ".join("(" + value + ")" for value in parameters) + ")"
+
+
 def generate(schema_path, source_root, output):
     config = json.loads(schema_path.read_text())
     if config["version"] != 1:
         raise ValueError("Unsupported native ABI metadata version")
     atomic_adapters = config.get("native_atomic_adapters", [])
     call_adapters = config.get("native_call_adapters", [])
+    intrinsics = config.get("native_intrinsic_bindings", [])
+    expressions = config.get("native_expression_adapters", [])
     selected = {record[key] for record in atomic_adapters for key in ("small_export", "wide_export")}
     selected.update(step["call"] for record in call_adapters for step in record["steps"] if "call" in step)
+    expression_exports = config.get("native_expression_exports", [])
+    selected.update(expression_exports)
     native_types = {record["vtype"]: record for record in config.get("native_types", [])}
     exported = declarations(source_root, config["sources"], selected, native_types)
     if set(exported) != selected:
@@ -179,10 +250,24 @@ def generate(schema_path, source_root, output):
     text = ["// Generated from V declarations and structured ABI metadata; do not maintain.",
             f"#ifndef {guard}", f"#define {guard}",
             "#include <stdbool.h>", "#include <stddef.h>", "#include <stdint.h>"]
+    symbols = {name: (arity, ["value"] * arity) for name, arity in BUILTINS.items()}
+    symbols.update({name: (value[1], ["value"] * value[1]) for name, value in exported.items()})
+    for record in config.get("native_expression_imports", []):
+        name = identifier(record["name"])
+        header = record["header"]
+        parameters = record["parameters"]
+        if not re.fullmatch(r"[A-Za-z0-9_./-]+\.h", header) or ".." in header.split("/"):
+            raise ValueError(f"Invalid native expression import header: {header}")
+        if name in symbols or any(kind not in ("value", "type") for kind in parameters):
+            raise ValueError(f"Invalid native expression import: {name}")
+        text.append("#include <" + header + ">")
+        symbols[name] = (len(parameters), parameters)
     text += [value[0] for value in exported.values()]
     text += [adapter(record, exported) for record in atomic_adapters]
     text += [call_adapter(record, exported) for record in call_adapters]
-    names = [identifier(record["name"]) for record in atomic_adapters + call_adapters]
+    text += [intrinsic_adapter(record) for record in intrinsics]
+    text += [expression_adapter(record, symbols) for record in expressions]
+    names = [identifier(record["name"]) for record in atomic_adapters + call_adapters + intrinsics + expressions]
     if len(names) != len(set(names)):
         raise ValueError("Duplicate native adapter name")
     names = set(names)
