@@ -310,3 +310,256 @@ fn test_calculator_scientific_ui_has_wire_supported_controls_and_resize_hint() {
 	free_tree(app.build(ui2.rect(0, 0, 340, 540))!)
 	assert math.abs(app.calculator.display.f64() - math.pi) < 1e-14
 }
+
+fn test_calculator_programmer_parse_exact_limits_prefixes_and_four_base_texts() {
+	for index, text in ['18446744073709551615', 'FFFFFFFFFFFFFFFF',
+		'1777777777777777777777', '1111111111111111111111111111111111111111111111111111111111111111']! {
+		value, status := calculator_integer_parse(text, calculator_programmer_bases[index])
+		assert status == '' && value == calculator_programmer_max
+		formatted := calculator_integer_text(value, calculator_programmer_bases[index])
+		assert formatted == text
+		unsafe { formatted.free() }
+	}
+	for text in ['0xFFFFFFFFFFFFFFFF', '0Xffffffffffffffff', '0o1777777777777777777777',
+		'0b1111111111111111111111111111111111111111111111111111111111111111']! {
+		value, status := calculator_integer_parse(text, 10)
+		assert status == '' && value == calculator_programmer_max
+	}
+	for index, text in ['18446744073709551616', '10000000000000000',
+		'2000000000000000000000', '10000000000000000000000000000000000000000000000000000000000000000']! {
+		_, status := calculator_integer_parse(text, calculator_programmer_bases[index])
+		assert status == 'calculator.programmer.error.range'
+	}
+	for text in ['', '-1', '+1', '1.5', '1e3', '0x', '0b', '1\n2', '1 2', '1\x00', '数字']! {
+		_, status := calculator_integer_parse(text, 10)
+		assert status.len > 0
+	}
+	_, invalid_base := calculator_integer_parse('1', 3)
+	assert invalid_base == 'calculator.programmer.error.input'
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('255')
+	assert app.integer.decimal_text == '255'
+	assert app.integer.hex_text == 'FF'
+	assert app.integer.octal_text == '377'
+	assert app.integer.binary_text == '11111111'
+}
+
+fn test_calculator_programmer_base_entry_keyboard_and_floating_state_are_isolated() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('2+9')
+	app.handle('calculator.scientific.sqrt')!
+	assert app.calculator.display == '3'
+	assert app.scientific_operand
+	app.key_input('\x10\x02')
+	assert app.programmer && app.integer.base == 16
+	app.key_input('af\x7fC')
+	assert app.integer.hex_text == 'AC'
+	app.key_input('g')
+	assert app.integer.hex_text == 'AC' && app.integer.status == 'calculator.programmer.error.input'
+	app.key_input('\x1b[3~\x1b[1~')
+	assert app.integer.hex_text == 'AC'
+	app.key_input('\x04')
+	assert app.degrees
+	app.key_input('\x1b\x02')
+	assert app.integer.value == 0 && app.integer.base == 8
+	app.key_input('78')
+	assert app.integer.value == 7
+	assert app.integer.status == 'calculator.programmer.error.digit'
+	app.key_input('\x02\x1b10101')
+	assert app.integer.base == 2 && app.integer.value == 21
+	app.key_input('\x02')
+	assert app.integer.base == 10 && app.integer.decimal_text == '21'
+	app.handle('calculator.programmer.base.hex')!
+	app.handle('calculator.programmer.digit.F')!
+	assert app.integer.value == 351
+	app.key_input('\x10=')
+	assert !app.programmer && app.scientific
+	assert app.calculator.display == '5'
+	app.handle('calculator.mode.programmer')!
+	assert app.integer.hex_text == '15F'
+	app.handle('calculator.mode.basic')!
+	assert !app.programmer && !app.scientific
+	assert app.calculator.display == '5'
+}
+
+fn test_calculator_programmer_arithmetic_wraps_and_divides_without_float_rounding() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('18446744073709551615')
+	app.key_input('+1=')
+	assert app.integer.value == 0
+	assert app.integer.history.last().expression == '18446744073709551615 + 1'
+	app.key_input('\x1b0-1=')
+	assert app.integer.value == calculator_programmer_max
+	app.key_input('*2=')
+	assert app.integer.decimal_text == '18446744073709551614'
+	app.key_input('\x1b')
+	app.paste_input('18446744073709551615')
+	app.key_input('/2=')
+	assert app.integer.decimal_text == '9223372036854775807'
+	app.key_input('\x1b')
+	app.paste_input('18446744073709551615')
+	app.key_input('%2=')
+	assert app.integer.value == 1
+	app.key_input('\x1b1+2*3=')
+	assert app.integer.value == 9
+	app.key_input('=')
+	assert app.integer.value == 27
+}
+
+fn test_calculator_programmer_bitwise_unsigned_shifts_and_unary_pending_operands() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.key_input('255&15=')
+	assert app.integer.value == 15
+	app.key_input('\x1b240|15=')
+	assert app.integer.value == 255
+	app.key_input('\x1b255^15=')
+	assert app.integer.value == 240
+	app.key_input('\x1b~')
+	assert app.integer.value == calculator_programmer_max
+	app.key_input('>>1=')
+	assert app.integer.decimal_text == '9223372036854775807'
+	app.key_input('\x1b1<<63=')
+	assert app.integer.decimal_text == '9223372036854775808'
+	app.key_input('>>63=')
+	assert app.integer.value == 1
+	app.key_input('<<0=')
+	assert app.integer.value == 1
+	app.key_input('\x1b1&0~=')
+	assert app.integer.value == 1
+	app.key_input('\x1b1')
+	app.handle('calculator.programmer.not')!
+	assert app.integer.value == calculator_programmer_max - 1
+	app.handle('calculator.programmer.shr')!
+	app.paste_input('63')
+	app.handle('calculator.programmer.equals')!
+	assert app.integer.value == 1
+}
+
+fn test_calculator_programmer_domain_errors_and_invalid_paste_preserve_values() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	for operation in ['/', '%', '<', '>']! {
+		app.key_input('\x1b7')
+		app.key_input(operation)
+		app.paste_input(if operation == '/' || operation == '%' { '0' } else { '64' })
+		app.key_input('=')
+		assert app.integer.has_error
+		assert app.integer.value == if operation == '/' || operation == '%' { u64(0) } else { u64(64) }
+		assert app.integer.status == if operation == '/' || operation == '%' {
+			'calculator.programmer.error.zero'
+		} else { 'calculator.programmer.error.shift' }
+		assert app.integer.history.len == 0
+		app.key_input('5')
+		assert !app.integer.has_error && app.integer.value == 5
+		assert app.integer.pending == .none
+	}
+	app.key_input('\x1b42+')
+	for text in ['-1', '+3', '3.5', 'NaN', '1e3', '2+3=', '1\n2',
+		'18446744073709551616', '0x10000000000000000', '0b2']! {
+		app.paste_input(text)
+		assert app.integer.value == 42
+		assert app.integer.accumulator == 42 && app.integer.pending == .add
+		assert !app.integer.has_error && app.integer.status.len > 0
+	}
+	app.paste_input(' 0x10 ')
+	app.key_input('=')
+	assert app.integer.value == 58 && app.integer.status == ''
+	app.key_input('\x1b')
+	app.paste_input('18446744073709551615')
+	app.key_input('0')
+	assert app.integer.value == calculator_programmer_max
+	assert app.integer.status == 'calculator.programmer.error.range'
+	app.key_input('\x7f')
+	assert app.integer.decimal_text == '1844674407370955161'
+	app.paste_input('0')
+	assert app.integer.value == 0 && app.integer.status == ''
+}
+
+fn test_calculator_programmer_history_is_bounded_exact_and_separate_from_float_history() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.key_input('2+3=')
+	assert app.history.len == 1
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('18446744073709551615')
+	app.key_input('-1=')
+	for _ in 0 .. 40 { app.key_input('=') }
+	assert app.integer.history.len == calculator_history_limit
+	assert app.integer.value == calculator_programmer_max - 41
+	app.handle('calculator.programmer.base.hex')!
+	app.handle('calculator.programmer.history.1')!
+	assert app.integer.value == calculator_programmer_max - 40
+	assert app.integer.hex_text == 'FFFFFFFFFFFFFFD7'
+	app.handle('calculator.programmer.history.next')!
+	app.handle('calculator.programmer.history.0')!
+	assert app.integer.value == calculator_programmer_max - 40
+	app.handle('calculator.programmer.history.previous')!
+	app.handle('calculator.programmer.history.0')!
+	assert app.integer.value == calculator_programmer_max - 41
+	app.handle('calculator.programmer.history.clear')!
+	assert app.integer.history.len == 0
+	app.handle('calculator.mode.basic')!
+	assert app.history.len == 1 && app.calculator.display == '5'
+	app.handle('calculator.history.0')!
+	assert app.calculator.display == '5'
+}
+
+fn test_calculator_programmer_native_controls_readouts_wire_and_compact_layout() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('0xFFFFFFFFFFFFFFFF')
+	app.handle('calculator.programmer.and')!
+	app.paste_input('255')
+	app.handle('calculator.programmer.equals')!
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 620, 576))!
+	for action in calculator_programmer_key_actions {
+		control := calculator_feature_find(tree, action) or { panic('missing integer key') }
+		assert control.kind == .button
+		assert control.frame.x >= 0 && control.frame.x + control.frame.width <= 620
+		assert control.frame.y >= 0 && control.frame.y + control.frame.height <= 576
+	}
+	for action in calculator_programmer_base_actions {
+		assert calculator_feature_find(tree, action) != none
+	}
+	assert calculator_feature_find(tree, 'calculator.mode.basic') != none
+	assert calculator_feature_find(tree, 'calculator.mode.scientific') != none
+	assert calculator_feature_find(tree, 'calculator.programmer.history.0') != none
+	mut matching_readouts := 0
+	for child in tree.children {
+		if child.kind == .label && child.text in ['255', 'FF', '377', '11111111']! {
+			matching_readouts++
+		}
+	}
+	assert matching_readouts == 4
+	mut encoded := []u8{cap: 65536}
+	unsafe { encoded.flags |= .noslices }
+	encode_app_element(tree, mut encoded)!
+	mut reader := WireReader{ data: encoded }
+	decoded := decode_app_element(mut reader, 0)!
+	assert calculator_feature_find(decoded, 'calculator.programmer.not') != none
+	free_tree(decoded)
+	free_tree(tree)
+	unsafe { encoded.free() }
+	for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 340, 510)]! {
+		begin_frame_elements()
+		compact := app.build(size)!
+		assert calculator_feature_find(compact, 'calculator.mode.basic') != none
+		assert calculator_feature_find(compact, 'calculator.programmer.base.bin') != none
+		assert (calculator_feature_find(compact, 'calculator.programmer.not') != none) == (size.width >= 540)
+		free_tree(compact)
+	}
+	app.handle('calculator.programmer.base.bin')!
+	app.handle('calculator.programmer.digit.1')!
+	assert app.integer.value == 1
+}

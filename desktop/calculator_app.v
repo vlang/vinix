@@ -56,6 +56,8 @@ mut:
 	layout_scientific  bool
 	scientific_operand bool
 	scientific_status  string
+	programmer         bool
+	integer            CalculatorProgrammer
 }
 
 fn new_calculator_app() &CalculatorApp {
@@ -65,6 +67,7 @@ fn new_calculator_app() &CalculatorApp {
 	}
 	mut app := &CalculatorApp{ calculator: Calculator{ keys: keys } }
 	unsafe { app.history.flags |= .noslices }
+	unsafe { app.integer.history.flags |= .noslices }
 	return app
 }
 
@@ -168,6 +171,7 @@ fn release_compiled_calculator_layout(element ui2.Element) {
 }
 
 fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
+	if app.programmer { return app.build_programmer(size) }
 	if app.calculator.has_error { app.set_display(tr('calculator.error'), false) }
 	if app.scientific && (size.width < 540 || size.height < 430) {
 		mut children := frame_elements(8)
@@ -549,13 +553,24 @@ fn (mut app CalculatorApp) key_input(text string) {
 	mut at := 0
 	for at < text.len {
 		ch := text[at]
+		if ch == 0x10 {
+			app.programmer = !app.programmer
+			at++
+			continue
+		}
 		if ch == 0x13 {
+			app.programmer = false
 			app.scientific = !app.scientific
 			at++
 			continue
 		}
+		if ch == 0x02 && app.programmer {
+			app.integer.next_base()
+			at++
+			continue
+		}
 		if ch == 0x04 {
-			if app.scientific { app.degrees = !app.degrees }
+			if app.scientific && !app.programmer { app.degrees = !app.degrees }
 			at++
 			continue
 		}
@@ -568,6 +583,11 @@ fn (mut app CalculatorApp) key_input(text string) {
 				at++
 				if final { break }
 			}
+			continue
+		}
+		if app.programmer {
+			app.integer.key(ch)
+			at++
 			continue
 		}
 		key := match ch {
@@ -601,6 +621,10 @@ fn (mut app CalculatorApp) key_input(text string) {
 // Pasted text is one numeric operand; control bytes and operators do not run
 // commands. Invalid or non-finite input leaves the calculator unchanged.
 fn (mut app CalculatorApp) paste_input(text string) {
+	if app.programmer {
+		app.integer.paste(text)
+		return
+	}
 	trimmed := text.trim_space()
 	defer { unsafe { trimmed.free() } }
 	if !calculator_valid_number(trimmed)
@@ -679,14 +703,21 @@ fn calculator_mode_button(action string, selected bool, x f64, width f64) ui2.El
 			bg:     if selected { app_accent } else { settings_choice_bg }
 			radius: 5
 		}, ui2.TextStyle{ color: if selected { app_on_accent } else { body_text }, size: 11, align: .center })
-		tooltip: tr('calculator.scientific.shortcuts')
+		tooltip: tr(if action == 'calculator.mode.programmer' {
+			'calculator.programmer.shortcuts'
+		} else {
+			'calculator.scientific.shortcuts'
+		})
 	}
 }
 
 fn (app &CalculatorApp) mode_controls(mut children []ui2.Element, width f64) {
-	children << calculator_mode_button('calculator.mode.basic', !app.scientific, 12, 72)
-	children << calculator_mode_button('calculator.mode.scientific', app.scientific, 90, 116)
-	if app.scientific && width >= 330 {
+	available := if width > 36 { width - 36 } else { f64(0) }
+	factor := if available >= 304 { f64(1) } else { available / 304 }
+	children << calculator_mode_button('calculator.mode.basic', !app.scientific && !app.programmer, 12, 72 * factor)
+	children << calculator_mode_button('calculator.mode.scientific', app.scientific && !app.programmer, 18 + 72 * factor, 116 * factor)
+	children << calculator_mode_button('calculator.mode.programmer', app.programmer, 24 + 188 * factor, 116 * factor)
+	if app.scientific && !app.programmer && width >= 480 {
 		children << calculator_mode_button('calculator.angle.degrees', app.degrees, width - 124, 54)
 		children << calculator_mode_button('calculator.angle.radians', !app.degrees, width - 64, 54)
 	}
@@ -767,12 +798,23 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 }
 
 fn (mut app CalculatorApp) handle(event_id string) ! {
+	if event_id == 'calculator.mode.programmer' {
+		app.programmer = true
+		return
+	}
+	if app.programmer && event_id != 'calculator.mode.basic'
+		&& event_id != 'calculator.mode.scientific' {
+		app.integer.handle(event_id)
+		return
+	}
 	match event_id {
 		'calculator.mode.basic' {
+			app.programmer = false
 			app.scientific = false
 			return
 		}
 		'calculator.mode.scientific' {
+			app.programmer = false
 			app.scientific = true
 			return
 		}
@@ -864,6 +906,7 @@ fn (mut app CalculatorApp) handle(event_id string) ! {
 }
 
 fn (mut app CalculatorApp) close_app() {
+	app.integer.close()
 	if app.layout_ready {
 		release_compiled_calculator_layout(app.layout)
 		app.layout_ready = false
