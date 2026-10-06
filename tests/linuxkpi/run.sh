@@ -78,7 +78,8 @@ esac
 # separately generated V objects include its headers. Native builds use the
 # kernel's unchanged GNU11/general-register flags.
 for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfixture \
-    taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture; do
+    taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture \
+    srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture; do
     python3 "$repo/tests/linuxkpi/compile-v-fixture.py" "$fixture_module" \
         --host --arch "$native_v_arch" "$work/$fixture_module.c"
     ${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
@@ -97,6 +98,8 @@ assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b"
 CHECK
 done
 printf '%s\n' 'LinuxKPI: independent V fixtures have no implicit allocator imports'
+${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
+    -c "$repo/kernel/asm/$native_asm/linuxkpi_printk_fixture_abi.S" -o "$work/printk_fixture_abi.o"
 ${CC:-clang} -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST \
     -c "$repo/kernel/asm/x86_64/linuxkpi_fixture_abi.S" -o "$work/fixture_storage.o"
 python3 "$repo/tests/linuxkpi/fixture-goldens.py"
@@ -108,16 +111,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -ffreestanding -fno-builtin \
     -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -c "$work/policyhost.c" -o "$work/policyhost.o"
-# Link production implementations/bindings and the independent fixtures.
-# Independent guest *_test.c fixtures are built only by the kernel.
-set --
-for source in "$repo"/kernel/c/linuxkpi*.c; do
-    case "$source" in
-        *_native_test.c) ;;
-        *_test.c) continue ;;
-    esac
-    set -- "$@" "$source"
-done
+# Link production implementations with the independent runtime and sync fixtures.
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
@@ -125,7 +119,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \

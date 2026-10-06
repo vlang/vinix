@@ -287,7 +287,7 @@ ifeq ($(LINUXKPI),1)
     # Keep the native 128-bit helper dormant until a caller selects that width.
     LINUXKPI_LIB := obj/linuxkpi/exchange128.a
     LINUXKPI_GENERATED_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h
-    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
     LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)
@@ -505,6 +505,8 @@ obj/asm/aarch64/linuxkpi_varargs.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_varargs.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_storage.S.o obj/asm/x86_64/linuxkpi_storage.S.o: $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_fixture_abi.S.o: $(V_CONFIG_STAMP)
+obj/asm/aarch64/linuxkpi_printk_fixture_abi.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
+obj/asm/x86_64/linuxkpi_printk_fixture_abi.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_workqueue_abi.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_workqueue_abi.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 
