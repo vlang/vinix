@@ -306,8 +306,8 @@ fn test_grapher_resize_and_native_wire_use_supported_finite_elements() {
 		for child in decoded.children {
 			if child.id != 'grapher.chart' { continue }
 			charts++
-			assert child.frame.width == tree.frame.width - 76
-			assert child.frame.height == tree.frame.height - 354
+			assert child.frame.width == size.width - 76
+			assert child.frame.height == size.height - if size.width < 600 || size.height < 452 { 260 } else { 354 }
 			assert child.children.len <= grapher_sample_count + 24
 			for mark in child.children {
 				assert mark.kind == .view
@@ -541,6 +541,7 @@ fn test_grapher_document_controls_fit_default_and_minimum_layout() {
 	app.initialize()
 	defer { app.close_app() }
 	for size in [ui2.rect(0, 0, 840, 636), ui2.rect(0, 0, 320, 380)]! {
+		app.handle('grapher.page.document')!
 		begin_frame_elements()
 		tree := app.build(size)!
 		mut controls := 0
@@ -557,7 +558,12 @@ fn test_grapher_document_controls_fit_default_and_minimum_layout() {
 			if child.id == 'grapher.chart' { assert child.frame.height >= 98 }
 		}
 		assert controls == 3
-		assert csv_y - document_y == 36
+		if size.width >= 600 && size.height >= 452 {
+			assert csv_y - document_y == 36
+		} else {
+			assert document_y == 152
+			assert csv_y == 0
+		}
 		free_tree(tree)
 	}
 }
@@ -700,6 +706,7 @@ fn test_grapher_png_keyboard_path_and_layout_preserve_document_and_csv_destinati
 	assert app.export_status == 'grapher.png_invalid'
 	assert app.field_text(5) == csv && app.field_text(6) == document
 	for size in [ui2.rect(0, 0, 840, 636), ui2.rect(0, 0, 320, 452)]! {
+		app.handle('grapher.page.png')!
 		begin_frame_elements()
 		tree := app.build(size)!
 		mut controls := 0
@@ -715,7 +722,12 @@ fn test_grapher_png_keyboard_path_and_layout_preserve_document_and_csv_destinati
 			}
 			if child.id == 'grapher.path' { csv_y = child.frame.y }
 		}
-		assert controls == 2 && png_y - csv_y == 36
+		assert controls == 2
+		if size.width >= 600 && size.height >= 452 {
+			assert png_y - csv_y == 36
+		} else {
+			assert csv_y == 0
+		}
 		free_tree(tree)
 	}
 }
@@ -730,4 +742,234 @@ fn test_grapher_png_writer_failure_preserves_plot_and_does_not_accept_stale_valu
 	assert app.values == values && app.range == range && app.plotted
 	app.set_field(0, 'x')
 	assert app.dirty && !app.write_graph_png(-1)
+}
+
+fn grapher_layout_test_find(tree ui2.Element, id string) ?ui2.Element {
+	if tree.id == id { return tree }
+	for child in tree.children {
+		if found := grapher_layout_test_find(child, id) { return found }
+	}
+	return none
+}
+
+fn grapher_layout_test_bounds(tree ui2.Element) {
+	for child in tree.children {
+		assert math.is_finite(child.frame.x) && math.is_finite(child.frame.y)
+		assert math.is_finite(child.frame.width) && math.is_finite(child.frame.height)
+		assert child.frame.x >= 0 && child.frame.y >= 0
+		assert child.frame.width > 0 && child.frame.height > 0
+		assert child.frame.x + child.frame.width <= tree.frame.width
+		assert child.frame.y + child.frame.height <= tree.frame.height
+		grapher_layout_test_bounds(child)
+	}
+}
+
+fn test_grapher_layout_pages_bound_every_rectangle_in_all_languages_and_native_wire() {
+	previous := desktop_language
+	defer { set_desktop_language(previous) }
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 600, 452),
+			ui2.rect(0, 0, 599, 452), ui2.rect(0, 0, 600, 451), ui2.rect(0, 0, 280, 320),
+			ui2.rect(0, 0, 320, 380), ui2.rect(0, 0, 440, 410), ui2.rect(0, 0, 2000, 960)]! {
+			compact := size.width < 600 || size.height < 452
+			for page, action in ['grapher.page.graph', 'grapher.page.document',
+				'grapher.page.csv', 'grapher.page.png']! {
+				app.handle(action)!
+				begin_frame_elements()
+				tree := app.build(size)!
+				assert tree.frame.width == size.width && tree.frame.height == size.height
+				grapher_layout_test_bounds(tree)
+				for key in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+					assert (grapher_layout_test_find(tree, key) != none) == compact
+					if compact {
+						button := grapher_layout_test_find(tree, key) or { panic('missing page') }
+						assert button.text == tr(key) && button.text != key
+						assert (button.box.bg == app_accent) == (key == action)
+					}
+				}
+				for index, id in grapher_field_actions {
+					visible := !compact || int(grapher_page_for_field(index)) == page
+					assert (grapher_layout_test_find(tree, id) != none) == visible
+				}
+				assert (grapher_layout_test_find(tree, 'grapher.chart') != none) == (!compact || page == 0)
+				assert (grapher_layout_test_find(tree, 'grapher.document_open') != none) == (!compact || page == 1)
+				assert (grapher_layout_test_find(tree, 'grapher.document_save_as') != none) == (!compact || page == 1)
+				assert (grapher_layout_test_find(tree, 'grapher.export') != none) == (!compact || page == 2)
+				assert (grapher_layout_test_find(tree, 'grapher.export_png') != none) == (!compact || page == 3)
+				if compact && page > 0 {
+					help := if page == 1 { 'grapher.compact.document' } else if page == 2 { 'grapher.compact.csv' } else { 'grapher.compact.png' }
+					for key in [help, 'grapher.compact.keyboard']! {
+						text := tr(key)
+						mut start := 0
+						mut lines := 0
+						for child in tree.children {
+							if child.tooltip != text { continue }
+							mut end := start
+							for end < text.len && text[end] != `\n` { end++ }
+							assert child.text == unsafe { tos(text.str + start, end - start) }
+							assert child.text.index_u8(`\n`) < 0
+							start = end + 1
+							lines++
+						}
+						assert lines > 0 && lines <= 3 && start >= text.len
+					}
+				}
+				if compact {
+					mut encoded := []u8{cap: 1024 * 1024}
+					unsafe { encoded.flags |= .noslices }
+					encode_app_element(tree, mut encoded)!
+					mut reader := WireReader{data: encoded}
+					decoded := decode_app_element(mut reader, 0)!
+					assert reader.index == encoded.len
+					grapher_layout_test_bounds(decoded)
+					assert grapher_layout_test_find(decoded, action) != none
+					free_tree(decoded)
+					unsafe { encoded.free() }
+				}
+				free_tree(tree)
+			}
+		}
+	}
+}
+
+fn test_grapher_tiny_layout_has_bounded_action_and_hint_without_mutating_graph() {
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	app.handle('grapher.expression')!
+	app.paste_input('x^2+')
+	app.handle('grapher.page.png')!
+	app.handle('grapher.png_path')!
+	app.paste_input('/tmp/graph-')
+	app.key_input('\xd0')
+	assert app.pending_length == 1
+	values, connections, range, program := app.values, app.connect, app.range, app.program
+	for size in [ui2.rect(0, 0, 180, 96), ui2.rect(0, 0, 279, 319), ui2.rect(0, 0, 96, 200),
+		ui2.rect(0, 0, 32, 32), ui2.rect(0, 0, 0, 0), ui2.rect(0, 0, -3, -8)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		assert tree.frame.width == if size.width > 0 { size.width } else { 0 }
+		assert tree.frame.height == if size.height > 0 { size.height } else { 0 }
+		grapher_layout_test_bounds(tree)
+		app.key_input('\x01bad\r\t\x0c')
+		app.paste_input('/bad-paste.png')
+		assert app.focus == 7 && !app.selected && app.pending_length == 1
+		assert app.field_text(7) == '/tmp/graph-'
+		assert (grapher_layout_test_find(tree, 'grapher.plot') != none) == (size.width >= 96 && size.height >= 96)
+		if size.width > 0 && size.height > 0 {
+			hint := grapher_layout_test_find(tree, 'grapher.resize') or { panic('resize hint') }
+			assert hint.text == tr('grapher.resize') && hint.tooltip == hint.text
+		}
+		assert app.compact_page == .png && app.dirty
+		assert app.field_text(0) == 'x^2+'
+		assert app.values == values && app.connect == connections && app.range == range && app.program == program
+		free_tree(tree)
+	}
+	app.handle('grapher.plot')!
+	assert !app.plotted && app.status == 'grapher.expression_invalid'
+	begin_frame_elements()
+	resized := app.build(ui2.rect(0, 0, 280, 320))!
+	assert app.focus == 7 && app.compact_page == .png && !app.tiny_layout
+	free_tree(resized)
+	app.key_input('\x96')
+	assert app.pending_length == 0 && app.field_text(7) == '/tmp/graph-Ж'
+}
+
+fn test_grapher_compact_keyboard_reveals_each_field_and_page_switch_stops_hidden_edits() {
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	app.handle('grapher.document_path')!
+	app.paste_input('/tmp/graph-Ж.vgraph')
+	app.key_input('\xd0')
+	assert app.pending_length == 1
+	begin_frame_elements()
+	first := app.build(ui2.rect(0, 0, 280, 320))!
+	assert app.compact_page == .document
+	assert grapher_layout_test_find(first, 'grapher.document_path') != none
+	free_tree(first)
+	app.handle('grapher.page.graph')!
+	assert app.focus == -1 && !app.selected && app.pending_length == 0
+	app.key_input('x')
+	assert app.field_text(6) == '/tmp/graph-Ж.vgraph'
+	app.key_input('\x0c')
+	assert app.focus == 0 && app.compact_page == .graph
+	for expected in 1 .. 9 {
+		app.key_input('\t')
+		assert app.focus == expected % 8
+		assert app.compact_page == grapher_page_for_field(app.focus)
+		begin_frame_elements()
+		tree := app.build(ui2.rect(0, 0, 280, 320))!
+		field := grapher_layout_test_find(tree, grapher_field_actions[app.focus]) or { panic('focused field hidden') }
+		assert field.focused && field.text_selection.anchor == 0
+		free_tree(tree)
+	}
+	app.handle('grapher.page.csv')!
+	app.handle('grapher.path')!
+	app.handle('grapher.page.csv')!
+	assert app.focus == 5 && app.selected
+	app.key_input('\x1b')
+	assert app.focus == -1
+	begin_frame_elements()
+	wide := app.build(ui2.rect(0, 0, 840, 626))!
+	assert grapher_layout_test_find(wide, 'grapher.path') != none
+	free_tree(wide)
+	begin_frame_elements()
+	compact := app.build(ui2.rect(0, 0, 280, 320))!
+	assert app.compact_page == .csv
+	free_tree(compact)
+}
+
+fn test_grapher_compact_pages_save_open_and_export_from_the_same_preserved_fields() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-compact-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	csv, document, png := disk_utility_join_path(root, 'samples.csv'),
+		disk_utility_join_path(root, 'curve.vgraph'), disk_utility_join_path(root, 'curve.png')
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() csv.free() document.free() png.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	app.set_field(0, 'sqrt(x)')
+	app.set_field(5, csv)
+	app.set_field(6, document)
+	app.set_field(7, png)
+	for action in ['grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+		app.handle(action)!
+		begin_frame_elements()
+		tree := app.build(ui2.rect(0, 0, 280, 320))!
+		grapher_layout_test_bounds(tree)
+		free_tree(tree)
+		match action {
+			'grapher.page.document' {
+				app.handle('grapher.document_save_as')!
+				assert app.document_status == 'grapher.document_saved'
+				app.set_field(0, 'x')
+				app.handle('grapher.document_path')!
+				app.key_input('\r')
+				assert app.document_status == 'grapher.document_opened' && app.field_text(0) == 'sqrt(x)'
+			}
+			'grapher.page.csv' {
+				app.handle('grapher.path')!
+				app.key_input('\r')
+				assert app.export_status == 'grapher.export_saved'
+			}
+			else {
+				app.handle('grapher.png_path')!
+				app.key_input('\r')
+				assert app.export_status == 'grapher.png_saved'
+			}
+		}
+		assert app.field_text(5) == csv && app.field_text(6) == document && app.field_text(7) == png
+	}
+	assert os.exists(csv) && os.exists(document) && os.exists(png)
+	pixels := grapher_test_png_pixels(png)
+	C.stbi_image_free(pixels)
 }

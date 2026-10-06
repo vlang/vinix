@@ -248,3 +248,47 @@ fn test_grapher_repeated_png_exports_and_path_failures_release_owned_memory() {
 	}
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_grapher_complete_compact_paging_keyboard_resize_and_languages_release_all_owned_memory() {
+	previous := desktop_language
+	defer { set_desktop_language(previous) }
+	mut app := GrapherApp{}
+	app.initialize()
+	for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 280, 320), ui2.rect(0, 0, 180, 96)]! {
+		for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+			app.handle(page)!
+			begin_frame_elements()
+			free_tree(app.build(size)!)
+		}
+	}
+	app.close_app()
+	C.vinix_heap_begin()
+	for _ in 0 .. 30 {
+		app.initialize()
+		for language in desktop_languages {
+			set_desktop_language(language)
+			for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 599, 452),
+				ui2.rect(0, 0, 600, 451), ui2.rect(0, 0, 280, 320), ui2.rect(0, 0, 180, 96),
+				ui2.rect(0, 0, 32, 32), ui2.rect(0, 0, 0, 0)]! {
+				for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+					app.handle(page)!
+					begin_frame_elements()
+					free_tree(app.build(size)!)
+				}
+			}
+			begin_frame_elements()
+			free_tree(app.build(ui2.rect(0, 0, 280, 320))!)
+			app.key_input('\x0c')
+			for _ in 0 .. 8 {
+				app.key_input('\t')
+				begin_frame_elements()
+				free_tree(app.build(ui2.rect(0, 0, 280, 320))!)
+				assert app.compact_page == grapher_page_for_field(app.focus)
+			}
+		}
+		app.close_app()
+		app.close_app()
+		assert app.compact_page == .graph && !app.compact_layout && !app.tiny_layout
+	}
+	assert C.vinix_heap_end() == 0
+}

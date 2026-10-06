@@ -29,6 +29,9 @@ mut:
 	status         string
 	export_status  string
 	document_status string
+	compact_page   GrapherPage
+	compact_layout bool
+	tiny_layout    bool
 }
 
 fn open_grapher_app(mut _ Desktop) !NativeApp {
@@ -176,12 +179,17 @@ fn (mut app GrapherApp) handle(id string) ! {
 	for index, action in grapher_field_actions {
 		if id == action {
 			app.focus = index
+			app.reveal_focused_page()
 			app.selected = true
 			app.pending_length = 0
 			return
 		}
 	}
 	match id {
+		'grapher.page.graph' { app.select_page(.graph) }
+		'grapher.page.document' { app.select_page(.document) }
+		'grapher.page.csv' { app.select_page(.csv) }
+		'grapher.page.png' { app.select_page(.png) }
 		'grapher.plot' { app.plot() }
 		'grapher.reset' {
 			app.reset_ranges()
@@ -264,6 +272,7 @@ fn (mut app GrapherApp) input_byte(ch u8) {
 }
 
 fn (mut app GrapherApp) key_input(text string) {
+	if app.tiny_layout { return }
 	if text.len > 1 && text[0] == 0x1b { return }
 	for ch in text {
 		match ch {
@@ -275,6 +284,7 @@ fn (mut app GrapherApp) key_input(text string) {
 			}
 			0x0c {
 				app.focus = 0
+				app.reveal_focused_page()
 				app.selected = true
 				app.pending_length = 0
 			}
@@ -284,6 +294,7 @@ fn (mut app GrapherApp) key_input(text string) {
 			}
 			`\t` {
 				app.focus = (app.focus + 1) % app.fields.len
+				app.reveal_focused_page()
 				app.selected = true
 				app.pending_length = 0
 			}
@@ -307,6 +318,7 @@ fn (mut app GrapherApp) key_input(text string) {
 }
 
 fn (mut app GrapherApp) paste_input(text string) {
+	if app.tiny_layout { return }
 	if app.focus < 0 { return }
 	// Reject rather than merge pasted multi-line expressions or invalid UTF-8.
 	if !grapher_valid_utf8(text) {
@@ -422,4 +434,7 @@ fn (mut app GrapherApp) close_app() {
 	app.status = ''
 	app.export_status = ''
 	app.document_status = ''
+	app.compact_page = .graph
+	app.compact_layout = false
+	app.tiny_layout = false
 }

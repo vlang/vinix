@@ -77,6 +77,10 @@ fn grapher_tick(value f64, x int, y int, width int, align ui2.Align) ui2.Element
 }
 
 fn (app &GrapherApp) chart(width int, height int) ui2.Element {
+	return app.chart_at(width, height, 52, 174)
+}
+
+fn (app &GrapherApp) chart_at(width int, height int, chart_x int, chart_y int) ui2.Element {
 	mut children := frame_elements(grapher_sample_count + 24)
 	for index in 1 .. 10 {
 		children << ui2.view('', ui2.rect(f64(width * index / 10), 0, 1, f64(height)), ui2.BoxStyle{ bg: body_rule }, [])
@@ -93,17 +97,27 @@ fn (app &GrapherApp) chart(width int, height int) ui2.Element {
 		}
 		for index in 0 .. grapher_sample_count {
 			stroke := app.chart_stroke(index, width, height) or { continue }
-			children << ui2.view('', ui2.rect(f64(stroke.x), f64(stroke.y), f64(stroke.width), f64(stroke.height)), ui2.BoxStyle{ bg: app_accent }, [])
+			// Container clipping already limits the rendered and exported curve.
+			// Bound the wire rectangles too, including the final sample at an edge.
+			stroke_width := if stroke.width < width - stroke.x { stroke.width } else { width - stroke.x }
+			stroke_height := if stroke.height < height - stroke.y { stroke.height } else { height - stroke.y }
+			children << ui2.view('', ui2.rect(f64(stroke.x), f64(stroke.y), f64(stroke_width), f64(stroke_height)), ui2.BoxStyle{ bg: app_accent }, [])
 		}
 	}
-	return ui2.view('grapher.chart', ui2.rect(52, 174, f64(width), f64(height)),
+	return ui2.view('grapher.chart', ui2.rect(f64(chart_x), f64(chart_y), f64(width), f64(height)),
 		ui2.BoxStyle{ bg: body_panel, border_color: body_rule, border_left: 1, border_top: 1, border_right: 1, border_bottom: 1 }, children)
 }
 
 fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 	if !app.initialized { app.initialize() }
-	width := if int(size.width) > 320 { int(size.width) } else { 320 }
-	height := if int(size.height) > 452 { int(size.height) } else { 452 }
+	width := if math.is_finite(size.width) && size.width > 0 { int(size.width) } else { 0 }
+	height := if math.is_finite(size.height) && size.height > 0 { int(size.height) } else { 0 }
+	compact := width < 600 || height < 452
+	if compact && !app.compact_layout { app.reveal_focused_page() }
+	app.compact_layout = compact
+	app.tiny_layout = width < 280 || height < 320
+	if app.tiny_layout { return app.build_tiny(width, height) }
+	if compact { return app.build_compact(width, height) }
 	mut children := frame_elements(32)
 	children << ui2.label('', tr('app.grapher'), ui2.rect(12, 10, f64(width - 24), 26), ui2.TextStyle{ size: 18, bold: true, color: body_heading })
 	children << ui2.label('', tr('grapher.equation_label'), ui2.rect(12, 44, 38, 28), ui2.TextStyle{ size: 12, color: body_text })
