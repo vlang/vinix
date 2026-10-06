@@ -180,6 +180,8 @@ const available_apps = [
 		height: 500
 		process_name: 'vinix-calendar'
 		keyboard: true
+		polling: true
+		poll_interval_ms: 100
 		open: open_calendar
 	},
 	AppFactory{

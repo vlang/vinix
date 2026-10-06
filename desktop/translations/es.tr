@@ -4091,3 +4091,93 @@ system_information.search.count_short
 system_information.search.label
 Buscar
 -----
+preview.undo
+Deshacer
+-----
+preview.redo
+Rehacer
+-----
+preview.status.crop_undone
+Recorte deshecho. Rehacer lo restaura.
+-----
+preview.status.crop_redone
+Recorte restaurado. Exporta PNG para guardarlo.
+-----
+calendar.search.label
+Buscar
+-----
+calendar.search.title
+Buscar eventos
+-----
+calendar.search.hint
+Buscar eventos por título o lugar
+-----
+calendar.search.clear
+Borrar
+-----
+calendar.search.back
+Calendario
+-----
+calendar.search.empty
+No hay eventos coincidentes
+-----
+calendar.search.count
+{0} evento coincidente|{0} eventos coincidentes
+-----
+calendar.search.page
+Página {0} de {1}
+-----
+disk_usage.view.inventory
+Inventario
+-----
+disk_usage.view.capacity
+Sistema de archivos
+-----
+disk_usage.capacity.total
+TOTAL
+-----
+disk_usage.capacity.used
+USADO
+-----
+disk_usage.capacity.free
+LIBRE
+-----
+disk_usage.capacity.available
+DISPONIBLE
+-----
+disk_usage.capacity.unavailable
+No disponible
+-----
+disk_usage.capacity.scope
+Sistema de archivos de la carpeta analizada.
+-----
+disk_usage.capacity.refresh
+Volver a analizar actualiza estas cifras.
+-----
+disk_usage.capacity.available_note
+Disponible excluye el espacio reservado.
+-----
+disk_usage.capacity.inventory_note
+El inventario cuenta el contenido de los archivos.
+-----
+calculator.scientific.sinh
+sinh
+-----
+calculator.scientific.cosh
+cosh
+-----
+calculator.scientific.tanh
+tanh
+-----
+calculator.scientific.asinh
+asinh
+-----
+calculator.scientific.acosh
+acosh
+-----
+calculator.scientific.atanh
+atanh
+-----
+disk_usage.capacity.resize
+Amplía la ventana para ver la capacidad.
+-----

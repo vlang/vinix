@@ -4091,3 +4091,93 @@ system_information.search.count_short
 system_information.search.label
 Поиск
 -----
+preview.undo
+Отменить
+-----
+preview.redo
+Повторить
+-----
+preview.status.crop_undone
+Обрезка отменена. Повторить восстановит её.
+-----
+preview.status.crop_redone
+Обрезка восстановлена. Экспортируйте PNG для сохранения.
+-----
+calendar.search.label
+Поиск
+-----
+calendar.search.title
+Поиск событий
+-----
+calendar.search.hint
+Поиск событий по названию или месту
+-----
+calendar.search.clear
+Очистить
+-----
+calendar.search.back
+Календарь
+-----
+calendar.search.empty
+Совпадений не найдено
+-----
+calendar.search.count
+{0} совпадение|{0} совпадения|{0} совпадений
+-----
+calendar.search.page
+Страница {0} из {1}
+-----
+disk_usage.view.inventory
+Файлы
+-----
+disk_usage.view.capacity
+Файловая система
+-----
+disk_usage.capacity.total
+ВСЕГО
+-----
+disk_usage.capacity.used
+ЗАНЯТО
+-----
+disk_usage.capacity.free
+СВОБОДНО
+-----
+disk_usage.capacity.available
+ДОСТУПНО
+-----
+disk_usage.capacity.unavailable
+Недоступно
+-----
+disk_usage.capacity.scope
+Файловая система выбранной папки.
+-----
+disk_usage.capacity.refresh
+Повторное сканирование обновляет значения.
+-----
+disk_usage.capacity.available_note
+Доступный объём не включает резерв.
+-----
+disk_usage.capacity.inventory_note
+Объём файлов считается по дереву папок.
+-----
+calculator.scientific.sinh
+sinh
+-----
+calculator.scientific.cosh
+cosh
+-----
+calculator.scientific.tanh
+tanh
+-----
+calculator.scientific.asinh
+asinh
+-----
+calculator.scientific.acosh
+acosh
+-----
+calculator.scientific.atanh
+atanh
+-----
+disk_usage.capacity.resize
+Увеличьте окно для просмотра ёмкости.
+-----

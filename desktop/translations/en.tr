@@ -4091,3 +4091,93 @@ system_information.search.count_short
 system_information.search.label
 Search
 -----
+preview.undo
+Undo crop
+-----
+preview.redo
+Redo crop
+-----
+preview.status.crop_undone
+Crop undone. Redo restores it.
+-----
+preview.status.crop_redone
+Crop restored. Export PNG to save.
+-----
+calendar.search.label
+Search
+-----
+calendar.search.title
+Search events
+-----
+calendar.search.hint
+Find events by title or location
+-----
+calendar.search.clear
+Clear
+-----
+calendar.search.back
+Calendar
+-----
+calendar.search.empty
+No matching events
+-----
+calendar.search.count
+{0} matching event|{0} matching events
+-----
+calendar.search.page
+Page {0} of {1}
+-----
+disk_usage.view.inventory
+Inventory
+-----
+disk_usage.view.capacity
+Filesystem
+-----
+disk_usage.capacity.total
+TOTAL
+-----
+disk_usage.capacity.used
+USED
+-----
+disk_usage.capacity.free
+FREE
+-----
+disk_usage.capacity.available
+AVAILABLE
+-----
+disk_usage.capacity.unavailable
+Unavailable
+-----
+disk_usage.capacity.scope
+Filesystem containing the scan folder.
+-----
+disk_usage.capacity.refresh
+Rescan refreshes these figures.
+-----
+disk_usage.capacity.available_note
+Available excludes reserved filesystem space.
+-----
+disk_usage.capacity.inventory_note
+Inventory counts file contents in the scanned tree.
+-----
+calculator.scientific.sinh
+sinh
+-----
+calculator.scientific.cosh
+cosh
+-----
+calculator.scientific.tanh
+tanh
+-----
+calculator.scientific.asinh
+asinh
+-----
+calculator.scientific.acosh
+acosh
+-----
+calculator.scientific.atanh
+atanh
+-----
+disk_usage.capacity.resize
+Enlarge the window to show capacity details.
+-----
