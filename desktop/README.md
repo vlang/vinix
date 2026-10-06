@@ -66,18 +66,19 @@ What it does:
   save-aware closing and exclusive Save As
 - a **Calculator** with Basic/Scientific modes, DEG/RAD and hyperbolic functions,
   memory, validated numeric paste, bounded calculation history and exact unsigned
-  64-bit Programmer mode with four bases and bitwise operations; acknowledged
+  8/16/32/64-bit Programmer mode with four bases and bitwise operations; acknowledged
   result copy to the guest session clipboard
 - a **calendar** with month navigation, searchable persistent local events and
   bounded ICS import/export
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs, plus filesystem capacity
-- a **clock** with local time, a stopwatch with laps and a countdown timer
+- a **clock** with local time, a stopwatch with laps and up to four named
+  countdown timers
 - **Preview**, an image viewer with zoom, pan, all eight JPEG EXIF orientations,
   manual rotation, rectangular selection/cropping and resizing with Undo/Redo and
   PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
-  filtering and matching-row export
+  text/leading-level filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
   reports with localized search, refresh and export
 - **Archive Utility**, TAR browsing, creation and safe whole/selected extraction
@@ -86,10 +87,10 @@ What it does:
 - **Backup**, versioned local folder copies and restore to a new folder
 - **Notes**, searchable local plain-text notes with autosave, text export and
   close confirmation when a final save fails
-- **Reminders**, persistent local tasks with due dates, priorities, completion
-  and filters
+- **Reminders**, persistent local tasks with due dates, priorities, completion,
+  filters and stable priority/due/title sorting
 - **Grapher**, bounded mathematical function plots with axes, ranges, saved graph
-  documents and CSV export
+  documents, CSV samples and PNG export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
   and hex/RGB text copy to the guest session clipboard
 - **Dictionary**, offline WordNet lookup, suggestions, history, full-definition
@@ -173,10 +174,11 @@ typing any word with a q in it drop the user back to the console.
     clock_app.v    the large clock and stopwatch application
     calculator_app.v / calculator_programmer*.v / calculator_random.c.v
                       arithmetic modes, memory, history and random operands
-    terminal_selection.v  character/word/physical-row selection and Copy/Cmd-C handling
+    terminal_selection.v  text/word/physical-row/block selection and Copy/Cmd-C handling
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     preview_app*.v  the standalone image viewer and export model
-    console_app*.v  bounded log snapshots, filtering and tail following
+    console_app*.v / console_severity.v
+                       bounded log snapshots, text/level filtering and tail following
     system_information*.v  system-source inventory and report export
     archive_app*.v  bounded TAR browsing, creation and extraction
     disk_utility*.v  block-device and mounted-volume inspection
@@ -460,7 +462,10 @@ arithmetic and memory. Unavailable entropy preserves the current operand and
 shows a retry status. Cube root accepts negative operands; log2 requires a
 positive operand, and cube reports an error when its result is not finite.
 Copy result or Ctrl-C copies the displayed number in Basic or Scientific mode, or the
-exact selected-base digits in Programmer mode.
+exact selected-base digits in Programmer mode. Programmer supports unsigned
+8/16/32/64-bit words; arithmetic and NOT wrap at the chosen width. Narrowing
+drops high bits of current, pending and repeat operands; widening zero-extends.
+History recall restores its original width and value, and AC keeps the width.
 Arithmetic errors are not copied. The bounded guest clipboard service reports
 success only after acknowledgement; failed or unavailable copies preserve its
 previous contents.
@@ -474,8 +479,12 @@ logical lines. Changed output or window geometry clears selection. Copies
 larger than 64 KiB are refused without truncating or replacing the clipboard.
 Double-click selects a word; triple-click selects a physical row and its
 newline when another row follows. Dragging extends whole words or rows in
-either direction. Wide and combining character cell widths, rectangular
-selection and logical-line reflow remain future work.
+either direction. Choose Block in the toolbar to drag a rectangular selection;
+short/blank rows receive space padding, internal spaces and UTF-8 cells remain
+intact, and no final newline is added. Text restores ordinary and multi-click
+gestures; switching modes clears selection/copy feedback. Wide and combining
+character cell widths, modifier-key block gestures and logical-line reflow
+remain future work.
 The macOS comparison is [Apple's Terminal shortcut guide](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac).
 
 Preview applies all eight JPEG EXIF orientations, including mirrored forms,
