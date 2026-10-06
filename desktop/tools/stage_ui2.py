@@ -27,6 +27,12 @@ def staged_source(name, source_path):
     upstream checkout untouched and give the staged receiver an unambiguous
     name until the compiler preserves the module boundary here.
     """
+    if name in {"file_dialog_linux.v", "message_box_linux.v"}:
+        # These upstream helpers build quoted shell commands. Preserve their
+        # shell behavior through V's current argument-array process API.
+        with open(source_path) as handle:
+            return handle.read().replace(
+                "os.execute(command)", "os.exec(['/bin/sh', '-c', command])")
     if name != "vml_embed.v":
         return None
     text = open(source_path).read()
