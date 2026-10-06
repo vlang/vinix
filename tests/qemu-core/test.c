@@ -53,6 +53,7 @@
 #include "restartfixture-api.h"
 #include "nanosleepfixture-api.h"
 #include "blockedfixture-api.h"
+#include "pollfixture-api.h"
 #line 51 "test.c"
 
 #define CHECK(expression) do {                                               \
@@ -2094,28 +2095,7 @@ static int test_wait_ends_for_a_pending_signal(void)
 /* V3 makes the V `int` type pointer-width. Linux still defines pollfd.fd as a
  * 32-bit C int, so exercise the structure from a real libc caller: widening
  * the kernel field makes it combine fd/events into one invalid descriptor. */
-static int test_pollfd_abi(void)
-{
-	int pair[2];
-	CHECK(pipe(pair) == 0);
-	struct pollfd descriptor = {
-		.fd = pair[0],
-		.events = POLLIN,
-	};
-	CHECK(poll(&descriptor, 1, 0) == 0);
-	CHECK(descriptor.revents == 0);
-	CHECK(write(pair[1], "p", 1) == 1);
-	CHECK(poll(&descriptor, 1, 1000) == 1);
-	CHECK((descriptor.revents & POLLIN) != 0);
-	char byte = 0;
-	CHECK(read(pair[0], &byte, 1) == 1);
-	CHECK(byte == 'p');
-	CHECK(close(pair[0]) == 0);
-	CHECK(close(pair[1]) == 0);
-	puts("QEMU CORE PASS: Linux pollfd ABI");
-	return 0;
-}
-
+#line 2426 "test.c"
 /* A blocking write larger than PIPE_BUF alternates between filling the pipe
  * and waiting for the reader to make room. Both directions share the pipe's
  * event. A reader used to be able to consume the "space available" wake in
