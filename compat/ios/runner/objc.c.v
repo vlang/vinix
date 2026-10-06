@@ -214,6 +214,7 @@ fn objc_allocate(cls u64) u64 {
 	header.gestures.flags |= .noslices
 	object := u64(memory) + sizeof(ObjHeader)
 	unsafe { *(&u64(object)) = cls }
+	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { header.number = -1 }
 	ios_runtime.live++
 	return objc_construct(object, cls)
 }

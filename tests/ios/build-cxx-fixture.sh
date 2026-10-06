@@ -20,4 +20,5 @@ mkdir -p "$OUTPUT"
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -no_fixup_chains -e _main "$OUTPUT/startup.o" "$ROOT/tests/ios/libcxx.tbd" \
     "$ROOT/tests/ios/libSystem.tbd" "$ROOT/tests/ios/startup.tbd" \
-    "$ROOT/examples/ios-calculator/api/Foundation.tbd" "$ROOT/tests/ios/GameController.tbd" -o "$OUTPUT/startup"
+    "$ROOT/examples/ios-calculator/api/Foundation.tbd" "$ROOT/tests/ios/GameController.tbd" \
+    "$ROOT/tests/ios/CoreLocation.tbd" -o "$OUTPUT/startup"

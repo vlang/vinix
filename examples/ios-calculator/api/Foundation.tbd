@@ -4,5 +4,5 @@ targets: [ arm64-ios ]
 install-name: '/System/Library/Frameworks/Foundation.framework/Foundation'
 exports:
   - targets: [ arm64-ios ]
-    symbols: [ '_OBJC_CLASS_$_NSObject', '_OBJC_METACLASS_$_NSObject', '_OBJC_CLASS_$_NSString', ___CFConstantStringClassReference, '_OBJC_CLASS_$_NSData', '_OBJC_CLASS_$_NSPropertyListSerialization', '_OBJC_CLASS_$_NSNotificationCenter', '_OBJC_CLASS_$_NSUserDefaults' ]
+    symbols: [ '_OBJC_CLASS_$_NSObject', '_OBJC_METACLASS_$_NSObject', '_OBJC_CLASS_$_NSString', ___CFConstantStringClassReference, '_OBJC_CLASS_$_NSData', '_OBJC_CLASS_$_NSPropertyListSerialization', '_OBJC_CLASS_$_NSNotificationCenter', '_OBJC_CLASS_$_NSUserDefaults', '_OBJC_CLASS_$_NSOperationQueue' ]
 ...

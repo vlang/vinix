@@ -68,7 +68,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
 | libSystem | Memory/string/conversion/math subset; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
-| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers and file-backed standard user defaults |
+| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, single manifest window-scene connection, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
@@ -105,6 +105,9 @@ options are unsupported. The scene bridge connects one window delegate from
 `Info.plist`; foreground/background transitions and additional scene APIs remain
 unfinished. Framework class descriptors and constants do not imply that their
 graphics, audio, sensor or media methods are implemented.
+Operation queues expose their name and concurrency settings; operation scheduling
+is unsupported. CoreLocation implements the weak delegate property; location
+services and authorization are unsupported.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
@@ -160,16 +163,17 @@ work yet.** With the optional C++ runtime, the unchanged release binary runs
 entitlement data, reaches `UIApplicationMain`, registers notification observers,
 and enters the scene delegate declared in its binary `Info.plist`. Its own code
 then starts the worker/UPnP threads, registers its VFS asset/document paths,
-reads configuration files and constructs its native view controller. The current
-guest stops at `NSOperationQueue setName:`, which is not implemented yet.
+reads configuration files, constructs its native view controller, and enters
+`viewDidLoad`, including camera/location/motion helper setup. The current guest
+stops at `EAGLContext initWithAPI:`, the call that creates its OpenGL ES context.
 Darwin private JIT probes fail normally; no successful entitlement or ptrace
 operation is fabricated.
 
 The guest regression stages the whole upstream app bundle and reports
 `iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime`. It checks the
 767-import inspection, native `+load` and scene-launch messages, exit status 1
-and the explicit unsupported-API diagnostic. Passing this probe verifies that
-progress and failure, not a working PPSSPP UI. `--with-ppsspp` requires
+and the specific unimplemented `EAGLContext initWithAPI:` diagnostic. Passing this
+probe verifies that progress and failure, not a working PPSSPP UI. `--with-ppsspp` requires
 `--with-cxx`; add `--with-2048` to verify the working apps in the same guest.
 
 Binaries without chained fixups previously reported no imports. `--imports` reads

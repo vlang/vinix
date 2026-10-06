@@ -9,6 +9,33 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	if notification_dispatch(object, selector, mut frame) { return true }
 	if propertylist_dispatch(object, selector, mut frame) { return true }
 	if scene_dispatch(object, selector, mut frame) { return true }
+	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['NSOperationQueue']) {
+		mut queue := obj_header(object)
+		match selector {
+			'name' { frame.x[0] = queue.fields[0] }
+			'setName:' {
+				if frame.x[2] != 0 && !objc_is_kind(frame.x[2], ios_runtime.names['NSString']) { panic('iOS: operation queue name must be a string') }
+				store_field(object, 0, frame.x[2])
+			}
+			'maxConcurrentOperationCount' { frame.x[0] = u64(queue.number) }
+			'setMaxConcurrentOperationCount:' {
+				value := i64(frame.x[2])
+				if value != -1 && value < 1 { panic('iOS: invalid operation queue concurrency') }
+				queue.number = value
+			}
+			else { return false } // Scheduling needs a worker implementation.
+		}
+		return true
+	}
+	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['CLLocationManager']) {
+		mut location := obj_header(object)
+		match selector {
+			'delegate' { frame.x[0] = location.target }
+			'setDelegate:' { objc_store_weak(unsafe { &location.target }, frame.x[2]) }
+			else { return false }
+		}
+		return true
+	}
 	cls := objc_class(object)
 	info := ios_runtime.classes[cls] or { return false }
 	if object in ios_runtime.classes {

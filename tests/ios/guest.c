@@ -79,7 +79,8 @@ int main(void) {
     puts("iOS PASS: native UIKit scene and application launch");
     if (!access("/opt/ios/PPSSPP", R_OK)) {
         run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
-        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1, "SceneDelegate class was loaded!");
+        run("/opt/ios/PPSSPP", NULL, NULL, NULL, 1,
+            "unimplemented Objective-C method EAGLContext initWithAPI:");
         puts("iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime");
     }
     if (!access("/opt/ios/cxx", R_OK)) {

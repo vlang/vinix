@@ -33,6 +33,15 @@ extern NSString *const GCControllerDidDisconnectNotification __attribute__((weak
 - (NSString *)stringByAppendingString:(NSString *)string;
 - (bool)isEqualToString:(NSString *)string;
 @end
+@interface NSOperationQueue : NSObject
+@property (copy) NSString *name;
+@property long maxConcurrentOperationCount;
+@end
+@interface CLLocationManager : NSObject
+@property (nonatomic, weak) id delegate;
+@end
+@interface StartupLocationManager : CLLocationManager @end
+@implementation StartupLocationManager @end
 @interface NSUserDefaults : NSObject
 + (instancetype)standardUserDefaults;
 - (NSString *)stringForKey:(NSString *)key;
@@ -117,6 +126,20 @@ int main(int argc, char **argv) {
         if (!GCControllerDidConnectNotification || !GCControllerDidDisconnectNotification ||
             strcmp([GCControllerDidConnectNotification UTF8String], "GCControllerDidConnectNotification") ||
             strcmp([GCControllerDidDisconnectNotification UTF8String], "GCControllerDidDisconnectNotification")) return 41;
+        NSOperationQueue *queue = [NSOperationQueue new];
+        if (queue.name || queue.maxConcurrentOperationCount != -1) return 42;
+        queue.name = @"AccelerometerQueue";
+        queue.maxConcurrentOperationCount = 1;
+        if (![queue.name isEqualToString:@"AccelerometerQueue"] || queue.maxConcurrentOperationCount != 1) return 43;
+        queue.maxConcurrentOperationCount = -1;
+        queue.name = 0;
+        if (queue.name || queue.maxConcurrentOperationCount != -1) return 44;
+        CLLocationManager *location = [StartupLocationManager new];
+        NSObject *locationDelegate = [NSObject new];
+        location.delegate = locationDelegate;
+        if (location.delegate != locationDelegate || ![location respondsToSelector:@selector(setDelegate:)]) return 45;
+        locationDelegate = 0;
+        if (location.delegate) return 46;
         NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
         if (argc > 1) {
             if (![[defaults stringForKey:@"vinix-persistence"] isEqualToString:@"&<✅🚀>"] || [defaults integerForKey:@"vinix-number"] != -42) return 37;
@@ -168,6 +191,7 @@ int main(int argc, char **argv) {
         if (destroyed != 2 || deallocated != 1) return 28;
     }
     puts("IOS-STARTUP: NSData and XML property lists");
+    puts("IOS-STARTUP: operation queue configuration and weak location delegate");
     puts("IOS-STARTUP: notifications, filtering, weak observers and reentrant removal");
     puts("IOS-STARTUP: load, categories, initialize, ObjC++ lifetime and UTF-16");
     return 0;
