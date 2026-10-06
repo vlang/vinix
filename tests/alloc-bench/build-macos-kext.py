@@ -72,11 +72,10 @@ def main() -> int:
     subprocess.run(["python3", str(ROOT / "tests/alloc-bench/compile-v-sampler.py"),
                     str(generated)], check=True)
     shutil.copyfile(ROOT / "kernel/c/heap_benchmark_v.h", state / "heap_benchmark_v.h")
-    sources = [generated]
-    for original in [ROOT / "tests/alloc-bench/macos-kext-info.c"]:
-        staged = state / original.name
-        staged.write_bytes(original.read_bytes())
-        sources.append(staged)
+    metadata = state / "macos-kext-info.c"
+    subprocess.run(["python3", str(ROOT / "tests/alloc-bench/compile-v-kmod-info.py"),
+                    str(metadata)], check=True)
+    sources = [generated, metadata]
     commands = []
     objects = []
     with (state / "build.log").open("wb") as log:
@@ -102,6 +101,10 @@ def main() -> int:
         compile_flags=COMMON_FLAGS, platform_compile_flags=DARWIN_FLAGS,
         source_sha256=hashlib.sha256(sources[0].read_bytes()).hexdigest(),
         adapter_sha256=hashlib.sha256(sources[1].read_bytes()).hexdigest(),
+        metadata_language="V",
+        metadata_source_sha256=hashlib.sha256((ROOT / "tests/alloc-bench/kmodmeta/core.v").read_bytes()).hexdigest(),
+        metadata_generator_sha256=hashlib.sha256((ROOT / "tests/alloc-bench/compile-v-kmod-info.py").read_bytes()).hexdigest(),
+        metadata_initialization="static native data; compiler aggregate initializer promoted before loading",
         sampler_header_sha256=hashlib.sha256((state / "heap_benchmark_v.h").read_bytes()).hexdigest(),
         sampler_language="V",
         compiler=compiler_version, build_commands=commands,
