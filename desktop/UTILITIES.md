@@ -23,10 +23,10 @@ Vinix engineering proposals based on the inspected code.
 | Vinix utility / macOS counterpart | Present before this change | Implemented in this change | Remaining gaps |
 | --- | --- | --- | --- |
 | Files / Finder | List, Finder and Miller-column views, dual-pane mode, sorting, current-folder search, navigation history, sidebar, tags, Quick Look, rename/copy/cut/paste/permanent delete and view preferences | Get Info for the selected file, including POSIX metadata and symbolic-link targets; persistent personal Trash with move, browse, restore without overwriting and confirmed emptying | Trash for other volumes/outside Home and recursive emptying of nonempty folders; restoration of file tags; multiple selection and batch operations; file-operation undo; tabs; recursive/content/metadata search; file associations and Open With; drag-and-drop file operations; permission editing; shared folders |
-| Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog | Persistent view preferences; per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
-| Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states | Settings search; clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
-| Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As | General selection/cut/copy, mouse caret/selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
-| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square, trig/inverse trig, ln/log10/exp and pi/e, with domain/finite errors and scientific operation history | Further scientific controls (cube/nth-root, log2, hyperbolic/inverse-hyperbolic, random and EE entry); programmer bases/bitwise operations, RPN, expression parsing, unit/currency conversion, Math Notes integration, selectable/copyable results, configurable precision/grouping and history persistence |
+| Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog; per-user saved sort/direction, filter, tree, columns, refresh interval, main view and resource tab | Per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
+| Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states; localized search across 27 options with keyboard navigation into their actual panes | Clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
+| Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As; UTF-8 document selection, mouse caret/drag selection, bounded guest clipboard copy and acknowledged cut, and selection replacement with undo | Field selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
+| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square, trig/inverse trig, ln/log10/exp and pi/e, with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory | Further scientific controls (cube/nth-root, log2, hyperbolic/inverse-hyperbolic, random and EE entry); signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, selectable/copyable results, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, search, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
 | Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; countdown timer, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; multiple named timers; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
@@ -46,6 +46,8 @@ Vinix engineering proposals based on the inspected code.
 
 Relevant macOS references: [process browsing](https://support.apple.com/en-ie/guide/activity-monitor/actmntr1001/mac)
 and [diagnostics](https://support.apple.com/guide/activity-monitor/run-system-diagnostics-actmntr2225/mac),
+[Settings search](https://support.apple.com/en-ie/guide/mac-help/mchl8d10839d/mac),
+[copy/cut/paste](https://support.apple.com/en-us/102553),
 [TextEdit search/replace](https://support.apple.com/guide/textedit/find-and-replace-text-txtef6cfde1a/mac),
 [Calculator modes](https://support.apple.com/guide/calculator/choose-the-right-mode-calc22d50970/mac)
 and [scientific controls](https://support.apple.com/guide/calculator/use-the-scientific-calculator-calcf964141e/mac),
@@ -134,7 +136,11 @@ not proposed as general Vinix utility ports.
   (Ctrl-E) writes `Activity-Monitor-Processes.csv` in the user's home. In tree
   mode it includes visible context ancestors. Clear History (Ctrl-L) resets
   resource/GPU/power graphs while retaining rate baselines; battery charge
-  history remains the shared battery service's history.
+  history remains the shared battery service's history. View choices are saved
+  in the active user's `.vinix-activity-settings`, with private atomic writes.
+  Search, pause, selection and scroll remain transient; the selected-process
+  filter reopens as All to avoid reused PIDs. Damaged records and conflicting
+  saves preserve existing data and show a warning.
 - **Editor:** Ctrl-Z/Ctrl-Y undo/redo; Ctrl-F opens Find; Ctrl-G finds the next
   match. Find is an exact UTF-8 byte search at character boundaries. Replace
   All is one undoable action. History is bounded and not a recovery journal.
@@ -142,7 +148,14 @@ not proposed as general Vinix utility ports.
   two-step Discard choices. Save As creates a new file and refuses existing
   paths, including leaf symlinks. A failed Open preserves the draft and the
   original Save destination. Forced termination bypasses the close guard;
-  autosave/recovery, file pickers and general selection remain future work.
+  autosave/recovery and file pickers remain future work. Drag text to select,
+  Ctrl-A selects the document, and Ctrl-B toggles marking with ordinary arrows
+  on the guest keyboard. Ctrl-C copies and Ctrl-X cuts after the compositor
+  acknowledges the copy; Ctrl-V pastes into and replaces a selection. Selection
+  respects UTF-8 boundaries and raw document bytes; copy is bounded to 64 KiB.
+  Copies stay in the guest session clipboard. An older compositor without this
+  capability reports unavailable and preserves text. Field selection is future
+  work. Mouse scrolling no longer forces the view back to the caret.
 - **Calendar:** select a date, choose New event, enter a title and optionally
   a time/location, then Save. Select an agenda event to edit/delete it. Events
   are local to the user's home and do not sync or issue alerts. Import / Export
@@ -164,6 +177,15 @@ not proposed as general Vinix utility ports.
   binary operation. Domain errors and non-finite results are shown explicitly.
   Scientific mode accepts a finite number pasted in exponent notation.
   History is bounded to 20 results and includes function arguments/angle units.
+  Select Programmer (Ctrl-P) for exact unsigned 64-bit values. Ctrl-B changes
+  the input base; prefixed numeric paste accepts `0x`, `0o` and `0b`. Full-sized
+  windows display all four bases together; compact windows show the selected
+  base. The bitwise keyboard controls are `&`, `|`, `^` and `~`. Addition,
+  subtraction and multiplication wrap modulo 2^64; shifts are logical with
+  counts 0–63. Overflowing input and division by zero preserve the value and
+  report an error. Programmer history is separate; Basic/Scientific state and
+  memory are preserved while switching modes. Signed arithmetic and variable
+  bit widths remain work.
 - **Terminal:** click Find, type an exact query, use the arrows or Enter to
   advance, and Escape to return keyboard input to the shell. Matches are
   physical output rows, including scrollback; Clear scrollback keeps the
@@ -175,7 +197,11 @@ not proposed as general Vinix utility ports.
 - **Capture:** Video now exposes the recording delay. Enter starts the chosen
   operation and Escape stops/cancels it.
 - **Settings:** choose About and Refresh to read system-reported information.
-  Missing data is labelled unavailable.
+  Missing data is labelled unavailable. Click Search or Ctrl-F, enter localized
+  category/control words, and use arrows, page keys and Enter to open a matching
+  pane. Words match together with case/accent folding; language names and scale
+  percentages are included. Escape clears/dismisses search. Search operates on
+  the implemented controls rather than external or unavailable settings.
 - **Preview:** enter an image path and Open; choose Fit, 100%, zoom or Rotate.
   Export PNG saves the current rotation with alpha; Original Copy keeps the
   exact encoded input. Enter a new output path because neither overwrites.
@@ -445,3 +471,63 @@ The final static AArch64 desktop (`5115a9e7`, including Calendar `189407bd`) is
 published for Files, Activity Monitor and Settings. Its QEMU workflows rerun
 passes with five native processes; final screenshots confirm the loaded corpus,
 Save As and Trash panes, and the complete wrapped Calendar explanations.
+
+### Search, selection and saved-view follow-up (2026-10-06)
+
+Activity Monitor now retains eight view choices in the active user's private
+settings record. Parsing, atomic replacement, competing windows, unsafe paths,
+short writes, bounded reads and repeated opening/closing are covered by 63
+behavior and 11 memory checks. Transient search, pause and PID selection are
+not saved. Calculator's Programmer mode uses unsigned 64-bit integers directly,
+with exact four-base readouts, modular arithmetic, logical shifts, invalid-input
+and domain handling, independent history and preserved Basic/Scientific
+state. Its 18 behavior and six memory checks cover values beyond floating-point
+precision, maximum integers, overflow and repeated rendering/cleanup.
+
+Text Editor now supports character-boundary document selection, mouse caret and
+dragging, select-all and keyboard marking, selection replacement, and guest
+clipboard copy/cut. Cut requires a successful matching acknowledgement and an
+unchanged document revision/range; failed or stale requests preserve text.
+Copied controls remain literal document data, while Start-menu paste treats them
+as search text rather than navigation or launch commands. Fragmented CSI/SS3
+navigation is bounded and a bare Escape is resolved after 100 milliseconds.
+The focused Editor checks pass 44 behavior cases and nine memory cases.
+
+The combined utility suite passes 254 behavior cases and 76 memory cases across
+21 modules, including the prepared WordNet corpus. The parity suite passes 80
+behavior and 14 memory cases. Settings passes 166 behavior/localization cases,
+nine general-memory checks and three search-memory checks. These checks include
+all indexed localized options, real-pane navigation, fragmented keyboard/paste
+input, visible placeholder/focus states, complete translation keys and supported
+font glyphs. All measured repeated paths retain zero owned bytes after warming
+persistent frame capacities.
+
+The broader redraw checks exposed allocations in named window-chrome element
+appends, native interface dispatch wrappers and Files' repeated row-path builder.
+Generated C and tracked allocations identified the sites. Field transfer,
+explicit wrapper ownership and the existing path semantics under a distinct
+helper name reduce the four-window fixture from 1,120 retained bytes per redraw
+to zero. The regression now checks every visible-window count, both themes,
+post-frame hit identities and repeated Start-menu redraws. An additional 27
+Files/compositor behavior cases pass, and each new lifetime was reviewed.
+
+The complete real-process IPC fixture passes on the host, including the new
+Programmer, Editor selection/clipboard/pointer and Settings search workflows.
+Activity's host branch skips when `/dev/processes` is absent. A focused static
+AArch64 entry built from `18d82f0b` runs the same four feature-check functions
+unchanged inside Vinix and requires that real device; Activity's saved record
+and reopened selected view pass there. The guest entry excludes the host
+fixture's unrelated zero-deadline pipe
+readiness expectation. Clipboard/UTF-8 checks and all 29 Python performance
+runner cases also pass.
+
+The final static AArch64 desktop (`bea41f8e`, including the Settings placeholder
+fix `836de41c` and compositor ownership fix `12ab25a7`) is published for Files,
+Activity Monitor and Settings. A fresh QEMU boot passes idle, apps, utility-view
+and window-drag scenarios with five-second samples. The utility-view scenario
+runs the compositor and all four real native app processes. Keyboard/pointer
+screenshots show Editor keyboard/drag selection and acknowledged cut, localized
+Settings search opening Keyboard, all four exact maximum-integer readouts and
+wrap to zero, and a newly reopened Activity Monitor retaining Resources/Network.
+Build hashes, source revisions, test logs and guest screenshots are retained
+under `build/utility-view-validation/`.

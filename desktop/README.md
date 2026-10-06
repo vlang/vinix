@@ -14,7 +14,7 @@ exists, with an automatic fallback to the static software binary.
 
 The app-by-app comparison with macOS, implemented utility improvements and
 the proposed missing utility applications are in [UTILITIES.md](UTILITIES.md).
-The application catalog contains 41 entries: 20 native utilities and 21 hosted
+The application catalog contains 42 entries: 21 native utilities and 21 hosted
 or installable integrations.
 
 What it does:
@@ -47,15 +47,19 @@ What it does:
   activity filters, parent/child trees, selectable columns, process inspection
   and termination, suspend/resume and priority controls; CPU/per-core, memory,
   disk, network, GPU submission and battery power histories; configurable
-  refresh rates, diagnostic exports and per-user startup applications
+  refresh rates, diagnostic exports, persistent view preferences and per-user
+  startup applications
 - a **text editor** for plain files, with an editable path, open/save controls,
-  cursor navigation and keyboard shortcuts
+  undo/redo, Find/Replace, document selection/cut/copy, mouse selection,
+  save-aware closing and exclusive Save As
 - a **Calculator** with Basic/Scientific modes, DEG/RAD functions, memory,
-  validated numeric paste and bounded calculation history
-- a **calendar** with month navigation, date selection and a jump back to today
+  validated numeric paste, bounded calculation history and exact unsigned
+  64-bit Programmer mode with four bases and bitwise operations
+- a **calendar** with month navigation, persistent local events and bounded
+  ICS import/export
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
   machine, ranked and measured while the walk runs
-- a **clock** with a large local-time display and a tenth-second stopwatch
+- a **clock** with local time, a stopwatch with laps and a countdown timer
 - **Preview**, an image viewer with zoom, pan, rotation and PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
   filtering and matching-row export
@@ -70,12 +74,14 @@ What it does:
 - **Grapher**, bounded mathematical function plots with axes, ranges and CSV export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
   and hex/RGB text copy to the guest session clipboard
+- **Dictionary**, offline WordNet lookup, suggestions, history and text export
 - **Capture**, a native screenshot and screen-recording app with delayed PNG
   screenshots, 5/10 fps AVI recording, automatic self-hiding and live status
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
   window with a second screen that receives the native compositor image
 - a **settings application**: window button side, taskbar style, theme,
-  wallpaper, display, battery and experimental M1 Wi-Fi controls
+  wallpaper, display, battery, experimental M1 Wi-Fi controls and localized
+  control search
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering
@@ -124,7 +130,7 @@ typing any word with a q in it drop the user back to the console.
     editor.v       the plain-text editor and its keyboard editing model
     calendar.v     Gregorian month layout and the calendar application
     clock_app.v    the large clock and stopwatch application
-    calculator_app.v  Basic/Scientific functions, memory and result history
+    calculator_app.v / calculator_programmer*.v  arithmetic modes, memory and history
     capture.v      the ui2 capture app, PNG encoder and AVI recorder
     preview_app*.v  the standalone image viewer and export model
     console_app*.v  bounded log snapshots, filtering and tail following
@@ -137,6 +143,8 @@ typing any word with a q in it drop the user back to the console.
     grapher_app*.v  bounded expression parsing, plotting and CSV samples
     color_meter_app.v / color_meter_service.v  colour samples and guest text copy
     native_close.v  save-aware window/session close requests
+    clipboard_copy.v  acknowledged text copy to the bounded guest clipboard
+    dictionary_app*.v  offline lookup, suggestions, history and export
     clipboard.v    guest text paste and asynchronous host clipboard requests
     switcher.v     Cmd-Tab: the session it opens and the panel it shows
     taskbar_pin.v / taskbar_drag.v  taskbar pins and dragging buttons into order
