@@ -1181,7 +1181,7 @@ settings.wifi.error.io
 Wi-Fiの入出力に失敗しました。更新して再試行してください。
 -----
 settings.wifi.error.not_ready
-Wi-Fiをオンにする前に対応するBCM4378ファームウェアを読み込んでください。
+Wi-Fiをオンにする前にBCM4378ファームウェアを読み込んでください。
 -----
 settings.wifi.error.permission
 権限がありません。Wi-Fiの操作には書き込み権限が必要です。
@@ -1253,7 +1253,7 @@ settings.wifi.state.connecting
 Wi-Fiネットワークに接続中...
 -----
 settings.wifi.state.detected
-BCM4378を検出しました。wifi-ctlで対応するファームウェアを読み込んでください。
+BCM4378を検出しました。wifi-ctlでファームウェアを読み込んでください。
 -----
 settings.wifi.state.driver_error
 ドライバエラーでWi-Fiが停止しました（{0}）。
