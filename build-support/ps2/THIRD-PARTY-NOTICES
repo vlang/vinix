@@ -1,0 +1,21 @@
+Iris IPU / Play! and Play! Framework
+
+Source: src/ipu/ipu.cpp in Iris 0.15-alpha
+The majority of this code is based upon Play!'s implementation of the IPU.
+The related MPEG-2 table and IDCT files come from Play! Framework.
+
+https://github.com/jpd002/Play-/tree/master/Source/ee
+https://github.com/jpd002/Play--Framework/tree/master/include/mpeg2
+https://github.com/jpd002/Play--Framework/tree/master/src/mpeg2
+https://github.com/jpd002/Play--Framework/blob/master/src/idct/IEEE1180.cpp
+
+The full BSD license notices are in Play-LICENSE and Play-Framework-LICENSE.
+
+MPEG IDCT implementation
+
+Source: src/ipu/ipu.cpp in Iris 0.15-alpha, lines 636-702
+IDCT code here taken from mpeg2decode
+Copyright (C) 1996, MPEG Software Simulation Group. All Rights Reserved.
+
+The original comment is retained in the downloaded Iris source. Play! Framework
+also retains it in src/idct/IEEE1180.cpp.

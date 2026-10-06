@@ -70,6 +70,7 @@ DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 IOS_STAGING="${VINIX_IOS_STAGING:-$SCRIPT_DIR/build/ios/staging}"
 PS1_STAGING="${VINIX_PS1_STAGING:-$SCRIPT_DIR/build/ps1/staging}"
+PS2_STAGING="${VINIX_PS2_STAGING:-$SCRIPT_DIR/build/ps2/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -1269,6 +1270,20 @@ if [ -x "$PS1_STAGING/usr/bin/vinix-ps1" ]; then
     mkdir -p "$STAGING/usr/share/licenses/vinix-ps1"
     cp -R "$PS1_STAGING/usr/share/licenses/vinix-ps1/." "$STAGING/usr/share/licenses/vinix-ps1/"
 fi
+# PlayStation 2 also uses a static native frontend; homebrew is optional.
+# Refresh its entire payload so cached images cannot retain a removed game.
+rm -f "$STAGING/usr/bin/vinix-ps2"
+rm -rf "$STAGING/usr/share/games/ps2" "$STAGING/usr/share/licenses/vinix-ps2"
+if [ -x "$PS2_STAGING/usr/bin/vinix-ps2" ]; then
+    install -m755 "$PS2_STAGING/usr/bin/vinix-ps2" "$STAGING/usr/bin/vinix-ps2"
+    mkdir -p "$STAGING/usr/share/games/ps2" "$STAGING/usr/share/licenses/vinix-ps2"
+    if [ -d "$PS2_STAGING/usr/share/games/ps2" ]; then
+        cp -R "$PS2_STAGING/usr/share/games/ps2/." "$STAGING/usr/share/games/ps2/"
+    fi
+    if [ -d "$PS2_STAGING/usr/share/licenses/vinix-ps2" ]; then
+        cp -R "$PS2_STAGING/usr/share/licenses/vinix-ps2/." "$STAGING/usr/share/licenses/vinix-ps2/"
+    fi
+fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
 # files at the root of the image.
@@ -1713,6 +1728,9 @@ CONTENT_KEY_INPUTS=(
     "$STAGING/usr/bin/vinix-ps1"
     "$STAGING/usr/share/games/ps1"
     "$STAGING/usr/share/licenses/vinix-ps1"
+    "$STAGING/usr/bin/vinix-ps2"
+    "$STAGING/usr/share/games/ps2"
+    "$STAGING/usr/share/licenses/vinix-ps2"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"
