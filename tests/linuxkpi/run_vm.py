@@ -18,6 +18,7 @@ MARKERS = [
     "linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained",
     "linuxkpi: borrowed string tokens, character search and whitespace trimming passed; no pages retained",
     "linuxkpi: exact user-copy prefixes, protection, demand faults and COW passed; no pages or heap objects retained",
+    "linuxkpi: scalar user reads, fault zeros and aligned coherence passed; no pages or heap objects retained",
     "linuxkpi: shared PCI config transactions, actual device widths, bounds and worker rollback passed; no pages retained",
     "linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained",
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",

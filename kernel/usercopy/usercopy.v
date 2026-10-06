@@ -132,11 +132,19 @@ fn copy_pagemap_policy_remaining(_pagemap &memory.Pagemap, kernel_address voidpt
 		}
 		attempts = 0
 		physical_address := physical + page_offset + memory.get_hhdm_offset()
-		unsafe {
+		$if amd64 {
 			if to_user {
-				C.memcpy(voidptr(physical_address), voidptr(u64(kernel_address) + copied), chunk)
+				copy_user_page_chunk(voidptr(physical_address), voidptr(u64(kernel_address) + copied), chunk)
 			} else {
-				C.memcpy(voidptr(u64(kernel_address) + copied), voidptr(physical_address), chunk)
+				copy_user_page_chunk(voidptr(u64(kernel_address) + copied), voidptr(physical_address), chunk)
+			}
+		} $else {
+			unsafe {
+				if to_user {
+					C.memcpy(voidptr(physical_address), voidptr(u64(kernel_address) + copied), chunk)
+				} else {
+					C.memcpy(voidptr(u64(kernel_address) + copied), voidptr(physical_address), chunk)
+				}
 			}
 		}
 		pagemap.l.release()

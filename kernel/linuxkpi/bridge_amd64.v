@@ -501,6 +501,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux user-copy remaining-count self-test failed')
 		}
 		C.kprintf(c'linuxkpi: exact user-copy prefixes, protection, demand faults and COW passed; no pages or heap objects retained\n')
+		if !scalar_uaccess_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux scalar user-read self-test failed')
+		}
+		C.kprintf(c'linuxkpi: scalar user reads, fault zeros and aligned coherence passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

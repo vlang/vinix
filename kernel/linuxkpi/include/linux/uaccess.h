@@ -50,6 +50,30 @@ unsigned long __must_check _copy_to_user(void __user *to,
 			__vinix_uaccess_size) : __vinix_uaccess_size; \
 })
 
-/* Atomic/pagefault-disabled, scalar, unsafe-scope and noncached copies need
- * their own native contracts; they are deliberately not declared here. */
+/* Ordinary faulting scalar reads. The eight-byte output is a synchronous
+ * kernel borrow; native page resolution emits a single width-specific load
+ * when the scalar fits in one page. Failure returns -EFAULT and zero bits. */
+int __must_check vinix_linuxkpi_get_user(const void __user *source,
+		size_t size, void *bits);
+
+#define get_user(x, ptr) ({ \
+	__typeof__(ptr) __vinix_get_pointer = (ptr); \
+	unsigned long long __vinix_get_bits = 0; \
+	_Static_assert(sizeof(*__vinix_get_pointer) == 1 || \
+		sizeof(*__vinix_get_pointer) == 2 || \
+		sizeof(*__vinix_get_pointer) == 4 || \
+		sizeof(*__vinix_get_pointer) == 8, "unsupported get_user scalar width"); \
+	int __vinix_get_error = vinix_linuxkpi_get_user( \
+		(const void __user *)__vinix_get_pointer, \
+		sizeof(*__vinix_get_pointer), &__vinix_get_bits); \
+	(x) = (__typeof__(*__vinix_get_pointer))__vinix_get_bits; \
+	__vinix_get_error; \
+})
+
+/* The checked native backend is also safe for callers that already performed
+ * access_ok. Both interfaces retain ordinary faulting task-context semantics. */
+#define __get_user(x, ptr) get_user((x), (ptr))
+
+/* Scalar stores, atomic/pagefault-disabled, unsafe-scope and noncached copies
+ * still need their own native contracts and are not declared here. */
 #endif
