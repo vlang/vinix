@@ -112,6 +112,33 @@ Skip to a paragraph for your host distro if there is any.
 `qemu` to test it, Python 3, Clang/LLVM/LLD, and a current V compiler need to
 be present.
 
+### Selecting the V compiler
+
+The build checks that `v version` succeeds and reports a V compiler version.
+It tries `v` on `PATH`, then `~/code/v/v` and `~/v/v`. An unrelated program
+or a broken wrapper named `v` is skipped during automatic discovery. Set `V`
+or `VINIX_V_COMPILER` to choose a compiler executable or checkout explicitly;
+an invalid explicit choice stops the build before compilation.
+
+To build with the V compiler pinned by kernel CI:
+
+```sh
+sh tools/m1-wifi/get-v.sh build-tools/v
+VINIX_V_COMPILER="$PWD/build-tools/v" ./scripts/run-desktop-aarch64.sh
+```
+
+For example, with a V checkout at `~/code/v`:
+
+```sh
+make -C "$HOME/code/v"
+"$HOME/code/v/v" version
+VINIX_V_COMPILER="$HOME/code/v" ./scripts/run-desktop-aarch64.sh
+```
+
+If a build reports `/opt/homebrew/bin/v: ... .viminfo: No such file or directory`,
+point it at the V compiler as above. That error comes from the selected `v`
+wrapper before it compiles the kernel.
+
 ### Build prerequisites for Ubuntu, Debian, and derivatives
 ```bash
 sudo apt install -y clang llvm lld make findutils curl git file xz-utils rsync xorriso qemu-system-x86 python3

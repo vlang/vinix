@@ -15,13 +15,24 @@
 # Vinix builds with a checkout's `v` (~/code/v/v here), never with the `vnew`
 # a V developer's tree may also hold: those go stale and stop building the
 # desktop. A `vnew` named explicitly is swapped for the `v` beside it.
+# Each candidate must report a V version before a build can use it: another
+# program or a broken wrapper named `v` can also be installed on PATH.
 
 select_v() {
-    local candidate="$1"
+    local candidate="$1" version
+    local severity="${2:-ERROR}"
 
     if [ -d "$candidate" ]; then
         candidate="${candidate%/}/v"
     fi
+    # Explicit overrides may name a command on PATH as well as a file.
+    case "$candidate" in
+        */*) ;;
+        *) candidate="$(command -v "$candidate" 2>/dev/null)" || {
+            echo "$severity: V compiler is not executable: $1" >&2
+            return 1
+        } ;;
+    esac
     case "$candidate" in
         */vnew)
             if [ -x "${candidate%vnew}v" ]; then
@@ -31,16 +42,30 @@ select_v() {
             ;;
     esac
 
-    if [ -x "$candidate" ]; then
-        V="$candidate"
-        return 0
+    if [ ! -x "$candidate" ]; then
+        echo "$severity: V compiler is not executable: $candidate" >&2
+        return 1
     fi
 
-    echo "ERROR: V compiler is not executable: $candidate" >&2
+    if version="$("$candidate" version </dev/null 2>&1)"; then
+        case "$version" in
+            'V '[0-9]*)
+                V="$candidate"
+                return 0
+                ;;
+        esac
+    fi
+
+    echo "$severity: not a working V compiler: $candidate (checked with 'version')" >&2
+    if [ -n "$version" ]; then
+        printf '%s\n' "$version" >&2
+    fi
     return 1
 }
 
 find_v() {
+    local candidate
+
     if [ -n "${V:-}" ]; then
         select_v "$V"
         return
@@ -52,25 +77,27 @@ find_v() {
     fi
 
     if command -v v >/dev/null 2>&1; then
-        V="$(command -v v)"
-        return 0
+        candidate="$(command -v v)"
+        if select_v "$candidate" WARNING; then
+            return 0
+        fi
     fi
 
-    # The usual checkout layout. Take the first one that can at least report
-    # its version.
+    # The usual checkout layout, also used when PATH's `v` is unusable.
     for candidate in "$HOME/code/v/v" "$HOME/v/v"; do
-        if [ -x "$candidate" ] && "$candidate" version >/dev/null 2>&1; then
-            V="$candidate"
+        if [ -x "$candidate" ] && select_v "$candidate" WARNING; then
             return 0
         fi
     done
 
-    echo "ERROR: cannot find the V compiler." >&2
-    echo "Put it on PATH, or set V/VINIX_V_COMPILER to it:" >&2
-    echo "    V=~/code/v/v $0 $*" >&2
-    echo "    VINIX_V_COMPILER=~/code/v $0 $*" >&2
+    echo "ERROR: cannot find a working V compiler." >&2
     return 1
 }
 
-find_v "$@" || exit 1
+find_v "$@" || {
+    echo "Set V/VINIX_V_COMPILER to a V programming language compiler:" >&2
+    echo "    V=~/code/v/v $0 $*" >&2
+    echo "    VINIX_V_COMPILER=~/code/v $0 $*" >&2
+    exit 1
+}
 export V

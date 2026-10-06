@@ -57,8 +57,19 @@ endif
 # User controllable C compiler command.
 CC := cc
 
-# User controllable archiver command.
+# User controllable archiver command. Apple's ar cannot archive the kernel's
+# ELF objects, so macOS builds need LLVM even when clang is the host compiler.
 AR := ar
+ifeq ($(shell uname -s),Darwin)
+    ifneq ($(strip $(VINIX_LLVM_AR)),)
+        AR := $(VINIX_LLVM_AR)
+    else
+        AR := $(shell command -v llvm-ar 2>/dev/null || \
+            for candidate in /opt/homebrew/opt/llvm/bin/llvm-ar /usr/local/opt/llvm/bin/llvm-ar; do \
+                if test -x "$$candidate"; then printf '%s\n' "$$candidate"; break; fi; \
+            done)
+    endif
+endif
 
 # User controllable V command.
 V := v
@@ -102,6 +113,9 @@ PROD :=
 
 # Ensure the dependencies have been obtained.
 ifneq ($(shell ( test '$(MAKECMDGOALS)' = clean || test '$(MAKECMDGOALS)' = distclean ); echo $$?),0)
+    ifeq ($(strip $(AR)),)
+        $(error LLVM llvm-ar is required on macOS; install LLVM or set AR/VINIX_LLVM_AR)
+    endif
     ifeq ($(shell ( ! test -d freestnd-c-hdrs || ! test -d cc-runtime || ! test -d c/flanterm || ! test -f c/nanoprintf.h || ! test -f c/lwip/include/lwip/init.h ); echo $$?),0)
         $(error Please run the ./get-deps script first)
     endif

@@ -69,6 +69,9 @@ class RunnerTests(unittest.TestCase):
             compiler.write_text("""#!/usr/bin/env python3
 import os, sys
 from pathlib import Path
+if sys.argv[1:] == ['version']:
+    print('V 0.5.2 test')
+    raise SystemExit(0)
 arch = sys.argv[sys.argv.index('-arch') + 1]
 source = Path(sys.argv[-1])
 print(f'{source}/main.v:1:1: warning: allocation (array initialization)')
