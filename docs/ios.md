@@ -1,5 +1,7 @@
 # iOS compatibility: Objective-C UIKit applications
 
+PS1 games use the separate native [PlayStation emulator](ps1.md).
+
 `run-ios` loads ordinary ARM64 iOS Mach-O executables in a Vinix userspace
 process. The [Objective-C UIKit calculator](../examples/ios-calculator/README.md)
 now runs unchanged in a desktop window. Its original ARM64 methods perform the

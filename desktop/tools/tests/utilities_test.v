@@ -606,7 +606,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 43
+	assert available_apps.len == 44
 	assert available_apps[31].process_name == 'vinix-preview'
 	assert available_apps[31].keyboard && available_apps[31].pointer
 	assert available_apps[32].process_name == 'vinix-console'
@@ -634,6 +634,10 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[41].keyboard && !available_apps[41].polling
 	assert available_apps[42].process_name == 'vinix-ios-ppsspp'
 	assert available_apps[42].standalone && available_apps[42].pointer && available_apps[42].polling
+	assert available_apps[43].title == 'PlayStation'
+	assert available_apps[43].process_name == 'vinix-ps1'
+	assert available_apps[43].standalone && available_apps[43].keyboard && available_apps[43].pointer
+	assert available_apps[43].polling && available_apps[43].poll_interval_ms == 16
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -760,7 +764,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 43
+	assert available_apps.len == 44
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len

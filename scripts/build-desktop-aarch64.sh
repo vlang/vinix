@@ -69,6 +69,7 @@ STEAM_STAGING="${VINIX_STEAM_STAGING:-$SCRIPT_DIR/build-aarch64-steam/staging}"
 DOTA2_STAGING="${VINIX_DOTA2_STAGING:-$SCRIPT_DIR/build/dota2-runtime/staging}"
 QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu-system/staging}"
 IOS_STAGING="${VINIX_IOS_STAGING:-$SCRIPT_DIR/build/ios/staging}"
+PS1_STAGING="${VINIX_PS1_STAGING:-$SCRIPT_DIR/build/ps1/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -1259,6 +1260,14 @@ if [ -x "$IOS_STAGING/usr/bin/run-ios" ]; then
         fi
     fi
 fi
+# The PlayStation frontend/core are statically linked and need no X11 layer.
+if [ -x "$PS1_STAGING/usr/bin/vinix-ps1" ]; then
+    install -m755 "$PS1_STAGING/usr/bin/vinix-ps1" "$STAGING/usr/bin/vinix-ps1"
+    mkdir -p "$STAGING/usr/share/games/ps1"
+    cp -R "$PS1_STAGING/usr/share/games/ps1/." "$STAGING/usr/share/games/ps1/"
+    mkdir -p "$STAGING/usr/share/licenses/vinix-ps1"
+    cp -R "$PS1_STAGING/usr/share/licenses/vinix-ps1/." "$STAGING/usr/share/licenses/vinix-ps1/"
+fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
 # files at the root of the image.
@@ -1700,6 +1709,9 @@ CONTENT_KEY_INPUTS=(
     "$STAGING/usr/bin/run-ios-gles"
     "$STAGING/usr/lib/vinix/ios-gles"
     "$STAGING/usr/share/vinix/ios"
+    "$STAGING/usr/bin/vinix-ps1"
+    "$STAGING/usr/share/games/ps1"
+    "$STAGING/usr/share/licenses/vinix-ps1"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

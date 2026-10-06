@@ -94,13 +94,13 @@ fn test_last_catalog_application_can_be_pinned_and_persists_its_identity() {
 		unsafe { home.free(); desktop.pinned_apps.free(); desktop.native_asset_icons.free() }
 	}
 	index := available_apps.len - 1
-	assert available_apps[index].process_name == 'vinix-ios-ppsspp'
+	assert available_apps[index].process_name == 'vinix-ps1'
 	assert desktop.pin_taskbar_app_in(home, index)
 	loaded := load_taskbar_pins(home)
 	assert loaded.len == 1 && loaded[0] == index
 	unsafe { loaded.free() }
 	entries := desktop.taskbar_entries()
-	assert entries.len == 1 && entries[0].id == 'taskpin.42'
+	assert entries.len == 1 && entries[0].id == taskbar_pin_actions[index]
 	assert entries[0].app_index == index && entries[0].window_id == 0
 	unsafe { entries.free() }
 	assert desktop.unpin_taskbar_app_in(home, index)
