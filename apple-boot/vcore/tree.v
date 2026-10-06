@@ -20,6 +20,7 @@ __global adt_to_fdt_state Convert_state
 // *never widen an access past the alignment of its operands. The host tests
 // *build the same sources against the C library instead.
 
+@[export: 'load_le32']
 pub fn load_le32(pointer voidptr) u32 {
 	unsafe {
 		bytes := &u8(pointer)
@@ -27,6 +28,7 @@ pub fn load_le32(pointer voidptr) u32 {
 	}
 }
 
+@[export: 'load_le64']
 pub fn load_le64(pointer voidptr) u64 {
 	unsafe {
 		bytes := &u8(pointer)
@@ -34,6 +36,7 @@ pub fn load_le64(pointer voidptr) u64 {
 	}
 }
 
+@[export: 'store_be32']
 pub fn store_be32(pointer voidptr, value u32) {
 	unsafe {
 		bytes := &u8(pointer)
@@ -44,6 +47,7 @@ pub fn store_be32(pointer voidptr, value u32) {
 	}
 }
 
+@[export: 'load_be32']
 pub fn load_be32(pointer voidptr) u32 {
 	unsafe {
 		bytes := &u8(pointer)
@@ -51,6 +55,7 @@ pub fn load_be32(pointer voidptr) u32 {
 	}
 }
 
+@[export: 'align_up']
 pub fn align_up(value u64, alignment u64) u64 {
 	unsafe {
 		return (value + alignment - u64(1)) & ~(alignment - u64(1))

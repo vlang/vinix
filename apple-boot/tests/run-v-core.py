@@ -27,7 +27,8 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     print("Apple loader: V core has no allocator imports", flush=True)
     gc = "-Wl,-dead_strip" if __import__("platform").system() == "Darwin" else "-Wl,--gc-sections"
     fixture_objects = {}
-    for fixture, module in (("converter", "convertercore"), ("boot", "bootfixture")):
+    for fixture, module in (("converter", "convertercore"), ("boot", "bootfixture"),
+                            ("helpers", "helperfixture")):
         fixture_source, fixture_object = work / (fixture + ".c"), work / (fixture + ".o")
         subprocess.run(["python3", str(here / "compile-fixture.py"), fixture,
                         str(fixture_source)], check=True)
@@ -43,6 +44,10 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     subprocess.run([cc, *flags, gc, str(fixture_objects["converter"]),
                     str(object_file), "-o", str(converter)], check=True)
     subprocess.run(["python3", str(here / "check_converter.py"), "--converter", str(converter)], check=True)
+    helpers = work / "helpers"
+    subprocess.run([cc, *flags, gc, str(fixture_objects["helpers"]),
+                    str(object_file), "-o", str(helpers)], check=True)
+    subprocess.run([str(helpers)], check=True)
     # The existing independent kernel memory fixture also checks atoi, which
     # the loader does not provide. That unrelated check uses the host libc.
     aliases = ["-Dvinix_" + name + "=apple_boot_host_" + name

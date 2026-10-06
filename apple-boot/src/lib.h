@@ -26,38 +26,10 @@ int strcmp(const char *left, const char *right);
 
 size_t lib_strnlen(const char *text, size_t limit);
 
-static inline uint32_t load_le32(const void *pointer)
-{
-    const uint8_t *bytes = pointer;
-    return (uint32_t)bytes[0] | (uint32_t)bytes[1] << 8 |
-           (uint32_t)bytes[2] << 16 | (uint32_t)bytes[3] << 24;
-}
-
-static inline uint64_t load_le64(const void *pointer)
-{
-    const uint8_t *bytes = pointer;
-    return (uint64_t)load_le32(bytes) | (uint64_t)load_le32(bytes + 4) << 32;
-}
-
-static inline void store_be32(void *pointer, uint32_t value)
-{
-    uint8_t *bytes = pointer;
-    bytes[0] = (uint8_t)(value >> 24);
-    bytes[1] = (uint8_t)(value >> 16);
-    bytes[2] = (uint8_t)(value >> 8);
-    bytes[3] = (uint8_t)value;
-}
-
-static inline uint32_t load_be32(const void *pointer)
-{
-    const uint8_t *bytes = pointer;
-    return (uint32_t)bytes[0] << 24 | (uint32_t)bytes[1] << 16 |
-           (uint32_t)bytes[2] << 8 | (uint32_t)bytes[3];
-}
-
-static inline uint64_t align_up(uint64_t value, uint64_t alignment)
-{
-    return (value + alignment - 1) & ~(alignment - 1);
-}
+uint32_t load_le32(const void *pointer);
+uint64_t load_le64(const void *pointer);
+void store_be32(void *pointer, uint32_t value);
+uint32_t load_be32(const void *pointer);
+uint64_t align_up(uint64_t value, uint64_t alignment);
 
 #endif
