@@ -48,6 +48,10 @@
 #include <ucontext.h>
 #include <time.h>
 #include <unistd.h>
+#include "signalfixture-api.h"
+#include "touchfixture-api.h"
+#include "restartfixture-api.h"
+#line 51 "test.c"
 
 #define CHECK(expression) do {                                               \
 	if (!(expression)) {                                                   \
@@ -85,7 +89,7 @@ static void nanosleep_interrupt(int signal)
 	nanosleep_interrupts++;
 }
 
-static int reap_ok(pid_t child)
+int reap_ok(pid_t child)
 {
 	int status = -1;
 	CHECK(child > 0);
@@ -166,119 +170,7 @@ static int test_cow(void)
 	puts("QEMU CORE PASS: copy-on-write fork");
 	return 0;
 }
-
-/* A fault may acquire a zeroed anonymous page while another thread faults on
- * the same page. Losing that race must retain the first writer's bytes. */
-struct anonymous_touch_worker {
-	volatile unsigned long *slots;
-	pthread_barrier_t *barrier;
-	unsigned int index;
-};
-
-static void *anonymous_touch(void *argument)
-{
-	struct anonymous_touch_worker *worker = argument;
-	pthread_barrier_wait(worker->barrier);
-	worker->slots[worker->index] = 0x56490000UL + worker->index;
-	return NULL;
-}
-
-static int test_anonymous_first_touch(void)
-{
-	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
-	const size_t span = 4UL * 1024 * 1024;
-	struct sysinfo before, reserved, committed;
-	CHECK(sysinfo(&before) == 0);
-	unsigned char *area = mmap(NULL, span, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	CHECK(area != MAP_FAILED);
-	CHECK(sysinfo(&reserved) == 0);
-#if defined(__x86_64__)
-	/* Metadata and normal kernel activity fit in this margin. The entire
-	 * untouched reservation would consume four MiB if it were pre-faulted. */
-	CHECK(reserved.freeram + 1024UL * 1024 >= before.freeram);
-#endif
-	/* Splitting an untouched mapping must not walk an absent shadow root. */
-	CHECK(munmap(area + page, page) == 0);
-	CHECK(area[0] == 0 && area[2 * page] == 0 && area[span - 1] == 0);
-	CHECK(munmap(area, page) == 0);
-	CHECK(munmap(area + 2 * page, span - 2 * page) == 0);
-
-	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	CHECK(area != MAP_FAILED);
-	pid_t child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		for (size_t i = 0; i < page; ++i)
-			if (area[i] != 0)
-				_exit(1);
-		memset(area, 0x42, page);
-		_exit(area[page - 1] == 0x42 ? 0 : 1);
-	}
-	CHECK(reap_ok(child) == 0);
-	for (size_t i = 0; i < page; ++i)
-		CHECK(area[i] == 0);
-	CHECK(munmap(area, page) == 0);
-
-	/* A syscall may write the first byte of an absent private page. */
-	area = mmap(NULL, 3 * page, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	CHECK(area != MAP_FAILED);
-	int endpoints[2];
-	const unsigned char payload = 0x73;
-	CHECK(pipe(endpoints) == 0);
-	CHECK(write(endpoints[1], &payload, 1) == 1);
-	CHECK(read(endpoints[0], area + page, 1) == 1);
-	CHECK(area[page] == payload && area[page + 1] == 0);
-	CHECK(close(endpoints[0]) == 0 && close(endpoints[1]) == 0);
-	CHECK(mprotect(area, page, PROT_READ) == 0);
-	CHECK(area[0] == 0 && area[page - 1] == 0);
-	CHECK(mprotect(area, page, PROT_READ | PROT_WRITE) == 0);
-	area[0] = 0x24;
-	CHECK(area[0] == 0x24);
-	CHECK(munmap(area, 3 * page) == 0);
-
-	area = mmap(NULL, page, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	CHECK(area != MAP_FAILED);
-	enum { workers = 2 };
-	pthread_t threads[workers];
-	struct anonymous_touch_worker arguments[workers];
-	pthread_barrier_t barrier;
-	CHECK(pthread_barrier_init(&barrier, NULL, workers + 1) == 0);
-	alarm(30);
-	for (unsigned int i = 0; i < workers; ++i) {
-		arguments[i] = (struct anonymous_touch_worker){
-			.slots = (volatile unsigned long *)area,
-			.barrier = &barrier, .index = i,
-		};
-		CHECK(pthread_create(&threads[i], NULL, anonymous_touch, &arguments[i]) == 0);
-	}
-	int barrier_result = pthread_barrier_wait(&barrier);
-	CHECK(barrier_result == 0 || barrier_result == PTHREAD_BARRIER_SERIAL_THREAD);
-	for (unsigned int i = 0; i < workers; ++i) {
-		CHECK(pthread_join(threads[i], NULL) == 0);
-		CHECK(((volatile unsigned long *)area)[i] == 0x56490000UL + i);
-	}
-	alarm(0);
-	CHECK(pthread_barrier_destroy(&barrier) == 0);
-	CHECK(area[page - 1] == 0);
-	CHECK(munmap(area, page) == 0);
-
-	/* MAP_POPULATE explicitly requests physical commitment on both targets. */
-	CHECK(sysinfo(&before) == 0);
-	area = mmap(NULL, span, PROT_READ | PROT_WRITE,
-	    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
-	CHECK(area != MAP_FAILED);
-	CHECK(sysinfo(&committed) == 0);
-	CHECK(committed.freeram + span - 1024UL * 1024 <= before.freeram);
-	CHECK(area[0] == 0 && area[span - 1] == 0);
-	CHECK(munmap(area, span) == 0);
-	puts("QEMU CORE PASS: anonymous first touch, zero pages, fork and explicit population");
-	return 0;
-}
-
+#line 282 "test.c"
 static int test_sparse_tmpfs_shared_mapping(void)
 {
 	const char *path = "/dev/shm/vinix-qemu-core-sparse";
@@ -540,134 +432,7 @@ static int test_forked_cow_memory_reclamation(void)
 	puts("QEMU CORE PASS: forked copy-on-write pages are reclaimed");
 	return 0;
 }
-
-static int test_default_terminating_signals(void)
-{
-	pid_t child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		for (;;)
-			pause();
-	}
-	CHECK(kill(child, SIGTERM) == 0);
-	int status = -1;
-	CHECK(waitpid(child, &status, 0) == child);
-	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM);
-
-	child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		for (;;)
-			pause();
-	}
-	CHECK(kill(child, SIGKILL) == 0);
-	status = -1;
-	CHECK(waitpid(child, &status, 0) == child);
-	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
-
-	/* These signals have ignored default dispositions on Linux. */
-	CHECK(kill(getpid(), SIGWINCH) == 0);
-	puts("QEMU CORE PASS: default signal dispositions");
-	return 0;
-}
-
-static volatile sig_atomic_t busy_loop_signalled;
-
-static void busy_loop_handler(int signal)
-{
-	(void)signal;
-	busy_loop_signalled = 1;
-}
-
-/* A thread that makes no syscalls still takes its signals: they are
- * delivered when an interrupt returns to it, as Linux delivers them. Without
- * that, a handler never ran and even SIGKILL could not stop the loop. */
-static int test_signals_reach_a_busy_loop(void)
-{
-	pid_t child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		struct sigaction action;
-		memset(&action, 0, sizeof(action));
-		action.sa_handler = busy_loop_handler;
-		sigemptyset(&action.sa_mask);
-		if (sigaction(SIGUSR1, &action, NULL) != 0)
-			_exit(2);
-		while (!busy_loop_signalled) {
-		}
-		_exit(0);
-	}
-	struct timespec pause_for = { .tv_sec = 0, .tv_nsec = 200000000 };
-	nanosleep(&pause_for, NULL);
-	CHECK(kill(child, SIGUSR1) == 0);
-	CHECK(reap_ok(child) == 0);
-
-	child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		for (;;) {
-		}
-	}
-	nanosleep(&pause_for, NULL);
-	CHECK(kill(child, SIGKILL) == 0);
-	int status = -1;
-	CHECK(waitpid(child, &status, 0) == child);
-	CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
-	puts("QEMU CORE PASS: signals reach a thread that makes no syscalls");
-	return 0;
-}
-
-static void restart_handler(int signal)
-{
-	(void)signal;
-}
-
-/* A read(2) a signal interrupts before any data came runs again once the
- * handler returns when the handler was installed with SA_RESTART, and fails
- * with EINTR when it was not. Go relies on the first; most C code on the
- * second. */
-static int interrupted_read(int restart)
-{
-	int channel[2];
-	CHECK(pipe(channel) == 0);
-	pid_t child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		close(channel[1]);
-		struct sigaction action;
-		memset(&action, 0, sizeof(action));
-		action.sa_handler = restart_handler;
-		action.sa_flags = restart ? SA_RESTART : 0;
-		sigemptyset(&action.sa_mask);
-		if (sigaction(SIGUSR1, &action, NULL) != 0)
-			_exit(2);
-		char byte = 0;
-		ssize_t got = read(channel[0], &byte, 1);
-		if (restart)
-			_exit(got == 1 && byte == 'r' ? 0 : 3);
-		_exit(got == -1 && errno == EINTR ? 0 : 4);
-	}
-	close(channel[0]);
-	struct timespec pause_for = { .tv_sec = 0, .tv_nsec = 200000000 };
-	nanosleep(&pause_for, NULL);
-	CHECK(kill(child, SIGUSR1) == 0);
-	nanosleep(&pause_for, NULL);
-	/* Unread when the read failed with EINTR; the child is gone by then. */
-	signal(SIGPIPE, SIG_IGN);
-	write(channel[1], "r", 1);
-	close(channel[1]);
-	CHECK(reap_ok(child) == 0);
-	return 0;
-}
-
-static int test_syscall_restart(void)
-{
-	CHECK(interrupted_read(1) == 0);
-	CHECK(interrupted_read(0) == 0);
-	puts("QEMU CORE PASS: SA_RESTART restarts an interrupted read");
-	return 0;
-}
-
+#line 671 "test.c"
 static void *block_in_read(void *argument)
 {
 	int fd = *(int *)argument;
