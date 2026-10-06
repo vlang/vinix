@@ -26,13 +26,13 @@ Vinix engineering proposals based on the inspected code.
 | Activity Monitor / Activity Monitor | Process search, application/owner/activity filters, process trees, selectable sortable columns, inspector, terminate/force-quit/suspend/resume/priority controls; CPU/per-core, memory, disk, network, GPU submission and battery histories; refresh control, process diagnostic reports and startup apps | Inactive, other-user and selected-process filters; CSV export of the visible process list; clear resource/GPU/power graph history without discarding counter baselines; startup toggles and launch timings cover the complete application catalog; per-user saved sort/direction, filter, tree, columns, refresh interval, main view and resource tab | Per-process network, energy, GPU and wakeup accounting; actual process stack sampling and hang/crash reports; CPU history in taskbar; compressed-memory/swap accounting if those facilities are introduced |
 | Settings / System Settings | Appearance, date/time display preferences, language, theme, wallpaper, Wi-Fi radio/scan/status, backlight/display scaling, battery history and keyboard layouts | About pane reading the actual kernel version, reported CPU/architecture, physical memory and uptime, with Refresh and unavailable-data states; localized search across 27 options with keyboard navigation into their actual panes | Clock/timezone setters; user management; accessibility; audio devices/volume; Bluetooth; printers; IP/DNS/proxy configuration; GUI package/update management; sleep/power policies |
 | Text Editor / TextEdit | Plain-text UTF-8 open/edit/save, cursor navigation and paste; byte-preserving handling of invalid UTF-8 | Bounded undo/redo; exact Find with next/previous and wrapping; highlighted matches; Replace and Replace All, with size checks and undo; unsaved-change guards for close/New/Open, failed-Open draft preservation and exclusive Save As; UTF-8 document selection, mouse caret/drag selection, bounded guest clipboard copy and acknowledged cut, and selection replacement with undo | Field selection, file picker, autosave/recovery/versions, wrapping, rich text, spelling, printing and larger documents |
-| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, sinh/cosh/tanh and their inverses, with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Further scientific controls (nth-root, random and EE entry); signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
+| Calculator / Calculator | Pointer-operated basic decimal arithmetic, percent, sign and powers | Keyboard arithmetic and backspace, validated numeric/scientific-notation paste, memory register, relative percentages, bounded result history with paging and recall; Basic/Scientific selection, DEG/RAD, square root/reciprocal/square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e, sinh/cosh/tanh and their inverses, editable EE exponents and binary nth-root with domain/finite errors and scientific operation history; exact unsigned 64-bit Programmer mode with DEC/HEX/OCT/BIN entry/readouts, modular arithmetic, bitwise operations, logical shifts, independent history and preserved Basic/Scientific memory; acknowledged guest clipboard result copy in every mode | Random; signed or variable-width programmer arithmetic, a bit editor, RPN, expression parsing, unit/currency conversion, Math Notes integration, result selection, configurable precision/grouping and history persistence |
 | Calendar / Calendar | Month navigation, selected dates, localized weeks and Today | Persistent local all-day/timed events with titles and locations; creation/editing/deletion; marked dates and selected-date agenda; strict ICS import/additive merge and exclusive export for one-day all-day or floating local minute-precision events; bounded UTF-8 title/location search across all stored events with chronological results and navigation into the actual event editor | Broader ICS semantics (timezones, recurrence, durations, alarms, extra fields), stable imported identities, duration/multiday events, day/week/year views, recurrence, reminders/notifications, multiple calendars, CalDAV/accounts and invitations |
-| Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; up to four independently named countdown timers, duration presets/adjustment, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; custom second-precision duration entry; sound/notifications; persistence and a service that continues after the app closes |
+| Clock / Clock | Local time and a monotonic stopwatch with pause/resume/reset | Bounded lap/split/total records; up to four independently named countdown timers, duration presets/adjustment and exact HH:MM:SS entry, pause/resume/reset and visible expiry | World clocks and timezone database; scheduled/repeating alarms; sound/notifications; persistence and a service that continues after the app closes |
 | Capture / Screenshot and screen recording | Full-desktop PNG, delay, self-hiding, 5/10 fps AVI recording, stop/cancel and status | Recording-delay controls on the Video page; Enter to start and Escape to stop/cancel | Window/region selection, output-location chooser, clipboard capture, cursor toggle, capture hotkeys, thumbnail/reveal workflow, audio and compressed video |
 | Disk Usage / Storage settings | Resumable size inventory, largest-folder/file rankings, hard-link deduplication, symlink avoidance, drill-down, parent navigation, stop and rescan | Editable scan root and report destination, keyboard input, raw-byte CSV report with proper text escaping and overwrite protection; total/used/free/available snapshot for the filesystem containing the scan root, refreshed on each scan and included separately in CSV | Mounted-volume overview, allocated versus logical size, storage categories, treemap, reveal in Files and guarded cleanup; disk management belongs in a separate utility |
 | Terminal / Terminal | Real PTY/Zsh, VT cursor/alternate-screen support, UTF-8 cells, bounded scrollback, paste and rebuild handoff | Find in scrollback/live screen with next/previous and wrap, match-row highlighting, and clear scrollback preserving live/alternate-screen contents; UTF-8 mouse selection across physical output rows, acknowledged guest clipboard Copy/Cmd-C and preserved Ctrl-C shell input | Word/line/rectangular selection, wide and combining character cell widths, logical-line reflow, tabs/split panes, profiles/fonts/colours, configurable history, complete ANSI colours/attributes, hyperlinks and command bookmarks |
-| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations, rectangular selection/cropping with one-step Undo/Redo, alpha-preserving PNG export, and exact original-file copying without overwriting | Longer undo history/recovery and image resampling; PDF rendering and page navigation; annotations, additional selection tools, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
+| Preview / Preview | Quick Look inside Files; no standalone viewer | Standalone PNG/JPEG viewer with editable paths, fit/actual-size/zoom, panning, quarter-turn rotation, all eight JPEG EXIF orientations composed with manual rotations, rectangular cropping and alpha-weighted bilinear resizing with aspect lock and shared one-step Undo/Redo, alpha-preserving PNG export, and exact original-file copying without overwriting | Longer undo history/recovery; PDF rendering and page navigation; annotations, additional selection tools, colour profiles/adjustments, broader metadata inspection, additional formats, printing and a file picker |
 | Console / Console | Application logs existed as files; no native viewer | Read-only bounded log tails, application-log presets, literal row filtering, follow/paging, recent logs and matching-row export without overwriting | Central log collection/retention, severity/metadata filters, structured crash reports and kernel-log capture; desktop output currently goes to `/dev/console` |
 | System Information / System Information | Small About pane in Settings | Native overview, hardware, storage and package reports from real system sources; bounded UTF-8 search across row values, translated labels and categories with token/case/accent matching; refresh, paging and complete text export without overwriting | Broader device/driver APIs, structured property inspection and remote reports; unavailable sources are labelled explicitly |
 | Archive Utility / Archive Utility | Terminal archive tools only | Native TAR browsing, creation and whole/selected extraction with entry/folder checkboxes, choices fixed during extraction, bounded streaming work, progress/cancel, new destinations and rejection of traversal, links and special entries | ZIP/gzip and other compressed formats; file picker and Files associations; encryption and larger archives |
@@ -40,7 +40,7 @@ Vinix engineering proposals based on the inspected code.
 | Backup / Time Machine workflow | No native backup workflow | Versioned local folder copies, completed-version browsing, explicit restore to a new folder and bounded progress/cancel | Scheduled backups, retention/free-space policy, permission/timestamp preservation, incremental deduplication, encryption, network destinations and system/filesystem snapshots; links and special files are refused |
 | Notes / Notes and Stickies | A static demo window, without a note store | Persistent bounded UTF-8 titles and plain-text bodies, title/body search, debounced autosave, explicit deletion and exclusive text export; damaged records and conflicting saves preserve existing data; failed final saves block ordinary window/session closing, with keep-editing and confirmed-discard choices; bounded current-note title/body Undo/Redo that survives autosave | Rich text, attachments, folders/tags, sync/sharing, import, printing, locked notes and recovery/versions; floating sticky windows |
 | Reminders / Reminders | No native task workflow | Persistent local tasks, optional local due dates/times, edit/complete/reopen, confirmed deletion, literal title search, all/open/completed/overdue filters and exclusive text/CSV export | Background alerts, recurrence, multiple lists, priorities/tags/subtasks, attachments, calendar integration and account sync/sharing |
-| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, separate sampled CSV export and exclusive 960×640 PNG image export with the same sampled curve/domain gaps and axes | Autosave/recovery, file picker and very-small-window layout; multiple/implicit/parametric equations, 3D plots, vector export, animations, integration/intersection tools and graph styling |
+| Grapher / Grapher | Calculator arithmetic only | Bounded explicit `y=f(x)` expressions, real-domain gaps, axes and finite editable ranges, zoom/reset, versioned `.vgraph` documents with validated Open and exclusive Save As, separate sampled CSV export and exclusive 960×640 PNG image export with the same sampled curve/domain gaps and axes; compact Graph/Document/CSV/PNG pages and bounded tiny-window guidance | Autosave/recovery and file picker; multiple/implicit/parametric equations, 3D plots, vector export, animations, integration/intersection tools and graph styling |
 | Color Meter / Digital Color Meter | No native screen-colour workflow | Compositor sampling in physical pixel coordinates, pointer tracking, freeze and independent physical X/Y locks, a 9×9 magnifier, 1×1/3×3/5×5/9×9 aperture averages, hex/RGB display and text copy to the guest session clipboard | ICC/display colour profiles and colour-space conversion, extended-range values, image copy and host clipboard writing |
 | Dictionary / Dictionary | No offline lexical utility | Native offline WordNet 3.0 lookup with 147,306 headwords, ASCII case folding and phrase/prefix suggestions, bounded Back/Forward history, UTF-8 definition wrapping/paging, exclusive text export and acknowledged guest clipboard copy of the full headword and unwrapped definition | Pronunciation/audio, morphology, full Unicode case folding, multiple/language sources, encyclopedic articles, definition selection, lookup from selected text and persistent history |
 
@@ -59,7 +59,7 @@ and [multiple named timers](https://support.apple.com/guide/clock-mac/apdw3d5aeb
 [Terminal shortcuts](https://support.apple.com/en-bh/guide/terminal/trmlshtcts/mac),
 [screenshot targets](https://support.apple.com/en-ie/102646),
 [Preview documents and images](https://support.apple.com/en-ca/guide/preview/prvw846b61d3/mac),
-[Preview image cropping](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac),
+[Preview image cropping and resizing](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac),
 [CIPA EXIF layout and orientation](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf),
 [Console log messages](https://support.apple.com/guide/console/log-messages-cnsl1012/mac)
 and [System Information reports](https://support.apple.com/guide/system-information/welcome/mac),
@@ -184,6 +184,10 @@ not proposed as general Vinix utility ports.
   numbered selector and name field to rename it (48 UTF-8 bytes); Start/Stop,
   Reset and presets affect only that timer. `*` marks running timers and `!`
   marks finished ones. Pause before changing its duration or removing it.
+  Set time opens a selected `HH:MM:SS` draft accepting one second through
+  exactly 24 hours. Apply or Enter resets only that timer; Cancel or Escape
+  preserves its duration. Invalid values leave the draft editable and the
+  timer unchanged. Another timer expiring does not interrupt an active draft.
   Every running timer continues while another timer or the stopwatch is shown.
   Expiry is visible in this app; closing Clock cancels the timers. Names and
   timers are session-only, with no background alarm or sound.
@@ -194,6 +198,11 @@ not proposed as general Vinix utility ports.
   inverse trig. Ctrl-S switches modes and Ctrl-D switches angle units in
   Scientific mode. Functions transform the displayed operand, including the
   right operand of a pending calculation.
+  EE, `e` or Shift-E starts an exponent: type its digits, use ± to change
+  its sign, or Backspace to edit. An unfinished exponent cannot be used or
+  copied. For an nth root, enter the radicand, choose root, enter its degree
+  and press `=`. Negative radicands require an odd integer degree; degree
+  zero is invalid. Negative degrees produce reciprocal roots when defined.
   A new digit replaces a scientific result; repeated equals repeats the last
   binary operation. Domain errors and non-finite results are shown explicitly.
   Scientific mode accepts a finite number pasted in exponent notation.
@@ -245,17 +254,23 @@ not proposed as general Vinix utility ports.
   Selection follows the displayed orientation, zoom and pan. Pan (P) restores
   drag-to-pan; Clear or Escape removes the selection, and Ctrl-A selects the
   whole image. Crop changes the in-memory pixels and preserves alpha; Export
-  PNG writes the current crop and rotation. Undo crop/Ctrl-Z and Redo crop/
-  Ctrl-Y restore the most recent crop, including its orientation and view state.
-  A new crop replaces that one history step; a successful Open clears it. Failed
-  Open or crop leaves it usable. The source file is preserved.
+  PNG writes the current edit and rotation. Width/Height accept pixel dimensions;
+  Lock aspect ratio updates the other dimension. Resize uses alpha-weighted
+  bilinear filtering in the displayed orientation, with at most 8192 pixels
+  per side and 8 Mi pixels total. Undo/Ctrl-Z and Redo/Ctrl-Y restore the most
+  recent crop or resize, including its orientation and view state. A new edit
+  replaces that history step; successful Open clears it. Failed Open, invalid
+  dimensions, allocation failure and no-op resizing preserve it. The source
+  file is preserved. Two image buffers can occupy 64 MiB at rest; transactional
+  resizing briefly allows 96 MiB, alongside the existing 40 MiB encoded-source
+  limit and bounded viewport buffer.
   Bounded metadata parsing supports both TIFF byte orders and ignores
   malformed/unsupported orientation records. Original Copy
   keeps the exact cached encoded input, including its metadata, even after
-  cropping, manual rotations or a later source-file change. Enter a new output
-  path because neither export overwrites. Successful opens appear in the app's
-  Recent Items. Longer crop history/recovery, resampling and PDF support remain
-  work.
+  cropping, resizing, manual rotations or a later source-file change. Enter a
+  new output path because neither export overwrites. Successful opens appear
+  in the app's Recent Items. Longer edit history/recovery and PDF support
+  remain work.
 - **Console:** choose a log preset or enter an absolute regular-file path.
   Follow Tail refreshes once per second; paging suspends follow. The exact,
   case-sensitive filter and Export Rows apply to all retained rows, including
@@ -338,6 +353,11 @@ not proposed as general Vinix utility ports.
   Domain failures leave gaps; sampling is bounded and does not prove a
   function is continuous between samples. Plots use the native child-process
   UI protocol and resize with the window.
+  Below a 600×452 content area, compact pages expose Graph, Document, CSV and
+  PNG controls. Tab visits every field and reveals its page; Ctrl-L selects the
+  equation. Changing pages by pointer stops edits to a hidden field. Below
+  280×320, enlarge the window to edit or export; Plot remains available where
+  it fits, and hidden fields reject typing and paste until enlarged.
   PNG destination is a third, independent output field, initially `graph.png`
   in the canonical home directory. Export PNG or Enter in that field writes a
   new opaque 960×640 image with the expression, range labels, axes and the same
@@ -837,3 +857,64 @@ Source manifests, generated C and assertion checks, build commands, host/guest
 logs, screenshot hashes and the independent review are retained under
 `build/utility-controls-validation/`. Earlier assertion-stripped artifacts are
 kept separately there as inconclusive correctness checks.
+
+### Image resizing, scientific entry, compact graphs and exact timers (2026-10-06)
+
+Preview adds bounded pixel dimensions, aspect lock and alpha-weighted bilinear
+resampling in the displayed EXIF/manual orientation. Cropping and resizing share
+one alternate image for Undo/Redo. Invalid dimensions, allocation failure and
+no-op resizing preserve that history; original-copy bytes remain unchanged.
+Calculator adds editable EE exponents and nth-root operations through its
+existing pending/repeated calculation and history paths, with strict incomplete,
+domain and finite-result checks. Numeric parsing preserves representable
+subnormals, and formatting keeps finite maximum values finite on recall.
+Grapher exposes compact Graph/Document/CSV/PNG pages and reveals the focused
+field's page; tiny windows preserve graph state and block hidden edits. Clock
+accepts exact one-second-through-24-hour drafts transactionally, preserving the
+selected draft when another timer expires.
+
+The immutable combined closure passes 219 behavior groups (7,045,263 assertions),
+including all 98 groups for these four apps, and 43 memory groups (194,378
+assertions) with zero retained allocations. It checks all six languages,
+serialized controls, compact bounds, the complete catalog and taskbar pinning.
+The behavior build retains two existing `os.execute` deprecation warnings and
+one unused-parameter notice in older shared fixtures; the memory build reports
+zero compiler errors, warnings or notices. Generated C and independent lifetime
+reviews verify inline drafts, borrowed catalog slices and transactional image
+ownership. Five font coverage cases pass: eight new characters are baked while
+all 20,320 existing glyph masks and metrics remain identical across 16 faces.
+
+Focused and complete host IPC and assertion-enabled guest IPC pass through
+actual app processes. Legacy host fixtures now resolve crop coordinates from
+the real viewport and verify usable, bounded scientific buttons rather than
+the previous fixed button width, preserving their independent pixel and
+numerical assertions. The guest checks the independent 2×2-to-1×1 resize's exact
+RGBA(204,153,102,160), protected exports and exact Undo/Redo, EE arithmetic,
+negative odd roots/domain errors, compact Grapher focus/export and independent
+timer expiry. Its non-production V generation retains executable assertion
+failure guards, verified in C before static linking. The guest fixture uses
+test revision `24ee11ab`; subsequent legacy host-fixture geometry corrections
+leave this focused guest entry unchanged.
+
+The QEMU replay records 20 workflow screenshots plus the initial desktop:
+256×256 aspect-locked resizing, export/Undo/Redo/protected overwrite,
+Calculator results 0.01 and 2, all four compact graph pages with successful
+PNG export and refusal to overwrite, and Clock's invalid draft, exact three
+seconds and visible expiry. The Preview output is 262,488 bytes and the graph
+image is 2,458,493 bytes. Short guest process samples establish startup and
+rendering; retained-memory evidence comes from the heap fixtures. Original
+failed harness observations are preserved, including the file-size parser's
+SHA suffix mistake; its corrected whole-line parser revalidates the unchanged
+serial record without another boot.
+
+The published production revision is `52e332a9`; its AArch64 desktop is
+25,408,600 bytes with SHA-256
+`54fb70afa6c5c873e432ba5e9a598d037f9b2d9b3096b3d7d6bf216bd69c0760`.
+Files, Activity Monitor and Settings copies match. The static assertion-enabled
+guest fixture is 25,119,296 bytes with SHA-256
+`174723b5e5764ac0251775c7b80d7391fcc882c77a073a3b974b76dc662bda5f`.
+Frozen source manifests, generated C/assertion guards, build commands,
+behavior/memory/IPC logs, font comparisons, QMP actions, serial bytes and
+screenshot hashes/reviews are retained under `build/utility-next-validation/`.
+The inventory remains 43 entries (21 native utilities and 22 integrations),
+with thirteen missing utility proposals and their backend dependencies.
