@@ -17,6 +17,7 @@ MARKERS = [
     "linuxkpi: Linux string matching, sysfs newlines and replacement passed; no pages retained",
     "linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained",
     "linuxkpi: borrowed string tokens, character search and whitespace trimming passed; no pages retained",
+    "linuxkpi: exact user-copy prefixes, protection, demand faults and COW passed; no pages or heap objects retained",
     "linuxkpi: shared PCI config transactions, actual device widths, bounds and worker rollback passed; no pages retained",
     "linuxkpi: 200 multiword bitmap operations, conversion and allocation tests passed; no pages retained",
     "linuxkpi: static and dynamic per-CPU isolation passed on 4 CPUs",
@@ -126,7 +127,7 @@ def main():
                     if any(marker in final_output for marker in ["KERNEL PANIC", "FATAL EXCEPTION", "self-test failed"]):
                         raise RuntimeError("guest failed after startup; see " + str(serial))
                     print("Default guest: PASS (4 CPUs, Linux ABI)" if args.no_linuxkpi else
-                          "LinuxKPI guest: PASS (4 CPUs, allocator/object caches, logging/formatting, locks, per-CPU storage, task waits/references, synchronization/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler, i915 copy/FPU)")
+                          "LinuxKPI guest: PASS (4 CPUs, user-copy prefixes/demand faults/COW, allocator/object caches, logging/formatting, locks, per-CPU storage, task waits/references, synchronization/sequence counters, clocks/timed waits, timers, ordered/delayed/unbound/bound work, priority/system queues, SRCU, wound/wait, bit/variable/I/O waits, scheduler, i915 copy/FPU)")
                     print("Serial log: " + str(serial))
                     return 0
                 if process.poll() is not None:

@@ -6,8 +6,8 @@ module compatcore
 // SPDX-License-Identifier: GPL-2.0-only
 
 // Kernel-string portion of Linux 6.6.157 lib/kstrtox.c. The substantive
-// *conversion algorithms below are unchanged; user-memory wrappers require
-// *a separate fault-safe copy implementation and remain unavailable.
+// *conversion algorithms below are unchanged; tagged kstrtox_user supplies
+// *user-memory wrappers through the separate native fault-safe copy backend.
 // *Callers provide NUL-terminated kernel strings, writable results and base
 // *zero or 2 through 16. Input is borrowed only for this synchronous call.
 

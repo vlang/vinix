@@ -418,9 +418,23 @@ the complete i915 source tree is not evidence that the driver runs.
   Borrowed strings are consumed synchronously without allocation, IRQ changes
   or preemption changes. The unchanged kernel header supplies their declarations.
   Real callers include PCI force-probe tokens and GT engine/power settings;
-  the device/settings lifecycles remain unresolved. `_from_user` wrappers and
-  Linux uaccess remain unimplemented: native Boolean user-copy results need
-  an independently validated remaining-byte and zero-tail bridge first.
+  the device/settings lifecycles remain unresolved. The eleven `_from_user`
+  wrappers copy the pinned bounded input into stack buffers before parsing.
+  Any uncopied byte returns `-EFAULT` without changing the result, even after
+  an earlier NUL. Integer buffers preserve the sign/base-two/newline limits;
+  Boolean input is capped at three bytes.
+- Ordinary `raw_copy_{from,to}_user`, `__copy_{from,to}_user`,
+  `_copy_{from,to}_user` and public `copy_{from,to}_user` use the real native
+  pagemap walk and return the exact uncopied suffix. Raw and double-underscore
+  copies leave that suffix untouched; public from-user copies zero it.
+  `access_ok` checks the numerical user half without implying page access.
+  Callsite object bounds and the Linux `INT_MAX` limit reject a public copy
+  before changing bytes. Existing native Boolean and remote-copy policies
+  retain their behavior. Faulting copies require ordinary task context with
+  enabled IRQs and preemption, and use the current syscall's owned pagemap.
+  The existing range-source pins and fresh identity checks protect backing
+  acquisition. Scalar, atomic/pagefault-disabled, unsafe-scope and noncached
+  APIs, dynamic hardened-usercopy checks and x86 LAM remain unresolved.
 - `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
   `strstrip` alias consume borrowed strings synchronously. Search results and
   tokens point into the caller's storage; splitting preserves empty tokens and
@@ -608,7 +622,28 @@ physical-page measurement. Default Linux-ABI startup passed with no LinuxKPI
 markers. Independent source and generated-C review found no new allocations or
 retained input/result pointers. Exact evidence is
 `/tmp/vinix-linuxkpi-kstrtox-final-validation.json`. The full syntax audit still
-passes 3/269 units; user-copy parsers and GPU/device operation remain unresolved.
+passes 3/269 units at that milestone; GPU/device operation remains unresolved.
+
+Ordinary user-copy validation used isolated x86 and ARM worktrees at
+`bea41f8e`, a frozen compiler, and only this feature's recorded overlay.
+The production V copy/parser host tests passed 6,440 assertions each under
+GNU99/GNU11 with ASan/UBSan and no allocator imports. The complete host runtime,
+unchanged-import tests and actual native page-source host tests also passed.
+Enabled x86, default x86 and default ARM builds passed; both default guests
+completed Linux-ABI startup. The exact final enabled ELF
+`4534a060ef59c7865d9c5e4188ff6e188fcfa48a772e8ede0ef324d4388a9eeb`
+passed the full normal native suite. New copy tests exercise real page holes,
+read-only/PROT_NONE pages, demand faults and COW; three warmups plus a measured
+batch return every physical page and live heap class to baseline. Independent
+source and final generated-C reviews found no retained borrows or hidden
+allocations. Earlier normal/SSE and clean-baseline runs exceeded the outer
+180-second limit; the final normal run used 600 seconds without changing any
+runtime callback deadline. SSE copy measurements also passed, while its full
+final suite check remains pending. The paired allocation gate has 414 sites,
+192 groups and 158 pre-existing failing groups, with no added groups; this is
+not a global allocation pass. The full i915 audit remains 3/269. Evidence uses
+the `/tmp/vinix-linuxkpi-uaccess-oct06-` prefix, including source/provenance,
+allocation comparison, independent reviews and preserved failed guest logs.
 
 Minimum-duration sleep validation used five frozen kernel paths at isolated
 baseline `53f41b30`, enabled ELF SHA256

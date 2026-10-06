@@ -1,6 +1,6 @@
 # Linux i915 next-session handoff
 
-Prepared 2026-10-02 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
+Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
 Committed implementation baseline: **`b9e2f45f`** (including shared native PCI configuration transactions). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
@@ -66,10 +66,11 @@ matching/replacement, minimum-duration sleeps, kernel-string number/Boolean
 parsers and borrowed token/whitespace helpers are committed and validated.
 Shared native PCI configuration transactions are committed and tested on
 actual x86 CF8/CFC and ARM ECAM transports. Linux PCI device registration,
-bus/device references and GPU binding remain unresolved. The next user-copy
-service also requires an owned native mmap fault lifetime: current file-backed
-fault acquisition can follow a removed range after dropping the pagemap lock.
-Read-only lease design is recorded below; it has not been implemented.
+bus/device references and GPU binding remain unresolved. Ordinary user-copy
+remaining counts, zero-tail semantics and bounded user-string parsers are now
+implemented. The current native `RangePageSource` already pins backing storage
+and rechecks mapping identity after unlocked acquisition; the earlier proposed
+global fault-lease rewrite was not applied.
 
 ## Committed progress
 
@@ -407,27 +408,45 @@ stubs. Read-only next-step design is in
   411-site reports and pre-existing x86 V errors remain preserved. This is no
   global allocation pass: `/tmp/vinix-linuxkpi-pci-allocation-comparison.json`.
 
-Native `copy_pagemap_policy` tracks exact copied prefixes but returns only a
-Boolean. Linux user-copy APIs need remaining-byte counts, whole-range checks,
-raw nonzeroing and public from-user zero-tail semantics. File-backed native
-faults currently look up a local range under pagemap.l, release it, then
-follow local/global/resource/handle pointers during acquisition; concurrent
-munmap can remove all of them. A later generation recheck cannot protect those
-earlier dereferences. The changed-range file-page loser is also deliberately
-leaked because the old code lacks safe backend ownership.
+Ordinary Linux user copies now use the native exact-remaining-count walk.
+Existing Boolean/remote adapters preserve their policy. Raw and `__copy_*`
+copies leave the uncopied tail alone; public from-user copies zero it after
+range rejection or a partial copy. Public callsite object bounds and `INT_MAX`
+checks reject copies without touching a destination. `access_ok` separately
+checks numerical bounds, including NULL and zero-size boundaries. Eleven
+bounded user-string parser wrappers use stack buffers and preserve results on
+copy/syntax/range failure. Run `python3 tests/linuxkpi/uaccess_test.py` separately
+from the shared runtime runner.
 
-Read-only next-service design is
-`/tmp/vinix-linuxkpi-uaccess-next-lifetime-contract.json`. Proposed allocation-free
-leases increment a scalar fault count under pagemap.l then the common
-range_locals_lock, capture stack metadata and retain the existing global owner
-until the last fault finishes. Last-local unmap must remove mappings immediately,
-defer global/resource/handle destruction while leases exist and never wait
-under lookup locks. Installers compare old identity/generation only after a
-fresh lookup and return every acquired loser page through its retained owner.
-All acquisition, population, split/fork, partial unmap and global-destruction
-paths need new lifetime review and deterministic fault/removal tests. This is a
-proposal; faulting Linux user-copy APIs have not been implemented.
-Atomic/pagefault-disabled/WC user-copy paths remain separate real dependencies.
+Native acquisition already uses `RangePageSource`: capture scalar metadata
+under `pagemap.l`, retain handle/resource, acquire optional device-range ownership
+outside that lock, and freshly recheck local identity/generation/global serial
+before installing. Losers return through the retained source. Current syscall
+unwind protects its pagemap through exec/exit; remote maps still need inspection
+references. The earlier fault-lease proposal and vanished temporary artifacts
+are not implementations or validation evidence.
+
+Independent remaining VM work includes mapping publication without a universal
+backing pin and DRM retain/release callbacks under `pagemap.l` that invert the
+virtio file-lock order. Virtio command submission can also demand-fault while
+holding the backing lock. Ordinary copies do not resolve those existing driver
+lock cycles. Scalar, atomic/pagefault-disabled, unsafe-scope and WC user-copy
+APIs require separate real implementations.
+
+The 2026-10-06 user-copy validation is isolated at `bea41f8e` with recorded
+feature hashes and a frozen compiler. Host copy/parser checks pass 6,440
+assertions per C standard; complete runtime/import and actual native
+page-source host checks pass. Enabled/default x86 and disabled ARM build,
+and both default Linux-ABI guests pass. Exact final enabled ELF
+`4534a060ef59c7865d9c5e4188ff6e188fcfa48a772e8ede0ef324d4388a9eeb`
+passes the full normal suite; the new native copy batches recover all pages
+and live heap objects. Full final SSE validation is still pending. Preserve
+the normal/SSE/clean-baseline 180-second timeout logs: the final normal run
+passes with a 600-second outer harness limit, with runtime deadlines unchanged.
+Paired default allocation reports contain 414 sites/192 groups and 158 existing
+failures with no added groups. Full i915 syntax still passes 3/269. Logs,
+source hashes and independent final generated-C reviews are under
+`/tmp/vinix-linuxkpi-uaccess-oct06-*`; they are scoped evidence, not GPU bringup.
 
 ## Bound and high-priority contracts
 

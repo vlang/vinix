@@ -77,14 +77,24 @@ fn copy_pagemap(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u
 }
 
 fn copy_pagemap_policy(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u64, length u64, to_user bool, fault_missing bool, cow bool) bool {
+	return copy_pagemap_policy_remaining(_pagemap, kernel_address, user_address, length,
+		to_user, fault_missing, cow) == 0
+}
+
+// Return the uncopied suffix. The prefix is committed one page at a time
+// while holding the pagemap lock, and failed resolution never changes the
+// bytes after that prefix. Keep the native range policy here: existing
+// Boolean callers allow a prefix before the architecture rejects a later
+// address outside the userspace half.
+fn copy_pagemap_policy_remaining(_pagemap &memory.Pagemap, kernel_address voidptr, user_address u64, length u64, to_user bool, fault_missing bool, cow bool) u64 {
 	if length == 0 {
-		return true
+		return 0
 	}
 	if kernel_address == unsafe { nil } || !valid_user_range(user_address, length) {
-		return false
+		return length
 	}
 	if _pagemap == unsafe { nil } {
-		return false
+		return length
 	}
 
 	mut pagemap := unsafe { _pagemap }
@@ -118,7 +128,7 @@ fn copy_pagemap_policy(_pagemap &memory.Pagemap, kernel_address voidptr, user_ad
 					continue
 				}
 			}
-			return false
+			return length - copied
 		}
 		attempts = 0
 		physical_address := physical + page_offset + memory.get_hhdm_offset()
@@ -132,7 +142,39 @@ fn copy_pagemap_policy(_pagemap &memory.Pagemap, kernel_address voidptr, user_ad
 		pagemap.l.release()
 		copied += chunk
 	}
-	return true
+	return 0
+}
+
+fn raw_copy_user(kernel_address voidptr, user_address u64, length u64, to_user bool) u64 {
+	// Zero-length copies must not inspect either pointer or the current task.
+	if length == 0 {
+		return 0
+	}
+	// These raw copies validate the complete user range before committing any
+	// prefix. The kernel buffer is borrowed and must remain accessible for the
+	// requested length throughout this synchronous copy.
+	if kernel_address == unsafe { nil } || !user_range(user_address, length) {
+		return length
+	}
+	mut process := proc.current_thread().process
+	if process == unsafe { nil } {
+		return length
+	}
+	return copy_pagemap_policy_remaining(process.pagemap, kernel_address, user_address,
+		length, to_user, true, true)
+}
+
+// Return the bytes that could not be read. Any copied prefix is preserved;
+// the uncopied destination suffix is left untouched. Missing pages may fault
+// in, so callers use ordinary kernel process context that permits faults.
+pub fn raw_copy_from_user(destination voidptr, source u64, length u64) u64 {
+	return raw_copy_user(destination, source, length, false)
+}
+
+// Return the bytes that could not be written. Missing and COW pages resolve
+// through the native fault handlers, and an inaccessible suffix is untouched.
+pub fn raw_copy_to_user(destination u64, source voidptr, length u64) u64 {
+	return raw_copy_user(source, destination, length, true)
 }
 
 pub fn copy_from_user(destination voidptr, source u64, length u64) bool {

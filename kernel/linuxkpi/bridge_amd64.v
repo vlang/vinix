@@ -497,6 +497,10 @@ pub fn initialise() {
 		C.kprintf(c'linuxkpi: kernel integer and Boolean parsing, range errors and result ownership passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: borrowed string tokens, character search and whitespace trimming passed; no pages retained\n')
 		C.kprintf(c'linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained\n')
+		if !uaccess_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux user-copy remaining-count self-test failed')
+		}
+		C.kprintf(c'linuxkpi: exact user-copy prefixes, protection, demand faults and COW passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')
