@@ -505,6 +505,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux scalar user-read self-test failed')
 		}
 		C.kprintf(c'linuxkpi: scalar user reads, fault zeros and aligned coherence passed; no pages or heap objects retained\n')
+		if !scalar_store_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux scalar user-store self-test failed')
+		}
+		C.kprintf(c'linuxkpi: scalar user stores, fault prefixes, COW and aligned coherence passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

@@ -74,6 +74,27 @@ int __must_check vinix_linuxkpi_get_user(const void __user *source,
  * access_ok. Both interfaces retain ordinary faulting task-context semantics. */
 #define __get_user(x, ptr) get_user((x), (ptr))
 
-/* Scalar stores, atomic/pagefault-disabled, unsafe-scope and noncached copies
- * still need their own native contracts and are not declared here. */
+/* Ordinary faulting scalar stores. Values are passed by value. Failure may
+ * leave a committed split-page prefix; no rollback or atomicity is promised. */
+#include <stdint.h>
+int __must_check vinix_linuxkpi_put_user(void __user *destination,
+		size_t size, uint64_t value);
+
+#define put_user(x, ptr) ({ \
+	__typeof__(*(ptr)) __vinix_put_value = (x); \
+	__typeof__(ptr) __vinix_put_pointer = (ptr); \
+	_Static_assert(sizeof(*__vinix_put_pointer) == 1 || \
+		sizeof(*__vinix_put_pointer) == 2 || \
+		sizeof(*__vinix_put_pointer) == 4 || \
+		sizeof(*__vinix_put_pointer) == 8, "unsupported put_user scalar width"); \
+	vinix_linuxkpi_put_user((void __user *)__vinix_put_pointer, \
+		sizeof(*__vinix_put_pointer), (uint64_t)__vinix_put_value); \
+})
+
+/* The native checked path is also safe after the caller's access_ok check.
+ * Both interfaces retain ordinary faulting process-context semantics. */
+#define __put_user(x, ptr) put_user((x), (ptr))
+
+/* Atomic/pagefault-disabled, unsafe-scope and noncached copies still need
+ * their own native contracts and are not declared here. */
 #endif
