@@ -4,8 +4,12 @@ The [next-session handoff](kernel-v-migration-handoff.md) lists the remaining
 implementations, build/test setup and porting constraints from the latest batch.
 
 Port first-party implementations in small stages, preserving their external
-interfaces. Keep third-party libraries, their C headers, and independent C
-test callers. Generated C from V is a build artifact, not maintained source.
+interfaces. The current request permits only third-party libraries to remain
+in C. Port first-party native bindings, header implementations and independent
+fixtures too; preserve original fixture assertions and frozen Git revisions for
+differential validation. Generated C from V is a build artifact, not maintained
+source. Historical batches below used the earlier fixture/binding exception;
+that exception no longer applies to maintained first-party source.
 Architecture instructions stay in V inline assembly where its constraints
 can express the required ABI and ordering. Naked entry points with exact
 fault/recovery labels stay in architecture assembly when V cannot express
@@ -442,3 +446,123 @@ Current local evidence is under
 `progress.json` records stage counts and commits; frozen kernels, provenance
 and serial logs identify the actual tested artifacts. These caches are local;
 this document and the handoff are the durable record.
+
+
+## First-party native boundaries and fixtures, 2026-10-06
+
+The continued request now includes all maintained first-party C. Completed
+ports since the preceding 10,191-line implementation batch remove another
+**2,406 original production/native-boundary C lines**, **453 original fixture
+lines** and **111 desktop header lines**. These are separate counts; new tests
+and archived evidence do not count as translations. The following stages are
+committed and validated; pending header and kernel-fixture stages are excluded.
+
+| Completed scope | Original C lines | Commit |
+| --- | ---: | --- |
+| Allocation tracker native frame capture | 9 | `129c1f39` |
+| Security native ABI boundaries | 257 | `49d01613` |
+| LinuxKPI SRCU header/layout boundaries | 83 | `09de736d` |
+| Console and formatting benchmark native entries | 76 | `987dbcc6` |
+| LinuxKPI common header/refcount/per-CPU bindings | 54 | `d91f43b1` |
+| LinuxKPI allocation/formatting/logging native bindings | 186 | `aa1d5bb8` |
+| Desktop backtraces and EGL presenter | 572 | `a2fa1fac` |
+| Apple boot reporter | 64 | `4d18ab71` |
+| Venus availability probe | 41 | `a9f22eed` |
+| Dota early client preload | 57 | `a55c5147` |
+| ARM init raw syscall/signal boundary | 40 | `5dc7b03d` |
+| AGX Darwin native tracing adapter | 55 | `06fd0680` |
+| LinuxKPI task and wait native boundaries | 122 | `2103d3d8` |
+| LinuxKPI workqueue native boundaries | 81 | `a774ab2a` |
+| Dota low-mapping preload | 219 | `5115a9e7` |
+| Steam 32-bit and 64-bit robust-list preloads | 179 | `032eaa2d` |
+| QEMU VNC window client | 311 | `45f28820` |
+| **Production/native total** | **2,406** | |
+
+Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
+tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
+(`5115a9e7`). The 111 desktop header lines are now generated from the real V
+ABI. The independent GPU fixture added in `fe295797` is new coverage and earns
+zero original-C translation credit. At these committed stages,
+`kernel/c/*.c` has **zero maintained non-fixture files**; first-party C fixture
+files and header algorithms still remain and must be ported. Genuine upstream
+Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
+
+The immutable benchmark evidence archive (`7ee28d8e`) removes 108 frozen
+first-party/generated C snapshots totaling 75,192 lines from maintained source,
+along with two frozen shell builders and an embedded init. This is archival
+work, **not a C-to-V port**. Its manifest pins exact commit, path, blob,
+SHA256, byte count and file mode; the materializer reconstructs the original
+bytes outside the checkout and rejects path escapes, tampering and overwrites.
+All 145 manifest records were verified, all 510 campaign integrity assertions
+passed and three recomputations were byte-identical. The 34 genuine patched
+musl snapshots remain preserved as upstream evidence.
+
+Kernel native boundaries preserve actual C wrapper callback identities,
+borrowed Linux layouts, acquire/release operations, tick alias identity and
+variadic native widths. ABI assembly contains architecture instructions;
+V owns algorithms and ownership. Both architectures built in isolated
+worktrees. Tracker/console native guests passed, and the complete four-CPU
+LinuxKPI guest passed after the runtime/SRCU/common stage and again after the
+task/wait/workqueue stage with exact free-page equality in every measured
+batch. The latter tested x86 ELF SHA256 is
+`3b6164b1853caa8adac1aceca0a32d32a22b6023f83fbf2cf43c4104d9783399`;
+its ARM counterpart is
+`86860faa0b4fa595eb53b5ce1d551e0d5c8bd323ae6b593631e9a30c5a20c179`.
+The first full guest hit the original timer watchdog/count check. The closest
+untouched C-boundary kernel passed, then the identical frozen new ELF passed
+on repeat. The original failure and both comparison logs are retained; host
+delay is a possible explanation, not an established cause. No diagnostic
+assertions, retirement requirements or deadlines changed.
+
+Desktop backtrace host ASan/UBSan fixtures, native ARM/x86 guests and an x86
+frozen-C guest passed. The presenter passed 67 host failure/lifetime cases and
+32 repeated lifecycles with zero remaining mocked resources, using ASan,
+UBSan and stack-use-after-return checks. Full static desktop links passed on
+both architectures using genuine GCC; the ARM dynamic Mesa link passed too.
+All six native `idle,apps,drag` scenarios passed (two rounds, 45 seconds each,
+15 seconds settling). The borrowed GL vertex storage remains permanent;
+caller-freed symbol arrays use one contiguous explicit allocation. Physical
+Apple graphics remains unverified.
+
+The Dota early preload passed nine original-C/V sanitizer cases and both
+native guest fixtures. Its copied path survives environment removal and its
+NODELETE reference retains the original process lifetime. The mapping preload
+passed 24 parser cases across 257 chunk boundaries, all 50 original probe
+conditions and both architecture model guests. The actual patched ARM-host
+translator passed C/C, C/V and V/V runs. An unpatched translator failed the
+original C MAP_FIXED_NOREPLACE/partial-host-page condition; that setup failure
+is retained separately. No assertions were weakened.
+
+ARM init passed all three native boot policies and all six required markers,
+four feature combinations, both echo host fixtures, callback-address and
+volatile-storage checks, and strict syscall/restorer disassembly checks. The
+first guest reached its markers but ran out of host disk while saving evidence;
+only the completed repeat is claimed as PASS. Steam passed frozen-C/V host
+sanitizers, 16 concurrent workers each doing 1,000 mapping/unmap cycles, native
+32/64-bit layout/export checks, and all four original-C/V translated guest
+variants. The i386 table retains 512 borrowed mappings, original saturation,
+overflow and failed-unmap behavior; its spin loop retains the optimized branch.
+Its instruction-only variadic bridge preserves all six syscall arguments.
+Neither Steam shared library imports an allocator.
+
+VNC passed 34 exact original-C/V sanitizer outcomes covering protocol bytes,
+partial/EINTR I/O, resize, pointer/key events, descriptor cleanup and XImage
+ownership. Both native mock guests and the actual ARM X11 production link
+passed. Its sole explicit calloc and XDestroyImage ownership match the original.
+Security, Apple reporter, Venus and AGX native adapters passed their relevant
+host and native fixtures; physical Darwin/Apple operation remains untested.
+All new lifetime boundaries received independent review.
+
+Current machine-local evidence is under
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
+Snapshots, ELF hashes and full serial logs identify tested inputs. Completed
+disposable image files may be retired after recording their hashes; their
+manifests and logs remain. This document and the handoff are the durable record.
+
+Linguist 7.27.0 at committed source
+`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb` reports **V 49.24%, C 13.10%**,
+430 C files, 400 Python files and 281 shell files. All 2,180 classified blobs and
+the displayed inventory sizes were checked against Git. No Verilog or vendored
+trees appear and `.gitattributes` is unchanged. The archived source inventory
+reduction receives zero port credit; remaining first-party fixtures and headers
+are counted honestly.

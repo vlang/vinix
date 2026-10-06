@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `db601f941aafd7a9335fd2b54cc3dfb41e12e468`,
+at source commit `90990bb7e4f4b5363f91e551f24df5ef49b0c9fb`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 557 | 5,641,624 | 23.71% |
-| Python | 385 | 4,040,474 | 16.98% |
-| Shell | 283 | 1,254,092 | 5.27% |
+| C | 430 | 2,884,969 | 13.10% |
+| Python | 400 | 4,140,704 | 18.81% |
+| Shell | 281 | 1,231,789 | 5.59% |
 
-All `.v` files are classified as V. The resulting V share is 41.85%, with no
+All `.v` files are classified as V. The resulting V share is 49.24%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -29,15 +29,18 @@ trees listed in `.gitattributes` are also marked vendored: `third_party`,
 `kernel/c/lwip` and `kernel/lwip-repository`. Those downloaded kernel trees
 are currently untracked. Vinix source that calls these libraries remains counted.
 
-Committed benchmark source snapshots under `tests/alloc-bench/results/` are
-included in the lists below.
+Immutable first-party/generated benchmark snapshots are recovered from pinned
+Git blobs using `tests/alloc-bench/materialize-evidence.py`. Their removal from
+maintained source receives no translation credit. Genuine patched musl evidence
+remains counted according to the committed attributes. First-party fixtures and
+headers remain counted honestly while their ports continue.
 
 ## Reproducing the classification
 
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev db601f941aafd7a9335fd2b54cc3dfb41e12e468 --breakdown --json
+github-linguist --rev 90990bb7e4f4b5363f91e551f24df5ef49b0c9fb --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -48,7 +51,6 @@ depend on its deployed Linguist version and the default-branch revision.
 
 | File | Bytes |
 | --- | ---: |
-| `apple-boot/report_init.c` | 1,697 |
 | `apple-boot/src/adt.h` | 3,097 |
 | `apple-boot/src/fdt.h` | 2,518 |
 | `apple-boot/src/lib.h` | 2,007 |
@@ -62,35 +64,24 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/atl-configuration-test.c` | 3,592 |
 | `build-support/android/musl-statistics.h` | 486 |
 | `build-support/android/runtime-compat.c` | 23,065 |
-| `build-support/dota2/early-client.c` | 2,167 |
-| `build-support/dota2/mmap32.c` | 8,464 |
-| `build-support/init-aarch64/syscall_abi.c` | 1,350 |
+| `build-support/dota2/early-client-abi.h` | 574 |
+| `build-support/dota2/mmap32-abi.h` | 501 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
-| `build-support/qemu-system/vinix-vnc-window.c` | 11,960 |
-| `build-support/steam/robust-list-i386.c` | 5,762 |
-| `build-support/steam/robust-list-x86_64.c` | 1,367 |
-| `build-support/venus/available.c` | 1,534 |
 | `build-support/x86-translation/sppc-office-compat.c` | 3,794 |
 | `build-support/xorg-server/vinix-xinput.c` | 3,367 |
 | `build-support/xorg-server/wine-host-v-abi.c` | 961 |
 | `build-support/xorg-server/wine-host-v-abi.h` | 802 |
 | `build-support/xorg-server/xinput_abi.h` | 893 |
 | `compat/ios/runner/abi/dispatch.h` | 392 |
-| `desktop/execinfo_compat.c` | 5,086 |
-| `desktop/execinfo_compat.h` | 417 |
-| `desktop/gpu_present.h` | 2,982 |
-| `desktop/gpu_present_egl.c` | 15,207 |
 | `desktop/libc_compat.h` | 1,911 |
 | `desktop/network_status.h` | 1,315 |
 | `desktop/quicklook_stb.h` | 454 |
-| `desktop/tools/tests/execinfo_compat_test.c` | 1,884 |
 | `desktop/tools/tests/heap_tracker.h` | 1,786 |
 | `gl-triangle/gl_v.h` | 1,885 |
 | `kernel/asm/x86_64/speculation.h` | 2,150 |
 | `kernel/c/acpi_sync_test.c` | 154 |
 | `kernel/c/agx_fake_g17.h` | 7,541 |
 | `kernel/c/agx_fake_g17_encode.h` | 1,583 |
-| `kernel/c/alloc_track.c` | 379 |
 | `kernel/c/alloc_track_v.h` | 260 |
 | `kernel/c/apple_ans.h` | 3,618 |
 | `kernel/c/apple_ans_ext2.h` | 2,708 |
@@ -107,33 +98,32 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/heap_benchmark_v.h` | 1,399 |
 | `kernel/c/inttypes.h` | 69 |
 | `kernel/c/linuxkpi_cache_test.c` | 11,338 |
+| `kernel/c/linuxkpi_common_v_contract.h` | 926 |
 | `kernel/c/linuxkpi_i915_policy_test.c` | 6,806 |
 | `kernel/c/linuxkpi_io_test.c` | 21,682 |
 | `kernel/c/linuxkpi_pci_config_test.c` | 14,017 |
 | `kernel/c/linuxkpi_printk_test.c` | 24,193 |
-| `kernel/c/linuxkpi_printk_v_primitives.c` | 4,601 |
 | `kernel/c/linuxkpi_runtime_native_test.c` | 21,136 |
-| `kernel/c/linuxkpi_runtime_v_primitives.c` | 4,684 |
-| `kernel/c/linuxkpi_runtime_v_primitives.h` | 2,023 |
+| `kernel/c/linuxkpi_runtime_v_contract.h` | 2,423 |
+| `kernel/c/linuxkpi_runtime_v_primitives.h` | 1,973 |
 | `kernel/c/linuxkpi_seqcount_test.c` | 12,766 |
 | `kernel/c/linuxkpi_srcu_test.c` | 23,566 |
-| `kernel/c/linuxkpi_srcu_v_primitives.c` | 4,522 |
+| `kernel/c/linuxkpi_srcu_v_contract.h` | 4,599 |
 | `kernel/c/linuxkpi_srcu_v_primitives.h` | 3,531 |
 | `kernel/c/linuxkpi_sync_native_test.c` | 6,266 |
 | `kernel/c/linuxkpi_task_native_test.c` | 3,868 |
-| `kernel/c/linuxkpi_task_v_primitives.c` | 3,358 |
+| `kernel/c/linuxkpi_task_v_contract.h` | 2,325 |
 | `kernel/c/linuxkpi_task_v_primitives.h` | 2,410 |
 | `kernel/c/linuxkpi_time_native_test.c` | 6,757 |
 | `kernel/c/linuxkpi_timer_native_test.c` | 5,082 |
 | `kernel/c/linuxkpi_usleep_test.c` | 13,915 |
-| `kernel/c/linuxkpi_v_primitives.c` | 2,955 |
-| `kernel/c/linuxkpi_v_primitives.h` | 1,587 |
+| `kernel/c/linuxkpi_v_primitives.h` | 1,643 |
 | `kernel/c/linuxkpi_wait_bit_test.c` | 15,687 |
-| `kernel/c/linuxkpi_wait_v_primitives.c` | 4,716 |
+| `kernel/c/linuxkpi_wait_v_contract.h` | 2,635 |
 | `kernel/c/linuxkpi_wait_v_primitives.h` | 5,106 |
 | `kernel/c/linuxkpi_worker_test.c` | 11,042 |
 | `kernel/c/linuxkpi_workqueue_native_test.c` | 35,439 |
-| `kernel/c/linuxkpi_workqueue_v_primitives.c` | 4,300 |
+| `kernel/c/linuxkpi_workqueue_v_contract.h` | 1,544 |
 | `kernel/c/linuxkpi_workqueue_v_primitives.h` | 2,244 |
 | `kernel/c/linuxkpi_ww_mutex_test.c` | 13,730 |
 | `kernel/c/locale.h` | 45 |
@@ -144,21 +134,20 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.c` | 2,650 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
-| `kernel/c/printf.c` | 1,824 |
-| `kernel/c/printf_benchmark.c` | 481 |
-| `kernel/c/printf_v.h` | 445 |
+| `kernel/c/printf_v.h` | 498 |
 | `kernel/c/pthread.h` | 1,298 |
 | `kernel/c/speculation.h` | 524 |
 | `kernel/c/stack_protector.h` | 762 |
 | `kernel/c/stack_slots.h` | 402 |
 | `kernel/c/stdio.h` | 501 |
 | `kernel/c/stdlib.h` | 1,224 |
-| `kernel/c/string.h` | 1,136 |
+| `kernel/c/string.h` | 1,344 |
 | `kernel/c/symbols.h` | 1,327 |
 | `kernel/c/sys/time.h` | 49 |
 | `kernel/c/sys/types.h` | 51 |
 | `kernel/c/sys/wait.h` | 49 |
 | `kernel/c/unistd.h` | 45 |
+| `kernel/c/varargs_abi.h` | 569 |
 | `kernel/c/verity.h` | 1,518 |
 | `kernel/c/vinix_endpoint.h` | 349 |
 | `kernel/c/vinix_inet6.h` | 1,423 |
@@ -231,104 +220,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/test.c` | 17,465 |
 | `tests/agx-fake-g17/test_encode.c` | 11,541 |
-| `tests/agx-trace/host.c` | 8,531 |
 | `tests/alloc-bench/bench.c` | 14,188 |
 | `tests/alloc-bench/kernel-bench.c` | 225 |
 | `tests/alloc-bench/kernel_sampler_test.c` | 3,295 |
 | `tests/alloc-bench/macos-kext-info.c` | 758 |
-| `tests/alloc-bench/results/2026-10-02-userspace/bench.c` | 14,188 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/launcher-probe.c` | 1,241 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/probe.c` | 224 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/probe-proof/verify-original.c` | 8,750 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v3/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/launcher.c` | 1,489 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify-all-classes.c` | 3,045 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/verify.c` | 8,750 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-all-classes.c` | 3,045 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/clock-baseline-2cpu/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/clock-final-2cpu/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/test.c` | 113,923 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/test.c` | 115,457 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/test.c` | 113,923 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/test.c` | 115,457 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/measure.c` | 22,627 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/measure.c` | 22,627 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-core-x86_64/test.c` | 113,923 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/earlier-candidate-socketbox-x86_64/test.c` | 114,764 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_bool.c` | 1,419 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_i64.c` | 1,410 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_ptr_Probe.c` | 1,487 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u16.c` | 1,409 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u32.c` | 1,410 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u64.c` | 1,410 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_u8.c` | 1,401 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__load_T_v_int.c` | 1,412 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_bool.c` | 186 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u32.c` | 183 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_T_u64.c` | 183 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__store_release.c` | 319 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/katomic__sync.c` | 85 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/codegen/klock__Lock__release.c` | 137 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/independent-review-v4/memory-runtime/runtime.c` | 3,709 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-extracted.c` | 12,041 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-v4/atomic-probe.c` | 403,984 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/receive_message-final.c` | 6,207 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_datagram-final.c` | 3,419 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_message-final.c` | 3,753 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/send_with_control-final.c` | 2,638 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_bind-final.c` | 4,600 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_connect-final.c` | 4,609 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getpeername-final.c` | 1,702 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_getsockname-final.c` | 1,702 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_recvfrom-final.c` | 2,992 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendmsg-final.c` | 454 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/syscall_sendto-final.c` | 2,739 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/kernel-x86_64/write_with_fds-final.c` | 4,881 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/aarch64/packaged-libc/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/amd64/packaged-libc/malloc.h` | 387 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/probe.c` | 990 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-final/probe.c` | 990 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/close_endpoint-arm-v5.c` | 2,317 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/read-arm-v5.c` | 3,208 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recv_seqpacket-arm-v5.c` | 3,952 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/recvmsg-arm-v5.c` | 9,906 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/send_datagram-arm-v5.c` | 3,419 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-lifetime-final/write_with_fds-arm-v5.c` | 4,881 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/baseline-complete/probe.c` | 5,149 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/candidate-complete/probe.c` | 5,149 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-baseline/probe.c` | 5,335 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/settlement-candidate/probe.c` | 5,335 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-baseline-4cpu/test.c` | 114,282 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/waiters-candidate-4cpu/test.c` | 114,282 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/bench.c` | 14,188 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/pagetable.c` | 6,698 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/pagetable.c` | 6,698 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/pagetable.c` | 6,602 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/launcher.c` | 1,489 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify-all-classes.c` | 3,045 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify-all-classes.c` | 3,045 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-x86_64/sources/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/pagetable.c` | 7,152 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/pagetable.c` | 7,152 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/measure.c` | 22,627 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__Pagemap__unmap_page_unlocked.c` | 3,046 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/kernel-x86_64/memory__table_empty_after_clear.c` | 180 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-final-reviewed.c` | 7,152 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/pagetable-reviewed.c` | 6,698 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/free.c` | 6,839 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/malloc.c` | 11,032 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-arm126-v5-final/mallocng/meta.h` | 7,713 |
@@ -337,7 +234,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/malloc.c` | 11,032 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/meta.h` | 7,713 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/disabled-v5-final/mallocng/realloc.c` | 1,318 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/kernel/c/memory.c` | 3,289 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/free.c` | 6,839 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/malloc.c` | 11,032 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-arm126-v5-final/mallocng/meta.h` | 7,713 |
@@ -348,17 +244,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/independent-review/sources/optimized-v5-final/mallocng/realloc.c` | 1,318 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/aarch64/packaged-libc/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/production-packaging/amd64/packaged-libc/malloc.h` | 387 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/bench.c` | 14,188 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/v5-diagnostic-preflight/sampler-before-hidden-and-header-warning-fix.c` | 6,462 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify-all-classes.c` | 7,105 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-aarch64/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify-all-classes.c` | 7,105 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/allocator-x86_64/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/pagetable.c` | 7,152 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/pagetable.c` | 7,152 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/test.c` | 115,524 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/measure.c` | 22,627 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/aligned_alloc.c` | 1,406 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/free.c` | 6,857 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/aarch64/glue.h` | 2,192 |
@@ -373,11 +258,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/realloc.c` | 1,318 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/aarch64/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/amd64/malloc.h` | 387 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/clock.c` | 4,903 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify-all-classes.c` | 7,105 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/tests/user-alloc/verify.c` | 8,922 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/bench.c` | 14,188 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/sampler.c` | 7,362 |
 | `tests/alloc-track/guest.c` | 1,841 |
 | `tests/alloc-track/test.c` | 2,894 |
 | `tests/amd64-console/test.c` | 2,041 |
@@ -414,8 +294,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-spi-touchpad/test.c` | 23,631 |
 | `tests/apple_display_hotplug/test_hotplug.c` | 6,863 |
 | `tests/apple_smc/test_smc.c` | 20,237 |
-| `tests/application-sandbox/guest.c` | 4,228 |
-| `tests/application-sandbox/host.c` | 6,329 |
+| `tests/application-sandbox/guest.c` | 4,701 |
+| `tests/application-sandbox/host.c` | 6,547 |
 | `tests/capability-exec/guest.c` | 7,634 |
 | `tests/clipboard/x11-client.c` | 1,901 |
 | `tests/clock-control/test.c` | 6,673 |
@@ -433,8 +313,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/lavapipe-native-wait.c` | 3,058 |
 | `tests/dota2/lavapipe-null-sets.c` | 15,711 |
 | `tests/dota2/library-loader.c` | 2,603 |
-| `tests/dota2/mmap32-parser-test.c` | 6,101 |
-| `tests/dota2/mmap32-probe.c` | 6,294 |
+| `tests/dota2/mmap-fixture-abi.h` | 348 |
+| `tests/dota2/mmap-probe-abi.h` | 475 |
 | `tests/dota2/signal-probe-test.c` | 6,568 |
 | `tests/dota2/signal-probe.c` | 12,255 |
 | `tests/dota2/steam-smoke.c` | 4,979 |
@@ -555,10 +435,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/scheduler-preemption/guest.c` | 5,391 |
 | `tests/securelevel-boot/guest.c` | 15,666 |
 | `tests/securelevel/guest.c` | 4,379 |
-| `tests/security-audit/collector_test.c` | 8,288 |
-| `tests/security-audit/collector_vm_test.c` | 4,491 |
+| `tests/security-audit/collector_test.c` | 8,900 |
+| `tests/security-audit/collector_vm_test.c` | 5,103 |
 | `tests/security-audit/test.c` | 7,865 |
-| `tests/security-mac/cli_test.c` | 3,212 |
+| `tests/security-mac/cli_test.c` | 3,327 |
 | `tests/security-mac/test.c` | 28,855 |
 | `tests/shared-streams/guest.c` | 5,447 |
 | `tests/smt-policy/guest.c` | 1,478 |
@@ -594,30 +474,26 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/fixture.c` | 5,603 |
 | `tests/x11-input/guest.c` | 1,447 |
 | `tests/xnualloc/reference.c` | 11,469 |
-| `tools/agx-re/agx_trace.c` | 4,031 |
 | `tools/agx-re/agx_trace.h` | 298 |
 | `tools/agx-re/agx_trace_v.h` | 2,133 |
 | `tools/m1-wifi/wifi_v.h` | 1,613 |
-| `tools/sandbox/sandbox_v.h` | 869 |
-| `tools/sandbox/vinix-sandbox.c` | 4,806 |
-| `tools/security-audit/collector.c` | 5,629 |
-| `tools/security-audit/collector_v.h` | 2,262 |
-| `tools/security-mac/mac.c` | 1,547 |
+| `tools/sandbox/sandbox_v.h` | 1,593 |
+| `tools/security-audit/collector_v.h` | 2,306 |
 | `tools/security-mac/mac.h` | 526 |
-| `tools/security-mac/mac_v.h` | 575 |
+| `tools/security-mac/mac_v.h` | 759 |
 
 ## Python files
 
 | File | Bytes |
 | --- | ---: |
-| `apple-boot/build.py` | 4,038 |
+| `apple-boot/build.py` | 4,340 |
 | `apple-boot/compile-v.py` | 2,034 |
 | `apple-boot/pack.py` | 4,497 |
 | `apple-boot/tests/check-v-abi.py` | 3,061 |
 | `apple-boot/tests/check_converter.py` | 3,285 |
 | `apple-boot/tests/fdt_check.py` | 5,286 |
 | `apple-boot/tests/ioreg_adt.py` | 3,303 |
-| `apple-boot/tests/qemu_iboot.py` | 16,226 |
+| `apple-boot/tests/qemu_iboot.py` | 16,230 |
 | `apple-boot/tests/run-v-core.py` | 2,656 |
 | `build-support/alpine-resolve.py` | 2,946 |
 | `build-support/android/art-bootclasspath.py` | 18,938 |
@@ -626,16 +502,19 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/build.py` | 21,463 |
 | `build-support/android/musl-runtime.py` | 2,590 |
 | `build-support/check-screenshot.py` | 5,382 |
+| `build-support/compile-v-module.py` | 6,761 |
 | `build-support/content-key.py` | 3,563 |
 | `build-support/debian-root.py` | 10,017 |
 | `build-support/desktop-build-key.py` | 11,970 |
 | `build-support/dhewm3/build.py` | 7,608 |
+| `build-support/dictionary/prepare.py` | 5,197 |
+| `build-support/dota2/compile-v-compat.py` | 1,457 |
 | `build-support/dota2/mesa-build.py` | 15,669 |
 | `build-support/dota2/qemu-stage.py` | 14,044 |
 | `build-support/dota2/venus-build.py` | 10,283 |
-| `build-support/dota2/vulkan-stage.py` | 20,201 |
+| `build-support/dota2/vulkan-stage.py` | 22,506 |
 | `build-support/ext2-set-root-owner.py` | 3,743 |
-| `build-support/init-aarch64/compile-v.py` | 2,499 |
+| `build-support/init-aarch64/compile-v.py` | 2,875 |
 | `build-support/java-cacerts.py` | 2,285 |
 | `build-support/link-duplicate-files.py` | 4,475 |
 | `build-support/make-docker-image.py` | 2,796 |
@@ -643,16 +522,19 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/minecraft/minecraft-login` | 7,459 |
 | `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 13,020 |
-| `build-support/opengothic/build.py` | 10,570 |
+| `build-support/opengothic/build.py` | 10,713 |
 | `build-support/patch-elf-interpreter.py` | 968 |
+| `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/build.py` | 7,918 |
-| `build-support/security-tools/compile-v-core.py` | 1,805 |
-| `build-support/security-tools/stage.py` | 3,773 |
+| `build-support/security-tools/compile-v-core.py` | 2,919 |
+| `build-support/security-tools/stage.py` | 3,614 |
 | `build-support/staging-cache.py` | 3,403 |
+| `build-support/steam/compile-v-robust.py` | 2,967 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
 | `build-support/venus/prepare-qemu.py` | 3,270 |
+| `build-support/venus/tests/run.py` | 6,197 |
 | `build-support/x86-translation/patch-msxml-unicode.py` | 4,979 |
 | `build-support/x86-translation/patch-wine-i386-qemu.py` | 2,899 |
 | `build-support/x86-translation/patch-wine-service-timeout.py` | 2,218 |
@@ -665,7 +547,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/genfont.py` | 10,792 |
 | `desktop/tools/input.py` | 8,219 |
 | `desktop/tools/stage_app.py` | 8,150 |
+| `desktop/tools/stage_host_gpu.py` | 3,424 |
 | `desktop/tools/stage_ui2.py` | 4,549 |
+| `desktop/tools/test-gpu-present.py` | 8,956 |
+| `desktop/tools/tests/test_dictionary_data.py` | 3,007 |
 | `gl-triangle/compile-v.py` | 2,353 |
 | `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
@@ -678,25 +563,25 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/run.py` | 2,202 |
 | `tests/agx-fake-g17/run_vm.py` | 10,384 |
-| `tests/agx-trace/run.py` | 6,627 |
+| `tests/agx-trace/run.py` | 10,891 |
 | `tests/alloc-bench/build-macos-kext.py` | 5,725 |
 | `tests/alloc-bench/compare-kernel.py` | 11,492 |
 | `tests/alloc-bench/compare.py` | 17,094 |
 | `tests/alloc-bench/compare_test.py` | 14,596 |
 | `tests/alloc-bench/compile-v-sampler.py` | 1,913 |
+| `tests/alloc-bench/materialize-evidence.py` | 7,895 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py` | 1,058 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py` | 2,225 |
-| `tests/alloc-bench/results/2026-10-02-userspace/check-recompute.py` | 14,061 |
+| `tests/alloc-bench/results/2026-10-02-userspace/check-recompute.py` | 14,178 |
 | `tests/alloc-bench/results/2026-10-02-userspace/compare.py` | 17,094 |
 | `tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix.py` | 8,908 |
-| `tests/alloc-bench/results/2026-10-02-userspace/recompute.py` | 15,386 |
+| `tests/alloc-bench/results/2026-10-02-userspace/recompute.py` | 15,946 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/capture-x86-diagnostic.py` | 1,678 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/run.py` | 2,197 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/run.py` | 3,446 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/runner.py` | 6,012 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-x86-v4-final.py` | 7,164 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/macos-driver.py` | 680 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-kernel-vinix.py` | 6,602 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-vinix.py` | 9,404 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/vinix-driver.py` | 994 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator-guard-stop/useralloc-v4-final-cohorts.py` | 3,689 |
@@ -717,14 +602,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage.py` | 11,764 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run.py` | 3,226 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/run-settlement-after-core.py` | 1,032 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.py` | 14,109 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.py` | 14,226 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/compare.py` | 17,094 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run_vm.py` | 13,468 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.py` | 15,386 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.py` | 15,946 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run-baseline.py` | 944 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run.py` | 1,553 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/prepare.py` | 2,437 |
@@ -738,10 +623,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run.py` | 25,268 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build.py` | 2,088 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute.py` | 14,109 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute.py` | 14,226 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/compare.py` | 17,094 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed.py` | 1,616 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.py` | 15,668 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.py` | 16,228 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure.py` | 2,225 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/run-vinix.py` | 9,404 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-final-driver.py` | 994 |
@@ -812,8 +697,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-bootstrap/test_prepare.py` | 9,429 |
 | `tests/desktop-bootstrap/test_recovery.py` | 8,983 |
 | `tests/desktop-bootstrap/test_runner.py` | 5,644 |
-| `tests/desktop-perf/run.py` | 26,347 |
-| `tests/desktop-perf/test_runner.py` | 15,989 |
+| `tests/desktop-perf/run.py` | 29,227 |
+| `tests/desktop-perf/test_runner.py` | 24,585 |
 | `tests/dhewm3/prepare-debian.py` | 2,639 |
 | `tests/dhewm3/run.py` | 12,457 |
 | `tests/disk-no-sync/run_vm.py` | 10,512 |
@@ -826,12 +711,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/export-test.py` | 10,464 |
 | `tests/dota2/launcher-test.py` | 14,628 |
 | `tests/dota2/lavapipe-run.py` | 14,637 |
+| `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
-| `tests/dota2/run.py` | 27,648 |
+| `tests/dota2/run.py` | 28,078 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
+| `tests/dota2/test-early-client.py` | 3,634 |
+| `tests/dota2/test-mmap32.py` | 2,868 |
 | `tests/dota2/vulkan-run-test.py` | 2,434 |
 | `tests/dota2/vulkan-run.py` | 14,280 |
-| `tests/dota2/vulkan-stage-test.py` | 15,890 |
+| `tests/dota2/vulkan-stage-test.py` | 18,459 |
 | `tests/dota2/wake-op-run.py` | 11,937 |
 | `tests/dumpability/run.py` | 3,726 |
 | `tests/elf-text/run.py` | 5,020 |
@@ -845,8 +733,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/gl-triangle/run.py` | 2,728 |
 | `tests/hypervisor/check-vmx.py` | 7,924 |
 | `tests/hypervisor/run-vm.py` | 1,241 |
-| `tests/init-policy/run-vm.py` | 3,781 |
-| `tests/init-policy/run.py` | 5,570 |
+| `tests/init-policy/run-vm.py` | 3,896 |
+| `tests/init-policy/run.py` | 5,766 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 5,440 |
@@ -858,16 +746,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/test_runner.py` | 4,875 |
 | `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
-| `tests/kernel-gaps/run.py` | 10,988 |
+| `tests/kernel-gaps/run.py` | 11,875 |
 | `tests/kernel-gaps/test_runner.py` | 4,085 |
 | `tests/kernel-job-control/run.py` | 5,293 |
 | `tests/kernel-link-layout/check.py` | 2,215 |
-| `tests/kernel-print/run.py` | 3,881 |
+| `tests/kernel-print/run.py` | 4,553 |
 | `tests/kernel-stack-guards/run.py` | 4,358 |
 | `tests/kernel-sysvmsg/run.py` | 4,812 |
 | `tests/krandom/run_native.py` | 2,466 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
-| `tests/linuxkpi/compile-v-core.py` | 1,238 |
+| `tests/linuxkpi/compile-v-core.py` | 1,629 |
+| `tests/linuxkpi/compile-v-primitives.py` | 949 |
 | `tests/linuxkpi/run_vm.py` | 9,941 |
 | `tests/linuxkpi/upstream_test.py` | 3,013 |
 | `tests/m1-wifi/run-ctl-vm.py` | 4,388 |
@@ -933,6 +822,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/stack-policy/run.py` | 3,792 |
 | `tests/stack-protector/diagnostic.py` | 2,257 |
 | `tests/stack-protector/run.py` | 3,291 |
+| `tests/steam/run-robust-vm.py` | 5,456 |
+| `tests/steam/test-robust-list.py` | 7,922 |
 | `tests/storage/test_split_desktop_initramfs.py` | 3,623 |
 | `tests/syscall-policy/run-host.py` | 11,663 |
 | `tests/syscall-policy/run.py` | 3,864 |
@@ -1065,14 +956,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/build-wine-host.sh` | 1,777 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/screenshot.sh` | 2,055 |
-| `desktop/tools/test-activity.sh` | 2,083 |
+| `desktop/tools/test-activity.sh` | 2,151 |
 | `desktop/tools/test-battery.sh` | 575 |
-| `desktop/tools/test-clipboard.sh` | 1,756 |
-| `desktop/tools/test-execinfo.sh` | 437 |
-| `desktop/tools/test-new-utilities.sh` | 2,624 |
-| `desktop/tools/test-settings.sh` | 3,640 |
-| `desktop/tools/test-utilities.sh` | 10,233 |
-| `desktop/tools/test-utility-parity.sh` | 2,586 |
+| `desktop/tools/test-clipboard.sh` | 1,824 |
+| `desktop/tools/test-execinfo.sh` | 834 |
+| `desktop/tools/test-new-utilities.sh` | 3,417 |
+| `desktop/tools/test-settings.sh` | 3,708 |
+| `desktop/tools/test-utilities.sh` | 10,301 |
+| `desktop/tools/test-utility-parity.sh` | 2,654 |
 | `gl-triangle/run-gl-triangle` | 2,400 |
 | `gl-triangle/run-gl-triangle-agx` | 1,255 |
 | `gl-triangle/run-m1-agx-smoke` | 820 |
@@ -1090,8 +981,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,506 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 87,837 |
-| `scripts/build-desktop-amd64.sh` | 14,049 |
+| `scripts/build-desktop-aarch64.sh` | 89,009 |
+| `scripts/build-desktop-amd64.sh` | 14,720 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,338 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,126 |
@@ -1108,22 +999,22 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
 | `scripts/build-minecraft-aarch64.sh` | 7,943 |
-| `scripts/build-nested-desktop-aarch64.sh` | 2,045 |
+| `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
 | `scripts/build-network-tools-aarch64.sh` | 8,938 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-python-aarch64.sh` | 3,553 |
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
-| `scripts/build-qemu-system-aarch64.sh` | 5,035 |
+| `scripts/build-qemu-system-aarch64.sh` | 5,236 |
 | `scripts/build-roblox-aarch64.sh` | 139 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,275 |
+| `scripts/build-steam-aarch64.sh` | 13,716 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,888 |
 | `scripts/build-userland-amd64.sh` | 5,925 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
-| `scripts/build-venus-aarch64.sh` | 5,137 |
+| `scripts/build-venus-aarch64.sh` | 5,339 |
 | `scripts/build-vinix-guest-disk.sh` | 1,837 |
 | `scripts/build-voffice-aarch64.sh` | 6,899 |
 | `scripts/build-x11-aarch64.sh` | 20,826 |
@@ -1137,7 +1028,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
-| `scripts/run-aarch64.sh` | 62,787 |
+| `scripts/run-aarch64.sh` | 63,001 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
 | `scripts/run-desktop-aarch64.sh` | 16,605 |
 | `scripts/run-desktop-amd64.sh` | 2,931 |
@@ -1154,8 +1045,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/aarch64/builder-source.sh` | 25,591 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/amd64/builder-source.sh` | 5,773 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
 | `tests/android/guest-init.sh` | 25,551 |
@@ -1167,7 +1056,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_display_hotplug/run.sh` | 131 |
 | `tests/apple_smc/run.sh` | 158 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
-| `tests/application-sandbox/test-host.sh` | 612 |
+| `tests/application-sandbox/test-host.sh` | 691 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
@@ -1177,7 +1066,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 2,253 |
-| `tests/desktop-perf/perf-init.sh` | 7,389 |
+| `tests/desktop-perf/perf-init.sh` | 9,247 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
 | `tests/developer-tools/smoke.sh` | 4,577 |
 | `tests/devicetree-string-list/run.sh` | 240 |
@@ -1204,7 +1093,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/run.sh` | 4,069 |
 | `tests/krandom/run.sh` | 1,539 |
-| `tests/linuxkpi/run.sh` | 4,301 |
+| `tests/linuxkpi/run.sh` | 6,581 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
 | `tests/m1-wifi/run.sh` | 100 |
@@ -1249,8 +1138,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 1,623 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
-| `tests/security-audit/collector-run.sh` | 1,124 |
-| `tests/security-mac/host-run.sh` | 583 |
+| `tests/security-audit/collector-run.sh` | 1,285 |
+| `tests/security-mac/host-run.sh` | 735 |
 | `tests/security-mac/run.sh` | 926 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/smt-policy/run-host.sh` | 1,181 |

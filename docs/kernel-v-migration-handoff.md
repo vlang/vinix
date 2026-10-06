@@ -1,223 +1,146 @@
 # Kernel C to V: next-session handoff
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
-The completed implementation source is
-`db601f941aafd7a9335fd2b54cc3dfb41e12e468`; the language inventory was committed
-as `56c6c584`. Re-read HEAD, `AGENTS.md` and the working-tree status before
-starting: other sessions actively edit and commit this checkout.
+The language snapshot below pins committed source
+`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb`. Re-read HEAD, `AGENTS.md` and
+working-tree status: other sessions actively edit and commit this checkout.
 
-## Request to continue
+## Current request
 
-> Continue migrating first-party C implementations to V in
-> `/Users/alex/code/vinix`. Read `AGENTS.md`, `docs/kernel-v-migration.md`
-> and `docs/kernel-v-migration-handoff.md` first. Work in stages, run the
-> relevant tests after each stage, build both kernel architectures, verify in
-> QEMU, and commit each completed stage using only its own paths. Preserve C
-> ABI, synchronization, allocation and lifetime behavior. Keep upstream
-> libraries and independent C fixtures intact. Update the migration record
-> and the C/Python/shell Linguist inventory after the ports.
+Continue migrating first-party C to V. The latest user instruction is
+**“only 3rd party libs can stay in C.”** This supersedes the previous exception
+for independent C fixtures and small native C bindings. Preserve ABI, atomic
+orders, allocation/lifetime behavior, exact independent assertions and
+immutable original Git revisions. Do not move implementation bodies into
+headers, strings or build generators, and do not mark own C as vendored.
+Generated C remains a build artifact; instruction-only architecture assembly
+expresses native entry points that V cannot represent. Native declaration
+headers should be generated from maintained V ABI/configuration metadata.
+
+Work in stages, run relevant host checks, build both kernel architectures,
+verify the appropriate complete QEMU guests and commit each completed stage
+using only its reviewed paths. No push is requested. Pending changes and old
+binaries are not evidence that a future stage passed.
 
 ## Completed work
 
-The continuation from `823aeb116eb3b3ab20463ccb9b1c3fba6f0c41ae` migrated
-**at least 10,191 original C implementation lines**. This conservative count
-excludes native ABI bindings, original diagnostic fixtures and scaffolding.
-A further 32-line classic GL example embedded in a shell script became V
-without receiving tally credit. Former C implementations were removed or
-reduced to narrow native bindings; maintained algorithms and ownership now
-live in V. Generated C is a build artifact.
+The preceding requested implementation batch completed **at least 10,191
+original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
+full tests, measured residuals and limitations remain in
+[kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
+continuation adds **2,406 original production C lines**, **453 original fixture
+lines** and **111 desktop header lines**, counted separately.
 
-| Completed scope | Native V location | Counted original lines | Commit |
-| --- | --- | ---: | --- |
-| Console/buffer policy | `kernel/kprint/printf_policy*.v` | 119 | `3a2c4ed6` |
-| Allocation instrumentation | `kernel/alloctrack` | 219 | `acad3b2a` |
-| Apple ADT/FDT and freestanding helpers | `apple-boot/vcore/tree.v` | 719 | `5f6951c7` |
-| Keyed bit waits and wound/wait mutexes | `kernel/linuxkpi/compatcore/{wait_bit,ww_mutex}.v` | 345 | `61572a06` |
-| Apple loader/runtime/handoff | `apple-boot/vcore/boot.v` | 1,059 | `5d2c7537` |
-| Sandbox, mandatory-policy CLI and audit collector | `tools/{sandbox,security-mac,security-audit}/core` | 665 | `5cfc023e` |
-| Darwin AGX trace observation | `tools/agx-re/tracecore/core.v` | 420 | `7149f685` |
-| LinuxKPI allocation, formatting and owned logging | `kernel/linuxkpi/compatcore/{runtime,format,printk}.v` | 840 | `6b18ca9e` |
-| Linux task state, clocks/sleeps and timer ownership | `kernel/linuxkpi/compatcore/{task,time,timer}.v` | 718 | `2172fb48` |
-| Locks/completions, SRCU and workqueues | `kernel/linuxkpi/compatcore/{sync,srcu,workqueue}.v` | 1,704 | `9b785b5f` |
-| Shared Vinix/XNU heap sampler | `kernel/heapbench` | 273 | `069f76c3` |
-| X11 input and Wine input/selection/process bridge | `build-support/xorg-server/{xinputcore,winehost}` | 1,712 | `58f63ef8` |
-| ARM shell, full-userland and desktop init | `build-support/init-aarch64/initcore` | 731 | `58f63ef8` |
-| M1 Wi-Fi control utility | `tools/m1-wifi/core` | 110 | `58f63ef8` |
-| EGL/GLUT samples | `gl-triangle/{eglcore,glutcore}` | 557 | `58f63ef8` |
-| **Total** | | **10,191** | |
+| Completed continuation | Commit |
+| --- | --- |
+| Tracker native frame capture | `129c1f39` |
+| Security native boundaries | `49d01613` |
+| SRCU bindings | `09de736d` |
+| Console/benchmark variadic entries | `987dbcc6` |
+| Common LinuxKPI bindings | `d91f43b1` |
+| LinuxKPI runtime/logger bindings | `aa1d5bb8` |
+| Desktop backtraces/presenter and existing execinfo fixture | `a2fa1fac` |
+| Apple reporter | `4d18ab71` |
+| Venus availability probe | `a9f22eed` |
+| Dota early client | `a55c5147` |
+| ARM init syscall/restorer boundary | `5dc7b03d` |
+| AGX native adapter and existing fixture | `06fd0680` |
+| Task/wait bindings | `2103d3d8` |
+| Workqueue bindings | `a774ab2a` |
+| Dota low mappings, existing parser/probe fixtures | `5115a9e7` |
+| Steam i386/x86_64 robust-list preloads | `032eaa2d` |
+| QEMU VNC window client | `45f28820` |
 
-The tally excludes 1,573 original diagnostic lines and 25 runtime-fixture
-scaffolding lines. The 146-line synchronization and 710-line workqueue fixture
-bodies remain byte-for-byte C. Task/time/timer exclude 312 original diagnostic
-lines from the count; the private deadline-table observer now has a V ABI
-entry while the independent caller's assertions and deadlines remain intact.
-For several scopes, the complete new native binding translation units were
-subtracted even though they contain declarations and new scaffolding.
-The detailed scope arithmetic is in [kernel-v-migration.md](kernel-v-migration.md).
+`kernel/c/*.c` now has **zero non-fixture maintained files**. Public header
+algorithms and independent fixtures still remain C. The instruction applies
+throughout the repository, including support utilities, tests and SDK headers.
+The current committed census contains 237 non-vendored `.c` paths / 54,233 lines
+(19 kernel fixtures / 5,448 lines, 210 test paths / 47,713 lines, two Apple
+fixtures / 168 lines, five support files / 899 lines and hello / five lines).
+This census is a scope guide, not a translation tally; genuine retained musl
+evidence requires provenance classification and headers/embedded sources are
+additional work. Recount before selecting the next stage.
 
-The preceding batch's 9,989 C implementation lines and 1,119 header/include
-implementation lines, including SMC, AGX G17, ext2, ANS, SPI, speakers, Wi-Fi,
-networking and earlier LinuxKPI helpers, are recorded there too. Keep the
-unmodified Linux, nanoprintf, lwIP and other imported libraries intact.
+The immutable archive (`7ee28d8e`) pins 145 records by exact commit/path/blob,
+SHA256, bytes and mode. It recovers 108 frozen first-party/generated C snapshots
+(75,192 lines), two frozen shell builders and one embedded init outside the
+checkout. It earns **zero translation credit**. All records, 510 campaign
+integrity assertions and three byte-identical recomputations passed. Genuine
+patched musl evidence remains preserved. Use
+`tests/alloc-bench/materialize-evidence.py`; never restore frozen benchmark C
+as maintained implementation.
 
-## Remaining kernel C
+## In progress at this handoff
 
-At the completed source revision, the top-level `kernel/c/*.c` inventory,
-excluding files named `*_test.c`, is **611 lines across ten files**. These are
-native bindings rather than the previously remaining LinuxKPI engines.
-Counts include comments and blank lines.
+The shared checkout has uncommitted coordinated work. Re-read diffs before
+continuing and do not commit others' paths:
 
-| File under `kernel/c/` | Lines | Native boundary |
-| --- | ---: | --- |
-| `alloc_track.c` | 9 | Capture the original native frame and retain it during the V walk |
-| `linuxkpi_printk_v_primitives.c` | 97 | Native `va_list`, variadic entries, header/task access and worker creation |
-| `linuxkpi_runtime_v_primitives.c` | 89 | Imported PCI tables, Linux field/header access and variadic formatting |
-| `linuxkpi_srcu_v_primitives.c` | 83 | Checked SRCU/work/timer layouts and Linux inline/header bindings |
-| `linuxkpi_task_v_primitives.c` | 41 | Checked task/time/timer layouts, tick aliases and native worker ABI |
-| `linuxkpi_v_primitives.c` | 54 | Existing Linux primitives, task fields, warnings and per-CPU linker storage |
-| `linuxkpi_wait_v_primitives.c` | 81 | Checked lock/wait layouts, bit access and actual C callback identities |
-| `linuxkpi_workqueue_v_primitives.c` | 81 | Native callback addresses, pthread/header access and variadic queue naming |
-| `printf.c` | 63 | Native variadic/nanoprintf entry points and ABI policy calls |
-| `printf_benchmark.c` | 13 | Native variadic benchmark entry and nanoprintf callback ABI |
-| **Total** | **611** | |
-
-Public C headers, independent C fixtures and committed benchmark source
-snapshots remain counted honestly. A larger C language-graph total therefore
-does not imply that these migrated engines remain C. Recount from committed
-source before selecting further first-party implementations; do not remove
-necessary ABI bindings or mark them vendored to change the graph.
+- Four native LinuxKPI fixtures (cache 242, i915 138, PCI 308, runtime 430) are V
+  in `kernel/linuxkpi/*fixture`; original C deletions and exact integration are
+  pending. Full host sanitizers/golden/upstream/header checks passed, both
+  architecture builds passed and 700 source hashes were frozen. The first
+  native guest failed the generic early compatibility selftest, so the stage
+  is **not committed/validated** yet. Diagnose its exact unchanged condition;
+  do not weaken assertions. Source/proof files: `fixture-native-source.json`,
+  `fixture-native-kernels.json`, `fixture-native-qemu.log`, `fng/serial.log`.
+- Task/time/timer 353, sync 160, wound/wait 321 and I/O 460 native fixtures are
+  being prepared in `.pending` V paths. Keep their original integration until
+  the preceding stage succeeds. Preserve every original loop/deadline, native
+  callback address and join/unlink before stack expiry.
+- LinuxKPI first-party overlay header algorithms are moving to
+  `headercore/primitive.v`, with surgical foreign-field metadata additions in
+  common/wait modules. Full host and standalone header checks pass; final
+  isolated builds/native guest and own-path commit remain required. Preserve
+  generic exchange/CAS widths including 128-bit, and native long-long spelling.
+- Android runtime 610 is in native V with actual pthread types and generated
+  readonly 128-thunk data. Frozen original-C/V host and x86 native comparisons
+  passed; final ARM repeat after readonly-table correction is pending. Its
+  genuine pinned musl statistics provider is mandatory; a stale staging loader
+  lacked that export and failed the original C before reaching V.
+- Office PE ABI 123, Xinput launcher 73, Wine host boundary 22 and hello 5 are next
+  support scopes. Main-kernel native/header algorithms and generated declaration
+  headers are still outstanding, as are remaining independent test sources.
 
 ## Validation and evidence
 
-Host sanitizer fixtures, required subsystem checks, both architecture builds
-and the relevant native guests passed for the ports. Independent lifetime
-review covered every new ownership boundary. The allocation-site allowlist
-check still fails on the unchanged baseline as described below; this batch
-does **not** claim that every repository check passes.
+Current local cache:
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
+The older 10,191-line batch cache is
+`/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/`.
+These are machine-local caches; the committed migration document is durable.
 
-The complete LinuxKPI guest passed on four CPUs with `qemu64`, TCG,
-`LINUXKPI=1`, `PROD=false`, and `-O2`. It covered caches/per-CPU storage, task
-references, timed waits, timer retirement, ordered/delayed/bound/unbound/
-priority/system workqueues, worker OOM rollback, SRCU, wound/wait, bit/I/O
-waits, logging, sequence counters, scheduler and FPU. Every measured batch
-returned to its exact free-page baseline. Tested kernel ELF SHA256:
-`9edf46d7d6f29de1f101567887879526c566dd5cc6e1c00564b5736b22bc7135`.
-Both builds, ARM boot and default `LINUXKPI=0` x86 boot also passed.
+Completed kernel-native stages passed sanitizer fixtures, both builds and
+appropriate guests. Full LinuxKPI diagnostics passed four-CPU qemu64/TCG,
+LINUXKPI=1, PROD=false, -O2, with exact free-page baselines. Final task/wait/WQ
+x86 ELF SHA256:
+`3b6164b1853caa8adac1aceca0a32d32a22b6023f83fbf2cf43c4104d9783399`;
+ARM:
+`86860faa0b4fa595eb53b5ce1d551e0d5c8bd323ae6b593631e9a30c5a20c179`.
+The first full run failed an original timer callback watchdog/count condition;
+the closest untouched C-boundary kernel passed and the identical new frozen
+kernel passed on repeat. Preserve the failed attempt and both comparison logs.
+Host contention is a plausible explanation, not established causation. No
+assertion or fixture deadline changed.
 
-The final source audit matches all 672 tracked kernel files to `db601f94`
-in each architecture tree, and both final builds exited successfully. The
-final default x86 hypervisor guest passed with ELF SHA256
-`13b771fb76e1e2f47976124d86639045027a15604e29482db58556844cc500a4`;
-the GCC sampler object remains unchanged (`a1423ea8…`). Final ARM ELF SHA256
-is `945416243c26087a94243d3e47e370881afc3e3c6db2a8a544317c18cc33f7f6`;
-its final desktop plan completed all 44 required reports across
-`ops,churn,cache,idle,apps,drag`, with screenshot checks for app launch/dragging.
+Desktop native backtraces, full links and `idle,apps,drag` passed on both
+architectures. The presenter passed 67 sanitizer failure/lifetime cases and 32
+zero-resource lifecycles. ARM init passed all three boot policies/all six
+markers; one earlier run could not save evidence after host ENOSPC. Steam
+passed actual 32/64-bit layouts, 16 × 1,000 concurrent table cycles and four
+translated original-C/V variants. Dota passed actual patched-translator C/C,
+C/V and V/V, all 50 original probe conditions and 24 parser cases × 257 chunk
+boundaries. VNC passed 34 differential outcomes, both native mocks and actual
+ARM X11 link. New lifetimes received independent review.
 
-Repeated `ops,churn` comparisons completed 80 reports each on the final V
-kernel and unchanged `823aeb11` C kernel (ELF SHA256
-`54732d4b8094d88eb3b4c6c7896ebf1008d1ca884c5165f9a2a571add19ba6b5`).
-Image, desktop, compiler/dependencies and frozen fixtures matched; counts stayed
-at 200 operations per case and 300 executions per program, with one DONE marker
-and no errors per completed guest. Raw heap-class/large-page deltas match in 71/72 operation
-reports, including all 36 warm reports; the only difference is one additional
-64-byte object in V's cold `stat` snapshot.
-
-This is not a universal flat-memory result. Existing VFS retention matches
-both kernels, both directories and both rounds: `mkdir` keeps 208 bytes per
-operation (+200 objects each in size-16/size-192), while `rename` and
-`rename_over` keep 180/160 size-16 objects per 200 operations. These VFS paths
-are unchanged by this batch. Whole-machine churn residuals vary from 0–80 KiB
-on C and 16–48 KiB on V; no new consistent per-operation object-growth pattern
-was observed. Keep these residuals and limitations explicit when discussing
-memory verification. Do not weaken assertions or conflate complete metric
-collection with zero retained memory.
-
-The shared heap sampler passed 674,496 host allocation/free pairs and all
-three native workload phases, with GCC 14.2.0 and checksum 27,358,432. The
-GCC-linked x86 kernel also passed the full default hypervisor guest. Its
-frozen and ISO-extracted ELF SHA256 is
-`1d36d30c4fb63886df8dd77f2f0e3124069d242726d87bc962ed53713f1e8cf5`.
-The new sampler has not run inside XNU; historical macOS benchmark captures
-remain evidence of their original C workload.
-
-The final V EGL binary passed all eight ARM Mesa fake-G17 rendering/fence/
-resource/lifetime cases with an exact dependency image. ELF SHA256:
-`4c165b986d67c3230c6d6a75d3678c482379cc612ba8fef795fddacbfdcd15b0`.
-One repeat hit an intermittent queue-destroy/retirement timing expectation in
-the unchanged ioctl fixture. The original C baseline and final unchanged V
-pipeline both passed. Failure/comparison logs remain preserved; no assertion
-or deadline was weakened.
-
-The Apple loader passed sanitizer/layout fixtures and complete fake-iBoot
-QEMU, with loader SHA256
-`029ccc584d10d99a8e558fe1d0a9d5602c26c0148ab0cf85bf62f0bcbfeb537a`.
-Real-ADT QEMU stopped at scheduler bootstrap (`spawn done, calling await...`)
-with both the untouched C loader and V port. That comparison remains
-unverified. Physical Apple boot/protocol/graphics/Wi-Fi operation, physical
-Metal tracing and the new XNU kext remain untested. Local TCG cannot verify
-actual VMX execution without nested VT-x.
-
-Security utility fixtures and native sandbox/audit guests passed on both
-architectures. X11 input and Wine input/selection fixtures passed in both
-native architectures, and Wi-Fi passed eleven native device-model cases on
-each. ARM shell/full/desktop init guests passed, including signal forwarding,
-restart and adopted-child process-group retirement; all nineteen existing
-bootstrap assertions passed. These models do not prove operation of physical
-hardware or optional GPU/Hyprland/Wi-Fi init branches.
-
-`tests/kernel-allocs/run.sh` reports **158 allowlist rejections** both on the
-untouched `823aeb11` baseline and after the ports. Both have 354 ARM warnings,
-293 x86 warnings and 414 distinct sites across architectures. Per-file/kind
-counts have zero additions or removals. The allowlist and harness were left
-unchanged; their delimiters are actual tabs. Production opt-in `compatcore`
-generation with `-warn-about-allocs` reports zero allocation warnings, and
-new generated code was inspected for implicit allocator imports. This is
-baseline evidence, not an allowlist PASS or a replacement for measured
-retirement checks.
-
-The diagnostic retirement policy from `94ed1845` remains: deferred reaping
-must be quiescent, free bytes stable for 500 ms, and retirement has a
-30-second allowance. Exact equality assertions remain intact. Earlier short
-baselines counted dying stacks, and extra worker tracing caused a completion
-timeout. The passing full guest keeps the original fixture deadlines and
-tracing disabled. Under host contention one bound-work marker was followed
-by many minutes without output before the worker/SRCU/wound-wait markers
-resumed and the suite passed. Compare future failures against an untouched
-baseline rather than weakening assertions.
-
-Local evidence is under
-`/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/`:
-
-- `compat-all-host-final.log`, `compat-all-{arm,x86}-build*.log`,
-  `compat-all-x86-qemu.log`, `compat-all-x86-guest/serial.log`,
-  `compat-all-{arm,x86}-kernel.json` and `compat-all-arm-qemu.log`.
-- `heap-sampler-host.log`, `heap-gcc-qemu.log`, `heap-gcc-provenance.json`,
-  `heap-default-x86-boot.log` and `heap-gcc-x86-kernel.elf`.
-- `apple-stage{1,2}-*.log` and `apple-stage2-loader.json`, including the
-  preserved real-ADT comparison.
-- `gl-mesa-qemu-exact-3.log`, `gl-c-baseline-qemu.log`,
-  `gl-mesa-pipeline-2.log`, `gl-vm-final-2/validation.json` and the preserved
-  retry/comparison logs. The latter validation is the final committed pipeline;
-  the earlier exact-image pass remains separate evidence.
-- `wine-host-final*.log`, `wine-{arm,x86}-qemu3.log`,
-  `xinput-host-final*.log`, `xinput-{arm,x86}-qemu*.log`,
-  `wifi-ctl-validation.json` and `wifi-{arm,x86}-guest.log`.
-- `init-policy-host.log`, `init-policy-qemu.log`,
-  `init-stage/validation.json` and `init-guests/*/serial.log`.
-- `kernel-alloc-sites.log`, `kernel-alloc-baseline-823.log`,
-  `kernel-alloc-baseline-compare.json`, `kernel-alloc-opt-core.log` and
-  `alloc-opt-core/compat.c`.
-- `final-source-{arm,x86}-build.log` for the completed exact-source builds
-  and `final-source-x86-qemu.log` for the final default x86 guest.
-- `perf-final/final-validation-summary.json`, `combined-validation.json`,
-  `warm-validation.json`, `baseline-validation.json`, raw serial logs and
-  `retention-review/matched-comparison.{json,txt}`. Missing-directory archive
-  setup and firmware-only startup attempts are preserved separately; final
-  comparisons used unchanged firmware/configuration/fixtures.
-
-These are machine-local caches. The committed migration document is the
-final durable record; do not assume caches exist on another machine or use
-an old worktree binary as validation of a future edit.
+The existing allocation-site check still rejects the same 158 sites on the
+unchanged baseline (354 ARM, 293 x86, 414 distinct); keep the allowlist intact.
+Earlier repeated ops/churn found identical warm heap deltas, but unchanged VFS
+retention remains: mkdir 208 B/op and rename residuals. Do not claim universal
+flat memory. See the migration record for raw measurements and exact inputs.
+Physical Apple protocols/graphics, Darwin tracing, XNU execution and actual VMX
+under TCG remain unverified. Native QEMU mocks do not establish hardware results.
+Completed disposable guest image inputs may be removed after recording hashes;
+serial logs, ELFs, metadata and removal manifests remain.
 
 ## Build and test setup
 
@@ -229,7 +152,7 @@ Respect `build-support/find-v.sh` and recheck versions before a new stage.
 Use explicit `make -C <worktree>/kernel`, not a root userland build.
 
 Current isolated source trees include `worktree-arm` and `worktree-x86`
-inside the batch cache above. Other worktrees elsewhere in
+inside the first-party cache above. Other worktrees elsewhere in
 `/Users/alex/.cache/vinix-c-to-v/` contain earlier bases and staged copies.
 Prefer fresh worktrees from current HEAD. Reuse or symlink untracked
 freestanding headers, architecture-specific cc-runtime dependencies,
@@ -300,12 +223,13 @@ Never compare benchmark captures from different workload/compiler policies.
   compares work/timer/wait functions or native APIs unregister callbacks.
 - Use explicit `voidptr` comparisons for pointer identity where V can emit
   structural comparisons, especially nested workqueue conditions.
-- Keep public C headers/layouts. `VINIX_V_RUNTIME` guards prevent generated
+- Preserve public native layouts; generate declaration headers from maintained V
+  ABI/configuration metadata. `VINIX_V_RUNTIME` guards prevent generated
   opaque-signature conflicts; escape reserved fields as `C.@type`/`C.@read`.
   Check private pool sizes/alignment and opaque storage with static assertions.
-- Linux macros/inlines can use narrow native bindings. Algorithms belong in
-  V; do not move complete C bodies into headers, strings or adapters. Keep
-  broad upstream Linux headers out of the main generated V blob.
+- Unmodified upstream Linux macros/inlines may be called by native V bindings.
+  First-party header algorithms belong in V; do not move complete C bodies
+  into headers, strings or adapters. Keep broad upstream Linux headers out of the main generated V blob.
 - Published stack waiter/run/cancel/barrier records must remain stack values
   and be detached under the same lock before their frames disappear. Saving
   callbacks/task identities before wake or invocation avoids later reads of
@@ -319,9 +243,9 @@ Never compare benchmark captures from different workload/compiler policies.
 - Extend production-core fixture generators rather than changing independent
   expected results. Host aliases for `strchr`, `strpbrk`, `strsep` avoid libc/
   sanitizer interposition; freestanding memory exports likewise need host aliases.
-- Native `va_list`, signal types/restorers and register syscalls remain narrow
-  ABI shims. V owns parsing/output/policy. Keep callback identity and synchronous
-  stack buffer borrowing intact across these boundaries.
+- Native variadic register access, restorers and raw syscalls use instruction-only
+  assembly when V cannot express the ABI. V owns parsing/output/policy. Keep
+  callback identity and synchronous stack buffer borrowing intact across these boundaries.
 - Empty condition-call loop bodies were dropped by this V compiler; explicit
   `continue` preserves EINTR/reaping loops. Names such as `print` can trigger
   built-in conversion behavior; inspect generated calls and allocator symbols.
@@ -333,25 +257,22 @@ Never compare benchmark captures from different workload/compiler policies.
 
 ## Git and language statistics
 
-Inspect `git diff HEAD -- <owned paths>` before committing those exact paths.
-Plain `git diff` can be empty when another session staged pending changes.
-Avoid `git add -A`, branch-wide cleanup, resetting shared worktrees and
-committing unrelated desktop/build edits. No push is requested. Re-read the
-current user request before selecting any further implementation scope.
+Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
+`git diff` can be empty when another session staged changes. Avoid broad
+staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
-At source commit `db601f941aafd7a9335fd2b54cc3dfb41e12e468`, Linguist 7.27.0
-reports **V 41.85%, C 23.71%**, with **557 C files, 385 Python files and 283
-shell files**. Inventory commit `56c6c584` records exact paths and committed
-blob sizes in [linguist-files.md](linguist-files.md). `.gitattributes` forces
-all `.v` to V and excludes third-party C. No Verilog or vendored trees appear
-in the counted inventory. New ABI headers and independent fixtures remain
-counted C; do not infer graph percentages from line counts.
+Linguist 7.27.0 at committed source
+`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb` reports **V 49.24%, C 13.10%**,
+430 C files, 400 Python files and 281 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,180 classified blobs
+were verified against Git; no Verilog or vendored trees appear. The archive
+changes maintained source inventory but contributes no translation credit.
+`.gitattributes` remains unchanged, with own fixtures/headers counted honestly.
 
-Local Linguist runs in Lima VM `vlin`, using the bare cache at
-`/Users/alex/.cache/vinix-linguist/repository.git` with object alternates to
-this checkout. Pass `--rev <committed-source-SHA>` explicitly. Use the checked
-helper at
-`/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/refresh-linguist-safe.py`.
-The older refresh helper has flawed snapshot-metadata handling. Update the
-source SHA and reproduction command, verify listed sizes against committed
-blobs, and keep first-party C counted honestly.
+Local Linguist runs in Lima VM `vlin`, using
+`/Users/alex/.cache/vinix-linguist/repository.git` with alternates to this
+checkout. Pass explicit `--rev <full-committed-source-SHA>`. The checked helper
+in the current first-party cache is `refresh-linguist-safe.py`. It verifies
+all listed bytes, source hash, reproduction command and percentages. Regenerate
+from a committed source revision after further ports; do not infer percentages
+from line counts or count archived evidence as translated work.
