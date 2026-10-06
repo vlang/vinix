@@ -1263,6 +1263,7 @@ fi
 # The PlayStation frontend/core are statically linked and need no X11 layer.
 if [ -x "$PS1_STAGING/usr/bin/vinix-ps1" ]; then
     install -m755 "$PS1_STAGING/usr/bin/vinix-ps1" "$STAGING/usr/bin/vinix-ps1"
+    rm -rf "$STAGING/usr/share/games/ps1"
     mkdir -p "$STAGING/usr/share/games/ps1"
     cp -R "$PS1_STAGING/usr/share/games/ps1/." "$STAGING/usr/share/games/ps1/"
     mkdir -p "$STAGING/usr/share/licenses/vinix-ps1"
