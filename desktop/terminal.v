@@ -142,6 +142,15 @@ mut:
 	search_pending [4]u8
 	search_pending_len int
 	search_escape_state int
+	selection_anchor TerminalSelectionPoint
+	selection_head TerminalSelectionPoint
+	selection_dragging bool
+	view_width int
+	view_height int
+	copy_client TextCopyClient
+	copy_key_pending [8]u8
+	copy_key_len int
+	copy_key_ms u64
 
 	// Escape parser state survives non-blocking reads. CSI parameters use a
 	// fixed array so a noisy child cannot allocate without bound.
@@ -409,6 +418,7 @@ fn (mut a TerminalApp) set_geometry(rows int, columns int) {
 	if a.rows == next_rows && a.columns == next_columns && a.screen.len == next_rows * next_columns {
 		return
 	}
+	a.clear_selection()
 
 	old_screen := a.screen
 	a.screen = terminal_resize_cells(old_screen, a.rows, a.columns, next_rows, next_columns)
@@ -443,12 +453,14 @@ fn (mut a TerminalApp) ensure_screen() {
 }
 
 fn (mut a TerminalApp) mark_row_dirty(row int) {
+	a.clear_selection()
 	if row >= 0 && row < a.dirty_rows.len {
 		a.dirty_rows[row] = true
 	}
 }
 
 fn (mut a TerminalApp) mark_all_rows_dirty() {
+	a.clear_selection()
 	for row in 0 .. a.dirty_rows.len {
 		a.dirty_rows[row] = true
 	}
@@ -544,6 +556,7 @@ fn terminal_cells_text(cells []rune, start int, end int, cursor int) string {
 }
 
 fn (mut a TerminalApp) push_history_row(row int) {
+	a.clear_selection()
 	unsafe { a.lines.flags |= .noslices }
 	a.lines << a.row_string(row)
 	for a.lines.len > terminal_scrollback {
@@ -675,11 +688,11 @@ fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int)
 }
 
 fn (mut a TerminalApp) poll() bool {
+	mut changed := a.expire_copy_key(desktop_monotonic_ms())
 	if a.terminal < 0 {
-		return false
+		return changed
 	}
 
-	mut changed := false
 	for _ in 0 .. terminal_reads_per_frame {
 		got := desktop_read(a.terminal, a.read_buf.data, u64(terminal_read_chunk))
 		if got <= 0 {
@@ -711,6 +724,7 @@ fn (mut a TerminalApp) poll() bool {
 // waiting for its user, whose typing polls it at once; background output
 // then shows within a quarter or half of a second instead of a tenth.
 fn (a &TerminalApp) next_poll_ms() u64 {
+	if a.copy_key_len > 0 { return terminal_active_poll_ms }
 	now := desktop_monotonic_ms()
 	if a.terminal < 0 {
 		return 0
@@ -1065,6 +1079,7 @@ fn (mut a TerminalApp) enter_alternate_screen() {
 	if a.alternate_screen {
 		return
 	}
+	a.clear_selection()
 	a.main_screen = a.screen
 	a.main_rows = a.rows
 	a.main_columns = a.columns
@@ -1085,6 +1100,7 @@ fn (mut a TerminalApp) leave_alternate_screen() {
 	if !a.alternate_screen {
 		return
 	}
+	a.clear_selection()
 	old_alternate := a.screen
 	a.screen = a.main_screen
 	a.main_screen = []rune{}
@@ -1262,19 +1278,14 @@ fn replaced_terminal_text(old string, next string) string {
 // VERASE, so normalize the desktop keyboard's Backspace byte to it.
 fn (mut a TerminalApp) key_input(text string) {
 	if a.search_open { a.search_input(text); return }
-	if a.terminal < 0 || a.exited || text.len == 0 {
-		return
-	}
-	mut input := []u8{cap: text.len}
-	for ch in text {
-		input << if ch == 8 { u8(0x7f) } else { ch }
-	}
-	desktop_write_all(a.terminal, input.data, u64(input.len))
-	unsafe { input.free() }
+	a.selection_key_input(text)
 }
 
 fn (mut a TerminalApp) paste_input(text string) {
 	if a.search_open { a.paste_search(text); return }
+	// Paste is literal shell input. A pending shortcut fragment precedes it;
+	// pasted CSI-u text is never interpreted as Copy.
+	a.flush_copy_key()
 	if a.terminal < 0 || a.exited || text.len == 0 {
 		return
 	}
@@ -1289,6 +1300,9 @@ fn (mut a TerminalApp) paste_input(text string) {
 
 fn (mut a TerminalApp) close_app() {
 	a.preserve_rebuild_snapshot()
+	a.copy_client.close()
+	a.clear_selection()
+	a.copy_key_len = 0
 	if a.search_query.cap > 0 { unsafe { a.search_query.free() } }
 	a.search_query = []u8{}
 	a.search_pending_len = 0
@@ -1302,13 +1316,27 @@ fn (mut a TerminalApp) close_app() {
 	}
 	a.pid = -1
 	a.exited = true
+	a.release_rendered_rows()
+	if a.screen.cap > 0 { unsafe { a.screen.free() } }
+	if a.main_screen.cap > 0 { unsafe { a.main_screen.free() } }
+	if a.lines.cap > 0 { unsafe { a.lines.free() } }
+	if a.read_buf.cap > 0 { unsafe { a.read_buf.free() } }
+	if a.error.len > 0 { unsafe { a.error.free() } }
+	a.screen = []rune{}
+	a.main_screen = []rune{}
+	a.lines = []string{}
+	a.read_buf = []u8{}
+	a.error = ''
 }
 
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	a.visible_rows = if height > terminal_toolbar_height + 2 * terminal_padding + terminal_row_height {
-		(height - terminal_toolbar_height - 2 * terminal_padding) / terminal_row_height
+	if a.view_width != width || a.view_height != height { a.clear_selection() }
+	a.view_width = width
+	a.view_height = height
+	a.visible_rows = if height > terminal_toolbar_height + terminal_selection_status_height + 2 * terminal_padding + terminal_row_height {
+		(height - terminal_toolbar_height - terminal_selection_status_height - 2 * terminal_padding) / terminal_row_height
 	} else {
 		1
 	}
@@ -1338,7 +1366,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	}
 	first := a.lines.len - a.scroll
 
-	mut children := frame_elements(a.visible_rows + 8)
+	mut children := frame_elements(a.visible_rows * 2 + 10)
 	a.build_search_toolbar(mut children, width)
 	for row in 0 .. a.visible_rows {
 		index := first + row
@@ -1348,14 +1376,13 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			screen_row := if a.alternate_screen { row } else { index - a.lines.len }
 			a.rendered_row(screen_row)
 		}
-		if text.len == 0 {
-			continue
-		}
 		row_y := terminal_toolbar_height + terminal_padding + row * terminal_row_height
 		if a.search_open && a.search_match == (if a.alternate_screen { row } else { index }) {
 			children << ui2.view('', ui2.rect(f64(terminal_padding), f64(row_y), f64(width - 2 * terminal_padding), f64(terminal_row_height)),
 				ui2.BoxStyle{ bg: terminal_button }, [])
 		}
+		a.build_selection_highlight(mut children, if a.alternate_screen { row } else { index }, row_y, width)
+		if text.len == 0 { continue }
 		children << ui2.label('', text, ui2.rect(f64(terminal_padding), f64(row_y), f64(width - 2 * terminal_padding), f64(terminal_row_height)), ui2.TextStyle{
 			color:       terminal_text
 			font_family: 'mono'
@@ -1383,11 +1410,13 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			align: .center
 		})
 	}
+	a.build_selection_status(mut children, width, height)
 
 	return ui2.screen(terminal_bg, children)
 }
 
 fn (mut a TerminalApp) handle(event_id string) ! {
+	if event_id == terminal_action_copy { a.copy_selection(); return }
 	if a.handle_search(event_id) { return }
 	match event_id {
 		terminal_action_scroll_up {

@@ -11,6 +11,7 @@ const terminal_action_clear_history = 'term.history.clear'
 const terminal_search_limit = 128
 
 fn (mut a TerminalApp) clear_scrollback() {
+	a.clear_selection()
 	for line in a.lines { if line.len > 0 { unsafe { line.free() } } }
 	a.lines.clear()
 	a.scroll = 0
@@ -103,8 +104,8 @@ fn (mut a TerminalApp) paste_search(text string) {
 
 fn (mut a TerminalApp) handle_search(action string) bool {
 	match action {
-		terminal_action_find { a.search_open = !a.search_open }
-		'term.find.field' { a.search_open = true }
+		terminal_action_find { a.flush_copy_key(); a.selection_dragging = false; a.search_open = !a.search_open }
+		'term.find.field' { a.flush_copy_key(); a.selection_dragging = false; a.search_open = true }
 		terminal_action_find_previous { a.find_output(-1) }
 		terminal_action_find_next { a.find_output(1) }
 		terminal_action_clear_history { a.clear_scrollback() }
@@ -116,15 +117,21 @@ fn (mut a TerminalApp) handle_search(action string) bool {
 fn (a &TerminalApp) build_search_toolbar(mut children []ui2.Element, width int) {
 	children << ui2.button(terminal_action_find, tr('terminal.find'), ui2.rect(8, 3, 60, 24),
 		ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
+	children << ui2.Element{
+		...ui2.button(terminal_action_copy, tr('terminal.selection.copy'), ui2.rect(76, 3, 60, 24),
+			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
+		enabled: a.has_selection()
+		tooltip: tr('terminal.selection.hint')
+	}
 	if !a.search_open {
-		children << ui2.button(terminal_action_clear_history, tr('terminal.history.clear'), ui2.rect(76, 3, 148, 24),
+		children << ui2.button(terminal_action_clear_history, tr('terminal.history.clear'), ui2.rect(144, 3, 148, 24),
 			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
 		return
 	}
-	field_width := if width > 164 { width - 164 } else { 1 }
+	field_width := if width > 232 { width - 232 } else { 1 }
 	children << ui2.Element{
 		...ui2.text_field('term.find.field', tr('terminal.find.placeholder'), editor_bytes_text(a.search_query),
-			ui2.rect(76, 3, f64(field_width), 24), ui2.BoxStyle{ bg: terminal_button, radius: 4 },
+			ui2.rect(144, 3, f64(field_width), 24), ui2.BoxStyle{ bg: terminal_button, radius: 4 },
 			ui2.TextStyle{ color: terminal_text, size: 11 }, 0)
 		focused: true
 	}
