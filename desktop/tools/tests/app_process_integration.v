@@ -392,7 +392,7 @@ fn check_utility_copy_clients() {
 	check_programmer_calculator_client(mut desktop)
 	check_terminal_copy_client(mut desktop)
 	check_preview_orientation_client(home, mut desktop)
-	if os.exists('/proc/version') { assert os.exists('/dev/processes') }
+	if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
 	println('IPC utility copy workflows passed')
 }
 
@@ -502,8 +502,10 @@ fn check_terminal_copy_client(mut desktop Desktop) {
 	app.handle('term.selection.copy') or { panic(err) }
 	integration_assert_clipboard(&desktop, expected)
 	integration_assert_text(mut app, ui2.rect(0, 0, 560, 316), tr('clipboard.copy.copied'))
+	assert desktop.clipboard.set_local_text('Cmd-C must replace this text')
 	if mut app is RemoteApp { app.key_input('\x1b[99;9u') }
 	integration_assert_clipboard(&desktop, expected)
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 316), tr('clipboard.copy.copied'))
 	if mut app is RemoteApp { app.key_input('\x03') }
 	integration_assert_clipboard(&desktop, expected)
 	println('IPC Terminal UTF-8 pointer selection, Copy, Cmd-C and Ctrl-C passed')
@@ -567,6 +569,9 @@ fn check_programmer_calculator_client(mut desktop Desktop) {
 	}
 	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('calculator.programmer.error.shift'))
 	integration_assert_integer(mut app, ['64', '40', '100', '1000000']!)
+	app.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, '1111111111111111111111111111111111111111111111111111111111111111')
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('clipboard.copy.empty'))
 	app.handle('calculator.programmer.clear') or { panic(err) }
 	app.handle('calculator.programmer.base.hex') or { panic(err) }
 	if mut app is RemoteApp {
