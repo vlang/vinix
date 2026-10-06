@@ -99,7 +99,9 @@ static pid_t start(const char *path, const char *logfile) {
             setenv("VINIX_IOS_DOCUMENTS", "/opt/ios/ppsspp-documents", 1);
             setenv("VINIX_IOS_EXIT_ON_CLOSE", "1", 1);
             if (!access("/opt/ios/ppsspp-muted", F_OK)) {
-                execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", (char *)NULL);
+                if (!access("/opt/ios/ppsspp-cube", F_OK))
+                    execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", "/opt/ios/cube.pbp", (char *)NULL);
+                else execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", (char *)NULL);
                 _exit(127);
             }
         }
@@ -186,6 +188,7 @@ void test_gles_ui(void) {
 }
 
 void test_ppsspp_ui(void) {
+    int cube = access("/opt/ios/ppsspp-cube", F_OK) == 0;
     expected_audio_failure = access("/opt/ios/ppsspp-muted", F_OK) != 0;
     (void)start("/opt/ios/PPSSPP", "/tmp/ios-ppsspp-ui.log");
     if (expected_audio_failure) {
@@ -209,9 +212,18 @@ void test_ppsspp_ui(void) {
     memcpy(first, surface + 12 + active * pixels, pixels * 4);
     __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
     for (unsigned tick = 0; tick < 180; ++tick) { usleep(20000); command(4, ""); }
+    if (cube) {
+        // Compare two frames after boot, so the splash-to-game transition
+        // alone cannot count as successful PSP execution or animation.
+        active = __atomic_load_n(surface + 7, __ATOMIC_ACQUIRE);
+        if (active > 1) fail("PSP cube baseline buffer");
+        __atomic_store_n(surface + 8, active, __ATOMIC_RELEASE);
+        memcpy(first, surface + 12 + active * pixels, pixels * 4);
+        __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
+    }
     // The original menu's Settings gear: route a real UIKit touch pair to its
     // native controller, then render the resulting settings screen.
-    pointer(1, 230, 34); pointer(2, 230, 34);
+    if (!cube) { pointer(1, 230, 34); pointer(2, 230, 34); }
     for (unsigned tick = 0; tick < 60; ++tick) { usleep(20000); command(4, ""); }
     active = __atomic_load_n(surface + 7, __ATOMIC_ACQUIRE);
     if (active > 1) fail("PPSSPP final active buffer");
@@ -228,7 +240,28 @@ void test_ppsspp_ui(void) {
     }
     unsigned distinct = 0;
     for (unsigned index = 0; index < sizeof(colors); ++index) distinct += colors[index];
-    if (changed < 1000 || lit < pixels / 4 || distinct < 16) fail("PPSSPP native scene did not render changing detailed pixels");
+    if ((!cube && changed < 1000) || lit < pixels / 4 || distinct < 16) fail("PPSSPP native scene did not render changing detailed pixels");
+    if (cube) {
+        unsigned background[2] = {0}, colored[2] = {0}, animated = 0;
+        for (unsigned y = 80; y < 240; ++y) for (unsigned x = 80; x < 310; ++x) {
+            unsigned index = y * 390 + x;
+            uint32_t frames[2] = {first[index], last[index]};
+            if (frames[0] != frames[1]) ++animated;
+            for (unsigned frame = 0; frame < 2; ++frame) {
+                uint32_t color = frames[frame] & 0xffffff;
+                if (color == 0x334455) ++background[frame]; // Demo's sceGuClearColor(0xff554433), ABGR.
+                unsigned r = color >> 16, g = (color >> 8) & 255, b = color & 255;
+                unsigned high = r > g ? r : g, low = r < g ? r : g;
+                if (b > high) high = b;
+                if (b < low) low = b;
+                if (high > 150 && high - low > 50) ++colored[frame];
+            }
+        }
+        printf("IOS-PSP-CUBE: background=%u/%u colored=%u/%u animated=%u\n",
+            background[0], background[1], colored[0], colored[1], animated);
+        if (background[0] < 2000 || background[1] < 2000 || colored[0] < 2000 ||
+            colored[1] < 2000 || animated < 1000) fail("PSP cube background, textured geometry or animation");
+    }
     // Export an actual framebuffer for visual review, sampled at two pixels.
     puts("IOS-PPSSPP-FRAME: 195 340");
     for (unsigned y = 0; y < 680; y += 2) {
@@ -249,5 +282,10 @@ void test_ppsspp_ui(void) {
     fclose(log);
     if (!strstr(diagnostics, "SceneDelegate: Launching PPSSPP") || !strstr(diagnostics, "RobotoCondensed-Regular") ||
         strstr(diagnostics, "V panic") || strstr(diagnostics, "terminate called")) fail("PPSSPP native startup/lifecycle");
+    if (cube) {
+        if (!strstr(diagnostics, "startup path passed to argv: /opt/ios/cube.pbp") ||
+            !strstr(diagnostics, "Booted /opt/ios/cube.pbp...")) fail("PSP homebrew native boot");
+        puts("iOS PASS: unchanged PPSSPP iOS binary executes PSP cube homebrew");
+    }
     puts("iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)");
 }

@@ -5,6 +5,7 @@ import time
 
 #include <locale.h>
 #include <wctype.h>
+#include <wchar.h>
 #include <setjmp.h>
 fn C.setjmp(voidptr) i32
 fn C.longjmp(voidptr, i32)
@@ -12,6 +13,12 @@ fn C._setjmp(voidptr) i32
 fn C._longjmp(voidptr, i32)
 fn C.towlower(u32) u32
 fn C.towupper(u32) u32
+fn C.wmemchr(&i32, i32, usize) &i32
+fn C.wmemcmp(&i32, &i32, usize) i32
+fn C.wmemcpy(&i32, &i32, usize) &i32
+fn C.wmemmove(&i32, &i32, usize) &i32
+fn C.wmemset(&i32, i32, usize) &i32
+fn C.wcslen(&i32) usize
 
 fn darwin_rune_lower(value i32) i32 { return i32(C.towlower(u32(value))) }
 fn darwin_rune_upper(value i32) i32 { return i32(C.towupper(u32(value))) }
@@ -149,8 +156,32 @@ fn darwin_memset_checked(destination voidptr, value i32, size usize, capacity us
     return C.memset(destination, value, size)
 }
 fn darwin_stack_fail() { panic('iOS: native stack protector detected corruption') }
+fn darwin_memset_pattern(destination voidptr, pattern voidptr, length usize, width usize) {
+	if length == 0 { return }
+	mut bytes := [16]u8{}
+	unsafe { C.memcpy(&bytes[0], pattern, width) }
+	mut offset := usize(0)
+	for offset < length {
+		count := if width < length - offset { width } else { length - offset }
+		unsafe { C.memcpy(voidptr(usize(destination) + offset), &bytes[0], count) }
+		offset += count
+	}
+}
+fn darwin_memset_pattern4(destination voidptr, pattern voidptr, length usize) { darwin_memset_pattern(destination, pattern, length, 4) }
+fn darwin_memset_pattern8(destination voidptr, pattern voidptr, length usize) { darwin_memset_pattern(destination, pattern, length, 8) }
+fn darwin_memset_pattern16(destination voidptr, pattern voidptr, length usize) { darwin_memset_pattern(destination, pattern, length, 16) }
 fn fixed_symbol(symbol string) ?u64 {
     return match symbol {
+		// wchar_t is signed 32-bit in both Darwin ARM64 and the native libc.
+		'_wmemchr' { u64(unsafe { voidptr(C.wmemchr) }) }
+		'_wmemcmp' { u64(unsafe { voidptr(C.wmemcmp) }) }
+		'_wmemcpy' { u64(unsafe { voidptr(C.wmemcpy) }) }
+		'_wmemmove' { u64(unsafe { voidptr(C.wmemmove) }) }
+		'_wmemset' { u64(unsafe { voidptr(C.wmemset) }) }
+		'_wcslen' { u64(unsafe { voidptr(C.wcslen) }) }
+		'_memset_pattern4' { u64(unsafe { voidptr(darwin_memset_pattern4) }) }
+		'_memset_pattern8' { u64(unsafe { voidptr(darwin_memset_pattern8) }) }
+		'_memset_pattern16' { u64(unsafe { voidptr(darwin_memset_pattern16) }) }
 		// The ARM64 native routines touch only the first 176 bytes of their
 		// opaque buffer, inside Darwin's 192-byte jmp_buf. Resolve their entry
 		// points directly: a V wrapper would save a frame that has returned.

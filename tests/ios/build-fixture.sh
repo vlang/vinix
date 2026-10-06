@@ -43,3 +43,10 @@ cp "$repo/tests/ios/scene.plist" "$output/SceneFixture.app/Info.plist"
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -no_fixup_chains -e _main "$output/arc-threads.o" "$repo/tests/ios/libSystem.tbd" \
     "$repo/tests/ios/startup.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" -o "$output/arc-threads"
+
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -isysroot "$SDK" \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror -Wno-error=incompatible-sysroot \
+    -c "$repo/tests/ios/mach-memory.c" -o "$output/mach-memory.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -no_fixup_chains -e _main "$output/mach-memory.o" "$repo/tests/ios/libSystem.tbd" \
+    -o "$output/mach-memory"

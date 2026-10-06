@@ -17,7 +17,9 @@ FEATURES = (
     b"iOS PASS: lazy function imports defer unsupported calls",
     b"iOS PASS: Darwin stdio, varargs and system queries",
     b"iOS PASS: native UIKit scene and application launch",
+    b"iOS PASS: native file launch and scene URL ownership",
     b"iOS PASS: thread-safe ARC and autorelease pools",
+    b"iOS PASS: native Mach VM aliases and mapping lifetime",
     b"iOS PASS: return status and unsupported imports",
     b"iOS PASS: universal executable selects ARM64",
     b"iOS PASS: ARM64e and malformed images rejected",
@@ -50,6 +52,7 @@ def main() -> int:
     parser.add_argument("--with-gles", action="store_true", help="run with the optional Mesa GLES backend and native graphics fixture")
     parser.add_argument("--with-ppsspp", action="store_true", help="probe native PPSSPP scene startup and report its unsupported API")
     parser.add_argument("--ppsspp-muted", action="store_true", help="test PPSSPP with its ordinary Sound/Enable=False preference")
+    parser.add_argument("--ppsspp-cube", action="store_true", help="boot the pinned upstream PSP rotating-cube demo in the unchanged iOS app")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
@@ -58,6 +61,8 @@ def main() -> int:
         parser.error("--with-ppsspp requires --with-cxx for PPSSPP's native C++ runtime")
     if arguments.ppsspp_muted and not (arguments.with_ppsspp and arguments.with_gles):
         parser.error("--ppsspp-muted requires --with-ppsspp and --with-gles")
+    if arguments.ppsspp_cube and not arguments.ppsspp_muted:
+        parser.error("--ppsspp-cube requires --ppsspp-muted")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")]
@@ -77,6 +82,9 @@ def main() -> int:
     if arguments.with_ppsspp or arguments.with_gles:
         subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download.py"),
             "--output", str(build / "ppsspp")], check=True)
+    if arguments.ppsspp_cube:
+        subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download-cube.py"),
+            "--output", str(build / "ppsspp/cube.pbp")], check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
@@ -89,6 +97,8 @@ def main() -> int:
     ) if arguments.with_2048 else ())
     if arguments.with_ppsspp:
         runner.FEATURE_MARKERS += (b"iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)",) if arguments.ppsspp_muted else (b"iOS BLOCKED: upstream PPSSPP unsupported API reached at runtime",)
+    if arguments.ppsspp_cube:
+        runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary executes PSP cube homebrew",)
     if arguments.with_cxx:
         runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
         runner.FEATURE_MARKERS += (b"iOS PASS: Objective-C image startup and C++ ivars",)
@@ -103,6 +113,7 @@ def main() -> int:
         for name in ("root", "sbin", "proc", "sys", "dev", "tmp", "opt/ios"):
             (rootfs / name).mkdir(parents=True)
         destination = rootfs / "opt/ios"
+        (destination / "launch name#é%?.bin").write_bytes(b"native file launch fixture\n")
         shutil.copy2(build / "staging/usr/bin" / ("run-ios-gles" if arguments.with_gles else "run-ios"), destination / "run-ios")
         if arguments.with_gles:
             shutil.copytree(build / "staging/usr/lib/vinix/ios-gles", rootfs / "usr/lib/vinix/ios-gles", symlinks=True)
@@ -111,7 +122,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "lazy", "stdio", "arc-threads"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         if arguments.with_cxx:
@@ -131,6 +142,9 @@ def main() -> int:
                 shutil.copy2(build / "staging/usr/bin/run-ios-gles", binary / "run-ios-gles")
                 (binary / "vinix-ios-ppsspp").symlink_to("run-ios-gles")
                 (destination / "ppsspp-muted").touch()
+                if arguments.ppsspp_cube:
+                    shutil.copy2(build / "ppsspp/cube.pbp", destination / "cube.pbp")
+                    (destination / "ppsspp-cube").touch()
             else:
                 shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app")
                 (destination / "PPSSPP").symlink_to("PPSSPP.app/PPSSPP")

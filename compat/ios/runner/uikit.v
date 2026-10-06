@@ -48,6 +48,8 @@ fn invoke_void(object u64, selector &char) {
 	}
 }
 
+type ObjBoolQuery = fn (u64, &char) bool
+
 @[export: 'ios_dispatch']
 fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 	mut object := frame.x[0]
@@ -144,6 +146,28 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		return true
 	}
 	mut header := obj_header(object)
+	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
+		match selector {
+			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures' {
+				query := c'preferredScreenEdgesDeferringSystemGestures'
+				imp := native_method(read64(object), ctext(u64(query)))
+				header.deferred_system_edges = if imp == 0 { u64(0) } else { unsafe { ObjInit(voidptr(imp))(object, query) } }
+				// Vinix delivers pointer events throughout the content area;
+				// it has no system swipe that competes with these edges.
+				return true
+			}
+			'setNeedsUpdateOfHomeIndicatorAutoHidden' {
+				query := c'prefersHomeIndicatorAutoHidden'
+				imp := native_method(read64(object), ctext(u64(query)))
+				header.home_indicator_hidden = imp != 0 && unsafe { ObjBoolQuery(voidptr(imp))(object, query) }
+				// The desktop window has no iOS home-indicator overlay.
+				return true
+			}
+			'preferredScreenEdgesDeferringSystemGestures' { frame.x[0] = 0; return true }
+			'prefersHomeIndicatorAutoHidden' { frame.x[0] = 0; return true }
+			else {}
+		}
+	}
 	if objc_is_kind(object, ios_runtime.names['UIView']) {
 		match selector {
 			'window' {
@@ -316,8 +340,10 @@ fn ui_application_main(argc int, argv &&char, principal u64, delegate_name u64) 
 	selector := c'application:didFinishLaunchingWithOptions:'
 	imp := native_method(cls, ctext(u64(selector)))
 	if imp == 0 { panic('iOS: application delegate launch method is missing') }
-	if !unsafe { ObjLaunch(voidptr(imp))(delegate, selector, ios_runtime.application, 0) } { return 1 }
-	scene_delegate := ui_connect_scene() or { eprintln('iOS: ${err}'); return 1 }
+	launch_options := ui_launch_options() or { eprintln('iOS: ${err}'); return 1 }
+	defer { objc_release(launch_options) }
+	if !unsafe { ObjLaunch(voidptr(imp))(delegate, selector, ios_runtime.application, launch_options) } { return 1 }
+	scene_delegate := ui_connect_scene(launch_options) or { eprintln('iOS: ${err}'); return 1 }
 	defer { objc_release(scene_delegate) }
 	if ios_runtime.window == 0 { panic('iOS: application did not create a window') }
 	request := os.getenv('VINIX_REQUEST_FD')

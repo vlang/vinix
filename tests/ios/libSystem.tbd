@@ -6,7 +6,7 @@ current-version: 1
 exports:
   - targets:     [ arm64-ios ]
     symbols:     [ _puts, _atoi, _malloc, _calloc, _free, _strlen, _strcmp, _memcpy, _memset, _printf, _abort, _mach_msg_server,
-                   __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder,
+                   __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder, _setenv,
                    _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,
                    _pthread_setspecific, _pthread_getspecific, _pthread_key_create,
                    _pthread_key_delete, _pthread_self, _pthread_once,
@@ -21,10 +21,13 @@ exports:
                    _asprintf, ___snprintf_chk, _clock_gettime, _gmtime_r, _strftime,
                    _posix_spawnp, _dlopen, _dlsym, _dlerror, _dlclose,
                    _open, _write, _close, _unlink, _shm_open, _shm_unlink,
-                   _ftruncate, _mmap, _munmap, _stat, _fstat, _strstr, _posix_memalign,
+                   _ftruncate, _mmap, _munmap, _stat, _fstat, _strstr, _posix_memalign, _pread, _pwrite, _lseek,
                    _dispatch_async, _dispatch_get_main_queue, __NSConcreteGlobalBlock,
                    __NSConcreteStackBlock, __Block_object_assign, __Block_object_dispose,
                    _opendir, _readdir, _closedir, ___tolower, ___toupper,
                    ___exp10, ___exp10f, ___sincos_stret, ___sincosf_stret,
-                   _setjmp, _longjmp, __setjmp, __longjmp ]
+                   _setjmp, _longjmp, __setjmp, __longjmp,
+                   _mach_task_self_, _vm_page_size, _vm_allocate, _vm_remap, _vm_deallocate,
+                   _memset_pattern4, _memset_pattern8, _memset_pattern16,
+                   _wmemchr, _wmemcmp, _wmemcpy, _wmemmove, _wmemset, _wcslen ]
 ...

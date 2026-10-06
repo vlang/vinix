@@ -79,6 +79,9 @@ int main(void) {
     run("/opt/ios/arc-threads", NULL, NULL, NULL, 0,
         "IOS-ARC: eight threads, weak/deallocation races and isolated autorelease pools\n");
     puts("iOS PASS: thread-safe ARC and autorelease pools");
+    run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
+        "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
+    puts("iOS PASS: native Mach VM aliases and mapping lifetime");
     const char *calculator = "/opt/ios/calculator";
     run(calculator, "7", "+", "5", 0, "IOS-CALCULATOR: 12\n");
     run(calculator, "3", "-", "9", 0, "IOS-CALCULATOR: -6\n");
@@ -97,6 +100,9 @@ int main(void) {
     run("/opt/ios/SceneFixture.app/SceneFixture", NULL, NULL, NULL, 0,
         "IOS-SCENE: native app delegate, manifest scene connection and window");
     puts("iOS PASS: native UIKit scene and application launch");
+    run("/opt/ios/SceneFixture.app/SceneFixture", "/opt/ios/launch name#é%?.bin", NULL, NULL, 0,
+        "IOS-SCENE-FILE: launch options, scene URL contexts, percent encoding and ARC lifetime");
+    puts("iOS PASS: native file launch and scene URL ownership");
     if (!access("/opt/ios/PPSSPP", R_OK)) {
         run("--inspect", "/opt/ios/PPSSPP", NULL, NULL, 0, "Imports: 767 (symbol table)");
         if (!access("/opt/ios/gles", R_OK)) test_ppsspp_ui();

@@ -81,6 +81,9 @@ mut:
 	autoresizing u64
 	multiple_touch bool
 	content_scale f64 = 1
+	deferred_system_edges u64
+	home_indicator_hidden bool
+	idle_timer_disabled bool
 }
 
 struct ObjRect {
@@ -159,7 +162,7 @@ fn objc_start() {
         'NSData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
-        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
+        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',

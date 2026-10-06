@@ -33,6 +33,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'NSNotificationCenter' { name == 'defaultCenter' }
 			'NSNotification' { name == 'notificationWithName:object:userInfo:' }
 			'NSBundle' { name == 'mainBundle' }
+			'NSURL' { name == 'fileURLWithPath:' }
 			'NSLocale' { name == 'currentLocale' }
 			'UIDevice' { name == 'currentDevice' }
 			'UIApplication' { name == 'sharedApplication' }
@@ -47,10 +48,15 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSArray']) { return name in ['count', 'firstObject', 'objectAtIndex:', 'objectAtIndexedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSDictionary']) { return name in ['count', 'objectForKey:', 'objectForKeyedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSData']) { return name in ['bytes', 'length'] }
+	if objc_is_kind(object, ios_runtime.names['NSURL']) { return name in ['path', 'absoluteString', 'isFileURL', 'scheme'] }
 	if objc_is_kind(object, ios_runtime.names['NSLocale']) { return name in ['objectForKey:', 'localeIdentifier'] }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return name in ['name', 'setName:', 'maxConcurrentOperationCount', 'setMaxConcurrentOperationCount:'] }
 	if objc_is_kind(object, ios_runtime.names['CLLocationManager']) { return name in ['delegate', 'setDelegate:'] }
-	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState'] }
+	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:'] }
+	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
+		return name in ['preferredScreenEdgesDeferringSystemGestures', 'prefersHomeIndicatorAutoHidden',
+			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures', 'setNeedsUpdateOfHomeIndicatorAutoHidden']
+	}
 	if objc_is_kind(object, ios_runtime.names['UIView']) { return name in ['frame', 'bounds', 'setFrame:', 'layer', 'addSubview:', 'removeFromSuperview', 'backgroundColor', 'setBackgroundColor:', 'tag', 'setTag:'] }
 	return false
 }
@@ -69,11 +75,17 @@ fn scene_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 			'delegate' { frame.x[0] = obj_header(object).fields[0] }
 			'setDelegate:' { store_field(object, 0, frame.x[2]) }
 			'applicationState' { frame.x[0] = 0 } // This runner owns one active foreground window.
+			'isIdleTimerDisabled' { frame.x[0] = u64(obj_header(object).idle_timer_disabled) }
+			'setIdleTimerDisabled:' { obj_header(object).idle_timer_disabled = frame.x[2] != 0 }
 			else { return false }
 		}
 		return true
 	}
 	if objc_is_kind(object, ios_runtime.names['UISceneConnectionOptions']) && selector == 'URLContexts' {
+		frame.x[0] = obj_header(object).fields[0]
+		return true
+	}
+	if objc_is_kind(object, ios_runtime.names['UIOpenURLContext']) && selector == 'URL' {
 		frame.x[0] = obj_header(object).fields[0]
 		return true
 	}
@@ -138,7 +150,7 @@ fn ui_terminate(delegate u64, scene_delegate u64) {
 
 type SceneConnect = fn (u64, &char, u64, u64, u64)
 
-fn ui_connect_scene() !u64 {
+fn ui_connect_scene(launch_options u64) !u64 {
 	path := os.join_path(ios_runtime.bundle, 'Info.plist')
 	if !os.is_file(path) { return 0 }
 	bytes := os.read_bytes(path)!
@@ -164,6 +176,13 @@ fn ui_connect_scene() !u64 {
 	options := objc_allocate(ios_runtime.names['UISceneConnectionOptions'])
 	defer { objc_release(options) }
 	contexts := objc_allocate(ios_runtime.names['NSSet'])
+	if launch_options != 0 {
+		url := obj_header(launch_options).items[0]
+		context := objc_allocate(ios_runtime.names['UIOpenURLContext'])
+		store_field(context, 0, url)
+		array_append(mut obj_header(contexts), context)
+		objc_release(context)
+	}
 	store_field(options, 0, contexts)
 	objc_release(contexts)
 	store_field(scene, 1, session)

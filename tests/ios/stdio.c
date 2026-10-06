@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <math.h>
 #include <setjmp.h>
+#include <wchar.h>
 extern int __tolower(int);
 extern int __toupper(int);
 #include <fcntl.h>
@@ -32,6 +33,28 @@ static int format(char *output, size_t size, const char *pattern, ...) {
 }
 
 int main(void) {
+    _Static_assert(sizeof(wchar_t) == 4, "Darwin ARM64 wide characters");
+    wchar_t wide[8] = {0}, wide_copy[8] = {0};
+    wmemset(wide, 0x1f642, 3);
+    if (wcslen(wide) != 3 || wmemchr(wide, 0x1f642, 3) != wide || wmemchr(wide, 0, 3)) return 82;
+    if (wmemcpy(wide_copy, wide, 4) != wide_copy || wmemcmp(wide_copy, wide, 4)) return 83;
+    wide_copy[0] = L'A';
+    if (wmemmove(wide_copy + 1, wide_copy, 4) != wide_copy + 1 || wide_copy[1] != L'A' ||
+        wide_copy[3] != 0x1f642 || wide_copy[4] || wide_copy[5] ||
+        wmemcmp(wide_copy, wide, 1) >= 0) return 84;
+    unsigned char pattern[16], patterned[64];
+    for (unsigned index = 0; index < sizeof(pattern); ++index) pattern[index] = (unsigned char)(index + 1);
+    for (unsigned width = 4; width <= 16; width *= 2) {
+        memset(patterned, 0xa7, sizeof(patterned));
+        if (width == 4) memset_pattern4(patterned + 1, pattern, 37);
+        if (width == 8) memset_pattern8(patterned + 1, pattern, 37);
+        if (width == 16) memset_pattern16(patterned + 1, pattern, 37);
+        for (unsigned index = 0; index < sizeof(patterned); ++index) {
+            unsigned char expected = index >= 1 && index < 38 ? pattern[(index - 1) % width] : 0xa7;
+            if (patterned[index] != expected) return 81;
+        }
+    }
+    memset_pattern16(NULL, NULL, 0);
     _Static_assert(sizeof(jmp_buf) == 192, "Darwin ARM64 jump buffer");
     struct { jmp_buf buffer; unsigned long guard; } jump = {.guard = 0x3141592653589793};
     volatile int jumped = 0;
@@ -65,6 +88,14 @@ int main(void) {
     }
     if (errno || closedir(directory) || found != 1) return 73;
     if (unlink("/tmp/ios-native-directory-test")) return 75;
+    int positioned = open("/tmp/ios-positioned-io", O_CREAT | O_TRUNC | O_RDWR, 0600);
+    char positioned_bytes[8] = {0};
+    if (positioned < 0 || write(positioned, "abcdef", 6) != 6 ||
+        pwrite(positioned, "XY", 2, 2) != 2 || lseek(positioned, 0, SEEK_CUR) != 6 ||
+        pread(positioned, positioned_bytes, sizeof(positioned_bytes), 0) != 6 ||
+        strcmp(positioned_bytes, "abXYef") || lseek(positioned, 0, SEEK_CUR) != 6 ||
+        pread(positioned, positioned_bytes, 1, 20) != 0 || close(positioned) ||
+        unlink("/tmp/ios-positioned-io")) return 80;
     char buffer[128];
     if (snprintf(buffer, sizeof(buffer), "%d %lld %.3f %s %*.*f", -42, 1234567890123LL,
         3.125, "arm64", 8, 2, 7.5) != 38) return 31;

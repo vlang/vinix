@@ -47,6 +47,11 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 	info := ios_runtime.classes[cls] or { return false }
 	if object in ios_runtime.classes {
 		match info.name {
+			'NSURL' {
+				if selector != 'fileURLWithPath:' { return false }
+				if frame.x[2] == 0 { panic('iOS: file URL requires a path') }
+				frame.x[0] = objc_autorelease(ui_file_url(string_text(frame.x[2])))
+			}
 			'UIDevice' {
 				if selector != 'currentDevice' { return false }
 				if ios_runtime.device == 0 { ios_runtime.device = objc_allocate(cls) }
@@ -125,16 +130,12 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 					path := os.join_path(ios_runtime.bundle, subdirectory, filename)
 					defer { if extension.len != 0 { unsafe { filename.free() } }; unsafe { path.free() } }
 					if !os.is_file(path) { frame.x[0] = 0; return true }
-					url := objc_allocate(ios_runtime.names['NSURL'])
-					store_field(url, 0, make_string(unsafe { &char(path.str) }))
-					frame.x[0] = objc_autorelease(url)
+					frame.x[0] = objc_autorelease(ui_file_url(path))
 				}
 				'resourcePath', 'bundlePath' { frame.x[0] = make_string(unsafe { &char(ios_runtime.bundle.str) }) }
 				'executablePath' { frame.x[0] = make_string(unsafe { &char(image_runtime.path.str) }) }
 				'executableURL', 'bundleURL' {
-					url := objc_allocate(ios_runtime.names['NSURL'])
-					store_field(url, 0, make_string(unsafe { &char(if selector == 'executableURL' { image_runtime.path.str } else { ios_runtime.bundle.str }) }))
-					frame.x[0] = objc_autorelease(url)
+					frame.x[0] = objc_autorelease(ui_file_url(if selector == 'executableURL' { image_runtime.path } else { ios_runtime.bundle }))
 				}
 				else { return false }
 			}
@@ -165,7 +166,10 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		'NSURL' {
 			match selector {
-				'path', 'absoluteString' { frame.x[0] = header.fields[0] }
+				'path' { frame.x[0] = header.fields[0] }
+				'absoluteString' { frame.x[0] = ui_file_url_string(object) }
+				'isFileURL' { frame.x[0] = 1 }
+				'scheme' { frame.x[0] = make_string(c'file') }
 				else { return false }
 			}
 		}

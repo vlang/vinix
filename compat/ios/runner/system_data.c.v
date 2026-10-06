@@ -28,6 +28,8 @@ mut:
 	task_self u32
 	main_queue [8]u64
 	main_jobs []u64
+	vm_mappings []MachMapping
+	vm_sequence u64
 	in6_any [16]u8
 	standard [3]u64
 	streams map[u64]voidptr
@@ -45,6 +47,7 @@ __global system_data = unsafe { &SystemData(nil) }
 fn system_data_start() ! {
 	system_data = &SystemData{page_size: u64(C.getpagesize()), task_self: 1}
 	system_data.main_jobs.flags |= .noslices
+	system_data.vm_mappings.flags |= .noslices
 	bytes := rand.bytes(8)!
 	unsafe { C.memcpy(&system_data.guard, bytes.data, 8); bytes.free() }
 	// Darwin FILE's public ARM64 ABI is 152 bytes. Zero-sized read/write
@@ -83,6 +86,7 @@ fn system_data_start() ! {
 
 fn system_data_stop() {
 	if system_data == unsafe { nil } { return }
+	mach_memory_stop()
 	for _, pointer in system_data.mutexes {
 		if C.pthread_mutex_destroy(pointer) != 0 { panic('iOS: active mutex at image shutdown') }
 		C.free(pointer)

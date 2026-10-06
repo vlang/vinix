@@ -39,6 +39,8 @@ fn inspect(image macho.Image, show_imports bool) ! {
 fn main() {
 	launcher := os.file_name(os.args[0])
 	if launcher == 'vinix-ios-ppsspp' {
+		if os.args.len > 2 { eprintln('usage: vinix-ios-ppsspp [PSP game file]'); exit(2) }
+		if os.args.len == 2 { C.setenv(c'VINIX_IOS_OPEN_FILE', unsafe { &char(os.args[1].str) }, 1) }
 		documents := os.getenv('VINIX_IOS_DOCUMENTS')
 		user_home := os.getenv('VINIX_USER_HOME')
 		path := if documents.len > 0 { documents } else { os.join_path(if user_home.len > 0 { user_home } else { '/root' }, '.local', 'share', 'vinix', 'ppsspp', 'Documents') }

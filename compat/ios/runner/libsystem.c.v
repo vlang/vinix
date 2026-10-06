@@ -118,6 +118,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := dispatch_symbol(symbol) { return address }
 	if address := time_symbol(symbol) { return address }
 	if address := files_symbol(symbol) { return address }
+	if address := mach_memory_symbol(symbol) { return address }
 	address := match symbol {
 		'___tolower', '_tolower' { unsafe { voidptr(darwin_rune_lower) } }
 		'___toupper', '_toupper' { unsafe { voidptr(darwin_rune_upper) } }

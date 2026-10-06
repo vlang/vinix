@@ -47,7 +47,7 @@ fi
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$SCRIPT_DIR/build-support/aarch64-cc-shim" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
-    -O2 -fno-stack-protector -w \
+    -O2 -D_GNU_SOURCE -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$OUTPUT/run-ios.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 -L"$SYSROOT/usr/lib" -L"$GCCLIB" \
     "${CXXLIBS[@]}" -lgcc_eh -lc -lgcc -lm "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
@@ -67,7 +67,7 @@ if [ "$WITH_GLES" = 1 ]; then
         -isystem "$SCRIPT_DIR/build-support/aarch64-cc-shim" -isystem "$GCCLIB/include" \
         -isystem "$SYSROOT/usr/include" -isystem "$MESA_SYSROOT/usr/include" \
         -isystem "$MESA_SYSROOT/usr/include/freetype2" \
-        -O2 -fno-stack-protector -w -no-pie \
+        -O2 -D_GNU_SOURCE -fno-stack-protector -w -no-pie \
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbegin.o" \
         "$OUTPUT/run-ios-gles.c" "$SCRIPT_DIR/compat/ios/runner/abi/dispatch.S" -ffixed-x18 \
         -L"$OUTPUT/staging/usr/lib/vinix/ios-gles" -L"$SYSROOT/usr/lib" -L"$GCCLIB" \

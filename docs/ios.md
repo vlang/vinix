@@ -61,15 +61,16 @@ executing a GUI app directly from a shell does not create a window. Set
 | Images | Little-endian ARM64 `MH_EXECUTE`, `MH_PIE`, iOS/iOS Simulator platforms |
 | Universal binaries | 32/64-bit slice tables, both byte orders; prefer ordinary ARM64 over ARM64e |
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
+| Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in library `dlopen`/`dlsym`/`dlerror` |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
 | Thread-local storage | Darwin TLV descriptors, initialized and zero-filled templates, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
-| libSystem | Memory/string/conversion/math subset; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
+| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
-| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
-| UIKit | UIApplicationMain with its principal class/application/delegate objects, single manifest window-scene connection, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
+| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
+| UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
@@ -86,8 +87,8 @@ ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyl
 binding opcodes, TLS pointer/initializer sections and multiple chain starts
 per page are rejected. Objective-C exceptions and Swift metadata are unsupported.
 Blocks support object/block captures, but not
-`__block` by-reference captures. The runtime and weak tables are single-threaded.
-Mach services,
+`__block` by-reference captures. ARC and weak tables are synchronized; UIKit
+view operations run on the main thread. Mach IPC services,
 direct Darwin syscalls, dynamic framework loading, Swift/SwiftUI, general
 Foundation/UIKit APIs, multiple scenes, compiled nibs/storyboards and Auto Layout are not
 implemented. View trees have bounded depth and at most 64 children per view.
@@ -113,6 +114,15 @@ User defaults use an atomically replaced per-bundle plist under
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
 UIKit typography/fit-to-width is approximate and UIKit accessibility labels
 are accepted but not exposed through a Vinix accessibility service.
+The Mach VM adapter supports allocations up to 4 GiB in the current process,
+page-aligned no-copy remaps with a zero mask and copy inheritance, and complete
+mapping removal. Cross-task mappings, copy-on-write remaps, partial removal,
+VM protection APIs and Mach inheritance across fork are unsupported. Each alias
+owns a backing descriptor, so removing its source does not invalidate the alias.
+Vinix windows have no iOS home indicator or competing system-edge swipe;
+controller update requests still invoke the app's native preference methods.
+Idle-timer requests retain application state; the desktop currently has no
+automatic screen-blanking timer.
 
 ## Native OpenGL ES and CoreText
 
@@ -208,8 +218,8 @@ The largest groups are:
 | UIKit | 29 |
 | Objective-C runtime | 26 |
 
-**The unchanged PPSSPP release binary renders its main menu and responds to
-Settings clicks on Vinix, with sound disabled.** With the optional runtime, it runs
+**The unchanged PPSSPP release binary renders its menus and executes a textured,
+rotating PSP cube demo on Vinix, with sound disabled.** With the optional runtime, it runs
 `SceneDelegate +load`, its native C++ constructors and `main`, reads its actual
 entitlement data, reaches `UIApplicationMain`, registers notification observers,
 and enters the scene delegate declared in its binary `Info.plist`. Its own code
@@ -257,6 +267,46 @@ splash transition, clicks Settings through native UIKit, checks detailed changin
 pixels and verifies exit status zero and shared-surface removal. It emits
 `iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)`.
 
+To exercise PSP emulation, use the pinned `cube.pbp` from PPSSPP's
+[upstream PSP tests](https://github.com/hrydgard/pspautotests/blob/f93c29855718a587360976e793f5b41a88ef7e68/demos/cube.pbp).
+The downloader verifies the 50,600-byte PBP header and SHA-256
+`4018ec0da8a88a1600380661bcd4461c09c4c69bc45139ec626a754f0eec3fc0`.
+Its `Cube Sample` MIPS executable draws the textured rotating cube from the
+[PSPSDK cube sample](https://github.com/pspdev/pspsdk/blob/master/src/samples/gu/cube/cube.c).
+Neither the PSP binary nor the iOS executable is rewritten.
+
+```sh
+python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+  --with-ppsspp --ppsspp-muted --ppsspp-cube --timeout 300 \
+  > build/ios/ppsspp-cube-guest.log 2>&1
+python3 tests/ios/frame.py build/ios/ppsspp-cube-guest.log build/ios/ppsspp-cube.png
+```
+
+The test passes `/opt/ios/cube.pbp` to the installed launcher. UIKit supplies a
+real file `NSURL` through `UIApplicationLaunchOptionsURLKey` and the scene's
+`UIOpenURLContext`; PPSSPP's native scene delegate puts that path in its own
+startup arguments. Its CPU uses the normal IR interpreter fallback when Darwin
+JIT probes fail. Its Mach allocation/remap calls share PSP RAM across the
+emulator's address views, and `pread` reads the actual PBP. Native pattern fills
+clear that RAM and native wide-character functions support its loading paths.
+
+The regression requires PPSSPP's own `Booted /opt/ios/cube.pbp...` diagnostic,
+the demo's ABGR clear color in two frames after boot, thousands of colored
+geometry pixels, and at least 1,000 changed pixels within the PSP viewport.
+The screenshot contains the cube and PPSSPP's original touch controls.
+Calculator, 2048, native C++/UIKit/GLES fixtures and process teardown run in the
+same Vinix guest. Separate iOS fixtures test RAM aliases after source removal,
+occupied fixed targets, real VM errors, positional-I/O offsets, pattern-fill
+boundaries, and file-URL encoding/ARC ownership. The VM, file-launch and stdio
+fixtures also pass the ARM64 host's ASan/UBSan checks.
+
+`vinix-ios-ppsspp [PSP game file]` accepts a startup file;
+`VINIX_IOS_OPEN_FILE` supplies one when the launcher has no file argument. The
+file must exist in the guest. As with other GUI apps, the launching compositor
+must supply its request/response pipes; the command alone in a shell does not
+create a desktop window. General URL schemes and subsequent open-file events
+remain unsupported.
+
 Audio is still unsupported. With sound enabled the actual binary stops at
 `AVAudioSession setCategory:error:`; the unmuted probe checks that precise
 failure. Without `--with-gles`, the static probe still checks the unsupported
@@ -302,7 +352,8 @@ exception unwinding through Mach-O frames remains unsupported; this is a tested
 C++ subset, not a complete ABI. The stdio and scene fixtures also run under
 ASan/UBSan on the ARM64 host.
 
-PSP game emulation has not been verified. Remaining work includes audio/device
+The rotating-cube homebrew is verified; commercial PSP games have not been
+tested. Remaining work includes audio/device
 services, additional Foundation/Darwin APIs, keyboard and multiple-touch input,
 and broader rendering coverage. Metal and the bundled MoltenVK dylib remain
 unsupported; the tested backend is OpenGL. Unsupported calls still diagnose the

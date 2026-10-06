@@ -12,6 +12,8 @@ fn C.ftruncate(i32, u64) i32
 fn C.close(int) int
 fn C.read(int, voidptr, usize) isize
 fn C.write(int, voidptr, usize) isize
+fn C.pread(i32, voidptr, usize, i64) isize
+fn C.pwrite(i32, voidptr, usize, i64) isize
 fn C.lseek(int, i64, int) i64
 fn C.ios_open()
 fn C.mlock(voidptr, usize) i32
@@ -91,6 +93,8 @@ fn darwin_mmap(address voidptr, size usize, protection i32, flags i32, file i32,
 fn files_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_stat', '_stat$INODE64' { u64(unsafe { voidptr(darwin_stat) }) }
+		'_pread' { u64(unsafe { voidptr(C.pread) }) }
+		'_pwrite' { u64(unsafe { voidptr(C.pwrite) }) }
 		'_lstat', '_lstat$INODE64' { u64(unsafe { voidptr(darwin_lstat) }) }
 		'_fstat', '_fstat$INODE64' { u64(unsafe { voidptr(darwin_fstat) }) }
 		'_mkdir' { u64(unsafe { voidptr(C.ios_mkdir) }) }
