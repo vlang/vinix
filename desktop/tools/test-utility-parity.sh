@@ -30,7 +30,7 @@ import sys
 root, destination = Path(sys.argv[1]), Path(sys.argv[2])
 names = ['utility_parity', 'calculator_features', 'disk_usage_features',
          'editor_features', 'editor_selection', 'calendar_events', 'clock_utility', 'files_info',
-         'capture_features']
+         'capture_features', 'text_copy_client', 'terminal_selection']
 imports, bodies = set(), []
 for name in names:
     source = root / 'desktop/tools/tests' / (name + '_test.v')
@@ -49,7 +49,8 @@ PY
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/utility_parity_test.v"
 
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"
-for test in calculator_features_memory utility_parity_memory editor_selection_memory; do
+for test in calculator_features_memory utility_parity_memory editor_selection_memory \
+            text_copy_client_memory terminal_selection_memory; do
     cp "$root/desktop/tools/tests/${test}_test.v" "$work/ui/"
     "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
         -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/${test}_test.v"

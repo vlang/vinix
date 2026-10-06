@@ -68,6 +68,12 @@ fn main() {
 		run_app_process(options)
 		return
 	}
+	// The same real app/clipboard workflows run inside Vinix without the
+	// host-only zero-deadline pipe timing assertions below.
+	if arguments().contains('--utility-copy-integration') {
+		check_utility_copy_clients()
+		return
+	}
 	// Standalone applications receive their pipe descriptors through the
 	// environment, leaving argv empty for applications that open argv[1].
 	if os.getenv('VINIX_RESPONSE_FD') != '' {
@@ -363,6 +369,144 @@ fn check_current_utility_workflow_clients(mut desktop Desktop) {
 	check_editor_selection_client(home)
 	check_settings_search_client(mut desktop)
 	check_activity_view_client(home, mut desktop)
+	check_terminal_copy_client(mut desktop)
+	check_preview_orientation_client(home, mut desktop)
+}
+
+fn check_utility_copy_clients() {
+	desktop_ignore_broken_pipe()
+	base := os.real_path(os.temp_dir())
+	home := join_path(base, 'vinix-copy-ipc-${os.getpid()}')
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	mut desktop := Desktop{home: home}
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_dictionary_workflow_client(home, mut desktop)
+	check_scientific_calculator_client(mut desktop)
+	check_programmer_calculator_client(mut desktop)
+	check_terminal_copy_client(mut desktop)
+	check_preview_orientation_client(home, mut desktop)
+	if os.exists('/proc/version') { assert os.exists('/dev/processes') }
+	println('IPC utility copy workflows passed')
+}
+
+fn integration_terminal_cells(text string, end int) int {
+	mut at := 0
+	mut cells := 0
+	for at < end {
+		length := editor_utf8_length(text[at])
+		at += if length > 0 && at + length <= end { length } else { 1 }
+		cells++
+	}
+	return cells
+}
+
+fn integration_assert_image_size(path string, width int, height int) {
+	bytes := os.read_bytes(path) or { panic(err) }
+	defer { unsafe { bytes.free() } }
+	mut actual_width := 0
+	mut actual_height := 0
+	mut channels := 0
+	assert C.stbi_info_from_memory(bytes.data, bytes.len, &actual_width, &actual_height, &channels) != 0
+	assert actual_width == width && actual_height == height
+}
+
+fn check_preview_orientation_client(home string, mut desktop Desktop) {
+	// Independent asymmetric 2x3 JPEG plus a little-endian IFD0 Orientation6.
+	image := base64.decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAADAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABoQAAIDAQEAAAAAAAAAAAAAAAQFAgMHBgH/xAAVAQEBAAAAAAAAAAAAAAAAAAAHCv/EABsRAAIDAQEBAAAAAAAAAAAAAAUGAwQHCAkC/9oADAMBAAIRAxEAPwBUcDgqTYViycPlOCuEVZNnK0W5rnnDPmlo4PHphaLGTx5zzF05PnVVGRjVwwOaMSPbDGBhRd1183LXvKXgts1nUGkpiJGqTZdEdWAjVWtk3hLXK18yykyNuAAnJ2nAlFTCQ2LMkYpaVgYZcBUPmAWDFDhlWrUhlx9FupNZRvQbutKCwZDdDJ/ZHTqsJuOHOPOuhttsYv7a7iaFlpf3/K2Z7eGOerUilNuDqyMDazE/u0aZDZUzduX7H//Z')
+	segment := [u8(0xff), 0xe1, 0, 34, `E`, `x`, `i`, `f`, 0, 0,
+		`I`, `I`, 42, 0, 8, 0, 0, 0, 1, 0, 0x12, 1, 3, 0,
+		1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0]!
+	mut jpeg := []u8{len: image.len + segment.len}
+	jpeg[0] = 0xff
+	jpeg[1] = 0xd8
+	for index, byte in segment { jpeg[2 + index] = byte }
+	for index in 2 .. image.len { jpeg[index + segment.len] = image[index] }
+	path := join_path(home, 'orientation.jpg')
+	export_path := join_path(home, 'orientation.png')
+	rotated_path := join_path(home, 'orientation-rotated.png')
+	original_path := join_path(home, 'orientation-original.jpg')
+	open_action := jump_open_prefix + path
+	defer { unsafe {
+		image.free(); jpeg.free(); path.free(); export_path.free()
+		rotated_path.free(); original_path.free(); open_action.free()
+	} }
+	os.write_file_array(path, jpeg) or { panic(err) }
+	factory := app_factory_named('vinix-preview') or { panic('Preview is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle(open_action) or { panic(err) }
+	free_tree(app.build(ui2.rect(0, 0, 800, 576)) or { panic(err) })
+	storage_remote_field(mut app, preview_action_export_path, export_path)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_image_size(export_path, 3, 2)
+	app.handle(preview_action_rotate_right) or { panic(err) }
+	storage_remote_field(mut app, preview_action_export_path, rotated_path)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_image_size(rotated_path, 2, 3)
+	storage_remote_field(mut app, preview_action_export_path, original_path)
+	app.handle(preview_action_export_copy) or { panic(err) }
+	original := os.read_bytes(original_path) or { panic(err) }
+	defer { unsafe { original.free() } }
+	assert original == jpeg
+	println('IPC Preview EXIF orientation, rotated PNG and exact Original Copy passed')
+}
+
+fn check_terminal_copy_client(mut desktop Desktop) {
+	if !os.exists(terminal_shell) {
+		println('IPC Terminal copy skipped: shell unavailable')
+		return
+	}
+	factory := app_factory_named('vinix-terminal') or { panic('Terminal is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	free_tree(app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) })
+	expected := 'vinix-copy-日本語'
+	if mut app is RemoteApp {
+		assert app.clipboard_copy && app.pointer && app.keyboard
+		app.key_input(expected)
+	}
+	mut found := false
+	mut x := 0
+	mut y := 0
+	for _ in 0 .. 50 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		for child in tree.children {
+			at := child.text.index(expected) or { continue }
+			x = terminal_padding + integration_terminal_cells(child.text, at) * terminal_column_width
+			y = int(child.frame.y) + 4
+			found = true
+			break
+		}
+		free_tree(tree)
+		if found { break }
+		desktop_sleep_ms(20)
+	}
+	assert found
+	if mut app is RemoteApp {
+		app.pointer_event(.down, .left, 0, x, y, 560, 316)
+		app.pointer_event(.move, .no_button, 0,
+			x + integration_terminal_cells(expected, expected.len) * terminal_column_width, y, 560, 316)
+		app.pointer_event(.up, .left, 0,
+			x + integration_terminal_cells(expected, expected.len) * terminal_column_width, y, 560, 316)
+	}
+	app.handle('term.selection.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, expected)
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 316), tr('clipboard.copy.copied'))
+	if mut app is RemoteApp { app.key_input('\x1b[99;9u') }
+	integration_assert_clipboard(&desktop, expected)
+	if mut app is RemoteApp { app.key_input('\x03') }
+	integration_assert_clipboard(&desktop, expected)
+	println('IPC Terminal UTF-8 pointer selection, Copy, Cmd-C and Ctrl-C passed')
 }
 
 fn integration_programmer_readout(element ui2.Element, row int) ?string {
@@ -399,6 +543,14 @@ fn check_programmer_calculator_client(mut desktop Desktop) {
 	}
 	integration_assert_integer(mut app, ['18446744073709551615', 'FFFFFFFFFFFFFFFF',
 		'1777777777777777777777', '1111111111111111111111111111111111111111111111111111111111111111']!)
+	for index, base in ['dec', 'hex', 'oct', 'bin']! {
+		app.handle('calculator.programmer.base.' + base) or { panic(err) }
+		app.handle('calculator.copy') or { panic(err) }
+		integration_assert_clipboard(&desktop, ['18446744073709551615', 'FFFFFFFFFFFFFFFF',
+			'1777777777777777777777', '1111111111111111111111111111111111111111111111111111111111111111']![index])
+		integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('clipboard.copy.copied'))
+	}
+	app.handle('calculator.programmer.base.dec') or { panic(err) }
 	if mut app is RemoteApp { app.key_input('+1=') }
 	integration_assert_integer(mut app, ['0', '0', '0', '0']!)
 	app.handle('calculator.programmer.not') or { panic(err) }
@@ -428,6 +580,8 @@ fn check_programmer_calculator_client(mut desktop Desktop) {
 	integration_assert_integer(mut app, ['10', 'A', '12', '1010']!)
 	if mut app is RemoteApp { app.key_input('\x10=') }
 	integration_calculator_display(mut app, '5')
+	if mut app is RemoteApp { app.key_input('\x03') }
+	integration_assert_clipboard(&desktop, '5')
 	assert native_app_prepare_close(mut app)
 	println('IPC Programmer Calculator exact integers and Basic state passed')
 }
@@ -546,20 +700,20 @@ fn check_editor_selection_client(home string) {
 		assert C.kill(app.pid, 0) == 0
 	}
 	desktop.start_menu_open = false
-	// A live Calculator has no clipboard-copy capability, even though its
+	// A live Clock has no clipboard-copy capability, even though its
 	// protocol peer supports the shared extension.
-	calculator_factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
-	mut calculator := start_remote_app_at_with_timeout(arguments()[0], calculator_factory, mut desktop,
+	clock_factory := app_factory_named('vinix-clock') or { panic('Clock is not registered') }
+	mut clock := start_remote_app_at_with_timeout(arguments()[0], clock_factory, mut desktop,
 		app_response_timeout_ms) or { panic(err) }
-	defer { close_remote(mut calculator) }
+	defer { close_remote(mut clock) }
 	request := text_copy_request(71, 'unauthorized overwrite')
 	defer { unsafe { request.free() } }
-	if mut calculator is RemoteApp {
-		assert calculator.pid > 0 && !calculator.clipboard_copy
-		assert !calculator.handle_native_operation(editor_bytes_text(request))
+	if mut clock is RemoteApp {
+		assert clock.pid > 0 && !clock.clipboard_copy
+		assert !clock.handle_native_operation(editor_bytes_text(request))
 	}
 	integration_assert_clipboard(&desktop, 'calc\n\x1b\x7f\t日本語')
-	integration_calculator_display(mut calculator, '0')
+	free_tree(clock.build(ui2.rect(0, 0, 540, 420)) or { panic(err) })
 	println('IPC Editor selection, clipboard acknowledgement, pointer and paste passed')
 }
 
@@ -704,8 +858,13 @@ fn check_dictionary_workflow_client(home string, mut desktop Desktop) {
 	storage_remote_field(mut app, 'dictionary.query', 'DATA_structure')
 	app.handle('dictionary.lookup') or { panic(err) }
 	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC organized collection.')
+	app.handle('dictionary.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, 'data structure\n\nIPC organized collection.')
+	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), tr('clipboard.copy.copied'))
 	app.handle('dictionary.back') or { panic(err) }
 	integration_assert_text(mut app, ui2.rect(0, 0, 880, 620), 'IPC computing definition.')
+	if mut app is RemoteApp { app.key_input('\x03') }
+	integration_assert_clipboard(&desktop, 'computing\n\nIPC computing definition.')
 	app.handle('dictionary.forward') or { panic(err) }
 	storage_remote_field(mut app, 'dictionary.export_path', export_path)
 	app.handle('dictionary.export') or { panic(err) }
@@ -1222,6 +1381,17 @@ fn check_scientific_calculator_client(mut desktop Desktop) {
 	}
 	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
 	integration_calculator_display(mut calculator, '3')
+	calculator.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, '3')
+	integration_assert_text(mut calculator, ui2.rect(0, 0, 620, 576), tr('clipboard.copy.copied'))
+	calculator.handle('calculator.scientific.cube') or { panic(err) }
+	integration_calculator_display(mut calculator, '27')
+	calculator.handle('calculator.scientific.cbrt') or { panic(err) }
+	integration_calculator_display(mut calculator, '3')
+	calculator.handle('C') or { panic(err) }
+	if mut calculator is RemoteApp { calculator.paste_input('8') }
+	calculator.handle('calculator.scientific.log2') or { panic(err) }
+	integration_calculator_display(mut calculator, '3')
 	calculator.handle('C') or { panic(err) }
 	if mut calculator is RemoteApp {
 		calculator.key_input('2+')
@@ -1256,6 +1426,9 @@ fn check_scientific_calculator_client(mut desktop Desktop) {
 	assert domain_display == tr('calculator.error')
 	assert tree_contains_text(domain, tr('calculator.error.domain'))
 	free_tree(domain)
+	calculator.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, '3')
+	integration_assert_text(mut calculator, ui2.rect(0, 0, 620, 576), tr('clipboard.copy.empty'))
 	calculator.handle('C') or { panic(err) }
 	if mut calculator is RemoteApp { calculator.paste_input('25') }
 	calculator.handle('calculator.scientific.sqrt') or { panic(err) }
