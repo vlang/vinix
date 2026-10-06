@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`c3ab77ea`** (ordinary scalar reads and serialized x86 user-copy transfers). Recheck HEAD and the worktree before
+Committed implementation baseline: **`15c21a91`** (ordinary faulting scalar reads/stores and serialized x86 user-copy transfers). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -69,7 +69,7 @@ actual x86 CF8/CFC and ARM ECAM transports. Linux PCI device registration,
 bus/device references and GPU binding remain unresolved. Ordinary user-copy
 remaining counts, zero-tail semantics and bounded user-string parsers are now
 implemented, together with ordinary scalar reads and checked serialized x86
-transfers. Scalar stores are the next implementation under review. The current
+transfers. Ordinary scalar stores are also implemented and validated. The current
 native `RangePageSource` already pins backing storage
 and rechecks mapping identity after unlocked acquisition; the earlier proposed
 global fault-lease rewrite was not applied.
@@ -78,6 +78,8 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `15c21a91` | Faulting scalar stores, split-page prefixes, real COW, aligned coherence and measured complete worker lifetimes |
+| `3a38ab99` | Per-invocation optional integer-policy audit adapters with current/older-metadata regression tests |
 | `c3ab77ea` | Fault-zero scalar reads, aligned read coherence and checked serialized x86 page-copy transfers |
 | `96f768b6` | Per-invocation real generated ABI adapters in full-driver audits and cleanup/error regression tests |
 | `d0a65f59` | Exact pinned integer type limits, overflow/cast predicates and independent boundary tests |
@@ -489,6 +491,28 @@ Exact checks, hashes and scope are in
 in `/tmp/vinix-linuxkpi-scalar-oct06-frozen-library-provenance.json`.
 This does not establish a global allocation pass or LinuxKPI support on ARM.
 
+Scalar stores are committed in `15c21a91`. Production-core/public-header checks
+pass 26,260 strict ASan/UBSan assertions per GNU99/GNU11 build; unsupported
+16-byte widths fail compilation. Actual generated code and optimized objects
+receive two lifetime reviews, including fault resolution, map locking, actor
+acknowledgement, joined/off-stack/reaped thread retirement and hidden allocation.
+Isolated enabled/default x86 and disabled ARM builds and both default ABI boots
+pass. The saved enabled ELF SHA256
+`93e6a7c83a579f672204bb9e68ee4424af192d223bd7da372e86065d6b47e2f5`
+passes complete normal and SSE suites, about 1,084/713 seconds with outer limits
+of 1,200/1,800 seconds. Runtime callback deadlines remain unchanged.
+
+Store fixtures cover real noncontiguous pages, protected split-page prefixes,
+sparse demand mapping, actual fork/COW separation and concurrent aligned
+2/4/8-byte writes. Three complete lifecycle warmups and resident warmups precede
+strict fourth-batch page/all-live-heap-class measurements; both guests recover
+exactly. The store fixture's first lifecycle is also flat after the preceding
+scalar-read fixture; this does not explain that earlier fixture's cold 8 KiB
+retention. Existing map/fork early-OOM rollback is outside this feature's scope.
+Evidence: `/tmp/vinix-linuxkpi-scalar-store-oct06-final-validation.json`.
+These builds use the recorded isolated baseline plus owned feature overlays,
+not the concurrently changing shared HEAD; ARM remains LinuxKPI-disabled.
+
 Typed user-pointer, original `pgoff_t` and pinned overflow/type predicates are
 also committed (`a070633d`, `bb37a234`, `d0a65f59`). Strict host and independent
 checks cover wrong types, single evaluation, both integer boundaries and
@@ -497,7 +521,7 @@ for an operand named `v`; `overflows_type` is not usable at file scope, whereas
 `castable_to_type` preserves that constant-expression case. No Linux page runtime
 is supplied by the page-offset representation.
 
-Audit commit `96f768b6` generates actual current ABI adapter headers privately
+Audit commits `96f768b6` and `3a38ab99` generate actual current ABI adapter headers privately
 per run, uses them before other include directories and cleans up after all
 compiler jobs. Invalid metadata rejects before compilation. Verified upstream
 files remain 7,668 unchanged; the full result is **4/269**, expected exit 1:

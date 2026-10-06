@@ -451,8 +451,14 @@ the complete i915 source tree is not evidence that the driver runs.
   Unaligned cross-page reads use protected page chunks and publish only after
   every byte succeeds; they make no cross-page atomicity promise. Page faults
   resolve outside the pagemap lock and retry against fresh permissions.
-  Both interfaces require ordinary faulting task context. Scalar stores remain
-  unresolved.
+  Both interfaces require ordinary faulting task context.
+- Ordinary `put_user` and `__put_user` store 1/2/4/8-byte scalars, convert the
+  value to the destination type and evaluate each argument once. Single-page
+  writes use one serialized width-specific x86 `MOV` under the checked map
+  lock; aligned ordinary-RAM stores retain x86 coherence. COW and missing-page
+  resolution occur outside that lock before fresh permission checks. Split-page
+  writes may commit a protected prefix before `-EFAULT`; they promise neither
+  rollback nor cross-page atomicity. These APIs require ordinary task context.
 - `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
   `strstrip` alias consume borrowed strings synchronously. Search results and
   tokens point into the caller's storage; splitting preserves empty tokens and
@@ -688,6 +694,28 @@ recovery of the library after a concurrent compiler update is recorded,
 with all 78 actual kernel builtin inputs matching the earlier captured hashes.
 Evidence is `/tmp/vinix-linuxkpi-scalar-oct06-final-validation.json` and
 `/tmp/vinix-linuxkpi-scalar-oct06-frozen-library-provenance.json`.
+
+Scalar stores are committed in `15c21a91`. Production-core/public-header checks
+pass 26,260 strict ASan/UBSan assertions per GNU99/GNU11 build; unsupported
+16-byte widths fail compilation. Actual generated code and optimized objects
+receive two lifetime reviews, including fault resolution, map locking, actor
+acknowledgement, joined/off-stack/reaped thread retirement and hidden allocation.
+Isolated enabled/default x86 and disabled ARM builds and both default ABI boots
+pass. The saved enabled ELF SHA256
+`93e6a7c83a579f672204bb9e68ee4424af192d223bd7da372e86065d6b47e2f5`
+passes complete normal and SSE suites, about 1,084/713 seconds with outer limits
+of 1,200/1,800 seconds. Runtime callback deadlines remain unchanged.
+
+Store fixtures cover real noncontiguous pages, protected split-page prefixes,
+sparse demand mapping, actual fork/COW separation and concurrent aligned
+2/4/8-byte writes. Three complete lifecycle warmups and resident warmups precede
+strict fourth-batch page/all-live-heap-class measurements; both guests recover
+exactly. The store fixture's first lifecycle is also flat after the preceding
+scalar-read fixture; this does not explain that earlier fixture's cold 8 KiB
+retention. Existing map/fork early-OOM rollback is outside this feature's scope.
+Evidence: `/tmp/vinix-linuxkpi-scalar-store-oct06-final-validation.json`.
+These builds use the recorded isolated baseline plus owned feature overlays,
+not the concurrently changing shared HEAD; ARM remains LinuxKPI-disabled.
 
 Typed-pointer checks pass 25,603 strict sanitizer assertions per C standard;
 wrong integer types fail compilation. The page-offset type compiles for both
