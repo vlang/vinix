@@ -118,6 +118,16 @@ mut:
 	pending_len int
 	buffer [32769]u8
 	read_limited bool
+	search [128]u8
+	search_len int
+	search_focus bool
+	search_selected bool
+	search_indices [4][512]int
+	search_counts [4]int
+	search_language DesktopLanguage
+	escape [16]u8
+	escape_len int
+	escape_ms u64
 }
 
 fn open_system_information(mut _ Desktop) !NativeApp {
@@ -222,23 +232,26 @@ fn (mut app SystemInformationApp) refresh_sources(sources SystemInformationSourc
 	}
 	app.initialized = true
 	app.report_status = ''
-	for tab in 0 .. 4 { app.clamp_scroll(tab) }
+	app.refilter_search(false)
 }
 
 fn (mut app SystemInformationApp) clamp_scroll(tab int) {
-	maximum := if app.sections[tab].rows.len > app.visible_rows { app.sections[tab].rows.len - app.visible_rows } else { 0 }
+	count := app.filtered_count(tab)
+	maximum := if count > app.visible_rows { count - app.visible_rows } else { 0 }
 	if app.scroll[tab] < 0 { app.scroll[tab] = 0 }
 	if app.scroll[tab] > maximum { app.scroll[tab] = maximum }
 }
 
 fn (mut app SystemInformationApp) handle(id string) ! {
 	for tab, action in system_information_tab_actions {
-		if id == action { app.tab = tab; app.path_focus = false; app.pending_len = 0; return }
+		if id == action { app.tab = tab; app.path_focus = false; app.search_focus = false; app.pending_len = 0; return }
 	}
 	match id {
 		'system_information.refresh' { app.refresh() }
 		'system_information.export' { app.export_report() }
-		'system_information.path' { app.path_focus = true; app.path_selected = true; app.pending_len = 0 }
+		'system_information.path' { app.focus_path() }
+		'system_information.search' { app.focus_search(false) }
+		'system_information.search.clear' { app.clear_search() }
 		'system_information.previous' { app.scroll[app.tab] -= app.visible_rows; app.clamp_scroll(app.tab) }
 		'system_information.next' { app.scroll[app.tab] += app.visible_rows; app.clamp_scroll(app.tab) }
 		else {}
@@ -250,7 +263,7 @@ fn (app &SystemInformationApp) pointer_moves_matter() bool { return false }
 
 fn (mut app SystemInformationApp) pointer_event(phase AppPointerPhase, _ AppPointerButton,
 	scroll int, x int, y int, _ int, height int) {
-	if phase == .scroll && x >= 150 && y >= 54 && y < height - 100 {
+	if phase == .scroll && x >= 150 && y >= 94 && y < height - 100 {
 		app.scroll[app.tab] -= scroll * 3
 		app.clamp_scroll(app.tab)
 	}
@@ -293,36 +306,25 @@ fn (mut app SystemInformationApp) path_text(text string) {
 }
 
 fn (mut app SystemInformationApp) key_input(text string) {
-	match text {
-		'\x1b[A' { app.scroll[app.tab]--; app.clamp_scroll(app.tab); return }
-		'\x1b[B' { app.scroll[app.tab]++; app.clamp_scroll(app.tab); return }
-		'\x1b[5~' { app.scroll[app.tab] -= app.visible_rows; app.clamp_scroll(app.tab); return }
-		'\x1b[6~' { app.scroll[app.tab] += app.visible_rows; app.clamp_scroll(app.tab); return }
-		'\x1b[H', '\x1b[1~' { app.scroll[app.tab] = 0; return }
-		'\x1b[F', '\x1b[4~' { app.scroll[app.tab] = system_information_row_limit; app.clamp_scroll(app.tab); return }
-		else {}
-	}
-	mut at := 0
-	for at < text.len {
-		ch := text[at]
-		if ch == 0x1b && at + 1 < text.len && text[at + 1] == `[` {
-			at += 2
-			for at < text.len { final := text[at] >= 0x40 && text[at] <= 0x7e; at++; if final { break } }
-			continue
-		}
+	if app.search_language != desktop_language { app.refilter_search(false) }
+	for ch in text {
+		if ch == 0x06 { app.focus_search(true); continue }
+		if ch == 0x0c { app.focus_path(); continue }
+		if app.escape_byte(ch) { continue }
 		match ch {
-			0x0c { app.path_focus = true; app.path_selected = true; app.pending_len = 0 }
+			0x01 { app.pending_len = 0; if app.search_focus { app.search_selected = true } else if app.path_focus { app.path_selected = true } }
 			0x12 { app.pending_len = 0; app.refresh() }
-			0x15 { if app.path_focus { app.report_path.clear(); app.pending_len = 0; app.path_selected = false; app.report_status = '' } }
-			0x1b { app.path_focus = false; app.pending_len = 0 }
+			0x15 { if app.search_focus { app.clear_search() } else if app.path_focus { app.report_path.clear(); app.pending_len = 0; app.path_selected = false; app.report_status = '' } }
+			0x1b { app.escape[0] = ch; app.escape_len = 1; app.escape_ms = desktop_monotonic_ms(); app.pending_len = 0 }
 			`\r`, `\n` { if app.path_focus { app.pending_len = 0; app.export_report() } }
-			else { if app.path_focus { app.path_byte(ch) } }
+			else { if app.search_focus { app.search_byte(ch) } else if app.path_focus { app.path_byte(ch) } }
 		}
-		at++
 	}
 }
 
 fn (mut app SystemInformationApp) paste_input(text string) {
+	app.expire_escape(~u64(0))
+	if app.search_focus { app.paste_search(text); return }
 	if !app.path_focus { return }
 	app.pending_len = 0
 	for ch in text { if ch >= 32 && ch != 127 { app.path_byte(ch) } }
@@ -340,7 +342,8 @@ fn (mut app SystemInformationApp) build(size ui2.Rect) !ui2.Element {
 	if !app.initialized { app.refresh() }
 	width := if int(size.width) >= 400 { int(size.width) } else { 400 }
 	height := if int(size.height) >= 250 { int(size.height) } else { 250 }
-	mut rows := (height - 180) / 22
+	if app.search_language != desktop_language { app.refilter_search(false) }
+	mut rows := (height - 220) / 22
 	if rows < 1 { rows = 1 }
 	if rows > 48 { rows = 48 }
 	app.visible_rows = rows
@@ -348,27 +351,40 @@ fn (mut app SystemInformationApp) build(size ui2.Rect) !ui2.Element {
 	mut children := frame_elements(96)
 	children << ui2.label('', tr('app.system_information'), ui2.rect(12, 12, 250, 28), ui2.TextStyle{size: 18, bold: true, color: body_heading})
 	children << ui2.button('system_information.refresh', tr('system_information.refresh'), ui2.rect(f64(width - 116), 12, 104, 28), ui2.BoxStyle{bg: settings_choice_bg, radius: 5}, ui2.TextStyle{size: 12, color: body_text, align: .center})
+	children << app.search_field(width)
+	children << ui2.button('system_information.search.clear', tr('system_information.search.clear'), ui2.rect(f64(width - 88), 54, 76, 28), ui2.BoxStyle{bg: settings_choice_bg, radius: 5}, ui2.TextStyle{size: 12, color: body_text, align: .center})
 	for tab, key in system_information_tab_keys {
-		children << ui2.button(system_information_tab_actions[tab], tr(key), ui2.rect(12, f64(54 + tab * 36), 134, 30),
+		tab_y := if height < 300 { 50 + tab * 30 } else { 54 + tab * 36 }
+		tab_height := if height < 300 { 26 } else { 30 }
+		children << ui2.button(system_information_tab_actions[tab], tr(key), ui2.rect(12, f64(tab_y), 134, f64(tab_height)),
 			ui2.BoxStyle{bg: if app.tab == tab { app_accent } else { settings_choice_bg }, radius: 5},
 			ui2.TextStyle{size: 12, color: if app.tab == tab { u32(0xffffff) } else { body_text }, align: .center})
 	}
 	section := &app.sections[app.tab]
 	for slot in 0 .. rows {
-		index := app.scroll[app.tab] + slot
-		if index >= section.rows.len { break }
+		filtered := app.scroll[app.tab] + slot
+		if filtered >= app.filtered_count(app.tab) { break }
+		index := if app.search_len == 0 { filtered } else { app.search_indices[app.tab][filtered] }
 		row := section.rows[index]
 		text, owned := system_information_row_text(row)
 		children << ui2.Element{
 			...ui2.label(if owned { frame_owned_text_id } else { '' }, text,
-				ui2.rect(158, f64(54 + slot * 22), f64(width - 170), 22),
+				ui2.rect(158, f64(94 + slot * 22), f64(width - 170), 22),
 				ui2.TextStyle{size: 12, color: if row.heading { body_heading } else { body_text }, bold: row.heading})
 			tooltip: text
 		}
 	}
-	children << ui2.button('system_information.previous', tr('system_information.previous'), ui2.rect(158, f64(height - 112), 80, 26), ui2.BoxStyle{bg: settings_choice_bg, radius: 4}, ui2.TextStyle{size: 11, color: body_text, align: .center})
-	children << ui2.button('system_information.next', tr('system_information.next'), ui2.rect(246, f64(height - 112), 80, 26), ui2.BoxStyle{bg: settings_choice_bg, radius: 4}, ui2.TextStyle{size: 11, color: body_text, align: .center})
-	if section.limited {
+	if app.filtered_count(app.tab) == 0 && app.search_len > 0 {
+		children << ui2.label('system_information.search.empty', tr('system_information.search.empty'), ui2.rect(158, 94, f64(width - 170), 38), ui2.TextStyle{size: 12, color: body_muted, lines: 2})
+	}
+	page_width := if width < 500 { 56 } else { 80 }
+	count_x := 158 + page_width * 2 + 20
+	children << ui2.button('system_information.previous', tr('system_information.previous'), ui2.rect(158, f64(height - 112), f64(page_width), 26), ui2.BoxStyle{bg: settings_choice_bg, radius: 4}, ui2.TextStyle{size: 11, color: body_text, align: .center})
+	children << ui2.button('system_information.next', tr('system_information.next'), ui2.rect(f64(166 + page_width), f64(height - 112), f64(page_width), 26), ui2.BoxStyle{bg: settings_choice_bg, radius: 4}, ui2.TextStyle{size: 11, color: body_text, align: .center})
+	if app.search_len > 0 {
+		count_key := if width < 500 { 'system_information.search.count_short' } else { 'system_information.search.count' }
+		children << ui2.label(frame_owned_text_id, tr_count(count_key, i64(app.filtered_count(app.tab))), ui2.rect(f64(count_x), f64(height - 112), f64(width - count_x - 12), 26), ui2.TextStyle{size: 11, color: body_muted})
+	} else if section.limited {
 		children << ui2.label('', tr('system_information.limited'), ui2.rect(338, f64(height - 112), f64(width - 350), 26), ui2.TextStyle{size: 11, color: body_muted})
 	}
 	children << ui2.label('', tr('system_information.destination'), ui2.rect(12, f64(height - 77), 220, 20), ui2.TextStyle{size: 11, color: body_muted})
@@ -423,4 +439,9 @@ fn (mut app SystemInformationApp) close_app() {
 	app.report_path = []u8{}
 	app.initialized = false
 	app.pending_len = 0
+	app.search_len = 0
+	app.search_focus = false
+	app.search_selected = false
+	app.search_counts = [4]int{}
+	app.escape_len = 0
 }

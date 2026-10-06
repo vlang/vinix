@@ -3995,3 +3995,96 @@ cbrt
 calculator.scientific.log2
 log2
 -----
+preview.pan
+Desplazar
+-----
+preview.select
+Seleccionar
+-----
+preview.crop
+Recortar
+-----
+preview.selection.clear
+Limpiar
+-----
+preview.status.select
+Arrastra sobre la imagen para seleccionar un área.
+-----
+preview.status.selection
+Selección lista. Recortar la aplica; Limpiar la cancela.
+-----
+preview.status.selection_empty
+Primero arrastra para seleccionar un área.
+-----
+preview.status.cropped
+Imagen recortada. Exporta PNG para guardarla.
+-----
+preview.status.crop_failed
+No se pudo recortar la imagen.
+-----
+preview.status.pan
+Arrastra para desplazarte; usa Seleccionar para recortar.
+-----
+grapher.document_path
+Ruta del documento de gráfica
+-----
+grapher.document_open
+Abrir
+-----
+grapher.document_save_as
+Guardar como
+-----
+grapher.document_invalid_path
+Introduce una ruta absoluta para el documento de gráfica.
+-----
+grapher.document_open_failed
+No se pudo abrir este documento de gráfica.
+-----
+grapher.document_invalid
+Documento de gráfica no válido o no compatible.
+-----
+grapher.document_opened
+Documento de gráfica abierto.
+-----
+grapher.document_save_failed
+No se pudo guardar este documento de gráfica.
+-----
+grapher.document_exists
+Esta ruta ya existe. Elige otro nombre.
+-----
+grapher.document_saved
+Documento de gráfica guardado.
+-----
+archive.select_all
+Seleccionar todo
+-----
+archive.clear_selection
+Limpiar
+-----
+archive.extract_selected
+Extraer selección
+-----
+archive.no_selection
+Selecciona al menos una entrada antes de extraer.
+-----
+archive.selection_hint
+Selecciona entradas; las carpetas seleccionadas incluyen su contenido.
+-----
+system_information.search.placeholder
+Buscar en informes · Ctrl-F
+-----
+system_information.search.clear
+Limpiar
+-----
+system_information.search.hint
+Busca nombres y valores en las cuatro secciones. La exportación incluye todas las filas.
+-----
+system_information.search.empty
+No hay filas coincidentes en esta sección.
+-----
+system_information.search.count
+{0} filas coincidentes
+-----
+system_information.search.count_short
+{0} filas
+-----

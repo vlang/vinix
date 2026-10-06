@@ -487,6 +487,8 @@ const available_apps = [
 		process_name: 'vinix-system-information'
 		keyboard: true
 		pointer: true
+		polling: true
+		poll_interval_ms: 100
 		open: open_system_information
 	},
 	AppFactory{

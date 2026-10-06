@@ -3995,3 +3995,96 @@ cbrt
 calculator.scientific.log2
 log2
 -----
+preview.pan
+Pan
+-----
+preview.select
+Select
+-----
+preview.crop
+Crop
+-----
+preview.selection.clear
+Clear
+-----
+preview.status.select
+Drag over the image to select an area.
+-----
+preview.status.selection
+Selection ready. Crop applies it; Clear cancels.
+-----
+preview.status.selection_empty
+Drag to select an area first.
+-----
+preview.status.cropped
+Image cropped. Export PNG to save.
+-----
+preview.status.crop_failed
+Could not crop the image.
+-----
+preview.status.pan
+Drag to pan; use Select to crop.
+-----
+grapher.document_path
+Graph document path
+-----
+grapher.document_open
+Open
+-----
+grapher.document_save_as
+Save As
+-----
+grapher.document_invalid_path
+Enter an absolute graph document path.
+-----
+grapher.document_open_failed
+Could not open this graph document.
+-----
+grapher.document_invalid
+Invalid or unsupported graph document.
+-----
+grapher.document_opened
+Graph document opened.
+-----
+grapher.document_save_failed
+Could not save this graph document.
+-----
+grapher.document_exists
+This path already exists. Choose another name.
+-----
+grapher.document_saved
+Graph document saved.
+-----
+archive.select_all
+Select All
+-----
+archive.clear_selection
+Clear
+-----
+archive.extract_selected
+Extract Selected
+-----
+archive.no_selection
+Select at least one entry before extracting.
+-----
+archive.selection_hint
+Select entries below; selected folders include their contents.
+-----
+system_information.search.placeholder
+Search reports · Ctrl-F
+-----
+system_information.search.clear
+Clear
+-----
+system_information.search.hint
+Search names and values in all four sections. Report export includes every row.
+-----
+system_information.search.empty
+No matching rows in this section.
+-----
+system_information.search.count
+{0} matching rows
+-----
+system_information.search.count_short
+{0} rows
+-----

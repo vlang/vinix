@@ -8,6 +8,45 @@ import os
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
+fn test_system_information_search_frames_reports_language_changes_and_close_keep_heap_flat() {
+	previous := desktop_language
+	set_desktop_language(.en)
+	defer { set_desktop_language(previous) }
+	mut app := SystemInformationApp{}
+	app.initialized = true
+	app.sections[0].add('system_information.memory_total', '16384 kB'.clone(), false)
+	app.sections[1].add('', 'virtio_gpu'.clone(), false)
+	app.sections[3].add('', 'café-package 1.0'.clone(), false)
+	for tab in 0 .. 4 {
+		app.tab = tab
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 780, 540))!)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		app.key_input('\x06')
+		app.paste_input('CAFE package')
+		assert app.filtered_count(3) == 1
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 780, 540))!)
+		set_desktop_language(.ru)
+		app.key_input('\x06')
+		app.paste_input('памяти')
+		assert app.filtered_count(0) == 1
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 400, 250))!)
+		data := app.report()
+		unsafe { data.free() }
+		app.key_input('\x01\x7f\xd0\x96\x7f\x1b')
+		app.expire_escape(~u64(0))
+		assert app.search_len == 0
+		set_desktop_language(.en)
+	}
+	app.close_app()
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_system_information_factory_interface_edits_and_exports_release_owned_memory() {
 	root := os.join_path(os.temp_dir(), 'vinix-system-information-native-heap-${os.getpid()}')
 	os.mkdir_all(root)!

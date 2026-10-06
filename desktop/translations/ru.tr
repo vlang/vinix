@@ -3995,3 +3995,96 @@ cbrt
 calculator.scientific.log2
 log2
 -----
+preview.pan
+Сдвиг
+-----
+preview.select
+Выделить
+-----
+preview.crop
+Обрезать
+-----
+preview.selection.clear
+Сбросить
+-----
+preview.status.select
+Протяните по изображению, чтобы выделить область.
+-----
+preview.status.selection
+Область выделена. Обрезать — применить, Сбросить — отменить.
+-----
+preview.status.selection_empty
+Сначала выделите область перетаскиванием.
+-----
+preview.status.cropped
+Изображение обрезано. Экспортируйте PNG для сохранения.
+-----
+preview.status.crop_failed
+Не удалось обрезать изображение.
+-----
+preview.status.pan
+Перетаскивайте для просмотра; Выделить — для обрезки.
+-----
+grapher.document_path
+Путь к документу графика
+-----
+grapher.document_open
+Открыть
+-----
+grapher.document_save_as
+Сохранить как
+-----
+grapher.document_invalid_path
+Введите абсолютный путь к документу графика.
+-----
+grapher.document_open_failed
+Не удалось открыть документ графика.
+-----
+grapher.document_invalid
+Недопустимый или неподдерживаемый документ графика.
+-----
+grapher.document_opened
+Документ графика открыт.
+-----
+grapher.document_save_failed
+Не удалось сохранить документ графика.
+-----
+grapher.document_exists
+Этот путь уже существует. Выберите другое имя.
+-----
+grapher.document_saved
+Документ графика сохранён.
+-----
+archive.select_all
+Выделить всё
+-----
+archive.clear_selection
+Сбросить
+-----
+archive.extract_selected
+Извлечь выбранное
+-----
+archive.no_selection
+Выберите хотя бы один элемент для извлечения.
+-----
+archive.selection_hint
+Выберите элементы ниже; выбранные папки включают своё содержимое.
+-----
+system_information.search.placeholder
+Поиск в отчётах · Ctrl-F
+-----
+system_information.search.clear
+Сбросить
+-----
+system_information.search.hint
+Поиск по названиям и значениям всех четырёх разделов. Экспорт включает все строки.
+-----
+system_information.search.empty
+В этом разделе совпадений нет.
+-----
+system_information.search.count
+{0} совпадений
+-----
+system_information.search.count_short
+{0} строк
+-----

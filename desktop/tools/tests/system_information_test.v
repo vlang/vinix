@@ -4,6 +4,190 @@ module main
 import os
 import ui2
 
+fn system_information_search_test_seed(mut app SystemInformationApp) {
+	app.initialized = true
+	app.sections[0].add('system_information.cpu', 'Test CPU'.clone(), false)
+	app.sections[0].add('system_information.memory_total', '16384 kB'.clone(), false)
+	app.sections[1].add('', 'drivers: virtio_gpu'.clone(), false)
+	app.sections[1].add_row(SystemInformationLine{key: 'system_information.network_report', unavailable: true})
+	app.sections[2].add('', 'tmpfs /home/alex'.clone(), false)
+	app.sections[3].add('', 'café-package 1.0'.clone(), false)
+	app.sections[3].add('', 'Пакет 2.0'.clone(), false)
+	app.refilter_search(false)
+}
+
+fn system_information_search_test_find(tree ui2.Element, id string) ?ui2.Element {
+	if tree.id == id { return tree }
+	for child in tree.children {
+		if found := system_information_search_test_find(child, id) { return found }
+	}
+	return none
+}
+
+fn test_system_information_search_fragmented_navigation_and_pending_input_boundaries() {
+	mut polling := false
+	for factory in available_apps {
+		if factory.process_name == 'vinix-system-information' { polling = factory.polling && factory.poll_interval_ms == 100 }
+	}
+	assert polling
+	mut app := SystemInformationApp{}
+	defer { app.close_app() }
+	app.initialized = true
+	for _ in 0 .. 40 { app.sections[3].add('', 'wanted'.clone(), false) }
+	app.key_input('\x06wanted')
+	app.key_input('\x1b')
+	assert !app.expire_escape(app.escape_ms + 99)
+	app.key_input('[B')
+	assert app.search_text() == 'wanted' && app.scroll[3] == 1 && app.search_focus
+	app.key_input('\x1b[')
+	app.key_input('6~')
+	assert app.scroll[3] == 1 + app.visible_rows && app.search_text() == 'wanted'
+	app.key_input('\x1bO')
+	app.key_input('A')
+	assert app.scroll[3] == app.visible_rows
+	app.key_input('\x1b[123456789012345678901234~')
+	assert app.search_text() == 'wanted' && app.escape_len == 0
+	app.key_input('\xd0\x01\x96')
+	assert app.search_text() == 'wanted' && app.search_selected && app.pending_len == 0
+	app.key_input('\xd0')
+	oversized := 'x'.repeat(129)
+	app.paste_input(oversized)
+	unsafe { oversized.free() }
+	assert app.pending_len == 0 && app.search_text() == 'wanted'
+	app.key_input('\x1b')
+	assert app.expire_escape(app.escape_ms + 100)
+	assert app.search_len == 0 && !app.search_focus
+}
+
+fn test_system_information_search_matches_translated_names_values_and_sections_without_changing_report() {
+	previous := desktop_language
+	set_desktop_language(.en)
+	defer { set_desktop_language(previous) }
+	mut app := SystemInformationApp{}
+	defer { app.close_app() }
+	system_information_search_test_seed(mut app)
+	app.key_input('\x06')
+	app.paste_input('CPU test')
+	assert app.search_text() == 'CPU test'
+	assert app.filtered_count(0) == 1
+	assert app.search_indices[0][0] == 0
+	assert app.filtered_count(1) == 0
+	app.key_input('\x06')
+	app.paste_input('virtio')
+	assert app.tab == 1 && app.filtered_count(1) == 1
+	app.key_input('\x06')
+	app.paste_input('unavailable network')
+	assert app.filtered_count(1) == 1 && app.search_indices[1][0] == 1
+	app.key_input('\x06')
+	app.paste_input('CAFE')
+	assert app.tab == 3 && app.filtered_count(3) == 1
+	app.key_input('\x06')
+	app.paste_input('пАКЕТ')
+	assert app.filtered_count(3) == 1 && app.search_indices[3][0] == 1
+	app.key_input('\x06')
+	app.paste_input('installed packages')
+	assert app.filtered_count(3) == 2 && app.filtered_count(0) == 0
+	data := app.report()
+	text := disk_usage_buffer_text(data)
+	assert text.contains('Test CPU') && text.contains('tmpfs /home/alex') && text.contains('café-package')
+	unsafe { data.free() }
+	app.handle('system_information.search.clear')!
+	assert app.filtered_count(0) == 2 && app.filtered_count(3) == 2
+}
+
+fn test_system_information_search_utf8_keyboard_paste_bounds_focus_and_language_changes() {
+	previous := desktop_language
+	set_desktop_language(.en)
+	defer { set_desktop_language(previous) }
+	mut app := SystemInformationApp{}
+	defer { app.close_app() }
+	system_information_search_test_seed(mut app)
+	app.key_input('\x06\xd0')
+	assert app.search_len == 0
+	app.key_input('\x96')
+	assert app.search_text() == 'Ж'
+	app.key_input('\x7f')
+	assert app.search_len == 0
+	app.paste_input('CPU\nTest\t\x01')
+	assert app.search_text() == 'CPU Test '
+	assert app.filtered_count(0) == 1
+	app.key_input('\x01')
+	oversized := 'x'.repeat(129)
+	app.paste_input(oversized)
+	unsafe { oversized.free() }
+	assert app.search_text() == 'CPU Test ' && app.search_selected
+	app.paste_input('memory')
+	assert app.search_text() == 'memory' && app.filtered_count(0) == 1
+	set_desktop_language(.ru)
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 780, 540))!)
+	assert app.filtered_count(0) == 0
+	app.key_input('\x06')
+	app.paste_input('памяти')
+	assert app.filtered_count(0) == 1
+	app.key_input('\x0c')
+	assert app.path_focus && !app.search_focus
+	app.paste_input('/tmp/report.txt')
+	assert disk_usage_buffer_text(app.report_path) == '/tmp/report.txt'
+	app.key_input('\x06\x1b')
+	app.expire_escape(~u64(0))
+	assert app.search_len == 0 && !app.search_focus
+	app.paste_input('ignored')
+	assert app.search_len == 0
+	app.key_input('\x06')
+	bound := 'a'.repeat(127)
+	app.paste_input(bound)
+	unsafe { bound.free() }
+	app.key_input('\xd0\x96')
+	assert app.search_len == 127 && app.pending_len == 0
+	app.key_input('\x01\x7f')
+	assert app.search_len == 0
+}
+
+fn test_system_information_search_paging_empty_ui_snapshot_refresh_and_small_window() {
+	previous := desktop_language
+	set_desktop_language(.en)
+	defer { set_desktop_language(previous) }
+	mut app := SystemInformationApp{}
+	defer { app.close_app() }
+	app.initialized = true
+	for index in 0 .. 80 {
+		app.sections[3].add('', if index % 2 == 0 { 'wanted'.clone() } else { 'other'.clone() }, false)
+	}
+	app.key_input('\x06')
+	app.paste_input('wanted')
+	assert app.tab == 3 && app.filtered_count(3) == 40
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 780, 540))!)
+	app.key_input('\x1b[F')
+	assert app.scroll[3] == 40 - app.visible_rows
+	app.handle('system_information.previous')!
+	assert app.scroll[3] == 40 - 2 * app.visible_rows
+	app.pointer_event(.scroll, .left, 2, 200, 130, 780, 540)
+	assert app.scroll[3] == 40 - 2 * app.visible_rows - 6
+	app.sections[3].clear()
+	app.sections[3].add('', 'wanted replacement'.clone(), false)
+	app.refilter_search(false)
+	assert app.filtered_count(3) == 1 && app.scroll[3] == 0
+	app.key_input('\x06')
+	app.paste_input('no such value')
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 400, 250))!
+	assert system_information_test_tree_has_text(tree, tr('system_information.search.empty'))
+	assert system_information_test_tree_has_text(tree, 'no such value')
+	assert app.visible_rows == 1
+	packages := system_information_search_test_find(tree, 'system_information.tab.3') or { panic('missing packages tab') }
+	assert packages.frame.y + packages.frame.height <= 173
+	previous_button := system_information_search_test_find(tree, 'system_information.previous') or { panic('missing previous button') }
+	next := system_information_search_test_find(tree, 'system_information.next') or { panic('missing next button') }
+	assert previous_button.frame.x + previous_button.frame.width < next.frame.x
+	count := system_information_search_test_find(tree, frame_owned_text_id) or { panic('missing match count') }
+	assert count.frame.width >= 90 && count.text == '0 rows'
+	free_tree(tree)
+	app.close_app()
+	assert app.search_len == 0 && app.search_counts[3] == 0
+}
+
 fn system_information_test_sources(root string) SystemInformationSources {
 	return SystemInformationSources{
 		version: join_path(root, 'version'), cpu: join_path(root, 'cpuinfo'), memory: join_path(root, 'meminfo'),
@@ -192,7 +376,7 @@ fn test_system_information_bounds_package_snapshots_and_supports_scroll_and_safe
 	app.handle('system_information.tab.3')!
 	app.key_input('\x1b[6~')
 	assert app.scroll[3] == app.visible_rows
-	app.pointer_event(.scroll, .no_button, -2, 200, 80, 780, 540)
+	app.pointer_event(.scroll, .no_button, -2, 200, 130, 780, 540)
 	assert app.scroll[3] == app.visible_rows + 6
 	app.key_input('\x1b[F')
 	assert app.scroll[3] == app.sections[3].rows.len - app.visible_rows
