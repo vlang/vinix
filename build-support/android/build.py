@@ -59,6 +59,14 @@ def musl_tools():
     return module
 
 
+def runtime_tools():
+    spec = importlib.util.spec_from_file_location("vinix_android_runtime", SUPPORT / "compile-v-runtime.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -236,7 +244,8 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     inputs += json.dumps(art_manifest, sort_keys=True).encode()
     inputs += json.dumps(bionic_manifest, sort_keys=True).encode()
     inputs += json.dumps(atl_manifest, sort_keys=True).encode()
-    for source in (Path(__file__), SUPPORT / "run-android", SUPPORT / "runtime-compat.c",
+    inputs += runtime_tools().inputs()
+    for source in (Path(__file__), SUPPORT / "run-android",
                    SUPPORT / "art-runtime.py", SUPPORT / "art16k.patch", SUPPORT / "build-art.sh",
                    SUPPORT / "art-bootclasspath.py", SUPPORT / "bionic16k.patch", SUPPORT / "build-bionic.sh",
                    SUPPORT / "build-atl.sh", SUPPORT / "atl-dex.py",
@@ -319,9 +328,9 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
     art.apply_atl(args.atl_runtime, runtime, atl_manifest)
     (runtime / art.ATL_MANIFEST).write_text(json.dumps(atl_manifest, indent=2) + "\n")
     relocate_configuration(runtime)
-    subprocess.run([compiler, "-O2", "-Wall", "-Wextra", "-Werror", "-shared", "-fPIC",
-                    str(SUPPORT / "runtime-compat.c"), "-ldl",
-                    "-o", str(runtime / "usr/lib/libvinix-android-compat.so")], check=True)
+    subprocess.run(["python3", str(SUPPORT / "compile-v-runtime.py"),
+                    str(runtime / "usr/lib/libvinix-android-compat.so"), "--cc", compiler,
+                    "--generated-dir", str(args.build_dir / "runtime-generated")], check=True)
     # The java-cacerts package contains a trigger rather than its generated
     # store. Recreate that store without running Alpine package scripts.
     subprocess.run(["python3", str(ROOT / "build-support/java-cacerts.py"),

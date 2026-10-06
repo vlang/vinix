@@ -479,6 +479,10 @@ class AtlTests(unittest.TestCase):
                 path.write_bytes(elf())
 
         def run(command: list[str], **options) -> None:
+            if command[0] == "sh":
+                return builder.subprocess.CompletedProcess(command, 0, stdout="fixture V compiler\n")
+            if len(command) > 2 and command[1].endswith("/compile-v-runtime.py"):
+                Path(command[2]).write_bytes(elf())
             if "-o" in command:
                 Path(command[command.index("-o") + 1]).write_bytes(elf())
 
@@ -499,7 +503,8 @@ class AtlTests(unittest.TestCase):
               patch.object(builder.shutil, "which", return_value="isolated-test-compiler"),
               patch.object(builder.subprocess, "run", side_effect=run) as commands):
             staging = builder.stage(args, lock, args.build_dir / "downloads")
-        return staging / builder.PREFIX.lstrip("/"), commands.call_count
+        build_calls = sum(call.args[0][0] != "sh" for call in commands.call_args_list)
+        return staging / builder.PREFIX.lstrip("/"), build_calls
 
     def test_builder_stages_coherent_atl_and_rejects_stale_cached_framework(self) -> None:
         runtime, calls = self.stage_android()
