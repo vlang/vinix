@@ -44,6 +44,9 @@ macOS or Windows parity work.
 | Keyboard minimize for the active window | `Cmd/Super+M` minimizes the focused window. `Super+Down` minimizes a floating window; existing restore and quarter-tile transitions remain available for arranged windows. A minimized window can be reopened with the taskbar or window switcher. | `Command+M` minimizes the front Mac window; Windows' arrow shortcuts support a restore/minimize sequence. [Apple's keyboard guide](https://support.apple.com/en-mide/102650), [Microsoft's keyboard guide](https://support.microsoft.com/en-US/Windows/Hardware/Input-Devices/windows-keyboard-tips-and-tricks). |
 | Persistent window overview | The taskbar overview button or `Cmd/Super+Ctrl+Up` opens a thumbnail grid for the active workspace, including minimized windows. Click a card or use arrows and Enter to restore/focus it; Escape or a backdrop click dismisses. Workspace buttons switch the grid, and Previous/Next pages keep every window reachable on small displays. Cards reuse retained thumbnails, with an app icon or generic window icon when no picture is available. `Cmd/Super+Tab` keeps its existing quick switcher. | Both macOS Mission Control and Windows Task View offer an overview for finding windows. Vinix's initial overview provides selection and workspace switching. [Apple Mission Control](https://support.apple.com/en-gb/guide/mac-help/mh35798/mac), [Windows Task View](https://support.microsoft.com/en-gb/windows/how-to-multitask-in-windows-b4fa0333-98f8-ef43-e25c-06d4fb1d6960). |
 | Discoverable arrangement chooser | `Cmd/Super+Z` or a right click on a window's maximize button opens an anchored chooser for maximize, restore, side halves and four quarters. Click a layout or use arrows and Enter; Escape or a click outside closes it. Small displays use a compact menu. | macOS and Windows expose arrangements from window controls; Windows also supports a layout shortcut. [Mac tiling icons and commands](https://support.apple.com/my-mm/guide/mac-help/mchl9674d0b0/mac), [Windows Snap layouts](https://support.microsoft.com/en-us/windows/experience/snap-your-windows). |
+| Snap Assist for the vacant half | A user half-snap from dragging, the chooser or Super+Left/Right offers visible current-workspace windows for the opposite half. Click or use arrows and Enter to tile one; Escape/click-away skips. Minimized windows are excluded, and an already occupied opposite half produces no offer. Paging keeps candidates reachable on small displays. Super+Up/Down still continues from a half into a quarter. | [Windows Snap Assist](https://support.microsoft.com/en-us/windows/experience/snap-your-windows). |
+| Windows switch and close shortcuts | Alt+Tab and Alt+Shift+Tab use the existing visual switcher, with the last Alt release committing selection. Alt+F4 calls the normal close handler, preserving unsaved-document handling. SPI, virtio and PS/2 drivers supply the necessary chords and release event. Fragmented input is retained without passing partial shortcuts to apps. | [Windows keyboard shortcuts](https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec). |
+| Window action menu and keyboard move/resize | Alt+Space or a right click on the title bar opens Move, Resize, Minimize, Maximize/Restore, Arrange, desktop migration and Close. Move/Resize uses 10-pixel arrow steps (1 with Shift), Enter applies, and Escape/click-away restores the full original frame and arrangement. Small screens page menu actions. | [Windows keyboard shortcuts](https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec). |
 
 On Mac keyboards, Command is the desktop's Super modifier. Shake and hide
 others operate within the active workspace. Restoring the hidden set should
@@ -58,9 +61,6 @@ step and the current limitation, rather than claiming full desktop parity.
 
 | Priority | Feature | Current limitation and proposed next step | Reference |
 | --- | --- | --- | --- |
-| P1 | Snap Assist | Snapping one window leaves the user to find and arrange the second. Offer current-workspace candidates for the vacant half, with click to tile and Escape/click-away to skip. Never move a minimized or background-workspace window automatically. | [Windows Snap Assist](https://support.microsoft.com/en-us/windows/experience/snap-your-windows). |
-| P1 | Windows keyboard compatibility | The switcher currently uses `Cmd/Super+Tab`, and close uses `Cmd/Super+W`. Add `Alt+Tab`, `Alt+Shift+Tab` and `Alt+F4` aliases after confirming release-event and fragmented-input handling in both keyboard drivers. Preserve application input when a chord is incomplete. | [Windows keyboard shortcuts](https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec). |
-| P1 | Window action menu and keyboard move/resize | The arrangement chooser handles tiling, but there is no general window action menu or `Alt+Space` menu. Add Move, Resize, Minimize, workspace migration and Close, with arrow-key manipulation and Escape to cancel. This also makes placement accessible without precision dragging. | [Windows keyboard shortcuts](https://support.microsoft.com/en-us/windows/keyboard-shortcuts-in-windows-dcc61a57-8ff0-cffe-9796-cb9706c75eec). |
 | P2 | Shared divider for tiled windows | Tiled windows have fixed half/quarter dimensions and do not resize together. Introduce an explicit adjacent-window pairing and a divider that respects both windows' minimum sizes; update both frames together. | [Windows divider resizing](https://support.microsoft.com/en-us/windows/experience/snap-your-windows). |
 | P2 | Arrangement groups | Taskbar grouping is by application, not by a set of tiled windows. Track a tile group and let one taskbar/overview action raise the whole group; remove closed or independently moved members safely. | [Windows Snap groups](https://support.microsoft.com/en-us/windows/experience/snap-your-windows). |
 | P2 | Richer workspaces | Four numbered workspaces and keyboard migration already work. Add pointer migration in the overview, user-visible names and adjacent-workspace shortcuts first; then support bounded creation/removal and carry live windows to a surviving workspace on removal. | [Windows multiple desktops](https://support.microsoft.com/en-gb/windows/how-to-multitask-in-windows-b4fa0333-98f8-ef43-e25c-06d4fb1d6960), [Apple's Spaces overview](https://support.apple.com/guide/mac-studio/manage-windows-on-your-mac-apd2345fc25d/mac). |
@@ -107,25 +107,41 @@ The regression cases for these changes cover:
 - Modal controls keep the desktop cursor visible over game surfaces that
   ordinarily hide it, and snap previews do not contaminate cached thumbnails.
 - Cards without a cached picture retain an app or generic window icon.
+- Snap Assist excludes minimized/background-workspace windows, skips occupied
+  halves, validates stale IDs, pages candidates and preserves quarter shortcuts.
+- Keyboard Move/Resize applies precise increments and constraints; cancellation
+  restores frame, saved restore frame, maximize and snap metadata without
+  changing focus. Close continues through the application's existing veto.
+- Alt and Super switching use the matching release event. Global shortcuts can
+  replace an open window control, and fragmented/malformed input is accounted
+  for byte by byte without duplicating a lone Escape.
+- SPI keyboard fixtures cover both Alt keys, reverse switching, repeat,
+  reset and ordinary Meta input while preserving the decoder C ABI.
 
-All 12 distinct host suites passed: isolation, placement, edge resizing,
-overview, layout chooser, title-bar clicks, workspaces, taskbar features,
-switcher, Quick Launch, utilities and Color Meter. The window suites run through
+All 15 window-experience suites passed: isolation, placement, edge resizing,
+overview, layout chooser, Snap Assist, window actions, Windows shortcuts,
+title-bar clicks, workspaces, taskbar features, switcher, Quick Launch,
+utilities and Color Meter. The additional localization suite passed for all
+six supported languages and their glyph coverage. Tests run through
 [test-window-experience.sh](tools/test-window-experience.sh) with V's new
-compiler, `ui2_headless`, `-gc none` and `-manualfree`. The latest
-[overview tests](tools/tests/window_overview_test.v), including the generic
-icon fallback, passed. Final optimized static desktop builds succeeded for
-both ARM64 and AMD64.
+compiler, `ui2_headless`, `-gc none` and `-manualfree`. Optimized static desktop
+builds and isolated optimized kernel builds succeeded for both ARM64 and AMD64.
+The SPI production fixtures passed 21 keyboard and 19 touchpad groups under
+ASan/UBSan, preserving the C ABI and requiring no allocator imports.
 
-QEMU idle and application-launch smoke tests passed. The final 25-second drag
-scenario exercised the overview, arrangement chooser, shake hide and restore,
-snap preview, quarter placement and drag-to-restore. It exited successfully
-without a kernel panic; pointer gestures and the rendered states were visually
-checked, including all eight chooser options and the Files icon and System
-thumbnail in the overview. The captures are
+The initial QEMU idle/application smoke and 25-second pointer scenario checked
+overview, layout selection, shake hide/restore, placement previews, quarters
+and drag-to-restore. The captures are
 [window overview](../docs/screenshots/vinix-window-overview-qemu.png) and
 [arrangement chooser](../docs/screenshots/vinix-window-layouts-qemu.png).
 
-The QEMU harness uses a stdin pipe, so these guest runs did not test a physical
-keyboard. Host protocol tests cover the documented shortcuts and fragmented
-overview input; physical-keyboard delivery in the guest remains unverified.
+The follow-up 65-second QEMU scenario uses a scratch init with desktop stdin
+connected to `/dev/console`. QMP keys travel through the updated VirtIO keyboard
+driver into the desktop. All 18 visual checks passed, with 22 captures: a half
+snap opens Assist; choosing a candidate fills the opposite half; Escape and
+Alt+Space control the menu; keyboard Move/Resize applies and cancels correctly;
+Alt+Tab and Alt+Shift+Tab display the switcher and focus the expected window on
+release; Alt+F4 closes only the focused window. The guest exited without a
+kernel panic. Reviewed captures show
+[Snap Assist](../docs/screenshots/vinix-window-snap-assist-qemu.png) and the
+[window action menu](../docs/screenshots/vinix-window-actions-qemu.png).

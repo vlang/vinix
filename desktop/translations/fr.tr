@@ -4398,3 +4398,51 @@ HH:MM:SS · 00:00:01–24:00:00
 clock.timer.duration.invalid
 Durée invalide · HH:MM:SS, 1s–24h
 -----
+window.actions.title
+Actions de fenêtre
+-----
+window.actions.move
+Déplacer
+-----
+window.actions.resize
+Redimensionner
+-----
+window.actions.minimize
+Réduire
+-----
+window.actions.arrange
+Disposer
+-----
+window.actions.close
+Fermer
+-----
+window.actions.workspace_1
+Déplacer vers le bureau 1
+-----
+window.actions.workspace_2
+Déplacer vers le bureau 2
+-----
+window.actions.workspace_3
+Déplacer vers le bureau 3
+-----
+window.actions.workspace_4
+Déplacer vers le bureau 4
+-----
+window.actions.moving
+Déplacement de fenêtre
+-----
+window.actions.resizing
+Redimensionnement de fenêtre
+-----
+window.actions.move_hint
+Flèches : déplacer. Maj : 1 pixel. Entrée : appliquer. Échap : annuler.
+-----
+window.actions.resize_hint
+Flèches : redimensionner. Maj : 1 pixel. Entrée : appliquer. Échap : annuler.
+-----
+window.snap_assist.title
+Remplir l’autre moitié
+-----
+window.snap_assist.hint
+Flèches : choisir. Entrée : disposer. Échap : passer.
+-----

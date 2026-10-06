@@ -19,6 +19,7 @@ const left_shift_rel = 0xaa
 const ctrl = 0x1d
 const ctrl_rel = 0x9d
 const tab = 0x0f
+const f4 = 0x3e
 const space = 0x39
 // Cmd on a Mac keyboard, Super elsewhere. Both arrive behind the 0xe0 prefix.
 const left_meta = 0x5b
@@ -33,6 +34,8 @@ __global (
 	console_shift_active           = bool(false)
 	console_ctrl_active            = bool(false)
 	console_alt_active             = bool(false)
+	console_alt_keys               = u8(0)
+	console_alt_tab_chorded        = bool(false)
 	// Cmd, and whether a chord was sent while it was down. The desktop's
 	// global shortcuts need the release so a held key cannot repeat a chord
 	// forever; Cmd-Tab and Cmd-Space both opt into that report.
@@ -40,6 +43,20 @@ __global (
 	console_meta_chorded           = bool(false)
 	console_extra_scancodes        = bool(false)
 )
+
+fn console_update_alt(right bool, pressed bool) {
+	mask := if right { u8(2) } else { u8(1) }
+	if pressed {
+		console_alt_keys |= mask
+	} else {
+		console_alt_keys &= ~mask
+	}
+	console_alt_active = console_alt_keys != 0
+	if !console_alt_active && console_alt_tab_chorded {
+		console_alt_tab_chorded = false
+		add_to_buf(c'\e[57443;1:3u', 12, true)
+	}
+}
 
 // Modified navigation keys use xterm's CSI 1;<modifier><final> encoding.
 // Keeping Super in this stream lets the framebuffer desktop offer the same
@@ -166,6 +183,14 @@ fn keyboard_handler() {
 			console_extra_scancodes = false
 
 			match input_byte {
+				left_alt {
+					console_update_alt(true, true)
+					continue
+				}
+				left_alt_rel {
+					console_update_alt(true, false)
+					continue
+				}
 				ctrl {
 					console_ctrl_active = true
 					continue
@@ -279,11 +304,11 @@ fn keyboard_handler() {
 				continue
 			}
 			left_alt {
-				console_alt_active = true
+				console_update_alt(false, true)
 				continue
 			}
 			left_alt_rel {
-				console_alt_active = false
+				console_update_alt(false, false)
 				continue
 			}
 			left_shift, right_shift {
@@ -320,6 +345,21 @@ fn keyboard_handler() {
 				add_to_buf(c'\e[9;9u', 6, true)
 			}
 			console_meta_chorded = true
+			continue
+		}
+		if console_alt_active && !console_meta_active && !console_ctrl_active
+			&& input_byte == tab {
+			if console_shift_active {
+				add_to_buf(c'\e[9;4u', 6, true)
+			} else {
+				add_to_buf(c'\e[9;3u', 6, true)
+			}
+			console_alt_tab_chorded = true
+			continue
+		}
+		if console_alt_active && !console_meta_active && !console_ctrl_active
+			&& !console_shift_active && input_byte == f4 {
+			add_to_buf(c'\e[1;3S', 6, true)
 			continue
 		}
 

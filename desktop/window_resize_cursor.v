@@ -32,7 +32,7 @@ fn window_resize_cursor_for_action(action string) WindowResizeCursor {
 }
 
 fn (d &Desktop) window_resize_cursor_kind() WindowResizeCursor {
-	if d.overview.active || d.window_layout.active {
+	if d.window_overlay_active() {
 		return .none_
 	}
 	if d.drag.kind == .resize {

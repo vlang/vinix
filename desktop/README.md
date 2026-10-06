@@ -43,6 +43,10 @@ What it does:
   workspace switching and keyboard selection, including minimized windows
 - an arrangement chooser on Super+Z or right-clicking Maximize, with visual
   half/quarter layouts and maximize/restore
+- Snap Assist after half tiling, with current-workspace candidates for the
+  vacant half and explicit selection before moving another window
+- an Alt+Space or title-bar context menu for keyboard move/resize, minimize,
+  maximize/restore, arrangement, workspace migration and close
 - a **V Start button** and Windows 7-style two-column Start menu, with pinned
   and recently used programs, their recent items, Recent Items, All Programs,
   type-to-search, readable paged program/search rows, system links and a
@@ -117,8 +121,8 @@ What it does:
 - native **Blender**: a Vinix GHOST backend renders with surfaceless EGL and
   publishes directly into a compositor-owned Vinix window, with no Xorg or
   Wayland server in the path
-- **Cmd-Tab**, which switches windows on the current workspace on a tap and
-  shows all of them in the middle of the screen when it is held
+- **Cmd/Super+Tab and Alt+Tab**, which switch windows on the current workspace
+  on a tap and show them in the middle of the screen when held; Shift reverses
 
 Keys: `Ctrl-Q` leaves the desktop, `Ctrl-N` opens a window, `Ctrl-K` the first
 application. `Super+Left/Right` tiles, `Super+Up/Down` maximizes or restores,
@@ -127,6 +131,13 @@ window. `Super+M` minimizes the focused window; `Super+Alt+H` hides/restores
 other windows, and `Super+Shift+M` restores the windows hidden by that action.
 `Super+Down` also minimizes a floating window after restoring an arranged one.
 `Super+Ctrl+Up` opens the overview and `Super+Z` opens the layout chooser.
+`Alt+Tab` switches windows; `Alt+Shift+Tab` switches in reverse, and releasing
+Alt selects the highlighted window. `Alt+F4` closes through the application
+close handler. `Alt+Space` or a right click on the title bar opens the window
+action menu. Its Move and Resize actions use arrows (10 pixels, or 1 with
+Shift), Enter to apply and Escape to restore the original frame. Half tiling
+offers Snap Assist: arrows choose a companion, Enter tiles it into the vacant
+half, and Escape or a click outside skips the offer.
 On Mac keyboards, Super is Command and Alt is Option.
 They are chords rather than bare letters because they fire
 whenever no application holds the keyboard, which on a machine whose pointer
@@ -145,6 +156,9 @@ typing any word with a q in it drop the user back to the console.
     window_resize_cursor.v  edge/corner resize cursor shapes and backing bounds
     window_overview.v  paged thumbnail overview and modal keyboard navigation
     window_layout.v    visual arrangement chooser on window chrome and Super+Z
+    window_snap_assist.v  candidate picker for the vacant tiled half
+    window_actions.v   window menu and reversible keyboard move/resize
+    window_overlays.v  modal ownership and fragmented global shortcut routing
     app.v          native application metadata and factories
     app_process.v  compositor/client IPC, UI-tree encoding and lifecycle
     native_surface_app.v  native external-client lifecycle and input transport
@@ -680,28 +694,34 @@ looking, and flashing a panel up for a tenth of a second would only be noise;
 a hold is a question, and deserves an answer.
 
 A terminal has no way to say "Cmd", so the keyboard drivers say it for it and
-the desktop reads three sequences out of the byte stream before anything else
-sees them:
+the desktop reads these sequences out of the byte stream before applications
+see them:
 
     \e[9;9u        Cmd-Tab
     \e[9;10u       Cmd-Shift-Tab
     \e[57444;1:3u  Cmd let go
+    \e[9;3u        Alt-Tab
+    \e[9;4u        Alt-Shift-Tab
+    \e[57443;1:3u  Last Alt key let go after Alt-Tab
+    \e[1;3S        Alt-F4
 
-The first two are the CSI-u encoding of Tab — the key's own code point, then 1
-plus a mask of the modifiers held with it, where super is 8 and shift is 1 —
-which is what a terminal that reports modified keys at all uses. The third has
-no precedent to follow, because no terminal has ever had a reason to report a
-modifier being released; it is the same encoding's left Super key with an event
-type of 3, "released". A driver only sends it when a chord was sent while Cmd
-was down, so a bare Cmd press still costs a shell nothing.
+The Tab sequences use CSI-u: the key's code point, then one plus the
+modifier mask (Super is 8, Alt is 2 and Shift is 1). Releases use the functional
+modifier key IDs and event type 3 from the
+[Kitty keyboard protocol](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
+Vinix drivers emit a Super release only after a Super chord and an Alt release
+only after Alt-Tab, when the last Alt key is released. The switcher tracks
+which modifier opened it, so releasing the other one cannot commit a selection.
+SPI, virtio and PS/2 drivers emit these chords; ordinary Alt letters retain
+their terminal Meta encoding.
 
 They are taken out of the stream ahead of the focused application, which is the
 one place the desktop overrules whoever is typing: Cmd-Tab belongs to the window
 manager on the machine this borrows the gesture from, and a terminal that
 swallowed it would strand a keyboard-only session in one window. A sequence
-split across two reads is held back rather than handed over in halves — but
-only from the second byte on, since a lone escape is a key someone pressed and
-delaying it would be felt.
+split across reads is held back rather than handed over in halves. A lone
+Escape settles on the next empty read; it dismisses an open window control or
+returns to the focused application exactly once.
 
 ## Settings
 

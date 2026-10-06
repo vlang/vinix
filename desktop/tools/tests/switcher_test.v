@@ -298,3 +298,72 @@ fn test_switcher_with_no_windows() {
 	assert desktop.take_switcher_keys(cmd_released) == ''
 	assert desktop.focus == 0
 }
+
+fn test_alt_tab_and_shift_tab_share_the_switcher_and_commit_on_alt_release() {
+	mut desktop := fixture_desktop()
+	on_top := desktop.focus
+	assert desktop.take_switcher_keys(key_alt_tab) == ''
+	assert desktop.switcher.alt_held
+	assert desktop.switcher_title() == 'Two'
+	assert desktop.focus == on_top
+	assert desktop.take_switcher_keys(key_alt_tab) == ''
+	assert desktop.switcher_title() == 'One'
+	assert desktop.take_switcher_keys(key_alt_shift_tab) == ''
+	assert desktop.switcher_title() == 'Two'
+	assert desktop.take_switcher_keys(key_alt_released) == ''
+	assert !desktop.switcher.active
+	assert !desktop.switcher.alt_held
+	assert title_of(desktop, desktop.focus) == 'Two'
+
+	mut backwards := fixture_desktop()
+	backwards.take_switcher_keys(key_alt_shift_tab)
+	assert backwards.switcher_title() == 'One'
+	backwards.take_switcher_keys(key_alt_released)
+	assert title_of(backwards, backwards.focus) == 'One'
+}
+
+fn test_switcher_only_the_modifier_that_opened_it_can_commit() {
+	mut alt := fixture_desktop()
+	alt.take_switcher_keys(key_alt_tab)
+	alt.take_switcher_keys(cmd_released)
+	assert alt.switcher.active && alt.switcher.alt_held
+	alt.take_switcher_keys(key_alt_released)
+	assert !alt.switcher.active
+
+	mut cmd := fixture_desktop()
+	cmd.take_switcher_keys(cmd_tab)
+	cmd.take_switcher_keys(key_alt_released)
+	assert cmd.switcher.active && !cmd.switcher.alt_held
+	cmd.take_switcher_keys(cmd_released)
+	assert !cmd.switcher.active
+}
+
+fn test_alt_switcher_chords_and_release_survive_each_csi_split() {
+	for chord in [key_alt_tab, key_alt_shift_tab] {
+		for split in 2 .. chord.len {
+			mut desktop := fixture_desktop()
+			assert desktop.take_switcher_keys(chord[..split]) == ''
+			assert !desktop.switcher.active
+			assert desktop.take_switcher_keys(chord[split..]) == ''
+			assert desktop.switcher.active && desktop.switcher.alt_held
+		}
+	}
+	for split in 2 .. key_alt_released.len {
+		mut desktop := fixture_desktop()
+		desktop.take_switcher_keys(key_alt_tab)
+		assert desktop.take_switcher_keys(key_alt_released[..split]) == ''
+		assert desktop.switcher.active
+		assert desktop.take_switcher_keys(key_alt_released[split..]) == ''
+		assert !desktop.switcher.active
+	}
+}
+
+fn test_alt_switcher_returns_unmodified_app_keys_and_ignores_idle_release() {
+	mut desktop := fixture_desktop()
+	assert desktop.take_switcher_keys('a\x1bf\t\x1bOS\x1b[1;7S') == 'a\x1bf\t\x1bOS\x1b[1;7S'
+	assert !desktop.switcher.active
+	assert desktop.take_switcher_keys('a${key_alt_tab}b${key_alt_released}c') == 'abc'
+	assert !desktop.switcher.active
+	assert title_of(desktop, desktop.focus) == 'Two'
+	assert desktop.take_switcher_keys(key_alt_released) == ''
+}

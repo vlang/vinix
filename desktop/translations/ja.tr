@@ -4297,6 +4297,54 @@ desktop.overview.previous
 desktop.overview.next
 次へ
 -----
+window.actions.title
+ウィンドウ操作
+-----
+window.actions.move
+移動
+-----
+window.actions.resize
+サイズ変更
+-----
+window.actions.minimize
+最小化
+-----
+window.actions.arrange
+配置
+-----
+window.actions.close
+閉じる
+-----
+window.actions.workspace_1
+デスクトップ1に移動
+-----
+window.actions.workspace_2
+デスクトップ2に移動
+-----
+window.actions.workspace_3
+デスクトップ3に移動
+-----
+window.actions.workspace_4
+デスクトップ4に移動
+-----
+window.actions.moving
+ウィンドウを移動
+-----
+window.actions.resizing
+ウィンドウのサイズ変更
+-----
+window.actions.move_hint
+矢印で移動 · Shiftで1ピクセル · Enterで適用 · Escで取消
+-----
+window.actions.resize_hint
+矢印でサイズ変更 · Shiftで1ピクセル · Enterで適用 · Escで取消
+-----
+window.snap_assist.title
+残りの半分に配置
+-----
+window.snap_assist.hint
+矢印で選択 · Enterで配置 · Escでスキップ
+-----
 preview.resize.width.label
 幅 px
 -----

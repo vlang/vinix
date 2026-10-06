@@ -158,6 +158,16 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 			if taken > seq_none {
 				i += taken
 				if !d.switcher.quick_launch {
+					// Switching and releasing its modifier can share a console
+					// read. Settle the remaining global packets while keeping
+					// queued launcher typing owned by the overlay.
+					if d.switcher.active && i < input.len {
+						remainder := unsafe { tos(input.str + i, input.len - i) }
+						result := d.take_switcher_keys(remainder)
+						if result.len > 0 && result.str != remainder.str {
+							unsafe { result.free() }
+						}
+					}
 					return ''
 				}
 				continue
@@ -203,7 +213,11 @@ fn (mut d Desktop) quick_launch_take_keys(input string) string {
 }
 
 fn (mut d Desktop) quick_launch_take_sequence(input string, at int) int {
-	mut partial := false
+	alt := d.take_alt_switcher_sequence(input, at)
+	if alt > seq_none {
+		return alt
+	}
+	mut partial := alt == seq_partial
 
 	found_toggle := match_at(input, at, quick_launch_key)
 	if found_toggle > seq_none {

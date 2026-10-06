@@ -208,6 +208,9 @@ mut:
 	overview                 WindowOverview
 	window_layout            WindowLayout
 	window_layout_right_release bool
+	snap_assist              WindowSnapAssist
+	window_actions           WindowActions
+	overlay_input            WindowOverlayInput
 	tray                     TrayState
 	version_check            VersionCheck
 	next_status_token        int
@@ -503,6 +506,12 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	}
 	if d.overview.active {
 		children << d.window_overview_element()
+	}
+	if assist := d.window_snap_assist_element() {
+		children << ui2.Element{ ...assist }
+	}
+	if actions := d.window_actions_element() {
+		children << ui2.Element{ ...actions }
 	}
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
@@ -1906,7 +1915,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 	d.pointer_x = x
 	d.pointer_y = y
-	if d.overview.active || d.window_layout.active {
+	if d.window_overlay_active() {
 		d.set_hover(d.hit_action(x, y))
 		return
 	}
@@ -2175,6 +2184,14 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	d.trace_selector(action, world)
 	d.set_hover(action)
 	d.dirty = true
+	if d.window_actions.active && d.window_actions_pointer_down(action, world) {
+		d.chrome_pointer_capture = true
+		return
+	}
+	if d.snap_assist.active && d.window_snap_assist_pointer_down(action, world) {
+		d.chrome_pointer_capture = true
+		return
+	}
 	if d.overview.active && d.window_overview_pointer_down(action, world) {
 		d.chrome_pointer_capture = true
 		return
@@ -2375,7 +2392,7 @@ fn (d &Desktop) trace_selector(action string, world ActionWorld) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
-	if d.overview.active || d.window_layout.active {
+	if d.window_overlay_active() {
 		// A chooser opened from the keyboard can cancel a held app gesture
 		// without receiving its press. Its release still belongs to the modal.
 		d.chrome_pointer_capture = false
@@ -2428,13 +2445,17 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 
 // Finish the placement preview's half, quarter or maximize gesture.
 fn (mut d Desktop) finish_window_drag(x int, y int) {
+	id := d.drag.window_id
 	d.finish_window_placement(x, y)
+	if d.drag.moved {
+		d.open_window_snap_assist(id)
+	}
 }
 
 // Non-primary buttons and the wheel have no desktop chrome meaning yet, but a
 // native pixel-surface client needs them for its own interaction model.
 fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, button AppPointerButton) {
-	if d.overview.active || d.window_layout.active {
+	if d.window_overlay_active() {
 		return
 	}
 	if d.switcher.active || d.start_menu_open {
@@ -2446,7 +2467,7 @@ fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, bu
 }
 
 fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
-	if d.overview.active || d.window_layout.active {
+	if d.window_overlay_active() {
 		return
 	}
 	if scroll == 0 || d.switcher.active || d.start_menu_open {

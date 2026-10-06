@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Cmd-Tab: the window switcher, and the global Cmd-Space keyboard hook.
+// Cmd-Tab/Alt-Tab: the window switcher, and the global Cmd-Space keyboard hook.
 //
 // A tap moves to the window under the one on top, the way Alt-Tab and Cmd-Tab
 // have always worked. Holding Cmd down instead asks the question "what else is
@@ -39,6 +39,16 @@ struct SwitcherKey {
 const switch_commit = 0
 const switch_quick_launch = 2
 
+const key_alt_tab = '\x1b[9;3u'
+const key_alt_shift_tab = '\x1b[9;4u'
+const key_alt_released = '\x1b[57443;1:3u'
+
+const alt_switcher_keys = [
+	SwitcherKey{key_alt_tab, 1},
+	SwitcherKey{key_alt_shift_tab, -1},
+	SwitcherKey{key_alt_released, switch_commit},
+]
+
 const switcher_keys = [
 	SwitcherKey{quick_launch_key, switch_quick_launch},
 	SwitcherKey{'\x1b[9;9u', 1},
@@ -69,6 +79,9 @@ mut:
 	shown   bool
 	started i64
 	index   int
+	// The modifier that opened this session owns its release. Letting go of
+	// Super during Alt-Tab (or Alt during Cmd-Tab) must not commit early.
+	alt_held bool
 	// The windows, most recently raised first, taken once when the session
 	// opens. The painting order it comes from changes as windows are raised,
 	// and a row that reshuffled under the selection while it was being read
@@ -97,6 +110,12 @@ mut:
 // it. While Quick Launch is active, all remaining input belongs to its query.
 fn (mut d Desktop) take_switcher_keys(keys string) string {
 	mut input := keys
+	mut owns_input := false
+	defer {
+		if owns_input {
+			unsafe { input.free() }
+		}
+	}
 	if d.switcher.pending.len > 0 {
 		if keys.len == 0 {
 			// Nothing completed it, so it was not one of ours after all.
@@ -107,12 +126,15 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 				// Quick Launch owns input. Treat it as Escape and dismiss instead
 				// of storing the same partial sequence again forever.
 				d.switcher_close()
+				unsafe { held.free() }
 				return ''
 			}
 			return held
 		}
 		input = d.switcher.pending + keys
+		unsafe { d.switcher.pending.free() }
 		d.switcher.pending = ''
+		owns_input = true
 	}
 
 	if d.switcher.quick_launch {
@@ -123,6 +145,7 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 	// of ours and is returned as it came rather than rebuilt -- there is no
 	// garbage collector here, and this runs on every frame that has input.
 	if input.index_u8(0x1b) < 0 {
+		owns_input = false
 		return input
 	}
 
@@ -139,13 +162,15 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 					// belongs to the newly opened launcher; bytes before it still
 					// belong to the previously focused application.
 					if i < input.len {
-						d.quick_launch_take_keys(input[i..])
+						d.quick_launch_take_keys(unsafe { tos(input.str + i, input.len - i) })
 					}
 					if kept.len == 0 {
 						unsafe { kept.free() }
 						return ''
 					}
-					return kept.bytestr()
+					result := kept.bytestr()
+					unsafe { kept.free() }
+					return result
 				}
 				continue
 			}
@@ -162,21 +187,34 @@ fn (mut d Desktop) take_switcher_keys(keys string) string {
 	}
 	if kept.len == input.len {
 		unsafe { kept.free() }
+		owns_input = false
 		return input
 	}
-	return kept.bytestr()
+	if kept.len == 0 {
+		unsafe { kept.free() }
+		return ''
+	}
+	result := kept.bytestr()
+	unsafe { kept.free() }
+	return result
 }
 
 // take_switcher_sequence tries every sequence at one position, acts on the one
 // that matches, and answers with how many bytes it took.
 fn (mut d Desktop) take_switcher_sequence(input string, at int) int {
-	mut partial := false
+	alt := d.take_alt_switcher_sequence(input, at)
+	if alt > seq_none {
+		return alt
+	}
+	mut partial := alt == seq_partial
 	for key in switcher_keys {
 		found := match_at(input, at, key.bytes)
 		if found > seq_none {
 			if key.step == switch_commit {
 				d.switcher.quick_launch_chord_held = false
-				d.switcher_commit()
+				if !d.switcher.alt_held {
+					d.switcher_commit()
+				}
 			} else if key.step == switch_quick_launch {
 				// Key repeat must not alternate open/closed while Cmd-Space is
 				// held. The explicit Cmd-release sequence arms the next press.
@@ -202,6 +240,36 @@ fn (mut d Desktop) take_switcher_sequence(input string, at int) int {
 			}
 			partial = partial || found == seq_partial
 		}
+	}
+	// Later window actions share CSI prefixes with switching. Keep an
+	// incomplete packet whole, then pass the completed chord through to its
+	// owner instead of exposing its first half to the application.
+	partial = partial || window_shortcut_prefix(input, at)
+	return if partial { seq_partial } else { seq_none }
+}
+
+fn (mut d Desktop) take_alt_switcher_sequence(input string, at int) int {
+	mut partial := false
+	for key in alt_switcher_keys {
+		found := match_at(input, at, key.bytes)
+		if found > seq_none {
+			if key.step == switch_commit {
+				if d.switcher.alt_held {
+					d.switcher_commit()
+				}
+			} else {
+				if d.switcher.quick_launch {
+					d.switcher_close()
+				}
+				opening := !d.switcher.active
+				d.switcher_step(key.step)
+				if opening && d.switcher.active {
+					d.switcher.alt_held = true
+				}
+			}
+			return found
+		}
+		partial = partial || found == seq_partial
 	}
 	return if partial { seq_partial } else { seq_none }
 }
@@ -232,6 +300,8 @@ fn match_at(input string, at int, seq string) int {
 // what a tap is for.
 fn (mut d Desktop) switcher_step(step int) {
 	if !d.switcher.active {
+		d.close_window_actions()
+		d.close_window_snap_assist()
 		d.switcher.order.clear()
 		for i := d.windows.len - 1; i >= 0; i-- {
 			if d.windows[i].workspace == d.current_workspace {
@@ -245,6 +315,7 @@ fn (mut d Desktop) switcher_step(step int) {
 			d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}'
 		}
 		d.switcher.active = true
+		d.switcher.alt_held = false
 		d.switcher.shown = false
 		d.switcher.index = 0
 		d.switcher.started = monotonic_millis()
@@ -290,6 +361,7 @@ fn (mut d Desktop) switcher_close() {
 		d.switcher.quick_launch = false
 	}
 	d.switcher.active = false
+	d.switcher.alt_held = false
 	d.switcher.shown = false
 	d.dirty = true
 }

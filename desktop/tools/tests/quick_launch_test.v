@@ -140,3 +140,26 @@ fn test_quick_launch_replaces_an_open_start_menu() {
 
 	desktop.switcher_close()
 }
+
+fn test_quick_launch_alt_tab_uses_alt_release_and_accepts_a_coalesced_release() {
+	mut desktop := quick_launch_fixture()
+	desktop.spawn('One', .welcome, 10, 10, 300, 200)
+	desktop.spawn('Two', .system, 20, 20, 300, 200)
+	one := desktop.windows[0].id
+	desktop.take_switcher_keys(quick_launch_key)
+	assert desktop.switcher.quick_launch
+	assert desktop.take_switcher_keys(key_alt_tab) == ''
+	assert !desktop.switcher.quick_launch
+	assert desktop.switcher.active && desktop.switcher.alt_held
+	assert desktop.take_switcher_keys(quick_launch_cmd_release) == ''
+	assert desktop.switcher.active
+	assert desktop.take_switcher_keys(key_alt_released) == ''
+	assert !desktop.switcher.active
+	assert desktop.focus == one
+
+	desktop.take_switcher_keys(quick_launch_key)
+	assert desktop.switcher.quick_launch
+	assert desktop.take_switcher_keys('${key_alt_tab}${key_alt_released}queued') == ''
+	assert !desktop.switcher.active
+	assert !desktop.switcher.quick_launch
+}

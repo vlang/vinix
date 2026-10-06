@@ -4298,6 +4298,54 @@ desktop.overview.previous
 desktop.overview.next
 Далее
 -----
+window.actions.title
+Действия с окном
+-----
+window.actions.move
+Переместить
+-----
+window.actions.resize
+Изменить размер
+-----
+window.actions.minimize
+Свернуть
+-----
+window.actions.arrange
+Расположить
+-----
+window.actions.close
+Закрыть
+-----
+window.actions.workspace_1
+На рабочий стол 1
+-----
+window.actions.workspace_2
+На рабочий стол 2
+-----
+window.actions.workspace_3
+На рабочий стол 3
+-----
+window.actions.workspace_4
+На рабочий стол 4
+-----
+window.actions.moving
+Перемещение окна
+-----
+window.actions.resizing
+Изменение размера окна
+-----
+window.actions.move_hint
+Стрелки — движение. Shift: 1 пиксель. Enter — применить. Esc — отменить.
+-----
+window.actions.resize_hint
+Стрелки — размер. Shift: 1 пиксель. Enter — применить. Esc — отменить.
+-----
+window.snap_assist.title
+Заполнить вторую половину
+-----
+window.snap_assist.hint
+Стрелки — выбор. Enter — разместить. Esc — пропустить.
+-----
 preview.resize.width.label
 Шир., px
 -----

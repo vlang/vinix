@@ -119,6 +119,8 @@ fn (mut d Desktop) apply_requested_scale() {
 		return
 	}
 
+	// Cancel reversible manipulation before translating its original frame.
+	d.close_window_actions()
 	old_pixels := d.canvas.pixels
 	d.canvas = new_scaled_canvas(new_width, new_height, desktop_physical_width, desktop_physical_height, target)
 	unsafe { free(voidptr(old_pixels)) }
@@ -173,6 +175,7 @@ fn (mut d Desktop) apply_requested_scale() {
 	d.clear_hit_targets()
 	d.close_window_overview()
 	d.close_window_layout()
+	d.close_window_snap_assist()
 	d.set_hover('')
 	d.drag = Drag{}
 	desktop_commit_scale(target)

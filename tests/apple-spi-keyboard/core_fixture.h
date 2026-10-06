@@ -97,6 +97,7 @@ struct decoder {
      * modifier this one's release has to be reported -- but only to someone
      * who asked, which is what pressing Cmd-Tab counts as. */
     uint8_t gui_chorded;
+    uint8_t alt_tab_chorded;
     uint64_t repeat_at;
     uint8_t message[MESSAGE_SIZE];
     size_t message_used;

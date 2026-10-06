@@ -187,6 +187,43 @@ static void test_command_chords(void)
         && !memcmp(out, "\033[57444;1:3u", 12));
 }
 
+static void test_alt_window_shortcuts(void)
+{
+    struct decoder d = {0}; uint8_t out[128];
+    expect_bytes(encode_key(43, 4, 0, 0, 0), (const uint8_t *)"\033[9;3u", 6);
+    expect_bytes(encode_key(43, 0x40, 0, 0, 0), (const uint8_t *)"\033[9;3u", 6);
+    expect_bytes(encode_key(43, 6, 0, 0, 0), (const uint8_t *)"\033[9;4u", 6);
+    expect_bytes(encode_key(61, 4, 0, 0, 0), (const uint8_t *)"\033[1;3S", 6);
+    expect_bytes(encode_key(61, 0, 0, 0, 0), (const uint8_t *)"\033OS", 3);
+    expect_bytes(encode_key(43, 5, 0, 0, 0), (const uint8_t *)"\033\t", 2);
+    expect_bytes(encode_key(4, 4, 0, 0, 0), (const uint8_t *)"\033a", 2);
+    /* Both Alt keys may be held: only releasing the last ends switching. */
+    assert(single(&d, 1, 0x44, 0, 43, out) == 6);
+    assert(d.alt_tab_chorded);
+    assert(single(&d, 2, 0x40, 0, 0, out) == 0);
+    assert(single(&d, 3, 0, 0, 0, out) == 12
+        && !memcmp(out, "\033[57443;1:3u", 12));
+    assert(!d.alt_tab_chorded);
+    assert(single(&d, 4, 0, 0, 0, out) == 0);
+    /* Ordinary Meta input and Alt-F4 request no unsolicited release. */
+    assert(single(&d, 5, 4, 0, 4, out) == 2);
+    assert(single(&d, 6, 0, 0, 0, out) == 0);
+    assert(single(&d, 7, 4, 0, 61, out) == 6);
+    assert(single(&d, 8, 0, 0, 0, out) == 0);
+    assert(single(&d, 9, 4, 0, 43, out) == 6);
+    assert(repeat_key(&d, 9 + REPEAT_DELAY, 0, out, 128) == 6
+        && !memcmp(out, "\033[9;3u", 6));
+    reset_input(&d);
+    assert(!d.alt_tab_chorded);
+    assert(single(&d, 10 + REPEAT_DELAY, 0, 0, 0, out) == 0);
+    /* Pressing Alt after Tab is held must also arm the repeated chord. */
+    assert(single(&d, 20 + REPEAT_DELAY, 0, 0, 43, out) == 1);
+    assert(single(&d, 21 + REPEAT_DELAY, 4, 0, 43, out) == 0);
+    assert(repeat_key(&d, 20 + 2 * REPEAT_DELAY, 0, out, 128) == 6);
+    assert(d.alt_tab_chorded);
+    assert(single(&d, 21 + 2 * REPEAT_DELAY, 0, 0, 0, out) == 12);
+}
+
 static void test_repeat(void)
 {
     struct decoder d = {0}; uint8_t out[128];
@@ -509,6 +546,7 @@ int main(void)
     run(test_navigation_fn_and_function_keys, "navigation, DECCKM, Fn, function keys");
     run(test_command_tab, "Cmd-Tab chords and the release that ends them");
     run(test_command_chords, "CSI-u preserves general Cmd chords");
+    run(test_alt_window_shortcuts, "Alt window chords, last-Alt release and ordinary Meta input");
     run(test_repeat, "repeat timing, modifiers, no catch-up burst");
     run(test_rollover, "rollover errors and recovery");
     run(test_crc_and_identity_rejection, "packet/message CRC and identity rejection");

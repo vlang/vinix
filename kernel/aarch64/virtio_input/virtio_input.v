@@ -87,6 +87,7 @@ const key_delete = u16(111)
 
 // Linux keycodes for modifiers
 const key_tab = u16(15)
+const key_f4 = u16(62)
 const key_leftshift = u16(42)
 const key_rightshift = u16(54)
 const key_leftctrl = u16(29)
@@ -144,6 +145,8 @@ __global (
 	vi_shift_active  = false
 	vi_ctrl_active   = false
 	vi_alt_active    = false
+	vi_alt_keys      = u8(0)
+	vi_alt_tab_chorded = false
 	vi_caps_active   = false
 	// Cmd, and whether a chord was sent while it was down. The desktop's
 	// window switcher is drawn for as long as Cmd is held, so unlike every
@@ -388,7 +391,17 @@ fn process_key(code u16, value u32) {
 			return
 		}
 		key_leftalt, key_rightalt {
-			vi_alt_active = value != 0
+			mask := if code == key_leftalt { u8(1) } else { u8(2) }
+			if value != 0 {
+				vi_alt_keys |= mask
+			} else {
+				vi_alt_keys &= ~mask
+			}
+			vi_alt_active = vi_alt_keys != 0
+			if !vi_alt_active && vi_alt_tab_chorded {
+				vi_alt_tab_chorded = false
+				vi_puts(c'\e[57443;1:3u')
+			}
 			return
 		}
 		key_capslock {
@@ -424,6 +437,18 @@ fn process_key(code u16, value u32) {
 	if vi_meta_active && code == key_tab {
 		vi_emit_csi_u(9, 8 | if vi_shift_active { u32(1) } else { u32(0) })
 		vi_meta_chorded = true
+		return
+	}
+	// Alt-Tab needs a distinct Shift variant and a release report, while
+	// ordinary Alt letters retain the terminal's existing Meta encoding.
+	if vi_alt_active && !vi_meta_active && !vi_ctrl_active && code == key_tab {
+		vi_emit_csi_u(9, 2 | if vi_shift_active { u32(1) } else { u32(0) })
+		vi_alt_tab_chorded = true
+		return
+	}
+	if vi_alt_active && !vi_meta_active && !vi_ctrl_active && !vi_shift_active
+		&& code == key_f4 {
+		vi_puts(c'\e[1;3S')
 		return
 	}
 

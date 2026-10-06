@@ -175,6 +175,8 @@ fn (mut d Desktop) cancel_window_overlay_app_pointer() {
 }
 
 fn (mut d Desktop) open_window_overview() {
+	d.close_window_snap_assist()
+	d.close_window_actions()
 	d.close_window_layout()
 	d.switcher_close()
 	if d.start_menu_open {

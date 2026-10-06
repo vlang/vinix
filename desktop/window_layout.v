@@ -52,6 +52,8 @@ fn (mut d Desktop) open_window_layout(id int) {
 		d.close_window_layout()
 		return
 	}
+	d.close_window_snap_assist()
+	d.close_window_actions()
 	d.switcher_close()
 	d.close_window_overview()
 	d.close_start_menu()
@@ -100,7 +102,7 @@ fn (mut d Desktop) close_window_layout() {
 // Its matching release is swallowed by the input loop, even after selection
 // or click-away has already closed the chooser.
 fn (mut d Desktop) window_layout_right_down(x int, y int) bool {
-	if d.window_layout.active || d.overview.active || d.switcher.active || d.start_menu_open {
+	if d.window_overlay_active() || d.switcher.active || d.start_menu_open {
 		d.close_window_layout()
 		d.close_window_overview()
 		d.switcher_close()
@@ -144,6 +146,7 @@ fn (mut d Desktop) apply_window_layout(choice int) {
 		d.maximize(id)
 	} else {
 		d.snap_window(id, placement.snap)
+		d.open_window_snap_assist(id)
 	}
 }
 

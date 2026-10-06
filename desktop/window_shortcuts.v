@@ -9,6 +9,8 @@ module main
 // one-based in the protocol). The ARM64 keyboard driver emits this for the
 // Command key on a Mac keyboard and Super-W on other keyboards.
 const key_cmd_w = '\x1b[119;9u'
+// Alt+F4 uses xterm's modified F4 encoding. Plain F4 remains app input.
+const key_alt_f4 = '\x1b[1;3S'
 // Modified arrows use xterm's CSI 1;<modifier><final> form. The modifier value
 // follows the same one-based mask as CSI-u: Super is 9.
 const key_super_up = '\x1b[1;9A'
@@ -23,6 +25,36 @@ const key_super_workspaces = ['\x1b[49;9u', '\x1b[50;9u', '\x1b[51;9u', '\x1b[52
 // The keyboard protocol carries the shifted character as its codepoint, so
 // Shift+1..4 arrive as !, @, # and $ while the modifier still records Shift.
 const key_super_shift_workspaces = ['\x1b[33;10u', '\x1b[64;10u', '\x1b[35;10u', '\x1b[36;10u']
+const window_shortcut_keys = [key_cmd_w, key_alt_f4, key_super_d, key_super_m, key_super_shift_m,
+	key_super_alt_h, key_super_home, key_super_left, key_super_right, key_super_up, key_super_down]
+
+// The switcher's earlier stream parser retains incomplete global chords;
+// actions stay here, after its completed packets have passed through.
+fn window_shortcut_prefix(input string, at int) bool {
+	for key in window_shortcut_keys {
+		if match_at(input, at, key) == seq_partial {
+			return true
+		}
+	}
+	for workspace in 0 .. workspace_count {
+		if match_at(input, at, key_super_workspaces[workspace]) == seq_partial
+			|| match_at(input, at, key_super_shift_workspaces[workspace]) == seq_partial {
+			return true
+		}
+	}
+	return false
+}
+
+fn window_shortcut_sequence(sequence string) bool {
+	for key in window_shortcut_keys {
+		if sequence == key { return true }
+	}
+	for workspace in 0 .. workspace_count {
+		if sequence == key_super_workspaces[workspace]
+			|| sequence == key_super_shift_workspaces[workspace] { return true }
+	}
+	return false
+}
 
 enum TileDirection {
 	up
@@ -78,6 +110,9 @@ fn (mut d Desktop) tile_focused(direction TileDirection) {
 			}
 		}
 	}
+	if direction == .left || direction == .right {
+		d.open_window_snap_assist(window.id)
+	}
 }
 
 // take_window_shortcuts removes the global window-management chords from an
@@ -98,6 +133,9 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 	mut i := 0
 	for i < keys.len {
 		mut matched := match_at(keys, i, key_cmd_w)
+		if matched <= seq_none {
+			matched = match_at(keys, i, key_alt_f4)
+		}
 		if matched > seq_none {
 			if d.focus != 0 {
 				d.close_window(d.focus)
@@ -133,15 +171,32 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 			continue
 		}
 		matched = match_at(keys, i, key_super_left)
-		if matched > seq_none {
-			d.tile_focused(.left)
-			i += matched
-			continue
+		mut horizontal := TileDirection.left
+		if matched <= seq_none {
+			matched = match_at(keys, i, key_super_right)
+			horizontal = .right
 		}
-		matched = match_at(keys, i, key_super_right)
 		if matched > seq_none {
-			d.tile_focused(.right)
+			d.tile_focused(horizontal)
 			i += matched
+			if d.snap_assist.active {
+				// The chooser opened after the central keyboard router ran.
+				// It owns the rest of this same read, including its selection.
+				if i < keys.len {
+					remainder := unsafe { tos(keys.str + i, keys.len - i) }
+					result := d.take_window_overlay_keys(remainder)
+					if result.len > 0 && result.str != remainder.str {
+						unsafe { result.free() }
+					}
+				}
+				if kept.len == 0 {
+					unsafe { kept.free() }
+					return ''
+				}
+				result := kept.bytestr()
+				unsafe { kept.free() }
+				return result
+			}
 			continue
 		}
 		matched = match_at(keys, i, key_super_up)

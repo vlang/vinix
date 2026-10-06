@@ -445,6 +445,7 @@ pub mut:
 	//     *modifier this one's release has to be reported -- but only to someone
 	//     *who asked, which is what pressing Cmd-Tab counts as.
 	gui_chorded  u8
+	alt_tab_chorded u8
 	repeat_at    u64
 	message      [20]u8
 	message_used usize
@@ -533,6 +534,7 @@ pub fn reset_input(d &Decoder) {
 		cancel_repeat(d)
 		d.repeat_key = u8(0)
 		d.gui_chorded = u8(0)
+		d.alt_tab_chorded = u8(0)
 		d.modifiers = u8(0)
 		d.fn_ = u8(0)
 		for i := u32(0); i < u32(6); i++ {
@@ -645,6 +647,14 @@ pub fn encode_key(key u8, modifiers u8, caps i32, fn_ i32, application_cursor i3
 
 		if gui && i32(key) == 43 {
 			csi_u(&out, u32(9), 8 | u32(shift))
+			return out
+		}
+		if alt && !gui && !ctrl && i32(key) == 43 {
+			csi_u(&out, u32(9), 2 | u32(shift))
+			return out
+		}
+		if alt && !gui && !ctrl && !shift && i32(key) == 61 {
+			sequence(&out, c'\033[1;3S')
 			return out
 		}
 		if gui && i32(key) >= 79 && i32(key) <= 82 {
@@ -880,6 +890,12 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 			sequence(&release, c'\033[57444;1:3u')
 			append_key(out, capacity, &used, release)
 		}
+		if i32(d.alt_tab_chorded) && !(u32(d.modifiers) & 68) {
+			release := Key_bytes{}
+			d.alt_tab_chorded = u8(0)
+			sequence(&release, c'\033[57443;1:3u')
+			append_key(out, capacity, &used, release)
+		}
 		for i := u32(0); i < u32(6); i++ {
 			key := report[i + u32(3)]
 			// ErrorRollOver, POSTFail, ErrorUndefined are not key releases.
@@ -911,6 +927,10 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 				d.repeat_at = now + u64(500000)
 				if u32(d.modifiers) & 136 {
 					d.gui_chorded = u8(1)
+				}
+				if key == u8(43) && u32(d.modifiers) & 68 != 0
+					&& u32(d.modifiers) & 153 == 0 {
+					d.alt_tab_chorded = u8(1)
 				}
 			}
 		}
@@ -990,6 +1010,12 @@ pub fn repeat_key(d &Decoder, now u64, app i32, out &u8, capacity usize) usize {
 			return usize(0)
 		}
 		append_key(out, capacity, &used, encode_key(d.repeat_key, d.modifiers, i32(d.caps), i32(d.fn_), app))
+		// Modifiers can change while Tab is already repeating. Arm the
+		// release whenever the Alt chord was actually delivered.
+		if used != 0 && d.repeat_key == u8(43) && u32(d.modifiers) & 68 != 0
+			&& u32(d.modifiers) & 153 == 0 {
+			d.alt_tab_chorded = u8(1)
+		}
 		// Never emit an unbounded catch-up burst after a scheduler stall.
 
 		d.repeat_at = now + u64(33333)

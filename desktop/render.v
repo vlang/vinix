@@ -264,7 +264,7 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	}
 	// Desktop file icons and context menus are painted after the tree, inside
 	// the same clip, so a partial frame does not blend them over themselves.
-	if desktop_overlays && !d.overview.active && !d.window_layout.active {
+	if desktop_overlays && !d.window_overlay_active() {
 		d.render_create_context_overlays()
 	}
 	d.save_cursor_backing(clip)
@@ -499,10 +499,10 @@ fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, dep
 		d.canvas.blend_round_rect(x, y, w, h, radius, el.box.bg, taskbar_progress_alpha)
 		return
 	}
-	floating := depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id
+	floating := (depth == 1 && (el.id.starts_with('win.') || el.id == switcher_panel_id
 		|| el.id == action_start_panel || el.id == taskbar_preview_panel
 		|| el.id == action_tray_flyout || el.id == taskbar_tooltip_id
-		|| el.id == window_layout_panel_id || el.id == window_overview_panel)
+		|| el.id == window_layout_panel_id || el.id == window_overview_panel)) || el.id == window_snap_assist_panel || el.id == window_actions_panel
 	// The switcher is drawn through: it covers the middle of the screen for as
 	// long as a key is held, and what it covers should stay legible behind it.
 	// Alpha is not something a ui2 box style can declare, so like the shadow
@@ -1966,7 +1966,7 @@ fn (mut d Desktop) draw_cursor() {
 			continue
 		}
 		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height
-			&& !d.overview.active && !d.window_layout.active {
+			&& !d.window_overlay_active() {
 			return
 		}
 		break

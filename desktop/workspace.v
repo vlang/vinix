@@ -48,6 +48,8 @@ fn (mut d Desktop) switch_workspace(workspace int) {
 	d.switcher_close()
 	d.close_window_overview()
 	d.close_window_layout()
+	d.close_window_snap_assist()
+	d.close_window_actions()
 	if d.start_menu_open {
 		d.close_start_menu()
 	}
@@ -73,6 +75,8 @@ fn (mut d Desktop) move_window_to_workspace(id int, workspace int) {
 	if d.windows[index].workspace == workspace {
 		return
 	}
+	d.close_window_snap_assist()
+	d.close_window_actions()
 	// A switcher snapshot may contain the window being moved. Close compositor
 	// overlays before changing ownership so a later Cmd release cannot focus an
 	// invisible window from that stale snapshot.

@@ -4298,6 +4298,54 @@ Previous
 desktop.overview.next
 Next
 -----
+window.actions.title
+Window actions
+-----
+window.actions.move
+Move
+-----
+window.actions.resize
+Resize
+-----
+window.actions.minimize
+Minimize
+-----
+window.actions.arrange
+Arrange
+-----
+window.actions.close
+Close
+-----
+window.actions.workspace_1
+Move to desktop 1
+-----
+window.actions.workspace_2
+Move to desktop 2
+-----
+window.actions.workspace_3
+Move to desktop 3
+-----
+window.actions.workspace_4
+Move to desktop 4
+-----
+window.actions.moving
+Moving window
+-----
+window.actions.resizing
+Resizing window
+-----
+window.actions.move_hint
+Arrows move. Shift: 1 pixel. Enter applies. Esc cancels.
+-----
+window.actions.resize_hint
+Arrows resize. Shift: 1 pixel. Enter applies. Esc cancels.
+-----
+window.snap_assist.title
+Fill the other half
+-----
+window.snap_assist.hint
+Arrow keys choose. Enter tiles. Esc skips.
+-----
 preview.resize.width.label
 Width px
 -----

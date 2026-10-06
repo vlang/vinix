@@ -4298,6 +4298,54 @@ Anterior
 desktop.overview.next
 Siguiente
 -----
+window.actions.title
+Acciones de ventana
+-----
+window.actions.move
+Mover
+-----
+window.actions.resize
+Cambiar tamaño
+-----
+window.actions.minimize
+Minimizar
+-----
+window.actions.arrange
+Organizar
+-----
+window.actions.close
+Cerrar
+-----
+window.actions.workspace_1
+Mover al escritorio 1
+-----
+window.actions.workspace_2
+Mover al escritorio 2
+-----
+window.actions.workspace_3
+Mover al escritorio 3
+-----
+window.actions.workspace_4
+Mover al escritorio 4
+-----
+window.actions.moving
+Mover ventana
+-----
+window.actions.resizing
+Cambiar tamaño de ventana
+-----
+window.actions.move_hint
+Flechas mueven. Mayús: 1 píxel. Intro aplica. Esc cancela.
+-----
+window.actions.resize_hint
+Flechas cambian tamaño. Mayús: 1 píxel. Intro aplica. Esc cancela.
+-----
+window.snap_assist.title
+Completar la otra mitad
+-----
+window.snap_assist.hint
+Flechas eligen. Intro acopla. Esc omite.
+-----
 preview.resize.width.label
 Ancho px
 -----

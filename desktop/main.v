@@ -524,7 +524,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		click = TitlebarClick{}
 	}
 	if packet.pressed & button_left != 0 {
-		if d.create_context_left_down(pointer_x, pointer_y) {
+		if !d.window_overlay_active() && d.create_context_left_down(pointer_x, pointer_y) {
 			click = TitlebarClick{}
 		} else {
 			click = d.titlebar_pointer_down_at(click, pointer_x, pointer_y, desktop_monotonic_ms())
@@ -542,7 +542,13 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		d.on_app_pointer_button(pointer_x, pointer_y, .up, .middle)
 	}
 	if packet.pressed & button_right != 0 {
-		if d.window_layout_right_down(pointer_x, pointer_y) {
+		if d.window_actions_right_down(pointer_x, pointer_y) {
+			click = TitlebarClick{}
+		} else if d.snap_assist.active {
+			d.close_window_snap_assist()
+			d.window_layout_right_release = true
+			click = TitlebarClick{}
+		} else if d.window_layout_right_down(pointer_x, pointer_y) {
 			click = TitlebarClick{}
 		} else if d.open_create_context_menu(pointer_x, pointer_y) {
 			click = TitlebarClick{}
@@ -578,29 +584,22 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 		unsafe { raw.free() }
 	}
 
-	// Modal window controls own typing before Cmd-Tab or an application.
-	// Empty reads also settle an incomplete overview escape sequence.
-	viewed := d.take_window_overview_keys(keys)
+	// Window controls own typing; global switching can replace a control.
+	// Empty reads also settle an incomplete terminal escape sequence.
+	controls := d.take_window_overlay_keys(keys)
 	defer {
-		if viewed.len > 0 && viewed.str != keys.str {
-			unsafe { viewed.free() }
+		if controls.len > 0 && controls.str != keys.str {
+			unsafe { controls.free() }
 		}
 	}
-	arranged := d.take_window_layout_keys(viewed)
-	defer {
-		if arranged.len > 0 && arranged.str != viewed.str && arranged.str != keys.str {
-			unsafe { arranged.free() }
-		}
-	}
-	switched := d.take_switcher_keys(arranged)
-	if switched.len == 0 {
+	if controls.len == 0 {
 		return
 	}
 
 	// Brightness is the machine's, not the focused window's: F1 and F2 dim and
 	// brighten the panel whatever is on top, and are taken out of the stream so
 	// a terminal does not also receive them as an escape sequence.
-	mut rest := d.take_brightness_keys(switched)
+	mut rest := d.take_brightness_keys(controls)
 	if rest.len == 0 {
 		return
 	}
