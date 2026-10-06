@@ -228,8 +228,8 @@ pub fn reset(handle voidptr) {
 	gate.lock.release()
 }
 
-fn C.vinix_acpi_sync_native_test() int
-fn C.vinix_acpi_sync_boot_test() int
+fn C.vinix_acpi_sync_native_test() i32
+fn C.vinix_acpi_sync_boot_test() i32
 
 pub fn test_boot() {
 	$if acpi_sync_test ? {

@@ -30,21 +30,18 @@ def main():
     if not compiler.is_file():
         parser.error(f"V compiler missing: {compiler}")
     state.mkdir(parents=True, exist_ok=True)
-    # Arbitrary V/C test defines are not included in the repository's normal
-    # object stamp. Rebuild their affected objects when switching test mode.
-    for file in ("obj/blob.c", "obj/blob.c.o", "obj/blob.c.d", "obj/c/acpi_sync_test.c.o"):
-        (kernel / file).unlink(missing_ok=True)
     env = os.environ.copy()
     env["VEXE"] = str(compiler)
     command = ["make", "-C", str(kernel), "-j4", "CC=clang", f"V={compiler}",
-               f"ARCH={args.arch}", "VFLAGS=-d acpi_sync_test",
-               "CPPFLAGS=-DVINIX_ACPI_SYNC_TEST=1"]
+               f"ARCH={args.arch}", "ACPI_SYNC_TEST=1", "STACK_GUARD_TEST=0"]
+    if env.get("AR"):
+        command.append(f"AR={env['AR']}")
+    linker = shutil.which("ld.lld")
+    if not linker:
+        parser.error("ld.lld is required")
     if args.arch == "aarch64":
-        command.append("LIMINE_MP=1")
+        command.extend(["LIMINE_MP=1", f"LD_AARCH64={linker}"])
     else:
-        linker = shutil.which("ld.lld")
-        if not linker:
-            parser.error("ld.lld is required")
         command.append(f"LD_X86_64={linker}")
     with (state / "build.log").open("w") as log:
         subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)

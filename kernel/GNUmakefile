@@ -41,6 +41,12 @@ ifneq ($(ARCH),aarch64)
 endif
 endif
 
+# Optional independent fixture for the native ACPI synchronization gates.
+ACPI_SYNC_TEST ?= 0
+ifneq ($(filter $(ACPI_SYNC_TEST),0 1),$(ACPI_SYNC_TEST))
+    $(error ACPI_SYNC_TEST must be 0 or 1)
+endif
+
 # User controllable C compiler command.
 CC := cc
 
@@ -234,7 +240,11 @@ override VFLAGS += \
     -gc none \
     -target-libc-headers \
     -no-closures \
-    -d no_backtrace
+    -d no_backtrace \
+    -exclude @vlib/builtin/backtraces_nix.c.v
+
+# The disabled host backtrace implementation still includes POSIX headers.
+# Exclude that builtin source from the freestanding kernel translation unit.
 
 ifeq ($(ARCH),aarch64)
     override VFLAGS += -arch arm64 -d aarch64
@@ -249,7 +259,12 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-stack-guard-$(STACK_GUARD_TEST)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-acpi-test-$(ACPI_SYNC_TEST)-stack-guard-$(STACK_GUARD_TEST)
+
+ifeq ($(ACPI_SYNC_TEST),1)
+    override VFLAGS += -d acpi_sync_test
+    ACPI_SYNC_OBJ := obj/acpi-sync/native.o
+endif
 
 ifeq ($(PCI_CONFIG_TEST),1)
     override VFLAGS += -d pci_config_test
@@ -348,7 +363,7 @@ override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort
 # imported `uacpi` package while compiling obj/vsrc.
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
-override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ) $(LINUXKPI_LIB)
+override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ) $(LINUXKPI_LIB) $(ACPI_SYNC_OBJ)
 override OBJ += obj/nanoprintf.o
 ifeq ($(ARCH),x86_64)
 override OBJ += obj/heap_benchmark.c.o
@@ -359,6 +374,18 @@ override HEADER_DEPS := $(addprefix obj/c/,$(CFILES:.c=.c.d)) $(addprefix obj/as
 .PHONY: all
 all: bin/$(OUTPUT)
 $(LINUXKPI_COBJ): $(V_CONFIG_STAMP)
+
+ifeq ($(ACPI_SYNC_TEST),1)
+ACPI_SYNC_V_ARCH := $(if $(filter aarch64,$(ARCH)),arm64,amd64)
+obj/acpi-sync/native.c: ../tests/acpi-sync/nativefixture/core.v ../tests/acpi-sync/native-abi.h ../tests/acpi-sync/compile-v-native.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	python3 ../tests/acpi-sync/compile-v-native.py $@ --arch $(ACPI_SYNC_V_ARCH)
+
+obj/acpi-sync/native.o: obj/acpi-sync/native.c GNUmakefile $(V_CONFIG_STAMP)
+	$(CC) $(CFLAGS) $(CPPFLAGS) -I ../tests/acpi-sync -Wno-unused-function -std=gnu11 -c $< -o $@
+
+-include obj/acpi-sync/native.d
+endif
 
 ifeq ($(LINUXKPI),1)
 .PHONY: linuxkpi-verify
