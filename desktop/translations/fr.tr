@@ -4446,3 +4446,45 @@ Remplir l’autre moitié
 window.snap_assist.hint
 Flèches : choisir. Entrée : disposer. Échap : passer.
 -----
+reminders.priority
+Priorité
+-----
+reminders.priority.none
+Aucune
+-----
+reminders.priority.low
+Faible
+-----
+reminders.priority.medium
+Moyenne
+-----
+reminders.priority.high
+Élevée
+-----
+reminders.csv_priority
+Priorité
+-----
+capture.cursor.shown
+Pointeur visible
+-----
+capture.cursor.hidden
+Pointeur masqué
+-----
+capture.cursor.help
+Cliquer pour afficher ou masquer le pointeur
+-----
+capture.screenshot.facts.hidden
+PNG{0}bureau entier{0}sans pointeur
+-----
+capture.video.facts.hidden
+Vidéo AVI{0}jusqu'à 640 x 480{0}sans pointeur{0}sans son
+-----
+calculator.scientific.random
+Rand
+-----
+calculator.scientific.random.help
+Nombre aléatoire de 0 à 1 (1 exclu)
+-----
+calculator.random.unavailable
+Aléatoire indisponible ; réessayez
+-----

@@ -4447,3 +4447,45 @@ clock.timer.duration.help
 clock.timer.duration.invalid
 Неверное время · ЧЧ:ММ:СС, 1с–24ч
 -----
+reminders.priority
+Приоритет
+-----
+reminders.priority.none
+Нет
+-----
+reminders.priority.low
+Низкий
+-----
+reminders.priority.medium
+Средний
+-----
+reminders.priority.high
+Высокий
+-----
+reminders.csv_priority
+Приоритет
+-----
+capture.cursor.shown
+Указатель виден
+-----
+capture.cursor.hidden
+Указатель скрыт
+-----
+capture.cursor.help
+Нажмите, чтобы показать или скрыть указатель
+-----
+capture.screenshot.facts.hidden
+PNG{0}весь рабочий стол{0}без указателя
+-----
+capture.video.facts.hidden
+Видео AVI{0}до 640 x 480{0}без указателя{0}без звука
+-----
+calculator.scientific.random
+Rand
+-----
+calculator.scientific.random.help
+Случайное число от 0 до 1 (не включая 1)
+-----
+calculator.random.unavailable
+Источник случайности недоступен; повторите
+-----

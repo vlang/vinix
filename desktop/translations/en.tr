@@ -4447,3 +4447,45 @@ HH:MM:SS · 00:00:01–24:00:00
 clock.timer.duration.invalid
 Invalid time · HH:MM:SS, 1s–24h
 -----
+reminders.priority
+Priority
+-----
+reminders.priority.none
+None
+-----
+reminders.priority.low
+Low
+-----
+reminders.priority.medium
+Medium
+-----
+reminders.priority.high
+High
+-----
+reminders.csv_priority
+Priority
+-----
+capture.cursor.shown
+Pointer shown
+-----
+capture.cursor.hidden
+Pointer hidden
+-----
+capture.cursor.help
+Click to show or hide the pointer
+-----
+capture.screenshot.facts.hidden
+PNG{0}full desktop{0}pointer hidden
+-----
+capture.video.facts.hidden
+AVI video{0}up to 640 x 480{0}pointer hidden{0}no audio
+-----
+calculator.scientific.random
+Rand
+-----
+calculator.scientific.random.help
+Random operand from 0 up to 1 (excluding 1)
+-----
+calculator.random.unavailable
+Random source unavailable; try again
+-----
