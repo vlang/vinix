@@ -87,6 +87,12 @@ def generate(source, output, arch="amd64", defines=()):
     with tempfile.TemporaryDirectory(prefix="vinix-v-module-") as directory:
         work = Path(directory)
         shutil.copytree(source, work / source.name)
+        # Native variadic consumers share the V cursor implementation. Stage
+        # only this explicitly imported module, preserving the isolated build.
+        has_abiargs = any(re.search(r"^\s*import abiargs(?:\s|$)", path.read_text(), re.M)
+                          for path in source.glob("*.v"))
+        if has_abiargs:
+            shutil.copytree(ROOT / "kernel/abiargs", work / "abiargs")
         (work / "v.mod").write_text("Module { name: 'native_module' }\n")
         (work / "entry.v").write_text(f"module main\nimport {source.name} as _\n")
         command = [v, "-shared", "-no-builtin", "-no-closures", "-os", "vinix",
@@ -102,6 +108,8 @@ def generate(source, output, arch="amd64", defines=()):
         text = re.sub(r"\b(_vinit|_vcleanup|_vinit_caller|_vcleanup_caller|"
                       r"_vno_main_init_caller|_v3_no_main_initialized)\b",
                       lambda match: source.name + "_" + match[1], text)
+        if has_abiargs:
+            text = re.sub(r"\babiargs__", source.name + "__abiargs__", text)
         # A module implementing execinfo supplies its own exported declarations.
         # Suppress only this translation unit's legacy compiler fallback. Other
         # callers still receive the compiler's normal backtrace declarations.
