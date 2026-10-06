@@ -5,6 +5,7 @@ import importlib.util
 import os
 from pathlib import Path
 import platform
+import runpy
 import shutil
 import subprocess
 import tarfile
@@ -23,10 +24,13 @@ def main():
     if (state / 'root.ext2').exists():
         parser.error('Use a fresh state directory for the ext2 checks')
     sysroot = Path(os.environ.get('VINIX_AARCH64_SYSROOT', str(ROOT / 'build-aarch64-userland/sysroot')))
+    serial = runpy.run_path(str(ROOT / 'tests/kernel-gaps/compile-v-fixture.py'))['compile_serial'](
+        state / 'serial.o', 'aarch64', [os.environ.get('CC', 'clang'), '--target=aarch64-linux-musl',
+                                      f'--sysroot={sysroot}', '-O2', '-Wall', '-Wextra', '-Werror'])
     subprocess.run([os.environ.get('CC', 'clang'), '--target=aarch64-linux-musl', f'--sysroot={sysroot}',
                     '-static', '-pthread', '-O2', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
                     '-DTEST_DIR="/root"', '-DSECURELEVEL_EXT2',
-                    str(Path(__file__).with_name('guest.c')), str(ROOT / 'tests/kernel-gaps/serial.c'),
+                    str(Path(__file__).with_name('guest.c')), str(serial),
                     f'-L{sysroot / "lib"}', '-fuse-ld=lld', '-o', str(state / 'init')], check=True)
     rootfs = state / 'rootfs'
     for directory in ('root', 'sbin', 'tmp'):

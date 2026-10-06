@@ -50,7 +50,7 @@ def main():
         subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
     command = [sys.executable, str(ROOT / "tests/kernel-gaps/run.py"),
                "--kernel-dir", str(kernel), "--arch", args.arch,
-               "--source", str(ROOT / "tests/kernel-gaps/smoke.c"),
+               "--source", str(ROOT / "tests/kernel-gaps/smokefixture/core.v"),
                "--state-dir", str(state / "guest"),
                "--expect", "ACPI-SYNC: bootstrap polling PASS",
                "--expect", "ACPI-SYNC: ALL PASS",

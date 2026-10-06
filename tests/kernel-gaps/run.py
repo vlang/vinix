@@ -178,20 +178,32 @@ def main() -> int:
             shutil.copyfile(prebuilt, init)
         init.chmod(0o755)
     else:
+        generator = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+        serial_source = state / "serial.o"
+        source = args.source.resolve()
+        if source.suffix == ".v":
+            fixture_source = state / "fixture.o"
+        else:
+            fixture_source = source
         if args.arch == "aarch64":
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT",
                                          str(ROOT / "build-aarch64-userland/sysroot")))
             command = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
                        f"--sysroot={sysroot}", "-static", "-pthread", "-O2",
                        "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                       str(Path(__file__).with_name("serial.c")),
-                       str(args.source.resolve()), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
+                       str(serial_source), str(fixture_source),
+                       f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
                        "-o", str(init)]
         else:
             command = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc"),
                        "-static", "-pthread", "-O2", "-Wall", "-Wextra", "-Werror",
-                       str(Path(__file__).with_name("serial.c")),
-                       str(args.source.resolve()), "-o", str(init)]
+                       str(serial_source), str(fixture_source), "-o", str(init)]
+        if source.suffix == ".v":
+            command[1:1] = ["-D_GNU_SOURCE", "-fno-strict-aliasing", "-I", str(source.parent)]
+        source_index = command.index(str(serial_source))
+        generator["compile_serial"](serial_source, args.arch, command[:source_index])
+        if source.suffix == ".v":
+            generator["compile_module"](source.parent, fixture_source, args.arch, command[:source_index])
         # These independent include-C fixtures exercise the production V cores
         # through the same native ABI adapters as the installed utilities.
         security_sources = {
@@ -206,7 +218,7 @@ def main() -> int:
             generate = runpy.run_path(str(ROOT / "build-support/security-tools/compile-v-core.py"))["generate"]
             generate(tool, core, "arm64" if args.arch == "aarch64" else "amd64", ("security_no_main",))
             # Reuse the selected compiler/target flags, omitting fixture and linker inputs.
-            source_index = command.index(str(Path(__file__).with_name("serial.c")))
+            source_index = command.index(str(serial_source))
             subprocess.run(command[:source_index] + ["-D_GNU_SOURCE", "-DVINIX_V_RUNTIME", "-I", str(ROOT / include),
                                                      "-c", str(core), "-o", str(obj)], check=True)
             command.insert(command.index("-o"), str(obj))

@@ -3,6 +3,7 @@
 import argparse
 import importlib.util
 import os
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,12 +26,13 @@ def main():
     for name in ('sbin', 'lib', 'tmp', 'dev', 'proc', 'sys', 'root'):
         (rootfs / name).mkdir(parents=True, exist_ok=True)
     source = ROOT / 'tests/elf-text/guest.c'
-    serial = runner_root / 'tests/kernel-gaps/serial.c'
+    compile_serial = runpy.run_path(str(runner_root / 'tests/kernel-gaps/compile-v-fixture.py'))['compile_serial']
     flags = ['-O2', '-Wall', '-Wextra', '-Werror']
     if args.arch == 'aarch64':
         sysroot = Path(os.environ.get('VINIX_AARCH64_SYSROOT', runner_root / 'build-aarch64-userland/sysroot'))
         loader = Path(os.environ.get('VINIX_AARCH64_LOADER', runner_root / 'build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1'))
         cc = [os.environ.get('CC', 'clang'), '--target=aarch64-linux-musl', f'--sysroot={sysroot}', '-fuse-ld=lld', '-fno-stack-protector']
+        serial = compile_serial(state / 'serial.o', args.arch, cc + flags)
         subprocess.run(cc + flags + ['-static', str(serial), str(source), f'-L{sysroot / "lib"}', '-o', str(rootfs / 'sbin/init')], check=True)
         # The build sysroot contains static libc; use the real Alpine loader
         # as the shared libc instead of silently producing a static PIE.
@@ -38,6 +40,7 @@ def main():
         loader_name = 'ld-musl-aarch64.so.1'
     else:
         cc = [os.environ.get('CC_AMD64', 'x86_64-linux-musl-gcc')]
+        serial = compile_serial(state / 'serial.o', args.arch, cc + flags)
         subprocess.run(cc + flags + ['-static', str(serial), str(source), '-o', str(rootfs / 'sbin/init')], check=True)
         subprocess.run(cc + flags + ['-fPIE', '-pie', str(serial), str(source), '-o', str(rootfs / 'elf-pie')], check=True)
         loader = Path(subprocess.check_output(cc + ['-print-file-name=libc.so'], text=True).strip())

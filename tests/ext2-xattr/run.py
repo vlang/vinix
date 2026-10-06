@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import runpy
 import struct
 import shutil
 import subprocess
@@ -86,8 +87,10 @@ def main():
     cc = ([os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
            f"-L{sysroot / 'lib'}", "-fuse-ld=lld"] if args.arch == "aarch64" else
           [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")])
+    serial = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))["compile_serial"](
+        state / "serial.o", args.arch, cc + ["-O2", "-Wall", "-Wextra", "-Werror"])
     subprocess.run(cc + ["-static", "-pthread", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                        str(args.source.resolve()), str(ROOT / "tests/kernel-gaps/serial.c"),
+                        str(args.source.resolve()), str(serial),
                         "-o", str(state / "init")], check=True)
     rootfs = state / "rootfs"
     for directory in ("root", "sbin", "tmp", "dev", "proc", "sys", "run"):

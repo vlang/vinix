@@ -44,7 +44,7 @@ After building an isolated kernel, run the actual Linux ABI test with:
 
 ```sh
 python3 tests/kernel-gaps/run.py --arch=aarch64 --kernel-dir=/absolute/kernel \
-  --source=tests/network-ipv6/guest.c \
+  --source=tests/network-ipv6/guestfixture/core.v \
   --expect='IPV6 PASS: TCP UDP dual-stack socket ABI' \
   --expect='IPV6 PASS: rtnetlink IPv6 loopback reporting' \
   --expect='IPV6 PASS: repeated socket path allocation measurement' \

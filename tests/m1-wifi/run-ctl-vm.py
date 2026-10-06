@@ -25,7 +25,8 @@ else:
     start=['-static'];end=[]
 hooks=['open','close','read','tcgetattr','tcsetattr','nanosleep','ioctl']
 subprocess.run(cc+common+['-Dmain=test_program_main',*['-D'+h+'=test_'+h for h in hooks],'-c',str(source),'-o',str(obj)],check=True)
-subprocess.run(cc+common+start+[str(root/'tests/kernel-gaps/serial.c'),str(root/'tests/m1-wifi/ctl_guest.c'),str(obj)]+end+['-o',str(fixture)],check=True)
+serial=runpy.run_path(str(root/'tests/kernel-gaps/compile-v-fixture.py'))['compile_serial'](state/'serial.o',args.arch,cc+common)
+subprocess.run(cc+common+start+[str(serial),str(root/'tests/m1-wifi/ctl_guest.c'),str(obj)]+end+['-o',str(fixture)],check=True)
 rootfs=state/'rootfs'
 for directory in ('sbin','dev','proc','sys','tmp','root'):(rootfs/directory).mkdir(parents=True,exist_ok=True)
 shutil.copy2(fixture,rootfs/'sbin/init')

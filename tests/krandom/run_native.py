@@ -47,7 +47,7 @@ def main():
     return subprocess.run([
         sys.executable, str(ROOT / "tests/kernel-gaps/run.py"),
         "--kernel-dir", str(kernel), "--arch", args.arch,
-        "--source", str(ROOT / "tests/kernel-gaps/smoke.c"),
+        "--source", str(ROOT / "tests/kernel-gaps/smokefixture/core.v"),
         "--state-dir", str(state / "guest"), "--timeout", "240",
         "--expect", "RANDOM-RESEED: 10000 reseeds and partial reads PASS",
         "--expect", "KERNEL GUEST RUNNER: PASS"], env=env).returncode
