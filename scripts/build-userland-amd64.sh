@@ -127,13 +127,8 @@ install -m755 "$SCRIPT_DIR/build-support/init-amd64/alpine-init" \
 mkdir -p "$STAGING/dev" "$STAGING/proc" "$STAGING/sys" "$STAGING/tmp"
 chmod 1777 "$STAGING/tmp"
 
-cat > "$STAGING/root/hello.c" << 'EOF'
-#include <stdio.h>
-int main(void) {
-    puts("Hello from Alpine GCC on Vinix/amd64!");
-    return 0;
-}
-EOF
+rm -f "$STAGING/root/hello.c"
+install -m644 "$SCRIPT_DIR/build-support/userland-demo/hello-amd64.v" "$STAGING/root/hello.v"
 
 if [ ! -x "$STAGING/bin/busybox" ] ||
    [ ! -e "$STAGING/lib/ld-musl-x86_64.so.1" ] ||

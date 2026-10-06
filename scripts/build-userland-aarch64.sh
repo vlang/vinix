@@ -194,13 +194,8 @@ export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 export XBPS_ARCH=aarch64
 EOF
 
-cat > "$STAGING/root/hello.c" << 'EOF'
-#include <stdio.h>
-int main(void) {
-    printf("Hello from Alpine GCC on Vinix!\n");
-    return 0;
-}
-EOF
+rm -f "$STAGING/root/hello.c"
+install -m644 "$SCRIPT_DIR/build-support/userland-demo/hello-aarch64.v" "$STAGING/root/hello.v"
 
 if [ ! -x "$STAGING/bin/busybox" ] ||
    [ ! -e "$STAGING/lib/ld-musl-aarch64.so.1" ] ||
