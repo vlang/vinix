@@ -45,6 +45,34 @@ builder verifies their hashes. Each guest uses a standalone initramfs, without
 building or copying a desktop image. `--case reuse` isolates the inactive-view
 test; the default requires all five feature markers exactly once.
 
+The independent fixture now lives in `mountfixture/core.v`. Its declaration
+header uses the actual native SDK interfaces and contains no implementation.
+All 70 original checks, their diagnostic line numbers, denial counts and the
+16 KiB retention bound remain intact. Both full and reuse variants build
+strictly with ARM and x86 musl SDKs, with no allocator imports.
+
+Use `--work /tmp/proc-mount-new` to preserve a fresh guest's build and image
+artifacts instead of the default temporary directory. For an independent C
+control, recover `tests/procfs-mount/guest.c` from Git revision
+`99162a3924e8fc12d6e2298ee46bfde6c2627269`, compile it with the same SDK
+(adding `-DPROC_MOUNT_REUSE_ONLY` for the reuse case), and supply
+`--prebuilt-init /path/to/original-init`. These options retain the original
+VM controllers, markers and default 300-second budget.
+
+The original-C and V full/reuse controls passed on both architectures. Their
+full-run denial measurements were:
+
+| Architecture and fixture | Initial 3,000 denials | PID namespace 1,000 denials |
+| --- | --- | --- |
+| ARM64 C and V | 1,296 → 1,296 KiB | 2,176 → 2,176 KiB |
+| x86 C | 992 → 992 KiB | 1,300 → 1,300 KiB |
+| x86 V | 992 → 992 KiB | 1,364 → 1,348 KiB |
+
+Every sample satisfies the unchanged retention assertion; none grows during
+the denials. The x86 starting values differ, so these results do not claim
+identical cold process-retirement timing. Native Vinix namespace and procfs
+semantics are required; there is no desktop-host execution claim.
+
 ## Coverage and measured results
 
 The full guest checks:

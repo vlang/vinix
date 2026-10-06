@@ -2,8 +2,10 @@
 """Compile the procfs-mount ABI test and boot it through an isolated existing VM driver."""
 from pathlib import Path
 import argparse
+import contextlib
 import importlib.util
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -21,6 +23,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=("aarch64", "amd64"), default="aarch64")
     parser.add_argument("--case", choices=("full", "reuse"), default="full")
+    parser.add_argument("--work", type=Path)
+    parser.add_argument("--prebuilt-init", type=Path)
     arguments = parser.parse_args()
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     runner_path = runner_root / ("tests/realtime/run_vm.py" if arguments.arch == "aarch64"
@@ -31,20 +35,33 @@ def main():
     runner.PASS_MARKER = b"PROC MOUNT GUEST: PASS"
     runner.FAIL_MARKERS = (b"PROC MOUNT FAIL", b"FATAL EXCEPTION", b"KERNEL PANIC")
     runner.FEATURE_MARKERS = (FEATURES[2],) if arguments.case == "reuse" else FEATURES
-    with tempfile.TemporaryDirectory(prefix="vinix-procfs-mount-vm-") as directory:
+    workspace = (contextlib.nullcontext(str(arguments.work.resolve())) if arguments.work
+                 else tempfile.TemporaryDirectory(prefix="vinix-procfs-mount-vm-"))
+    with workspace as directory:
         work = Path(directory)
+        if arguments.work:
+            work.mkdir(parents=True, exist_ok=False)
         if arguments.arch == "aarch64":
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", runner_root / "build-aarch64-userland/sysroot"))
-            command = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
-                f"--sysroot={sysroot}", "-static", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                str(ROOT / "tests/procfs-mount/guest.c"), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
-                "-o", str(work / "init")]
+            compiler = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}"]
+            gcc_root = runner_root / "build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl"
+            if gcc_root.exists(): compiler.append(f"--gcc-install-dir={sorted(gcc_root.iterdir())[-1]}")
+            linker = [f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else:
-            command = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc"), "-static", "-O2",
-                "-Wall", "-Wextra", "-Werror", str(ROOT / "tests/procfs-mount/guest.c"),
-                "-o", str(work / "init")]
-        if arguments.case == "reuse": command.insert(1, "-DPROC_MOUNT_REUSE_ONLY")
-        subprocess.run(command, check=True)
+            compiler = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
+            linker = []
+        if arguments.prebuilt_init:
+            shutil.copy2(arguments.prebuilt_init, work / "init")
+        else:
+            generate = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
+            defines = ("nofloat",) + (("proc_mount_reuse_only",) if arguments.case == "reuse" else ())
+            generate(ROOT / "tests/procfs-mount/mountfixture", work / "fixture.c",
+                     "arm64" if arguments.arch == "aarch64" else "amd64", defines)
+            flags = ["-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
+                     "-D_GNU_SOURCE", "-fno-strict-aliasing", "-Wno-unused-function", "-Wno-unused-parameter",
+                     "-I", str(ROOT / "tests/procfs-mount/mountfixture")]
+            subprocess.run(compiler + flags + ["-c", str(work / "fixture.c"), "-o", str(work / "fixture.o")], check=True)
+            subprocess.run(compiler + ["-static", str(work / "fixture.o")] + linker + ["-o", str(work / "init")], check=True)
         for name in ("root", "sbin", "proc", "sys", "dev", "tmp"):
             (work / "rootfs" / name).mkdir(parents=True)
         if arguments.arch == "amd64":
