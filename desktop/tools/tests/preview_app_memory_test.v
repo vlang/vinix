@@ -263,11 +263,27 @@ fn test_preview_repeated_select_cancel_failed_allocate_crop_export_and_close_rel
 		app.select_image()
 		assert app.apply_crop()
 		assert app.pixels_from_crop && app.orientation == 1 && app.rotation == 0
+		for _ in 0 .. 8 {
+			assert app.undo_crop() && !app.pixels_from_crop && app.can_redo_crop()
+			assert app.publish_surface()
+			assert app.redo_crop() && app.pixels_from_crop && app.can_undo_crop()
+		}
 		app.rotate(1)
 		app.select_image()
 		app.selection.anchor_x = 1
 		app.selection.anchor_y = 1
 		assert app.apply_crop()
+		assert app.undo_crop() && app.pixels_from_crop
+		before := app.crop_state()
+		history := app.crop_history
+		assert !app.apply_crop_using(preview_heap_fail_crop_allocation)
+		assert app.crop_state() == before && app.crop_history == history && app.can_redo_crop()
+		preview_set_field(mut app.open_path, original)
+		assert !app.open_image()
+		assert app.crop_state() == before && app.crop_history == history && app.can_redo_crop()
+		preview_set_field(mut app.open_path, path)
+		app.select_image()
+		assert app.apply_crop() && app.can_undo_crop() && !app.can_redo_crop()
 		preview_set_field(mut app.export_path, output)
 		assert app.export_image(false)
 		assert desktop_unlink(output) == 0
@@ -283,6 +299,7 @@ fn test_preview_repeated_select_cancel_failed_allocate_crop_export_and_close_rel
 		assert app.open_image() && !app.pixels_from_crop
 		app.select_image()
 		assert app.apply_crop()
+		if cycle & 1 == 0 { assert app.undo_crop() }
 		app.close_app()
 		app.close_app()
 	}

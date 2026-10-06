@@ -700,9 +700,15 @@ fn test_preview_crop_normalizes_every_exif_turn_preserves_alpha_and_original_sou
 			assert app.open_image()
 			app.orientation = orientation
 			app.rotation = rotation
+			app.set_viewport(2, 2)
+			app.set_zoom(400)
+			app.pan(-1, 1)
+			app.tool = .select
 			width, height := app.oriented_dimensions()
 			app.selection = PreviewSelection{active: true, anchor_x: 1,
 				caret_x: width - 1, caret_y: height - 2}
+			before := app.crop_state()
+			geometry := app.geometry()
 			mut expected := []u8{len: (width - 1) * (height - 1) * 4}
 			for y in 0 .. height - 1 {
 				for x in 0 .. width - 1 {
@@ -718,6 +724,19 @@ fn test_preview_crop_normalizes_every_exif_turn_preserves_alpha_and_original_sou
 			assert !app.selection.active && app.fit && app.pan_x == 0 && app.pan_y == 0
 			assert app.source == original && app.loaded_path == path
 			for index, byte in expected { assert unsafe { app.pixels[index] } == byte }
+			cropped := app.crop_state()
+			assert app.can_undo_crop() && !app.can_redo_crop()
+			assert app.crop_history == before && cropped.pixels != before.pixels
+			for _ in 0 .. 3 {
+				assert app.undo_crop()
+				assert app.crop_state() == before && app.geometry() == geometry
+				assert !app.can_undo_crop() && app.can_redo_crop()
+				for index, byte in pixels { assert unsafe { app.pixels[index] } == byte }
+				assert app.source == original && app.loaded_path == path
+				assert app.redo_crop()
+				assert app.crop_state() == cropped
+				for index, byte in expected { assert unsafe { app.pixels[index] } == byte }
+			}
 			preview_set_field(mut app.export_path, exported)
 			assert app.export_image(false)
 			mut reopened := PreviewApp{}
@@ -785,7 +804,7 @@ fn test_preview_selection_keyboard_resets_pan_mode_and_visible_crop_controls() {
 	begin_frame_elements()
 	mut tree := app.build(ui2.rect(0, 0, 800, 540))!
 	for action in [preview_action_pan, preview_action_select, preview_action_crop,
-		preview_action_clear_selection]! {
+		preview_action_clear_selection, preview_action_undo_crop, preview_action_redo_crop]! {
 		control := preview_test_control(tree, action) or { panic('Missing Preview control') }
 		assert !control.enabled && control.frame.x >= 0 && control.frame.x + control.frame.width <= 800
 	}
@@ -806,6 +825,34 @@ fn test_preview_selection_keyboard_resets_pan_mode_and_visible_crop_controls() {
 	free_tree(tree)
 	app.key_input('\r')
 	assert app.status_key == 'preview.status.cropped' && app.pixels_from_crop
+	for body_width in [666, 800]! {
+		begin_frame_elements()
+		tree = app.build(ui2.rect(0, 0, body_width, 320))!
+		undo := preview_test_control(tree, preview_action_undo_crop) or { panic('Missing Undo') }
+		redo := preview_test_control(tree, preview_action_redo_crop) or { panic('Missing Redo') }
+		assert undo.enabled && !redo.enabled
+		assert undo.frame.x >= 0 && undo.frame.x + undo.frame.width <= redo.frame.x
+		assert redo.frame.x + redo.frame.width <= body_width
+		assert undo.frame.y + undo.frame.height < preview_toolbar_height
+		free_tree(tree)
+	}
+	app.focus_field(.export_path)
+	app.pending[0] = 0xe6
+	app.pending_len = 1
+	app.key_input('\x1a')
+	assert app.focus == .image && app.pending_len == 0 && app.can_redo_crop()
+	assert !app.pixels_from_crop && app.status_key == 'preview.status.crop_undone'
+	begin_frame_elements()
+	tree = app.build(ui2.rect(0, 0, 666, 320))!
+	assert !(preview_test_control(tree, preview_action_undo_crop) or { panic('Missing Undo') }).enabled
+	assert (preview_test_control(tree, preview_action_redo_crop) or { panic('Missing Redo') }).enabled
+	free_tree(tree)
+	app.key_input('\x19')
+	assert app.pixels_from_crop && app.can_undo_crop() && app.status_key == 'preview.status.crop_redone'
+	app.handle(preview_action_undo_crop)!
+	assert app.can_redo_crop()
+	app.handle(preview_action_redo_crop)!
+	assert app.can_undo_crop()
 	app.key_input('\x01')
 	app.set_zoom(200)
 	assert !app.selection.active
@@ -868,4 +915,104 @@ fn test_preview_crop_selection_surface_shades_outside_and_draws_a_border() {
 	clear := open_vinix_surface(app.surface_path) or { panic('Missing cleared surface') }
 	assert clear.pixel(0, 0) == 0xffffff && clear.pixel(4, 4) == 0xffffff
 	clear.close()
+}
+
+fn test_preview_crop_history_replaces_one_step_and_survives_failed_open_or_crop() {
+	root := preview_test_root('crop-history')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	bad := files_child_path(root, 'missing.png')
+	defer { unsafe { path.free(); bad.free() } }
+	pixels := []u8{len: 8 * 6 * 4, init: u8(index % 256)}
+	preview_test_write_image(path, 8, 6, pixels)
+	unsafe { pixels.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	assert !app.undo_crop() && !app.redo_crop()
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	app.select_image()
+	app.selection.caret_x = 5
+	assert app.apply_crop()
+	assert app.width == 6 && app.height == 6
+	first_pixels := app.pixels
+	app.select_image()
+	app.selection.anchor_x = 1
+	app.selection.anchor_y = 1
+	assert app.apply_crop()
+	assert app.width == 5 && app.height == 5
+	assert app.crop_history.pixels == first_pixels && app.crop_history.pixels_from_crop
+	second_pixels := app.pixels
+	assert app.undo_crop() && app.pixels == first_pixels
+	assert app.width == 6 && app.height == 6 && !app.undo_crop()
+	assert app.redo_crop() && app.pixels == second_pixels && !app.redo_crop()
+	for undone in [false, true]! {
+		if undone { assert app.undo_crop() }
+		app.select_image()
+		before := app.crop_state()
+		history := app.crop_history
+		assert !app.apply_crop_using(preview_test_fail_crop_allocation)
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+		preview_set_field(mut app.open_path, bad)
+		assert !app.open_image()
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+		preview_set_field(mut app.open_path, path)
+	}
+	// A new crop after Undo discards the former Redo and starts one new step.
+	assert app.pixels == first_pixels && app.can_redo_crop()
+	app.selection = PreviewSelection{active: true, caret_x: 3, caret_y: 2}
+	assert app.apply_crop()
+	assert app.width == 4 && app.height == 3 && app.can_undo_crop() && !app.can_redo_crop()
+	assert app.crop_history.pixels == first_pixels
+	assert app.undo_crop() && app.pixels == first_pixels && app.width == 6
+	assert app.redo_crop() && app.width == 4 && app.height == 3
+	// Reopening clears history from either position, while keeping Open usable.
+	for undone in [false, true]! {
+		if undone { assert app.undo_crop() }
+		assert app.open_image()
+		assert !app.can_undo_crop() && !app.can_redo_crop()
+		assert app.crop_history.pixels == unsafe { nil } && !app.pixels_from_crop
+		assert app.width == 8 && app.height == 6
+		app.select_image()
+		assert app.apply_crop()
+	}
+	assert app.undo_crop()
+	app.close_app()
+	app.close_app()
+	assert app.pixels == unsafe { nil } && app.crop_history.pixels == unsafe { nil }
+}
+
+fn test_preview_crop_history_restores_each_image_view_and_clamps_to_resized_window() {
+	root := preview_test_root('crop-history-view')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	defer { unsafe { path.free() } }
+	preview_test_fixture(path)
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	app.orientation = 6
+	app.rotate(1)
+	app.set_viewport(1, 1)
+	app.set_zoom(400)
+	app.select_image()
+	before := app.crop_state()
+	assert app.apply_crop()
+	app.rotate(1)
+	app.set_zoom(200)
+	app.set_tool(.pan)
+	cropped_view := app.crop_state()
+	assert app.undo_crop() && app.crop_state() == before
+	assert !app.pointer_moves_matter()
+	assert app.redo_crop() && app.crop_state() == cropped_view
+	app.set_viewport(100, 100)
+	assert app.undo_crop()
+	assert app.width == before.width && app.height == before.height
+	assert app.orientation == 6 && app.rotation == before.rotation && app.zoom == 400 && !app.fit
+	assert app.viewport_width == 100 && app.viewport_height == 100
+	assert app.pan_x == 0 && app.pan_y == 0
+	assert app.geometry().left >= 0 && app.geometry().top >= 0
+	assert app.publish_surface()
+	assert app.redo_crop() && app.publish_surface()
 }

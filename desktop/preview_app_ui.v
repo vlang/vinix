@@ -63,7 +63,7 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 		}
 	}
 	loaded := a.pixels != unsafe { nil }
-	mut children := frame_elements(22)
+	mut children := frame_elements(24)
 	children << preview_button(preview_action_open, 'preview.open', 8, 6, 64, true)
 	children << preview_path_field(preview_action_open_path, 'preview.path.open.placeholder',
 		a.open_path, 80, 6, if width > 88 { width - 88 } else { 1 }, a.focus == .open_path, a.select_all)
@@ -88,8 +88,12 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 		loaded && a.crop_rect_valid(a.crop_rect()))
 	children << preview_button(preview_action_clear_selection, 'preview.selection.clear', 256, 114, 80,
 		loaded && a.selection.active)
+	children << preview_button(preview_action_undo_crop, 'preview.undo', 344, 114, 100,
+		a.can_undo_crop())
+	children << preview_button(preview_action_redo_crop, 'preview.redo', 450, 114, 100,
+		a.can_redo_crop())
 	children << ui2.label('', tr(if a.tool == .select { 'preview.status.select' } else { 'preview.status.pan' }),
-		ui2.rect(344, 114, if width > 352 { f64(width - 352) } else { 1 }, 28),
+		ui2.rect(558, 114, if width > 566 { f64(width - 566) } else { 1 }, 28),
 		ui2.TextStyle{color: body_muted, size: 11})
 	children << ui2.view('', ui2.rect(0, preview_toolbar_height - 1, size.width, 1), ui2.BoxStyle{ bg: body_rule }, [])
 	mut image := frame_elements(1)

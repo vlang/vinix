@@ -97,6 +97,11 @@ fn (mut a PreviewApp) key_input(input string) {
 			index++
 			continue
 		}
+		if ch == 0x1a || ch == 0x19 {
+			if ch == 0x1a { a.undo_crop() } else { a.redo_crop() }
+			index++
+			continue
+		}
 		if ch == 0x1b {
 			if index + 1 < input.len && (input[index + 1] == `[` || input[index + 1] == `O`) {
 				index += 2
@@ -229,6 +234,8 @@ fn (mut a PreviewApp) handle(action string) ! {
 		preview_action_select { a.set_tool(.select) }
 		preview_action_crop { a.apply_crop() }
 		preview_action_clear_selection { a.clear_selection() }
+		preview_action_undo_crop { a.undo_crop() }
+		preview_action_redo_crop { a.redo_crop() }
 		else {}
 	}
 }

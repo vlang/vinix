@@ -30,6 +30,8 @@ const preview_action_pan = 'preview.pan'
 const preview_action_select = 'preview.select'
 const preview_action_crop = 'preview.crop'
 const preview_action_clear_selection = 'preview.selection.clear'
+const preview_action_undo_crop = 'preview.undo'
+const preview_action_redo_crop = 'preview.redo'
 
 enum PreviewFocus {
 	image
@@ -74,6 +76,8 @@ mut:
 	drag_pan_y         int
 	tool               PreviewTool
 	selection          PreviewSelection
+	crop_history       PreviewCropState
+	crop_undone        bool
 }
 
 fn open_preview(mut _ Desktop) !NativeApp {
@@ -147,6 +151,7 @@ fn (mut a PreviewApp) release_surface() {
 
 fn (mut a PreviewApp) release_image() {
 	a.release_surface()
+	a.release_crop_history()
 	a.release_pixels()
 	unsafe {
 		a.source.free()

@@ -29,6 +29,98 @@ struct PreviewCropRect {
 	height int
 }
 
+// One alternate image owns its buffer independently of the active image.
+// Original file bytes and paths stay in PreviewApp, shared by both states.
+// Viewport size belongs to the current window; restored pan is clamped to it.
+struct PreviewCropState {
+	pixels           &u8 = unsafe { nil }
+	pixels_from_crop bool
+	width            int
+	height           int
+	orientation      int = 1
+	rotation         int
+	fit              bool = true
+	zoom             int  = 100
+	pan_x            int
+	pan_y            int
+	tool             PreviewTool
+	selection        PreviewSelection
+}
+
+fn (a &PreviewApp) crop_state() PreviewCropState {
+	return PreviewCropState{
+		pixels: a.pixels
+		pixels_from_crop: a.pixels_from_crop
+		width: a.width
+		height: a.height
+		orientation: a.orientation
+		rotation: a.rotation
+		fit: a.fit
+		zoom: a.zoom
+		pan_x: a.pan_x
+		pan_y: a.pan_y
+		tool: a.tool
+		selection: a.selection
+	}
+}
+
+fn (a &PreviewApp) can_undo_crop() bool {
+	return a.crop_history.pixels != unsafe { nil } && !a.crop_undone
+}
+
+fn (a &PreviewApp) can_redo_crop() bool {
+	return a.crop_history.pixels != unsafe { nil } && a.crop_undone
+}
+
+fn (mut a PreviewApp) release_crop_history() {
+	preview_release_pixel_buffer(a.crop_history.pixels, a.crop_history.pixels_from_crop)
+	a.crop_history = PreviewCropState{}
+	a.crop_undone = false
+}
+
+fn (mut a PreviewApp) swap_crop_state() {
+	// Both buffers remain owned exactly once. Surface files contain their own
+	// rendered copy, so neither the compositor nor a UI tree borrows these pixels.
+	previous := a.crop_history
+	a.crop_history = a.crop_state()
+	a.pixels = previous.pixels
+	a.pixels_from_crop = previous.pixels_from_crop
+	a.width = previous.width
+	a.height = previous.height
+	a.orientation = previous.orientation
+	a.rotation = previous.rotation
+	a.fit = previous.fit
+	a.zoom = previous.zoom
+	a.pan_x = previous.pan_x
+	a.pan_y = previous.pan_y
+	a.tool = previous.tool
+	a.selection = previous.selection
+	a.selection.dragging = false
+	a.dragging = false
+	a.focus = .image
+	a.select_all = false
+	a.pending_len = 0
+	a.clamp_pan()
+	a.surface_dirty = true
+	a.refresh_details()
+}
+
+fn (mut a PreviewApp) undo_crop() bool {
+	if !a.can_undo_crop() { return false }
+	a.swap_crop_state()
+	a.crop_undone = true
+	a.status_key = 'preview.status.crop_undone'
+	return true
+}
+
+fn (mut a PreviewApp) redo_crop() bool {
+	if !a.can_redo_crop() { return false }
+	a.swap_crop_state()
+	a.crop_undone = false
+	a.status_key = 'preview.status.crop_redone'
+	return true
+}
+
 fn (a &PreviewApp) crop_rect() PreviewCropRect {
 	if !a.selection.active { return PreviewCropRect{} }
 	left := if a.selection.anchor_x < a.selection.caret_x { a.selection.anchor_x } else { a.selection.caret_x }
@@ -135,12 +227,16 @@ fn preview_allocate_crop(length usize) &u8 {
 	return pixels
 }
 
-fn (mut a PreviewApp) release_pixels() {
-	if a.pixels == unsafe { nil } { return }
-	if a.pixels_from_crop {
-		$if track_heap ? { C.vheap_free(a.pixels) }
+fn preview_release_pixel_buffer(pixels &u8, pixels_from_crop bool) {
+	if pixels == unsafe { nil } { return }
+	if pixels_from_crop {
+		$if track_heap ? { C.vheap_free(pixels) }
 	}
-	C.stbi_image_free(a.pixels)
+	C.stbi_image_free(pixels)
+}
+
+fn (mut a PreviewApp) release_pixels() {
+	preview_release_pixel_buffer(a.pixels, a.pixels_from_crop)
 	a.pixels = unsafe { nil }
 	a.pixels_from_crop = false
 }
@@ -172,9 +268,11 @@ fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
 			}
 		}
 	}
-	// Copy before releasing the old decoder/crop allocation. Compositor
-// surfaces are independent files; no UI element borrows either pixel buffer.
-	a.release_pixels()
+	// Commit only after the new crop is complete. A second crop drops the old
+	// alternate buffer and retains the active image for one Undo. At rest there
+	// are at most two 32 MiB pixel buffers, plus the unchanged source bytes.
+	a.release_crop_history()
+	a.crop_history = a.crop_state()
 	a.pixels = pixels
 	a.pixels_from_crop = true
 	a.width = rect.width
