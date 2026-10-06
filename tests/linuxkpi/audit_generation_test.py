@@ -21,13 +21,15 @@ import audit
 
 CALLER = """#include <linux/spinlock.h>
 #include <linux/atomic.h>
+#include <linux/overflow.h>
 
 void native_adapter_caller(spinlock_t *lock, unsigned long *value)
 {
-    unsigned long flags;
+    unsigned long flags, sum;
     spin_lock_irqsave(lock, flags);
     (void)arch_xchg_relaxed(value, 1UL);
     (void)arch_cmpxchg_relaxed(value, 1UL, 2UL);
+    (void)check_add_overflow(*value, 1UL, &sum);
     spin_unlock_irqrestore(lock, flags);
 }
 """
@@ -60,6 +62,8 @@ class AuditGenerationTest(unittest.TestCase):
             self.generated_directories.append(generated)
             self.assertTrue((generated / "vinix/spinlock_adapters.h").is_file())
             self.assertTrue((generated / "vinix/atomic_exchange.h").is_file())
+            if (audit.HERE / "abi/overflow.json").is_file():
+                self.assertTrue((generated / "vinix/integer_policy.h").is_file())
             self.assertFalse(any("obj" in Path(value).parts for value in command))
         return self.run_subprocess(command, **kwargs)
 
@@ -100,6 +104,26 @@ class AuditGenerationTest(unittest.TestCase):
         self.assertEqual(self.compiler_commands, [])
         self.assertEqual(self.generated_directories, [])
         self.assertEqual(len(self.generation_directories), 1)
+        self.assertFalse(self.generation_directories[0].parent.exists())
+
+
+    def test_invalid_optional_integer_metadata_stops_before_the_compiler(self):
+        if not (audit.HERE / "abi/overflow.json").is_file():
+            self.skipTest("integer-policy metadata is absent in this source snapshot")
+        invalid = self.directory / "invalid-integer-metadata"
+        (invalid / "abi").mkdir(parents=True)
+        (invalid / "generate-abi.py").symlink_to(audit.HERE / "generate-abi.py")
+        for name in ("spinlock.json", "atomic-exchange.json"):
+            (invalid / "abi" / name).symlink_to(audit.HERE / "abi" / name)
+        (invalid / "abi/overflow.json").write_text("{ malformed metadata")
+        with patch.object(audit, "HERE", invalid):
+            status, output, stdout, stderr = self.invoke("integer-failure")
+        self.assertEqual(status, 2, stdout + stderr)
+        self.assertIn("JSONDecodeError", stderr)
+        self.assertFalse(output.exists())
+        self.assertEqual(self.compiler_commands, [])
+        self.assertEqual(self.generated_directories, [])
+        self.assertEqual(len(self.generation_directories), 3)
         self.assertFalse(self.generation_directories[0].parent.exists())
 
 

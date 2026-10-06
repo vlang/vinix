@@ -41,8 +41,13 @@ def generate_headers(directory):
     # The native build derives these declarations and adapters from V exports
     # and ABI metadata. Regenerate them here instead of using kernel obj files
     # that may belong to another architecture or an older implementation.
-    for schema, header in (("spinlock.json", "spinlock_adapters.h"),
-                           ("atomic-exchange.json", "atomic_exchange.h")):
+    adapters = [("spinlock.json", "spinlock_adapters.h"),
+                ("atomic-exchange.json", "atomic_exchange.h")]
+    # The integer-policy migration introduces this metadata alongside its
+    # consumers. Older committed source snapshots have neither prerequisite.
+    if (HERE / "abi/overflow.json").is_file():
+        adapters.append(("overflow.json", "integer_policy.h"))
+    for schema, header in adapters:
         subprocess.run([sys.executable, str(HERE / "generate-abi.py"),
                         str(HERE / "abi" / schema), str(directory / "vinix" / header)],
                        check=True, capture_output=True, text=True)
