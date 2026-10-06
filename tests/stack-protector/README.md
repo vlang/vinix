@@ -1,6 +1,6 @@
 # V stack protector
 
-`python3 run.py` links the actual V guard and failure handler to independent C
+`python3 run.py` links the actual V guard and failure handler to independent V
 callers built with global `-fstack-protector-strong`. It checks the guard's static
 placeholder, 1,000 successful replacements and protected-frame returns, then
 requires the V panic path when a child's guard is deliberately changed under
@@ -8,10 +8,14 @@ a protected frame. This introduces no out-of-bounds access. Privileged boot
 entropy and the fatal panic are host adapters.
 
 The test also rejects allocator imports and checks the generated LLVM attributes
-to ensure initialization and its C ABI wrapper remain unprotected. The production
+to require a volatile, non-inlined protected frame and unprotected initialization,
+main and native ABI wrappers. The production
 kernel uses the same attribute-bearing declarations in `stack_protector.h`.
 Architecture entropy instructions additionally require both kernel builds and
 guest boots; host tests cannot access ARM privileged identification registers.
+`VINIX_STACK_TEST_ARCH=x86_64` selects the x86 host ABI when using an x86
+compiler on an ARM host. The original 57-line C caller is recoverable at
+`27aaf760fd4cc92fd3641984718e43d9e923404f:tests/stack-protector/host.c`.
 
 `python3 diagnostic.py` tests both real V serial adapters through mocked byte
 outputs under ASan/UBSan. Independent V callers check borrowed NUL-terminated
