@@ -359,6 +359,297 @@ fn check_current_utility_workflow_clients(mut desktop Desktop) {
 	check_calendar_interchange_client(home, mut desktop)
 	check_editor_workflow_client(home, mut desktop)
 	check_files_trash_client(home, mut desktop)
+	check_programmer_calculator_client(mut desktop)
+	check_editor_selection_client(home)
+	check_settings_search_client(mut desktop)
+	check_activity_view_client(home, mut desktop)
+}
+
+fn integration_programmer_readout(element ui2.Element, row int) ?string {
+	if element.kind == .label && element.frame.x == 78 && element.frame.y == 106 + row * 28 {
+		return element.text
+	}
+	for child in element.children {
+		if text := integration_programmer_readout(child, row) { return text }
+	}
+	return none
+}
+
+fn integration_assert_integer(mut app NativeApp, expected [4]string) {
+	tree := app.build(ui2.rect(0, 0, 620, 576)) or { panic(err) }
+	defer { free_tree(tree) }
+	assert tree_has_id(tree, 'calculator.programmer.equals')
+	for row, text in expected {
+		actual := integration_programmer_readout(tree, row) or { panic('missing integer readout') }
+		assert actual == text, 'Programmer readout ${row}: ${actual}, expected ${text}'
+	}
+}
+
+// Exact operands and results cross the real app protocol without converting
+// through floating point. Returning to Basic must retain its pending sum.
+fn check_programmer_calculator_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	if mut app is RemoteApp {
+		assert app.pid > 0 && app.keyboard && C.kill(app.pid, 0) == 0
+		app.key_input('2+3\x10')
+		app.paste_input('18446744073709551615')
+	}
+	integration_assert_integer(mut app, ['18446744073709551615', 'FFFFFFFFFFFFFFFF',
+		'1777777777777777777777', '1111111111111111111111111111111111111111111111111111111111111111']!)
+	if mut app is RemoteApp { app.key_input('+1=') }
+	integration_assert_integer(mut app, ['0', '0', '0', '0']!)
+	app.handle('calculator.programmer.not') or { panic(err) }
+	app.handle('calculator.programmer.shr') or { panic(err) }
+	if mut app is RemoteApp {
+		app.paste_input('63')
+		app.key_input('=')
+	}
+	integration_assert_integer(mut app, ['1', '1', '1', '1']!)
+	app.handle('calculator.programmer.shl') or { panic(err) }
+	if mut app is RemoteApp {
+		app.paste_input('64')
+		app.key_input('=')
+	}
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('calculator.programmer.error.shift'))
+	integration_assert_integer(mut app, ['64', '40', '100', '1000000']!)
+	app.handle('calculator.programmer.clear') or { panic(err) }
+	app.handle('calculator.programmer.base.hex') or { panic(err) }
+	if mut app is RemoteApp {
+		app.key_input('ff&')
+		app.paste_input('0b1010')
+		app.key_input('=')
+	}
+	integration_assert_integer(mut app, ['10', 'A', '12', '1010']!)
+	if mut app is RemoteApp { app.paste_input('0x10000000000000000') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 576), tr('calculator.programmer.error.range'))
+	integration_assert_integer(mut app, ['10', 'A', '12', '1010']!)
+	if mut app is RemoteApp { app.key_input('\x10=') }
+	integration_calculator_display(mut app, '5')
+	assert native_app_prepare_close(mut app)
+	println('IPC Programmer Calculator exact integers and Basic state passed')
+}
+
+fn integration_assert_clipboard(desktop &Desktop, expected string) {
+	assert desktop.clipboard.local_available && desktop.clipboard.local_length == expected.len
+	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == expected
+	assert desktop.clipboard.pid == -1 && desktop.clipboard.fd == -1
+}
+
+fn integration_editor_paste(mut desktop Desktop, mut app NativeApp) {
+	app.handle(editor_action_document) or { panic(err) }
+	rest := desktop.take_paste_keys('\x16')
+	assert rest.len == 0
+	unsafe { rest.free() }
+}
+
+// Copy/Cut waits for the compositor's acknowledgement. Saved document bytes
+// verify selection replacement and Undo as well as visible highlight state.
+fn check_editor_selection_client(home string) {
+	path := join_path(home, 'selection-Ж.txt')
+	mut desktop := Desktop{ home: home, focus: 9300 }
+	defer {
+		desktop.clipboard.close_request()
+		desktop.free_start_menu_query()
+		unsafe {
+			path.free()
+			desktop.apps.free()
+			desktop.windows.free()
+			desktop.native_asset_icons.free()
+			desktop.clipboard.url.free()
+			desktop.clipboard.pending.free()
+			desktop.clipboard.data.free()
+		}
+	}
+	factory := app_factory_named('vinix-editor') or { panic('Text Editor is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	desktop.apps << app
+	desktop.windows << Window{ id: 9300, title: 'Text Editor', page: .app, app_index: 0 }
+	app.handle(editor_action_document) or { panic(err) }
+	document := 'aй😀\nsecond\nthird\nfourth\nfifth'
+	if mut app is RemoteApp {
+		assert app.clipboard_copy && app.pointer && app.peer_features & app_feature_text_copy != 0
+		app.paste_input(document)
+		app.key_input('\x01\x03')
+	}
+	integration_assert_clipboard(&desktop, document)
+	selected := app.build(ui2.rect(0, 0, 700, 500)) or { panic(err) }
+	assert tree_has_id(selected, 'editor.selection.highlight')
+	free_tree(selected)
+	if mut app is RemoteApp { app.key_input('\x18') }
+	integration_assert_clipboard(&desktop, document)
+	app.handle(editor_action_save_as) or { panic(err) }
+	storage_remote_field(mut app, editor_action_save_as_path, path)
+	app.handle(editor_action_save_as_create) or { panic(err) }
+	integration_assert_file(path, '')
+	app.handle(editor_action_document) or { panic(err) }
+	if mut app is RemoteApp { app.key_input('\x1a') }
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(path, document)
+	app.handle(editor_action_document) or { panic(err) }
+	if mut app is RemoteApp {
+		app.key_input('\x01')
+		app.paste_input('replaced')
+	}
+	integration_editor_paste(mut desktop, mut app)
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(path, 'replacedaй😀\nsecond\nthird\nfourth\nfifth')
+	if mut app is RemoteApp { app.key_input('\x1a\x1a') }
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(path, document)
+	// Build first to establish the child's viewport before pointer packets.
+	viewport := app.build(ui2.rect(0, 0, 700, 500)) or { panic(err) }
+	free_tree(viewport)
+	if mut app is RemoteApp {
+		app.pointer_event(.down, .left, 0, 18, 90, 700, 500)
+		app.pointer_event(.up, .left, 0, 18, 90, 700, 500)
+		app.key_input('!')
+	}
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(path, 'a!й😀\nsecond\nthird\nfourth\nfifth')
+	if mut app is RemoteApp { app.key_input('\x1a') }
+	if mut app is RemoteApp {
+		app.pointer_event(.down, .left, 0, 18, 90, 700, 500)
+		app.pointer_event(.move, .no_button, 0, 26, 108, 700, 500)
+		app.pointer_event(.up, .left, 0, 26, 108, 700, 500)
+		app.key_input('\x03')
+	}
+	integration_assert_clipboard(&desktop, 'й😀\nse')
+	dragged := app.build(ui2.rect(0, 0, 700, 500)) or { panic(err) }
+	assert tree_has_id(dragged, 'editor.selection.highlight')
+	free_tree(dragged)
+	if mut app is RemoteApp { app.paste_input('Z') }
+	app.handle(editor_action_save) or { panic(err) }
+	integration_assert_file(path, 'aZcond\nthird\nfourth\nfifth')
+	// Copied control bytes are text when pasted into Start-menu search.
+	app.handle(editor_action_document) or { panic(err) }
+	if mut app is RemoteApp {
+		app.key_input('\x01')
+		app.paste_input('calc\n\x1b\x7f\t日本語')
+		app.key_input('\x01\x03')
+	}
+	integration_assert_clipboard(&desktop, 'calc\n\x1b\x7f\t日本語')
+	desktop.start_menu_open = true
+	desktop.start_menu_page = 2
+	window_count := desktop.windows.len
+	rest := desktop.take_paste_keys('\x16')
+	assert rest.len == 0
+	unsafe { rest.free() }
+	assert desktop.start_menu_open && desktop.start_menu_page == 0 && desktop.start_menu_searching
+	assert desktop.start_menu_query_text() == 'calc 日本語'
+	assert desktop.windows.len == window_count
+	if mut app is RemoteApp {
+		assert C.kill(app.pid, 0) == 0
+	}
+	desktop.start_menu_open = false
+	// A live Calculator has no clipboard-copy capability, even though its
+	// protocol peer supports the shared extension.
+	calculator_factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut calculator := start_remote_app_at_with_timeout(arguments()[0], calculator_factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut calculator) }
+	request := text_copy_request(71, 'unauthorized overwrite')
+	defer { unsafe { request.free() } }
+	if mut calculator is RemoteApp {
+		assert calculator.pid > 0 && !calculator.clipboard_copy
+		assert !calculator.handle_native_operation(editor_bytes_text(request))
+	}
+	integration_assert_clipboard(&desktop, 'calc\n\x1b\x7f\t日本語')
+	integration_calculator_display(mut calculator, '0')
+	println('IPC Editor selection, clipboard acknowledgement, pointer and paste passed')
+}
+
+fn check_settings_search_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-settings') or { panic('Settings is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	if mut app is RemoteApp {
+		assert app.pid > 0 && app.keyboard && app.polling
+		app.key_input('\x06window buttons')
+	}
+	results := app.build(ui2.rect(0, 0, 760, 576)) or { panic(err) }
+	assert tree_has_id(results, 'settings.search.result.0') && !tree_has_id(results, 'settings.search.result.1')
+	free_tree(results)
+	if mut app is RemoteApp {
+		app.key_input('\x1b')
+		app.key_input('[B\r')
+	}
+	appearance := app.build(ui2.rect(0, 0, 760, 576)) or { panic(err) }
+	assert tree_has_id(appearance, 'settings.side.0') && !tree_has_id(appearance, 'settings.search.result.0')
+	free_tree(appearance)
+	if mut app is RemoteApp {
+		app.key_input('\x06')
+		app.paste_input('brightness')
+	}
+	display_results := app.build(ui2.rect(0, 0, 760, 576)) or { panic(err) }
+	assert tree_has_id(display_results, 'settings.search.result.0')
+	free_tree(display_results)
+	app.handle('settings.search.result.0') or { panic(err) }
+	display := app.build(ui2.rect(0, 0, 760, 576)) or { panic(err) }
+	assert tree_has_id(display, settings_scale_100_action) && !tree_has_id(display, 'settings.search.result.0')
+	free_tree(display)
+	if mut app is RemoteApp {
+		app.key_input('\x06')
+		app.paste_input('keyboard french')
+		app.key_input('\r')
+	}
+	keyboard := app.build(ui2.rect(0, 0, 760, 576)) or { panic(err) }
+	assert tree_has_id(keyboard, 'settings.keyboard.enable.3')
+	free_tree(keyboard)
+	println('IPC Settings search and keyboard pane navigation passed')
+}
+
+fn integration_tree_background(element ui2.Element, id string) ?u32 {
+	if element.id == id { return element.box.bg }
+	for child in element.children {
+		if color := integration_tree_background(child, id) { return color }
+	}
+	return none
+}
+
+fn check_activity_view_client(home string, mut desktop Desktop) {
+	if !os.exists(activity_device) {
+		println('IPC Activity saved view requires the real /dev/processes device; host check skipped')
+		return
+	}
+	path := join_path(home, activity_preferences_filename)
+	defer { unsafe { path.free() } }
+	factory := app_factory_named('vinix-activity') or { panic('Activity Monitor is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	for action in ['activity.sort.name', 'activity.sort.name', 'activity.tree', 'activity.filter',
+		'activity.column.toggle.ppid', 'activity.interval', 'activity.view.resources',
+		'activity.resources.network']! {
+		app.handle(action) or { panic(err) }
+	}
+	close_remote(mut app)
+	record := os.read_file(path) or { panic(err) }
+	defer { unsafe { record.free() } }
+	prefs := activity_parse_view_preferences(record) or { panic('missing saved Activity view') }
+	assert prefs.sort == .name && prefs.descending && prefs.hierarchy && prefs.filter == .applications
+	assert prefs.columns & activity_column_bit(.ppid) != 0 && prefs.interval_ms == 2000
+	assert prefs.view == .resources && prefs.resource_tab == .network
+	mut reopened := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut reopened) }
+	resources := reopened.build(ui2.rect(0, 0, 900, 600)) or { panic(err) }
+	assert tree_has_id(resources, 'activity.resources')
+	network_color := integration_tree_background(resources, 'activity.resources.network') or { panic('missing Network tab') }
+	assert network_color == app_accent
+	free_tree(resources)
+	reopened.handle('activity.view.processes') or { panic(err) }
+	processes := reopened.build(ui2.rect(0, 0, 900, 600)) or { panic(err) }
+	assert tree_has_id(processes, 'activity.sort.ppid')
+	tree_color := integration_tree_background(processes, 'activity.tree') or { panic('missing hierarchy control') }
+	assert tree_color == files_sidebar_selected
+	free_tree(processes)
+	println('IPC Activity saved view and reopen passed')
 }
 
 // An independently packed tiny index keeps this IPC check offline and bounded.
