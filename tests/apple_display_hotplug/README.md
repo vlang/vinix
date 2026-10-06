@@ -1,14 +1,30 @@
-# Apple display hotplug policy
+# Display-hotplug policy oracle
 
-`./run.sh` generates C from the production V policy and links it to the
-independent C caller with ASan/UBSan. It preserves the state layout and tests
-DP, Thunderbolt and USB4 detection, cold attach without HPD, transient pulses,
-connect/disconnect debounce, unsigned timer wrap and one-shot reboot selection.
-Boundary cases include null reset, initial attachment without an event, zero
-debounce, raw status preservation and non-`1` C truth values. The extended
-fixture also passes against the original C implementation.
-The policy object must have no allocator imports.
+Run the independent V fixture against the actual kernel hotplug policy:
 
-Kernel builds and guest boots cover integration on both architectures. QEMU
-does not emulate Apple's CD321x/DCP hardware; physical cable attachment and
-firmware display training require a base M1 machine.
+```sh
+tests/apple_display_hotplug/run.sh
+python3 tests/apple_display_hotplug/run.py --host-arch amd64
+```
+
+Host builds use ASan/UBSan with immediate failure. The generated production and
+fixture objects have no allocator imports; the policy state stays on the stack.
+Apple's sanitizer does not support LeakSanitizer. All 47 original checks and
+line tags remain, including cold attach without HPD, short HPD pulses, unsigned
+counter wrap, one-shot action selection, non-1 C truth values and zero debounce.
+
+Build a static native fixture and boot an isolated guest:
+
+```sh
+python3 tests/apple_display_hotplug/run.py --arch aarch64 \
+  --kernel-dir /path/to/isolated/kernel \
+  --state-dir /path/to/new/hotplug-build \
+  --guest-state-dir /path/to/new/hotplug-guest
+```
+
+Use `--arch x86_64` for musl GCC, or `--build-only` to emit the native executable.
+`--original-reference /path/to/frozen/test_hotplug.c` compares the immutable
+original with the same provider, compiler flags and guest entry. Normal builds
+read maintained V only. The production provider is copied with a private module
+name; its algorithms and public header remain unchanged. Native model tests do
+not verify physical CD321x/DCP hardware operation.
