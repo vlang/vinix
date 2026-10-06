@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Exercise the production live-allocation tracker with sanitizer C callers."""
+"""Exercise the production live-allocation tracker with independent V callers."""
 from pathlib import Path
 import os
 import re
+import runpy
 import subprocess
 import tempfile
 
@@ -30,6 +31,12 @@ with tempfile.TemporaryDirectory(prefix="vinix-track-") as directory:
     symbols = subprocess.check_output(["nm", "-u", str(obj)], text=True)
     assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
     executable = work / "test"
-    subprocess.run([*flags, str(obj), str(ROOT / "tests/alloc-track/test.c"), "-o", str(executable)], check=True)
+    fixture = work / "fixture.c"
+    generate = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
+    generate(ROOT / "tests/alloc-track/fixture", fixture,
+             "arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64")
+    subprocess.run([*flags, "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
+                    "-Wno-unused-parameter", "-I", str(ROOT / "tests/alloc-track/fixture"),
+                    str(obj), str(fixture), "-o", str(executable)], check=True)
     subprocess.run([str(executable)], check=True)
     print("Allocation tracker: 8,192 live records, replacement/deletion/restart, call chains and bounded dump; no allocator imports")
