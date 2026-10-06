@@ -426,6 +426,116 @@ fn test_calculator_programmer_complete_init_mode_switch_resize_close_release_own
 	assert C.vinix_heap_end() == 0
 }
 
+fn test_calculator_programmer_width_cycles_history_recall_wire_and_live_masking_release_memory() {
+	mut app := new_calculator_app()
+	calculator_programmer_memory_warm_frames(mut app)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for index, action in calculator_programmer_width_actions {
+			app.handle('calculator.programmer.width.64')!
+			app.handle('calculator.programmer.base.dec')!
+			app.key_input('\x1b')
+			app.paste_input('18446744073709551615')
+			app.handle(action)!
+			assert app.integer.value == [u64(255), 65535, 4294967295, calculator_programmer_max]![index]
+			app.key_input('+1=~')
+			assert app.integer.history.last().width == calculator_programmer_widths[index]
+			app.handle('calculator.programmer.width.8')!
+			app.handle('calculator.programmer.history.0')!
+			assert app.integer.width == calculator_programmer_widths[index]
+			assert app.integer.value == [u64(255), 65535, 4294967295, calculator_programmer_max]![index]
+			for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 620, 576),
+				ui2.rect(0, 0, 760, 640), ui2.rect(0, 0, 340, 400)]! {
+				begin_frame_elements()
+				tree := app.build(size)!
+				mut encoded := []u8{cap: 65536}
+				unsafe { encoded.flags |= .noslices }
+				encode_app_element(tree, mut encoded)!
+				mut reader := WireReader{ data: encoded }
+				decoded := decode_app_element(mut reader, 0)!
+				free_tree(decoded)
+				free_tree(tree)
+				unsafe { encoded.free() }
+			}
+		}
+		app.handle('calculator.programmer.width.64')!
+		app.key_input('\x1b300+300=')
+		app.handle('calculator.programmer.width.8')!
+		app.key_input('=')
+		assert app.integer.value == 132 && app.integer.last_operand == 44
+	}
+	app.close_app()
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_programmer_width_overflow_shift_errors_and_recovery_release_memory() {
+	mut app := new_calculator_app()
+	calculator_programmer_memory_warm_frames(mut app)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for index, action in calculator_programmer_width_actions {
+			app.handle(action)!
+			app.handle('calculator.programmer.base.dec')!
+			app.key_input('\x1b42+')
+			app.paste_input(['256', '65536', '4294967296', '18446744073709551616']![index])
+			assert app.integer.value == 42 && app.integer.accumulator == 42
+			assert app.integer.pending == .add && app.integer.status == 'calculator.programmer.error.range'
+			app.paste_input('0x01')
+			app.key_input('=')
+			assert app.integer.value == 43
+			app.key_input('\x1b1<')
+			count := calculator_integer_text(u64(calculator_programmer_widths[index]), 10)
+			app.paste_input(count)
+			unsafe { count.free() }
+			app.key_input('=')
+			assert app.integer.has_error && app.integer.status == 'calculator.programmer.error.shift'
+			app.handle('calculator.programmer.width.8')!
+			assert app.integer.has_error
+			app.key_input('3+5==')
+			assert app.integer.value == 13 && app.integer.width == 8
+			app.integer.set_width(7)
+			assert app.integer.width == 8
+		}
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_programmer_width_init_mode_memory_resize_and_close_release_memory() {
+	mut warm := new_calculator_app()
+	calculator_programmer_memory_warm_frames(mut warm)
+	warm.close_app()
+	unsafe { free(warm) }
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut app := new_calculator_app()
+		app.key_input('2+3=')
+		app.handle('calculator.memory.add')!
+		app.handle('calculator.mode.programmer')!
+		for action in calculator_programmer_width_actions {
+			app.handle(action)!
+			app.key_input('\x1b~')
+			for size in [ui2.rect(0, 0, 620, 576), ui2.rect(0, 0, 340, 400)]! {
+				begin_frame_elements()
+				free_tree(app.build(size)!)
+			}
+		}
+		app.handle('calculator.mode.basic')!
+		assert app.calculator.display == '5' && app.memory == 5 && app.has_memory
+		app.handle('calculator.mode.scientific')!
+		app.handle('calculator.scientific.sqrt')!
+		app.handle('calculator.mode.programmer')!
+		app.handle('calculator.programmer.width.8')!
+		app.handle('calculator.programmer.history.0')!
+		assert app.integer.width == 64 && app.integer.value == calculator_programmer_max
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_calculator_copy_native_requests_acknowledgements_frames_and_close_release_memory() {
 	saved := app_compositor_features
 	app_compositor_features = app_features

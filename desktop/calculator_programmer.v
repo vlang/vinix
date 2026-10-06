@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// The integer model never converts through f64. Arithmetic is unsigned u64,
-// so add/subtract/multiply and bitwise results wrap modulo 2^64; right shifts
-// are logical. Input overflow and shift counts outside 0..63 are refused.
+// The integer model never converts through f64. Unsigned arithmetic wraps at
+// the selected 8/16/32/64-bit width; right shifts are logical. Narrowing drops
+// high bits of live operands, while history keeps each result's original width.
 module main
 
 const calculator_programmer_max = u64(0xffffffffffffffff)
@@ -18,6 +18,10 @@ const calculator_programmer_base_actions = ['calculator.programmer.base.dec',
 	'calculator.programmer.base.hex', 'calculator.programmer.base.oct',
 	'calculator.programmer.base.bin']!
 const calculator_programmer_bases = [10, 16, 8, 2]!
+const calculator_programmer_widths = [8, 16, 32, 64]!
+const calculator_programmer_width_actions = ['calculator.programmer.width.8',
+	'calculator.programmer.width.16', 'calculator.programmer.width.32',
+	'calculator.programmer.width.64']!
 const calculator_programmer_history_actions = ['calculator.programmer.history.0',
 	'calculator.programmer.history.1', 'calculator.programmer.history.2',
 	'calculator.programmer.history.3', 'calculator.programmer.history.4']!
@@ -39,12 +43,14 @@ enum CalculatorIntegerOperation {
 struct CalculatorIntegerHistory {
 	expression string
 	value u64
+	width int = 64
 }
 
 struct CalculatorProgrammer {
 mut:
 	value u64
 	base int = 10
+	width int = 64
 	decimal_text string = '0'
 	hex_text string = '0'
 	octal_text string = '0'
@@ -74,9 +80,28 @@ fn calculator_integer_digit(ch u8) int {
 // Prefixes are allowed for a pasted single operand, regardless of the active
 // display base. Leading signs, whitespace within a number and commands fail.
 fn calculator_integer_parse(text string, selected_base int) (u64, string) {
-	if text.len == 0 || text.len > 66 || selected_base !in calculator_programmer_bases {
+	return calculator_integer_parse_width(text, selected_base, 64)
+}
+
+fn calculator_integer_mask(width int) u64 {
+	// Validate before shifting so neither negative nor 64-bit shifts occur.
+	if width !in calculator_programmer_widths { return calculator_programmer_max }
+	return calculator_programmer_max >> u32(64 - width)
+}
+
+fn calculator_integer_width_action(width int) string {
+	for index, candidate in calculator_programmer_widths {
+		if width == candidate { return calculator_programmer_width_actions[index] }
+	}
+	return calculator_programmer_width_actions[3]
+}
+
+fn calculator_integer_parse_width(text string, selected_base int, width int) (u64, string) {
+	if text.len == 0 || text.len > 66 || selected_base !in calculator_programmer_bases
+		|| width !in calculator_programmer_widths {
 		return 0, 'calculator.programmer.error.input'
 	}
+	maximum := calculator_integer_mask(width)
 	mut base := selected_base
 	mut at := 0
 	if text.len >= 2 && text[0] == `0` {
@@ -98,7 +123,7 @@ fn calculator_integer_parse(text string, selected_base int) (u64, string) {
 		digit := calculator_integer_digit(text[at])
 		if digit < 0 { return 0, 'calculator.programmer.error.input' }
 		if digit >= base { return 0, 'calculator.programmer.error.digit' }
-		if result > (calculator_programmer_max - u64(digit)) / u64(base) {
+		if result > (maximum - u64(digit)) / u64(base) {
 			return 0, 'calculator.programmer.error.range'
 		}
 		result = result * u64(base) + u64(digit)
@@ -149,17 +174,30 @@ fn (mut state CalculatorProgrammer) free_texts() {
 }
 
 fn (mut state CalculatorProgrammer) set_value(value u64) {
-	decimal := calculator_integer_text(value, 10)
-	hex := calculator_integer_text(value, 16)
-	octal := calculator_integer_text(value, 8)
-	binary := calculator_integer_text(value, 2)
+	masked := value & calculator_integer_mask(state.width)
+	decimal := calculator_integer_text(masked, 10)
+	hex := calculator_integer_text(masked, 16)
+	octal := calculator_integer_text(masked, 8)
+	binary := calculator_integer_text(masked, 2)
 	state.free_texts()
-	state.value = value
+	state.value = masked
 	state.decimal_text = decimal
 	state.hex_text = hex
 	state.octal_text = octal
 	state.binary_text = binary
 	state.texts_owned = true
+}
+
+// A width change alters representations only. Pending operations, repeat
+// state, entry flags, errors and base survive; widening zero-extends. AC keeps
+// the selected width. Saved history values and widths are never truncated.
+fn (mut state CalculatorProgrammer) set_width(width int) {
+	if width !in calculator_programmer_widths || width == state.width { return }
+	state.width = width
+	mask := calculator_integer_mask(width)
+	state.accumulator &= mask
+	state.last_operand &= mask
+	state.set_value(state.value)
 }
 
 fn (mut state CalculatorProgrammer) clear() {
@@ -192,7 +230,7 @@ fn (mut state CalculatorProgrammer) digit(digit int) {
 	}
 	if state.has_error { state.clear() }
 	left := if state.replace_input { u64(0) } else { state.value }
-	if left > (calculator_programmer_max - u64(digit)) / u64(state.base) {
+	if left > (calculator_integer_mask(state.width) - u64(digit)) / u64(state.base) {
 		state.status = 'calculator.programmer.error.range'
 		return
 	}
@@ -206,7 +244,7 @@ fn (mut state CalculatorProgrammer) digit(digit int) {
 fn (mut state CalculatorProgrammer) paste(text string) {
 	trimmed := text.trim_space()
 	defer { unsafe { trimmed.free() } }
-	value, status := calculator_integer_parse(trimmed, state.base)
+	value, status := calculator_integer_parse_width(trimmed, state.base, state.width)
 	if status.len > 0 {
 		state.status = status
 		return
@@ -228,26 +266,34 @@ fn (mut state CalculatorProgrammer) backspace() {
 }
 
 fn calculator_integer_result(left u64, right u64, operation CalculatorIntegerOperation) (u64, string) {
-	if (operation == .divide || operation == .remainder) && right == 0 {
+	return calculator_integer_result_width(left, right, operation, 64)
+}
+
+fn calculator_integer_result_width(left u64, right u64, operation CalculatorIntegerOperation, width int) (u64, string) {
+	if width !in calculator_programmer_widths { return 0, 'calculator.programmer.error.input' }
+	mask := calculator_integer_mask(width)
+	lhs := left & mask
+	rhs := right & mask
+	if (operation == .divide || operation == .remainder) && rhs == 0 {
 		return 0, 'calculator.programmer.error.zero'
 	}
-	if (operation == .shift_left || operation == .shift_right) && right > 63 {
+	if (operation == .shift_left || operation == .shift_right) && right >= u64(width) {
 		return 0, 'calculator.programmer.error.shift'
 	}
 	result := match operation {
-		.add { left + right }
-		.subtract { left - right }
-		.multiply { left * right }
-		.divide { left / right }
-		.remainder { left % right }
-		.bit_and { left & right }
-		.bit_or { left | right }
-		.bit_xor { left ^ right }
-		.shift_left { left << int(right) }
-		.shift_right { left >> int(right) }
-		else { left }
+		.add { lhs + rhs }
+		.subtract { lhs - rhs }
+		.multiply { lhs * rhs }
+		.divide { lhs / rhs }
+		.remainder { lhs % rhs }
+		.bit_and { lhs & rhs }
+		.bit_or { lhs | rhs }
+		.bit_xor { lhs ^ rhs }
+		.shift_left { lhs << int(right) }
+		.shift_right { lhs >> int(right) }
+		else { lhs }
 	}
-	return result, ''
+	return result & mask, ''
 }
 
 fn calculator_integer_operator(operation CalculatorIntegerOperation) string {
@@ -271,7 +317,7 @@ fn (mut state CalculatorProgrammer) remember(expression string) {
 		unsafe { state.history[0].expression.free() }
 		state.history.delete(0)
 	}
-	state.history << CalculatorIntegerHistory{ expression: expression, value: state.value }
+	state.history << CalculatorIntegerHistory{ expression: expression, value: state.value, width: state.width }
 	state.history_offset = 0
 }
 
@@ -284,7 +330,7 @@ fn (mut state CalculatorProgrammer) remember_binary(left u64, right u64, operati
 }
 
 fn (mut state CalculatorProgrammer) evaluate(operation CalculatorIntegerOperation, right u64) bool {
-	result, status := calculator_integer_result(state.accumulator, right, operation)
+	result, status := calculator_integer_result_width(state.accumulator, right, operation, state.width)
 	if status.len > 0 {
 		state.status = status
 		state.has_error = true
@@ -334,7 +380,7 @@ fn (mut state CalculatorProgrammer) equals() {
 fn (mut state CalculatorProgrammer) bit_not() {
 	if state.has_error { return }
 	before := calculator_integer_text(state.value, 10)
-	state.set_value(state.value ^ calculator_programmer_max)
+	state.set_value(state.value ^ calculator_integer_mask(state.width))
 	expression := 'NOT ' + before
 	unsafe { before.free() }
 	state.remember(expression)
@@ -386,10 +432,15 @@ fn (mut state CalculatorProgrammer) handle(action string) {
 	for index, candidate in calculator_programmer_base_actions {
 		if candidate == action { state.base = calculator_programmer_bases[index]; return }
 	}
+	for index, candidate in calculator_programmer_width_actions {
+		if candidate == action { state.set_width(calculator_programmer_widths[index]); return }
+	}
 	for row, candidate in calculator_programmer_history_actions {
 		if candidate == action && row + state.history_offset < state.history.len {
 			value := state.history[state.history.len - 1 - row - state.history_offset].value
+			width := state.history[state.history.len - 1 - row - state.history_offset].width
 			state.clear()
+			state.width = width
 			state.set_value(value)
 			state.replace_input = false
 			state.operand_ready = true
