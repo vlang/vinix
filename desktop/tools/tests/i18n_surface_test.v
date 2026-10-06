@@ -115,7 +115,7 @@ fn test_context_menu_rows_are_worded_when_drawn() {
 	assert context_entry_title(tray_context_show_entries[0]) == 'Показать значок'
 	set_desktop_language(.es)
 	assert context_entry_title(create_context_background_entries[1]) == 'Nuevo archivo'
-	assert context_entry_title(create_context_item_entries[4]) == 'Eliminar'
+	assert context_entry_title(create_context_item_entries[4]) == 'Mover a la Papelera'
 	// A row built elsewhere keeps the words it was given.
 	assert context_entry_title(ui2.MenuEntry{ id: start_context_open, title: 'Open' }) == 'Open'
 }
