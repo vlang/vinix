@@ -740,9 +740,9 @@ pub fn mock_write(cookie voidptr, addr u64, value u32) {
 		if !m.frozen {
 			expect(!!(m.now - m.asserted >= 100), 317, c'm->now - m->asserted >= 100')
 		}
-		used :=  &m.sent_n[0] + (m.stages - 1) 
+		used :=  &m.sent_n[0] + (m.stages - 1)
 		expect(!!(( *used ) < m.lengths[m.stages - 1] && value <= 255), 319, c'*used < m->lengths[m->stages - 1] && value <= 255')
-		 m.sent[m.stages - 1][(*used)++] = u8(value) 
+		 m.sent[m.stages - 1][(*used)++] = u8(value)
 		m.tx_level++
 	}
 	m.regs[off / 4] = value
