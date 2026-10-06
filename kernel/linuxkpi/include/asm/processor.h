@@ -12,4 +12,12 @@
 /* A native spin hint also services TLB shootdowns while IRQs are disabled.
  * Other Linux CPU and task-switch services are not supplied here. */
 void cpu_relax(void);
+
+/* Preserve the original x86 instruction helpers and their real dependencies.
+ * Privileged writers and alternative patching keep their upstream externs;
+ * CPU capability, mapping and device transport remain separate contracts. */
+#include <linux/errno.h>
+#include <asm/cpufeatures.h>
+#include <asm/alternative.h>
+#include <asm/special_insns.h>
 #endif

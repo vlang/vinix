@@ -68,6 +68,13 @@ after a filesystem failure. Mutable build inputs still require isolation.
   references retain their genuine unresolved symbols; no early-MMIO, fixmap or
   kmap runtime is supplied. Configuration-disabled initialization follows the
   original inline behavior.
+- Original x86 instruction helpers are visible through the genuine
+  `processor.h` dependency closure, including the exact 64-byte MOVDIR64B
+  helper and `iosubmit_cmds512` loop. Compiler probes preserve their real
+  instruction bytes and memory operands. Privileged CR0/CR4 writers and
+  alternative patching keep genuine unresolved references. This compiler
+  closure supplies no device portal, MMIO ownership or instruction execution
+  validation; the following CPU feature bridge is a separate runtime change.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -621,6 +628,8 @@ incomplete.
 tests/linuxkpi/run.sh
 python3 tests/linuxkpi/nocache_test.py
 python3 tests/linuxkpi/asm_generated_headers_test.py
+python3 tests/linuxkpi/special_insns_test.py
+python3 tests/linuxkpi/smp_type_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1467,3 +1476,20 @@ desktop harness completes `ops,churn,cache,idle,apps,drag`; it reports up to
 48 KiB retained per 300-process churn batch and positive syscall allocations.
 No global leak-free result is claimed. Aggregate
 evidence: `/tmp/vinix-linuxkpi-pci-topology-oct06-final-validation.json`.
+
+Original instruction-helper validation passes sixteen strict GNU99/GNU11
+compiler objects and four deliberately rejected missing-dependency probes.
+Independent replays check every input hash, complete undefined-symbol output,
+real MOVDIR opcode bytes and original alternative sections/relocations. An
+isolated enabled build at `e2641335` plus only the processor-header overlay
+compiles and links, retaining genuine unresolved privileged/patching references
+in the reference objects; its saved ELF has no new instruction caller or guest
+execution claim. Ten additional objects replay actual native Make flags.
+
+The full frozen Kbuild audit remains **4/269**, expected exit 1. All fifteen
+previous MOVDIR declaration failures advance to genuine remaining dependencies;
+zero MOVDIR errors remain in its complete diagnostics. RCU, `cpu_feature_enabled`,
+original CSD integration and other services still block the driver. QEMU TCG
+does not expose MOVDIRI/MOVDIR64B on this host and rejects forced feature exposure;
+positive instruction execution needs capable hardware. Evidence:
+`/tmp/vinix-linuxkpi-movdir64b-oct06-final-validation.json`.

@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current PCI topology feature: **`e2641335`** (native maskable IRQ accounting, genuine Kbuild header wrappers, resident non-temporal copies, task-owned fault controls and checked user-write scopes). Recheck HEAD and the worktree before
+Committed implementation baseline before the current instruction-header feature: **`079e3ccd`** (bounded native PCI topology, maskable IRQ accounting, genuine Kbuild wrappers and checked user-copy services). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,8 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `079e3ccd` | Native bounded PCI/CardBus topology, permanent scalar boot publication and read-only capability validation |
+| `d6d62bcc` | Actual original CSD records/initializer compiler tests; SMP runtime remains unresolved |
 | `e2641335` | Actual maskable IRQ entry/exit ownership, scheduler handoff guards and measured complete actor lifetimes |
 | `24afa95c` | Exact original Kbuild mmiowb wrapper; original disabled tracking macros, no fabricated barrier |
 | `770ba039` | Exact pinned Kbuild-generated early-ioremap and kmap-size wrappers with genuine unresolved mapping references |
@@ -728,6 +730,36 @@ positive syscall allocations. This is scoped
 snapshot recovery evidence, not global leak freedom or GPU support. Sources,
 artifacts, results, failed attempts and independent review are collected in
 `/tmp/vinix-linuxkpi-pci-topology-oct06-final-validation.json`.
+
+## Original instruction headers and CPU feature work
+
+The genuine x86 `processor.h` instruction dependency closure now exposes original
+MOVDIR64B/`iosubmit_cmds512`, preserving full 64-byte memory operands, exact opcode
+bytes and original alternative metadata. CR0/CR4 writers and alternative patching
+remain genuine unresolved symbols in reference objects. Sixteen strict compiler
+objects, four rejected incomplete-header probes, ten actual Make-profile objects
+and independent same-hash replays pass. An isolated enabled `e2641335` plus only
+the processor overlay compiles and links; its saved ELF has no new instruction
+caller and no separate guest/instruction execution claim.
+
+The full frozen audit remains 4/269 with expected exit 1 and the same source set.
+All fifteen prior MOVDIR declaration blockers advance to genuine RCU,
+`cpu_feature_enabled`, `ERR_CAST` or architecture-header dependencies. Full
+diagnostics contain no remaining MOVDIR error. QEMU TCG does not expose either
+direct-store bit on this host and rejects forced positive exposure. Compiler
+closure is not positive instruction, device-portal or MMIO validation. Evidence:
+`/tmp/vinix-linuxkpi-movdir64b-oct06-final-validation.json`.
+
+Next runtime work samples only MOVDIRI/MOVDIR64B hardware bits on each actual
+native CPU before its online acknowledgement, then publishes one immutable
+all-online-CPU intersection before first compatibility users. Support exactly
+original feature IDs 539/540; leaf-seven ECX includes OS-state-sensitive features,
+so a blanket raw-word alias is incorrect. Queries must preserve caller state and
+remain valid across migration. Hotplug and policy replacement need a separate
+protocol. The existing word-zero/four queries are a legacy current-CPU subset.
+Original CSD tests now preserve records and genuine unresolved dispatcher/mask
+references, but production full-header integration and real IRQ dispatch still
+need implementation.
 
 ## Bound and high-priority contracts
 
