@@ -8,6 +8,11 @@
 /* Native user mappings use hardware page tables. This selects the genuine
  * MMU header layout; Linux page ownership and GPU mappings remain separate. */
 #define CONFIG_MMU 1
+/* Native x86 paging supports Limine's four- and five-level modes. Select the
+ * genuine five-level-capable type ABI; Linux page ownership and runtime
+ * geometry bindings remain separate dependencies. */
+#define CONFIG_X86_5LEVEL 1
+#define CONFIG_PGTABLE_LEVELS 5
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
 /* Ordinary process/IRQ capture uses a native owned-byte logger. NMI entry,

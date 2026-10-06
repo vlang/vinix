@@ -56,6 +56,13 @@ after a filesystem failure. Mutable build inputs still require isolation.
   checked `u64_to_user_ptr` conversion, `pgoff_t` representation and pinned
   integer type-limit/overflow macros are preserved. These compiler helpers
   supply no Linux page ownership or address-space runtime.
+- Original x86 page-table types and complete upstream page/folio/descriptor
+  records are visible through their genuine transitive includes. The compiler
+  profile supports five-level paging, matching native Limine support for four
+  or five levels. Original UAPI integer aliases, endian/Sparse annotations and
+  aligned types have one owner, avoiding duplicate GNU99 typedefs and include
+  order conflicts. Linux page ownership, descriptor/PFN services and runtime
+  page-table geometry bindings remain unresolved.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -557,6 +564,7 @@ incomplete.
 
 ```sh
 tests/linuxkpi/run.sh
+python3 tests/linuxkpi/pgtable_type_test.py
 python3 tests/linuxkpi/pagefault_test.py
 python3 tests/linuxkpi/uaccess_test.py
 python3 tests/linuxkpi/bounds_generation_test.py
@@ -1187,14 +1195,16 @@ all compiler jobs. The same private include tree now contains genuine
 compiler-derived bounds. Regression tests cover repeated real compilation,
 invalid metadata and bounds-compiler rejection before driver compilation.
 The latest isolated report is
-`/tmp/vinix-linuxkpi-bounds-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
+`/tmp/vinix-linuxkpi-compiler-next-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
 `i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
 syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
 blockers are cleared. The report uses committed baseline `27aaf760` plus the
-owned bounds overlay, rather than other sessions' changing metadata. Leading
-first errors now include `pgtable_t` in 206 units, missing
-`asm/early_ioremap.h`, ordinary RCU pointer APIs and `call_single_data_t`. These are syntax
+owned bounds/type/scope/declaration overlays, rather than other sessions'
+changing metadata. Original page-table types and static-key declarations clear
+their prior first errors. Leading first errors now include `rcu_read_lock` in
+199 units, RCU pointer APIs, missing `asm/early_ioremap.h` and
+`call_single_data_t`. These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
@@ -1208,13 +1218,25 @@ rebuild on an unchanged invocation. GNU Make 3.81 tests separate prerequisite
 timestamps by whole seconds. Evidence is in
 `/tmp/vinix-linuxkpi-bounds-oct06-independent-final/independent-review.json`.
 
+Page-type checks compile complete original records and entry representations
+under strict GNU99/GNU11, with both kernel-first and UAPI-first include orders
+and no typedef-warning suppression. Independent x86/ARM compiler checks verify
+all sixteen scalar aliases, endian/checksum/poll types and aligned layouts in
+four include orders without runtime imports. Existing user-copy and scalar-store
+sanitizer checks still pass. The isolated enabled compiler-profile kernel
+compiles and links; its generated native V C/object are byte-identical to the
+passed task-fault ELF. This compiler-only milestone adds no native Linux page
+operations and makes no guest-boot claim for that separately linked ELF.
+Evidence: `/tmp/vinix-linuxkpi-types-oct06-corrected-independent/result.json`
+and `/tmp/vinix-linuxkpi-compiler-next-oct06-final-artifacts.json`.
+
 ## Remaining driver integration
 
 The complete i915 build still fails. Ordinary per-CPU storage and scheduler
 pins, current-task identity, ordinary blocking task states/wakeups and retained
 task references now have native implementations. Namespace-relative
-PID queries, SMP dispatch, interrupt-context accounting and page-table types
-still need a bridge. No `mm` field or dummy address space is exposed.
+PID queries, SMP dispatch, interrupt-context accounting and runtime page-table
+geometry/ownership still need a bridge. No `mm` field or dummy address space is exposed.
 Borrowed `current` must not be used after exit; callers retaining a view use
 `get_task_struct` before surrendering its running/owned lifetime and release
 it with `put_task_struct`.
