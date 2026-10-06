@@ -20,8 +20,9 @@ VINIX_QEMU_SMP=4 python3 tests/kernel-gaps/run.py --no-network \
   --timeout 1800 --expect 'VINIX PROC MAP LOOKUP: PASS'
 ```
 
-Repeat with `--arch x86_64` and its kernel directory. Also run the unchanged
-`tests/proc-thread-lock/test.c` and `tests/kernel-retention/test.c` regressions.
+Repeat with `--arch x86_64` and its kernel directory. Also run the
+[thread-lock](../proc-thread-lock/README.md) and
+[kernel-retention](../kernel-retention/README.md) regressions.
 
 The independent V fixture preserves the original 221-line C oracle, including
 all 25 failure diagnostics, the three inspectors, four 12-child cohorts,
