@@ -20,7 +20,7 @@ subprocess.run(['python3',str(ROOT/'build-support/xorg-server/compile-v-host.py'
 source=a.state_dir/'guest.c'
 macros=('sigaction','open','close','read','tcgetattr','tcsetattr','nanosleep')
 text=''.join('#define '+name+' vxi_test_'+name+'\n' for name in macros)
-text += '#define main xinput_bridge_main\n#include "'+str(core.resolve())+'"\n#include "'+str(ROOT/'build-support/xorg-server/vinix-xinput.c')+'"\n#undef main\n#define main xinput_fixture_main\n#include "'+str(ROOT/'tests/x11-input/fixture.c')+'"\n#undef main\n'
+text += '#define main xinput_bridge_main\n#include "'+str(core.resolve())+'"\n#undef main\n#define main xinput_fixture_main\n#include "'+str(ROOT/'tests/x11-input/fixture.c')+'"\n#undef main\n'
 text += ''.join('#undef '+name+'\n' for name in macros)
 text += '#include "'+str(ROOT/'tests/x11-input/guest.c')+'"\n'
 source.write_text(text)

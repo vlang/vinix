@@ -357,11 +357,11 @@ def prepare(args, work: Path) -> tuple[Path, Path]:
     # Build the input/X11 host from the same isolated source as the desktop.
     sysroot = REPO / "build-aarch64-x11/sysroot"
     host_sources = [str(args.host_source)]
-    if args.host_source == REPO / "build-support/xorg-server/wine-host-v-abi.c":
+    if args.host_source == REPO / "build-support/xorg-server/winehost/core.v":
         host_core = work / "wine-host-core.c"
         subprocess.run(["python3", str(REPO / "build-support/xorg-server/compile-v-host.py"),
                         "winehost", str(host_core), "--arch", "arm64"], check=True)
-        host_sources = [str(REPO / "build-support/xorg-server/wine-host-v-abi.c"), str(host_core),
+        host_sources = [str(host_core),
                         f"-I{REPO}/build-support/xorg-server"]
     subprocess.run(["aarch64-linux-musl-gcc", "-O2", "-w", "-D__vinix__",
                     f"-I{sysroot}/usr/include", *host_sources,
@@ -427,7 +427,7 @@ def main() -> None:
     parser.add_argument("--work", type=Path, default=REPO / "build/dota2/game-test")
     parser.add_argument("--desktop", type=Path, default=REPO / "build/vinix-desktop")
     parser.add_argument("--host-source", type=Path,
-                        default=REPO / "build-support/xorg-server/wine-host-v-abi.c")
+                        default=REPO / "build-support/xorg-server/winehost/core.v")
     parser.add_argument("--steamclient", type=Path,
                         default=REPO / "build-aarch64-steam/preseed-home/.local/share/Steam/steamrt64")
     parser.add_argument("--gldriverquery", type=Path,

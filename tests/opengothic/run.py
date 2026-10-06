@@ -96,7 +96,7 @@ def prepare(args, work: Path) -> Path:
     subprocess.run(["python3", str(ROOT / "build-support/xorg-server/compile-v-host.py"),
                     "winehost", str(host_core), "--arch", "arm64"], check=True)
     subprocess.run(["aarch64-linux-musl-gcc", "-O2", "-w", "-D__vinix__", f"-I{sysroot}/usr/include",
-                    str(ROOT / "build-support/xorg-server/wine-host-v-abi.c"), str(host_core),
+                    str(host_core),
                     f"-I{ROOT}/build-support/xorg-server",
                     f"-L{sysroot}/usr/lib", f"-L{sysroot}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",

@@ -18,7 +18,7 @@ state = args.state_dir.resolve()
 state.mkdir(parents=True, exist_ok=False)
 core = state / "core.c"
 subprocess.run(["python3", str(ROOT / "build-support/xorg-server/compile-v-host.py"),
-                "winehost", str(core), "--arch", "arm64" if args.arch == "aarch64" else "amd64"], check=True)
+                "winehost", str(core), "--arch", "arm64" if args.arch == "aarch64" else "amd64", "--no-main"], check=True)
 headers = ROOT / "build-aarch64-x11/sysroot/usr/include/X11"
 (state / "X11").symlink_to(headers, target_is_directory=True)
 include = ROOT / "build-support/xorg-server"
@@ -33,7 +33,7 @@ if args.arch == "aarch64":
     sysroot = environment.get("VINIX_AARCH64_SYSROOT", str(ROOT / "build-aarch64-userland/sysroot"))
     flags += ["--target=aarch64-linux-musl", "--sysroot=" + sysroot]
 objects = []
-for source in (core, include / "wine-host-v-abi.c"):
+for source in (core,):
     obj = state / (source.stem + ".o")
     subprocess.run([compiler, *flags, "-c", str(source), "-o", str(obj)], check=True)
     objects.append(str(obj))

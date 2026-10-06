@@ -21,13 +21,11 @@ with tempfile.TemporaryDirectory(prefix='vinix-xinput-test-') as directory:
     work=Path(directory)
     generated=work/'core.c'; obj=work/'core.o'
     subprocess.run(['python3',str(ROOT/'build-support/xorg-server/compile-v-host.py'),'xinputcore',str(generated)],check=True)
-    subprocess.run([*flags,'-c',str(generated),'-o',str(obj)],check=True)
+    subprocess.run([*flags,'-Dmain=xinput_bridge_main','-c',str(generated),'-o',str(obj)],check=True)
     symbols=subprocess.check_output(['nm','-u',str(obj)],text=True)
     assert not re.search(r'\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b',symbols),symbols
-    shim=work/'shim.o'
-    subprocess.run([*flags,'-Dmain=xinput_bridge_main','-c',str(ROOT/'build-support/xorg-server/vinix-xinput.c'),'-o',str(shim)],check=True)
     program=work/'test'
-    subprocess.run([*flags,str(obj),str(shim),str(ROOT/'tests/x11-input/fixture.c'),'-o',str(program)],check=True)
+    subprocess.run([*flags,str(obj),str(ROOT/'tests/x11-input/fixture.c'),'-o',str(program)],check=True)
     expected=json.loads((ROOT/'tests/x11-input/traces.json').read_text()) if not args.baseline else {}
     if args.baseline:
         old=work/'original.o'; baseline=work/'baseline'

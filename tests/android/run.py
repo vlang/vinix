@@ -274,7 +274,7 @@ def prepare(args: argparse.Namespace) -> Path | None:
     subprocess.run(["python3", str(ROOT / "build-support/xorg-server/compile-v-host.py"),
                     "winehost", str(host_core), "--arch", "arm64"], check=True)
     subprocess.run([compiler, "-O2", "-w", "-D__vinix__", f"-I{x11}/usr/include",
-                    str(ROOT / "build-support/xorg-server/wine-host-v-abi.c"), str(host_core),
+                    str(host_core),
                     f"-I{ROOT}/build-support/xorg-server",
                     f"-L{x11}/usr/lib", f"-L{x11}/lib", "-Wl,--allow-shlib-undefined",
                     "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",

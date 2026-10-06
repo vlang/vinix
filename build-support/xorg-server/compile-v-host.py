@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 MODULES = {"winehost": "winehost", "xinputcore": "xinputcore"}
-def generate(tool, output, arch="amd64"):
+def generate(tool, output, arch="amd64", no_main=False):
     module = MODULES[tool]
     v = subprocess.check_output(["sh", "-c", '. "$1/build-support/find-v.sh"; printf "%s" "$V"', "find-v", str(ROOT)], text=True)
     with tempfile.TemporaryDirectory(prefix="vinix-x11-v-") as directory:
@@ -17,14 +17,16 @@ def generate(tool, output, arch="amd64"):
         shutil.copytree(ROOT / "build-support/xorg-server" / module, work / module)
         (work / "v.mod").write_text("Module { name: 'x11_bridge' }\n")
         (work / "entry.v").write_text(f"module main\nimport {module} as _\n")
-        subprocess.run([v, "-shared", "-no-builtin", "-no-closures", "-os", "vinix", "-arch", arch,
+        definitions = ["-d", "wine_host_no_main"] if no_main else []
+        subprocess.run([v, "-shared", "-no-builtin", "-no-closures", "-os", "vinix", "-arch", arch, *definitions,
                         "-target-libc-headers", "-gc", "none", "-manualfree", "-o", str(output), str(work)],
                        check=True, env={**os.environ, "V_C_ERROR_BUG_REPORT_DISABLED": "1"})
-        output.write_text('#pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-label"\n#pragma GCC diagnostic ignored "-Wunused-parameter"\n' + output.read_text())
+        output.write_text('#define VINIX_XINPUT_V_RUNTIME 1\n#pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-label"\n#pragma GCC diagnostic ignored "-Wunused-parameter"\n' + output.read_text())
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tool", choices=MODULES)
     parser.add_argument("output", type=Path)
     parser.add_argument("--arch", choices=("amd64", "arm64"), default="amd64")
+    parser.add_argument("--no-main", action="store_true", help="Generate the Wine bridge as a fixture library")
     args = parser.parse_args()
-    generate(args.tool, args.output, args.arch)
+    generate(args.tool, args.output, args.arch, args.no_main)

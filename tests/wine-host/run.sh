@@ -16,7 +16,7 @@ fi
 [ -n "$headers" ] || { echo 'Wine host: X11/XTest/Xdamage headers required' >&2; exit 1; }
 mkdir "$work/include"
 ln -s "$headers/X11" "$work/include/X11"
-python3 "$root/build-support/xorg-server/compile-v-host.py" winehost "$work/core.c"
+python3 "$root/build-support/xorg-server/compile-v-host.py" winehost "$work/core.c" --no-main
 link_flags='-Wl,--gc-sections'
 if [ "$(uname -s)" = Darwin ]; then
     link_flags='-Wl,-undefined,dynamic_lookup'
@@ -26,7 +26,7 @@ ${CC:-clang} -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function \
     -fno-omit-frame-pointer -ffunction-sections -fdata-sections \
     -I"$work/include" -I"$root/build-support/xorg-server" \
     -DVINIX_WINE_HOST_NO_MAIN "$work/core.c" \
-    "$root/build-support/xorg-server/wine-host-v-abi.c" "$root/tests/wine-host/test.c" \
+    "$root/tests/wine-host/test.c" \
     $link_flags -o "$work/test"
 if nm -u "$work/test" | rg '(^| )_?(memdup|new_array|v_malloc|v_realloc|builtin__malloc|array__push)$'; then
     echo 'Wine host: implicit V allocator import' >&2; exit 1

@@ -22,6 +22,9 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+typedef struct sigaction vwh_sigaction;
+_Static_assert(sizeof(sig_atomic_t) == sizeof(int32_t) && __atomic_always_lock_free(4, 0),
+               "Original signal-safe and shared-damage 32-bit storage");
 int vwh_running(void);
 void vwh_set_running(int);
 int vwh_errno(void);
@@ -29,4 +32,6 @@ void vwh_install_signals(void);
 void vwh_install_x_error(void);
 void vwh_damage_store(void *, uint32_t);
 int vinix_wine_host_main(int, char **);
+void vinix_wine_host_stop(int);
+int vinix_wine_host_x_error(Display *, XErrorEvent *);
 #endif

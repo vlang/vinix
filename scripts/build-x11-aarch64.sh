@@ -526,7 +526,7 @@ $CC -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parame
     -I"$SCRIPT_DIR/build-support/xorg-server" -I"$SYSROOT/usr/include" \
     -c "$BUILD_DIR/vinix-xinput-core.c" -o "$BUILD_DIR/vinix-xinput-core.o"
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
-    "$SCRIPT_DIR/build-support/xorg-server/vinix-xinput.c" "$BUILD_DIR/vinix-xinput-core.o" \
+    "$BUILD_DIR/vinix-xinput-core.o" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
     -lXtst -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-xinput"
@@ -539,7 +539,7 @@ python3 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py" winehost \
     "$BUILD_DIR/vinix-wine-host-core.c" --arch arm64
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
     -I"$SCRIPT_DIR/build-support/xorg-server" \
-    "$SCRIPT_DIR/build-support/xorg-server/wine-host-v-abi.c" "$BUILD_DIR/vinix-wine-host-core.c" \
+    "$BUILD_DIR/vinix-wine-host-core.c" \
     -fuse-ld=lld -L"$SYSROOT/usr/lib" -L"$SYSROOT/lib" \
     -Wl,-rpath-link,"$SYSROOT/usr/lib" -Wl,-rpath-link,"$SYSROOT/lib" \
     -lXtst -lXdamage -lX11 -lXext -lxcb -o "$STAGING/usr/bin/vinix-wine-host"
