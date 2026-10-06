@@ -35,9 +35,10 @@ enum DesktopLanguage {
 	es
 	fr
 	ja
+	zh
 }
 
-const desktop_languages = [DesktopLanguage.en, .ru, .es, .fr, .ja]
+const desktop_languages = [DesktopLanguage.en, .ru, .es, .fr, .ja, .zh]
 
 // code names the language in the preferences file and its translation file.
 fn (l DesktopLanguage) code() string {
@@ -47,6 +48,7 @@ fn (l DesktopLanguage) code() string {
 		.es { 'es' }
 		.fr { 'fr' }
 		.ja { 'ja' }
+		.zh { 'zh' }
 	}
 }
 
@@ -60,6 +62,7 @@ fn (l DesktopLanguage) native_name() string {
 		.es { 'Español' }
 		.fr { 'Français' }
 		.ja { '日本語' }
+		.zh { '中文（简体）' }
 	}
 }
 

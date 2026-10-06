@@ -38,8 +38,10 @@ subsetting and instantiating regular/bold faces. To regenerate offline, pass
 file. Font timestamps are preserved to make subset regeneration reproducible.
 The generated subsets and `desktop/font_data.v` must be committed together.
 
-The generator uses Japanese fallback only when Roboto lacks a catalog glyph,
-preserving existing Latin and Cyrillic masks and metrics. It aligns the
+Chinese catalog CJK characters use the Simplified Chinese source documented
+in [FONT-SOURCES.md](../FONT-SOURCES.md). Other Japanese characters use the
+bundled fallback only when Roboto lacks the glyph, preserving existing Latin
+and Cyrillic masks and metrics. The generator aligns the
 fallback to Roboto's baseline and preserves the desktop's line heights and
 logical advances at both 1x and 2x. Japanese glyphs in the monospaced face
 advance by two existing terminal cells. Missing Japanese glyphs or a glyph

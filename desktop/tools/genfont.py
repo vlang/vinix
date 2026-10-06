@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterise the desktop's Roboto faces and Japanese fallback into V source.
+"""Rasterise Roboto with Chinese and Japanese fallback into V source.
 
 Vinix has no font files and no rasteriser, so the glyphs travel with the
 binary: every face is baked here into an 8-bit coverage atlas and emitted as
@@ -11,8 +11,9 @@ what a text style asks for rather than scaling, because a stretched bitmap
 atlas looks worse than one a couple of pixels off.
 
 Every face carries printable ASCII, the supported supplemental code points in
-EXTRA_RUNES, and the characters used by the Japanese translation. Noto Sans JP
-supplies Japanese glyphs without replacing any existing Roboto glyphs.
+EXTRA_RUNES, and the characters used by every translation. Noto Sans CJK SC
+supplies Chinese catalog glyphs; bundled Noto Sans JP subsets supply
+Japanese-only glyphs.
 
 Run from the repository root after changing a size, a face or the rune list:
 
@@ -22,10 +23,11 @@ After adding Japanese characters, rebuild the bundled font subsets as well:
 
     python3 desktop/tools/genfont.py --update-japanese-subsets
 
-The subset update needs fontTools and downloads a pinned, hash-checked upstream
-font; normal atlas generation uses only Pillow and the bundled subsets. See
-desktop/fonts/README.md for source provenance and reproducible dependencies.
-Roboto and Noto Sans JP are licensed under the SIL Open Font License 1.1; the
+The Japanese subset update needs fontTools and a pinned, hash-checked source.
+Normal atlas generation uses Pillow, bundled Japanese subsets, and cached
+Chinese sources; the first run downloads and verifies the Chinese sources.
+See desktop/fonts/README.md and desktop/FONT-SOURCES.md for provenance.
+Roboto, Noto Sans JP, and Noto Sans CJK SC use SIL Open Font License 1.1; the
 atlases carry that license too (see desktop/FONT-LICENSE.txt).
 """
 
@@ -122,7 +124,70 @@ JAPANESE_FONT_URL = (
 )
 JAPANESE_FONT_SHA256 = "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f"
 
+NATIVE_LABELS = "中文（简体）日本語"
+CJK_REVISION = "523d033d6cb47f4a80c58a35753646f5c3608a78"
+CJK_URL = ("https://raw.githubusercontent.com/notofonts/noto-cjk/"
+           + CJK_REVISION + "/Sans/OTF/SimplifiedChinese/")
+CJK_SOURCES = {
+    "NotoSansCJKsc-Regular.otf": "2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b",
+    "NotoSansCJKsc-Bold.otf": "b5f0d1a190a7f9b43c310a8850630af12553df32c4c050543f9059732d9b4c0a",
+}
 
+
+def catalog_runes(paths):
+    characters = set()
+    for path in paths:
+        for block in path.read_text(encoding="utf-8").split("-----"):
+            lines = block.strip().splitlines()
+            if len(lines) >= 2:
+                characters.update("\n".join(lines[1:]))
+    return {ord(ch) for ch in characters if not ch.isspace() and ord(ch) > LAST_CHAR}
+
+
+def translation_runes():
+    return catalog_runes(sorted((DESKTOP_DIR / "translations").glob("*.tr"))) | {
+        ord(ch) for ch in NATIVE_LABELS}
+
+
+@functools.lru_cache(maxsize=None)
+def chinese_runes():
+    return catalog_runes([DESKTOP_DIR / "translations/zh.tr"]) | {
+        ord(ch) for ch in "中文（简体）"}
+
+
+def is_cjk(code_point):
+    return (0x3000 <= code_point <= 0x303F
+            or 0x3400 <= code_point <= 0x9FFF
+            or 0xFF00 <= code_point <= 0xFFEF)
+
+
+def is_chinese_glyph(code_point):
+    return is_cjk(code_point) and code_point in chinese_runes()
+
+
+@functools.lru_cache(maxsize=None)
+def cjk_font_path(file_name):
+    cache = Path(os.environ.get("VINIX_FONT_CACHE", Path.home() / ".cache/vinix/fonts"))
+    path = cache / "noto-cjk-2.004" / file_name
+    if not path.exists():
+        print("Downloading %s..." % file_name)
+        with urllib.request.urlopen(CJK_URL + file_name, timeout=60) as response:
+            data = response.read()
+        if hashlib.sha256(data).hexdigest() != CJK_SOURCES[file_name]:
+            sys.exit("download checksum mismatch: %s" % file_name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    if hashlib.sha256(path.read_bytes()).hexdigest() != CJK_SOURCES[file_name]:
+        sys.exit("cached font checksum mismatch: %s" % path)
+    return str(path)
+
+
+@functools.lru_cache(maxsize=None)
+def missing_glyph(font):
+    return rasterise(font, NOTDEF_PROBE)
+
+
+@functools.lru_cache(maxsize=None)
 def japanese_runes():
     """The catalog and its native language name define the Japanese subset."""
     if not JAPANESE_CATALOG.exists():
@@ -218,27 +283,29 @@ def rasterise(font, code_point):
 @functools.lru_cache(maxsize=None)
 def has_glyph(font, code_point):
     candidate = rasterise(font, code_point)
-    notdef = rasterise(font, NOTDEF_PROBE)
-    return (candidate != notdef and (candidate[0] != 0 or candidate[1] != 0))
+    return candidate != missing_glyph(font) and (candidate[0] != 0 or candidate[1] != 0)
 
 
-def glyph_font(file_name, size, bold, code_point, japanese):
+def glyph_font(file_name, size, bold, code_point, japanese=None):
+    # One atlas slot is shared across locales. Prefer Simplified Chinese shapes
+    # for the Chinese catalog, while retaining JP shapes for Japanese-only text.
+    if is_chinese_glyph(code_point):
+        source = "NotoSansCJKsc-Bold.otf" if bold else "NotoSansCJKsc-Regular.otf"
+        return open_font(cjk_font_path(source), size)
     font = open_font(file_name, size)
+    if japanese is None:
+        japanese = japanese_runes()
     if code_point in japanese and not has_glyph(font, code_point):
         return open_japanese_font(bold, size)
     return font
 
 
-def supported_extras(faces, japanese):
-    """Runes every face has a real glyph for.
-
-    A rune is kept only if no face falls back to .notdef for it, so the same
-    slot means the same character in all of them and the runtime needs one
-    shared index.
-    """
+def supported_extras(faces, japanese, required=None):
+    """Keep only real glyphs in every face and scale; require catalog coverage."""
+    if required is None:
+        required = translation_runes()
     kept = []
-    # Ascending, because the renderer binary-searches the list.
-    for code_point in sorted(set(EXTRA_RUNES) | japanese):
+    for code_point in sorted(set(EXTRA_RUNES) | required | japanese):
         ok = True
         for _, file_name, size, bold in faces:
             for raster_scale in RASTER_SCALES:
@@ -246,10 +313,12 @@ def supported_extras(faces, japanese):
                 if not has_glyph(font, code_point):
                     ok = False
                     break
+            if not ok:
+                break
         if ok:
             kept.append(code_point)
-        elif code_point in japanese:
-            sys.exit("Japanese character U+%04X is missing; run with --update-japanese-subsets" % code_point)
+        elif code_point in required or code_point in japanese:
+            sys.exit("translation needs missing glyph U+%04X (%s)" % (code_point, chr(code_point)))
         else:
             print("  dropped U+%04X (not in every face)" % code_point)
     return kept
@@ -276,11 +345,16 @@ def build_face(file_name, size, bold, raster_scale, extras, japanese):
             # own ascender would otherwise put Japanese text below the run.
             by += font.getmetrics()[0] - raster_font.getmetrics()[0]
             if "Mono" in file_name:
-                # Japanese characters take two terminal cells, centered in
+                # CJK fallback characters take two terminal cells, centered in
                 # that space; ASCII and the other existing glyphs stay fixed.
                 advance = 2 * int(round(logical_font.getlength("M"))) * raster_scale
                 bx += (advance - logical_advance * raster_scale) // 2
-            if by < 0 or by + height > (ascent + descent) * raster_scale:
+            line_height = (ascent + descent) * raster_scale
+            if is_chinese_glyph(code_point):
+                if height > line_height:
+                    sys.exit("Chinese glyph U+%04X exceeds the %dpx line box" % (code_point, size))
+                by = max(0, min(by, line_height - height))
+            elif by < 0 or by + height > line_height:
                 sys.exit("Japanese glyph U+%04X exceeds the %dpx line box" % (code_point, size))
         if bx < -128 or bx > 127:
             sys.exit("left bearing out of range for U+%04X" % code_point)
@@ -323,9 +397,9 @@ def main():
     out.append("")
     out.append("// Generated by desktop/tools/genfont.py. Do not edit by hand.")
     out.append("//")
-    out.append("// Coverage atlases for Roboto with Noto Sans JP Japanese fallback, so the")
-    out.append("// binary needs no font file on a system that has none. Both fonts and these")
-    out.append("// derivatives use the SIL Open Font License 1.1; see desktop/FONT-LICENSE.txt.")
+    out.append("// Coverage atlases for Roboto with Noto Sans JP and CJK SC fallback; the")
+    out.append("// binary needs no font files. Glyph data uses the SIL Open Font License")
+    out.append("// 1.1; see desktop/FONT-LICENSE.txt and desktop/FONT-SOURCES.md.")
     out.append("module main")
     out.append("")
     out.append("// FaceBlob is one rasterised face. `bold`, logical `size` and `raster_scale`")

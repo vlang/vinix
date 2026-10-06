@@ -91,10 +91,13 @@ fn test_translations_keep_placeholders_and_plural_forms() {
 				forms := text.split('|')
 				want := match language {
 					.ru { 3 }
-					.ja { 1 }
+					.ja, .zh { 1 }
 					.en, .es, .fr { 2 }
 				}
 				assert forms.len == want, '${language.code()} ${key} needs ${want} plural forms'
+				for form in forms {
+					assert i18n_placeholders(form) == i18n_placeholders(english), '${language.code()} ${key} changes a plural form\'s placeholders'
+				}
 			} else {
 				assert !text.contains('|'), '${language.code()} ${key} is a plural only in translation'
 			}
@@ -171,7 +174,9 @@ fn i18n_shows_words(literal string) bool {
 		}
 		r, size := next_rune(literal, at)
 		if (r >= `a` && r <= `z`) || (r >= `A` && r <= `Z`)
-			|| (r >= 0xc0 && r <= 0x24f && r != 0xd7 && r != 0xf7) || (r >= 0x400 && r <= 0x4ff) {
+			|| (r >= 0xc0 && r <= 0x24f && r != 0xd7 && r != 0xf7) || (r >= 0x400 && r <= 0x4ff)
+			|| (r >= 0x3040 && r <= 0x30ff)
+			|| (r >= 0x3400 && r <= 0x9fff) {
 			return true
 		}
 		at += size
