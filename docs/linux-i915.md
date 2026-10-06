@@ -459,8 +459,8 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `CPUID` fallback avoids speculative width or count selection after permission
   checks; it adds a serialization cost per chunk. Native vendor/feature-based
   `LFENCE` selection and broader kernel speculation mitigation remain pending.
-  Dynamic hardened usercopy checks, x86 LAM, unsafe-scope and noncached APIs
-  remain unresolved.
+  Dynamic hardened usercopy checks, x86 LAM and noncached APIs remain
+  unresolved.
 - Ordinary `get_user` and `__get_user` read 1/2/4/8-byte scalars, evaluate their
   source and output once, preserve source signedness on assignment and clear
   the complete output on `-EFAULT`. Single-page reads use a width-specific,
@@ -489,6 +489,14 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `__copy_{from,to}_user_inatomic` always uses resident-only page chunks,
   returns the exact uncopied suffix and leaves that suffix untouched, including
   at task depth zero. NMI use remains unsupported.
+- `user_access_begin` and its read/write aliases use the generic numerical
+  `access_ok` check; end operations supply a compiler barrier. `unsafe_put_user`
+  preserves the existing checked scalar conversion/evaluation rules and
+  branches to the caller's cleanup label on failure. Earlier successful writes
+  remain committed. Scopes open no direct user-virtual access window, retain no
+  mapping and change no IRQ, preemption or task-fault state. Scalar access
+  inherits the native ordinary/resident-only context contract. Unsafe reads
+  and unsafe bulk-copy helpers remain unresolved.
 - `strchr`, `strpbrk`, `strsep`, `skip_spaces`, `strim` and the original
   `strstrip` alias consume borrowed strings synchronously. Search results and
   tokens point into the caller's storage; splitting preserves empty tokens and
@@ -564,6 +572,8 @@ incomplete.
 
 ```sh
 tests/linuxkpi/run.sh
+python3 tests/linuxkpi/user_access_scope_test.py
+python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
 python3 tests/linuxkpi/pagefault_test.py
 python3 tests/linuxkpi/uaccess_test.py
@@ -1217,6 +1227,20 @@ consumer and verify regeneration after flag/config changes, followed by no
 rebuild on an unchanged invocation. GNU Make 3.81 tests separate prerequisite
 timestamps by whole seconds. Evidence is in
 `/tmp/vinix-linuxkpi-bounds-oct06-independent-final/independent-review.json`.
+
+User-access scope tests exercise the actual production V range/store
+frontends and compiler macros against independent callbacks: 449,253 strict
+ASan/UBSan assertions per GNU99/GNU11, including the unchanged relocation
+record, single evaluation, signed/narrow values, prefix failures and cleanup
+branches. Independent x86/ARM O0/O1/O2 checks verify compiler barriers and
+control flow without hardware fences, STAC/CLAC or added runtime imports.
+These compiler checks do not validate native mapping or hardware access.
+Evidence: `/tmp/vinix-linuxkpi-user-access-scope-oct06-independent/` and
+`/tmp/vinix-linuxkpi-user-access-scope-oct06-integrated-host/result.json`.
+Typed static-key extern declarations match the original two wrapper types;
+separate actual definitions/consumer objects and existing boolean branches
+pass strict compilation, linking and sanitizer checks. No CPU-frequency key
+definition or text-patching runtime is fabricated.
 
 Page-type checks compile complete original records and entry representations
 under strict GNU99/GNU11, with both kernel-first and UAPI-first include orders

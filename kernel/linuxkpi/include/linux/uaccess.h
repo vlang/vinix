@@ -77,8 +77,8 @@ int __must_check vinix_linuxkpi_get_user(const void __user *source,
 	__vinix_get_error; \
 })
 
-/* The checked native backend is also safe for callers that already performed
- * access_ok. Both interfaces retain ordinary faulting task-context semantics. */
+/* The checked native backend is also safe after access_ok. The current task's
+ * fault policy selects ordinary page resolution or resident-only access. */
 #define __get_user(x, ptr) get_user((x), (ptr))
 
 /* Ordinary faulting scalar stores. Values are passed by value. Failure may
@@ -98,9 +98,11 @@ int __must_check vinix_linuxkpi_put_user(void __user *destination,
 		sizeof(*__vinix_put_pointer), (uint64_t)__vinix_put_value); \
 })
 
-/* The native checked path is also safe after the caller's access_ok check.
- * Both interfaces retain ordinary faulting process-context semantics. */
+/* The native checked path is also safe after access_ok and honors task-local
+ * disabled fault resolution without opening a raw virtual-access window. */
 #define __put_user(x, ptr) put_user((x), (ptr))
 
-/* Unsafe-scope and noncached copies still need their own native contracts. */
+#include <vinix/user_access_scope.h>
+
+/* Unsafe reads/copies and noncached copies need their own native contracts. */
 #endif
