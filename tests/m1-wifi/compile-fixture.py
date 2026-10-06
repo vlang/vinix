@@ -11,7 +11,7 @@ ROOT=Path(__file__).resolve().parents[2]
 HERE=Path(__file__).resolve().parent
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('output',type=Path)
-p.add_argument('--kind',choices=('protocol',),default='protocol')
+p.add_argument('--kind',choices=('protocol','platform'),default='protocol')
 p.add_argument('--arch',choices=('arm64','amd64'),default='arm64' if platform.machine() in ('arm64','aarch64') else 'amd64')
 p.add_argument('--entry',action='store_true')
 p.add_argument('--guest',action='store_true')

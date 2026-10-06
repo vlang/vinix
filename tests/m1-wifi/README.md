@@ -65,6 +65,10 @@ The independent protocol machine and its 98 assertions now live in
 `09e70d945ca7d63ebc4969213994afab9e7e1dbe` on ARM and x86 hosts. Both
 native model guests require every original group marker. These results
 cover injected firmware/ring behavior; physical Wi-Fi remains unverified.
+The platform fixture and all 29 assertions now live in `platformfixture/`.
+`run-platform.py` compares the eight original simulated MMIO policy groups
+against the same immutable revision; ARM and x86 native guests exercise every
+group using the unchanged production cores and injected platform hooks.
 
 Build fixes include typed user-copy addresses in the V adapter, removal of
 unavailable `strlen` dependencies, host tests using `-iquote` rather than
