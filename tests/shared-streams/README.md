@@ -10,3 +10,8 @@ short reads, and ESPIPE for positioned stream I/O.
 Run `python3 tests/shared-streams/run.py` for ARM or add `--arch=amd64`.
 The runner accepts the same isolated-kernel and cached-runner environment
 variables as `tests/stack-policy/run.py`.
+
+The independent workload lives in `streamfixture/core.v`; its narrow ABI header
+imports the actual native libc and Linux terminal layouts. The runner generates
+and compiles V for the selected architecture. Original reader/writer counts,
+transfer sizes, shared-offset checks and the 300-second deadline are retained.
