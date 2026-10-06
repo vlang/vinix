@@ -115,33 +115,58 @@ fn (mut a TerminalApp) handle_search(action string) bool {
 }
 
 fn (a &TerminalApp) build_search_toolbar(mut children []ui2.Element, width int) {
-	children << ui2.button(terminal_action_find, tr('terminal.find'), ui2.rect(8, 3, 60, 24),
-		ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
-	children << ui2.Element{
-		...ui2.button(terminal_action_copy, tr('terminal.selection.copy'), ui2.rect(76, 3, 60, 24),
+	left := if width > 16 { 8 } else { 0 }
+	available := if width > 16 { width - 16 } else if width > 0 { width } else { 1 }
+	gap := if available >= 48 { 8 } else if available >= 24 { 4 } else { 0 }
+	group_width := if a.search_open && available >= 32 { available / 2 - gap } else { available }
+	unit := if group_width >= 3 + 2 * gap { (group_width - 2 * gap) / 3 } else { 1 }
+	find_width := if unit < 60 { unit } else { 60 }
+	copy_width := find_width
+	mode_left := left + find_width + copy_width + 2 * gap
+	mode_width := terminal_clamp(group_width - find_width - copy_width - 2 * gap, 1, 64)
+	if available >= 3 {
+		children << ui2.button(terminal_action_find, tr('terminal.find'), ui2.rect(f64(left), 3, f64(find_width), 24),
 			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
-		enabled: a.has_selection()
-		tooltip: tr('terminal.selection.hint')
+		children << ui2.Element{
+			...ui2.button(terminal_action_copy, tr('terminal.selection.copy'), ui2.rect(f64(left + find_width + gap), 3, f64(copy_width), 24),
+				ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
+			enabled: a.has_selection()
+			tooltip: tr(a.selection_hint_key())
+		}
 	}
-	if !a.search_open {
-		children << ui2.button(terminal_action_clear_history, tr('terminal.history.clear'), ui2.rect(144, 3, 148, 24),
+	children << ui2.Element{
+		...ui2.button(terminal_action_selection_mode, tr(if a.selection_block { 'terminal.selection.block' } else { 'terminal.selection.text' }),
+			ui2.rect(f64(if available >= 3 { mode_left } else { left }), 3, f64(if available >= 3 { mode_width } else { available }), 24),
 			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
+		checked: a.selection_block
+		tooltip: tr('terminal.selection.mode.help')
+	}
+	right := left + available
+	next_left := mode_left + mode_width + gap
+	if !a.search_open {
+		if right - next_left >= 32 {
+			children << ui2.button(terminal_action_clear_history, tr('terminal.history.clear'), ui2.rect(f64(next_left), 3, f64(terminal_clamp(right - next_left, 1, 148)), 24),
+				ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 11, align: .center })
+		}
 		return
 	}
-	field_width := if width > 232 { width - 232 } else { 1 }
+	remaining := right - next_left
+	if remaining < 3 { return }
+	navigation_width := terminal_clamp((remaining - 2 * gap) / 4, 1, 32)
+	field_width := remaining - 2 * navigation_width - 2 * gap
 	children << ui2.Element{
 		...ui2.text_field('term.find.field', tr('terminal.find.placeholder'), editor_bytes_text(a.search_query),
-			ui2.rect(144, 3, f64(field_width), 24), ui2.BoxStyle{ bg: terminal_button, radius: 4 },
+			ui2.rect(f64(next_left), 3, f64(field_width), 24), ui2.BoxStyle{ bg: terminal_button, radius: 4 },
 			ui2.TextStyle{ color: terminal_text, size: 11 }, 0)
 		focused: true
 	}
 	children << ui2.Element{
-		...ui2.button(terminal_action_find_previous, '<', ui2.rect(f64(width - 80), 3, 32, 24),
+		...ui2.button(terminal_action_find_previous, '<', ui2.rect(f64(next_left + field_width + gap), 3, f64(navigation_width), 24),
 			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 12, align: .center })
 		tooltip: tr('terminal.find.previous')
 	}
 	children << ui2.Element{
-		...ui2.button(terminal_action_find_next, '>', ui2.rect(f64(width - 42), 3, 32, 24),
+		...ui2.button(terminal_action_find_next, '>', ui2.rect(f64(right - navigation_width), 3, f64(navigation_width), 24),
 			ui2.BoxStyle{ bg: terminal_button, radius: 4 }, ui2.TextStyle{ color: terminal_text, size: 12, align: .center })
 		tooltip: if a.search_query.len > 0 && a.search_match < 0 { tr('terminal.find.no_match') } else { tr('terminal.find.next') }
 	}

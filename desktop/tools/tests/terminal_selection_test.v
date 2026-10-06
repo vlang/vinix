@@ -438,3 +438,239 @@ fn test_terminal_selection_words_and_lines_stop_at_physical_autowrap_rows() {
 	terminal_selection_click_at(mut app, 18, 58, 2100, 64, 118)
 	terminal_selection_expect(unsafe { &app }, 'ghi')
 }
+
+fn test_terminal_block_selection_normalizes_rows_and_columns_independently_and_pads_short_rows() {
+	mut app := TerminalApp{}
+	defer { app.close_app() }
+	terminal_selection_fixture(mut app, 'aй😀 d\r\nxy\r\n', 3, 12)
+	app.handle(terminal_action_selection_mode)!
+	assert app.selection_block
+	for coordinates in [[16, 42, 48, 74]!, [48, 74, 16, 42]!, [48, 42, 16, 74]!, [16, 74, 48, 42]!]! {
+		terminal_selection_drag(mut app, coordinates[0], coordinates[1], coordinates[2], coordinates[3], 112, 118)
+		assert app.has_selection() && !app.selection_dragging
+		first, last := app.selection_bounds()
+		assert first.row == 0 && first.column == 1 && last.row == 2 && last.column == 5
+		terminal_selection_expect(unsafe { &app }, 'й😀 d\ny   \n    ')
+	}
+}
+
+fn test_terminal_block_selection_uses_viewport_edges_instead_of_short_rows_and_zero_width_is_empty() {
+	mut app := TerminalApp{}
+	defer { app.close_app() }
+	terminal_selection_fixture(mut app, 'a\r\n\r\nb', 3, 12)
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 80, 42, 1000, 74, 112, 118)
+	first, last := app.selection_bounds()
+	assert first.column == 9 && last.column == 12
+	terminal_selection_expect(unsafe { &app }, '   \n   \n   ')
+	terminal_selection_drag(mut app, -100, 42, 24, 74, 112, 118)
+	terminal_selection_expect(unsafe { &app }, 'a \n  \nb ')
+	terminal_selection_drag(mut app, 40, 42, 40, 74, 112, 118)
+	assert !app.has_selection()
+	assert app.selected_bytes().len == 0
+	app.copy_selection()
+	assert app.take_clipboard_copy_request().len == 0
+}
+
+fn test_terminal_block_selection_disables_multiclick_expansion_and_text_toggle_restores_it() {
+	mut app := TerminalApp{}
+	defer { app.close_app() }
+	terminal_selection_fixture(mut app, 'alpha beta_gamma end', 2, 24)
+	app.toggle_selection_mode()
+	for count in 0 .. 3 {
+		terminal_selection_click_at(mut app, 74, 42, u64(1000 + 100 * count), 208, 102)
+		assert app.selection_click.count == 0 && app.selection_unit == .character
+		assert !app.has_selection()
+	}
+	terminal_selection_drag(mut app, 72, 42, 88, 42, 208, 102)
+	terminal_selection_expect(unsafe { &app }, 'ta')
+	app.toggle_selection_mode()
+	assert !app.selection_block && !app.has_selection() && app.selection_click.count == 0
+	terminal_selection_click_at(mut app, 74, 42, 2000, 208, 102)
+	terminal_selection_click_at(mut app, 74, 42, 2100, 208, 102)
+	assert app.selection_unit == .word
+	terminal_selection_expect(unsafe { &app }, 'beta_gamma')
+}
+
+fn test_terminal_block_selection_copies_utf8_history_blank_rows_live_screen_and_alternate() {
+	mut app := TerminalApp{}
+	defer { app.close_app() }
+	terminal_selection_fixture(mut app, 'old й😀 x\r\n\r\nthird é\r\nlast', 2, 12)
+	app.toggle_selection_mode()
+	app.scroll = app.lines.len
+	terminal_selection_drag(mut app, 40, 42, 72, 58, 112, 102)
+	terminal_selection_expect(unsafe { &app }, 'й😀 x\n    ')
+	app.pointer_event(.down, .left, 0, 40, 42, 112, 102)
+	app.pointer_event(.move, .no_button, 0, 72, 79, 112, 102)
+	app.pointer_event(.move, .no_button, 0, 72, 79, 112, 102)
+	app.pointer_event(.up, .left, 0, 72, 79, 112, 102)
+	assert app.scroll == 0
+	terminal_selection_expect(unsafe { &app }, 'й😀 x\n    \nd é \n    ')
+	app.enter_alternate_screen()
+	assert app.selection_block && !app.has_selection()
+	terminal_selection_output(mut app, 'aé\r\nz')
+	terminal_selection_drag(mut app, 16, 42, 32, 58, 112, 102)
+	terminal_selection_expect(unsafe { &app }, 'é \n  ')
+	app.leave_alternate_screen()
+	assert app.selection_block && !app.has_selection()
+}
+
+fn test_terminal_block_selection_clips_long_history_to_viewport_and_keeps_combining_cells() {
+	mut app := TerminalApp{exited: true}
+	defer { app.close_app() }
+	app.set_geometry(2, 4)
+	app.visible_rows = 2
+	app.lines << 'aé\u0301😀long'.clone()
+	app.scroll = 1
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 8, 42, 1000, 42, 48, 102)
+	terminal_selection_expect(unsafe { &app }, 'aé\u0301😀')
+	terminal_selection_drag(mut app, 24, 42, 40, 42, 48, 102)
+	terminal_selection_expect(unsafe { &app }, '\u0301😀')
+}
+
+fn test_terminal_block_selection_invalidation_preserves_mode_and_toggle_clears_copy_feedback() {
+	features := app_compositor_features
+	defer { app_compositor_features = features }
+	app_compositor_features |= app_feature_text_copy
+	mut app := TerminalApp{}
+	defer { app.close_app() }
+	terminal_selection_fixture(mut app, 'one\r\ntwo', 2, 12)
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_output(mut app, '\x07')
+	assert app.has_selection()
+	app.copy_selection()
+	request := app.take_clipboard_copy_request()
+	defer { unsafe { request.free() } }
+	ack := text_copy_reply(app.copy_client.sequence, true)
+	defer { unsafe { ack.free() } }
+	app.toggle_selection_mode()
+	assert !app.selection_block && !app.has_selection() && app.copy_client.status_key() == ''
+	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
+	assert app.copy_client.status_key() == ''
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	app.copy_selection() // This packet is still owned by the client.
+	app.toggle_selection_mode()
+	assert app.take_clipboard_copy_request().len == 0 && app.copy_client.status_key() == ''
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_output(mut app, '!')
+	assert app.selection_block && !app.has_selection()
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	app.set_geometry(3, 12)
+	assert app.selection_block && !app.has_selection()
+	app.visible_rows = 3
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 118)
+	app.clear_scrollback()
+	assert app.selection_block && !app.has_selection()
+	for _ in 0 .. terminal_scrollback + 2 { terminal_selection_output(mut app, 'history\r\n') }
+	app.scroll = app.lines.len
+	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 118)
+	terminal_selection_output(mut app, 'evict\r\n')
+	assert app.selection_block && !app.has_selection()
+}
+
+fn test_terminal_block_selection_highlights_full_rectangle_in_blank_cells_and_copy_is_enabled() {
+	mut app := TerminalApp{exited: true}
+	defer { app.close_app() }
+	size := ui2.rect(0, 0, 176, 116)
+	begin_frame_elements()
+	free_tree(app.build(size)!)
+	terminal_selection_output(mut app, 'aй😀\r\n\r\nb')
+	app.toggle_selection_mode()
+	terminal_selection_drag(mut app, 64, 42, 104, 74, 176, 116)
+	begin_frame_elements()
+	tree := app.build(size)!
+	defer { free_tree(tree) }
+	assert terminal_selection_tree_count(unsafe { &tree }, 'term.selection.highlight') == 3
+	mut highlights := 0
+	for child in tree.children {
+		if child.id == 'term.selection.highlight' {
+			assert child.frame.x == 64 && child.frame.width == 40 && child.frame.height == 16
+			highlights++
+		}
+		if child.id == terminal_action_copy { assert child.enabled }
+		if child.id == terminal_action_selection_mode { assert child.enabled && child.checked }
+	}
+	assert highlights == 3
+	terminal_selection_expect(unsafe { &app }, '     \n     \n     ')
+}
+
+fn test_terminal_block_toolbar_keeps_mode_copy_and_search_bounded_in_all_languages() {
+	language := desktop_language
+	defer { desktop_language = language }
+	mut app := TerminalApp{exited: true}
+	defer { app.close_app() }
+	for lang in desktop_languages {
+		desktop_language = lang
+		for width in [1, 16, 32, 48, 80, 112, 176, 220, 272, 560]! {
+			for search in [false, true]! {
+				for block in [false, true]! {
+					app.search_open = search
+					app.selection_block = block
+					begin_frame_elements()
+					tree := app.build(ui2.rect(0, 0, f64(width), 118))!
+					mut last_edge := f64(0)
+					mut mode_found := false
+					mut copy_found := false
+					for child in tree.children {
+						if child.frame.y != 3 { continue }
+						assert child.frame.x >= last_edge && child.frame.width > 0
+						assert child.frame.x + child.frame.width <= width
+						last_edge = child.frame.x + child.frame.width
+						if child.id == terminal_action_selection_mode {
+							assert child.checked == block && child.enabled
+							assert child.text == tr(if block { 'terminal.selection.block' } else { 'terminal.selection.text' })
+							mode_found = true
+						}
+						if child.id == terminal_action_copy { copy_found = true }
+					}
+					assert mode_found
+					if width >= 32 { assert copy_found }
+					free_tree(tree)
+				}
+			}
+		}
+	}
+}
+
+fn test_terminal_block_copy_accepts_exact_byte_limit_and_rejects_one_extra_without_truncation() {
+	features := app_compositor_features
+	defer { app_compositor_features = features }
+	app_compositor_features |= app_feature_text_copy
+	mut app := TerminalApp{exited: true}
+	defer { app.close_app() }
+	app.set_geometry(1, 255)
+	app.lines = []string{cap: 256}
+	plain := 'x'.repeat(255)
+	suffix := 'x'.repeat(254)
+	unicode := 'é' + suffix
+	defer { unsafe { plain.free(); suffix.free(); unicode.free() } }
+	for row in 0 .. 256 { app.lines << if row == 0 { unicode.clone() } else { plain.clone() } }
+	app.toggle_selection_mode()
+	app.selection_anchor = TerminalSelectionPoint{row: 0}
+	app.selection_head = TerminalSelectionPoint{row: 255, column: 255}
+	app.copy_selection()
+	request := app.take_clipboard_copy_request()
+	defer { unsafe { request.free() } }
+	assert request.len == text_copy_header_size + clipboard_max_bytes
+	mut clipboard := HostClipboard{configured: true}
+	sequence := text_copy_into_session(mut clipboard, editor_bytes_text(request)) or { panic('exact block copy refused') }
+	assert clipboard.local_length == clipboard_max_bytes
+	assert clipboard.local_bytes[0] == 0xc3 && clipboard.local_bytes[1] == 0xa9
+	assert clipboard.local_bytes[clipboard.local_length - 1] == `x`
+	ack := text_copy_reply(sequence, true)
+	defer { unsafe { ack.free() } }
+	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
+	assert app.copy_client.status_key() == 'clipboard.copy.copied'
+	unsafe { app.lines[1].free() }
+	app.lines[1] = unicode.clone()
+	app.copy_selection()
+	assert app.copy_client.status_key() == 'clipboard.copy.too_large'
+	assert app.take_clipboard_copy_request().len == 0
+	assert clipboard.local_length == clipboard_max_bytes
+	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
+	assert app.copy_client.status_key() == 'clipboard.copy.too_large'
+}

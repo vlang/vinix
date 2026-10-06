@@ -145,6 +145,7 @@ mut:
 	selection_anchor TerminalSelectionPoint
 	selection_head TerminalSelectionPoint
 	selection_dragging bool
+	selection_block bool
 	selection_unit TerminalSelectionUnit
 	selection_origin_start TerminalSelectionPoint
 	selection_origin_end TerminalSelectionPoint
@@ -1421,6 +1422,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a TerminalApp) handle(event_id string) ! {
 	if event_id == terminal_action_copy { a.copy_selection(); return }
+	if event_id == terminal_action_selection_mode { a.toggle_selection_mode(); return }
 	if a.handle_search(event_id) { return }
 	match event_id {
 		terminal_action_scroll_up {

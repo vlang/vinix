@@ -224,3 +224,111 @@ fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render
 	}
 	assert retained == 0
 }
+
+fn terminal_block_memory_frames(mut app TerminalApp) {
+	for language in desktop_languages {
+		desktop_language = language
+		for size in [ui2.rect(0, 0, 112, 118), ui2.rect(0, 0, 272, 118), ui2.rect(0, 0, 560, 340)]! {
+			for search in [false, true]! {
+				for block in [false, true]! {
+					app.search_open = search
+					app.selection_block = block
+					begin_frame_elements()
+					free_tree(app.build(size) or { panic(err) })
+				}
+			}
+		}
+	}
+}
+
+fn test_terminal_block_selection_native_dispatch_padding_toggle_history_alternate_and_render_retain_zero_bytes() {
+	features := app_compositor_features
+	language := desktop_language
+	defer { app_compositor_features = features; desktop_language = language }
+	app_compositor_features |= app_feature_text_copy
+	mut warm := TerminalApp{exited: true}
+	terminal_block_memory_frames(mut warm)
+	warm.close_app()
+	mut desktop := Desktop{}
+	defer { unsafe { desktop.native_asset_icons.free() } }
+	mut clipboard := HostClipboard{configured: true}
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut native := open_terminal(mut desktop) or { panic(err) }
+		mut app := unsafe { &TerminalApp(native) }
+		app.exited = true
+		app.set_geometry(3, 12)
+		app.visible_rows = 3
+		terminal_selection_memory_output(mut app, 'aй😀 d\r\nxy\r\n')
+		app.handle(terminal_action_selection_mode) or { panic(err) }
+		app.pointer_event(.down, .left, 0, 16, 42, 112, 118)
+		app.pointer_event(.move, .no_button, 0, 48, 74, 112, 118)
+		app.pointer_event(.up, .left, 0, 48, 74, 112, 118)
+		app.key_input(terminal_key_cmd_copy)
+		request := native_app_text_copy_request(mut native)
+		sequence := text_copy_into_session(mut clipboard, editor_bytes_text(request)) or { panic('block copy refused') }
+		assert clipboard.local_length == 'й😀 d\ny   \n    '.len
+		assert unsafe { tos(&clipboard.local_bytes[0], clipboard.local_length) } == 'й😀 d\ny   \n    '
+		ack := text_copy_reply(sequence, true)
+		app.handle(terminal_action_selection_mode) or { panic(err) }
+		native_app_receive_desktop_service(mut native, editor_bytes_text(ack))
+		assert app.copy_client.status_key() == '' && !app.selection_block
+		unsafe { request.free(); ack.free() }
+		app.handle(terminal_action_selection_mode) or { panic(err) }
+		app.pointer_event(.down, .left, 0, 16, 42, 112, 118)
+		app.pointer_event(.up, .left, 0, 48, 74, 112, 118)
+		app.copy_selection()
+		app.copy_selection()
+		app.handle(terminal_action_selection_mode) or { panic(err) }
+		assert app.take_clipboard_copy_request().len == 0
+		terminal_block_memory_frames(mut app)
+		for _ in 0 .. terminal_scrollback + 2 { terminal_selection_memory_output(mut app, 'history é\r\n') }
+		app.enter_alternate_screen()
+		terminal_selection_memory_output(mut app, 'alternate й\r\nrow')
+		terminal_block_memory_frames(mut app)
+		app.leave_alternate_screen()
+		app.clear_scrollback()
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_terminal_block_selection_exact_limit_overflow_and_snapshot_replacement_retain_zero_bytes() {
+	features := app_compositor_features
+	defer { app_compositor_features = features }
+	app_compositor_features |= app_feature_text_copy
+	plain := 'x'.repeat(255)
+	suffix := 'x'.repeat(254)
+	unicode := 'é' + suffix
+	defer { unsafe { plain.free(); suffix.free(); unicode.free() } }
+	C.vinix_heap_begin()
+	for _ in 0 .. 50 {
+		mut app := TerminalApp{exited: true}
+		app.set_geometry(1, 255)
+		app.lines = []string{cap: 256}
+		for row in 0 .. 256 { app.lines << if row == 0 { unicode.clone() } else { plain.clone() } }
+		app.toggle_selection_mode()
+		app.selection_anchor = TerminalSelectionPoint{row: 0}
+		app.selection_head = TerminalSelectionPoint{row: 255, column: 255}
+		app.copy_selection()
+		request := app.take_clipboard_copy_request()
+		assert request.len == text_copy_header_size + clipboard_max_bytes
+		unsafe { app.lines[1].free() }
+		app.lines[1] = unicode.clone()
+		app.copy_selection()
+		assert app.copy_client.status_key() == 'clipboard.copy.too_large'
+		assert app.take_clipboard_copy_request().len == 0
+		app.selection_head = TerminalSelectionPoint{row: 1, column: 4}
+		app.copy_selection()
+		app.copy_selection()
+		new_request := app.take_clipboard_copy_request()
+		assert new_request.len == text_copy_header_size + 'éxxx\néxxx'.len
+		app.toggle_selection_mode()
+		assert app.copy_client.status_key() == ''
+		unsafe { request.free(); new_request.free() }
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}

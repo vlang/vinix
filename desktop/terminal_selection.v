@@ -6,6 +6,7 @@ import ui2
 import encoding.utf8
 
 const terminal_action_copy = 'term.selection.copy'
+const terminal_action_selection_mode = 'term.selection.mode'
 const terminal_selection_status_height = 22
 const terminal_key_cmd_copy = '\x1b[99;9u'
 const terminal_key_cmd_copy_caps = '\x1b[67;9u'
@@ -38,11 +39,24 @@ fn terminal_point_before(left TerminalSelectionPoint, right TerminalSelectionPoi
 }
 
 fn (a &TerminalApp) has_selection() bool {
+	if a.selection_block {
+		return a.selection_anchor.row >= 0 && a.selection_head.row >= 0
+			&& terminal_clamp(a.selection_anchor.column, 0, a.columns) != terminal_clamp(a.selection_head.column, 0, a.columns)
+	}
 	return a.selection_anchor.row >= 0 && a.selection_head.row >= 0
 		&& (a.selection_anchor.row != a.selection_head.row || a.selection_anchor.column != a.selection_head.column)
 }
 
 fn (a &TerminalApp) selection_bounds() (TerminalSelectionPoint, TerminalSelectionPoint) {
+	if a.selection_block {
+		return TerminalSelectionPoint{
+			row: if a.selection_anchor.row < a.selection_head.row { a.selection_anchor.row } else { a.selection_head.row }
+			column: terminal_clamp(if a.selection_anchor.column < a.selection_head.column { a.selection_anchor.column } else { a.selection_head.column }, 0, a.columns)
+		}, TerminalSelectionPoint{
+			row: if a.selection_anchor.row > a.selection_head.row { a.selection_anchor.row } else { a.selection_head.row }
+			column: terminal_clamp(if a.selection_anchor.column > a.selection_head.column { a.selection_anchor.column } else { a.selection_head.column }, 0, a.columns)
+		}
+	}
 	if terminal_point_before(a.selection_head, a.selection_anchor) { return a.selection_head, a.selection_anchor }
 	return a.selection_anchor, a.selection_head
 }
@@ -55,6 +69,18 @@ fn (mut a TerminalApp) clear_selection() {
 	a.selection_origin_start = TerminalSelectionPoint{}
 	a.selection_origin_end = TerminalSelectionPoint{}
 	a.selection_click = TerminalSelectionClick{}
+}
+
+fn (mut a TerminalApp) toggle_selection_mode() {
+	a.selection_block = !a.selection_block
+	a.clear_selection()
+	// The next mode starts with fresh copy feedback. Transferred snapshots are
+	// owned by IPC; close releases only packets still owned by this client.
+	a.copy_client.close()
+}
+
+fn (a &TerminalApp) selection_hint_key() string {
+	return if a.selection_block { 'terminal.selection.block.hint' } else { 'terminal.selection.hint' }
 }
 
 fn terminal_selection_click_near(previous TerminalSelectionClick, x int, y int) bool {
@@ -158,7 +184,7 @@ fn (a &TerminalApp) pointer_selection_point(x int, y int) TerminalSelectionPoint
 	visible := terminal_clamp((y - terminal_toolbar_height - terminal_padding) / terminal_row_height, 0, a.visible_rows - 1)
 	row := if a.alternate_screen { visible } else { a.lines.len - a.scroll + visible }
 	column := if x > terminal_padding { (x - terminal_padding + terminal_column_width / 2) / terminal_column_width } else { 0 }
-	return TerminalSelectionPoint{row: row, column: terminal_clamp(column, 0, a.selection_row_cells(row))}
+	return TerminalSelectionPoint{row: row, column: terminal_clamp(column, 0, if a.selection_block { a.columns } else { a.selection_row_cells(row) })}
 }
 
 fn (a &TerminalApp) pointer_selection_cell(x int, y int) TerminalSelectionPoint {
@@ -205,8 +231,8 @@ fn (mut a TerminalApp) selection_pointer_event_at(phase AppPointerPhase, button 
 		a.search_pending_len = 0
 		a.search_escape_state = 0
 		point := a.pointer_selection_point(x, y)
-		count := terminal_selection_click_count(a.selection_click, point, x, y, now)
-		a.selection_click = TerminalSelectionClick{count: count, x: x, y: y, row: point.row, at_ms: now}
+		count := if a.selection_block { 1 } else { terminal_selection_click_count(a.selection_click, point, x, y, now) }
+		a.selection_click = if a.selection_block { TerminalSelectionClick{} } else { TerminalSelectionClick{count: count, x: x, y: y, row: point.row, at_ms: now} }
 		a.selection_unit = if count == 2 { TerminalSelectionUnit.word } else if count == 3 { TerminalSelectionUnit.line } else { TerminalSelectionUnit.character }
 		first, last := if count == 3 { a.selection_line_bounds(point.row) }
 			else if count == 2 { a.selection_word_bounds(a.pointer_selection_cell(x, y)) } else { point, point }
@@ -228,6 +254,7 @@ fn (mut a TerminalApp) selection_pointer_event_at(phase AppPointerPhase, button 
 
 fn (a &TerminalApp) selected_bytes() []u8 {
 	if !a.has_selection() { return []u8{} }
+	if a.selection_block { return a.selected_block_bytes() }
 	first, last := a.selection_bounds()
 	mut length := 0
 	for row in first.row .. last.row + 1 {
@@ -264,6 +291,48 @@ fn (a &TerminalApp) selected_bytes() []u8 {
 	return output
 }
 
+// A block has the same cell width on every physical row. Rows shorter than
+// the block are padded with ASCII spaces, including wholly blank rows; UTF-8
+// cells and internal spaces keep their original bytes. No final newline is
+// added, and the exact byte count is checked before constructing the copy.
+fn (a &TerminalApp) selected_block_bytes() []u8 {
+	first, last := a.selection_bounds()
+	mut length := 0
+	for row in first.row .. last.row + 1 {
+		cells := a.selection_row_cells(row)
+		start := terminal_clamp(first.column, 0, cells)
+		end := terminal_clamp(last.column, start, cells)
+		length += last.column - first.column - (end - start)
+		if !a.alternate_screen && row < a.lines.len {
+			text := a.lines[row]
+			length += terminal_text_cell_offset(text, end) - terminal_text_cell_offset(text, start)
+		} else {
+			screen_row := if a.alternate_screen { row } else { row - a.lines.len }
+			for column in start .. end { length += terminal_utf8_len(a.screen[screen_row * a.columns + column]) }
+		}
+		if row < last.row { length++ }
+		if length > clipboard_max_bytes { return []u8{len: clipboard_max_bytes + 1} }
+	}
+	mut output := []u8{cap: length}
+	for row in first.row .. last.row + 1 {
+		cells := a.selection_row_cells(row)
+		start := terminal_clamp(first.column, 0, cells)
+		end := terminal_clamp(last.column, start, cells)
+		if !a.alternate_screen && row < a.lines.len {
+			text := a.lines[row]
+			from := terminal_text_cell_offset(text, start)
+			to := terminal_text_cell_offset(text, end)
+			for index in from .. to { output << text[index] }
+		} else {
+			screen_row := if a.alternate_screen { row } else { row - a.lines.len }
+			for column in start .. end { terminal_append_utf8(mut output, a.screen[screen_row * a.columns + column]) }
+		}
+		for _ in 0 .. last.column - first.column - (end - start) { output << u8(` `) }
+		if row < last.row { output << u8(`\n`) }
+	}
+	return output
+}
+
 fn (mut a TerminalApp) copy_selection() {
 	if !a.has_selection() { return }
 	bytes := a.selected_bytes()
@@ -279,8 +348,8 @@ fn (a &TerminalApp) build_selection_highlight(mut children []ui2.Element, row in
 	first, last := a.selection_bounds()
 	if row < first.row || row > last.row { return }
 	cells := a.selection_row_cells(row)
-	start := if row == first.row { first.column } else { 0 }
-	end := (if row == last.row { last.column } else { cells }) + if row < last.row { 1 } else { 0 }
+	start := if a.selection_block || row == first.row { first.column } else { 0 }
+	end := if a.selection_block { last.column } else { (if row == last.row { last.column } else { cells }) + if row < last.row { 1 } else { 0 } }
 	x := terminal_padding + start * terminal_column_width
 	w := terminal_clamp((end - start) * terminal_column_width, 0, if width - terminal_padding > x { width - terminal_padding - x } else { 0 })
 	if w > 0 {
@@ -290,7 +359,7 @@ fn (a &TerminalApp) build_selection_highlight(mut children []ui2.Element, row in
 
 fn (a &TerminalApp) build_selection_status(mut children []ui2.Element, width int, height int) {
 	key := a.copy_client.status_key()
-	children << ui2.label('term.selection.status', tr(if key.len > 0 { key } else { 'terminal.selection.hint' }),
+	children << ui2.label('term.selection.status', tr(if key.len > 0 { key } else { a.selection_hint_key() }),
 		ui2.rect(8, f64(height - terminal_selection_status_height), f64(if width > 16 { width - 16 } else { 1 }), terminal_selection_status_height),
 		ui2.TextStyle{color: terminal_text, size: 10})
 }
