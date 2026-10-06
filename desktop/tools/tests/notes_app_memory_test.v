@@ -5,9 +5,12 @@ import os
 import ui2
 
 #include "@VMODROOT/heap_tracker.h"
+#include "@VMODROOT/notes_heap_test_guard.h"
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_notes_heap_require_tracking()
+fn C.vinix_notes_heap_require_clean()
 
 fn notes_heap_home(name string) string {
 	base := os.real_path(os.temp_dir())
@@ -61,7 +64,7 @@ fn test_notes_repeated_model_saves_filter_build_poll_and_exports_release_all_own
 	}
 	a.close_app()
 	a.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_init_close_creation_deletion_and_failed_parse_release_owned_bytes() {
@@ -88,7 +91,7 @@ fn test_notes_init_close_creation_deletion_and_failed_parse_release_owned_bytes(
 		assert !a.decode('VINIX-NOTES 1\n2\n1 2 0\n日本語\n')
 		a.close_app()
 	}
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_conflicting_saves_and_invalid_pastes_keep_drafts_without_leaks() {
@@ -116,7 +119,7 @@ fn test_notes_conflicting_saves_and_invalid_pastes_keep_drafts_without_leaks() {
 		second.close_app()
 	}
 	first.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_maximum_text_wrapping_and_oversize_store_releases_buffers() {
@@ -145,7 +148,7 @@ fn test_notes_maximum_text_wrapping_and_oversize_store_releases_buffers() {
 		assert a.wrap_count > 50
 	}
 	a.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep_zero_bytes() {
@@ -197,7 +200,7 @@ fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep
 	a.handle('notes.discard')!
 	a.handle('notes.confirm_discard')!
 	a.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_maximum_history_eviction_buffer_swaps_branching_and_idempotent_close_keep_zero_bytes() {
@@ -228,7 +231,7 @@ fn test_notes_maximum_history_eviction_buffer_swaps_branching_and_idempotent_clo
 		a.close_app()
 		a.close_app()
 	}
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_history_repeated_undo_redo_autosave_and_successful_scope_changes_release_all_snapshots() {
@@ -279,7 +282,7 @@ fn test_notes_history_repeated_undo_redo_autosave_and_successful_scope_changes_r
 		free_tree(tree)
 	}
 	a.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
 }
 
 fn test_notes_history_rejected_edits_and_failed_conflicting_store_actions_keep_zero_bytes() {
@@ -323,5 +326,68 @@ fn test_notes_history_rejected_edits_and_failed_conflicting_store_actions_keep_z
 		stale.close_app()
 	}
 	first.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_notes_heap_require_clean()
+}
+
+
+fn test_notes_repeated_text_imports_publish_and_release_all_new_owners() {
+ $if prod { panic('Notes retention fixtures require assertions') }
+ home := notes_heap_home('imports')
+ source := join_path(home, 'source.txt')
+ defer { os.rmdir_all(home) or {} unsafe { home.free() source.free() } }
+ os.write_file(source, '\xef\xbb\xbf日\r\n😀\tlast\r')!
+ C.vinix_heap_begin()
+ witness := 'notes import tracker witness'.clone()
+ C.vinix_notes_heap_require_tracking()
+ unsafe { witness.free() }
+ mut app := new_notes_app(home)
+ for index in 0 .. 100 {
+  app.open_import()
+  app.key_input('\x01')
+  app.paste_input(source)
+  app.import_note()
+  assert !app.importing && !app.dirty && app.count == index + 1
+  assert editor_bytes_text(app.body) == '日\n😀\tlast\n'
+ }
+ app.close_app()
+ app.close_app()
+ C.vinix_notes_heap_require_clean()
+}
+
+fn test_notes_failed_imports_and_modal_frames_keep_draft_history_and_zero_owned_bytes() {
+ $if prod { panic('Notes retention fixtures require assertions') }
+ home := notes_heap_home('import-failures')
+ source := join_path(home, 'source.txt')
+ defer { os.rmdir_all(home) or {} unsafe { home.free() source.free() } }
+ os.write_file(source, '\xffinvalid')!
+ mut app := new_notes_app(home)
+ app.new_note()
+ app.focus_field(2)
+ app.paste_input('Draft 日😀')
+ app.open_import()
+ app.paste_input(source)
+ begin_frame_elements()
+ warm := app.build(ui2.rect(0, 0, 820, 576))!
+ free_tree(warm)
+ begin_frame_elements()
+ small := app.build(ui2.rect(0, 0, 180, 96))!
+ free_tree(small)
+ history := app.history_count
+ C.vinix_heap_begin()
+ for _ in 0 .. 100 {
+  app.import_note()
+  assert app.import_status == 'notes.invalid_text' && app.count == 1 && app.dirty
+  assert editor_bytes_text(app.body) == 'Draft 日😀' && app.history_count == history
+  begin_frame_elements()
+  tree := app.build(ui2.rect(0, 0, 820, 576))!
+  free_tree(tree)
+  begin_frame_elements()
+  tiny := app.build(ui2.rect(0, 0, 180, 96))!
+  free_tree(tiny)
+  app.cancel_import()
+  app.open_import()
+ }
+ app.discard_allowed = true
+ app.close_app()
+ C.vinix_notes_heap_require_clean()
 }

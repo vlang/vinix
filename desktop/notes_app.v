@@ -32,6 +32,10 @@ mut:
 	body            []u8
 	query           []u8
 	export_path     []u8
+	import_path     []u8
+	importing       bool
+	import_focus    int = 2
+	import_status   string
 	default_export  string
 	actions         [notes_limit]string
 	matches         [notes_limit]int
@@ -64,12 +68,14 @@ fn new_notes_app(home string) NotesApp {
 		body:        []u8{cap: notes_body_limit}
 		query:       []u8{cap: 256}
 		export_path: []u8{cap: 512}
+		import_path: []u8{cap: 512}
 	}
 	unsafe {
 		a.title.flags |= .noslices
 		a.body.flags |= .noslices
 		a.query.flags |= .noslices
 		a.export_path.flags |= .noslices
+		a.import_path.flags |= .noslices
 	}
 	for index in 0 .. notes_limit {
 		text := index.str()
@@ -206,10 +212,16 @@ fn (mut a NotesApp) decode(data string) bool {
 }
 
 fn (a &NotesApp) encode(skip int) string {
+	return a.encode_added(skip, '', '')
+}
+
+// The current draft and an imported note are published in one transaction.
+// No selection, item, history or ID changes until the snapshot is accepted.
+fn (a &NotesApp) encode_added(skip int, added_title string, added_body string) string {
 	mut bytes := []u8{cap: 4096}
 	unsafe { bytes.flags |= .noslices }
 	editor_append(mut bytes, 'VINIX-NOTES 1\n')
-	next := a.next_id.str()
+	next := (if added_title.len > 0 { a.next_id + 1 } else { a.next_id }).str()
 	editor_append(mut bytes, next)
 	unsafe { next.free() }
 	bytes << `\n`
@@ -217,24 +229,24 @@ fn (a &NotesApp) encode(skip int) string {
 		if index == skip { continue }
 		title := if index == a.selected { editor_bytes_text(a.title) } else { a.items[index].title }
 		body := if index == a.selected { editor_bytes_text(a.body) } else { a.items[index].body }
-		id := a.items[index].id.str()
-		tlen := title.len.str()
-		blen := body.len.str()
-		header := '${id} ${tlen} ${blen}\n'
-		editor_append(mut bytes, header)
-		editor_append(mut bytes, title)
-		editor_append(mut bytes, body)
-		bytes << `\n`
-		unsafe {
-			id.free()
-			tlen.free()
-			blen.free()
-			header.free()
-		}
+		notes_encode_entry(mut bytes, a.items[index].id, title, body)
 	}
+	if added_title.len > 0 { notes_encode_entry(mut bytes, a.next_id, added_title, added_body) }
 	data := bytes.bytestr()
 	unsafe { bytes.free() }
 	return data
+}
+
+fn notes_encode_entry(mut bytes []u8, entry_id u64, title string, body string) {
+	id := entry_id.str()
+	tlen := title.len.str()
+	blen := body.len.str()
+	header := '${id} ${tlen} ${blen}\n'
+	editor_append(mut bytes, header)
+	editor_append(mut bytes, title)
+	editor_append(mut bytes, body)
+	bytes << `\n`
+	unsafe { id.free() tlen.free() blen.free() header.free() }
 }
 
 fn (mut a NotesApp) reload() {
@@ -471,6 +483,7 @@ fn (mut a NotesApp) close_app() {
 		a.body.free()
 		a.query.free()
 		a.export_path.free()
+		a.import_path.free()
 		a.default_export.free()
 	}
 	a.record = ''
@@ -478,6 +491,9 @@ fn (mut a NotesApp) close_app() {
 	a.body = []u8{}
 	a.query = []u8{}
 	a.export_path = []u8{}
+	a.import_path = []u8{}
+	a.importing = false
+	a.import_status = ''
 	a.default_export = ''
 	a.dirty = false
 	a.reset_close_choice()

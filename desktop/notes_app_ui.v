@@ -54,6 +54,8 @@ fn (mut a NotesApp) focus_field(field int) {
 
 fn (mut a NotesApp) handle(event_id string) ! {
 	a.pending_len = 0
+	if a.importing && !a.close_requested && event_id != 'notes.import_path'
+		&& event_id != 'notes.import_confirm' && event_id != 'notes.import_cancel' { return }
 	if event_id.starts_with('notes.row.') {
 		index := notes_number(console_borrow(event_id, 10, event_id.len)) or { return }
 		if index < u64(a.count) { a.select_note(int(index)) }
@@ -64,6 +66,10 @@ fn (mut a NotesApp) handle(event_id string) ! {
 		'notes.title' { a.focus_field(1) }
 		'notes.body' { a.focus_field(2) }
 		'notes.export_path' { a.focus_field(3) }
+		'notes.import_path' { if a.importing { a.focus_field(4) } }
+		'notes.import' { a.open_import() }
+		'notes.import_confirm' { if a.importing && !a.close_requested { a.import_note() } }
+		'notes.import_cancel' { if a.importing { a.cancel_import() } }
 		'notes.new' { a.new_note() }
 		'notes.save' { a.save() }
 		'notes.undo' { a.restore_history(false) }
@@ -117,6 +123,12 @@ fn (mut a NotesApp) handle(event_id string) ! {
 }
 
 fn (mut a NotesApp) insert_text(text string) {
+	if a.importing && !a.close_requested {
+		console_edit_character(mut a.import_path, text, 512, a.select_all)
+		a.import_status = ''
+		a.select_all = false
+		return
+	}
 	a.reset_close_choice()
 	if a.focus == 0 || a.focus == 3 {
 		if a.focus == 0 {
@@ -172,6 +184,12 @@ fn (mut a NotesApp) insert_text(text string) {
 }
 
 fn (mut a NotesApp) backspace(forward bool) {
+	if a.importing && !a.close_requested {
+		console_backspace(mut a.import_path, a.select_all)
+		a.import_status = ''
+		a.select_all = false
+		return
+	}
 	a.reset_close_choice()
 	if a.focus == 0 {
 		console_backspace(mut a.query, a.select_all)
@@ -212,6 +230,7 @@ fn (mut a NotesApp) backspace(forward bool) {
 }
 
 fn (mut a NotesApp) key_input(input string) {
+	if a.importing && !a.close_requested { a.import_key_input(input) return }
 	if input.len > 1 && input[0] == 0x1b {
 		a.pending_len = 0
 		a.select_all = false
@@ -278,6 +297,8 @@ fn (mut a NotesApp) key_input(input string) {
 			a.restore_history(true)
 		} else if byte == 0x0e {
 			a.new_note()
+		} else if byte == 0x0f {
+			a.open_import()
 		} else if byte == 0x1b {
 			a.select_all = false
 			a.delete_pending = false
@@ -301,6 +322,12 @@ fn (mut a NotesApp) key_input(input string) {
 }
 
 fn (mut a NotesApp) paste_input(text string) {
+	if a.importing && !a.close_requested {
+		if !notes_valid_text(text, 512, false) { a.import_status = 'notes.import_invalid' return }
+		a.pending_len = 0
+		a.insert_text(text)
+		return
+	}
 	a.reset_close_choice()
 	a.pending_len = 0
 	// A paste is one bounded UTF-8 edit. Reject malformed/control text as a
@@ -318,6 +345,7 @@ fn (a &NotesApp) pointer_moves_matter() bool { return false }
 
 fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int,
 	x int, y int, _ int, height int) {
+	if a.importing && !a.close_requested { return }
 	close_height := if a.close_requested { 64 } else { 0 }
 	if phase == .scroll {
 		if x < 230 {
@@ -340,6 +368,7 @@ fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton
 }
 
 fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
+	if a.importing && !a.close_requested { return a.build_import(size) }
 	width := int(size.width)
 	height := int(size.height)
 	if width < 500 || height < 242 || (a.close_requested && (width < 700 || height < 306)) {
@@ -369,17 +398,15 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 	// Keep the viewport inside that new range before rendering its text.
 	a.clamp_body_scroll()
 	mut children := frame_elements(24 + a.page_rows + a.text_rows)
-	button_width := if width >= 688 { 104 } else { (width - 64) / 6 }
+	button_width := if width >= 808 { 104 } else { (width - 72) / 7 }
 	for index, key in ['notes.new', 'notes.save', 'notes.refresh', 'notes.delete']! {
 		children << console_button(key, key, 12 + index * (button_width + 8), 10, button_width, a.delete_pending && index == 3)
 	}
 	children << notes_history_button('notes.undo', 12 + 4 * (button_width + 8), 10, button_width, a.can_undo())
 	children << notes_history_button('notes.redo', 12 + 5 * (button_width + 8), 10, button_width, a.can_redo())
-	if a.delete_pending && width >= 820 {
-		children << console_button('notes.cancel_delete', 'notes.cancel_delete', 684, 10, 124, false)
-	}
+	children << console_button('notes.import', 'notes.import', 12 + 6 * (button_width + 8), 10, button_width, false)
 	children << console_field('notes.search', editor_bytes_text(a.query), 12, 58, 216, a.focus == 0)
-	if a.delete_pending && width < 820 {
+	if a.delete_pending {
 		children << ui2.button('notes.cancel_delete', tr('notes.cancel_delete'), ui2.rect(12, 91, 216, 18), ui2.BoxStyle{ bg: body_panel, radius: 4 }, ui2.TextStyle{ size: 11, color: body_text })
 	} else {
 		children << ui2.label('', tr('notes.search_hint'), ui2.rect(12, 91, 216, 18), ui2.TextStyle{ size: 11, color: body_muted })

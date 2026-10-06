@@ -723,3 +723,159 @@ fn test_notes_tiny_history_view_keeps_explicit_failed_save_close_choices_accessi
 	assert a.prepare_close() && !a.dirty
 	a.close_app()
 }
+
+
+fn notes_test_import_path(mut app NotesApp, path string) {
+ app.open_import()
+ app.key_input('\x01')
+ app.paste_input(path)
+}
+
+fn test_notes_text_import_publishes_current_draft_and_utf8_note_atomically() {
+ home := notes_test_home('import')
+ source := join_path(home, '日本語.TXT')
+ defer { os.rmdir_all(home) or {} unsafe { home.free() source.free() } }
+ os.write_file(source, '\xef\xbb\xbfFirst\r\n日本語\t😀\rLast\n')!
+ mut app := new_notes_app(home)
+ app.new_note()
+ notes_test_edit(mut app, 'Old title', 'old body')
+ assert app.save()
+ notes_test_edit(mut app, 'Draft title', 'unsaved body')
+ assert app.dirty && app.can_undo()
+ notes_test_import_path(mut app, source)
+ app.handle('notes.import_confirm')!
+ assert !app.importing && !app.dirty && app.count == 2 && app.selected == 1
+ assert app.items[0].title == 'Draft title' && app.items[0].body == 'unsaved body'
+ assert app.items[1].id == 2 && app.next_id == 3
+ assert editor_bytes_text(app.title) == '日本語'
+ assert editor_bytes_text(app.body) == 'First\n日本語\t😀\nLast\n'
+ assert app.status == 'notes.import_saved' && !app.can_undo()
+ assert app.query.len == 0 && app.matched == 2
+ // An old confirmation packet cannot import the file again after closing.
+ app.handle('notes.import_confirm')!
+ assert app.count == 2
+ saved := app.record.clone()
+ original := os.read_file(source)!
+ assert original == '\xef\xbb\xbfFirst\r\n日本語\t😀\rLast\n'
+ unsafe { original.free() }
+ app.close_app()
+ mut reopened := new_notes_app(home)
+ assert reopened.count == 2 && reopened.record == saved
+ assert reopened.items[0].body == 'unsaved body'
+ assert reopened.items[1].body == 'First\n日本語\t😀\nLast\n'
+ reopened.close_app()
+ unsafe { saved.free() }
+}
+
+fn test_notes_import_normalized_size_empty_file_and_utf8_title_bounds() {
+ home := notes_test_home('import-limits')
+ source := join_path(home, 'lines.txt')
+ defer { os.rmdir_all(home) or {} unsafe { home.free() source.free() } }
+ mut app := new_notes_app(home)
+ crlf := '\r\n'.repeat(notes_body_limit)
+ os.write_file(source, crlf)!
+ unsafe { crlf.free() }
+ notes_test_import_path(mut app, source)
+ app.import_note()
+ assert app.count == 1 && app.body.len == notes_body_limit && !app.dirty
+ for byte in app.body { assert byte == `\n` }
+ os.write_file(source, '')!
+ notes_test_import_path(mut app, source)
+ app.import_note()
+ assert app.count == 2 && app.body.len == 0 && editor_bytes_text(app.title) == 'lines'
+ old_record := app.record.clone()
+ oversized := 'x'.repeat(notes_body_limit + 1)
+ os.write_file(source, oversized)!
+ unsafe { oversized.free() }
+ notes_test_import_path(mut app, source)
+ app.import_note()
+ assert app.count == 2 && app.import_status == 'notes.limit' && app.record == old_record
+ os.write_file(source, '\xffbroken')!
+ app.import_note()
+ assert app.count == 2 && app.import_status == 'notes.invalid_text' && app.record == old_record
+ os.write_file(source, 'nul\x00byte')!
+ app.import_note()
+ assert app.count == 2 && app.import_status == 'notes.invalid_text'
+ app.cancel_import()
+ filename := '日'.repeat(60) + '.txt'
+ long_path := join_path(home, filename)
+ title := notes_import_title(long_path)
+ assert title.len == 159 && notes_valid_text(title, notes_title_limit, false)
+ assert title == '日'.repeat(53)
+ unsafe { filename.free() long_path.free() title.free() old_record.free() }
+ app.close_app()
+}
+
+fn test_notes_import_conflicts_invalid_sources_and_cancel_preserve_draft_and_history() {
+ home := notes_test_home('import-failures')
+ source := join_path(home, 'source.txt')
+ link := join_path(home, 'linked.txt')
+ directory := join_path(home, 'folder')
+ defer { os.rmdir_all(home) or {} unsafe { home.free() source.free() link.free() directory.free() } }
+ os.write_file(source, 'imported body')!
+ os.symlink(source, link)!
+ os.mkdir(directory)!
+ mut app := new_notes_app(home)
+ app.new_note()
+ notes_test_edit(mut app, 'Saved', 'saved body')
+ assert app.save()
+ notes_test_edit(mut app, 'Draft', 'draft body')
+ history := app.history_count
+ cursor := app.cursor
+ snapshot := app.record.clone()
+ for invalid in [link, directory, '/dev/null', '/relative/../file']! {
+  notes_test_import_path(mut app, invalid)
+  app.import_note()
+  assert app.importing && app.count == 1 && app.selected == 0 && app.next_id == 2
+  assert editor_bytes_text(app.title) == 'Draft' && editor_bytes_text(app.body) == 'draft body'
+  assert app.history_count == history && app.cursor == cursor && app.record == snapshot && app.dirty
+ }
+ notes_test_import_path(mut app, source)
+ lock_fd := notes_lock(app.home_fd)
+ assert lock_fd >= 0
+ app.import_note()
+ assert app.import_status == 'notes.save_failed' && app.count == 1 && app.record == snapshot
+ desktop_close(lock_fd)
+ mut other := new_notes_app(home)
+ notes_test_edit(mut other, 'Newer', 'other body')
+ assert other.save()
+ app.import_note()
+ assert app.import_status == 'notes.conflict' && app.count == 1 && app.record == snapshot
+ assert app.history_count == history && app.dirty && editor_bytes_text(app.body) == 'draft body'
+ app.handle('notes.new')!
+ assert app.count == 1 // Modal import ignores background actions.
+ app.key_input('\x1b')
+ assert !app.importing && app.focus == 2 && app.history_count == history && app.dirty
+ app.handle('notes.import_confirm')!
+ assert app.count == 1 && editor_bytes_text(app.body) == 'draft body'
+ app.discard_allowed = true
+ app.close_app()
+ other.close_app()
+ unsafe { snapshot.free() }
+}
+
+fn test_notes_import_popup_keyboard_bounds_and_registered_home_anchor() {
+ home := notes_test_home('import-ui')
+ registered := home + '-registration'
+ source := join_path(home, 'input.txt')
+ alias_source := join_path(registered, 'input.txt')
+ defer { os.rm(registered) or {} os.rmdir_all(home) or {} unsafe { home.free() registered.free() source.free() alias_source.free() } }
+ os.write_file(source, 'from registered HOME')!
+ os.symlink(home, registered)!
+ mut app := new_notes_app(registered)
+ app.key_input('\x0f')
+ assert app.importing && app.focus == 4
+ app.paste_input(alias_source)
+ for size in [ui2.rect(0, 0, 820, 576), ui2.rect(0, 0, 380, 218), ui2.rect(0, 0, 180, 96), ui2.rect(0, 0, 20, 10)]! {
+  begin_frame_elements()
+  tree := app.build(size)!
+  for child in tree.children {
+   assert child.frame.x >= 0 && child.frame.y >= 0 && child.frame.width >= 0 && child.frame.height >= 0
+   assert child.frame.x + child.frame.width <= size.width && child.frame.y + child.frame.height <= size.height
+  }
+  free_tree(tree)
+ }
+ app.key_input('\r')
+ assert !app.importing && app.count == 1 && editor_bytes_text(app.body) == 'from registered HOME'
+ app.close_app()
+}
