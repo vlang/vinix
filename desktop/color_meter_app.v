@@ -7,17 +7,24 @@ const color_meter_aperture_actions = ['color_meter.aperture.1', 'color_meter.ape
 	'color_meter.aperture.5', 'color_meter.aperture.9']!
 const color_meter_aperture_values = [1, 3, 5, 9]!
 const color_meter_aperture_texts = ['1 x 1', '3 x 3', '5 x 5', '9 x 9']!
+const color_meter_live_reply_timeout_ms = u64(1000)
 
 @[heap]
 struct ColorMeterApp {
 mut:
 	initialized bool
 	following bool
+	locked_x bool
+	locked_y bool
+	lock_x int
+	lock_y int
 	focus int
 	selected bool
 	x_input []u8
 	y_input []u8
 	sequence u32
+	waiting bool
+	waiting_since u64
 	request ColorMeterRequest
 	report ColorMeterReport
 	aperture int = 1
@@ -63,19 +70,33 @@ fn color_meter_set_coordinate(mut bytes []u8, coordinate int) {
 
 fn (mut app ColorMeterApp) queue(command ColorMeterCommand) {
 	app.initialize()
+	app.sequence++
+	app.waiting = false
+	app.request = ColorMeterRequest{}
+	mut operation := command
 	mut x := 0
 	mut y := 0
 	if command == .sample {
 		x = color_meter_coordinate(app.x_input) or { app.status = 'color_meter.invalid_input' return }
 		y = color_meter_coordinate(app.y_input) or { app.status = 'color_meter.invalid_input' return }
+	} else if command == .pointer {
+		x = app.lock_x
+		y = app.lock_y
+		operation = if app.locked_x && app.locked_y { ColorMeterCommand.pointer_lock_xy }
+			else if app.locked_x { ColorMeterCommand.pointer_lock_x }
+			else if app.locked_y { ColorMeterCommand.pointer_lock_y }
+			else { ColorMeterCommand.pointer }
 	}
-	app.sequence++
-	app.request = ColorMeterRequest{ sequence: app.sequence, command: command, x: x, y: y, aperture: app.aperture }
+	app.request = ColorMeterRequest{ sequence: app.sequence, command: operation, x: x, y: y, aperture: app.aperture }
 }
 
 fn (mut app ColorMeterApp) take_desktop_service_request() ColorMeterRequest {
 	request := app.request
 	app.request = ColorMeterRequest{}
+	if color_meter_pointer_command(request.command) {
+		app.waiting = true
+		app.waiting_since = desktop_monotonic_ms()
+	}
 	return request
 }
 
@@ -93,8 +114,10 @@ fn (mut app ColorMeterApp) refresh_texts() {
 }
 
 fn (mut app ColorMeterApp) receive_desktop_service_reply(payload string) {
-	report := color_meter_decode_report(payload) or { app.status = 'color_meter.unavailable' return }
+	if payload.len >= 4 && color_meter_read_u32(payload, 0) != app.sequence { return }
+	report := color_meter_decode_report(payload) or { app.waiting = false app.status = 'color_meter.unavailable' return }
 	if report.sequence != app.sequence { return }
+	app.waiting = false
 	previous := ColorMeterReport{ ...app.report, sequence: report.sequence }
 	if previous != report || app.hex_text.len == 0 {
 		app.report = report
@@ -112,6 +135,8 @@ fn (mut app ColorMeterApp) receive_desktop_service_reply(payload string) {
 
 fn (mut app ColorMeterApp) freeze() {
 	app.following = false
+	app.sequence++
+	app.waiting = false
 	app.request = ColorMeterRequest{}
 	if app.report.count > 0 {
 		app.initialize()
@@ -119,6 +144,23 @@ fn (mut app ColorMeterApp) freeze() {
 		color_meter_set_coordinate(mut app.y_input, app.report.y)
 		app.status = 'color_meter.frozen'
 	}
+}
+
+fn (mut app ColorMeterApp) toggle_lock(horizontal bool) {
+	locked := if horizontal { app.locked_x } else { app.locked_y }
+	if !locked && (app.report.count == 0 || (app.report.status != .sampled && app.report.status != .copied)) {
+		app.status = 'color_meter.lock_requires_sample'
+		return
+	}
+	if horizontal {
+		app.locked_x = !locked
+		if !locked { app.lock_x = app.report.x }
+	} else {
+		app.locked_y = !locked
+		if !locked { app.lock_y = app.report.y }
+	}
+	if app.following { app.queue(.pointer) }
+	else { app.sequence++ app.waiting = false app.request = ColorMeterRequest{} }
 }
 
 fn (mut app ColorMeterApp) handle(action string) ! {
@@ -133,6 +175,8 @@ fn (mut app ColorMeterApp) handle(action string) ! {
 	match action {
 		'color_meter.live' { app.following = true app.queue(.pointer) }
 		'color_meter.freeze' { app.freeze() }
+		'color_meter.lock_x' { app.toggle_lock(true) }
+		'color_meter.lock_y' { app.toggle_lock(false) }
 		'color_meter.sample' { app.following = false app.queue(.sample) }
 		'color_meter.copy_hex' { app.freeze() app.queue(.copy_hex) }
 		'color_meter.copy_rgb' { app.freeze() app.queue(.copy_rgb) }
@@ -173,7 +217,24 @@ fn (mut app ColorMeterApp) key_input(input string) {
 	}
 }
 
+fn (mut app ColorMeterApp) live_reply_expired(now u64) bool {
+	if now == ~u64(0) { return false }
+	// Failed initial clocks and rollbacks restart this bounded wait, rather
+	// than subtracting unsigned timestamps or timing out a fresh request.
+	if app.waiting_since == ~u64(0) || now < app.waiting_since {
+		app.waiting_since = now
+		return false
+	}
+	return now - app.waiting_since >= color_meter_live_reply_timeout_ms
+}
+
 fn (mut app ColorMeterApp) poll() bool {
+	if app.waiting {
+		if !app.live_reply_expired(desktop_monotonic_ms()) { return false }
+		app.freeze()
+		app.status = 'color_meter.live_unavailable'
+		return true
+	}
 	if app.following { app.queue(.pointer) }
 	// The compositor marks the tree only when its returned sample changes.
 	return false
@@ -195,6 +256,12 @@ fn (mut app ColorMeterApp) close_app() {
 	app.detail_text = ''
 	app.initialized = false
 	app.following = false
+	app.waiting = false
+	app.waiting_since = 0
+	app.locked_x = false
+	app.locked_y = false
+	app.lock_x = 0
+	app.lock_y = 0
 	app.request = ColorMeterRequest{}
 	app.report = ColorMeterReport{}
 }
@@ -208,7 +275,8 @@ fn (mut app ColorMeterApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.label('', tr('app.color_meter'), ui2.rect(12, 10, f64(width - 24), 24),
 		ui2.TextStyle{ size: 18, color: body_heading, bold: true })
 	if width < 584 || height < 506 {
-		children << ui2.label('', tr('color_meter.resize'), ui2.rect(12, 44, f64(width - 24), 72),
+		help_height := if height > 124 { 72 } else if height > 52 { height - 52 } else { 0 }
+		children << ui2.label('', tr('color_meter.resize'), ui2.rect(12, 44, f64(width - 24), f64(help_height)),
 			ui2.TextStyle{ size: 12, color: body_muted, lines: 3 })
 		return ui2.screen(app_surface, children)
 	}
@@ -226,7 +294,11 @@ fn (mut app ColorMeterApp) build(size ui2.Rect) !ui2.Element {
 			ui2.BoxStyle{ bg: if app.aperture == color_meter_aperture_values[index] { app_accent } else { settings_choice_bg }, radius: 4 },
 			ui2.TextStyle{ size: 11, align: .center, color: if app.aperture == color_meter_aperture_values[index] { app_on_accent } else { body_text } })
 	}
-	children << ui2.label('', tr('color_meter.magnifier'), ui2.rect(12, 138, 228, 20), ui2.TextStyle{ size: 12, color: body_muted })
+	children << console_button('color_meter.lock_x', 'color_meter.lock_x', 12, 136, 120, app.locked_x)
+	children << console_button('color_meter.lock_y', 'color_meter.lock_y', 140, 136, 120, app.locked_y)
+	children << ui2.label('', tr('color_meter.lock_hint'), ui2.rect(276, 134, f64(width - 288), 32),
+		ui2.TextStyle{ size: 10, color: body_muted, lines: 2 })
+	children << ui2.label('', tr('color_meter.magnifier'), ui2.rect(12, 170, 228, 20), ui2.TextStyle{ size: 12, color: body_muted })
 	mut cells := frame_elements(82)
 	for row in 0 .. color_meter_grid_size {
 		for column in 0 .. color_meter_grid_size {
@@ -240,20 +312,20 @@ fn (mut app ColorMeterApp) build(size ui2.Rect) !ui2.Element {
 		f64(app.aperture * 24), f64(app.aperture * 24)), ui2.BoxStyle{
 			transparent: true, border_color: 0xffffff, border_left: 1, border_right: 1, border_top: 1, border_bottom: 1
 		}, [])
-	children << ui2.view('color_meter.magnifier', ui2.rect(12, 162, 216, 216), ui2.BoxStyle{}, cells)
-	children << ui2.label('', tr('color_meter.value'), ui2.rect(252, 142, f64(width - 264), 24), ui2.TextStyle{ size: 12, color: body_muted })
-	children << ui2.view('color_meter.swatch', ui2.rect(252, 174, 120, 100), ui2.BoxStyle{ bg: if app.report.count > 0 { app.report.rgb } else { body_panel }, radius: 6 }, [])
-	children << ui2.label('', app.hex_text, ui2.rect(384, 180, f64(width - 396), 28), ui2.TextStyle{ size: 20, color: body_text, font_family: 'mono' })
-	children << ui2.label('', app.rgb_text, ui2.rect(384, 220, f64(width - 396), 24), ui2.TextStyle{ size: 12, color: body_text, font_family: 'mono' })
-	children << console_button('color_meter.copy_hex', 'color_meter.copy_hex', 252, 294, 142, false)
-	children << console_button('color_meter.copy_rgb', 'color_meter.copy_rgb', 402, 294, 142, false)
-	children << ui2.label('', app.detail_text, ui2.rect(252, 338, f64(width - 264), 42),
+	children << ui2.view('color_meter.magnifier', ui2.rect(12, 194, 216, 216), ui2.BoxStyle{}, cells)
+	children << ui2.label('', tr('color_meter.value'), ui2.rect(252, 174, f64(width - 264), 24), ui2.TextStyle{ size: 12, color: body_muted })
+	children << ui2.view('color_meter.swatch', ui2.rect(252, 206, 120, 100), ui2.BoxStyle{ bg: if app.report.count > 0 { app.report.rgb } else { body_panel }, radius: 6 }, [])
+	children << ui2.label('', app.hex_text, ui2.rect(384, 212, f64(width - 396), 28), ui2.TextStyle{ size: 20, color: body_text, font_family: 'mono' })
+	children << ui2.label('', app.rgb_text, ui2.rect(384, 252, f64(width - 396), 24), ui2.TextStyle{ size: 12, color: body_text, font_family: 'mono' })
+	children << console_button('color_meter.copy_hex', 'color_meter.copy_hex', 252, 326, 142, false)
+	children << console_button('color_meter.copy_rgb', 'color_meter.copy_rgb', 402, 326, 142, false)
+	children << ui2.label('', app.detail_text, ui2.rect(252, 370, f64(width - 264), 42),
 		ui2.TextStyle{ size: 11, color: body_muted, lines: 2 })
-	children << ui2.label('', tr(app.status), ui2.rect(12, f64(height - 126), f64(width - 24), 44),
+	children << ui2.label('', tr(app.status), ui2.rect(12, f64(height - 90), f64(width - 24), 28),
 		ui2.TextStyle{ size: 12, color: body_text, lines: 2 })
-	children << ui2.label('', tr('color_meter.hint'), ui2.rect(12, f64(height - 76), f64(width - 24), 34),
+	children << ui2.label('', tr('color_meter.hint'), ui2.rect(12, f64(height - 58), f64(width - 24), 28),
 		ui2.TextStyle{ size: 11, color: body_muted, lines: 2 })
-	children << ui2.label('', tr('color_meter.clipboard_hint'), ui2.rect(12, f64(height - 37), f64(width - 24), 32),
+	children << ui2.label('', tr('color_meter.clipboard_hint'), ui2.rect(12, f64(height - 26), f64(width - 24), 24),
 		ui2.TextStyle{ size: 10, color: body_muted, lines: 2 })
 	return ui2.screen(app_surface, children)
 }

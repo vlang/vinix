@@ -154,6 +154,244 @@ fn test_color_meter_report_sequences_ignore_stale_samples_and_small_windows_expl
 	free_tree(full)
 }
 
+fn color_meter_test_reply(mut app ColorMeterApp, desktop &Desktop) ColorMeterReport {
+	report := color_meter_sample(desktop, app.take_desktop_service_request())
+	bytes := color_meter_encode_report(report)
+	app.receive_desktop_service_reply(unsafe { tos(bytes.data, bytes.len) })
+	unsafe { bytes.free() }
+	return report
+}
+
+fn test_color_meter_live_locks_resolve_each_unlocked_axis_from_physical_pointer_and_cursor_backing() {
+	mut desktop := Desktop{ canvas: new_scaled_canvas(5, 5, 10, 10, 2), pointer_x: 2, pointer_y: 3 }
+	defer { unsafe { free(desktop.canvas.pixels) desktop.cursor_backing.pixels.free() desktop.native_asset_icons.free() } }
+	for y in 0 .. 10 {
+		for x in 0 .. 10 { unsafe { desktop.canvas.pixels[y * 10 + x] = u32(y * 10 + x) } }
+	}
+	x := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_x, x: 1, y: 100 })
+	assert x.x == 1 && x.y == 7 && x.rgb == 71
+	y := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_y, x: 100, y: 2 })
+	assert y.x == 5 && y.y == 2 && y.rgb == 25
+	both := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_xy, x: 9, y: 0, aperture: 3 })
+	assert both.x == 9 && both.y == 0 && both.count == 4 && both.rgb == 14
+	desktop.cursor_backing.box = DamageRect{ x: 0, y: 3, w: 1, h: 1, valid: true }
+	desktop.cursor_backing.pixels = []u32{len: 4, init: 0x2468ac}
+	unsafe { desktop.canvas.pixels[7 * 10 + 1] = 0xffffff }
+	saved := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_x, x: 1 })
+	assert saved.x == 1 && saved.y == 7 && saved.rgb == 0x2468ac
+	desktop.pointer_x = 4
+	desktop.pointer_y = 1
+	moved := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_x, x: 1 })
+	assert moved.x == 1 && moved.y == 3 && moved.rgb == 31
+}
+
+fn test_color_meter_lock_commands_append_without_changing_existing_wire_values_and_sizes() {
+	assert int(ColorMeterCommand.sample) == 1 && int(ColorMeterCommand.pointer) == 2
+	assert int(ColorMeterCommand.copy_hex) == 3 && int(ColorMeterCommand.copy_rgb) == 4
+	assert color_meter_request_size == 24 && color_meter_report_size == 441
+	for command in [ColorMeterCommand.sample, .pointer, .copy_hex, .copy_rgb,
+		.pointer_lock_x, .pointer_lock_y, .pointer_lock_xy]! {
+		request := ColorMeterRequest{ sequence: 17, command: command, x: 3, y: 7, aperture: 9 }
+		mut bytes := color_meter_encode_request(request)
+		assert bytes.len == 24
+		assert color_meter_decode_request(unsafe { tos(bytes.data, bytes.len) })? == request
+		bytes[8] = 8
+		assert color_meter_decode_request(unsafe { tos(bytes.data, bytes.len) }) == none
+		unsafe { bytes.free() }
+	}
+}
+
+fn test_color_meter_independent_locks_capture_report_and_preserve_freeze_copy_manual_sample_and_aperture() {
+	mut desktop := Desktop{ canvas: new_scaled_canvas(5, 5, 10, 10, 2), pointer_x: 2, pointer_y: 3 }
+	defer { unsafe { free(desktop.canvas.pixels) desktop.native_asset_icons.free() } }
+	desktop.canvas.clear(0x123456)
+	mut app := &ColorMeterApp{}
+	defer { app.close_app() unsafe { free(app) } }
+	app.handle('color_meter.lock_x')!
+	assert !app.locked_x && app.status == 'color_meter.lock_requires_sample'
+	assert app.take_desktop_service_request().command == .none_
+	app.handle('color_meter.live')!
+	assert color_meter_test_reply(mut app, &desktop).x == 5
+	app.handle('color_meter.lock_x')!
+	assert app.following && app.locked_x && !app.locked_y && app.lock_x == 5
+	desktop.pointer_x = 4
+	desktop.pointer_y = 1
+	x := color_meter_test_reply(mut app, &desktop)
+	assert x.x == 5 && x.y == 3
+	app.handle('color_meter.lock_y')!
+	assert app.locked_y && app.lock_y == 3
+	desktop.pointer_x = 0
+	desktop.pointer_y = 4
+	assert color_meter_test_reply(mut app, &desktop).y == 3
+	app.handle('color_meter.aperture.9')!
+	both := color_meter_test_reply(mut app, &desktop)
+	assert both.x == 5 && both.y == 3 && both.aperture == 9 && both.count == 72
+	app.handle('color_meter.freeze')!
+	assert !app.following && app.locked_x && app.locked_y
+	assert editor_bytes_text(app.x_input) == '5' && editor_bytes_text(app.y_input) == '3'
+	app.handle('color_meter.copy_rgb')!
+	assert app.take_desktop_service_request().command == .copy_rgb && !app.following
+	app.handle('color_meter.x')!
+	app.paste_input('0')
+	app.handle('color_meter.y')!
+	app.paste_input('9')
+	app.handle('color_meter.sample')!
+	manual := color_meter_test_reply(mut app, &desktop)
+	assert manual.x == 0 && manual.y == 9 && app.lock_x == 5 && app.lock_y == 3
+	app.handle('color_meter.live')!
+	assert app.take_desktop_service_request().command == .pointer_lock_xy
+	app.handle('color_meter.lock_x')!
+	assert app.take_desktop_service_request().command == .pointer_lock_y
+	assert !app.locked_x && app.locked_y
+	app.handle('color_meter.lock_y')!
+	assert app.take_desktop_service_request().command == .pointer
+	assert !app.locked_x && !app.locked_y && app.following
+	app.close_app()
+	assert !app.locked_x && !app.locked_y && app.lock_x == 0 && app.lock_y == 0
+}
+
+fn test_color_meter_freeze_lock_changes_and_invalid_manual_input_invalidate_pending_replies() {
+	mut desktop := Desktop{ canvas: new_canvas(10, 10), pointer_x: 4, pointer_y: 5 }
+	defer { unsafe { free(desktop.canvas.pixels) desktop.native_asset_icons.free() } }
+	desktop.canvas.clear(0xabcdef)
+	mut app := &ColorMeterApp{}
+	defer { app.close_app() unsafe { free(app) } }
+	app.handle('color_meter.live')!
+	color_meter_test_reply(mut app, &desktop)
+	app.poll()
+	mut stale := color_meter_encode_report(color_meter_sample(&desktop, app.take_desktop_service_request()))
+	defer { unsafe { stale.free() } }
+	app.handle('color_meter.freeze')!
+	app.receive_desktop_service_reply(unsafe { tos(stale.data, stale.len) })
+	assert app.status == 'color_meter.frozen' && app.hex_text == '#ABCDEF'
+	stale[4] = 255
+	app.receive_desktop_service_reply(unsafe { tos(stale.data, stale.len) })
+	assert app.status == 'color_meter.frozen'
+	app.handle('color_meter.live')!
+	old := app.take_desktop_service_request()
+	app.handle('color_meter.lock_x')!
+	lock_sequence := app.sequence
+	bytes := color_meter_encode_report(ColorMeterReport{ sequence: old.sequence, status: .unavailable })
+	app.receive_desktop_service_reply(unsafe { tos(bytes.data, bytes.len) })
+	unsafe { bytes.free() }
+	assert app.sequence == lock_sequence && app.lock_x == 4 && app.hex_text == '#ABCDEF'
+	app.handle('color_meter.x')!
+	app.paste_input('32768')
+	app.handle('color_meter.sample')!
+	assert app.sequence > lock_sequence && app.take_desktop_service_request().command == .none_
+	assert app.status == 'color_meter.invalid_input'
+	app.receive_desktop_service_reply(unsafe { tos(stale.data, stale.len) })
+	assert app.status == 'color_meter.invalid_input'
+}
+
+fn test_color_meter_locked_bounds_and_unavailable_canvas_return_errors_without_clamping() {
+	mut desktop := Desktop{ canvas: new_scaled_canvas(5, 5, 10, 10, 2), pointer_x: 3, pointer_y: 2 }
+	defer { unsafe { free(desktop.canvas.pixels) desktop.native_asset_icons.free() } }
+	desktop.canvas.clear(0x123456)
+	for coordinate in [-1, 10, 2147483647]! {
+		x := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_x, x: coordinate })
+		y := color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_y, y: coordinate })
+		assert x.status == .invalid && y.status == .invalid && x.count == 0 && y.count == 0
+	}
+	desktop.pointer_x = 2147483647
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_y, y: 0 }).status == .invalid
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_xy, x: 0, y: 0 }).count == 1
+	desktop.pointer_x = int(~u64(0) >> 1)
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_y, y: 0 }).status == .invalid
+	desktop.canvas.scale = 2147483647
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer }).status == .unavailable
+	desktop.canvas.scale = 0
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_xy }).status == .unavailable
+	desktop.canvas.scale = 2
+	pixels := desktop.canvas.pixels
+	desktop.canvas.pixels = unsafe { nil }
+	assert color_meter_sample(&desktop, ColorMeterRequest{ command: .pointer_lock_x }).status == .unavailable
+	desktop.canvas.pixels = pixels
+	mut app := &ColorMeterApp{}
+	defer { app.close_app() unsafe { free(app) } }
+	app.handle('color_meter.sample')!
+	color_meter_test_reply(mut app, &desktop)
+	app.handle('color_meter.lock_x')!
+	assert app.locked_x
+	app.handle('color_meter.live')!
+	desktop.canvas.physical_width = 0
+	color_meter_test_reply(mut app, &desktop)
+	assert app.status == 'color_meter.unavailable' && app.report.count == 0 && app.hex_text == ''
+	app.handle('color_meter.lock_y')!
+	assert !app.locked_y && app.status == 'color_meter.lock_requires_sample'
+	app.handle('color_meter.lock_x')!
+	assert !app.locked_x && app.following
+}
+
+fn test_color_meter_lock_controls_fit_default_minimum_and_tiny_resize_layouts() {
+	mut app := &ColorMeterApp{}
+	defer { app.close_app() unsafe { free(app) } }
+	for size in [ui2.rect(0, 0, 620, 516), ui2.rect(0, 0, 584, 506),
+		ui2.rect(0, 0, 400, 300), ui2.rect(0, 0, 180, 96)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		assert color_test_has_text(tree, if size.width >= 584 && size.height >= 506 { tr('color_meter.lock_x') } else { tr('color_meter.resize') })
+		for child in tree.children {
+			assert child.frame.x >= 0 && child.frame.y >= 0
+			assert child.frame.width >= 0 && child.frame.height >= 0
+			assert child.frame.x + child.frame.width <= size.width
+			assert child.frame.y + child.frame.height <= size.height
+		}
+		free_tree(tree)
+	}
+}
+
+fn test_color_meter_missing_live_service_reply_times_out_without_replacing_sample_and_rebases_clock_rollback() {
+	mut desktop := Desktop{ canvas: new_canvas(10, 10), pointer_x: 4, pointer_y: 5 }
+	defer { unsafe { free(desktop.canvas.pixels) desktop.native_asset_icons.free() } }
+	desktop.canvas.clear(0x123456)
+	mut app := &ColorMeterApp{}
+	defer { app.close_app() unsafe { free(app) } }
+	app.handle('color_meter.live')!
+	color_meter_test_reply(mut app, &desktop)
+	app.handle('color_meter.lock_x')!
+	request := app.take_desktop_service_request()
+	assert request.command == .pointer_lock_x && app.waiting
+	sequence := app.sequence
+	assert !app.poll() && app.sequence == sequence
+	assert app.take_desktop_service_request().command == .none_
+	start := app.waiting_since
+	assert !app.live_reply_expired(~u64(0)) && app.waiting_since == start
+	app.waiting_since = ~u64(0)
+	assert !app.live_reply_expired(10) && app.waiting_since == 10
+	assert !app.live_reply_expired(1009)
+	assert app.live_reply_expired(1010)
+	app.waiting_since = desktop_monotonic_ms() + 1000
+	assert !app.poll() && app.following && app.waiting && app.sequence == sequence
+	assert app.waiting_since <= desktop_monotonic_ms()
+	assert app.report.rgb == 0x123456 && app.lock_x == 4
+	// A matching successful reply ends waiting, so an old timestamp cannot
+	// time out an already completed service operation.
+	bytes := color_meter_encode_report(color_meter_sample(&desktop, request))
+	app.receive_desktop_service_reply(unsafe { tos(bytes.data, bytes.len) })
+	unsafe { bytes.free() }
+	assert !app.waiting && app.following
+	app.waiting_since = 0
+	assert !app.poll() && app.sequence > sequence && app.following
+	dropped := app.take_desktop_service_request()
+	assert dropped.command == .pointer_lock_x && app.waiting
+	app.waiting_since = desktop_monotonic_ms() - color_meter_live_reply_timeout_ms
+	assert app.poll()
+	assert !app.waiting && !app.following && app.status == 'color_meter.live_unavailable'
+	assert app.report.rgb == 0x123456 && app.hex_text == '#123456' && app.locked_x
+	assert editor_bytes_text(app.x_input) == '4' && editor_bytes_text(app.y_input) == '5'
+	late := color_meter_encode_report(ColorMeterReport{ ...app.report, sequence: dropped.sequence, rgb: 0xffffff })
+	app.receive_desktop_service_reply(unsafe { tos(late.data, late.len) })
+	unsafe { late.free() }
+	assert app.status == 'color_meter.live_unavailable' && app.hex_text == '#123456'
+	app.handle('color_meter.copy_hex')!
+	assert app.take_desktop_service_request().command == .copy_hex
+	app.handle('color_meter.live')!
+	assert app.take_desktop_service_request().command == .pointer_lock_x && app.waiting
+	app.handle('color_meter.freeze')!
+	assert !app.waiting && !app.poll()
+}
+
 struct ColorPasteTestReceiver {
 mut:
 	last string

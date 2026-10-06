@@ -15,6 +15,11 @@ enum ColorMeterCommand {
 	pointer
 	copy_hex
 	copy_rgb
+	// Appended commands keep existing command values and wire sizes unchanged.
+	// x/y are fixed physical pixels only for their corresponding locked axes.
+	pointer_lock_x
+	pointer_lock_y
+	pointer_lock_xy
 }
 
 enum ColorMeterStatus {
@@ -57,6 +62,11 @@ fn color_meter_aperture_valid(value int) bool {
 	return value == 1 || value == 3 || value == 5 || value == 9
 }
 
+fn color_meter_pointer_command(command ColorMeterCommand) bool {
+	return command == .pointer || command == .pointer_lock_x
+		|| command == .pointer_lock_y || command == .pointer_lock_xy
+}
+
 fn color_meter_read_u32(data string, offset int) u32 {
 	return u32(data[offset]) | u32(data[offset + 1]) << 8 |
 		u32(data[offset + 2]) << 16 | u32(data[offset + 3]) << 24
@@ -77,7 +87,7 @@ fn color_meter_decode_request(data string) ?ColorMeterRequest {
 	if data.len != color_meter_request_size || color_meter_read_u32(data, 0) != color_meter_request_magic { return none }
 	command := color_meter_read_u32(data, 8)
 	aperture := int(i32(color_meter_read_u32(data, 20)))
-	if command < u32(ColorMeterCommand.sample) || command > u32(ColorMeterCommand.copy_rgb)
+	if command < u32(ColorMeterCommand.sample) || command > u32(ColorMeterCommand.pointer_lock_xy)
 		|| !color_meter_aperture_valid(aperture) { return none }
 	return ColorMeterRequest{
 		sequence: color_meter_read_u32(data, 4)
@@ -212,11 +222,21 @@ fn color_meter_sample(desktop &Desktop, request ColorMeterRequest) ColorMeterRep
 	}
 	if report.width == 0 || report.height == 0 || canvas.stride < report.width
 		|| canvas.stride > 32768 || unsafe { canvas.pixels == nil } { return report }
-	if request.command == .pointer {
-		report = ColorMeterReport{
-			...report
-			x: desktop.pointer_x * canvas.scale + canvas.scale / 2
-			y: desktop.pointer_y * canvas.scale + canvas.scale / 2
+	if color_meter_pointer_command(request.command) {
+		if canvas.scale <= 0 || canvas.scale > 32768 { return report }
+		// Calculate the unlocked axes in a wider type before bounding them. A
+		// malformed pointer or scale cannot wrap into a valid physical pixel.
+		if request.command != .pointer_lock_x && request.command != .pointer_lock_xy {
+			if desktop.pointer_x < 0 || desktop.pointer_x >= report.width { return ColorMeterReport{ ...report, status: .invalid } }
+			x := i64(desktop.pointer_x) * i64(canvas.scale) + canvas.scale / 2
+			if x < 0 || x >= report.width { return ColorMeterReport{ ...report, status: .invalid } }
+			report = ColorMeterReport{ ...report, x: int(x) }
+		}
+		if request.command != .pointer_lock_y && request.command != .pointer_lock_xy {
+			if desktop.pointer_y < 0 || desktop.pointer_y >= report.height { return ColorMeterReport{ ...report, status: .invalid } }
+			y := i64(desktop.pointer_y) * i64(canvas.scale) + canvas.scale / 2
+			if y < 0 || y >= report.height { return ColorMeterReport{ ...report, status: .invalid } }
+			report = ColorMeterReport{ ...report, y: int(y) }
 		}
 	}
 	if report.x < 0 || report.y < 0 || report.x >= report.width || report.y >= report.height
@@ -269,7 +289,7 @@ fn (mut app RemoteApp) handle_desktop_service(data string) bool {
 	request := color_meter_decode_request(data) or { return false }
 	if unsafe { app.desktop == nil } { return false }
 	mut report := ColorMeterReport{}
-	if request.command == .sample || request.command == .pointer {
+	if request.command == .sample || color_meter_pointer_command(request.command) {
 		report = color_meter_sample(app.desktop, request)
 	} else {
 		report = ColorMeterReport{ ...app.color_sample, sequence: request.sequence }
