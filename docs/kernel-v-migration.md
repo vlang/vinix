@@ -452,7 +452,7 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **13,079 original fixture/benchmark
+**3,251 original production/native-boundary C lines**, **14,710 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel and
 eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
 boundary lines now use instruction-only
@@ -540,6 +540,14 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | QEMU signal, first-touch and restart independent scopes | 241 | `fb74d12a` |
 | Native clock-control independent oracle | 163 | `7ddfcb65` |
 | QEMU interrupted nanosleep independent scope | 40 | `60f5c267` |
+| SPI keyboard independent golden/PIO fixture | 564 | `558dc058` |
+| SPI touchpad independent protocol/PIO fixture | 505 | `775f7f2a` |
+| Native x86 poll independent fixture | 85 | `003f5861` |
+| POSIX timer signal independent fixture | 230 | `ad82c434` |
+| Display-hotplug independent oracle | 147 | `d21ed758` |
+| Verified-boot standalone protocol fixture | 40 | `8b96b191` |
+| QEMU blocked-thread exit/exec independent scope | 38 | `22c5d6ee` |
+| QEMU pollfd ABI independent scope | 22 | `eecdee92` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -799,10 +807,67 @@ including its signal counter and handler. All nine original check expressions
 and logical lines, the one-second sleep, 20-ms interruption delay and native
 volatile signal counter remain. Both actual host sanitizer ABIs, both strict
 four-module SDK links and three paired native cases per architecture passed.
-Normal builds use maintained V without recovering original C. The current QEMU
-source contains 3,140 original lines plus ten integration lines; the broader
+Normal builds use maintained V without recovering original C. That stage left
+3,140 original lines plus ten integration lines; the broader
 270-line stage remains uncredited. `qemu-nanosleep40-final-validation.json`
 records the immutable inputs, cleanup/callback review and reused kernels.
+
+The SPI keyboard (`558dc058`, 564) and touchpad (`775f7f2a`, 505) fixtures
+preserve all 147/115 ordered assertion expressions and lines, 21/19 groups and
+100,000 mutations each. Both actual host sanitizer ABIs, strict native SDK pairs
+and all eight complete C/V native model guests passed with no allocator imports.
+The full ARM production provider is unchanged. Private x86 providers omit only
+five manifested, unexecuted ARM hardware entries; exercised algorithms remain
+identical. `spi-{keyboard,touchpad}-stage-validation.json` records peer review.
+A later whitespace-only fix (`1363af4b`) regenerated identical native code.
+These model tests add no physical SPI operation or new kernel-build claim.
+
+The x86 poll oracle (`003f5861`, 85) preserves all 29 original checks, 40-ms
+sleeping, both 50-ms child writes, duplicate descriptor readiness, HUP and the
+original 32/33-event limits. Strict musl GCC C/V builds and both complete native
+guests passed against the reused default kernel. Fixed stack records retain
+synchronous poll/read borrows and original reap/close order; no allocator
+imports appear. `poll-validation.json` records peer lifetime review. This
+x86/Vinix-specific fixture adds no ARM or host sanitizer claim.
+
+The POSIX timer oracle (`ad82c434`, 230) preserves all 59 original check
+expressions and lines, signal delivery, native union-sigval callback identity,
+timer ownership and deadlines. Both strict SDK pairs, all four complete native
+C/V controls, the maintained x86 runner and both generated caller-ownership
+checks passed. It reuses the already validated default kernels with unchanged
+300-second budgets. `posix-timer-fixture/validation.json` records peer review;
+no production kernel change or host syscall simulation is claimed.
+
+The display-hotplug oracle (`d21ed758`, 147) retains all 47 checks, cold attach,
+unsigned counter wrap, zero debounce and non-1 C truth values. Both actual host
+ASan/UBSan comparisons and all four strict SDK/native C/V controls passed;
+production provider source and instructions match each pair exactly. State
+remains a synchronous stack borrow, with no allocator imports. Peer review
+restored the original diagnostic newline before final host/native validation.
+`hotplug-validation.json` preserves the initial unsupported Darwin leak-sanitizer
+setup and missing ARM kernel-directory attempt; actual address/undefined
+sanitizers halt on errors. Physical CD321x/DCP operation remains untested.
+
+The verified-boot fixture (`8b96b191`, 40) builds fresh standalone freestanding
+ELFs for both architectures. Both C/V pairs preserve all 120 request bytes and
+native volatile response/MMIO widths, with empty initialization and zero
+unresolved runtime symbols. All 16 real Limine scenarios passed: accepted
+handoff and rejected config, kernel and module tampering for each pair.
+Five unchanged host policy tests passed too. `verified-fixture-validation.json`
+records peer review, original 40-second budgets and pinned Limine 12.8.0 builds.
+This bootloader fixture adds no production-kernel or Secure Boot enrollment
+claim; the native tests ran with firmware authentication disabled.
+
+Two further QEMU scopes port blocked-thread exit/exec (`22c5d6ee`, 38) and
+pollfd ABI (`eecdee92`, 22). Both actual host sanitizer ABIs, strict SDK links,
+complete maintained-only generators and paired native guests passed six blocked
+and eleven poll input/failure cases. All two/ten original checks retain their
+expressions and logical lines. The actual thread callback, permanent child
+channel, 100-ms settling, exec/reap order, 32/16-bit poll fields and 1,000-ms
+poll deadline remain. Retained reap/exec-probe helpers receive zero credit.
+`qemu-{blocked38,poll22}-final-validation.json` records independent review;
+3,080 original QEMU lines plus 14 integration lines remain at this snapshot.
+The broader 270-line scope and complete host-model workload remain uncredited.
 
 Native callback contracts (`03ad7bb3`, 18 paths) and const string/log-record
 contracts (`e79802e4`, five paths) receive zero algorithm credit. They preserve
@@ -842,9 +907,9 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `60f5c267fc4fc2b4484379dc51eace713ec27b44`,
+At committed source `eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 172 test paths / 42,182 lines,
+The non-vendored `.c` census still contains 166 test paths / 40,555 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
 of the repository-wide request. This census is not a translation tally. The
@@ -980,8 +1045,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`60f5c267fc4fc2b4484379dc51eace713ec27b44` reports **V 71.62%, C 6.08%**,
-465 C files, 485 Python files and 285 shell files. All 2,563 classified blob
+`eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17` reports **V 71.68%, C 5.90%**,
+469 C files, 492 Python files and 285 shell files. All 2,588 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;

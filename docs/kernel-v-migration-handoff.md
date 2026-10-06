@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`60f5c267fc4fc2b4484379dc51eace713ec27b44`. Re-read HEAD, `AGENTS.md` and
+`eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **13,079 original fixture/benchmark
+continuation adds **3,251 original production C lines**, **14,710 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel, eight
 Wi-Fi tool lines),
 counted separately. Twenty-one stack-pointer/syscall/variadic boundary lines use
@@ -102,6 +102,14 @@ instruction-only assembly and receive no V algorithm credit.
 | QEMU signal/first-touch/restart independent scopes (241) | `fb74d12a` |
 | Native clock-control independent oracle (163) | `7ddfcb65` |
 | QEMU interrupted nanosleep independent scope (40) | `60f5c267` |
+| SPI keyboard independent fixture (564) | `558dc058` |
+| SPI touchpad independent fixture (505) | `775f7f2a` |
+| Native x86 poll independent fixture (85) | `003f5861` |
+| POSIX timer signal independent fixture (230) | `ad82c434` |
+| Display-hotplug independent oracle (147) | `d21ed758` |
+| Verified-boot standalone protocol fixture (40) | `8b96b191` |
+| QEMU blocked-thread exit/exec independent scope (38) | `22c5d6ee` |
+| QEMU pollfd ABI independent scope (22) | `eecdee92` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
 | Canonical callback contracts (zero credit) | `03ad7bb3` |
 | Const string/log-record contracts (zero credit) | `e79802e4` |
@@ -112,8 +120,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 172 test paths /
-42,182 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 166 test paths /
+40,555 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -160,8 +168,11 @@ stage's input hashes before continuing; completed commits above are separate:
   fixture verdict. A correctly labelled per-CPU QMP snapshot shows kernel TLB
   polling; interrupt-disabled polling alone does not establish deadlock.
   The fresh original-C `qemu64` control failed with child wait status nine
-  (SIGKILL); the cause remains unknown and its evidence is preserved. Its V pair
-  is running. Both retain four CPUs, exact assertions, workloads and 3,600-second budgets,
+  (SIGKILL); its V pair failed the original bound-CPU routing assertion. Both
+  causes remain unknown and their evidence is preserved. A separate failure-only
+  diagnostic also ended with SIGKILL before printing routing operands. Its cause
+  remains unknown; it retained exact assertions and is not the validation ELF.
+  Both comparisons retain four CPUs, exact workloads and 3,600-second budgets,
   recording CPU/kernel configuration changes without claiming earlier failures
   resolved. Both fresh default architecture builds/boots and the opt-in build
   pass for the composed 23-path contract stage. Its complete guest initially
@@ -191,11 +202,16 @@ stage's input hashes before continuing; completed commits above are separate:
   six paired native guests pass all 61 original checks with original reap-body
   lifetimes. A separate 40-line interrupted nanosleep scope (`60f5c267`) passed both
   host sanitizer ABIs, strict SDK links and paired native cases with nine original
-  checks. Only those 281 lines receive credit; the broader 270-line stage
+  checks. Blocked-thread exit/exec (38, `22c5d6ee`) and pollfd ABI (22, `eecdee92`)
+  also passed both host/SDK/native comparisons with two/ten original checks.
+  Only those 341 lines receive credit; the broader 270-line stage
   remains pending. Preserve old failure evidence and explicit configurations.
-- The SPI keyboard/touchpad fixtures (564/505), blocked-thread scope (38) and
-  POSIX timer oracle (230) are in progress. They receive no credit until complete
-  native comparisons and exact-path commits; preserve their original controls.
+- SPI keyboard/touchpad (564/505), POSIX timer (230), x86 poll (85), hotplug
+  policy (147) and verified-boot protocol (40) fixtures are committed with exact
+  assertions and native controls. Their detailed receipts are listed below.
+- At this pinned snapshot, resource-open (133), shared-stream (119) and QEMU
+  epoll (30) are excluded from the totals. Add them only after complete native
+  comparisons and exact-path commits; preserve their original controls.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
@@ -270,7 +286,35 @@ volatile signal counter and actual exported callback preserve signal identity.
 Both actual host sanitizer ABIs, both strict four-module SDK links and three
 paired native cases per architecture passed against reused immutable kernels.
 `qemu-nanosleep40-final-validation.json` records peer lifetime review; the
-remaining QEMU source has 3,140 original lines plus ten integration lines.
+scope at that stage left 3,140 original lines plus ten integration lines.
+Blocked-thread and pollfd ports now leave 3,080 plus 14 integration lines.
+
+The SPI fixtures (`558dc058`, `775f7f2a`) passed 147/115 original checks,
+21/19 groups, 100,000 mutations each, both actual host sanitizer ABIs and all
+eight native C/V model controls. Full ARM provider code remains unchanged;
+private x86 providers omit only five manifested, unexecuted ARM hardware
+entries. Native models add no physical SPI claim. `spi-{keyboard,touchpad}-stage-validation.json`
+records no allocator imports and peer lifetime review.
+
+The POSIX timer (`ad82c434`, 230), x86 poll (`003f5861`, 85) and hotplug
+(`d21ed758`, 147) fixtures retain all 59/29/47 original checks. Complete native
+C/V controls and strict SDK links passed; hotplug also passed both actual host
+sanitizer comparisons. Fixed records, exported callbacks, timer/FD/child
+ownership and original deadlines remain. Receipts: `posix-timer-fixture/validation.json`,
+`poll-validation.json`, `hotplug-validation.json`. They reuse immutable kernels;
+x86 poll adds no ARM/host check and physical CD321x/DCP remains untested.
+
+The verified-boot fixture (`8b96b191`, 40) passed both fresh freestanding builds,
+byte-identical 120-byte C/V request records, volatile IR/instruction checks,
+five host policy tests and all 16 native Limine scenarios. It retains the
+40-second budget and rejects config, kernel and module tampering. Both native
+pairs ran with Secure Boot disabled; no new firmware trust enrollment or
+production-kernel build is claimed. `verified-fixture-validation.json` records
+peer review and pinned Limine 12.8.0 inputs.
+
+Completed disposable test images may be retired only after recording hashes;
+preserve source, executables, logs and receipts. Recent image-build failures
+from a full host disk were setup failures before any fixture verdict.
 
 Current local cache:
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
@@ -520,9 +564,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`60f5c267fc4fc2b4484379dc51eace713ec27b44` reports **V 71.62%, C 6.08%**,
-465 C files, 485 Python files and 285 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,563 classified blobs
+`eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17` reports **V 71.68%, C 5.90%**,
+469 C files, 492 Python files and 285 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,588 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

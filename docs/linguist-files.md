@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `60f5c267fc4fc2b4484379dc51eace713ec27b44`,
+at source commit `eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 465 | 2,477,487 | 6.08% |
-| Python | 485 | 4,854,784 | 11.92% |
-| Shell | 285 | 1,251,941 | 3.07% |
+| C | 469 | 2,411,336 | 5.90% |
+| Python | 492 | 4,939,514 | 12.08% |
+| Shell | 285 | 1,252,089 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 71.62%, with no
+All `.v` files are classified as V. The resulting V share is 71.68%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 60f5c267fc4fc2b4484379dc51eace713ec27b44 --breakdown --json
+github-linguist --rev eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -187,7 +187,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/param.h` | 138 |
 | `kernel/linuxkpi/include/asm/percpu.h` | 434 |
 | `kernel/linuxkpi/include/asm/posix_types.h` | 450 |
-| `kernel/linuxkpi/include/asm/processor.h` | 594 |
+| `kernel/linuxkpi/include/asm/processor.h` | 941 |
 | `kernel/linuxkpi/include/asm/rwonce.h` | 80 |
 | `kernel/linuxkpi/include/asm/string.h` | 260 |
 | `kernel/linuxkpi/include/asm/swab.h` | 181 |
@@ -281,7 +281,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-track/guestfixture/guest-native-abi.h` | 381 |
 | `tests/amd64-console/guestfixture/console-native-abi.h` | 237 |
 | `tests/amd64-exceptions/test.c` | 4,154 |
-| `tests/amd64-poll/test.c` | 3,655 |
+| `tests/amd64-poll/pollfixture/poll-native-abi.h` | 579 |
 | `tests/android/android-egl-queue-probe.c` | 7,185 |
 | `tests/android/android-split-probe.c` | 175 |
 | `tests/android/atfork-test.c` | 6,206 |
@@ -308,9 +308,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-speakers/fixture-native-abi.h` | 302 |
 | `tests/apple-speakers/guest_sound.c` | 5,306 |
 | `tests/apple-spi-keyboard/core_fixture.h` | 10,037 |
-| `tests/apple-spi-keyboard/test.c` | 26,896 |
-| `tests/apple-spi-touchpad/test.c` | 23,631 |
-| `tests/apple_display_hotplug/test_hotplug.c` | 6,863 |
+| `tests/apple-spi-keyboard/keyboard-native-abi.h` | 610 |
+| `tests/apple-spi-touchpad/touchpad-native-abi.h` | 610 |
+| `tests/apple_display_hotplug/hotplugfixture/hotplug-native-abi.h` | 229 |
 | `tests/apple_smc/fixture-v-abi.h` | 402 |
 | `tests/application-sandbox/guest.c` | 4,701 |
 | `tests/application-sandbox/host.c` | 6,547 |
@@ -444,7 +444,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pidfd/job_guest.c` | 361 |
 | `tests/pidfd/mac_guest.c` | 6,237 |
 | `tests/posix-acl/test.c` | 16,388 |
-| `tests/posix-timer/guest.c` | 9,370 |
+| `tests/posix-timer/timerfixture/timer-fixture-native-abi.h` | 1,454 |
 | `tests/proc-map-lookup/test.c` | 9,848 |
 | `tests/proc-thread-lock/test.c` | 6,488 |
 | `tests/process-churn/guest.c` | 18,635 |
@@ -452,13 +452,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-allocs/guest.c` | 8,473 |
 | `tests/procfs-mount/guest.c` | 9,751 |
 | `tests/ps1/guest.c` | 13,415 |
+| `tests/qemu-core/blockedfixture/blockedfixture_v_contract.h` | 577 |
+| `tests/qemu-core/blockedoracle/blocked-oracle-native-abi.h` | 1,147 |
 | `tests/qemu-core/nanosleepfixture/nanosleepfixture_v_contract.h` | 818 |
 | `tests/qemu-core/nanosleeporacle/nanosleep-oracle-native-abi.h` | 609 |
+| `tests/qemu-core/pollfixture/pollfixture_v_contract.h` | 650 |
+| `tests/qemu-core/polloracle/poll-oracle-native-abi.h` | 639 |
 | `tests/qemu-core/restartfixture/restartfixture_v_contract.h` | 534 |
 | `tests/qemu-core/restartoracle/restart-oracle-native-abi.h` | 360 |
 | `tests/qemu-core/signalfixture/signalfixture_v_contract.h` | 851 |
 | `tests/qemu-core/signaloracle/signal-oracle-native-abi.h` | 532 |
-| `tests/qemu-core/test.c` | 107,091 |
+| `tests/qemu-core/test.c` | 105,536 |
 | `tests/qemu-core/touchfixture/touchfixture_v_contract.h` | 1,400 |
 | `tests/qemu-core/touchmodel/touch-model-native-abi.h` | 733 |
 | `tests/qemu-core/touchoracle/touch-oracle-native-abi.h` | 319 |
@@ -494,7 +498,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/user-alloc/clock.c` | 4,903 |
 | `tests/user-alloc/verify-all-classes.c` | 7,105 |
 | `tests/user-alloc/verify.c` | 8,922 |
-| `tests/verified-boot/kernel.c` | 1,499 |
+| `tests/verified-boot/bootfixture/boot-native-abi.h` | 476 |
 | `tests/verified-root/guest.c` | 7,771 |
 | `tests/verified-root/host.c` | 11,399 |
 | `tests/virtio-gpu-venus/abi.c` | 2,352 |
@@ -714,6 +718,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-track/run_guest.py` | 1,101 |
 | `tests/alloc-track/run_native.py` | 3,834 |
 | `tests/amd64-console/run.py` | 1,040 |
+| `tests/amd64-poll/run.py` | 2,839 |
 | `tests/android/activity-lifecycle-test.py` | 4,770 |
 | `tests/android/art-runtime-test.py` | 26,423 |
 | `tests/android/atl-configuration.py` | 7,854 |
@@ -738,10 +743,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-speakers/compile-fixture.py` | 1,194 |
 | `tests/apple-speakers/provider.py` | 3,177 |
 | `tests/apple-speakers/run.py` | 9,731 |
-| `tests/apple-spi-keyboard/run.py` | 2,743 |
+| `tests/apple-spi-keyboard/compile-fixture.py` | 1,682 |
+| `tests/apple-spi-keyboard/provider.py` | 3,119 |
+| `tests/apple-spi-keyboard/run.py` | 9,938 |
 | `tests/apple-spi-keyboard/run.sh` | 127 |
 | `tests/apple-spi-touchpad/run.sh` | 127 |
-| `tests/apple_display_hotplug/run.py` | 1,982 |
+| `tests/apple_display_hotplug/run.py` | 7,460 |
 | `tests/apple_smc/compile-fixture.py` | 776 |
 | `tests/apple_smc/run.py` | 7,170 |
 | `tests/block-storage/run.py` | 6,237 |
@@ -834,6 +841,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/compile-v-core.py` | 1,629 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
 | `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
+| `tests/linuxkpi/cpu_feature_policy_test.py` | 30,725 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/irq_context_test.py` | 25,527 |
@@ -842,10 +850,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/overflow_type_test.py` | 13,758 |
 | `tests/linuxkpi/pagefault_test.py` | 22,314 |
 | `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
-| `tests/linuxkpi/run_vm.py` | 11,291 |
+| `tests/linuxkpi/run_vm.py` | 11,417 |
 | `tests/linuxkpi/scalar_store_test.py` | 21,614 |
 | `tests/linuxkpi/scalar_uaccess_test.py` | 17,555 |
 | `tests/linuxkpi/smp_type_test.py` | 21,549 |
+| `tests/linuxkpi/special_insns_test.py` | 12,994 |
 | `tests/linuxkpi/spin_test.py` | 5,602 |
 | `tests/linuxkpi/standalone_test.py` | 4,640 |
 | `tests/linuxkpi/static_key_declaration_test.py` | 12,107 |
@@ -894,7 +903,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pci-config/arm_vm.py` | 14,616 |
 | `tests/pci-config/topology_test.py` | 36,084 |
 | `tests/posix-timer/check-generated.py` | 1,464 |
-| `tests/posix-timer/run.py` | 3,804 |
+| `tests/posix-timer/run.py` | 4,098 |
 | `tests/process-churn/check-generated.py` | 2,462 |
 | `tests/process-churn/check-results.py` | 7,512 |
 | `tests/process-churn/run.py` | 5,871 |
@@ -906,10 +915,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps1/frame.py` | 1,895 |
 | `tests/ps1/run.py` | 6,744 |
 | `tests/python3/smoke.py` | 9,112 |
-| `tests/qemu-core/compile-fixtures.py` | 1,665 |
+| `tests/qemu-core/compile-fixtures.py` | 1,698 |
 | `tests/qemu-core/oracle_support.py` | 4,328 |
 | `tests/qemu-core/run_vm.py` | 13,462 |
+| `tests/qemu-core/test-blockedfixture.py` | 9,618 |
 | `tests/qemu-core/test-nanosleepfixture.py` | 9,100 |
+| `tests/qemu-core/test-pollfixture.py` | 8,605 |
 | `tests/qemu-core/test-restartfixture.py` | 6,766 |
 | `tests/qemu-core/test-signalfixture.py` | 6,769 |
 | `tests/qemu-core/test-touchfixture.py` | 7,389 |
@@ -950,7 +961,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/uname/run.py` | 2,859 |
 | `tests/user-access/sites.py` | 3,169 |
 | `tests/userland-demo/run.py` | 3,723 |
-| `tests/verified-boot/runtime.py` | 8,363 |
+| `tests/verified-boot/runtime.py` | 10,385 |
 | `tests/verified-boot/test.py` | 13,268 |
 | `tests/verified-root/run-host.py` | 7,267 |
 | `tests/verified-root/runtime.py` | 14,950 |
@@ -1256,7 +1267,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pagecache/run.sh` | 2,509 |
 | `tests/pci-config/run.sh` | 1,237 |
 | `tests/private-pages/run-host.sh` | 5,998 |
-| `tests/qemu-core/run.sh` | 3,725 |
+| `tests/qemu-core/run.sh` | 3,873 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
 | `tests/qemu-nested/run.sh` | 3,182 |
 | `tests/realtime/run.sh` | 1,513 |
