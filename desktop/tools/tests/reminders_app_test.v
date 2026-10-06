@@ -672,12 +672,20 @@ fn test_reminders_overdue_filter_composes_each_sort_and_clock_unavailability() {
 	app.handle('reminders.filter.overdue')!
 	assert app.match_count == 4
 	for slot, index in [1, 3, 4, 6]! { assert app.matches[slot] == index }
+	app.handle('reminders.direction.toggle')!
+	for slot, index in [6, 4, 3, 1]! { assert app.matches[slot] == index }
 	app.handle('reminders.sort.priority')!
 	for slot, index in [1, 6, 3, 4]! { assert app.matches[slot] == index }
+	app.handle('reminders.direction.toggle')!
+	for slot, index in [4, 3, 1, 6]! { assert app.matches[slot] == index }
 	app.handle('reminders.sort.due')!
 	for slot, index in [3, 6, 1, 4]! { assert app.matches[slot] == index }
+	app.handle('reminders.direction.toggle')!
+	for slot, index in [1, 4, 6, 3]! { assert app.matches[slot] == index }
 	app.handle('reminders.sort.title')!
 	for slot, index in [1, 4, 3, 6]! { assert app.matches[slot] == index }
+	app.handle('reminders.direction.toggle')!
+	for slot, index in [6, 3, 1, 4]! { assert app.matches[slot] == index }
 	app.selected = 6
 	app.handle('reminders.delete')!
 	app.clock_valid = false
@@ -703,6 +711,8 @@ fn test_reminders_sort_is_readonly_for_v1_and_preserves_busy_conflict_drafts() {
 	defer { first.close_app() second.close_app() }
 	second.handle('reminders.sort.title')!
 	assert second.matches[0] == 1 && second.matches[1] == 0
+	second.handle('reminders.direction.toggle')!
+	assert second.matches[0] == 0 && second.matches[1] == 1
 	unchanged := os.read_file(path)!
 	assert unchanged == legacy && second.record == legacy
 	unsafe { unchanged.free() }
@@ -714,9 +724,11 @@ fn test_reminders_sort_is_readonly_for_v1_and_preserves_busy_conflict_drafts() {
 	first.selected = 1
 	first.toggle_selected()
 	second.handle('reminders.sort.priority')!
+	second.handle('reminders.direction.toggle')!
 	second.save_edit()
 	assert second.status == 'reminders.changed' && second.editing
 	assert second.edit_index == 0 && second.edit_priority == .high
+	assert second.sort_reversed[int(RemindersSort.priority)]
 	assert editor_bytes_text(second.title_input) == 'Pending identity'
 	assert second.record == legacy && second.data.items[0].title == 'Zebra'
 	second.reload()
@@ -727,9 +739,11 @@ fn test_reminders_sort_is_readonly_for_v1_and_preserves_busy_conflict_drafts() {
 	lock_fd := reminders_lock(second.home_fd)
 	assert lock_fd >= 0
 	second.handle('reminders.sort.due')!
+	second.handle('reminders.direction.toggle')!
 	second.save_edit()
 	assert second.status == 'reminders.busy' && second.editing
 	assert second.edit_index == 0 && second.edit_priority == .low
+	assert second.sort_reversed[int(RemindersSort.due)]
 	assert second.data.items[0].priority == .none
 	desktop_close(lock_fd)
 	second.save_edit()
@@ -758,6 +772,12 @@ fn test_reminders_sort_keyboard_focus_and_bounded_controls_do_not_overlap_rows()
 	app.key_input('\x1b[D')
 	assert app.sort == .title
 	app.key_input('\t')
+	assert app.focus == 5
+	app.key_input('\x1b[C')
+	assert app.sort_reversed[int(RemindersSort.title)]
+	app.key_input(' ')
+	assert !app.sort_reversed[int(RemindersSort.title)]
+	app.key_input('\t')
 	assert app.focus == 2
 	app.key_input('\x1b[C')
 	assert app.sort == .title
@@ -766,6 +786,10 @@ fn test_reminders_sort_keyboard_focus_and_bounded_controls_do_not_overlap_rows()
 	assert app.focus == 4 && app.editing && app.edit_index == 0
 	app.key_input('\x1b[C')
 	assert app.sort == .manual && editor_bytes_text(app.title_input) == 'Zeta'
+	app.key_input('\t')
+	assert app.focus == 5 && app.editing
+	app.key_input('\r')
+	assert app.sort_reversed[int(RemindersSort.manual)] && app.editing
 	app.key_input('\t')
 	assert app.focus == 0 && app.editing
 	for language in desktop_languages {
@@ -786,13 +810,146 @@ fn test_reminders_sort_keyboard_focus_and_bounded_controls_do_not_overlap_rows()
 					previous_right = child.frame.x + child.frame.width
 					sorts++
 				}
-				if child.id == 'reminders.new' { assert child.frame.y == 124 }
+				if child.id == 'reminders.direction.toggle' {
+					assert child.frame.y == 120 && child.frame.height == 28
+					assert child.frame.x >= 14 && child.frame.x + child.frame.width <= width - 14
+					assert child.text == tr(app.direction_key()) && child.text != app.direction_key()
+					face := desktop.face_for(child.text_style)
+					assert face.text_width(child.text) <= int(child.frame.width) - 8
+				}
+				if child.id == 'reminders.new' { assert child.frame.y == 160 }
 				if child.id.starts_with('reminders.row.') {
-					assert child.frame.y >= 164 && child.frame.y + child.frame.height < 616 - 300
+					assert child.frame.y >= 200 && child.frame.y + child.frame.height < 616 - 300
 				}
 			}
-			assert sorts == 4 && app.page_rows == 3
+			assert sorts == 4 && app.page_rows == 2
 			free_tree(tree)
 		}
+	}
+}
+
+fn test_reminders_each_direction_reverses_primary_keys_keeps_ties_and_is_session_only() {
+	home := reminders_test_home('directions')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	for order in [RemindersSort.manual, RemindersSort.priority, RemindersSort.due, RemindersSort.title]! {
+		app.handle(reminders_sort_key(order))!
+		assert !app.sort_reversed[int(order)]
+		app.handle('reminders.direction.toggle')!
+		assert app.sort_reversed[int(order)] && app.focus == 5
+		expected := match order {
+			.manual { [8, 7, 6, 5, 4, 3, 2, 1, 0]! }
+			.priority { [0, 8, 4, 3, 5, 7, 1, 2, 6]! }
+			.due { [1, 4, 6, 2, 7, 3, 0, 5, 8]! }
+			.title { [6, 5, 3, 1, 4, 0, 2, 8, 7]! }
+		}
+		for slot, index in expected { assert app.matches[slot] == index }
+		assert app.record == reminders_test_sort_record()
+	}
+	app.reload()
+	assert app.sort == .title && app.sort_reversed[int(RemindersSort.title)]
+	assert app.matches[0] == 6 && app.matches[6] == 2 && app.matches[7] == 8
+	app.handle('reminders.sort.due')!
+	assert app.sort_reversed[int(RemindersSort.due)]
+	for slot, index in [1, 4, 6, 2, 7, 3, 0, 5, 8]! { assert app.matches[slot] == index }
+	app.key_input('\x1b[D')
+	// Sort-key focus changes the key, rather than its remembered direction.
+	assert app.sort == .priority && app.sort_reversed[int(RemindersSort.priority)]
+	stored := os.read_file(path)!
+	assert stored == reminders_test_sort_record()
+	unsafe { stored.free() }
+	mut reopened := new_reminders_app(home, 0)
+	defer { reopened.close_app() }
+	assert reopened.sort == .manual
+	for order in [RemindersSort.manual, RemindersSort.priority, RemindersSort.due, RemindersSort.title]! {
+		assert !reopened.sort_reversed[int(order)]
+	}
+}
+
+fn test_reminders_direction_changes_keep_selected_delete_guard_edit_draft_and_exports_attached() {
+	home := reminders_test_home('direction-identities')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.page_rows = 2
+	app.selected = 1
+	app.handle('reminders.delete')!
+	app.handle('reminders.sort.priority')!
+	app.handle('reminders.direction.toggle')!
+	assert app.selected == 1 && app.confirming_delete && app.scroll == 5
+	assert app.matches[app.scroll + 1] == 1
+	app.handle('reminders.delete_confirm')!
+	assert app.data.count == 8 && app.data.items[1].title == 'Alpha'
+	assert app.data.items[3].title == 'alpha' && app.data.items[3].priority == .low
+	app.selected = 3
+	app.begin_edit(3)
+	app.key_input('\x01')
+	app.paste_input('Unsaved direction draft')
+	app.handle('reminders.priority.high')!
+	app.handle('reminders.sort.due')!
+	app.handle('reminders.direction.toggle')!
+	assert app.selected == 3 && app.edit_index == 3 && app.editing
+	assert app.edit_priority == .high && app.data.items[3].priority == .low
+	assert editor_bytes_text(app.title_input) == 'Unsaved direction draft'
+	assert editor_bytes_text(app.due_input) == '2028-02-29 09:00'
+	app.handle('reminders.search')!
+	app.paste_input('Al')
+	assert app.selected == -1 && app.edit_index == 3 && app.editing && !app.confirming_delete
+	app.page_rows = 1
+	app.scroll = 1
+	text := app.visible_text(false)
+	csv := app.visible_text(true)
+	assert text == '[x] Alpha\t2028-02-29\tPriority: High\n[ ] Al\t2028-02-29\tPriority: Medium\n[ ] Alpha\tPriority: None\n'
+	assert csv == '"Title","Due","Completed (0 or 1)","Priority"\n"Alpha","2028-02-29",1,"High"\n"Al","2028-02-29",0,"Medium"\n"Alpha","",0,"None"\n'
+	unsafe { text.free() csv.free() }
+	app.cancel_edit()
+	assert app.data.items[3].title == 'alpha' && app.sort_reversed[int(RemindersSort.due)]
+}
+
+fn test_reminders_direction_and_sort_controls_fit_compact_tiny_frames_without_mutating_drafts() {
+	home := reminders_test_home('direction-small')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, reminders_test_sort_record())!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.selected = 4
+	app.begin_edit(4)
+	app.key_input('\x01')
+	app.paste_input('Small frame draft')
+	app.handle('reminders.sort.due')!
+	app.handle('reminders.direction.toggle')!
+	for dimensions in [[800, 616]!, [480, 616]!, [360, 616]!, [360, 2000]!, [240, 300]!, [180, 144]!, [120, 100]!, [60, 40]!]! {
+		begin_frame_elements()
+		tree := app.build(ui2.rect(0, 0, dimensions[0], dimensions[1]))!
+		mut directions := 0
+		mut row_bottom := f64(0)
+		for child in tree.children {
+			assert child.frame.x >= 0 && child.frame.y >= 0
+			assert child.frame.width > 0 && child.frame.height > 0
+			assert child.frame.x + child.frame.width <= dimensions[0]
+			assert child.frame.y + child.frame.height <= dimensions[1]
+			if child.id == 'reminders.direction.toggle' {
+				directions++
+				assert child.text == tr('reminders.direction.latest') && child.text != 'reminders.direction.latest'
+				row_bottom = child.frame.y + child.frame.height
+			}
+			if child.id.starts_with('reminders.row.') { assert child.frame.y >= row_bottom }
+		}
+		assert directions == 1
+		free_tree(tree)
+		assert app.selected == 4 && app.edit_index == 4 && app.editing
+		assert editor_bytes_text(app.title_input) == 'Small frame draft'
+		assert editor_bytes_text(app.due_input) == '2028-02-29 09:00'
+		assert app.edit_priority == .low && app.data.items[4].title == 'alpha'
+		assert app.sort == .due && app.sort_reversed[int(RemindersSort.due)]
 	}
 }

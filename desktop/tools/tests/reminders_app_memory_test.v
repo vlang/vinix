@@ -5,9 +5,12 @@ import os
 import ui2
 
 #include "@VMODROOT/heap_tracker.h"
+#include "@VMODROOT/reminders_heap_test_guard.h"
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_reminders_heap_require_tracking()
+fn C.vinix_reminders_heap_require_clean()
 
 fn reminders_heap_descriptors() int {
 	mut count := 0
@@ -93,7 +96,7 @@ fn test_reminders_repeated_edits_filters_exports_reload_and_frames_release_owned
 	}
 	app.close_app()
 	app.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_reminders_heap_require_clean()
 }
 
 fn test_reminders_repeated_initialization_and_close_release_all_model_buffers_and_descriptors() {
@@ -119,7 +122,7 @@ fn test_reminders_repeated_initialization_and_close_release_all_model_buffers_an
 		app.close_app()
 	}
 	assert reminders_heap_descriptors() == descriptors
-	assert C.vinix_heap_end() == 0
+	C.vinix_reminders_heap_require_clean()
 }
 
 fn test_reminders_parse_failure_and_save_conflict_paths_release_temporary_allocations() {
@@ -144,7 +147,7 @@ fn test_reminders_parse_failure_and_save_conflict_paths_release_temporary_alloca
 	}
 	first.close_app()
 	second.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_reminders_heap_require_clean()
 }
 
 fn test_reminders_priority_legacy_parse_failure_and_draft_cancel_release_all_owned_memory() {
@@ -181,7 +184,7 @@ fn test_reminders_priority_legacy_parse_failure_and_draft_cancel_release_all_own
 		assert app.edit_priority == .none && app.data.count == 0
 	}
 	app.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_reminders_heap_require_clean()
 }
 
 fn test_reminders_full_bounded_sorting_filter_exports_and_draft_frames_retain_no_memory() {
@@ -238,5 +241,75 @@ fn test_reminders_full_bounded_sorting_filter_exports_and_draft_frames_retain_no
 		app.handle('reminders.filter.all')!
 	}
 	app.close_app()
-	assert C.vinix_heap_end() == 0
+	C.vinix_reminders_heap_require_clean()
+}
+
+fn test_reminders_direction_controls_full_model_exports_and_compact_frames_release_all_allocations() {
+	$if prod { panic('Reminders memory coverage requires enabled assertions') }
+	// Prove that the C checks observe a real V heap allocation before measuring.
+	C.vinix_heap_begin()
+	sentinel := 'Reminders heap tracker guard'.clone()
+	C.vinix_reminders_heap_require_tracking()
+	unsafe { sentinel.free() }
+	C.vinix_reminders_heap_require_clean()
+	home := reminders_heap_home('direction-full')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	mut app := new_reminders_app(home, 0)
+	mut bytes := []u8{cap: 16384}
+	unsafe { bytes.flags |= .noslices }
+	editor_append(mut bytes, reminders_record_header)
+	for index in 0 .. reminders_limit {
+		title := match index % 4 { 0 { 'Alpha' } 1 { 'alpha' } 2 { '日本語' } else { '😀' } }
+		due := match index % 4 { 0 { '' } 1 { '2028-02-29 09:00' } 2 { '2028-02-29' } else { '2027-01-01' } }
+		priority := match index % 4 { 0 { ReminderPriority.none } 1 { ReminderPriority.high } 2 { ReminderPriority.medium } else { ReminderPriority.low } }
+		reminders_append_row(mut bytes, title, due, false, priority)
+	}
+	assert app.publish(editor_bytes_text(bytes))
+	unsafe { bytes.free() }
+	app.selected = 0
+	app.begin_edit(0)
+	app.paste_input(' direction draft')
+	for dimensions in [[800, 616]!, [480, 616]!, [360, 616]!, [360, 2000]!, [240, 300]!, [180, 144]!, [120, 100]!, [60, 40]!]! {
+		begin_frame_elements()
+		warm := app.build(ui2.rect(0, 0, dimensions[0], dimensions[1]))!
+		free_tree(warm)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 40 {
+		for order in [RemindersSort.manual, RemindersSort.priority, RemindersSort.due, RemindersSort.title]! {
+			app.handle(reminders_sort_key(order))!
+			app.focus_field(5)
+			app.key_input('\x1b[C')
+			assert app.sort_reversed[int(order)] && app.selected == 0
+			assert app.editing && app.edit_index == 0
+			assert editor_bytes_text(app.title_input) == 'Alpha direction draft'
+			assert app.data.items[0].title == 'Alpha' && app.match_count == reminders_limit
+			if order == .manual { assert app.matches[0] == 255 && app.matches[255] == 0 }
+			else if order == .priority { assert app.matches[0] == 0 && app.matches[63] == 252 && app.matches[255] == 253 }
+			else if order == .due { assert app.matches[0] == 1 && app.matches[63] == 253 && app.matches[255] == 252 }
+			else { assert app.matches[0] == 3 && app.matches[63] == 255 && app.matches[255] == 252 }
+			for dimensions in [[800, 616]!, [480, 616]!, [360, 616]!, [360, 2000]!, [240, 300]!, [180, 144]!, [120, 100]!, [60, 40]!]! {
+				begin_frame_elements()
+				tree := app.build(ui2.rect(0, 0, dimensions[0], dimensions[1]))!
+				free_tree(tree)
+			}
+			csv := app.visible_text(true)
+			text := app.visible_text(false)
+			assert csv.len > 4000 && text.len > 4000
+			unsafe { csv.free() text.free() }
+			app.handle('reminders.direction.toggle')!
+			assert !app.sort_reversed[int(order)] && app.edit_index == 0
+		}
+		app.handle('reminders.search')!
+		app.key_input('\x01')
+		app.paste_input('Alpha')
+		app.handle('reminders.sort.manual')!
+		app.handle('reminders.direction.toggle')!
+		assert app.match_count == 64 && app.matches[0] == 252 && app.matches[63] == 0
+		app.handle('reminders.search')!
+		app.key_input('\x01\x7f')
+		app.set_sort_reversed(false)
+	}
+	app.close_app()
+	C.vinix_reminders_heap_require_clean()
 }

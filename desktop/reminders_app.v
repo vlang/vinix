@@ -75,6 +75,7 @@ mut:
 	count_text string
 	filter RemindersFilter
 	sort RemindersSort
+	sort_reversed [4]bool
 	selected int = -1
 	scroll int
 	page_rows int = 7
@@ -271,25 +272,30 @@ fn (mut app RemindersApp) refilter() {
 }
 
 fn (app &RemindersApp) match_before(left int, right int) bool {
+	if app.sort == .manual {
+		return if app.sort_reversed[int(app.sort)] { left > right } else { left < right }
+	}
 	a := &app.data.items[left]
 	b := &app.data.items[right]
+	// A missing date always follows dated tasks, even with latest-first order.
+	if app.sort == .due {
+		if a.due.len == 0 && b.due.len > 0 { return false }
+		if a.due.len > 0 && b.due.len == 0 { return true }
+	}
 	order := match app.sort {
 		.manual { 0 }
 		.priority { int(b.priority) - int(a.priority) }
-		.due {
-			if a.due.len == 0 && b.due.len > 0 { 1 }
-			else if a.due.len > 0 && b.due.len == 0 { -1 }
-			else { reminders_compare_text(a.due, b.due) }
-		}
+		.due { reminders_compare_text(a.due, b.due) }
 		.title { reminders_compare_text(a.title, b.title) }
 	}
-	return order < 0 || (order == 0 && left < right)
+	if order == 0 { return left < right }
+	return if app.sort_reversed[int(app.sort)] { order > 0 } else { order < 0 }
 }
 
 // Only the bounded view indices move. Persisted rows, editor indices and delete
 // guards retain their identities; equal keys retain original insertion order.
 fn (mut app RemindersApp) sort_matches() {
-	if app.sort == .manual { return }
+	if app.sort == .manual && !app.sort_reversed[int(app.sort)] { return }
 	for slot := 1; slot < app.match_count; slot++ {
 		index := app.matches[slot]
 		mut position := slot
@@ -304,6 +310,26 @@ fn (mut app RemindersApp) sort_matches() {
 fn (mut app RemindersApp) set_sort(order RemindersSort) {
 	if app.sort == order { return }
 	app.sort = order
+	app.reorder_view()
+}
+
+fn (mut app RemindersApp) set_sort_reversed(reversed bool) {
+	if app.sort_reversed[int(app.sort)] == reversed { return }
+	app.sort_reversed[int(app.sort)] = reversed
+	app.reorder_view()
+}
+
+fn (app &RemindersApp) direction_key() string {
+	reversed := app.sort_reversed[int(app.sort)]
+	return match app.sort {
+		.manual { if reversed { 'reminders.direction.newest' } else { 'reminders.direction.oldest' } }
+		.priority { if reversed { 'reminders.direction.low' } else { 'reminders.direction.high' } }
+		.due { if reversed { 'reminders.direction.latest' } else { 'reminders.direction.earliest' } }
+		.title { if reversed { 'reminders.direction.za' } else { 'reminders.direction.az' } }
+	}
+}
+
+fn (mut app RemindersApp) reorder_view() {
 	app.refilter()
 	app.scroll = 0
 	for slot in 0 .. app.match_count {
