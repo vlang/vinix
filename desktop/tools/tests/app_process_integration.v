@@ -777,14 +777,56 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 	word := 'café_42'
 	if mut app is RemoteApp {
 		assert app.clipboard_copy && app.pointer && app.keyboard
-		app.key_input("printf 'ipcword_42 café_42 tail\\n'\n")
+	}
+	// The installed interactive shell loads its startup files before reading
+	// keys. Its initial termios setup can flush input queued immediately after
+	// fork, so wait for a settled prompt before entering the output command.
+	mut ready := false
+	mut prompt := ''
+	mut prompt_y := 0
+	mut prompt_stable := 0
+	for _ in 0 .. 300 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		mut matched := false
+		for child in tree.children {
+			if child.kind != .label || int(child.frame.y) < terminal_toolbar_height + terminal_padding
+				|| int(child.frame.y) >= 316 - terminal_selection_status_height
+				|| child.text.len <= 1 || !child.text.ends_with('_') { continue }
+			next_y := int(child.frame.y)
+			prompt_stable = if next_y == prompt_y && child.text == prompt { prompt_stable + 1 } else { 1 }
+			if prompt.len > 0 { unsafe { prompt.free() } }
+			prompt = child.text.clone()
+			prompt_y = next_y
+			matched = true
+			ready = prompt_stable >= 3
+			break
+		}
+		free_tree(tree)
+		if !matched { prompt_stable = 0 }
+		if ready { break }
+		desktop_sleep_ms(100)
+	}
+	if prompt.len > 0 { unsafe { prompt.free() } }
+	if !ready {
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		eprintln('IPC Terminal shell prompt did not settle; rendered text follows:')
+		for child in tree.children { if child.text.len > 0 { eprintln(child.text) } }
+		free_tree(tree)
+	}
+	assert ready
+	if mut app is RemoteApp {
+		// ASCII octal escapes produce the same independent Unicode output even
+		// when the shell line editor starts in the C locale. Ctrl-U clears any
+		// draft command; carriage return is the ordinary Enter key.
+		app.key_input("\x15printf 'ipcword_42 caf\\303\\251_42 tail\\n'\r")
 	}
 	mut found := false
 	mut x := 0
 	mut y := 0
 	mut line := ''
 	mut stable := 0
-	for _ in 0 .. 50 {
+	for _ in 0 .. 300 {
 		if mut app is RemoteApp { app.poll() }
 		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
 		mut matched := false
@@ -811,6 +853,12 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 		desktop_sleep_ms(100)
 	}
 	defer { if line.len > 0 { unsafe { line.free() } } }
+	if !found {
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		eprintln('IPC Terminal Unicode output row did not settle; rendered text follows:')
+		for child in tree.children { if child.text.len > 0 { eprintln(child.text) } }
+		free_tree(tree)
+	}
 	assert found
 	if mut app is RemoteApp {
 		for _ in 0 .. 2 {
