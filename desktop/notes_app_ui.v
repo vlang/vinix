@@ -138,14 +138,16 @@ fn (mut a NotesApp) insert_text(text string) {
 	}
 	if a.focus == 1 {
 		if text == '\n' || text == '\t' { return }
-		if (if a.select_all { 0 } else { a.title.len }) + text.len > notes_title_limit {
+		remaining := if a.select_all { 0 } else { a.title.len }
+		if remaining + text.len > notes_title_limit {
 			a.status = 'notes.limit'
 			return
 		}
 		a.record_history()
 		console_edit_character(mut a.title, text, notes_title_limit, a.select_all)
 	} else {
-		if (if a.select_all { 0 } else { a.body.len }) + text.len > notes_body_limit {
+		remaining := if a.select_all { 0 } else { a.body.len }
+		if remaining + text.len > notes_body_limit {
 			a.status = 'notes.limit'
 			return
 		}
