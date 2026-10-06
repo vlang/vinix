@@ -4297,3 +4297,104 @@ Précédent
 desktop.overview.next
 Suivant
 -----
+preview.resize.width.label
+Larg. px
+-----
+preview.resize.height.label
+Haut. px
+-----
+preview.resize.lock.label
+Garder les proportions
+-----
+preview.resize.apply
+Redimensionner
+-----
+preview.resize.limit
+8192 px/côté ; 8 Mi pixels
+-----
+preview.status.resize_invalid
+Entrez des dimensions positives : 8192 par côté et 8 Mi pixels au total.
+-----
+preview.status.resize_failed
+Impossible d’allouer l’image. L’image et l’historique restent inchangés.
+-----
+preview.status.resize_unchanged
+L’image a déjà ces dimensions.
+-----
+preview.status.resized
+Image redimensionnée en mémoire. Exportez en PNG pour enregistrer.
+-----
+preview.status.resize_undone
+Redimensionnement annulé. Rétablir restaure l’image.
+-----
+preview.status.resize_redone
+Redimensionnement rétabli. Exportez en PNG pour enregistrer.
+-----
+calculator.scientific.ee
+EE
+-----
+calculator.scientific.root
+root
+-----
+calculator.scientific.ee.help
+Saisissez les chiffres de l’exposant ; ± change le signe et Retour arrière permet de le modifier.
+-----
+calculator.scientific.root.help
+Saisissez un nombre, choisissez root, saisissez le degré puis appuyez sur =. Un nombre négatif exige un degré entier impair ; le degré zéro est invalide.
+-----
+calculator.error.exponent
+Saisissez au moins un chiffre de l’exposant.
+-----
+grapher.page.graph
+Graphe
+-----
+grapher.page.document
+Document
+-----
+grapher.page.csv
+CSV
+-----
+grapher.page.png
+PNG
+-----
+grapher.compact.document
+Le document garde formule et plages.
+Enregistrer sous crée un fichier.
+Les fichiers existants sont protégés.
+-----
+grapher.compact.csv
+Export de 513 valeurs x,y.
+Les points invalides gardent y vide.
+Les fichiers existants sont protégés.
+-----
+grapher.compact.png
+Export du graphe en 960 × 640.
+Formule et plages sont vérifiées.
+Les fichiers existants sont protégés.
+-----
+grapher.compact.keyboard
+Tab parcourt les champs et les pages.
+Ctrl+L sélectionne la formule.
+Entrée trace, ouvre ou exporte.
+-----
+grapher.resize
+Agrandissez à 280 × 320 pour modifier et exporter.
+-----
+clock.timer.duration
+Durée
+-----
+clock.timer.duration.field
+HH:MM:SS
+-----
+clock.timer.duration.apply
+Appliquer
+-----
+clock.timer.duration.cancel
+Annuler
+-----
+clock.timer.duration.help
+HH:MM:SS · 00:00:01–24:00:00
+-----
+clock.timer.duration.invalid
+Durée invalide · HH:MM:SS, 1s–24h
+-----

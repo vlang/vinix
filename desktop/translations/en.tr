@@ -4092,10 +4092,10 @@ system_information.search.label
 Search
 -----
 preview.undo
-Undo crop
+Undo
 -----
 preview.redo
-Redo crop
+Redo
 -----
 preview.status.crop_undone
 Crop undone. Redo restores it.
@@ -4297,4 +4297,105 @@ Previous
 -----
 desktop.overview.next
 Next
+-----
+preview.resize.width.label
+Width px
+-----
+preview.resize.height.label
+Height px
+-----
+preview.resize.lock.label
+Lock aspect ratio
+-----
+preview.resize.apply
+Resize
+-----
+preview.resize.limit
+8192 px/side; 8 Mi pixels
+-----
+preview.status.resize_invalid
+Enter positive pixel dimensions: up to 8192 per side and 8 Mi pixels total.
+-----
+preview.status.resize_failed
+Cannot allocate the resized image. The image and Undo history are unchanged.
+-----
+preview.status.resize_unchanged
+The image already has these pixel dimensions.
+-----
+preview.status.resized
+Image resized in memory. Export PNG to save the edit.
+-----
+preview.status.resize_undone
+Resize undone. Redo restores the resized image.
+-----
+preview.status.resize_redone
+Resize restored. Export PNG to save the edit.
+-----
+calculator.scientific.ee
+EE
+-----
+calculator.scientific.root
+root
+-----
+calculator.scientific.ee.help
+Type exponent digits; use ± for the sign and Backspace to edit.
+-----
+calculator.scientific.root.help
+Enter a number, choose root, enter the degree, then press =. Negative numbers require an odd integer degree; zero degree is invalid.
+-----
+calculator.error.exponent
+Enter at least one exponent digit.
+-----
+grapher.page.graph
+Graph
+-----
+grapher.page.document
+Document
+-----
+grapher.page.csv
+CSV
+-----
+grapher.page.png
+PNG
+-----
+grapher.compact.document
+A graph document stores the equation
+and all four ranges. Save As creates
+a new file; existing files are protected.
+-----
+grapher.compact.csv
+Export 513 sampled x,y values.
+Invalid points keep an empty y cell.
+Existing files are protected.
+-----
+grapher.compact.png
+Export a 960 × 640 graph image.
+The current equation and ranges are
+validated. Existing files are protected.
+-----
+grapher.compact.keyboard
+Tab visits every field and its page.
+Ctrl+L selects the equation.
+Enter plots, opens or exports.
+-----
+grapher.resize
+Enlarge to 280 × 320 to edit and export.
+-----
+clock.timer.duration
+Set time
+-----
+clock.timer.duration.field
+HH:MM:SS
+-----
+clock.timer.duration.apply
+Apply
+-----
+clock.timer.duration.cancel
+Cancel
+-----
+clock.timer.duration.help
+HH:MM:SS · 00:00:01–24:00:00
+-----
+clock.timer.duration.invalid
+Invalid time · HH:MM:SS, 1s–24h
 -----

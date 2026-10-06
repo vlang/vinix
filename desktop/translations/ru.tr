@@ -4298,3 +4298,104 @@ desktop.overview.previous
 desktop.overview.next
 Далее
 -----
+preview.resize.width.label
+Шир., px
+-----
+preview.resize.height.label
+Выс., px
+-----
+preview.resize.lock.label
+Сохранять пропорции
+-----
+preview.resize.apply
+Изменить размер
+-----
+preview.resize.limit
+До 8192 px; всего 8 Ми px
+-----
+preview.status.resize_invalid
+Введите положительные размеры: до 8192 на сторону и 8 Ми пикселей всего.
+-----
+preview.status.resize_failed
+Не удалось выделить память. Изображение и история не изменены.
+-----
+preview.status.resize_unchanged
+Изображение уже имеет этот размер.
+-----
+preview.status.resized
+Размер изменён в памяти. Экспортируйте PNG для сохранения.
+-----
+preview.status.resize_undone
+Размер восстановлен. Повтор вернёт изменение.
+-----
+preview.status.resize_redone
+Изменение размера повторено. Экспортируйте PNG для сохранения.
+-----
+calculator.scientific.ee
+EE
+-----
+calculator.scientific.root
+root
+-----
+calculator.scientific.ee.help
+Введите показатель степени; ± меняет знак, Backspace удаляет символ.
+-----
+calculator.scientific.root.help
+Введите число, нажмите root, введите степень корня и нажмите =. Для отрицательных чисел нужна нечётная целая степень; нулевая степень недопустима.
+-----
+calculator.error.exponent
+Введите хотя бы одну цифру показателя степени.
+-----
+grapher.page.graph
+График
+-----
+grapher.page.document
+Документ
+-----
+grapher.page.csv
+CSV
+-----
+grapher.page.png
+PNG
+-----
+grapher.compact.document
+Документ хранит формулу и диапазоны.
+Сохранение создаёт новый файл.
+Существующие файлы защищены.
+-----
+grapher.compact.csv
+Экспорт 513 отсчётов x,y.
+У недопустимых точек y пуст.
+Существующие файлы защищены.
+-----
+grapher.compact.png
+Экспорт графика 960 × 640.
+Формула и диапазоны проверяются.
+Существующие файлы защищены.
+-----
+grapher.compact.keyboard
+Tab выбирает поле и его вкладку.
+Ctrl+L выбирает формулу.
+Enter строит, открывает или экспортирует.
+-----
+grapher.resize
+Увеличьте до 280 × 320 для правки и экспорта.
+-----
+clock.timer.duration
+Время
+-----
+clock.timer.duration.field
+ЧЧ:ММ:СС
+-----
+clock.timer.duration.apply
+Применить
+-----
+clock.timer.duration.cancel
+Отмена
+-----
+clock.timer.duration.help
+ЧЧ:ММ:СС · 00:00:01–24:00:00
+-----
+clock.timer.duration.invalid
+Неверное время · ЧЧ:ММ:СС, 1с–24ч
+-----

@@ -4298,3 +4298,104 @@ Anterior
 desktop.overview.next
 Siguiente
 -----
+preview.resize.width.label
+Ancho px
+-----
+preview.resize.height.label
+Alto px
+-----
+preview.resize.lock.label
+Fijar proporción
+-----
+preview.resize.apply
+Redimensionar
+-----
+preview.resize.limit
+8192 px/lado; 8 Mi píxeles
+-----
+preview.status.resize_invalid
+Introduce dimensiones positivas: hasta 8192 por lado y 8 Mi píxeles en total.
+-----
+preview.status.resize_failed
+No se puede reservar la imagen. La imagen y el historial no cambiaron.
+-----
+preview.status.resize_unchanged
+La imagen ya tiene estas dimensiones.
+-----
+preview.status.resized
+Imagen redimensionada en memoria. Exporta PNG para guardar.
+-----
+preview.status.resize_undone
+Redimensionado deshecho. Rehacer restaura la imagen.
+-----
+preview.status.resize_redone
+Redimensionado restaurado. Exporta PNG para guardar.
+-----
+calculator.scientific.ee
+EE
+-----
+calculator.scientific.root
+root
+-----
+calculator.scientific.ee.help
+Escribe el exponente; usa ± para el signo y Retroceso para editar.
+-----
+calculator.scientific.root.help
+Introduce un número, pulsa root, introduce el grado y pulsa =. Los números negativos requieren un grado entero impar; el grado cero no es válido.
+-----
+calculator.error.exponent
+Introduce al menos un dígito del exponente.
+-----
+grapher.page.graph
+Gráfico
+-----
+grapher.page.document
+Archivo
+-----
+grapher.page.csv
+CSV
+-----
+grapher.page.png
+PNG
+-----
+grapher.compact.document
+Guarda la ecuación y los cuatro rangos.
+Guardar como crea un archivo nuevo.
+Los archivos existentes se protegen.
+-----
+grapher.compact.csv
+Exporta 513 valores x,y muestreados.
+Los puntos inválidos dejan y vacío.
+Los archivos existentes se protegen.
+-----
+grapher.compact.png
+Exporta una imagen de 960 × 640.
+Valida la ecuación y los rangos actuales.
+Los archivos existentes se protegen.
+-----
+grapher.compact.keyboard
+Tab recorre campos y abre su página.
+Ctrl+L selecciona la ecuación.
+Intro dibuja, abre o exporta.
+-----
+grapher.resize
+Amplíe a 280 × 320 para editar y exportar.
+-----
+clock.timer.duration
+Duración
+-----
+clock.timer.duration.field
+HH:MM:SS
+-----
+clock.timer.duration.apply
+Aplicar
+-----
+clock.timer.duration.cancel
+Cancelar
+-----
+clock.timer.duration.help
+HH:MM:SS · 00:00:01–24:00:00
+-----
+clock.timer.duration.invalid
+Hora inválida · HH:MM:SS, 1s–24h
+-----
