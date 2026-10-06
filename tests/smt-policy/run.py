@@ -3,6 +3,7 @@
 import importlib.util
 import os
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
@@ -33,8 +34,13 @@ with tempfile.TemporaryDirectory(prefix='vinix-smt-') as directory:
     work = Path(directory)
     for name in ('sbin', 'dev', 'sys', 'proc', 'root'):
         (work / 'rootfs' / name).mkdir(parents=True)
-    subprocess.run([os.environ.get('CC_AMD64', 'x86_64-linux-musl-gcc'), '-static',
-                    '-O2', '-Wall', '-Wextra', '-Werror', str(ROOT / 'tests/smt-policy/guest.c'),
+    compiler = os.environ.get('CC_AMD64', 'x86_64-linux-musl-gcc')
+    fixture = work / 'fixture.o'
+    compile_module = runpy.run_path(str(ROOT / 'tests/kernel-gaps/compile-v-fixture.py'))['compile_module']
+    compile_module(ROOT / 'tests/smt-policy/guestfixture', fixture, 'x86_64',
+                   [compiler, '-O2', '-Wall', '-Wextra', '-Werror', '-D_GNU_SOURCE',
+                    '-fno-strict-aliasing'])
+    subprocess.run([compiler, '-static', '-O2', '-Wall', '-Wextra', '-Werror', str(fixture),
                     '-o', str(work / 'rootfs/sbin/init')], check=True)
     qemu = Path(shutil.which(os.environ.get('VINIX_QEMU_X86_64', 'qemu-system-x86_64')))
     firmware = os.environ.get('VINIX_OVMF_CODE', str(qemu.parent.parent / 'share/qemu/edk2-x86_64-code.fd'))

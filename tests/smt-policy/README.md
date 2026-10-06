@@ -18,3 +18,7 @@ checks. After `./scripts/build-amd64.sh --no-userland --no-iso`, run
 threads per core, first restricted and then enabled, checking the actual
 scheduler affinity mask. `VINIX_AMD64_KERNEL` and `VINIX_VM_RUNNER_ROOT` allow
 an isolated kernel checkout to use the original checkout's cached boot support.
+The independent guest is V in `guestfixture`; CPUID and affinity macros remain
+the unmodified native SDK operations. Set `VINIX_V_COMPILER` and `CC_AMD64`
+to verified V and musl compilers. The original 39-line C fixture is recoverable
+at `3d667aebfe6c35dc78f0f56713c02a40432d86ae:tests/smt-policy/guest.c`.
