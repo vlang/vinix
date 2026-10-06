@@ -35,6 +35,7 @@ const calculator_scientific_actions = ['calculator.scientific.sqrt', 'calculator
 	'calculator.scientific.cube', 'calculator.scientific.cbrt', 'calculator.scientific.log2',
 	'calculator.scientific.sinh', 'calculator.scientific.cosh', 'calculator.scientific.tanh',
 	'calculator.scientific.asinh', 'calculator.scientific.acosh', 'calculator.scientific.atanh']!
+const calculator_scientific_entry_actions = ['calculator.scientific.ee', 'calculator.scientific.root']!
 
 struct CalculatorHistoryEntry {
 	expression string
@@ -66,6 +67,7 @@ mut:
 	degrees            bool = true
 	layout_scientific  bool
 	scientific_operand bool
+	exponent_input     bool
 	scientific_status  string
 	programmer         bool
 	integer            CalculatorProgrammer
@@ -270,12 +272,17 @@ fn calculator_number_text(value f64) string {
 fn (app &CalculatorApp) number_text(value f64) string {
 	if !app.scientific { return calculator_number_text(value) }
 	mut buffer := [96]u8{}
-	length := unsafe {
+	mut length := unsafe {
 		C.snprintf(&char(&buffer[0]), 96, c'%.15g', if value == 0 {
 			f64(0)
 		} else {
 			value
 		})
+	}
+	// Fifteen significant digits can round DBL_MAX beyond the finite range.
+	// Preserve a valid operand at that boundary instead of displaying infinity.
+	if length > 0 && length < 96 && !math.is_finite(calculator_numeric_value(unsafe { tos(&buffer[0], length) })) {
+		length = unsafe { C.snprintf(&char(&buffer[0]), 96, c'%.17g', value) }
 	}
 	return unsafe { tos(&buffer[0], if length > 0 && length < 96 { length } else { 0 }).clone() }
 }
@@ -286,6 +293,7 @@ fn (mut app CalculatorApp) clear_calculator() {
 	app.input_percent = false
 	app.last_percent = false
 	app.scientific_operand = false
+	app.exponent_input = false
 	app.scientific_status = ''
 }
 
@@ -295,11 +303,23 @@ fn (mut app CalculatorApp) fail_calculator() {
 	app.input_percent = false
 	app.last_percent = false
 	app.scientific_operand = false
+	app.exponent_input = false
 	app.scientific_status = 'calculator.error.operation'
 	app.set_display(tr('calculator.error'), false)
 }
 
 fn (mut app CalculatorApp) calculate(operator string, right f64) bool {
+	if operator == 'root' {
+		result, status := calculator_nth_root(app.calculator.accumulator, right)
+		if status.len > 0 {
+			app.fail_calculator()
+			app.scientific_status = status
+			return false
+		}
+		app.calculator.accumulator = result
+		app.set_display(app.number_text(result), true)
+		return true
+	}
 	result := calculate_binary(app.calculator.accumulator, right, operator) or {
 		app.fail_calculator()
 		return false
@@ -312,7 +332,9 @@ fn (mut app CalculatorApp) calculate(operator string, right f64) bool {
 fn (mut app CalculatorApp) remember_result(left f64, operator string, right f64) {
 	left_text := app.number_text(left)
 	right_text := app.number_text(right)
-	expression := left_text + ' ' + operator + ' ' + right_text
+	expression := if operator == 'root' {
+		'root(' + left_text + ', ' + right_text + ')'
+	} else { left_text + ' ' + operator + ' ' + right_text }
 	unsafe {
 		left_text.free()
 		right_text.free()
@@ -394,7 +416,8 @@ fn (mut app CalculatorApp) scientific_apply(action string) {
 	if app.calculator.has_error {
 		if constant { app.clear_calculator() } else { return }
 	}
-	input := app.calculator.display.f64()
+	if !constant && !app.commit_exponent() { return }
+	input := calculator_numeric_value(app.calculator.display)
 	mut result := if action == 'calculator.scientific.pi' { math.pi } else { math.e }
 	if !constant {
 		value, status := calculator_scientific_value(action, input, app.degrees)
@@ -411,6 +434,7 @@ fn (mut app CalculatorApp) scientific_apply(action string) {
 	app.last_percent = false
 	app.calculator.last_operator = ''
 	app.calculator.last_operand = 0
+	app.exponent_input = false
 	// replace_input makes a new digit replace the transformed value. This flag
 	// separately says that a pending binary operation has a real right operand.
 	app.scientific_operand = true
@@ -481,6 +505,7 @@ fn (mut app CalculatorApp) press(key string) {
 	match key {
 		'C' { app.clear_calculator() }
 		'.' {
+			if app.exponent_input { return }
 			app.scientific_operand = false
 			app.scientific_status = ''
 			app.input_percent = false
@@ -494,10 +519,15 @@ fn (mut app CalculatorApp) press(key string) {
 			calculator.replace_input = false
 		}
 		'±', '%' {
+			if key == '±' && app.exponent_input {
+				app.change_exponent_sign(!calculator_exponent_negative(calculator.display))
+				return
+			}
+			if !app.commit_exponent() { return }
 			if !calculator.has_error {
-				mut value := -calculator.display.f64()
+				mut value := -calculator_numeric_value(calculator.display)
 				if key == '%' {
-					app.input_percent_rate = calculator.display.f64() / 100
+					app.input_percent_rate = calculator_numeric_value(calculator.display) / 100
 					app.input_percent = calculator.pending_operator == '+' || calculator.pending_operator == '-'
 					value = if app.input_percent {
 						calculator.accumulator * app.input_percent_rate
@@ -516,9 +546,15 @@ fn (mut app CalculatorApp) press(key string) {
 				calculator.replace_input = false
 			}
 		}
-		'+', '-', '*', '÷', '^' {
+		'+', '-', '*', '÷', '^', 'root' {
 			if calculator.has_error { return }
-			current := calculator.display.f64()
+			if app.exponent_input && (key == '+' || key == '-')
+				&& !calculator_exponent_has_digits(calculator.display) {
+				app.change_exponent_sign(key == '-')
+				return
+			}
+			if !app.commit_exponent() { return }
+			current := calculator_numeric_value(calculator.display)
 			if calculator.has_accumulator && calculator.pending_operator.len > 0
 				&& (!calculator.replace_input || app.scientific_operand) {
 				if !app.calculate(calculator.pending_operator, current) { return }
@@ -535,8 +571,9 @@ fn (mut app CalculatorApp) press(key string) {
 		}
 		'=' {
 			if calculator.has_error { return }
+			if !app.commit_exponent() { return }
 			mut operator := calculator.pending_operator
-			mut right := calculator.display.f64()
+			mut right := calculator_numeric_value(calculator.display)
 			if operator.len > 0 {
 				if calculator.replace_input && !app.scientific_operand {
 					right = calculator.accumulator
@@ -548,7 +585,7 @@ fn (mut app CalculatorApp) press(key string) {
 			} else {
 				operator = calculator.last_operator
 				right = calculator.last_operand
-				calculator.accumulator = calculator.display.f64()
+				calculator.accumulator = calculator_numeric_value(calculator.display)
 				if app.last_percent { right = calculator.accumulator * app.last_percent_rate }
 			}
 			if operator.len == 0 { return }
@@ -572,6 +609,12 @@ fn (mut app CalculatorApp) backspace() {
 		return
 	}
 	if app.calculator.replace_input { return }
+	if app.exponent_input {
+		text := app.calculator.display
+		app.set_display(unsafe { tos(text.str, text.len - 1) }.clone(), true)
+		app.exponent_input = calculator_exponent_at(app.calculator.display) >= 0
+		return
+	}
 	if app.calculator.display.contains('e') || app.calculator.display.contains('E') {
 		app.set_display('0', false)
 		return
@@ -631,6 +674,11 @@ fn (mut app CalculatorApp) key_input(text string) {
 			at++
 			continue
 		}
+		if (ch == `e` || ch == `E`) && app.scientific {
+			app.begin_exponent()
+			at++
+			continue
+		}
 		key := match ch {
 			`0` { '0' }
 			`1` { '1' }
@@ -680,6 +728,7 @@ fn (mut app CalculatorApp) paste_input(text string) {
 	app.input_percent = false
 	app.scientific_operand = false
 	app.scientific_status = ''
+	app.exponent_input = false
 	app.set_display(trimmed.clone(), true)
 	app.calculator.replace_input = app.scientific && (trimmed.contains('e') || trimmed.contains('E'))
 	app.scientific_operand = app.calculator.replace_input
@@ -710,7 +759,7 @@ fn calculator_valid_scientific_number(text string) bool {
 		if !text[at].is_digit() { return false }
 		at++
 	}
-	return at > start && math.is_finite(text.f64())
+	return at > start && math.is_finite(calculator_numeric_value(text))
 }
 
 fn calculator_valid_number(text string) bool {
@@ -729,7 +778,7 @@ fn calculator_valid_number(text string) bool {
 		}
 		return false
 	}
-	return digits > 0 && math.is_finite(text.f64())
+	return digits > 0 && math.is_finite(calculator_numeric_value(text))
 }
 
 fn calculator_utility_button(action string, text string, x f64, y f64, width f64) ui2.Element {
@@ -816,9 +865,10 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 			tooltip: tr(key)
 		}
 		for index, action in calculator_scientific_actions {
-			children << ui2.button(action, tr(action), ui2.rect(left + f64(index % 4) * 60,
-				154 + f64(index / 4) * 44, 52, 36), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
-				ui2.TextStyle{ size: 13, color: body_text, align: .center })
+			children << calculator_scientific_button(action, index, left)
+		}
+		for index, action in calculator_scientific_entry_actions {
+			children << calculator_scientific_button(action, calculator_scientific_actions.len + index, left)
 		}
 	}
 	history_x := if app.scientific { x - 248 } else { x }
@@ -922,14 +972,16 @@ fn (mut app CalculatorApp) handle(event_id string) ! {
 				app.set_display(app.number_text(app.memory), true)
 				app.scientific_operand = false
 				app.scientific_status = ''
+				app.exponent_input = false
 				app.calculator.has_error = false
 				app.calculator.replace_input = false
 			}
 			return
 		}
 		'calculator.memory.add', 'calculator.memory.subtract' {
+			if !app.commit_exponent() { return }
 			if !app.calculator.has_error {
-				value := app.calculator.display.f64()
+				value := calculator_numeric_value(app.calculator.display)
 				next := app.memory + if event_id == 'calculator.memory.add' {
 					value
 				} else {
@@ -943,6 +995,14 @@ fn (mut app CalculatorApp) handle(event_id string) ! {
 			return
 		}
 		else {}
+	}
+	if event_id == 'calculator.scientific.ee' {
+		app.begin_exponent()
+		return
+	}
+	if event_id == 'calculator.scientific.root' {
+		if app.scientific { app.press('root') }
+		return
 	}
 	for action in calculator_scientific_actions {
 		if event_id == action {
@@ -981,4 +1041,5 @@ fn (mut app CalculatorApp) close_app() {
 	app.set_display('0', false)
 	if app.calculator.keys.cap > 0 { unsafe { app.calculator.keys.free() } }
 	app.calculator = Calculator{}
+	app.exponent_input = false
 }

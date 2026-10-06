@@ -8,6 +8,102 @@ import ui2
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
+fn test_calculator_ee_root_editing_domains_history_memory_and_wire_release_owned_memory() {
+	mut app := new_calculator_app()
+	app.handle('calculator.mode.scientific')!
+	for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+		begin_frame_elements()
+		free_tree(app.build(size)!)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		app.key_input('c1.25e-3')
+		app.press('±')
+		app.press('±')
+		app.key_input('\x7f\x7f\x7fe-3+1=')
+		app.handle('calculator.memory.add')!
+		app.key_input('c27')
+		app.handle('calculator.scientific.root')!
+		app.key_input('9')
+		app.handle('calculator.scientific.sqrt')!
+		app.key_input('==')
+		assert !app.calculator.has_error
+		app.key_input('c')
+		app.paste_input('-8')
+		app.handle('calculator.scientific.root')!
+		app.paste_input('-3')
+		app.key_input('=')
+		assert app.calculator.display == '-0.5'
+		for invalid in ['1e', '1e-', '1e309']! {
+			app.key_input('c')
+			app.key_input(invalid)
+			app.handle('calculator.scientific.sqrt')!
+			assert app.calculator.has_error
+		}
+		app.key_input('c16')
+		app.handle('calculator.scientific.root')!
+		app.key_input('0=')
+		assert app.calculator.has_error
+		app.handle('calculator.memory.recall')!
+		app.handle('calculator.history.0')!
+		app.handle('calculator.mode.basic')!
+		app.handle('calculator.scientific.ee')!
+		app.handle('calculator.mode.programmer')!
+		app.paste_input('18446744073709551615')
+		app.handle('calculator.scientific.root')!
+		assert app.integer.value == calculator_programmer_max
+		app.handle('calculator.mode.scientific')!
+		for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			mut encoded := []u8{cap: 65536}
+			unsafe { encoded.flags |= .noslices }
+			encode_app_element(tree, mut encoded)!
+			mut reader := WireReader{ data: encoded }
+			decoded := decode_app_element(mut reader, 0)!
+			free_tree(decoded)
+			free_tree(tree)
+			unsafe { encoded.free() }
+		}
+	}
+	app.close_app()
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_ee_root_complete_init_finite_boundary_resize_and_close_release_memory() {
+	mut warm := new_calculator_app()
+	warm.handle('calculator.mode.scientific')!
+	for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+		begin_frame_elements()
+		free_tree(warm.build(size)!)
+	}
+	warm.close_app()
+	unsafe { free(warm) }
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut app := new_calculator_app()
+		app.handle('calculator.mode.scientific')!
+		app.key_input('1.7976931348623157e308+0=')
+		app.handle('calculator.scientific.ee')!
+		app.press('±')
+		app.press('±')
+		app.key_input('\x7f\x7f8')
+		app.key_input('c27')
+		app.handle('calculator.scientific.root')!
+		app.key_input('3=')
+		assert app.calculator.display == '3'
+		for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+			begin_frame_elements()
+			free_tree(app.build(size)!)
+		}
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_calculator_interaction_and_history_release_owned_allocations() {
 	mut app := new_calculator_app()
 	begin_frame_elements()

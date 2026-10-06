@@ -12,6 +12,239 @@ fn calculator_feature_find(tree ui2.Element, action string) ?ui2.Element {
 	return none
 }
 
+fn test_calculator_ee_keyboard_control_sign_backspace_and_decimal_state() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('1.25E-3')
+	assert app.calculator.display == '1.25e-3' && app.exponent_input
+	app.press('±')
+	assert app.calculator.display == '1.25e3'
+	app.press('±')
+	assert app.calculator.display == '1.25e-3'
+	app.key_input('.')
+	assert app.calculator.display == '1.25e-3'
+	app.key_input('\x7f\x7f')
+	assert app.calculator.display == '1.25e' && app.exponent_input
+	app.key_input('-+2')
+	assert app.calculator.display == '1.25e2'
+	app.key_input('+1=')
+	assert app.calculator.display == '126' && !app.exponent_input
+	assert app.history.last().expression == '125 + 1'
+	app.key_input('c6')
+	app.handle('calculator.scientific.ee')!
+	app.handle('calculator.scientific.ee')!
+	assert app.calculator.display == '6e'
+	app.key_input('\x7f.5')
+	assert app.calculator.display == '6.5' && !app.exponent_input
+	app.key_input('e-2')
+	app.handle('calculator.scientific.sqrt')!
+	assert math.abs(app.calculator.display.f64() - math.sqrt(.065)) < 1e-14
+	app.key_input('9')
+	assert app.calculator.display == '9'
+}
+
+fn test_calculator_ee_incomplete_overflow_underflow_and_finite_boundary_guards() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('4')
+	app.handle('calculator.memory.add')!
+	for operand in ['1e', '1e-', '1e+']! {
+		app.key_input('c')
+		app.key_input(operand)
+		assert app.copy_value() == ''
+		before := app.history.len
+		app.handle('calculator.memory.add')!
+		assert app.memory == 4 && app.has_memory
+		assert app.calculator.has_error && app.scientific_status == 'calculator.error.exponent'
+		assert app.history.len == before
+	}
+	for command in ['=', '*', '%']! {
+		app.key_input('c1e309')
+		assert app.calculator.display == '1e309' && !app.calculator.has_error
+		assert app.copy_value() == ''
+		app.key_input(command)
+		assert app.calculator.has_error && app.scientific_status == 'calculator.error.nonfinite'
+	}
+	app.key_input('c1e309\x7f8+0=')
+	assert app.calculator.display == '1e+308' && !app.calculator.has_error
+	app.key_input('c1.7976931348623157e308+0=')
+	assert !app.calculator.has_error && math.is_finite(app.calculator.display.f64())
+	assert app.calculator.display.f64() == 1.7976931348623157e308
+	assert app.copy_value() == app.calculator.display
+	app.key_input('c5e-324+0=')
+	assert calculator_numeric_value(app.calculator.display) == 5e-324
+	app.key_input('c1e-400+2=')
+	assert app.calculator.display == '2'
+	app.key_input('c1e-')
+	app.handle('calculator.scientific.pi')!
+	assert !app.exponent_input && !app.calculator.has_error
+}
+
+fn test_calculator_ee_paste_equivalence_limits_pending_operand_and_modes() {
+	mut typed := new_calculator_app()
+	mut pasted := new_calculator_app()
+	defer { typed.close_app() pasted.close_app() }
+	for index, operand in ['1.25e3', '1.25E-3', '.5e+2', '5e-324']! {
+		typed.handle('calculator.mode.scientific')!
+		pasted.handle('calculator.mode.scientific')!
+		typed.key_input('c2+')
+		pasted.key_input('c2+')
+		typed.key_input(operand)
+		pasted.paste_input(operand)
+		typed.key_input('==')
+		pasted.key_input('==')
+		assert typed.calculator.display == pasted.calculator.display
+		assert typed.history.last().expression == pasted.history.last().expression
+		assert typed.calculator.last_operand == pasted.calculator.last_operand
+		assert typed.history.len == (index + 1) * 2
+	}
+	long_mantissa := '1'.repeat(calculator_input_limit - 2)
+	defer { unsafe { long_mantissa.free() } }
+	typed.key_input('c')
+	typed.key_input(long_mantissa)
+	typed.key_input('e3')
+	assert typed.calculator.display.len == calculator_input_limit
+	typed.press('±')
+	assert !calculator_exponent_negative(typed.calculator.display)
+	typed.key_input('4')
+	assert typed.calculator.display.len == calculator_input_limit
+	typed.key_input('\x7f\x7f\x7fe')
+	typed.press('±')
+	typed.key_input('2')
+	assert calculator_exponent_negative(typed.calculator.display)
+	assert typed.calculator.display.len == calculator_input_limit
+	typed.key_input('c2+')
+	typed.handle('calculator.scientific.ee')!
+	assert typed.calculator.display == '0e' && typed.calculator.accumulator == 2
+	typed.key_input('3=')
+	assert typed.calculator.display == '2'
+	typed.key_input('c6e2')
+	typed.handle('calculator.memory.add')!
+	assert typed.memory == 600 && !typed.exponent_input
+	typed.handle('calculator.mode.programmer')!
+	typed.handle('calculator.programmer.base.hex')!
+	typed.key_input('FE')
+	assert typed.integer.value == 254
+	typed.handle('calculator.scientific.ee')!
+	typed.handle('calculator.scientific.root')!
+	assert typed.integer.value == 254
+	typed.handle('calculator.mode.basic')!
+	typed.handle('calculator.memory.recall')!
+	assert typed.calculator.display == '600' && !typed.exponent_input
+	typed.key_input('e')
+	assert typed.calculator.display == '600'
+	typed.handle('calculator.mode.scientific')!
+	typed.handle('calculator.history.0')!
+	assert typed.calculator.display == '2'
+}
+
+fn test_calculator_nth_root_real_domains_reciprocals_and_numeric_boundaries() {
+	for index, radicand in [27.0, -27.0, -8.0, 16.0, .0625, 0.0, 1e308, 1e-300, 5e-324]! {
+		degree := [3.0, 3.0, -3.0, .5, -2.0, 3.0, 2.0, 3.0, 1.0]![index]
+		expected := [3.0, -3.0, -.5, 256.0, 4.0, 0.0, 1e154, 1e-100, 5e-324]![index]
+		value, status := calculator_nth_root(radicand, degree)
+		assert status == '' && math.is_finite(value)
+		assert if expected == 0 { value == 0 } else { math.abs(value / expected - 1) < 1e-13 }
+	}
+	for index, radicand in [4.0, 0.0, -16.0, -27.0, -27.0, -27.0, 1e308, 1e-300]! {
+		degree := [0.0, -2.0, 2.0, 2.5, 9007199254740992.0, -2.0, .5, -1.0e-308]![index]
+		value, status := calculator_nth_root(radicand, degree)
+		assert value == 0
+		assert status == if index < 6 { 'calculator.error.domain' } else { 'calculator.error.nonfinite' }
+	}
+	for nonfinite in [math.inf(1), math.inf(-1), math.nan()]! {
+		_, left_status := calculator_nth_root(nonfinite, 3)
+		_, right_status := calculator_nth_root(27, nonfinite)
+		assert left_status == 'calculator.error.nonfinite'
+		assert right_status == 'calculator.error.nonfinite'
+	}
+}
+
+fn test_calculator_nth_root_pending_unary_repeat_history_memory_and_recovery() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('81')
+	app.handle('calculator.scientific.root')!
+	assert app.calculator.pending_operator == 'root' && app.calculator.replace_input
+	app.key_input('2==')
+	assert app.calculator.display == '3'
+	assert app.history[0].expression == 'root(81, 2)' && app.history[0].result == '9'
+	assert app.history[1].expression == 'root(9, 2)'
+	app.handle('calculator.memory.add')!
+	app.key_input('c27')
+	app.handle('calculator.scientific.root')!
+	app.key_input('9')
+	app.handle('calculator.scientific.sqrt')!
+	assert app.scientific_operand && app.calculator.pending_operator == 'root'
+	app.key_input('=')
+	assert app.calculator.display == '3'
+	assert app.history.last().expression == 'root(27, 3)'
+	app.key_input('c2+25')
+	app.handle('calculator.scientific.root')!
+	app.key_input('2=')
+	assert math.abs(app.calculator.display.f64() - math.sqrt(27)) < 1e-14
+	app.handle('calculator.history.2')!
+	assert app.calculator.display == '3' && app.calculator.pending_operator == ''
+	app.key_input('c')
+	app.paste_input('-27')
+	app.handle('calculator.scientific.root')!
+	app.paste_input('-3')
+	app.key_input('=')
+	assert math.abs(app.calculator.display.f64() + 1.0 / 3) < 1e-14
+	app.key_input('c16')
+	app.handle('calculator.scientific.root')!
+	before := app.history.len
+	app.key_input('0=')
+	assert app.calculator.has_error && app.scientific_status == 'calculator.error.domain'
+	assert app.history.len == before
+	app.handle('calculator.memory.recall')!
+	assert app.calculator.display == '3' && !app.calculator.has_error
+	app.handle('calculator.mode.basic')!
+	app.handle('calculator.scientific.root')!
+	assert app.calculator.pending_operator == ''
+}
+
+fn test_calculator_ee_root_controls_wire_minimum_windows_and_scoped_dispatch() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	previous_language := desktop_language
+	defer { set_desktop_language(previous_language) }
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			for action in calculator_scientific_entry_actions {
+				control := calculator_feature_find(tree, action) or { panic('missing entry control') }
+				assert control.kind == .button && control.text == tr(action)
+				assert control.tooltip.len > 0
+				assert control.frame.x >= 0 && control.frame.x + control.frame.width <= size.width
+				assert control.frame.y >= 154 && control.frame.y + control.frame.height < 422
+			}
+			mut wire := []u8{cap: 65536}
+			unsafe { wire.flags |= .noslices }
+			encode_app_element(tree, mut wire)!
+			mut reader := WireReader{ data: wire }
+			decoded := decode_app_element(mut reader, 0)!
+			app.key_input('c2')
+			ee := calculator_feature_find(decoded, 'calculator.scientific.ee') or { panic('missing wire EE') }
+			app.handle(if ee.action_id.len > 0 { ee.action_id } else { ee.id })!
+			app.key_input('3')
+			root := calculator_feature_find(decoded, 'calculator.scientific.root') or { panic('missing wire root') }
+			app.handle(if root.action_id.len > 0 { root.action_id } else { root.id })!
+			app.key_input('2=')
+			assert math.abs(app.calculator.display.f64() - math.sqrt(2000)) < 1e-13
+			free_tree(decoded)
+			free_tree(tree)
+			unsafe { wire.free() }
+		}
+	}
+}
+
 fn test_calculator_keyboard_operands_and_repeated_equals() {
 	mut app := new_calculator_app()
 	defer { app.close_app() }
@@ -472,7 +705,7 @@ fn test_calculator_hyperbolic_controls_fit_all_scientific_windows_and_dispatch_w
 		for index, action in calculator_scientific_actions {
 			control := calculator_feature_find(tree, action) or { panic('missing scientific control') }
 			assert control.kind == .button && control.text == tr(action)
-			assert control.frame.width == 52 && control.frame.height == 36
+			assert control.frame.width == 40 && control.frame.height == 36
 			assert control.frame.x >= 0 && control.frame.x + control.frame.width <= panel.frame.x - 16
 			assert control.frame.y >= 154 && control.frame.y + control.frame.height <= 410
 			assert control.frame.x + control.frame.width <= size.width
