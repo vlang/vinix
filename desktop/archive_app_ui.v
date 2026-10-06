@@ -22,6 +22,12 @@ fn (mut a ArchiveApp) handle(event_id string) ! {
 		return
 	}
 	if a.operation != .idle { return }
+	for slot, action in archive_row_actions {
+		if event_id == action {
+			a.toggle_entry(a.scroll + slot)
+			return
+		}
+	}
 	if event_id.starts_with(jump_open_prefix) {
 		path := unsafe { tos(event_id.str + jump_open_prefix.len, event_id.len - jump_open_prefix.len) }
 		if archive_absolute_valid(path) && path.len <= archive_path_limit {
@@ -39,6 +45,9 @@ fn (mut a ArchiveApp) handle(event_id string) ! {
 		'archive.output' { a.focus_field(3) }
 		'archive.browse' { a.browse_archive() }
 		'archive.extract' { a.extract_archive() }
+		'archive.extract_selected' { a.extract_selection() }
+		'archive.select_all' { a.set_entry_selection(true) }
+		'archive.clear_selection' { a.set_entry_selection(false) }
 		'archive.create' { a.create_archive() }
 		'archive.up' {
 			a.scroll -= a.page_rows
@@ -195,9 +204,10 @@ fn (mut a ArchiveApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
 	footer := height - 202
-	a.page_rows = if footer > 140 { (footer - 136) / 22 } else { 1 }
+	a.page_rows = if footer > 202 { (footer - 180) / 22 } else { 1 }
+	if a.page_rows > archive_row_actions.len { a.page_rows = archive_row_actions.len }
 	a.clamp_scroll()
-	mut children := frame_elements(a.page_rows * 2 + 24)
+	mut children := frame_elements(a.page_rows * 3 + 28)
 	children << archive_label('archive.subtitle', 14, 8, width - 28)
 	children << archive_label('archive.path_label', 14, 44, 100)
 	children << console_field('archive.path', editor_bytes_text(a.archive_input), 116, 42, width - 216, a.focus == 0)
@@ -205,21 +215,29 @@ fn (mut a ArchiveApp) build(size ui2.Rect) !ui2.Element {
 	children << archive_label('archive.destination_label', 14, 84, 100)
 	children << console_field('archive.destination', editor_bytes_text(a.extract_input), 116, 82, width - 216, a.focus == 1)
 	children << archive_button('archive.extract', width - 92, 83, 78, false)
+	children << archive_button('archive.select_all', 14, 121, 110, false)
+	children << archive_button('archive.clear_selection', 132, 121, 90, false)
+	children << archive_button('archive.extract_selected', 230, 121, 204, false)
+	children << archive_label('archive.selection_hint', 14, 153, width - 28)
 	if a.entries.len == 0 {
-		children << archive_label('archive.empty', 18, 138, width - 36)
+		children << archive_label('archive.empty', 18, 182, width - 36)
 	} else {
 		for row in 0 .. a.page_rows {
 			index := a.scroll + row
 			if index >= a.entries.len { break }
 			entry := a.entries[index]
-			children << ui2.label('', entry.name, ui2.rect(18, f64(136 + row * 22), f64(width - 170), 22),
+			children << ui2.button(archive_row_actions[row], if entry.selected { '[x]' } else { '[ ]' },
+				ui2.rect(18, f64(180 + row * 22), 34, 20),
+				ui2.BoxStyle{bg: if entry.selected { app_accent } else { settings_choice_bg }, radius: 3},
+				ui2.TextStyle{color: if entry.selected { u32(0xffffff) } else { body_text }, size: 12, align: .center})
+			children << ui2.label('', entry.name, ui2.rect(60, f64(180 + row * 22), f64(width - 212), 22),
 				ui2.TextStyle{ color: body_text, size: 12 })
 			children << ui2.label('', if entry.directory {
 				tr('archive.directory')
 			} else {
 				entry.size_text
 			},
-				ui2.rect(f64(width - 145), f64(136 + row * 22), 127, 22),
+				ui2.rect(f64(width - 145), f64(180 + row * 22), 127, 22),
 				ui2.TextStyle{ color: body_muted, size: 12, align: .right })
 		}
 	}

@@ -57,6 +57,242 @@ fn archive_test_action(tree ui2.Element, id string) bool {
 	return false
 }
 
+fn archive_test_write_entries(path string, names []string, payloads []string, kinds []u8) {
+	mut data := []u8{cap: 4096}
+	unsafe { data.flags |= .noslices }
+	defer { unsafe { data.free() } }
+	for index, name in names {
+		entry := archive_test_single(name, payloads[index], kinds[index])
+		for at in 0 .. entry.len - 1024 { data << entry[at] }
+		unsafe { entry.free() }
+	}
+	for _ in 0 .. 1024 { data << u8(0) }
+	os.write_file_array(path, data) or { panic(err) }
+}
+
+fn test_archive_selection_directory_boundaries_and_individual_unicode_members() {
+	root := archive_test_root('selected')
+	defer { os.rmdir_all(root) or {} }
+	path := join_path(root, 'choices.tar')
+	archive_test_write_entries(path,
+		['docs', 'docs/empty', 'docs/nested', 'docs/nested/日本語.txt', 'docs-copy', 'docs-copy/other.txt', 'elsewhere.txt'],
+		['', '', '', 'Hello 😀', '', 'omitted', 'outside'],
+		[u8(`5`), `0`, `5`, `0`, `5`, `0`, `0`])
+	mut app := new_archive_app()
+	defer { app.close_app() }
+	archive_set_field(mut app.archive_input, path)
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	app.toggle_entry(0)
+	for index in 0 .. 4 { assert app.entries[index].selected }
+	for index in 4 .. 7 { assert !app.entries[index].selected }
+	selected := join_path(root, 'selected-folder')
+	archive_set_field(mut app.extract_input, selected)
+	assert app.extract_selection() && app.goal == u64('Hello 😀'.len)
+	archive_test_finish(mut app)
+	assert app.status_key == 'archive.extracted' && app.done == app.goal
+	assert os.read_file(join_path(selected, 'docs/nested/日本語.txt'))! == 'Hello 😀'
+	assert os.read_file(join_path(selected, 'docs/empty'))! == ''
+	assert !os.exists(join_path(selected, 'docs-copy'))
+	assert !os.exists(join_path(selected, 'elsewhere.txt'))
+	// Removing a member leaves the sibling selected, while the containing
+	// directories no longer imply that removed member belongs to the choice.
+	app.toggle_entry(3)
+	assert !app.entries[0].selected && !app.entries[2].selected && !app.entries[3].selected
+	assert app.entries[1].selected
+	app.set_entry_selection(false)
+	app.toggle_entry(3)
+	app.toggle_entry(6)
+	individual := join_path(root, 'individual')
+	archive_set_field(mut app.extract_input, individual)
+	assert app.extract_selection() && app.goal == u64('Hello 😀outside'.len)
+	archive_test_finish(mut app)
+	assert os.read_file(join_path(individual, 'docs/nested/日本語.txt'))! == 'Hello 😀'
+	assert os.read_file(join_path(individual, 'elsewhere.txt'))! == 'outside'
+	assert !os.exists(join_path(individual, 'docs/empty'))
+	assert !os.exists(join_path(individual, 'docs-copy'))
+	// Whole-archive extraction still ignores the visible choice.
+	whole := join_path(root, 'whole')
+	archive_set_field(mut app.extract_input, whole)
+	assert app.extract_archive() && app.goal == app.data_size
+	archive_test_finish(mut app)
+	assert os.read_file(join_path(whole, 'docs-copy/other.txt'))! == 'omitted'
+}
+
+fn test_archive_selection_empty_refresh_failure_and_frozen_operation() {
+	root := archive_test_root('selection-state')
+	defer { os.rmdir_all(root) or {} }
+	path := join_path(root, 'choices.tar')
+	payload := 'a'.repeat(archive_chunk * 2 + 5)
+	defer { unsafe { payload.free() } }
+	archive_test_write_entries(path, ['ignored.txt', 'chosen.txt'], ['ignored', payload], [u8(`0`), `0`])
+	mut app := new_archive_app()
+	defer { app.close_app() }
+	archive_set_field(mut app.archive_input, path)
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	destination := join_path(root, 'chosen')
+	archive_set_field(mut app.extract_input, destination)
+	assert !app.extract_selection() && app.status_key == 'archive.no_selection'
+	assert !os.exists(destination) && app.operation == .idle
+	app.toggle_entry(1)
+	assert app.extract_selection() && app.goal == u64(payload.len)
+	assert app.poll() && app.index == 1 && app.done == 0 // one unselected entry per poll
+	assert app.poll() && app.done == u64(archive_chunk)
+	app.handle('archive.clear_selection')!
+	app.toggle_entry(1)
+	app.set_entry_selection(false)
+	assert app.entries[1].selected && app.operation == .extracting
+	assert !app.browse_archive() && !app.extract_selection() && !app.create_archive()
+	// Even direct edits cannot change the frozen mask used by this operation.
+	app.entries[0].selected = true
+	app.entries[1].selected = false
+	os.write_file(path, 'changed after the validated capture')!
+	archive_test_finish(mut app)
+	assert os.read_file(join_path(destination, 'chosen.txt'))! == payload
+	assert !os.exists(join_path(destination, 'ignored.txt')) && app.done == app.goal
+	assert app.root_fd == -1 && app.write_fd == -1
+	app.set_entry_selection(true)
+	assert !app.extract_selection() && app.status_key == 'archive.exists'
+	assert app.operation == .idle && app.entries[1].selected
+	archive_test_write(path, 'fresh.txt', 'fresh')
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	assert app.entries.len == 1 && !app.entries[0].selected
+	archive_set_field(mut app.extract_input, join_path(root, 'empty-after-refresh'))
+	assert !app.extract_selection() && app.status_key == 'archive.no_selection'
+	app.toggle_entry(0)
+	archive_set_field(mut app.archive_input, join_path(root, 'missing.tar'))
+	assert !app.browse_archive() && app.entries[0].selected
+	archive_set_field(mut app.archive_input, path)
+	assert app.browse_archive()
+	app.cancel()
+	assert app.entries.len == 0 && !app.extract_selection()
+}
+
+fn test_archive_selection_validates_unselected_entries_and_rejects_destination_attacks() {
+	root := archive_test_root('selection-security')
+	defer { os.rmdir_all(root) or {} }
+	path := join_path(root, 'choices.tar')
+	mut app := new_archive_app()
+	defer { app.close_app() }
+	archive_set_field(mut app.archive_input, path)
+	for name in ['../escape', 'safe', 'nested/symlink', 'safe/child'] {
+		kind := if name == 'nested/symlink' { u8(`2`) } else { u8(`0`) }
+		archive_test_write_entries(path, ['safe', name], ['good', 'bad'], [u8(`0`), kind])
+		assert app.browse_archive()
+		archive_test_finish(mut app)
+		assert app.status_key == 'archive.unsafe_entry' && app.loaded_path.len == 0 && app.entries.len == 0
+		assert !app.extract_selection()
+	}
+	archive_test_write_entries(path, ['unselected.txt', 'nested/file.txt'], ['omit', 'captured'], [u8(`0`), `0`])
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	app.toggle_entry(1)
+	outside := join_path(root, 'outside')
+	os.mkdir(outside)!
+	os.write_file(join_path(outside, 'file.txt'), 'must survive')!
+	destination := join_path(root, 'attacked')
+	archive_set_field(mut app.extract_input, destination)
+	assert app.extract_selection()
+	os.symlink(outside, join_path(destination, 'nested'))!
+	archive_test_finish(mut app)
+	assert app.status_key == 'archive.extract_failed' && app.operation == .idle
+	assert os.read_file(join_path(outside, 'file.txt'))! == 'must survive'
+	assert !os.exists(join_path(destination, 'unselected.txt'))
+	assert app.root_fd == -1 && app.write_fd == -1
+	// A preexisting regular member is never overwritten.
+	second := join_path(root, 'occupied')
+	archive_set_field(mut app.extract_input, second)
+	assert app.extract_selection()
+	os.mkdir(join_path(second, 'nested'))!
+	os.write_file(join_path(second, 'nested/file.txt'), 'replacement')!
+	archive_test_finish(mut app)
+	assert app.status_key == 'archive.extract_failed'
+	assert os.read_file(join_path(second, 'nested/file.txt'))! == 'replacement'
+}
+
+fn test_archive_selection_ui_wire_paging_and_cancel() {
+	root := archive_test_root('selection-ui')
+	defer { os.rmdir_all(root) or {} }
+	path := join_path(root, 'choices.tar')
+	archive_test_write_entries(path, ['first.txt', '日本語.txt', 'last.txt'], ['one', 'two 😀', 'three'], [u8(`0`), `0`, `0`])
+	mut app := new_archive_app()
+	defer { app.close_app() }
+	archive_set_field(mut app.archive_input, path)
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 800, 680))!
+	mut encoded := []u8{cap: 4096}
+	unsafe { encoded.flags |= .noslices }
+	encode_app_element(tree, mut encoded)!
+	decoded := decode_app_tree(encoded)!
+	for action in ['archive.row.0', 'archive.row.1', 'archive.select_all', 'archive.clear_selection', 'archive.extract_selected', 'archive.extract'] {
+		assert archive_test_action(decoded, action)
+	}
+	free_tree(tree)
+	free_tree(decoded)
+	unsafe { encoded.free() }
+	app.scroll = 1
+	app.handle('archive.row.0')!
+	assert !app.entries[0].selected && app.entries[1].selected && !app.entries[2].selected
+	app.handle('archive.select_all')!
+	for entry in app.entries { assert entry.selected }
+	app.handle('archive.clear_selection')!
+	for entry in app.entries { assert !entry.selected }
+	app.scroll = 0
+	app.handle('archive.row.1')!
+	destination := join_path(root, 'cancelled')
+	archive_set_field(mut app.extract_input, destination)
+	app.handle('archive.extract_selected')!
+	assert app.operation == .extracting
+	assert app.poll() && app.done == 0
+	app.handle('archive.cancel')!
+	assert app.status_key == 'archive.cancelled_partial' && app.operation == .idle
+	assert !os.exists(join_path(destination, 'first.txt'))
+	app.toggle_entry(-1)
+	app.toggle_entry(9999)
+	assert app.entries[1].selected
+}
+
+fn test_archive_selection_mask_covers_last_entry_at_the_archive_limit() {
+	root := archive_test_root('selection-limit')
+	defer { os.rmdir_all(root) or {} }
+	path := join_path(root, 'limit.tar')
+	mut bytes := []u8{cap: 512 * archive_max_entries + 1024}
+	for index in 0 .. archive_max_entries {
+		number := index.str()
+		name := 'file-${number}'
+		header := archive_tar_header(ArchiveEntry{name: name})
+		for byte in header { bytes << byte }
+		unsafe { number.free() name.free() }
+	}
+	for _ in 0 .. 1024 { bytes << u8(0) }
+	os.write_file_array(path, bytes)!
+	unsafe { bytes.free() }
+	mut app := new_archive_app()
+	defer { app.close_app() }
+	archive_set_field(mut app.archive_input, path)
+	assert app.browse_archive()
+	archive_test_finish(mut app)
+	assert app.entries.len == archive_max_entries
+	app.toggle_entry(archive_max_entries - 1)
+	destination := join_path(root, 'last-only')
+	archive_set_field(mut app.extract_input, destination)
+	assert app.extract_selection() && app.goal == 0
+	assert app.extraction_mask[archive_max_entries - 1] && !app.extraction_mask[0]
+	assert app.poll() && app.index == 1
+	archive_test_finish(mut app)
+	assert app.status_key == 'archive.extracted'
+	last_number := (archive_max_entries - 1).str()
+	last_name := 'file-${last_number}'
+	assert os.is_file(join_path(destination, last_name))
+	assert !os.exists(join_path(destination, 'file-0'))
+	assert !os.exists(join_path(destination, 'file-2046'))
+	unsafe { last_number.free() last_name.free() }
+}
+
 fn test_archive_round_trip_creates_browses_and_extracts_a_real_tree() {
 	root := archive_test_root('round-trip')
 	defer { os.rmdir_all(root) or {} }

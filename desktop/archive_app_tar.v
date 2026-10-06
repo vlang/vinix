@@ -16,6 +16,7 @@ mut:
 	size        u64
 	offset      int
 	directory   bool
+	selected    bool
 	inode       u64
 	device      u64
 	mtime       i64

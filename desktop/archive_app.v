@@ -35,6 +35,8 @@ mut:
 	done                u64
 	goal                u64
 	data_size           u64
+	extract_selected    bool
+	extraction_mask     [archive_max_entries]bool
 	snapshot_inode      u64
 	snapshot_device     u64
 	snapshot_mtime      i64
@@ -108,6 +110,7 @@ fn (mut a ArchiveApp) release_operation() {
 	a.output_leaf = ''
 	a.operation_path = ''
 	a.operation = .idle
+	a.extract_selected = false
 	a.entry_written = 0
 	a.focus = -1
 }
@@ -191,7 +194,31 @@ fn (mut a ArchiveApp) browse_archive() bool {
 }
 
 fn (mut a ArchiveApp) extract_archive() bool {
+	return a.begin_extraction(false)
+}
+
+fn (mut a ArchiveApp) extract_selection() bool {
+	return a.begin_extraction(true)
+}
+
+// The parsed capture has been validated in full, including entries that are
+// not selected. Freeze the selection before creating any destination.
+fn (mut a ArchiveApp) begin_extraction(selected_only bool) bool {
 	if a.operation != .idle || a.loaded_path.len == 0 { return false }
+	mut selected_count := 0
+	mut selected_size := u64(0)
+	for index, entry in a.entries {
+		chosen := !selected_only || entry.selected
+		a.extraction_mask[index] = chosen
+		if chosen {
+			selected_count++
+			selected_size += entry.size
+		}
+	}
+	if selected_only && selected_count == 0 {
+		a.status_key = 'archive.no_selection'
+		return false
+	}
 	path := editor_bytes_text(a.extract_input).clone()
 	defer { unsafe { path.free() } }
 	root, status := archive_new_directory(path)
@@ -201,12 +228,13 @@ fn (mut a ArchiveApp) extract_archive() bool {
 	}
 	a.root_fd = root
 	a.operation = .extracting
+	a.extract_selected = selected_only
 	a.operation_path = path.clone()
 	a.status_key = 'archive.extracting'
 	a.index = 0
 	a.entry_written = 0
 	a.done = 0
-	a.goal = a.data_size
+	a.goal = selected_size
 	a.focus = -1
 	a.set_progress()
 	return true
@@ -360,6 +388,11 @@ fn (mut a ArchiveApp) poll_extracting() {
 		return
 	}
 	entry := a.entries[a.index]
+	if a.extract_selected && !a.extraction_mask[a.index] {
+		// Skip one entry per poll, so a sparse selection remains cancellable.
+		a.index++
+		return
+	}
 	if a.write_fd < 0 {
 		a.write_fd = archive_extract_entry(a.root_fd, entry)
 		if a.write_fd < 0 {
