@@ -6,6 +6,7 @@ translation units make the command fail and their diagnostics remain in JSON.
 """
 import argparse
 from concurrent.futures import ThreadPoolExecutor
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -53,11 +54,26 @@ def generate_headers(directory):
                        check=True, capture_output=True, text=True)
 
 
+def generate_bounds(directory, root, archive, compiler, flags):
+    # Use the same target/config/includes as every audited driver unit. The
+    # original bounds source comes from the verified archive outside its import.
+    script = HERE / "generate-bounds.py"
+    spec = importlib.util.spec_from_file_location("vinix_audit_bounds", script)
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+    output = directory / "generated/bounds.h"
+    return generator.generate(root, archive, output, Path(str(output) + ".d"),
+                              Path(str(output) + ".json"), compiler,
+                              [flag for flag in flags if flag != "-fsyntax-only"])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-dir", type=Path,
                         default=upstream.DEFAULT / ("linux-" + upstream.PIN["version"]))
     parser.add_argument("--cc", default="clang")
+    parser.add_argument("--archive", type=Path,
+                        help="pinned Linux archive used to derive kernel bounds")
     parser.add_argument("--make", default="make")
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--output", type=Path, default=HERE.parents[1] / "build/linuxkpi/i915-audit.json")
@@ -91,6 +107,10 @@ def main():
                 "-I", str(root / "arch/x86/include/uapi"),
                 "-I", str(root / "drivers/gpu/drm/i915"),
             ]
+            bounds = generate_bounds(generated, root,
+                                     args.archive or root.parent /
+                                     ("linux-" + upstream.PIN["version"] + ".tar.xz"),
+                                     args.cc, flags)
 
             def compile_source(source):
                 result = subprocess.run([args.cc] + flags + [str(source)], capture_output=True, text=True)
@@ -109,6 +129,7 @@ def main():
             blockers[key] = blockers.get(key, 0) + 1
         report = {"linux_version": upstream.PIN["version"], "pci_id": "8086:9a49",
                   "stage": "syntax-only; link/runtime readiness is not checked",
+                  "bounds": bounds,
                   "compiled": len(results) - len(failures), "total": len(results),
                   "blockers": blockers, "results": results}
         args.output.parent.mkdir(parents=True, exist_ok=True)

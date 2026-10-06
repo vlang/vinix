@@ -36,6 +36,17 @@ The current build compiles and links unmodified Linux `lib/list_sort.c`,
 memory-copy component; they do not initialize the GPU or submit commands. Importing
 the complete i915 source tree is not evidence that the driver runs.
 
+Enabled native builds and driver audits derive `generated/bounds.h` by compiling
+the exact pinned `kernel/bounds.c`, extracted outside the verified import. The
+generator uses the caller's actual target, configuration and generated ABI
+headers, verifies the archive and import, and records compiler/input hashes.
+`CONFIG_MMU=1` reflects Vinix's hardware page tables; Linux page ownership,
+zones, DMA and GPU mapping services remain unresolved. The native Make rules
+track the compiler command and discovered headers, including canonical paths
+on macOS. Failed generation preserves the previous header. Individual output
+replacements are atomic; the header/provenance hashes detect a mismatched bundle
+after a filesystem failure. Mutable build inputs still require isolation.
+
 ## Implemented APIs
 
 - Linux integer types, error pointers, overflow helpers and compiler macros.
@@ -534,6 +545,8 @@ incomplete.
 
 ```sh
 tests/linuxkpi/run.sh
+python3 tests/linuxkpi/bounds_generation_test.py
+python3 tests/linuxkpi/audit_generation_test.py
 python3 kernel/linuxkpi/audit.py
 python3 tests/linuxkpi/run_vm.py \
     --kernel build-amd64-kernel/bin/vinix \
@@ -1156,18 +1169,30 @@ to `build/linuxkpi/i915-audit.json`. An incomplete API layer makes this command
 exit with status 1. The current result is **4/269** translation units passing.
 Each invocation generates real native ABI adapter headers from current metadata
 in its own temporary directory, ahead of other includes, and cleans up after
-all compiler jobs. Regression tests cover repeated real compilation and invalid
-metadata rejection before compilation. The current exact report is
-`/tmp/vinix-linuxkpi-audit-generated-oct06-native.json`; `i915_memcpy.c`,
+all compiler jobs. The same private include tree now contains genuine
+compiler-derived bounds. Regression tests cover repeated real compilation,
+invalid metadata and bounds-compiler rejection before driver compilation.
+The latest isolated report is
+`/tmp/vinix-linuxkpi-bounds-oct06-frozen-audit-report.json`; `i915_memcpy.c`,
 `i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
 syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
-blockers are cleared. Leading first errors now include missing
-`generated/bounds.h`, `asm/early_ioremap.h`, ordinary RCU pointer APIs
-and `call_single_data_t`. These are syntax
+blockers are cleared. The report uses committed baseline `27aaf760` plus the
+owned bounds overlay, rather than other sessions' changing metadata. Leading
+first errors now include `pgtable_t` in 206 units, missing
+`asm/early_ioremap.h`, ordinary RCU pointer APIs and `call_single_data_t`. These are syntax
 paths, not a complete runtime dependency inventory.
 Even a successful syntax audit would still require actual
 object linking, unresolved-symbol checks and runtime/hardware testing.
+
+Bounds checks compile four real GNU99/GNU11 profiles against the original
+enums and `sizeof` values, reject eleven invalid or changing-input cases,
+and check command stamps and malformed compiler markers. Audit preparation
+passes four regression tests. Six independent Make checks compile a real
+consumer and verify regeneration after flag/config changes, followed by no
+rebuild on an unchanged invocation. GNU Make 3.81 tests separate prerequisite
+timestamps by whole seconds. Evidence is in
+`/tmp/vinix-linuxkpi-bounds-oct06-independent-final/independent-review.json`.
 
 ## Remaining driver integration
 

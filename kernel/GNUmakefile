@@ -18,6 +18,7 @@ STACK_GUARD_TEST ?= 0
 LINUXKPI ?= 0
 LINUXKPI_COBJ := $(patsubst c/%.c,obj/c/%.c.o,$(wildcard c/linuxkpi*.c))
 LINUXKPI_SOURCE_DIR ?= $(abspath ../third_party/linux-i915/linux-6.6.157)
+LINUXKPI_ARCHIVE ?= $(abspath $(dir $(LINUXKPI_SOURCE_DIR))/linux-6.6.157.tar.xz)
 ifneq ($(LINUXKPI),0)
 ifneq ($(LINUXKPI),1)
     $(error LINUXKPI must be 0 or 1)
@@ -286,7 +287,10 @@ ifeq ($(LINUXKPI),1)
     LINUXKPI_OBJ += obj/linuxkpi/headercore.o obj/linuxkpi/exchangecore.o
     # Keep the native 128-bit helper dormant until a caller selects that width.
     LINUXKPI_LIB := obj/linuxkpi/exchange128.a
-    LINUXKPI_GENERATED_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h obj/linuxkpi/include/vinix/integer_policy.h
+    LINUXKPI_ABI_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h obj/linuxkpi/include/vinix/integer_policy.h
+    # Match the generator's resolved -MQ target, including macOS /tmp aliases.
+    LINUXKPI_BOUNDS_HEADER := $(realpath $(CURDIR))/obj/linuxkpi/include/generated/bounds.h
+    LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_BOUNDS_HEADER)
     LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
@@ -407,6 +411,22 @@ obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json 
 
 obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json linuxkpi/generate-abi.py linuxkpi/headercore/policy.v
 	python3 linuxkpi/generate-abi.py $< $@
+
+# Compiler-derived bounds use the actual native MMU/config/header profile.
+# Reevaluate the command stamp on every invocation, preserving its timestamp
+# when flags are unchanged. Header dependencies include all discovered inputs.
+.PHONY: linuxkpi-bounds-command
+obj/linuxkpi/.bounds-command: linuxkpi-bounds-command
+	python3 linuxkpi/generate-bounds.py --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --command-stamp $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
+
+$(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) obj/linuxkpi/.bounds-command linuxkpi/generate-bounds.py linuxkpi/upstream.py linuxkpi/upstream.json linuxkpi/include/generated/autoconf.h $(LINUXKPI_ARCHIVE) GNUmakefile $(V_CONFIG_STAMP)
+	python3 linuxkpi/generate-bounds.py --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --output $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
+# Native consumers must recompile after a compiler/config change even when
+# numeric bounds are equal. Mark successful validation newer than its inputs;
+# the standalone generator still preserves unchanged bytes and timestamps.
+	touch $@
+
+-include $(LINUXKPI_BOUNDS_HEADER).d
 
 obj/linuxkpi/exchangecore.c obj/linuxkpi/exchange128core.c: obj/linuxkpi/%.c: linuxkpi/%/core.v ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"

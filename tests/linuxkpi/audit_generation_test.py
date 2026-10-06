@@ -22,6 +22,15 @@ import audit
 CALLER = """#include <linux/spinlock.h>
 #include <linux/atomic.h>
 #include <linux/overflow.h>
+#include <generated/bounds.h>
+#define __GENERATING_BOUNDS_H
+#include <linux/page-flags.h>
+#include <linux/mmzone.h>
+#include <linux/log2.h>
+_Static_assert(NR_PAGEFLAGS == __NR_PAGEFLAGS, "actual configured page flags");
+_Static_assert(MAX_NR_ZONES == __MAX_NR_ZONES, "actual configured zones");
+_Static_assert(SPINLOCK_SIZE == sizeof(spinlock_t), "actual lock ABI");
+_Static_assert(NR_CPUS_BITS == order_base_2(CONFIG_NR_CPUS), "configured CPUs");
 
 void native_adapter_caller(spinlock_t *lock, unsigned long *value)
 {
@@ -43,6 +52,7 @@ class AuditGenerationTest(unittest.TestCase):
         self.root = self.directory / "linux"
         self.root.mkdir()
         upstream = audit.upstream.DEFAULT / ("linux-" + audit.upstream.PIN["version"])
+        self.archive = upstream.parent / ("linux-" + audit.upstream.PIN["version"] + ".tar.xz")
         for name in ("include", "arch"):
             (self.root / name).symlink_to(upstream / name, target_is_directory=True)
         self.source = self.root / "drivers/gpu/drm/i915/adapter_caller.c"
@@ -52,11 +62,14 @@ class AuditGenerationTest(unittest.TestCase):
         self.compiler_commands = []
         self.generated_directories = []
         self.generation_directories = []
+        self.bounds_commands = []
 
     def run_command(self, command, **kwargs):
         if len(command) > 1 and Path(command[1]).name == "generate-abi.py":
             self.generation_directories.append(Path(command[-1]).parents[1])
-        if command[0] == "clang":
+        if "-S" in command:
+            self.bounds_commands.append(command)
+        if str(self.source) in command:
             self.compiler_commands.append(command)
             generated = Path(command[command.index("-I") + 1])
             self.generated_directories.append(generated)
@@ -64,13 +77,18 @@ class AuditGenerationTest(unittest.TestCase):
             self.assertTrue((generated / "vinix/atomic_exchange.h").is_file())
             if (audit.HERE / "abi/overflow.json").is_file():
                 self.assertTrue((generated / "vinix/integer_policy.h").is_file())
+            bounds = generated / "generated/bounds.h"
+            self.assertTrue(bounds.is_file())
+            self.assertTrue(Path(str(bounds) + ".d").is_file())
+            self.assertTrue(Path(str(bounds) + ".json").is_file())
             self.assertFalse(any("obj" in Path(value).parts for value in command))
         return self.run_subprocess(command, **kwargs)
 
-    def invoke(self, name):
+    def invoke(self, name, compiler="clang"):
         output = self.directory / (name + ".json")
         stdout, stderr = io.StringIO(), io.StringIO()
         arguments = ["audit.py", "--source-dir", str(self.root), "--jobs", "1",
+                     "--archive", str(self.archive), "--cc", compiler,
                      "--output", str(output)]
         with patch.object(sys, "argv", arguments), \
                 patch.object(audit.upstream, "verify"), \
@@ -86,9 +104,30 @@ class AuditGenerationTest(unittest.TestCase):
             self.assertEqual(status, 0, stdout + stderr)
             report = json.loads(output.read_text())
             self.assertEqual((report["compiled"], report["total"]), (1, 1), report)
+            self.assertEqual(report["bounds"]["configuration"]["CONFIG_MMU"], "1")
+            self.assertEqual(report["bounds"]["archive_sha256"], audit.upstream.PIN["sha256"])
         self.assertEqual(len(self.compiler_commands), 2)
+        self.assertEqual(len(self.bounds_commands), 2)
         self.assertEqual(len(set(self.generated_directories)), 2)
         for directory in self.generated_directories:
+            self.assertFalse(directory.parent.exists())
+
+    def test_bounds_compiler_failure_stops_before_driver_compilation(self):
+        compiler = self.directory / "reject-bounds.py"
+        compiler.write_text("#!" + sys.executable + "\n"
+                            "import os, sys\n"
+                            "if '-S' in sys.argv:\n"
+                            "    print('injected bounds compiler failure', file=sys.stderr)\n"
+                            "    sys.exit(1)\n"
+                            "os.execvp('clang', ['clang'] + sys.argv[1:])\n")
+        compiler.chmod(0o755)
+        status, output, stdout, stderr = self.invoke("bounds-failure", str(compiler))
+        self.assertEqual(status, 2, stdout + stderr)
+        self.assertIn("injected bounds compiler failure", stderr)
+        self.assertFalse(output.exists())
+        self.assertEqual(self.compiler_commands, [])
+        self.assertEqual(len(self.bounds_commands), 1)
+        for directory in self.generation_directories:
             self.assertFalse(directory.parent.exists())
 
     def test_invalid_metadata_stops_before_the_compiler(self):

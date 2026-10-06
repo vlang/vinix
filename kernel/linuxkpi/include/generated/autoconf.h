@@ -5,6 +5,9 @@
 #define CONFIG_64BIT 1
 #define CONFIG_X86 1
 #define CONFIG_X86_64 1
+/* Native user mappings use hardware page tables. This selects the genuine
+ * MMU header layout; Linux page ownership and GPU mappings remain separate. */
+#define CONFIG_MMU 1
 #define CONFIG_SMP 1
 #define CONFIG_NR_CPUS 256
 /* Ordinary process/IRQ capture uses a native owned-byte logger. NMI entry,
