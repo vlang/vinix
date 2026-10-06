@@ -52,7 +52,6 @@
 #define COMMAND_US 5000000u
 #define BOOT_US 10000000u
 #define SEND_US 20000u
-#define TYPE(t) ((uint64_t)(t) << 52)
 #define IOVA_MASK ((UINT64_C(1) << 42) - 1)
 #define PM_FLAGS (3u << 8)
 #define PM_DISABLE (1u << 10)
