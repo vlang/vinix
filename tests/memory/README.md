@@ -121,6 +121,27 @@ zeroing/poisoning, resident-page invalid/double frees, tail bits, arithmetic
 bounds, x86 snapshot source order, and mixed-size churn. It deliberately models
 an abstract PMM rather than claiming to execute the kernel PMM.
 
+The independent memory-primitive oracle is maintained in
+`runtimefixture/core.v`. It checks the production V primitives under private
+export names, preserving all alignment/overlap domains, guard-page endpoints,
+zero-length protected pointers, byte values and 13 integer-parser cases:
+
+```sh
+tests/memory/run-runtime.sh
+tests/memory/run-runtime.sh --host-arch amd64
+```
+
+The default host run enables ASan/UBSan and rejects allocator imports.
+`--original-reference /path/to/immutable/runtime.c` also runs the original
+oracle against the identical production primitive object and compares complete
+output. Case counts are 226,419 with 4 KiB pages and 410,739 with 16 KiB pages.
+Native C/V controls use `run-runtime.py --arch`, an isolated `--kernel-dir`,
+fresh `--state-dir` and `--guest-state-dir`; their complete workload gets a
+3,600-second outer allowance. Both mappings are unmapped before the success
+marker, and the native entry keeps PID 1 alive afterward. The primitive object
+retains general-register-only compilation; only its unused Darwin x86 math
+header is skipped because the SDK defines floating-point inline functions.
+
 Build the actual kernel in debug and production with the repository's toolchain
 and dependencies. Enable the boot tests by adding `VFLAGS='-d heap_selftest'`
 to the kernel make invocation. For example, using the native Linux CI flags:
