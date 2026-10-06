@@ -13,6 +13,10 @@ covers signals arriving before waiter attachment. An unrelated blocked signal
 stays pending. Sigsuspend and AMD64 pause retain their existing interruption
 mask by requesting no additional signals.
 
+The independent guest is maintained in `timerfixture/core.v` and compiled
+through the native libc ABI. Its original assertions and timing bounds remain
+unchanged.
+
 The guest covers:
 
 - Twenty musl SIGEV_THREAD one-shot timers with the original core test's 20 ms
