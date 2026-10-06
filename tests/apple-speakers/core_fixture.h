@@ -128,8 +128,6 @@
 #define CONF_UNK3           (1u << 14)
 #define CONF_NO_FEEDBACK    (1u << 15)
 #define CONF_SYNC_SEL       (7u << 16)
-#define ADAPTER_A(cl)       (0x8000u * (cl))
-#define ADAPTER_B(cl)       (0x8000u * (cl) + 0x4000u)
 #define TX_SLOTS            8u     /* BCLK = 256 fs: 8 slots of 32 bits */
 #define SENSE_SLOTS         16u    /* the same frame as 16 slots of 16 bits */
 #define BCLK_RATIO          256u
@@ -142,19 +140,14 @@
 #define ADMAC_RX_STOP       0x000c
 #define ADMAC_TX_SRAM_SIZE  0x0094
 #define ADMAC_RX_SRAM_SIZE  0x0098
-#define CHAN_BASE(ch)       (0x8000u + (ch) * 0x200u)
 #define CHAN_CTL            0x00
 #define CHAN_RST_RINGS      (1u << 0)
-#define CHAN_INTSTATUS(i)   (0x10u + (i) * 4u)
-#define CHAN_INTMASK(i)     (0x20u + (i) * 4u)
 #define CHAN_BUS_WIDTH      0x40
 #define CHAN_CARVEOUT       0x50
 #define CHAN_FIFOCTL        0x54
 #define CHAN_RESIDUE        0x64
 #define CHAN_DESC_RING      0x70
 #define CHAN_REPORT_RING    0x74
-#define DESC_WRITE(ch)      (0x10000u + ((ch) / 2u) * 4u + ((ch) & 1u) * 0x4000u)
-#define REPORT_READ(ch)     (0x10100u + ((ch) / 2u) * 4u + ((ch) & 1u) * 0x4000u)
 #define RING_EMPTY          (1u << 8)
 #define RING_FULL           (1u << 9)
 #define RING_ERR            (1u << 10)
@@ -190,17 +183,9 @@ struct speaker_params {
     uint8_t vs_chan;
 };
 
-static const struct speaker_params j313_speakers[SPK_COUNT] = {
-    { 29000, 36000, 2400, 80000, 120000, 15000, 4900, 3750, 14000, 0, 1 },
-    { 29000, 36000, 2400, 80000, 120000, 15000, 4900, 3750, 14000, 2, 3 },
-};
-
 #define T_AMBIENT_M    50000
 #define T_HYSTERESIS_M 5000
 #define T_WINDOW_M     20000
-
-#define Q32(x)         ((int64_t)(x) << 32)
-#define MILLI_TO_Q32(m) (((int64_t)(m) << 32) / 1000)
 
 struct speaker_model {
     int64_t coil;           /* Q32 degrees */
@@ -310,178 +295,91 @@ struct speakers {
     uint32_t event_count;
 };
 
-#define rd(...) vinix_spk_core_rd(__VA_ARGS__)
-uint32_t rd(struct speakers *s, uint64_t address);
-#define wr(...) vinix_spk_core_wr(__VA_ARGS__)
-void wr(struct speakers *s, uint64_t address, uint32_t value);
-#define modify(...) vinix_spk_core_modify(__VA_ARGS__)
-void modify(struct speakers *s, uint64_t address, uint32_t mask, uint32_t value);
-#define now_us(...) vinix_spk_core_now_us(__VA_ARGS__)
-uint64_t now_us(struct speakers *s);
-#define delay_us(...) vinix_spk_core_delay_us(__VA_ARGS__)
-void delay_us(struct speakers *s, uint32_t us);
-#define post(...) vinix_spk_core_post(__VA_ARGS__)
-void post(struct speakers *s, int32_t code, int32_t a, int32_t b);
-#define take_event(...) vinix_spk_core_take_event(__VA_ARGS__)
-int take_event(struct speakers *s, struct speaker_event *out);
-#define mul_q48(...) vinix_spk_core_mul_q48(__VA_ARGS__)
-int64_t mul_q48(int64_t a, int64_t b);
-#define mul_q32u(...) vinix_spk_core_mul_q32u(__VA_ARGS__)
-uint64_t mul_q32u(uint64_t a, uint64_t b);
-#define log2_q16(...) vinix_spk_core_log2_q16(__VA_ARGS__)
-int64_t log2_q16(uint64_t x);
-#define db_to_power_q32(...) vinix_spk_core_db_to_power_q32(__VA_ARGS__)
-uint64_t db_to_power_q32(int32_t mdb);
-#define i2c_base(...) vinix_spk_core_i2c_base(__VA_ARGS__)
-uint64_t i2c_base(struct speakers *s, int amp);
-#define i2c_reset(...) vinix_spk_core_i2c_reset(__VA_ARGS__)
-void i2c_reset(struct speakers *s, int amp);
-#define i2c_clear(...) vinix_spk_core_i2c_clear(__VA_ARGS__)
-int i2c_clear(struct speakers *s, int amp);
-#define i2c_wait(...) vinix_spk_core_i2c_wait(__VA_ARGS__)
-int i2c_wait(struct speakers *s, int amp);
-#define i2c_write(...) vinix_spk_core_i2c_write(__VA_ARGS__)
-int i2c_write(struct speakers *s, int amp, uint8_t reg, uint8_t value);
-#define i2c_read(...) vinix_spk_core_i2c_read(__VA_ARGS__)
-int i2c_read(struct speakers *s, int amp, uint8_t reg, uint8_t *value);
-#define tas_update(...) vinix_spk_core_tas_update(__VA_ARGS__)
-int tas_update(struct speakers *s, int amp, uint8_t reg, uint8_t mask, uint8_t value);
-#define tas_expect(...) vinix_spk_core_tas_expect(__VA_ARGS__)
-int tas_expect(struct speakers *s, int amp, uint8_t reg, uint8_t mask, uint8_t value);
-#define tas_power(...) vinix_spk_core_tas_power(__VA_ARGS__)
-int tas_power(struct speakers *s, int amp, uint8_t mode);
-#define tas_init(...) vinix_spk_core_tas_init(__VA_ARGS__)
-int tas_init(struct speakers *s, int amp);
-#define tas_set_rate(...) vinix_spk_core_tas_set_rate(__VA_ARGS__)
-int tas_set_rate(struct speakers *s, int amp);
-#define sdz_set(...) vinix_spk_core_sdz_set(__VA_ARGS__)
-void sdz_set(struct speakers *s, int enabled);
-#define lfsr_step(...) vinix_spk_core_lfsr_step(__VA_ARGS__)
-uint32_t lfsr_step(uint32_t state);
-#define nco_div_register(...) vinix_spk_core_nco_div_register(__VA_ARGS__)
-uint32_t nco_div_register(uint32_t div);
-#define nco_set_rate(...) vinix_spk_core_nco_set_rate(__VA_ARGS__)
-int nco_set_rate(struct speakers *s, uint32_t channel, uint32_t rate);
-#define nco_enable(...) vinix_spk_core_nco_enable(__VA_ARGS__)
-void nco_enable(struct speakers *s, uint32_t channel, int enable);
-#define cluster(...) vinix_spk_core_cluster(__VA_ARGS__)
-uint64_t cluster(struct speakers *s, uint32_t n);
-#define cluster_on(...) vinix_spk_core_cluster_on(__VA_ARGS__)
-int cluster_on(struct speakers *s, uint32_t n);
-#define cluster_off(...) vinix_spk_core_cluster_off(__VA_ARGS__)
-void cluster_off(struct speakers *s, uint32_t n);
-#define mca_set_format(...) vinix_spk_core_mca_set_format(__VA_ARGS__)
-void mca_set_format(struct speakers *s, uint32_t n);
-#define adapter_value(...) vinix_spk_core_adapter_value(__VA_ARGS__)
-uint32_t adapter_value(uint32_t channels);
-#define mca_configure_tx(...) vinix_spk_core_mca_configure_tx(__VA_ARGS__)
-void mca_configure_tx(struct speakers *s);
-#define mca_configure_sense(...) vinix_spk_core_mca_configure_sense(__VA_ARGS__)
-void mca_configure_sense(struct speakers *s);
-#define mca_ports(...) vinix_spk_core_mca_ports(__VA_ARGS__)
-void mca_ports(struct speakers *s, int on);
-#define lowest_port(...) vinix_spk_core_lowest_port(__VA_ARGS__)
-uint32_t lowest_port(uint32_t mask);
-#define serdes_reset(...) vinix_spk_core_serdes_reset(__VA_ARGS__)
-void serdes_reset(struct speakers *s, uint32_t n, uint32_t unit, uint32_t conf);
-#define serdes_enable(...) vinix_spk_core_serdes_enable(__VA_ARGS__)
-void serdes_enable(struct speakers *s, uint32_t n, uint32_t unit, int enable);
-#define chan(...) vinix_spk_core_chan(__VA_ARGS__)
-uint64_t chan(struct speakers *s, uint32_t ch);
-#define admac_setup(...) vinix_spk_core_admac_setup(__VA_ARGS__)
-int admac_setup(struct speakers *s, uint32_t ch, uint32_t frame);
-#define admac_reset_rings(...) vinix_spk_core_admac_reset_rings(__VA_ARGS__)
-void admac_reset_rings(struct speakers *s, uint32_t ch);
-#define admac_descriptor(...) vinix_spk_core_admac_descriptor(__VA_ARGS__)
-void admac_descriptor(struct speakers *s, uint32_t ch, uint64_t iova, uint32_t length);
-#define admac_run(...) vinix_spk_core_admac_run(__VA_ARGS__)
-void admac_run(struct speakers *s, uint32_t ch, int run);
-#define admac_reap(...) vinix_spk_core_admac_reap(__VA_ARGS__)
-uint32_t admac_reap(struct speakers *s, uint32_t ch);
-#define model_rate(...) vinix_spk_core_model_rate(__VA_ARGS__)
-void model_rate(struct speakers *s);
-#define model_reset(...) vinix_spk_core_model_reset(__VA_ARGS__)
-void model_reset(struct speakers *s);
-#define model_cool(...) vinix_spk_core_model_cool(__VA_ARGS__)
-void model_cool(struct speakers *s, uint64_t samples);
-#define model_idle(...) vinix_spk_core_model_idle(__VA_ARGS__)
-void model_idle(struct speakers *s);
-#define min_gain_mdb(...) vinix_spk_core_min_gain_mdb(__VA_ARGS__)
-int32_t min_gain_mdb(void);
-#define model_run(...) vinix_spk_core_model_run(__VA_ARGS__)
-int model_run(struct speakers *s, uint32_t n, const int16_t *frames, uint32_t count,
+uint32_t vinix_spk_core_rd(struct speakers *s, uint64_t address);
+void vinix_spk_core_wr(struct speakers *s, uint64_t address, uint32_t value);
+void vinix_spk_core_modify(struct speakers *s, uint64_t address, uint32_t mask, uint32_t value);
+uint64_t vinix_spk_core_now_us(struct speakers *s);
+void vinix_spk_core_delay_us(struct speakers *s, uint32_t us);
+void vinix_spk_core_post(struct speakers *s, int32_t code, int32_t a, int32_t b);
+int vinix_spk_core_take_event(struct speakers *s, struct speaker_event *out);
+int64_t vinix_spk_core_mul_q48(int64_t a, int64_t b);
+uint64_t vinix_spk_core_mul_q32u(uint64_t a, uint64_t b);
+int64_t vinix_spk_core_log2_q16(uint64_t x);
+uint64_t vinix_spk_core_db_to_power_q32(int32_t mdb);
+uint64_t vinix_spk_core_i2c_base(struct speakers *s, int amp);
+void vinix_spk_core_i2c_reset(struct speakers *s, int amp);
+int vinix_spk_core_i2c_clear(struct speakers *s, int amp);
+int vinix_spk_core_i2c_wait(struct speakers *s, int amp);
+int vinix_spk_core_i2c_write(struct speakers *s, int amp, uint8_t reg, uint8_t value);
+int vinix_spk_core_i2c_read(struct speakers *s, int amp, uint8_t reg, uint8_t *value);
+int vinix_spk_core_tas_update(struct speakers *s, int amp, uint8_t reg, uint8_t mask, uint8_t value);
+int vinix_spk_core_tas_expect(struct speakers *s, int amp, uint8_t reg, uint8_t mask, uint8_t value);
+int vinix_spk_core_tas_power(struct speakers *s, int amp, uint8_t mode);
+int vinix_spk_core_tas_init(struct speakers *s, int amp);
+int vinix_spk_core_tas_set_rate(struct speakers *s, int amp);
+void vinix_spk_core_sdz_set(struct speakers *s, int enabled);
+uint32_t vinix_spk_core_lfsr_step(uint32_t state);
+uint32_t vinix_spk_core_nco_div_register(uint32_t div);
+int vinix_spk_core_nco_set_rate(struct speakers *s, uint32_t channel, uint32_t rate);
+void vinix_spk_core_nco_enable(struct speakers *s, uint32_t channel, int enable);
+uint64_t vinix_spk_core_cluster(struct speakers *s, uint32_t n);
+int vinix_spk_core_cluster_on(struct speakers *s, uint32_t n);
+void vinix_spk_core_cluster_off(struct speakers *s, uint32_t n);
+void vinix_spk_core_mca_set_format(struct speakers *s, uint32_t n);
+uint32_t vinix_spk_core_adapter_value(uint32_t channels);
+void vinix_spk_core_mca_configure_tx(struct speakers *s);
+void vinix_spk_core_mca_configure_sense(struct speakers *s);
+void vinix_spk_core_mca_ports(struct speakers *s, int on);
+uint32_t vinix_spk_core_lowest_port(uint32_t mask);
+void vinix_spk_core_serdes_reset(struct speakers *s, uint32_t n, uint32_t unit, uint32_t conf);
+void vinix_spk_core_serdes_enable(struct speakers *s, uint32_t n, uint32_t unit, int enable);
+uint64_t vinix_spk_core_chan(struct speakers *s, uint32_t ch);
+int vinix_spk_core_admac_setup(struct speakers *s, uint32_t ch, uint32_t frame);
+void vinix_spk_core_admac_reset_rings(struct speakers *s, uint32_t ch);
+void vinix_spk_core_admac_descriptor(struct speakers *s, uint32_t ch, uint64_t iova, uint32_t length);
+void vinix_spk_core_admac_run(struct speakers *s, uint32_t ch, int run);
+uint32_t vinix_spk_core_admac_reap(struct speakers *s, uint32_t ch);
+void vinix_spk_core_model_rate(struct speakers *s);
+void vinix_spk_core_model_reset(struct speakers *s);
+void vinix_spk_core_model_cool(struct speakers *s, uint64_t samples);
+void vinix_spk_core_model_idle(struct speakers *s);
+int32_t vinix_spk_core_min_gain_mdb(void);
+int vinix_spk_core_model_run(struct speakers *s, uint32_t n, const int16_t *frames, uint32_t count,
     int32_t *fault_value);
-#define model_gain(...) vinix_spk_core_model_gain(__VA_ARGS__)
-int32_t model_gain(struct speakers *s);
-#define set_attenuation(...) vinix_spk_core_set_attenuation(__VA_ARGS__)
-int set_attenuation(struct speakers *s, int32_t att);
-#define apply_policy(...) vinix_spk_core_apply_policy(__VA_ARGS__)
-void apply_policy(struct speakers *s, uint64_t now);
-#define tx_at(...) vinix_spk_core_tx_at(__VA_ARGS__)
-uint8_t *tx_at(struct speakers *s, uint64_t position);
-#define tx_submit(...) vinix_spk_core_tx_submit(__VA_ARGS__)
-void tx_submit(struct speakers *s);
-#define energy_slot(...) vinix_spk_core_energy_slot(__VA_ARGS__)
-uint64_t *energy_slot(struct speakers *s, uint64_t period);
-#define tx_account(...) vinix_spk_core_tx_account(__VA_ARGS__)
-void tx_account(struct speakers *s);
-#define tx_pad(...) vinix_spk_core_tx_pad(__VA_ARGS__)
-void tx_pad(struct speakers *s);
-#define tx_service(...) vinix_spk_core_tx_service(__VA_ARGS__)
-uint32_t tx_service(struct speakers *s, uint64_t now);
-#define sense_iova(...) vinix_spk_core_sense_iova(__VA_ARGS__)
-uint64_t sense_iova(struct speakers *s, uint64_t period);
-#define sense_submit(...) vinix_spk_core_sense_submit(__VA_ARGS__)
-void sense_submit(struct speakers *s);
-#define expected_energy(...) vinix_spk_core_expected_energy(__VA_ARGS__)
-void expected_energy(struct speakers *s, uint64_t k, uint64_t out[SPK_COUNT]);
-#define check_liveness(...) vinix_spk_core_check_liveness(__VA_ARGS__)
-void check_liveness(struct speakers *s, uint64_t k, const int16_t *frames);
-#define sense_service(...) vinix_spk_core_sense_service(__VA_ARGS__)
-void sense_service(struct speakers *s, uint64_t now);
-#define reset_positions(...) vinix_spk_core_reset_positions(__VA_ARGS__)
-void reset_positions(struct speakers *s);
-#define hardware_stop(...) vinix_spk_core_hardware_stop(__VA_ARGS__)
-void hardware_stop(struct speakers *s);
-#define fault_shutdown(...) vinix_spk_core_fault_shutdown(__VA_ARGS__)
-void fault_shutdown(struct speakers *s);
-#define configure(...) vinix_spk_core_configure(__VA_ARGS__)
-int configure(struct speakers *s, uint32_t rate);
-#define wants_start(...) vinix_spk_core_wants_start(__VA_ARGS__)
-int wants_start(struct speakers *s);
-#define start_clocks(...) vinix_spk_core_start_clocks(__VA_ARGS__)
-int start_clocks(struct speakers *s);
-#define start_stream(...) vinix_spk_core_start_stream(__VA_ARGS__)
-int start_stream(struct speakers *s);
-#define stop(...) vinix_spk_core_stop(__VA_ARGS__)
-void stop(struct speakers *s);
-#define service(...) vinix_spk_core_service(__VA_ARGS__)
-uint32_t service(struct speakers *s);
-#define room(...) vinix_spk_core_room(__VA_ARGS__)
-uint32_t room(struct speakers *s);
-#define reserve(...) vinix_spk_core_reserve(__VA_ARGS__)
-uint8_t *reserve(struct speakers *s, uint32_t *length);
-#define commit(...) vinix_spk_core_commit(__VA_ARGS__)
-void commit(struct speakers *s, uint32_t bytes);
-#define drain(...) vinix_spk_core_drain(__VA_ARGS__)
-void drain(struct speakers *s);
-#define drained(...) vinix_spk_core_drained(__VA_ARGS__)
-int drained(struct speakers *s);
-#define init(...) vinix_spk_core_c_init(__VA_ARGS__)
-int init(struct speakers *s, const struct vinix_apple_speakers_config *cfg);
-#define get_status(...) vinix_spk_core_get_status(__VA_ARGS__)
-void get_status(struct speakers *s, struct vinix_apple_speakers_status *out);
-#define kernel_read32(...) vinix_spk_core_kernel_read32(__VA_ARGS__)
-uint32_t kernel_read32(void *cookie, uint64_t address);
-#define kernel_write32(...) vinix_spk_core_kernel_write32(__VA_ARGS__)
-void kernel_write32(void *cookie, uint64_t address, uint32_t value);
-#define kernel_now_us(...) vinix_spk_core_kernel_now_us(__VA_ARGS__)
-uint64_t kernel_now_us(void *cookie);
-#define kernel_delay_us(...) vinix_spk_core_kernel_delay_us(__VA_ARGS__)
-void kernel_delay_us(void *cookie, uint32_t us);
-#define kernel_clean(...) vinix_spk_core_kernel_clean(__VA_ARGS__)
-void kernel_clean(void *cookie, uint64_t address, uint32_t length);
-#define kernel_invalidate(...) vinix_spk_core_kernel_invalidate(__VA_ARGS__)
-void kernel_invalidate(void *cookie, uint64_t address, uint32_t length);
-#define kernel_power(...) vinix_spk_core_kernel_power(__VA_ARGS__)
-int kernel_power(void *cookie, uint32_t cluster, int on);
+int32_t vinix_spk_core_model_gain(struct speakers *s);
+int vinix_spk_core_set_attenuation(struct speakers *s, int32_t att);
+void vinix_spk_core_apply_policy(struct speakers *s, uint64_t now);
+uint8_t *vinix_spk_core_tx_at(struct speakers *s, uint64_t position);
+void vinix_spk_core_tx_submit(struct speakers *s);
+uint64_t *vinix_spk_core_energy_slot(struct speakers *s, uint64_t period);
+void vinix_spk_core_tx_account(struct speakers *s);
+void vinix_spk_core_tx_pad(struct speakers *s);
+uint32_t vinix_spk_core_tx_service(struct speakers *s, uint64_t now);
+uint64_t vinix_spk_core_sense_iova(struct speakers *s, uint64_t period);
+void vinix_spk_core_sense_submit(struct speakers *s);
+void vinix_spk_core_expected_energy(struct speakers *s, uint64_t k, uint64_t out[SPK_COUNT]);
+void vinix_spk_core_check_liveness(struct speakers *s, uint64_t k, const int16_t *frames);
+void vinix_spk_core_sense_service(struct speakers *s, uint64_t now);
+void vinix_spk_core_reset_positions(struct speakers *s);
+void vinix_spk_core_hardware_stop(struct speakers *s);
+void vinix_spk_core_fault_shutdown(struct speakers *s);
+int vinix_spk_core_configure(struct speakers *s, uint32_t rate);
+int vinix_spk_core_wants_start(struct speakers *s);
+int vinix_spk_core_start_clocks(struct speakers *s);
+int vinix_spk_core_start_stream(struct speakers *s);
+void vinix_spk_core_stop(struct speakers *s);
+uint32_t vinix_spk_core_service(struct speakers *s);
+uint32_t vinix_spk_core_room(struct speakers *s);
+uint8_t *vinix_spk_core_reserve(struct speakers *s, uint32_t *length);
+void vinix_spk_core_commit(struct speakers *s, uint32_t bytes);
+void vinix_spk_core_drain(struct speakers *s);
+int vinix_spk_core_drained(struct speakers *s);
+int vinix_spk_core_c_init(struct speakers *s, const struct vinix_apple_speakers_config *cfg);
+void vinix_spk_core_get_status(struct speakers *s, struct vinix_apple_speakers_status *out);
+uint32_t vinix_spk_core_kernel_read32(void *cookie, uint64_t address);
+void vinix_spk_core_kernel_write32(void *cookie, uint64_t address, uint32_t value);
+uint64_t vinix_spk_core_kernel_now_us(void *cookie);
+void vinix_spk_core_kernel_delay_us(void *cookie, uint32_t us);
+void vinix_spk_core_kernel_clean(void *cookie, uint64_t address, uint32_t length);
+void vinix_spk_core_kernel_invalidate(void *cookie, uint64_t address, uint32_t length);
+int vinix_spk_core_kernel_power(void *cookie, uint32_t cluster, int on);
