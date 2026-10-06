@@ -17,6 +17,12 @@
 #include <linux/panic.h>
 #include <linux/printk.h>
 #include <linux/sprintf.h>
+#define u64_to_user_ptr(x) (		\
+{					\
+	typecheck(u64, (x));		\
+	(void __user *)(uintptr_t)(x);	\
+}					\
+)
 #define container_of_safe(ptr, type, member) \
     ((ptr) ? container_of((ptr), type, member) : NULL)
 #define might_sleep() BUG_ON(!vinix_linuxkpi_may_sleep())
