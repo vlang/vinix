@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb`. Re-read HEAD, `AGENTS.md` and
+`9f47270ee3c6754312bc09fc74d8f77e2cfe2229`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,8 +28,10 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **2,406 original production C lines**, **453 original fixture
-lines** and **111 desktop header lines**, counted separately.
+continuation adds **3,234 original production C lines**, **3,411 original fixture
+lines** and **248 header implementation lines** (111 desktop, 137 kernel),
+counted separately. Five stack-pointer boundary lines use instruction-only
+assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
 | --- | --- |
@@ -50,13 +52,22 @@ lines** and **111 desktop header lines**, counted separately.
 | Dota low mappings, existing parser/probe fixtures | `5115a9e7` |
 | Steam i386/x86_64 robust-list preloads | `032eaa2d` |
 | QEMU VNC window client | `45f28820` |
+| Android native runtime | `1d6730ac` |
+| Xinput native launcher / Wine host boundary | `bea41f8e` |
+| Office PE ABI | `7df94498` |
+| Cache/i915/PCI/runtime native fixtures (1,118 lines) | `3b3b131d` |
+| Seven task/time/sync/I/O/sequence fixtures (1,582 lines) | `cbb528e0` |
+| Kernel native headers / ARM PCI fixture (37 / 57 lines) | `6b3769f2` |
+| IPv6 / common serial / smoke fixtures (201 lines) | `7dfa57c5` |
+| LinuxKPI typed/generic header operations (100 lines) | `9f47270e` |
 
 `kernel/c/*.c` now has **zero non-fixture maintained files**. Public header
 algorithms and independent fixtures still remain C. The instruction applies
 throughout the repository, including support utilities, tests and SDK headers.
-The current committed census contains 237 non-vendored `.c` paths / 54,233 lines
-(19 kernel fixtures / 5,448 lines, 210 test paths / 47,713 lines, two Apple
-fixtures / 168 lines, five support files / 899 lines and hello / five lines).
+At the pinned source, the committed census contains 224 non-vendored `.c`
+paths / 51,215 lines (seven kernel fixtures / 2,691 lines, 213 test paths /
+48,280 lines, two Apple fixtures / 168 lines, one Android support fixture /
+71 lines and hello / five lines).
 This census is a scope guide, not a translation tally; genuine retained musl
 evidence requires provenance classification and headers/embedded sources are
 additional work. Recount before selecting the next stage.
@@ -75,31 +86,23 @@ as maintained implementation.
 The shared checkout has uncommitted coordinated work. Re-read diffs before
 continuing and do not commit others' paths:
 
-- Four native LinuxKPI fixtures (cache 242, i915 138, PCI 308, runtime 430) are V
-  in `kernel/linuxkpi/*fixture`; original C deletions and exact integration are
-  pending. Full host sanitizers/golden/upstream/header checks passed, both
-  architecture builds passed and 700 source hashes were frozen. The first
-  native guest failed the generic early compatibility selftest, so the stage
-  is **not committed/validated** yet. Diagnose its exact unchanged condition;
-  do not weaken assertions. Source/proof files: `fixture-native-source.json`,
-  `fixture-native-kernels.json`, `fixture-native-qemu.log`, `fng/serial.log`.
-- Task/time/timer 353, sync 160, wound/wait 321 and I/O 460 native fixtures are
-  being prepared in `.pending` V paths. Keep their original integration until
-  the preceding stage succeeds. Preserve every original loop/deadline, native
-  callback address and join/unlink before stack expiry.
-- LinuxKPI first-party overlay header algorithms are moving to
-  `headercore/primitive.v`, with surgical foreign-field metadata additions in
-  common/wait modules. Full host and standalone header checks pass; final
-  isolated builds/native guest and own-path commit remain required. Preserve
-  generic exchange/CAS widths including 128-bit, and native long-long spelling.
-- Android runtime 610 is in native V with actual pthread types and generated
-  readonly 128-thunk data. Frozen original-C/V host and x86 native comparisons
-  passed; final ARM repeat after readonly-table correction is pending. Its
-  genuine pinned musl statistics provider is mandatory; a stale staging loader
-  lacked that export and failed the original C before reaching V.
-- Office PE ABI 123, Xinput launcher 73, Wine host boundary 22 and hello 5 are next
-  support scopes. Main-kernel native/header algorithms and generated declaration
-  headers are still outstanding, as are remaining independent test sources.
+- All remaining six LinuxKPI kernel fixtures (SRCU 541, worker 223, workqueue
+  742, usleep 312, wait-bit 355 and printk 514) are now V in the working tree.
+  Their 2,687 original lines, explicit native variadic assembly and exact
+  integration are **uncommitted pending native verification**. The full host
+  sanitizer/header/upstream suite passed; all 17 fixture objects have no hidden
+  allocator imports. Record layouts, actual C callback addresses and all
+  original deadline/retirement/assertion policies received independent review.
+  `fixture-final-proof/evidence.json` identifies every owned path and hash.
+- ACPI native fixture 206 is V in `tests/acpi-sync/nativefixture`, with an
+  explicit `ACPI_SYNC_TEST=1` option, separate native object and configuration
+  stamp. Both strict native objects/no-allocator checks and lifetime review
+  passed; both actual native ACPI guests and its own-path commit remain.
+- Hello's five original C lines and the 71-line Android configuration fixture
+  remain support scopes. Further first-party header algorithms (overflow,
+  pointer/preemption, barriers/RCU and others) and standalone/host/native test
+  sources remain to port. Do not mistake zero kernel implementation C for
+  completion of the repository-wide request.
 
 ## Validation and evidence
 
@@ -132,6 +135,30 @@ C/V and V/V, all 50 original probe conditions and 24 parser cases × 257 chunk
 boundaries. VNC passed 34 differential outcomes, both native mocks and actual
 ARM X11 link. New lifetimes received independent review.
 
+The corrected first four fixture guest passed after restoring original unsigned
+`MKDEV` literal arguments; expected values remain unchanged. The next seven
+fixtures and typed/generic headers passed the complete four-CPU guest with
+exact free-page equality. Its tested LinuxKPI ELF SHA256 is
+`195c83c50c0d295da8e510b8046a946ac071fa73cf6ce9ed2be3f33bad4636cd`.
+ARM PCI/full-DAIF ELF is
+`638c983715bb1d51a3fe00901a79cb0e4dcf355b7d183545b3c55beacb0c156d`;
+default x86 ELF is
+`bcfec8fd702ac3697ea3f65bd13c6a04edbf7df00c18b869d42f3f9657b63d9c`.
+`fixture-next-source.json` freezes 763 paths from committed source plus exact
+owned changes. Another session's uncommitted user-copy paths were excluded;
+the earlier accidental mixed snapshot's compilation failure is retained.
+The original-C/V IPv6 verdict and class measurements match byte for byte on
+both architectures: 500 exchanges, all classes flat, slab delta zero. Both V
+PID1/fork/COW/mmap smoke guests passed. Native header and generic atomic/IRQ
+oracles passed, including 128-bit operations and original lvalue sequencing.
+
+Android and Xinput/Wine host/strict-native/both-architecture fixtures passed;
+actual ARM X11 links passed. Office host and native Win64 export checks passed;
+translated Wine executed both SDK PE fixtures, each returning unique success
+code 73 after all checks. A skipped fixture returning zero fails. Earlier
+stale Android statistics-provider and Wine NLS-layout failures remain evidence;
+full Office/APK UI was not rerun.
+
 The existing allocation-site check still rejects the same 158 sites on the
 unchanged baseline (354 ARM, 293 x86, 414 distinct); keep the allowlist intact.
 Earlier repeated ops/churn found identical warm heap deltas, but unchanged VFS
@@ -157,7 +184,8 @@ inside the first-party cache above. Other worktrees elsewhere in
 Prefer fresh worktrees from current HEAD. Reuse or symlink untracked
 freestanding headers, architecture-specific cc-runtime dependencies,
 `c/{lwip,uacpi,flanterm}` and `c/nanoprintf.h`. Build each architecture's
-runtime archive separately. `kernel/get-deps` resets/cleans dependencies;
+runtime archive separately with LLVM ar; Darwin ar cannot index ELF runtime
+objects correctly. `kernel/get-deps` resets/cleans dependencies;
 do not run it through shared dependency symlinks.
 
 Set `port_arm` and `port_x86` to separate prepared worktrees, and guest
@@ -165,18 +193,18 @@ variables to unused state directories. Build/test shapes remain:
 
 ```sh
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_arm/kernel" -j4 \
-  ARCH=aarch64 CC=clang V=/Users/alex/code/v/v LIMINE_MP=1 STACK_GUARD_TEST=0 \
+  ARCH=aarch64 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v LIMINE_MP=1 STACK_GUARD_TEST=0 \
   LD_AARCH64=/opt/homebrew/bin/ld.lld
 
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_x86/kernel" -j4 \
-  ARCH=x86_64 LINUXKPI=0 CC=clang V=/Users/alex/code/v/v \
+  ARCH=x86_64 LINUXKPI=0 CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v \
   LIMINE_MP=1 STACK_GUARD_TEST=0 LD_X86_64=/opt/homebrew/bin/ld.lld
 
 python3 tests/hypervisor/run-vm.py --arch x86_64 \
   --kernel-dir "$port_x86/kernel" --state-dir "$port_x86_guest" --timeout 3600
 
 V_C_ERROR_BUG_REPORT_DISABLED=1 make -C "$port_x86/kernel" -j4 \
-  ARCH=x86_64 LINUXKPI=1 PROD=false CC=clang V=/Users/alex/code/v/v \
+  ARCH=x86_64 LINUXKPI=1 PROD=false CC=clang AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/Users/alex/code/v/v \
   LIMINE_MP=1 STACK_GUARD_TEST=0 LD_X86_64=/opt/homebrew/bin/ld.lld \
   LINUXKPI_SOURCE_DIR=/Users/alex/code/vinix/third_party/linux-i915/linux-6.6.157
 
@@ -262,9 +290,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb` reports **V 49.24%, C 13.10%**,
-430 C files, 400 Python files and 281 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,180 classified blobs
+`9f47270ee3c6754312bc09fc74d8f77e2cfe2229` reports **V 50.97%, C 12.25%**,
+440 C files, 418 Python files and 283 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,316 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

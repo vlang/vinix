@@ -452,10 +452,12 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**2,406 original production/native-boundary C lines**, **453 original fixture
-lines** and **111 desktop header lines**. These are separate counts; new tests
+**3,234 original production/native-boundary C lines**, **3,411 original fixture
+lines** and **248 header implementation lines** (111 desktop and 137 kernel).
+A further five original stack-pointer boundary lines now use instruction-only
+assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
-committed and validated; pending header and kernel-fixture stages are excluded.
+committed and validated; pending stages are excluded.
 
 | Completed scope | Original C lines | Commit |
 | --- | ---: | --- |
@@ -476,7 +478,10 @@ committed and validated; pending header and kernel-fixture stages are excluded.
 | Dota low-mapping preload | 219 | `5115a9e7` |
 | Steam 32-bit and 64-bit robust-list preloads | 179 | `032eaa2d` |
 | QEMU VNC window client | 311 | `45f28820` |
-| **Production/native total** | **2,406** | |
+| Android native runtime | 610 | `1d6730ac` |
+| Xinput native launcher and Wine host boundary | 95 | `bea41f8e` |
+| Office Windows PE API boundary | 123 | `7df94498` |
+| **Production/native total** | **3,234** | |
 
 Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
 tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
@@ -486,6 +491,71 @@ zero original-C translation credit. At these committed stages,
 `kernel/c/*.c` has **zero maintained non-fixture files**; first-party C fixture
 files and header algorithms still remain and must be ported. Genuine upstream
 Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
+
+| Further completed fixture/header scope | Original C lines | Commit |
+| --- | ---: | --- |
+| Cache, i915 policy, PCI and common runtime independent fixtures | 1,118 | `3b3b131d` |
+| Task, time, timer, synchronization, wound/wait, I/O and sequence fixtures | 1,582 | `cbb528e0` |
+| ARM PCI controller fixture | 57 | `6b3769f2` |
+| IPv6 native guest and common serial/smoke fixtures | 201 | `7dfa57c5` |
+| Kernel callback/UART/counter and lwIP header algorithms | 37 | `6b3769f2` |
+| LinuxKPI typed header helpers and generic exchange/CAS operations | 100 | `9f47270e` |
+
+The first kernel-fixture guest failed the unchanged i915 device-encoding
+condition. Its cause was signed literals passed to the foreign `MKDEV` macro:
+V's foreign declaration metadata did not convert the generated C literals.
+Explicit `u32` arguments restore the original unsigned inputs, including the
+`0xabc` major-number case. The corrected full host suite, both builds and full
+four-CPU guest passed. No expected values or deadlines changed.
+
+The next seven fixtures and header helpers passed the full host sanitizer,
+standalone-header and upstream tests, both architecture builds, default x86
+boot, ARM ECAM/full-DAIF vectors and the complete four-CPU LinuxKPI guest.
+Every measured native batch returned to its exact free-page baseline. The
+LinuxKPI ELF SHA256 is
+`195c83c50c0d295da8e510b8046a946ac071fa73cf6ce9ed2be3f33bad4636cd`;
+ARM PCI ELF is
+`638c983715bb1d51a3fe00901a79cb0e4dcf355b7d183545b3c55beacb0c156d`;
+default x86 ELF is
+`bcfec8fd702ac3697ea3f65bd13c6a04edbf7df00c18b869d42f3f9657b63d9c`.
+The source snapshot pins committed source plus 763 exact source hashes,
+excluding another session's uncommitted user-copy changes. Its first accidental
+mixed snapshot failed default x86 compilation; that attempt remains preserved
+and is not validation of this migration.
+
+Header differential checks preserve 10 bounded UART traces, 256 actual native
+callback invocations, stack alignment and counter ordering. Optimized ARM
+counter access is `isb; mrs CNTVCT_EL0; ret`; the stack helper is the
+instruction-only `mov x0, sp; ret` leaf. lwIP callbacks retain their exact
+registered pointer bytes and borrowed lifetimes. Both architectures passed
+500 socket/netlink exchanges with every measured class unchanged and zero slab
+byte growth. The V IPv6 fixture retains all 50 original assertions and their
+preprocessed diagnostic line numbers; its verdict and class measurements are
+byte-identical to the frozen C fixture on both architectures. Native V PID1,
+fork/COW, wait and mmap smoke guests also passed on both architectures.
+
+LinuxKPI's generic exchange/CAS handles 8/16/32/64/128-bit native operands,
+pointers and signed/volatile values. V owns the atomic operations; generated
+native adapters preserve one-time operand capture, type/domain checks and
+original IRQ flag-lvalue evaluation order. The 13 IRQ sequencing lines and
+other generated type-capture scaffolding receive zero V algorithm credit.
+The independent 20-case differential oracle and native 128-bit fixtures passed
+on both architectures. Dormant 128-bit code retains the original upstream
+`libatomic` requirement without adding those imports to ordinary kernel links.
+
+Android original-C/V host sanitizers, strict native builds and both architecture
+musl guests passed, including readonly 128-thunk data, real pthread layouts,
+stack/memory/atfork/fortify/statistics behavior and hidden-symbol checks. The
+pinned patched musl statistics provider is required; an earlier stale provider
+failed the original C before V. Xinput/Wine original traces, host sanitizers,
+both native architecture mock guests and the actual ARM X11 production links
+passed. The unchanged x86 full X11 link needs the baseline's external libbsd
+resolution. Office retains all 33 native Win64 exports and passed 1,024 rounds
+of 40 null/output combinations under host sanitizers. Both actual SDK PE
+fixtures executed under translated Wine and returned their unique success
+code 73; exit zero without execution fails the strengthened runner. Earlier
+Wine NLS-layout setup failures remain recorded. Full Office/APK UI operation
+was not rerun.
 
 The immutable benchmark evidence archive (`7ee28d8e`) removes 108 frozen
 first-party/generated C snapshots totaling 75,192 lines from maintained source,
@@ -560,8 +630,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`90990bb7e4f4b5363f91e551f24df5ef49b0c9fb` reports **V 49.24%, C 13.10%**,
-430 C files, 400 Python files and 281 shell files. All 2,180 classified blobs and
+`9f47270ee3c6754312bc09fc74d8f77e2cfe2229` reports **V 50.97%, C 12.25%**,
+440 C files, 418 Python files and 283 shell files. All 2,316 classified blobs and
 the displayed inventory sizes were checked against Git. No Verilog or vendored
 trees appear and `.gitattributes` is unchanged. The archived source inventory
 reduction receives zero port credit; remaining first-party fixtures and headers
