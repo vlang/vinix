@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`bc0b9a77b50922bc52654e1ed6b965217fd88e05`. Re-read HEAD, `AGENTS.md` and
+`5ecc81c0fd8c341a2b57d60badf84e853b747e8c`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **11,881 original fixture/benchmark
+continuation adds **3,251 original production C lines**, **12,442 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel, eight
 Wi-Fi tool lines),
 counted separately. Twenty-one stack-pointer/syscall/variadic boundary lines use
@@ -95,6 +95,9 @@ instruction-only assembly and receive no V algorithm credit.
 | Wi-Fi tool native header policies (8) | `46ea29c7` |
 | Portable allocation benchmark (419) | `5b37c952` |
 | Large-I/O lifetime guest (56) | `bc0b9a77` |
+| Network randomness independent oracle (320) | `b39872cf` |
+| Memory primitive independent oracle (107) | `42ed5d38` |
+| Speculation policy independent oracle (134) | `5ecc81c0` |
 | Distinct benchmark differential output archive (zero credit) | `944c12e1` |
 | Native integer constant-expression metadata (zero credit) | `0fe3679c` |
 | Native high-byte string semantics correction (zero credit) | `bc9a5ea4` |
@@ -102,8 +105,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 178 test paths /
-43,390 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 175 test paths /
+42,829 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -140,11 +143,24 @@ stage's input hashes before continuing; completed commits above are separate:
   modes; its original-C control passed too. Both original-C and V native x86 workloads
   failed with the same generic
   child verdict under two CPUs; the original-C run took about 38 minutes.
-  Fresh four-CPU C/V runs retain all 3,600-second deadlines and original checks
-  and add only failure-status diagnostics. The complete V and immutable original-C x86 host sanitizer proofs now both
-  pass with halt-on-error and no function diagnostics; the native x86 proof and
-  composed production builds/full compatibility guest remain pending. Preserve both initial failures.
-  This broader stage still receives no credit. The frozen compiler
+  The complete V workload passes halt-on-error ASan/UBSan on both actual host
+  ABIs, as does the immutable x86 C control. The final native ARM C control and
+  identical V repeat pass all 26 groups and seven boundary modes; the first
+  final V image hit the unchanged bound-CPU routing assertion. That failure's
+  cause remains unknown and its evidence is preserved. The original four-CPU
+  x86 `max`/TCG control expired at its unchanged 3,600-second allowance with no
+  fixture verdict. A correctly labelled per-CPU QMP snapshot shows kernel TLB
+  polling; interrupt-disabled polling alone does not establish deadlock.
+  Fresh paired `qemu64` controls are prepared and held pending production
+  contract validation. They retain four CPUs, exact assertions, workloads and
+  3,600-second budgets, recording CPU/kernel configuration changes without
+  claiming the earlier failures resolved. Both fresh default architecture
+  builds/boots and the opt-in build pass for the composed 23-path contract stage.
+  Its complete four-CPU compatibility guest passed worker OOM, SRCU, wound/wait
+  and keyed-bit groups with exact page baselines, then failed the unchanged
+  I/O timeout/early/signal assertion. The failed ELF and log are preserved;
+  matching baseline and immutable-repeat validation remain pending. Preserve
+  every initial failure; this broader fixture stage receives no credit. The frozen compiler
   ignores V `thread_local` under `-os vinix`; native TLS storage retains real
   pthread isolation. Preserve all original assertions, ownership and deadlines.
 - Speaker, ANS, both independent AGX and all three Wi-Fi fixture scopes are
@@ -155,7 +171,14 @@ stage's input hashes before continuing; completed commits above are separate:
   the normal x86 control expired at their 300/900-second outer limits, without
   weakening assertions. Fresh x86 original-C/V runs use the same documented
   3,600-second outer allowance equally; all intrinsic deadlines/counts/assertions
-  remain. Preserve old failure evidence and record the explicit configuration.
+  remain. The original `max`/TCG x86 control also expired at 3,600 seconds during
+  the unchanged 4,000 joined-thread churn. A fresh original-C `qemu64` control
+  with the corrected default kernel passed the 270-line scope's memory groups,
+  then failed an untouched alarm assertion: nine 50-ms timer firings in a second
+  against the required ten. Its V pair has not launched. CPU/kernel changes are
+  explicit, the failure is preserved, and no causal resolution is claimed. Pending signal,
+  first-touch and restart scopes remain separate, uncommitted and uncredited.
+  Preserve old failure evidence and record the explicit configuration.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
@@ -181,6 +204,23 @@ seven-second settling. ARM pages stayed 46→46; x86 stayed 132→132 with exact
 C/V measurement/verdict parity. Its 240-second outer allowance is unchanged.
 `big-io-validation.json` records no allocator imports and peer lifetime review;
 the separate forced-vmap configuration was not rerun.
+
+Three more independent oracles retire 561 original C lines: network randomness
+(`b39872cf`, 320), memory primitives (`42ed5d38`, 107) and speculation policy
+(`5ecc81c0`, 134). Both actual host C/V ASan/UBSan comparisons and all 12
+complete native C/V guests passed against immutable ALLOC_TRACK kernels.
+Network checks retain all 38 predicates, 64 goldens and draw/port/buffer domains;
+memory retains 16 checks and 410,739/226,419 ARM/x86 cases; speculation retains
+21 assertions and all 6,144 combinations. Fixed local tables and callback
+contexts remain synchronous stack borrows; generated code and both SDK objects
+have no allocator imports, and production provider instructions match each
+C/V pair. The original speculation C source has a GCC signed-comparison
+warning under strict flags; the native pair uses Clang with the actual musl
+SDK, and the new V fixture additionally compiles strictly with GCC. No
+assertion, intrinsic deadline or workload was weakened. These fixture-only
+stages add no new kernel build or physical mitigation claim. Receipts are
+`net-random-validation.json`, `memory-runtime-validation.json` and
+`speculation-policy-validation.json`, with peer lifetime review.
 
 Current local cache:
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
@@ -430,9 +470,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`bc0b9a77b50922bc52654e1ed6b965217fd88e05` reports **V 71.76%, C 6.20%**,
-453 C files, 471 Python files and 285 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,513 classified blobs
+`5ecc81c0fd8c341a2b57d60badf84e853b747e8c` reports **V 71.77%, C 6.14%**,
+454 C files, 473 Python files and 285 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,520 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

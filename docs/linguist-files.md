@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `bc0b9a77b50922bc52654e1ed6b965217fd88e05`,
+at source commit `5ecc81c0fd8c341a2b57d60badf84e853b747e8c`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 453 | 2,508,229 | 6.20% |
-| Python | 471 | 4,694,831 | 11.60% |
-| Shell | 285 | 1,254,561 | 3.10% |
+| C | 454 | 2,488,252 | 6.14% |
+| Python | 473 | 4,720,063 | 11.65% |
+| Shell | 285 | 1,250,900 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 71.76%, with no
+All `.v` files are classified as V. The resulting V share is 71.77%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev bc0b9a77b50922bc52654e1ed6b965217fd88e05 --breakdown --json
+github-linguist --rev 5ecc81c0fd8c341a2b57d60badf84e853b747e8c --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -180,6 +180,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/fpu/api.h` | 408 |
 | `kernel/linuxkpi/include/asm/ioctl.h` | 79 |
 | `kernel/linuxkpi/include/asm/kmap_size.h` | 157 |
+| `kernel/linuxkpi/include/asm/mmiowb.h` | 154 |
 | `kernel/linuxkpi/include/asm/param.h` | 138 |
 | `kernel/linuxkpi/include/asm/percpu.h` | 434 |
 | `kernel/linuxkpi/include/asm/posix_types.h` | 450 |
@@ -418,10 +419,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memory/bigio/big-io-native-abi.h` | 475 |
 | `tests/memory/bigiomodel/big-io-model-abi.h` | 830 |
 | `tests/memory/pagetable.c` | 7,152 |
-| `tests/memory/runtime.c` | 4,898 |
+| `tests/memory/runtimefixture/memory-runtime-native-abi.h` | 605 |
 | `tests/mount-policy/test.c` | 27,539 |
 | `tests/mounted-disk-policy/guest.c` | 9,548 |
-| `tests/net-random/test.c` | 11,439 |
+| `tests/net-random/fixture/net-random-native-abi.h` | 351 |
 | `tests/network-ipv6/guestfixture/ipv6-guest-native-abi.h` | 558 |
 | `tests/network-ipv6/host.c` | 9,939 |
 | `tests/network-options/core_fixture.h` | 3,746 |
@@ -467,7 +468,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/smt-policy/guestfixture/smt-native-abi.h` | 250 |
 | `tests/socket-io/guest.c` | 14,210 |
 | `tests/sound/test.c` | 7,406 |
-| `tests/speculation-policy/policy.c` | 5,294 |
+| `tests/speculation-policy/fixture/speculation-fixture-native-abi.h` | 544 |
 | `tests/stack-policy/guest.c` | 4,914 |
 | `tests/stack-protector/diagnosticfixture/diagnostic-native-abi.h` | 434 |
 | `tests/stack-protector/protectorfixture/protector-native-abi.h` | 505 |
@@ -814,7 +815,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
-| `tests/linuxkpi/asm_generated_headers_test.py` | 11,884 |
+| `tests/linuxkpi/asm_generated_headers_test.py` | 17,568 |
 | `tests/linuxkpi/audit_generation_test.py` | 8,245 |
 | `tests/linuxkpi/bounds_generation_test.py` | 22,687 |
 | `tests/linuxkpi/compile-v-core.py` | 1,629 |
@@ -851,6 +852,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mapped-writeback/run.py` | 7,942 |
 | `tests/memlock/run_vm.py` | 1,113 |
 | `tests/memory/heap_model_test.py` | 13,042 |
+| `tests/memory/run-runtime.py` | 7,331 |
 | `tests/memory/test-big-io.py` | 6,072 |
 | `tests/minecraft/test-fetcher.py` | 4,085 |
 | `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
@@ -859,6 +861,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/host.py` | 7,901 |
 | `tests/mounted-disk-policy/run.py` | 7,112 |
 | `tests/native-boundaries/run.py` | 4,283 |
+| `tests/net-random/run.py` | 6,889 |
 | `tests/network-options/compile-v-core.py` | 918 |
 | `tests/network-options/run-host.py` | 2,136 |
 | `tests/network-options/run.py` | 3,864 |
@@ -909,7 +912,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/socket-io/check-generated.py` | 3,504 |
 | `tests/socket-io/run.py` | 3,907 |
 | `tests/sound/run_vm.py` | 9,575 |
-| `tests/speculation-policy/run.py` | 1,750 |
+| `tests/speculation-policy/run.py` | 7,078 |
 | `tests/stack-policy/run.py` | 3,792 |
 | `tests/stack-protector/compile-v-diagnostic.py` | 888 |
 | `tests/stack-protector/diagnostic.py` | 1,893 |
@@ -1199,11 +1202,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memlock/run.sh` | 2,089 |
 | `tests/memory-pressure/run.sh` | 3,124 |
 | `tests/memory/run-big-metadata.sh` | 735 |
-| `tests/memory/run-runtime.sh` | 1,858 |
+| `tests/memory/run-runtime.sh` | 177 |
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,110 |
-| `tests/net-random/run.sh` | 2,274 |
+| `tests/net-random/run.sh` | 294 |
 | `tests/network-ipv6/run-host.sh` | 135 |
 | `tests/network-options/run-host.sh` | 138 |
 | `tests/network-tcp-lifetime/run-host.sh` | 143 |

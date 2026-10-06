@@ -452,7 +452,7 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **11,881 original fixture/benchmark
+**3,251 original production/native-boundary C lines**, **12,442 original fixture/benchmark
 lines** and **258 header implementation lines** (111 desktop, 139 kernel and
 eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
 boundary lines now use instruction-only
@@ -533,6 +533,9 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Wi-Fi native tool header policies | 8 | `46ea29c7` |
 | Portable allocation benchmark workloads | 419 | `5b37c952` |
 | Large-I/O exact-page lifetime guest | 56 | `bc0b9a77` |
+| Network randomness independent oracle | 320 | `b39872cf` |
+| Memory primitive independent oracle | 107 | `42ed5d38` |
+| Speculation policy independent oracle | 134 | `5ecc81c0` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -716,6 +719,40 @@ imports. `big-io-validation.json` records peer lifetime review and immutable
 kernels. This fixture-only stage does not establish the separate forced-vmap
 self-test configuration.
 
+The network-randomness oracle (`b39872cf`) preserves all 38 original checks,
+64 literal SipHash answers, 16 offsets, 262,144 ID draws, the 32,768-datagram
+reuse floor, 2,000 port picks, 30,000 three-way uniform draws and seven large
+unsigned bounds. Its deterministic SplitMix64 provider and permanent ID/port
+tables remain independent of the unchanged production V cores. All four native
+C/V guests and both actual host sanitizer comparisons passed with identical
+output. Signed callback context remains a synchronous stack borrow through
+the actual C wrapper; generated static seed/enabled/vector initializers and
+no-allocator imports were checked on both SDKs.
+
+The memory primitive oracle (`42ed5d38`) preserves all 16 checks, original
+alignment/overlap loops, eight byte values, all inclusive guard-page lengths,
+zero-length protected pointers and 13 atoi cases. Actual host C/V ASan/UBSan
+comparisons and all four native C/V guests passed: 410,739 cases on ARM's
+16 KiB pages and 226,419 on x86's 4 KiB pages. Both original mappings are
+unmapped before success. The identical production primitive instructions use
+only general registers; an unused Darwin x86 math header is skipped solely
+to retain the original x87/SSE restrictions.
+
+The speculation oracle (`5ecc81c0`) preserves 21 original assertion expressions
+and line numbers and all 6,144 independent CPUID/MSR combinations. Both actual
+host C/V sanitizer comparisons and all four native C/V guests passed. Both
+SDKs have identical C/V production provider instructions and no allocator
+imports; CPUID outpointers remain synchronous stack borrows. The unchanged
+original fixture trips GCC's signed-comparison warning under `-Werror`, so the
+native x86 C/V pair uses Clang with the actual musl/GCC CRT SDK; no assertion
+or warning policy was weakened. The new V fixture also passes strict native
+GCC compilation. These three fixture stages reuse immutable ALLOC_TRACK
+kernels, receive 561 original-C lines of credit, preserve the same C/V
+3,600-second outer guest budgets, and add no new production or physical
+mitigation claim. Local receipts are `net-random-validation.json`,
+`memory-runtime-validation.json` and `speculation-policy-validation.json`;
+all new lifetime boundaries received independent review.
+
 Native integer constant-expression metadata (`0fe3679c`) preserves all 4,099
 assertions, arbitrary native integer widths and single evaluation, with zero
 V algorithm credit. Both fresh default builds/boots and the full host checks
@@ -730,9 +767,9 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `bc0b9a77b50922bc52654e1ed6b965217fd88e05`,
+At committed source `5ecc81c0fd8c341a2b57d60badf84e853b747e8c`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 178 test paths / 43,390 lines,
+The non-vendored `.c` census still contains 175 test paths / 42,829 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
 of the repository-wide request. This census is not a translation tally.
@@ -866,8 +903,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`bc0b9a77b50922bc52654e1ed6b965217fd88e05` reports **V 71.76%, C 6.20%**,
-453 C files, 471 Python files and 285 shell files. All 2,513 classified blob
+`5ecc81c0fd8c341a2b57d60badf84e853b747e8c` reports **V 71.77%, C 6.14%**,
+454 C files, 473 Python files and 285 shell files. All 2,520 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
