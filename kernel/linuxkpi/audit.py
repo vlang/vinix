@@ -37,6 +37,17 @@ def driver_sources(root, make):
     return sorted(set(driver / (p[:-2] + ".c") for p in result.stdout.split() if p.endswith(".o")))
 
 
+def generate_headers(directory):
+    # The native build derives these declarations and adapters from V exports
+    # and ABI metadata. Regenerate them here instead of using kernel obj files
+    # that may belong to another architecture or an older implementation.
+    for schema, header in (("spinlock.json", "spinlock_adapters.h"),
+                           ("atomic-exchange.json", "atomic_exchange.h")):
+        subprocess.run([sys.executable, str(HERE / "generate-abi.py"),
+                        str(HERE / "abi" / schema), str(directory / "vinix" / header)],
+                       check=True, capture_output=True, text=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-dir", type=Path,
@@ -54,31 +65,35 @@ def main():
         sources = driver_sources(root, args.make)
         if not sources:
             raise ValueError("upstream Kbuild returned no i915 sources")
-        flags = [
-            "--target=x86_64-unknown-none", "-std=gnu11", "-ffreestanding", "-fwrapv",
-            "-nostdinc", "-fsyntax-only", "-ferror-limit=5",
-            "-Werror=implicit-function-declaration", "-Wno-unused-parameter",
-            "-D__KERNEL__", "-include", "linux/kconfig.h",
-            # Linux 6.6.157 scripts/Makefile.lib adds this after LINUXINCLUDE's
-            # kconfig preinclude, before parsing each C translation unit.
-            "-include", str(root / "include/linux/compiler_types.h"),
-            "-DCONFIG_X86=1", "-DCONFIG_X86_64=1",
-            "-DCONFIG_ACPI=1", "-DCONFIG_DRM_I915=1", "-DCONFIG_DRM_FBDEV_EMULATION=1",
-            "-isystem", str(HERE.parent / "freestnd-c-hdrs"),
-            "-I", str(HERE / "include"), "-I", str(HERE.parent / "c"),
-            "-I", str(root / "include"), "-I", str(root / "include/uapi"),
-            "-I", str(root / "arch/x86/include"),
-            "-I", str(root / "arch/x86/include/uapi"),
-            "-I", str(root / "drivers/gpu/drm/i915"),
-        ]
+        with tempfile.TemporaryDirectory(prefix="vinix-i915-audit-") as temporary:
+            generated = Path(temporary) / "include"
+            generate_headers(generated)
+            flags = [
+                "--target=x86_64-unknown-none", "-std=gnu11", "-ffreestanding", "-fwrapv",
+                "-nostdinc", "-fsyntax-only", "-ferror-limit=5",
+                "-Werror=implicit-function-declaration", "-Wno-unused-parameter",
+                "-D__KERNEL__", "-include", "linux/kconfig.h",
+                # Linux 6.6.157 scripts/Makefile.lib adds this after LINUXINCLUDE's
+                # kconfig preinclude, before parsing each C translation unit.
+                "-include", str(root / "include/linux/compiler_types.h"),
+                "-DCONFIG_X86=1", "-DCONFIG_X86_64=1",
+                "-DCONFIG_ACPI=1", "-DCONFIG_DRM_I915=1", "-DCONFIG_DRM_FBDEV_EMULATION=1",
+                "-isystem", str(HERE.parent / "freestnd-c-hdrs"),
+                "-I", str(generated),
+                "-I", str(HERE / "include"), "-I", str(HERE.parent / "c"),
+                "-I", str(root / "include"), "-I", str(root / "include/uapi"),
+                "-I", str(root / "arch/x86/include"),
+                "-I", str(root / "arch/x86/include/uapi"),
+                "-I", str(root / "drivers/gpu/drm/i915"),
+            ]
 
-        def compile_source(source):
-            result = subprocess.run([args.cc] + flags + [str(source)], capture_output=True, text=True)
-            return {"source": str(source.relative_to(root)), "passed": result.returncode == 0,
-                    "diagnostics": result.stderr}
+            def compile_source(source):
+                result = subprocess.run([args.cc] + flags + [str(source)], capture_output=True, text=True)
+                return {"source": str(source.relative_to(root)), "passed": result.returncode == 0,
+                        "diagnostics": result.stderr}
 
-        with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-            results = list(pool.map(compile_source, sources))
+            with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+                results = list(pool.map(compile_source, sources))
         failures = [r for r in results if not r["passed"]]
         blockers = {}
         for result in failures:
@@ -100,6 +115,8 @@ def main():
         return 1 if failures else 0
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print("i915 audit failed: " + str(error), file=sys.stderr)
+        if isinstance(error, subprocess.CalledProcessError) and error.stderr:
+            print(error.stderr.rstrip(), file=sys.stderr)
         return 2
 
 
