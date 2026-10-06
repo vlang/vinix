@@ -57,6 +57,7 @@ const settings_action_language = 'settings.language.'
 const settings_action_theme = 'settings.theme.'
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
+const settings_language_actions = ['settings.language.0', 'settings.language.1', 'settings.language.2']!
 
 const settings_sidebar_width = 132
 const settings_padding = 16
@@ -105,6 +106,22 @@ mut:
 	// in. When desktop_language differs they are remade before being shown.
 	labels_language      DesktopLanguage
 	wifi_labels_language DesktopLanguage
+	// Only the bounded query owns storage; result indices and input fragments
+	// are inline. Frame labels borrow the query and translation table.
+	search []u8
+	search_results [27]int
+	search_count int
+	search_selected int
+	search_page int
+	search_rows int = 6
+	search_language DesktopLanguage
+	search_focused bool
+	search_select_all bool
+	search_pending [4]u8
+	search_pending_len int
+	search_escape [16]u8
+	search_escape_len int
+	search_escape_ms u64
 }
 
 fn (mut d Desktop) open_settings() !NativeApp {
@@ -117,6 +134,7 @@ fn (mut d Desktop) open_settings() !NativeApp {
 fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
+	if a.search_language != desktop_language { a.refilter_search() }
 
 	mut children := frame_elements(3)
 
@@ -132,25 +150,26 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	pane_width := width - pane_x
 	// Display polls the panel no more often than the desktop redraws for its
 	// clock, and picks up a change another Settings window made.
-	if a.category == .display {
+	if !a.searching() && a.category == .display {
 		now := desktop_monotonic_ms()
 		if !a.initialized || (now != ~u64(0) && (now < a.last_poll_ms
 			|| now - a.last_poll_ms >= 1000)) {
 			a.refresh()
 		}
 	}
-	if a.category == .wifi {
+	if !a.searching() && a.category == .wifi {
 		now := desktop_monotonic_ms()
 		if !a.wifi_initialized || (now != ~u64(0) && (now < a.wifi_last_poll_ms
 			|| now - a.wifi_last_poll_ms >= 1000)) {
 			a.refresh_wifi()
 		}
 	}
-	if a.category == .about && !a.about.initialized { a.about.refresh() }
+	if !a.searching() && a.category == .about && !a.about.initialized { a.about.refresh() }
+	content := if a.searching() { a.search_pane(pane_width, height) } else { a.pane(pane_width, height) }
 
 	children << ui2.view('', ui2.rect(f64(pane_x), 0, f64(pane_width), f64(height)), ui2.BoxStyle{
 		bg: app_surface
-	}, a.pane(pane_width, height))
+	}, content)
 
 	// The screen's own background never shows; the two panes cover it. It is
 	// the application surface so that a window resized oddly still looks whole.
@@ -189,18 +208,21 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 }
 
 fn (a &SettingsApp) category_rows() []ui2.Element {
-	mut rows := frame_elements(settings_categories.len)
+	mut rows := frame_elements(settings_categories.len + 1)
+	rows << a.search_field()
 	for index, category in settings_categories {
 		selected := category == a.category
-		y := settings_padding + index * 32
-		rows << ui2.clickable_view('${settings_action_category}${index}', ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
-			bg: settings_category_selected
-			transparent: !selected
-		}, frame_child(ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
+		y := 56 + index * 30
+		mut label := frame_elements(1)
+		label << ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
 			color: if selected { body_heading } else { body_text }
 			size: 13
 			bold: selected
-		})))
+		})
+		rows << ui2.clickable_view(settings_category_actions[index], ui2.rect(0, f64(y), f64(settings_sidebar_width), 28), ui2.BoxStyle{
+			bg: settings_category_selected
+			transparent: !selected
+		}, label)
 	}
 	return rows
 }
@@ -260,16 +282,16 @@ fn (a &SettingsApp) appearance_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_note(tr('settings.appearance.buttons_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_side}0', tr('settings.appearance.right'), settings_padding, y, half, settings.button_side == .right)
-	out << settings_choice('${settings_action_side}1', tr('settings.appearance.left'), settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
+	out << settings_choice('settings.side.0', tr('settings.appearance.right'), settings_padding, y, half, settings.button_side == .right)
+	out << settings_choice('settings.side.1', tr('settings.appearance.left'), settings_padding + half + settings_row_gap, y, half, settings.button_side == .left)
 	y += 28 + 22
 
 	out << settings_heading(tr('settings.appearance.taskbar'), y, width)
 	y += 22
 	out << settings_note(tr('settings.appearance.taskbar_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_taskbar}0', tr('settings.appearance.standard'), settings_padding, y, half, settings.taskbar_mode == .standard)
-	out << settings_choice('${settings_action_taskbar}1', tr('settings.appearance.combined'), settings_padding + half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
+	out << settings_choice('settings.taskbar.0', tr('settings.appearance.standard'), settings_padding, y, half, settings.taskbar_mode == .standard)
+	out << settings_choice('settings.taskbar.1', tr('settings.appearance.combined'), settings_padding + half + settings_row_gap, y, half, settings.taskbar_mode == .combined)
 	y += 28 + 6
 	out << settings_note(if settings.taskbar_mode == .combined {
 		tr('settings.appearance.combined_note')
@@ -292,27 +314,27 @@ fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_note(tr('settings.date_time.format_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_format}0', tr('settings.date_time.24_hour'), settings_padding, y, half, settings.clock_24_hour)
-	out << settings_choice('${settings_action_clock_format}1', tr('settings.date_time.12_hour'), settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
+	out << settings_choice('settings.clock.format.0', tr('settings.date_time.24_hour'), settings_padding, y, half, settings.clock_24_hour)
+	out << settings_choice('settings.clock.format.1', tr('settings.date_time.12_hour'), settings_padding + half + settings_row_gap, y, half, !settings.clock_24_hour)
 	y += 28 + 22
 
 	out << settings_heading(tr('settings.date_time.seconds'), y, width)
 	y += 22
 	out << settings_note(tr('settings.date_time.seconds_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_seconds}0', tr('settings.date_time.show'), settings_padding, y, half, settings.clock_show_seconds)
-	out << settings_choice('${settings_action_clock_seconds}1', tr('settings.date_time.hide'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
+	out << settings_choice('settings.clock.seconds.0', tr('settings.date_time.show'), settings_padding, y, half, settings.clock_show_seconds)
+	out << settings_choice('settings.clock.seconds.1', tr('settings.date_time.hide'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_seconds)
 	y += 28 + 22
 
 	out << settings_heading(tr('settings.date_time.date_line'), y, width)
 	y += 22
 	out << settings_note(tr('settings.date_time.date_line_note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_clock_date}0', tr('settings.date_time.show_date'), settings_padding, y, half, settings.clock_show_date)
-	out << settings_choice('${settings_action_clock_date}1', tr('settings.date_time.hide_date'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
+	out << settings_choice('settings.clock.date.0', tr('settings.date_time.show_date'), settings_padding, y, half, settings.clock_show_date)
+	out << settings_choice('settings.clock.date.1', tr('settings.date_time.hide_date'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_date)
 	y += 28 + settings_row_gap
-	out << settings_choice('${settings_action_clock_weekday}0', tr('settings.date_time.show_weekday'), settings_padding, y, half, settings.clock_show_weekday)
-	out << settings_choice('${settings_action_clock_weekday}1', tr('settings.date_time.hide_weekday'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
+	out << settings_choice('settings.clock.weekday.0', tr('settings.date_time.show_weekday'), settings_padding, y, half, settings.clock_show_weekday)
+	out << settings_choice('settings.clock.weekday.1', tr('settings.date_time.hide_weekday'), settings_padding + half + settings_row_gap, y, half, !settings.clock_show_weekday)
 
 	return out
 }
@@ -329,8 +351,8 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_note(tr('settings.theme.note'), y, width)
 	y += 22
-	out << settings_choice('${settings_action_theme}0', tr('settings.theme.default'), settings_padding, y, half, settings.theme == .default_)
-	out << settings_choice('${settings_action_theme}1', tr('settings.theme.macos'), settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
+	out << settings_choice('settings.theme.0', tr('settings.theme.default'), settings_padding, y, half, settings.theme == .default_)
+	out << settings_choice('settings.theme.1', tr('settings.theme.macos'), settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
 	y += 28 + 10
 
 	// Each description is two lines, broken where the translation breaks it.
@@ -364,7 +386,7 @@ fn (a &SettingsApp) language_pane(width int) []ui2.Element {
 	for index, language in desktop_languages {
 		column := index % columns
 		row := index / columns
-		out << settings_choice('${settings_action_language}${index}', language.native_name(),
+		out << settings_choice(settings_language_actions[index], language.native_name(),
 			settings_padding + column * (choice_width + settings_row_gap), y + row * (28 +
 			settings_row_gap), choice_width, settings.language == language)
 	}
@@ -439,28 +461,17 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 }
 
 fn (mut a SettingsApp) handle(event_id string) ! {
+	if a.handle_search(event_id) { return }
 	if event_id.starts_with(settings_action_category) {
-		index := event_id[settings_action_category.len..].int()
-		if index >= 0 && index < settings_categories.len {
-			a.category = settings_categories[index]
-			// Entering either device pane reads it once, rather than leaving
-			// the pane blank until the next poll comes round.
-			match a.category {
-				.about { a.about.refresh() }
-				.battery { a.battery_read(true) }
-				.wifi {
-					a.wifi_action_result = WifiResult.ok
-					a.refresh_wifi()
-				}
-				.display {
-					a.write_result = BacklightResult.ok
-					a.refresh()
-				}
-				else {}
-			}
+		for index, action in settings_category_actions {
+			if event_id == action { a.choose_category(settings_categories[index]); break }
 		}
 		return
 	}
+	// A stale control from the pane hidden by results cannot change a setting.
+	if a.searching() { return }
+	a.search_focused = false
+	a.search_select_all = false
 	if event_id == 'settings.about.refresh' { a.about.refresh(); return }
 	if a.category == .wifi {
 		a.handle_wifi(event_id)
@@ -510,12 +521,13 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(settings_action_language) {
-		index := event_id[settings_action_language.len..].int()
-		if index >= 0 && index < desktop_languages.len {
-			a.desktop.settings.language = desktop_languages[index]
-			// This window answers in the new language on its very next
-			// frame; the compositor follows when it receives the settings.
-			set_desktop_language(a.desktop.settings.language)
+		for index, action in settings_language_actions {
+			if event_id == action {
+				a.desktop.settings.language = desktop_languages[index]
+				// This window answers in the new language on its next frame.
+				set_desktop_language(a.desktop.settings.language)
+				break
+			}
 		}
 		return
 	}

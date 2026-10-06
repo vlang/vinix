@@ -93,4 +93,7 @@ fn (mut about SettingsAbout) release() {
 
 fn (mut a SettingsApp) close_app() {
 	a.about.release()
+	unsafe { a.search.free() }
+	a.search = []u8{}
+	a.clear_search()
 }

@@ -10,6 +10,9 @@ module main
 import ui2
 
 const settings_action_keyboard_enable = 'settings.keyboard.enable.'
+const settings_keyboard_actions = ['settings.keyboard.enable.0', 'settings.keyboard.enable.1',
+	'settings.keyboard.enable.2', 'settings.keyboard.enable.3', 'settings.keyboard.enable.4',
+	'settings.keyboard.enable.5']!
 
 // A toggle looks like a choice but can be on beside others.
 fn settings_toggle(id string, label string, x int, y int, width int, on bool) ui2.Element {
@@ -64,7 +67,7 @@ fn (a &SettingsApp) keyboard_pane(width int) []ui2.Element {
 	for index, layout in keyboard_layouts {
 		x := settings_padding + (index % columns) * (cell + settings_row_gap)
 		row_y := y + (index / columns) * (28 + settings_row_gap)
-		out << settings_toggle('${settings_action_keyboard_enable}${index}', keyboard_layout_text(layout),
+		out << settings_toggle(settings_keyboard_actions[index], keyboard_layout_text(layout),
 			x, row_y, cell, settings.keyboard_layouts & layout.bit() != 0)
 	}
 	return out
@@ -75,10 +78,11 @@ fn (a &SettingsApp) keyboard_pane(width int) []ui2.Element {
 // current one moves typing to the first that is still on.
 fn (mut a SettingsApp) handle_keyboard(event_id string) bool {
 	if event_id.starts_with(settings_action_keyboard_enable) {
-		index := event_id[settings_action_keyboard_enable.len..].int()
-		if index < 0 || index >= keyboard_layouts.len {
-			return true
+		mut index := -1
+		for candidate, action in settings_keyboard_actions {
+			if event_id == action { index = candidate; break }
 		}
+		if index < 0 { return true }
 		layout := keyboard_layouts[index]
 		mask := a.desktop.settings.keyboard_layouts
 		if mask & layout.bit() == 0 {
