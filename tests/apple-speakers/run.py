@@ -28,10 +28,15 @@ with tempfile.TemporaryDirectory(prefix="vinix-speakers-", dir="/tmp") as direct
     imports = subprocess.check_output(["nm", "-u", str(work / "core.o")], text=True)
     if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
         raise RuntimeError("unexpected allocator import in J313 speakers core:\n" + imports)
+    subprocess.run(["python3", str(ROOT / "tests/apple-ans/compile-fixture.py"), "--kind", "platform", str(work / "platform.c")], check=True)
+    subprocess.run(common + ["-Wno-unused-function", "-Wno-unused-parameter", "-Wno-unused-label",
+                    "-ffreestanding", "-fno-builtin", "-fwrapv", "-fno-strict-aliasing",
+                    "-iquote", str(ROOT / "tests/apple-ans"), "-iquote", str(ROOT / "kernel/c"),
+                    "-c", str(work / "platform.c"), "-o", str(work / "platform.o")], check=True)
     for suite in ("apple-speakers",):
         subprocess.run(common + ["-iquote", str(ROOT / "kernel/c"),
                         str(ROOT / "tests" / suite / "test.c"), str(work / "core.o"),
-                        str(ROOT / "tests/apple-ans/platform_fixture.c"),
+                        str(work / "platform.o"),
                         "-o", str(work / "host"), "-lm"], check=True)
         subprocess.run([str(work / "host")], check=True)
     print("PASS V J313 speakers C ABI, ASan/UBSan and no allocator imports")
