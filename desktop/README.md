@@ -52,17 +52,18 @@ What it does:
 - a **text editor** for plain files, with an editable path, open/save controls,
   undo/redo, Find/Replace, document selection/cut/copy, mouse selection,
   save-aware closing and exclusive Save As
-- a **Calculator** with Basic/Scientific modes, DEG/RAD functions, memory,
-  validated numeric paste, bounded calculation history and exact unsigned
+- a **Calculator** with Basic/Scientific modes, DEG/RAD and hyperbolic functions,
+  memory, validated numeric paste, bounded calculation history and exact unsigned
   64-bit Programmer mode with four bases and bitwise operations; acknowledged
   result copy to the guest session clipboard
-- a **calendar** with month navigation, persistent local events and bounded
-  ICS import/export
+- a **calendar** with month navigation, searchable persistent local events and
+  bounded ICS import/export
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
-  machine, ranked and measured while the walk runs
+  machine, ranked and measured while the walk runs, plus filesystem capacity
 - a **clock** with local time, a stopwatch with laps and a countdown timer
 - **Preview**, an image viewer with zoom, pan, all eight JPEG EXIF orientations,
-  manual rotation, rectangular selection/cropping and PNG/original export
+  manual rotation, rectangular selection/cropping with Undo/Redo and
+  PNG/original export
 - **Console**, a bounded application-log viewer with tail following, exact
   filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
@@ -401,15 +402,16 @@ display and adds a start/stop/reset stopwatch with tenth-second updates.
 
 Calculator offers Basic and Scientific modes. Scientific adds square root,
 reciprocal, square/cube/cube root, trig/inverse trig, ln/log10/log2/exp and pi/e,
-with selectable DEG/RAD units, explicit domain/finite errors and
-15-significant-digit results.
+plus sinh/cosh/tanh and their inverses, with selectable DEG/RAD units,
+explicit domain/finite errors and 15-significant-digit results. Hyperbolic
+functions are independent of the angle units.
 Ctrl-S switches mode and Ctrl-D switches angle units in Scientific mode.
 Functions use the displayed operand, including a pending binary operation's
 right operand. Numeric paste accepts finite exponent notation in Scientific
 mode. Memory and repeated equals remain available; click a recent result to
 recall it from the bounded 20-entry history.
-Nth-root, hyperbolic/inverse-hyperbolic functions, random and EE entry remain
-future work. Cube root accepts negative operands; log2 requires a positive
+Nth-root, random and EE entry remain future work. Cube root accepts negative
+operands; log2 requires a positive
 operand, and cube reports an error when its result is not finite. Copy result
 or Ctrl-C copies the displayed number in Basic or Scientific mode, or the
 exact selected-base digits in Programmer mode.
@@ -437,11 +439,27 @@ replaces only the in-memory pixels, preserving alpha and the displayed EXIF/
 rotation mapping. Export PNG writes the current cropped/rotated image to a new
 path. Original Copy retains the exact cached source bytes and metadata after
 cropping, rotation or a later source-file change. Neither export overwrites an
-existing path. Crop undo, image resampling and PDF support remain future work.
+existing path. Undo crop/Ctrl-Z and Redo crop/Ctrl-Y restore the last crop and
+its orientation, zoom, pan and selection. A new crop replaces that one history
+step; a successful Open clears it, while failed Open/crop preserves it. Longer
+undo history, recovery, image resampling and PDF support remain future work.
 The macOS comparison is [Apple's image-cropping guide](https://support.apple.com/guide/preview/crop-resize-or-rotate-an-image-prvw2015/mac).
 Metadata parsing is bounded, accepts both TIFF byte orders and falls back to
 raw orientation for malformed or unsupported records. The format reference is
 [CIPA's EXIF specification](https://www.cipa.jp/std/documents/e/DC-X008-Translation-2019-E.pdf).
+
+Calendar's Search field or Ctrl-F searches all stored event titles and locations
+with bounded UTF-8 input and case/accent folding. Every query word must match;
+results are chronological, with dates and times, and selecting one opens its
+actual date and event editor. Paging covers all results. Clear or Escape
+returns to the month; editor/interchange drafts keep their own keyboard input.
+The comparison is [Apple's Calendar search shortcuts](https://support.apple.com/en-sa/guide/calendar/ical002/mac).
+
+Disk Usage's Filesystem view shows total, used, free and available bytes for the
+filesystem containing the scan folder. Rescan refreshes the snapshot; missing
+or invalid source data is labelled unavailable. Available excludes reserved
+filesystem space. These counters are exported as separate CSV rows from the
+logical file-content total, which may include other mounted filesystems.
 
 Grapher's graph-document path is separate from its CSV sample-export path and
 defaults to `graph.vgraph` in the canonical home folder. Enter a new absolute
