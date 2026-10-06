@@ -43,6 +43,16 @@ allocation/free pairs. Timed samples verify the two payload
 endpoints and use serialized x86 TSC reads. Allocation and free policies,
 including Vinix's poison checks, remain enabled.
 
+`samplerfixture/core.v` independently checks the sampler's checksum, exact
+674,496 success allocations/frees, allocation failure and poisoned-zeroing
+rollback in each phase, a constant clock, and kext start/stop results.
+`python3 tests/alloc-bench/test_v_sampler.py` runs it under ASan/UBSan.
+The original calloc/free pair remains explicit. Native assembly captures the
+complete variadic register banks for the bounded libc log buffer; those three
+original va-list capture lines receive no V algorithm credit. Original C/V
+fixtures are also compared on both host ABIs and both native musl targets,
+using a deterministic clock rather than reporting comparative benchmark timings.
+
 Vinix runs this sampler on the boot CPU before the scheduler starts, after
 SMP publishes heap-cache readiness. macOS runs it from a loaded kext. This
 execution-context difference and TCG's timing limit the interpretation;
@@ -193,8 +203,11 @@ VM after `KALLOC-DONE`. Its manifest records the
 generated sampler hash, ABI-header hash, kernel hash, common compiler flags,
 and execution context. Comparisons reject a mismatched generated artifact
 or header.
-On macOS, the generated V sampler supplies kext start/stop functions;
-`kernel-bench.c` records their public ABI. `macos-kext-info.c` supplies the kmod ABI descriptor,
+On macOS, the generated V sampler supplies kext start/stop functions.
+`compile-v-sampler.py --header /path/to/sampler.h /path/to/sampler.c` derives
+their public declarations directly from those V exports. The old five-line
+declaration-only C input is retired with zero algorithm credit.
+`macos-kext-info.c` supplies the kmod ABI descriptor,
 and `build-macos-kext.py` creates the bundle and records exact build commands:
 
 ```sh
