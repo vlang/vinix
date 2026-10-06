@@ -114,6 +114,155 @@ fn test_calculator_scientific_unary_functions_and_degree_angles() {
 	assert app.history[2].expression == '(-3)^2'
 }
 
+fn test_calculator_hyperbolic_known_values_symmetry_and_angle_independence() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	actions := ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+		'calculator.scientific.tanh', 'calculator.scientific.asinh',
+		'calculator.scientific.acosh', 'calculator.scientific.atanh']!
+	inputs := ['1', '-1', '1', '-1', '2', '-.5']!
+	expressions := ['sinh(1)', 'cosh(-1)', 'tanh(1)', 'asinh(-1)', 'acosh(2)', 'atanh(-0.5)']!
+	expected := [1.1752011936438014, 1.5430806348152437, .7615941559557649,
+		-.881373587019543, 1.3169578969248166, -.5493061443340548]!
+	for angle in ['calculator.angle.degrees', 'calculator.angle.radians']! {
+		app.handle(angle)!
+		for index, action in actions {
+			app.key_input('c')
+			app.paste_input(inputs[index])
+			app.handle(action)!
+			assert !app.calculator.has_error
+			assert math.abs(app.calculator.display.f64() - expected[index]) < 1e-14
+			assert app.calculator.replace_input
+			assert app.history.last().expression == expressions[index]
+			assert !app.history.last().expression.ends_with('[DEG]')
+			assert !app.history.last().expression.ends_with('[RAD]')
+		}
+	}
+	for index, action in actions {
+		value, status := calculator_scientific_value(action, if index == 4 { f64(1) } else { f64(0) }, true)
+		assert status == ''
+		assert value == if index == 1 { f64(1) } else { f64(0) }
+	}
+	for action in ['calculator.scientific.sinh', 'calculator.scientific.tanh',
+		'calculator.scientific.asinh', 'calculator.scientific.atanh']! {
+		positive, positive_status := calculator_scientific_value(action, .25, true)
+		negative, negative_status := calculator_scientific_value(action, -.25, false)
+		assert positive_status == '' && negative_status == ''
+		assert positive == -negative
+	}
+}
+
+fn test_calculator_hyperbolic_domains_full_finite_range_and_error_recovery() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	for index, action in ['calculator.scientific.acosh', 'calculator.scientific.acosh',
+		'calculator.scientific.atanh', 'calculator.scientific.atanh',
+		'calculator.scientific.atanh', 'calculator.scientific.atanh',
+		'calculator.scientific.sinh', 'calculator.scientific.cosh']! {
+		app.key_input('c')
+		app.paste_input(['.999999999999999', '-2', '1', '-1', '2', '-2', '711', '-711']![index])
+		before := app.history.len
+		app.handle(action)!
+		assert app.calculator.has_error
+		assert app.scientific_status == if index < 6 {
+			'calculator.error.domain'
+		} else { 'calculator.error.nonfinite' }
+		assert app.history.len == before
+		app.key_input('7')
+		assert !app.calculator.has_error && app.calculator.display == '7'
+	}
+	for action in ['calculator.scientific.sinh', 'calculator.scientific.cosh']! {
+		for input in ['710', '-710']! {
+			app.key_input('c')
+			app.paste_input(input)
+			app.handle(action)!
+			assert !app.calculator.has_error && math.is_finite(app.calculator.display.f64())
+			assert math.abs(math.abs(app.calculator.display.f64()) / 1.1169973830808557e308 - 1) < 1e-14
+		}
+	}
+	for index, action in ['calculator.scientific.asinh', 'calculator.scientific.acosh',
+		'calculator.scientific.tanh', 'calculator.scientific.tanh',
+		'calculator.scientific.atanh', 'calculator.scientific.atanh']! {
+		app.key_input('c')
+		app.paste_input(['-1e308', '1e308', '1e308', '-1e308', '.999999999999999', '1e-300']![index])
+		app.handle(action)!
+		assert !app.calculator.has_error && math.is_finite(app.calculator.display.f64())
+		if index < 2 {
+			assert math.abs(math.abs(app.calculator.display.f64()) - 709.889355822726) < 1e-12
+		} else if index < 4 {
+			assert app.calculator.display == if index == 2 { '1' } else { '-1' }
+		} else if index == 4 {
+			assert app.calculator.display.f64() > 17
+		} else {
+			assert math.abs(app.calculator.display.f64() / 1e-300 - 1) < 1e-14
+		}
+	}
+	for action in ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+		'calculator.scientific.tanh', 'calculator.scientific.asinh',
+		'calculator.scientific.acosh', 'calculator.scientific.atanh']! {
+		for input in [math.inf(1), math.inf(-1), math.nan()]! {
+			value, status := calculator_scientific_value(action, input, true)
+			assert value == 0 && status == 'calculator.error.nonfinite'
+		}
+	}
+}
+
+fn test_calculator_hyperbolic_pending_operands_modes_history_memory_and_copy() {
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.key_input('2+0')
+	app.handle('calculator.scientific.cosh')!
+	assert app.calculator.pending_operator == '+' && app.calculator.accumulator == 2
+	app.key_input('==')
+	assert app.calculator.display == '4'
+	assert app.history[0].expression == 'cosh(0)'
+	assert app.history[1].expression == '2 + 1'
+	assert app.history[2].expression == '3 + 1'
+	app.key_input('c1')
+	app.handle('calculator.scientific.sinh')!
+	result := app.calculator.display.clone()
+	defer { unsafe { result.free() } }
+	app.handle('calculator.memory.add')!
+	app.key_input('\x03')
+	packet := app.take_clipboard_copy_request()
+	defer { unsafe { packet.free() } }
+	assert console_borrow(editor_bytes_text(packet), text_copy_header_size, packet.len) == result
+	assert app.history.len == 4
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('0xFF')
+	app.key_input('+1=')
+	assert app.integer.value == 256 && app.integer.history.len == 1
+	app.handle('calculator.scientific.cosh')!
+	assert app.integer.value == 256 && app.history.len == 4
+	app.key_input('\x13')
+	assert !app.programmer
+	if !app.scientific { app.key_input('\x13') }
+	assert app.calculator.display == result && app.integer.value == 256
+	app.handle('calculator.angle.radians')!
+	app.handle('calculator.history.0')!
+	assert app.calculator.display == result
+	app.handle('calculator.scientific.asinh')!
+	assert math.abs(app.calculator.display.f64() - 1) < 1e-14
+	app.handle('calculator.mode.basic')!
+	app.handle('calculator.scientific.cosh')!
+	assert math.abs(app.calculator.display.f64() - 1) < 1e-14
+	app.key_input('c2+3==')
+	assert app.calculator.display == '8'
+	app.handle('calculator.mode.scientific')!
+	assert !app.degrees
+	app.handle('calculator.memory.recall')!
+	assert app.calculator.display == result
+	app.handle('calculator.scientific.asinh')!
+	app.key_input('7')
+	assert app.calculator.display == '7'
+}
+
 fn test_calculator_scientific_constants_radians_and_units_leave_operands_unchanged() {
 	mut app := new_calculator_app()
 	defer { app.close_app() }
@@ -309,6 +458,50 @@ fn test_calculator_scientific_ui_has_wire_supported_controls_and_resize_hint() {
 	begin_frame_elements()
 	free_tree(app.build(ui2.rect(0, 0, 340, 540))!)
 	assert math.abs(app.calculator.display.f64() - math.pi) < 1e-14
+}
+
+fn test_calculator_hyperbolic_controls_fit_all_scientific_windows_and_dispatch_wire_actions() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566),
+		ui2.rect(0, 0, 760, 620)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		panel := calculator_feature_find(tree, 'calculator') or { panic('missing keypad') }
+		for index, action in calculator_scientific_actions {
+			control := calculator_feature_find(tree, action) or { panic('missing scientific control') }
+			assert control.kind == .button && control.text == tr(action)
+			assert control.frame.width == 52 && control.frame.height == 36
+			assert control.frame.x >= 0 && control.frame.x + control.frame.width <= panel.frame.x - 16
+			assert control.frame.y >= 154 && control.frame.y + control.frame.height <= 410
+			assert control.frame.x + control.frame.width <= size.width
+			assert control.frame.y + control.frame.height <= size.height
+			if index > 0 {
+				previous := calculator_feature_find(tree, calculator_scientific_actions[index - 1]) or { panic('missing previous control') }
+				assert control.frame.x >= previous.frame.x + previous.frame.width
+					|| control.frame.y >= previous.frame.y + previous.frame.height
+			}
+		}
+		mut encoded := []u8{cap: 65536}
+		unsafe { encoded.flags |= .noslices }
+		encode_app_element(tree, mut encoded)!
+		mut reader := WireReader{ data: encoded }
+		decoded := decode_app_element(mut reader, 0)!
+		for index, action in ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+			'calculator.scientific.tanh', 'calculator.scientific.asinh',
+			'calculator.scientific.acosh', 'calculator.scientific.atanh']! {
+			control := calculator_feature_find(decoded, action) or { panic('missing wire operation') }
+			app.key_input('c')
+			app.paste_input(if index == 4 { '1' } else { '0' })
+			app.handle(if control.action_id.len > 0 { control.action_id } else { control.id })!
+			assert !app.calculator.has_error
+			assert app.calculator.display == if index == 1 { '1' } else { '0' }
+		}
+		free_tree(decoded)
+		free_tree(tree)
+		unsafe { encoded.free() }
+	}
 }
 
 fn test_calculator_programmer_parse_exact_limits_prefixes_and_four_base_texts() {

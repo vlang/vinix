@@ -12,6 +12,14 @@ import ui2
 import math
 
 #include <stdio.h>
+#include <math.h>
+
+fn C.sinh(value f64) f64
+fn C.cosh(value f64) f64
+fn C.tanh(value f64) f64
+fn C.asinh(value f64) f64
+fn C.acosh(value f64) f64
+fn C.atanh(value f64) f64
 
 const calculator_history_limit = 20
 const calculator_input_limit = 48
@@ -24,7 +32,9 @@ const calculator_scientific_actions = ['calculator.scientific.sqrt', 'calculator
 	'calculator.scientific.tan', 'calculator.scientific.asin', 'calculator.scientific.acos',
 	'calculator.scientific.atan', 'calculator.scientific.ln', 'calculator.scientific.log',
 	'calculator.scientific.exp', 'calculator.scientific.pi', 'calculator.scientific.e',
-	'calculator.scientific.cube', 'calculator.scientific.cbrt', 'calculator.scientific.log2']!
+	'calculator.scientific.cube', 'calculator.scientific.cbrt', 'calculator.scientific.log2',
+	'calculator.scientific.sinh', 'calculator.scientific.cosh', 'calculator.scientific.tanh',
+	'calculator.scientific.asinh', 'calculator.scientific.acosh', 'calculator.scientific.atanh']!
 
 struct CalculatorHistoryEntry {
 	expression string
@@ -329,7 +339,9 @@ fn calculator_scientific_value(action string, value f64, degrees bool) (f64, str
 		|| (action == 'calculator.scientific.reciprocal' && value == 0)
 		|| ((action == 'calculator.scientific.ln' || action == 'calculator.scientific.log'
 			|| action == 'calculator.scientific.log2') && value <= 0)
-		|| ((action == 'calculator.scientific.asin' || action == 'calculator.scientific.acos') && math.abs(value) > 1) {
+		|| ((action == 'calculator.scientific.asin' || action == 'calculator.scientific.acos') && math.abs(value) > 1)
+		|| (action == 'calculator.scientific.acosh' && value < 1)
+		|| (action == 'calculator.scientific.atanh' && math.abs(value) >= 1) {
 		return 0, 'calculator.error.domain'
 	}
 	angle := if degrees { value * (math.pi / 180) } else { value }
@@ -358,6 +370,15 @@ fn calculator_scientific_value(action string, value f64, degrees bool) (f64, str
 		'calculator.scientific.ln' { math.log(value) }
 		'calculator.scientific.log' { math.log10(value) }
 		'calculator.scientific.exp' { math.exp(value) }
+		// libm evaluates the full finite sinh/cosh range, including values for
+		// which exp(value) itself would overflow before division by two.
+		// Hyperbolic arguments and results do not use the DEG/RAD setting.
+		'calculator.scientific.sinh' { C.sinh(value) }
+		'calculator.scientific.cosh' { C.cosh(value) }
+		'calculator.scientific.tanh' { C.tanh(value) }
+		'calculator.scientific.asinh' { C.asinh(value) }
+		'calculator.scientific.acosh' { C.acosh(value) }
+		'calculator.scientific.atanh' { C.atanh(value) }
 		else { return 0, 'calculator.error.operation' }
 	}
 	return if math.is_finite(result) { result } else { f64(0) }, if math.is_finite(result) {
@@ -795,8 +816,8 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 			tooltip: tr(key)
 		}
 		for index, action in calculator_scientific_actions {
-			children << ui2.button(action, tr(action), ui2.rect(left + f64(index % 3) * 80,
-				154 + f64(index / 3) * 44, 72, 36), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
+			children << ui2.button(action, tr(action), ui2.rect(left + f64(index % 4) * 60,
+				154 + f64(index / 4) * 44, 52, 36), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
 				ui2.TextStyle{ size: 13, color: body_text, align: .center })
 		}
 	}

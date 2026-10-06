@@ -47,7 +47,7 @@ fn test_calculator_scientific_operations_modes_history_and_errors_release_owned_
 		for index, action in calculator_scientific_actions {
 			app.key_input('c')
 			app.paste_input(['9', '4', '-3', '30', '60', '45', '.5', '.5', '1', '1', '100', '0',
-				'0', '0', '-2', '-8', '8']![index])
+				'0', '0', '-2', '-8', '8', '1', '1', '1', '1', '2', '.5']![index])
 			app.handle(action)!
 		}
 		app.key_input('c2+9')
@@ -94,6 +94,60 @@ fn test_calculator_scientific_init_resize_and_close_release_all_owned_memory() {
 		app.close_app()
 		unsafe { free(app) }
 	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_hyperbolic_boundaries_domains_wire_and_mode_cycles_release_owned_memory() {
+	mut app := new_calculator_app()
+	app.handle('calculator.mode.scientific')!
+	for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+		begin_frame_elements()
+		free_tree(app.build(size)!)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for angle in ['calculator.angle.degrees', 'calculator.angle.radians']! {
+			app.handle(angle)!
+			for index, action in ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+				'calculator.scientific.tanh', 'calculator.scientific.asinh',
+				'calculator.scientific.acosh', 'calculator.scientific.atanh']! {
+				app.key_input('c')
+				app.paste_input(['710', '-710', '-1e308', '-1e308', '1e308', '.999999999999999']![index])
+				app.handle(action)!
+				assert !app.calculator.has_error
+			}
+		}
+		for index, action in ['calculator.scientific.sinh', 'calculator.scientific.cosh',
+			'calculator.scientific.acosh', 'calculator.scientific.atanh']! {
+			app.key_input('c')
+			app.paste_input(['711', '-711', '.5', '1']![index])
+			app.handle(action)!
+			assert app.calculator.has_error
+		}
+		app.key_input('c1')
+		app.handle('calculator.scientific.asinh')!
+		app.handle('calculator.mode.basic')!
+		app.handle('calculator.scientific.cosh')!
+		app.handle('calculator.mode.programmer')!
+		app.handle('calculator.scientific.sinh')!
+		app.handle('calculator.mode.scientific')!
+		app.handle('calculator.history.0')!
+		app.key_input('+2=')
+		for size in [ui2.rect(0, 0, 540, 430), ui2.rect(0, 0, 620, 566)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			mut encoded := []u8{cap: 65536}
+			unsafe { encoded.flags |= .noslices }
+			encode_app_element(tree, mut encoded)!
+			mut reader := WireReader{ data: encoded }
+			decoded := decode_app_element(mut reader, 0)!
+			free_tree(decoded)
+			free_tree(tree)
+			unsafe { encoded.free() }
+		}
+	}
+	app.close_app()
+	app.close_app()
 	assert C.vinix_heap_end() == 0
 }
 
