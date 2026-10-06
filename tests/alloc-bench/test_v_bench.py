@@ -94,7 +94,7 @@ def normalize(contents, help_text=False):
 
 
 def compare(v_exe, c_exe, work):
-    cases = [("success", ["--iterations", str(n), "--samples", str(samples), "--label", "a_Z-0.1"], "none", 1)
+    cases = [(f"success-{n}-{samples}", ["--iterations", str(n), "--samples", str(samples), "--label", "a_Z-0.1"], "none", 1)
              for n, samples in ((1, 5), (63, 6), (64, 5), (65, 6), (257, 31), (2000, 5))]
     cases += [("ordered", ["--quick", "--iterations", "65", "--samples", "6"], "none", 1),
               ("help", ["--help"], "none", 1), ("help_after_quick", ["--quick", "--help"], "none", 1)]
