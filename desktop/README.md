@@ -66,8 +66,8 @@ What it does:
   save-aware closing and exclusive Save As
 - a **Calculator** with Basic/Scientific modes, DEG/RAD and hyperbolic functions,
   memory, validated numeric paste, bounded calculation history and exact unsigned
-  8/16/32/64-bit Programmer mode with four bases and bitwise operations; acknowledged
-  result copy to the guest session clipboard
+  8/16/32/64-bit Programmer mode with four bases, bitwise operations and a bit
+  editor; acknowledged result copy to the guest session clipboard
 - a **calendar** with month navigation, searchable persistent local events and
   bounded ICS import/export
 - **Disk Usage**, a disk usage analyzer: the largest folders and files on the
@@ -85,12 +85,12 @@ What it does:
   with progress/cancel
 - **Disk Utility**, read-only block-device and mounted-volume inspection
 - **Backup**, versioned local folder copies and restore to a new folder
-- **Notes**, searchable local plain-text notes with autosave, text export and
-  close confirmation when a final save fails
+- **Notes**, searchable local plain-text notes with autosave, UTF-8 text
+  import/export and close confirmation when a final save fails
 - **Reminders**, persistent local tasks with due dates, priorities, completion,
-  filters and stable priority/due/title sorting
+  filters and stable added/priority/due/title sorting in either direction
 - **Grapher**, bounded mathematical function plots with axes, ranges, saved graph
-  documents, CSV samples and PNG export
+  documents, CSV samples and PNG/SVG export
 - **Color Meter**, live screen-colour samples, aperture averages, a magnifier
   and hex/RGB text copy to the guest session clipboard
 - **Dictionary**, offline WordNet lookup, suggestions, history, full-definition
@@ -466,9 +466,15 @@ exact selected-base digits in Programmer mode. Programmer supports unsigned
 8/16/32/64-bit words; arithmetic and NOT wrap at the chosen width. Narrowing
 drops high bits of current, pending and repeat operands; widening zero-extends.
 History recall restores its original width and value, and AC keeps the width.
+Choose Bits to edit the displayed operand by clicking labelled bits; bit 0 is
+the least significant bit. Full windows show the whole word, while compact
+windows page through eight bits at a time. Keypad restores numeric entry.
+Bit edits preserve pending/repeated operators and leave history unchanged until
+evaluation. Narrowing or recalling a narrower word clamps the visible bit page.
 Arithmetic errors are not copied. The bounded guest clipboard service reports
 success only after acknowledgement; failed or unavailable copies preserve its
 previous contents.
+The bit editor comparison is [Apple's programmer Calculator guide](https://support.apple.com/en-bh/guide/calculator/calc8990e3ee/mac).
 
 Terminal supports mouse selection of UTF-8 cells across physical output rows,
 including scrollback and the alternate screen. Drag to select, then choose
@@ -528,8 +534,12 @@ links; choose another name for a later revision. Open or Enter in that path
 field validates the whole bounded, versioned document before replacing and
 plotting the graph. Failed opens preserve the current fields and plot. Save
 changes before opening another
-document; Grapher has no autosave or recovery journal. Multiple equations,
-3D graphs and PNG/vector export remain separate work. The macOS comparison is
+document; Grapher has no autosave or recovery journal. Independent PNG and SVG
+destinations export the validated plot at 960×640 without replacing existing
+files. SVG uses vector paths and text, preserves domain gaps and clips the
+curve to the plotted ranges. Compact Graph/Document/CSV/PNG/SVG pages expose
+all fields; Tab reveals the active field's page. Multiple equations and
+3D graphs remain separate work. The macOS comparison is
 [Apple's graph and equation guide](https://support.apple.com/guide/grapher/create-a-graph-and-add-equations-gcalcd405d09/mac).
 
 Archive Utility browses uncompressed TAR snapshots. Toggle the entry checkboxes
@@ -555,11 +565,27 @@ Copy status distinguishes acknowledged success, failure and an unavailable
 guest clipboard service. Copying does not write the host clipboard.
 
 Notes keeps local UTF-8 titles and plain-text bodies with search, debounced
-autosave and exclusive text export. If a final save fails, ordinary window
-closing or desktop exit keeps the draft open. Keep editing cancels that close
-request. Retry Save, export the draft, or choose Discard draft followed by
+autosave and exclusive text export. Import or Ctrl-O opens a text-file path.
+Enter imports one regular UTF-8 file as a new note; Escape cancels. Its basename
+becomes the title, with a nonempty `.txt` extension removed. An optional UTF-8
+BOM is removed and CRLF/CR become LF; normalized bodies are limited to 16 KiB.
+The current draft and imported note are saved together. Invalid files, size
+limits or conflicting saves preserve the draft, history and saved notes.
+This imports plain text; rich formats and folder imports remain future work.
+The comparison is [Apple's Notes import guide](https://support.apple.com/en-ie/102223).
+If a final save fails, ordinary window closing or desktop exit keeps the draft
+open. Keep editing cancels that close request. Retry Save, export the draft,
+or choose Discard draft followed by
 Confirm discard and retry closing. Forced process termination bypasses the
 guard; Notes does not provide a recovery journal.
+
+Reminders' Direction control reverses the selected Added/Priority/Due/Title
+sort. Each sort remembers its direction for this window. Equal keys keep
+added order, and undated tasks stay last in either Due direction. Tab to
+Direction, use Right for reversed or Left for default, or Enter/Space to
+toggle. Sorting preserves selected tasks and editor drafts; exports follow
+the complete current view. Titles compare case-sensitive UTF-8 bytes.
+The comparison is [Apple's Reminders sorting guide](https://support.apple.com/en-ae/guide/reminders/remn922d0b42/mac).
 
 Color Meter samples the presented desktop in physical framebuffer pixels.
 Live follows the pointer every 100 ms; Freeze, Space or Escape holds the
