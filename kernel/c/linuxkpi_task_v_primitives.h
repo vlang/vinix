@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "linuxkpi_callback_v_abi.h"
 /* Narrow ABI views checked against unmodified public Linux layouts. */
 struct vkt_task_view {
     void *vinix_thread;
@@ -18,7 +19,7 @@ struct vkt_timer_view {
     struct vkt_timer_view *next;
     struct vkt_timer_view **pprev;
     unsigned long expires;
-    void (*function)(void *);
+    void (*function)(struct timer_list *);
     uint32_t flags;
 };
 #endif
@@ -65,7 +66,7 @@ void vkt_guest_exit(void);
 uint64_t vkt_max_sec_in_jiffies(void);
 unsigned int vkt_sec_conversion(void);
 unsigned int vkt_nsec_conversion(void);
-void vkt_unexpected_callback(void *);
+void vkt_unexpected_callback(struct timer_list *);
 void *vkt_timer_thread(void *);
 int vkt_pthread_create(void *, void *(*)(void *), void *);
 int vkt_pthread_detach(void *);

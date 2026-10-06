@@ -23,7 +23,7 @@ __global vkh_system_highpri_wq &C.workqueue_struct
 __global vkh_system_unbound_wq &C.workqueue_struct
 fn C.vinix_linuxkpi_work_worker(voidptr) voidptr
 fn C.vinix_linuxkpi_pool_manager(voidptr) voidptr
-fn C.vinix_linuxkpi_work_barrier(voidptr)
+fn C.vinix_linuxkpi_work_barrier(&C.work_struct)
 fn C.delayed_work_timer_fn(&C.timer_list)
 fn C.pthread_join(C.pthread_t, voidptr) i32
 fn C.memcpy(voidptr, voidptr, usize) voidptr

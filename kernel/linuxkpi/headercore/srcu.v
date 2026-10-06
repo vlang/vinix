@@ -13,8 +13,8 @@ struct C.vks_data_alignment_probe { prefix u8, data C.srcu_data }
 type HeaderWorkFn = fn (&C.work_struct)
 fn C.INIT_WORK(&C.work_struct, HeaderWorkFn)
 fn C.INIT_DELAYED_WORK(&C.delayed_work, HeaderWorkFn)
-fn C.vinix_linuxkpi_srcu_gp_work(voidptr)
-fn C.vinix_linuxkpi_srcu_callback_work(voidptr)
+fn C.vinix_linuxkpi_srcu_gp_work(&C.work_struct)
+fn C.vinix_linuxkpi_srcu_callback_work(&C.work_struct)
 @[c_extern]
 __global C.system_unbound_wq voidptr
 fn C.preempt_disable()

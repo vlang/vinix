@@ -4,18 +4,18 @@
 #include "linuxkpi_wait_v_primitives.h"
 /* Exact pinned ABI views. The binding checks every accessed field and type
  * alignment, while the main generated V blob avoids broad Linux headers. */
-struct vks_rcu_head { struct vks_rcu_head *next; void (*func)(void *); };
+struct vks_rcu_head { struct vks_rcu_head *next; void (*func)(struct callback_head *); };
 struct vks_cblist {
     struct vks_rcu_head *head, **tails[4];
     unsigned long gp_seq[4];
     long len, seglen[4];
     unsigned char flags;
 };
-struct vks_work { long data; struct vkw_list entry; void (*func)(void *); };
+struct vks_work { long data; struct vkw_list entry; void (*func)(struct work_struct *); };
 struct vks_timer {
     void *next, *pprev;
     unsigned long expires;
-    void (*function)(void *);
+    void (*function)(struct timer_list *);
     unsigned int flags;
 };
 struct vks_delayed_work {
@@ -83,9 +83,9 @@ void srcu_init(void);
 int init_srcu_struct(void *);
 int __srcu_read_lock(void *);
 void __srcu_read_unlock(void *, int);
-void call_srcu(void *, void *, void (*)(void *));
-void vinix_linuxkpi_srcu_gp_work(void *);
-void vinix_linuxkpi_srcu_callback_work(void *);
+void call_srcu(void *, void *, void (*)(struct callback_head *));
+void vinix_linuxkpi_srcu_gp_work(struct work_struct *);
+void vinix_linuxkpi_srcu_callback_work(struct work_struct *);
 uint64_t get_state_synchronize_srcu(void *);
 uint64_t start_poll_synchronize_srcu(void *);
 bool poll_state_synchronize_srcu(void *, uint64_t);

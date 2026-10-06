@@ -67,7 +67,7 @@ pub fn nr_iowait() u32 {
 }
 
 @[export: 'bit_wait_io']
-pub fn bit_wait_io(key voidptr, mode i32) i32 {
+pub fn bit_wait_io(key &C.wait_bit_key, mode i32) i32 {
 	unsafe {
 		io_schedule()
 		return if C.vkp_signal_pending(mode) { -4 } else { 0 }
@@ -75,7 +75,7 @@ pub fn bit_wait_io(key voidptr, mode i32) i32 {
 }
 
 @[export: 'bit_wait_io_timeout']
-pub fn bit_wait_io_timeout(key voidptr, mode i32) i32 {
+pub fn bit_wait_io_timeout(key &C.wait_bit_key, mode i32) i32 {
 	unsafe {
 		now := C.vkp_jiffies()
 		timeout := C.vkp_bit_timeout(key)

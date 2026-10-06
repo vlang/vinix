@@ -27,7 +27,7 @@ mut:
 	entry C.vkw_list
 	task voidptr
 }
-type WaitWakeFn = fn (voidptr, u32, i32, voidptr) i32
+type WaitWakeFn = fn (&C.wait_queue_entry, u32, i32, voidptr) i32
 
 fn C.vkw_wake_state(voidptr, u32) i32
 fn C.vkw_irqs_disabled() bool
@@ -255,7 +255,7 @@ fn wake_queue_locked(head &C.vkw_wait_queue, mode u32, quota i32, key voidptr) i
 			flags := wait.flags
 			if (flags & 4) != 0 { continue }
 			callback := WaitWakeFn(wait.func)
-			result := callback(wait, mode, 0, key)
+			result := callback(&C.wait_queue_entry(wait), mode, 0, key)
 			if result < 0 { break }
 			if result != 0 && (flags & 1) != 0 {
 				remaining--
@@ -284,14 +284,14 @@ pub fn wake_up_locked_key(storage voidptr, mode u32, key voidptr) {
 	unsafe { wake_queue_locked(&C.vkw_wait_queue(storage), mode, 1, key) }
 }
 @[export: 'default_wake_function']
-pub fn default_wake_function(storage voidptr, mode u32, flags i32, key voidptr) i32 {
+pub fn default_wake_function(storage &C.wait_queue_entry, mode u32, flags i32, key voidptr) i32 {
 	unsafe {
 		require(flags == 0)
 		return C.vkw_wake_state((&C.vkw_wait_entry(storage)).@private, mode)
 	}
 }
 @[export: 'autoremove_wake_function']
-pub fn autoremove_wake_function(storage voidptr, mode u32, flags i32, key voidptr) i32 {
+pub fn autoremove_wake_function(storage &C.wait_queue_entry, mode u32, flags i32, key voidptr) i32 {
 	unsafe {
 		result := default_wake_function(storage, mode, flags, key)
 		if result != 0 {

@@ -11,7 +11,9 @@ _Static_assert(WQ_UNBOUND == 2 && WQ_HIGHPRI == 16 && __WQ_ORDERED == 131072 && 
 _Static_assert(sizeof(pthread_t) == sizeof(uint64_t), "V worker thread ABI");
 void *vinix_linuxkpi_work_worker(void *);
 void *vinix_linuxkpi_pool_manager(void *);
-void vinix_linuxkpi_work_barrier(void *);
+void vinix_linuxkpi_work_barrier(struct work_struct *);
+_Static_assert(_Generic(&vinix_linuxkpi_work_barrier, work_func_t: 1, default: 0), "registered work callback type");
+_Static_assert(_Generic(&delayed_work_timer_fn, __typeof__(((struct timer_list *)0)->function): 1, default: 0), "registered delayed timer callback type");
 void *vinix_linuxkpi_workqueue_allocate(unsigned int, int);
 char *vinix_linuxkpi_workqueue_name(void *);
 void *vinix_linuxkpi_workqueue_start(void *);

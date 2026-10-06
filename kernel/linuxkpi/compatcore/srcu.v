@@ -9,7 +9,7 @@ module compatcore
 struct C.vks_rcu_head {
 mut:
 	next &C.vks_rcu_head
-	func fn (voidptr)
+	func fn (&C.callback_head)
 }
 struct C.vks_cblist {
 mut:
@@ -24,7 +24,7 @@ struct C.vks_work {
 mut:
 	data i64
 	entry C.vkw_list
-	func fn (voidptr)
+	func fn (&C.work_struct)
 }
 struct C.vks_delayed_work {
 mut:
@@ -38,7 +38,7 @@ mut:
 	next voidptr
 	pprev voidptr
 	expires u64
-	function fn (voidptr)
+	function fn (&C.timer_list)
 	flags u32
 }
 struct C.vks_srcu_data {
@@ -260,7 +260,7 @@ fn srcu_updater_queue() voidptr {
 }
 fn srcu_kick_updater(sup &C.vks_srcu_usage) { unsafe { C.vks_queue_delayed_work(srcu_updater_queue(), &sup.work, 0) } }
 @[export: 'call_srcu']
-pub fn call_srcu(storage voidptr, record voidptr, function fn (voidptr)) {
+pub fn call_srcu(storage voidptr, record voidptr, function fn (&C.callback_head)) {
 	unsafe {
 		head := &C.vks_rcu_head(record)
 		require(!is_null(head) && usize(function) != 0)
@@ -283,7 +283,7 @@ pub fn call_srcu(storage voidptr, record voidptr, function fn (voidptr)) {
 	}
 }
 @[export: 'vinix_linuxkpi_srcu_gp_work']
-pub fn srcu_gp_work(work voidptr) {
+pub fn srcu_gp_work(work &C.work_struct) {
 	unsafe {
 		sup := &C.vks_srcu_usage(usize(work) - __offsetof(C.vks_srcu_usage, work))
 		ssp := &C.vks_srcu(sup.srcu_ssp)
@@ -325,7 +325,7 @@ pub fn srcu_gp_work(work voidptr) {
 	}
 }
 @[export: 'vinix_linuxkpi_srcu_callback_work']
-pub fn srcu_callback_work(work voidptr) {
+pub fn srcu_callback_work(work &C.work_struct) {
 	unsafe {
 		sdp := &C.vks_srcu_data(usize(work) - __offsetof(C.vks_srcu_data, work))
 		sup := &C.vks_srcu_usage((&C.vks_srcu(sdp.ssp)).srcu_sup)
@@ -343,7 +343,7 @@ pub fn srcu_callback_work(work voidptr) {
 			C.vkp_spin_unlock_irqrestore(&sup.lock, flags)
 			require(C.vinix_linuxkpi_may_sleep())
 			C.vks_preempt_disable()
-			function(head) // Callback may free or requeue head; never read it again.
+			function(&C.callback_head(head)) // Callback may free or requeue head; never read it again.
 			require(C.vks_preempt_count() == 1 && !C.vkw_irqs_disabled())
 			C.vks_preempt_enable()
 			flags = C.vkp_spin_lock_irqsave(&sup.lock)

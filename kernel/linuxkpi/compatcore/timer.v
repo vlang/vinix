@@ -9,10 +9,10 @@ mut:
 	next &C.vkt_timer_view
 	pprev &&C.vkt_timer_view
 	expires u64
-	function fn (voidptr)
+	function fn (&C.timer_list)
 	flags u32
 }
-fn C.vkt_unexpected_callback(voidptr)
+fn C.vkt_unexpected_callback(&C.timer_list)
 fn C.vkt_timer_thread(voidptr) voidptr
 fn C.vkt_pthread_create(voidptr, fn (voidptr) voidptr, voidptr) i32
 fn C.vkt_pthread_detach(voidptr) i32
@@ -78,7 +78,7 @@ fn vkt_detach_locked(timer &C.vkt_timer_view) i32 {
 }
 
 @[export: 'init_timer_key']
-pub fn timer_init(storage voidptr, function fn (voidptr), flags u32, name &char, key voidptr) {
+pub fn timer_init(storage voidptr, function fn (&C.timer_list), flags u32, name &char, key voidptr) {
 	unsafe {
 		require((flags & ~u32(0x200000)) == 0)
 		mut timer := &C.vkt_timer_view(storage)
@@ -209,7 +209,7 @@ pub fn timer_dispatch() u32 {
 			C.vinix_linuxkpi_preempt_disable()
 			C.vkp_spin_unlock_irqrestore(&vkt_timer_lock, if irq_safe { u64(0) } else { flags })
 			depth := C.vinix_linuxkpi_preempt_count()
-			function(timer)
+			function(&C.timer_list(timer))
 			require(C.vinix_linuxkpi_preempt_count() == depth && ((C.vinix_linuxkpi_irq_flags() & 512) != 0) != irq_safe)
 			flags = C.vkp_spin_lock_irqsave(&vkt_timer_lock)
 			// Callback may already have freed timer: only touch our stack record.
@@ -266,7 +266,7 @@ pub fn timer_round_relative_current(tick u64) u64 { return timer_round_relative(
 pub fn timer_round_up_relative_current(tick u64) u64 { return timer_round_up_relative(tick, i32(C.vinix_linuxkpi_cpu_id())) }
 
 @[export: 'vkt_unexpected_callback']
-pub fn timer_unexpected_callback(timer voidptr) { require(false) }
+pub fn timer_unexpected_callback(timer &C.timer_list) { require(false) }
 
 @[export: 'vinix_linuxkpi_timer_selftest']
 pub fn timer_selftest() i32 {

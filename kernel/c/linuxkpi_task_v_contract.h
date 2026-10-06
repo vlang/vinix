@@ -21,4 +21,6 @@ _Static_assert(HZ == 1000 && BITS_PER_LONG == 64 && SEC_JIFFIE_SC == 22 && NSEC_
 
 _Static_assert(sizeof(pthread_t) <= sizeof(uint64_t), "V pthread storage");
 _Static_assert(INITIAL_JIFFIES == 4294667296UL && SMP_CACHE_BYTES == 64, "native jiffies data contract");
+_Static_assert(__builtin_types_compatible_p(__typeof__(((struct vkt_timer_view *)0)->function), __typeof__(((struct timer_list *)0)->function)), "native timer callback type");
+_Static_assert(_Generic(&vkt_unexpected_callback, __typeof__(((struct timer_list *)0)->function): 1, default: 0), "registered timer callback type");
 #endif

@@ -294,7 +294,7 @@ fn wq_promote_delayed_locked(dwork &C.vks_delayed_work) {
 	}
 }
 @[export: 'delayed_work_timer_fn']
-pub fn delayed_work_timer_fn(timer voidptr) {
+pub fn delayed_work_timer_fn(timer &C.timer_list) {
 	unsafe {
 		dwork := &C.vks_delayed_work(usize(timer) - __offsetof(C.vks_delayed_work, timer))
 		C.vkwq_delayed_gate(timer)
@@ -526,7 +526,7 @@ pub fn work_worker(argument voidptr) voidptr {
 			ww_list_add_tail(&run.entry, &C.vkwq_running)
 			wq_wake_workers_locked(wq)
 			C.vkp_spin_unlock_irqrestore(&vkwq_work_lock, flags)
-			function(work)
+			function(&C.work_struct(work))
 			require(C.vinix_linuxkpi_may_sleep() && C.vkwq_current_running())
 			flags = C.vkp_spin_lock_irqsave(&vkwq_work_lock)
 			// The callback may have freed work. Only use retained run/wait records.
@@ -813,7 +813,7 @@ pub fn cancel_delayed_work_sync(storage voidptr) bool {
 	unsafe { dwork := &C.vks_delayed_work(storage); return wq_cancel_sync(&dwork.work, dwork) }
 }
 @[export: 'vinix_linuxkpi_work_barrier']
-pub fn work_barrier_callback(work voidptr) { require(false) }
+pub fn work_barrier_callback(work &C.work_struct) { require(false) }
 fn wq_init_barrier(barrier &WorkBarrier) {
 	unsafe {
 		C.vks_init_work(&barrier.work, C.vkwq_barrier_callback())

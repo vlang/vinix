@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "linuxkpi_callback_v_abi.h"
 
 /* Narrow ABI views, checked against the unchanged Linux layouts in the
  * binding translation unit. The generated V blob need not import Linux. */
@@ -12,7 +13,7 @@ struct vkw_wait_key { void *flags; int bit_nr; unsigned long timeout; };
 struct vkw_wait_entry {
     unsigned int flags;
     void *private;
-    int (*func)(void *, unsigned int, int, void *);
+    int (*func)(struct wait_queue_entry *, unsigned int, int, void *);
     struct vkw_list entry;
 };
 struct vkw_wait_queue { unsigned int lock; struct vkw_list head; };
@@ -57,19 +58,19 @@ void *vkw_autoremove_callback(void);
 void wait_bit_init(void);
 void *bit_waitqueue(void *, int);
 void *__var_waitqueue(void *);
-int wake_bit_function(void *, unsigned int, int, void *);
-int vinix_linuxkpi_var_wake_function(void *, unsigned int, int, void *);
+int wake_bit_function(struct wait_queue_entry *, unsigned int, int, void *);
+int vinix_linuxkpi_var_wake_function(struct wait_queue_entry *, unsigned int, int, void *);
 void init_wait_var_entry(void *, void *, int);
-int __wait_on_bit(void *, void *, int (*)(void *, int), unsigned int);
-int __wait_on_bit_lock(void *, void *, int (*)(void *, int), unsigned int);
-int out_of_line_wait_on_bit(void *, int, int (*)(void *, int), unsigned int);
-int out_of_line_wait_on_bit_timeout(void *, int, int (*)(void *, int), unsigned int, uint64_t);
-int out_of_line_wait_on_bit_lock(void *, int, int (*)(void *, int), unsigned int);
+int __wait_on_bit(void *, void *, int (*)(struct wait_bit_key *, int), unsigned int);
+int __wait_on_bit_lock(void *, void *, int (*)(struct wait_bit_key *, int), unsigned int);
+int out_of_line_wait_on_bit(void *, int, int (*)(struct wait_bit_key *, int), unsigned int);
+int out_of_line_wait_on_bit_timeout(void *, int, int (*)(struct wait_bit_key *, int), unsigned int, uint64_t);
+int out_of_line_wait_on_bit_lock(void *, int, int (*)(struct wait_bit_key *, int), unsigned int);
 void __wake_up_bit(void *, void *, int);
 void wake_up_bit(void *, int);
 void wake_up_var(void *);
-int bit_wait(void *, int);
-int bit_wait_timeout(void *, int);
+int bit_wait(struct wait_bit_key *, int);
+int bit_wait_timeout(struct wait_bit_key *, int);
 int ww_mutex_lock(void *, void *);
 int ww_mutex_lock_interruptible(void *, void *);
 int ww_mutex_trylock(void *, void *);
@@ -92,8 +93,8 @@ void remove_wait_queue(void *, void *);
 int __wake_up(void *, unsigned int, int, void *);
 void __wake_up_locked(void *, unsigned int, int);
 void __wake_up_locked_key(void *, unsigned int, void *);
-int default_wake_function(void *, unsigned int, int, void *);
-int autoremove_wake_function(void *, unsigned int, int, void *);
+int default_wake_function(struct wait_queue_entry *, unsigned int, int, void *);
+int autoremove_wake_function(struct wait_queue_entry *, unsigned int, int, void *);
 void init_wait_entry(void *, int);
 void prepare_to_wait(void *, void *, int);
 bool prepare_to_wait_exclusive(void *, void *, int);

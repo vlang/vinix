@@ -99,7 +99,7 @@ fn bit_waiter(entry voidptr) &C.vkw_wait_bit {
 }
 
 @[export: 'wake_bit_function']
-pub fn wake_bit_function(entry voidptr, mode u32, sync i32, argument voidptr) i32 {
+pub fn wake_bit_function(entry &C.wait_queue_entry, mode u32, sync i32, argument voidptr) i32 {
 	unsafe {
 		key := &C.vkw_wait_key(argument)
 		wait := bit_waiter(entry)
@@ -110,7 +110,7 @@ pub fn wake_bit_function(entry voidptr, mode u32, sync i32, argument voidptr) i3
 }
 
 @[export: 'vinix_linuxkpi_var_wake_function']
-pub fn var_wake_function(entry voidptr, mode u32, sync i32, argument voidptr) i32 {
+pub fn var_wake_function(entry &C.wait_queue_entry, mode u32, sync i32, argument voidptr) i32 {
 	unsafe {
 		key := &C.vkw_wait_key(argument)
 		wait := bit_waiter(entry)
@@ -137,13 +137,13 @@ pub fn init_wait_var_entry(storage voidptr, variable voidptr, flags i32) {
 }
 
 @[export: '__wait_on_bit']
-pub fn wait_on_bit(queue voidptr, storage voidptr, action fn (voidptr, i32) i32, mode u32) i32 {
+pub fn wait_on_bit(queue voidptr, storage voidptr, action fn (&C.wait_bit_key, i32) i32, mode u32) i32 {
 	unsafe {
 		wait := &C.vkw_wait_bit(storage)
 		mut result := i32(0)
 		for {
 			C.vkw_wait_prepare(queue, &wait.wq_entry, mode)
-			if C.vkw_test_bit(wait.key.bit_nr, wait.key.flags) { result = action(&wait.key, i32(mode)) }
+			if C.vkw_test_bit(wait.key.bit_nr, wait.key.flags) { result = action(&C.wait_bit_key(&wait.key), i32(mode)) }
 			if !C.vkw_test_bit_acquire(wait.key.bit_nr, wait.key.flags) || result != 0 { break }
 		}
 		C.vkw_wait_finish(queue, &wait.wq_entry)
@@ -152,7 +152,7 @@ pub fn wait_on_bit(queue voidptr, storage voidptr, action fn (voidptr, i32) i32,
 }
 
 @[export: 'out_of_line_wait_on_bit']
-pub fn out_of_line_wait_on_bit(word voidptr, bit i32, action fn (voidptr, i32) i32, mode u32) i32 {
+pub fn out_of_line_wait_on_bit(word voidptr, bit i32, action fn (&C.wait_bit_key, i32) i32, mode u32) i32 {
 	unsafe {
 		queue := bit_waitqueue(word, bit)
 		mut wait := C.vkw_wait_bit{}
@@ -162,7 +162,7 @@ pub fn out_of_line_wait_on_bit(word voidptr, bit i32, action fn (voidptr, i32) i
 }
 
 @[export: 'out_of_line_wait_on_bit_timeout']
-pub fn out_of_line_wait_on_bit_timeout(word voidptr, bit i32, action fn (voidptr, i32) i32, mode u32, timeout u64) i32 {
+pub fn out_of_line_wait_on_bit_timeout(word voidptr, bit i32, action fn (&C.wait_bit_key, i32) i32, mode u32, timeout u64) i32 {
 	unsafe {
 		queue := bit_waitqueue(word, bit)
 		mut wait := C.vkw_wait_bit{}
@@ -174,14 +174,14 @@ pub fn out_of_line_wait_on_bit_timeout(word voidptr, bit i32, action fn (voidptr
 }
 
 @[export: '__wait_on_bit_lock']
-pub fn wait_on_bit_lock(queue voidptr, storage voidptr, action fn (voidptr, i32) i32, mode u32) i32 {
+pub fn wait_on_bit_lock(queue voidptr, storage voidptr, action fn (&C.wait_bit_key, i32) i32, mode u32) i32 {
 	unsafe {
 		wait := &C.vkw_wait_bit(storage)
 		mut result := i32(0)
 		for {
 			C.vkw_wait_prepare_exclusive(queue, &wait.wq_entry, mode)
 			if C.vkw_test_bit(wait.key.bit_nr, wait.key.flags) {
-				result = action(&wait.key, i32(mode))
+				result = action(&C.wait_bit_key(&wait.key), i32(mode))
 				if result != 0 { C.vkw_wait_finish(queue, &wait.wq_entry) }
 			}
 			// Atomic acquisition wins a simultaneous signal or action error.
@@ -196,7 +196,7 @@ pub fn wait_on_bit_lock(queue voidptr, storage voidptr, action fn (voidptr, i32)
 }
 
 @[export: 'out_of_line_wait_on_bit_lock']
-pub fn out_of_line_wait_on_bit_lock(word voidptr, bit i32, action fn (voidptr, i32) i32, mode u32) i32 {
+pub fn out_of_line_wait_on_bit_lock(word voidptr, bit i32, action fn (&C.wait_bit_key, i32) i32, mode u32) i32 {
 	unsafe {
 		queue := bit_waitqueue(word, bit)
 		mut wait := C.vkw_wait_bit{}
@@ -227,13 +227,13 @@ pub fn wake_up_var(variable voidptr) {
 }
 
 @[export: 'bit_wait']
-pub fn bit_wait(key voidptr, mode i32) i32 {
+pub fn bit_wait(key &C.wait_bit_key, mode i32) i32 {
 	C.vkp_schedule()
 	return if C.vkp_signal_pending(mode) { -4 } else { 0 }
 }
 
 @[export: 'bit_wait_timeout']
-pub fn bit_wait_timeout(storage voidptr, mode i32) i32 {
+pub fn bit_wait_timeout(storage &C.wait_bit_key, mode i32) i32 {
 	unsafe {
 		key := &C.vkw_wait_key(storage)
 		now := C.vkp_jiffies()
