@@ -615,3 +615,50 @@ The final GUI run uses longer simulated key holds and paste settling after
 an initially inconclusive paste screenshot. Logs, both GUI observations,
 frozen source manifests, binary hashes and final screenshots are retained in
 `build/utility-copy-validation/`.
+
+### Document and selection follow-up (2026-10-06)
+
+Preview now crops rectangular selections in the displayed image coordinates,
+including EXIF orientation, manual rotation, zoom and panning. PNG export keeps
+the cropped alpha values; Original Copy still preserves the source bytes.
+Grapher saves versioned expression/range documents and validates an entire
+document before replacing the current graph. Archive Utility extracts selected
+TAR entries or folder descendants with choices fixed for the operation and the
+existing whole-archive safety checks. System Information searches actual row
+values, translated labels and categories without limiting the exported report.
+Its Search caption remains visible in both themes, and result counts use the
+English, Spanish and Russian plural forms.
+
+The combined utility suite passes 295 behavior cases and 92 tracked-memory
+cases across 23 modules. Every measured repeated-use group retains zero owned
+bytes after warming persistent frame capacities. The Dictionary data encoder
+also passes five Python cases. After the final search-caption change, System
+Information passes its ten behavior and four memory cases again; the final
+plural translations pass all 16 localization cases and another four memory
+cases. New buffer ownership and the selection/document lifetimes received
+independent reviews.
+
+The complete host IPC fixture and its focused document entry pass against the
+final production source. The same focused entry runs as a static AArch64
+executable inside Vinix with `--require-vinix`, requiring the actual
+`/dev/processes` device. It verifies every pixel of an independently seeded
+2×2 crop, PNG export and byte-exact Original Copy; exclusive graph Save As and
+restored fields/chart after Open; selected TAR descendants and omitted
+similarly named siblings; and search, Unicode query transport, fragmented
+navigation, polled Escape and complete unfiltered report export.
+
+The final static AArch64 desktop (`38ee5040`) is published for Files, Activity
+Monitor and Settings. Its 5,950,328-byte artifact has SHA256
+`8c1a00173d59e08363faff21424184a5736d8d02ed213fd5dbe27d0142652ab7`;
+all three published copies match. A fresh QEMU scenario runs the compositor
+and the four real utility clients. Reviewed screenshots show a 200×120 crop
+and successful PNG export, a saved graph changed to a parabola and restored by
+Open, selective extraction with readable completion status, and search,
+empty-result, report-save and Escape states. Guest output confirms the exact
+saved graph fields, only the two selected archive files and all report
+sections. These five-second samples verify startup and rendering; the
+operation and repeated-use assertions above supply the functional and memory
+checks. Corrected pointer coordinates and key mapping resolve the initial
+inconclusive Grapher screenshots. Logs, both GUI observations, frozen source
+manifests, binary hashes and final screenshots are retained in
+`build/utility-document-validation/`.
