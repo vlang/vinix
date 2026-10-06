@@ -66,6 +66,8 @@ fn (mut a NotesApp) handle(event_id string) ! {
 		'notes.export_path' { a.focus_field(3) }
 		'notes.new' { a.new_note() }
 		'notes.save' { a.save() }
+		'notes.undo' { a.restore_history(false) }
+		'notes.redo' { a.restore_history(true) }
 		'notes.refresh' { a.reload() }
 		'notes.delete' { a.delete_note() }
 		'notes.keep_editing' {
@@ -128,18 +130,26 @@ fn (mut a NotesApp) insert_text(text string) {
 		return
 	}
 	if a.selected < 0 || a.focus < 1 || a.focus > 2 { return }
+	if !notes_valid_text(text, notes_body_limit, a.focus == 2) { return }
+	current := if a.focus == 1 { editor_bytes_text(a.title) } else { editor_bytes_text(a.body) }
+	if (!a.select_all && text.len == 0) || (a.select_all && current == text) {
+		a.select_all = false
+		return
+	}
 	if a.focus == 1 {
 		if text == '\n' || text == '\t' { return }
 		if (if a.select_all { 0 } else { a.title.len }) + text.len > notes_title_limit {
 			a.status = 'notes.limit'
 			return
 		}
+		a.record_history()
 		console_edit_character(mut a.title, text, notes_title_limit, a.select_all)
 	} else {
 		if (if a.select_all { 0 } else { a.body.len }) + text.len > notes_body_limit {
 			a.status = 'notes.limit'
 			return
 		}
+		a.record_history()
 		if a.select_all {
 			a.body.clear()
 			a.cursor = 0
@@ -168,6 +178,14 @@ fn (mut a NotesApp) backspace(forward bool) {
 		console_backspace(mut a.export_path, a.select_all)
 		a.export_status = ''
 	} else if a.selected >= 0 {
+		changed := if a.focus == 1 { a.title.len > 0 } else if a.focus == 2 {
+			if a.select_all { a.body.len > 0 } else if forward { a.cursor < a.body.len } else { a.cursor > 0 }
+		} else { false }
+		if !changed {
+			a.select_all = false
+			return
+		}
+		a.record_history()
 		if a.focus == 1 {
 			console_backspace(mut a.title, a.select_all)
 		} else if a.focus == 2 {
@@ -252,6 +270,10 @@ fn (mut a NotesApp) key_input(input string) {
 			a.select_all = true
 		} else if byte == 0x13 {
 			a.save()
+		} else if byte == 0x1a {
+			a.restore_history(false)
+		} else if byte == 0x19 {
+			a.restore_history(true)
 		} else if byte == 0x0e {
 			a.new_note()
 		} else if byte == 0x1b {
@@ -318,6 +340,24 @@ fn (mut a NotesApp) pointer_event(phase AppPointerPhase, button AppPointerButton
 fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
+	if width < 500 || height < 242 || (a.close_requested && (width < 700 || height < 306)) {
+		mut small := frame_elements(7)
+		button_width := if width > 32 { (width - 32) / 2 } else { 1 }
+		small << notes_history_button('notes.undo', 12, 10, button_width, a.can_undo())
+		small << notes_history_button('notes.redo', 20 + button_width, 10, button_width, a.can_redo())
+		if a.close_requested {
+			small << notes_small_close_button('notes.keep_editing', 12, 42, button_width, false)
+			small << notes_small_close_button('notes.discard', 20 + button_width, 42, button_width, false)
+			if a.discard_pending {
+				small << notes_small_close_button('notes.confirm_discard', 12, 66, width - 24, true)
+			} else {
+				small << ui2.label('', tr(a.status), ui2.rect(12, 66, f64(width - 24), 22), ui2.TextStyle{ size: 9, color: app_accent })
+			}
+		} else {
+			small << ui2.label('', tr('notes.enlarge'), ui2.rect(12, 46, f64(if width > 24 { width - 24 } else { 1 }), 32), ui2.TextStyle{ size: 11, color: body_muted })
+		}
+		return ui2.screen(app_surface, small)
+	}
 	close_height := if a.close_requested { 64 } else { 0 }
 	a.page_rows = if height > 250 { (height - 213) / 30 } else { 1 }
 	a.text_rows = if height - close_height >= 243 { (height - close_height - 225) / 18 } else { 1 }
@@ -327,14 +367,21 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 	// Keep the viewport inside that new range before rendering its text.
 	a.clamp_body_scroll()
 	mut children := frame_elements(24 + a.page_rows + a.text_rows)
+	button_width := if width >= 688 { 104 } else { (width - 64) / 6 }
 	for index, key in ['notes.new', 'notes.save', 'notes.refresh', 'notes.delete']! {
-		children << console_button(key, key, 12 + index * 112, 10, 104, a.delete_pending && index == 3)
+		children << console_button(key, key, 12 + index * (button_width + 8), 10, button_width, a.delete_pending && index == 3)
 	}
-	if a.delete_pending {
-		children << console_button('notes.cancel_delete', 'notes.cancel_delete', 460, 10, 130, false)
+	children << notes_history_button('notes.undo', 12 + 4 * (button_width + 8), 10, button_width, a.can_undo())
+	children << notes_history_button('notes.redo', 12 + 5 * (button_width + 8), 10, button_width, a.can_redo())
+	if a.delete_pending && width >= 820 {
+		children << console_button('notes.cancel_delete', 'notes.cancel_delete', 684, 10, 124, false)
 	}
 	children << console_field('notes.search', editor_bytes_text(a.query), 12, 58, 216, a.focus == 0)
-	children << ui2.label('', tr('notes.search_hint'), ui2.rect(12, 91, 216, 18), ui2.TextStyle{ size: 11, color: body_muted })
+	if a.delete_pending && width < 820 {
+		children << ui2.button('notes.cancel_delete', tr('notes.cancel_delete'), ui2.rect(12, 91, 216, 18), ui2.BoxStyle{ bg: body_panel, radius: 4 }, ui2.TextStyle{ size: 11, color: body_text })
+	} else {
+		children << ui2.label('', tr('notes.search_hint'), ui2.rect(12, 91, 216, 18), ui2.TextStyle{ size: 11, color: body_muted })
+	}
 	for row in 0 .. a.page_rows {
 		match_index := a.list_scroll + row
 		if match_index >= a.matched { break }
@@ -385,6 +432,21 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 		}
 		size:  12
 	})
-	children << ui2.label('', tr('notes.hint'), ui2.rect(12, f64(height - 32), f64(width - 24), 24), ui2.TextStyle{ color: body_muted, size: 11 })
+	children << ui2.label('', tr(if a.history_count > 0 { 'notes.history_scope' } else { 'notes.hint' }), ui2.rect(12, f64(height - 32), f64(width - 24), 24), ui2.TextStyle{ color: body_muted, size: 11 })
 	return ui2.screen(app_surface, children)
+}
+
+fn notes_history_button(key string, x int, y int, width int, enabled bool) ui2.Element {
+	return ui2.Element{
+		...console_button(key, key, x, y, width, false)
+		enabled: enabled
+		text_style: ui2.TextStyle{ color: if enabled { body_text } else { body_muted }, size: 12, align: .center }
+		accessibility_label: tr(key)
+	}
+}
+
+fn notes_small_close_button(key string, x int, y int, width int, active bool) ui2.Element {
+	return ui2.button(key, tr(key), ui2.rect(f64(x), f64(y), f64(width), 20),
+		ui2.BoxStyle{ bg: if active { app_accent } else { body_panel }, radius: 4 },
+		ui2.TextStyle{ color: if active { app_on_accent } else { body_text }, size: 9, align: .center })
 }

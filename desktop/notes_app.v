@@ -53,6 +53,9 @@ mut:
 	pending         [4]u8
 	pending_len     int
 	last_edit       u64
+	history         [notes_history_limit]NotesHistoryEntry
+	history_count   int
+	history_position int
 }
 
 fn new_notes_app(home string) NotesApp {
@@ -258,6 +261,7 @@ fn (mut a NotesApp) reload() {
 		a.free_items()
 		a.next_id = 1
 	}
+	a.clear_history()
 	a.read_failed = false
 	unsafe { a.record.free() }
 	a.record = data.clone()
@@ -332,6 +336,7 @@ fn (mut a NotesApp) new_note() {
 
 fn (mut a NotesApp) load_selected(index int) {
 	if index < 0 || index >= a.count { return }
+	a.clear_history()
 	a.selected = index
 	a.title.clear()
 	a.body.clear()
@@ -376,6 +381,7 @@ fn (mut a NotesApp) delete_note() {
 	for at in index .. a.count - 1 { a.items[at] = a.items[at + 1] }
 	a.count--
 	a.items[a.count] = NotesEntry{}
+	a.clear_history()
 	a.selected = -1
 	a.title.clear()
 	a.body.clear()
@@ -453,6 +459,7 @@ fn (mut a NotesApp) close_app() {
 	// Forced process termination still bypasses the guard. An ordinary close
 	// reaches destruction only after save or the explicit discard confirmation.
 	if a.dirty && !a.discard_allowed { a.save() }
+	a.clear_history()
 	a.free_items()
 	for index in 0 .. notes_limit {
 		unsafe { a.actions[index].free() }

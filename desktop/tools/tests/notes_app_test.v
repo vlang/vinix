@@ -470,3 +470,256 @@ fn test_notes_conflicting_close_export_retry_and_new_edits_revoke_discard_permis
 	assert check.items[0].title == 'Newer' && check.items[0].body == 'stored'
 	check.close_app()
 }
+
+fn test_notes_history_restores_atomic_utf8_pastes_title_body_cursor_and_focus() {
+	home := notes_test_home('history-fields')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	assert !a.can_undo() && !a.can_redo()
+	a.paste_input('日本語 title')
+	assert a.history_count == 1
+	a.focus_field(2)
+	a.paste_input('日😀\nРусский')
+	assert a.history_count == 2
+	a.key_input('\x1b[H')
+	previous_cursor := a.cursor
+	a.key_input('X')
+	assert a.history_count == 3
+	a.key_input('\x1a')
+	assert editor_bytes_text(a.body) == '日😀\nРусский'
+	assert a.cursor == previous_cursor && a.focus == 2 && a.can_redo()
+	a.key_input('\x1a')
+	assert a.body.len == 0 && a.focus == 2 && a.cursor == 0
+	a.handle('notes.undo')!
+	assert editor_bytes_text(a.title) == tr('notes.untitled') && a.focus == 1 && a.select_all
+	assert !a.can_undo() && a.can_redo()
+	a.handle('notes.redo')!
+	assert editor_bytes_text(a.title) == '日本語 title' && a.focus == 2
+	a.key_input('\x19\x19')
+	assert editor_bytes_text(a.body) == '日😀\nXРусский' && !a.can_redo()
+	a.close_app()
+}
+
+fn test_notes_history_has_32_shared_slots_and_real_edits_alone_invalidate_redo() {
+	home := notes_test_home('history-bound')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	a.focus_field(2)
+	for _ in 0 .. 40 { a.key_input('日') }
+	assert a.history_count == notes_history_limit && a.history_position == notes_history_limit
+	for _ in 0 .. notes_history_limit { a.restore_history(false) }
+	assert a.body.len == 8 * 3 && !a.can_undo() && a.can_redo()
+	for _ in 0 .. notes_history_limit { a.restore_history(true) }
+	assert a.body.len == 40 * 3 && a.can_undo() && !a.can_redo()
+	a.restore_history(false)
+	position := a.history_position
+	a.paste_input('')
+	a.key_input('\x1b[F')
+	a.key_input('\x1b[3~') // Navigation and deleting past the end leave history intact.
+	a.paste_input('\xff')
+	oversize := 'x'.repeat(notes_body_limit + 1)
+	a.paste_input(oversize)
+	unsafe { oversize.free() }
+	assert a.history_position == position && a.can_redo()
+	a.key_input('\x01')
+	same := editor_bytes_text(a.body).clone()
+	a.paste_input(same)
+	unsafe { same.free() }
+	assert a.history_position == position && a.can_redo()
+	a.focus_field(0)
+	a.paste_input('日')
+	a.focus_field(3)
+	a.key_input('z\x7f')
+	assert a.history_position == position && a.can_redo()
+	a.focus_field(2)
+	a.key_input('X')
+	assert a.history_count == notes_history_limit && !a.can_redo()
+	a.restore_history(false)
+	assert a.body.len == 39 * 3
+	a.close_app()
+}
+
+fn test_notes_history_selection_forward_delete_and_backspace_are_utf8_edits() {
+	home := notes_test_home('history-delete')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	a.focus_field(2)
+	a.paste_input('日😀')
+	a.key_input('\x1b[D')
+	a.key_input('\x1b[3~')
+	assert editor_bytes_text(a.body) == '日' && a.cursor == 3
+	a.restore_history(false)
+	assert editor_bytes_text(a.body) == '日😀' && a.cursor == 3
+	a.restore_history(true)
+	a.key_input('\x7f')
+	assert a.body.len == 0 && a.cursor == 0
+	a.restore_history(false)
+	assert editor_bytes_text(a.body) == '日' && a.cursor == 3
+	a.key_input('\x01')
+	a.paste_input('😀\nreplacement')
+	a.restore_history(false)
+	assert editor_bytes_text(a.body) == '日' && a.select_all && a.cursor == 3
+	a.restore_history(true)
+	a.key_input('\x01\x7f')
+	assert a.body.len == 0
+	a.restore_history(false)
+	assert editor_bytes_text(a.body) == '😀\nreplacement' && a.select_all
+	a.restore_history(true)
+	count := a.history_count
+	a.backspace(false)
+	a.backspace(true)
+	assert a.history_count == count && !a.can_redo()
+	a.close_app()
+}
+
+fn test_notes_history_survives_autosave_failed_save_and_revokes_close_discard_choice() {
+	home := notes_test_home('history-save')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	notes_test_edit(mut a, 'Saved', '日😀')
+	assert a.poll_at(a.last_edit + notes_autosave_ms) && !a.dirty && a.history_count == 2
+	a.restore_history(false)
+	assert a.dirty && a.body.len == 0
+	assert a.poll_at(a.last_edit + notes_autosave_ms) && !a.dirty && a.can_redo()
+	a.restore_history(true)
+	assert editor_bytes_text(a.body) == '日😀' && a.save()
+	a.focus_field(1)
+	a.key_input('\x01\x7f')
+	assert !a.prepare_close() && a.status == 'notes.title_required'
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	assert a.discard_allowed
+	a.key_input('\x1a')
+	assert !a.discard_allowed && !a.close_requested && editor_bytes_text(a.title) == 'Saved'
+	assert a.prepare_close() && a.can_redo()
+	a.key_input('\x19')
+	assert !a.prepare_close() && a.dirty
+	a.handle('notes.discard')!
+	a.handle('notes.confirm_discard')!
+	a.close_app()
+	mut check := new_notes_app(home)
+	assert check.items[0].title == 'Saved' && check.items[0].body == '日😀'
+	assert !check.can_undo() && !check.can_redo()
+	check.close_app()
+}
+
+fn test_notes_history_blocked_operations_preserve_it_successful_note_changes_clear_it() {
+	home := notes_test_home('history-conflict')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	notes_test_edit(mut a, 'First', 'one')
+	assert a.save()
+	a.new_note()
+	assert a.history_count == 0
+	notes_test_edit(mut a, 'Second', 'two')
+	assert a.save()
+	a.select_note(0)
+	assert a.history_count == 0
+	a.key_input('draft')
+	mut newer := new_notes_app(home)
+	newer.focus_field(2)
+	newer.paste_input('newer')
+	assert newer.save()
+	count := a.history_count
+	assert !a.save() && a.status == 'notes.conflict'
+	a.select_note(1)
+	a.new_note()
+	a.delete_note()
+	a.reload()
+	assert a.selected == 0 && a.count == 2 && a.history_count == count
+	a.restore_history(false)
+	assert a.can_redo() && !a.save()
+	a.close_app()
+	newer.close_app()
+	mut b := new_notes_app(home)
+	b.focus_field(2)
+	b.paste_input('changed')
+	assert b.save() && b.history_count == 1
+	b.select_note(0)
+	assert b.history_count == 1 // Selecting the same note preserves history.
+	b.reload()
+	assert b.history_count == 0
+	b.focus_field(2)
+	b.paste_input('changed again')
+	assert b.save()
+	b.delete_note()
+	assert b.history_count == 1 && b.delete_pending
+	b.delete_note()
+	assert b.history_count == 0 && b.count == 1 && b.selected == 0
+	b.close_app()
+}
+
+fn test_notes_history_buttons_reflect_both_directions_at_default_compact_and_tiny_sizes() {
+	home := notes_test_home('history-layout')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	for size in [ui2.rect(0, 0, 820, 576), ui2.rect(0, 0, 500, 300), ui2.rect(0, 0, 500, 242), ui2.rect(0, 0, 180, 96)]! {
+		for state in 0 .. 3 {
+			if state == 1 { a.paste_input('Changed') }
+			if state == 2 { a.restore_history(false) }
+			begin_frame_elements()
+			tree := a.build(size)!
+			mut seen := 0
+			for control in tree.children {
+				if control.id !in ['notes.undo', 'notes.redo'] { continue }
+				seen++
+				assert control.enabled == (if control.id == 'notes.undo' { a.can_undo() } else { a.can_redo() })
+				assert control.frame.x >= 0 && control.frame.y >= 0
+				assert control.frame.width > 0 && control.frame.height > 0
+				assert control.frame.x + control.frame.width <= size.width
+				assert control.frame.y + control.frame.height <= size.height
+			}
+			assert seen == 2
+			free_tree(tree)
+		}
+		a.clear_history()
+		a.load_selected(0)
+		a.focus_field(1)
+		a.select_all = true
+	}
+	a.close_app()
+}
+
+fn test_notes_tiny_history_view_keeps_explicit_failed_save_close_choices_accessible() {
+	home := notes_test_home('history-tiny-close')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	assert a.save()
+	a.focus_field(1)
+	a.key_input('\x01\x7f')
+	assert !a.prepare_close()
+	for size in [ui2.rect(0, 0, 180, 96), ui2.rect(0, 0, 500, 242), ui2.rect(0, 0, 600, 300)]! {
+		assert !a.prepare_close()
+		for confirming in [false, true]! {
+			if confirming { a.handle('notes.discard')! }
+			begin_frame_elements()
+			tree := a.build(size)!
+			mut keep := false
+			mut discard := false
+			mut confirm := false
+			for control in tree.children {
+				keep = keep || control.id == 'notes.keep_editing'
+				discard = discard || control.id == 'notes.discard'
+				confirm = confirm || control.id == 'notes.confirm_discard'
+				assert control.frame.x >= 0 && control.frame.y >= 0
+				assert control.frame.width > 0 && control.frame.height > 0
+				assert control.frame.x + control.frame.width <= size.width
+				assert control.frame.y + control.frame.height <= size.height
+			}
+			assert keep && discard && confirm == confirming
+			free_tree(tree)
+		}
+	}
+	a.handle('notes.keep_editing')!
+	assert !a.close_requested && !a.discard_allowed && a.dirty
+	a.key_input('\x1a')
+	assert a.prepare_close() && !a.dirty
+	a.close_app()
+}

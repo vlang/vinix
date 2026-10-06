@@ -169,6 +169,9 @@ fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep
 	begin_frame_elements()
 	close_warm := a.build(ui2.rect(0, 0, 820, 576))!
 	free_tree(close_warm)
+	begin_frame_elements()
+	small_warm := a.build(ui2.rect(0, 0, 180, 96))!
+	free_tree(small_warm)
 	a.handle('notes.keep_editing')!
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
@@ -178,6 +181,9 @@ fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep
 		tree := a.build(ui2.rect(0, 0, 820, 576))!
 		free_tree(tree)
 		a.handle('notes.confirm_discard')!
+		begin_frame_elements()
+		small := a.build(ui2.rect(0, 0, 180, 96))!
+		free_tree(small)
 		assert a.prepare_close() && a.discard_allowed
 		a.focus_field(2)
 		a.paste_input('日😀')
@@ -191,5 +197,131 @@ fn test_notes_repeated_denied_close_confirmation_editing_frames_and_cleanup_keep
 	a.handle('notes.discard')!
 	a.handle('notes.confirm_discard')!
 	a.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_notes_maximum_history_eviction_buffer_swaps_branching_and_idempotent_close_keep_zero_bytes() {
+	home := notes_heap_home('history-maximum')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut text := []u8{len: notes_body_limit, init: `x`}
+	defer { unsafe { text.free() } }
+	C.vinix_heap_begin()
+	for _ in 0 .. 20 {
+		mut a := new_notes_app(home)
+		if a.count == 0 { a.new_note() }
+		a.focus_field(2)
+		for index in 0 .. 40 {
+			text[0] = if index % 2 == 0 { `a` } else { `b` }
+			a.key_input('\x01')
+			a.paste_input(editor_bytes_text(text))
+		}
+		assert a.history_count == notes_history_limit && a.body.len == notes_body_limit
+		for _ in 0 .. notes_history_limit { a.restore_history(false) }
+		assert !a.can_undo() && a.can_redo()
+		for _ in 0 .. notes_history_limit { a.restore_history(true) }
+		assert a.can_undo() && !a.can_redo()
+		for _ in 0 .. 10 { a.restore_history(false) }
+		a.key_input('\x01')
+		a.paste_input('Branch 日😀')
+		assert !a.can_redo()
+		assert a.poll_at(a.last_edit + notes_autosave_ms)
+		a.close_app()
+		a.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_notes_history_repeated_undo_redo_autosave_and_successful_scope_changes_release_all_snapshots() {
+	home := notes_heap_home('history-scope')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	mut a := new_notes_app(home)
+	a.new_note()
+	a.focus_field(2)
+	a.paste_input('日😀\nfirst')
+	assert a.save()
+	for size in [ui2.rect(0, 0, 820, 576), ui2.rect(0, 0, 500, 300), ui2.rect(0, 0, 180, 96)]! {
+		begin_frame_elements()
+		warm := a.build(size)!
+		free_tree(warm)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 80 {
+		a.focus_field(2)
+		a.key_input('\x01')
+		a.paste_input('changed\n日本語😀')
+		for _ in 0 .. 10 {
+			a.key_input('\x1a\x19')
+			assert editor_bytes_text(a.body) == 'changed\n日本語😀'
+		}
+		assert a.poll_at(a.last_edit + notes_autosave_ms)
+		a.new_note()
+		assert a.history_count == 0
+		a.focus_field(2)
+		a.paste_input('Second draft')
+		assert a.save()
+		a.select_note(0)
+		assert a.history_count == 0
+		a.focus_field(2)
+		a.key_input('X')
+		assert a.save()
+		a.reload()
+		assert a.history_count == 0
+		a.select_note(1)
+		a.focus_field(1)
+		a.key_input('\x01')
+		a.paste_input('Delete me')
+		assert a.save()
+		a.delete_note()
+		a.delete_note()
+		assert a.history_count == 0 && a.count == 1
+		begin_frame_elements()
+		tree := a.build(ui2.rect(0, 0, 820, 576))!
+		free_tree(tree)
+	}
+	a.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_notes_history_rejected_edits_and_failed_conflicting_store_actions_keep_zero_bytes() {
+	home := notes_heap_home('history-failed')
+	defer { os.rmdir_all(home) or {}; unsafe { home.free() } }
+	oversize := 'x'.repeat(notes_body_limit + 1)
+	defer { unsafe { oversize.free() } }
+	mut first := new_notes_app(home)
+	first.new_note()
+	assert first.save()
+	first.new_note()
+	assert first.save()
+	first.select_note(0)
+	C.vinix_heap_begin()
+	for _ in 0 .. 40 {
+		mut stale := new_notes_app(home)
+		first.focus_field(2)
+		first.paste_input('日')
+		assert first.save()
+		stale.focus_field(2)
+		stale.paste_input('Draft 😀')
+		stale.paste_input('second')
+		stale.restore_history(false)
+		count := stale.history_count
+		position := stale.history_position
+		stale.paste_input('\xff')
+		stale.paste_input(oversize)
+		assert stale.history_count == count && stale.history_position == position && stale.can_redo()
+		assert !stale.save()
+		stale.select_note(1)
+		stale.new_note()
+		stale.delete_note()
+		stale.reload()
+		assert stale.history_count == count && stale.history_position == position && stale.selected == 0
+		stale.key_input('\x19')
+		assert !stale.prepare_close()
+		stale.handle('notes.discard')!
+		stale.handle('notes.confirm_discard')!
+		stale.key_input('\x1a')
+		assert !stale.discard_allowed
+		stale.close_app()
+	}
+	first.close_app()
 	assert C.vinix_heap_end() == 0
 }
