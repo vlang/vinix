@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`ac285e4208116510d66a7ecb1eda75a40f495acc`. Re-read HEAD, `AGENTS.md` and
+`bbf1e243e21ab58b46a4853c0e88383ff45b290a`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,9 +28,9 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **7,438 original fixture
-lines** and **248 header implementation lines** (111 desktop, 137 kernel),
-counted separately. Fourteen stack-pointer/syscall boundary lines use instruction-only
+continuation adds **3,251 original production C lines**, **9,655 original fixture
+lines** and **250 header implementation lines** (111 desktop, 139 kernel),
+counted separately. Seventeen stack-pointer/syscall/variadic boundary lines use instruction-only
 assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
@@ -73,12 +73,24 @@ assembly and receive no V algorithm credit.
 | Remaining LinuxKPI kernel fixtures (2,687) | `33be42d7` |
 | x86 console syscall fixture (57) | `b3fdcb83` |
 | Native allocation-tracker guest fixture (58) | `ac285e42` |
+| Random host hooks (29 V; three variadic boundary lines excluded) | `3d667aeb` |
+| SMT native guest (39) | `12854d0f` |
+| Stack diagnostic fixture (55) | `87d95202` |
+| Real protected-frame oracle (57) | `15048510` |
+| Seven standalone LinuxKPI fixtures (199) | `f7ccc132` |
+| Pointer/preemption runtime header policies (2) | `112e18aa` |
+| ANS ext2/platform fixtures (268) | `2a19e1d2` |
+| ANS controller/media original fixture scope (815) | `34e728c4` |
+| SPI/speaker provider consumer repairs (zero extra credit) | `e29fe952` |
+| AGX encoder independent fixture (289) | `083cb12b` |
+| Strict syscall diagnostics (46) | `6f506fd8` |
+| AGX verifier independent fixture (420) | `bbf1e243` |
 
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 204 test paths /
-47,155 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 187 test paths /
+45,282 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -96,18 +108,22 @@ as maintained implementation.
 The shared checkout has coordinated uncommitted work. Re-read diffs and each
 stage's input hashes before continuing; completed commits above are separate:
 
-- LinuxKPI runtime pointer/preemption policies and native compiler-check
-  metadata are being validated. Preserve the complete newly committed
-  `type_min`/`type_max`/overflow/castability constexpr family; it is a separate
-  translation scope. Only the two runtime policy lines earn new algorithm
-  credit in the narrow stage.
-- LinuxKPI host fixtures, the pthread/TLS scheduler model and seven standalone
-  programs are being translated in parallel. Pending modules use `.pending`
-  suffixes until their actual complete independent workloads pass. The frozen
-  compiler ignores V `thread_local` under `-os vinix`; native TLS storage uses
-  instruction/declaration-only architecture assembly, retaining real pthread
-  isolation. Original assertions, failure cases, ownership and deadlines stay
-  intact.
+- Pointer/preemption runtime policies and the seven standalone programs are
+  committed. The broader native constexpr/type family is being represented in
+  checked compiler metadata with zero new V algorithm credit. Preserve all
+  4,099 assertions, single-evaluation/ICE behavior, rejection domains and
+  arbitrary native integer widths. Both fresh debug default kernels booted;
+  the complete compatibility guest is in progress on immutable ELF
+  `8e5a969a929f38418b9d7f65ec21050bc7e701dee1d8e2f29040b7a9265fe15f`.
+- LinuxKPI host fixtures and the pthread/TLS scheduler model passed a complete
+  private true-V ARM sanitizer workload and all original boundary cases.
+  Maintained integration, actual x86 host ABI checks and both native SDK/model
+  guests are in progress. Pending work is not credited. The frozen compiler
+  ignores V `thread_local` under `-os vinix`; native TLS storage retains real
+  pthread isolation. Preserve all original assertions, ownership and deadlines.
+- Speaker and QEMU-core independent fixtures are being ported in bounded
+  stages. ANS and both independent AGX fixtures are committed; native model
+  success does not establish physical hardware operation.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
@@ -120,6 +136,24 @@ Current local cache:
 The older 10,191-line batch cache is
 `/Users/alex/.cache/vinix-c-to-v/batch-next-10k-20261005-220015/`.
 These are machine-local caches; the committed migration document is durable.
+
+The latest independent AGX encoder/verifier scopes passed original-C/V
+sanitizers on actual ARM/x86 hosts and all eight native model guests. All
+73 checks, 16 branch goldens and the verifier's sole explicit calloc/free
+pair remain intact. Strict syscall diagnostics passed original-C/V guests
+on both architectures with PROD=false and strict SMAP/PAN; the failed status
+copy remains retryable. Debug ELF hashes: ARM
+`a10010c78606e25d469728452269c1aa432f553017a104d2cf93e24a2ab53b9a`,
+x86 `a741183dee9ec04a7879a4ab328a506b927e0d61faa850d1b0cdbce5cc95bb78`.
+The protected stack-frame oracle passed real compiler checks on Darwin ARM
+and Rosetta x86; it is a host fixture, with no native musl startup claim.
+ANS retained all 38 model cases and passed original-C/V sanitizers and both
+native guests. Scratch providers omit only eight documented, unexecuted ARM
+hardware bindings, with unchanged exercised algorithms and zero physical
+hardware/x86-production claims. New lifetime boundaries received peer review.
+Local receipts include `agx-{encode,verify}-fixture-validation.json`,
+`syscall-diag-validation.json`, `stack-protector-validation.json`,
+`ans-{ext2,model}-stage-validation.json` and `header-policy-validation.json`.
 
 The final six kernel fixtures passed the complete four-CPU qemu64 LinuxKPI
 guest with exact free-page equality. Tested ELF SHA256:
@@ -328,9 +362,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`ac285e4208116510d66a7ecb1eda75a40f495acc` reports **V 71.45%, C 6.75%**,
-441 C files, 437 Python files and 284 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,388 classified blobs
+`bbf1e243e21ab58b46a4853c0e88383ff45b290a` reports **V 71.68%, C 6.50%**,
+440 C files, 447 Python files and 284 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,435 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

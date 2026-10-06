@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **7,438 original fixture
-lines** and **248 header implementation lines** (111 desktop and 137 kernel).
-A further 14 original stack-pointer/syscall boundary lines now use instruction-only
+**3,251 original production/native-boundary C lines**, **9,655 original fixture
+lines** and **250 header implementation lines** (111 desktop and 139 kernel).
+A further 17 original stack-pointer/syscall/variadic boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
 committed and validated; pending stages are excluded.
@@ -512,6 +512,17 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Remaining six LinuxKPI kernel fixtures | 2,687 | `33be42d7` |
 | Native x86 console syscall fixture | 57 | `b3fdcb83` |
 | Native allocation tracker guest fixture | 58 | `ac285e42` |
+| Random host-hook fixture (V portion; three variadic boundary lines excluded) | 29 | `3d667aeb` |
+| Native SMT policy guest fixture | 39 | `12854d0f` |
+| Stack diagnostic independent fixture | 55 | `87d95202` |
+| Real compiler-protected stack-frame oracle | 57 | `15048510` |
+| Seven standalone LinuxKPI boundary fixtures | 199 | `f7ccc132` |
+| ANS ext2 and platform independent fixtures | 268 | `2a19e1d2` |
+| ANS controller/media original fixture scope | 815 | `34e728c4` |
+| AGX recovered encoder independent fixture | 289 | `083cb12b` |
+| Strict pathname/status-copy diagnostic guest | 46 | `6f506fd8` |
+| AGX verifier/provenance independent fixture | 420 | `bbf1e243` |
+| LinuxKPI pointer/preemption runtime header policies | 2 | `112e18aa` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -577,9 +588,55 @@ SHA256 values are
 `388fa8f702fd5e574610cb326f4e8948b3af669f750a6ac5f4602f72d98f6bdf` (ARM) and
 `38fd754c28595bfc7a9285fea37cac46bf8624a4acdb4e4eb0f120e4ebe370d2` (x86).
 
-At committed source `ac285e4208116510d66a7ecb1eda75a40f495acc`,
+Random host hooks preserve all GP/FP/long-double/overflow-stack variadic
+arguments and native hardware-word state. Original-C/V sanitizer traces and
+521-line native guest traces matched on both architectures. The native variadic
+producer's three original lines receive zero V algorithm credit. SMT guest
+original-C/V runs matched disabled/enabled topology policies on x86; the
+unchanged production topology host test also passed. Stack serial diagnostics
+passed original-C/V sanitizers and four native guest runs. The real canary
+fixture passed actual Darwin ARM and Rosetta x86 protected frames, child exit
+99 and LLVM checks requiring protected/non-inlined frames and unprotected
+initialization/callers. That protected-frame fixture is host-only; no musl
+startup placeholder assertion is claimed.
+
+The seven standalone LinuxKPI fixtures passed both actual host architectures
+under ASan/UBSan and the complete existing host suite. Their 17 native static
+constraints remain intact. Pointer/preemption runtime policies passed 4,099
+assertions on four configurations, both architecture builds/default guests
+and the complete four-CPU compatibility guest with exact free-page equality.
+Its ELF SHA256 is
+`855a3a6d01baaf33b6ae6d22de119bef6a1abdae9ac8d0eeb9ddc63d7d31e839`.
+Native compiler constant/type constraints receive zero algorithm credit.
+
+ANS preserves all 11 ext2 and 27 controller/media cases, including 202 original
+controller assertions. Original-C/V ASan/UBSan output matched; both native model
+guests passed. Only eight documented, unexecuted ARM hardware bindings are
+omitted in scratch providers; all exercised controller/media bytes are unchanged.
+This establishes neither physical ANS operation nor production x86 support.
+The transitional include changes are counted once within the frozen original
+fixture scope; the unused native TYPE scaffold earns zero new algorithm credit.
+SPI and speaker consumers now link the V platform provider (`e29fe952`), with
+their original sanitizer workloads passing and zero additional translation credit.
+
+AGX preserves all 16 encoder branch goldens, dense/appended hashes and all 32
+encoder plus 41 verifier checks. Original-C/V ASan/UBSan runs passed on actual
+ARM/x86 host ABIs; all eight native model guests passed. The verifier retains
+one explicit 314-record calloc/free pair; generated output rejects hidden
+allocator calls. Strict syscall diagnostics passed original-C/V guests on both
+architectures with PROD=false and strict SMAP/PAN, retaining EFAULT checks,
+valid stat/statx/getcwd and failed wait4 status-copy followed by retry/exit 37.
+The debug ARM ELF is
+`a10010c78606e25d469728452269c1aa432f553017a104d2cf93e24a2ab53b9a`;
+x86 is `a741183dee9ec04a7879a4ab328a506b927e0d61faa850d1b0cdbce5cc95bb78`.
+An earlier unrelated opt-in boot expired before userspace within the unchanged
+180-second harness window; its logs remain retained. The default debug
+comparison runs passed without changing that window. All new lifetimes
+received independent review.
+
+At committed source `bbf1e243e21ab58b46a4853c0e88383ff45b290a`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 204 test paths / 47,155 lines,
+The non-vendored `.c` census still contains 187 test paths / 45,282 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
 of the repository-wide request. This census is not a translation tally.
@@ -713,8 +770,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`ac285e4208116510d66a7ecb1eda75a40f495acc` reports **V 71.45%, C 6.75%**,
-441 C files, 437 Python files and 284 shell files. All 2,388 classified blob
+`bbf1e243e21ab58b46a4853c0e88383ff45b290a` reports **V 71.68%, C 6.50%**,
+440 C files, 447 Python files and 284 shell files. All 2,435 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include a 17,850,662-byte `desktop/font_data.v` blob;
