@@ -23,3 +23,12 @@ coverage. When available, it creates five VMs, checks all guest GPRs across
 IO/HLT exits and closes each session. `--require-vmx` requires that execution
 marker; use it on an x86 setup with nested VT-x. The local macOS ARM host's
 x86 QEMU TCG setup cannot provide that coverage.
+
+The maintained guest fixture is `guestfixture/core.v`. Its 15 assertions and
+failure line numbers remain those of the original independent C fixture.
+`python3 tests/hypervisor/host-test.py --state-dir /new/isolated/directory`
+compares both versions under ASan/UBSan in 19 success/failure cases. The host
+model checks the complete public ABI sequence and all 15 register values for
+each of five VMs; its Darwin ARM variadic entry uses an instruction-only native
+adapter. These model checks complement the native guest checks and do not
+claim physical VMX execution.

@@ -48,6 +48,8 @@ def main() -> int:
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--qemu", default="qemu-system-aarch64")
     parser.add_argument("--cc", default="clang")
+    parser.add_argument("--sysroot", type=Path, default=Path(os.environ.get(
+        "VINIX_AARCH64_SYSROOT", str(ROOT / "build-aarch64-userland/sysroot"))))
     parser.add_argument("--firmware", type=Path)
     parser.add_argument("--vars-template", type=Path)
     parser.add_argument("--bootloader", type=Path, default=ROOT / "boot-image/limine-bin/BOOTAA64.EFI")
@@ -90,11 +92,19 @@ def main() -> int:
         frozen.mkdir()
         originals = {}
         copies = {}
+        fixture = Path(__file__).with_name("armfixture")
+        fixture_inputs = (("init_source", fixture / "core.v"),
+                          ("init_abi", fixture / "pci-arm-fixture-native-abi.h"),
+                          ("init_syscall", fixture / "syscall3.S"),
+                          ("fixture_generator", ROOT / "tests/kernel-gaps/compile-v-fixture.py"),
+                          ("module_generator", ROOT / "build-support/compile-v-module.py"))
         for name, source in (("kernel", kernel), ("firmware", firmware),
                              ("bootloader", loader), ("vars_template", vars_template),
-                             ("init_source", Path(__file__).with_name("arm_init.c"))):
+                             *fixture_inputs):
             before = digest(source)
-            target = frozen / ("init_source.c" if name == "init_source" else name)
+            target = (frozen / "armfixture" / source.name
+                      if name.startswith("init_") else frozen / name)
+            target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
             if digest(target) != before or digest(source) != before:
                 raise RuntimeError(f"input changed while freezing: {source}")
@@ -109,20 +119,31 @@ def main() -> int:
         for directory in ("sbin", "dev", "proc", "sys", "root", "tmp"):
             (rootfs / directory).mkdir(parents=True)
         obj = state / "arm_init.o"
+        syscall_obj = state / "syscall3.o"
+        generated_source = state / "arm_init.c"
         init = rootfs / "sbin/init"
-        compile_command = [cc, "--target=aarch64-linux-musl", "-std=gnu11", "-O2",
+        compile_command = [cc, "--target=aarch64-linux-musl", f"--sysroot={args.sysroot.resolve()}",
+                           "-std=gnu11", "-O2",
                            "-Wall", "-Wextra", "-Werror", "-nostdlib", "-ffreestanding",
-                           "-fno-stack-protector", "-fno-pie", "-c",
-                           str(copies["init_source"]), "-o", str(obj)]
+                           "-fno-stack-protector", "-fno-pie", "-Wno-unused-function",
+                           "-Wno-unused-parameter", "-I", str(frozen / "armfixture"), "-c",
+                           str(generated_source), "-o", str(obj)]
         link_command = [ld, "-m", "aarch64elf", "--nostdlib", "-static", "-e", "_start",
-                        "--build-id=none", str(obj), "-o", str(init)]
+                        "--build-id=none", str(obj), str(syscall_obj), "-o", str(init)]
 
         def run(command: list[str]) -> None:
             commands.append(command)
             with (state / "preparation.log").open("ab") as log:
                 subprocess.run(command, stdout=log, stderr=log, check=True)
 
+        run([sys.executable, str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"),
+             str(generated_source), "--arch", "aarch64", "--module", str(frozen / "armfixture")])
+        for name, source in fixture_inputs:
+            if digest(source) != digest(copies[name]):
+                raise RuntimeError(f"fixture input changed during generation: {source}")
         run(compile_command)
+        run([cc, "--target=aarch64-linux-musl", "-c", str(copies["init_syscall"]),
+             "-o", str(syscall_obj)])
         run(link_command)
         init.chmod(0o755)
         archive_path = state / "initramfs.tar"
@@ -149,7 +170,8 @@ def main() -> int:
         report["inputs"] = {name: {"path": str(path), "sha256": digest(path)}
                             for name, path in (("kernel", kernel), ("firmware", firmware),
                                                ("bootloader", loader), ("vars_template", vars_template),
-                                               ("init_source", copies["init_source"]),
+                                               *copies.items(),
+                                               ("generated_init_source", generated_source),
                                                ("init", init), ("initramfs", archive_path),
                                                ("limine_conf", conf))}
         report["original_input_paths"] = originals

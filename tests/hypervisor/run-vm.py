@@ -16,7 +16,7 @@ parser.add_argument("--require-vmx", action="store_true",
                     help="fail unless IO/HLT guest execution passed (needs nested VT-x)")
 args = parser.parse_args()
 command = [sys.executable, str(ROOT / "tests/kernel-gaps/run.py"),
-           "--source", str(ROOT / "tests/hypervisor/guest.c"), "--arch", args.arch,
+           "--source", str(ROOT / "tests/hypervisor/guestfixture/core.v"), "--arch", args.arch,
            "--kernel-dir", str(args.kernel_dir), "--timeout", str(args.timeout),
            "--expect", "HYPERVISOR GUEST PASS", "--fail", "HYPERVISOR FAIL:"]
 if args.state_dir:
