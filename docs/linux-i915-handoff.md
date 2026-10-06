@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`15c21a91`** (ordinary faulting scalar reads/stores and serialized x86 user-copy transfers). Recheck HEAD and the worktree before
+Committed implementation baseline: **`0e35bb9a`** (task-owned fault controls, resident-only copies, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -69,7 +69,9 @@ actual x86 CF8/CFC and ARM ECAM transports. Linux PCI device registration,
 bus/device references and GPU binding remain unresolved. Ordinary user-copy
 remaining counts, zero-tail semantics and bounded user-string parsers are now
 implemented, together with ordinary scalar reads and checked serialized x86
-transfers. Ordinary scalar stores are also implemented and validated. The current
+transfers. Ordinary scalar stores, task-local fault-control nesting and resident-only
+atomic copies are implemented and validated. Checked user-write scopes and
+original page-table/UAPI type representations are committed. The current
 native `RangePageSource` already pins backing storage
 and rechecks mapping identity after unlocked acquisition; the earlier proposed
 global fault-lease rewrite was not applied.
@@ -78,6 +80,11 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `0e35bb9a` | Generic checked user-access scopes and `unsafe_put_user` cleanup control flow |
+| `376b5d66` | Genuine typed static-key extern declarations, preserving existing boolean branches |
+| `a88dcea7` | Original page-table/UAPI type representations and five-level-capable compiler profile |
+| `dd1df42f` | Task-owned fault controls, disabled page-in/COW policy and exact resident-only copies |
+| `f1d5860b` | Actual pinned bounds compiler generation, input provenance and native Make dependencies |
 | `15c21a91` | Faulting scalar stores, split-page prefixes, real COW, aligned coherence and measured complete worker lifetimes |
 | `3a38ab99` | Per-invocation optional integer-policy audit adapters with current/older-metadata regression tests |
 | `c3ab77ea` | Fault-zero scalar reads, aligned read coherence and checked serialized x86 page-copy transfers |
@@ -440,8 +447,9 @@ Independent remaining VM work includes mapping publication without a universal
 backing pin and DRM retain/release callbacks under `pagemap.l` that invert the
 virtio file-lock order. Virtio command submission can also demand-fault while
 holding the backing lock. Ordinary copies do not resolve those existing driver
-lock cycles. Scalar stores, atomic/pagefault-disabled, unsafe-scope and WC user-copy
-APIs require separate real implementations.
+lock cycles. Ordinary scalar stores, task-owned fault controls, resident-only
+atomic copies and checked write scopes are now implemented. Noncached user-copy
+validation is in progress; it is not a committed native feature yet.
 
 The 2026-10-06 user-copy validation is isolated at `bea41f8e` with recorded
 feature hashes and a frozen compiler. Host copy/parser checks pass 6,440
@@ -527,12 +535,57 @@ compiler jobs. Invalid metadata rejects before compilation. Verified upstream
 files remain 7,668 unchanged; the full result is **4/269**, expected exit 1:
 `i915_memcpy.c`, `i915_config.c`, `display/intel_qp_tables.c` and
 `i915_user_extensions.c`. The last unit is syntax-only and not linked. Exact
-report: `/tmp/vinix-linuxkpi-audit-generated-oct06-native.json`. Genuine pinned
-`bounds.c` extraction was researched outside the import, but no production
-bounds header/config changes were made: current compatibility configuration
-omits `CONFIG_MMU` despite native paging. Review that contract before accepting
-any generated constants; subsequent missing page types require real ownership
-and address-space implementations.
+report at that milestone: `/tmp/vinix-linuxkpi-audit-generated-oct06-native.json`.
+Bounds generation is now committed in `f1d5860b`: compile the exact pinned
+`kernel/bounds.c` outside the verified import using the actual target, config
+and generated adapters; record compiler/discovered-header hashes and command
+stamps. `CONFIG_MMU=1` matches native paging. The five-level-capable type profile
+is committed in `a88dcea7`, with original UAPI aliases and annotations rather
+than duplicate typedefs. Linux page ownership, PFN/descriptor services and
+runtime geometry globals remain unresolved. Latest frozen syntax report:
+`/tmp/vinix-linuxkpi-compiler-next-oct06-frozen-audit-report.json`, **4/269**,
+expected exit 1. Original page-table types and static-key declarations clear
+prior first errors; 199 units first fail on `rcu_read_lock`, followed by RCU
+pointer APIs, `asm/early_ioremap.h` and `call_single_data_t`.
+
+## Latest task-fault and compiler-scope validation
+
+`dd1df42f` implements task-owned depth with exact compiler barriers, checked
+overflow/underflow and original IRQ-state restoration. New tasks start at zero;
+an actual worker sleeps and migrates while holding depth two. Native missing
+page/COW resolution and kernel trap policy reject disabled scopes before
+allocation. Resident accesses still work. Explicit inatomic copies always
+reject missing/COW pages, preserve exact prefixes and never zero their tails.
+IRQ/NMI/softirq context accounting and exception-table recovery remain pending.
+
+The same enabled ELF SHA256
+`22979f43e8511c33097d69ef8537781da96831814896390bedd8ccc675ea6ce2`
+passes the complete normal rerun and SSE suite, about 1,173/961 seconds. The
+first normal run passed fault-control measurements but failed a later I/O
+fixture; preserve that failed report. Its cause remains unresolved. Three
+full actor-lifecycle warmups precede exact fourth-batch physical/free-heap-class
+recovery. Enabled/default x86 and disabled ARM builds and both default boots
+pass. Host tests pass 433,858 depth assertions plus eight fatal cases and
+9,200 copy assertions per GNU99/GNU11. Final actual generated C and optimized
+objects received independent lifetime reviews. Evidence:
+`/tmp/vinix-linuxkpi-pagefault-oct06-final-validation.json`.
+
+Compiler milestones `a88dcea7`, `376b5d66` and `0e35bb9a` restore original
+complete page/folio/descriptor and entry types, genuine UAPI aliases, typed
+extern static keys and checked user-write scopes. Strict checks exercise both
+include orders, sixteen unchanged scalar aliases on x86/ARM, separate key
+definitions/consumer symbol closure, and 449,253 scope assertions per C
+standard. Independent O0/O1/O2 scope objects preserve end compiler barriers
+and error-label cleanup, without raw STAC/CLAC windows or extra imports.
+Scalar access inherits the native ordinary/resident-only context contract;
+unsafe reads and bulk-copy wrappers remain unresolved.
+
+Saved compiler-profile ELF `065b36cb1af47879fb76b22e0a5f6b62a4a4b3035ee78503afce853fd8610f7d`
+compiles/links. Its native V C and object match the passed fault-control kernel
+byte-for-byte; no full guest boot is claimed for this separately linked ELF.
+Aggregate evidence: `/tmp/vinix-linuxkpi-compiler-next-oct06-final-validation.json`.
+These are scoped runtime/compiler results, not GPU bringup or a global allocation
+pass. Upstream remains unchanged.
 
 ## Bound and high-priority contracts
 
