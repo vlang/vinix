@@ -47,7 +47,7 @@ fn test_calculator_scientific_operations_modes_history_and_errors_release_owned_
 		for index, action in calculator_scientific_actions {
 			app.key_input('c')
 			app.paste_input(['9', '4', '-3', '30', '60', '45', '.5', '.5', '1', '1', '100', '0',
-				'0', '0']![index])
+				'0', '0', '-2', '-8', '8']![index])
 			app.handle(action)!
 		}
 		app.key_input('c2+9')
@@ -198,6 +198,77 @@ fn test_calculator_programmer_complete_init_mode_switch_resize_close_release_own
 		app.handle('calculator.scientific.sqrt')!
 		app.key_input('\x10\x02')
 		assert app.integer.value == calculator_programmer_max
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_calculator_copy_native_requests_acknowledgements_frames_and_close_release_memory() {
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut warm := new_calculator_app()
+	for mode in ['calculator.mode.basic', 'calculator.mode.scientific', 'calculator.mode.programmer']! {
+		warm.handle(mode)!
+		warm.handle('calculator.copy')!
+		for size in [ui2.rect(0, 0, 620, 566), ui2.rect(0, 0, 340, 510), ui2.rect(0, 0, 340, 400)]! {
+			begin_frame_elements()
+			free_tree(warm.build(size)!)
+		}
+	}
+	warm.close_app()
+	unsafe { free(warm) }
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut native := open_native_calculator()
+		mut app := unsafe { &CalculatorApp(native) }
+		for mode in ['calculator.mode.basic', 'calculator.mode.scientific', 'calculator.mode.programmer']! {
+			app.handle(mode)!
+			if app.programmer {
+				app.handle('calculator.programmer.base.hex')!
+				app.paste_input('0xFFFFFFFFFFFFFFFF')
+			} else {
+				app.key_input('c2+')
+				app.paste_input('-12.500')
+			}
+			app.key_input('\x03')
+			old_sequence := app.copy_client.sequence
+			packet := native_app_text_copy_request(mut native)
+			assert packet.len > text_copy_header_size
+			app.handle('calculator.copy')!
+			stale := text_copy_reply(old_sequence, true)
+			native_app_receive_text_copy(mut native, editor_bytes_text(stale))
+			assert app.copy_client.status_key() == 'clipboard.copy.pending'
+			unsafe { stale.free() packet.free() }
+			current := native_app_text_copy_request(mut native)
+			ack := text_copy_reply(app.copy_client.sequence, false)
+			native_app_receive_text_copy(mut native, editor_bytes_text(ack))
+			assert app.copy_client.status_key() == 'clipboard.copy.failed'
+			unsafe { current.free() ack.free() }
+			app.handle('calculator.copy')!
+			accepted := native_app_text_copy_request(mut native)
+			ok := text_copy_reply(app.copy_client.sequence, true)
+			native_app_receive_text_copy(mut native, editor_bytes_text(ok))
+			assert app.copy_client.status_key() == 'clipboard.copy.copied'
+			unsafe { accepted.free() ok.free() }
+			for size in [ui2.rect(0, 0, 620, 566), ui2.rect(0, 0, 340, 510), ui2.rect(0, 0, 340, 400)]! {
+				begin_frame_elements()
+				free_tree(app.build(size)!)
+			}
+			app.key_input('=')
+			if app.programmer {
+				app.key_input('\x1b7/0=\x03')
+			} else {
+				app.key_input('c1/0=\x03')
+			}
+			assert native_app_text_copy_request(mut native).len == 0
+			assert app.copy_client.status_key() == 'clipboard.copy.empty'
+		}
+		app.handle('calculator.mode.basic')!
+		app.key_input('c9\x03')
+		// Closing an undispatched request owns and releases its packet too.
 		app.close_app()
 		app.close_app()
 		unsafe { free(app) }

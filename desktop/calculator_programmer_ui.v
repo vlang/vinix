@@ -47,11 +47,13 @@ fn (app &CalculatorApp) programmer_base_controls(mut children []ui2.Element, wid
 }
 
 fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
-	mut children := frame_elements(64)
+	mut children := frame_elements(66)
 	app.mode_controls(mut children, size.width)
 	available := if size.width > 24 { size.width - 24 } else { f64(0) }
 	compact := size.width < 540 || size.height < 560
 	if compact {
+		app.copy_controls(mut children, ui2.rect(12, 258, 140, 26),
+			ui2.rect(164, 258, size.width - 176, 26))
 		app.programmer_base_controls(mut children, size.width, 46, false)
 		children << ui2.label('', app.integer.text(app.integer.base), ui2.rect(12, 82, available, 42),
 			ui2.TextStyle{ size: if app.integer.base == 2 { 9 } else { 20 }, color: body_heading, align: .right })
@@ -71,6 +73,8 @@ fn (mut app CalculatorApp) build_programmer(size ui2.Rect) ui2.Element {
 		}
 		return ui2.screen(app_surface, children)
 	}
+	app.copy_controls(mut children, ui2.rect(334, 10, 116, 26),
+		ui2.rect(462, 10, size.width - 474, 26))
 	children << ui2.Element{
 		...ui2.label('', tr('calculator.programmer.rules'), ui2.rect(12, 44, available, 18),
 			ui2.TextStyle{ size: 11, color: body_muted })

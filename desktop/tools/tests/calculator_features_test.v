@@ -563,3 +563,191 @@ fn test_calculator_programmer_native_controls_readouts_wire_and_compact_layout()
 	app.handle('calculator.programmer.digit.1')!
 	assert app.integer.value == 1
 }
+
+fn test_calculator_cube_cube_root_log2_domains_and_pending_arithmetic() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.scientific')!
+	app.paste_input('-2')
+	app.handle('calculator.scientific.cube')!
+	assert app.calculator.display == '-8'
+	assert app.history.last().expression == '(-2)^3'
+	app.handle('calculator.scientific.cbrt')!
+	assert math.abs(app.calculator.display.f64() + 2) < 1e-14
+	assert app.history.last().expression == 'cbrt(-8)'
+	app.key_input('c5+8')
+	app.handle('calculator.scientific.log2')!
+	assert app.calculator.display == '3'
+	assert app.history.last().expression == 'log2(8)'
+	app.key_input('==')
+	assert app.calculator.display == '11'
+	app.key_input('c2+')
+	app.paste_input('-8')
+	app.handle('calculator.scientific.cbrt')!
+	app.key_input('==')
+	assert app.calculator.display == '-2'
+	app.key_input('c0')
+	app.handle('calculator.scientific.cbrt')!
+	assert app.calculator.display == '0'
+	for value in ['0', '-1']! {
+		app.key_input('c')
+		app.paste_input(value)
+		before := app.history.len
+		app.handle('calculator.scientific.log2')!
+		assert app.calculator.has_error
+		assert app.scientific_status == 'calculator.error.domain'
+		assert app.history.len == before
+	}
+	app.key_input('c')
+	app.paste_input('1e200')
+	app.handle('calculator.scientific.cube')!
+	assert app.calculator.has_error
+	assert app.scientific_status == 'calculator.error.nonfinite'
+	app.key_input('c')
+	app.paste_input('-1e300')
+	app.handle('calculator.scientific.cbrt')!
+	assert !app.calculator.has_error
+	assert math.abs(app.calculator.display.f64() / -1e100 - 1) < 1e-14
+}
+
+fn test_calculator_copy_snapshots_exact_float_display_without_changing_arithmetic() {
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.key_input('2+')
+	app.paste_input('-12.500')
+	app.key_input('\x03')
+	assert app.calculator.pending_operator == '+'
+	assert app.calculator.accumulator == 2
+	assert app.calculator.display == '-12.500'
+	assert app.history.len == 0
+	app.key_input('=')
+	packet := app.take_clipboard_copy_request()
+	defer { unsafe { packet.free() } }
+	assert console_borrow(editor_bytes_text(packet), text_copy_header_size, packet.len) == '-12.500'
+	assert app.calculator.display == '-10.5'
+	assert app.history.len == 1
+	ack := text_copy_reply(app.copy_client.sequence, true)
+	defer { unsafe { ack.free() } }
+	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
+	assert app.copy_client.status_key() == 'clipboard.copy.copied'
+	app.key_input('=')
+	assert app.calculator.display == '-23'
+	assert app.copy_client.status_key() == ''
+	app.handle('calculator.mode.scientific')!
+	app.key_input('c')
+	app.paste_input('1e-12')
+	app.handle('calculator.mode.basic')!
+	app.handle('calculator.copy')!
+	second := app.take_clipboard_copy_request()
+	defer { unsafe { second.free() } }
+	assert console_borrow(editor_bytes_text(second), text_copy_header_size, second.len) == '1e-12'
+	assert app.history.len == 2
+	app.handle('calculator.mode.scientific')!
+	app.handle('calculator.scientific.pi')!
+	app.key_input('\x03')
+	precise := app.take_clipboard_copy_request()
+	defer { unsafe { precise.free() } }
+	assert console_borrow(editor_bytes_text(precise), text_copy_header_size, precise.len) == '3.14159265358979'
+	assert app.calculator.display == '3.14159265358979'
+}
+
+fn test_calculator_copy_selected_integer_base_errors_and_acknowledgements() {
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.paste_input('18446744073709551615')
+	for index, action in calculator_programmer_base_actions {
+		app.handle(action)!
+		app.key_input('\x03')
+		packet := app.take_clipboard_copy_request()
+		assert console_borrow(editor_bytes_text(packet), text_copy_header_size, packet.len)
+			== ['18446744073709551615', 'FFFFFFFFFFFFFFFF', '1777777777777777777777',
+				'1111111111111111111111111111111111111111111111111111111111111111']![index]
+		unsafe { packet.free() }
+		assert app.integer.value == calculator_programmer_max
+		assert app.integer.history.len == 0
+	}
+	old_ack := text_copy_reply(app.copy_client.sequence, true)
+	defer { unsafe { old_ack.free() } }
+	app.handle('calculator.programmer.base.dec')!
+	app.key_input('\x1b7/0=\x03')
+	assert app.integer.has_error
+	assert app.take_clipboard_copy_request().len == 0
+	assert app.copy_client.status_key() == 'clipboard.copy.empty'
+	app.receive_clipboard_copy_reply(editor_bytes_text(old_ack))
+	assert app.copy_client.status_key() == 'clipboard.copy.empty'
+	app.handle('calculator.mode.basic')!
+	app.key_input('c1/0=')
+	app.handle('calculator.copy')!
+	assert app.calculator.has_error
+	assert app.take_clipboard_copy_request().len == 0
+	app.key_input('c9\x03')
+	packet := app.take_clipboard_copy_request()
+	defer { unsafe { packet.free() } }
+	failed := text_copy_reply(app.copy_client.sequence, false)
+	defer { unsafe { failed.free() } }
+	app.receive_clipboard_copy_reply('malformed')
+	assert app.copy_client.status_key() == 'clipboard.copy.pending'
+	app.receive_clipboard_copy_reply(editor_bytes_text(failed))
+	assert app.copy_client.status_key() == 'clipboard.copy.failed'
+	assert app.calculator.display == '9'
+	app_compositor_features = 0
+	app.handle('calculator.copy')!
+	assert app.copy_client.status_key() == 'clipboard.copy.unavailable'
+	assert app.take_clipboard_copy_request().len == 0
+	assert app.calculator.display == '9'
+}
+
+fn test_calculator_copy_controls_status_and_scientific_rows_fit_native_windows() {
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	for mode in ['calculator.mode.basic', 'calculator.mode.scientific', 'calculator.mode.programmer']! {
+		app.handle(mode)!
+		app.handle('calculator.copy')!
+		for size in [ui2.rect(0, 0, 620, 566), ui2.rect(0, 0, 540, 560),
+			ui2.rect(0, 0, 340, 510), ui2.rect(0, 0, 340, 430), ui2.rect(0, 0, 340, 400)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			copy := calculator_feature_find(tree, 'calculator.copy') or { panic('missing Copy') }
+			assert copy.kind == .button
+			assert copy.text == tr('calculator.copy') || copy.text == tr('clipboard.copy.pending')
+			assert copy.frame.x >= 0 && copy.frame.x + copy.frame.width <= size.width
+			assert copy.frame.y >= 0 && copy.frame.y + copy.frame.height <= size.height
+			if mode == 'calculator.mode.basic' && size.height >= 430 {
+				last_mode := calculator_feature_find(tree, 'calculator.mode.programmer') or { panic('missing Programmer mode') }
+				assert copy.frame.x >= last_mode.frame.x + last_mode.frame.width
+			}
+			status := calculator_feature_find(tree, 'calculator.copy.status') or { panic('missing copy status') }
+			assert status.text == tr('clipboard.copy.pending')
+			assert status.action_id == 'calculator.copy'
+				|| status.frame.x >= copy.frame.x + copy.frame.width || status.frame.y >= copy.frame.y + copy.frame.height
+			if app.scientific && !app.programmer && size.width >= 540 && size.height >= 430 {
+				for action in calculator_scientific_actions {
+					control := calculator_feature_find(tree, action) or { panic('missing scientific operation') }
+					assert control.frame.y + control.frame.height <= 422
+				}
+			}
+			if mode == 'calculator.mode.programmer' && size.width == 620 {
+				assert app.integer.history_rows == 2
+			}
+			mut wire := []u8{cap: 65536}
+			unsafe { wire.flags |= .noslices }
+			encode_app_element(tree, mut wire)!
+			mut reader := WireReader{ data: wire }
+			decoded := decode_app_element(mut reader, 0)!
+			assert calculator_feature_find(decoded, 'calculator.copy') != none
+			free_tree(decoded)
+			free_tree(tree)
+			unsafe { wire.free() }
+		}
+	}
+}

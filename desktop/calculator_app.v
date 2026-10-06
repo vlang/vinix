@@ -23,7 +23,8 @@ const calculator_scientific_actions = ['calculator.scientific.sqrt', 'calculator
 	'calculator.scientific.square', 'calculator.scientific.sin', 'calculator.scientific.cos',
 	'calculator.scientific.tan', 'calculator.scientific.asin', 'calculator.scientific.acos',
 	'calculator.scientific.atan', 'calculator.scientific.ln', 'calculator.scientific.log',
-	'calculator.scientific.exp', 'calculator.scientific.pi', 'calculator.scientific.e']!
+	'calculator.scientific.exp', 'calculator.scientific.pi', 'calculator.scientific.e',
+	'calculator.scientific.cube', 'calculator.scientific.cbrt', 'calculator.scientific.log2']!
 
 struct CalculatorHistoryEntry {
 	expression string
@@ -58,6 +59,7 @@ mut:
 	scientific_status  string
 	programmer         bool
 	integer            CalculatorProgrammer
+	copy_client        TextCopyClient
 }
 
 fn new_calculator_app() &CalculatorApp {
@@ -174,8 +176,10 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 	if app.programmer { return app.build_programmer(size) }
 	if app.calculator.has_error { app.set_display(tr('calculator.error'), false) }
 	if app.scientific && (size.width < 540 || size.height < 430) {
-		mut children := frame_elements(8)
+		mut children := frame_elements(10)
 		app.mode_controls(mut children, size.width)
+		app.copy_controls(mut children, ui2.rect(12, 206, 140, 26),
+			ui2.rect(164, 206, size.width - 176, 26))
 		children << ui2.label('', app.calculator.display, ui2.rect(12, 72, size.width - 24, 46),
 			ui2.TextStyle{ size: 22, color: body_heading, align: .right })
 		children << ui2.label('', tr('calculator.scientific.resize'), ui2.rect(12, 132, size.width - 24, 56),
@@ -200,7 +204,7 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			0
 		}
-		app.panel_y = if size.height >= 430 { 78 } else { 0 }
+		app.panel_y = if size.height >= 430 { 78 } else { 42 }
 		app.layout = build_native_calculator_layout(&app)
 		app.layout_ready = true
 	}
@@ -211,7 +215,12 @@ fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {
 	if size.height >= 430 {
 		return app.with_utility_controls(tree, size)
 	}
-	return tree
+	// Short Basic windows retain their keypad; only the spare header rows are
+	// used so Copy cannot cover either the display or an arithmetic key.
+	mut children := unsafe { tree.children }
+	app.copy_controls(mut children, ui2.rect(12, 10, 140, 26),
+		ui2.rect(164, 10, size.width - 176, 26))
+	return ui2.Element{ ...tree, children: children }
 }
 
 // The ui2 example's immutable display is adapted here with explicit ownership.
@@ -318,7 +327,8 @@ fn calculator_scientific_value(action string, value f64, degrees bool) (f64, str
 	if !math.is_finite(value) { return 0, 'calculator.error.nonfinite' }
 	if (action == 'calculator.scientific.sqrt' && value < 0)
 		|| (action == 'calculator.scientific.reciprocal' && value == 0)
-		|| ((action == 'calculator.scientific.ln' || action == 'calculator.scientific.log') && value <= 0)
+		|| ((action == 'calculator.scientific.ln' || action == 'calculator.scientific.log'
+			|| action == 'calculator.scientific.log2') && value <= 0)
 		|| ((action == 'calculator.scientific.asin' || action == 'calculator.scientific.acos') && math.abs(value) > 1) {
 		return 0, 'calculator.error.domain'
 	}
@@ -330,6 +340,9 @@ fn calculator_scientific_value(action string, value f64, degrees bool) (f64, str
 		'calculator.scientific.sqrt' { math.sqrt(value) }
 		'calculator.scientific.reciprocal' { 1 / value }
 		'calculator.scientific.square' { value * value }
+		'calculator.scientific.cube' { value * value * value }
+		'calculator.scientific.cbrt' { math.cbrt(value) }
+		'calculator.scientific.log2' { math.log2(value) }
 		'calculator.scientific.sin' { math.sin(angle) }
 		'calculator.scientific.cos' { math.cos(angle) }
 		'calculator.scientific.tan' { math.tan(angle) }
@@ -393,6 +406,7 @@ fn (mut app CalculatorApp) scientific_apply(action string) {
 		expression = match action {
 			'calculator.scientific.reciprocal' { '1 / (' + argument + ')' }
 			'calculator.scientific.square' { '(' + argument + ')^2' }
+			'calculator.scientific.cube' { '(' + argument + ')^3' }
 			else { tr(action) + '(' + argument + ')' }
 		}
 		unsafe { argument.free() }
@@ -550,9 +564,15 @@ fn (mut app CalculatorApp) backspace() {
 }
 
 fn (mut app CalculatorApp) key_input(text string) {
+	app.copy_client.clear_status()
 	mut at := 0
 	for at < text.len {
 		ch := text[at]
+		if ch == 0x03 {
+			app.copy_result()
+			at++
+			continue
+		}
 		if ch == 0x10 {
 			app.programmer = !app.programmer
 			at++
@@ -621,6 +641,7 @@ fn (mut app CalculatorApp) key_input(text string) {
 // Pasted text is one numeric operand; control bytes and operators do not run
 // commands. Invalid or non-finite input leaves the calculator unchanged.
 fn (mut app CalculatorApp) paste_input(text string) {
+	app.copy_client.clear_status()
 	if app.programmer {
 		app.integer.paste(text)
 		return
@@ -697,12 +718,12 @@ fn calculator_utility_button(action string, text string, x f64, y f64, width f64
 	}, ui2.TextStyle{ color: body_text, size: 11, align: .center })
 }
 
-fn calculator_mode_button(action string, selected bool, x f64, width f64) ui2.Element {
+fn calculator_mode_button(action string, selected bool, x f64, width f64, font_size int) ui2.Element {
 	return ui2.Element{
 		...ui2.button(action, tr(action), ui2.rect(x, 10, width, 26), ui2.BoxStyle{
 			bg:     if selected { app_accent } else { settings_choice_bg }
 			radius: 5
-		}, ui2.TextStyle{ color: if selected { app_on_accent } else { body_text }, size: 11, align: .center })
+		}, ui2.TextStyle{ color: if selected { app_on_accent } else { body_text }, size: font_size, align: .center })
 		tooltip: tr(if action == 'calculator.mode.programmer' {
 			'calculator.programmer.shortcuts'
 		} else {
@@ -712,14 +733,17 @@ fn calculator_mode_button(action string, selected bool, x f64, width f64) ui2.El
 }
 
 fn (app &CalculatorApp) mode_controls(mut children []ui2.Element, width f64) {
-	available := if width > 36 { width - 36 } else { f64(0) }
-	factor := if available >= 304 { f64(1) } else { available / 304 }
-	children << calculator_mode_button('calculator.mode.basic', !app.scientific && !app.programmer, 12, 72 * factor)
-	children << calculator_mode_button('calculator.mode.scientific', app.scientific && !app.programmer, 18 + 72 * factor, 116 * factor)
-	children << calculator_mode_button('calculator.mode.programmer', app.programmer, 24 + 188 * factor, 116 * factor)
+	compact_basic := !app.scientific && !app.programmer && width < 480
+	available := if width > 42 { width - 42 } else { f64(0) }
+	factor := if compact_basic { available / 444 } else if width >= 340 { f64(1) }
+		else { if width > 36 { (width - 36) / 304 } else { f64(0) } }
+	font_size := if compact_basic { 9 } else { 11 }
+	children << calculator_mode_button('calculator.mode.basic', !app.scientific && !app.programmer, 12, 72 * factor, font_size)
+	children << calculator_mode_button('calculator.mode.scientific', app.scientific && !app.programmer, 18 + 72 * factor, 116 * factor, font_size)
+	children << calculator_mode_button('calculator.mode.programmer', app.programmer, 24 + 188 * factor, 116 * factor, font_size)
 	if app.scientific && !app.programmer && width >= 480 {
-		children << calculator_mode_button('calculator.angle.degrees', app.degrees, width - 124, 54)
-		children << calculator_mode_button('calculator.angle.radians', !app.degrees, width - 64, 54)
+		children << calculator_mode_button('calculator.angle.degrees', app.degrees, width - 124, 54, 11)
+		children << calculator_mode_button('calculator.angle.radians', !app.degrees, width - 64, 54, 11)
 	}
 }
 
@@ -729,6 +753,19 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 	app.mode_controls(mut children, size.width)
 	x := app.panel_x
 	width := app.panel_width
+	compact_basic := !app.scientific && size.width < 480
+	if app.scientific {
+		app.copy_controls(mut children, ui2.rect(x - 248, 42, 232, 26),
+			ui2.rect(x - 140, 86, 124, 24))
+	} else if compact_basic {
+		factor := if size.width > 42 { (size.width - 42) / 444 } else { f64(0) }
+		app.copy_controls(mut children, ui2.rect(30 + 304 * factor, 10, 140 * factor, 26),
+			ui2.rect(0, 0, 0, 0))
+	} else {
+		copy_width := if size.width >= 486 { f64(140) } else { size.width - 346 }
+		app.copy_controls(mut children, ui2.rect(334, 10, copy_width, 26),
+			ui2.rect(12, 42, if x > 24 { x - 24 } else { 0 }, 26))
+	}
 	button_width := (width - 24) / 5
 	for index, action in ['calculator.memory.clear', 'calculator.memory.recall', 'calculator.memory.add',
 		'calculator.memory.subtract', 'calculator.backspace']! {
@@ -738,7 +775,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 	}
 	if app.scientific {
 		left := x - 248
-		children << ui2.label('', tr('calculator.mode.scientific'), ui2.rect(left, 86, 232, 24),
+		children << ui2.label('', tr('calculator.mode.scientific'), ui2.rect(left, 86, 100, 24),
 			ui2.TextStyle{ size: 13, bold: true, color: body_heading })
 		key := if app.scientific_status.len > 0 {
 			app.scientific_status
@@ -759,7 +796,7 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 		}
 		for index, action in calculator_scientific_actions {
 			children << ui2.button(action, tr(action), ui2.rect(left + f64(index % 3) * 80,
-				154 + f64(index / 3) * 52, 72, 44), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
+				154 + f64(index / 3) * 44, 72, 36), ui2.BoxStyle{ bg: settings_choice_bg, radius: 6 },
 				ui2.TextStyle{ size: 13, color: body_text, align: .center })
 		}
 	}
@@ -798,6 +835,11 @@ fn (mut app CalculatorApp) with_utility_controls(tree ui2.Element, size ui2.Rect
 }
 
 fn (mut app CalculatorApp) handle(event_id string) ! {
+	if event_id == 'calculator.copy' {
+		app.copy_result()
+		return
+	}
+	app.copy_client.clear_status()
 	if event_id == 'calculator.mode.programmer' {
 		app.programmer = true
 		return
@@ -906,6 +948,7 @@ fn (mut app CalculatorApp) handle(event_id string) ! {
 }
 
 fn (mut app CalculatorApp) close_app() {
+	app.copy_client.close()
 	app.integer.close()
 	if app.layout_ready {
 		release_compiled_calculator_layout(app.layout)
