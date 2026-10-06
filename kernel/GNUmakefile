@@ -269,7 +269,7 @@ ifeq ($(LINUXKPI),1)
     LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
     LINUXKPI_OBJ += obj/linuxkpi/headercore.o
-    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
     LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)

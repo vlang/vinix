@@ -6,7 +6,9 @@ import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MODULES = ("cachefixture", "i915policyfixture", "pciconfigfixture", "runtimefixture")
+MODULES = ("cachefixture", "i915policyfixture", "pciconfigfixture", "runtimefixture",
+           "taskfixture", "timefixture", "timerfixture", "syncfixture", "wwfixture",
+           "iofixture", "seqfixture")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

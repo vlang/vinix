@@ -52,7 +52,8 @@ CHECK
 # GNU inline semantics keep Darwin libc's external inlines in libc when several
 # separately generated V objects include its headers. Native builds use the
 # kernel's unchanged GNU11/general-register flags.
-for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfixture; do
+for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfixture \
+    taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture; do
     python3 "$repo/tests/linuxkpi/compile-v-fixture.py" "$fixture_module" \
         --host --arch "$native_v_arch" "$work/$fixture_module.c"
     ${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
@@ -64,7 +65,13 @@ for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfix
         -iquote "$repo/kernel/c" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
         -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" -I"$source_dir/drivers/gpu/drm/i915" \
         -c "$work/$fixture_module.c" -o "$work/$fixture_module.o"
+    python3 - "$work/$fixture_module.o" <<'CHECK'
+import re, subprocess, sys
+symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
+assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
+CHECK
 done
+printf '%s\n' 'LinuxKPI: independent V fixtures have no implicit allocator imports'
 ${CC:-clang} -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST \
     -c "$repo/kernel/asm/x86_64/linuxkpi_fixture_abi.S" -o "$work/fixture_storage.o"
 python3 "$repo/tests/linuxkpi/fixture-goldens.py"
@@ -93,7 +100,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
