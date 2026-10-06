@@ -234,6 +234,8 @@ fn test_fonts_draw_every_translated_rune() {
 		}
 		for key, text in desktop_translations[language.code()] {
 			for r in text.runes() {
+				// Compact Grapher help renders catalog line breaks as separate labels.
+				if r == `\n` { continue }
 				if r == ` ` || r == ` ` {
 					continue
 				}

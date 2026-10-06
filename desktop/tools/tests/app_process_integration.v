@@ -68,6 +68,12 @@ fn main() {
 		run_app_process(options)
 		return
 	}
+	if arguments().contains('--prepare-precision-gui') {
+		image := integration_resize_source()
+		defer { unsafe { image.free() } }
+		os.write_file('/tmp/utility-resize-input.png', unsafe { tos(&u8(image.data), image.len) }) or { panic(err) }
+		return
+	}
 	// The same real app/clipboard workflows run inside Vinix without the
 	// host-only zero-deadline pipe timing assertions below.
 	if arguments().contains('--utility-copy-integration') {
@@ -93,6 +99,13 @@ fn main() {
 		desktop_ignore_broken_pipe()
 		mut desktop := Desktop{}
 		check_utility_controls_clients(mut desktop)
+		return
+	}
+	if arguments().contains('--utility-precision-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_precision_clients(mut desktop)
 		return
 	}
 	// Standalone applications receive their pipe descriptors through the
@@ -357,6 +370,7 @@ fn main() {
 	check_utility_document_clients(mut desktop)
 	check_utility_recovery_clients(mut desktop)
 	check_utility_controls_clients(mut desktop)
+	check_utility_precision_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -508,6 +522,223 @@ fn check_utility_controls_clients(mut desktop Desktop) {
 	check_clock_named_timer_client(mut desktop)
 	check_color_meter_client()
 	println('IPC utility controls workflows passed')
+}
+
+fn check_utility_precision_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	base := os.real_path(temporary)
+	pid := os.getpid().str()
+	name := 'vinix-precision-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { temporary.free(); pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_clock_duration_client(mut desktop)
+	check_preview_resize_client(home, mut desktop)
+	check_calculator_precision_client(mut desktop)
+	check_grapher_compact_client(home, mut desktop)
+	println('IPC utility precision workflows passed')
+}
+
+fn integration_element_named(element ui2.Element, id string) ?ui2.Element {
+	if element.id == id || element.action_id == id { return element }
+	for child in element.children {
+		found := integration_element_named(child, id) or { continue }
+		return found
+	}
+	return none
+}
+
+fn integration_assert_calculator_display(mut app NativeApp, expected string) {
+	tree := app.build(ui2.rect(0, 0, 620, 566)) or { panic(err) }
+	display := integration_element_named(tree, 'display') or { panic('missing Calculator display') }
+	assert display.text == expected
+	free_tree(tree)
+}
+
+fn integration_resize_source() []u8 {
+	// Independent PNG: opaque red/half-alpha green, transparent blue/white.
+	// Its bilinear center is premultiplied RGBA (204,153,102,160), not the
+	// straight RGB average that would retain invisible blue in the result.
+	return base64.decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP4z8DwHwgbGMA0EAAAP9cIeY8TiooAAAAASUVORK5CYII=')
+}
+
+fn integration_assert_resize_pixel(path string) {
+	bytes := os.read_bytes(path) or { panic(err) }
+	defer { unsafe { bytes.free() } }
+	mut dimensions := [3]int{}
+	pixels := unsafe { C.stbi_load_from_memory(bytes.data, bytes.len, &dimensions[0], &dimensions[1], &dimensions[2], 4) }
+	assert pixels != unsafe { nil }
+	defer { C.stbi_image_free(pixels) }
+	assert dimensions[0] == 1 && dimensions[1] == 1
+	assert unsafe { pixels[0] == 204 && pixels[1] == 153 && pixels[2] == 102 && pixels[3] == 160 }
+}
+
+fn check_preview_resize_client(home string, mut desktop Desktop) {
+	image := integration_resize_source()
+	defer { unsafe { image.free() } }
+	source := system_information_join_path(home, 'resize-source.png')
+	output := system_information_join_path(home, 'resize-1x1.png')
+	undo := system_information_join_path(home, 'resize-undo.png')
+	redo := system_information_join_path(home, 'resize-redo.png')
+	defer { unsafe { source.free(); output.free(); undo.free(); redo.free() } }
+	os.write_file(source, unsafe { tos(&u8(image.data), image.len) }) or { panic(err) }
+	factory := app_factory_named('vinix-preview') or { panic('Preview is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	storage_remote_field(mut app, preview_action_open_path, source)
+	app.handle(preview_action_open) or { panic(err) }
+	storage_remote_field(mut app, preview_action_resize_width, '1')
+	app.handle(preview_action_resize) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 566), tr('preview.status.resized'))
+	storage_remote_field(mut app, preview_action_export_path, output)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_resize_pixel(output)
+	// A no-op and failed resize must retain the sole Undo state.
+	app.handle(preview_action_resize) or { panic(err) }
+	storage_remote_field(mut app, preview_action_resize_width, '8192')
+	app.handle(preview_action_resize) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 566), tr('preview.status.resize_invalid'))
+	state := app.build(ui2.rect(0, 0, 800, 566)) or { panic(err) }
+	assert integration_tree_enabled(state, preview_action_undo_crop)
+	free_tree(state)
+	app.handle(preview_action_undo_crop) or { panic(err) }
+	storage_remote_field(mut app, preview_action_export_path, undo)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_same_image_pixels(undo, source, 2, 2)
+	app.handle(preview_action_redo_crop) or { panic(err) }
+	storage_remote_field(mut app, preview_action_export_path, redo)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_resize_pixel(redo)
+	app.handle(preview_action_export_png) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 566), tr('preview.status.exists'))
+	integration_assert_resize_pixel(redo)
+	println('IPC Preview alpha-weighted resize, protected export and exact Undo/Redo passed')
+}
+
+fn check_calculator_precision_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('calculator.mode.scientific') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('2.5E-3*4=') }
+	integration_assert_calculator_display(mut app, '0.01')
+	app.handle('C') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('8') }
+	app.handle('calculator.scientific.root') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('3=') }
+	integration_assert_calculator_display(mut app, '2')
+	app.handle('C') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('-8') }
+	app.handle('calculator.scientific.root') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('3=') }
+	integration_assert_calculator_display(mut app, '-2')
+	app.handle('C') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('8') }
+	app.handle('calculator.scientific.root') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('0=') }
+	integration_assert_calculator_display(mut app, tr('calculator.error'))
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 566), tr('calculator.error.domain'))
+	app.handle('C') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('1E=') }
+	integration_assert_calculator_display(mut app, tr('calculator.error'))
+	integration_assert_text(mut app, ui2.rect(0, 0, 620, 566), tr('calculator.error.exponent'))
+	println('IPC Calculator EE arithmetic, odd negative root and domain guards passed')
+}
+
+fn integration_assert_frame_inside(element ui2.Element, width f64, height f64) {
+	assert element.frame.x >= 0 && element.frame.y >= 0
+	assert element.frame.width >= 0 && element.frame.height >= 0
+	assert element.frame.x + element.frame.width <= width
+	assert element.frame.y + element.frame.height <= height
+	for child in element.children {
+		integration_assert_frame_inside(child, element.frame.width, element.frame.height)
+	}
+}
+
+fn check_grapher_compact_client(home string, mut desktop Desktop) {
+	factory := app_factory_named('vinix-grapher') or { panic('Grapher is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	compact := app.build(ui2.rect(0, 0, 320, 340)) or { panic(err) }
+	for child in compact.children { integration_assert_frame_inside(child, 320, 340) }
+	assert integration_element_named(compact, 'grapher.page.graph') != none
+	free_tree(compact)
+	path := system_information_join_path(home, 'compact-graph.png')
+	defer { unsafe { path.free() } }
+	storage_remote_field(mut app, 'grapher.png_path', path)
+	image_page := app.build(ui2.rect(0, 0, 320, 340)) or { panic(err) }
+	assert integration_element_named(image_page, 'grapher.png_path') != none
+	assert integration_element_named(image_page, 'grapher.export_png') != none
+	assert integration_element_named(image_page, 'grapher.expression') == none
+	for child in image_page.children { integration_assert_frame_inside(child, 320, 340) }
+	free_tree(image_page)
+	app.handle('grapher.export_png') or { panic(err) }
+	assert os.exists(path)
+	integration_assert_text(mut app, ui2.rect(0, 0, 320, 340), tr('grapher.png_saved'))
+	if mut app is RemoteApp { app.key_input('\x0c') }
+	graph_page := app.build(ui2.rect(0, 0, 320, 340)) or { panic(err) }
+	assert integration_element_named(graph_page, 'grapher.expression') != none
+	assert integration_element_named(graph_page, 'grapher.png_path') == none
+	free_tree(graph_page)
+	tiny := app.build(ui2.rect(0, 0, 180, 96)) or { panic(err) }
+	for child in tiny.children { integration_assert_frame_inside(child, 180, 96) }
+	assert integration_element_named(tiny, 'grapher.plot') != none
+	free_tree(tiny)
+	println('IPC Grapher compact pages, visible focus, PNG export and tiny geometry passed')
+}
+
+fn check_clock_duration_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-clock') or { panic('Clock is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('clock.tab.timer') or { panic(err) }
+	app.handle('clock.timer.duration') or { panic(err) }
+	storage_remote_field(mut app, 'clock.timer.duration.field', '24:00:01')
+	app.handle('clock.timer.duration.apply') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), tr('clock.timer.duration.invalid'))
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), '00:05:00')
+	storage_remote_field(mut app, 'clock.timer.duration.field', '00:00:07')
+	if mut app is RemoteApp { app.key_input('\r') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), '00:00:07')
+	app.handle('clock.timer.duration') or { panic(err) }
+	storage_remote_field(mut app, 'clock.timer.duration.field', '00:00:02\n')
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), '00:00:07')
+	if mut app is RemoteApp { app.key_input('\x1b') }
+	app.handle('clock.timer.add') or { panic(err) }
+	app.handle('clock.timer.preset.1') or { panic(err) }
+	app.handle('clock.timer.toggle') or { panic(err) }
+	app.handle('clock.timer.select.0') or { panic(err) }
+	app.handle('clock.timer.duration') or { panic(err) }
+	storage_remote_field(mut app, 'clock.timer.duration.field', '00:00:01')
+	draft := app.build(ui2.rect(0, 0, 400, 370)) or { panic(err) }
+	assert !integration_tree_enabled(draft, 'clock.timer.toggle')
+	assert integration_tree_enabled(draft, 'clock.timer.duration.apply')
+	free_tree(draft)
+	app.handle('clock.timer.duration.apply') or { panic(err) }
+	app.handle('clock.timer.toggle') or { panic(err) }
+	running := app.build(ui2.rect(0, 0, 400, 370)) or { panic(err) }
+	assert !integration_tree_enabled(running, 'clock.timer.duration')
+	free_tree(running)
+	app.handle('clock.timer.duration') or { panic(err) }
+	app.handle('clock.timer.select.1') or { panic(err) }
+	desktop_sleep_ms(1100)
+	if mut app is RemoteApp { app.last_poll_ms = 0; app.poll() }
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), tr('clock.timer.finished'))
+	app.handle('clock.timer.select.1') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 400, 370), tr('clock.stop'))
+	println('IPC Clock exact duration validation, cancellation and independent expiry passed')
 }
 
 fn check_grapher_png_client(home string, mut desktop Desktop) {

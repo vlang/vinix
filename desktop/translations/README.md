@@ -29,8 +29,9 @@ them with `i18n.load_tr_map_from_files` and looks text up with `tr()`.
   one, other); Russian gives three (one, few, many: 1 and 21 элемент,
   2–4 элемента, 5–20 элементов). Japanese and Chinese use one form for every
   count, without `|`.
-- Keep entries on one line, and keep them about as short as the English: the
-  desktop's labels have fixed widths.
+- Keep ordinary labels on one line and about as short as the English: the
+  desktop's labels have fixed widths. Compact Grapher help uses three catalog
+  lines, rendered as three separate labels; preserve those line breaks.
 - Product names (Firefox, Wine, QEMU, macOS...) are not translated.
 
 The desktop's fonts carry ASCII, Latin-1, Russian Cyrillic, and the Japanese
