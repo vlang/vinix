@@ -40,7 +40,8 @@ fn preview_status_error(key string) bool {
 	return key in ['preview.status.cannot_open', 'preview.status.source_limit',
 		'preview.status.unsupported', 'preview.status.pdf_unavailable', 'preview.status.cannot_decode',
 		'preview.status.pixel_limit', 'preview.status.surface_failed', 'preview.status.exists',
-		'preview.status.export_failed', 'preview.status.crop_failed']
+		'preview.status.export_failed', 'preview.status.crop_failed',
+		'preview.status.resize_invalid', 'preview.status.resize_failed']
 }
 
 fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
@@ -63,7 +64,7 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 		}
 	}
 	loaded := a.pixels != unsafe { nil }
-	mut children := frame_elements(24)
+	mut children := frame_elements(31)
 	children << preview_button(preview_action_open, 'preview.open', 8, 6, 64, true)
 	children << preview_path_field(preview_action_open_path, 'preview.path.open.placeholder',
 		a.open_path, 80, 6, if width > 88 { width - 88 } else { 1 }, a.focus == .open_path, a.select_all)
@@ -95,6 +96,20 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.label('', tr(if a.tool == .select { 'preview.status.select' } else { 'preview.status.pan' }),
 		ui2.rect(558, 114, if width > 566 { f64(width - 566) } else { 1 }, 28),
 		ui2.TextStyle{color: body_muted, size: 11})
+	children << ui2.label('', tr('preview.resize.width.label'), ui2.rect(8, 150, 58, 28), ui2.TextStyle{color: body_muted, size: 11})
+	children << ui2.label('', tr('preview.resize.height.label'), ui2.rect(140, 150, 64, 28), ui2.TextStyle{color: body_muted, size: 11})
+	children << preview_dimension_field(preview_action_resize_width, 'preview.resize.width.label',
+		a.resize_width.text(), 70, 150, a.focus == .resize_width, a.select_all)
+	children << preview_dimension_field(preview_action_resize_height, 'preview.resize.height.label',
+		a.resize_height.text(), 208, 150, a.focus == .resize_height, a.select_all)
+	lock_button := preview_button(preview_action_resize_lock, 'preview.resize.lock.label', 278, 150, 142, loaded)
+	children << if loaded && a.resize_locked { ui2.Element{...lock_button
+		box: ui2.BoxStyle{bg: catalina_control_accent, radius: 5}
+		text_style: ui2.TextStyle{color: app_on_accent, size: 12, align: .center}
+	} } else { lock_button }
+	children << preview_button(preview_action_resize, 'preview.resize.apply', 426, 150, 112, a.resize_valid())
+	children << ui2.label('', tr('preview.resize.limit'), ui2.rect(546, 150,
+		if width > 554 { f64(width - 554) } else { 1 }, 28), ui2.TextStyle{color: body_muted, size: 11})
 	children << ui2.view('', ui2.rect(0, preview_toolbar_height - 1, size.width, 1), ui2.BoxStyle{ bg: body_rule }, [])
 	mut image := frame_elements(1)
 	if a.surface_image.len > 0 {
@@ -132,4 +147,15 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 		tooltip: tr(a.status_key)
 	}
 	return ui2.screen(app_surface, children)
+}
+
+fn preview_dimension_field(action string, key string, text string, x int, y int,
+	focused bool, select_all bool) ui2.Element {
+	return ui2.Element{
+		...ui2.text_field(action, tr(key), text, ui2.rect(f64(x), f64(y), 62, 28),
+			ui2.BoxStyle{bg: body_panel, radius: 5}, ui2.TextStyle{color: body_text, size: 12}, 0)
+		focused: focused
+		text_selection: ui2.TextSelection{anchor: if focused && select_all { 0 } else { text.len }, caret: text.len}
+		accessibility_label: tr(key)
+	}
 }

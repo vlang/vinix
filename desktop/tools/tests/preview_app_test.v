@@ -454,10 +454,10 @@ fn test_preview_fit_zoom_pan_surfaces_actions_and_idempotent_close() {
 	assert app.pan_x == 0 && app.pan_y == 0
 	app.key_input('\x1b[C')
 	assert app.pan_x == 7
-	app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 8, 1, 200)
-	app.pointer_event(.move, .left, 0, 17, preview_toolbar_height + 8, 1, 200)
+	app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 8, 1, preview_toolbar_height + preview_status_height + 24)
+	app.pointer_event(.move, .left, 0, 17, preview_toolbar_height + 8, 1, preview_toolbar_height + preview_status_height + 24)
 	assert app.pan_x == 0
-	app.pointer_event(.up, .left, 0, 17, preview_toolbar_height + 8, 1, 200)
+	app.pointer_event(.up, .left, 0, 17, preview_toolbar_height + 8, 1, preview_toolbar_height + preview_status_height + 24)
 	assert !app.dragging
 	app.set_zoom(9999)
 	assert app.zoom == 400
@@ -1015,4 +1015,282 @@ fn test_preview_crop_history_restores_each_image_view_and_clamps_to_resized_wind
 	assert app.geometry().left >= 0 && app.geometry().top >= 0
 	assert app.publish_surface()
 	assert app.redo_crop() && app.publish_surface()
+}
+
+fn preview_test_resize(mut app PreviewApp, width int, height int) bool {
+	app.resize_width.set(width)
+	app.resize_height.set(height)
+	return app.apply_resize()
+}
+
+fn test_preview_resize_controls_parse_bound_digits_lock_aspect_and_reject_invalid_paste_atomically() {
+	root := preview_test_root('resize-controls')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	defer { unsafe { path.free() } }
+	pixels := []u8{len: 6 * 4 * 4, init: 255}
+	preview_test_write_image(path, 6, 4, pixels)
+	unsafe { pixels.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	assert !app.apply_resize()
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	assert app.resize_locked && app.resize_width.text() == '6' && app.resize_height.text() == '4'
+	app.handle(preview_action_resize_width)!
+	app.paste_input('12')
+	assert app.resize_width.value() == 12 && app.resize_height.value() == 8
+	app.key_input('\t')
+	assert app.focus == .resize_height && app.select_all
+	app.key_input('3')
+	assert app.resize_height.value() == 3 && app.resize_width.value() == 5
+	before_width := app.resize_width
+	before_height := app.resize_height
+	app.key_input('\x01')
+	for invalid in ['-2', '3.5', '0x10', '2\n', '日本', '10000', '\xff']! {
+		app.paste_input(invalid)
+		assert app.resize_width == before_width && app.resize_height == before_height && app.select_all
+	}
+	app.key_input('x\xe6\x97\xa5')
+	assert app.resize_height == before_height && app.select_all
+	app.paste_input('0')
+	assert app.resize_height.value() == 0 && !app.resize_valid() && !app.apply_resize()
+	assert app.width == 6 && app.height == 4 && app.crop_history.pixels == unsafe { nil }
+	app.handle(preview_action_resize_lock)!
+	assert !app.resize_locked
+	app.focus_field(.resize_width)
+	app.paste_input('2')
+	app.focus_field(.resize_height)
+	app.paste_input('3')
+	assert app.resize_width.value() == 2 && app.resize_height.value() == 3
+	app.key_input('\r')
+	assert app.width == 2 && app.height == 3 && app.focus == .image && app.can_undo_crop()
+	assert app.undo_crop() && app.resize_width.text() == '6' && app.resize_height.text() == '4'
+	app.rotate(1)
+	assert app.resize_width.value() == 4 && app.resize_height.value() == 6
+	app.resize_width.set(8192)
+	app.resize_height.set(1024)
+	assert app.resize_valid()
+	app.resize_height.set(1025)
+	assert !app.resize_valid()
+	app.resize_width = PreviewDimension{bytes: [`9`, `9`, `9`, `9`, 0]!, len: 4}
+	assert !app.resize_valid()
+	app.resize_height = PreviewDimension{bytes: [`1`, `x`, 0, 0, 0]!, len: 2}
+	assert !app.resize_valid()
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 760, 480))!
+	for action in [preview_action_resize_width, preview_action_resize_height,
+		preview_action_resize_lock, preview_action_resize]! {
+		control := preview_test_control(tree, action) or { panic('Missing resize control') }
+		assert control.frame.y == 150 && control.frame.height == 28
+		assert control.frame.x >= 0 && control.frame.x + control.frame.width <= 760
+	}
+	assert !(preview_test_control(tree, preview_action_resize) or { panic('Missing Resize') }).enabled
+	free_tree(tree)
+}
+
+fn test_preview_resize_bilinear_alpha_avoids_transparent_color_halos_and_exports_edited_pixels() {
+	root := preview_test_root('resize-alpha')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	output := files_child_path(root, 'resized.png')
+	original := files_child_path(root, 'original.png')
+	defer { unsafe { path.free(); output.free(); original.free() } }
+	pixels := [u8(255), 0, 0, 255, 0, 0, 255, 0]
+	preview_test_write_image(path, 2, 1, pixels)
+	unsafe { pixels.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	assert preview_test_resize(mut app, 3, 1)
+	expected := [u8(255), 0, 0, 255, 255, 0, 0, 128, 0, 0, 0, 0]!
+	for index, value in expected { assert unsafe { app.pixels[index] } == value }
+	assert app.status_key == 'preview.status.resized' && app.orientation == 1 && app.rotation == 0
+	preview_set_field(mut app.export_path, output)
+	assert app.export_image(false)
+	mut exported := PreviewApp{}
+	defer { exported.close_app() }
+	preview_set_field(mut exported.open_path, output)
+	assert exported.open_image() && exported.width == 3 && exported.height == 1
+	for index, value in expected { assert unsafe { exported.pixels[index] } == value }
+	assert !app.export_image(false) && app.status_key == 'preview.status.exists'
+	preview_set_field(mut app.export_path, original)
+	assert app.export_image(true)
+	original_bytes := os.read_bytes(original)!
+	input_bytes := os.read_bytes(path)!
+	assert original_bytes == input_bytes
+	unsafe { original_bytes.free(); input_bytes.free() }
+	assert app.undo_crop() && app.width == 2 && app.height == 1
+	assert app.status_key == 'preview.status.resize_undone'
+	assert app.redo_crop() && app.status_key == 'preview.status.resize_redone'
+	// Both nonzero alpha values participate in straight-alpha output.
+	assert desktop_unlink(path) == 0
+	partial := [u8(255), 0, 0, 128, 0, 0, 255, 64]
+	preview_test_write_image(path, 2, 1, partial)
+	unsafe { partial.free() }
+	assert app.open_image() && preview_test_resize(mut app, 1, 1)
+	assert unsafe { app.pixels[0] } == 170 && unsafe { app.pixels[1] } == 0
+	assert unsafe { app.pixels[2] } == 85 && unsafe { app.pixels[3] } == 96
+}
+
+fn test_preview_resize_normalizes_all_exif_rotations_and_restores_the_original_view() {
+	root := preview_test_root('resize-orientation')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	defer { unsafe { path.free() } }
+	pixels := [u8(255), 0, 0, 255, 0, 255, 0, 128, 0, 0, 255, 64,
+		255, 255, 0, 255, 0, 255, 255, 64, 255, 0, 255, 128]
+	preview_test_write_image(path, 2, 3, pixels)
+	unsafe { pixels.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	for orientation in 1 .. 9 {
+		for rotation in 0 .. 4 {
+			assert app.open_image()
+			app.orientation = orientation
+			app.rotation = rotation
+			app.set_viewport(1, 1)
+			app.set_zoom(400)
+			app.select_image()
+			before := app.crop_state()
+			width, height := app.oriented_dimensions()
+			corners := [app.pixel_offset(0, 0), app.pixel_offset(width - 1, 0),
+				app.pixel_offset(0, height - 1), app.pixel_offset(width - 1, height - 1)]!
+			assert preview_test_resize(mut app, width * 2, height * 2)
+			assert app.width == width * 2 && app.height == height * 2
+			assert app.orientation == 1 && app.rotation == 0 && !app.selection.active && app.fit
+			output := [0, (app.width - 1) * 4, (app.height - 1) * app.width * 4,
+				(app.height * app.width - 1) * 4]!
+			for index, offset in output {
+				for channel in 0 .. 4 {
+					assert unsafe { app.pixels[offset + channel] } == unsafe { before.pixels[corners[index] + channel] }
+				}
+			}
+			assert app.undo_crop() && app.crop_state() == before
+			assert app.redo_crop() && app.width == width * 2 && app.height == height * 2
+		}
+	}
+}
+
+fn test_preview_resize_failure_invalid_input_and_noop_preserve_undo_redo_selection_and_pixels() {
+	root := preview_test_root('resize-transaction')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	bad := files_child_path(root, 'missing.png')
+	defer { unsafe { path.free(); bad.free() } }
+	preview_test_fixture(path)
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	assert preview_test_resize(mut app, 8, 4)
+	for undone in [false, true]! {
+		if undone { assert app.undo_crop() }
+		app.select_image()
+		before := app.crop_state()
+		history := app.crop_history
+		app.resize_width.set(12)
+		app.resize_height.set(6)
+		assert !app.apply_resize_using(preview_test_fail_crop_allocation)
+		assert app.status_key == 'preview.status.resize_failed'
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+		app.resize_width = PreviewDimension{bytes: [`0`, 0, 0, 0, 0]!, len: 1}
+		assert !app.apply_resize_using(preview_test_fail_crop_allocation)
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+		width, height := app.oriented_dimensions()
+		app.resize_width.set(width)
+		app.resize_height.set(height)
+		assert app.apply_resize_using(preview_test_fail_crop_allocation)
+		assert app.status_key == 'preview.status.resize_unchanged'
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+		preview_set_field(mut app.open_path, bad)
+		assert !app.open_image()
+		assert app.crop_state() == before && app.crop_history == history && app.crop_undone == undone
+	}
+	preview_set_field(mut app.open_path, path)
+	assert app.can_redo_crop()
+	assert preview_test_resize(mut app, 3, 2)
+	assert app.can_undo_crop() && !app.can_redo_crop()
+	assert app.undo_crop() && app.width == 2 && app.height == 1
+	assert app.redo_crop()
+	app.select_image()
+	app.selection.caret_x = 1
+	assert app.apply_crop() && app.crop_edit == .crop
+	assert app.undo_crop() && app.width == 3 && app.height == 2
+	assert app.status_key == 'preview.status.crop_undone'
+	assert app.redo_crop() && app.width == 2 && app.height == 2
+	assert preview_test_resize(mut app, 4, 4) && app.crop_edit == .resize
+	assert app.undo_crop() && app.width == 2 && app.height == 2
+	assert app.open_image() && !app.can_undo_crop() && !app.can_redo_crop()
+	app.close_app()
+	app.close_app()
+}
+
+fn test_preview_resize_extreme_dimensions_preserve_solid_rgba_and_bound_allocation_requests() {
+	root := preview_test_root('resize-limits')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	defer { unsafe { path.free() } }
+	pixel := [u8(34), 67, 91, 128]
+	preview_test_write_image(path, 1, 1, pixel)
+	unsafe { pixel.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	assert preview_test_resize(mut app, 8192, 1)
+	for index in 0 .. 8192 {
+		assert unsafe { app.pixels[index * 4] } == 34
+		assert unsafe { app.pixels[index * 4 + 1] } == 67
+		assert unsafe { app.pixels[index * 4 + 2] } == 91
+		assert unsafe { app.pixels[index * 4 + 3] } == 128
+	}
+	assert preview_test_resize(mut app, 1, 8192)
+	assert unsafe { app.pixels[(8192 - 1) * 4] } == 34
+	assert unsafe { app.pixels[(8192 - 1) * 4 + 3] } == 128
+	before := app.crop_state()
+	history := app.crop_history
+	app.resize_width.set(8192)
+	app.resize_height.set(1024)
+	assert !app.apply_resize_using(preview_test_fail_crop_allocation)
+	assert app.status_key == 'preview.status.resize_failed'
+	assert app.crop_state() == before && app.crop_history == history
+	app.resize_height.set(1025)
+	assert !app.apply_resize_using(preview_test_fail_crop_allocation)
+	assert app.status_key == 'preview.status.resize_invalid'
+	assert app.crop_state() == before && app.crop_history == history
+}
+
+fn test_preview_resize_fields_and_actions_stay_visible_at_supported_sizes_in_every_language() {
+	root := preview_test_root('resize-languages')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	defer { unsafe { path.free() } }
+	preview_test_fixture(path)
+	mut app := PreviewApp{}
+	defer { app.close_app(); set_desktop_language(.en) }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for size in [ui2.rect(0, 0, 800, 566), ui2.rect(0, 0, 666, 320)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			for action in [preview_action_resize_width, preview_action_resize_height,
+				preview_action_resize_lock, preview_action_resize, preview_action_undo_crop, preview_action_redo_crop]! {
+				control := preview_test_control(tree, action) or { panic('Missing resize/history control') }
+				assert control.frame.x >= 0 && control.frame.x + control.frame.width <= size.width
+				assert control.frame.y >= 0 && control.frame.y + control.frame.height < preview_toolbar_height
+				assert control.frame.height == 28 && control.frame.y + control.frame.height < size.height - preview_status_height
+				assert control.accessibility_label.len > 0
+			}
+			assert (preview_test_control(tree, preview_action_resize_width) or { panic('Missing Width') }).text == '2'
+			assert (preview_test_control(tree, preview_action_resize_height) or { panic('Missing Height') }).text == '1'
+			assert (preview_test_control(tree, preview_action_resize) or { panic('Missing Resize') }).enabled
+			assert (preview_test_control(tree, preview_action_resize_lock) or { panic('Missing Aspect Lock') }).box.bg == catalina_control_accent
+			free_tree(tree)
+		}
+	}
 }

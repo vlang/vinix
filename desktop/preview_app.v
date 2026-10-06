@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Preview keeps the decoded image at its original resolution. Only the visible
+// Preview retains image pixels at their edited resolution. Only the visible
 // viewport becomes a compositor surface, so zooming does not allocate an
 // enlarged copy of the image or render pixels outside the window.
 module main
@@ -8,7 +8,7 @@ const preview_max_source = u64(40 * 1024 * 1024)
 const preview_max_pixels = 8 * 1024 * 1024
 const preview_max_dimension = 8192
 const preview_max_path = 1024
-const preview_toolbar_height = 148
+const preview_toolbar_height = 184
 const preview_status_height = 28
 const preview_max_viewport = 2048
 const preview_min_zoom = 10
@@ -32,11 +32,17 @@ const preview_action_crop = 'preview.crop'
 const preview_action_clear_selection = 'preview.selection.clear'
 const preview_action_undo_crop = 'preview.undo'
 const preview_action_redo_crop = 'preview.redo'
+const preview_action_resize_width = 'preview.resize.width'
+const preview_action_resize_height = 'preview.resize.height'
+const preview_action_resize_lock = 'preview.resize.lock'
+const preview_action_resize = 'preview.resize'
 
 enum PreviewFocus {
 	image
 	open_path
 	export_path
+	resize_width
+	resize_height
 }
 
 struct PreviewApp {
@@ -78,6 +84,10 @@ mut:
 	selection          PreviewSelection
 	crop_history       PreviewCropState
 	crop_undone        bool
+	crop_edit          PreviewEdit
+	resize_width       PreviewDimension
+	resize_height      PreviewDimension
+	resize_locked      bool = true
 }
 
 fn open_preview(mut _ Desktop) !NativeApp {
@@ -281,6 +291,7 @@ fn (mut a PreviewApp) open_image() bool {
 	a.surface_dirty = true
 
 	a.refresh_details()
+	a.refresh_resize_fields()
 	a.set_status('preview.status.opened')
 	record_recent_item('vinix-preview', a.loaded_path)
 	return true
@@ -448,6 +459,7 @@ fn (mut a PreviewApp) rotate(delta int) {
 	if a.pixels == unsafe { nil } { return }
 	a.reset_selection()
 	a.rotation = (a.rotation + delta + 4) % 4
+	a.refresh_resize_fields()
 	a.center_pan()
 	a.surface_dirty = true
 	a.refresh_details()

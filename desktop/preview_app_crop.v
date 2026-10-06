@@ -29,7 +29,7 @@ struct PreviewCropRect {
 	height int
 }
 
-// One alternate image owns its buffer independently of the active image.
+// Crop and resize share one alternate image buffer, owned independently of the active image.
 // Original file bytes and paths stay in PreviewApp, shared by both states.
 // Viewport size belongs to the current window; restored pan is clamped to it.
 struct PreviewCropState {
@@ -103,13 +103,14 @@ fn (mut a PreviewApp) swap_crop_state() {
 	a.clamp_pan()
 	a.surface_dirty = true
 	a.refresh_details()
+	a.refresh_resize_fields()
 }
 
 fn (mut a PreviewApp) undo_crop() bool {
 	if !a.can_undo_crop() { return false }
 	a.swap_crop_state()
 	a.crop_undone = true
-	a.status_key = 'preview.status.crop_undone'
+	a.status_key = if a.crop_edit == .resize { 'preview.status.resize_undone' } else { 'preview.status.crop_undone' }
 	return true
 }
 
@@ -117,7 +118,7 @@ fn (mut a PreviewApp) redo_crop() bool {
 	if !a.can_redo_crop() { return false }
 	a.swap_crop_state()
 	a.crop_undone = false
-	a.status_key = 'preview.status.crop_redone'
+	a.status_key = if a.crop_edit == .resize { 'preview.status.resize_redone' } else { 'preview.status.crop_redone' }
 	return true
 }
 
@@ -252,7 +253,7 @@ fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
 		return false
 	}
 	// The bounded dimensions guarantee at most 32 MiB and no multiplication
-// overflow. A failed allocation preserves pixels, selection and source bytes.
+	// overflow. A failed allocation preserves pixels, selection and source bytes.
 	length := usize(rect.width * rect.height * 4)
 	pixels := allocate(length)
 	if pixels == unsafe { nil } {
@@ -273,6 +274,7 @@ fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
 	// are at most two 32 MiB pixel buffers, plus the unchanged source bytes.
 	a.release_crop_history()
 	a.crop_history = a.crop_state()
+	a.crop_edit = .crop
 	a.pixels = pixels
 	a.pixels_from_crop = true
 	a.width = rect.width
@@ -286,6 +288,7 @@ fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
 	a.pan_y = 0
 	a.surface_dirty = true
 	a.refresh_details()
+	a.refresh_resize_fields()
 	a.status_key = 'preview.status.cropped'
 	return true
 }

@@ -321,14 +321,112 @@ fn test_preview_selection_mapping_and_cancellation_repeatedly_allocate_nothing()
 	C.vinix_heap_begin()
 	for _ in 0 .. 2000 {
 		app.set_tool(.select)
-		app.pointer_event(.down, .left, 0, 280, preview_toolbar_height + 140, 800, 576)
+		app.pointer_event(.down, .left, 0, 280, preview_toolbar_height + 140, 800, preview_toolbar_height + preview_status_height + 400)
 		assert app.selection.active
-		app.pointer_event(.move, .left, 0, 479, preview_toolbar_height + 219, 800, 576)
-		app.pointer_event(.up, .left, 0, 479, preview_toolbar_height + 219, 800, 576)
+		app.pointer_event(.move, .left, 0, 479, preview_toolbar_height + 219, 800, preview_toolbar_height + preview_status_height + 400)
+		app.pointer_event(.up, .left, 0, 479, preview_toolbar_height + 219, 800, preview_toolbar_height + preview_status_height + 400)
 		assert app.crop_rect() == PreviewCropRect{left: 20, top: 10, width: 50, height: 20}
 		assert !app.apply_crop_using(preview_heap_fail_crop_allocation)
 		app.key_input('\x1b')
 		assert !app.selection.active
 	}
 	assert C.vinix_heap_end() == 0
+}
+
+fn test_preview_resize_repeated_edit_history_alpha_export_frames_and_close_release_all_allocations() {
+	root := os.join_path(os.temp_dir(), 'vinix-preview-resize-heap-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	output := files_child_path(root, 'resized.png')
+	defer { unsafe { path.free(); output.free() } }
+	writer_pixels := []u8{len: 8 * 6 * 4, init: u8(index % 256)}
+	writer := PreviewApp{width: 8, height: 6, pixels: writer_pixels.data}
+	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL, 0o600)
+	assert fd >= 0 && writer.write_png(fd) && desktop_close(fd) == 0
+	unsafe { writer_pixels.free() }
+	mut warm := PreviewApp{}
+	preview_set_field(mut warm.open_path, path)
+	assert warm.open_image()
+	begin_frame_elements()
+	free_tree(warm.build(ui2.rect(0, 0, 760, 480))!)
+	warm.close_app()
+	C.vinix_heap_begin()
+	for cycle in 0 .. 150 {
+		mut app := PreviewApp{}
+		preview_set_field(mut app.open_path, path)
+		assert app.open_image()
+		app.orientation = cycle % 8 + 1
+		app.rotation = cycle % 4
+		app.focus_field(.resize_width)
+		app.paste_input('12')
+		assert app.resize_valid()
+		assert app.apply_resize()
+		for _ in 0 .. 8 {
+			assert app.undo_crop() && app.can_redo_crop()
+			assert app.redo_crop() && app.can_undo_crop()
+		}
+		app.select_image()
+		before := app.crop_state()
+		history := app.crop_history
+		app.resize_width.set(4)
+		app.resize_height.set(3)
+		assert !app.apply_resize_using(preview_heap_fail_crop_allocation)
+		assert app.crop_state() == before && app.crop_history == history
+		assert app.apply_resize()
+		assert app.undo_crop()
+		app.resize_width.set(6)
+		app.resize_height.set(4)
+		assert app.apply_resize() && !app.can_redo_crop()
+		app.select_image()
+		app.selection.caret_x = 3
+		assert app.apply_crop()
+		app.resize_width.set(8)
+		app.resize_height.set(5)
+		assert app.apply_resize()
+		preview_set_field(mut app.export_path, output)
+		assert app.export_image(false) && desktop_unlink(output) == 0
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 760, 480))!)
+		assert app.open_image() && !app.can_undo_crop() && !app.can_redo_crop()
+		app.resize_width.set(3)
+		app.resize_height.set(2)
+		assert app.apply_resize()
+		if cycle & 1 == 0 { assert app.undo_crop() }
+		app.close_app()
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_preview_resize_inline_numeric_edits_validation_noops_and_failed_allocations_retain_nothing() {
+	pixels := []u8{len: 6 * 4 * 4}
+	defer { unsafe { pixels.free() } }
+	mut app := PreviewApp{width: 6, height: 4, pixels: pixels.data}
+	app.refresh_resize_fields()
+	C.vinix_heap_begin()
+	for _ in 0 .. 10000 {
+		app.focus_field(.resize_width)
+		app.paste_input('12')
+		assert app.resize_width.value() == 12 && app.resize_height.value() == 8
+		app.key_input('\x01')
+		app.paste_input('4.5')
+		assert app.resize_width.value() == 12 && app.select_all
+		assert !app.apply_resize_using(preview_heap_fail_crop_allocation)
+		app.key_input('6')
+		assert app.resize_width.value() == 6 && app.resize_height.value() == 4
+		assert app.apply_resize_using(preview_heap_fail_crop_allocation)
+		assert app.pixels == pixels.data && app.crop_history.pixels == unsafe { nil }
+		app.key_input('\t\x01')
+		app.key_input('0')
+		assert !app.apply_resize_using(preview_heap_fail_crop_allocation)
+		app.key_input('\x01' + '4')
+		assert app.resize_valid()
+		app.key_input('\x7f')
+		assert !app.resize_valid()
+		app.resize_height.set(4)
+	}
+	assert C.vinix_heap_end() == 0
+	// The synthetic pixels are borrowed by this test, not owned by Preview.
+	app.pixels = unsafe { nil }
 }

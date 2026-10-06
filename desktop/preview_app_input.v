@@ -21,6 +21,10 @@ fn (mut a PreviewApp) field_character(length int) {
 }
 
 fn (mut a PreviewApp) field_ascii(ch u8) {
+	if a.focus == .resize_width || a.focus == .resize_height {
+		a.resize_key(ch)
+		return
+	}
 	mut field := if a.focus == .open_path { &a.open_path } else { &a.export_path }
 	unsafe { field.flags |= .noslices }
 	if ch == 0x01 {
@@ -71,7 +75,7 @@ fn (mut a PreviewApp) key_input(input string) {
 				a.pending[a.pending_len] = ch
 				a.pending_len++
 				if a.pending_len == editor_utf8_length(a.pending[0]) {
-					if a.focus != .image { a.field_character(a.pending_len) }
+					if a.focus == .open_path || a.focus == .export_path { a.field_character(a.pending_len) }
 					a.pending_len = 0
 				}
 				index++
@@ -150,6 +154,10 @@ fn (mut a PreviewApp) key_input(input string) {
 fn (mut a PreviewApp) paste_input(input string) {
 	if a.focus == .image || input.len == 0 { return }
 	a.pending_len = 0
+	if a.focus == .resize_width || a.focus == .resize_height {
+		a.resize_paste(input)
+		return
+	}
 	mut field := if a.focus == .open_path { &a.open_path } else { &a.export_path }
 	existing_length := if a.select_all { 0 } else { field.len }
 	if existing_length + input.len > preview_max_path { return }
@@ -200,6 +208,10 @@ fn (mut a PreviewApp) handle(action string) ! {
 		preview_action_open { a.open_image() }
 		preview_action_open_path { a.focus_field(.open_path) }
 		preview_action_export_path { a.focus_field(.export_path) }
+		preview_action_resize_width { a.focus_field(.resize_width) }
+		preview_action_resize_height { a.focus_field(.resize_height) }
+		preview_action_resize_lock { a.toggle_resize_lock() }
+		preview_action_resize { a.apply_resize() }
 		preview_action_image {
 			a.focus = .image
 			a.select_all = false
