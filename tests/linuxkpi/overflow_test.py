@@ -52,7 +52,8 @@ def prepare(work, arch, suffix=""):
     abi.generate(ROOT / ("kernel/linuxkpi/abi/overflow.json" + suffix), work,
                  work / "V/include/vinix/integer_policy.h")
     original = work / "original/include"
-    for header in ("linux/overflow.h", "linux/slab.h", "linux/preempt.h", "linux/irqflags.h"):
+    for header in ("linux/overflow.h", "linux/slab.h", "linux/preempt.h", "linux/irqflags.h",
+                   "asm/processor.h"):
         path = original / header
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(subprocess.check_output(["git", "show", ORIGINAL + ":kernel/linuxkpi/include/" + header], cwd=ROOT))
@@ -68,6 +69,14 @@ def prepare(work, arch, suffix=""):
     target = work / "V/include/linux/overflow.h"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(replacement)
+    # Both host controls need the pinned CPU declaration dependency. The old
+    # preempt header imports processor.h; newer production versions import x86
+    # instructions and Linux errno/atomic namespaces that are invalid for this
+    # native Darwin host oracle. Preserve the original dependency byte for byte
+    # rather than treating those unrelated compiler failures as rejected types.
+    processor = work / "V/include/asm/processor.h"
+    processor.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(original / "asm/processor.h", processor)
     for header, macro in (("slab.h", "ZERO_OR_NULL_PTR"), ("preempt.h", "preemptible")):
         old = (original / "linux" / header).read_text()
         changed, count = re.subn(r"^#define " + macro + r"\([^\n]*\n",
