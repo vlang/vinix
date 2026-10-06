@@ -88,6 +88,13 @@ fn main() {
 		check_utility_recovery_clients(mut desktop)
 		return
 	}
+	if arguments().contains('--utility-controls-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_controls_clients(mut desktop)
+		return
+	}
 	// Standalone applications receive their pipe descriptors through the
 	// environment, leaving argv empty for applications that open argv[1].
 	if os.getenv('VINIX_RESPONSE_FD') != '' {
@@ -349,6 +356,7 @@ fn main() {
 	check_current_utility_workflow_clients(mut desktop)
 	check_utility_document_clients(mut desktop)
 	check_utility_recovery_clients(mut desktop)
+	check_utility_controls_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -472,11 +480,155 @@ fn check_utility_recovery_clients(mut desktop Desktop) {
 }
 
 fn integration_tree_enabled(element ui2.Element, id string) bool {
-	if element.id == id { return element.enabled }
+	if element.id == id || element.action_id == id { return element.enabled }
 	for child in element.children {
 		if integration_tree_enabled(child, id) { return true }
 	}
 	return false
+}
+
+fn check_utility_controls_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	base := os.real_path(temporary)
+	pid := os.getpid().str()
+	name := 'vinix-controls-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { temporary.free(); pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_grapher_png_client(home, mut desktop)
+	check_notes_history_client(mut desktop)
+	check_clock_named_timer_client(mut desktop)
+	check_color_meter_client()
+	println('IPC utility controls workflows passed')
+}
+
+fn check_grapher_png_client(home string, mut desktop Desktop) {
+	factory := app_factory_named('vinix-grapher') or { panic('Grapher is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	path := system_information_join_path(home, 'graph-Ж.png')
+	fresh := system_information_join_path(home, 'invalid-graph.png')
+	defer { unsafe { path.free(); fresh.free() } }
+	storage_remote_field(mut app, 'grapher.expression', 'sqrt(x)')
+	for index, action in ['grapher.xmin', 'grapher.xmax', 'grapher.ymin', 'grapher.ymax']! {
+		values := ['-1', '1', '-2', '2']!
+		storage_remote_field(mut app, action, values[index])
+	}
+	storage_remote_field(mut app, 'grapher.png_path', path)
+	app.handle('grapher.export_png') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 840, 636), tr('grapher.png_saved'))
+	bytes := os.read_bytes(path) or { panic(err) }
+	defer { unsafe { bytes.free() } }
+	mut dimensions := [3]int{}
+	pixels := unsafe { C.stbi_load_from_memory(bytes.data, bytes.len, &dimensions[0], &dimensions[1], &dimensions[2], 4) }
+	assert pixels != unsafe { nil }
+	defer { C.stbi_image_free(pixels) }
+	assert dimensions[0] == 960 && dimensions[1] == 640
+	mut curve_pixels := 0
+	for y in 110 .. 550 {
+		for x in 110 .. 932 {
+			at := (y * 960 + x) * 4
+			color := unsafe { u32(pixels[at]) << 16 | u32(pixels[at + 1]) << 8 | u32(pixels[at + 2]) }
+			assert unsafe { pixels[at + 3] } == 255
+			if x < 510 { assert color != 0x1671d9 }
+			if color == 0x1671d9 { curve_pixels++ }
+		}
+	}
+	assert curve_pixels > 100
+	if mut app is RemoteApp { app.key_input('\r') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 840, 636), tr('grapher.png_exists'))
+	preserved := os.read_bytes(path) or { panic(err) }
+	assert preserved == bytes
+	unsafe { preserved.free() }
+	storage_remote_field(mut app, 'grapher.expression', 'sin(')
+	storage_remote_field(mut app, 'grapher.png_path', fresh)
+	app.handle('grapher.export_png') or { panic(err) }
+	assert !os.exists(fresh)
+	integration_assert_text(mut app, ui2.rect(0, 0, 840, 636), tr('grapher.expression_invalid'))
+	println('IPC Grapher PNG pixels, gaps and destination protection passed')
+}
+
+fn check_notes_history_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-notes') or { panic('Notes is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('notes.new') or { panic(err) }
+	storage_remote_field(mut app, 'notes.title', 'History 日本語')
+	storage_remote_field(mut app, 'notes.body', 'First complete paste 日本語')
+	app.handle('notes.save') or { panic(err) }
+	storage_remote_field(mut app, 'notes.body', 'Second complete paste Ж')
+	if mut app is RemoteApp { app.key_input('\x1a') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), 'First complete paste 日本語')
+	ready := app.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert integration_tree_enabled(ready, 'notes.redo')
+	free_tree(ready)
+	app.handle('notes.save') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('\x19') }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), 'Second complete paste Ж')
+	app.handle('notes.undo') or { panic(err) }
+	if mut app is RemoteApp { app.paste_input('different complete paste') }
+	changed := app.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert !integration_tree_enabled(changed, 'notes.redo')
+	free_tree(changed)
+	app.handle('notes.undo') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 820, 576), 'First complete paste 日本語')
+	app.handle('notes.new') or { panic(err) }
+	new_note := app.build(ui2.rect(0, 0, 820, 576)) or { panic(err) }
+	assert !integration_tree_enabled(new_note, 'notes.undo')
+	assert !integration_tree_enabled(new_note, 'notes.redo')
+	free_tree(new_note)
+	println('IPC Notes atomic Undo/Redo, saved history and note scope passed')
+}
+
+fn check_clock_named_timer_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-clock') or { panic('Clock is not registered') }
+	assert factory.keyboard && factory.polling
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('clock.tab.timer') or { panic(err) }
+	storage_remote_field(mut app, 'clock.timer.name', 'Tea 日本語')
+	app.handle('clock.timer.preset.1') or { panic(err) }
+	app.handle('clock.timer.toggle') or { panic(err) }
+	app.handle('clock.timer.add') or { panic(err) }
+	storage_remote_field(mut app, 'clock.timer.name', 'Work Ж')
+	app.handle('clock.timer.toggle') or { panic(err) }
+	app.handle('clock.timer.select.0') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), 'Tea 日本語')
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), tr('clock.stop'))
+	app.handle('clock.timer.toggle') or { panic(err) }
+	app.handle('clock.timer.less') or { panic(err) }
+	app.handle('clock.timer.toggle') or { panic(err) }
+	app.handle('clock.timer.select.1') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), 'Work Ж')
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), tr('clock.stop'))
+	desktop_sleep_ms(1100)
+	if mut app is RemoteApp { app.last_poll_ms = 0; app.poll() }
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), tr('clock.timer.finished'))
+	app.handle('clock.timer.select.1') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), tr('clock.stop'))
+	app.handle('clock.timer.toggle') or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 560, 376), tr('clock.start'))
+	app.handle('clock.timer.add') or { panic(err) }
+	app.handle('clock.timer.add') or { panic(err) }
+	full := app.build(ui2.rect(0, 0, 560, 376)) or { panic(err) }
+	assert !integration_tree_enabled(full, 'clock.timer.add')
+	free_tree(full)
+	app.handle('clock.timer.remove') or { panic(err) }
+	removed := app.build(ui2.rect(0, 0, 560, 376)) or { panic(err) }
+	assert integration_tree_enabled(removed, 'clock.timer.add')
+	free_tree(removed)
+	println('IPC Clock independent named timers, expiry and bounds passed')
 }
 
 fn check_preview_crop_client(home string, mut desktop Desktop) {
@@ -2213,6 +2365,30 @@ fn check_color_meter_client() {
 	frozen := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
 	assert tree_contains_text(frozen, '#FEDCBA') && tree_contains_text(frozen, tr('color_meter.frozen'))
 	free_tree(frozen)
+	// Physical X remains9 while the other axis follows a2x pointer. Both
+	// locks then hold9,9; releasing X resumes only that axis's live position.
+	meter.handle('color_meter.lock_x') or { panic(err) }
+	desktop.pointer_x = 11
+	desktop.pointer_y = 4
+	unsafe { pixels[9 * 32 + 9] = 0x2468ac; pixels[9 * 32 + 27] = 0x987654 }
+	meter.handle('color_meter.live') or { panic(err) }
+	if mut meter is RemoteApp {
+		assert meter.color_sample.x == 9 && meter.color_sample.y == 9 && meter.color_sample.rgb == 0x2468ac
+	}
+	meter.handle('color_meter.lock_y') or { panic(err) }
+	desktop.pointer_x = 13
+	desktop.pointer_y = 6
+	if mut meter is RemoteApp {
+		meter.last_poll_ms = 0
+		meter.poll()
+		assert meter.color_sample.x == 9 && meter.color_sample.y == 9 && meter.color_sample.rgb == 0x2468ac
+	}
+	meter.handle('color_meter.lock_x') or { panic(err) }
+	if mut meter is RemoteApp {
+		assert meter.color_sample.x == 27 && meter.color_sample.y == 9 && meter.color_sample.rgb == 0x987654
+	}
+	meter.handle('color_meter.freeze') or { panic(err) }
+	meter.handle('color_meter.lock_y') or { panic(err) }
 
 	desktop.canvas.pixels = unsafe { nil }
 	meter.handle('color_meter.sample') or { panic(err) }
@@ -2223,6 +2399,7 @@ fn check_color_meter_client() {
 	unavailable := meter.build(ui2.rect(0, 0, 620, 516)) or { panic(err) }
 	assert tree_contains_text(unavailable, tr('color_meter.unavailable'))
 	assert !tree_contains_text(unavailable, '#FEDCBA')
+	assert !tree_contains_text(unavailable, '#987654')
 	free_tree(unavailable)
 	meter.handle('color_meter.copy_hex') or { panic(err) }
 	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == 'rgb(18, 52, 86)'
