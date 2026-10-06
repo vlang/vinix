@@ -49,6 +49,9 @@ struct AppFactory {
 	// Only the built-in Color Meter can request bounded canvas sampling and
 	// colour clipboard values. Ordinary and external clients have no access.
 	desktop_services bool
+	// Built-in text clients may write bounded guest clipboard text. This
+	// capability does not grant screen sampling or host clipboard access.
+	clipboard_copy bool
 	// A standalone app the image does not carry names the pkg package that
 	// provides it. Launching it before that install explains how to get it.
 	install_package   string
@@ -137,6 +140,9 @@ const available_apps = [
 		width: 620
 		height: 410
 		process_name: 'vinix-settings'
+		keyboard: true
+		polling: true
+		poll_interval_ms: 100
 		open: open_settings_app
 	},
 	AppFactory{
@@ -158,6 +164,10 @@ const available_apps = [
 		height: 500
 		process_name: 'vinix-editor'
 		keyboard: true
+		pointer: true
+		clipboard_copy: true
+		polling: true
+		poll_interval_ms: 100
 		open: open_editor
 	},
 	AppFactory{

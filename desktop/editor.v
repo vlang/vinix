@@ -61,6 +61,7 @@ struct EditorSnapshot {
 	text     []u8
 	cursor   int
 	revision u64
+	selection_anchor int = -1
 }
 
 struct TextEditorApp {
@@ -74,6 +75,22 @@ mut:
 	status_path       bool
 	status_language   DesktopLanguage
 	cursor            int
+	selection_anchor  int = -1
+	selection_dragging bool
+	selection_marking bool
+	copy_text []u8
+	copy_sequence u32
+	copy_queued bool
+	copy_waiting bool
+	copy_cut bool
+	copy_start int
+	copy_end int
+	copy_revision u64
+	key_csi_active bool
+	key_csi_len int
+	key_csi_overflow bool
+	key_csi [16]u8
+	key_csi_ms u64
 	focus             EditorFocus = .document
 	scroll            int
 	visible_rows      int = 1
@@ -472,11 +489,7 @@ fn (mut a TextEditorApp) insert_byte(ch u8) {
 }
 
 fn (mut a TextEditorApp) insert(ch u8) {
-	if a.text.len >= editor_max_file_size {
-		a.set_status('editor.status.limit')
-		return
-	}
-	a.record_edit()
+	if !a.prepare_selection_insertion(1) { return }
 	a.insert_byte(ch)
 	a.modified = true
 	a.set_status('editor.status.unsaved')
@@ -491,11 +504,7 @@ fn (mut a TextEditorApp) type_pending() {
 		a.append_field_character(length)
 		return
 	}
-	if a.text.len + length > editor_max_file_size {
-		a.set_status('editor.status.limit')
-		return
-	}
-	a.record_edit()
+	if !a.prepare_selection_insertion(length) { return }
 	for k := 0; k < length; k++ {
 		a.insert_byte(a.pending[k])
 	}
@@ -526,6 +535,7 @@ fn (mut a TextEditorApp) edit_path(ch u8) {
 fn (mut a TextEditorApp) document_key(ch u8) {
 	match ch {
 		8, 127 {
+			if a.delete_selection() { return }
 			if a.cursor > 0 {
 				start := editor_char_before(a.text, a.cursor)
 				a.delete_char(start, a.cursor - start)
@@ -533,9 +543,12 @@ fn (mut a TextEditorApp) document_key(ch u8) {
 		}
 		`\n`, `\r` { a.insert(`\n`) }
 		`\t` {
+			if !a.prepare_selection_insertion(4) { return }
 			for _ in 0 .. 4 {
-				a.insert(` `)
+				a.insert_byte(` `)
 			}
+			a.modified = true
+			a.set_status('editor.status.unsaved')
 		}
 		else {
 			if ch >= 0x20 && ch < 0x7f {
@@ -555,6 +568,33 @@ fn (mut a TextEditorApp) key_input(input string) {
 	mut i := 0
 	for i < input.len {
 		ch := input[i]
+		if a.key_csi_active && a.key_csi_len == -1 {
+			if ch == `[` || ch == `O` {
+				a.key_csi_len = 0
+				i++
+				continue
+			}
+			// Resolve a bare Escape, then process the following ordinary key.
+			a.expire_key_escape(~u64(0))
+		}
+		if a.key_csi_active {
+			if ch == 0x1b {
+				// A malformed prefix cannot release a nested CSI's numeric tail.
+				a.key_csi_len = -1
+				a.key_csi_overflow = false
+				a.key_csi_ms = desktop_monotonic_ms()
+			} else if ch >= 0x40 && ch <= 0x7e {
+				if !a.key_csi_overflow { a.selection_navigation(ch) }
+				a.key_csi_active = false
+				a.key_csi_len = 0
+				a.key_csi_overflow = false
+			} else if a.key_csi_len < a.key_csi.len && ch >= 0x20 && ch < 0x40 {
+				a.key_csi[a.key_csi_len] = ch
+				a.key_csi_len++
+			} else { a.key_csi_overflow = true }
+			i++
+			continue
+		}
 		// A multibyte character is gathered and typed as one. A byte that cannot
 		// continue it ends it early: the partial character is dropped and that
 		// byte is read afresh, so a control key or escape is never swallowed.
@@ -583,6 +623,24 @@ fn (mut a TextEditorApp) key_input(input string) {
 		// Editor-wide shortcuts remain available because focused applications
 		// receive control bytes before the desktop considers its own shortcuts.
 		match ch {
+			0x01 {
+				if a.focus == .document { a.select_document() i++ continue }
+			}
+			0x03, 0x18 {
+				if a.focus == .document { a.copy_selection(ch == 0x18) }
+				i++
+				continue
+			}
+			0x02 {
+				if a.focus == .document {
+					a.selection_marking = !a.selection_marking
+					if a.selection_marking { a.selection_anchor = a.cursor }
+					a.edit_recorded = false
+					a.set_status('editor.selection.selected')
+				}
+				i++
+				continue
+			}
 			0x1a {
 				a.undo_edit()
 				i++
@@ -624,71 +682,19 @@ fn (mut a TextEditorApp) key_input(input string) {
 			else {}
 		}
 
-		if ch == 0x1b && (i + 1 >= input.len || input[i + 1] != `[`) {
-			if a.save_as_open || a.pending_action != .none_ {
-				a.cancel_editor_choice()
-				a.save_as_open = false
-			}
-			a.close_find()
+		if ch == 0x1b {
+			// Keep the first byte across keyboard reads. Polling disambiguates
+			// the Escape key from a split CSI/SS3 prefix after 100 milliseconds.
+			a.key_csi_active = true
+			a.key_csi_len = -1
+			a.key_csi_overflow = false
+			a.key_csi_ms = desktop_monotonic_ms()
 			i++
 			continue
 		}
-		// Escape closes Find. Consume a complete arrow sequence in fields so
-		// its printable tail cannot become query or path text.
 		if a.focus != .document {
-			if ch == 0x1b {
-				if i + 1 < input.len && input[i + 1] == `[` {
-					i += 2
-					for i < input.len && (input[i] < 0x40 || input[i] > 0x7e) { i++ }
-					i++
-				} else {
-					a.close_find()
-					a.focus = .document
-					i++
-				}
-				continue
-			}
 			a.field_key(ch)
 			i++
-			continue
-		}
-
-		if ch == 0x1b && i + 2 < input.len && input[i + 1] == `[` {
-			a.edit_recorded = false
-			a.clear_match()
-			code := input[i + 2]
-			match code {
-				`A` { a.move_vertical(-1) }
-				`B` { a.move_vertical(1) }
-				`C` {
-					a.cursor += editor_char_length(a.text, a.cursor)
-				}
-				`D` {
-					a.cursor = editor_char_before(a.text, a.cursor)
-				}
-				`H` {
-					a.cursor = a.line_start(a.cursor)
-				}
-				`F` {
-					a.cursor = a.line_end(a.cursor)
-				}
-				// The console sends Home and End as `ESC [1~` and `ESC [4~`.
-				`1`, `3`, `4` {
-					if i + 3 < input.len && input[i + 3] == `~` {
-						if code == `1` {
-							a.cursor = a.line_start(a.cursor)
-						} else if code == `4` {
-							a.cursor = a.line_end(a.cursor)
-						} else if a.cursor < a.text.len {
-							a.delete_char(a.cursor, editor_char_length(a.text, a.cursor))
-						}
-						i += 4
-						continue
-					}
-				}
-				else {}
-			}
-			i += 3
 			continue
 		}
 
@@ -703,15 +709,14 @@ fn (mut a TextEditorApp) paste_input(text string) {
 		return
 	}
 	a.pending_len = 0
+	a.key_csi_active = false
+	a.key_csi_len = 0
+	a.key_csi_overflow = false
 	if a.focus != .document {
 		a.paste_field(text)
 		return
 	}
-	if a.text.len + text.len > editor_max_file_size {
-		a.set_status('editor.status.limit')
-		return
-	}
-	a.record_edit()
+	if !a.prepare_selection_insertion(text.len) { return }
 	for ch in text {
 		a.insert_byte(ch)
 	}
@@ -797,15 +802,16 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 	} else {
 		1
 	}
-	a.follow_cursor()
+	a.scroll = editor_clamp(a.scroll, 0, a.document_scroll_limit())
 
-	mut lines := frame_elements(a.visible_rows * 2)
+	mut lines := frame_elements(a.visible_rows * 3 + 1)
 	mut position := a.offset_for_line(a.scroll)
 	for row := 0; row < a.visible_rows; row++ {
 		if position > a.text.len {
 			break
 		}
 		end := a.line_end(position)
+		a.build_selection_highlight(mut lines, position, end, row, width)
 		a.build_match_highlight(mut lines, position, end, row)
 		lines << ui2.label('', editor_slice_text(a.text, position, end - position), ui2.rect(f64(editor_padding), f64(editor_padding + row * editor_row_height), f64(width - 2 * editor_padding), f64(editor_row_height)), ui2.TextStyle{
 			color: body_text
@@ -842,6 +848,9 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 fn (mut a TextEditorApp) handle(event_id string) ! {
 	// A click between the two reads of a split character abandons it.
 	a.pending_len = 0
+	a.key_csi_active = false
+	a.key_csi_len = 0
+	a.key_csi_overflow = false
 	// A Jump List or Recent Items entry opens its document in a new window.
 	if event_id.starts_with(jump_open_prefix) {
 		path := event_id[jump_open_prefix.len..]
@@ -851,6 +860,9 @@ fn (mut a TextEditorApp) handle(event_id string) ! {
 		return
 	}
 	match event_id {
+		editor_action_select_all { a.select_document() }
+		editor_action_copy { a.copy_selection(false) }
+		editor_action_cut { a.copy_selection(true) }
 		editor_action_save_as { a.begin_save_as() }
 		editor_action_save_as_path { a.focus = .save_as }
 		editor_action_save_as_create { a.create_save_as() }

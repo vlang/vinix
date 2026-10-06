@@ -44,7 +44,8 @@ const remote_owned_element_key = '__vinix.remote.owned'
 const app_feature_toolbar = u8(1) // app_toolbar_id toolbars and Finder's glyphs
 const app_feature_close_guard = u8(2)
 const app_feature_desktop_services = u8(4)
-const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services
+const app_feature_text_copy = u8(8)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy
 
 // What the compositor at the other end of the pipe draws: this program's own
 // features until a request says otherwise.
@@ -1173,6 +1174,7 @@ mut:
 	standalone       bool
 	peer_features    u8
 	desktop_services bool
+	clipboard_copy bool
 	color_sample     ColorMeterReport
 	pointer          bool
 	us_keys          bool
@@ -1256,6 +1258,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		keyboard:         factory.keyboard
 		standalone:       factory.standalone
 		desktop_services: factory.desktop_services
+		clipboard_copy: factory.clipboard_copy
 		pointer:          factory.pointer
 		us_keys:          factory.us_keys
 		desktop:          desktop
@@ -1391,8 +1394,8 @@ fn (mut a RemoteApp) handle(event_id string) ! {
 	if !reply.ok {
 		return app_reply_error(reply)
 	}
-	if a.desktop_services && reply.payload.len > 0 {
-		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	if (a.desktop_services || a.clipboard_copy) && reply.payload.len > 0 {
+		a.handle_native_operation(unsafe { tos(reply.payload.data, reply.payload.len) })
 	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
@@ -1408,8 +1411,8 @@ fn (mut a RemoteApp) key_input(text string) {
 	}
 	a.tree_stale = true
 	reply := a.transact(.key_input, 0, 0, text) or { return }
-	if reply.ok && a.desktop_services && reply.payload.len > 0 {
-		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	if reply.ok && (a.desktop_services || a.clipboard_copy) && reply.payload.len > 0 {
+		a.handle_native_operation(unsafe { tos(reply.payload.data, reply.payload.len) })
 	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
@@ -1428,8 +1431,8 @@ fn (mut a RemoteApp) paste_input(text string) {
 	// Installed standalone clients may predate the dedicated paste command.
 	command := if a.standalone { AppCommand.key_input } else { AppCommand.paste_input }
 	reply := a.transact(command, 0, 0, text) or { return }
-	if reply.ok && a.desktop_services && reply.payload.len > 0 {
-		a.handle_desktop_service(unsafe { tos(reply.payload.data, reply.payload.len) })
+	if reply.ok && (a.desktop_services || a.clipboard_copy) && reply.payload.len > 0 {
+		a.handle_native_operation(unsafe { tos(reply.payload.data, reply.payload.len) })
 	}
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }

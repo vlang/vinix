@@ -3864,7 +3864,7 @@ editor.selection.copied
 Выделение скопировано в буфер обмена Vinix.
 -----
 editor.selection.unavailable
-Копирование в буфер недоступно. Документ сохранён.
+Копирование в буфер недоступно. Документ не изменён.
 -----
 calculator.mode.programmer
 Программист

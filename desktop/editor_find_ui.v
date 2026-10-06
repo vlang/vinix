@@ -24,9 +24,12 @@ fn (a &TextEditorApp) build_edit_toolbar(mut children []ui2.Element) {
 		a.redo_history.len > 0)
 	children << editor_edit_button(editor_action_find, tr('editor.find'), editor_padding + 148, 45, 68,
 		true)
+	children << editor_edit_button(editor_action_cut, tr('editor.selection.cut'), 232, 45, 68, a.has_selection())
+	children << editor_edit_button(editor_action_copy, tr('editor.selection.copy'), 306, 45, 68, a.has_selection())
+	children << editor_edit_button(editor_action_select_all, tr('editor.selection.all'), 380, 45, 112, a.text.len > 0)
 	if a.find_open {
 		children << editor_edit_button(editor_action_find_close, tr('editor.find.close'),
-			editor_padding + 222, 45, 68, true)
+			498, 45, 112, true)
 	}
 }
 

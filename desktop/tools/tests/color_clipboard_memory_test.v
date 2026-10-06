@@ -52,7 +52,8 @@ fn (receiver &ColorClipboardHeapReceiver) typed_text() string {
 fn test_color_clipboard_owned_text_replacement_and_bounds_keep_zero_bytes() {
 	mut clipboard := HostClipboard{ configured: true }
 	full := '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
-	oversize := '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefx'
+	oversize := 'x'.repeat(clipboard_max_bytes + 1)
+	defer { unsafe { oversize.free() } }
 	C.vinix_heap_begin()
 	for index in 0 .. 200 {
 		assert clipboard.set_local_text(full) && clipboard.local_length == 64

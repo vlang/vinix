@@ -236,6 +236,7 @@ fn test_editor_workflow_save_failure_keeps_close_denied_and_all_panel_actions_re
 	assert app.visible_rows >= 1
 	free_tree(tree)
 	app.key_input('\x1b')
+	assert app.expire_key_escape(app.key_csi_ms + 100)
 	assert !app.save_as_open && app.pending_action == .none_ && app.modified
 }
 

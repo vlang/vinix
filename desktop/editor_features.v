@@ -30,6 +30,7 @@ fn (a &TextEditorApp) snapshot() EditorSnapshot {
 		text:     a.text.clone()
 		cursor:   a.cursor
 		revision: a.revision
+		selection_anchor: a.selection_anchor
 	}
 }
 
@@ -42,6 +43,13 @@ fn (mut a TextEditorApp) reset_history() {
 	a.document_has_save = false
 	a.edit_recorded = false
 	a.pending_len = 0
+	a.key_csi_active = false
+	a.key_csi_len = 0
+	a.key_csi_overflow = false
+	a.clear_selection()
+	a.copy_queued = false
+	a.copy_waiting = false
+	a.copy_text.clear()
 	a.clear_match()
 }
 
@@ -57,6 +65,7 @@ fn (mut a TextEditorApp) record_edit() {
 		a.edit_recorded = true
 	}
 	a.clear_match()
+	a.clear_selection()
 }
 
 fn (mut a TextEditorApp) restore_snapshot(snapshot EditorSnapshot) {
@@ -64,6 +73,9 @@ fn (mut a TextEditorApp) restore_snapshot(snapshot EditorSnapshot) {
 	unsafe { a.text.free() }
 	a.text = snapshot.text
 	a.cursor = snapshot.cursor
+	a.selection_anchor = snapshot.selection_anchor
+	a.selection_dragging = false
+	a.selection_marking = false
 	a.revision = snapshot.revision
 	a.modified = a.revision != a.saved_revision
 	a.edit_recorded = false
@@ -166,6 +178,7 @@ fn (mut a TextEditorApp) find_match(previous bool) {
 	a.match_start = chosen
 	a.match_end = chosen + a.query.len
 	a.cursor = chosen
+	a.clear_selection()
 	a.edit_recorded = false
 	a.set_status('editor.status.match')
 	a.follow_cursor()
@@ -326,6 +339,7 @@ fn (mut a TextEditorApp) close_app() {
 		a.document_path.free()
 		a.pending_path.free()
 		a.save_as_path.free()
+		a.copy_text.free()
 	}
 	a = TextEditorApp{}
 }

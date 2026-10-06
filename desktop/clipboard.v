@@ -27,8 +27,9 @@ mut:
 	success    bool
 	data       []u8
 	pending    string
-	// Session-local colour values are short and need no allocating buffer.
-	local_bytes [64]u8
+	// Session text is bounded by the same limit as incoming paste. Fixed
+	// storage permits repeated copying without retaining old allocations.
+	local_bytes [clipboard_max_bytes]u8
 	local_length int
 	local_available bool
 }
@@ -144,7 +145,7 @@ fn (mut d Desktop) request_host_paste() {
 fn (mut d Desktop) request_paste(force_host bool) {
 	if !force_host && d.clipboard.local_available {
 		text := unsafe { tos(&d.clipboard.local_bytes[0], d.clipboard.local_length) }
-		if d.start_menu_open { d.start_menu_key_input(text) }
+		if d.start_menu_open { d.paste_start_menu_text(text) }
 		else if d.focused_app_takes_keys() { d.send_paste_to_focused(text) }
 		return
 	}
@@ -196,7 +197,7 @@ fn (mut d Desktop) poll_host_paste() {
 		&& d.start_menu_open == d.clipboard.menu {
 		text := clipboard_text(unsafe { tos(d.clipboard.data.data, d.clipboard.data.len) })
 		if d.start_menu_open {
-			d.start_menu_key_input(text)
+			d.paste_start_menu_text(text)
 		} else {
 			d.send_paste_to_focused(text)
 		}

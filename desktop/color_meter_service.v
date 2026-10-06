@@ -161,6 +161,10 @@ fn native_app_desktop_service_request(mut app NativeApp) []u8 {
 }
 
 fn native_app_receive_desktop_service(mut app NativeApp, payload string) {
+	if payload.len == text_copy_reply_size && color_meter_read_u32(payload, 0) == text_copy_magic {
+		native_app_receive_text_copy(mut app, payload)
+		return
+	}
 	if mut app is DesktopServiceApp {
 		mut service := DesktopServiceApp(app)
 		service.receive_desktop_service_reply(payload)
@@ -168,7 +172,8 @@ fn native_app_receive_desktop_service(mut app NativeApp, payload string) {
 }
 
 fn send_native_app_operation_response(fd int, state AppWireState, mut app NativeApp) bool {
-	bytes := native_app_desktop_service_request(mut app)
+	mut bytes := native_app_text_copy_request(mut app)
+	if bytes.len == 0 { bytes = native_app_desktop_service_request(mut app) }
 	sent := send_app_response(fd, true, state, bytes)
 	if bytes.cap > 0 { unsafe { bytes.free() } }
 	return sent

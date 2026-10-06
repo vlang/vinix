@@ -201,6 +201,8 @@ fn test_editor_find_fields_take_utf8_and_escape_without_editing_document() {
 	assert editor_bytes_text(editor.replacement) == 'замена'
 	assert editor.undo_history.len == 1
 	editor.key_input('\x1b')
+	assert editor.find_open
+	assert editor.expire_key_escape(editor.key_csi_ms + 100)
 	assert !editor.find_open && editor.focus == .document
 	assert editor_bytes_text(editor.text) == 'hello café hello'
 }
