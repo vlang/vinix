@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Run the independent C verifier fixtures against the production V core."""
+"""Run independent verifier/encoder fixtures against the production V core."""
+import argparse
 import os
 from pathlib import Path
 import re
+import platform
+import runpy
 import shutil
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--c-encoder-reference", type=Path,
+                    help="Compare an immutable original encoder fixture")
+args = parser.parse_args()
+arch = os.environ.get("VINIX_G17_TEST_ARCH", "aarch64" if platform.machine().lower() in ("arm64", "aarch64") else "x86_64")
+if arch not in ("aarch64", "x86_64"):
+    parser.error("unsupported host architecture")
 v = subprocess.check_output([
     "sh", "-c", '. "$1/build-support/find-v.sh"; printf "%s" "$V"',
     "find-v", str(ROOT)], text=True)
@@ -20,7 +30,8 @@ with tempfile.TemporaryDirectory(prefix="vinix-g17-", dir="/tmp") as directory:
     (work / "v.mod").write_text("Module { name: 'vinix_g17_tests' }\n")
     for source in ("agx_fake_g17.v", "agx_fake_g17_encode.v"):
         shutil.copyfile(ROOT / "kernel/lib" / source, work / source)
-    subprocess.run([v, "-shared", "-no-builtin", "-os", "vinix", "-target-libc-headers",
+    subprocess.run([v, "-shared", "-no-builtin", "-os", "vinix", "-arch",
+                    "arm64" if arch == "aarch64" else "amd64", "-target-libc-headers",
                     "-nofloat", "-gc", "none", "-manualfree", "-o", str(work / "core.c"),
                     str(work)], check=True, env={**os.environ, "V_C_ERROR_BUG_REPORT_DISABLED": "1"})
     subprocess.run(common + ["-Wno-unused-function", "-Wno-unused-parameter", "-ffreestanding", "-fno-builtin",
@@ -29,9 +40,19 @@ with tempfile.TemporaryDirectory(prefix="vinix-g17-", dir="/tmp") as directory:
     imports = subprocess.check_output(["nm", "-u", str(work / "core.o")], text=True)
     if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
         raise RuntimeError("unexpected allocator import in G17 verifier:\n" + imports)
-    for fixture, sources in [("test.c", []), ("test_encode.c", [])]:
+    fixture = work / "fixture.o"
+    compile_module = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))["compile_module"]
+    compile_module(ROOT / "tests/agx-fake-g17/encodefixture", fixture, arch,
+                   common + ["-fno-strict-aliasing", "-iquote", str(ROOT / "kernel/c")])
+    imports = subprocess.check_output(["nm", "-u", str(fixture)], text=True)
+    if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
+        raise RuntimeError("unexpected allocator import in G17 encoder fixture:\n" + imports)
+    fixtures = [ROOT / "tests/agx-fake-g17/test.c", fixture]
+    if args.c_encoder_reference:
+        fixtures.append(args.c_encoder_reference.resolve())
+    for fixture in fixtures:
         subprocess.run(common + ["-iquote", str(ROOT / "kernel/c"),
-                        str(ROOT / "tests/agx-fake-g17" / fixture), *map(str, sources), str(work / "core.o"),
+                        str(fixture), str(work / "core.o"),
                         "-o", str(work / "host")], check=True)
         subprocess.run([str(work / "host")], check=True)
-    print("PASS V G17 verifier C ABI, encoder integration, ASan/UBSan and no allocator imports")
+    print("PASS V G17 verifier native ABI, independent encoder integration, ASan/UBSan and no allocator imports")
