@@ -304,7 +304,8 @@ fn append_reserved_mappings(node &devicetree.DTNode, display bool, mut plan Real
 		}
 		unsafe { addresses.free() }
 	}
-	if (if display { plan.display_mappings.len } else { plan.mappings.len }) == before {
+	after := if display { plan.display_mappings.len } else { plan.mappings.len }
+	if after == before {
 		println('dcp-backlight: no reserved DART mappings were described')
 		return false
 	}

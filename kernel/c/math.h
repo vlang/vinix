@@ -12,4 +12,7 @@ double floor(double x);
 double fabs(double x);
 double pow(double x, double y);
 
+#define signbit(x) __builtin_signbit(x)
+#define isfinite(x) __builtin_isfinite(x)
+
 #endif

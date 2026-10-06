@@ -120,13 +120,6 @@ or a broken wrapper named `v` is skipped during automatic discovery. Set `V`
 or `VINIX_V_COMPILER` to choose a compiler executable or checkout explicitly;
 an invalid explicit choice stops the build before compilation.
 
-To build with the V compiler pinned by kernel CI:
-
-```sh
-sh tools/m1-wifi/get-v.sh build-tools/v
-VINIX_V_COMPILER="$PWD/build-tools/v" ./scripts/run-desktop-aarch64.sh
-```
-
 For example, with a V checkout at `~/code/v`:
 
 ```sh
