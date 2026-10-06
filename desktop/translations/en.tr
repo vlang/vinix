@@ -3848,3 +3848,111 @@ The source changed while moving. Its contents were preserved in Trash; metadata 
 files.trash.empty_unsynced
 Items were removed, but syncing failed. Refresh Trash to check remaining entries.
 -----
+editor.selection.all
+Select all
+-----
+editor.selection.copy
+Copy
+-----
+editor.selection.cut
+Cut
+-----
+editor.selection.selected
+Drag to select. Ctrl-A: all. Ctrl-B: mark with arrows. Ctrl-C/X/V: copy/cut/paste.
+-----
+editor.selection.copied
+Selection copied to the guest clipboard.
+-----
+editor.selection.unavailable
+Guest clipboard copy is unavailable. The document is preserved.
+-----
+calculator.mode.programmer
+Programmer
+-----
+calculator.programmer.rules
+Unsigned 64-bit integers. +, -, * and NOT wrap modulo 2^64.
+-----
+calculator.programmer.shifts
+Right shifts fill with zero; shift counts are 0..63.
+-----
+calculator.programmer.shortcuts
+Ctrl-P: Programmer. Ctrl-B: next base. & | ^ ~: bitwise. < >: shift.
+-----
+calculator.programmer.resize
+Enlarge the window for the integer keypad, or use keyboard controls.
+-----
+calculator.programmer.input_hint
+Choose DEC, HEX, OCT or BIN before entering digits. Escape clears.
+-----
+calculator.programmer.error.input
+Enter one unsigned integer; fractions, signs and commands are refused.
+-----
+calculator.programmer.error.range
+Integer is outside the 64-bit range; the previous value is preserved.
+-----
+calculator.programmer.error.digit
+That digit is unavailable in the selected base; the value is preserved.
+-----
+calculator.programmer.error.zero
+Integer division and remainder require a nonzero divisor.
+-----
+calculator.programmer.error.shift
+A shift count must be an integer from 0 to 63.
+-----
+calculator.programmer.base.dec
+DEC
+-----
+calculator.programmer.base.hex
+HEX
+-----
+calculator.programmer.base.oct
+OCT
+-----
+calculator.programmer.base.bin
+BIN
+-----
+calculator.programmer.and
+AND
+-----
+calculator.programmer.or
+OR
+-----
+calculator.programmer.xor
+XOR
+-----
+calculator.programmer.not
+NOT
+-----
+settings.search.placeholder
+Search
+-----
+settings.search.heading
+Search results
+-----
+settings.search.empty
+No matching settings.
+-----
+settings.search.hint
+Choose a result to open its settings.
+-----
+settings.search.clear
+Clear
+-----
+settings.search.previous
+Previous
+-----
+settings.search.next
+Next
+-----
+activity.preferences.read_failed
+Saved view settings could not be read. Defaults are in use; the file is preserved.
+-----
+activity.preferences.save_failed
+View settings could not be saved. Your current view remains available.
+-----
+activity.preferences.changed
+Another window changed the saved view settings. Reopen Activity Monitor to use them.
+-----
+activity.preferences.unsynced
+View settings were saved, but storage synchronization could not be confirmed.
+-----

@@ -3848,3 +3848,111 @@ El origen cambió durante el traslado. Su contenido se conservó en la Papelera;
 files.trash.empty_unsynced
 Se eliminaron los elementos, pero falló la sincronización. Actualiza la Papelera para revisar las entradas restantes.
 -----
+editor.selection.all
+Seleccionar todo
+-----
+editor.selection.copy
+Copiar
+-----
+editor.selection.cut
+Cortar
+-----
+editor.selection.selected
+Arrastra para seleccionar. Ctrl-A: todo. Ctrl-B: marcar con flechas. Ctrl-C/X/V: copiar/cortar/pegar.
+-----
+editor.selection.copied
+Selección copiada al portapapeles de Vinix.
+-----
+editor.selection.unavailable
+No se puede copiar al portapapeles. Se conserva el documento.
+-----
+calculator.mode.programmer
+Programador
+-----
+calculator.programmer.rules
+Enteros de 64 bits sin signo. +, -, * y NOT usan módulo 2^64.
+-----
+calculator.programmer.shifts
+El desplazamiento derecho rellena con cero; pasos de 0 a 63.
+-----
+calculator.programmer.shortcuts
+Ctrl-P: Programador. Ctrl-B: siguiente base. & | ^ ~: bits. < >: desplazar.
+-----
+calculator.programmer.resize
+Amplía la ventana para ver el teclado entero o usa el teclado físico.
+-----
+calculator.programmer.input_hint
+Elige DEC, HEX, OCT o BIN antes de introducir cifras. Escape borra.
+-----
+calculator.programmer.error.input
+Introduce un entero sin signo; no se admiten fracciones, signos ni órdenes.
+-----
+calculator.programmer.error.range
+El entero excede 64 bits; se conserva el valor anterior.
+-----
+calculator.programmer.error.digit
+Esa cifra no existe en la base elegida; se conserva el valor.
+-----
+calculator.programmer.error.zero
+La división entera y el resto requieren un divisor distinto de cero.
+-----
+calculator.programmer.error.shift
+El número de pasos debe ser un entero entre 0 y 63.
+-----
+calculator.programmer.base.dec
+DEC
+-----
+calculator.programmer.base.hex
+HEX
+-----
+calculator.programmer.base.oct
+OCT
+-----
+calculator.programmer.base.bin
+BIN
+-----
+calculator.programmer.and
+AND
+-----
+calculator.programmer.or
+OR
+-----
+calculator.programmer.xor
+XOR
+-----
+calculator.programmer.not
+NOT
+-----
+settings.search.placeholder
+Buscar
+-----
+settings.search.heading
+Resultados de búsqueda
+-----
+settings.search.empty
+No hay ajustes coincidentes.
+-----
+settings.search.hint
+Elige un resultado para abrir sus ajustes.
+-----
+settings.search.clear
+Limpiar
+-----
+settings.search.previous
+Anterior
+-----
+settings.search.next
+Siguiente
+-----
+activity.preferences.read_failed
+No se pudieron leer los ajustes de vista. Se usan los predeterminados y se conserva el archivo.
+-----
+activity.preferences.save_failed
+No se pudieron guardar los ajustes de vista. La vista actual sigue disponible.
+-----
+activity.preferences.changed
+Otra ventana cambió los ajustes de vista guardados. Vuelva a abrir el Monitor de Actividad para usarlos.
+-----
+activity.preferences.unsynced
+Se guardaron los ajustes de vista, pero no se pudo confirmar la sincronización del almacenamiento.
+-----

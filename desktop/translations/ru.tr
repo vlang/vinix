@@ -3848,3 +3848,111 @@ files.trash.changed_moved
 files.trash.empty_unsynced
 Объекты удалены, но синхронизация не выполнена. Обновите корзину, чтобы проверить оставшиеся записи.
 -----
+editor.selection.all
+Выбрать всё
+-----
+editor.selection.copy
+Копировать
+-----
+editor.selection.cut
+Вырезать
+-----
+editor.selection.selected
+Выделяйте мышью. Ctrl-A: всё. Ctrl-B: выделение стрелками. Ctrl-C/X/V: копировать/вырезать/вставить.
+-----
+editor.selection.copied
+Выделение скопировано в буфер обмена Vinix.
+-----
+editor.selection.unavailable
+Копирование в буфер недоступно. Документ сохранён.
+-----
+calculator.mode.programmer
+Программист
+-----
+calculator.programmer.rules
+Беззнаковые целые 64 бит. +, -, * и NOT работают по модулю 2^64.
+-----
+calculator.programmer.shifts
+Сдвиг вправо заполняет нулями; число сдвигов от 0 до 63.
+-----
+calculator.programmer.shortcuts
+Ctrl-P: Программист. Ctrl-B: сменить основание. & | ^ ~: биты. < >: сдвиг.
+-----
+calculator.programmer.resize
+Увеличьте окно для целочисленных кнопок или используйте клавиатуру.
+-----
+calculator.programmer.input_hint
+Выберите DEC, HEX, OCT или BIN перед вводом цифр. Escape очищает.
+-----
+calculator.programmer.error.input
+Введите одно беззнаковое целое: дроби, знаки и команды не принимаются.
+-----
+calculator.programmer.error.range
+Число превышает диапазон 64 бит; прежнее значение сохранено.
+-----
+calculator.programmer.error.digit
+Этой цифры нет в выбранном основании; значение сохранено.
+-----
+calculator.programmer.error.zero
+Для целого деления и остатка делитель должен быть ненулевым.
+-----
+calculator.programmer.error.shift
+Число сдвигов должно быть целым от 0 до 63.
+-----
+calculator.programmer.base.dec
+DEC
+-----
+calculator.programmer.base.hex
+HEX
+-----
+calculator.programmer.base.oct
+OCT
+-----
+calculator.programmer.base.bin
+BIN
+-----
+calculator.programmer.and
+AND
+-----
+calculator.programmer.or
+OR
+-----
+calculator.programmer.xor
+XOR
+-----
+calculator.programmer.not
+NOT
+-----
+settings.search.placeholder
+Поиск
+-----
+settings.search.heading
+Результаты поиска
+-----
+settings.search.empty
+Подходящих настроек нет.
+-----
+settings.search.hint
+Выберите результат, чтобы открыть настройки.
+-----
+settings.search.clear
+Очистить
+-----
+settings.search.previous
+Назад
+-----
+settings.search.next
+Далее
+-----
+activity.preferences.read_failed
+Не удалось прочитать настройки вида. Используются настройки по умолчанию; файл сохранён.
+-----
+activity.preferences.save_failed
+Не удалось сохранить настройки вида. Текущий вид остаётся доступным.
+-----
+activity.preferences.changed
+В другом окне изменены сохранённые настройки вида. Откройте Монитор активности заново, чтобы применить их.
+-----
+activity.preferences.unsynced
+Настройки вида сохранены, но подтвердить синхронизацию с накопителем не удалось.
+-----
