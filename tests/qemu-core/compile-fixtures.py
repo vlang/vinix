@@ -7,7 +7,7 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-MODULES = ("signalfixture", "touchfixture", "restartfixture", "nanosleepfixture", "blockedfixture", "pollfixture")
+MODULES = ("signalfixture", "touchfixture", "restartfixture", "nanosleepfixture", "blockedfixture", "pollfixture", "epollfixture")
 
 
 def load(path, name):

@@ -35,10 +35,9 @@ tests/qemu-core/run.sh amd64
 
 The signal-disposition, first-touch, interrupted-read, nanosleep-remainder and
 blocked-thread exit/exec fixtures are compiled from `signalfixture`,
-`touchfixture`, `restartfixture`, `nanosleepfixture`, `blockedfixture` and
-`pollfixture` V modules. The normal
-builder generates their ephemeral C and declaration headers outside the
-checkout and links them with the remaining test program. All 82 original
+`touchfixture`, `restartfixture`, `nanosleepfixture`, `blockedfixture`,
+`pollfixture` and `epollfixture` V modules. The normal builder generates their
+ephemeral C and declaration headers outside the checkout and links them with the remaining test program. All 96 original
 `CHECK` sites keep their predicates and logical source line numbers; the shared
 `reap_ok` body remains unchanged.
 
@@ -54,6 +53,7 @@ python3 tests/qemu-core/test-restartfixture.py /tmp/qemu-restart --arch arm64
 python3 tests/qemu-core/test-nanosleepfixture.py /tmp/qemu-nanosleep --arch arm64
 python3 tests/qemu-core/test-blockedfixture.py /tmp/qemu-blocked --arch arm64
 python3 tests/qemu-core/test-pollfixture.py /tmp/qemu-poll --arch arm64
+python3 tests/qemu-core/test-epollfixture.py /tmp/qemu-epoll --arch arm64
 ```
 
 The host touch comparison uses real mappings, forks, pipes, protection and
@@ -89,4 +89,8 @@ On the host, only Linux auxv inputs and the executable path are supplied by the
 provider; native guests use actual `/sbin/init`, `/proc/self/auxv` and `getauxval`.
 The poll comparison uses real pipe and poll calls with the SDK pollfd/count ABI;
 eleven cases cover API errors, both close failures and event/byte sentinels.
+The epoll comparison preserves the native packed event stride, data and count
+ABI. Fifteen cases cover every API error, event/data/byte sentinels and all
+three close failures. Host inputs use real pipe readiness through poll; native
+guests use actual epoll calls.
 These bounded comparisons supplement the full feature and persistence runner.
