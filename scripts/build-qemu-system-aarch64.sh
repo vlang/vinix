@@ -116,10 +116,14 @@ if [ -z "$CLANG" ] || [ -z "$GCCLIB" ] || \
     echo "AArch64 X11 sysroot or cross compiler is missing; build the X11 layer first." >&2
     exit 1
 fi
+python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+    "$SCRIPT_DIR/build-support/qemu-system/vnccore" \
+    "$BUILD_DIR/vinix-vnc-window.c" --arch arm64
 "$CLANG" --target=aarch64-linux-musl --sysroot="$X11_SYSROOT" \
     --gcc-install-dir="$GCCLIB" -static-libgcc -O2 -Wall -Wextra -Werror \
+    -Wno-unused-function -Wno-unused-label -Wno-unused-parameter \
     -I"$X11_SYSROOT/usr/include" \
-    "$SCRIPT_DIR/build-support/qemu-system/vinix-vnc-window.c" \
+    "$BUILD_DIR/vinix-vnc-window.c" \
     -fuse-ld=lld -L"$X11_SYSROOT/usr/lib" -L"$X11_SYSROOT/lib" \
     -Wl,-rpath-link,"$X11_SYSROOT/usr/lib" \
     -Wl,-rpath-link,"$X11_SYSROOT/lib" \
