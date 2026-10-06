@@ -4,9 +4,12 @@ module main
 import ui2
 
 #include "@VMODROOT/heap_tracker.h"
+#include "@VMODROOT/calculator_heap_test_guard.h"
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_calculator_heap_require_tracking()
+fn C.vinix_calculator_heap_require_clean()
 
 fn calculator_memory_random_write(fd int, bits u64) {
 	mut bytes := [8]u8{}
@@ -316,6 +319,126 @@ fn test_calculator_hyperbolic_boundaries_domains_wire_and_mode_cycles_release_ow
 	app.close_app()
 	app.close_app()
 	assert C.vinix_heap_end() == 0
+}
+
+fn calculator_programmer_bits_memory_warm_frames(mut app CalculatorApp) {
+	calculator_programmer_memory_warm_frames(mut app)
+	app.handle('calculator.programmer.bits') or { panic(err) }
+	for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 620, 576),
+		ui2.rect(0, 0, 340, 400), ui2.rect(0, 0, 220, 300), ui2.rect(0, 0, 180, 300), ui2.rect(0, 0, 120, 100), ui2.rect(0, 0, 60, 40)]! {
+		begin_frame_elements()
+		free_tree(app.build(size) or { panic(err) })
+	}
+}
+
+fn test_calculator_programmer_bits_repeated_operands_pages_copy_history_wire_release_memory() {
+	$if prod { panic('Calculator memory coverage requires enabled assertions') }
+	C.vinix_heap_begin()
+	sentinel := 'Calculator bit editor heap guard'.clone()
+	C.vinix_calculator_heap_require_tracking()
+	unsafe { sentinel.free() }
+	C.vinix_calculator_heap_require_clean()
+	saved := app_compositor_features
+	app_compositor_features = app_features
+	defer { app_compositor_features = saved }
+	mut app := new_calculator_app()
+	calculator_programmer_bits_memory_warm_frames(mut app)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for width_action in calculator_programmer_width_actions {
+			app.handle(width_action)!
+			for base_action in calculator_programmer_base_actions {
+				app.handle(base_action)!
+				app.key_input('\x1b')
+				app.paste_input('0x3')
+				app.handle('calculator.programmer.add')!
+				for bit in 0 .. app.integer.width {
+					app.handle(calculator_programmer_bit_actions[bit])!
+					app.handle(calculator_programmer_bit_actions[bit])!
+				}
+				app.handle('calculator.programmer.bit.0')!
+				app.key_input('=')
+				assert app.integer.value == 5
+				app.handle('calculator.programmer.bit.0')!
+				app.key_input('=')
+				assert app.integer.value == 6
+				app.handle('calculator.copy')!
+				packet := app.take_clipboard_copy_request()
+				assert packet.len > 0
+				unsafe { packet.free() }
+				app.handle('calculator.programmer.history.0')!
+			}
+			app.handle('calculator.programmer.bits.previous')!
+			for page in 0 .. app.integer.width / 8 {
+				app.integer.bit_page = page
+				for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 620, 576),
+					ui2.rect(0, 0, 340, 400), ui2.rect(0, 0, 220, 300), ui2.rect(0, 0, 180, 300), ui2.rect(0, 0, 120, 100), ui2.rect(0, 0, 60, 40)]! {
+					begin_frame_elements()
+					tree := app.build(size)!
+					mut encoded := []u8{cap: 65536}
+					unsafe { encoded.flags |= .noslices }
+					encode_app_element(tree, mut encoded)!
+					mut reader := WireReader{ data: encoded }
+					decoded := decode_app_element(mut reader, 0)!
+					free_tree(decoded)
+					free_tree(tree)
+					unsafe { encoded.free() }
+				}
+			}
+			app.handle('calculator.programmer.bits')!
+			app.handle('calculator.programmer.bits')!
+		}
+		app.handle('calculator.programmer.base.dec')!
+		app.key_input('\x1b5/0=')
+		app.handle('calculator.programmer.bit.0')!
+		assert app.integer.has_error && app.integer.value == 0
+		app.handle('calculator.mode.basic')!
+		app.key_input('c4+1=')
+		app.handle('calculator.mode.programmer')!
+	}
+	app.close_app()
+	app.close_app()
+	C.vinix_calculator_heap_require_clean()
+}
+
+fn test_calculator_programmer_bits_init_stale_actions_mode_cycles_and_close_release_memory() {
+	$if prod { panic('Calculator memory coverage requires enabled assertions') }
+	mut warm := new_calculator_app()
+	calculator_programmer_bits_memory_warm_frames(mut warm)
+	warm.close_app()
+	unsafe { free(warm) }
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut app := new_calculator_app()
+		app.key_input('9+2=')
+		app.handle('calculator.memory.add')!
+		app.handle('calculator.mode.programmer')!
+		app.handle('calculator.programmer.bits')!
+		app.handle('calculator.programmer.bit.63')!
+		assert app.integer.value == u64(1) << 63
+		app.handle('calculator.programmer.width.8')!
+		app.handle('calculator.programmer.bit.63')!
+		app.integer.toggle_bit(-1)
+		app.integer.toggle_bit(64)
+		assert app.integer.value == 0
+		app.handle('calculator.programmer.bit.7')!
+		app.key_input('+1=')
+		app.handle('calculator.mode.scientific')!
+		assert app.calculator.display == '11' && app.memory == 11
+		app.handle('calculator.programmer.bits')!
+		app.handle('calculator.programmer.bit.0')!
+		assert app.integer.bits_view && app.integer.value == 129
+		app.handle('calculator.mode.programmer')!
+		for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 620, 576),
+			ui2.rect(0, 0, 340, 400), ui2.rect(0, 0, 220, 300), ui2.rect(0, 0, 180, 300), ui2.rect(0, 0, 120, 100), ui2.rect(0, 0, 60, 40)]! {
+			begin_frame_elements()
+			free_tree(app.build(size)!)
+		}
+		app.close_app()
+		app.close_app()
+		unsafe { free(app) }
+	}
+	C.vinix_calculator_heap_require_clean()
 }
 
 fn calculator_programmer_memory_warm_frames(mut app CalculatorApp) {

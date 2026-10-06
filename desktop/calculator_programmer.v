@@ -68,6 +68,8 @@ mut:
 	history []CalculatorIntegerHistory
 	history_offset int
 	history_rows int = 1
+	bits_view bool
+	bit_page int
 }
 
 fn calculator_integer_digit(ch u8) int {
@@ -194,6 +196,7 @@ fn (mut state CalculatorProgrammer) set_value(value u64) {
 fn (mut state CalculatorProgrammer) set_width(width int) {
 	if width !in calculator_programmer_widths || width == state.width { return }
 	state.width = width
+	if state.bit_page >= width / 8 { state.bit_page = width / 8 - 1 }
 	mask := calculator_integer_mask(width)
 	state.accumulator &= mask
 	state.last_operand &= mask
@@ -426,6 +429,9 @@ fn (mut state CalculatorProgrammer) key(ch u8) {
 }
 
 fn (mut state CalculatorProgrammer) handle(action string) {
+	for bit, candidate in calculator_programmer_bit_actions {
+		if candidate == action { state.toggle_bit(bit); return }
+	}
 	for index, candidate in calculator_programmer_digit_actions {
 		if candidate == action { state.digit(index); return }
 	}
@@ -440,7 +446,7 @@ fn (mut state CalculatorProgrammer) handle(action string) {
 			value := state.history[state.history.len - 1 - row - state.history_offset].value
 			width := state.history[state.history.len - 1 - row - state.history_offset].width
 			state.clear()
-			state.width = width
+			state.set_width(width)
 			state.set_value(value)
 			state.replace_input = false
 			state.operand_ready = true
@@ -448,6 +454,13 @@ fn (mut state CalculatorProgrammer) handle(action string) {
 		}
 	}
 	match action {
+		'calculator.programmer.bits' { state.bits_view = !state.bits_view }
+		'calculator.programmer.bits.previous' {
+			if state.bit_page > 0 { state.bit_page-- }
+		}
+		'calculator.programmer.bits.next' {
+			if state.bit_page + 1 < state.width / 8 { state.bit_page++ }
+		}
 		'calculator.programmer.add' { state.operator(.add) }
 		'calculator.programmer.subtract' { state.operator(.subtract) }
 		'calculator.programmer.multiply' { state.operator(.multiply) }

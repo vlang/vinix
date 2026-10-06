@@ -904,6 +904,214 @@ fn test_calculator_hyperbolic_controls_fit_all_scientific_windows_and_dispatch_w
 	}
 }
 
+fn test_calculator_programmer_bits_edit_every_valid_bit_exactly_and_reject_stale_actions() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	for width_action in calculator_programmer_width_actions {
+		app.handle(width_action)!
+		for base_action in calculator_programmer_base_actions {
+			app.handle(base_action)!
+			app.key_input('\x1b')
+			for bit in 0 .. app.integer.width {
+				app.handle(calculator_programmer_bit_actions[bit])!
+				assert app.integer.value == u64(1) << u32(bit)
+				assert app.copy_value() == app.integer.text(app.integer.base)
+				assert app.integer.operand_ready && !app.integer.replace_input
+				app.handle(calculator_programmer_bit_actions[bit])!
+				assert app.integer.value == 0
+			}
+			app.integer.toggle_bit(-1)
+			app.integer.toggle_bit(64)
+			assert app.integer.value == 0 && app.integer.status == ''
+			assert app.integer.history.len == 0
+		}
+	}
+	app.handle('calculator.programmer.width.8')!
+	app.handle('calculator.programmer.base.dec')!
+	app.key_input('\x1b')
+	app.key_input('5+')
+	app.handle('calculator.programmer.bit.8')!
+	app.handle('calculator.programmer.bit.63')!
+	assert app.integer.value == 5 && app.integer.accumulator == 5
+	assert app.integer.pending == .add && !app.integer.operand_ready && app.integer.replace_input
+	app.key_input('\x1b5/0=')
+	assert app.integer.has_error
+	app.handle('calculator.programmer.bit.0')!
+	assert app.integer.has_error && app.integer.value == 0
+}
+
+fn test_calculator_programmer_bits_preserve_pending_repeat_modes_copy_and_saved_history() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.key_input('9+2=')
+	app.handle('calculator.memory.add')!
+	app.handle('calculator.mode.scientific')!
+	app.key_input('c1e-')
+	app.handle('calculator.mode.programmer')!
+	app.handle('calculator.programmer.width.8')!
+	app.handle('calculator.programmer.base.hex')!
+	app.key_input('A+')
+	app.handle('calculator.programmer.bits')!
+	assert app.integer.bits_view && app.integer.value == 10 && app.integer.pending == .add
+	assert app.integer.replace_input && !app.integer.operand_ready
+	app.handle('calculator.programmer.bit.3')!
+	assert app.integer.value == 2 && app.integer.accumulator == 10 && app.integer.pending == .add
+	app.key_input('=')
+	assert app.integer.value == 12 && app.integer.last_operand == 2
+	assert app.integer.history.last().expression == '10 + 2'
+	app.handle('calculator.programmer.bit.0')!
+	assert app.integer.value == 13 && app.integer.last_operator == .add && app.integer.last_operand == 2
+	assert app.integer.history.last().value == 12
+	app.key_input('=')
+	assert app.integer.value == 15 && app.integer.history.last().expression == '13 + 2'
+	assert app.copy_value() == 'F'
+	app.handle('calculator.programmer.bits')!
+	assert !app.integer.bits_view && app.integer.last_operator == .add && app.integer.replace_input
+	app.key_input('=')
+	assert app.integer.value == 17
+	app.handle('calculator.mode.scientific')!
+	assert app.calculator.display == '1e-' && app.exponent_input
+	assert app.memory == 11 && app.has_memory && app.history.len == 1
+	app.handle('calculator.programmer.bit.0')!
+	assert app.integer.value == 17 && app.calculator.display == '1e-'
+	app.handle('calculator.mode.basic')!
+	app.handle('calculator.programmer.bits')!
+	assert !app.integer.bits_view && app.integer.value == 17
+	app.handle('calculator.mode.programmer')!
+	app.handle('calculator.programmer.bits')!
+	app.handle('calculator.programmer.history.1')!
+	assert app.integer.value == 15 && app.integer.width == 8 && app.integer.base == 16 && app.integer.bits_view
+	app.handle('calculator.programmer.bit.7')!
+	assert app.integer.value == 143 && app.integer.history[1].value == 15
+	app.handle('calculator.programmer.width.64')!
+	for _ in 0 .. 20 { app.handle('calculator.programmer.bits.next')! }
+	assert app.integer.bit_page == 7
+	app.handle('calculator.programmer.width.16')!
+	assert app.integer.bit_page == 1 && app.integer.value == 143 && app.integer.bits_view
+	app.key_input('\x1b')
+	assert app.integer.width == 16 && app.integer.base == 16 && app.integer.bits_view && app.integer.bit_page == 1
+	app.handle('calculator.programmer.width.64')!
+	for _ in 0 .. 20 { app.handle('calculator.programmer.bits.next')! }
+	assert app.integer.bit_page == 7
+	app.handle('calculator.programmer.history.0')!
+	assert app.integer.width == 8 && app.integer.bit_page == 0 && app.integer.value == 17
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 340, 400))!
+	assert calculator_feature_find(tree, 'calculator.programmer.bit.7') != none
+	assert calculator_feature_find(tree, 'calculator.programmer.bit.63') == none
+	free_tree(tree)
+}
+
+fn test_calculator_programmer_bits_controls_indices_pages_geometry_and_wire_dispatch() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.key_input('3+2=')
+	for size in [ui2.rect(0, 0, 540, 560), ui2.rect(0, 0, 620, 576),
+		ui2.rect(0, 0, 340, 400), ui2.rect(0, 0, 340, 510), ui2.rect(0, 0, 620, 430),
+		ui2.rect(0, 0, 220, 300), ui2.rect(0, 0, 180, 300)]! {
+		compact := size.width < 540 || size.height < 560
+		for width_action in calculator_programmer_width_actions {
+			app.handle(width_action)!
+			app.integer.bits_view = false
+			begin_frame_elements()
+			keypad := app.build(size)!
+			view := calculator_feature_find(keypad, 'calculator.programmer.bits') or { panic('missing Bits view control') }
+			assert view.text == tr('calculator.programmer.bits') && !view.checked
+			free_tree(keypad)
+			app.handle('calculator.programmer.bits')!
+			for page in 0 .. app.integer.width / 8 {
+				app.integer.bit_page = page
+				app.integer.set_value(u64(1) << u32(page * 8))
+				begin_frame_elements()
+				tree := app.build(size)!
+				assert tree.children.len <= 180
+				for child in tree.children {
+					assert child.frame.x >= 0 && child.frame.width > 0 && child.frame.x + child.frame.width <= size.width
+					assert child.frame.y >= 0 && child.frame.height > 0 && child.frame.y + child.frame.height <= size.height
+				}
+				view_control := calculator_feature_find(tree, 'calculator.programmer.bits') or { panic('missing Keypad view control') }
+				assert view_control.text == tr('calculator.programmer.keypad') && view_control.checked
+				assert calculator_feature_find(tree, 'calculator.programmer.equals') != none
+				if compact {
+					range_label := calculator_feature_find(tree, 'calculator.programmer.bits.range') or { panic('missing bit range') }
+					assert range_label.text == calculator_programmer_bit_ranges[page]
+					assert calculator_feature_find(tree, 'calculator.programmer.bits.previous') != none
+					assert calculator_feature_find(tree, 'calculator.programmer.bits.next') != none
+				} else {
+					assert calculator_feature_find(tree, 'calculator.programmer.history.0') != none
+					assert calculator_feature_find(tree, 'calculator.programmer.digit.0') == none
+				}
+				mut count := 0
+				for bit, action in calculator_programmer_bit_actions {
+					if button := calculator_feature_find(tree, action) {
+						count++
+						assert bit < app.integer.width
+						assert !compact || bit / 8 == page
+						assert button.text == if bit == page * 8 { '1' } else { '0' }
+						assert button.checked == (bit == page * 8)
+						assert button.tooltip == tr('calculator.programmer.bits.help')
+						mut labeled := false
+						for child in tree.children {
+							if child.kind == .label && child.text == calculator_programmer_bit_labels[bit]
+								&& child.frame.x == button.frame.x && child.frame.width == button.frame.width
+								&& child.frame.y + child.frame.height == button.frame.y { labeled = true }
+						}
+						assert labeled
+						for child in tree.children {
+							if child.id == action || child.action_id == action { continue }
+							assert button.frame.x + button.frame.width <= child.frame.x
+								|| child.frame.x + child.frame.width <= button.frame.x
+								|| button.frame.y + button.frame.height <= child.frame.y
+								|| child.frame.y + child.frame.height <= button.frame.y
+						}
+					}
+				}
+				assert count == if compact { 8 } else { app.integer.width }
+				mut encoded := []u8{cap: 65536}
+				unsafe { encoded.flags |= .noslices }
+				encode_app_element(tree, mut encoded)!
+				mut reader := WireReader{ data: encoded }
+				decoded := decode_app_element(mut reader, 0)!
+				button := calculator_feature_find(decoded, calculator_programmer_bit_actions[page * 8]) or { panic('missing wire bit') }
+				assert button.text == '1' && button.checked
+				app.handle(if button.action_id.len > 0 { button.action_id } else { button.id })!
+				assert app.integer.value == 0
+				free_tree(decoded)
+				free_tree(tree)
+				unsafe { encoded.free() }
+			}
+		}
+	}
+}
+
+fn test_calculator_programmer_tiny_guidance_fits_without_mutating_pending_bit_operands() {
+	mut app := new_calculator_app()
+	defer { app.close_app() }
+	app.handle('calculator.mode.programmer')!
+	app.handle('calculator.programmer.bits')!
+	app.key_input('5+')
+	app.handle('calculator.programmer.bit.0')!
+	for size in [ui2.rect(0, 0, 120, 100), ui2.rect(0, 0, 60, 40),
+		ui2.rect(0, 0, 340, 250), ui2.rect(0, 0, 620, 120), ui2.rect(0, 0, 1, 1)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		for child in tree.children {
+			assert child.frame.x >= 0 && child.frame.y >= 0
+			assert child.frame.width > 0 && child.frame.height > 0
+			assert child.frame.x + child.frame.width <= size.width
+			assert child.frame.y + child.frame.height <= size.height
+		}
+		free_tree(tree)
+		assert app.integer.value == 4 && app.integer.accumulator == 5
+		assert app.integer.pending == .add && app.integer.operand_ready && !app.integer.replace_input
+		assert app.integer.bits_view && app.integer.width == 64 && app.integer.base == 10
+	}
+	app.key_input('==')
+	assert app.integer.value == 13 && app.integer.last_operand == 4
+}
+
 fn test_calculator_programmer_width_masks_defaults_and_compatible_64_bit_helpers() {
 	for index, width in calculator_programmer_widths {
 		assert calculator_integer_mask(width) == [u64(255), 65535, 4294967295, calculator_programmer_max]![index]
