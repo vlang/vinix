@@ -59,6 +59,13 @@ not a claim that the whole tree is warning-free. The control utility is tested
 on the host and cross-built as a static AArch64 binary for the desktop image;
 target userspace execution has not been validated on hardware.
 
+The independent protocol machine and its 98 assertions now live in
+`protocolfixture/` as V. `run-protocol.py` compares all 26 groups and
+100,000 parser mutations against immutable C fixture bytes from
+`09e70d945ca7d63ebc4969213994afab9e7e1dbe` on ARM and x86 hosts. Both
+native model guests require every original group marker. These results
+cover injected firmware/ring behavior; physical Wi-Fi remains unverified.
+
 Build fixes include typed user-copy addresses in the V adapter, removal of
 unavailable `strlen` dependencies, host tests using `-iquote` rather than
 shadowing libc headers, and four minimal V compatibility fixes in the existing
