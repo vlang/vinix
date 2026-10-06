@@ -3,6 +3,8 @@ module main
 
 import math
 import os
+import encoding.xml
+import strconv
 import ui2
 
 fn C.mkfifo(path &char, mode u32) int
@@ -307,7 +309,7 @@ fn test_grapher_resize_and_native_wire_use_supported_finite_elements() {
 			if child.id != 'grapher.chart' { continue }
 			charts++
 			assert child.frame.width == size.width - 76
-			assert child.frame.height == size.height - if size.width < 600 || size.height < 452 { 260 } else { 354 }
+			assert child.frame.height == size.height - if size.width < 600 || size.height < 452 { 260 } else { 390 }
 			assert child.children.len <= grapher_sample_count + 24
 			for mark in child.children {
 				assert mark.kind == .view
@@ -777,13 +779,13 @@ fn test_grapher_layout_pages_bound_every_rectangle_in_all_languages_and_native_w
 			ui2.rect(0, 0, 320, 380), ui2.rect(0, 0, 440, 410), ui2.rect(0, 0, 2000, 960)]! {
 			compact := size.width < 600 || size.height < 452
 			for page, action in ['grapher.page.graph', 'grapher.page.document',
-				'grapher.page.csv', 'grapher.page.png']! {
+				'grapher.page.csv', 'grapher.page.png', 'grapher.page.svg']! {
 				app.handle(action)!
 				begin_frame_elements()
 				tree := app.build(size)!
 				assert tree.frame.width == size.width && tree.frame.height == size.height
 				grapher_layout_test_bounds(tree)
-				for key in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+				for key in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png', 'grapher.page.svg']! {
 					assert (grapher_layout_test_find(tree, key) != none) == compact
 					if compact {
 						button := grapher_layout_test_find(tree, key) or { panic('missing page') }
@@ -800,8 +802,9 @@ fn test_grapher_layout_pages_bound_every_rectangle_in_all_languages_and_native_w
 				assert (grapher_layout_test_find(tree, 'grapher.document_save_as') != none) == (!compact || page == 1)
 				assert (grapher_layout_test_find(tree, 'grapher.export') != none) == (!compact || page == 2)
 				assert (grapher_layout_test_find(tree, 'grapher.export_png') != none) == (!compact || page == 3)
+				assert (grapher_layout_test_find(tree, 'grapher.export_svg') != none) == (!compact || page == 4)
 				if compact && page > 0 {
-					help := if page == 1 { 'grapher.compact.document' } else if page == 2 { 'grapher.compact.csv' } else { 'grapher.compact.png' }
+					help := if page == 1 { 'grapher.compact.document' } else if page == 2 { 'grapher.compact.csv' } else if page == 3 { 'grapher.compact.png' } else { 'grapher.compact.svg' }
 					for key in [help, 'grapher.compact.keyboard']! {
 						text := tr(key)
 						mut start := 0
@@ -898,9 +901,9 @@ fn test_grapher_compact_keyboard_reveals_each_field_and_page_switch_stops_hidden
 	assert app.field_text(6) == '/tmp/graph-Ж.vgraph'
 	app.key_input('\x0c')
 	assert app.focus == 0 && app.compact_page == .graph
-	for expected in 1 .. 9 {
+	for expected in 1 .. 10 {
 		app.key_input('\t')
-		assert app.focus == expected % 8
+		assert app.focus == expected % 9
 		assert app.compact_page == grapher_page_for_field(app.focus)
 		begin_frame_elements()
 		tree := app.build(ui2.rect(0, 0, 280, 320))!
@@ -972,4 +975,260 @@ fn test_grapher_compact_pages_save_open_and_export_from_the_same_preserved_field
 	assert os.exists(csv) && os.exists(document) && os.exists(png)
 	pixels := grapher_test_png_pixels(png)
 	C.stbi_image_free(pixels)
+}
+
+struct GrapherSvgTestReader {
+	data string
+mut:
+	at int
+}
+
+fn (mut reader GrapherSvgTestReader) number() f64 {
+	data := reader.data
+	mut at := reader.at
+	for at < data.len && data[at] == ` ` { at++ }
+	start := at
+	for at < data.len {
+		ch := data[at]
+		if (ch < `0` || ch > `9`) && ch != `.` && ch != `-` && ch != `+`
+			&& ch != `e` && ch != `E` { break }
+		at++
+	}
+	assert at > start
+	value := strconv.atof64(unsafe { tos(data.str + start, at - start) }) or { panic('SVG number') }
+	assert math.is_finite(value)
+	reader.at = at
+	return value
+}
+
+fn test_grapher_svg_parses_as_standalone_vector_and_preserves_sample_connections_and_domain_gaps() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-svg-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.svg')
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	for index, text in ['-1', '1', '-2', '2']! { app.set_field(index + 1, text) }
+	app.set_field(8, path)
+	for source in ['x', 'sqrt(x)', '1/(x-.123)', 'floor(x)', 'sqrt(-1)', '1e308']! {
+		app.set_field(0, source)
+		assert app.plot()
+		values, connections, range, program := app.values, app.connect, app.range, app.program
+		fields := app.graph_document_values()
+		app.handle('grapher.export_svg')!
+		assert app.export_status == 'grapher.svg_saved'
+		assert app.values == values && app.connect == connections && app.range == range && app.program == program
+		assert app.graph_document_values() == fields && app.plotted && !app.dirty
+		data := os.read_file(path)!
+		defer { unsafe { data.free() } }
+		assert data.len < 65536 && !data.contains('<image') && !data.contains('data:')
+		doc := xml.XMLDocument.from_string(data)!
+		assert doc.root.name == 'svg'
+		assert doc.root.attributes['xmlns'] == 'http://www.w3.org/2000/svg'
+		assert doc.root.attributes['width'] == '960' && doc.root.attributes['height'] == '640'
+		assert doc.root.attributes['viewBox'] == '0 0 960 640'
+		plot := doc.get_element_by_id('plot') or { panic('SVG clip') }
+		assert plot.name == 'clipPath'
+		curve := doc.get_element_by_id('curve') or { panic('SVG curve') }
+		assert curve.name == 'path' && curve.attributes['stroke'] == '#1671d9'
+		commands := curve.attributes['d']
+		mut reader := GrapherSvgTestReader{data: commands}
+		mut segments := 0
+		for index in 1 .. grapher_sample_count {
+			left, right := values[index - 1], values[index]
+			if !left.valid || !right.valid || !connections[index] { continue }
+			if (left.value < -2 && right.value < -2) || (left.value > 2 && right.value > 2) { continue }
+			assert reader.at < commands.len && commands[reader.at] == `M`
+			reader.at++
+			x1 := reader.number()
+			y1 := reader.number()
+			assert reader.at < commands.len && commands[reader.at] == `L`
+			reader.at++
+			x2 := reader.number()
+			y2 := reader.number()
+			assert reader.at < commands.len && commands[reader.at] == ` `
+			reader.at++
+			if left.value >= -2 && left.value <= 2 {
+				assert math.abs(x1 - (110.0 + f64(index - 1) * 821.0 / 512.0)) < 1e-8
+			}
+			if right.value >= -2 && right.value <= 2 {
+				assert math.abs(x2 - (110.0 + f64(index) * 821.0 / 512.0)) < 1e-8
+			}
+			assert x1 >= 110 && x1 <= x2 && x2 <= 931
+			for value in [y1, y2]! { assert value >= 110 && value <= 549 }
+			if source == 'x' {
+				assert math.abs(y1 - (110 + (2 - left.value) / 4 * 439)) < 1e-8
+				assert math.abs(y2 - (110 + (2 - right.value) / 4 * 439)) < 1e-8
+			}
+			if source == 'sqrt(x)' { assert x1 >= 520.5 }
+			if source == '1/(x-.123)' {
+				assert (y1 > 329.5 && y2 > 329.5) || (y1 < 329.5 && y2 < 329.5)
+			}
+			if source == 'floor(x)' { assert math.abs(y1 - y2) < 1e-8 }
+			segments++
+		}
+		assert reader.at == commands.len
+		assert (segments == 0) == (source == 'sqrt(-1)' || source == '1e308')
+		axes := doc.get_element_by_id('axes') or { panic('SVG axes') }
+		assert axes.attributes['d'] == 'M520.5 110V550 M110 329.5H932 '
+		assert data.contains('>y = ' + source + '</desc>')
+		assert data.contains('>x</text>') && data.contains('>y</text>')
+		assert data.contains('>-2</text>') && data.contains('>2</text>')
+		assert data.contains('>-1</text>') && data.contains('>1</text>')
+		assert C.unlink(&char(path.str)) == 0
+	}
+}
+
+fn test_grapher_svg_xml_text_escapes_metacharacters_and_rejects_invalid_unicode() {
+	for invalid in ['\x00', '\x01', '\x08', '\x0b', '\x0c', '\xff', '\xc0\xaf', '\xed\xa0\x80',
+		'\xef\xbf\xbe', '\xef\xbf\xbf', '\xf4\x90\x80\x80', '\xe2\x82']! {
+		assert !grapher_svg_text_valid(invalid)
+	}
+	text := '& < > " \' Ж 日本語\t\n\r'
+	assert grapher_svg_text_valid(text)
+	path := os.join_path(os.temp_dir(), 'vinix-grapher-escape-${os.getpid()}.xml')
+	defer { os.rm(path) or {} unsafe { path.free() } }
+	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_TRUNC, 0o600)
+	assert fd >= 0
+	mut stream := GrapherSvgStream{fd: fd}
+	stream.append('<test>')
+	stream.text(text)
+	stream.append('</test>')
+	stream.flush()
+	assert stream.ok && desktop_close(fd) == 0
+	data := os.read_file(path)!
+	defer { unsafe { data.free() } }
+	assert data == '<test>&amp; &lt; &gt; &quot; &apos; Ж 日本語\t\n\r</test>'
+	doc := xml.XMLDocument.from_string(data)!
+	assert doc.root.name == 'test'
+	mut rejected := GrapherSvgStream{fd: -1}
+	rejected.text('\xef\xbf\xbf')
+	assert !rejected.ok && rejected.length == 0
+}
+
+fn test_grapher_svg_clips_vector_segments_at_interpolated_boundary_coordinates() {
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	app.set_field(0, 'x')
+	for index, text in ['-1', '1', '-.5001', '.5001']! { app.set_field(index + 1, text) }
+	assert app.plot()
+	mut first := GrapherSvgSegment{}
+	mut last := GrapherSvgSegment{}
+	mut count := 0
+	for index in 1 .. grapher_sample_count {
+		segment := app.svg_segment(index) or { continue }
+		if count == 0 { first = segment }
+		last = segment
+		count++
+	}
+	assert count > 0
+	assert math.abs(first.x1 - (110 + (1 - .5001) * 821 / 2)) < 1e-8
+	assert math.abs(last.x2 - (110 + (1 + .5001) * 821 / 2)) < 1e-8
+	assert first.y1 == 549 && last.y2 == 110
+	// Even finite opposing extremes cannot overflow the clipping calculation.
+	app.values[0] = GrapherValue{valid: true, value: -1e308}
+	app.values[1] = GrapherValue{valid: true, value: 1e308}
+	app.connect[1] = true
+	extreme := app.svg_segment(1) or { panic('finite extreme segment') }
+	assert math.is_finite(extreme.x1) && math.is_finite(extreme.x2)
+	assert extreme.x1 <= extreme.x2 && extreme.y1 == 549 && extreme.y2 == 110
+}
+
+fn test_grapher_svg_refuses_existing_paths_links_invalid_fields_and_removes_failed_creation() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-svg-safe-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph.svg')
+	link := disk_utility_join_path(root, 'link.svg')
+	parent := disk_utility_join_path(root, 'parent')
+	through := disk_utility_join_path(parent, 'graph.svg')
+	fresh := disk_utility_join_path(root, 'new.svg')
+	fifo := disk_utility_join_path(root, 'pipe.svg')
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() link.free() parent.free() through.free() fresh.free() fifo.free() }
+	}
+	os.write_file(path, 'keep this destination')!
+	os.symlink(path, link)!
+	os.symlink(root, parent)!
+	assert C.mkfifo(&char(fifo.str), 0o600) == 0
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	for destination in [path, link, root, fifo]! {
+		app.set_field(8, destination)
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_exists'
+	}
+	app.set_field(8, through)
+	app.export_svg()
+	assert app.export_status == 'grapher.svg_failed'
+	for destination in ['', 'relative.svg', '/tmp/../graph.svg', '/tmp//graph.svg', '/tmp/bad\xff.svg', '/tmp/bad\x00.svg']! {
+		app.set_field(8, destination)
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_invalid'
+	}
+	app.set_field(8, fresh)
+	app.set_field(0, 'sin(')
+	app.export_svg()
+	assert app.status == 'grapher.expression_invalid' && !app.plotted && !os.exists(fresh)
+	app.set_field(0, 'x')
+	assert app.plot()
+	values, range := app.values, app.range
+	assert !app.write_graph_svg(-1)
+	assert app.values == values && app.range == range && app.plotted && !app.dirty
+	app.values[0] = GrapherValue{valid: true, value: math.inf(1)}
+	app.export_svg()
+	assert app.export_status == 'grapher.svg_failed' && !os.exists(fresh)
+	app.values = values
+	app.range[0] = math.nan()
+	assert !app.write_graph_svg(-1)
+	app.range = range
+	app.set_field(0, 'x+1')
+	assert !app.write_graph_svg(-1) && app.dirty
+	preserved := os.read_file(path)!
+	assert preserved == 'keep this destination'
+	unsafe { preserved.free() }
+}
+
+fn test_grapher_svg_keyboard_compact_control_and_export_preserve_other_destinations() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-svg-ui-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.svg')
+	defer { os.rmdir_all(root) or {} unsafe { temporary.free() root.free() path.free() } }
+	mut app := GrapherApp{}
+	app.initialize()
+	defer { app.close_app() }
+	mut destinations := [3]string{}
+	for index in 0 .. 3 { destinations[index] = app.field_text(index + 5).clone() }
+	defer { for destination in destinations { unsafe { destination.free() } } }
+	assert app.field_text(8).ends_with('/graph.svg') || app.field_text(8) == ''
+	app.handle('grapher.svg_path')!
+	app.paste_input(path)
+	app.handle('grapher.page.graph')!
+	assert app.focus == -1 && app.compact_page == .graph
+	app.handle('grapher.svg_path')!
+	assert app.focus == 8 && app.compact_page == .svg
+	for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 600, 452), ui2.rect(0, 0, 280, 320)]! {
+		begin_frame_elements()
+		tree := app.build(size)!
+		grapher_layout_test_bounds(tree)
+		assert grapher_layout_test_find(tree, 'grapher.svg_path') != none
+		assert grapher_layout_test_find(tree, 'grapher.export_svg') != none
+		free_tree(tree)
+	}
+	app.set_field(0, 'sqrt(x)')
+	app.key_input('\r')
+	assert app.export_status == 'grapher.svg_saved' && app.status == 'grapher.domain_gaps'
+	app.key_input('\r')
+	assert app.export_status == 'grapher.svg_exists'
+	for index, destination in destinations { assert app.field_text(index + 5) == destination }
+	assert app.field_text(8) == path && app.focus == 8 && app.compact_page == .svg
 }

@@ -10,6 +10,7 @@ enum GrapherPage {
 	document
 	csv
 	png
+	svg
 }
 
 fn grapher_page_for_field(index int) GrapherPage {
@@ -17,6 +18,7 @@ fn grapher_page_for_field(index int) GrapherPage {
 		5 { .csv }
 		6 { .document }
 		7 { .png }
+		8 { .svg }
 		else { .graph }
 	}
 }
@@ -72,9 +74,9 @@ fn (app &GrapherApp) build_compact(width int, height int) ui2.Element {
 	mut children := frame_elements(32)
 	children << ui2.label('', tr('app.grapher'), ui2.rect(12, 10, f64(width - 24), 26),
 		ui2.TextStyle{ size: 18, bold: true, color: body_heading })
-	column := (width - 48) / 4
+	column := (width - 56) / 5
 	for index, key in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv',
-		'grapher.page.png']! {
+		'grapher.page.png', 'grapher.page.svg']! {
 		selected := int(app.compact_page) == index
 		children << ui2.button(key, tr(key), ui2.rect(f64(12 + index * (column + 8)), 44, f64(column), 28),
 			ui2.BoxStyle{ bg: if selected { app_accent } else { settings_choice_bg }, radius: 5 },
@@ -109,6 +111,7 @@ fn (app &GrapherApp) build_compact(width int, height int) ui2.Element {
 			.document { 6, 'grapher.document_path', 'grapher.compact.document' }
 			.csv { 5, 'grapher.page.csv', 'grapher.compact.csv' }
 			.png { 7, 'grapher.png_path', 'grapher.compact.png' }
+			.svg { 8, 'grapher.svg_path', 'grapher.compact.svg' }
 			else { 6, 'grapher.document_path', 'grapher.compact.document' }
 		}
 		children << ui2.label('', tr(label), ui2.rect(12, 84, f64(width - 24), 22), ui2.TextStyle{ size: 12, color: body_text })
@@ -118,7 +121,11 @@ fn (app &GrapherApp) build_compact(width int, height int) ui2.Element {
 			children << grapher_button('grapher.document_open', 'grapher.document_open', 12, 152, button_width)
 			children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', 20 + button_width, 152, button_width)
 		} else {
-			action := if app.compact_page == .csv { 'grapher.export' } else { 'grapher.export_png' }
+			action := match app.compact_page {
+				.csv { 'grapher.export' }
+				.svg { 'grapher.export_svg' }
+				else { 'grapher.export_png' }
+			}
 			children << grapher_button(action, action, 12, 152, width - 24)
 		}
 		grapher_compact_help(mut children, help, width, 192, 11)

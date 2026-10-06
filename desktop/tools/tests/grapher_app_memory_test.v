@@ -2,12 +2,16 @@
 module main
 
 import os
+import math
 import ui2
 
 #include "@VMODROOT/heap_tracker.h"
+#include "@VMODROOT/grapher_heap_test_guard.h"
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_grapher_heap_require_tracking()
+fn C.vinix_grapher_heap_require_clean()
 
 fn test_grapher_repeated_parse_evaluation_and_plot_release_owned_memory() {
 	mut app := GrapherApp{}
@@ -33,6 +37,7 @@ fn test_grapher_repeated_parse_evaluation_and_plot_release_owned_memory() {
 	}
 	app.close_app()
 	app.close_app()
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -63,6 +68,7 @@ fn test_grapher_repeated_csv_export_and_existing_destination_release_owned_memor
 		assert C.unlink(&char(path.str)) == 0
 	}
 	app.close_app()
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -79,6 +85,7 @@ fn test_grapher_repeated_initialize_close_releases_owned_buffers() {
 		app.close_app()
 		app.close_app()
 	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -113,6 +120,7 @@ fn test_grapher_registered_home_alias_resolution_and_default_export_release_owne
 		assert C.unlink(&char(path.str)) == 0
 		app.close_app()
 	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -128,6 +136,7 @@ fn test_grapher_repeated_document_parser_and_serialization_release_owned_memory(
 		assert grapher_document_parse('VINIX-GRAPH 1\nexpression=sin(\nxmin=-1\nxmax=1\nymin=-1\nymax=1\n') == none
 		unsafe { bytes.free() }
 	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -177,6 +186,7 @@ fn test_grapher_repeated_document_open_save_and_failures_release_owned_memory() 
 		app.close_app()
 		app.close_app()
 	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -200,6 +210,7 @@ fn test_grapher_repeated_png_render_failed_stream_and_stale_model_release_owned_
 		assert !app.write_graph_png(-1)
 	}
 	app.close_app()
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -246,6 +257,7 @@ fn test_grapher_repeated_png_exports_and_path_failures_release_owned_memory() {
 		app.close_app()
 		app.close_app()
 	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }
 
@@ -255,7 +267,7 @@ fn test_grapher_complete_compact_paging_keyboard_resize_and_languages_release_al
 	mut app := GrapherApp{}
 	app.initialize()
 	for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 280, 320), ui2.rect(0, 0, 180, 96)]! {
-		for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+		for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png', 'grapher.page.svg']! {
 			app.handle(page)!
 			begin_frame_elements()
 			free_tree(app.build(size)!)
@@ -270,7 +282,7 @@ fn test_grapher_complete_compact_paging_keyboard_resize_and_languages_release_al
 			for size in [ui2.rect(0, 0, 840, 626), ui2.rect(0, 0, 599, 452),
 				ui2.rect(0, 0, 600, 451), ui2.rect(0, 0, 280, 320), ui2.rect(0, 0, 180, 96),
 				ui2.rect(0, 0, 32, 32), ui2.rect(0, 0, 0, 0)]! {
-				for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png']! {
+				for page in ['grapher.page.graph', 'grapher.page.document', 'grapher.page.csv', 'grapher.page.png', 'grapher.page.svg']! {
 					app.handle(page)!
 					begin_frame_elements()
 					free_tree(app.build(size)!)
@@ -279,7 +291,7 @@ fn test_grapher_complete_compact_paging_keyboard_resize_and_languages_release_al
 			begin_frame_elements()
 			free_tree(app.build(ui2.rect(0, 0, 280, 320))!)
 			app.key_input('\x0c')
-			for _ in 0 .. 8 {
+			for _ in 0 .. 9 {
 				app.key_input('\t')
 				begin_frame_elements()
 				free_tree(app.build(ui2.rect(0, 0, 280, 320))!)
@@ -290,5 +302,87 @@ fn test_grapher_complete_compact_paging_keyboard_resize_and_languages_release_al
 		app.close_app()
 		assert app.compact_page == .graph && !app.compact_layout && !app.tiny_layout
 	}
+	C.vinix_grapher_heap_require_clean()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_grapher_repeated_svg_stream_failure_escaping_and_nonfinite_model_retain_zero_bytes() {
+	mut app := GrapherApp{}
+	app.initialize()
+	app.write_graph_svg(-1)
+	C.vinix_heap_begin()
+	witness := []u8{len: 16}
+	C.vinix_grapher_heap_require_tracking()
+	unsafe { witness.free() }
+	for _ in 0 .. 500 {
+		for source in ['x', 'sqrt(x)', '1/(x-.123)', 'floor(x)', 'sqrt(-1)', '1e308']! {
+			app.set_field(0, source)
+			assert app.plot()
+			assert !app.write_graph_svg(-1)
+		}
+		mut stream := GrapherSvgStream{fd: -1}
+		stream.text('& < > " \' Ж 日本語')
+		stream.text('\xef\xbf\xbf')
+		assert !stream.ok
+		app.values[0] = GrapherValue{valid: true, value: math.inf(1)}
+		assert !app.write_graph_svg(-1)
+		app.set_field(0, 'x+1')
+		assert !app.write_graph_svg(-1)
+	}
+	app.close_app()
+	C.vinix_grapher_heap_require_clean()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_grapher_repeated_svg_export_existing_paths_and_cleanup_retain_zero_bytes() {
+	temporary := os.join_path(os.temp_dir(), 'vinix-grapher-svg-memory-${os.getpid()}')
+	os.mkdir_all(temporary)!
+	root := os.real_path(temporary)
+	path := disk_utility_join_path(root, 'graph-Ж.svg')
+	link := disk_utility_join_path(root, 'link.svg')
+	parent := disk_utility_join_path(root, 'parent')
+	through := disk_utility_join_path(parent, 'graph.svg')
+	os.symlink(path, link)!
+	os.symlink(root, parent)!
+	defer {
+		os.rmdir_all(root) or {}
+		unsafe { temporary.free() root.free() path.free() link.free() parent.free() through.free() }
+	}
+	mut app := GrapherApp{}
+	app.initialize()
+	app.close_app()
+	C.vinix_heap_begin()
+	witness := []u8{len: 16}
+	C.vinix_grapher_heap_require_tracking()
+	unsafe { witness.free() }
+	for _ in 0 .. 100 {
+		app.initialize()
+		app.set_field(8, path)
+		app.set_field(0, 'sqrt(x)')
+		app.handle('grapher.svg_path')!
+		app.key_input('\r')
+		assert app.export_status == 'grapher.svg_saved'
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_exists'
+		app.set_field(8, link)
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_exists'
+		app.set_field(8, through)
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_failed'
+		app.set_field(8, 'relative.svg')
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_invalid'
+		assert C.unlink(&char(path.str)) == 0
+		app.set_field(8, path)
+		app.values[0] = GrapherValue{valid: true, value: math.inf(1)}
+		app.export_svg()
+		assert app.export_status == 'grapher.svg_failed' && !os.exists(path)
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 280, 320))!)
+		app.close_app()
+		app.close_app()
+	}
+	C.vinix_grapher_heap_require_clean()
 	assert C.vinix_heap_end() == 0
 }

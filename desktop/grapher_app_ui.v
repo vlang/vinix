@@ -16,6 +16,8 @@ fn (app &GrapherApp) field(index int, x int, y int, width int) ui2.Element {
 		tr('grapher.document_path')
 	} else if index == 7 {
 		tr('grapher.png_path')
+	} else if index == 8 {
+		tr('grapher.svg_path')
 	} else { '' }
 	return ui2.Element{
 		...ui2.text_field(grapher_field_actions[index], placeholder, app.field_text(index), ui2.rect(f64(x), f64(y), f64(width), 28),
@@ -136,7 +138,7 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << ui2.label('', tr('grapher.radians'), ui2.rect(310, 134, f64(width - 322), 28), ui2.TextStyle{ size: 11, color: body_muted })
 	}
 	chart_width := width - 76
-	chart_height := height - 354
+	chart_height := height - 390
 	children << app.chart(chart_width, chart_height)
 	if app.plotted {
 		children << grapher_tick(app.range[3], 2, 174, 44, .right)
@@ -144,14 +146,16 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << grapher_tick(app.range[0], 52, 176 + chart_height, chart_width / 2, .left)
 		children << grapher_tick(app.range[1], 52 + chart_width / 2, 176 + chart_height, chart_width / 2, .right)
 	}
-	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 158), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
-	children << app.field(6, 12, height - 134, width - 234)
-	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 134, 88)
-	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 134, 102)
-	children << app.field(5, 12, height - 98, width - 136)
-	children << grapher_button('grapher.export', 'grapher.export', width - 116, height - 98, 104)
-	children << app.field(7, 12, height - 62, width - 136)
-	children << grapher_button('grapher.export_png', 'grapher.export_png', width - 116, height - 62, 104)
+	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 194), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
+	children << app.field(6, 12, height - 170, width - 234)
+	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 170, 88)
+	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 170, 102)
+	children << app.field(5, 12, height - 134, width - 136)
+	children << grapher_button('grapher.export', 'grapher.export', width - 116, height - 134, 104)
+	children << app.field(7, 12, height - 98, width - 136)
+	children << grapher_button('grapher.export_png', 'grapher.export_png', width - 116, height - 98, 104)
+	children << app.field(8, 12, height - 62, width - 136)
+	children << grapher_button('grapher.export_svg', 'grapher.export_svg', width - 116, height - 62, 104)
 	status := if app.document_status.len > 0 {
 		app.document_status
 	} else if app.export_status.len > 0 {

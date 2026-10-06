@@ -4,7 +4,7 @@ module main
 #include <stdio.h>
 
 const grapher_field_actions = ['grapher.expression', 'grapher.xmin', 'grapher.xmax', 'grapher.ymin',
-	'grapher.ymax', 'grapher.path', 'grapher.document_path', 'grapher.png_path']!
+	'grapher.ymax', 'grapher.path', 'grapher.document_path', 'grapher.png_path', 'grapher.svg_path']!
 const grapher_field_limit = 512
 
 struct GrapherField {
@@ -14,7 +14,7 @@ mut:
 
 struct GrapherApp {
 mut:
-	fields         [8]GrapherField
+	fields         [9]GrapherField
 	initialized    bool
 	focus          int = -1
 	selected       bool
@@ -59,6 +59,9 @@ fn (mut app GrapherApp) initialize() {
 	image := grapher_default_path(home, 'graph.png')
 	app.set_field(7, image)
 	unsafe { image.free() }
+	vector := grapher_default_path(home, 'graph.svg')
+	app.set_field(8, vector)
+	unsafe { vector.free() }
 	app.plot()
 }
 
@@ -190,6 +193,7 @@ fn (mut app GrapherApp) handle(id string) ! {
 		'grapher.page.document' { app.select_page(.document) }
 		'grapher.page.csv' { app.select_page(.csv) }
 		'grapher.page.png' { app.select_page(.png) }
+		'grapher.page.svg' { app.select_page(.svg) }
 		'grapher.plot' { app.plot() }
 		'grapher.reset' {
 			app.reset_ranges()
@@ -199,6 +203,7 @@ fn (mut app GrapherApp) handle(id string) ! {
 		'grapher.zoom_out' { app.zoom(2) }
 		'grapher.export' { app.export_csv() }
 		'grapher.export_png' { app.export_png() }
+		'grapher.export_svg' { app.export_svg() }
 		'grapher.document_open' { app.open_graph_document() }
 		'grapher.document_save_as' { app.save_graph_document() }
 		else {}
@@ -300,7 +305,9 @@ fn (mut app GrapherApp) key_input(text string) {
 			}
 			`\r`, `\n` {
 				app.pending_length = 0
-				if app.focus == 7 {
+				if app.focus == 8 {
+					app.export_svg()
+				} else if app.focus == 7 {
 					app.export_png()
 				} else if app.focus == 6 {
 					app.open_graph_document()
