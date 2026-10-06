@@ -54,10 +54,22 @@ def run():
                  "-I" + str(linux / "include/uapi"), "-I" + str(linux / "arch/x86/include"),
                  "-I" + str(linux / "arch/x86/include/uapi")]
         dead_strip = "-Wl,-dead_strip" if platform.system() == "Darwin" else "-Wl,--gc-sections"
+        processor = subprocess.check_output([
+            "git", "show", ORIGINAL + ":kernel/linuxkpi/include/asm/processor.h"], cwd=ROOT)
         outputs = []
         for kind in ("original", "V"):
             overlay = work / kind / "include"
             (overlay / "linux").mkdir(parents=True)
+            # Preserve the exact CPU dependency on both sides. Alias its
+            # unused inline declaration while importing it, then restore the
+            # public V declaration to avoid a duplicate cpu_relax definition.
+            # No CPU hint call is part of these native IRQ/lvalue observations.
+            (overlay / "asm").mkdir()
+            (overlay / "asm/processor-original.h").write_bytes(processor)
+            (overlay / "asm/processor.h").write_text(
+                "#define cpu_relax vhst_reference_cpu_relax\n"
+                '#include "processor-original.h"\n'
+                "#undef cpu_relax\nvoid cpu_relax(void);\n")
             abi.generate(ROOT / "kernel/linuxkpi/abi/atomic-exchange.json", ROOT / "kernel/linuxkpi",
                          overlay / "vinix/atomic_exchange.h")
             abi.generate(ROOT / "kernel/linuxkpi/abi/overflow.json", ROOT / "kernel/linuxkpi",
