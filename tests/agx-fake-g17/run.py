@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--c-encoder-reference", type=Path,
                     help="Compare an immutable original encoder fixture")
+parser.add_argument("--c-verifier-reference", type=Path,
+                    help="Compare an immutable original verifier fixture")
 args = parser.parse_args()
 arch = os.environ.get("VINIX_G17_TEST_ARCH", "aarch64" if platform.machine().lower() in ("arm64", "aarch64") else "x86_64")
 if arch not in ("aarch64", "x86_64"):
@@ -47,7 +49,20 @@ with tempfile.TemporaryDirectory(prefix="vinix-g17-", dir="/tmp") as directory:
     imports = subprocess.check_output(["nm", "-u", str(fixture)], text=True)
     if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
         raise RuntimeError("unexpected allocator import in G17 encoder fixture:\n" + imports)
-    fixtures = [ROOT / "tests/agx-fake-g17/test.c", fixture]
+    verifier = work / "verifier.o"
+    compile_module(ROOT / "tests/agx-fake-g17/verifyfixture", verifier, arch,
+                   common + ["-fno-strict-aliasing", "-iquote", str(ROOT / "kernel/c")])
+    imports = subprocess.check_output(["nm", "-u", str(verifier)], text=True)
+    if re.search(r"\b_?(?:malloc|realloc|memdup|new_array\w*)\b", imports):
+        raise RuntimeError("unexpected allocator import in G17 verifier fixture:\n" + imports)
+    # The independent 314-record scale fixture owns precisely one original
+    # calloc/free pair. Reject compiler-inserted calls even to those same APIs.
+    generated = verifier.with_suffix(".c").read_text()
+    if len(re.findall(r"\bcalloc\(", generated)) != 1 or len(re.findall(r"\bfree\(", generated)) != 1:
+        raise RuntimeError("G17 verifier fixture changed its original allocation ownership")
+    fixtures = [verifier, fixture]
+    if args.c_verifier_reference:
+        fixtures.append(args.c_verifier_reference.resolve())
     if args.c_encoder_reference:
         fixtures.append(args.c_encoder_reference.resolve())
     for fixture in fixtures:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the independent encoder golden oracle and unchanged V policy in QEMU."""
+"""Run independent G17 oracles and unchanged V policy in QEMU."""
 import argparse
 import hashlib
 import json
@@ -21,6 +21,7 @@ def main():
     parser.add_argument("--kernel-dir", type=Path, required=True)
     parser.add_argument("--state-dir", type=Path, required=True)
     parser.add_argument("--c-reference", type=Path)
+    parser.add_argument("--fixture", choices=("encoder", "verifier"), default="encoder")
     parser.add_argument("--timeout", type=int, default=600)
     args = parser.parse_args()
     state = args.state_dir.resolve()
@@ -38,7 +39,8 @@ def main():
         (provider / name).write_text(source)
     for name in ("agx_fake_g17.h", "agx_fake_g17_encode.h"):
         shutil.copyfile(ROOT / "kernel/c" / name, provider / name)
-    for module, source in (("encodefixture", ROOT / "tests/agx-fake-g17/encodefixture"),
+    fixture_name = "encodefixture" if args.fixture == "encoder" else "verifyfixture"
+    for module, source in ((fixture_name, ROOT / "tests/agx-fake-g17" / fixture_name),
                            ("fixturedriver", ROOT / "tests/kernel-gaps/fixturedriver"),
                            ("serialcore", ROOT / "tests/kernel-gaps/serialcore")):
         shutil.copytree(source, sources / module)
@@ -54,27 +56,33 @@ def main():
     flags = cc + target + ["-O2", "-Wall", "-Wextra", "-Werror", "-D_GNU_SOURCE",
                            "-fno-stack-protector", "-fno-strict-aliasing"]
     objects = []
-    for module in ("lib", "encodefixture", "fixturedriver", "serialcore"):
+    for module in ("lib", fixture_name, "fixturedriver", "serialcore"):
         obj = state / f"{module}.o"
-        if module == "encodefixture" and args.c_reference:
+        if module == fixture_name and args.c_reference:
             original = sources / "original.c"
             shutil.copyfile(args.c_reference, original)
             subprocess.run(flags + ["-iquote", str(ROOT / "tests/agx-fake-g17"),
                                      "-Dmain=vinix_independent_fixture", "-c", str(original),
                                      "-o", str(obj)], check=True)
         else:
-            extra = ["-Dmain=vinix_independent_fixture", "-iquote", str(provider)] if module == "encodefixture" else []
+            extra = ["-Dmain=vinix_independent_fixture", "-iquote", str(provider)] if module == fixture_name else []
             if module == "lib":
                 extra = ["-DVINIX_V_RUNTIME", "-ffreestanding", "-fno-builtin"]
             compile_module(sources / module, obj, args.arch, flags + extra)
         imports = subprocess.check_output([os.environ.get("NM", "nm"), "-u", str(obj)], text=True)
-        if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
+        allowed_scale_allocation = module == fixture_name and args.fixture == "verifier"
+        forbidden = r"\b_?(?:malloc|realloc|memdup|new_array\w*)\b" if allowed_scale_allocation else r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b"
+        if re.search(forbidden, imports):
             raise RuntimeError("unexpected allocator import: " + imports)
+        if allowed_scale_allocation and not args.c_reference:
+            generated = obj.with_suffix(".c").read_text()
+            if len(re.findall(r"\bcalloc\(", generated)) != 1 or len(re.findall(r"\bfree\(", generated)) != 1:
+                raise RuntimeError("G17 verifier fixture changed its original allocation ownership")
         objects.append(obj)
     executable = state / "init"
     subprocess.run(cc + target + ["-static", "-O2", *map(str, objects), *link,
                                    "-o", str(executable)], check=True)
-    receipt = {"scope": "unchanged production G17 policy and original independent encoder golden oracle",
+    receipt = {"scope": "unchanged production G17 policy and original independent " + args.fixture + " oracle",
                "arch": args.arch,
                "inputs": {str(p.relative_to(state)): hashlib.sha256(p.read_bytes()).hexdigest()
                           for p in sources.rglob("*") if p.is_file()},
@@ -84,7 +92,7 @@ def main():
                             "--arch", args.arch, "--kernel-dir", str(args.kernel_dir),
                             "--prebuilt-init", str(executable), "--state-dir", str(state / "guest"),
                             "--timeout", str(args.timeout), "--expect", "INDEPENDENT FIXTURE PASS",
-                            "--expect", "fake G17 recovered 3D encoder tests passed",
+                            "--expect", "fake G17 recovered 3D encoder tests passed" if args.fixture == "encoder" else "fake G17 HAL300 verifier tests passed",
                             "--fail", "INDEPENDENT FIXTURE FAIL", "--fail", "check failed at line"])
 
 
