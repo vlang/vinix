@@ -38,7 +38,7 @@ Run from the repository root:
 CC=clang sh tests/apple-spi-keyboard/run.sh
 ```
 
-The independent keyboard assertions now live in V. The runner compiles the
+The independent keyboard and touchpad assertions now live in V. The runner compiles the
 immutable original C fixture from Git outside the checkout and compares every
 output line against V while linking the same production V provider. Both actual
 Darwin ARM and x86 host ABIs run with AddressSanitizer and
@@ -46,7 +46,10 @@ UndefinedBehaviorSanitizer; no allocator imports are permitted in the fixtures.
 The 21 keyboard groups retain framing, modifier/repeat behavior, all fragment
 splits, output guards, FIFO transfers, reset polarity, chip-select timing,
 timeouts, recovery, GPIO gating and 100,000 deterministic mutated packets.
-The shared runner also preserves the 19 touchpad oracle groups.
+The 19 touchpad groups retain wire-mode goldens, native and boot-mouse motion,
+click edges, all 85 fragment splits, 16-contact reassembly, interleaved keyboard
+traffic, malformed packets, mode retry, continuous chip select, staged FIFO
+failures, frozen counters, final releases and 100,000 mutated messages.
 
 ```sh
 python3 tests/apple-spi-keyboard/run.py --host-arch amd64
@@ -57,7 +60,8 @@ python3 tests/apple-spi-keyboard/run.py --suite keyboard --arch x86_64 \
 ```
 
 Native checks use both real musl SDKs and run complete original-C/V model pairs
-with all 21 group markers. ARM uses the full provider. The private x86 model
+with every 21-keyboard or 19-touchpad group marker. Select `--suite touchpad`
+for the touchpad native pairs. ARM uses the full provider. The private x86 model
 omits five unexecuted ARM hardware definitions; `provider.py` records their
 body hashes and call sites and verifies that every retained source byte is
 unchanged. It does not add x86 production support. Use `--state-dir` to retain

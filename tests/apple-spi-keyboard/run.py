@@ -15,7 +15,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 ORIGINAL = 'fb74d12ab3ac2510500fbd3393f3374864d23967'
-PORTS = {'keyboard': HERE / 'keyboardfixture'}
+PORTS = {'keyboard': HERE / 'keyboardfixture',
+         'touchpad': ROOT / 'tests/apple-spi-touchpad/touchpadfixture'}
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--state-dir', type=Path)
 p.add_argument('--suite', choices=('keyboard', 'touchpad', 'both'), default='both')
@@ -35,7 +36,7 @@ context = nullcontext(str(a.state_dir.resolve())) if a.state_dir else tempfile.T
 generate = runpy.run_path(str(ROOT / 'build-support/compile-v-module.py'))['generate']
 provider = runpy.run_path(str(HERE / 'provider.py'))['copy_provider']
 quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-label', '-Wno-unused-variable', '-fwrapv', '-fno-strict-aliasing']
-quotes = ['-iquote', str(HERE), '-iquote', str(ROOT / 'kernel/c'), '-iquote', str(ROOT / 'tests/apple-ans')]
+quotes = ['-iquote', str(HERE), '-iquote', str(ROOT / 'kernel/c'), '-iquote', str(ROOT / 'tests/apple-ans'), '-iquote', str(ROOT / 'tests/apple-spi-touchpad')]
 
 
 def digest(path):
@@ -67,7 +68,7 @@ with context as directory:
     for kind in PORTS:
         for path in sorted(PORTS[kind].glob('*.v')):
             receipt['source_hashes'][str(path.relative_to(ROOT))] = digest(path)
-        header = HERE / (kind + '-native-abi.h')
+        header = PORTS[kind].parent / (kind + '-native-abi.h')
         receipt['source_hashes'][str(header.relative_to(ROOT))] = digest(header)
     receipt['host_provider'] = provider(ROOT, work / 'spicore', hardware=a.host_arch == 'arm64')
     generate(work / 'spicore', work / 'core.c', a.host_arch, ('nofloat',))
