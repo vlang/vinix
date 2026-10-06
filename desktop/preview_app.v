@@ -42,6 +42,7 @@ mut:
 	pixels             &u8 = unsafe { nil }
 	width              int
 	height             int
+	orientation        int = 1
 	rotation           int
 	fit                bool = true
 	zoom               int  = 100
@@ -151,6 +152,8 @@ fn (mut a PreviewApp) release_image() {
 	a.details = ''
 	a.width = 0
 	a.height = 0
+	a.orientation = 1
+	a.rotation = 0
 	a.dragging = false
 	a.surface_dirty = false
 }
@@ -252,6 +255,7 @@ fn (mut a PreviewApp) open_image() bool {
 	a.pixels = pixels
 	a.width = dimensions[0]
 	a.height = dimensions[1]
+	a.orientation = preview_jpeg_orientation(source)
 	a.rotation = 0
 	a.fit = true
 	a.zoom = 100
@@ -269,20 +273,35 @@ fn (mut a PreviewApp) open_image() bool {
 }
 
 fn (a &PreviewApp) oriented_dimensions() (int, int) {
-	return if a.rotation & 1 == 0 { a.width } else { a.height }, if a.rotation & 1 == 0 {
-		a.height
-	} else {
-		a.width
-	}
+	width, height := a.exif_dimensions()
+	return if a.rotation & 1 == 0 { width } else { height }, if a.rotation & 1 == 0 {
+		height
+	} else { width }
 }
 
 @[inline]
 fn (a &PreviewApp) pixel_offset(x int, y int) int {
-	return match a.rotation {
-		1 { ((a.height - 1 - x) * a.width + y) * 4 }
-		2 { ((a.height - 1 - y) * a.width + a.width - 1 - x) * 4 }
-		3 { (x * a.width + a.width - 1 - y) * 4 }
-		else { (y * a.width + x) * 4 }
+	// Undo the user's turn in EXIF-oriented coordinates, then map that pixel
+	// into the unchanged decoder allocation. Rendering and PNG export share
+	// this composition, including the four mirrored EXIF orientations.
+	width, height := a.exif_dimensions()
+	mut exif_x := x
+	mut exif_y := y
+	match a.rotation {
+		1 { exif_x = y; exif_y = height - 1 - x }
+		2 { exif_x = width - 1 - x; exif_y = height - 1 - y }
+		3 { exif_x = width - 1 - y; exif_y = x }
+		else {}
+	}
+	return match a.orientation {
+		2 { (exif_y * a.width + a.width - 1 - exif_x) * 4 }
+		3 { ((a.height - 1 - exif_y) * a.width + a.width - 1 - exif_x) * 4 }
+		4 { ((a.height - 1 - exif_y) * a.width + exif_x) * 4 }
+		5 { (exif_x * a.width + exif_y) * 4 }
+		6 { ((a.height - 1 - exif_x) * a.width + exif_y) * 4 }
+		7 { ((a.height - 1 - exif_x) * a.width + a.width - 1 - exif_y) * 4 }
+		8 { (exif_x * a.width + a.width - 1 - exif_y) * 4 }
+		else { (exif_y * a.width + exif_x) * 4 }
 	}
 }
 

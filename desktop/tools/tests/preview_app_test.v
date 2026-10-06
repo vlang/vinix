@@ -8,6 +8,261 @@ import ui2
 fn C.mkfifo(&char, u32) int
 
 const preview_test_png = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAD0lEQVR4nGP4z8DwHwgbABB5A359Y87XAAAAAElFTkSuQmCC'
+// Six distinct pixels in an asymmetric 2x3 JPEG (quality 100, no subsampling).
+const preview_test_orientation_jpeg = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAADAAIDAREAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABoQAAIDAQEAAAAAAAAAAAAAAAQFAgMHBgH/xAAVAQEBAAAAAAAAAAAAAAAAAAAHCv/EABsRAAIDAQEBAAAAAAAAAAAAAAUGAwQHCAkC/9oADAMBAAIRAxEAPwBUcDgqTYViycPlOCuEVZNnK0W5rnnDPmlo4PHphaLGTx5zzF05PnVVGRjVwwOaMSPbDGBhRd1183LXvKXgts1nUGkpiJGqTZdEdWAjVWtk3hLXK18yykyNuAAnJ2nAlFTCQ2LMkYpaVgYZcBUPmAWDFDhlWrUhlx9FupNZRvQbutKCwZDdDJ/ZHTqsJuOHOPOuhttsYv7a7iaFlpf3/K2Z7eGOerUilNuDqyMDazE/u0aZDZUzduX7H//Z'
+
+fn preview_test_put_tiff(mut bytes []u8, at int, value u32, size int, little bool) {
+	for index in 0 .. size {
+		shift := if little { index * 8 } else { (size - 1 - index) * 8 }
+		bytes[at + index] = u8(value >> shift)
+	}
+}
+
+fn preview_test_exif_segment(orientation int, little bool) []u8 {
+	mut segment := []u8{len: 36}
+	segment[0] = 0xff
+	segment[1] = 0xe1
+	segment[3] = 34
+	segment[4] = `E`
+	segment[5] = `x`
+	segment[6] = `i`
+	segment[7] = `f`
+	segment[10] = if little { `I` } else { `M` }
+	segment[11] = segment[10]
+	preview_test_put_tiff(mut segment, 12, 42, 2, little)
+	preview_test_put_tiff(mut segment, 14, 8, 4, little)
+	preview_test_put_tiff(mut segment, 18, 1, 2, little)
+	preview_test_put_tiff(mut segment, 20, 0x0112, 2, little)
+	preview_test_put_tiff(mut segment, 22, 3, 2, little)
+	preview_test_put_tiff(mut segment, 24, 1, 4, little)
+	preview_test_put_tiff(mut segment, 28, u32(orientation), 2, little)
+	return segment
+}
+
+fn preview_test_add_segment(image []u8, segment []u8) []u8 {
+	mut result := []u8{len: image.len + segment.len}
+	result[0] = 0xff
+	result[1] = 0xd8
+	for index, byte in segment { result[2 + index] = byte }
+	for index in 2 .. image.len { result[index + segment.len] = image[index] }
+	return result
+}
+
+fn test_preview_exif_parser_accepts_both_byte_orders_and_bounds_malformed_records() {
+	image := base64.decode(preview_test_orientation_jpeg)
+	defer { unsafe { image.free() } }
+	assert preview_jpeg_orientation(image) == 1
+	for little in [false, true]! {
+		for orientation in 1 .. 9 {
+			segment := preview_test_exif_segment(orientation, little)
+			jpeg := preview_test_add_segment(image, segment)
+			assert preview_jpeg_orientation(jpeg) == orientation
+			unsafe { jpeg.free(); segment.free() }
+		}
+		for change in 0 .. 12 {
+			mut segment := preview_test_exif_segment(6, little)
+			match change {
+				0 { segment[10] = `X` }
+				1 { preview_test_put_tiff(mut segment, 12, 43, 2, little) }
+				2 { preview_test_put_tiff(mut segment, 14, 0xfffffff0, 4, little) }
+				3 { preview_test_put_tiff(mut segment, 14, 7, 4, little) }
+				4 { preview_test_put_tiff(mut segment, 14, 9, 4, little) }
+				5 { preview_test_put_tiff(mut segment, 18, 65535, 2, little) }
+				6 { preview_test_put_tiff(mut segment, 22, 4, 2, little) }
+				7 { preview_test_put_tiff(mut segment, 24, 2, 4, little) }
+				8 { preview_test_put_tiff(mut segment, 28, 0, 2, little) }
+				9 { preview_test_put_tiff(mut segment, 28, 9, 2, little) }
+				10 { segment[3] = 33 }
+				else { segment[3] = 1 }
+			}
+			jpeg := preview_test_add_segment(image, segment)
+			assert preview_jpeg_orientation(jpeg) == 1
+			unsafe { jpeg.free(); segment.free() }
+		}
+		segment := preview_test_exif_segment(8, little)
+		for length in 0 .. segment.len {
+			mut truncated := []u8{len: length + 2}
+			truncated[0] = 0xff
+			truncated[1] = 0xd8
+			for index in 0 .. length { truncated[index + 2] = segment[index] }
+			assert preview_jpeg_orientation(truncated) == 1
+			unsafe { truncated.free() }
+		}
+		mut directory := []u8{len: segment.len + 12}
+		for index, byte in segment { directory[index] = byte }
+		directory[3] = u8(directory.len - 2)
+		preview_test_put_tiff(mut directory, 18, 2, 2, little)
+		for index in 0 .. 12 { directory[32 + index] = segment[20 + index] }
+		duplicate := preview_test_add_segment(image, directory)
+		assert preview_jpeg_orientation(duplicate) == 1
+		unsafe { duplicate.free() }
+		preview_test_put_tiff(mut directory, 20, 0x0100, 2, little)
+		// Unknown tags and even a cyclic thumbnail offset are never followed.
+		preview_test_put_tiff(mut directory, 44, 8, 4, little)
+		with_unknown := preview_test_add_segment(image, directory)
+		assert preview_jpeg_orientation(with_unknown) == 8
+		unsafe { with_unknown.free(); directory.free(); segment.free() }
+		mut padded := []u8{len: 40}
+		original := preview_test_exif_segment(5, little)
+		for index in 0 .. 18 { padded[index] = original[index] }
+		for index in 18 .. original.len { padded[index + 4] = original[index] }
+		padded[3] = 38
+		preview_test_put_tiff(mut padded, 14, 12, 4, little)
+		shifted_ifd := preview_test_add_segment(image, padded)
+		assert preview_jpeg_orientation(shifted_ifd) == 5
+		preview_test_put_tiff(mut padded, 22, 0, 2, little)
+		empty_ifd := preview_test_add_segment(image, padded)
+		assert preview_jpeg_orientation(empty_ifd) == 1
+		unsafe { empty_ifd.free(); shifted_ifd.free(); padded.free(); original.free() }
+	}
+	assert preview_tiff_orientation(image, -1, image.len) == 1
+	assert preview_tiff_orientation(image, 0, image.len + 1) == 1
+	assert preview_tiff_orientation(image, 10, 9) == 1
+}
+
+fn test_preview_exif_scanner_skips_other_metadata_and_stops_before_jpeg_scan() {
+	image := base64.decode(preview_test_orientation_jpeg)
+	segment := preview_test_exif_segment(6, false)
+	jpeg := preview_test_add_segment(image, segment)
+	defer { unsafe { image.free(); segment.free(); jpeg.free() } }
+	other := [u8(0xff), 0xe1, 0, 8, `X`, `M`, `P`, 0, 0, 0, 0xff, 0x01, 0xff, 0xd0, 0xff]
+	preceded := preview_test_add_segment(jpeg, other)
+	assert preview_jpeg_orientation(preceded) == 6
+	unsafe { preceded.free(); other.free() }
+	scan := [u8(0xff), 0xda, 0, 2]
+	after_scan := preview_test_add_segment(jpeg, scan)
+	assert preview_jpeg_orientation(after_scan) == 1
+	unsafe { after_scan.free(); scan.free() }
+	mut first_bad := preview_test_exif_segment(9, true)
+	conflicting := preview_test_add_segment(jpeg, first_bad)
+	assert preview_jpeg_orientation(conflicting) == 1
+	unsafe { conflicting.free(); first_bad.free() }
+	mut many := []u8{len: preview_max_jpeg_metadata_segments * 4}
+	for index in 0 .. preview_max_jpeg_metadata_segments {
+		many[index * 4] = 0xff
+		many[index * 4 + 1] = 0xe0
+		many[index * 4 + 3] = 2
+	}
+	bounded := preview_test_add_segment(jpeg, many)
+	assert preview_jpeg_orientation(bounded) == 1
+	unsafe { bounded.free(); many.free() }
+}
+
+fn test_preview_all_exif_orientations_compose_with_each_user_rotation() {
+	expected := [[0, 4, 8, 12, 16, 20]!, [4, 0, 12, 8, 20, 16]!,
+		[20, 16, 12, 8, 4, 0]!, [16, 20, 8, 12, 0, 4]!, [0, 8, 16, 4, 12, 20]!,
+		[16, 8, 0, 20, 12, 4]!, [20, 12, 4, 16, 8, 0]!, [4, 12, 20, 0, 8, 16]!]!
+	for orientation in 1 .. 9 {
+		base_width := if orientation >= 5 { 3 } else { 2 }
+		base_height := if orientation >= 5 { 2 } else { 3 }
+		mut app := PreviewApp{width: 2, height: 3, orientation: orientation}
+		for rotation in 0 .. 4 {
+			app.rotation = rotation
+			width, height := app.oriented_dimensions()
+			assert width == if rotation & 1 == 0 { base_width } else { base_height }
+			assert height == if rotation & 1 == 0 { base_height } else { base_width }
+			for y in 0 .. height {
+				for x in 0 .. width {
+					index := match rotation {
+						1 { (base_height - 1 - x) * base_width + y }
+						2 { (base_height - 1 - y) * base_width + base_width - 1 - x }
+						3 { x * base_width + base_width - 1 - y }
+						else { y * base_width + x }
+					}
+					assert app.pixel_offset(x, y) == expected[orientation - 1][index]
+				}
+			}
+		}
+	}
+}
+
+fn test_preview_oriented_jpeg_surface_fit_pan_png_and_exact_original_copy() {
+	root := preview_test_root('orientation')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'image.jpg')
+	export_path := files_child_path(root, 'oriented.png')
+	copy_path := files_child_path(root, 'original.jpg')
+	defer { unsafe { path.free(); export_path.free(); copy_path.free() } }
+	image := base64.decode(preview_test_orientation_jpeg)
+	defer { unsafe { image.free() } }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	for little in [false, true]! {
+		for orientation in 1 .. 9 {
+			segment := preview_test_exif_segment(orientation, little)
+			jpeg := preview_test_add_segment(image, segment)
+			os.write_file_array(path, jpeg)!
+			preview_set_field(mut app.open_path, path)
+			assert app.open_image()
+			assert app.width == 2 && app.height == 3 && app.orientation == orientation
+			for rotation in 0 .. 4 {
+				width, height := app.oriented_dimensions()
+				app.set_viewport(width, height)
+				app.set_zoom(100)
+				assert app.publish_surface()
+				surface := open_vinix_surface(app.surface_path) or { panic('Missing oriented surface') }
+				for y in 0 .. height {
+					for x in 0 .. width {
+						at := app.pixel_offset(x, y)
+						rgb := unsafe { u32(app.pixels[at]) << 16 | u32(app.pixels[at + 1]) << 8
+							| u32(app.pixels[at + 2]) }
+						assert surface.pixel(x, y) == rgb
+					}
+				}
+				surface.close()
+				preview_set_field(mut app.export_path, export_path)
+				assert app.export_image(false)
+				mut reopened := PreviewApp{}
+				preview_set_field(mut reopened.open_path, export_path)
+				assert reopened.open_image()
+				assert reopened.width == width && reopened.height == height && reopened.orientation == 1
+				for y in 0 .. height {
+					for x in 0 .. width {
+						for channel in 0 .. 4 {
+							assert unsafe { reopened.pixels[(y * width + x) * 4 + channel] }
+								== unsafe { app.pixels[app.pixel_offset(x, y) + channel] }
+						}
+					}
+				}
+				reopened.close_app()
+				assert desktop_unlink(export_path) == 0
+				app.rotate(1)
+			}
+			assert app.rotation == 0 && app.width == 2 && app.height == 3
+			app.set_viewport(1, 1)
+			app.set_zoom(400)
+			width, height := app.oriented_dimensions()
+			app.pan(9999, 9999)
+			assert app.pan_x == width * 4 - 1 && app.pan_y == height * 4 - 1
+			app.fit_image()
+			geometry := app.geometry()
+			assert geometry.width == 1 && geometry.height == 1
+			// Manual turns never alter the source metadata or decoded dimensions.
+			app.rotate(1)
+			os.write_file(path, 'changed after open')!
+			preview_set_field(mut app.export_path, copy_path)
+			assert app.export_image(true)
+			copy := os.read_bytes(copy_path)!
+			assert copy == jpeg
+			unsafe { copy.free() }
+			assert desktop_unlink(copy_path) == 0
+			old_pixels := app.pixels
+			preview_set_field(mut app.open_path, path)
+			assert !app.open_image() && app.pixels == old_pixels && app.orientation == orientation
+			assert app.rotation == 1
+			unsafe { jpeg.free(); segment.free() }
+		}
+	}
+	// Invalid EXIF still decodes safely, replacing the previous orientation.
+	mut segment := preview_test_exif_segment(6, true)
+	segment[10] = `X`
+	malformed := preview_test_add_segment(image, segment)
+	os.write_file_array(path, malformed)!
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image() && app.orientation == 1 && app.rotation == 0
+	assert app.width == 2 && app.height == 3
+	unsafe { malformed.free(); segment.free() }
+}
 
 fn preview_test_root(name string) string {
 	root := os.join_path(os.temp_dir(), 'vinix-preview-${name}-${os.getpid()}')
