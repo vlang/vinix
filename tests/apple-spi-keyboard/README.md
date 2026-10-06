@@ -16,16 +16,18 @@ are not probed. A compatible GPIO in `interrupts-extended` can gate polling;
 when present it fully gates reads, while device trees without one use timer
 polling.
 
-The C transport uses bounded PIO transfers, packet and message CRC validation,
+The native V transport uses bounded PIO transfers, packet and message CRC
+validation,
 20-byte keyboard-message reassembly, press/release tracking and software repeat.
 Console encoding covers a US layout, independent left/right modifiers, logical
 Caps Lock, Control bytes, Option-as-Escape, navigation, application cursor mode,
-function keys and Fn-navigation/Fn-Delete. Touchpad and management reports are
-ignored. Three consecutive SPI transfer or ready-packet framing errors reset
+function keys and Fn-navigation/Fn-Delete. The shared poller also handles
+touchpad reports and bounded mode commands. Three consecutive SPI transfer or
+ready-packet framing errors reset
 the shared transport after a bounded cool-off instead of disabling it for the
 rest of the boot.
 
-This does not implement the trackpad, keyboard backlight, Caps Lock LED, Touch
+This does not implement keyboard backlight, Caps Lock LED, Touch
 Bar, suspend/resume, USB keyboards or newer DockChannel/MTP keyboards.
 
 ## Host tests
@@ -36,19 +38,33 @@ Run from the repository root:
 CC=clang sh tests/apple-spi-keyboard/run.sh
 ```
 
-The tests include the exact production C implementation with mock MMIO and a
-mock timer. AddressSanitizer and UndefinedBehaviorSanitizer are enabled by
-default; `SANITIZE=0` permits compilers without those runtimes. The 19 test groups
-cover framing, modifier/repeat behavior, all two-fragment splits, output bounds,
-FIFO transfers, reset polarity, chip-select timing/cleanup, transfer timeouts,
-retry backoff/revival, ready-gated polling, invalid ready packets and 100,000
-deterministic mutated packets.
+The independent keyboard assertions now live in V. The runner compiles the
+immutable original C fixture from Git outside the checkout and compares every
+output line against V while linking the same production V provider. Both actual
+Darwin ARM and x86 host ABIs run with AddressSanitizer and
+UndefinedBehaviorSanitizer; no allocator imports are permitted in the fixtures.
+The 21 keyboard groups retain framing, modifier/repeat behavior, all fragment
+splits, output guards, FIFO transfers, reset polarity, chip-select timing,
+timeouts, recovery, GPIO gating and 100,000 deterministic mutated packets.
+The shared runner also preserves the 19 touchpad oracle groups.
 
-All 19 host test groups pass with Clang sanitizers, and the
-production C source cross-compiled as a freestanding AArch64 object with
-`-Wall -Wextra -Werror`. The V integration and complete kernel were not compiled
-in the implementation environment; no M1 hardware test has been performed.
-These tests are not proof of a working keyboard on hardware.
+```sh
+python3 tests/apple-spi-keyboard/run.py --host-arch amd64
+python3 tests/apple-spi-keyboard/run.py --suite keyboard --arch aarch64 \
+  --kernel-dir /path/to/validated/kernel --guest-state-dir /tmp/spi-arm
+python3 tests/apple-spi-keyboard/run.py --suite keyboard --arch x86_64 \
+  --kernel-dir /path/to/validated/kernel --guest-state-dir /tmp/spi-x86
+```
+
+Native checks use both real musl SDKs and run complete original-C/V model pairs
+with all 21 group markers. ARM uses the full provider. The private x86 model
+omits five unexecuted ARM hardware definitions; `provider.py` records their
+body hashes and call sites and verifies that every retained source byte is
+unchanged. It does not add x86 production support. Use `--state-dir` to retain
+source hashes, generated objects, allocator audits and golden outputs.
+
+No M1 hardware test has been performed. These injected models do not prove
+physical SPI keyboard or touchpad operation.
 
 ## Kernel and hardware validation
 
