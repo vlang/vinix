@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `bbf1e243e21ab58b46a4853c0e88383ff45b290a`,
+at source commit `7ebf1a385c0d09a40ff29a7715238be3756d5361`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 440 | 2,580,148 | 6.50% |
-| Python | 447 | 4,436,382 | 11.18% |
-| Shell | 284 | 1,250,689 | 3.15% |
+| C | 441 | 2,542,113 | 6.35% |
+| Python | 456 | 4,528,411 | 11.31% |
+| Shell | 285 | 1,254,561 | 3.13% |
 
-All `.v` files are classified as V. The resulting V share is 71.68%, with no
+All `.v` files are classified as V. The resulting V share is 71.79%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev bbf1e243e21ab58b46a4853c0e88383ff45b290a --breakdown --json
+github-linguist --rev 7ebf1a385c0d09a40ff29a7715238be3756d5361 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -79,6 +79,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/network_status.h` | 1,315 |
 | `desktop/quicklook_stb.h` | 454 |
 | `desktop/tools/tests/heap_tracker.h` | 1,786 |
+| `games/ps1/abi.h` | 1,098 |
 | `gl-triangle/gl_v.h` | 1,885 |
 | `kernel/asm/x86_64/speculation.h` | 2,150 |
 | `kernel/c/agx_fake_g17.h` | 7,541 |
@@ -180,7 +181,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/swab.h` | 181 |
 | `kernel/linuxkpi/include/asm/types.h` | 79 |
 | `kernel/linuxkpi/include/asm/unaligned.h` | 177 |
-| `kernel/linuxkpi/include/generated/autoconf.h` | 1,505 |
+| `kernel/linuxkpi/include/generated/autoconf.h` | 1,681 |
 | `kernel/linuxkpi/include/generated/timeconst.h` | 1,100 |
 | `kernel/linuxkpi/include/linux/bug.h` | 1,481 |
 | `kernel/linuxkpi/include/linux/compiler_attributes.h` | 869 |
@@ -226,8 +227,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/verifyfixture/verifier-native-abi.h` | 609 |
 | `tests/alloc-bench/bench.c` | 14,188 |
-| `tests/alloc-bench/kernel-bench.c` | 225 |
-| `tests/alloc-bench/kernel_sampler_test.c` | 3,295 |
 | `tests/alloc-bench/macos-kext-info.c` | 758 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/aarch64/packaged-libc/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v4/amd64/packaged-libc/malloc.h` | 387 |
@@ -263,6 +262,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/sources/x86_64/realloc.c` | 1,318 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/aarch64/malloc.h` | 387 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/production-packaging/amd64/malloc.h` | 387 |
+| `tests/alloc-bench/samplerfixture/fixture-native-abi.h` | 697 |
 | `tests/alloc-track/fixture/fixture-v-abi.h` | 486 |
 | `tests/alloc-track/guestfixture/guest-native-abi.h` | 381 |
 | `tests/amd64-console/guestfixture/console-native-abi.h` | 237 |
@@ -290,9 +290,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-ans/ans_fixture.h` | 7,084 |
 | `tests/apple-ans/ext2-fixture-v-abi.h` | 686 |
 | `tests/apple-ans/ext2_fixture.h` | 1,174 |
-| `tests/apple-speakers/core_fixture.h` | 20,643 |
+| `tests/apple-speakers/core_fixture.h` | 15,714 |
+| `tests/apple-speakers/fixture-native-abi.h` | 302 |
 | `tests/apple-speakers/guest_sound.c` | 5,306 |
-| `tests/apple-speakers/test.c` | 40,698 |
 | `tests/apple-spi-keyboard/core_fixture.h` | 10,037 |
 | `tests/apple-spi-keyboard/test.c` | 26,896 |
 | `tests/apple-spi-touchpad/test.c` | 23,631 |
@@ -436,6 +436,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/process-inspection/test.c` | 21,545 |
 | `tests/procfs-allocs/guest.c` | 8,473 |
 | `tests/procfs-mount/guest.c` | 9,751 |
+| `tests/ps1/guest.c` | 13,415 |
 | `tests/qemu-core/test.c` | 115,679 |
 | `tests/qemu-nested/inner-init.c` | 1,452 |
 | `tests/realtime/test.c` | 22,685 |
@@ -458,7 +459,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/stack-policy/guest.c` | 4,914 |
 | `tests/stack-protector/diagnosticfixture/diagnostic-native-abi.h` | 434 |
 | `tests/stack-protector/protectorfixture/protector-native-abi.h` | 505 |
-| `tests/stat-buffer/guest.c` | 5,495 |
+| `tests/stat-buffer/guestfixture/stat-native-abi.h` | 919 |
 | `tests/steam/madvise-x86_64.c` | 1,109 |
 | `tests/syscall-diagnostics/guestfixture/diagnostics-native-abi.h` | 267 |
 | `tests/syscall-policy/guest.c` | 18,139 |
@@ -541,6 +542,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/musl/stage.py` | 13,020 |
 | `build-support/opengothic/build.py` | 10,713 |
 | `build-support/patch-elf-interpreter.py` | 968 |
+| `build-support/ps1/build.py` | 8,162 |
+| `build-support/ps1/download-homebrew.py` | 1,628 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/build.py` | 7,918 |
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
@@ -573,8 +576,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `gl-triangle/compile-v.py` | 2,353 |
 | `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
-| `kernel/linuxkpi/audit.py` | 6,555 |
+| `kernel/linuxkpi/audit.py` | 7,718 |
 | `kernel/linuxkpi/generate-abi.py` | 14,932 |
+| `kernel/linuxkpi/generate-bounds.py` | 20,254 |
 | `kernel/linuxkpi/upstream.py` | 4,638 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
 | `tests/aarch64-sigreturn/run.py` | 5,300 |
@@ -590,7 +594,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/compare-kernel.py` | 11,492 |
 | `tests/alloc-bench/compare.py` | 17,094 |
 | `tests/alloc-bench/compare_test.py` | 14,596 |
-| `tests/alloc-bench/compile-v-sampler.py` | 1,913 |
+| `tests/alloc-bench/compile-v-sampler.py` | 2,480 |
 | `tests/alloc-bench/materialize-evidence.py` | 7,895 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py` | 1,058 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py` | 2,225 |
@@ -677,7 +681,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/run-macos.py` | 7,184 |
 | `tests/alloc-bench/run-vinix.py` | 9,404 |
 | `tests/alloc-bench/test_compare_kernel.py` | 13,510 |
-| `tests/alloc-bench/test_v_sampler.py` | 1,496 |
+| `tests/alloc-bench/test_v_sampler.py` | 7,089 |
 | `tests/alloc-track/run.py` | 2,493 |
 | `tests/alloc-track/run_guest.py` | 1,101 |
 | `tests/alloc-track/run_native.py` | 3,834 |
@@ -703,7 +707,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-ans/run.py` | 9,144 |
 | `tests/apple-ans/run.sh` | 61 |
 | `tests/apple-ans/storage-provider.py` | 3,185 |
-| `tests/apple-speakers/run.py` | 2,714 |
+| `tests/apple-speakers/compile-fixture.py` | 1,194 |
+| `tests/apple-speakers/provider.py` | 3,177 |
+| `tests/apple-speakers/run.py` | 9,731 |
 | `tests/apple-spi-keyboard/run.py` | 2,743 |
 | `tests/apple-spi-keyboard/run.sh` | 127 |
 | `tests/apple-spi-touchpad/run.sh` | 127 |
@@ -794,7 +800,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
-| `tests/linuxkpi/audit_generation_test.py` | 6,026 |
+| `tests/linuxkpi/audit_generation_test.py` | 8,245 |
+| `tests/linuxkpi/bounds_generation_test.py` | 22,687 |
 | `tests/linuxkpi/compile-v-core.py` | 1,629 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
 | `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
@@ -848,6 +855,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-allocs/run.py` | 4,043 |
 | `tests/procfs-mount/check-generated.py` | 3,436 |
 | `tests/procfs-mount/run.py` | 4,622 |
+| `tests/ps1/desktop.py` | 9,729 |
+| `tests/ps1/frame.py` | 1,895 |
+| `tests/ps1/run.py` | 6,744 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/run_vm.py` | 13,462 |
 | `tests/qemu-initramfs-split/test_split.py` | 6,018 |
@@ -1039,7 +1049,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,506 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 89,798 |
+| `scripts/build-desktop-aarch64.sh` | 90,500 |
 | `scripts/build-desktop-amd64.sh` | 14,720 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,338 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1060,6 +1070,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
 | `scripts/build-network-tools-aarch64.sh` | 8,938 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
+| `scripts/build-ps1-aarch64.sh` | 3,170 |
 | `scripts/build-python-aarch64.sh` | 3,553 |
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |

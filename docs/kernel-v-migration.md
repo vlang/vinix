@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **9,655 original fixture
+**3,251 original production/native-boundary C lines**, **11,049 original fixture
 lines** and **250 header implementation lines** (111 desktop and 139 kernel).
-A further 17 original stack-pointer/syscall/variadic boundary lines now use instruction-only
+A further 20 original stack-pointer/syscall/variadic boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
 committed and validated; pending stages are excluded.
@@ -523,6 +523,9 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Strict pathname/status-copy diagnostic guest | 46 | `6f506fd8` |
 | AGX verifier/provenance independent fixture | 420 | `bbf1e243` |
 | LinuxKPI pointer/preemption runtime header policies | 2 | `112e18aa` |
+| Speaker independent transport/thermal fixture | 1,234 | `3ab257ae` |
+| Raw stat exact-retention guest | 88 | `09d3db88` |
+| Kernel sampler ownership fixture (three variadic boundary lines excluded) | 72 | `7ebf1a38` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -634,9 +637,39 @@ An earlier unrelated opt-in boot expired before userspace within the unchanged
 comparison runs passed without changing that window. All new lifetimes
 received independent review.
 
-At committed source `bbf1e243e21ab58b46a4853c0e88383ff45b290a`,
+The speaker fixture preserves all 175 original assertions and 20 model groups,
+with original-C/V ASan/UBSan parity on both actual host ABIs and both native
+model guests passing every marker. Its two aligned DMA allocations retain their
+original process lifetime, played storage grows through the original realloc,
+and the expectation/played frees remain unchanged. Scratch providers omit only
+eight documented unexecuted ARM hardware entries; every retained algorithm byte
+is unchanged. Physical speaker operation remains unverified.
+
+The stat-buffer guest retains all 32 source check sites (31 per architecture),
+original line diagnostics, warmup, three 300-iteration cohorts and uninterrupted
+6.1-second grace periods. Original-C/V native runs on both architectures produced
+identical measurement/verdict lines, with every live class, slab page count,
+large-page count and post-free counter exactly flat. Native scanf/printf widths
+and synchronous stack borrows are preserved; no allocator imports were added.
+
+The sampler ownership fixture preserves all 20 assertions, exactly 674,496
+success allocations/frees, all three OOM and poisoned-zeroing positions, constant
+clock failure and kext results. Original-C/V ASan/UBSan passed on both host ABIs;
+all four native musl model runs passed. The sole explicit calloc/free pair and
+bounded 16 KiB log capture remain. Three variadic capture lines use native
+instructions and receive zero V algorithm credit. The five-line public C
+declaration input is retired with zero algorithm credit; declarations now derive
+from V exports and passed both SDK type constraints. The default production
+benchmark's generated artifact remains byte-identical. The first V ARM image
+stalled entirely in firmware; the identical kernel/init passed with a fresh
+image and the same deadline. Its failure log remains preserved. These fixture
+clocks provide ownership evidence, not comparative performance measurements.
+Local receipts are `speakers-stage-validation.json`, `stat-buffer-validation.json`
+and `sampler-fixture-validation.json`. All new lifetimes received peer review.
+
+At committed source `7ebf1a385c0d09a40ff29a7715238be3756d5361`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 187 test paths / 45,282 lines,
+The non-vendored `.c` census still contains 184 test paths / 44,223 lines,
 including genuine patched musl evidence. Maintained first-party host/native
 fixtures and header algorithms remain to port; zero kernel C is not completion
 of the repository-wide request. This census is not a translation tally.
@@ -770,11 +803,11 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`bbf1e243e21ab58b46a4853c0e88383ff45b290a` reports **V 71.68%, C 6.50%**,
-440 C files, 447 Python files and 284 shell files. All 2,435 classified blob
+`7ebf1a385c0d09a40ff29a7715238be3756d5361` reports **V 71.79%, C 6.35%**,
+441 C files, 456 Python files and 285 shell files. All 2,458 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
-Concurrent commits include a 17,850,662-byte `desktop/font_data.v` blob;
+Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
 these graph percentages describe the whole pinned revision and are not a
 measure of this port batch. Archived source and duplicate-helper retirement
 receive zero new port credit; first-party fixtures and headers remain counted

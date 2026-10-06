@@ -2,7 +2,7 @@
 
 Updated 2026-10-06 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`bbf1e243e21ab58b46a4853c0e88383ff45b290a`. Re-read HEAD, `AGENTS.md` and
+`7ebf1a385c0d09a40ff29a7715238be3756d5361`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,10 +28,10 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,251 original production C lines**, **9,655 original fixture
+continuation adds **3,251 original production C lines**, **11,049 original fixture
 lines** and **250 header implementation lines** (111 desktop, 139 kernel),
-counted separately. Seventeen stack-pointer/syscall/variadic boundary lines use instruction-only
-assembly and receive no V algorithm credit.
+counted separately. Twenty stack-pointer/syscall/variadic boundary lines use
+instruction-only assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
 | --- | --- |
@@ -85,12 +85,15 @@ assembly and receive no V algorithm credit.
 | AGX encoder independent fixture (289) | `083cb12b` |
 | Strict syscall diagnostics (46) | `6f506fd8` |
 | AGX verifier independent fixture (420) | `bbf1e243` |
+| Speaker transport/thermal fixture (1,234) | `3ab257ae` |
+| Raw stat retention guest (88) | `09d3db88` |
+| Sampler ownership fixture (72 V; three variadic lines excluded) | `7ebf1a38` |
 
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 187 test paths /
-45,282 lines, including genuine patched musl evidence. This is a scope guide,
+source, the committed non-vendored `.c` census contains 184 test paths /
+44,223 lines, including genuine patched musl evidence. This is a scope guide,
 not a translation tally; headers and embedded sources are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -113,17 +116,30 @@ stage's input hashes before continuing; completed commits above are separate:
   checked compiler metadata with zero new V algorithm credit. Preserve all
   4,099 assertions, single-evaluation/ICE behavior, rejection domains and
   arbitrary native integer widths. Both fresh debug default kernels booted;
-  the complete compatibility guest is in progress on immutable ELF
-  `8e5a969a929f38418b9d7f65ec21050bc7e701dee1d8e2f29040b7a9265fe15f`.
+  the first complete compatibility guest failed the unchanged SRCU deadlines on
+  immutable ELF `8e5a969a929f38418b9d7f65ec21050bc7e701dee1d8e2f29040b7a9265fe15f`.
+  An exact original-header control has identical instructions in all 105 linked
+  objects and 161 archive members and passed the entire compatibility guest.
+  The unchanged new ELF is repeating in a fresh image. Preserve the initial
+  failure, control and repeat; no assertions or deadlines have been weakened.
 - LinuxKPI host fixtures and the pthread/TLS scheduler model passed a complete
   private true-V ARM sanitizer workload and all original boundary cases.
-  Maintained integration, actual x86 host ABI checks and both native SDK/model
-  guests are in progress. Pending work is not credited. The frozen compiler
+  Actual x86 tests and an immutable original-C control both exposed the same
+  void-pointer/native-typed callback sanitizer mismatches. Native ARM original
+  C/V controls both exposed high-byte strchr and strreplace signedness bugs.
+  Narrow canonical callback contracts and byte fixes are being validated separately; all original checks remain. The fixed native
+  ARM V workload now passes all 26 groups and seven child boundary modes; its
+  original-C control also passed. Final production checks and a clean x86
+  proof are pending.
+  This broader stage still receives no credit. The frozen compiler
   ignores V `thread_local` under `-os vinix`; native TLS storage retains real
   pthread isolation. Preserve all original assertions, ownership and deadlines.
-- Speaker and QEMU-core independent fixtures are being ported in bounded
-  stages. ANS and both independent AGX fixtures are committed; native model
-  success does not establish physical hardware operation.
+- Speaker, ANS and both independent AGX fixtures are committed. Wi-Fi and
+  QEMU-core independent fixtures are being ported in bounded stages. Wi-Fi host
+  testing found an existing native const callback mismatch; its narrow ABI fix
+  is separately committed as `e89f3526` after both fresh builds and boot checks.
+  It receives zero translation credit and is outside the pinned language snapshot. Native model success does not establish physical
+  hardware operation.
 - Further first-party kernel/SDK headers, native guest programs and hardware
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
@@ -154,6 +170,23 @@ hardware/x86-production claims. New lifetime boundaries received peer review.
 Local receipts include `agx-{encode,verify}-fixture-validation.json`,
 `syscall-diag-validation.json`, `stack-protector-validation.json`,
 `ans-{ext2,model}-stage-validation.json` and `header-policy-validation.json`.
+
+The speaker fixture retained all 175 assertions/20 groups and passed original-C/V
+sanitizers on actual ARM/x86 hosts and both complete native model guests. Its
+original explicit allocations and frees remain; eight unexecuted hardware entries
+are omitted only in manifested scratch providers. The stat guest retained all
+32 source checks and three 300-iteration cohorts; original-C/V guests on both
+architectures returned identical lines with every measured heap class/page and
+post-free counter flat. The sampler retained 20 assertions, exact allocation
+counts and every OOM/poison/clock/kext case. Both host sanitizer comparisons and
+all four native model guests passed. Three variadic capture lines and the retired
+five-line declaration input receive zero algorithm credit. V exports now produce
+the public declarations; the default production sampler artifact is byte-identical.
+A first sampler V ARM image stalled in firmware; the identical kernel/init passed
+with a fresh image and unchanged deadline. Receipts: `speakers-stage-validation.json`,
+`stat-buffer-validation.json`, `sampler-fixture-validation.json` and
+`sampler-fixture-arm-firmware-stall.json`. These tests add no physical hardware or
+comparative benchmark performance claim.
 
 The final six kernel fixtures passed the complete four-CPU qemu64 LinuxKPI
 guest with exact free-page equality. Tested ELF SHA256:
@@ -362,13 +395,13 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`bbf1e243e21ab58b46a4853c0e88383ff45b290a` reports **V 71.68%, C 6.50%**,
-440 C files, 447 Python files and 284 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,435 classified blobs
+`7ebf1a385c0d09a40ff29a7715238be3756d5361` reports **V 71.79%, C 6.35%**,
+441 C files, 456 Python files and 285 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,458 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.
-Concurrent commits include a 17,850,662-byte `desktop/font_data.v` blob;
+Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
 the percentages describe the whole pinned source, not this port batch.
 
 Local Linguist runs in Lima VM `vlin`, using
