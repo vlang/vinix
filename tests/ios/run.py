@@ -63,6 +63,7 @@ def main() -> int:
     parser.add_argument("--ppsspp-muted", action="store_true", help="test PPSSPP with its ordinary Sound/Enable=False preference")
     parser.add_argument("--ppsspp-cube", action="store_true", help="boot the pinned upstream PSP rotating-cube demo in the unchanged iOS app")
     parser.add_argument("--ppsspp-nzp", action="store_true", help="play the pinned NZ:P 3D PSP shooter in the unchanged iOS app")
+    parser.add_argument("--ppsspp-gow", action="store_true", help="run Sony's God of War: Chains of Olympus PSP demo in the unchanged iOS app")
     parser.add_argument("--timeout", type=int, default=180)
     arguments = parser.parse_args()
     if arguments.timeout <= 0:
@@ -75,6 +76,8 @@ def main() -> int:
         parser.error("--ppsspp-cube requires --ppsspp-muted")
     if arguments.ppsspp_nzp and (not arguments.ppsspp_muted or arguments.ppsspp_cube):
         parser.error("--ppsspp-nzp requires --ppsspp-muted and cannot be combined with --ppsspp-cube")
+    if arguments.ppsspp_gow and (not arguments.ppsspp_muted or arguments.ppsspp_cube or arguments.ppsspp_nzp):
+        parser.error("--ppsspp-gow requires --ppsspp-muted and cannot be combined with another PSP game")
     build = Path(os.environ.get("VINIX_IOS_BUILD_DIR", ROOT / "build/ios"))
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "scripts/build-ios-aarch64.sh")]
@@ -100,6 +103,9 @@ def main() -> int:
     if arguments.ppsspp_nzp:
         subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download-nzp.py"),
             "--output", str(build / "nzportable")], check=True)
+    if arguments.ppsspp_gow:
+        subprocess.run(["python3", str(ROOT / "examples/ios-ppsspp/download-gow.py"),
+            "--output", str(build / "god-of-war")], check=True)
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("ios_vm", runner_root / "tests/realtime/run_vm.py")
     runner = importlib.util.module_from_spec(spec)
@@ -116,6 +122,8 @@ def main() -> int:
         runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary executes PSP cube homebrew",)
     if arguments.ppsspp_nzp:
         runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary plays NZP PSP shooter",)
+    if arguments.ppsspp_gow:
+        runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary runs God of War PSP demo",)
     if arguments.with_cxx:
         runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
         runner.FEATURE_MARKERS += (b"iOS PASS: Objective-C image startup and C++ ivars",)
@@ -170,6 +178,15 @@ def main() -> int:
                     (game / "setup.ini").write_text("-condebug +developer 1 +exec vinix-input.cfg\n")
                     (game / "nzp/vinix-input.cfg").write_text('bind "SELECT" "edict 1; echo VINIX-NZP-STATE-DONE"\nbinddt "SELECT" ""\n')
                     (destination / "ppsspp-nzp").touch()
+                if arguments.ppsspp_gow:
+                    game = destination / "ppsspp-documents/PSP/GAME/UCUS98713"
+                    shutil.copytree(build / "god-of-war/unpacked/PSP/GAME/UCUS98713", game, copy_function=stage_game_asset)
+                    system = destination / "ppsspp-documents/PSP/SYSTEM"
+                    system.mkdir(parents=True)
+                    # Ordinary PPSSPP settings: software GLES does not need
+                    # the iOS default's 2x internal render resolution.
+                    (system / "ppsspp.ini").write_text("[Sound]\nEnable=False\n[Graphics]\nInternalResolution=1\n")
+                    (destination / "ppsspp-gow").touch()
             else:
                 shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app")
                 (destination / "PPSSPP").symlink_to("PPSSPP.app/PPSSPP")

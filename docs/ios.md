@@ -219,7 +219,8 @@ The largest groups are:
 | Objective-C runtime | 26 |
 
 **The unchanged PPSSPP release binary renders its menus and runs PSP homebrew
-on Vinix, with sound disabled.** With the optional runtime, it runs
+and a commercial PSP demo on Vinix, with sound disabled.** With the optional
+runtime, it runs
 `SceneDelegate +load`, its native C++ constructors and `main`, reads its actual
 entitlement data, reaches `UIApplicationMain`, registers notification observers,
 and enters the scene delegate declared in its binary `Info.plist`. Its own code
@@ -349,6 +350,73 @@ changing to `(1024.0, 2076.7, 80.0)`, magazine `8 → 5`, health `100`, and
 calculator, 2048, C++/UIKit/GLES and shutdown checks. This run uses the IR
 interpreter and software OpenGL rendering; sound remains disabled.
 
+The next commercial-game probe uses **God of War: Chains of Olympus — Battle
+of Attica**, Sony's playable PSP demo, disc ID `UCUS98713`. Sony announced
+[the Battle of Attica demo](https://blog.playstation.com/2007/09/27/god-of-war-chains-of-olympus-special-edition-demo-disc/)
+in 2007. The PBP used here comes from
+[PlayDreamCreate's demo archive](https://playdreamcreate.com/), linked by
+[PPSSPP's official demos documentation](https://www.ppsspp.org/docs/getting-started/how-to-get-demos-and-homebrew/).
+It does not require App Store credentials. The downloader pins the following
+locally measured sizes and hashes, not publisher-supplied checksums:
+
+```text
+PSP ZIP:    169,451,774 bytes
+SHA-256:    6c1e4cffecf389e5dbcc995564e3d311afcfd9beaa493e6feace642aa57785ea
+EBOOT.PBP:  169,451,184 bytes
+SHA-256:    7d147100be1127d87351042a22526cc64c3229e9b0a9fb984bcd5e0aa20a1523
+```
+
+Its original `PARAM.SFO` identifies `God of War(R): Chains of Olympus Demo`,
+version `1.00`, requiring PSP firmware `3.51`. The PBP retains its encrypted
+`NPUMDIMG` data; PPSSPP's own loader handles it. The downloader checks the exact
+archive members, executable size/hash and headers, and installs it under
+`PSP/GAME/UCUS98713`. Neither the demo nor PPSSPP's iOS executable is rebuilt or
+patched. The binaries remain in the ignored build directory.
+
+```sh
+python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+  --with-ppsspp --ppsspp-muted --ppsspp-gow --timeout 1200 \
+  > build/ios/ppsspp-gow-guest.log 2>&1
+python3 tests/ios/frame.py build/ios/ppsspp-gow-guest.log build/ios/ppsspp-gow.png
+```
+
+The probe sets the normal `[Graphics] InternalResolution=1` preference instead
+of PPSSPP's iOS default of 2× resolution. This reduces the software renderer's
+work while preserving the demo's PSP rendering effects. It waits for colored
+title-screen pixels, then presses Cross to start/skip the introduction until
+the game's green health HUD appears. PPSSPP's original fast-forward control
+runs the landing and camera introduction; the test releases it before capturing
+the opening scene, dragging the original analog stick left and pressing Square
+three times. The pixel checks require the health HUD and a detailed environment
+in both game frames, and at least
+1,000 changed pixels inside the PSP viewport, excluding the controls below it.
+Full 390×680 frames preserve the scene before movement, after movement and after
+the attack inputs. Start opens the game's own pause/upgrade menu, which removes
+the gameplay health HUD; pressing Start again must restore it and the environment.
+The test then confirms/jumps with Cross, performs light combos with Square,
+uses Triangle for heavy attacks and advances with the analog stick. It requires
+the game's red-orb counter to grow from its initial single `0` into an additional
+digit, identified by red font pixels in the fixed HUD field. This checks an
+actual combat/pickup result; a changing camera sequence alone cannot pass it.
+The emulator's own native boot diagnostic and normal process teardown are also
+required. The final exported frame is after combat and pickups.
+
+The demo's first rendering work can exceed the small fixtures' 30-second IPC
+deadline. This probe allows 120 seconds per reply, with the outer VM deadline
+still bounding the whole run. It captures actual GLKView shared-buffer pixels,
+and feeds ordinary UIKit touch events to PPSSPP's original on-screen controls.
+
+Verified on 2026-10-06 in the ARM64 Vinix QEMU guest: 82,841 changed viewport
+pixels after the analog input, health-HUD pixels `52 → 0 → 52` across
+pause/resume, and second-digit red font pixels `0 → 9` after nine combat batches.
+The final native frame shows **14 red orbs and a six-hit combo**, with Kratos
+alive. PPSSPP's native boot and clean process/surface teardown passed, followed
+by the calculator, 2048, C++/UIKit/GLES and other iOS regression checks. The
+complete log is `build/ios/ppsspp-gow-guest.log`; its final combat screenshot is
+`build/ios/ppsspp-gow.png`. This run uses the original IR interpreter fallback
+and Mesa software OpenGL; sound remains disabled. The complete retail game and
+the rest of the demo have not been tested.
+
 `vinix-ios-ppsspp [PSP game file]` accepts a startup file;
 `VINIX_IOS_OPEN_FILE` supplies one when the launcher has no file argument. The
 file must exist in the guest. As with other GUI apps, the launching compositor
@@ -401,8 +469,9 @@ exception unwinding through Mach-O frames remains unsupported; this is a tested
 C++ subset, not a complete ABI. The stdio and scene fixtures also run under
 ASan/UBSan on the ARM64 host.
 
-The rotating-cube homebrew and NZ:P's Nacht der Untoten gameplay are verified;
-commercial PSP games have not been tested. Remaining work includes audio/device
+The rotating-cube homebrew, NZ:P's Nacht der Untoten and God of War's opening
+demo scene have been tested. The full retail God of War game and the rest of
+the demo are untested. Remaining work includes audio/device
 services, additional Foundation/Darwin APIs, keyboard and multiple-touch input,
 and broader rendering coverage. Metal and the bundled MoltenVK dylib remain
 unsupported; the tested backend is OpenGL. Unsupported calls still diagnose the

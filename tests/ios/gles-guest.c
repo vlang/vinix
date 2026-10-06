@@ -19,6 +19,8 @@ static char image[256], action[64];
 static int expected_audio_failure;
 static int startup_failed;
 static pid_t ui_child;
+static int reply_timeout = 30000;
+static unsigned command_kind, tick_count;
 
 static int audio_failure(void) {
     int status;
@@ -48,8 +50,11 @@ static void transfer(int fd, void *pointer, size_t length, int writing) {
         if (!writing) {
             struct pollfd waiting = {.fd = fd, .events = POLLIN};
             int ready;
-            do { ready = poll(&waiting, 1, 30000); } while (ready < 0 && errno == EINTR);
-            if (ready <= 0) fail("application reply timeout");
+            do { ready = poll(&waiting, 1, reply_timeout); } while (ready < 0 && errno == EINTR);
+            if (ready <= 0) {
+                printf("IOS-UI-TIMEOUT: command=%u tick=%u\n", command_kind, tick_count);
+                fail("application reply timeout");
+            }
         }
         ssize_t count = writing ? write(fd, (char *)pointer + offset, length - offset) :
             read(fd, (char *)pointer + offset, length - offset);
@@ -72,6 +77,8 @@ static void reply(void) {
     transfer(response_fd, bytes, byte_count, 0);
 }
 static void command_data(unsigned kind, const void *payload, uint32_t length) {
+    command_kind = kind;
+    if (kind == 4) ++tick_count;
     unsigned char header[136] = {0};
     uint32_t magic = 0x56415050, width = 390, height = 680;
     memcpy(header, &magic, 4); header[4] = 10; header[5] = (unsigned char)kind;
@@ -95,6 +102,7 @@ static void press(int x, int y) {
 static pid_t start(const char *path, const char *logfile) {
     log_path = logfile;
     startup_failed = 0;
+    command_kind = tick_count = 0;
     int requests[2], responses[2];
     if (pipe(requests) || pipe(responses)) fail("pipes");
     pid_t child = fork();
@@ -115,6 +123,9 @@ static pid_t start(const char *path, const char *logfile) {
                 if (!access("/opt/ios/ppsspp-nzp", F_OK))
                     execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp",
                         "/opt/ios/ppsspp-documents/PSP/GAME/nzportable/EBOOT.PBP", (char *)NULL);
+                else if (!access("/opt/ios/ppsspp-gow", F_OK))
+                    execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp",
+                        "/opt/ios/ppsspp-documents/PSP/GAME/UCUS98713/EBOOT.PBP", (char *)NULL);
                 else if (!access("/opt/ios/ppsspp-cube", F_OK))
                     execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", "/opt/ios/cube.pbp", (char *)NULL);
                 else execl("/usr/bin/vinix-ios-ppsspp", "vinix-ios-ppsspp", (char *)NULL);
@@ -170,6 +181,48 @@ static void export_frame(const uint32_t *frame, unsigned step) {
         for (unsigned x = 0; x < 390; x += step) printf("%06x", frame[y * 390 + x] & 0xffffff);
         putchar('\n');
     }
+}
+static void gow_ticks(unsigned count) {
+    // Loading a large encrypted demo under the IR interpreter takes longer
+    // than the small homebrew fixtures. Report progress without dumping a
+    // whole framebuffer on every batch.
+    for (unsigned left = count; left;) {
+        unsigned batch = left > 100 ? 100 : left;
+        ticks(batch); left -= batch;
+        printf("IOS-PSP-GOW: tick %u\n", tick_count);
+        fflush(stdout);
+    }
+}
+static unsigned gow_health(const uint32_t *frame) {
+    unsigned green = 0;
+    // The native demo's green health bar is at the top left of the PSP
+    // viewport. The copyright and title screens have no such pixels.
+    for (unsigned y = 60; y < 120; ++y) for (unsigned x = 0; x < 200; ++x) {
+        uint32_t color = frame[y * 390 + x];
+        unsigned r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+        if (g >= 60 && g * 10 > r * 16 && g * 10 > b * 16) ++green;
+    }
+    return green;
+}
+static unsigned psp_lit(const uint32_t *frame) {
+    unsigned lit = 0;
+    for (unsigned y = 60; y < 280; ++y) for (unsigned x = 0; x < 390; ++x) {
+        uint32_t color = frame[y * 390 + x];
+        if (((color >> 16) & 255) > 10 || ((color >> 8) & 255) > 10 || (color & 255) > 10) ++lit;
+    }
+    return lit;
+}
+static unsigned gow_orb_digits(const uint32_t *frame) {
+    unsigned red = 0;
+    // The initial red-orb count is the single digit 0, left of this region.
+    // Combat/pickups grow the game's own counter into its second digit.
+    for (unsigned y = 100; y < 109; ++y) for (unsigned x = 84; x < 92; ++x) {
+        uint32_t color = frame[y * 390 + x];
+        unsigned r = (color >> 16) & 255, g = (color >> 8) & 255, b = color & 255;
+        // The game's dark-red font reaches about 150, not full-bright red.
+        if (r > 100 && r > g * 3 && r > b * 3) ++red;
+    }
+    return red;
 }
 struct player_state { float origin[3], magazine, health; };
 static char *nzp_log(void) {
@@ -266,6 +319,8 @@ void test_gles_ui(void) {
 void test_ppsspp_ui(void) {
     int cube = access("/opt/ios/ppsspp-cube", F_OK) == 0;
     int nzp = access("/opt/ios/ppsspp-nzp", F_OK) == 0;
+    int gow = access("/opt/ios/ppsspp-gow", F_OK) == 0;
+    reply_timeout = gow ? 120000 : 30000;
     expected_audio_failure = access("/opt/ios/ppsspp-muted", F_OK) != 0;
     (void)start("/opt/ios/PPSSPP", "/tmp/ios-ppsspp-ui.log");
     if (expected_audio_failure) {
@@ -288,7 +343,35 @@ void test_ppsspp_ui(void) {
     __atomic_store_n(surface + 8, active, __ATOMIC_RELEASE);
     memcpy(first, surface + 12 + active * pixels, pixels * 4);
     __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
-    for (unsigned tick = 0; tick < 180; ++tick) { usleep(20000); command(4, ""); }
+    ticks(180);
+    if (gow) {
+        for (unsigned attempt = 0; ; ++attempt) {
+            snapshot(surface, first);
+            if (psp_lit(first) > 50000) break;
+            if (attempt == 40) fail("God of War title screen timed out");
+            gow_ticks(50);
+        }
+        puts("IOS-PSP-GOW: title");
+        export_frame(first, 2);
+        // Cross skips the title animation, starts the demo, and skips the
+        // introduction when needed. Wait for the actual game's health HUD.
+        for (unsigned attempt = 0; ; ++attempt) {
+            press(294, 426); gow_ticks(60);
+            snapshot(surface, first);
+            if (gow_health(first) >= 20 && psp_lit(first) > 50000) break;
+            if (attempt == 8) { export_frame(first, 2); fail("God of War gameplay HUD timed out"); }
+        }
+        // The health HUD appears during the unskippable camera introduction.
+        // Use PPSSPP's original fast-forward control to run that sequence,
+        // then release it before testing the game's movement and combat.
+        pointer(1, 194, 426); gow_ticks(200); pointer(2, 194, 426); gow_ticks(60);
+        puts("IOS-PSP-GOW: opening battle");
+        snapshot(surface, first); export_frame(first, 1); fflush(stdout);
+        pointer(1, 114, 524); pointer(0, 74, 524); gow_ticks(60); pointer(2, 74, 524); ticks(20);
+        puts("IOS-PSP-GOW: analog movement");
+        snapshot(surface, last); export_frame(last, 1); fflush(stdout);
+        press(244, 376); press(244, 376); press(244, 376); // Square: chained blades.
+    }
     if (nzp) for (unsigned tick = 0; tick < 600; ++tick) { usleep(20000); command(4, ""); }
     if (nzp) {
         press(294, 426); ticks(100); // Cross: SOLO.
@@ -318,9 +401,21 @@ void test_ppsspp_ui(void) {
         memcpy(first, surface + 12 + active * pixels, pixels * 4);
         __atomic_store_n(surface + 8, UINT32_MAX, __ATOMIC_RELEASE);
     }
+    if (gow) {
+        unsigned animated = 0;
+        for (unsigned y = 60; y < 280; ++y) for (unsigned x = 0; x < 390; ++x) {
+            unsigned index = y * 390 + x;
+            if (first[index] != last[index]) ++animated;
+        }
+        unsigned before_health = gow_health(first), after_health = gow_health(last);
+        printf("IOS-PSP-GOW: health-pixels=%u/%u viewport-lit=%u/%u animated=%u\n",
+            before_health, after_health, psp_lit(first), psp_lit(last), animated);
+        if (before_health < 20 || after_health < 20 || psp_lit(first) < 50000 ||
+            psp_lit(last) < 50000 || animated < 1000) fail("God of War gameplay HUD, environment or animation");
+    }
     // The original menu's Settings gear: route a real UIKit touch pair to its
     // native controller, then render the resulting settings screen.
-    if (!cube && !nzp) { pointer(1, 230, 34); pointer(2, 230, 34); }
+    if (!cube && !nzp && !gow) { pointer(1, 230, 34); pointer(2, 230, 34); }
     for (unsigned tick = 0; tick < 60; ++tick) { usleep(20000); command(4, ""); }
     active = __atomic_load_n(surface + 7, __ATOMIC_ACQUIRE);
     if (active > 1) fail("PPSSPP final active buffer");
@@ -361,8 +456,42 @@ void test_ppsspp_ui(void) {
     }
     // Export native gameplay before/after input, or the existing sampled frame.
     if (nzp) export_frame(first, 1);
-    export_frame(last, nzp ? 1 : 2);
+    export_frame(last, (nzp || gow) ? 1 : 2);
     printf("IOS-PPSSPP-PIXELS: changed=%u lit=%u colors=%u\n", changed, lit, distinct);
+    if (gow) {
+        unsigned playing_health = gow_health(last);
+        press(194, 524); ticks(20); // Start: the game's own pause/upgrade menu.
+        snapshot(surface, last);
+        unsigned paused_health = gow_health(last);
+        puts("IOS-PSP-GOW: game pause menu"); export_frame(last, 2); fflush(stdout);
+        if (paused_health >= 20) fail("God of War Start did not open its pause menu");
+        press(194, 524); ticks(20); // Start again: return to the actual game.
+        snapshot(surface, last);
+        unsigned resumed_health = gow_health(last);
+        printf("IOS-PSP-GOW: pause/resume health-pixels=%u/%u/%u\n", playing_health, paused_health, resumed_health);
+        if (resumed_health < 20 || psp_lit(last) < 50000) fail("God of War Start did not resume gameplay");
+        unsigned initial_orbs = gow_orb_digits(last);
+        if (initial_orbs > 5) fail("God of War initial red-orb counter");
+        // Finish any remaining enemy-arrival shot, dismiss the tutorial and
+        // fight with the actual PSP buttons. Require a changed game-owned
+        // orb counter, so the cinematic alone cannot count as gameplay.
+        unsigned orbs = initial_orbs;
+        for (unsigned attempt = 0; orbs < 8; ++attempt) {
+            if (attempt == 24) { export_frame(last, 1); fail("God of War combat did not earn red orbs"); }
+            press(294, 426); // Cross: confirm tutorials/jump.
+            press(244, 376); press(244, 376); press(244, 376); // Square: light combo.
+            press(294, 326); // Triangle: heavy attack.
+            pointer(1, 114, 524); pointer(0, 114, 474); gow_ticks(20); pointer(2, 114, 474);
+            gow_ticks(40);
+            snapshot(surface, last); orbs = gow_orb_digits(last);
+            printf("IOS-PSP-GOW: combat %u health-pixels=%u orb-digit-pixels=%u\n",
+                attempt + 1, gow_health(last), orbs);
+            fflush(stdout);
+        }
+        if (!gow_health(last) || psp_lit(last) < 50000) fail("God of War combat did not leave a live game scene");
+        printf("IOS-PSP-GOW: earned red orbs, digit-pixels=%u->%u\n", initial_orbs, orbs);
+        export_frame(last, 1);
+    }
     free(first); free(last);
     command(6, ""); close(request_fd); close(response_fd);
     int status;
@@ -385,6 +514,12 @@ void test_ppsspp_ui(void) {
             !strstr(diagnostics, "Booted /opt/ios/ppsspp-documents/PSP/GAME/nzportable/EBOOT.PBP..."))
             fail("NZP native PSP boot");
         puts("iOS PASS: unchanged PPSSPP iOS binary plays NZP PSP shooter");
+    }
+    if (gow) {
+        if (!strstr(diagnostics, "startup path passed to argv: /opt/ios/ppsspp-documents/PSP/GAME/UCUS98713/EBOOT.PBP") ||
+            !strstr(diagnostics, "Booted /opt/ios/ppsspp-documents/PSP/GAME/UCUS98713/EBOOT.PBP..."))
+            fail("God of War native PSP boot");
+        puts("iOS PASS: unchanged PPSSPP iOS binary runs God of War PSP demo");
     }
     puts("iOS PASS: upstream PPSSPP native framebuffer and process lifecycle (muted)");
 }
