@@ -77,7 +77,8 @@ it requires no X11, Mesa or iOS runtime changes.
 Game speed follows the desktop's polling cadence; real-time performance across
 other games is unmeasured. Audio is submitted to Vinix's nonblocking OSS device
 when available; the regression uses `--mute` and does not verify sound output.
-Commercial game compatibility and analog controllers have not been tested.
+Crash Bandicoot (USA, SCUS-94900) was verified in N. Sanity Beach with
+the HLE BIOS. Other commercial games and analog controllers have not been tested.
 
 ## Verification
 
@@ -104,3 +105,22 @@ Its native screenshot is above; its transcript is `build/ps1/desktop.log`.
 
 The iOS regression also passes with calculator, 2048, C++/UIKit/GLES fixtures
 and the unchanged PPSSPP iOS binary executing the PSP cube demo.
+
+The supplied Crash Bandicoot USA CUE/BIN was also verified on 2026-10-06.
+The trial reached its title menu, island map and N. Sanity Beach, then tested
+forward movement, jumping and spinning away the three starting crates.
+Pause froze every game pixel for 60 poll frames; resuming changed 17,654 pixels
+after 120 frames. The emulator and isolated QEMU guest shut down cleanly.
+Its captured frames, input sequence and serial log are retained under
+`build/ps1/crash-smoke/`. This trial used the same native executable and
+unchanged core with the HLE BIOS.
+
+A separate desktop trial opened the supplied disc through **Open game**,
+using actual mouse and keyboard input. It reached the same level, moved and
+jumped with the on-screen controller, and cleared the remaining crate with
+the keyboard's Square binding. Pause kept every displayed game pixel
+unchanged; Resume continued gameplay, and normal window close shut down
+the emulator successfully. Its screenshots, input sequence and serial log
+are under `build/ps1/crash-desktop/`.
+
+![Crash jumping in N. Sanity Beach in Vinix's PlayStation window](images/ps1-crash-bandicoot-vinix.png)
