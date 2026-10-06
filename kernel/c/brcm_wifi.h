@@ -30,6 +30,9 @@ enum bw_state { BW_OFF, BW_CHIP, BW_BOOTING, BW_READY, BW_JOINING, BW_LINK, BW_F
 enum bw_error { BW_OK = 0, BW_EINVAL = -1, BW_ENOSPC = -2, BW_EIO = -3,
     BW_ETIME = -4, BW_EPROTO = -5, BW_ENOTSUP = -6, BW_ENOLINK = -7 };
 
+/* Keep the native callback type const-qualified in generated V callers. */
+typedef const uint8_t bw_const_byte;
+
 struct bw_ops {
 #ifdef VINIX_V_RUNTIME
     union {
@@ -50,7 +53,7 @@ struct bw_ops {
     /* Must disable PCI bus mastering and drain/quiesce before return.
      * The driver NEVER frees or reuses the DMA pool after a fatal error. */
     void (*stop_dma)(void *);
-    void (*receive)(void *, BW_CONST uint8_t *ethernet, size_t length);
+    void (*receive)(void *, bw_const_byte *ethernet, size_t length);
 };
 struct bw_core { uint32_t base, wrap; uint16_t id; uint8_t rev; };
 struct bw_mem { uint8_t *cpu; uint64_t dma; size_t len; };

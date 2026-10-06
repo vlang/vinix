@@ -1,5 +1,7 @@
 @[translated]
 module wificore
+@[typedef]
+struct C.bw_const_byte {}
 #include "brcm_wifi.h"
 #include <string.h>
 fn C.memcpy(voidptr, voidptr, usize) voidptr
@@ -74,7 +76,7 @@ pub mut:
 	// Must disable PCI bus mastering and drain/quiesce before return.
 	//     *The driver NEVER frees or reuses the DMA pool after a fatal error.
 	stop_dma fn (voidptr)
-	receive  fn (voidptr, &u8, usize)
+	receive  fn (voidptr, &C.bw_const_byte, usize)
 }
 
 pub struct C.bw_core {
@@ -1702,7 +1704,7 @@ pub fn wifi_completion(d &C.bw_device, ring u32, m &u8, n usize) i32 {
 	// Only authenticated data, never vendor-event interpretation of RX data.
 
 	if !wifi_l16(voidptr(m + 8)) && u32(d.state) == u32(i32(Bw_state.bw_link)) && len >= usize(14) && len <= usize(1514) && i32(wifi_b16(voidptr(p.mem.cpu + off + 12))) != 34924 {
-		d.ops.receive(voidptr(d.cookie), p.mem.cpu + off, len)
+		d.ops.receive(voidptr(d.cookie), &C.bw_const_byte(p.mem.cpu + off), len)
 		d.rx_frames++
 	}
 	p.owner = u8(0)

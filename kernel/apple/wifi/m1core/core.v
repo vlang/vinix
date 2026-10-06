@@ -411,7 +411,7 @@ pub fn m1_bus_sync(u voidptr, p voidptr, n usize, to_device i32) {
 }
 
 @[export: 'vinix_m1_core_receive']
-pub fn m1_receive(u voidptr, p &u8, n usize) {
+pub fn m1_receive(u voidptr, p &C.bw_const_byte, n usize) {
 	unsafe {
 
 
