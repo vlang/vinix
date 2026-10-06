@@ -59,6 +59,11 @@ interrupt_thunk_\num:
 6:
     // Resolve both user-CS and capability gates before entering C.
     lfence
+.if \num >= 32
+    mov $\num, %edi
+    mov 152(%rsp), %rsi
+    call vinix_x86_maskable_irq_enter
+.endif
     mov %rsp, %rdi
     call interrupt_enter
     mov $\num, %rdi
@@ -69,6 +74,13 @@ interrupt_thunk_\num:
     xor %rbp, %rbp
     mov (%rbx), %rbx
     call __x86_indirect_thunk_rbx
+.if \num >= 32
+    // A handler may enable IRQs; close its region atomically before any
+    // task-context return work. IRET restores the interrupted flags.
+    cli
+    mov $\num, %edi
+    call vinix_x86_maskable_irq_exit
+.endif
     jmp interrupt_thunk_exit
 .endm
 

@@ -5,6 +5,7 @@ import katomic
 import memory
 import proc
 import usercopy
+import x86.cpu.local as cpulocal
 import linuxkpi.compatcore
 
 // A synchronous borrow from the running Thread. Running ownership protects
@@ -14,6 +15,11 @@ fn native_fault_depth() &u32 {
 	mut caller := proc.current_thread()
 	if caller == unsafe { nil } { return unsafe { nil } }
 	return unsafe { &caller.linuxkpi_fault_depth }
+}
+
+@[export: 'vinix_linuxkpi_maskable_irq_depth']
+fn native_maskable_irq_depth() u32 {
+	return cpulocal.maskable_irq_depth()
 }
 
 fn native_fault_resolution_disabled() bool {

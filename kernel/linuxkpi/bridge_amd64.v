@@ -62,7 +62,7 @@ fn release_preemption(allow_reschedule bool) {
 	}
 	preempt_depth[index]--
 	reschedule := allow_reschedule && preempt_depth[index] == 0 && preempt_pending[index]
-		&& ints
+		&& ints && cpulocal.current().maskable_irq_depth == 0
 	if reschedule {
 		preempt_pending[index] = false
 	}
@@ -93,6 +93,7 @@ fn preempt_check_resched() {
 	ints := cpu.interrupt_toggle(false)
 	index := cpulocal.current().cpu_number
 	reschedule := ints && preempt_depth[index] == 0 && preempt_pending[index]
+		&& cpulocal.current().maskable_irq_depth == 0
 	if reschedule {
 		preempt_pending[index] = false
 	}
@@ -271,7 +272,7 @@ fn alloc_pages(count u64, reclaim bool) voidptr {
 fn may_sleep() bool {
 	ints := cpu.interrupt_toggle(false)
 	index := cpulocal.current().cpu_number
-	allowed := ints && preempt_depth[index] == 0
+	allowed := ints && preempt_depth[index] == 0 && cpulocal.current().maskable_irq_depth == 0
 	cpu.interrupt_toggle(ints)
 	return allowed
 }
@@ -301,6 +302,7 @@ fn irq_restore(flags u64) {
 	index := cpulocal.current().cpu_number
 	ints := flags & (u64(1) << 9) != 0
 	reschedule := ints && preempt_depth[index] == 0 && preempt_pending[index]
+		&& cpulocal.current().maskable_irq_depth == 0
 	if reschedule {
 		preempt_pending[index] = false
 	}
@@ -518,6 +520,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Linux resident non-temporal user-copy self-test failed')
 		}
 		C.kprintf(c'linuxkpi: resident non-temporal user copies, page prefixes and fences passed; no pages or heap objects retained\n')
+		if !irq_context_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native maskable IRQ context self-test failed')
+		}
+		C.kprintf(c'linuxkpi: native maskable IRQ nesting, hardware deferral and task context passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

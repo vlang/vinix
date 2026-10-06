@@ -8,6 +8,11 @@ fn interrupt_state() bool {
 	return cpu.interrupt_state()
 }
 
+// Preserve the existing ARM context contract; native IRQ accounting is separate.
+fn wait_context_allowed() bool {
+	return cpu.interrupt_state()
+}
+
 @[inline]
 fn interrupt_toggle(state bool) bool {
 	return cpu.interrupt_toggle(state)

@@ -9,6 +9,14 @@ fn interrupt_state() bool {
 	return cpu.interrupt_state()
 }
 
+fn wait_context_allowed() bool {
+	return cpu.interrupt_state() && maskable_wait_allowed()
+}
+
+fn maskable_wait_allowed() bool {
+	return cpulocal.maskable_irq_depth() == 0
+}
+
 @[inline]
 fn interrupt_toggle(state bool) bool {
 	return cpu.interrupt_toggle(state)

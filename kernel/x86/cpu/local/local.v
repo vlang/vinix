@@ -85,6 +85,13 @@ pub mut:
 	ldt_process voidptr
 	// Feature-gated speculation controls selected separately on each CPU.
 	speculation_policy u64
+	// Native maskable entries are tracked from CPU setup through every thunk
+	// return or scheduler handoff. These never retain an interrupted Thread.
+	maskable_irq_depth               u32
+	maskable_irq_entries             u64
+	maskable_irq_peak_depth          u32
+	maskable_irq_user_entries        u64
+	maskable_irq_scheduler_deferrals u64
 }
 
 __global (

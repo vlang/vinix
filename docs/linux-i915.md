@@ -377,8 +377,22 @@ after a filesystem failure. Mutable build inputs still require isolation.
   `free_percpu`; CPU hotplug and Linux early-boot per-CPU machinery are pending.
 - Ordinary `preempt_disable`/`preempt_enable`, nested counts, `preemptible`,
   no-reschedule release and deferred rescheduling. `preempt_count` currently
-  reports scheduler pins only. Linux IRQ/NMI/softirq context accounting and
+  reports scheduler pins only. Full Linux IRQ/NMI/softirq context encoding and
   `in_interrupt`/`in_atomic` are not implemented.
+- Native x86 maskable interrupts have CPU-owned nesting and entry counters
+  from CPU initialization onward. Real vectors 32 through 255 enter after
+  installing kernel GS; their ordinary thunk returns close the region with
+  IRQs disabled before task-return work. Scheduler handoffs close their own
+  entry before releasing the outgoing task or changing GS. A scheduler IRQ
+  nested inside an IRQ-enabled handler defers the switch and rearms its timer.
+  Sleep/fault predicates and voluntary scheduler/pthread operations reject
+  actual interrupt context before ownership changes. Blocking event waits
+  reject before consuming pending events or attaching listeners. Ordinary
+  task wait behavior, including ARM's existing IRQ contract, is preserved.
+  This does not implement Linux's context bit layout, NMI entry, BH dispatch,
+  IRQ registration or ordinary RCU grace periods. Scheduler IST1 still requires
+  IRQ exclusion while it is active; nesting accounting cannot repair a frame
+  overwritten by reentering that same stack.
 - A `current` task view embedded in the native x86 Thread, with
   initial-namespace PID/TGID queries, a bounded name and task-owned flags.
   Refresh preserves every Linux-owned bit, including unchanged vtime helper
@@ -487,10 +501,11 @@ after a filesystem failure. Mutable build inputs still require isolation.
 - Task-owned `pagefault_disable`/`pagefault_enable` nesting survives native
   sleeps, preemption and CPU migration; new tasks start at zero. The operations
   preserve IRQ and preemption state and place compiler barriers around depth
-  changes. `faulthandler_disabled` also checks native preemption pins. Checked
+  changes. `faulthandler_disabled` also checks native preemption pins and actual
+  maskable interrupt depth. Checked
   user copies and kernel fault handlers reject page-in/COW before allocation
   when resolution is disabled. Unknown direct kernel faults remain fatal;
-  Linux exception-table fixups and IRQ/NMI context accounting remain pending.
+  Linux exception-table fixups and complete IRQ/NMI/BH encoding remain pending.
   `__copy_{from,to}_user_inatomic` always uses resident-only page chunks,
   returns the exact uncopied suffix and leaves that suffix untouched, including
   at task depth zero. NMI use remains unsupported.
@@ -595,6 +610,7 @@ python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
 python3 tests/linuxkpi/pagefault_test.py
+python3 tests/linuxkpi/irq_context_test.py
 python3 tests/linuxkpi/uaccess_test.py
 python3 tests/linuxkpi/bounds_generation_test.py
 python3 tests/linuxkpi/audit_generation_test.py
@@ -1289,7 +1305,7 @@ and `/tmp/vinix-linuxkpi-compiler-next-oct06-final-artifacts.json`.
 The complete i915 build still fails. Ordinary per-CPU storage and scheduler
 pins, current-task identity, ordinary blocking task states/wakeups and retained
 task references now have native implementations. Namespace-relative
-PID queries, SMP dispatch, interrupt-context accounting and runtime page-table
+PID queries, SMP dispatch, full Linux interrupt-context encoding and runtime page-table
 geometry/ownership still need a bridge. No `mm` field or dummy address space is exposed.
 Borrowed `current` must not be used after exit; callers retaining a view use
 `get_task_struct` before surrendering its running/owned lifetime and release
@@ -1362,3 +1378,40 @@ Existing partial map/fork OOM rollback remains outside this feature. The first
 compile rejected a reserved V identifier; the reviewed identifier-only correction
 and failed result are preserved. Aggregate evidence:
 `/tmp/vinix-linuxkpi-nocache-oct06-final-validation.json`.
+
+Native maskable-IRQ validation uses the frozen 28-path integration overlay and
+the same saved enabled ELF
+`aaad1db6f60f17a4ea84ad98e457c5d2e7687a2b43ca36aa17777309300f3381`
+for complete four-CPU normal and SSE guests. Actual nested software interrupts,
+hardware scheduler IPIs, idle-target wakeups, sleep/yield and user-mode interrupt
+delivery pass. A pending blocking event remains untouched inside a handler.
+User-mode entry counters and a later depth-zero task return have separate serial
+markers; they do not prove that a particular interrupted task returned through
+the ordinary non-scheduler IRET path. Three complete actor-lifecycle warmups
+precede a fourth with physical free bytes exactly `348405760` before and after,
+and every live heap class equal in both guests. The first warmup retains 14 pages;
+the measured fourth retains none.
+
+Strict GNU99/GNU11 IRQ host checks each pass 280,732 ASan/UBSan assertions and
+inspect all 224 paired IRQ thunks, 32 untouched exception thunks and the real
+saved-CS offset. Fault-control checks each pass 494,347 assertions plus eight
+fatal cases. Independent reviewers checked the final generated C, optimized
+objects, linked ELF, two scheduler handoff paths, fixture join/off-stack cleanup
+and all frozen sources. Default x86 and disabled ARM builds and Linux-ABI startup
+pass. An earlier broad event-wait guard timed out on ARM; the final guard tests
+actual x86 maskable depth and preserves ordinary task wait behavior. The failed
+attempt and passing private diagnostic variant remain recorded.
+
+The disabled ARM desktop harness completes `ops,churn,cache,idle,apps,drag` with
+the saved final kernel. It reports retained allocations, including
+16–32 KiB per 300-process churn batch, so no global leak-free result is claimed.
+The allocation-site gate exits 1 on both the clean `24afa95c` baseline and this
+feature: 354 ARM sites, 293 x86 sites and exactly the same 158 failing groups.
+The first gate invocation never started because its isolated checkout lacked
+the harness; its corrected failure record is preserved. Aggregate evidence:
+`/tmp/vinix-linuxkpi-irq-context-oct06-final-validation.json`.
+
+Workqueue callback identity still needs an interrupt-context gate: an IRQ that
+interrupts a worker must not inherit its callback/drain-chaining privileges.
+The currently shared workqueue backend is awaiting that separate repair and
+native regression coverage. NMI/BH entry and ordinary RCU remain unresolved.

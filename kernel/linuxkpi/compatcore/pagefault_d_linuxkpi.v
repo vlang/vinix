@@ -14,6 +14,7 @@ fn C.vkf_irq_save() u64
 fn C.vkf_irq_restore(u64)
 @[c: 'vinix_linuxkpi_preempt_count']
 fn C.vkf_preempt_count() u32
+fn C.vinix_linuxkpi_maskable_irq_depth() u32
 
 // Linux needs compiler ordering, rather than an inter-CPU hardware fence,
 // around its task-local depth change. This lowers to a compiler primitive.
@@ -72,9 +73,10 @@ pub fn pagefault_disabled() bool {
 	return depth != unsafe { nil } && C.vkp_load32(depth, 0) != 0
 }
 
-// This is the supported native preemption component of Linux in_atomic().
-// Hard-IRQ, softirq and NMI accounting remain separate pending services.
+// Explicit native pins and actual maskable IRQ nesting prohibit fault handling.
+// Full Linux preempt-count encoding, softirq and NMI remain separate services.
 @[export: 'faulthandler_disabled']
 pub fn faulthandler_disabled() bool {
 	return pagefault_disabled() || C.vkf_preempt_count() != 0
+		|| C.vinix_linuxkpi_maskable_irq_depth() != 0
 }

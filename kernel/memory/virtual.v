@@ -48,9 +48,20 @@ pub __global (
 	page_in_resolver fn (&Pagemap, u64) bool
 	locked_bytes_resolver fn (&Pagemap) u64
 	fault_resolution_guard u64
+	native_fault_context_guard u64
 )
 
 type FaultResolutionGuard = fn () bool
+
+// The architecture publishes this after every boot CPU has installed its
+// native context, before runnable tasks/interrupts start. The callback is
+// permanent and never called before the acknowledged setup of kernel GS.
+pub fn register_native_fault_context_guard(guard fn () bool) {
+	bits := u64(voidptr(guard))
+	if bits == 0 || !katomic.cas(mut &native_fault_context_guard, u64(0), bits) {
+		panic('native fault-context guard already installed or invalid')
+	}
+}
 
 // The compatibility runtime installs this once during boot, before publishing
 // its workers. This module cannot import its task/scheduler implementation.
@@ -62,6 +73,11 @@ pub fn register_fault_resolution_guard(guard fn () bool) {
 }
 
 pub fn fault_resolution_disabled() bool {
+	native_bits := katomic.load(&native_fault_context_guard)
+	if native_bits != 0 {
+		native_guard := unsafe { FaultResolutionGuard(voidptr(native_bits)) }
+		if native_guard() { return true }
+	}
 	bits := katomic.load(&fault_resolution_guard)
 	if bits == 0 { return false }
 	guard := unsafe { FaultResolutionGuard(voidptr(bits)) }

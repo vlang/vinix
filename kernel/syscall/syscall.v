@@ -5,11 +5,19 @@ import proc
 import sched
 import userland
 
+fn C.vinix_linuxkpi_test_maskable_user_return()
+
 // Called by syscall_entry in asm/x86_64/syscall_entry.S on the way back to
 // userspace, with the saved GPR frame, as syscall/common.v's leave() is on
 // arm64.
 @[export: 'syscall_leave']
 fn leave(context &cpulocal.GPRState) {
+	if cpulocal.maskable_irq_depth() != 0 {
+		panic('x86: syscall return inherited maskable IRQ context')
+	}
+	$if linuxkpi ? {
+		C.vinix_linuxkpi_test_maskable_user_return()
+	}
 	userland.flush_owed_sync()
 	userland.settle_owed_memory()
 	// A call that broke a pledge(2) promise has unwound and holds nothing;

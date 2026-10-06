@@ -5,6 +5,7 @@ import proc
 import sched
 import event.eventstruct
 import katomic
+import lib
 
 __global (
 	waiting_event_count = u64(0)
@@ -150,6 +151,11 @@ fn next_event_below(events []&eventstruct.Event, bound u64) int {
 
 fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation bool,
 	watched_index u64, generation u64, generations []u64, explicit_mask bool, interrupt_mask u64) ?u64 {
+	// Reject native x86 IRQ callers before pending events, listeners or queues
+	// change. Ordinary native waits retain their existing architecture contract.
+	$if amd64 {
+		if block && !maskable_wait_allowed() { return none }
+	}
 	mut t := proc.current_thread()
 
 	interrupt_toggle(false)
@@ -277,7 +283,7 @@ pub fn await(mut events []&eventstruct.Event, block bool) ?u64 {
 // and a wait would let go of the CPU with the lock still taken, and come back
 // with interrupts on whatever they were.
 pub fn may_wait() bool {
-	return interrupt_state()
+	return wait_context_allowed()
 }
 
 // Signal acceptance waits must also wake for their requested blocked signals.
@@ -368,7 +374,18 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	return ret
 }
 
+// Native thread ownership changes require an ordinary task on x86. Check
+// before consuming a join reference or changing run-queue and exit state.
+pub fn require_task_context() {
+	$if amd64 {
+		if !maskable_wait_allowed() {
+			lib.kpanic(unsafe { nil }, c'native pthread operation in maskable IRQ context')
+		}
+	}
+}
+
 pub fn pthread_exit(ret voidptr) {
+	require_task_context()
 	interrupt_toggle(false)
 
 	mut current_thread := proc.current_thread()
@@ -384,6 +401,7 @@ pub fn pthread_exit(ret voidptr) {
 }
 
 pub fn pthread_wait(t &proc.Thread) voidptr {
+	require_task_context()
 	mut storage := [&t.exited]!
 	mut events := unsafe { stack_list(&storage[0], storage.len) }
 	for !katomic.load(&t.pthread_exited) {

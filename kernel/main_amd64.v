@@ -172,6 +172,7 @@ fn kmain() {
 	C._vinit(0, 0)
 
 	// Initialize the earliest arch structures.
+	asm volatile amd64 { cli; ; ; memory }
 	gdt.initialise()
 	idt.initialise()
 	isr.initialise()

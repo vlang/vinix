@@ -6,8 +6,8 @@
 
 /* Task-local nesting suppresses native page-in/COW without disabling
  * preemption or ordinary task sleeps. Fault-handler queries include the
- * supported native preemption count. Linux IRQ/NMI accounting and exception
- * table fixups remain separate pending services. */
+ * native preemption pins and actual maskable IRQ depth. Full Linux context-bit
+ * encoding, NMI/BH accounting and exception fixups remain separate services. */
 void pagefault_disable(void);
 void pagefault_enable(void);
 bool pagefault_disabled(void);

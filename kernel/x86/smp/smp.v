@@ -82,6 +82,9 @@ pub fn initialise() {
 
 	// All GS/TPIDR CPU numbers are now installed; publish cache readiness.
 	memory.heap_enable_cpu_caches(u64(cpu_locals.len))
+	// All CPUs still have IRQs off and APs await scheduler_vector. Counting
+	// already began in their setup; only the permanent fault observer is new.
+	memory.initialise_native_irq_fault_guard()
 	$if heap_benchmark ? {
 		memory.heap_benchmark()
 	}

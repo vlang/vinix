@@ -13,6 +13,7 @@ struct C.__threadattr {}
 
 @[export: 'pthread_create']
 pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine fn (voidptr) voidptr, arg voidptr) int {
+	event.require_task_context()
 	if attr != unsafe { nil } {
 		lib.kpanic(unsafe { nil }, c'pthread_create() called with non-NULL attr')
 	}
@@ -36,6 +37,7 @@ pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine f
 
 @[export: 'pthread_detach']
 pub fn pthread_detach(t &C.__thread_data) int {
+	event.require_task_context()
 	mut thrd := unsafe { &proc.Thread(t) }
 	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
 		return errno.einval
@@ -47,6 +49,7 @@ pub fn pthread_detach(t &C.__thread_data) int {
 
 @[export: 'pthread_join']
 pub fn pthread_join(t &C.__thread_data, retval &voidptr) int {
+	event.require_task_context()
 	mut thrd := unsafe { &proc.Thread(t) }
 	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
 		return errno.einval

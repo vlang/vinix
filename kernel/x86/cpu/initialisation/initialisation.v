@@ -36,8 +36,15 @@ const cr4_smep = u64(1) << 20
 __global smap_enabled u8
 
 pub fn initialise(smp_info &limine.LimineSMPInfo) {
+	// No maskable entry may precede this CPU's GS and context initialization.
+	asm volatile amd64 { cli; ; ; memory }
 	mut cpu_local := unsafe { &cpulocal.Local(smp_info.extra_argument) }
 	cpu_number := cpu_local.cpu_number
+	cpu_local.maskable_irq_depth = 0
+	cpu_local.maskable_irq_entries = 0
+	cpu_local.maskable_irq_peak_depth = 0
+	cpu_local.maskable_irq_user_entries = 0
+	cpu_local.maskable_irq_scheduler_deferrals = 0
 
 	cpu_local.lapic_id = smp_info.lapic_id
 

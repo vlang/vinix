@@ -42,7 +42,7 @@ struct task { uint32_t depth; unsigned identity; };
 struct context {
     struct task *task;
     uint64_t flags;
-    uint32_t preempt, cpu;
+    uint32_t preempt, cpu, maskable;
     unsigned borrows, saves, restores, preempt_queries;
     bool mutation;
 };
@@ -84,6 +84,10 @@ uint32_t vinix_linuxkpi_preempt_count(void) {
     return current.preempt;
 }
 
+uint32_t vinix_linuxkpi_maskable_irq_depth(void) {
+    return current.maskable;
+}
+
 void vinix_linuxkpi_bug(const char *message, int line) {
     (void)line;
     if (!expect_fatal || current.flags != fatal_flags ||
@@ -98,7 +102,7 @@ void vinix_linuxkpi_bug(const char *message, int line) {
 }
 
 static bool model_may_sleep(void) {
-    return (current.flags & IRQ_ENABLED) && !current.preempt;
+    return (current.flags & IRQ_ENABLED) && !current.preempt && !current.maskable;
 }
 
 static void reset(struct task *task, uint64_t flags, uint32_t preempt,
@@ -116,6 +120,7 @@ static void mutate(bool disable, uint32_t expected) {
     CHECK(current.task && current.task->depth == expected);
     CHECK(current.task == before.task && current.cpu == before.cpu);
     CHECK(current.flags == before.flags && current.preempt == before.preempt);
+    CHECK(current.maskable == before.maskable);
     CHECK(model_may_sleep() == before_sleep);
     CHECK(current.borrows == before.borrows + 1);
     CHECK(current.saves == before.saves + 1);
@@ -129,6 +134,7 @@ static void query(bool fault_handler, bool expected) {
     CHECK(result == expected);
     CHECK(current.task == before.task && current.cpu == before.cpu);
     CHECK(current.flags == before.flags && current.preempt == before.preempt);
+    CHECK(current.maskable == before.maskable);
     CHECK(current.borrows == before.borrows + 1);
     CHECK(current.saves == before.saves && current.restores == before.restores);
 }
@@ -206,6 +212,25 @@ static void fault_handler_predicate(void) {
     /* IRQ flags alone do not fabricate hardirq/NMI context accounting. */
 }
 
+static void native_maskable_predicate(void) {
+    const uint32_t nesting[] = {0, 1, 2, 17, UINT32_MAX};
+    for (unsigned irq = 0; irq < 2; irq++) {
+        for (unsigned pin = 0; pin < 2; pin++) {
+            for (unsigned depth = 0; depth < 2; depth++) {
+                for (size_t index = 0; index < sizeof(nesting) / sizeof(nesting[0]); index++) {
+                    struct task task = { .depth = depth, .identity = 5 };
+                    reset(&task, irq ? 0x246 : 0x46, pin, 1);
+                    current.maskable = nesting[index];
+                    query(false, depth != 0);
+                    query(true, depth != 0 || pin != 0 || nesting[index] != 0);
+                    CHECK(current.maskable == nesting[index]);
+                    CHECK(task.depth == depth);
+                }
+            }
+        }
+    }
+}
+
 static void *parallel_task(void *argument) {
     struct task *task = argument;
     reset(task, (task->identity & 1) ? 0x46 : 0x246,
@@ -257,6 +282,7 @@ int main(int argc, char **argv) {
     nesting_and_state();
     independent_tasks_and_migration();
     fault_handler_predicate();
+    native_maskable_predicate();
     parallel_isolation();
     printf("LinuxKPI pagefault depth: %lu assertions passed\n", assertions);
     return 0;

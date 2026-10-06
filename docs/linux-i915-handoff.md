@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline: **`e393312a`** (resident non-temporal copies, task-owned fault controls, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
+Committed implementation baseline before the current native IRQ feature: **`24afa95c`** (genuine Kbuild header wrappers, resident non-temporal copies, task-owned fault controls, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,8 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `24afa95c` | Exact original Kbuild mmiowb wrapper; original disabled tracking macros, no fabricated barrier |
+| `770ba039` | Exact pinned Kbuild-generated early-ioremap and kmap-size wrappers with genuine unresolved mapping references |
 | `e393312a` | Resident non-temporal user copies, exact page prefixes, completion fences and measured mapping lifetimes |
 | `0e35bb9a` | Generic checked user-access scopes and `unsafe_put_user` cleanup control flow |
 | `376b5d66` | Genuine typed static-key extern declarations, preserving existing boolean branches |
@@ -375,9 +377,10 @@ archive into another separate reference directory, never into the import.
 ### Ordinary RCU prerequisites
 
 Explicit SRCU counters do not cover ordinary RCU's implicit IRQ-off, preemption
-or BH read regions. Accurate context tracking requires real native interrupt
-entry/exit, scheduler/idle paths that bypass the common exit, and softirq/BH
-exclusion/dispatch. Current x86 NMI entry also needs paranoid GS and stack
+or BH read regions. Native x86 maskable entry/exit and scheduler handoffs now
+have real CPU-owned accounting; the final validation below covers actual
+nested interrupts and task returns. Linux's full context encoding, softirq/BH
+exclusion/dispatch and ordinary RCU remain pending. Current x86 NMI entry also needs paranoid GS and stack
 handling: an NMI can arrive during ring-0 windows with user GS or a released
 old Thread. A counter hook on the current ordinary thunk would be unsafe.
 Do not resolve in_nmi/local_bh/ordinary RCU with constant or explicit-reader-only
@@ -548,10 +551,12 @@ stamps. `CONFIG_MMU=1` matches native paging. The five-level-capable type profil
 is committed in `a88dcea7`, with original UAPI aliases and annotations rather
 than duplicate typedefs. Linux page ownership, PFN/descriptor services and
 runtime geometry globals remain unresolved. Latest frozen syntax report:
-`/tmp/vinix-linuxkpi-asm-generated-headers-oct06-frozen-audit-report.json`, **4/269**,
+`/tmp/vinix-linuxkpi-mmiowb-oct06-frozen-audit-report.json`, **4/269**,
 expected exit 1. Original page-table types and static-key declarations clear
 prior first errors; 199 units first fail on `rcu_read_lock`, followed by RCU
-pointer APIs, `asm/early_ioremap.h` and `call_single_data_t`.
+pointer APIs, `movdir64b` and `call_single_data_t`. Original mmiowb tracking
+macros are disabled under this configuration; a forced tracking configuration
+still rejects the absent architecture barrier.
 
 ## Latest task-fault and compiler-scope validation
 
@@ -561,7 +566,8 @@ an actual worker sleeps and migrates while holding depth two. Native missing
 page/COW resolution and kernel trap policy reject disabled scopes before
 allocation. Resident accesses still work. Explicit inatomic copies always
 reject missing/COW pages, preserve exact prefixes and never zero their tails.
-IRQ/NMI/softirq context accounting and exception-table recovery remain pending.
+Full Linux IRQ/NMI/BH encoding and exception-table recovery remain pending;
+native maskable accounting is covered by the newer validation below.
 
 The same enabled ELF SHA256
 `22979f43e8511c33097d69ef8537781da96831814896390bedd8ccc675ea6ce2`
@@ -611,6 +617,59 @@ symbols remain unresolved. Enabled compiler-only integration links and retains
 the passed nocache V C/object exactly; its separately linked ELF has no new
 guest-boot claim. Evidence:
 `/tmp/vinix-linuxkpi-asm-generated-headers-oct06-final-validation.json`.
+
+## Native maskable IRQ validation and next context work
+
+The frozen 28-path IRQ overlay passes full four-CPU normal and SSE guests using
+the same saved ELF
+`aaad1db6f60f17a4ea84ad98e457c5d2e7687a2b43ca36aa17777309300f3381`.
+Real thunk nesting, scheduler self-IPIs and deferred switches, sleep/yield,
+idle-target wakeup, pending-event preservation and actual userspace interrupts
+pass. Each vector 32–255 closes its CPU-owned region before ordinary task return;
+both scheduler handoffs close it before releasing the old task or changing GS.
+Vectors 0–31 remain unchanged. Scheduler IST1 still requires IRQ exclusion;
+accounting does not make reentry on an overwritten IST frame safe.
+
+The actual native fixture joins every actor and observes its off-stack handoff
+before releasing its last retention pin or resetting permanent ledger storage.
+After three full lifecycle warmups, the measured fourth returns physical free
+bytes from `348405760` to exactly `348405760` and restores every live heap class
+in both guests. The first warmup retains 14 pages; do not describe the first
+batch or global kernel allocation behavior as leak-free. Separate serial markers
+prove user-CS entry and a later depth-zero task return, without identifying a
+particular interrupted task or proving ordinary non-scheduler IRET return.
+
+Strict GNU99/GNU11 IRQ host checks pass 280,732 sanitizer assertions each and
+inspect all 256 real thunk routes, including the saved-CS frame offset. Updated
+fault-control checks pass 494,347 assertions plus eight fatal cases per profile.
+Default x86 and disabled ARM builds and Linux-ABI startup pass. Final generated
+C, optimized objects, linked ELF, all frozen sources and fixture cleanup received
+independent review. An earlier broad event-wait guard timed out on ARM; the
+passing final version checks actual x86 maskable depth and restores ordinary
+task wait behavior. Preserve that failed attempt and its passing diagnostic
+variant instead of treating the failure as an architecture validation pass.
+
+The final disabled ARM kernel also completes desktop harness scenarios
+`ops,churn,cache,idle,apps,drag`. Its measurements include 16–32 KiB retained per
+300-process churn batch and positive syscall allocations; this establishes no
+global leak-free result. Clean `24afa95c` baseline and feature allocation scans
+both exit 1 with 354 ARM sites, 293 x86 sites and identical 158 failing groups.
+The initial allocation job never started because its worktree lacked the test
+harness; the corrected failure record is preserved. Frozen sources, artifacts,
+all result files and independent reviews are collected in
+`/tmp/vinix-linuxkpi-irq-context-oct06-final-validation.json`.
+
+Next, fix workqueue callback identity under real IRQ interruption: the current
+task-only worker lookup must not grant an interrupt producer callback or drain
+chaining privileges. That backend is currently owned by another session; do not
+overwrite its ABI migration. Ordinary IRQ-off/pinned task callbacks must retain
+their identity. NMI/BH tracking, full Linux context encoding and ordinary RCU
+remain unresolved. SMP dispatch needs real IRQ-delivered callbacks and original
+CSD lifetimes; a synchronous marker cannot stand in for completion of detached
+asynchronous callbacks. PCI topology work must keep explicit root provenance,
+scalar private ownership and complete OOM rollback before publishing permanent
+native device pointers. Linux PCI/device/devres APIs and GPU binding remain
+pending.
 
 ## Bound and high-priority contracts
 

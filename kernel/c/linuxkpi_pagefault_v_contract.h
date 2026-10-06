@@ -12,6 +12,9 @@ uint32_t *vinix_linuxkpi_fault_depth(void);
 uint64_t vinix_linuxkpi_irq_save(void);
 void vinix_linuxkpi_irq_restore(uint64_t flags);
 uint32_t vinix_linuxkpi_preempt_count(void);
+/* Actual native maskable depth; requires initialized kernel GS, preserves IF.
+ * This is independent of Linux preempt-count bit encoding and NMI/BH state. */
+uint32_t vinix_linuxkpi_maskable_irq_depth(void);
 
 /* Existing native CPU/worker primitives used by the task-scope fixture.
  * Keep their declarations independent of the Linux header/type namespace. */

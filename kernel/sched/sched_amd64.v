@@ -139,6 +139,20 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 
 	mut cpu_local := cpulocal.current()
 
+	// Only our own IRQ may surround a switch. A timer interrupt nested in an
+	// IRQ-enabled hardware handler must leave that handler on its CPU.
+	if cpu_local.maskable_irq_depth != 1 {
+		if cpu_local.maskable_irq_depth == 0 {
+			lib.kpanic(unsafe { nil }, c'sched: scheduler without a maskable IRQ entry')
+		}
+		if cpu_local.maskable_irq_scheduler_deferrals == u64(-1) {
+			lib.kpanic(unsafe { nil }, c'sched: IRQ deferral count overflow')
+		}
+		cpu_local.maskable_irq_scheduler_deferrals++
+		apic.lapic_eoi()
+		apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, 1000)
+		return
+	}
 	consume_reschedule(cpu_local.cpu_number)
 	katomic.store(mut &cpu_local.is_idle, false)
 	if preemption_guard != unsafe { nil } {
@@ -262,6 +276,8 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// it read the -1 stored below and stopped the kernel on an index out
 		// of range, or, once another CPU had taken the thread up, answered
 		// for that CPU instead of this one.
+		// This path abandons the thunk instead of returning to its exit.
+		cpulocal.maskable_irq_exit(u32(scheduler_vector))
 		cpu.set_gs_base(u64(&cpu_local.cpu_number))
 		katomic.store(mut &current_thread.running_on, u64(-1))
 		// Capture the destination before releasing the thread: another CPU can
@@ -282,6 +298,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		if migration_cpu != u32(-1) {
 			wake_cpu(migration_cpu)
 		}
+	} else {
+		// Dispatch and idle from an idle CPU also abandon their thunk.
+		cpulocal.maskable_irq_exit(u32(scheduler_vector))
 	}
 
 	if unsafe { next_thread == nil } {
@@ -542,6 +561,7 @@ pub fn yield(save_ctx bool) {
 	asm volatile amd64 {
 		cli
 	}
+	require_task_context()
 
 	apic.lapic_timer_stop()
 
@@ -578,6 +598,7 @@ pub fn dequeue_and_yield() {
 	asm volatile amd64 {
 		cli
 	}
+	require_task_context()
 	dequeue_thread(proc.current_thread())
 	yield(true)
 }
@@ -596,6 +617,7 @@ pub fn dequeue_and_die() {
 	asm volatile amd64 {
 		cli
 	}
+	require_task_context()
 	mut t := proc.current_thread()
 	t.is_dead = true
 	proc.linuxkpi_mark_task_dead(mut t)
@@ -633,6 +655,7 @@ pub fn resume_saved_context() {
 	asm volatile amd64 {
 		cli
 	}
+	require_task_context()
 	mut t := proc.current_thread()
 	t.context_preset = true
 	yield(true)
@@ -859,6 +882,7 @@ pub fn await() {
 	asm volatile amd64 {
 		cli
 	}
+	require_task_context()
 	mut cpu_local := cpulocal.current()
 	wakeup := if device_poll_callback != voidptr(0) && cpu_local.cpu_number == 0 {
 		idle_poll_wakeup_us
@@ -880,9 +904,17 @@ fn C.vinix_enter_idle(stack_top u64, entry voidptr, arg voidptr)
 @[noreturn]
 pub fn enter_idle() {
 	asm volatile amd64 { cli }
+	require_task_context()
 	top := cpulocal.current().idle_int_stack
 	C.vinix_enter_idle(top, voidptr(await), unsafe { nil })
 	for {}
+}
+
+// Call with IRQs disabled, before queue, task, GS or stack ownership changes.
+fn require_task_context() {
+	if cpulocal.current().maskable_irq_depth != 0 {
+		lib.kpanic(unsafe { nil }, c'sched: blocking or exiting from a maskable IRQ')
+	}
 }
 
 // ITIMER_REAL is counted down by the clock tick here: see sched/itimer.v.
