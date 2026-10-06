@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import runpy
 import shlex
 import subprocess
 import sys
@@ -40,14 +41,16 @@ def main() -> int:
     for key in ["qemu_version", "machine", "accelerator", "cpu", "smp", "memory_mb"]:
         if key not in config:
             parser.error(f"VM configuration lacks {key}")
-    source = ROOT / "tests/alloc-bench/bench.c"
     state = args.state_dir.resolve()
     state.mkdir(parents=True, exist_ok=False)
     staged_source = state / "bench.c"
-    staged_source.write_bytes(source.read_bytes())
-    source_hash = hashlib.sha256(staged_source.read_bytes()).hexdigest()
+    generation = runpy.run_path(str(ROOT / "tests/alloc-bench/compile-v-bench.py"))["generate"](staged_source)
+    source_hash = generation["source_sha256"]
+    staged_header = state / "bench-native-abi.h"
+    header_hash = generation["native_header_sha256"]
     config.update(source_sha256=source_hash, compile_flags=FLAGS,
-                  iterations=args.iterations, samples=args.samples)
+                  iterations=args.iterations, samples=args.samples,
+                  v_generation=generation, native_header_sha256=header_hash)
     config["build_method"] = ("guest GCC C-to-assembly; host Apple assembler/linker"
                               if args.guest_sdk else "guest GCC driver")
     (state / "config.json").write_text(json.dumps(config, indent=2) + "\n")
@@ -59,12 +62,13 @@ def main() -> int:
     remote_dir = f"/tmp/vinix-alloc-bench-{time.time_ns()}"
     subprocess.run(ssh + ["mkdir -m 700 " + shlex.quote(remote_dir)], check=True, timeout=30)
     scp = ["scp", "-i", str(args.identity.resolve()), "-P", str(args.port),
-           "-o", "BatchMode=yes", *host_key_options, str(staged_source), f"{destination}:{remote_dir}/bench.c"]
+           "-o", "BatchMode=yes", *host_key_options, str(staged_source), str(staged_header), f"{destination}:{remote_dir}/"]
     subprocess.run(scp, check=True, timeout=60)
     gcc = shlex.quote(args.gcc)
     prefix = f"""set -e
 cd {shlex.quote(remote_dir)}
 test "$(/usr/bin/shasum -a 256 bench.c | /usr/bin/awk '{{print $1}}')" = {source_hash}
+test "$(/usr/bin/shasum -a 256 bench-native-abi.h | /usr/bin/awk '{{print $1}}')" = {header_hash}
 echo ALLOC-COMPILE-BEGIN
 {gcc} --version | head -n 1
 if {gcc} -dM -E - </dev/null | grep __clang__; then
@@ -82,7 +86,7 @@ fi
                        f"-isysroot {shlex.quote(args.guest_sdk)} -nostdinc "
                        f"-isystem {shlex.quote(includes)} "
                        f"-isystem {shlex.quote(args.guest_sdk + '/usr/include')} "
-                       "-S bench.c -o bench.s")
+                       "-I . -S bench.c -o bench.s")
             config["guest_compile_command"] = codegen
             subprocess.run(ssh + [prefix + codegen], stdout=log, stderr=subprocess.STDOUT,
                            check=True, timeout=args.timeout)
@@ -98,7 +102,7 @@ fi
                            check=True, timeout=60)
             command = f"cd {shlex.quote(remote_dir)} && chmod 755 alloc-bench && echo ALLOC-COMPILE-DONE && {run}"
         else:
-            codegen = f"{gcc} {shlex.join(FLAGS)} bench.c -o alloc-bench"
+            codegen = f"{gcc} {shlex.join(FLAGS)} -I . bench.c -o alloc-bench"
             config["guest_compile_command"] = codegen
             command = prefix + codegen + "\necho ALLOC-COMPILE-DONE\n" + run
         (state / "config.json").write_text(json.dumps(config, indent=2) + "\n")

@@ -211,6 +211,23 @@ class ComparabilityTests(unittest.TestCase):
         right.meta["clock_resolution_ns"] = "1000"
         self.assertEqual(benchmark.comparability(left, right)[0], [])
 
+    def test_v_artifacts_require_matching_native_header_and_manifest(self) -> None:
+        left, right = self.paired()
+        for run in (left, right):
+            run.config["native_header_sha256"] = "a" * 64
+            run.config["v_generation"] = {"source_sha256": run.config["source_sha256"],
+                                          "native_header_sha256": "a" * 64}
+        self.assertEqual(benchmark.comparability(left, right)[0], [])
+        right.config["native_header_sha256"] = "b" * 64
+        self.assertTrue(any("header differs" in s for s in benchmark.comparability(left, right)[0]))
+        right.config["native_header_sha256"] = "a" * 64
+        right.config["v_generation"]["source_sha256"] = "c" * 64
+        self.assertTrue(any("manifest differs" in s for s in benchmark.comparability(left, right)[0]))
+        del right.config["v_generation"]
+        self.assertTrue(any("manifest required" in s for s in benchmark.comparability(left, right)[0]))
+        del right.config["native_header_sha256"]
+        self.assertTrue(any("valid native_header_sha256" in s for s in benchmark.comparability(left, right)[0]))
+
 
 class CommandTests(unittest.TestCase):
     def invoke(self, mismatch: bool = False, diagnostic: bool = False) -> tuple[int, str, str]:

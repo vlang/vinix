@@ -10,18 +10,28 @@ captures and failed targets. The
 [earlier kernel measurements](results/2026-10-02/README.md) preserve the direct
 kernel allocator comparison and qualify the old user-space timings.
 
-`bench.c` runs identical single-thread C workloads on both guests. Compile
-with genuine GNU GCC: Apple's `/usr/bin/gcc` is Clang, and the benchmark records
-that distinction. Results count an allocation/free pair, a map/unmap pair, or
-a pipe/create/close pair, rather than counting each half separately.
+`benchcore/core.v` supplies identical single-thread workloads on both guests.
+`compile-v-bench.py` emits their C build artifact and native declaration header.
+Compile that artifact with genuine GNU GCC: Apple's `/usr/bin/gcc` is Clang,
+and the benchmark records that distinction. Results count an allocation/free
+pair, a map/unmap pair, or a pipe/create/close pair, rather than counting each
+half separately.
 
 The workloads are 64-byte malloc reuse, mixed-size 64-object batches,
 256 KiB malloc with one verified byte per 4 KiB, anonymous 4 KiB mmap/unmap
 without a touch, 256 KiB mmap/touch/unmap, and pipe creation/closure. Every
 workload has a full warmup and 5–31 recorded samples. Payload reads and writes
-are volatile; checksums must match. `-fno-builtin` also prevents allocation
-calls from being removed. Logs identify the compiler, OS, architecture, native
-page size, clock resolution, counts, size distribution, and access stride.
+use native volatile byte fields; checksums must match. `-fno-builtin` also
+prevents allocation calls from being removed. Logs identify the compiler, OS,
+architecture, native page size, clock resolution, counts, size distribution,
+and access stride.
+Both runners record the V source hashes, V compiler version/hash, generated
+artifact hash and native header hash, then compile inside the guest with the
+same GCC flags as before. `test_v_bench.py --original-reference /outside/bench.c`
+compares the immutable original C under ASan/UBSan, using a deterministic clock
+and fault provider to check sample ordering, all mixed-batch OOM prefixes,
+syscall failures, both pipe closes and restoration of the first close's errno.
+These model clocks verify semantics and do not provide timing comparisons.
 
 ## What the measurements mean
 

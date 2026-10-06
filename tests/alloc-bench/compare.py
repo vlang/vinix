@@ -260,6 +260,22 @@ def comparability(vinix: Run, macos: Run) -> tuple[list[str], list[str]]:
     for key in CONFIG_FIELDS:
         if vinix.config.get(key) != macos.config.get(key):
             mismatches.append(f"QEMU config {key}: Vinix={vinix.config.get(key)!r}, macOS={macos.config.get(key)!r}")
+    # Historical captures predate the V artifact and remain readable. New
+    # captures must compare the included native declarations as well as C bytes.
+    if any("v_generation" in run.config or "native_header_sha256" in run.config
+           for run in (vinix, macos)):
+        for run in (vinix, macos):
+            header = run.config.get("native_header_sha256")
+            generation = run.config.get("v_generation")
+            if not isinstance(header, str) or not re.fullmatch(r"[0-9a-f]{64}", header):
+                mismatches.append(f"{run.name}: valid native_header_sha256 required")
+            if not isinstance(generation, dict):
+                mismatches.append(f"{run.name}: V generation manifest required")
+            elif (generation.get("source_sha256") != run.config.get("source_sha256") or
+                  generation.get("native_header_sha256") != header):
+                mismatches.append(f"{run.name}: V generation manifest differs from staged artifacts")
+        if vinix.config.get("native_header_sha256") != macos.config.get("native_header_sha256"):
+            mismatches.append("native benchmark header differs between guests")
     for workload in WORKLOADS:
         for key in ("category", "operation", "pairs", "samples", "warmup_pairs", "bytes",
                     "batch", "touch_stride"):

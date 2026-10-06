@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import shlex
 import shutil
 import subprocess
@@ -41,8 +42,8 @@ def main() -> int:
     kernel, sysroot = args.kernel.resolve(), args.sysroot.resolve()
     qemu = Path(shutil.which(args.qemu) or args.qemu).resolve()
     firmware = (args.firmware or qemu.parent.parent / "share/qemu/edk2-x86_64-code.fd").resolve()
-    source = ROOT / "tests/alloc-bench/bench.c"
-    inputs = [kernel, firmware, source, sysroot / "usr/bin/gcc", sysroot / "bin/busybox",
+    source = ROOT / "tests/alloc-bench/benchcore/core.v"
+    inputs = [kernel, firmware, source, source.parent / "bench-native-abi.h", sysroot / "usr/bin/gcc", sysroot / "bin/busybox",
               sysroot / "lib/ld-musl-x86_64.so.1", sysroot / "usr/lib/libc.a"]
     if args.allocator_check:
         inputs.append(args.allocator_check.resolve())
@@ -57,8 +58,8 @@ def main() -> int:
         (rootfs / name).mkdir(exist_ok=True)
     (rootfs / "tmp").chmod(0o1777)
     guest_source = rootfs / "root/alloc-bench.c"
-    shutil.copyfile(source, guest_source)
-    source_hash = hashlib.sha256(guest_source.read_bytes()).hexdigest()
+    generation = runpy.run_path(str(ROOT / "tests/alloc-bench/compile-v-bench.py"))["generate"](guest_source)
+    source_hash = generation["source_sha256"]
     allocator_check = ""
     if args.allocator_check:
         check_source = rootfs / "root/allocator-check.c"
@@ -89,7 +90,7 @@ mount -t proc proc /proc
 echo ALLOC-COMPILE-BEGIN
 gcc --version | head -n 1
 gcc -dM -E - </dev/null | grep __clang__ && exit 1
-""" + allocator_check + "gcc " + shlex.join(FLAGS) + """ /root/alloc-bench.c -o /root/alloc-bench || {
+""" + allocator_check + "gcc " + shlex.join(FLAGS) + """ -I /root /root/alloc-bench.c -o /root/alloc-bench || {
     echo ALLOC-FAIL stage=compile
     while :; do sleep 60; done
 }
@@ -126,6 +127,8 @@ while :; do sleep 60; done
         "machine": MACHINE, "accelerator": ACCELERATOR, "cpu": CPU,
         "smp": SMP, "memory_mb": 4096,
         "source_sha256": source_hash,
+        "v_generation": generation,
+        "native_header_sha256": generation["native_header_sha256"],
         "kernel_sha256": kernel_hash,
         "kernel_verification": "extracted from completed ISO and matched supplied kernel",
         "compile_flags": FLAGS, "iterations": args.iterations, "samples": args.samples,
