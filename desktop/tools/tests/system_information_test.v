@@ -183,6 +183,10 @@ fn test_system_information_search_paging_empty_ui_snapshot_refresh_and_small_win
 	assert previous_button.frame.x + previous_button.frame.width < next.frame.x
 	count := system_information_search_test_find(tree, frame_owned_text_id) or { panic('missing match count') }
 	assert count.frame.width >= 90 && count.text == '0 rows'
+	label := system_information_search_test_find(tree, 'system_information.search.label') or { panic('missing search label') }
+	field := system_information_search_test_find(tree, 'system_information.search') or { panic('missing search field') }
+	assert label.text == 'Search' && label.frame.x + label.frame.width < field.frame.x
+	assert field.frame.width >= 80 && field.frame.x + field.frame.width < 312
 	free_tree(tree)
 	app.close_app()
 	assert app.search_len == 0 && app.search_counts[3] == 0

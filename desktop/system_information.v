@@ -351,6 +351,7 @@ fn (mut app SystemInformationApp) build(size ui2.Rect) !ui2.Element {
 	mut children := frame_elements(96)
 	children << ui2.label('', tr('app.system_information'), ui2.rect(12, 12, 250, 28), ui2.TextStyle{size: 18, bold: true, color: body_heading})
 	children << ui2.button('system_information.refresh', tr('system_information.refresh'), ui2.rect(f64(width - 116), 12, 104, 28), ui2.BoxStyle{bg: settings_choice_bg, radius: 5}, ui2.TextStyle{size: 12, color: body_text, align: .center})
+	children << ui2.label('system_information.search.label', tr('system_information.search.label'), ui2.rect(158, 54, 50, 28), ui2.TextStyle{size: 12, color: body_muted})
 	children << app.search_field(width)
 	children << ui2.button('system_information.search.clear', tr('system_information.search.clear'), ui2.rect(f64(width - 88), 54, 76, 28), ui2.BoxStyle{bg: settings_choice_bg, radius: 5}, ui2.TextStyle{size: 12, color: body_text, align: .center})
 	for tab, key in system_information_tab_keys {

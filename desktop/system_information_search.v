@@ -153,7 +153,7 @@ fn (app &SystemInformationApp) search_field(width int) ui2.Element {
 	for ch in text { if ch & 0xc0 != 0x80 { count++ } }
 	return ui2.Element{
 		...ui2.text_field('system_information.search', tr('system_information.search.placeholder'), text,
-			ui2.rect(158, 54, f64(width - 256), 28), ui2.BoxStyle{bg: body_panel, radius: 5},
+			ui2.rect(216, 54, f64(width - 314), 28), ui2.BoxStyle{bg: body_panel, radius: 5},
 			ui2.TextStyle{color: body_text, size: 12}, 0)
 		focused: app.search_focus
 		text_selection: ui2.TextSelection{anchor: if app.search_focus && app.search_selected { 0 } else { count }, caret: count}

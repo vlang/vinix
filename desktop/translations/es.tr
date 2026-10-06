@@ -4088,3 +4088,6 @@ system_information.search.count
 system_information.search.count_short
 {0} filas
 -----
+system_information.search.label
+Buscar
+-----
