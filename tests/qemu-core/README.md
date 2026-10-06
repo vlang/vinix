@@ -33,10 +33,11 @@ V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
 tests/qemu-core/run.sh amd64
 ```
 
-The signal-disposition, first-touch and interrupted-read fixtures are compiled
-from `signalfixture`, `touchfixture` and `restartfixture` V modules. The normal
+The signal-disposition, first-touch, interrupted-read and nanosleep-remainder
+fixtures are compiled from `signalfixture`, `touchfixture`, `restartfixture`
+and `nanosleepfixture` V modules. The normal
 builder generates their ephemeral C and declaration headers outside the
-checkout and links them with the remaining test program. All 61 original
+checkout and links them with the remaining test program. All 70 original
 `CHECK` sites keep their predicates and logical source line numbers; the shared
 `reap_ok` body remains unchanged.
 
@@ -49,6 +50,7 @@ with the actual host architecture, or `--arch amd64` on a Mac with Rosetta:
 python3 tests/qemu-core/test-signalfixture.py /tmp/qemu-signal --arch arm64
 python3 tests/qemu-core/test-touchfixture.py /tmp/qemu-touch --arch arm64
 python3 tests/qemu-core/test-restartfixture.py /tmp/qemu-restart --arch arm64
+python3 tests/qemu-core/test-nanosleepfixture.py /tmp/qemu-nanosleep --arch arm64
 ```
 
 The host touch comparison uses real mappings, forks, pipes, protection and
@@ -75,4 +77,6 @@ The signal and restart comparisons deliberately inject `EAGAIN` at both fork
 positions. They compare the original and translated return value, errno and
 fork count, so matching original `QEMU CORE FAIL` diagnostics are expected for
 those inputs. The final differential verdict and assertions determine success.
+The nanosleep comparison also injects `EIO` at signal registration and `EAGAIN`
+at fork, then compares its original checks, return value, errno and API counts.
 These bounded comparisons supplement the full feature and persistence runner.

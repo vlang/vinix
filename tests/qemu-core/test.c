@@ -51,6 +51,7 @@
 #include "signalfixture-api.h"
 #include "touchfixture-api.h"
 #include "restartfixture-api.h"
+#include "nanosleepfixture-api.h"
 #line 51 "test.c"
 
 #define CHECK(expression) do {                                               \
@@ -75,7 +76,7 @@ static const char persist_payload[] = "vinix-ext2-cache-writeback-v1";
 static const char *synced_file = "/root/vinix-qemu-core/synced";
 static const char synced_payload[] = "vinix-ext2-sync-writeback-v1";
 static volatile sig_atomic_t posix_timer_callbacks;
-static volatile sig_atomic_t nanosleep_interrupts;
+#line 75 "test.c"
 
 static void posix_timer_callback(union sigval value)
 {
@@ -83,11 +84,7 @@ static void posix_timer_callback(union sigval value)
 		posix_timer_callbacks++;
 }
 
-static void nanosleep_interrupt(int signal)
-{
-	(void)signal;
-	nanosleep_interrupts++;
-}
+#line 87 "test.c"
 
 int reap_ok(pid_t child)
 {
@@ -472,40 +469,7 @@ static int test_exit_takes_down_blocked_threads(void)
 	return 0;
 }
 
-/* nanosleep(2) reports a relative duration in `rem` when a signal interrupts
- * it. Returning the absolute monotonic clock here turns libc's retry into an
- * epoch-sized sleep, which used to wedge a newly reloaded desktop as soon as
- * one of its startup children changed state. */
-static int test_interrupted_nanosleep_remaining(void)
-{
-	struct sigaction action;
-	memset(&action, 0, sizeof(action));
-	action.sa_handler = nanosleep_interrupt;
-	sigemptyset(&action.sa_mask);
-	CHECK(sigaction(SIGUSR1, &action, NULL) == 0);
-
-	pid_t parent = getpid();
-	pid_t child = fork();
-	CHECK(child >= 0);
-	if (child == 0) {
-		struct timespec delay = {.tv_nsec = 20000000};
-		nanosleep(&delay, NULL);
-		_exit(kill(parent, SIGUSR1) == 0 ? 0 : 1);
-	}
-
-	struct timespec request = {.tv_sec = 1};
-	struct timespec remaining = {.tv_sec = -1, .tv_nsec = -1};
-	errno = 0;
-	CHECK(nanosleep(&request, &remaining) == -1);
-	CHECK(errno == EINTR);
-	CHECK(nanosleep_interrupts == 1);
-	CHECK(remaining.tv_sec == 0);
-	CHECK(remaining.tv_nsec > 0 && remaining.tv_nsec < 1000000000L);
-	CHECK(nanosleep(&remaining, NULL) == 0);
-	CHECK(reap_ok(child) == 0);
-	puts("QEMU CORE PASS: interrupted nanosleep returns a relative remainder");
-	return 0;
-}
+#line 744 "test.c"
 
 static int prepare_directory(void)
 {

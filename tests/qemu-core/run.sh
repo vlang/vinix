@@ -17,14 +17,14 @@ trap cleanup EXIT INT TERM
 if [ "${1:-}" = amd64 ]; then
 	mkdir -p "$work/rootfs/root" "$work/rootfs/sbin" "$work/rootfs/tmp" "$work/rootfs/dev"
 	python3 "$repo/tests/qemu-core/compile-fixtures.py" "$work/v" --arch amd64
-	for module in signalfixture touchfixture restartfixture; do
+	for module in signalfixture touchfixture restartfixture nanosleepfixture; do
 		"${CC_AMD64:-x86_64-linux-musl-gcc}" -O2 -Wall -Wextra -Werror \
 			-Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -fno-strict-aliasing \
 			-I"$work/v/$module" -c "$work/v/$module.c" -o "$work/$module.o"
 	done
 	"${CC_AMD64:-x86_64-linux-musl-gcc}" -static -O2 -Wall -Wextra -Werror \
 		-I"$work/v" "$repo/tests/qemu-core/test.c" \
-		"$work/signalfixture.o" "$work/touchfixture.o" "$work/restartfixture.o" \
+		"$work/signalfixture.o" "$work/touchfixture.o" "$work/restartfixture.o" "$work/nanosleepfixture.o" \
 		-o "$work/rootfs/sbin/init" -lpthread
 	COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" -C "$work/rootfs" .
 	VINIX_AMD64_KERNEL="${VINIX_AMD64_KERNEL:-$repo/build-amd64-kernel/bin/vinix}" \
@@ -60,7 +60,7 @@ done
 
 echo "==> Building static AArch64 core-test init..."
 python3 "$repo/tests/qemu-core/compile-fixtures.py" "$work/v" --arch arm64
-for module in signalfixture touchfixture restartfixture; do
+for module in signalfixture touchfixture restartfixture nanosleepfixture; do
 	"$cc" --target=aarch64-linux-musl --sysroot="$sysroot" \
 		-O2 -fno-stack-protector -Wall -Wextra -Werror \
 		-Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -fno-strict-aliasing \
@@ -69,7 +69,7 @@ done
 "$cc" --target=aarch64-linux-musl --sysroot="$sysroot" \
 	-static -O2 -fno-stack-protector -Wall -Wextra -Werror \
 	-I"$work/v" "$repo/tests/qemu-core/test.c" \
-	"$work/signalfixture.o" "$work/touchfixture.o" "$work/restartfixture.o" \
+	"$work/signalfixture.o" "$work/touchfixture.o" "$work/restartfixture.o" "$work/nanosleepfixture.o" \
 	-L"$sysroot/lib" -fuse-ld=lld \
 	-o "$work/init"
 
