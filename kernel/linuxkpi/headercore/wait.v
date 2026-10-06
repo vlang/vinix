@@ -9,7 +9,7 @@ struct C.wait_queue_entry {}
 @[typedef]
 struct C.raw_spinlock_t {}
 @[typedef]
-struct C.atomic_t {}
+struct C.atomic_t { counter i32 }
 fn C.init_waitqueue_head(&C.wait_queue_head)
 fn C.prepare_to_wait(&C.wait_queue_head, &C.wait_queue_entry, i32)
 fn C.prepare_to_wait_exclusive(&C.wait_queue_head, &C.wait_queue_entry, i32) bool
@@ -66,7 +66,7 @@ pub fn wait_bit_wake_callback() voidptr { return voidptr(C.wake_bit_function) }
 @[export: 'vkw_var_wake_callback']
 pub fn wait_var_wake_callback() voidptr { return voidptr(C.vinix_linuxkpi_var_wake_function) }
 @[export: 'vkw_signal_state']
-pub fn wait_signal_state(state u32, task voidptr) bool { return unsafe { C.signal_pending_state(i32(state), &C.task_struct(task)) } }
+pub fn wait_signal_state(state u32, task voidptr) bool { return unsafe { C.signal_pending_state(state, &C.task_struct(task)) != 0 } }
 @[export: 'vkw_current_state']
 pub fn wait_current_state(state u32) { C.set_current_state(state) }
 @[export: 'vkw_wake_task']

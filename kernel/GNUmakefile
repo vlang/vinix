@@ -266,9 +266,12 @@ endif
 ifeq ($(LINUXKPI),1)
     override VFLAGS += -d linuxkpi
     override CPPFLAGS += -DVINIX_LINUXKPI
-    LINUXKPI_CPPFLAGS := -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
+    LINUXKPI_CPPFLAGS := -I obj/linuxkpi/include -D__KERNEL__ -include linux/kconfig.h -include $(LINUXKPI_SOURCE_DIR)/include/linux/compiler_types.h -I linuxkpi/include -I $(LINUXKPI_SOURCE_DIR)/include -I $(LINUXKPI_SOURCE_DIR)/include/uapi -I $(LINUXKPI_SOURCE_DIR)/arch/x86/include -I $(LINUXKPI_SOURCE_DIR)/drivers/gpu/drm/i915 -Wno-unused-parameter -fwrapv
     LINUXKPI_OBJ := obj/linuxkpi/list_sort.o obj/linuxkpi/sort.o obj/linuxkpi/rbtree.o obj/linuxkpi/find_bit.o obj/linuxkpi/hweight.o obj/linuxkpi/ctype.o obj/linuxkpi/siphash.o obj/linuxkpi/i915_config.o obj/linuxkpi/intel_qp_tables.o obj/linuxkpi/i915_memcpy.o
-    LINUXKPI_OBJ += obj/linuxkpi/headercore.o
+    LINUXKPI_OBJ += obj/linuxkpi/headercore.o obj/linuxkpi/exchangecore.o
+    # Keep the native 128-bit helper dormant until a caller selects that width.
+    LINUXKPI_LIB := obj/linuxkpi/exchange128.a
+    LINUXKPI_GENERATED_HEADERS := obj/linuxkpi/include/vinix/spinlock_adapters.h obj/linuxkpi/include/vinix/atomic_exchange.h
     LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
@@ -345,7 +348,7 @@ override CFILES := $(shell cd c && find -L * -type f -name '*.c' | LC_ALL=C sort
 # imported `uacpi` package while compiling obj/vsrc.
 override COBJ := $(addprefix obj/c/,$(CFILES:.c=.c.o))
 override ASOBJ := $(addprefix obj/asm/,$(ASFILES:.S=.S.o))
-override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ)
+override OBJ := $(COBJ) $(ASOBJ) $(LINUXKPI_OBJ) $(LINUXKPI_LIB)
 override OBJ += obj/nanoprintf.o
 ifeq ($(ARCH),x86_64)
 override OBJ += obj/heap_benchmark.c.o
@@ -364,6 +367,28 @@ linuxkpi-verify:
 all: linuxkpi-verify
 
 $(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
+
+# Native argument/lvalue adapters are generated from exported V signatures and
+# structured ABI metadata. Their headers contain no maintained algorithms.
+$(LINUXKPI_COBJ) $(LINUXKPI_OBJ) obj/linuxkpi/exchange128core.o obj/blob.c.o: $(LINUXKPI_GENERATED_HEADERS)
+
+obj/linuxkpi/include/vinix/spinlock_adapters.h: linuxkpi/abi/spinlock.json linuxkpi/generate-abi.py linuxkpi/headercore/primitive.v
+	python3 linuxkpi/generate-abi.py $< $@
+
+obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json linuxkpi/generate-abi.py linuxkpi/exchangecore/core.v linuxkpi/exchange128core/core.v
+	python3 linuxkpi/generate-abi.py $< $@
+
+obj/linuxkpi/exchangecore.c obj/linuxkpi/exchange128core.c: obj/linuxkpi/%.c: linuxkpi/%/core.v ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+	mkdir -p "$(@D)"
+	python3 ../build-support/compile-v-module.py linuxkpi/$* $@ --arch amd64 -d nofloat
+
+obj/linuxkpi/exchangecore.o obj/linuxkpi/exchange128core.o: obj/linuxkpi/%.o: obj/linuxkpi/%.c GNUmakefile $(V_CONFIG_STAMP)
+	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -Wno-atomic-alignment -std=gnu11 -c $< -o $@
+
+obj/linuxkpi/exchange128.a: obj/linuxkpi/exchange128core.o
+	$(AR) rcs $@ $<
+
+-include obj/linuxkpi/exchange128core.d
 
 # The original SipHash translation unit expects Kbuild export declarations.
 obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h

@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "guard": "VINIX_GENERATED_SPINLOCK_ADAPTERS_H",
+  "sources": [
+    "headercore/primitive.v"
+  ],
+  "native_types": [
+    {
+      "vtype": "C.spinlock_t",
+      "kind": "typedef",
+      "name": "spinlock_t"
+    }
+  ],
+  "native_call_adapters": [
+    {
+      "name": "spin_lock_irqsave",
+      "parameters": [
+        "lock",
+        "flags"
+      ],
+      "shape": "statement",
+      "steps": [
+        {
+          "call": "vinix_local_irq_save",
+          "arguments": [],
+          "publish": "flags"
+        },
+        {
+          "call": "spin_lock",
+          "arguments": [
+            "lock"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spin_unlock_irqrestore",
+      "parameters": [
+        "lock",
+        "flags"
+      ],
+      "shape": "statement",
+      "steps": [
+        {
+          "call": "spin_unlock",
+          "arguments": [
+            "lock"
+          ]
+        },
+        {
+          "call": "vinix_local_irq_restore",
+          "arguments": [
+            "flags"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "spin_trylock_irqsave",
+      "parameters": [
+        "lock",
+        "flags"
+      ],
+      "shape": "expression",
+      "steps": [
+        {
+          "call": "vinix_local_irq_save",
+          "arguments": [],
+          "publish": "flags"
+        },
+        {
+          "capture": "__vinix_acquired",
+          "call": "spin_trylock",
+          "arguments": [
+            "lock"
+          ]
+        },
+        {
+          "unless": "__vinix_acquired",
+          "call": "vinix_local_irq_restore",
+          "arguments": [
+            "flags"
+          ]
+        },
+        {
+          "result": "__vinix_acquired"
+        }
+      ]
+    }
+  ]
+}

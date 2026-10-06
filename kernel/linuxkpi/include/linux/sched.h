@@ -39,7 +39,8 @@ struct task_struct {
 void vinix_linuxkpi_set_task_state(unsigned int state);
 #define set_current_state(state) vinix_linuxkpi_set_task_state(state)
 #define __set_current_state(state) vinix_linuxkpi_set_task_state(state)
-#define task_is_running(task) (__atomic_load_n(&(task)->__state, __ATOMIC_RELAXED) == TASK_RUNNING)
+bool vinix_task_is_running(const struct task_struct *);
+#define task_is_running vinix_task_is_running
 void schedule(void);
 int io_schedule_prepare(void) __must_check;
 void io_schedule_finish(int token);
@@ -53,8 +54,8 @@ long schedule_timeout_killable(long timeout);
 long schedule_timeout_idle(long timeout);
 int wake_up_process(struct task_struct *task);
 int wake_up_state(struct task_struct *task, unsigned int state);
-static inline int task_pid_nr(const struct task_struct *task) { return task->pid; }
-static inline int task_tgid_nr(const struct task_struct *task) { return task->tgid; }
-static inline bool need_resched(void) { return vinix_linuxkpi_need_resched(); }
-static inline int cond_resched(void) { return vinix_linuxkpi_cond_resched(); }
+int task_pid_nr(const struct task_struct *);
+int task_tgid_nr(const struct task_struct *);
+bool need_resched(void);
+int cond_resched(void);
 #endif

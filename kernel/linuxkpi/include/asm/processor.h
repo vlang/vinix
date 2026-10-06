@@ -5,8 +5,5 @@
 
 /* A native spin hint also services TLB shootdowns while IRQs are disabled.
  * Other Linux CPU, page-table and task-switch services are not supplied here. */
-static inline void cpu_relax(void)
-{
-    vinix_linuxkpi_spin_wait();
-}
+void cpu_relax(void);
 #endif

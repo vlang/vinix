@@ -5,11 +5,11 @@ module headercore
 #include "linuxkpi_common_v_contract.h"
 
 @[typedef]
-struct C.spinlock_t {}
+struct C.spinlock_t { locked u32 }
 @[typedef]
 struct C.refcount_t {}
 struct C.mutex {}
-struct C.task_struct { in_iowait u32, __state u32 }
+struct C.task_struct { in_iowait u32, __state u32, vinix_thread voidptr, pid i32, tgid i32 }
 struct C.wait_bit_key { timeout usize }
 @[typedef]
 struct C.vkh_const_char_p {}
@@ -26,7 +26,7 @@ fn C.WARN_ON_ONCE(bool) bool
 __global C.current &C.task_struct
 fn C.schedule()
 fn C.schedule_timeout(isize) isize
-fn C.signal_pending_state(i32, &C.task_struct) bool
+fn C.signal_pending_state(u32, &C.task_struct) i32
 @[c_extern]
 __global C.jiffies usize
 fn C.READ_ONCE(usize) usize
@@ -72,7 +72,7 @@ pub fn common_schedule() { C.schedule() }
 @[export: 'vkp_schedule_timeout']
 pub fn common_schedule_timeout(timeout isize) isize { return C.schedule_timeout(timeout) }
 @[export: 'vkp_signal_pending']
-pub fn common_signal_pending(mode i32) bool { return C.signal_pending_state(mode, C.current) }
+pub fn common_signal_pending(mode i32) bool { return C.signal_pending_state(u32(mode), C.current) != 0 }
 @[export: 'vkp_jiffies']
 pub fn common_jiffies() usize { return C.READ_ONCE(C.jiffies) }
 @[export: 'vkp_bit_timeout']

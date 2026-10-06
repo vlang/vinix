@@ -71,10 +71,7 @@ unsigned int kmem_cache_size(struct kmem_cache *);
 #define KMEM_CACHE(__struct, __flags) \
     kmem_cache_create(#__struct, sizeof(struct __struct), \
                      __alignof__(struct __struct), (__flags), NULL)
-static inline void *kmem_cache_zalloc(struct kmem_cache *cache, gfp_t flags)
-{
-    return kmem_cache_alloc(cache, flags | __GFP_ZERO);
-}
+void *kmem_cache_zalloc(struct kmem_cache *, gfp_t);
 
 #define ZERO_SIZE_PTR ((void *)16UL)
 #define ZERO_OR_NULL_PTR(p) ((uintptr_t)(p) <= 16UL)

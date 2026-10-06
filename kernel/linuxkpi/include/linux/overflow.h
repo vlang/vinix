@@ -6,13 +6,7 @@
 #define check_sub_overflow(a, b, d) __builtin_sub_overflow((a), (b), (d))
 #define check_mul_overflow(a, b, d) __builtin_mul_overflow((a), (b), (d))
 #define type_max(t) ((t)((((t)1 << (sizeof(t) * 8 - 1 - is_signed_type(t))) - 1) * 2 + 1))
-static inline size_t array_size(size_t a, size_t b) {
-    size_t result;
-    return check_mul_overflow(a, b, &result) ? SIZE_MAX : result;
-}
-static inline size_t size_add(size_t a, size_t b) {
-    size_t result;
-    return check_add_overflow(a, b, &result) ? SIZE_MAX : result;
-}
-static inline size_t size_mul(size_t a, size_t b) { return array_size(a, b); }
+size_t array_size(size_t, size_t);
+size_t size_add(size_t, size_t);
+size_t size_mul(size_t, size_t);
 #endif

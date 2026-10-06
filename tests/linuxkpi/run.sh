@@ -30,6 +30,14 @@ ${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
 ${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
     -c "$repo/kernel/asm/$native_asm/linuxkpi_workqueue_abi.S" -o "$work/workqueue_abi.o"
 ${CC:-clang} -DVINIX_LINUXKPI -c "$repo/kernel/asm/$native_asm/linuxkpi_storage.S" -o "$work/storage.o"
+python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/spinlock.json" "$work/include/vinix/spinlock_adapters.h"
+python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/atomic-exchange.json" "$work/include/vinix/atomic_exchange.h"
+python3 "$repo/tests/linuxkpi/exchange_test.py"
+python3 "$repo/tests/linuxkpi/spin_test.py"
+python3 "$repo/build-support/compile-v-module.py" "$repo/kernel/linuxkpi/exchangecore" "$work/exchangecore.c" --arch "$native_v_arch" -d nofloat
+${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
+    -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function \
+    -fsanitize=address,undefined -fno-omit-frame-pointer -c "$work/exchangecore.c" -o "$work/exchangecore.o"
 python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" "$work/headercore.c"
 # Keep upstream header algorithms in their native, separately compiled V object.
 # Darwin's fortified macros are incompatible with Linux's string declarations;
@@ -39,7 +47,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-a
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
     -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-    -iquote "$repo/kernel/c" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    -iquote "$repo/kernel/c" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
     -c "$work/headercore.c" -o "$work/headercore.o"
 python3 - "$work/headercore.o" <<'CHECK'
@@ -48,6 +56,23 @@ symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
 assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
 print("LinuxKPI: native V header primitives have no implicit allocator imports")
 CHECK
+# Standalone header tests use the same production algorithms without unrelated
+# task/queue callback storage. Dead stripping keeps unused kernel dependencies
+# out of each deliberately small, independent test executable.
+python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" \
+    --implementations-only "$work/headerimpl.c"
+${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
+    -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function \
+    -D_FORTIFY_SOURCE=0 -D__sputc=vhp_header_sputc -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
+    -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
+    -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
+    -iquote "$repo/kernel/c" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
+    -c "$work/headerimpl.c" -o "$work/headerimpl.o"
+case $(uname -s) in
+    Darwin) header_link_gc=-Wl,-dead_strip ;;
+    *) header_link_gc=-Wl,--gc-sections ;;
+esac
 # Compile every independent fixture with native header layouts and sanitizers.
 # GNU inline semantics keep Darwin libc's external inlines in libc when several
 # separately generated V objects include its headers. Native builds use the
@@ -62,7 +87,7 @@ for fixture_module in runtimefixture cachefixture pciconfigfixture i915policyfix
         -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
         -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ \
         -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-        -iquote "$repo/kernel/c" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+        -iquote "$repo/kernel/c" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
         -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" -I"$source_dir/drivers/gpu/drm/i915" \
         -c "$work/$fixture_module.c" -o "$work/$fixture_module.o"
     python3 - "$work/$fixture_module.o" <<'CHECK'
@@ -98,9 +123,9 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -fsanitize=address,undefined -fno-omit-frame-pointer -pthread \
     -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -DVINIX_LINUXKPI_FORMAT_HOST_TEST -D__KERNEL__ -Dmain=vinix_linuxkpi_host_original_main \
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-    -I"$source_dir/drivers/gpu/drm/i915" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+    -I"$source_dir/drivers/gpu/drm/i915" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
+    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$@" "$repo/tests/linuxkpi/test.c" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
@@ -131,9 +156,9 @@ for helper in helper_kernel helper_drm_color task_header_sched task_header_ww co
         -fsanitize=address,undefined -fno-omit-frame-pointer \
         -DVINIX_LINUXKPI -DVINIX_LINUXKPI_HOST_TEST -D__KERNEL__ \
         -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
-        -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
+        -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
         -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-        "$repo/tests/linuxkpi/${helper}_test.c" -o "$work/$helper"
+        "$repo/tests/linuxkpi/${helper}_test.c" "$work/headerimpl.o" "$header_link_gc" -o "$work/$helper"
     "$work/$helper"
 done
 printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'

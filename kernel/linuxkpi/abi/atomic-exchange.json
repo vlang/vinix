@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "guard": "VINIX_GENERATED_ATOMIC_EXCHANGE_H",
+  "sources": ["exchangecore/core.v", "exchange128core/core.v"],
+  "native_atomic_adapters": [
+    {
+      "name": "arch_xchg_relaxed",
+      "operation": "exchange",
+      "parameters": ["ptr", "value"],
+      "widths": [1, 2, 4, 8, 16],
+      "small_export": "vinix_arch_exchange_bits",
+      "wide_export": "vinix_arch_exchange_128"
+    },
+    {
+      "name": "arch_cmpxchg_relaxed",
+      "operation": "compare_exchange",
+      "parameters": ["ptr", "old", "value"],
+      "widths": [1, 2, 4, 8, 16],
+      "small_export": "vinix_arch_compare_exchange_bits",
+      "wide_export": "vinix_arch_compare_exchange_128"
+    }
+  ],
+  "aliases": [
+    {"name": "arch_cmpxchg64_relaxed", "target": "arch_cmpxchg_relaxed"},
+    {"name": "arch_cmpxchg_local", "target": "arch_cmpxchg_relaxed"},
+    {"name": "arch_cmpxchg64_local", "target": "arch_cmpxchg_relaxed"}
+  ]
+}
