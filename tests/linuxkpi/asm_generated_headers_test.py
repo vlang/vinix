@@ -4,7 +4,8 @@
 
 Check the x86 Kbuild selection, original declarations and real fixmap enums.
 Declaration-only objects must emit nothing; references must retain the exact
-unimplemented upstream symbols. All generated adapters/bounds stay private.
+unimplemented upstream symbols. MMIO write-barrier tracking stays disabled by
+the real configuration. All generated adapters/bounds stay private.
 """
 
 import argparse
@@ -18,6 +19,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -40,9 +42,18 @@ DECLARATIONS = r'''
 #include <asm/early_ioremap.h>
 #include <asm/kmap_size.h>
 #include <asm/fixmap.h>
+#include <asm/mmiowb.h>
 /* Repeated use relies on the original headers' include guards. */
 #include <asm/kmap_size.h>
 #include <asm/early_ioremap.h>
+#include <asm/mmiowb.h>
+
+#if defined(CONFIG_MMIOWB) || defined(CONFIG_ARCH_HAS_MMIOWB)
+#error production x86 has no MMIO write-barrier tracking configuration
+#endif
+#ifdef mmiowb
+#error no replacement mmiowb runtime macro is provided
+#endif
 
 _Static_assert(CONFIG_MMU == 1 && CONFIG_X86_5LEVEL == 1 &&
                CONFIG_PGTABLE_LEVELS == 5, "production MMU/type profile");
@@ -114,6 +125,19 @@ void reference_early_copy(void *destination, phys_addr_t address,
 #endif
 '''
 
+MMIOWB_TRACKING_REFERENCES = r'''
+void reference_original_tracking(void) {
+    mmiowb_set_pending();
+    mmiowb_spin_lock();
+    mmiowb_spin_unlock();
+}
+'''
+
+MMIOWB_RUNTIME_REFERENCE = r'''
+#include <asm/mmiowb.h>
+void reference_missing_runtime(void) { mmiowb(); }
+'''
+
 
 def sha256(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -134,6 +158,59 @@ def kbuild_entries(path, variable):
                           path.read_text(), re.M))
 
 
+def derive_wrappers(work, linux, archive, owned):
+    """Execute pinned Kbuild outside the verified import, retaining its bytes."""
+    if audit.upstream.digest(archive) != audit.upstream.PIN["sha256"]:
+        raise AssertionError("Kbuild wrapper archive differs from the pinned source")
+    reference = work / "kbuild-reference"
+    scripts = ("scripts/Kbuild.include", "scripts/Makefile.asm-generic")
+    remaining = set(scripts)
+    prefix = "linux-" + audit.upstream.PIN["version"] + "/"
+    with tarfile.open(archive, "r|xz") as source:
+        for member in source:
+            name = member.name.removeprefix(prefix)
+            if name not in remaining:
+                continue
+            if not member.isfile():
+                raise AssertionError("Kbuild script is not a regular archive member")
+            target = reference / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with source.extractfile(member) as stream:
+                target.write_bytes(stream.read())
+            remaining.remove(name)
+            if not remaining:
+                break
+    if remaining:
+        raise AssertionError("Missing original Kbuild scripts: " + str(remaining))
+    # Only the original input paths are symlinks. The generated sibling is a
+    # private directory, so Kbuild cannot write wrappers into the import.
+    (reference / "include").symlink_to(linux / "include", target_is_directory=True)
+    arch_include = reference / "arch/x86/include"
+    arch_include.mkdir(parents=True)
+    (arch_include / "asm").symlink_to(linux / "arch/x86/include/asm",
+                                      target_is_directory=True)
+    argv = [os.environ.get("MAKE", "make"), "-f", "scripts/Makefile.asm-generic",
+            "srctree=" + str(reference), "obj=arch/x86/include/generated/asm",
+            "generic=include/asm-generic", "SRCARCH=x86"]
+    result = subprocess.run(argv, cwd=reference, capture_output=True, text=True)
+    (reference / "make.log").write_text(result.stdout + result.stderr)
+    if result.returncode:
+        raise AssertionError("Original Kbuild wrapper generation failed:\n" + result.stderr)
+    wrappers = {}
+    for path in owned:
+        original = arch_include / "generated/asm" / path.name
+        generated = original.read_bytes()
+        # An overlay may carry provenance/license comments, but every other
+        # byte must be the actual Kbuild-produced forwarding directive.
+        uncommented = re.sub(r"/\*.*?\*/", "", path.read_text(), flags=re.S).lstrip()
+        if uncommented.encode() != generated:
+            raise AssertionError("Overlay differs from original Kbuild wrapper: " + path.name)
+        wrappers[path.name] = {"bytes": generated.decode(), "sha256": sha256(original)}
+    return {"argv": argv, "archive_sha256": audit.upstream.PIN["sha256"],
+            "scripts_sha256": {name: sha256(reference / name) for name in scripts},
+            "wrappers": wrappers}
+
+
 def run(keep_directory=None):
     linux = Path(os.environ.get("LINUXKPI_SOURCE_DIR", audit.upstream.DEFAULT /
         ("linux-" + audit.upstream.PIN["version"]))).resolve()
@@ -143,15 +220,16 @@ def run(keep_directory=None):
     generic_kbuild = linux / "include/asm-generic/Kbuild"
     if "early_ioremap.h" not in kbuild_entries(x86_kbuild, "generic-y"):
         raise AssertionError("Pinned x86 Kbuild no longer selects generic early_ioremap")
-    if "kmap_size.h" not in kbuild_entries(generic_kbuild, "mandatory-y"):
-        raise AssertionError("Pinned generic Kbuild no longer requires kmap_size")
-    for name in ("early_ioremap.h", "kmap_size.h"):
+    for name in ("kmap_size.h", "mmiowb.h"):
+        if name not in kbuild_entries(generic_kbuild, "mandatory-y"):
+            raise AssertionError("Pinned generic Kbuild no longer requires " + name)
+    for name in ("early_ioremap.h", "kmap_size.h", "mmiowb.h"):
         if (linux / "arch/x86/include/asm" / name).exists():
             raise AssertionError("Pinned x86 now owns the header: " + name)
         if name in kbuild_entries(x86_kbuild, "generated-y"):
             raise AssertionError("Pinned x86 now generates the header itself: " + name)
     owned = [HERE / "include/asm" / name
-             for name in ("early_ioremap.h", "kmap_size.h")]
+             for name in ("early_ioremap.h", "kmap_size.h", "mmiowb.h")]
     originals = [linux / "include/asm-generic" / path.name for path in owned]
     original_fixmap = linux / "arch/x86/include/asm/fixmap.h"
     compiler = os.environ.get("CC", "clang")
@@ -163,6 +241,7 @@ def run(keep_directory=None):
     if not temporary:
         work.mkdir(parents=True, exist_ok=False)
     try:
+        kbuild = derive_wrappers(work, linux, archive, owned)
         include = work / "include"
         audit.generate_headers(include)
         results = []
@@ -198,7 +277,8 @@ def run(keep_directory=None):
                       "early_memremap_prot", "early_iounmap", "early_memunmap"}),
                     ("initialization-references", INITIALIZATION_REFERENCES,
                      {"early_ioremap_init", "early_ioremap_setup", "early_ioremap_reset",
-                      "copy_from_early_mem"} if enabled_init else set())):
+                      "copy_from_early_mem"} if enabled_init else set()),
+                    ("mmiowb-tracking-references", MMIOWB_TRACKING_REFERENCES, set())):
                     source = work / (tag + "-" + name + ".c")
                     source.write_text(DECLARATIONS + body)
                     obj = source.with_suffix(".o")
@@ -221,16 +301,44 @@ def run(keep_directory=None):
                     probes.append({"probe": name, "argv": argv, "symbols": symbols,
                         "unresolved_symbols": sorted(imported), "object_sha256": sha256(obj),
                         "input_sha256": {str(path): sha256(path) for path in inputs}})
+                rejected = []
+                for name, body, extra in (
+                    ("mmiowb-runtime-absent", MMIOWB_RUNTIME_REFERENCE, []),
+                    ("mmiowb-enabled-unsupported", "#include <asm/mmiowb.h>\n" +
+                     MMIOWB_TRACKING_REFERENCES, ["-DCONFIG_MMIOWB=1"])):
+                    source = work / (tag + "-" + name + ".c")
+                    source.write_text(body)
+                    obj = source.with_suffix(".o")
+                    argv = command + flags + extra + ["-c", str(source), "-o", str(obj)]
+                    compiled = subprocess.run(argv, capture_output=True, text=True)
+                    source.with_suffix(".log").write_text(compiled.stdout + compiled.stderr)
+                    # A forced MMIOWB profile has real unsupported original
+                    # prerequisites. Preserve its diagnostics; never satisfy
+                    # them with synthetic arch state or a barrier function.
+                    if compiled.returncode == 0 or obj.exists():
+                        raise AssertionError("Unsupported MMIOWB service compiled: " + name)
+                    if not re.search(r"error: call to undeclared function 'mmiowb'",
+                                     compiled.stderr):
+                        raise AssertionError("Original missing MMIOWB barrier was hidden:\n" +
+                                             compiled.stderr)
+                    rejected.append({"probe": name, "argv": argv,
+                                     "exit": compiled.returncode,
+                                     "diagnostics": compiled.stderr})
                 results.append({"standard": standard, "profile": profile,
-                                "bounds": provenance, "probes": probes})
-                print(tag + ": original ABI/enums passed; only referenced mapping services remain unresolved")
+                                "bounds": provenance, "probes": probes,
+                                "rejected_probes": rejected})
+                print(tag + ": original ABI/enums and disabled MMIOWB tracking passed; "
+                      "unsupported mapping/barrier services remain unavailable")
         report = {"scope": "Compiler-only generated-header forwarding. No early mapping, "
                   "MMIO cache policy, native fixmap/page ownership or GPU runtime is supplied. "
-                  "Production initialization is the original configuration-disabled no-op; "
+                  "Production initialization and MMIOWB tracking are original "
+                  "configuration-disabled no-ops; "
                   "the additional profile checks declarations only.",
             "linux_version": audit.upstream.PIN["version"],
             "kbuild_selection": {"early_ioremap.h": "x86 generic-y",
-                                 "kmap_size.h": "mandatory-y with no x86 implementation"},
+                                 "kmap_size.h": "mandatory-y with no x86 implementation",
+                                 "mmiowb.h": "mandatory-y with no x86 implementation"},
+            "original_kbuild": kbuild,
             "source_sha256": {str(path): sha256(path) for path in
                 [x86_kbuild, generic_kbuild, original_fixmap, *owned, *originals, Path(__file__)]},
             "results": results}
