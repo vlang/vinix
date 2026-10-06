@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 import importlib.util
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -33,13 +34,16 @@ def main():
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
             command = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl",
                 f"--sysroot={sysroot}", "-static", "-O2", "-pthread", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-                str(ROOT / "tests/socket-io/guest.c"), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
-                "-o", str(work / "init")]
+                f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else:
             command = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc"), "-static", "-O2", "-pthread",
-                "-Wall", "-Wextra", "-Werror", str(ROOT / "tests/socket-io/guest.c"),
-                "-o", str(work / "init")]
-        subprocess.run(command, check=True)
+                "-Wall", "-Wextra", "-Werror"]
+        command += ["-D_GNU_SOURCE", "-fno-strict-aliasing"]
+        helper = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+        fixture = helper["compile_module"](ROOT / "tests/socket-io/socketfixture",
+                                            work / "fixture.o", "aarch64" if arguments.arch == "aarch64" else "x86_64",
+                                            command)
+        subprocess.run(command + [str(fixture), "-o", str(work / "init")], check=True)
         for name in ("root", "sbin", "proc", "sys", "dev"):
             (work / "rootfs" / name).mkdir(parents=True)
         if arguments.baseline:

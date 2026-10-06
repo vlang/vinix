@@ -111,3 +111,8 @@ buffer/readiness checks, and the corrected console-session fixture. It later
 fails the separate POSIX SIGEV_THREAD timer callback assertion; the full core
 suite therefore remains incomplete. No test thresholds or assertions were
 relaxed.
+
+The independent guest now lives in `socketfixture/core.v`, with native libc
+and socket declarations in its narrow ABI header. The runner compiles the V
+module for the selected architecture. All 79 original check sites, allocation
+limits, exchange counts and the 300-second budget are retained.
