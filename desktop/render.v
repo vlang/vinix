@@ -160,7 +160,9 @@ fn frame_elements(capacity int) []ui2.Element {
 // fresh one-element array literal every time the parent is rebuilt.
 fn frame_child(element ui2.Element) []ui2.Element {
 	mut children := frame_elements(1)
-	children << element
+	// Transfer the declaration's fields, as window chrome does. V3 deep-clones
+	// a named Element on append, stranding borrowed text and owned frame labels.
+	children << ui2.Element{ ...element }
 	return children
 }
 

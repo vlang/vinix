@@ -7,6 +7,31 @@ import ui2
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 
+fn test_nested_frame_controls_borrow_model_strings_and_release_owned_labels() {
+	model := 'persistent input and title'.clone()
+	defer { unsafe { model.free() } }
+	begin_frame_elements()
+	free_tree(ui2.screen(app_surface, frame_child(ui2.label('', model,
+		ui2.rect(0, 0, 180, 24), ui2.TextStyle{}))))
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		begin_frame_elements()
+		borrowed := ui2.text_field('nested.field', '', model, ui2.rect(0, 0, 180, 24),
+			ui2.BoxStyle{}, ui2.TextStyle{}, 0)
+		children := frame_child(borrowed)
+		assert children[0].text.str == model.str
+		free_tree(ui2.screen(app_surface, children))
+		assert model == 'persistent input and title'
+		begin_frame_elements()
+		owned := tr_fill('disk_usage.error.cannot_open', model)
+		labels := frame_child(ui2.label(frame_owned_text_id, owned,
+			ui2.rect(0, 0, 180, 24), ui2.TextStyle{}))
+		assert labels[0].text.str == owned.str
+		free_tree(ui2.screen(app_surface, labels))
+	}
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_disk_usage_capacity_read_views_reports_and_refresh_do_not_retain_heap() {
 	previous := desktop_language
 	defer { set_desktop_language(previous) }
