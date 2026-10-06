@@ -108,6 +108,13 @@ fn main() {
 		check_utility_precision_clients(mut desktop)
 		return
 	}
+	if arguments().contains('--utility-input-integration') {
+		if arguments().contains('--require-vinix') { assert os.exists('/dev/processes') }
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_utility_input_clients(mut desktop)
+		return
+	}
 	// Standalone applications receive their pipe descriptors through the
 	// environment, leaving argv empty for applications that open argv[1].
 	if os.getenv('VINIX_RESPONSE_FD') != '' {
@@ -371,6 +378,7 @@ fn main() {
 	check_utility_recovery_clients(mut desktop)
 	check_utility_controls_clients(mut desktop)
 	check_utility_precision_clients(mut desktop)
+	check_utility_input_clients(mut desktop)
 	desktop_restore_requested_scale()
 }
 
@@ -545,6 +553,287 @@ fn check_utility_precision_clients(mut desktop Desktop) {
 	check_calculator_precision_client(mut desktop)
 	check_grapher_compact_client(home, mut desktop)
 	println('IPC utility precision workflows passed')
+}
+
+fn check_utility_input_clients(mut desktop Desktop) {
+	temporary := os.temp_dir()
+	base := os.real_path(temporary)
+	pid := os.getpid().str()
+	name := 'vinix-input-ipc-${pid}'
+	home := system_information_join_path(base, name)
+	unsafe { temporary.free(); pid.free(); name.free() }
+	os.mkdir(home) or { panic(err) }
+	previous_home := desktop_user_home
+	desktop_user_home = home
+	defer {
+		desktop_user_home = previous_home
+		desktop.clipboard.close_request()
+		os.rmdir_all(home) or {}
+		unsafe { base.free(); home.free() }
+	}
+	check_calculator_random_client(mut desktop)
+	check_reminders_priority_client(home, mut desktop)
+	check_capture_cursor_client(mut desktop)
+	check_terminal_word_line_client(mut desktop)
+	println('IPC utility input workflows passed')
+}
+
+fn check_calculator_random_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-calculator') or { panic('Calculator is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	app.handle('calculator.mode.scientific') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('7') }
+	app.handle('calculator.memory.add') or { panic(err) }
+	if mut app is RemoteApp { app.key_input('c1+2=c2+1e-') }
+	app.handle('calculator.scientific.random') or { panic(err) }
+	tree := app.build(ui2.rect(0, 0, 620, 566)) or { panic(err) }
+	value := (integration_tree_text(tree, 'display') or { panic('missing Calculator display') }).clone()
+	defer { unsafe { value.free() } }
+	assert tree_has_id(tree, 'calculator.scientific.random')
+	assert tree_contains_text(tree, '1 + 2 = 3')
+	unavailable := tree_contains_text(tree, tr('calculator.random.unavailable'))
+	free_tree(tree)
+	if unavailable {
+		// A guest without entropy must preserve its unfinished operand and remain
+		// usable. The host has /dev/urandom and must exercise the success path.
+		assert os.exists('/dev/processes')
+		assert value == '1e-'
+		if mut app is RemoteApp { app.key_input('3=') }
+		integration_assert_calculator_display(mut app, '2.001')
+		app.handle('calculator.memory.recall') or { panic(err) }
+		integration_assert_calculator_display(mut app, '7')
+		println('IPC Calculator Rand unavailable: recoverable entropy status and preserved arithmetic verified')
+		return
+	}
+	operand := calculator_numeric_value(value)
+	assert math.is_finite(operand) && operand >= 0 && operand < 1
+	app.handle('calculator.copy') or { panic(err) }
+	integration_assert_clipboard(&desktop, value)
+	rand_history := app.build(ui2.rect(0, 0, 620, 566)) or { panic(err) }
+	assert tree_contains_text(rand_history, tr('calculator.scientific.random') + ' = ' + value)
+	free_tree(rand_history)
+	if mut app is RemoteApp { app.key_input('==') }
+	result_tree := app.build(ui2.rect(0, 0, 620, 566)) or { panic(err) }
+	result := integration_tree_text(result_tree, 'display') or { panic('missing Calculator result') }
+	assert math.abs(calculator_numeric_value(result) - (2 + 2 * operand)) < 1e-13
+	assert tree_contains_text(result_tree, '1 + 2 = 3')
+	free_tree(result_tree)
+	app.handle('calculator.memory.recall') or { panic(err) }
+	integration_assert_calculator_display(mut app, '7')
+	app.handle('calculator.mode.basic') or { panic(err) }
+	app.handle('calculator.scientific.random') or { panic(err) }
+	integration_assert_calculator_display(mut app, '7')
+	println('IPC Calculator Rand interval, pending arithmetic, repeat, history, Copy and memory passed')
+}
+
+fn check_reminders_priority_client(home string, mut desktop Desktop) {
+	path := system_information_join_path(home, '.vinix-reminders')
+	export := system_information_join_path(home, 'priority.csv')
+	defer { unsafe { path.free(); export.free() } }
+	legacy := 'VINIX-REMINDERS 1\n0\t\tLegacy task\n'
+	os.write_file(path, legacy) or { panic(err) }
+	factory := app_factory_named('vinix-reminders') or { panic('Reminders is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 616), 'Legacy task')
+	integration_assert_text(mut app, ui2.rect(0, 0, 800, 616), tr('reminders.priority.none'))
+	integration_assert_file(path, legacy)
+	app.handle('reminders.row.0') or { panic(err) }
+	app.handle('reminders.edit') or { panic(err) }
+	app.handle('reminders.priority.low') or { panic(err) }
+	app.handle('reminders.cancel') or { panic(err) }
+	integration_assert_file(path, legacy)
+	app.handle('reminders.edit') or { panic(err) }
+	app.handle('reminders.priority.high') or { panic(err) }
+	chosen := app.build(ui2.rect(0, 0, 800, 616)) or { panic(err) }
+	control := integration_element_named(chosen, 'reminders.priority.high') or { panic('missing High priority') }
+	assert control.kind == .button && control.box.bg == app_accent
+	assert control.text == tr('reminders.priority.high')
+	free_tree(chosen)
+	app.handle('reminders.save') or { panic(err) }
+	integration_assert_file(path, 'VINIX-REMINDERS 2\n0\t3\t\tLegacy task\n')
+	for index, priority in ['reminders.priority.low', 'reminders.priority.medium', 'reminders.priority.none']! {
+		app.handle('reminders.new') or { panic(err) }
+		storage_remote_field(mut app, 'reminders.title', ['Low task', 'Medium task', 'Default task']![index])
+		app.handle(priority) or { panic(err) }
+		app.handle('reminders.save') or { panic(err) }
+	}
+	integration_assert_file(path, 'VINIX-REMINDERS 2\n0\t3\t\tLegacy task\n0\t1\t\tLow task\n0\t2\t\tMedium task\n0\t0\t\tDefault task\n')
+	app.handle('reminders.row.0') or { panic(err) }
+	app.handle('reminders.toggle') or { panic(err) }
+	app.handle('reminders.filter.completed') or { panic(err) }
+	storage_remote_field(mut app, 'reminders.export_path', export)
+	app.handle('reminders.export_csv') or { panic(err) }
+	close_remote(mut app)
+	csv := os.read_file(export) or { panic(err) }
+	defer { unsafe { csv.free() } }
+	assert csv.contains(tr('reminders.csv_priority'))
+	assert csv.contains('"Legacy task","",1,"' + tr('reminders.priority.high') + '"\n')
+	mut reopened := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut reopened) }
+	for priority in ['reminders.priority.low', 'reminders.priority.medium', 'reminders.priority.none']! {
+		integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 616), tr(priority))
+	}
+	reopened.handle('reminders.filter.completed') or { panic(err) }
+	integration_assert_text(mut reopened, ui2.rect(0, 0, 800, 616), tr('reminders.priority.high'))
+	println('IPC Reminders v1 preservation, v2 priority migration, four levels, completion, CSV and reopen passed')
+}
+
+// Send a real old-compositor header to the same new Capture process. The
+// unadvertised cursor flag remains zero while normal replies advertise the new app.
+fn integration_capture_legacy_request(mut app NativeApp, mut desktop Desktop, command AppCommand, payload string) AppReply {
+	if mut app is RemoteApp {
+		state := app_current_state(&desktop)
+		assert !state.capture_request.hide_cursor
+		mut header := []u8{cap: app_request_header_size}
+		wire_put_u32(mut header, app_protocol_magic)
+		wire_put_u8(mut header, app_protocol_version)
+		wire_put_u8(mut header, u8(command))
+		wire_put_u8(mut header, app_features & ~app_feature_capture_cursor)
+		wire_put_u8(mut header, 0)
+		wire_put_i32(mut header, 560)
+		wire_put_i32(mut header, 396)
+		wire_put_state(mut header, state)
+		wire_put_u32(mut header, u32(payload.len))
+		assert header.len == app_request_header_size
+		assert desktop_write_all(app.request_fd, header.data, u64(header.len))
+		unsafe { header.free() }
+		if payload.len > 0 { assert desktop_write_all(app.request_fd, payload.str, u64(payload.len)) }
+		reply := receive_app_response(app.response_fd) or { panic(err) }
+		assert reply.ok && reply.features & app_feature_capture_cursor != 0
+		assert !reply.state.capture_request.hide_cursor
+		apply_app_state(mut desktop, reply.state)
+		app.tree_stale = true
+		return reply
+	}
+	panic('Capture must be a real remote app')
+}
+
+fn check_capture_cursor_client(mut desktop Desktop) {
+	factory := app_factory_named('vinix-capture') or { panic('Capture is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	initial := app.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
+	assert integration_tree_enabled(initial, capture_action_cursor)
+	assert tree_contains_text(initial, tr('capture.cursor.shown'))
+	free_tree(initial)
+	app.handle(capture_action_cursor) or { panic(err) }
+	app.handle(capture_action_delay_5) or { panic(err) }
+	app.handle(capture_action_take_screenshot) or { panic(err) }
+	assert desktop.capture.request.hide_cursor && desktop.capture.request.delay == 5
+	assert desktop.capture.report.phase == .screenshot_countdown
+	sequence := desktop.capture.request.sequence
+	active := app.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
+	assert !integration_tree_enabled(active, capture_action_cursor)
+	assert tree_contains_text(active, tr('capture.cursor.hidden'))
+	free_tree(active)
+	app.handle(capture_action_cursor) or { panic(err) }
+	assert desktop.capture.request.sequence == sequence && desktop.capture.request.hide_cursor
+	app.handle(capture_action_stop) or { panic(err) }
+	assert desktop.capture.report.phase == .cancelled
+	app.handle(capture_action_video_tab) or { panic(err) }
+	app.handle(capture_action_start_video) or { panic(err) }
+	assert desktop.capture.report.phase == .video_countdown && desktop.capture.request.hide_cursor
+	countdown_report := desktop.capture.report
+	// Transport a recording report without opening a writer in this headless compositor.
+	desktop.capture.report.phase = .recording
+	recording := app.build(ui2.rect(0, 0, 560, 396)) or { panic(err) }
+	assert !integration_tree_enabled(recording, capture_action_cursor)
+	free_tree(recording)
+	app.handle(capture_action_cursor) or { panic(err) }
+	assert desktop.capture.request.hide_cursor
+	desktop.capture.report = countdown_report
+	app.handle(capture_action_stop) or { panic(err) }
+	app.handle(capture_action_cursor) or { panic(err) }
+	app.handle(capture_action_screenshot_tab) or { panic(err) }
+	app.handle(capture_action_take_screenshot) or { panic(err) }
+	assert !desktop.capture.request.hide_cursor
+	app.handle(capture_action_stop) or { panic(err) }
+	legacy_build := integration_capture_legacy_request(mut app, mut desktop, .build, '')
+	mut reader := WireReader{data: legacy_build.payload}
+	legacy_tree := decode_app_element(mut reader, 0) or { panic(err) }
+	assert !tree_has_id(legacy_tree, capture_action_cursor)
+	free_tree(legacy_tree)
+	unsafe { legacy_build.payload.free() }
+	for action in [capture_action_cursor, capture_action_take_screenshot, capture_action_stop]! {
+		reply := integration_capture_legacy_request(mut app, mut desktop, .handle, action)
+		if reply.payload.cap > 0 { unsafe { reply.payload.free() } }
+	}
+	assert !desktop.capture.request.hide_cursor && desktop.capture.report.phase == .cancelled
+	println('IPC Capture cursor flag request/reply, frozen active choice and old-compositor fallback passed')
+}
+
+fn check_terminal_word_line_client(mut desktop Desktop) {
+	assert os.exists(terminal_shell), 'Terminal selection needs the installed shell'
+	factory := app_factory_named('vinix-terminal') or { panic('Terminal is not registered') }
+	mut app := start_remote_app_at_with_timeout(arguments()[0], factory, mut desktop,
+		app_response_timeout_ms) or { panic(err) }
+	defer { close_remote(mut app) }
+	free_tree(app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) })
+	word := 'café_42'
+	if mut app is RemoteApp {
+		assert app.clipboard_copy && app.pointer && app.keyboard
+		app.key_input("printf 'ipcword_42 café_42 tail\\n'\n")
+	}
+	mut found := false
+	mut x := 0
+	mut y := 0
+	mut line := ''
+	mut stable := 0
+	for _ in 0 .. 50 {
+		if mut app is RemoteApp { app.poll() }
+		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+		mut matched := false
+		for child in tree.children {
+			if child.text != 'ipcword_42 café_42 tail' { continue }
+			at := child.text.index(word) or { continue }
+			x = terminal_padding + integration_terminal_cells(child.text, at) * terminal_column_width + 3
+			next_y := int(child.frame.y) + 4
+			next_line := child.text + '\n'
+			stable = if next_y == y && next_line == line { stable + 1 } else { 1 }
+			if line.len > 0 { unsafe { line.free() } }
+			line = next_line
+			y = next_y
+			assert y + terminal_row_height < 316 - terminal_selection_status_height
+			matched = true
+			found = stable >= 3
+			break
+		}
+		free_tree(tree)
+		if !matched { stable = 0 }
+		if found { break }
+		// Initial PTY echo can precede the shell editor's prompt/redraw. Output
+		// clears selection, so wait for complete, settled text before clicking.
+		desktop_sleep_ms(100)
+	}
+	defer { if line.len > 0 { unsafe { line.free() } } }
+	assert found
+	if mut app is RemoteApp {
+		for _ in 0 .. 2 {
+			app.pointer_event(.down, .left, 0, x, y, 560, 316)
+			app.pointer_event(.up, .left, 0, x, y, 560, 316)
+		}
+	}
+	app.handle(terminal_action_copy) or { panic(err) }
+	integration_assert_clipboard(&desktop, word)
+	if mut app is RemoteApp {
+		// A different button resets the click sequence before three new clicks.
+		app.pointer_event(.down, .right, 0, x, y, 560, 316)
+		for _ in 0 .. 3 {
+			app.pointer_event(.down, .left, 0, x, y, 560, 316)
+			app.pointer_event(.up, .left, 0, x, y, 560, 316)
+		}
+	}
+	app.handle(terminal_action_copy) or { panic(err) }
+	integration_assert_clipboard(&desktop, line)
+	assert desktop.clipboard.set_local_text('Cmd-C must replace this text')
+	if mut app is RemoteApp { app.key_input(terminal_key_cmd_copy) }
+	integration_assert_clipboard(&desktop, line)
+	println('IPC Terminal double-click Unicode word, triple-click physical line and Cmd-C clipboard passed')
 }
 
 fn integration_element_named(element ui2.Element, id string) ?ui2.Element {
@@ -1569,7 +1858,8 @@ fn check_programmer_calculator_client(mut desktop Desktop) {
 }
 
 fn integration_assert_clipboard(desktop &Desktop, expected string) {
-	assert desktop.clipboard.local_available && desktop.clipboard.local_length == expected.len
+	assert desktop.clipboard.local_available && desktop.clipboard.local_length == expected.len,
+		'Clipboard has ${desktop.clipboard.local_length} bytes; expected ${expected.len}'
 	assert unsafe { tos(&desktop.clipboard.local_bytes[0], desktop.clipboard.local_length) } == expected
 	assert desktop.clipboard.pid == -1 && desktop.clipboard.fd == -1
 }
