@@ -12,7 +12,7 @@ fn test_clock_named_timer_frames_names_and_lifecycle_retain_no_heap() {
 	defer { set_desktop_language(previous) }
 	mut app := ClockApp{tab: 1}
 	app.refresh()
-	for language in [DesktopLanguage.en, .es, .ru]! {
+	for language in desktop_languages {
 		set_desktop_language(language)
 		begin_frame_elements()
 		free_tree(app.build(ui2.rect(0, 0, 560, 376))!)
@@ -35,7 +35,7 @@ fn test_clock_named_timer_frames_names_and_lifecycle_retain_no_heap() {
 			app.set_timer_duration(1000)
 			app.toggle_timer_at(1000)
 		}
-		for language in [DesktopLanguage.en, .es, .ru]! {
+		for language in desktop_languages {
 			set_desktop_language(language)
 			app.refresh()
 			for size in [ui2.rect(0, 0, 560, 376), ui2.rect(0, 0, 400, 370), ui2.rect(0, 0, 180, 96)]! {
@@ -49,6 +49,39 @@ fn test_clock_named_timer_frames_names_and_lifecycle_retain_no_heap() {
 		assert app.remove_timer()
 		app.toggle_stopwatch_at(1000)
 		for index in 1 .. 70 { app.add_lap_at(u64(1000 + index * 100)) }
+		app.close_app()
+		app.close_app()
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_clock_exact_duration_edit_validation_and_frames_retain_no_heap() {
+	mut app := ClockApp{tab: 1}
+	app.refresh()
+	app.handle('clock.timer.duration')!
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 560, 376))!)
+	app.close_app()
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		app.tab = 1
+		app.refresh()
+		app.handle('clock.timer.duration')!
+		app.paste_input('invalid\n')
+		assert app.duration_selected
+		app.paste_input('24:00:01')
+		app.key_input('\r')
+		assert app.duration_editing && app.duration_error
+		app.key_input('\x01')
+		app.key_input('00:00:01')
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 400, 370))!)
+		app.key_input('\r')
+		assert app.timers[0].duration_ms == 1000 && !app.duration_editing
+		app.handle('clock.timer.duration')!
+		app.key_input('\x7f')
+		app.key_input('00:00:02\x1b')
+		assert app.timers[0].duration_ms == 1000 && !app.duration_editing
 		app.close_app()
 		app.close_app()
 	}

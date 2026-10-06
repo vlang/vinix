@@ -44,6 +44,11 @@ mut:
 	name_selected      bool
 	name_pending       [4]u8
 	name_pending_len   int
+	duration_editing   bool
+	duration_selected  bool
+	duration_error     bool
+	duration_draft     [8]u8
+	duration_length    int
 }
 
 fn open_clock(mut desktop Desktop) !NativeApp {
@@ -286,6 +291,26 @@ fn (mut a ClockApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a ClockApp) handle(event_id string) ! {
 	a.initialize_timers()
+	match event_id {
+		'clock.timer.duration' {
+			a.edit_timer_duration()
+			return
+		}
+		'clock.timer.duration.field' {
+			if a.duration_editing { a.duration_selected = true }
+			return
+		}
+		'clock.timer.duration.apply' {
+			if a.apply_timer_duration() { a.refresh() }
+			return
+		}
+		'clock.timer.duration.cancel' {
+			a.cancel_duration_edit()
+			return
+		}
+		else {}
+	}
+	a.cancel_duration_edit()
 	if event_id == 'clock.timer.name' {
 		a.name_focus = true
 		a.name_selected = true
@@ -426,5 +451,6 @@ fn (mut a ClockApp) close_app() {
 	a.selected_timer = 0
 	a.name_focus = false
 	a.name_pending_len = 0
+	a.cancel_duration_edit()
 	a.running = false
 }

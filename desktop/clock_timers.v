@@ -57,7 +57,7 @@ fn (mut a ClockApp) update_timer(now u64) {
 		}
 	}
 	// Never redirect typing into another timer when a countdown finishes.
-	if first_finished >= 0 && !a.name_focus {
+	if first_finished >= 0 && !a.name_focus && !a.duration_editing {
 		a.selected_timer = first_finished
 		a.tab = 1
 	}
@@ -111,6 +111,7 @@ fn (mut a ClockApp) adjust_timer(delta i64) {
 fn (mut a ClockApp) add_timer() bool {
 	a.initialize_timers()
 	if a.timer_count == clock_timer_limit { return false }
+	a.cancel_duration_edit()
 	a.selected_timer = a.timer_count
 	a.timers[a.timer_count] = ClockTimer{}
 	a.timer_count++
@@ -126,6 +127,7 @@ fn (mut a ClockApp) remove_timer() bool {
 	a.timer_count--
 	a.timers[a.timer_count] = ClockTimer{}
 	if a.selected_timer >= a.timer_count { a.selected_timer = a.timer_count - 1 }
+	a.cancel_duration_edit()
 	a.name_focus = false
 	a.name_pending_len = 0
 	return true
@@ -136,6 +138,7 @@ fn (a &ClockApp) timer_name(index int) string {
 }
 
 fn (mut a ClockApp) paste_input(text string) {
+	if a.duration_editing { a.paste_duration(text); return }
 	if !a.name_focus || a.tab != 1 { return }
 	a.name_pending_len = 0
 	// Validate the complete paste before replacing a selected name. This
@@ -150,6 +153,7 @@ fn (mut a ClockApp) paste_input(text string) {
 }
 
 fn (mut a ClockApp) key_input(input string) {
+	if a.duration_editing { a.duration_key_input(input); return }
 	if !a.name_focus || a.tab != 1 { return }
 	if input.len > 1 && input[0] == 27 { a.name_pending_len = 0; return }
 	for ch in input {
@@ -251,19 +255,47 @@ fn (mut a ClockApp) append_timer(mut children []ui2.Element, width int) {
 		...clock_control('clock.timer.remove', tr('clock.timer.remove'), width - 120, 184, 96, false)
 		enabled: a.timer_count > 1 && !a.timers[a.selected_timer].running
 	}
-	children << ui2.label('', a.timer_text, ui2.rect(f64(pad), 218, f64(inner), 42),
+	children << ui2.label('', a.timer_text, ui2.rect(f64(pad), 218, f64(inner - 112), 42),
 		ui2.TextStyle{color: clock_stopwatch, font_family: 'mono', size: 28, bold: true, align: .center})
+	children << ui2.Element{
+		...clock_control('clock.timer.duration', tr('clock.timer.duration'), width - 120, 224, 96, a.duration_editing)
+		enabled: !a.timers[a.selected_timer].running
+	}
 	center := width / 2
-	children << clock_control('clock.timer.less', '-1', center - 148, 264, 44, false)
-	children << clock_control('clock.timer.preset.1', tr('clock.timer.preset.1'), center - 96, 264, 58, false)
-	children << clock_control('clock.timer.preset.5', tr('clock.timer.preset.5'), center - 30, 264, 58, false)
-	children << clock_control('clock.timer.preset.15', tr('clock.timer.preset.15'), center + 36, 264, 66, false)
-	children << clock_control('clock.timer.more', '+1', center + 110, 264, 44, false)
-	children << clock_control('clock.timer.toggle', if a.timers[a.selected_timer].running { tr('clock.stop') } else { tr('clock.start') }, center - 118, 300, 112, true)
+	if a.duration_editing {
+		mut draft_children := frame_elements(1)
+		draft_children << ui2.Element{
+			...ui2.text_field('', tr('clock.timer.duration.field'), a.duration_text(),
+				ui2.rect(8, 0, f64(inner - 208), 30), ui2.BoxStyle{transparent: true},
+				ui2.TextStyle{color: body_text, font_family: 'mono', size: 14}, 0)
+			focused: true
+			text_selection: ui2.TextSelection{
+				anchor: if a.duration_selected { 0 } else { a.duration_length }
+				caret: a.duration_length
+			}
+		}
+		children << ui2.clickable_view('clock.timer.duration.field', ui2.rect(f64(pad), 264, f64(inner - 192), 30),
+			ui2.BoxStyle{bg: body_panel, radius: 5, border_color: app_accent,
+				border_top: 1, border_bottom: 1, border_left: 1, border_right: 1}, draft_children)
+		children << clock_control('clock.timer.duration.apply', tr('clock.timer.duration.apply'), width - 208, 264, 88, true)
+		children << clock_control('clock.timer.duration.cancel', tr('clock.timer.duration.cancel'), width - 112, 264, 88, false)
+	} else {
+		children << clock_control('clock.timer.less', '-1', center - 148, 264, 44, false)
+		children << clock_control('clock.timer.preset.1', tr('clock.timer.preset.1'), center - 96, 264, 58, false)
+		children << clock_control('clock.timer.preset.5', tr('clock.timer.preset.5'), center - 30, 264, 58, false)
+		children << clock_control('clock.timer.preset.15', tr('clock.timer.preset.15'), center + 36, 264, 66, false)
+		children << clock_control('clock.timer.more', '+1', center + 110, 264, 44, false)
+	}
+	children << ui2.Element{
+		...clock_control('clock.timer.toggle', if a.timers[a.selected_timer].running { tr('clock.stop') } else { tr('clock.start') }, center - 118, 300, 112, true)
+		enabled: !a.duration_editing
+	}
 	children << clock_control('clock.timer.reset', tr('clock.reset'), center + 6, 300, 112, false)
-	children << ui2.label('', tr(if a.timers[a.selected_timer].done { 'clock.timer.finished' } else { 'clock.timer.legend' }),
+	children << ui2.label('', tr(if a.duration_editing {
+		if a.duration_error { 'clock.timer.duration.invalid' } else { 'clock.timer.duration.help' }
+	} else if a.timers[a.selected_timer].done { 'clock.timer.finished' } else { 'clock.timer.legend' }),
 		ui2.rect(f64(pad), 334, f64(inner), 18),
-		ui2.TextStyle{color: if a.timers[a.selected_timer].done { clock_stop } else { body_muted }, size: 11, align: .center})
+		ui2.TextStyle{color: if a.duration_error || a.timers[a.selected_timer].done { clock_stop } else { body_muted }, size: 11, align: .center})
 	children << ui2.label('', tr('clock.timer.scope'), ui2.rect(f64(pad), 354, f64(inner), 16),
 		ui2.TextStyle{color: body_muted, size: 10, align: .center})
 }

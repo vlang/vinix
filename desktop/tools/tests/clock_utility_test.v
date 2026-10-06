@@ -235,7 +235,7 @@ fn test_all_timer_controls_and_translated_labels_fit_and_show_real_enabled_state
 	defer { app.close_app() }
 	app.refresh()
 	for _ in 1 .. 4 { assert app.add_timer() }
-	for language in [DesktopLanguage.en, .es, .ru]! {
+	for language in desktop_languages {
 		set_desktop_language(language)
 		for size in [ui2.rect(0, 0, 560, 376), ui2.rect(0, 0, 400, 370), ui2.rect(0, 0, 180, 96)]! {
 			begin_frame_elements()
@@ -247,6 +247,126 @@ fn test_all_timer_controls_and_translated_labels_fit_and_show_real_enabled_state
 				assert clock_utility_element(tree, 'clock.timer.select.3') != none
 				assert clock_utility_element(tree, 'clock.timer.name') != none
 			}
+			free_tree(tree)
+		}
+	}
+}
+
+fn test_exact_timer_duration_rejects_malformed_and_out_of_range_values() {
+	for text in ['00:00:01', '01:02:03', '23:59:59', '24:00:00']! {
+		value := clock_parse_duration(text) or { panic('valid duration rejected') }
+		formatted := clock_timer_text(value)
+		assert formatted == text
+		unsafe { formatted.free() }
+	}
+	for text in ['', '00:00:00', '24:00:01', '99:00:00', '00:60:00', '00:00:60',
+		'1:02:03', '01:2:03', '01:02:3', '+1:02:03', '01:02:03 ', ' 1:02:03',
+		'01;02:03', '01:02:0x', '01:02:\x00', '０1:02:03']! {
+		assert clock_parse_duration(text) == none
+	}
+}
+
+fn test_exact_timer_duration_is_transactional_and_affects_only_selected_timer() {
+	mut app := ClockApp{tab: 1}
+	defer { app.close_app() }
+	// Keep this simulated start ahead of refresh()'s real clock so only the
+	// supplied observation times advance this unrelated timer.
+	base := ~u64(0) - 1_000_000
+	app.set_timer_duration(5000)
+	app.toggle_timer_at(base)
+	assert app.add_timer()
+	app.handle('clock.timer.duration')!
+	assert app.duration_text() == '00:05:00' && app.duration_selected
+	app.paste_input('01:02:03')
+	app.handle('clock.timer.duration.apply')!
+	assert app.timers[1].duration_ms == 3_723_000
+	assert app.timers[1].remaining_ms == 3_723_000 && !app.duration_editing
+	assert app.timers[0].running && app.timers[0].remaining(base + 1000) == 4000
+	app.handle('clock.timer.duration')!
+	app.paste_input('24:00:01')
+	app.key_input('\r')
+	assert app.duration_editing && app.duration_error
+	assert app.timers[1].duration_ms == 3_723_000
+	app.key_input('\x01')
+	app.paste_input('00:00:17')
+	app.key_input('\r')
+	assert app.timers[1].duration_ms == 17_000 && !app.duration_editing
+	app.toggle_timer_at(base + 1000)
+	app.handle('clock.timer.duration')!
+	assert !app.duration_editing && app.timers[1].running
+}
+
+fn test_exact_timer_duration_input_preserves_rejected_paste_and_cancels_cleanly() {
+	mut app := ClockApp{tab: 1}
+	defer { app.close_app() }
+	app.handle('clock.timer.duration')!
+	for text in ['00:00:003', '00:00:03\n', '00:00:Ж', '00:00:\x00']! {
+		app.paste_input(text)
+		assert app.duration_text() == '00:05:00' && app.duration_selected
+		assert app.duration_error && app.timers[0].duration_ms == 300_000
+	}
+	app.key_input('00:00:23')
+	assert app.duration_text() == '00:00:23' && !app.duration_error
+	app.key_input('\x7f')
+	assert app.duration_text() == '00:00:2'
+	app.key_input('\r')
+	assert app.duration_error && app.duration_editing
+	app.key_input('4\r')
+	assert !app.duration_editing && app.timers[0].duration_ms == 24_000
+	app.handle('clock.timer.duration')!
+	app.key_input('\x7f')
+	assert app.duration_text() == ''
+	app.key_input('00:00:55\x1b')
+	assert !app.duration_editing && app.timers[0].duration_ms == 24_000
+	app.handle('clock.timer.duration')!
+	app.paste_input('00:00:56')
+	app.handle('clock.timer.duration.cancel')!
+	assert app.timers[0].duration_ms == 24_000 && !app.duration_editing
+}
+
+fn test_hidden_timer_expiry_preserves_exact_duration_draft_until_selection_changes() {
+	mut app := ClockApp{tab: 1}
+	defer { app.close_app() }
+	app.set_timer_duration(1000)
+	app.toggle_timer_at(1000)
+	assert app.add_timer()
+	app.handle('clock.timer.duration')!
+	app.key_input('00:00:37')
+	app.update_timer(2000)
+	assert app.timers[0].done && app.selected_timer == 1 && app.duration_editing
+	assert app.duration_text() == '00:00:37'
+	app.handle('clock.timer.select.0')!
+	assert !app.duration_editing && app.timers[1].duration_ms == 300_000
+	app.handle('clock.timer.duration')!
+	assert app.duration_text() == '00:00:01'
+	app.paste_input('00:00:08')
+	assert app.add_timer()
+	assert !app.duration_editing
+	app.handle('clock.timer.duration')!
+	assert app.remove_timer()
+	assert !app.duration_editing
+}
+
+fn test_exact_timer_duration_editor_fits_minimum_window_and_disables_start() {
+	previous := desktop_language
+	defer { set_desktop_language(previous) }
+	mut app := ClockApp{tab: 1}
+	defer { app.close_app() }
+	app.refresh()
+	app.handle('clock.timer.duration')!
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for size in [ui2.rect(0, 0, 560, 376), ui2.rect(0, 0, 400, 370)]! {
+			begin_frame_elements()
+			tree := app.build(size)!
+			for child in tree.children { clock_assert_inside(child, size.width, size.height) }
+			start := clock_utility_element(tree, 'clock.timer.toggle') or { panic('missing start') }
+			assert !start.enabled
+			field := clock_utility_element(tree, 'clock.timer.duration.field') or { panic('missing duration') }
+			assert field.children.len == 1 && field.children[0].focused
+			assert field.children[0].text_selection.anchor == 0 && field.children[0].text_selection.caret == 8
+			assert clock_utility_element(tree, 'clock.timer.duration.apply') != none
+			assert clock_utility_element(tree, 'clock.timer.duration.cancel') != none
 			free_tree(tree)
 		}
 	}
