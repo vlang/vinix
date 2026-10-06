@@ -4184,3 +4184,69 @@ disk_usage.capacity.resize
 calendar.search.enlarge
 Увеличьте окно, чтобы увидеть календарь и результаты поиска.
 -----
+color_meter.lock_x
+Закрепить X
+-----
+color_meter.lock_y
+Закрепить Y
+-----
+color_meter.lock_hint
+Закреплённая координата постоянна; другая следует за указателем.
+-----
+color_meter.lock_requires_sample
+Сначала измерьте цвет, затем закрепите координату.
+-----
+color_meter.live_unavailable
+Измерение в реальном времени недоступно. Сохранён последний цвет.
+-----
+grapher.png_path
+Путь для PNG
+-----
+grapher.export_png
+Экспорт PNG
+-----
+grapher.png_saved
+График PNG сохранён
+-----
+grapher.png_invalid
+Укажите абсолютный путь UTF-8 для PNG
+-----
+grapher.png_exists
+Файл PNG уже существует
+-----
+grapher.png_failed
+Не удалось сохранить график PNG
+-----
+notes.undo
+Отменить
+-----
+notes.redo
+Повторить
+-----
+notes.history_scope
+Последние 32 правки этой заметки. Ctrl-Z / Ctrl-Y.
+-----
+notes.enlarge
+Увеличьте окно для редактирования заметок.
+-----
+clock.enlarge
+Увеличьте окно для работы с часами.
+-----
+clock.timer.number
+Таймер {0}
+-----
+clock.timer.name
+Имя таймера
+-----
+clock.timer.add
+Добавить
+-----
+clock.timer.remove
+Удалить
+-----
+clock.timer.legend
+* запущен · ! завершён · для изменений остановите
+-----
+clock.timer.scope
+До четырёх таймеров. Закрытие часов отменяет их.
+-----

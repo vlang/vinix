@@ -4184,3 +4184,69 @@ Enlarge the window to show capacity details.
 calendar.search.enlarge
 Enlarge the window to see the calendar and search results.
 -----
+color_meter.lock_x
+Lock X
+-----
+color_meter.lock_y
+Lock Y
+-----
+color_meter.lock_hint
+Locks hold physical coordinates while Live follows the other axis.
+-----
+color_meter.lock_requires_sample
+Sample a color before locking a coordinate.
+-----
+color_meter.live_unavailable
+Live sampling is unavailable. The last sample is unchanged.
+-----
+grapher.png_path
+PNG destination
+-----
+grapher.export_png
+Export PNG
+-----
+grapher.png_saved
+PNG graph exported
+-----
+grapher.png_invalid
+Choose an absolute UTF-8 PNG destination
+-----
+grapher.png_exists
+PNG destination already exists
+-----
+grapher.png_failed
+Could not export the PNG graph
+-----
+notes.undo
+Undo
+-----
+notes.redo
+Redo
+-----
+notes.history_scope
+Last 32 edits in this note. Ctrl-Z / Ctrl-Y.
+-----
+notes.enlarge
+Enlarge the window to edit notes.
+-----
+clock.enlarge
+Enlarge the window to use Clock.
+-----
+clock.timer.number
+Timer {0}
+-----
+clock.timer.name
+Timer name
+-----
+clock.timer.add
+Add timer
+-----
+clock.timer.remove
+Remove
+-----
+clock.timer.legend
+* running · ! finished · pause to adjust or remove
+-----
+clock.timer.scope
+Up to four timers. Closing Clock cancels them.
+-----

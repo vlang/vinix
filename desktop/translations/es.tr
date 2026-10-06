@@ -4184,3 +4184,69 @@ Amplía la ventana para ver la capacidad.
 calendar.search.enlarge
 Amplía la ventana para ver el calendario y los resultados.
 -----
+color_meter.lock_x
+Bloquear X
+-----
+color_meter.lock_y
+Bloquear Y
+-----
+color_meter.lock_hint
+El bloqueo fija una coordenada física; En vivo sigue el otro eje.
+-----
+color_meter.lock_requires_sample
+Muestrea un color antes de bloquear una coordenada.
+-----
+color_meter.live_unavailable
+El muestreo en vivo no está disponible. Se conserva la última muestra.
+-----
+grapher.png_path
+Destino PNG
+-----
+grapher.export_png
+Exportar PNG
+-----
+grapher.png_saved
+Gráfica PNG exportada
+-----
+grapher.png_invalid
+Elige una ruta absoluta UTF-8 para el PNG
+-----
+grapher.png_exists
+El destino PNG ya existe
+-----
+grapher.png_failed
+No se pudo exportar la gráfica PNG
+-----
+notes.undo
+Deshacer
+-----
+notes.redo
+Rehacer
+-----
+notes.history_scope
+Últimas 32 ediciones de esta nota. Ctrl-Z / Ctrl-Y.
+-----
+notes.enlarge
+Amplía la ventana para editar notas.
+-----
+clock.enlarge
+Amplía la ventana para usar Reloj.
+-----
+clock.timer.number
+Temporizador {0}
+-----
+clock.timer.name
+Nombre
+-----
+clock.timer.add
+Añadir
+-----
+clock.timer.remove
+Eliminar
+-----
+clock.timer.legend
+* activo · ! finalizado · pausa para editar o eliminar
+-----
+clock.timer.scope
+Hasta cuatro temporizadores. Cerrar Reloj los cancela.
+-----
