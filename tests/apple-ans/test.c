@@ -7,16 +7,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* Share the exact ext2 fixture/reader, but run its seven groups separately. */
-#define main ext2_fixture_tests_main
-#define rng ext2_fixture_rng
-#define random32 ext2_fixture_random32
-#define t_mutation ext2_fixture_mutation
-#include "ext2_test.c"
-#undef rng
-#undef random32
-#undef t_mutation
-#undef main
+/* Borrow the native V image builder for the partition-to-ext2 bridge. */
+#include "ext2-fixture-v-abi.h"
+#define setup ext2_fixture_setup
+#define destroy ext2_fixture_destroy
 #include "ans_fixture.h"
 
 #define F_NVME UINT64_C(0x100000)

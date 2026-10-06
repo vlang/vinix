@@ -1,40 +1,108 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-only
-"""Run the independent media fixtures against the production V ANS and classic-ext2 cores."""
+"""Run independent media goldens against unchanged production V storage cores."""
+import argparse
+from contextlib import nullcontext
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shutil
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-v = subprocess.check_output([
-    "sh", "-c", '. "$1/build-support/find-v.sh"; printf "%s" "$V"',
-    "find-v", str(ROOT)], text=True)
+HERE = Path(__file__).resolve().parent
+ORIGINAL = "d4a056552913b73e57bf42905e8fb5914bc9065a"
+p = argparse.ArgumentParser(description=__doc__)
+p.add_argument("--state-dir", type=Path, help="retain generated objects and parity receipts")
+p.add_argument("--arch", choices=("aarch64", "x86_64"), help="also execute the V ext2 model in a native guest")
+p.add_argument("--kernel-dir", type=Path)
+p.add_argument("--guest-state-dir", type=Path)
+a = p.parse_args()
+if a.arch and (not a.kernel_dir or not a.guest_state_dir):
+    p.error("--arch requires --kernel-dir and --guest-state-dir")
+if a.state_dir:
+    a.state_dir.mkdir(parents=True, exist_ok=False)
 common = [os.environ.get("CC", "clang"), "-std=gnu11", "-O2", "-g",
           "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
           "-fno-omit-frame-pointer"]
-with tempfile.TemporaryDirectory(prefix="vinix-ans-", dir="/tmp") as directory:
+quiet = ["-Wno-unused-function", "-Wno-unused-parameter", "-Wno-unused-label",
+         "-fwrapv", "-fno-strict-aliasing"]
+quotes = ["-iquote", str(ROOT / "kernel/c"), "-iquote", str(HERE)]
+context = nullcontext(str(a.state_dir.resolve())) if a.state_dir else tempfile.TemporaryDirectory(prefix="vinix-ans-", dir="/tmp")
+with context as directory:
     work = Path(directory)
-    (work / "v.mod").write_text("Module { name: 'vinix_ans_tests' }\n")
-    shutil.copyfile(ROOT / "kernel/apple/ans/ext2core/core.v", work / "core.v")
-    (work / "anscore").mkdir()
-    shutil.copyfile(ROOT / "kernel/apple/ans/anscore/core.v", work / "anscore/core.v")
-    (work / "core.v").write_text((work / "core.v").read_text().replace(
-        "module ext2core", "module ext2core\nimport anscore as _"))
-    subprocess.run([v, "-shared", "-no-builtin", "-no-closures", "-os", "vinix", "-target-libc-headers",
-                    "-nofloat", "-gc", "none", "-manualfree", "-o", str(work / "core.c"),
-                    str(work)], check=True, env={**os.environ, "V_C_ERROR_BUG_REPORT_DISABLED": "1"})
-    subprocess.run(common + ["-Wno-unused-function", "-Wno-unused-parameter", "-ffreestanding", "-fno-builtin",
-                    "-fno-strict-aliasing", "-DVINIX_V_RUNTIME", "-I", str(ROOT / "kernel/c"),
-                    "-c", str(work / "core.c"), "-o", str(work / "core.o")], check=True)
-    imports = subprocess.check_output(["nm", "-u", str(work / "core.o")], text=True)
-    if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
-        raise RuntimeError("unexpected allocator import in storage cores:\n" + imports)
-    for fixture in ("ext2_test.c", "test.c"):
-        subprocess.run(common + ["-iquote", str(ROOT / "kernel/c"),
-                        str(ROOT / "tests/apple-ans" / fixture), str(work / "core.o"), str(ROOT / "tests/apple-ans/platform_fixture.c"),
-                        "-o", str(work / "host")], check=True)
-        subprocess.run([str(work / "host")], check=True)
-    print("PASS V ANS/classic-ext2 C ABI, ASan/UBSan and no allocator imports")
+    source = work / "ext2core"
+    source.mkdir()
+    (source / "anscore").mkdir()
+    shutil.copyfile(ROOT / "kernel/apple/ans/ext2core/core.v", source / "core.v")
+    shutil.copyfile(ROOT / "kernel/apple/ans/anscore/core.v", source / "anscore/core.v")
+    (source / "core.v").write_text((source / "core.v").read_text().replace(
+        "module ext2core", "module ext2core\nimport ext2core.anscore as _"))
+    runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"](
+        source, work / "core.c", "arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64", ("nofloat",))
+    receipt = {"original_revision": ORIGINAL, "originals": {}}
+    for name in ("ext2_test.c", "platform_fixture.c", "test.c", "test_rw.h", "ext2_fixture.h", "ans_fixture.h"):
+        raw = subprocess.check_output(["git", "show", ORIGINAL + ":tests/apple-ans/" + name], cwd=ROOT)
+        (work / name).write_bytes(raw)
+        receipt["originals"][name] = {"sha256": hashlib.sha256(raw).hexdigest(), "lines": len(raw.splitlines())}
+    for output, kind, extra in (("ext2.c", "ext2", ("--entry",)), ("ext2-library.c", "ext2", ()), ("platform.c", "platform", ())):
+        subprocess.run(["python3", str(HERE / "compile-fixture.py"), "--kind", kind, *extra, str(work / output)], check=True)
+    for name in ("core.c", "ext2.c", "ext2-library.c", "platform.c"):
+        subprocess.run(common + quiet + quotes + ["-ffreestanding", "-fno-builtin"] +
+                       (["-DVINIX_V_RUNTIME"] if name == "core.c" else []) +
+                       ["-c", str(work / name), "-o", str(work / (name + ".o"))], check=True)
+        imports = subprocess.check_output(["nm", "-u", str(work / (name + ".o"))], text=True)
+        forbidden = r"\b_?(?:realloc|memdup|new_array\w*|v_malloc)\b"
+        if name in ("core.c", "platform.c"):
+            forbidden = r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*|v_malloc)\b"
+        assert not re.search(forbidden, imports), imports
+        receipt[name] = {"sha256": hashlib.sha256((work / name).read_bytes()).hexdigest(), "imports": imports.splitlines()}
+    markers = {}
+    for kind in ("ext2", "ans"):
+        original = work / ("ext2_test.c" if kind == "ext2" else "test.c")
+        subprocess.run(common + quotes + [str(original), str(work / "core.c.o"), str(work / "platform_fixture.c"), "-o", str(work / (kind + "-original"))], check=True)
+        model = [str(work / "ext2.c.o")] if kind == "ext2" else [str(HERE / "test.c"), str(work / "ext2-library.c.o")]
+        subprocess.run(common + quotes + model + [str(work / "core.c.o"), str(work / "platform.c.o"), "-o", str(work / (kind + "-host"))], check=True)
+        expected = subprocess.check_output([str(work / (kind + "-original"))])
+        actual = subprocess.check_output([str(work / (kind + "-host"))])
+        assert expected == actual, (expected, actual)
+        markers[kind] = actual.decode().splitlines()
+        (work / (kind + ".stdout")).write_bytes(actual)
+        print(actual.decode(), end="")
+    receipt["goldens"] = markers
+    (work / "validation.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print("PASS independent C/V ANS/classic-ext2 goldens, C ABI, ASan/UBSan and no implicit allocator imports")
+    if a.arch:
+        native_arch = "arm64" if a.arch == "aarch64" else "amd64"
+        native_source = work / "native-provider/ext2core"
+        native_source.mkdir(parents=True)
+        shutil.copyfile(ROOT / "kernel/apple/ans/ext2core/core.v", native_source / "core.v")
+        runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"](
+            native_source, work / "core-native.c", native_arch, ("nofloat",))
+        subprocess.run(["python3", str(HERE / "compile-fixture.py"), "--entry", "--guest", "--arch", native_arch, str(work / "native.c")], check=True)
+        subprocess.run(["python3", str(HERE / "compile-fixture.py"), "--kind", "platform", "--arch", native_arch, str(work / "platform-native.c")], check=True)
+        if a.arch == "aarch64":
+            sysroot = ROOT / "build-aarch64-userland/sysroot"
+            gcc = sorted((ROOT / "build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl").iterdir())[-1]
+            cc = [os.environ.get("CC_AARCH64", "/opt/homebrew/opt/llvm/bin/clang"), "--target=aarch64-linux-musl", "--sysroot=" + str(sysroot), "--gcc-install-dir=" + str(gcc)]
+        else:
+            cc = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
+        flags = ["-std=gnu11", "-O2", "-g", "-Wall", "-Wextra", "-Werror", *quiet, *quotes]
+        for name in ("core-native.c", "native.c", "platform-native.c"):
+            extra = ["-DVINIX_V_RUNTIME", "-ffreestanding", "-fno-builtin"] if name == "core-native.c" else []
+            if name == "core-native.c" and a.arch == "x86_64":
+                extra.append("-Wno-array-parameter")
+            subprocess.run(cc + flags + extra + ["-c", str(work / name), "-o", str(work / (name + ".native.o"))], check=True)
+        serial = work / "serial.o"
+        runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))["compile_serial"](serial, a.arch, cc + flags)
+        init = work / "native-init"
+        subprocess.run(cc + (["-fuse-ld=lld"] if a.arch == "aarch64" else []) + ["-static", str(work / "core-native.c.native.o"), str(work / "native.c.native.o"), str(work / "platform-native.c.native.o"), str(serial), "-o", str(init)], check=True)
+        command = ["python3", str(ROOT / "tests/kernel-gaps/run.py"), "--arch", a.arch, "--prebuilt-init", str(init), "--kernel-dir", str(a.kernel_dir), "--state-dir", str(a.guest_state_dir), "--no-network", "--timeout", "300"]
+        for marker in markers["ext2"]:
+            command += ["--expect", marker]
+        (work / "native-inputs.json").write_text(json.dumps({"arch": a.arch, "fixture_sha256": hashlib.sha256(init.read_bytes()).hexdigest(), "kernel_sha256": hashlib.sha256((a.kernel_dir / "bin/vinix").read_bytes()).hexdigest(), "expected_markers": markers["ext2"], "command": command}, indent=2) + "\n")
+        subprocess.run(command, check=True)
