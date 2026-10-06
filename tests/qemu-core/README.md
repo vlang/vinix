@@ -36,9 +36,10 @@ tests/qemu-core/run.sh amd64
 The signal-disposition, first-touch, interrupted-read, nanosleep-remainder and
 blocked-thread exit/exec fixtures are compiled from `signalfixture`,
 `touchfixture`, `restartfixture`, `nanosleepfixture`, `blockedfixture`,
-`pollfixture` and `epollfixture` V modules. The normal builder generates their
-ephemeral C and declaration headers outside the checkout and links them with the remaining test program. All 96 original
-`CHECK` sites keep their predicates and logical source line numbers; the shared
+`pollfixture`, `epollfixture` and `intfixture` V modules. The normal builder
+generates ephemeral C and declaration headers outside the checkout and links
+them with the remaining test program. All 98 original `CHECK` sites keep their
+predicates and logical source line numbers; the shared
 `reap_ok` body remains unchanged.
 
 Independent comparisons recover the original fixture from commit
@@ -54,6 +55,7 @@ python3 tests/qemu-core/test-nanosleepfixture.py /tmp/qemu-nanosleep --arch arm6
 python3 tests/qemu-core/test-blockedfixture.py /tmp/qemu-blocked --arch arm64
 python3 tests/qemu-core/test-pollfixture.py /tmp/qemu-poll --arch arm64
 python3 tests/qemu-core/test-epollfixture.py /tmp/qemu-epoll --arch arm64
+python3 tests/qemu-core/test-intfixture.py /tmp/qemu-int --arch arm64
 ```
 
 The host touch comparison uses real mappings, forks, pipes, protection and
@@ -93,4 +95,8 @@ The epoll comparison preserves the native packed event stride, data and count
 ABI. Fifteen cases cover every API error, event/data/byte sentinels and all
 three close failures. Host inputs use real pipe readiness through poll; native
 guests use actual epoll calls.
+The syscall C-int comparison preserves the original zero-extended directory word
+and native variadic argument widths. Three cases compare syscall/close failures
+and argument bits; an additional nonzero argument probe checks the instruction
+ABI adapter. The host uses native openat while guests call actual syscall.
 These bounded comparisons supplement the full feature and persistence runner.

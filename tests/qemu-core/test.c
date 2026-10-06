@@ -55,6 +55,7 @@
 #include "blockedfixture-api.h"
 #include "pollfixture-api.h"
 #include "epollfixture-api.h"
+#include "intfixture-api.h"
 #line 51 "test.c"
 
 #define CHECK(expression) do {                                               \
@@ -2177,16 +2178,7 @@ static int test_large_pipe_progress(void)
 /* The AArch64 syscall ABI leaves the unused high half of C-int arguments
  * unspecified. qemu-user zero-extends AT_FDCWD while translating x86 open(2),
  * and the kernel must truncate it before interpreting the signed value. */
-static int test_syscall_int_truncation(void)
-{
-	long descriptor = syscall(SYS_openat, UINT64_C(0x00000000ffffff9c), ".",
-	    O_RDONLY, 0);
-	CHECK(descriptor >= 0);
-	CHECK(close((int)descriptor) == 0);
-	puts("QEMU CORE PASS: syscall C-int truncation");
-	return 0;
-}
-
+#line 2545 "test.c"
 /* An abstract socket name belongs to the socket that bound it, and has to come
  * back when that socket goes. Leaking it reserved the name for the life of the
  * machine: an X server that had been restarted could not bind its own display
