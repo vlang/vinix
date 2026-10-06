@@ -31,6 +31,7 @@ fn reminders_heap_add(mut app RemindersApp, title string, due string) {
 	app.paste_input(title)
 	app.handle('reminders.due') or { panic(err) }
 	app.paste_input(due)
+	app.handle('reminders.priority.high') or { panic(err) }
 	app.save_edit()
 }
 
@@ -55,7 +56,7 @@ fn test_reminders_repeated_edits_filters_exports_reload_and_frames_release_owned
 		assert app.data.count == 1 && !app.editing
 		app.handle('reminders.row.0')!
 		app.toggle_selected()
-		assert app.data.items[0].completed
+		assert app.data.items[0].completed && app.data.items[0].priority == .high
 		app.handle('reminders.filter.completed')!
 		app.handle('reminders.search')!
 		app.key_input('\x01')
@@ -68,19 +69,20 @@ fn test_reminders_repeated_edits_filters_exports_reload_and_frames_release_owned
 		assert app.status == 'reminders.export_saved'
 		assert desktop_unlink(path) == 0
 		csv := app.visible_text(true)
-		assert csv.contains('"Café 日本語 😀","2028-02-29 12:00",1')
+		assert csv.contains('"Café 日本語 😀","2028-02-29 12:00",1,"High"')
 		unsafe { csv.free() }
 		app.reload()
-		assert app.data.count == 1
+		assert app.data.count == 1 && app.data.items[0].priority == .high
 		app.handle('reminders.row.0')!
 		app.begin_edit(0)
 		app.key_input('\x01')
 		app.paste_input('Renamed 😀')
+		app.handle('reminders.priority.medium')!
 		begin_frame_elements()
 		tree := app.build(ui2.rect(0, 0, 800, 616))!
 		free_tree(tree)
 		app.save_edit()
-		assert !app.editing
+		assert !app.editing && app.data.items[0].priority == .medium
 		app.handle('reminders.search')!
 		app.key_input('\x01\x7f')
 		app.handle('reminders.row.0')!
@@ -107,7 +109,7 @@ fn test_reminders_repeated_initialization_and_close_release_all_model_buffers_an
 	C.vinix_heap_begin()
 	for _ in 0 .. 40 {
 		mut app := new_reminders_app(home, 0)
-		assert app.data.count == 1
+		assert app.data.count == 1 && app.data.items[0].priority == .high
 		assert app.data.items[0].title == 'Persisted 😀'
 		app.reload()
 		begin_frame_elements()
@@ -134,6 +136,7 @@ fn test_reminders_parse_failure_and_save_conflict_paths_release_temporary_alloca
 		reminders_heap_add(mut second, 'Pending task 😀', '2028-02-29')
 		assert second.editing && second.status == 'reminders.changed'
 		assert editor_bytes_text(second.title_input) == 'Pending task 😀'
+		assert second.edit_priority == .high
 		second.cancel_edit()
 		mut invalid := reminders_parse('VINIX-REMINDERS 1\n0\t\tGood first row\n0\t2026-02-30\tBad second row\n') or { continue }
 		invalid.free_items()
@@ -141,5 +144,42 @@ fn test_reminders_parse_failure_and_save_conflict_paths_release_temporary_alloca
 	}
 	first.close_app()
 	second.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_reminders_priority_legacy_parse_failure_and_draft_cancel_release_all_owned_memory() {
+	home := reminders_heap_home('priority-parser')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	mut app := new_reminders_app(home, 0)
+	app.begin_edit(-1)
+	begin_frame_elements()
+	warm := app.build(ui2.rect(0, 0, 800, 616))!
+	free_tree(warm)
+	app.cancel_edit()
+	C.vinix_heap_begin()
+	for _ in 0 .. 200 {
+		mut legacy := reminders_parse('VINIX-REMINDERS 1\n0\t2028-02-29\tLegacy\n1\t\tDone\n') or { panic('legacy parse') }
+		assert legacy.items[0].priority == .none && legacy.items[1].priority == .none
+		legacy.free_items()
+		mut current := reminders_parse('VINIX-REMINDERS 2\n0\t1\t\tLow\n0\t2\t\tMedium\n1\t3\t\tHigh\n') or { panic('v2 parse') }
+		assert current.items[0].priority == .low && current.items[1].priority == .medium && current.items[2].priority == .high
+		current.free_items()
+		for invalid in ['VINIX-REMINDERS 2\n0\t3\t\tGood\n0\t4\t\tBad\n',
+			'VINIX-REMINDERS 2\n0\t3\t\tGood\n0\t3\t2026-02-30\tBad date\n']! {
+			mut parsed := reminders_parse(invalid) or { continue }
+			parsed.free_items()
+			assert false, 'invalid priority record accepted'
+		}
+		app.begin_edit(-1)
+		app.paste_input('Canceled task')
+		app.handle('reminders.priority.high')!
+		assert app.edit_priority == .high
+		begin_frame_elements()
+		tree := app.build(ui2.rect(0, 0, 480, 616))!
+		free_tree(tree)
+		app.cancel_edit()
+		assert app.edit_priority == .none && app.data.count == 0
+	}
+	app.close_app()
 	assert C.vinix_heap_end() == 0
 }

@@ -5,14 +5,27 @@ module main
 const reminders_limit = 256
 const reminders_title_limit = 256
 const reminders_record_limit = 128 * 1024
-const reminders_record_header = 'VINIX-REMINDERS 1\n'
+const reminders_record_header = 'VINIX-REMINDERS 2\n'
+const reminders_record_header_v1 = 'VINIX-REMINDERS 1\n'
 const reminders_filename = '.vinix-reminders'
+
+enum ReminderPriority { none low medium high }
+
+fn reminders_priority_key(priority ReminderPriority) string {
+	return match priority {
+		.none { 'reminders.priority.none' }
+		.low { 'reminders.priority.low' }
+		.medium { 'reminders.priority.medium' }
+		.high { 'reminders.priority.high' }
+	}
+}
 
 struct ReminderTask {
 mut:
 	title string
 	due string
 	completed bool
+	priority ReminderPriority
 }
 
 struct RemindersData {
@@ -42,6 +55,7 @@ mut:
 	page_rows int = 7
 	editing bool
 	edit_index int = -1
+	edit_priority ReminderPriority
 	confirming_delete bool
 	focus int = -1
 	select_all bool
@@ -108,25 +122,40 @@ fn (mut data RemindersData) free_items() {
 	data.count = 0
 }
 
+// Version 1 remains readable without rewriting it. The first successful user
+// save publishes version 2 through the same lock and snapshot conflict guard.
 fn reminders_parse(record string) ?RemindersData {
-	if record.len > reminders_record_limit || !record.starts_with(reminders_record_header) { return none }
+	if record.len > reminders_record_limit { return none }
+	version := if record.starts_with(reminders_record_header) { 2 } else if record.starts_with(reminders_record_header_v1) { 1 } else { return none }
 	mut data := RemindersData{}
 	mut complete := false
 	defer { if !complete { data.free_items() } }
-	mut start := reminders_record_header.len
+	mut start := if version == 1 { reminders_record_header_v1.len } else { reminders_record_header.len }
 	for start < record.len {
 		if data.count >= reminders_limit { return none }
 		mut end := start
 		for end < record.len && record[end] != `\n` { end++ }
 		if end >= record.len || end - start < 4 || record[start + 1] != `\t` { return none }
 		if record[start] != `0` && record[start] != `1` { return none }
-		mut split := start + 2
+		mut due_start := start + 2
+		mut priority := ReminderPriority.none
+		if version == 2 {
+			if end - start < 6 || record[start + 2] < `0` || record[start + 2] > `3` || record[start + 3] != `\t` { return none }
+			priority = match record[start + 2] {
+				`1` { ReminderPriority.low }
+				`2` { ReminderPriority.medium }
+				`3` { ReminderPriority.high }
+				else { ReminderPriority.none }
+			}
+			due_start = start + 4
+		}
+		mut split := due_start
 		for split < end && record[split] != `\t` { split++ }
 		if split >= end { return none }
-		due := console_borrow(record, start + 2, split)
+		due := console_borrow(record, due_start, split)
 		title := console_borrow(record, split + 1, end)
 		if !reminders_due_valid(due) || !reminders_clean_title(title) { return none }
-		data.items[data.count] = ReminderTask{ title: title.clone(), due: due.clone(), completed: record[start] == `1` }
+		data.items[data.count] = ReminderTask{ title: title.clone(), due: due.clone(), completed: record[start] == `1`, priority: priority }
 		data.count++
 		start = end + 1
 	}
@@ -278,7 +307,9 @@ fn (mut app RemindersApp) begin_edit(index int) {
 	app.pending_len = 0
 	app.title_input.clear()
 	app.due_input.clear()
+	app.edit_priority = .none
 	if index >= 0 {
+		app.edit_priority = app.data.items[index].priority
 		editor_append(mut app.title_input, app.data.items[index].title)
 		editor_append(mut app.due_input, app.data.items[index].due)
 	}
@@ -287,6 +318,7 @@ fn (mut app RemindersApp) begin_edit(index int) {
 fn (mut app RemindersApp) cancel_edit() {
 	app.editing = false
 	app.edit_index = -1
+	app.edit_priority = .none
 	app.confirming_delete = false
 	app.focus = -1
 	app.select_all = false
@@ -295,8 +327,10 @@ fn (mut app RemindersApp) cancel_edit() {
 	app.due_input.clear()
 }
 
-fn reminders_append_row(mut bytes []u8, title string, due string, completed bool) {
+fn reminders_append_row(mut bytes []u8, title string, due string, completed bool, priority ReminderPriority) {
 	bytes << if completed { u8(`1`) } else { u8(`0`) }
+	bytes << `\t`
+	bytes << u8(`0`) + u8(priority)
 	bytes << `\t`
 	editor_append(mut bytes, due)
 	bytes << `\t`
@@ -306,19 +340,19 @@ fn reminders_append_row(mut bytes []u8, title string, due string, completed bool
 
 // Build a prospective snapshot first. The live rows are changed only after
 // publication succeeds; conflicts and I/O errors leave edits and tasks intact.
-fn (app &RemindersApp) candidate(index int, title string, due string, completed bool, deleting bool) string {
+fn (app &RemindersApp) candidate(index int, title string, due string, completed bool, priority ReminderPriority, deleting bool) string {
 	mut bytes := []u8{cap: reminders_record_limit}
 	unsafe { bytes.flags |= .noslices }
 	editor_append(mut bytes, reminders_record_header)
 	for at in 0 .. app.data.count {
 		if at == index {
-			if !deleting { reminders_append_row(mut bytes, title, due, completed) }
+			if !deleting { reminders_append_row(mut bytes, title, due, completed, priority) }
 		} else {
 			item := &app.data.items[at]
-			reminders_append_row(mut bytes, item.title, item.due, item.completed)
+			reminders_append_row(mut bytes, item.title, item.due, item.completed, item.priority)
 		}
 	}
-	if index == -1 && !deleting { reminders_append_row(mut bytes, title, due, completed) }
+	if index == -1 && !deleting { reminders_append_row(mut bytes, title, due, completed, priority) }
 	result := editor_bytes_text(bytes).clone()
 	unsafe { bytes.free() }
 	return result
@@ -345,7 +379,7 @@ fn (mut app RemindersApp) save_edit() {
 	if !reminders_clean_title(title) { app.status = 'reminders.title_required' return }
 	if !reminders_due_valid(due) { app.status = 'reminders.invalid_due' return }
 	completed := app.edit_index >= 0 && app.data.items[app.edit_index].completed
-	record := app.candidate(app.edit_index, title, due, completed, false)
+	record := app.candidate(app.edit_index, title, due, completed, app.edit_priority, false)
 	defer { unsafe { record.free() } }
 	if app.publish(record) {
 		app.selected = if app.edit_index >= 0 { app.edit_index } else { app.data.count - 1 }
@@ -357,14 +391,14 @@ fn (mut app RemindersApp) save_edit() {
 fn (mut app RemindersApp) toggle_selected() {
 	if app.selected < 0 || app.selected >= app.data.count { app.status = 'reminders.select_task' return }
 	item := &app.data.items[app.selected]
-	record := app.candidate(app.selected, item.title, item.due, !item.completed, false)
+	record := app.candidate(app.selected, item.title, item.due, !item.completed, item.priority, false)
 	defer { unsafe { record.free() } }
 	app.publish(record)
 }
 
 fn (mut app RemindersApp) delete_selected() {
 	if !app.confirming_delete || app.selected < 0 || app.selected >= app.data.count { return }
-	record := app.candidate(app.selected, '', '', false, true)
+	record := app.candidate(app.selected, '', '', false, .none, true)
 	defer { unsafe { record.free() } }
 	if app.publish(record) { app.selected = -1 app.cancel_edit() }
 }

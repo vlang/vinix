@@ -30,6 +30,16 @@ fn (mut app RemindersApp) handle(event_id string) ! {
 		}
 		'reminders.save' { app.save_edit() }
 		'reminders.cancel' { app.cancel_edit() app.status = 'reminders.ready' }
+		'reminders.priority.none', 'reminders.priority.low', 'reminders.priority.medium', 'reminders.priority.high' {
+			if app.editing {
+				app.edit_priority = match event_id {
+					'reminders.priority.low' { ReminderPriority.low }
+					'reminders.priority.medium' { ReminderPriority.medium }
+					'reminders.priority.high' { ReminderPriority.high }
+					else { ReminderPriority.none }
+				}
+			}
+		}
 		'reminders.toggle' { if !app.editing { app.confirming_delete = false app.toggle_selected() } }
 		'reminders.delete' {
 			if !app.editing {
@@ -129,7 +139,7 @@ fn (app &RemindersApp) visible_text(csv bool) string {
 	mut bytes := []u8{cap: reminders_record_limit}
 	unsafe { bytes.flags |= .noslices }
 	if csv {
-		for index, key in ['reminders.csv_title', 'reminders.csv_due', 'reminders.csv_completed']! {
+		for index, key in ['reminders.csv_title', 'reminders.csv_due', 'reminders.csv_completed', 'reminders.csv_priority']! {
 			if index > 0 { bytes << `,` }
 			reminders_csv_field(mut bytes, tr(key))
 		}
@@ -143,10 +153,16 @@ fn (app &RemindersApp) visible_text(csv bool) string {
 			reminders_csv_field(mut bytes, item.due)
 			bytes << `,`
 			bytes << if item.completed { u8(`1`) } else { u8(`0`) }
+			bytes << `,`
+			reminders_csv_field(mut bytes, tr(reminders_priority_key(item.priority)))
 		} else {
 			editor_append(mut bytes, if item.completed { '[x] ' } else { '[ ] ' })
 			editor_append(mut bytes, item.title)
 			if item.due.len > 0 { bytes << `\t` editor_append(mut bytes, item.due) }
+			bytes << `\t`
+			editor_append(mut bytes, tr('reminders.priority'))
+			editor_append(mut bytes, ': ')
+			editor_append(mut bytes, tr(reminders_priority_key(item.priority)))
 		}
 		bytes << `\n`
 	}
@@ -164,7 +180,7 @@ fn (mut app RemindersApp) export_visible(csv bool) {
 fn (mut app RemindersApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	app.page_rows = if height > 416 { (height - 392) / 40 } else { 1 }
+	app.page_rows = if height > 460 { (height - 436) / 40 } else { 1 }
 	if app.page_rows < 1 { app.page_rows = 1 }
 	if app.page_rows > reminders_limit { app.page_rows = reminders_limit }
 	app.clamp_scroll()
@@ -186,13 +202,14 @@ fn (mut app RemindersApp) build(size ui2.Rect) !ui2.Element {
 		if slot >= app.match_count { break }
 		index := app.matches[slot]
 		item := &app.data.items[index]
-		mut content := frame_elements(3)
+		mut content := frame_elements(4)
 		content << ui2.label('', item.title, ui2.rect(8, 0, f64(width - 52), 20), ui2.TextStyle{color: body_text, size: 12})
 		content << ui2.label('', if item.due.len > 0 { item.due } else { tr('reminders.no_due') }, ui2.rect(8, 20, 160, 17), ui2.TextStyle{color: body_muted, size: 11})
-		content << ui2.label('', tr(app.due_status(index)), ui2.rect(178, 20, f64(width - 224), 17), ui2.TextStyle{color: if app.is_overdue(index) { u32(0xf08070) } else { body_muted }, size: 11})
+		content << ui2.label('', tr(app.due_status(index)), ui2.rect(178, 20, f64(width - 364), 17), ui2.TextStyle{color: if app.is_overdue(index) { u32(0xf08070) } else { body_muted }, size: 11})
+		content << ui2.label('', tr(reminders_priority_key(item.priority)), ui2.rect(f64(width - 176), 20, 132, 17), ui2.TextStyle{color: if item.priority == .high { app_accent } else { body_muted }, size: 11})
 		children << ui2.clickable_view(app.row_actions[index], ui2.rect(14, f64(124 + row * 40), f64(width - 28), 38), ui2.BoxStyle{bg: body_panel, radius: 4, border_color: if app.selected == index { app_accent } else { body_rule }, border_left: 1, border_right: 1, border_top: 1, border_bottom: 1}, content)
 	}
-	footer := height - 256
+	footer := height - 300
 	children << console_button('reminders.previous', 'reminders.previous', 14, footer, 110, false)
 	children << console_button('reminders.next', 'reminders.next', 132, footer, 110, false)
 	if app.editing {
@@ -202,6 +219,12 @@ fn (mut app RemindersApp) build(size ui2.Rect) !ui2.Element {
 		children << console_field('reminders.due', editor_bytes_text(app.due_input), 14, footer + 111, width - 268, app.focus == 1)
 		children << console_button('reminders.save', 'reminders.save', width - 240, footer + 112, 112, false)
 		children << console_button('reminders.cancel', 'reminders.cancel', width - 120, footer + 112, 106, false)
+		children << ui2.label('', tr('reminders.priority'), ui2.rect(14, f64(footer + 151), 92, 30), ui2.TextStyle{color: body_muted, size: 11})
+		priority_stride := (width - 128) / 4
+		for index, priority in [ReminderPriority.none, .low, .medium, .high]! {
+			key := reminders_priority_key(priority)
+			children << console_button(key, key, 114 + index * priority_stride, footer + 150, priority_stride - 8, app.edit_priority == priority)
+		}
 	} else if app.confirming_delete {
 		children << ui2.label('', tr('reminders.confirm_delete'), ui2.rect(14, f64(footer + 42), f64(width - 28), 24), ui2.TextStyle{color: body_text, size: 12})
 		children << console_button('reminders.delete_confirm', 'reminders.delete_confirm', 14, footer + 77, 160, false)

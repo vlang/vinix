@@ -184,7 +184,7 @@ fn test_reminders_corruption_read_failures_and_invalid_records_are_preserved() {
 	assert !app.editing
 	assert !app.publish(reminders_record_header)
 	assert os.read_file(path)! == bad
-	for record in ['VINIX-REMINDERS 2\n', 'VINIX-REMINDERS 1\n2\t\tInvalid\n',
+	for record in ['VINIX-REMINDERS 3\n', 'VINIX-REMINDERS 1\n2\t\tInvalid\n',
 		'VINIX-REMINDERS 1\n0\t\t\n', 'VINIX-REMINDERS 1\n0\t\tIncomplete',
 		'VINIX-REMINDERS 1\n0\t\tInvalid\tfield\n', 'VINIX-REMINDERS 1\n0\t\tBad\xff\n']! {
 		mut parsed := reminders_parse(record) or { continue }
@@ -275,9 +275,9 @@ fn test_reminders_exclusive_filtered_text_csv_export_and_frame_build() {
 	csv := app.visible_text(true)
 	text := app.visible_text(false)
 	defer { unsafe { csv.free() text.free() } }
-	assert csv.contains('"日本語, ""quoted""","2028-02-29",0\n')
+	assert csv.contains('"日本語, ""quoted""","2028-02-29",0,"None"\n')
 	assert !csv.contains('Hidden')
-	assert text == '[ ] 日本語, "quoted"\t2028-02-29\n'
+	assert text == '[ ] 日本語, "quoted"\t2028-02-29\tPriority: None\n'
 	path := join_path(home, 'export.csv')
 	defer { unsafe { path.free() } }
 	app.handle('reminders.export_path')!
@@ -302,7 +302,7 @@ fn test_reminders_count_bound_rejects_new_tasks_and_oversized_storage() {
 	mut bytes := []u8{cap: 8192}
 	defer { unsafe { bytes.free() } }
 	editor_append(mut bytes, reminders_record_header)
-	for _ in 0 .. reminders_limit { reminders_append_row(mut bytes, 'Task', '', false) }
+	for _ in 0 .. reminders_limit { reminders_append_row(mut bytes, 'Task', '', false, .none) }
 	assert app.publish(editor_bytes_text(bytes))
 	assert app.data.count == reminders_limit
 	app.begin_edit(-1)
@@ -314,7 +314,7 @@ fn test_reminders_count_bound_rejects_new_tasks_and_oversized_storage() {
 	app.reload()
 	assert app.read_failed
 	assert app.data.count == reminders_limit
-	reminders_append_row(mut bytes, 'One more', '', false)
+	reminders_append_row(mut bytes, 'One more', '', false, .none)
 	mut invalid := reminders_parse(editor_bytes_text(bytes)) or { return }
 	invalid.free_items()
 	assert false, 'record above task count bound accepted'
@@ -335,4 +335,191 @@ fn test_reminders_trusted_home_alias_is_resolved_before_anchoring_records() {
 	defer { direct.close_app() }
 	assert direct.data.count == 1
 	assert direct.data.items[0].title == 'Aliased profile'
+}
+
+fn test_reminders_v1_record_stays_unchanged_until_saved_and_then_migrates() {
+	home := reminders_test_home('priority-migration')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	legacy := 'VINIX-REMINDERS 1\n0\t2028-02-29\tLegacy task\n1\t\tCompleted legacy\n'
+	os.write_file(path, legacy)!
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	assert !app.read_failed && app.data.count == 2
+	assert app.data.items[0].priority == .none && app.data.items[1].priority == .none
+	assert app.data.items[1].completed
+	app.begin_edit(0)
+	app.handle('reminders.priority.high')!
+	assert app.edit_priority == .high && app.data.items[0].priority == .none
+	app.handle('reminders.cancel')!
+	app.poll_time(0)
+	app.reload()
+	unchanged := os.read_file(path)!
+	assert unchanged == legacy
+	unsafe { unchanged.free() }
+	app.begin_edit(0)
+	assert app.edit_priority == .none
+	app.handle('reminders.priority.medium')!
+	app.save_edit()
+	assert !app.editing && app.data.items[0].priority == .medium
+	migrated := os.read_file(path)!
+	assert migrated == 'VINIX-REMINDERS 2\n0\t2\t2028-02-29\tLegacy task\n1\t0\t\tCompleted legacy\n'
+	unsafe { migrated.free() }
+	mut reopened := new_reminders_app(home, 0)
+	defer { reopened.close_app() }
+	assert reopened.data.items[0].priority == .medium
+	assert reopened.data.items[1].priority == .none && reopened.data.items[1].completed
+}
+
+fn test_reminders_each_priority_roundtrips_and_toggle_edit_cancel_preserve_values() {
+	home := reminders_test_home('priorities')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	for priority in [ReminderPriority.none, .low, .medium, .high]! {
+		app.begin_edit(-1)
+		assert app.edit_priority == .none
+		app.paste_input('Task')
+		app.handle(reminders_priority_key(priority))!
+		assert app.edit_priority == priority
+		app.save_edit()
+		assert !app.editing
+	}
+	app.reload()
+	for index, priority in [ReminderPriority.none, .low, .medium, .high]! {
+		assert app.data.items[index].priority == priority
+		app.selected = index
+		app.toggle_selected()
+		assert app.data.items[index].completed && app.data.items[index].priority == priority
+		app.begin_edit(index)
+		assert app.edit_priority == priority
+		app.handle('reminders.priority.none')!
+		app.key_input('\x1b')
+		assert !app.editing && app.edit_priority == .none
+		assert app.data.items[index].priority == priority
+		app.handle('reminders.priority.high')!
+		assert app.edit_priority == .none && app.data.items[index].priority == priority
+	}
+	app.begin_edit(3)
+	app.handle('reminders.priority.low')!
+	app.save_edit()
+	assert app.data.items[3].priority == .low && app.data.items[3].completed
+	app.selected = 1
+	app.confirming_delete = true
+	app.delete_selected()
+	assert app.data.count == 3
+	assert app.data.items[1].priority == .medium
+	assert app.data.items[2].priority == .low
+}
+
+fn test_reminders_v2_rejects_malformed_priority_fields_and_preserves_loaded_tasks() {
+	for record in ['VINIX-REMINDERS 2\n0\t4\t\tTask\n',
+		'VINIX-REMINDERS 2\n0\t-1\t\tTask\n', 'VINIX-REMINDERS 2\n0\t03\t\tTask\n',
+		'VINIX-REMINDERS 2\n0\t\t\tTask\n', 'VINIX-REMINDERS 2\n0\ta\t\tTask\n',
+		'VINIX-REMINDERS 2\n0\t3 \t\tTask\n', 'VINIX-REMINDERS 2\n0\t3\tTask\n',
+		'VINIX-REMINDERS 2\n0\t3\t\tTask', 'VINIX-REMINDERS 2\n0\t3\t\tTask\tExtra\n',
+		'VINIX-REMINDERS 2\n0\t3\t\tGood first\n0\t4\t\tBad second\n',
+		'VINIX-REMINDERS 1\n0\t3\t\tTask\n']! {
+		mut parsed := reminders_parse(record) or { continue }
+		parsed.free_items()
+		assert false, 'malformed priority record accepted'
+	}
+	home := reminders_test_home('priority-invalid')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.begin_edit(-1)
+	app.paste_input('Protected task')
+	app.handle('reminders.priority.high')!
+	app.save_edit()
+	bad := 'VINIX-REMINDERS 2\n0\t9\t\tBad priority\n'
+	os.write_file(path, bad)!
+	app.reload()
+	assert app.read_failed && app.data.count == 1
+	assert app.data.items[0].priority == .high && app.data.items[0].title == 'Protected task'
+	app.begin_edit(0)
+	assert !app.editing
+	stored := os.read_file(path)!
+	assert stored == bad
+	unsafe { stored.free() }
+}
+
+fn test_reminders_v1_migration_conflict_and_busy_save_keep_priority_draft() {
+	home := reminders_test_home('priority-conflict')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	path := join_path(home, reminders_filename)
+	defer { unsafe { path.free() } }
+	os.write_file(path, 'VINIX-REMINDERS 1\n0\t\tLegacy\n')!
+	mut first := new_reminders_app(home, 0)
+	mut second := new_reminders_app(home, 0)
+	defer { first.close_app() second.close_app() }
+	second.begin_edit(0)
+	second.handle('reminders.priority.high')!
+	first.selected = 0
+	first.toggle_selected()
+	second.save_edit()
+	assert second.status == 'reminders.changed' && second.editing
+	assert second.edit_priority == .high && second.data.items[0].priority == .none
+	assert second.record == 'VINIX-REMINDERS 1\n0\t\tLegacy\n'
+	second.reload()
+	assert !second.editing && second.data.items[0].completed
+	second.begin_edit(0)
+	second.handle('reminders.priority.low')!
+	lock_fd := reminders_lock(second.home_fd)
+	assert lock_fd >= 0
+	second.save_edit()
+	assert second.status == 'reminders.busy' && second.editing && second.edit_priority == .low
+	assert second.data.items[0].priority == .none
+	desktop_close(lock_fd)
+	second.save_edit()
+	assert !second.editing && second.data.items[0].priority == .low
+	assert second.data.items[0].completed
+}
+
+fn test_reminders_priority_exports_csv_text_and_list_badge_with_safe_editor_geometry() {
+	home := reminders_test_home('priority-export')
+	defer { os.rmdir_all(home) or {} unsafe { home.free() } }
+	mut app := new_reminders_app(home, 0)
+	defer { app.close_app() }
+	app.begin_edit(-1)
+	app.paste_input('Important, "quoted"')
+	app.handle('reminders.priority.high')!
+	app.save_edit()
+	csv := app.visible_text(true)
+	text := app.visible_text(false)
+	defer { unsafe { csv.free() text.free() } }
+	assert csv == '"Title","Due","Completed (0 or 1)","Priority"\n"Important, ""quoted""","",0,"High"\n'
+	assert text == '[ ] Important, "quoted"\tPriority: High\n'
+	begin_frame_elements()
+	tree := app.build(ui2.rect(0, 0, 800, 616))!
+	mut found_badge := false
+	for child in tree.children {
+		if child.id == 'reminders.row.0' {
+			for label in child.children { if label.text == 'High' { found_badge = true } }
+		}
+	}
+	assert found_badge
+	free_tree(tree)
+	app.begin_edit(0)
+	for width in [480, 800, 1000]! {
+		begin_frame_elements()
+		editor := app.build(ui2.rect(0, 0, width, 616))!
+		mut priorities := 0
+		mut previous_right := f64(0)
+		for child in editor.children {
+			if child.id.starts_with('reminders.priority.') {
+				assert child.frame.x >= previous_right && child.frame.width >= 70
+				assert child.frame.x + child.frame.width <= width - 14
+				assert child.frame.y > 616 - 300 + 142 && child.frame.y + child.frame.height < 616 - 105
+				assert child.text == tr(child.id) && child.text != child.id
+				previous_right = child.frame.x + child.frame.width
+				priorities++
+			}
+		}
+		assert priorities == 4
+		free_tree(editor)
+	}
 }
