@@ -63,10 +63,18 @@ $(BUILD)/obj/vcore-host.o: $(BUILD)/obj/vcore-host.c src/v_abi.h
 comma := ,
 HOST_GC := $(if $(filter Darwin,$(shell uname -s)),-Wl$(comma)-dead_strip,-Wl$(comma)--gc-sections)
 
-$(BUILD)/adt2fdt: tests/adt2fdt.c $(BUILD)/obj/vcore-host.o src/*.h
+$(BUILD)/obj/converter-fixture.c: tests/convertercore/core.v tests/converter-v-abi.h tests/compile-fixture.py ../build-support/compile-v-module.py
+	@mkdir -p $(dir $@)
+	python3 tests/compile-fixture.py converter $@
+
+$(BUILD)/obj/converter-fixture.o: $(BUILD)/obj/converter-fixture.c tests/converter-v-abi.h src/*.h
+	$(HOSTCC) -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function \
+		-Wno-unused-parameter -fwrapv -fno-strict-aliasing -ffunction-sections \
+		-fdata-sections -Isrc -Itests -c $< -o $@
+
+$(BUILD)/adt2fdt: $(BUILD)/obj/converter-fixture.o $(BUILD)/obj/vcore-host.o
 	@mkdir -p $(BUILD)
-	$(HOSTCC) -O2 -g -Wall -Wextra -Werror -DAPPLE_BOOT_HOST $(HOST_GC) -o $@ \
-		tests/adt2fdt.c $(BUILD)/obj/vcore-host.o
+	$(HOSTCC) $(HOST_GC) -o $@ $^
 
 # The converter check reads this Mac's IORegistry; the QEMU test boots
 # $(VINIX_KERNEL_DIR)/bin/vinix (default ../kernel) through a fake iBoot.

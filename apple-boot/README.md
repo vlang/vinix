@@ -48,7 +48,8 @@ make -C apple-boot test
 ```
 
 - `tests/check_converter.py` rebuilds this Mac's ADT from the IORegistry,
-  converts it with the loader's own C code, reads it back as the kernel
+  converts it with the loader's V code through the independent V converter,
+  reads it back as the kernel
   does, and checks every node's translated `reg` against the windows XNU
   mapped (on an M5 Max: 233 nodes, 0 differences).
 - `tests/qemu_iboot.py` boots the image in QEMU through a stub that hands
@@ -61,7 +62,16 @@ make -C apple-boot test
   `--kernel` picks the kernel, `--no-aic` takes QEMU's GIC path instead.
   `--real-adt` hands over this Mac's own tree (about 2,000 nodes, 726 KB on
   an M5 Max) with only the watchdog and AIC hidden, so the loader and the
-  kernel get through all of it.
+  kernel attempt the complete tree. The current real-ADT guest failure also
+  occurs with the unchanged C baseline; its evidence is recorded in
+  [the migration record](../docs/kernel-v-migration.md).
+
+`python3 apple-boot/tests/run-v-core.py` checks the public structure ABI,
+the converter and boot-runtime goldens with address and undefined-behavior
+sanitizers. `python3 apple-boot/tests/fixture-parity.py --state-dir <new-dir>`
+builds the frozen pre-port C fixtures from Git and compares every boot golden
+and ten converter cases, including binary FDT output. Maintained fixture
+bodies are V; generated C is only a build artifact.
 
 ## Install on a Mac
 

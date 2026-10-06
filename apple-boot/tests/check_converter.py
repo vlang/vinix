@@ -34,7 +34,7 @@ def main() -> int:
         print("SKIP: needs macOS's IORegistry")
         return 0
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--converter", type=Path, help="already built independent C converter fixture")
+    parser.add_argument("--converter", type=Path, help="already built independent converter fixture")
     arguments = parser.parse_args()
     converter = arguments.converter or HERE.parent / "build/adt2fdt"
     if not arguments.converter:

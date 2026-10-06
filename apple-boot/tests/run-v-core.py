@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Exercise production V through unchanged C converter and memory fixtures."""
+"""Exercise production V through independent native V loader fixtures."""
 import os
 from pathlib import Path
 import re
@@ -26,8 +26,21 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
     print("Apple loader: V core has no allocator imports", flush=True)
     gc = "-Wl,-dead_strip" if __import__("platform").system() == "Darwin" else "-Wl,--gc-sections"
+    fixture_objects = {}
+    for fixture, module in (("converter", "convertercore"), ("boot", "bootfixture")):
+        fixture_source, fixture_object = work / (fixture + ".c"), work / (fixture + ".o")
+        subprocess.run(["python3", str(here / "compile-fixture.py"), fixture,
+                        str(fixture_source)], check=True)
+        subprocess.run([cc, "-std=gnu11", *flags, "-Wno-unused-function",
+                        "-Wno-unused-parameter", "-Wno-unused-label", "-fwrapv", "-fno-strict-aliasing",
+                        "-ffunction-sections", "-fdata-sections", "-I" + str(loader / "src"),
+                        "-I" + str(here), "-c", str(fixture_source),
+                        "-o", str(fixture_object)], check=True)
+        fixture_symbols = subprocess.check_output(["nm", "-u", str(fixture_object)], text=True)
+        assert not re.search(r"\b_?(?:calloc|realloc|memdup|new_array\w*)\b", fixture_symbols), fixture_symbols
+        fixture_objects[fixture] = fixture_object
     converter = work / "adt2fdt"
-    subprocess.run([cc, *flags, "-DAPPLE_BOOT_HOST", gc, str(here / "adt2fdt.c"),
+    subprocess.run([cc, *flags, gc, str(fixture_objects["converter"]),
                     str(object_file), "-o", str(converter)], check=True)
     subprocess.run(["python3", str(here / "check_converter.py"), "--converter", str(converter)], check=True)
     # The existing independent kernel memory fixture also checks atoi, which
@@ -42,6 +55,6 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
 
     if (loader / "vcore/boot.v").exists():
         boot = work / "boot-runtime"
-        subprocess.run([cc, *flags, gc, str(here / "boot-runtime.c"),
+        subprocess.run([cc, *flags, gc, str(fixture_objects["boot"]),
                         str(object_file), "-o", str(boot)], check=True)
         subprocess.run([str(boot)], check=True)
