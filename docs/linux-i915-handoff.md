@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current CPU-policy feature: **`909f6a4b`** (original instruction-helper closure, bounded native PCI topology, maskable IRQ accounting and checked user-copy services). Recheck HEAD and the worktree before
+Committed implementation baseline before the current SMP-header feature: **`4052200b`** (common boot CPU direct-store capabilities, original instruction-helper closure, bounded native PCI topology and checked user-copy services). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `4052200b` | Immutable actual boot-CPU MOVDIRI/MOVDIR64B capability intersection and measured caller-state-preserving queries |
 | `909f6a4b` | Original x86 instruction-helper include closure, unchanged MOVDIR operands/opcodes and genuine unresolved privileged references |
 | `079e3ccd` | Native bounded PCI/CardBus topology, permanent scalar boot publication and read-only capability validation |
 | `d6d62bcc` | Actual original CSD records/initializer compiler tests; SMP runtime remains unresolved |
@@ -555,10 +556,10 @@ stamps. `CONFIG_MMU=1` matches native paging. The five-level-capable type profil
 is committed in `a88dcea7`, with original UAPI aliases and annotations rather
 than duplicate typedefs. Linux page ownership, PFN/descriptor services and
 runtime geometry globals remain unresolved. Latest frozen syntax report:
-`/tmp/vinix-linuxkpi-movdir64b-oct06-full-audit-report.json`, **4/269**,
+`/tmp/vinix-linuxkpi-smp-headers-oct06-enabled-proof/full-audit-report.json`, **4/269**,
 expected exit 1. Original page-table types, static-key declarations and
-instruction-header closure clear prior first errors; 206 units first fail on
-`rcu_read_lock`, followed by RCU pointer APIs, `call_single_data_t` and
+instruction-header and original CSD closure clear prior first errors; 213 units first fail on
+`rcu_read_lock`, followed by RCU pointer APIs and
 `cpu_feature_enabled`. Full diagnostics contain no MOVDIR error. Original mmiowb tracking
 macros are disabled under this configuration; a forced tracking configuration
 still rejects the absent architecture barrier.
@@ -785,8 +786,37 @@ baseline. Do not claim global allocation success. Full evidence:
 `/tmp/vinix-linuxkpi-directstore-policy-oct06-final-validation.json`.
 
 Original CSD tests now preserve records and genuine unresolved dispatcher/mask
-references, but production full-header integration and real IRQ dispatch still
-need implementation.
+references. Production full-header integration now passes strict same-source
+compiler and native link checks; real masks and IRQ dispatch still need
+implementation.
+
+The SMP overlay imports original Linux/x86 records and declarations, then
+restores only CPU accessors to the real native function and `get_cpu` pin.
+Exact original early declarations leave actual storage/maps unresolved. Genuine
+x86 Kconfig selects the architecture frame helper; with FRAME_POINTER and
+HARDENED_USERCOPY unset its original branch returns `NOT_STACK`, without Linux
+stack validation. Existing `current_thread_info()` casting still does not match
+the native task view; TIF/status accessors remain an unsupported runtime boundary.
+
+Final maintained test `smp_header_test.py` passes 22 GNU99/GNU11/assembly objects
+and six genuinely rejected missing-prerequisite cases. Original CSD/node/mask
+and fourteen-callback `smp_ops` ABI words match, individual CPU query/pin/unpin
+relocations are native, cold orders emit no symbols and original eight
+dispatch/mask plus six early-map imports remain genuine. The unchanged CSD
+initializer test passes 420,004 ASan/UBSan assertions per standard with actual
+production full headers now compiling. Section dumps use separate outputs;
+all 22 original object hashes and four derived copies are preserved and verified.
+Initial stale pre-objcopy receipts are retained as superseded evidence.
+
+Fresh isolated enabled/default x86 and disabled ARM builds at `909f6a4b` plus
+only four header/config paths compile and link. Enabled ELF SHA256:
+`f2e594e33c380e620d79c09b278d81109fec17827bf187763e02c13a0e9a570c`.
+The existing raw native CPU accessor exists in its real header object but is
+garbage-collected when unreferenced in this ELF. No new runtime algorithm or
+guest execution claim follows from this header feature. Full audit remains
+4/269; exactly seven CSD first errors advance to RCU (206 to 213). Masks,
+early maps, `smp_ops`, hotplug and remote callback services remain pending.
+Aggregate: `/tmp/vinix-linuxkpi-smp-headers-oct06-final-validation.json`.
 
 ## Bound and high-priority contracts
 

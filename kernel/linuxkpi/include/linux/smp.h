@@ -3,10 +3,12 @@
 #define VINIX_LINUX_SMP_H
 #include <linux/preempt.h>
 #include <vinix/runtime.h>
-unsigned int raw_smp_processor_id(void);
+/* Original CSD records, masks and SMP dispatch declarations have one owner. */
+#include_next <linux/smp.h>
+
+/* Keep the native scheduler pin; CPU queries use the asm/smp.h bridge. */
 unsigned int vinix_get_cpu(void);
-#define smp_processor_id() raw_smp_processor_id()
+#undef get_cpu
 #define get_cpu vinix_get_cpu
-#define put_cpu() preempt_enable()
-/* CPU masks, hotplug and remote function dispatch are not implemented. */
+/* Linux masks, hotplug, smp_ops and remote dispatch remain unresolved. */
 #endif

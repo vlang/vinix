@@ -75,6 +75,15 @@ after a filesystem failure. Mutable build inputs still require isolation.
   alternative patching keep genuine unresolved references. This compiler
   closure supplies no device portal, MMIO ownership or instruction execution
   validation; the following CPU feature bridge is a separate runtime change.
+- Original SMP/CSD records, initialization macros and x86 dispatcher records
+  come from the unchanged headers. Native CPU queries and scheduler pins retain
+  their existing Vinix accessors rather than interpreting GS as Linux's
+  `pcpu_hot`. Original early per-CPU declaration macros preserve genuine
+  unresolved storage/map references. The exact x86 Kconfig frame-helper
+  selection avoids a duplicate generic fallback; with frame pointers disabled,
+  the original helper returns `NOT_STACK`, without stack validation. Remote
+  callbacks, CPU masks, hotplug, `smp_ops` and Linux thread-info/TIF ownership
+  remain separate runtime dependencies.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -638,6 +647,7 @@ python3 tests/linuxkpi/asm_generated_headers_test.py
 python3 tests/linuxkpi/special_insns_test.py
 python3 tests/linuxkpi/cpu_feature_policy_test.py
 python3 tests/linuxkpi/smp_type_test.py
+python3 tests/linuxkpi/smp_header_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1272,15 +1282,16 @@ all compiler jobs. The same private include tree now contains genuine
 compiler-derived bounds. Regression tests cover repeated real compilation,
 invalid metadata and bounds-compiler rejection before driver compilation.
 The latest isolated report is
-`/tmp/vinix-linuxkpi-movdir64b-oct06-full-audit-report.json`; `i915_memcpy.c`,
+`/tmp/vinix-linuxkpi-smp-headers-oct06-enabled-proof/full-audit-report.json`; `i915_memcpy.c`,
 `i915_config.c`, `display/intel_qp_tables.c` and `i915_user_extensions.c` pass
 syntax. The last unit is not yet linked into the native kernel. Logging/WARN/taint,
 device-number types, integer limits and native CPU spin-hint visibility
 blockers are cleared. The report uses a frozen isolated source/profile rather
 than other sessions' changing metadata. Original page-table types, static-key
 declarations and instruction-header closure clear their prior first errors.
-Leading first errors include `rcu_read_lock` in 206 units, RCU pointer APIs,
-`call_single_data_t` and `cpu_feature_enabled`. All fifteen former MOVDIR
+Leading first errors include `rcu_read_lock` in 213 units, RCU pointer APIs and
+`cpu_feature_enabled`. The seven former CSD type errors now reach RCU.
+All fifteen former MOVDIR
 declaration blockers advance; complete diagnostics contain no MOVDIR errors.
 These are syntax
 paths, not a complete runtime dependency inventory.
@@ -1534,3 +1545,30 @@ scenarios. Churn retains 16–48 KiB per 300-process batch and some syscall
 measurements remain positive, so this is not a global leak-free claim.
 Aggregate evidence:
 `/tmp/vinix-linuxkpi-directstore-policy-oct06-final-validation.json`.
+
+Original SMP-header integration passes 22 strict GNU99/GNU11 and assembly
+objects, with six genuine incomplete-prerequisite rejections. Production and
+original CSD/node, cpumask and fourteen-callback `smp_ops` ABI vectors match
+byte for byte. Six CPU query/pin/unpin functions retain their expected native
+relocations; no Linux `pcpu_hot` reference appears. Original dispatch/mask and
+early-map consumers keep eight and six unresolved symbols respectively. Cold
+include orders emit no symbols. The unchanged initializer test also passes
+420,004 ASan/UBSan assertions per standard, and both actual production full
+header probes now compile.
+
+Fresh isolated enabled/default x86 and disabled ARM builds at `909f6a4b` plus
+only four header/config paths compile and link. Enabled ELF SHA256:
+`f2e594e33c380e620d79c09b278d81109fec17827bf187763e02c13a0e9a570c`.
+Saved objects preserve the existing native CPU accessor ABI; linker garbage
+collection removes an unreferenced accessor from this ELF. This header change
+adds no allocation, callback or IRQ-dispatch algorithm and has no new guest
+execution claim. The full audit stays **4/269**, with exactly seven CSD first
+errors advancing to RCU. The corrected test uses separate section-dump outputs,
+preserves all 22 compiler objects and records the four derived object hashes;
+the earlier stale pre-dump receipts are superseded.
+
+`current_thread_info()` still assumes a Linux task/thread-info layout which the
+native compatibility task view does not supply. TIF/status accessors and Linux
+stack ownership are not enabled by these declarations. CPU masks, early maps,
+hotplug, `smp_ops` and remote callback execution remain unresolved. Evidence:
+`/tmp/vinix-linuxkpi-smp-headers-oct06-final-validation.json`.

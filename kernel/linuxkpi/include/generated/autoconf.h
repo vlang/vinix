@@ -5,6 +5,10 @@
 #define CONFIG_64BIT 1
 #define CONFIG_X86 1
 #define CONFIG_X86_64 1
+/* Exact x86 Kconfig selection avoids the generic duplicate frame helper.
+ * FRAME_POINTER/HARDENED_USERCOPY remain disabled: this declares no native
+ * Linux stack-bound validation service. */
+#define CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES 1
 /* Native user mappings use hardware page tables. This selects the genuine
  * MMU header layout; Linux page ownership and GPU mappings remain separate. */
 #define CONFIG_MMU 1
