@@ -42,6 +42,12 @@ ifneq ($(ARCH),aarch64)
 endif
 endif
 
+# Optional read-only topology and allocation rollback fixture on either arch.
+PCI_TOPOLOGY_TEST ?= 0
+ifneq ($(filter $(PCI_TOPOLOGY_TEST),0 1),$(PCI_TOPOLOGY_TEST))
+    $(error PCI_TOPOLOGY_TEST must be 0 or 1)
+endif
+
 # Optional independent fixture for the native ACPI synchronization gates.
 ACPI_SYNC_TEST ?= 0
 ifneq ($(filter $(ACPI_SYNC_TEST),0 1),$(ACPI_SYNC_TEST))
@@ -260,7 +266,7 @@ endif
 # changes. Keep the selected configuration in the prerequisite name so moving
 # between a QEMU SMP build and a hardware-safe Apple build cannot reuse a
 # stale obj/blob.c.o.
-V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-acpi-test-$(ACPI_SYNC_TEST)-stack-guard-$(STACK_GUARD_TEST)
+V_CONFIG_STAMP := obj/.v-config-$(ARCH)-limine-mp-$(LIMINE_MP)-alloc-track-$(ALLOC_TRACK)-linuxkpi-$(LINUXKPI)-pci-test-$(PCI_CONFIG_TEST)-pci-topology-$(PCI_TOPOLOGY_TEST)-acpi-test-$(ACPI_SYNC_TEST)-stack-guard-$(STACK_GUARD_TEST)
 
 ifeq ($(ACPI_SYNC_TEST),1)
     override VFLAGS += -d acpi_sync_test
@@ -270,6 +276,10 @@ endif
 ifeq ($(PCI_CONFIG_TEST),1)
     override VFLAGS += -d pci_config_test
     override CPPFLAGS += -DVINIX_PCI_CONFIG_TEST
+endif
+
+ifeq ($(PCI_TOPOLOGY_TEST),1)
+    override VFLAGS += -d pci_topology_test
 endif
 
 ifneq ($(STACK_GUARD_TEST),0)

@@ -10,6 +10,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 MMAP_LEASE_MARKER = "mmap: retained fault owners, concurrent removal and deferred reclamation passed; no pages retained"
+TOPOLOGY_MARKER = "pci: native bounded topology, read-only capabilities and rollback passed; no pages or heap objects retained"
+
 MARKERS = [
     "linuxkpi: 200 allocator, IRQ lock, Linux list/sort/rbtree self-tests passed; no pages retained",
     "linuxkpi: original i915 timeout and DSC table helpers, Linux device encodings passed; no pages retained",
@@ -65,6 +67,7 @@ def main():
     parser.add_argument("--cpu", default="max")
     parser.add_argument("--no-linuxkpi", action="store_true", help="check a default kernel without the API layer")
     parser.add_argument("--mmap-lease-test", action="store_true", help="require the opt-in native mapping lifetime fixture")
+    parser.add_argument("--pci-topology-test", action="store_true", help="require the opt-in native PCI topology fixture")
     parser.add_argument("--timeout", type=int, default=90)
     args = parser.parse_args()
     state = args.state_dir.resolve()
@@ -114,6 +117,10 @@ def main():
                     time.sleep(0.1)
                     continue
                 expected = MARKERS[-1:] if args.no_linuxkpi else MARKERS
+                if args.pci_topology_test:
+                    expected = expected + [TOPOLOGY_MARKER]
+                elif TOPOLOGY_MARKER in output:
+                    raise RuntimeError("PCI topology fixture unexpectedly enabled; see " + str(serial))
                 if args.mmap_lease_test:
                     expected = expected + [MMAP_LEASE_MARKER]
                 elif MMAP_LEASE_MARKER in output:

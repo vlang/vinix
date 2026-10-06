@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
 Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current native IRQ feature: **`24afa95c`** (genuine Kbuild header wrappers, resident non-temporal copies, task-owned fault controls, genuine page-table/UAPI types and checked user-write scopes). Recheck HEAD and the worktree before
+Committed implementation baseline before the current PCI topology feature: **`e2641335`** (native maskable IRQ accounting, genuine Kbuild header wrappers, resident non-temporal copies, task-owned fault controls and checked user-write scopes). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `e2641335` | Actual maskable IRQ entry/exit ownership, scheduler handoff guards and measured complete actor lifetimes |
 | `24afa95c` | Exact original Kbuild mmiowb wrapper; original disabled tracking macros, no fabricated barrier |
 | `770ba039` | Exact pinned Kbuild-generated early-ioremap and kmap-size wrappers with genuine unresolved mapping references |
 | `e393312a` | Resident non-temporal user copies, exact page prefixes, completion fences and measured mapping lifetimes |
@@ -666,10 +667,67 @@ overwrite its ABI migration. Ordinary IRQ-off/pinned task callbacks must retain
 their identity. NMI/BH tracking, full Linux context encoding and ordinary RCU
 remain unresolved. SMP dispatch needs real IRQ-delivered callbacks and original
 CSD lifetimes; a synchronous marker cannot stand in for completion of detached
-asynchronous callbacks. PCI topology work must keep explicit root provenance,
-scalar private ownership and complete OOM rollback before publishing permanent
-native device pointers. Linux PCI/device/devres APIs and GPU binding remain
+asynchronous callbacks. Linux PCI/device/devres APIs and GPU binding remain
 pending.
+
+## Native bounded PCI topology
+
+The native scanner now retains configured PCI/CardBus bridges, uses their actual
+parent BDFs, checks bounded bus windows and frees all private observations before
+publishing separate permanent device records. Absent functions no longer retain
+allocated descriptors. Root bus numbers are explicitly supplied and borrowed
+only during construction; current boot integration supplies domain-zero bus
+zero. Host-function numbers and MCFG apertures do not establish additional
+roots. Real firmware SEG/BBN/CRS root discovery remains pending, and uACPI
+namespace initialization currently follows PCI publication. Do not claim general
+multi-root discovery or solve that ordering by inventing firmware roots.
+
+The graph uses nonmoving scalar records and a fixed bus bitmap, with no recursion
+or dynamically growing worklist. Each checked transport transaction finishes
+before an allocation. Every constructor error destroys the complete private
+graph. Construction is for early boot or ordinary tasks; the fallible allocator
+can reclaim, so this is no IRQ allocation guarantee. Readers must finish before
+their uniquely owned snapshot is destroyed. Escaped native driver/uACPI device
+pointers instead have boot lifetime; initialization is idempotent and supplies
+no live replacement, hotplug or rescan API.
+
+Conventional capability validation checks links, cycles, known MSI/MSI-X extents
+and the MSI-X `low11+1` entry count before granting either capability. Malformed
+chains keep the device but publish zero interrupt support. Unknown payload
+extents and extended capabilities remain unresolved. There are no topology or
+capability configuration writes, BAR probes, IRQ registration or Linux
+`pci_dev`/`pci_bus` objects. Publication copies only scalars, frees the graph,
+then creates permanent capability bitmaps. Raw descriptor OOM frees all prior
+descriptors/vector/graph before failing; the vector and bitmap allocators retain
+their existing fatal-OOM behavior.
+
+Fresh isolated architecture builds at `e2641335` pass. The exact saved enabled
+ELF `fee7d8617e9ab98e5810f6b84183a3481f3cb4494698fb9c523198b26b129687`
+passes both complete four-CPU normal/SSE suites. Three complete warmups precede
+the fourth rollback cycle with exact PMM bytes `420929536` before/after and all
+live heap classes equal. Optional-fixture default x86 recovers `423432192` bytes;
+actual ARM ECAM/config fixtures recover `960380928`. True default x86 and
+disabled ARM builds/startup pass with the fixtures absent. Four configured ARM
+CPUs are not proof of native ARM SMP.
+
+`tests/pci-config/topology_test.py` runs the actual unchanged V algorithms and
+transport core against private synchronous observers. GNU99/GNU11 each pass
+7,150,771 sanitizer assertions, including every private allocation/transaction
+failure, bounded relationships, capability errors, 200 full destruction cycles
+and explicit reader join before destruction. Independent final native
+generated-C/object/ELF lifetime review approves both architectures. Preserve the
+earlier failed V name/clone/callback lowering attempts and the first guest's
+missing-bootloader preparation error. Final callbacks use direct scalar native
+calls and the boot vector transfers its unique backing store once.
+
+The allocation gate still fails with 354 ARM sites, 293 x86 sites and 158 groups;
+its sole delta exchanges the old scanner heap site for the permanent vector
+initialization. The disabled ARM desktop harness completes all six scenarios,
+including retained churn allocations up to 48 KiB per 300-process batch and
+positive syscall allocations. This is scoped
+snapshot recovery evidence, not global leak freedom or GPU support. Sources,
+artifacts, results, failed attempts and independent review are collected in
+`/tmp/vinix-linuxkpi-pci-topology-oct06-final-validation.json`.
 
 ## Bound and high-priority contracts
 

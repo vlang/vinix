@@ -16,6 +16,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_MARKER = "pci: ARM checked config widths, bounds and interrupt masks passed"
+TOPOLOGY_MARKER = "pci: native bounded topology, read-only capabilities and rollback passed; no pages or heap objects retained"
 MMAP_LEASE_MARKER = "mmap: retained fault owners, concurrent removal and deferred reclamation passed; no pages retained"
 INIT_MARKER = "PCI ARM GUEST: Linux ABI PID1 PASS"
 FAILURES = ("KERNEL PANIC", "FATAL EXCEPTION", "PCI ARM GUEST: FAIL")
@@ -58,6 +59,8 @@ def main() -> int:
                         help="require fixture absence for a default ARM kernel")
     parser.add_argument("--mmap-lease-test", action="store_true",
                         help="require the opt-in native mapping lifetime fixture")
+    parser.add_argument("--pci-topology-test", action="store_true",
+                        help="require the opt-in native PCI topology fixture")
     args = parser.parse_args()
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("--timeout must be finite and positive")
@@ -67,6 +70,7 @@ def main() -> int:
     report: dict = {"status": "preparing", "state_dir": str(state),
                     "config_test_expected": not args.no_config_test,
                     "mmap_lease_test_expected": args.mmap_lease_test,
+                    "pci_topology_test_expected": args.pci_topology_test,
                     "configured_cpus": 4,
                     "scope": (("Native mapping races and temporary page/heap recovery with a resident actor; "
                                if args.mmap_lease_test else "") +
@@ -201,13 +205,16 @@ def main() -> int:
                     failed = True
                 if not args.mmap_lease_test and MMAP_LEASE_MARKER in output:
                     failed = True
+                if not args.pci_topology_test and TOPOLOGY_MARKER in output:
+                    failed = True
                 if failed or failure_started is not None:
                     if failure_started is None:
                         failure_started = time.monotonic()
                     if time.monotonic() - failure_started >= 1 or process.poll() is not None:
                         raise RuntimeError(f"ARM guest failed; see {serial}")
                 elif INIT_MARKER in output and (args.no_config_test or CONFIG_MARKER in output) and (
-                        not args.mmap_lease_test or MMAP_LEASE_MARKER in output):
+                        not args.mmap_lease_test or MMAP_LEASE_MARKER in output) and (
+                        not args.pci_topology_test or TOPOLOGY_MARKER in output):
                     # Let PID1 continue for a bounded second, observing panics
                     # after its marker rather than stopping at the first byte.
                     if passed_started is None:
@@ -222,13 +229,14 @@ def main() -> int:
                         final_output = serial.read_text(errors="replace")
                         if any(marker in final_output for marker in FAILURES) or (
                                 args.no_config_test and CONFIG_MARKER in final_output) or (
-                                not args.mmap_lease_test and MMAP_LEASE_MARKER in final_output):
+                                not args.mmap_lease_test and MMAP_LEASE_MARKER in final_output) or (
+                                not args.pci_topology_test and TOPOLOGY_MARKER in final_output):
                             raise RuntimeError(f"ARM guest failed during final drain; see {serial}")
                         report["serial_sha256"] = digest(serial)
                         report["status"] = "passed"
                         print("ARM PCI guest: PASS (ECAM/full-DAIF controller fixture, Linux ABI PID1)"
                               if not args.no_config_test else
-                              "Default ARM guest: PASS (Linux ABI PID1; PCI fixture disabled)")
+                              "Default ARM guest: PASS (Linux ABI PID1; config fixture disabled)")
                         print(f"Serial log: {serial}")
                         return 0
                 if process.poll() is not None:

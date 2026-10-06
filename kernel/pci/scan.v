@@ -1,99 +1,94 @@
 @[has_globals]
 module pci
 
+import memory
+
 __global (
 	scanned_devices []&PCIDevice
+	boot_scan_done bool
 )
 
-const max_function = 8
-
-const max_device = 32
-
-const max_bus = 256
+// This is a native V callback, not a Linux PCI configuration ABI. The actual
+// checked transport releases its lock before the caller allocates a record.
+pub fn native_topology_read(bdf u32, offset u16, width u8) (u32, int) {
+	mut value := u32(0)
+	status := checked_config_read(0, bdf >> 8, (bdf >> 3) & 31, bdf & 7,
+		u64(offset), u32(width), unsafe { &value })
+	return value, int(status)
+}
 
 pub fn initialise() {
+	// Devices escape to drivers and uACPI as permanent borrowed pointers. This
+	// is boot publication, never live replacement or a hotplug/rescan interface.
+	if boot_scan_done { return }
 	print('pci: Building device scan\n')
-	mut root_bus := PCIDevice{}
-	configc := root_bus.read[u32](0xc)
-
-	if (configc & 0x800000) == 0 {
-		check_bus(0, -1)
-	} else {
-		for function := u8(0); function < max_function; function++ {
-			host_bridge := PCIDevice{
-				bus:      0
-				slot:     0
-				function: function
-				parent:   0
-			}
-			config0 := host_bridge.read[u32](0)
-			if config0 == 0xffffffff {
-				continue
-			}
-
-			check_bus(function, -1)
+	// Existing platform setup supports domain-zero root bus zero. Neither a
+	// host bridge's function number nor an MCFG aperture establishes other
+	// roots; firmware SEG/BBN/CRS root discovery remains a separate dependency.
+	mut roots := [u8(0)]!
+	snapshot, status := topology_build(unsafe { &roots[0] }, 1, native_topology_read, 0)
+	if status != topology_ok {
+		C.kprintf(c'pci: read-only topology failed, status=%lld\n', i64(status))
+		panic('pci: cannot construct a valid configured topology')
+	}
+	// The exact capacity prevents growth from retaining old array buffers.
+	mut boot_records := []&PCIDevice{cap: int(snapshot.function_count())}
+	boot_records.flags |= .noslices
+	mut function := snapshot.first_function()
+	for function != unsafe { nil } {
+		mut device := unsafe { &PCIDevice(memory.malloc_packed_fallible(sizeof(PCIDevice))) }
+		if device == unsafe { nil } {
+			// No capability bitmap exists yet, and no device has escaped.
+			for previous in boot_records { memory.free(previous) }
+			unsafe { boot_records.free() }
+			topology_destroy(snapshot)
+			panic('pci: device publication allocation failed')
 		}
-	}
-}
-
-fn check_bus(bus u8, parent i64) {
-	for dev := u8(0); dev < max_device; dev++ {
-		for func := u8(0); func < max_function; func++ {
-			check_function(bus, dev, func, parent)
-		}
-	}
-}
-
-fn check_function(bus u8, slot u8, function u8, parent i64) {
-	mut device := &PCIDevice{
-		bus:      bus
-		slot:     slot
-		function: function
-		parent:   parent
-	}
-	device.read_info()
-	if device.device_id == 0xffff && device.vendor_id == 0xffff {
-		return
-	}
-
-	// Handle PCI to PCI bridges, and we are done.
-	if device.class == 0x6 && device.subclass == 0x4 {
-		config := device.read[u32](0x18)
-		check_bus(u8(config >> 8), 1)
-	} else {
-		scanned_devices << device
-
-		status := device.read[u16](0x6)
-
-		if (status & (1 << 4)) != 0 { // parse capabilities list
-			mut off := device.read[u8](0x34)
-
-			for off > 0 {
-				id := device.read[u8](off)
-
-				match id {
-					0x5 {
-						device.msi_support = true
-						device.msi_offset = off
-					}
-					0x11 {
-						device.msix_support = true
-						device.msix_offset = off
-
-						message_control := device.read[u16](off + 2)
-
-						device.msix_table_size = message_control & 0x7FF
-						device.msix_table_bitmap.initialise(device.msix_table_size)
-					}
-					else {}
-				}
-
-				off = device.read[u8](off + 1)
+		unsafe {
+			*device = PCIDevice{
+				bus: u8(function.bdf >> 8)
+				slot: u8((function.bdf >> 3) & 31)
+				function: u8(function.bdf & 7)
+				parent: i64(function.parent_bridge_bdf)
+				header_type: function.header_type
+				device_id: u16(function.identity >> 16)
+				vendor_id: u16(function.identity)
+				revision_id: u16(u8(function.class_revision))
+				class: u8(function.class_revision >> 24)
+				subclass: u8(function.class_revision >> 16)
+				prog_if: u8(function.class_revision >> 8)
+				multifunction: function.multifunction
+				irq_pin: function.irq_pin
 			}
 		}
-
+		boot_records << device
+		function = function.next_function()
+	}
+	// Only scalar fields were copied. No published device borrows graph nodes.
+	topology_destroy(snapshot)
+	for mut device in boot_records {
+		caps, cap_status := capabilities_read((u32(device.bus) << 8) |
+			(u32(device.slot) << 3) | device.function, device.header_type, native_topology_read)
+		if cap_status == topology_ok {
+			device.msi_support = caps.msi_offset != 0
+			device.msi_offset = caps.msi_offset
+			device.msix_support = caps.msix_offset != 0
+			device.msix_offset = caps.msix_offset
+			device.msix_table_size = caps.msix_entries
+			if device.msix_support { device.msix_table_bitmap.initialise(caps.msix_entries) }
+		} else {
+			C.kprintf(c'pci: rejecting interrupt capabilities for BDF=%u, status=%lld\n',
+				(u32(device.bus) << 8) | (u32(device.slot) << 3) | device.function, i64(cap_status))
+		}
 		C.kprintf(c'pci: Found [%llx:%llx:%llx:%lld]\n', u64(device.bus), u64(device.slot),
 			u64(device.function), i64(device.parent))
+	}
+	// Transfer the unique vector backing store into its permanent boot owner.
+	scanned_devices = unsafe { boot_records }
+	boot_scan_done = true
+	$if pci_topology_test ? {
+		if !topology_native_selftest() { panic('pci: native topology self-test failed') }
+		C.kprintf(c'pci: native bounded topology, read-only capabilities and rollback passed; no pages or heap objects retained\n')
 	}
 }
 

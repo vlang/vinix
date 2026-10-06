@@ -581,6 +581,21 @@ after a filesystem failure. Mutable build inputs still require isolation.
   unresolved; this transport does not provide them. BAR sizing still needs
   exclusive ownership and safe device quiescence. NMI/FIQ recursion, nonzero
   segments, nonzero-origin ARM apertures and x86 extended ECAM remain pending.
+- Native PCI discovery builds a privately owned, bounded topology from explicit
+  root bus numbers and configured PCI/CardBus bridges. Boot currently supplies
+  domain-zero root bus zero; firmware discovery of additional roots remains
+  pending. The scanner retains bridges, records their actual parent BDFs and
+  allocates device records only for present functions. Cycles, intersecting bus
+  windows, malformed headers and transport failures cause complete private
+  rollback. CRS responses require a future retry policy and return an explicit
+  not-ready error. All eight conventional functions remain discoverable.
+  Read-only conventional capability parsing validates links and known MSI/MSI-X
+  extents before publishing either capability, including the correct MSI-X
+  entry count. Rejected chains advertise neither interrupt capability. Private
+  snapshots are freed after scalar copying; published native devices and their
+  exact-capacity vector have boot lifetime. There is no rescan/hotplug interface
+  or Linux PCI/device/devres registration. BAR/resource ownership, extended
+  capabilities and unknown capability payload validation remain pending.
 - Boolean static branches without text patching; CPUID feature words 0 and 4.
 - Kernel FPU borrowing that saves/restores the running thread's existing
   XSAVE/FXSAVE storage while preemption is disabled. The upstream i915 WC-copy
@@ -1415,3 +1430,40 @@ Workqueue callback identity still needs an interrupt-context gate: an IRQ that
 interrupts a worker must not inherit its callback/drain-chaining privileges.
 The currently shared workqueue backend is awaiting that separate repair and
 native regression coverage. NMI/BH entry and ordinary RCU remain unresolved.
+
+Native PCI topology validation uses fresh architecture worktrees at `e2641335`
+and the frozen eight-path implementation overlay. Strict GNU99/GNU11 host
+checks each pass 7,150,771 ASan/UBSan assertions against the actual topology,
+capability parser and checked transport core. Tests cover actual relationships,
+malformed bus windows, all eight functions, every transaction failure, each
+private allocation failure, repeated destruction and reader quiescence. Host
+transport and allocation observers do not establish hardware discovery.
+
+The same saved enabled ELF
+`fee7d8617e9ab98e5810f6b84183a3481f3cb4494698fb9c523198b26b129687`
+passes the complete four-CPU normal and SSE guests. After three full rollback
+warmups, the fourth restores physical free bytes exactly from `420929536` to
+`420929536` and every live heap class. Default x86 with the optional fixture
+restores `423432192` bytes; actual ARM ECAM/configuration and topology fixtures
+restore `960380928` bytes. All warmups also recover their starting bytes. True
+default x86 and disabled ARM builds/startup pass with both PCI fixtures absent.
+Four configured ARM CPUs do not establish native ARM SMP support.
+
+Independent final generated-C, optimized-object, linked-ELF and source review
+checks allocation ownership, callback lowering and complete failure cleanup on
+both architectures. Earlier compile failures exposed a global-name collision,
+an implicit array clone and a V callback-name collision with `encoding.binary`;
+their failed logs and generated C are retained. Final native callbacks lower
+directly without interface boxes or vector clones. The first ARM guest attempt
+failed during bootloader preparation; the explicit bootloader retry passed.
+Recoverable OOM claims cover private graph allocation and raw descriptor
+rollback. The permanent publication vector and MSI-X bitmap still use existing
+fatal allocator paths.
+
+The broader allocation gate still exits 1: 354 ARM sites, 293 x86 sites and
+158 failing groups. Its only site change replaces the old per-probe device
+allocation with the boot-owned vector initialization. The separate disabled ARM
+desktop harness completes `ops,churn,cache,idle,apps,drag`; it reports up to
+48 KiB retained per 300-process churn batch and positive syscall allocations.
+No global leak-free result is claimed. Aggregate
+evidence: `/tmp/vinix-linuxkpi-pci-topology-oct06-final-validation.json`.

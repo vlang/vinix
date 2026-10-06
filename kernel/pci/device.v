@@ -8,6 +8,7 @@ pub:
 	slot     u8
 	function u8
 	parent   i64
+	header_type u8
 pub mut:
 	device_id         u16
 	vendor_id         u16
