@@ -2381,7 +2381,7 @@ disk_usage.report.exists
 ファイルが既に存在します: {0}
 -----
 settings.category.about
-このシステムについて
+システム情報
 -----
 settings.about.kernel
 OSとカーネル
