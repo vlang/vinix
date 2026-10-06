@@ -389,9 +389,9 @@ if [ "$WITH_WINE" -eq 1 ]; then
     x86_64-w64-mingw32-gcc -Os -s \
         "$SCRIPT_DIR/tests/wine/smoke.c" \
         -o "$STAGING/usr/share/wine/vinix-wine-smoke.exe"
-    x86_64-w64-mingw32-gcc -Os -s -shared \
-        "$SCRIPT_DIR/build-support/x86-translation/sppc-office-compat.c" \
-        -o "$STAGING/usr/share/wine/vinix-sppc-office-compat.dll"
+    python3 "$SCRIPT_DIR/build-support/x86-translation/compile-v-office.py" \
+        "$STAGING/usr/share/wine/vinix-sppc-office-compat.dll" \
+        --cc x86_64-w64-mingw32-gcc --generated-dir "$BUILD_DIR/office-generated"
     i686-w64-mingw32-gcc -Os -s \
         "$SCRIPT_DIR/tests/wine/smoke.c" \
         -o "$STAGING/usr/share/wine/vinix-wine-smoke32.exe"
