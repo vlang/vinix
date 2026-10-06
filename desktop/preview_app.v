@@ -8,7 +8,7 @@ const preview_max_source = u64(40 * 1024 * 1024)
 const preview_max_pixels = 8 * 1024 * 1024
 const preview_max_dimension = 8192
 const preview_max_path = 1024
-const preview_toolbar_height = 112
+const preview_toolbar_height = 148
 const preview_status_height = 28
 const preview_max_viewport = 2048
 const preview_min_zoom = 10
@@ -26,6 +26,10 @@ const preview_action_rotate_left = 'preview.rotate.left'
 const preview_action_rotate_right = 'preview.rotate.right'
 const preview_action_export_png = 'preview.export.png'
 const preview_action_export_copy = 'preview.export.copy'
+const preview_action_pan = 'preview.pan'
+const preview_action_select = 'preview.select'
+const preview_action_crop = 'preview.crop'
+const preview_action_clear_selection = 'preview.selection.clear'
 
 enum PreviewFocus {
 	image
@@ -40,6 +44,7 @@ mut:
 	loaded_path        string
 	source             []u8
 	pixels             &u8 = unsafe { nil }
+	pixels_from_crop   bool
 	width              int
 	height             int
 	orientation        int = 1
@@ -67,6 +72,8 @@ mut:
 	drag_y             int
 	drag_pan_x         int
 	drag_pan_y         int
+	tool               PreviewTool
+	selection          PreviewSelection
 }
 
 fn open_preview(mut _ Desktop) !NativeApp {
@@ -140,7 +147,7 @@ fn (mut a PreviewApp) release_surface() {
 
 fn (mut a PreviewApp) release_image() {
 	a.release_surface()
-	if a.pixels != unsafe { nil } { C.stbi_image_free(a.pixels) }
+	a.release_pixels()
 	unsafe {
 		a.source.free()
 		a.loaded_path.free()
@@ -155,6 +162,8 @@ fn (mut a PreviewApp) release_image() {
 	a.orientation = 1
 	a.rotation = 0
 	a.dragging = false
+	a.tool = .pan
+	a.selection = PreviewSelection{}
 	a.surface_dirty = false
 }
 
@@ -397,7 +406,7 @@ fn (mut a PreviewApp) refresh_details() {
 }
 
 fn (mut a PreviewApp) set_zoom(percent int) {
-	a.dragging = false
+	a.reset_selection()
 	a.fit = false
 	a.zoom = if percent < preview_min_zoom {
 		preview_min_zoom
@@ -422,7 +431,7 @@ fn (mut a PreviewApp) zoom_by(delta int) {
 }
 
 fn (mut a PreviewApp) fit_image() {
-	a.dragging = false
+	a.reset_selection()
 	a.fit = true
 	a.pan_x = 0
 	a.pan_y = 0
@@ -432,7 +441,7 @@ fn (mut a PreviewApp) fit_image() {
 
 fn (mut a PreviewApp) rotate(delta int) {
 	if a.pixels == unsafe { nil } { return }
-	a.dragging = false
+	a.reset_selection()
 	a.rotation = (a.rotation + delta + 4) % 4
 	a.center_pan()
 	a.surface_dirty = true
@@ -446,7 +455,10 @@ fn (mut a PreviewApp) pan(dx int, dy int) {
 	a.pan_x += dx
 	a.pan_y += dy
 	a.clamp_pan()
-	if a.pan_x != old_x || a.pan_y != old_y { a.surface_dirty = true }
+	if a.pan_x != old_x || a.pan_y != old_y {
+		if a.selection.active { a.reset_selection() }
+		a.surface_dirty = true
+	}
 }
 
 fn (mut a PreviewApp) close_app() {

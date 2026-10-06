@@ -25,11 +25,22 @@ fn preview_path_field(action string, placeholder string, bytes []u8, x int, y in
 	}
 }
 
+fn preview_tool_button(action string, key string, x int, width int, enabled bool,
+	selected bool) ui2.Element {
+	button := preview_button(action, key, x, 114, width, enabled)
+	if !enabled || !selected { return button }
+	return ui2.Element{
+		...button
+		box: ui2.BoxStyle{bg: catalina_control_accent, radius: 5}
+		text_style: ui2.TextStyle{color: app_on_accent, size: 12, align: .center}
+	}
+}
+
 fn preview_status_error(key string) bool {
 	return key in ['preview.status.cannot_open', 'preview.status.source_limit',
 		'preview.status.unsupported', 'preview.status.pdf_unavailable', 'preview.status.cannot_decode',
 		'preview.status.pixel_limit', 'preview.status.surface_failed', 'preview.status.exists',
-		'preview.status.export_failed']
+		'preview.status.export_failed', 'preview.status.crop_failed']
 }
 
 fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
@@ -52,7 +63,7 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 		}
 	}
 	loaded := a.pixels != unsafe { nil }
-	mut children := frame_elements(18)
+	mut children := frame_elements(22)
 	children << preview_button(preview_action_open, 'preview.open', 8, 6, 64, true)
 	children << preview_path_field(preview_action_open_path, 'preview.path.open.placeholder',
 		a.open_path, 80, 6, if width > 88 { width - 88 } else { 1 }, a.focus == .open_path, a.select_all)
@@ -71,6 +82,15 @@ fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
 	children << preview_path_field(preview_action_export_path, 'preview.path.export.placeholder',
 		a.export_path, 94, 78, if width > 102 { width - 102 } else { 1 },
 		a.focus == .export_path, a.select_all)
+	children << preview_tool_button(preview_action_pan, 'preview.pan', 8, 70, loaded, a.tool == .pan)
+	children << preview_tool_button(preview_action_select, 'preview.select', 84, 80, loaded, a.tool == .select)
+	children << preview_button(preview_action_crop, 'preview.crop', 170, 114, 80,
+		loaded && a.crop_rect_valid(a.crop_rect()))
+	children << preview_button(preview_action_clear_selection, 'preview.selection.clear', 256, 114, 80,
+		loaded && a.selection.active)
+	children << ui2.label('', tr(if a.tool == .select { 'preview.status.select' } else { 'preview.status.pan' }),
+		ui2.rect(344, 114, if width > 352 { f64(width - 352) } else { 1 }, 28),
+		ui2.TextStyle{color: body_muted, size: 11})
 	children << ui2.view('', ui2.rect(0, preview_toolbar_height - 1, size.width, 1), ui2.BoxStyle{ bg: body_rule }, [])
 	mut image := frame_elements(1)
 	if a.surface_image.len > 0 {

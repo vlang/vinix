@@ -454,10 +454,10 @@ fn test_preview_fit_zoom_pan_surfaces_actions_and_idempotent_close() {
 	assert app.pan_x == 0 && app.pan_y == 0
 	app.key_input('\x1b[C')
 	assert app.pan_x == 7
-	app.pointer_event(.down, .left, 0, 10, 120, 1, 200)
-	app.pointer_event(.move, .left, 0, 17, 120, 1, 200)
+	app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 8, 1, 200)
+	app.pointer_event(.move, .left, 0, 17, preview_toolbar_height + 8, 1, 200)
 	assert app.pan_x == 0
-	app.pointer_event(.up, .left, 0, 17, 120, 1, 200)
+	app.pointer_event(.up, .left, 0, 17, preview_toolbar_height + 8, 1, 200)
 	assert !app.dragging
 	app.set_zoom(9999)
 	assert app.zoom == 400
@@ -621,4 +621,251 @@ fn test_preview_decodes_iphone_png_as_straight_rgba_and_exports_correct_colors()
 	for index in 0 .. 8 {
 		assert unsafe { reopened.pixels[index] } == unsafe { app.pixels[index] }
 	}
+}
+
+fn preview_test_fail_crop_allocation(_ usize) &u8 { return unsafe { nil } }
+
+fn preview_test_control(element ui2.Element, action string) ?ui2.Element {
+	if element.id == action { return element }
+	for child in element.children {
+		if found := preview_test_control(child, action) { return found }
+	}
+	return none
+}
+
+fn test_preview_selection_maps_fit_zoom_pan_centered_viewports_and_clamped_drag() {
+	pixels := []u8{len: 100 * 50 * 4}
+	defer { unsafe { pixels.free() } }
+	mut app := PreviewApp{width: 100, height: 50, pixels: pixels.data,
+		viewport_width: 800, viewport_height: 400}
+	app.set_tool(.select)
+	body_height := preview_toolbar_height + preview_status_height + 400
+	app.pointer_event(.down, .left, 0, 280, preview_toolbar_height + 140, 800, body_height)
+	assert app.selection.anchor_x == 20 && app.selection.anchor_y == 10
+	assert app.pointer_moves_matter() && !app.dragging
+	app.pointer_event(.move, .left, 0, 439, preview_toolbar_height + 199, 800, body_height)
+	assert app.crop_rect() == PreviewCropRect{left: 20, top: 10, width: 40, height: 15}
+	// Release coordinates complete the selection even without a final move.
+	app.pointer_event(.up, .left, 0, 479, preview_toolbar_height + 219, 800, body_height)
+	assert app.crop_rect() == PreviewCropRect{left: 20, top: 10, width: 50, height: 20}
+	assert !app.pointer_moves_matter()
+	app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 10, 800, body_height)
+	assert !app.selection.active
+	app.viewport_width = 120
+	app.viewport_height = 60
+	app.fit = false
+	app.zoom = 200
+	app.pan_x = 70
+	app.pan_y = 40
+	zoomed_height := preview_toolbar_height + preview_status_height + 60
+	app.pointer_event(.down, .left, 0, 20, preview_toolbar_height + 10, 120, zoomed_height)
+	assert app.selection.anchor_x == 45 && app.selection.anchor_y == 25
+	app.pointer_event(.move, .left, 0, -1000000, 1000000, 120, zoomed_height)
+	assert app.selection.caret_x == 0 && app.selection.caret_y == 49
+	assert app.crop_rect_valid(app.crop_rect())
+	app.pointer_event(.up, .left, 0, 1000000, -1000000, 120, zoomed_height)
+	assert app.selection.caret_x == 99 && app.selection.caret_y == 0
+	app.fit = true
+	app.viewport_width = 2048
+	app.viewport_height = 2048
+	app.pan_x = 0
+	app.pan_y = 0
+	large_height := preview_toolbar_height + preview_status_height + 3000
+	// 2048-square viewport centered in a 4096x3000 body; 400x200 image centered within it.
+	pixel_x, pixel_y, inside := app.selection_pixel(2048, preview_toolbar_height + 1500,
+		4096, large_height, false)
+	assert inside && pixel_x == 50 && pixel_y == 25
+	_, _, outside := app.selection_pixel(0, preview_toolbar_height, 4096, large_height, false)
+	assert !outside
+}
+
+fn test_preview_crop_normalizes_every_exif_turn_preserves_alpha_and_original_source() {
+	root := preview_test_root('crop-pixels')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	exported := files_child_path(root, 'cropped.png')
+	copied := files_child_path(root, 'original.png')
+	defer { unsafe { path.free(); exported.free(); copied.free() } }
+	pixels := [u8(10), 20, 30, 255, 40, 50, 60, 128, 70, 80, 90, 64,
+		100, 110, 120, 0, 130, 140, 150, 192, 160, 170, 180, 255]
+	defer { unsafe { pixels.free() } }
+	preview_test_write_image(path, 2, 3, pixels)
+	original := os.read_bytes(path)!
+	defer { unsafe { original.free() } }
+	for orientation in 1 .. 9 {
+		for rotation in 0 .. 4 {
+			os.write_file_array(path, original)!
+			mut app := PreviewApp{}
+			preview_set_field(mut app.open_path, path)
+			assert app.open_image()
+			app.orientation = orientation
+			app.rotation = rotation
+			width, height := app.oriented_dimensions()
+			app.selection = PreviewSelection{active: true, anchor_x: 1,
+				caret_x: width - 1, caret_y: height - 2}
+			mut expected := []u8{len: (width - 1) * (height - 1) * 4}
+			for y in 0 .. height - 1 {
+				for x in 0 .. width - 1 {
+					for channel in 0 .. 4 {
+						expected[(y * (width - 1) + x) * 4 + channel] = unsafe {
+							app.pixels[app.pixel_offset(x + 1, y) + channel] }
+					}
+				}
+			}
+			assert app.apply_crop()
+			assert app.width == width - 1 && app.height == height - 1
+			assert app.orientation == 1 && app.rotation == 0 && app.pixels_from_crop
+			assert !app.selection.active && app.fit && app.pan_x == 0 && app.pan_y == 0
+			assert app.source == original && app.loaded_path == path
+			for index, byte in expected { assert unsafe { app.pixels[index] } == byte }
+			preview_set_field(mut app.export_path, exported)
+			assert app.export_image(false)
+			mut reopened := PreviewApp{}
+			preview_set_field(mut reopened.open_path, exported)
+			assert reopened.open_image()
+			assert reopened.width == width - 1 && reopened.height == height - 1
+			for index, byte in expected { assert unsafe { reopened.pixels[index] } == byte }
+			reopened.close_app()
+			assert desktop_unlink(exported) == 0
+			os.write_file(path, 'changed after cropping')!
+			preview_set_field(mut app.export_path, copied)
+			assert app.export_image(true)
+			copy := os.read_bytes(copied)!
+			assert copy == original
+			assert desktop_unlink(copied) == 0
+			unsafe { copy.free(); expected.free() }
+			app.close_app()
+			app.close_app()
+		}
+	}
+}
+
+fn test_preview_crop_failure_empty_invalid_bounds_and_cancel_preserve_image() {
+	root := preview_test_root('crop-failures')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'image.png')
+	defer { unsafe { path.free() } }
+	preview_test_fixture(path)
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	assert !app.apply_crop()
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	old_pixels := app.pixels
+	assert !app.apply_crop() && app.status_key == 'preview.status.selection_empty'
+	app.selection = PreviewSelection{active: true, caret_x: 2}
+	assert !app.apply_crop() && app.pixels == old_pixels
+	app.selection = PreviewSelection{active: true, anchor_x: -1, caret_x: 0}
+	assert !app.apply_crop() && app.pixels == old_pixels
+	app.select_image()
+	selection := app.selection
+	assert !app.apply_crop_using(preview_test_fail_crop_allocation)
+	assert app.status_key == 'preview.status.crop_failed'
+	assert app.pixels == old_pixels && app.selection == selection
+	assert app.width == 2 && app.height == 1 && !app.pixels_from_crop
+	assert app.source.len > 0
+	app.key_input('\x1b')
+	assert !app.selection.active && app.pixels == old_pixels && app.focus == .image
+	app.select_image()
+	app.handle(preview_action_clear_selection)!
+	assert !app.selection.active && app.pixels == old_pixels
+	app.select_image()
+	app.handle(preview_action_pan)!
+	assert app.tool == .pan && !app.selection.active
+}
+
+fn test_preview_selection_keyboard_resets_pan_mode_and_visible_crop_controls() {
+	root := preview_test_root('crop-controls')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'image.png')
+	defer { unsafe { path.free() } }
+	preview_test_fixture(path)
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	begin_frame_elements()
+	mut tree := app.build(ui2.rect(0, 0, 800, 540))!
+	for action in [preview_action_pan, preview_action_select, preview_action_crop,
+		preview_action_clear_selection]! {
+		control := preview_test_control(tree, action) or { panic('Missing Preview control') }
+		assert !control.enabled && control.frame.x >= 0 && control.frame.x + control.frame.width <= 800
+	}
+	free_tree(tree)
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	begin_frame_elements()
+	tree = app.build(ui2.rect(0, 0, 800, 540))!
+	free_tree(tree)
+	app.key_input('s\x01')
+	assert app.tool == .select && app.selection.active
+	begin_frame_elements()
+	tree = app.build(ui2.rect(0, 0, 800, 540))!
+	assert (preview_test_control(tree, preview_action_crop) or { panic('Missing Crop') }).enabled
+	assert (preview_test_control(tree, preview_action_clear_selection) or { panic('Missing Clear') }).enabled
+	assert (preview_test_control(tree, preview_action_select) or { panic('Missing Select') }).box.bg == catalina_control_accent
+	assert (preview_test_control(tree, preview_action_pan) or { panic('Missing Pan') }).box.bg == body_panel
+	free_tree(tree)
+	app.key_input('\r')
+	assert app.status_key == 'preview.status.cropped' && app.pixels_from_crop
+	app.key_input('\x01')
+	app.set_zoom(200)
+	assert !app.selection.active
+	app.select_image()
+	app.rotate(1)
+	assert !app.selection.active
+	app.select_image()
+	app.fit_image()
+	assert !app.selection.active
+	app.select_image()
+	app.set_viewport(100, 100)
+	assert !app.selection.active
+	app.select_image()
+	app.set_zoom(400)
+	app.viewport_width = 1
+	app.viewport_height = 1
+	app.pan_x = 0
+	app.pan_y = 0
+	app.select_image()
+	app.pan(1, 1)
+	assert !app.selection.active
+	app.key_input('p')
+	assert app.tool == .pan
+	app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 1, 100, 400)
+	assert app.dragging
+	app.pointer_event(.move, .left, 0, 9, preview_toolbar_height + 1, 100, 400)
+	assert app.dragging
+	app.pointer_event(.move, .left, 0, 8, preview_toolbar_height + 1, 100, 400)
+	assert app.dragging
+	app.pointer_event(.up, .left, 0, 8, preview_toolbar_height + 1, 100, 400)
+	assert !app.dragging
+	app.select_image()
+	assert app.open_image() && !app.selection.active && app.tool == .pan
+}
+
+fn test_preview_crop_selection_surface_shades_outside_and_draws_a_border() {
+	root := preview_test_root('crop-overlay')
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'image.png')
+	defer { unsafe { path.free() } }
+	pixels := []u8{len: 4 * 4 * 4, init: 255}
+	preview_test_write_image(path, 4, 4, pixels)
+	unsafe { pixels.free() }
+	mut app := PreviewApp{}
+	defer { app.close_app() }
+	preview_set_field(mut app.open_path, path)
+	assert app.open_image()
+	app.set_viewport(16, 16)
+	app.set_zoom(400)
+	app.selection = PreviewSelection{active: true, anchor_x: 1, anchor_y: 1, caret_x: 2, caret_y: 2}
+	assert app.publish_surface()
+	surface := open_vinix_surface(app.surface_path) or { panic('Missing selection surface') }
+	assert surface.pixel(0, 0) == 0x999999
+	assert surface.pixel(4, 4) == catalina_control_accent
+	assert surface.pixel(7, 7) == 0xffffff
+	assert surface.pixel(11, 11) == catalina_control_accent
+	surface.close()
+	app.clear_selection()
+	assert app.publish_surface()
+	clear := open_vinix_surface(app.surface_path) or { panic('Missing cleared surface') }
+	assert clear.pixel(0, 0) == 0xffffff && clear.pixel(4, 4) == 0xffffff
+	clear.close()
 }

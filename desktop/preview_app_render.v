@@ -16,6 +16,12 @@ fn (mut a PreviewApp) publish_surface() bool {
 	}
 	geometry := a.geometry()
 	oriented_width, oriented_height := a.oriented_dimensions()
+	if !preview_dimensions_valid(oriented_width, oriented_height) { return false }
+	selection := a.crop_rect()
+	selection_left := geometry.left + selection.left * geometry.width / oriented_width
+	selection_top := geometry.top + selection.top * geometry.height / oriented_height
+	selection_right := geometry.left + ((selection.left + selection.width) * geometry.width + oriented_width - 1) / oriented_width - 1
+	selection_bottom := geometry.top + ((selection.top + selection.height) * geometry.height + oriented_height - 1) / oriented_height - 1
 	stride := a.viewport_width * 4
 	buffer_size := stride * a.viewport_height
 	mut surface := []u8{len: 48 + buffer_size}
@@ -47,6 +53,16 @@ fn (mut a PreviewApp) publish_surface() bool {
 			for component in 0 .. 3 {
 				value := int(unsafe { a.pixels[input + component] })
 				surface[out + 2 - component] = u8((value * alpha + background * (255 - alpha)) / 255)
+			}
+			if a.selection.active {
+				selected := x >= selection_left && x <= selection_right && y >= selection_top && y <= selection_bottom
+				if selected && (x == selection_left || x == selection_right || y == selection_top || y == selection_bottom) {
+					surface[out] = u8(catalina_control_accent)
+					surface[out + 1] = u8(catalina_control_accent >> 8)
+					surface[out + 2] = u8(catalina_control_accent >> 16)
+				} else if !selected {
+					for channel in 0 .. 3 { surface[out + channel] = u8(int(surface[out + channel]) * 3 / 5) }
+				}
 			}
 		}
 	}
@@ -95,6 +111,7 @@ fn (mut a PreviewApp) set_viewport(width int, height int) {
 		height
 	}
 	if a.viewport_width != next_width || a.viewport_height != next_height {
+		a.reset_selection()
 		a.viewport_width = next_width
 		a.viewport_height = next_height
 		a.clamp_pan()

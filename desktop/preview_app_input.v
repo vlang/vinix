@@ -6,6 +6,7 @@ fn (mut a PreviewApp) focus_field(focus PreviewFocus) {
 	a.select_all = true
 	a.pending_len = 0
 	a.dragging = false
+	a.selection.dragging = false
 }
 
 fn (mut a PreviewApp) field_character(length int) {
@@ -112,6 +113,7 @@ fn (mut a PreviewApp) key_input(input string) {
 				}
 				index++
 			} else {
+				a.clear_selection()
 				a.focus = .image
 				a.select_all = false
 				index++
@@ -122,6 +124,10 @@ fn (mut a PreviewApp) key_input(input string) {
 			a.field_ascii(ch)
 		} else {
 			match ch {
+				0x01 { a.select_image() }
+				`\r`, `\n` { if a.tool == .select { a.apply_crop() } }
+				`s`, `S` { a.set_tool(.select) }
+				`p`, `P` { a.set_tool(.pan) }
 				`+`, `=` { a.zoom_by(25) }
 				`-` { a.zoom_by(-25) }
 				`0` { a.set_zoom(100) }
@@ -219,17 +225,23 @@ fn (mut a PreviewApp) handle(action string) ! {
 		}
 		preview_action_export_png { a.export_image(false) }
 		preview_action_export_copy { a.export_image(true) }
+		preview_action_pan { a.set_tool(.pan) }
+		preview_action_select { a.set_tool(.select) }
+		preview_action_crop { a.apply_crop() }
+		preview_action_clear_selection { a.clear_selection() }
 		else {}
 	}
 }
 
 fn (a &PreviewApp) pointer_input_enabled() bool { return true }
 
-fn (a &PreviewApp) pointer_moves_matter() bool { return a.dragging }
+fn (a &PreviewApp) pointer_moves_matter() bool { return a.dragging || a.selection.dragging }
 
 fn (mut a PreviewApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int,
-	x int, y int, _ int, height int) {
+	x int, y int, width int, height int) {
 	if phase == .up {
+		a.update_selection(x, y, width, height)
+		a.selection.dragging = false
 		a.dragging = false
 		return
 	}
@@ -242,15 +254,21 @@ fn (mut a PreviewApp) pointer_event(phase AppPointerPhase, button AppPointerButt
 		&& y < height - preview_status_height {
 		a.focus = .image
 		a.select_all = false
-		if !a.fit {
+		if a.tool == .select {
+			a.start_selection(x, y, width, height)
+		} else if !a.fit {
 			a.dragging = true
 			a.drag_x = x
 			a.drag_y = y
 			a.drag_pan_x = a.pan_x
 			a.drag_pan_y = a.pan_y
 		}
-	} else if phase == .move && a.dragging {
-		a.pan(a.drag_pan_x - (x - a.drag_x) - a.pan_x,
-			a.drag_pan_y - (y - a.drag_y) - a.pan_y)
+	} else if phase == .move {
+		if a.selection.dragging {
+			a.update_selection(x, y, width, height)
+		} else if a.dragging {
+			a.pan(a.drag_pan_x - (x - a.drag_x) - a.pan_x,
+				a.drag_pan_y - (y - a.drag_y) - a.pan_y)
+		}
 	}
 }

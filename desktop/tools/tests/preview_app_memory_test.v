@@ -216,3 +216,102 @@ fn test_preview_path_growth_utf8_and_decode_errors_release_owned_memory() {
 	app.close_app()
 	assert C.vinix_heap_end() == 0
 }
+
+fn preview_heap_fail_crop_allocation(_ usize) &u8 { return unsafe { nil } }
+
+fn test_preview_repeated_select_cancel_failed_allocate_crop_export_and_close_releases_pixels() {
+	root := os.join_path(os.temp_dir(), 'vinix-preview-crop-heap-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {}; unsafe { root.free() } }
+	path := files_child_path(root, 'input.png')
+	output := files_child_path(root, 'output.png')
+	original := files_child_path(root, 'original.png')
+	defer { unsafe { path.free(); output.free(); original.free() } }
+	mut writer_pixels := []u8{len: 8 * 6 * 4, init: 127}
+	writer := PreviewApp{width: 8, height: 6, pixels: writer_pixels.data}
+	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL, 0o600)
+	assert fd >= 0 && writer.write_png(fd) && desktop_close(fd) == 0
+	unsafe { writer_pixels.free() }
+	mut warm := PreviewApp{}
+	preview_set_field(mut warm.open_path, path)
+	assert warm.open_image()
+	begin_frame_elements()
+	free_tree(warm.build(ui2.rect(0, 0, 800, 540))!)
+	warm.close_app()
+	C.vinix_heap_begin()
+	for cycle in 0 .. 150 {
+		mut app := PreviewApp{}
+		preview_set_field(mut app.open_path, path)
+		assert app.open_image()
+		app.orientation = cycle % 8 + 1
+		app.rotation = cycle % 4
+		app.set_viewport(32, 24)
+		app.set_zoom(400)
+		app.set_tool(.select)
+		app.pointer_event(.down, .left, 0, 10, preview_toolbar_height + 10, 32,
+			preview_toolbar_height + preview_status_height + 24)
+		app.pointer_event(.move, .left, 0, 20, preview_toolbar_height + 18, 32,
+			preview_toolbar_height + preview_status_height + 24)
+		app.pointer_event(.up, .left, 0, 20, preview_toolbar_height + 18, 32,
+			preview_toolbar_height + preview_status_height + 24)
+		assert app.selection.active
+		assert !app.apply_crop_using(preview_heap_fail_crop_allocation)
+		assert app.selection.active && !app.pixels_from_crop
+		assert app.publish_surface()
+		app.clear_selection()
+		assert !app.selection.active && app.publish_surface()
+		app.select_image()
+		assert app.apply_crop()
+		assert app.pixels_from_crop && app.orientation == 1 && app.rotation == 0
+		app.rotate(1)
+		app.select_image()
+		app.selection.anchor_x = 1
+		app.selection.anchor_y = 1
+		assert app.apply_crop()
+		preview_set_field(mut app.export_path, output)
+		assert app.export_image(false)
+		assert desktop_unlink(output) == 0
+		preview_set_field(mut app.export_path, original)
+		assert app.export_image(true)
+		assert desktop_unlink(original) == 0
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 800, 540))!)
+		app.select_image()
+		app.key_input('\x1b')
+		assert !app.selection.active
+		// Reopening also frees a crop buffer before adopting decoder pixels.
+		assert app.open_image() && !app.pixels_from_crop
+		app.select_image()
+		assert app.apply_crop()
+		app.close_app()
+		app.close_app()
+	}
+	live := C.vinix_heap_end()
+	if live != 0 {
+		count := C.vinix_heap_count()
+		for index in 0 .. if count < 10 { count } else { 10 } {
+			eprintln('Preview crop retained allocation: ${C.vinix_heap_size_at(index)} bytes')
+		}
+	}
+	assert live == 0, 'Preview crop retained ${live} bytes'
+}
+
+fn test_preview_selection_mapping_and_cancellation_repeatedly_allocate_nothing() {
+	pixels := []u8{len: 100 * 50 * 4}
+	defer { unsafe { pixels.free() } }
+	mut app := PreviewApp{width: 100, height: 50, pixels: pixels.data,
+		viewport_width: 800, viewport_height: 400}
+	C.vinix_heap_begin()
+	for _ in 0 .. 2000 {
+		app.set_tool(.select)
+		app.pointer_event(.down, .left, 0, 280, preview_toolbar_height + 140, 800, 576)
+		assert app.selection.active
+		app.pointer_event(.move, .left, 0, 479, preview_toolbar_height + 219, 800, 576)
+		app.pointer_event(.up, .left, 0, 479, preview_toolbar_height + 219, 800, 576)
+		assert app.crop_rect() == PreviewCropRect{left: 20, top: 10, width: 50, height: 20}
+		assert !app.apply_crop_using(preview_heap_fail_crop_allocation)
+		app.key_input('\x1b')
+		assert !app.selection.active
+	}
+	assert C.vinix_heap_end() == 0
+}
