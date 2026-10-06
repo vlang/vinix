@@ -327,6 +327,10 @@ fn (mut a CalendarApp) begin_event(index int) {
 	a.edit_pending_len = 0
 	a.status_key = ''
 	a.editing = true
+	a.search_focus = false
+	a.search_selected = false
+	a.search_pending_len = 0
+	a.search_escape_len = 0
 	if a.edit_title.cap == 0 {
 		a.edit_title = []u8{cap: calendar_event_title_limit}
 		a.edit_time = []u8{cap: 5}
@@ -443,7 +447,7 @@ fn calendar_edit_bytes(mut bytes []u8, input u8, maximum int, select_all bool) {
 
 fn (mut a CalendarApp) key_input(input string) {
 	if a.interchange { a.ics_key_input(input) return }
-	if !a.editing { return }
+	if !a.editing { a.search_key_input(input) return }
 	mut at := 0
 	for at < input.len {
 		byte := input[at]
@@ -543,7 +547,8 @@ fn calendar_paste_bytes(mut bytes []u8, text string, maximum int, select_all boo
 
 fn (mut a CalendarApp) paste_input(text string) {
 	if a.interchange { a.ics_paste(text) return }
-	if !a.editing || text.len == 0 { return }
+	if !a.editing { a.paste_search(text) return }
+	if text.len == 0 { return }
 	a.edit_pending_len = 0
 	pasted := match a.edit_focus {
 		0 {

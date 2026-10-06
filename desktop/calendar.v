@@ -25,7 +25,7 @@ const calendar_day_actions = ['calendar.day.1', 'calendar.day.2', 'calendar.day.
 	'calendar.day.30', 'calendar.day.31']
 
 const calendar_padding = 18
-const calendar_header_height = 54
+const calendar_header_height = 88
 const calendar_weekday_height = 28
 const calendar_footer_height = 34
 
@@ -64,6 +64,21 @@ mut:
 	ics_pending      [4]u8
 	ics_pending_len  int
 	ics_status       string = 'calendar.ics.ready'
+	// The query and result indices are inline; filtering borrows event text.
+	search           [128]u8
+	search_len       int
+	search_active    bool
+	search_focus     bool
+	search_selected  bool
+	search_pending   [4]u8
+	search_pending_len int
+	search_indices   [calendar_events_limit]int
+	search_count     int
+	search_scroll    int
+	search_visible   int = 1
+	search_escape    [16]u8
+	search_escape_len int
+	search_escape_ms u64
 }
 
 fn open_calendar(mut desktop Desktop) !NativeApp {
@@ -198,6 +213,10 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 	height := int(size.height)
 	if a.interchange { return a.build_interchange(size) }
 	if a.editing { return a.build_event_editor(width, height) }
+	if width < 360 || height < if a.search_active { 210 } else { 400 } {
+		return a.build_small_calendar(width, height)
+	}
+	if a.search_active { return a.build_search(width, height) }
 	inner := width - 2 * calendar_padding
 	mut children := frame_elements(100)
 
@@ -223,6 +242,7 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 		size:  13
 		align: .center
 	})
+	a.append_search_field(mut children, width)
 
 	cell_width := if inner > 7 { inner / 7 } else { 1 }
 	// Columns run from the language's first day of the week.
@@ -297,6 +317,10 @@ fn (mut a CalendarApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a CalendarApp) handle(event_id string) ! {
 	match event_id {
+		'calendar.search' { if !a.editing && !a.interchange { a.focus_search(true) } return }
+		'calendar.search.clear', 'calendar.search.back' { a.clear_search() return }
+		'calendar.search.previous' { a.search_scroll -= a.search_visible a.clamp_search_scroll() return }
+		'calendar.search.next' { a.search_scroll += a.search_visible a.clamp_search_scroll() return }
 		'calendar.ics.open' { if !a.editing { a.open_interchange() } return }
 		'calendar.ics.back' { a.interchange = false a.ics_pending_len = 0 return }
 		'calendar.ics.import_path' { a.ics_focus = 0 a.ics_selected = true a.ics_pending_len = 0 return }
@@ -364,7 +388,17 @@ fn (mut a CalendarApp) handle(event_id string) ! {
 	}
 	if event_id.starts_with('calendar.event.row.') {
 		index := calendar_borrow(event_id, 'calendar.event.row.'.len, event_id.len).int()
-		if index >= 0 && index < a.events.count { a.begin_event(index) }
+		if index >= 0 && index < a.events.count {
+			if a.search_active {
+				event := a.events.items[index]
+				a.year = event.year
+				a.month = event.month
+				a.selected_day = event.day
+				a.agenda_scroll = 0
+				a.refresh_labels()
+			}
+			a.begin_event(index)
+		}
 		return
 	}
 	if event_id.starts_with(calendar_action_day) {
