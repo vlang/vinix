@@ -4083,10 +4083,10 @@ system_information.search.empty
 No hay filas coincidentes en esta sección.
 -----
 system_information.search.count
-{0} filas coincidentes
+{0} fila coincidente|{0} filas coincidentes
 -----
 system_information.search.count_short
-{0} filas
+{0} fila|{0} filas
 -----
 system_information.search.label
 Buscar

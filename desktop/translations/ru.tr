@@ -4083,10 +4083,10 @@ system_information.search.empty
 В этом разделе совпадений нет.
 -----
 system_information.search.count
-{0} совпадений
+{0} совпадение|{0} совпадения|{0} совпадений
 -----
 system_information.search.count_short
-{0} строк
+{0} строка|{0} строки|{0} строк
 -----
 system_information.search.label
 Поиск

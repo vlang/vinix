@@ -4083,10 +4083,10 @@ system_information.search.empty
 No matching rows in this section.
 -----
 system_information.search.count
-{0} matching rows
+{0} matching row|{0} matching rows
 -----
 system_information.search.count_short
-{0} rows
+{0} row|{0} rows
 -----
 system_information.search.label
 Search
