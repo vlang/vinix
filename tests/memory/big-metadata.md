@@ -26,7 +26,7 @@ retired (three snapshots and a seven-second grace):
 
 ```sh
 python3 tests/kernel-gaps/run.py --arch x86_64 --no-network \
-  --kernel-dir /path/to/kernel --source tests/memory/big_io_guest.c \
+  --kernel-dir /path/to/kernel --source tests/memory/bigio/core.v \
   --expect 'vmap: self-test passed' --expect 'BIG IO PASS:' --timeout 240
 ```
 
@@ -37,3 +37,20 @@ tracked vmap allocation paths, including their header invalidation and
 large-page accounting. A repeated free is rejected before dereferencing an
 unmapped vmap header; ordinary PMM direct-map headers remain mapped and are
 invalidated/poisoned before reuse.
+
+The maintained guest is V. Its 17 original checks, 300 rounds, seven-second
+grace and exact page equality remain unchanged. Compare it with an immutable
+C reference on an actual host architecture using the shared V syscall model:
+
+```sh
+python3 tests/memory/test-big-io.py --host-arch arm64 \
+  --state-dir /tmp/big-io-host --original-reference /path/to/original.c
+```
+
+Repeat with `--host-arch amd64` for the x86 host ABI. The 22 sanitizer cases
+cover success, short reads/writes, malformed accounting, wrong EFAULT returns,
+interrupted settling and close failures. Native validation uses `--arch`,
+`--kernel-dir` and a fresh `--guest-state-dir`, preserving the original
+240-second outer allowance. The optional `--original-reference` builds the
+same immutable C control for comparison. Baseline kernel builds do not
+establish the separate `vmap_always` self-test configuration described above.
