@@ -83,3 +83,53 @@ fn test_console_dense_rows_and_sanitization_release_growth_buffers_on_close() {
 	app.close_app()
 	assert C.vinix_heap_end() == 0
 }
+
+fn test_console_severity_classification_has_no_retained_or_temporary_allocations() {
+	C.vinix_heap_begin()
+	for _ in 0 .. 5000 {
+		for text in ['[135:246:1006/123456.789:ERROR:source.cc(4)] failed',
+			'[2026-10-06T12:30:00Z] WARNING retry', '[  4.125] (EE) failed',
+			'DEBUG detail', 'plain words about ERROR']! {
+			level := console_line_severity(text, 0, text.len)
+			assert console_severity_matches(.all, level)
+		}
+	}
+	assert C.vinix_heap_end() == 0
+}
+
+fn test_console_severity_filters_frames_exports_and_compact_guidance_release_allocations() {
+	home := os.join_path(os.temp_dir(), 'vinix-console-severity-heap-${os.getpid()}')
+	os.mkdir(home)!
+	path := join_path(home, 'source.log')
+	export_path := join_path(home, 'export.txt')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() path.free() export_path.free() }
+	}
+	os.write_file(path, 'ERROR caf\xc3\xa9\nINFO ready\nWARN retry\nDEBUG detail\nplain ERROR\n')!
+	mut app := new_console_app(path, export_path)
+	for width in [800, 380, 240]! {
+		begin_frame_elements()
+		warm := app.build(ui2.rect(0, 0, f64(width), 400))!
+		free_tree(warm)
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for action in console_severity_actions {
+			app.handle(action)!
+			app.focus_field(1)
+			app.key_input('\x01\x7f')
+			app.export_visible()
+			assert app.export_status == 'console.export_saved'
+			assert desktop_unlink(export_path) == 0
+			app.paste_input('caf\xc3\xa9')
+			for width in [800, 380, 240]! {
+				begin_frame_elements()
+				tree := app.build(ui2.rect(0, 0, f64(width), 400))!
+				free_tree(tree)
+			}
+		}
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}

@@ -308,3 +308,156 @@ fn test_console_jump_open_empty_file_horizontal_view_and_build() {
 	assert invalid.path == '' && invalid.path_input.len == 0 && invalid.export_input.len == 0
 	assert invalid.status_key == 'console.invalid_path'
 }
+
+fn test_console_severity_recognizes_explicit_markers_and_aliases() {
+	assert console_line_severity('ERROR failed', 0, 12) == .error
+	for text in [' error: failed', 'FATAL: stopped', 'CRITICAL failed', '[ERROR] failed',
+		'[135:246:1006/123456.789:ERROR:source.cc(4)] failed', '[  4.125] (EE) failed']! {
+		assert console_line_severity(text, 0, text.len) == .error
+	}
+	for text in ['WARN: retry', 'Warning retry', '[ warning ] retry', '(WW) retry',
+		'[2026-10-06T12:30:00Z] WARNING retry']! {
+		assert console_line_severity(text, 0, text.len) == .warning
+	}
+	for text in ['INFO ready', 'notice: ready', '[INFO] ready', '[ 0.25] (II) ready']! {
+		assert console_line_severity(text, 0, text.len) == .info
+	}
+	for text in ['DEBUG trace', 'trace: step', '[DEBUG] detail', '(DB) detail']! {
+		assert console_line_severity(text, 0, text.len) == .debug
+	}
+	wrapped := 'xx[ERROR] payload yy'
+	assert console_line_severity(wrapped, 2, wrapped.len - 3) == .error
+}
+
+fn test_console_severity_does_not_guess_levels_from_message_words() {
+	for text in ['', ' ', 'An ERROR occurred', 'errors are words', 'ERRORS are words',
+		'ERROR-ish text', '[ERROR detail] words', '[app] ERROR words', '(==) ERROR words',
+		'[unterminated ERROR', '[2026-10-06] result ERROR', 'caf\xc3\xa9 ERROR body']! {
+		assert console_line_severity(text, 0, text.len) == .unmarked
+	}
+	assert console_line_severity('ERROR', -1, 5) == .unmarked
+	assert console_line_severity('ERROR', 0, 6) == .unmarked
+	assert console_line_severity('ERROR', 3, 2) == .unmarked
+	padding := '1'.repeat(256)
+	oversized := '[' + padding + ':ERROR] body'
+	defer { unsafe { padding.free() oversized.free() } }
+	assert console_line_severity(oversized, 0, oversized.len) == .unmarked
+}
+
+fn test_console_severity_and_text_filters_intersect_and_export_exact_rows() {
+	home := console_test_directory('severity-export')
+	path := join_path(home, 'source.log')
+	export_path := join_path(home, 'selected.txt')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() path.free() export_path.free() }
+	}
+	source := 'INFO keep\nERROR keep caf\xc3\xa9\nWARN omit\nplain ERROR keep\nDEBUG keep\nERROR omit\n'
+	os.write_file(path, source)!
+	mut app := new_console_app(path, export_path)
+	defer { app.close_app() }
+	assert app.severity_filter == .all && app.matching.len == 6
+	app.handle('console.filter')!
+	app.paste_input('keep')
+	assert app.matching.len == 4
+	app.handle('console.severity.error')!
+	assert app.severity_filter == .error && app.matching.len == 1
+	assert app.count_text == '1 / 6' && app.matching[0] == 1
+	assert app.text == source
+	app.handle('console.export')!
+	assert app.export_status == 'console.export_saved'
+	saved := os.read_file(export_path)!
+	defer { unsafe { saved.free() } }
+	assert saved == 'ERROR keep caf\xc3\xa9\n'
+	app.handle('console.severity.unmarked')!
+	assert app.export_status == ''
+	assert app.severity_filter == .unmarked
+	assert app.matching.len == 1 && app.matching[0] == 3
+	app.handle('console.export')!
+	assert app.export_status == 'console.export_exists'
+	app.handle('console.severity.all')!
+	assert app.matching.len == 4
+	app.handle('console.severity.debug')!
+	assert app.matching.len == 1 && app.matching[0] == 4
+	app.key_input('\x01\x7f')
+	assert app.matching.len == 1
+	app.handle('console.severity.warning')!
+	assert app.matching.len == 1 && app.matching[0] == 2
+	app.handle('console.severity.info')!
+	assert app.matching.len == 1 && app.matching[0] == 0
+}
+
+fn test_console_severity_follow_rotation_and_source_changes_reclassify_rows() {
+	home := console_test_directory('severity-follow')
+	path := join_path(home, 'source.log')
+	other := join_path(home, 'other.log')
+	export_path := join_path(home, 'selected.txt')
+	defer {
+		os.rmdir_all(home) or {}
+		unsafe { home.free() path.free() other.free() export_path.free() }
+	}
+	os.write_file(path, 'INFO old\nERROR one\nERROR two\nERROR three\n')!
+	os.write_file(other, '[DEBUG] new\n')!
+	mut app := new_console_app(path, export_path)
+	defer { app.close_app() }
+	app.page_rows = 1
+	app.handle('console.severity.error')!
+	assert app.follow && app.scroll == 2
+	app.scroll_by(-2)
+	assert !app.follow && app.scroll == 0
+	app.handle('console.severity.info')!
+	assert !app.follow && app.scroll == 0 && app.matching.len == 1
+	os.write_file(path, 'WARN replacement\n')!
+	assert app.refresh()
+	assert app.severity_filter == .info && app.matching.len == 0
+	assert app.lines[0].severity == .warning
+	app.handle('console.severity.warning')!
+	assert app.matching.len == 1
+	app.set_source(other)
+	assert app.severity_filter == .warning && app.matching.len == 0
+	app.handle('console.severity.debug')!
+	assert app.matching.len == 1 && app.lines[0].severity == .debug
+	os.rm(other)!
+	assert app.refresh()
+	assert app.status_key == 'console.no_file' && app.matching.len == 0
+	assert app.severity_filter == .debug
+}
+
+fn test_console_severity_controls_wrap_and_tiny_window_preserves_filters() {
+	mut app := new_console_app('/missing-severity-ui-fixture', '/tmp/unused-severity-export')
+	defer { app.close_app() }
+	app.handle('console.filter')!
+	app.paste_input('keep')
+	app.handle('console.severity.error')!
+	for width in [380, 600, 800]! {
+		begin_frame_elements()
+		tree := app.build(ui2.rect(0, 0, f64(width), 400))!
+		mut count := 0
+		for child in tree.children {
+			assert child.frame.x >= 0 && child.frame.y >= 0
+			assert child.frame.x + child.frame.width <= width
+			assert child.frame.y + child.frame.height <= 400
+			if !child.id.starts_with('console.severity.') { continue }
+			assert child.frame.x >= 0 && child.frame.width > 0
+			assert child.frame.x + child.frame.width <= width
+			assert child.frame.y + child.frame.height < app.severity_log_top(width)
+			count++
+		}
+		assert count == 6
+		free_tree(tree)
+	}
+	begin_frame_elements()
+	short := app.build(ui2.rect(0, 0, 380, 360))!
+	for child in short.children {
+		if child.frame.y == app.severity_log_top(380) {
+			assert child.frame.y + child.frame.height < 360 - 92
+		}
+	}
+	free_tree(short)
+	begin_frame_elements()
+	tiny := app.build(ui2.rect(0, 0, 240, 180))!
+	assert tiny.children.len == 1 && tiny.children[0].id == 'console.resize'
+	assert tiny.children[0].frame.x + tiny.children[0].frame.width <= 240
+	assert app.severity_filter == .error && editor_bytes_text(app.filter_input) == 'keep'
+	free_tree(tiny)
+}

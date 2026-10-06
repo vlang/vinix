@@ -12,6 +12,7 @@ const console_field_limit = 4096
 struct ConsoleLine {
 	start int
 	end   int
+	severity ConsoleSeverity
 }
 
 struct ConsoleApp {
@@ -22,6 +23,7 @@ mut:
 	matching      []int
 	path_input    []u8
 	filter_input  []u8
+	severity_filter ConsoleSeverityFilter
 	export_input  []u8
 	status_key    string
 	export_status string
@@ -93,11 +95,11 @@ fn (mut a ConsoleApp) refresh() bool {
 	mut start := 0
 	for at in 0 .. a.text.len {
 		if a.text[at] == `\n` {
-			a.lines << ConsoleLine{ start: start, end: at }
+			a.lines << ConsoleLine{ start: start, end: at, severity: console_line_severity(a.text, start, at) }
 			start = at + 1
 		}
 	}
-	if start < a.text.len { a.lines << ConsoleLine{ start: start, end: a.text.len } }
+	if start < a.text.len { a.lines << ConsoleLine{ start: start, end: a.text.len, severity: console_line_severity(a.text, start, a.text.len) } }
 	a.refilter()
 	return true
 }
@@ -106,7 +108,8 @@ fn (mut a ConsoleApp) refilter() {
 	a.matching.clear()
 	query := editor_bytes_text(a.filter_input)
 	for index, line in a.lines {
-		if query.len == 0 || console_borrow(a.text, line.start, line.end).contains(query) {
+		if console_severity_matches(a.severity_filter, line.severity)
+			&& (query.len == 0 || console_borrow(a.text, line.start, line.end).contains(query)) {
 			a.matching << index
 		}
 	}
@@ -209,6 +212,16 @@ fn (mut a ConsoleApp) export_visible() {
 
 fn (mut a ConsoleApp) handle(event_id string) ! {
 	a.pending_len = 0
+	for index, action in console_severity_actions {
+		if event_id == action {
+			if a.severity_filter != console_severity_filters[index] {
+				a.severity_filter = console_severity_filters[index]
+				a.export_status = ''
+				a.refilter()
+			}
+			return
+		}
+	}
 	if event_id.starts_with(jump_open_prefix) {
 		a.set_source(console_borrow(event_id, jump_open_prefix.len, event_id.len))
 		return
@@ -441,11 +454,20 @@ fn console_line_window(text string, line ConsoleLine, column int, width int) str
 fn (mut a ConsoleApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
+	if width < 380 || height < 360 {
+		mut small := frame_elements(1)
+		small << ui2.label('console.resize', tr('console.resize'),
+			ui2.rect(8, 8, f64(if width > 16 { width - 16 } else { 1 }),
+				f64(if height > 16 { height - 16 } else { 1 })),
+			ui2.TextStyle{ color: body_muted, size: 12, lines: 3 })
+		return ui2.screen(app_surface, small)
+	}
 	footer := height - 92
-	a.page_rows = if footer > 172 { (footer - 172) / 20 } else { 1 }
+	log_top := a.severity_log_top(width)
+	a.page_rows = if footer > log_top { (footer - log_top) / 20 } else { 1 }
 	if a.page_rows < 1 { a.page_rows = 1 }
 	if a.follow { a.scroll = a.max_scroll() } else { a.clamp_scroll() }
-	mut children := frame_elements(a.page_rows + 28)
+	mut children := frame_elements(a.page_rows + 34)
 	children << console_button('console.source.xorg', 'console.source.xorg', 14, 10, 110, false)
 	children << console_button('console.source.firefox', 'console.source.firefox', 132, 10, 110, false)
 	children << console_button('console.source.chromium', 'console.source.chromium', 250, 10, 110, false)
@@ -457,6 +479,7 @@ fn (mut a ConsoleApp) build(size ui2.Rect) !ui2.Element {
 	children << ui2.label('', a.count_text, ui2.rect(362, 84, f64(width - 376), 28), ui2.TextStyle{ color: body_text, size: 12 })
 	children << ui2.label('', tr('console.filter'), ui2.rect(14, 125, 98, 28), ui2.TextStyle{ color: body_muted, size: 12 })
 	children << console_field('console.filter', editor_bytes_text(a.filter_input), 114, 122, width - 128, a.focus == 1)
+	a.build_severity_controls(mut children, width)
 	if a.status_key.len > 0 || a.matching.len == 0 {
 		key := if a.status_key.len > 0 {
 			a.status_key
@@ -465,7 +488,8 @@ fn (mut a ConsoleApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			'console.no_matches'
 		}
-		children << ui2.label('', tr(key), ui2.rect(18, 172, f64(width - 36), 60),
+		message_height := if footer - log_top > 64 { 60 } else { footer - log_top - 4 }
+		children << ui2.label('', tr(key), ui2.rect(18, f64(log_top), f64(width - 36), f64(message_height)),
 			ui2.TextStyle{ color: body_muted, size: 13, lines: 3 })
 	} else {
 		columns := if width > 40 { (width - 40) / 8 } else { 1 }
@@ -474,7 +498,7 @@ fn (mut a ConsoleApp) build(size ui2.Rect) !ui2.Element {
 			if index >= a.matching.len { break }
 			line := a.lines[a.matching[index]]
 			children << ui2.label('', console_line_window(a.text, line, a.horizontal, columns),
-				ui2.rect(18, f64(168 + row * 20), f64(width - 36), 20),
+				ui2.rect(18, f64(log_top + row * 20), f64(width - 36), 20),
 				ui2.TextStyle{ color: body_text, font_family: 'mono', size: 12 })
 		}
 	}
