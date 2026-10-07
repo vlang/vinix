@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise large sparse EXT2 files across three hard-stop/restart cycles."""
 import argparse
+from contextlib import nullcontext
 import hashlib
 import importlib.util
 import os
@@ -27,6 +28,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=("aarch64", "amd64"), default="aarch64")
     parser.add_argument("--blocks", default="1024,4096")
+    parser.add_argument("--state-dir", type=Path, help="retain fresh payloads, disks and boot inputs")
+    parser.add_argument("--prebuilt-init", type=Path, help="use an independently built native control")
     args = parser.parse_args()
     blocks = [int(x) for x in args.blocks.split(",")]
     if any(x not in (1024, 4096) for x in blocks): parser.error("use 1024 or 4096 byte blocks")
@@ -41,15 +44,24 @@ def main():
     mke2fs = str(Path(debugfs).with_name("mke2fs"))
     e2fsck = str(Path(debugfs).with_name("e2fsck"))
     timeout = int(os.environ.get("VINIX_QEMU_TIMEOUT", "300"))
-    with tempfile.TemporaryDirectory(prefix="vinix-ext2-sparse-") as directory:
+    if args.state_dir:
+        args.state_dir.mkdir(parents=True)
+    state = nullcontext(str(args.state_dir.resolve())) if args.state_dir else tempfile.TemporaryDirectory(prefix="vinix-ext2-sparse-")
+    with state as directory:
         work = Path(directory)
         if args.arch == "aarch64":
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
             cc = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
                   f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else: cc = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
-        subprocess.run(cc + ["-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector",
-            str(ROOT / "tests/ext2-sparse/guest.c"), "-o", str(work / "init")], check=True)
+        if args.prebuilt_init:
+            shutil.copy2(args.prebuilt_init, work / "init")
+        else:
+            fixture = load("sparse_fixture_compile", ROOT / "tests/kernel-gaps/compile-v-fixture.py")
+            flags = cc + ["-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector"]
+            object_file = fixture.compile_module(ROOT / "tests/ext2-sparse/sparsefixture", work / "fixture.o",
+                                                 "aarch64" if args.arch == "aarch64" else "x86_64", flags)
+            subprocess.run(cc + ["-static", str(object_file), "-o", str(work / "init")], check=True)
         archive = work / "initramfs.tar"
         helper.initramfs(archive, "run")
         environment = {**os.environ, "VINIX_INITRAMFS": str(archive), "VINIX_BOOT_DISK": str(work / "boot.img"),
