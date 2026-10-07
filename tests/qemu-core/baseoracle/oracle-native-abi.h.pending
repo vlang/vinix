@@ -1,0 +1,11 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+#ifndef VINIX_QEMU_CORE_HOST_ORACLE_NATIVE_ABI_H
+#define VINIX_QEMU_CORE_HOST_ORACLE_NATIVE_ABI_H
+#include <basefixture_v_contract.h>
+/* Typed API declarations only. Implementations and providers are V. */
+int vqc_host_sysinfo(struct sysinfo *);
+int vqc_host_open(const char *, int, ...);
+int vqc_host_unlink(const char *);
+int vqc_host_madvise(void *, size_t, int);
+int vqc_host_execv(vqc_path, vqc_arguments);
+#endif

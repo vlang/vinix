@@ -100,3 +100,40 @@ and native variadic argument widths. Three cases compare syscall/close failures
 and argument bits; an additional nonzero argument probe checks the instruction
 ABI adapter. The host uses native openat while guests call actual syscall.
 These bounded comparisons supplement the full feature and persistence runner.
+
+## Pending migration checkpoint
+
+The committed `.pending` files preserve unfinished base/memory and futex
+fixture work. They are not selected by `run.sh` or the normal fixture builder;
+the corresponding bodies remain in `test.c`. These scopes receive **zero
+completed migration credit** until their native comparisons and normal-runner
+integration are complete. Original checks, workloads and deadlines remain
+unchanged. Their oracle is the same immutable `bbf1e243` source described above.
+
+The base/memory scope covers 270 original lines and preserves all 76 `CHECK`
+expressions and logical lines. Its current inputs match the cached ARM host
+ASan/UBSan comparison and ARM/x86 SDK build receipts. Earlier ARM full feature
+and persistence C/V comparisons passed. Native x86 completion remains blocked:
+the original full control passed the memory groups, then failed the untouched
+alarm assertion at original line 2239, observing nine timer firings against the
+required ten. Its paired V run was not launched. The earlier `max`/TCG control
+also exhausted its outer allowance during the original joined-thread workload;
+neither result establishes a cause or permits weakening the test.
+
+The futex scope covers 18 original lines and preserves all five `CHECK`
+expressions and logical lines. Fresh 2026-10-07 host ASan/UBSan comparisons
+passed seven independent cases on both actual host ABIs. Host providers model
+the atomic word operations and supply the target SDK's syscall number; guest
+providers invoke the real syscall. Cached ARM/x86 SDK links exist, but complete
+native validation of the current exact inputs and normal-runner integration
+remain pending. Historical guest logs are retained as evidence, including an
+x86 run whose original diagnostic line tags predate the final correction.
+
+Local checkpoint evidence is under
+`~/.cache/vinix-c-to-v/firstparty-only-20261006-011023`: the
+`pending-commit-oct07/qemu-core-pending-source-audit.json` input/check audit,
+`pending-commit-oct07/futex-host-{arm,x86}/validation.json` fresh host receipts,
+`qemu-core-host270-final/validation.json` base host receipt,
+`qemu-core-native270-final/validation.json` SDK receipt, and
+`qemu-core-qemu64-config.json` unresolved original native control. These local
+receipts and generated binaries are not maintained fixture sources.

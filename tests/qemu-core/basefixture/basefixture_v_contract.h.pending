@@ -1,0 +1,31 @@
+#ifndef VINIX_QEMU_CORE_BASE_FIXTURE_NATIVE_ABI_H
+#define VINIX_QEMU_CORE_BASE_FIXTURE_NATIVE_ABI_H
+#include <errno.h>
+#include <fcntl.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/sysinfo.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#ifndef __APPLE__
+#include <sys/random.h>
+#else
+/* Darwin host differential fixture supplies this Linux-native API. */
+ssize_t getrandom(void *, size_t, unsigned int);
+#endif
+/* Native volatile field views preserve the original mmap byte accesses. */
+struct vqc_volatile_byte { volatile unsigned char value; };
+typedef struct sysinfo vqc_sysinfo;
+typedef const char *vqc_path;
+typedef char *const *vqc_arguments;
+_Static_assert(sizeof(struct vqc_volatile_byte) == 1, "original volatile byte width");
+_Static_assert(_Alignof(struct vqc_volatile_byte) == 1, "original volatile byte alignment");
+_Static_assert(sizeof(pid_t) == 4, "original pid ABI");
+_Static_assert(sizeof(off_t) == 8, "original mmap offset ABI");
+_Static_assert(sizeof(unsigned long) == 8, "original native memory accounting word");
+_Static_assert(offsetof(struct sysinfo, freeram) == 40, "native free-memory field offset");
+_Static_assert(sizeof(vqc_path) == 8 && sizeof(vqc_arguments) == 8, "native exec pointer ABI");
+#endif

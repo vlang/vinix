@@ -1,0 +1,13 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+#ifndef VINIX_QEMU_CORE_FUTEX_ORACLE_NATIVE_ABI_H
+#define VINIX_QEMU_CORE_FUTEX_ORACLE_NATIVE_ABI_H
+#include <futexfixture_v_contract.h>
+#include <assert.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+long vqw_host_syscall(long,...);
+long vqw_host_syscall_body(long,void *,int,int,int,void *,int);
+int original_test_futex_wake_op(void);
+int test_futex_wake_op(void);
+#endif

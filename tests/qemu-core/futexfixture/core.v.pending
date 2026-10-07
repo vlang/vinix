@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Original independent FUTEX_WAKE_OP checks, lines1681-1698.
+@[translated]
+module futexfixture
+
+#include <futexfixture_v_contract.h>
+
+@[c_extern]
+__global C.errno i32
+
+fn C.printf(&char, ...) i32
+fn C.puts(&char) i32
+fn C.syscall(isize, ...) isize
+
+fn check(ok bool, line i32, expression &char) bool {
+	if !ok {
+		unsafe { C.printf(c'QEMU CORE FAIL line %d: %s (errno=%d)\n', line, expression, C.errno) }
+	}
+	return ok
+}
+
+@[export:'test_futex_wake_op']
+pub fn futex_wake_op() i32 {
+	unsafe {
+		mut words := [u32(0), u32(7)]!
+		if !check(C.syscall(isize(C.SYS_futex), &words[0], i32(5 | 128), i32(1), i32(1), &words[1], i32(0x10003007)) == 0,
+			1687, c'syscall(SYS_futex, &words[0], 5 | 128, 1, 1, &words[1], 0x10003007) == 0') {
+			return 1
+		}
+		if !check(words[1] == 10, 1688, c'words[1] == 10') { return 1 }
+		if !check(C.syscall(isize(C.SYS_futex), &words[0], i32(5 | 128), i32(1), i32(1), &words[1], i32(0x21000000)) == 0,
+			1691, c'syscall(SYS_futex, &words[0], 5 | 128, 1, 1, &words[1], 0x21000000) == 0') {
+			return 1
+		}
+		if !check(words[1] == 10, 1692, c'words[1] == 10') { return 1 }
+		C.errno = 0
+		if !check(C.syscall(isize(C.SYS_futex), &words[0], i32(5 | 128), i32(1), i32(1), voidptr(1), i32(0x21000000)) == -1 && C.errno == C.EFAULT,
+			1695, c'syscall(SYS_futex, &words[0], 5 | 128, 1, 1, (void *)1, 0x21000000) == -1 && errno == EFAULT') {
+			return 1
+		}
+		C.puts(c'QEMU CORE PASS: futex wake-op updates and compares user words')
+		return 0
+	}
+}

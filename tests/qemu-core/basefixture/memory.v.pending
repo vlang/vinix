@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Independent native memory fixtures; thresholds and original diagnostics kept.
+@[translated]
+@[has_globals]
+module basefixture
+
+@[typedef]
+struct C.vqc_sysinfo {
+	freeram usize
+}
+
+@[typedef]
+struct C.vqc_path {}
+@[typedef]
+struct C.vqc_arguments {}
+
+fn C.sysinfo(&C.vqc_sysinfo) i32
+fn C.sysconf(i32) isize
+fn C.ftruncate(i32, i64) i32
+fn C.mprotect(voidptr, usize, i32) i32
+fn C.pipe(&i32) i32
+fn C.write(i32, voidptr, usize) isize
+fn C.madvise(voidptr, usize, i32) i32
+fn C.execv(C.vqc_path, C.vqc_arguments) i32
+fn C.memcpy(voidptr, voidptr, usize) voidptr
+
+@[export: 'test_sparse_tmpfs_shared_mapping']
+pub fn test_sparse_tmpfs_shared_mapping() i32 {
+	unsafe {
+		path := &char(c'/dev/shm/vinix-qemu-core-sparse')
+		size := usize(64 * 1024 * 1024)
+		mut before := C.vqc_sysinfo{}
+		mut sized := C.vqc_sysinfo{}
+		mut mapped := C.vqc_sysinfo{}
+		if !check(C.sysinfo(&before) == 0, 287, c'sysinfo(&before) == 0') { return 1 }
+		fd := C.open(path, C.O_CREAT | C.O_EXCL | C.O_RDWR, i32(0o600))
+		if !check(fd >= 0, 289, c'fd >= 0') { return 1 }
+		if !check(C.ftruncate(fd, i64(size)) == 0, 290, c'ftruncate(fd, (off_t)size) == 0') { return 1 }
+		if !check(C.sysinfo(&sized) == 0, 291, c'sysinfo(&sized) == 0') { return 1 }
+		if !check(sized.freeram + usize(8 * 1024 * 1024) >= before.freeram, 292, c'sized.freeram + 8UL * 1024 * 1024 >= before.freeram') { return 1 }
+		area := &u8(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0))
+		if !check(usize(area) != usize(C.MAP_FAILED), 295, c'area != MAP_FAILED') { return 1 }
+		if !check(C.sysinfo(&mapped) == 0, 296, c'sysinfo(&mapped) == 0') { return 1 }
+		if !check(mapped.freeram + usize(8 * 1024 * 1024) >= sized.freeram, 297, c'mapped.freeram + 8UL * 1024 * 1024 >= sized.freeram') { return 1 }
+		if !check(area[0] == 0 && area[size - 1] == 0, 298, c'area[0] == 0 && area[size - 1] == 0') { return 1 }
+		area[0] = 0x42
+		area[size - 1] = 0x73
+		if !check(C.mprotect(area, size, C.PROT_READ) == 0, 301, c'mprotect(area, size, PROT_READ) == 0') { return 1 }
+		if !check(C.sysinfo(&mapped) == 0, 302, c'sysinfo(&mapped) == 0') { return 1 }
+		if !check(mapped.freeram + usize(8 * 1024 * 1024) >= sized.freeram, 303, c'mapped.freeram + 8UL * 1024 * 1024 >= sized.freeram') { return 1 }
+		child := C.fork()
+		if !check(child >= 0, 305, c'child >= 0') { return 1 }
+		if child == 0 {
+			reader := C.open(path, C.O_RDWR)
+			if reader < 0 { C._exit(1) }
+			other := &u8(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, reader, 0))
+			if usize(other) == usize(C.MAP_FAILED) || other[0] != 0x42 || other[size - 1] != 0x73 || other[size / 2] != 0 { C._exit(1) }
+			other[size / 2] = 0x5a
+			C._exit(0)
+		}
+		if !check(reap_ok(child) == 0, 318, c'reap_ok(child) == 0') { return 1 }
+		if !check(area[size / 2] == 0x5a, 319, c'area[size / 2] == 0x5a') { return 1 }
+		if !check(C.munmap(area, size) == 0, 320, c'munmap(area, size) == 0') { return 1 }
+		if !check(C.close(fd) == 0, 321, c'close(fd) == 0') { return 1 }
+		if !check(C.unlink(path) == 0, 322, c'unlink(path) == 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: sparse tmpfs shared mappings allocate on touch')
+		return 0
+	}
+}
+
+@[export: 'test_partial_munmap_reclaims_pages']
+pub fn test_partial_munmap_reclaims_pages() i32 {
+	unsafe {
+		size := usize(32 * 1024 * 1024)
+		page := usize(C.sysconf(C._SC_PAGESIZE))
+		hole := usize(16 * 1024 * 1024)
+		mut before := C.vqc_sysinfo{}
+		mut populated := C.vqc_sysinfo{}
+		mut after_hole := C.vqc_sysinfo{}
+		mut after_all := C.vqc_sysinfo{}
+		if !check(C.sysinfo(&before) == 0, 333, c'sysinfo(&before) == 0') { return 1 }
+		area := &u8(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(area) != usize(C.MAP_FAILED), 336, c'area != MAP_FAILED') { return 1 }
+		for offset := usize(0); offset < size; offset += page { area[offset] = 0x5a }
+		if !check(C.sysinfo(&populated) == 0, 339, c'sysinfo(&populated) == 0') { return 1 }
+		if !check(populated.freeram + usize(24 * 1024 * 1024) <= before.freeram, 340, c'populated.freeram + 24UL * 1024 * 1024 <= before.freeram') { return 1 }
+		if !check(C.munmap(area + usize(8 * 1024 * 1024), hole) == 0, 341, c'munmap(area + 8UL * 1024 * 1024, hole) == 0') { return 1 }
+		if !check(C.sysinfo(&after_hole) == 0, 342, c'sysinfo(&after_hole) == 0') { return 1 }
+		if !check(after_hole.freeram >= populated.freeram + usize(12 * 1024 * 1024), 343, c'after_hole.freeram >= populated.freeram + 12UL * 1024 * 1024') { return 1 }
+		if !check(area[0] == 0x5a && area[size - 16384] == 0x5a, 344, c'area[0] == 0x5a && area[size - 16384] == 0x5a') { return 1 }
+		if !check(C.munmap(area, usize(8 * 1024 * 1024)) == 0, 345, c'munmap(area, 8UL * 1024 * 1024) == 0') { return 1 }
+		if !check(C.munmap(area + usize(24 * 1024 * 1024), usize(8 * 1024 * 1024)) == 0, 346, c'munmap(area + 24UL * 1024 * 1024, 8UL * 1024 * 1024) == 0') { return 1 }
+		if !check(C.sysinfo(&after_all) == 0, 347, c'sysinfo(&after_all) == 0') { return 1 }
+		if !check(after_all.freeram + usize(8 * 1024 * 1024) >= before.freeram, 348, c'after_all.freeram + 8UL * 1024 * 1024 >= before.freeram') { return 1 }
+		mut ready := [2]i32{}
+		if !check(C.pipe(&ready[0]) == 0, 353, c'pipe(ready) == 0') { return 1 }
+		shared := &u8(C.mmap(nil, 4 * 16384, C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(shared) != usize(C.MAP_FAILED), 356, c'shared != MAP_FAILED') { return 1 }
+		shared[0] = 0x31
+		shared[3 * 16384] = 0x73
+		child := C.fork()
+		if !check(child >= 0, 360, c'child >= 0') { return 1 }
+		if child == 0 {
+			mut signal := char(0)
+			C.close(ready[1])
+			if C.read(ready[0], &signal, 1) != 1 { C._exit(1) }
+			C._exit(if shared[0] == 0x31 && shared[3 * 16384] == 0x73 { 0 } else { 1 })
+		}
+		if !check(C.close(ready[0]) == 0, 368, c'close(ready[0]) == 0') { return 1 }
+		if !check(C.munmap(shared, 16384) == 0, 369, c'munmap(shared, 16384) == 0') { return 1 }
+		if !check(C.write(ready[1], c'x', 1) == 1, 370, c'write(ready[1], "x", 1) == 1') { return 1 }
+		if !check(C.close(ready[1]) == 0, 371, c'close(ready[1]) == 0') { return 1 }
+		if !check(reap_ok(child) == 0, 372, c'reap_ok(child) == 0') { return 1 }
+		if !check(shared[3 * 16384] == 0x73, 373, c'shared[3 * 16384] == 0x73') { return 1 }
+		if !check(C.munmap(shared + 16384, 3 * 16384) == 0, 374, c'munmap(shared + 16384, 3 * 16384) == 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: partial unmap reclaims pages and retains forked shares')
+		return 0
+	}
+}
+
+@[export: 'test_madvise_reclaims_anonymous_pages']
+pub fn test_madvise_reclaims_anonymous_pages() i32 {
+	unsafe {
+		size := usize(32 * 1024 * 1024)
+		page := usize(C.sysconf(C._SC_PAGESIZE))
+		mut populated := C.vqc_sysinfo{}
+		mut discarded := C.vqc_sysinfo{}
+		mut area := &C.vqc_volatile_byte(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(area) != usize(C.MAP_FAILED), 457, c'area != MAP_FAILED') { return 1 }
+		for offset := usize(0); offset < size; offset += page { area[offset].value = 0x5a }
+		if !check(C.sysinfo(&populated) == 0, 460, c'sysinfo(&populated) == 0') { return 1 }
+		if !check(C.madvise(area, size, C.MADV_DONTNEED) == 0, 461, c'madvise((void *)area, size, MADV_DONTNEED) == 0') { return 1 }
+		if !check(C.sysinfo(&discarded) == 0, 462, c'sysinfo(&discarded) == 0') { return 1 }
+		if !check(discarded.freeram >= populated.freeram + usize(24 * 1024 * 1024), 463, c'discarded.freeram >= populated.freeram + 24UL * 1024 * 1024') { return 1 }
+		if !check(area[0].value == 0 && area[size - 16384].value == 0, 464, c'area[0] == 0 && area[size - 16384] == 0') { return 1 }
+		if !check(C.munmap(area, size) == 0, 465, c'munmap((void *)area, size) == 0') { return 1 }
+		area = &C.vqc_volatile_byte(C.mmap(nil, 16384, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(area) != usize(C.MAP_FAILED), 470, c'area != MAP_FAILED') { return 1 }
+		area[0].value = 0x73
+		child := C.fork()
+		if !check(child >= 0, 473, c'child >= 0') { return 1 }
+		if child == 0 {
+			if C.madvise(area, 16384, C.MADV_DONTNEED) != 0 { C._exit(1) }
+			C._exit(if area[0].value == 0 { 0 } else { 1 })
+		}
+		if !check(reap_ok(child) == 0, 479, c'reap_ok(child) == 0') { return 1 }
+		if !check(area[0].value == 0x73, 480, c'area[0] == 0x73') { return 1 }
+		if !check(C.munmap(area, 16384) == 0, 481, c'munmap((void *)area, 16384) == 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: madvise returns anonymous pages to the allocator')
+		return 0
+	}
+}
+
+@[export: 'test_short_lived_process_memory_reclamation']
+pub fn test_short_lived_process_memory_reclamation() i32 {
+	unsafe {
+		mut before := C.vqc_sysinfo{}
+		mut after := C.vqc_sysinfo{}
+		if !check(C.sysinfo(&before) == 0, 489, c'sysinfo(&before) == 0') { return 1 }
+		for attempt := i32(0); attempt < 16; attempt++ {
+			child := C.fork()
+			if !check(child >= 0, 492, c'child >= 0') { return 1 }
+			if child == 0 {
+				size := usize(32 * 1024 * 1024)
+				area := &C.vqc_volatile_byte(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+				if usize(area) == usize(C.MAP_FAILED) { C._exit(1) }
+				for offset := usize(0); offset < size; offset += 16384 { area[offset].value = 0x5a }
+				if (attempt & 1) != 0 {
+					mut argv := [&char(c'/sbin/init'), &char(c'--exec-memory-probe'), &char(nil)]!
+					argv_pointer := &&char(&argv[0])
+					path_pointer := argv[0]
+					mut native_path := C.vqc_path{}
+					mut native_argv := C.vqc_arguments{}
+					C.memcpy(&native_path, &path_pointer, sizeof(C.vqc_path))
+					C.memcpy(&native_argv, &argv_pointer, sizeof(C.vqc_arguments))
+					C.execv(native_path, native_argv)
+					C._exit(1)
+				}
+				C._exit(0)
+			}
+			if !check(reap_ok(child) == 0, 508, c'reap_ok(child) == 0') { return 1 }
+		}
+		if !check(C.sysinfo(&after) == 0, 510, c'sysinfo(&after) == 0') { return 1 }
+		if !check(after.freeram + usize(32 * 1024 * 1024) >= before.freeram, 511, c'after.freeram + 32UL * 1024 * 1024 >= before.freeram') { return 1 }
+		C.puts(c'QEMU CORE PASS: exit and exec reclaim process mappings')
+		return 0
+	}
+}
+
+@[export: 'test_forked_cow_memory_reclamation']
+pub fn test_forked_cow_memory_reclamation() i32 {
+	unsafe {
+		size := usize(32 * 1024 * 1024)
+		area := &C.vqc_volatile_byte(C.mmap(nil, size, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(area) != usize(C.MAP_FAILED), 521, c'area != MAP_FAILED') { return 1 }
+		for offset := usize(0); offset < size; offset += 16384 { area[offset].value = 0x31 }
+		mut before := C.vqc_sysinfo{}
+		mut after := C.vqc_sysinfo{}
+		if !check(C.sysinfo(&before) == 0, 525, c'sysinfo(&before) == 0') { return 1 }
+		for _ in 0 .. 16 {
+			child := C.fork()
+			if !check(child >= 0, 528, c'child >= 0') { return 1 }
+			if child == 0 {
+				for offset := usize(0); offset < size; offset += 16384 { area[offset].value = 0x73 }
+				C._exit(0)
+			}
+			if !check(reap_ok(child) == 0, 534, c'reap_ok(child) == 0') { return 1 }
+		}
+		if !check(C.sysinfo(&after) == 0, 536, c'sysinfo(&after) == 0') { return 1 }
+		if !check(after.freeram + usize(32 * 1024 * 1024) >= before.freeram, 537, c'after.freeram + 32UL * 1024 * 1024 >= before.freeram') { return 1 }
+		if !check(area[0].value == 0x31 && area[size - 16384].value == 0x31, 538, c'area[0] == 0x31 && area[size - 16384] == 0x31') { return 1 }
+		if !check(C.munmap(area, size) == 0, 539, c'munmap((void *)area, size) == 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: forked copy-on-write pages are reclaimed')
+		return 0
+	}
+}

@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
+"""Compare the native C/V fixtures through shared API inputs and real mappings."""
+import argparse
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+API_INPUTS = ("sysinfo", "open", "unlink", "madvise", "execv")
+EXPORTS = (
+    "reap_ok", "verify_marker", "verify_persistence_boot", "test_random", "test_cow",
+    "test_sparse_tmpfs_shared_mapping", "test_partial_munmap_reclaims_pages",
+    "test_madvise_reclaims_anonymous_pages", "test_short_lived_process_memory_reclamation",
+    "test_forked_cow_memory_reclamation",
+)
+
+
+def run(command, *, log=None, env=None):
+    result = subprocess.run(command, check=False, text=True, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, env=env)
+    if log:
+        log.write_text(result.stdout)
+    elif result.stdout:
+        print(result.stdout, end="")
+    result.check_returncode()
+    return result.stdout
+
+
+def check_no_allocators(objects):
+    for obj in objects:
+        symbols = run(["nm", "-u", str(obj)], log=obj.with_suffix(".nm"))
+        if (re.search(r"\b_?(?:malloc|calloc|realloc)\b", symbols)
+                or any(name in symbols for name in ("memdup", "v_malloc", "new_array"))):
+            raise ValueError(f"Unexpected allocator import in {obj}")
+
+
+def prepare(output, arch):
+    helper = ROOT / "tests/qemu-core/compile-basefixture.py"
+    if not helper.is_file():
+        helper = helper.with_suffix(".py.pending")
+    run(["python3", str(helper), str(output), "--arch", arch], log=output.parent / "prepare.log")
+    spec = importlib.util.spec_from_file_location("v_module", ROOT / "build-support/compile-v-module.py")
+    compiler = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(compiler)
+    return compiler
+
+
+def host(output, cc, native_headers):
+    arch = "arm64" if platform.machine() in ("arm64", "aarch64") else "amd64"
+    compiler = prepare(output, arch)
+    compiler.generate(output / "baseoracle", output / "baseoracle.c", arch=arch)
+    flags = [cc, "-O1", "-g", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
+             "-Wno-unused-parameter", "-Wno-unused-variable", "-fno-strict-aliasing",
+             "-fsanitize=address,undefined", "-I", str(output), "-I", str(output / "basefixture")]
+    if native_headers:
+        flags += ["-idirafter", str(native_headers)]
+    # Function-like native ABI remapping does not change struct tags/types.
+    # Darwin's native prototypes carry assembler symbol labels. Import them
+    # before remapping calls, so the fixture uses the typed V provider symbols.
+    provider_prefix = '#include "oracle-native-abi.h"\n' + "".join(
+        f"#define {name}(...) vqc_host_{name}(__VA_ARGS__)\n" for name in API_INPUTS)
+    for source in ("original-base", "basefixture"):
+        (output / f"host-{source}.c").write_text(provider_prefix + (output / f"{source}.c").read_text())
+    flags += ["-I", str(output / "baseoracle")]
+    original_names = [f"-D{name}=original_{name}" for name in EXPORTS]
+    original = output / "original-base.o"
+    core = output / "basefixture.o"
+    oracle = output / "baseoracle.o"
+    entry = output / "open-abi.o"
+    run(flags + original_names + ["-c", str(output / "host-original-base.c"), "-o", str(original)],
+        log=output / "original-compile.log")
+    run(flags + ["-c", str(output / "host-basefixture.c"), "-o", str(core)],
+        log=output / "v-compile.log")
+    run(flags + ["-c", str(output / "baseoracle.c"), "-o", str(oracle)], log=output / "oracle-compile.log")
+    run([cc, "-c", str(output / "baseoracle/open_abi.S"), "-o", str(entry)])
+    check_no_allocators((core, oracle))
+    executable = output / "basefixture-host"
+    run([cc, "-fsanitize=address,undefined", str(original), str(core), str(oracle), str(entry),
+         "-o", str(executable)])
+    result = run([str(executable)], log=output / "host.log",
+                 env={**os.environ, "ASAN_OPTIONS": "detect_leaks=0"})
+    for marker in ("QEMU CORE BASE DIFFERENTIAL PASS", "QEMU CORE MEMORY DIFFERENTIAL PASS"):
+        if marker not in result:
+            raise ValueError(f"Missing differential marker: {marker}")
+    (output / "validation.json").write_text(json.dumps({
+        "result": "PASS", "host": platform.platform(),
+        "base_cases": {"random_api_inputs": 5, "marker_boundaries": 14, "actual_fork_cow": 1},
+        "memory_cases": {"success": 5, "sysinfo_failures": 14},
+        "native_requests": "return, errno, sysinfo count and API request trace compared",
+        "ownership": "real fork/private/shared mappings; cases isolated in processes and joined before records expire",
+        "native_boundary": "Linux free-memory timeline, private anonymous discard and successful exec modeled on Darwin; real native guest validates kernel accounting and exec image",
+        "source_receipt": "original-source.json", "implicit_allocator_imports": [],
+        "executable_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(),
+    }, indent=2) + "\n")
+    print("QEMU-core base/memory C/V native host differential: PASS")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path, help="Evidence directory outside the checkout")
+    parser.add_argument("--cc", default="clang")
+    parser.add_argument("--native-headers", type=Path,
+                        default=ROOT / "build-aarch64-userland/sysroot/include")
+    args = parser.parse_args()
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    host(args.output, args.cc, args.native_headers)

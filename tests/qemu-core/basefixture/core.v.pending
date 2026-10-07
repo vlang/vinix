@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Independent fixture translated from test.c:88-168. Native libc owns its ABI.
+@[translated]
+@[has_globals]
+module basefixture
+
+#include <basefixture_v_contract.h>
+
+struct C.vqc_volatile_byte {
+mut:
+	value u8
+}
+
+@[c_extern]
+__global C.errno i32
+fn C.printf(&char, ...) i32
+fn C.puts(&char) i32
+fn C.open(&char, i32, ...) i32
+fn C.close(i32) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.unlink(&char) i32
+fn C.memcmp(voidptr, voidptr, usize) i32
+fn C.getrandom(voidptr, usize, u32) isize
+fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
+fn C.munmap(voidptr, usize) i32
+fn C.fork() i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C.WIFEXITED(i32) bool
+fn C.WEXITSTATUS(i32) i32
+fn C._exit(i32)
+
+fn check(ok bool, line i32, expression &char) bool {
+	if !ok {
+		unsafe { C.printf(c'QEMU CORE FAIL line %d: %s (errno=%d)\n', line, expression, C.errno) }
+	}
+	return ok
+}
+
+@[export: 'reap_ok']
+pub fn reap_ok(child i32) i32 {
+	unsafe {
+		mut status := i32(-1)
+		if !check(child > 0, 91, c'child > 0') { return 1 }
+		if !check(C.waitpid(child, &status, 0) == child, 92, c'waitpid(child, &status, 0) == child') { return 1 }
+		if !check(C.WIFEXITED(status) && C.WEXITSTATUS(status) == 0, 93, c'WIFEXITED(status) && WEXITSTATUS(status) == 0') { return 1 }
+		return 0
+	}
+}
+
+// ABI readonly: verify_marker.path
+// ABI readonly: verify_marker.payload
+@[export: 'verify_marker']
+pub fn verify_marker(path &char, payload &char, length usize) i32 {
+	unsafe {
+		fd := C.open(path, C.O_RDONLY)
+		if fd < 0 { return -1 }
+		mut observed := [64]char{}
+		if length >= sizeof(observed) {
+			C.close(fd)
+			C.errno = C.EINVAL
+			return -1
+		}
+		got := C.read(fd, &observed[0], sizeof(observed))
+		C.close(fd)
+		if got != isize(length) || C.memcmp(&observed[0], payload, length) != 0 {
+			C.errno = C.EIO
+			return -1
+		}
+		return C.unlink(path)
+	}
+}
+
+@[export: 'verify_persistence_boot']
+pub fn verify_persistence_boot() i32 {
+	unsafe {
+		fd := C.open(c'/root/vinix-qemu-core/persist', C.O_RDONLY)
+		if fd < 0 { return if C.errno == C.ENOENT { 0 } else { -1 } }
+		C.close(fd)
+		if verify_marker(c'/root/vinix-qemu-core/persist', c'vinix-ext2-cache-writeback-v1', 29) != 0 { return -1 }
+		if verify_marker(c'/root/vinix-qemu-core/synced', c'vinix-ext2-sync-writeback-v1', 28) != 0 { return -1 }
+		C.puts(c'VINIX QEMU CORE PERSIST: PASS')
+		return 1
+	}
+}
+
+@[export: 'test_random']
+pub fn test_random() i32 {
+	unsafe {
+		mut first := [64]u8{}
+		mut second := [64]u8{}
+		mut zero := [64]u8{}
+		if !check(C.getrandom(&first[0], sizeof(first), 0) == isize(sizeof(first)), 140, c'getrandom(first, sizeof(first), 0) == (ssize_t)sizeof(first)') { return 1 }
+		if !check(C.getrandom(&second[0], sizeof(second), 0) == isize(sizeof(second)), 141, c'getrandom(second, sizeof(second), 0) == (ssize_t)sizeof(second)') { return 1 }
+		if !check(C.memcmp(&first[0], &zero[0], sizeof(first)) != 0, 142, c'memcmp(first, zero, sizeof(first)) != 0') { return 1 }
+		if !check(C.memcmp(&first[0], &second[0], sizeof(first)) != 0, 143, c'memcmp(first, second, sizeof(first)) != 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: secure getrandom')
+		return 0
+	}
+}
+
+@[export: 'test_cow']
+pub fn test_cow() i32 {
+	unsafe {
+		page := &C.vqc_volatile_byte(C.mmap(nil, 4096, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
+		if !check(usize(page) != usize(C.MAP_FAILED), 152, c'page != MAP_FAILED') { return 1 }
+		page[0].value = 0x31
+		page[4095].value = 0x73
+		child := C.fork()
+		if child == 0 {
+			if page[0].value != 0x31 || page[4095].value != 0x73 { C._exit(1) }
+			page[0].value = 0xa5
+			page[4095].value = 0x5a
+			C._exit(if page[0].value == 0xa5 && page[4095].value == 0x5a { 0 } else { 1 })
+		}
+		if !check(reap_ok(child) == 0, 163, c'reap_ok(child) == 0') { return 1 }
+		if !check(page[0].value == 0x31 && page[4095].value == 0x73, 164, c'page[0] == 0x31 && page[4095] == 0x73') { return 1 }
+		if !check(C.munmap(page, 4096) == 0, 165, c'munmap((void *)page, 4096) == 0') { return 1 }
+		C.puts(c'QEMU CORE PASS: copy-on-write fork')
+		return 0
+	}
+}

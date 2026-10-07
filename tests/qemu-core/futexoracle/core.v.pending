@@ -1,0 +1,178 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Independent OS/fault inputs and native variadic capture for the immutable oracle.
+@[has_globals; translated]
+module futexoracle
+
+#include <futex-oracle-native-abi.h>
+
+@[c_extern]
+__global C.errno i32
+
+fn C.assert(bool)
+fn C.__atomic_fetch_add(&u32, u32, i32) u32
+fn C.__atomic_fetch_or(&u32, u32, i32) u32
+fn C.__atomic_load_n(&u32, i32) u32
+fn C.__atomic_store_n(&u32, u32, i32)
+fn C.syscall(isize, ...) isize
+fn C.vqw_host_syscall(isize, ...) isize
+fn C.original_test_futex_wake_op() i32
+fn C.test_futex_wake_op() i32
+fn C.close(i32) i32
+fn C.pipe(&i32) i32
+fn C.fork() i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C.WIFEXITED(i32) i32
+fn C.WEXITSTATUS(i32) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, usize) isize
+fn C.fflush(voidptr) i32
+fn C._exit(i32)
+fn C.puts(&char) i32
+fn C.open(&char, i32, ...) i32
+fn C.dup2(i32, i32) i32
+fn C.pause() i32
+
+__global (
+	futex_fault         i32
+	futex_calls         i32
+	futex_probe         bool
+	futex_last_word     u32
+	futex_argument_hash u64
+)
+
+@[export:'vqw_host_syscall_body']
+pub fn syscall_input(number isize, first voidptr, operation i32, wake i32, wake2 i32, second voidptr, encoded i32) isize {
+	unsafe {
+		C.assert(number == isize(C.SYS_futex))
+		if futex_probe {
+			C.assert(usize(first) == usize(0x123456789abcdef0) && usize(second) == usize(0x23456789abcdef01))
+			C.assert(operation == i32(0x11223344) && wake == i32(0x22334455) && wake2 == i32(0x33445566) && encoded == i32(0x44556677))
+			return 37
+		}
+		futex_calls++
+		C.assert(futex_calls <= 3 && usize(first) % 4 == 0 && operation == 133 && wake == 1 && wake2 == 1)
+		C.assert(*&u32(first) == 0)
+		C.assert(encoded == if futex_calls == 1 { i32(0x10003007) } else { i32(0x21000000) })
+		C.assert(usize(second) == if futex_calls == 3 { usize(1) } else { usize(first) + 4 })
+		futex_argument_hash = futex_argument_hash * 1099511628211 ^ u64(u32(operation)) ^ u64(u32(wake) << 8) ^ u64(u32(wake2) << 16) ^ u64(u32(encoded))
+		if (futex_fault == 1 && futex_calls == 1) || (futex_fault == 3 && futex_calls == 2) || (futex_fault == 6 && futex_calls == 3) {
+			C.errno = C.EIO
+			return -1
+		}
+		if futex_fault == 5 && futex_calls == 3 { return 0 }
+		mut result := isize(0)
+		$if futex_guest ? {
+			result = C.syscall(number, first, operation, wake, wake2, second, encoded)
+		} $else {
+			if usize(second) == 1 {
+				C.errno = C.EFAULT
+				result = -1
+			} else if futex_calls == 1 {
+				C.__atomic_fetch_add(&u32(second), u32(3), C.__ATOMIC_SEQ_CST)
+			} else {
+				C.__atomic_fetch_or(&u32(second), u32(0), C.__ATOMIC_SEQ_CST)
+			}
+		}
+		if usize(second) != 1 {
+			if futex_fault == 2 && futex_calls == 1 {
+				C.__atomic_store_n(&u32(second), u32(7), C.__ATOMIC_SEQ_CST)
+			}
+			if futex_fault == 4 && futex_calls == 2 {
+				C.__atomic_store_n(&u32(second), u32(11), C.__ATOMIC_SEQ_CST)
+			}
+			futex_last_word = C.__atomic_load_n(&u32(second), C.__ATOMIC_SEQ_CST)
+		}
+		return result
+	}
+}
+
+fn attempt(original bool, fault i32) [5]u64 {
+	unsafe {
+		mut endpoints := [2]i32{}
+		C.assert(C.pipe(&endpoints[0]) == 0)
+		C.fflush(nil)
+		child := C.fork()
+		C.assert(child >= 0)
+		if child == 0 {
+			C.close(endpoints[0])
+			futex_fault = fault
+			futex_calls = 0
+			futex_last_word = 7
+			futex_argument_hash = 0
+			C.errno = C.E2BIG
+			result := if original {
+				C.original_test_futex_wake_op()
+			} else {
+				C.test_futex_wake_op()
+			}
+			mut report := [u64(result), u64(u32(C.errno)), u64(futex_calls), u64(futex_last_word),
+				futex_argument_hash]!
+			C.assert(C.write(endpoints[1], &report[0], sizeof(report)) == isize(sizeof(report)))
+			C.fflush(nil)
+			C._exit(0)
+		}
+		C.close(endpoints[1])
+		mut report := [5]u64{}
+		C.assert(C.read(endpoints[0], &report[0], sizeof(report)) == isize(sizeof(report)))
+		C.assert(C.close(endpoints[0]) == 0)
+		mut status := i32(-1)
+		C.assert(C.waitpid(child, &status, 0) == child && C.WIFEXITED(status) != 0 && C.WEXITSTATUS(status) == 0)
+		return report
+	}
+}
+
+@[export:'main']
+pub fn main_entry() i32 {
+	unsafe {
+		$if futex_guest ? {
+			mut console := C.open(c'/dev/com1', C.O_WRONLY | C.O_NOCTTY)
+			if console < 0 { console = C.open(c'/dev/console', C.O_WRONLY | C.O_NOCTTY) }
+			if console >= 0 {
+				C.dup2(console, 1)
+				C.dup2(console, 2)
+				C.close(console)
+			}
+		}
+		futex_probe = true
+		C.assert(C.vqw_host_syscall(isize(C.SYS_futex), voidptr(0x123456789abcdef0), i32(0x11223344), i32(0x22334455), i32(0x33445566), voidptr(0x23456789abcdef01), i32(0x44556677)) == 37)
+		futex_probe = false
+		for fault := i32(0); fault <= 6; fault++ {
+			original := attempt(true, fault)
+			ported := attempt(false, fault)
+			for field in 0 .. 5 { C.assert(original[field] == ported[field]) }
+			C.assert(ported[0] == if fault == 0 { u64(0) } else { u64(1) })
+			expected_calls := if fault == 0 {
+				u64(3)
+			} else if fault <= 2 {
+				u64(1)
+			} else if fault <= 4 {
+				u64(2)
+			} else {
+				u64(3)
+			}
+			expected_errno := if fault == 0 {
+				C.EFAULT
+			} else if fault == 2 || fault == 4 {
+				C.E2BIG
+			} else if fault == 5 {
+				i32(0)
+			} else {
+				C.EIO
+			}
+			expected_word := if fault == 1 || fault == 2 {
+				u64(7)
+			} else if fault == 4 {
+				u64(11)
+			} else {
+				u64(10)
+			}
+			C.assert(ported[1] == u64(u32(expected_errno)) && ported[2] == expected_calls && ported[3] == expected_word)
+		}
+		C.puts(c'QEMU CORE FUTEX DIFFERENTIAL PASS: seven native argument/word/failure cases')
+		C.fflush(nil)
+		$if futex_guest ? {
+			for { C.pause() }
+		}
+		return 0
+	}
+}

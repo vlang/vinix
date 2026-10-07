@@ -1,0 +1,38 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+/* Native variadic argument capture only; policies and fault inputs live in V. */
+#if defined(__APPLE__) && defined(__aarch64__)
+.text
+.globl _vqw_host_syscall
+.p2align 2
+_vqw_host_syscall:
+ ldr x1,[sp]
+ ldr w2,[sp,#8]
+ ldr w3,[sp,#16]
+ ldr w4,[sp,#24]
+ ldr x5,[sp,#32]
+ ldr w6,[sp,#40]
+ b _vqw_host_syscall_body
+#elif defined(__aarch64__)
+.text
+.globl vqw_host_syscall
+.type vqw_host_syscall,%function
+.p2align 2
+vqw_host_syscall:
+ b vqw_host_syscall_body
+.size vqw_host_syscall,.-vqw_host_syscall
+.section .note.GNU-stack,"",%progbits
+#else
+.text
+#if defined(__APPLE__)
+.globl _vqw_host_syscall
+_vqw_host_syscall:
+ jmp _vqw_host_syscall_body
+#else
+.globl vqw_host_syscall
+.type vqw_host_syscall,@function
+vqw_host_syscall:
+ jmp vqw_host_syscall_body
+.size vqw_host_syscall,.-vqw_host_syscall
+.section .note.GNU-stack,"",@progbits
+#endif
+#endif

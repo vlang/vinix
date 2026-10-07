@@ -1,0 +1,115 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: BSD-2-Clause
+"""Build the independent V fixture and recover its immutable C oracle."""
+import argparse
+import hashlib
+import importlib.util
+import json
+from pathlib import Path
+import re
+import shutil
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+REFERENCE = "bbf1e243e21ab58b46a4853c0e88383ff45b290a"
+REFERENCE_PATH = "tests/qemu-core/test.c"
+REFERENCE_BLOB = "f6868d5ad82b92c66d62ac8cedfe37892b121b3a"
+REFERENCE_SHA256 = "3430d064beaef7fde111162176c7fe360def3cd3c8161cfc0898dfdd745cbedb"
+RANGES = ((88, 168), (282, 377), (450, 542))
+EXPORTS = (
+    "reap_ok", "verify_marker", "verify_persistence_boot", "test_random", "test_cow",
+    "test_sparse_tmpfs_shared_mapping", "test_partial_munmap_reclaims_pages",
+    "test_madvise_reclaims_anonymous_pages", "test_short_lived_process_memory_reclamation",
+    "test_forked_cow_memory_reclamation",
+)
+
+
+def original_source():
+    blob = subprocess.check_output(
+        ["git", "rev-parse", f"{REFERENCE}:{REFERENCE_PATH}"], cwd=ROOT, text=True).strip()
+    source = subprocess.check_output(["git", "show", f"{REFERENCE}:{REFERENCE_PATH}"], cwd=ROOT)
+    if blob != REFERENCE_BLOB or hashlib.sha256(source).hexdigest() != REFERENCE_SHA256:
+        raise ValueError("Frozen independent C oracle provenance changed")
+    return source
+
+
+def stage_pending(source, target):
+    target.mkdir(parents=True, exist_ok=True)
+    for path in sorted(source.iterdir()):
+        suffix = ".pending" if path.name.endswith(".pending") else ""
+        name = path.name.removesuffix(suffix) if suffix else path.name
+        if name.endswith((".v", ".h", ".S")):
+            shutil.copyfile(path, target / name)
+
+
+def generate(output, arch):
+    output.mkdir(parents=True, exist_ok=True)
+    try:
+        output.resolve().relative_to(ROOT.resolve())
+    except ValueError:
+        pass
+    else:
+        raise ValueError("Recover frozen C outside the maintained checkout")
+    stage = output / "basefixture"
+    stage_pending(ROOT / "tests/qemu-core/basefixture", stage)
+    module_spec = importlib.util.spec_from_file_location("v_module", ROOT / "build-support/compile-v-module.py")
+    compiler = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(compiler)
+    generated = output / "basefixture.c"
+    header = output / "basefixture-api.h"
+    compiler.generate(stage, generated, arch=arch)
+    compiler.emit_header(stage, generated, header)
+    return header
+
+
+def prepare(output, arch):
+    header = generate(output, arch)
+    original = original_source()
+    lines = original.decode().splitlines(keepends=True)
+    (output / "original-test.c").write_bytes(original)
+    # Linkage is the only oracle adaptation; all statements and CHECK text
+    # come directly from the pinned blob. Original line numbers stay exact.
+    reference = '#include "basefixture_v_contract.h"\n#line 52 "test.c"\n' + "".join(lines[51:72])
+    ported = '#line 1 "test.c"\n'
+    previous = 0
+    for first, last in RANGES:
+        section = "".join(lines[first - 1:last])
+        for name in EXPORTS:
+            section = re.sub(r"\bstatic int " + re.escape(name) + r"\(", "int " + name + "(", section)
+        reference += f'#line {first} "test.c"\n' + section
+        ported += "".join(lines[previous:first - 1]) + f'#line {last + 1} "test.c"\n'
+        previous = last
+    ported += "".join(lines[previous:])
+    # Preserve feature-test macros before native libc headers. The declarations
+    # are included after the original imports without changing CHECK lines.
+    ported = ported.replace('#include <unistd.h>\n',
+                            '#include <unistd.h>\n#include "basefixture-api.h"\n#line 51 "test.c"\n', 1)
+    (output / "original-base.c").write_text(reference)
+    (output / "ported-test.c").write_text(ported)
+    stage_pending(ROOT / "tests/qemu-core/baseoracle", output / "baseoracle")
+    original_header = header.read_text()
+    for name in EXPORTS:
+        original_header = re.sub(r"\b" + re.escape(name) + r"\b", "original_" + name, original_header)
+    original_header = original_header.replace("VINIX_GENERATED_BASEFIXTURE_API_H", "VINIX_GENERATED_ORIGINAL_BASEFIXTURE_API_H")
+    (output / "original-basefixture-api.h").write_text(original_header)
+    (output / "original-source.json").write_text(json.dumps({
+        "revision": REFERENCE, "path": REFERENCE_PATH, "blob": REFERENCE_BLOB,
+        "sha256": REFERENCE_SHA256, "original_line_ranges": RANGES,
+        "original_lines": sum(last - first + 1 for first, last in RANGES),
+        "baseline_adaptation": "Only function linkage changes, compiler name remapping and exact original #line directives; no body or expectation edits.",
+        "source_sha256": {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()
+                          for p in sorted(output.rglob("*")) if p.is_file() and p.suffix in (".v", ".h", ".c", ".S")},
+    }, indent=2) + "\n")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("output", type=Path)
+    parser.add_argument("--arch", choices=("amd64", "arm64"), default="arm64")
+    parser.add_argument("--module-only", action="store_true",
+                        help="Generate only the V module and declarations for the maintained fixture")
+    args = parser.parse_args()
+    if args.module_only:
+        generate(args.output, args.arch)
+    else:
+        prepare(args.output, args.arch)

@@ -1,0 +1,24 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+/* Native int-vararg capture only; API behavior remains in the V provider. */
+#if defined(__APPLE__)
+#define NATIVE_SYMBOL(name) _##name
+#else
+#define NATIVE_SYMBOL(name) name
+#endif
+.text
+.globl NATIVE_SYMBOL(vqc_host_open)
+#if defined(__aarch64__)
+NATIVE_SYMBOL(vqc_host_open):
+#if defined(__APPLE__)
+    ldr w2, [sp]
+#endif
+    b NATIVE_SYMBOL(vqc_host_open_body)
+#elif defined(__x86_64__)
+NATIVE_SYMBOL(vqc_host_open):
+    jmp NATIVE_SYMBOL(vqc_host_open_body)
+#else
+#error Unsupported native oracle architecture
+#endif
+#if !defined(__APPLE__)
+.section .note.GNU-stack,"",@progbits
+#endif

@@ -1,0 +1,197 @@
+// SPDX-License-Identifier: BSD-2-Clause
+// Shared Linux API inputs for the immutable C and V fixtures on Darwin.
+@[translated]
+@[has_globals]
+module baseoracle
+
+#include <basefixture_v_contract.h>
+
+@[typedef]
+struct C.vqc_sysinfo {
+mut:
+	freeram usize
+}
+@[typedef]
+struct C.vqc_path {}
+@[typedef]
+struct C.vqc_arguments {}
+
+fn C.open(&char, i32, ...) i32
+fn C.pipe(&i32) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.fork() i32
+fn C.getpid() i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C.WIFEXITED(i32) bool
+fn C.WEXITSTATUS(i32) i32
+fn C._exit(i32)
+fn C.fflush(voidptr) i32
+fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
+fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.strcmp(&char, &char) i32
+fn C.test_sparse_tmpfs_shared_mapping() i32
+fn C.original_test_sparse_tmpfs_shared_mapping() i32
+fn C.test_partial_munmap_reclaims_pages() i32
+fn C.original_test_partial_munmap_reclaims_pages() i32
+fn C.test_madvise_reclaims_anonymous_pages() i32
+fn C.original_test_madvise_reclaims_anonymous_pages() i32
+fn C.test_short_lived_process_memory_reclamation() i32
+fn C.original_test_short_lived_process_memory_reclamation() i32
+fn C.test_forked_cow_memory_reclamation() i32
+fn C.original_test_forked_cow_memory_reclamation() i32
+
+__global (
+	memory_path [64]char
+	memory_case i32
+	memory_failure i32
+	memory_reads i32
+	memory_events u64
+	memory_trace u64
+)
+
+fn record_memory_event(kind u64, argument u64) {
+	// A deterministic trace of native requests, independent of either caller.
+	memory_trace = (memory_trace ^ kind) * u64(1099511628211)
+	memory_trace = (memory_trace ^ argument) * u64(1099511628211)
+	memory_events++
+}
+
+@[export: 'vqc_host_sysinfo']
+pub fn memory_info(out &C.vqc_sysinfo) i32 {
+	unsafe {
+		memory_reads++
+		record_memory_event(1, u64(memory_reads))
+		if memory_reads == memory_failure {
+			C.errno = C.EIO
+			return -1
+		}
+		// These are external API input timelines: unchanged available memory,
+		// a populated/unmapped 32 MiB range, and a discarded 32 MiB range.
+		mut free := usize(1024 * 1024 * 1024)
+		if memory_case == 1 {
+			if memory_reads == 2 { free -= 32 * 1024 * 1024 }
+			if memory_reads == 3 { free -= 16 * 1024 * 1024 }
+		} else if memory_case == 2 && memory_reads == 1 {
+			free -= 32 * 1024 * 1024
+		}
+		C.memset(out, 0, sizeof(C.vqc_sysinfo))
+		out.freeram = free
+		return 0
+	}
+}
+
+// The instruction-only entry preserves Darwin's native int vararg slot.
+// API readonly: vqc_host_open_body.path
+@[export: 'vqc_host_open_body']
+pub fn memory_open(path &char, flags i32, mode i32) i32 {
+	unsafe {
+		record_memory_event(2, u64(u32(flags)))
+		chosen := if C.strcmp(path, c'/dev/shm/vinix-qemu-core-sparse') == 0 {
+			&memory_path[0]
+		} else { path }
+		if (flags & C.O_CREAT) != 0 {
+			record_memory_event(3, u64(u32(mode)))
+			return C.open(chosen, flags, mode)
+		}
+		return C.open(chosen, flags)
+	}
+}
+
+@[export: 'vqc_host_unlink']
+pub fn memory_unlink(path &char) i32 {
+	unsafe {
+		record_memory_event(4, 0)
+		return C.unlink(if C.strcmp(path, c'/dev/shm/vinix-qemu-core-sparse') == 0 {
+			&memory_path[0]
+		} else { path })
+	}
+}
+
+@[export: 'vqc_host_madvise']
+pub fn memory_discard(address voidptr, length usize, advice i32) i32 {
+	unsafe {
+		C.assert(advice == C.MADV_DONTNEED)
+		record_memory_event(5, length)
+		// Model Linux's anonymous DONTNEED contract with real private mappings.
+		// Replacing a child's mapping keeps the parent's forked pages intact.
+		mapped := C.mmap(address, length, C.PROT_READ | C.PROT_WRITE,
+			C.MAP_FIXED | C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+		return if usize(mapped) == usize(address) { 0 } else { -1 }
+	}
+}
+
+@[export: 'vqc_host_execv']
+pub fn memory_exec(native_path C.vqc_path, native_argv C.vqc_arguments) i32 {
+	unsafe {
+		mut path := &char(nil)
+		mut argv := &&char(nil)
+		C.memcpy(&path, &native_path, sizeof(C.vqc_path))
+		C.memcpy(&argv, &native_argv, sizeof(C.vqc_arguments))
+		C.assert(C.strcmp(path, c'/sbin/init') == 0)
+		C.assert(C.strcmp(argv[0], c'/sbin/init') == 0)
+		C.assert(C.strcmp(argv[1], c'--exec-memory-probe') == 0 && argv[2] == nil)
+		// A successful exec does not return to the caller. The actual native
+		// guest tests validate its argv/auxv image with the original probe.
+		C._exit(0)
+		return -1
+	}
+}
+
+fn memory_body(which i32, original bool) i32 {
+	return match which {
+		0 { if original { C.original_test_sparse_tmpfs_shared_mapping() } else { C.test_sparse_tmpfs_shared_mapping() } }
+		1 { if original { C.original_test_partial_munmap_reclaims_pages() } else { C.test_partial_munmap_reclaims_pages() } }
+		2 { if original { C.original_test_madvise_reclaims_anonymous_pages() } else { C.test_madvise_reclaims_anonymous_pages() } }
+		3 { if original { C.original_test_short_lived_process_memory_reclamation() } else { C.test_short_lived_process_memory_reclamation() } }
+		else { if original { C.original_test_forked_cow_memory_reclamation() } else { C.test_forked_cow_memory_reclamation() } }
+	}
+}
+
+fn memory_attempt(which i32, original bool, failure i32) [5]u64 {
+	unsafe {
+		mut report_pipe := [2]i32{}
+		C.assert(C.pipe(&report_pipe[0]) == 0)
+		C.fflush(nil)
+		child := C.fork()
+		C.assert(child >= 0)
+		if child == 0 {
+			C.close(report_pipe[0])
+			memory_case = which
+			memory_failure = failure
+			memory_reads = 0
+			memory_events = 0
+			memory_trace = u64(0xcbf29ce484222325)
+			C.errno = C.E2BIG
+			result := memory_body(which, original)
+			mut report := [u64(result), u64(u32(C.errno)), u64(memory_reads), memory_events, memory_trace]!
+			C.assert(C.write(report_pipe[1], &report[0], sizeof(report)) == isize(sizeof(report)))
+			C.fflush(nil)
+			C._exit(0)
+		}
+		C.close(report_pipe[1])
+		mut report := [5]u64{}
+		C.assert(C.read(report_pipe[0], &report[0], sizeof(report)) == isize(sizeof(report)))
+		C.assert(C.close(report_pipe[0]) == 0)
+		mut status := i32(-1)
+		C.assert(C.waitpid(child, &status, 0) == child && C.WIFEXITED(status) && C.WEXITSTATUS(status) == 0)
+		C.unlink(&memory_path[0])
+		return report
+	}
+}
+
+fn run_memory() {
+	unsafe {
+		C.strcpy(&memory_path[0], c'/tmp/vinix-qemu-memory-XXXXXX')
+		fd := C.mkstemp(&memory_path[0])
+		C.assert(fd >= 0 && C.close(fd) == 0 && C.unlink(&memory_path[0]) == 0)
+		for which, calls in [i32(4), 4, 2, 2, 2]! {
+			for failure in 0 .. int(calls + 1) {
+				original := memory_attempt(i32(which), true, i32(failure))
+				ported := memory_attempt(i32(which), false, i32(failure))
+				for field in 0 .. 5 { C.assert(original[field] == ported[field]) }
+				C.assert(ported[0] == if failure == 0 { u64(0) } else { u64(1) })
+			}
+		}
+		C.puts(c'QEMU CORE MEMORY DIFFERENTIAL PASS')
+	}
+}
