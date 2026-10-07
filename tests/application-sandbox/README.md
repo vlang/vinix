@@ -51,10 +51,10 @@ injected callbacks.
 Boot the userspace launcher regression against independently built kernels:
 
 ```sh
-python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guest.c \
+python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guestfixture/core.v \
   --arch aarch64 --kernel-dir kernel --expect 'APPLICATION SANDBOX GUEST PASS' \
   --fail 'APPLICATION SANDBOX FAIL'
-python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guest.c \
+python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guestfixture/core.v \
   --arch x86_64 --kernel-dir build-amd64-kernel --expect 'APPLICATION SANDBOX GUEST PASS' \
   --fail 'APPLICATION SANDBOX FAIL'
 sh tests/application-sandbox/run-native.sh aarch64 kernel
@@ -68,6 +68,19 @@ locked unveil, promise narrowing, refused network/executable memory, and fatal
 pledge violations. Invalid promises, unavailable paths and failed execution
 must stop the launch. These checks establish the exercised boundaries; they
 do not establish security of every syscall or application.
+
+The independent enforcement guest is maintained in `guestfixture/core.v`.
+It retains all 36 original checks, six fork/wait/exec cases, eight errno resets
+and all 41 bounding-capability checks. Credential and capability output
+records and the 17-pointer launcher argument array stay on the stack. The
+guest links the unchanged production V launcher and native serial constructor;
+it uses real Vinix syscalls, unlike the injected host oracle. Paired original-C
+and V static builds with both musl SDKs and all four complete native controls
+passed under the original 180-second allowance. Actual boot-image kernels and
+archived init executables matched the selected immutable kernels and SDK
+artifacts. These fixture checks reuse qualified kernels whose tracked sources
+are unchanged; they claim no new kernel build, guest sanitizer or whole-heap
+measurement.
 
 The native regression compiles the production Calculator profile directly,
 then verifies capability and root-identity removal, `no_new_privs`, anonymous

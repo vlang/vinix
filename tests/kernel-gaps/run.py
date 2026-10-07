@@ -204,10 +204,10 @@ def main() -> int:
         generator["compile_serial"](serial_source, args.arch, command[:source_index])
         if source.suffix == ".v":
             generator["compile_module"](source.parent, fixture_source, args.arch, command[:source_index])
-        # These independent include-C fixtures exercise the production V cores
-        # through the same native ABI adapters as the installed utilities.
+        # These independent guests exercise the production V cores through
+        # the same native ABI adapters as the installed utilities.
         security_sources = {
-            ROOT / "tests/application-sandbox/guest.c": ("sandbox", "tools/sandbox"),
+            ROOT / "tests/application-sandbox/guestfixture/core.v": ("sandbox", "tools/sandbox"),
             ROOT / "tests/security-audit/collector_vm_test.c": ("audit", "tools/security-audit"),
         }
         security = security_sources.get(args.source.resolve())
