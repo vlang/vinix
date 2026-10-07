@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**4,126 original production/native-boundary C lines**, **19,116 original fixture/benchmark
+**4,209 original production/native-boundary C lines**, **20,550 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
-eight Wi-Fi tool lines). A further 36 original stack-pointer/syscall/variadic/ordering
+eight Wi-Fi tool lines). A further 43 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
 assembly and receive no V algorithm credit. Two native TLS storage declaration
 lines in the PCI fixture also receive zero algorithm credit. New tests, generated lvalue adapters
@@ -487,7 +487,8 @@ committed and validated; pending stages are excluded.
 | Native N64 core bridge (four variadic-capture lines excluded) | 366 | `320172df` |
 | Native MIPS PADDLE cartridge (four ordering lines excluded) | 227 | `41c9ddd6` |
 | Native PS2 EE/IOP PADDLE programs (two ordering lines excluded) | 282 | `b2f7f8a9` |
-| **Production/native total** | **4,126** | |
+| Native PS2 file/ELF/boot/tick helper bodies (function boundaries excluded) | 83 | `6a6518c8` |
+| **Production/native total** | **4,209** | |
 
 Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
 tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
@@ -580,6 +581,10 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Securelevel native domain/device/concurrency fixture | 104 | `161c0d7a` |
 | PCI configuration/concurrency fixture (two TLS storage lines excluded) | 362 | `67fbd2fd` |
 | Application sandbox independent launcher fixture | 188 | `223b549e` |
+| MAC independent CLI fixture (seven variadic lines excluded) | 76 | `aaa2e6d5` |
+| Application sandbox native enforcement fixture | 129 | `464e5ad3` |
+| MAC native policy regression fixture | 661 | `f9ca26a2` |
+| Terminal-job-control native fixture | 568 | `583b0b62` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -1230,10 +1235,10 @@ source/ABI/lifetime/native evidence peers are recorded in
 `final-validation.json` and `commit.json` pin the sources and all four native
 runs. The stage reuses qualified kernels with unchanged production source;
 x86 emulator execution, fresh kernel builds, host MIPS sanitizers and physical
-PS2 operation remain unclaimed. The first-party PS2 core bridge remains C.
+PS2 operation remain unclaimed. The first-party PS2 core bridge continues below.
 
-The remaining 433-line PS2 bridge is compiled as C++20 and needs a native
-exception-ABI gate before translation. Its cached EE core owns live STL
+The original 433-line PS2 bridge is compiled as C++20 and requires native
+exception-ABI gates for translation. Its cached EE core owns live STL
 containers; longjmp would skip their destructors. The reviewed cache-only
 design uses real unwinding, caller-owned transaction cleanup, coordinate
 restoration before renderer exceptions propagate, and the original teardown
@@ -1260,7 +1265,7 @@ exception destruction during replacement unwinding. ARM executes real map
 ownership cleanup; x86 also retains the vector, which ARM Clang optimizes away.
 Final peer: `ps2-bridge-eh-prototype/root-final-native-peer.json` (SHA256
 `2631155b518ffbeb34aba6a9fdfdf742ba79cfa552595f4820a9eb50232c60b0`).
-The production port remains pending. The prototype's host explicit-owner/sanitizer checks
+The remaining frontend and ownership port remains pending. The prototype's host explicit-owner/sanitizer checks
 pass, but whole-zone and host exception-storage diagnostics remain failed and
 supply no reclamation proof. Full frontend/file/card/frame/post-swap failure,
 concurrent RTTI publication and arbitrary recursive captures remain future gates.
@@ -1270,6 +1275,37 @@ FAIL. The corrected model includes unpublished constructor-failure storage:
 22 allocations per round × 2,000 rounds. Preserve the original failed receipt;
 fresh corrected ARM/x86 runs are separate evidence. This prototype earns zero
 433-line bridge or 121-line I/O-manager port credit.
+
+The production helper stage (`6a6518c8`) ports 83 unique original body lines
+across file sizing, ELF detection, bare-metal setup, ticking and game booting.
+Ten original function-boundary lines receive no algorithm credit. V retains
+native EE register offsets, bounded retries, cycle/IOP ordering, the BIOS loop,
+path bounds and aligned instruction patches. Real SDK C++ exception entry,
+CFI/LSDA cleanup and RTTI preserve constructor failure, unpublished exception
+storage retirement and native unwinding. Strict both-SDK builds, 42-word
+native layouts and independent source/lifetime and unwind review pass.
+Both native helper controls execute 4,400 exception allocations/frees with
+zero retained tracked owners. Complete real ARM Iris C/V frontend pairs pass
+with the frozen original C oracle and five historical caller files from
+`5dcac6ee`, then with the current UI and its existing `e2d58278` V oracle.
+All seven verdicts, five metrics and three complete RGB/PNG exports match.
+The original 600-second allowance and fixture checks remain. The first
+current-UI/original-C pair failed the old parser at poll 136 by capturing START;
+those failures remain preserved and receive no PASS credit. Historical-caller
+and current maintained-fixture pairs are separate qualified evidence, without
+changing that original oracle. x86 runs the native helper model and builds
+SDK artifacts; full x86 Iris execution, fresh kernel builds and host whole-zone
+reclamation are unclaimed. Final independent gate:
+`ps2-bridge-v-stage/peer-root-final-native-validation.json` (SHA256
+`ef0d7c49577e7245ad303587656326e97eb3f80d245fa2b488b21169112021e4`);
+`postcommit-qualified-validation.json` pins only seven committed paths.
+The current bridge is 351 physical lines. Of its original 433 lines, 350
+remain uncredited, including the ten excluded boundaries. Earlier frozen
+receipts incorrectly said 348; the standalone arithmetic correction
+`original-credit-arithmetic-correction.json` (SHA256
+`ede2b5f052e11fb49b1063cab0b321dff2ee74bf47a280ee878de308b8e006c8`)
+preserves them and corrects only metadata. Frontend/STL, file/card, coordinate,
+renderer and I/O-manager ownership remain first-party work.
 
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, stack buffers/ELF records, file-backed initialized volatile
@@ -1371,6 +1407,135 @@ final source/ABI/lifetime/native peer: `application-sandbox-host-fixture/root-fi
 callbacks establish the launcher oracle; they add no real kernel sandbox
 enforcement, new kernel build, guest sanitizer or heap-retirement claim.
 
+The MAC CLI oracle (`aaa2e6d5`) ports 76 of 83 original lines; seven native
+variadic extraction lines use instruction-only assembly with zero V credit.
+All 17 assertions, eight invalid numbers, eight permission strings and five
+argv banks retain their original outcomes. Native const pointer contracts,
+64-bit argument transport and CFI are checked on both hosts and musl SDKs.
+The eight-pointer stack argument bank is borrowed synchronously; no implicit
+allocator imports appear. Both actual ARM/Rosetta x86 C/V ASan/UBSan pairs,
+both SDK layouts/links and all four complete native controls pass with the
+original 180-second allowance and identical six-line diagnostics. Fresh actual
+boot kernel/archive init extraction matches the selected immutable inputs.
+Independent final gate: `security-mac-cli-fixture/root-final-native-peer.json`
+(SHA256 `2ff13f196c6ceafcdf4565ba0cfa0823cec4faf7a7c671f863b5bedde5583fac`);
+`postcommit-qualified-validation.json` binds only seven committed paths.
+This injected CLI oracle adds no real policy-enforcement, fresh-kernel,
+native-sanitizer or whole-heap claim.
+
+The sandbox enforcement guest (`464e5ad3`, 129) preserves all 36 conditions,
+six fork/wait/exec cases, eight errno resets and 41 inclusive bounding-capability
+checks. Native credential/capability output records and the 17-pointer argv
+bank remain on the stack with their original borrowed lifetimes. Strict C/V
+SDK links and native layouts pass on both architectures. All four original
+C/V guest controls and both exact maintained-runner V controls pass real
+Vinix enforcement under the original 180-second allowance. The maintained
+compiler initially exposed a missing production-header include; the one-line
+relative include correction preserves the same declarations. Different final
+link orders required the two additional native controls. Fresh independent
+FAT/ISO extraction verifies all six boot kernels and effective init archives,
+including original x86 archive headers/content and its sole image-ID addition.
+The first disk-full setup failure occurred before QEMU and remains preserved.
+Final source/ABI/lifetime/native image gate:
+`application-sandbox-enforcement-fixture/peer-root-final-source-native-maintained.json`
+(SHA256 `7e275a2b805e61776eac6e74a438b954a16130cbabf02a6ba06ae2ef2f6e0912`);
+`postcommit-qualified-validation.json` pins only five committed paths.
+The shared runner's twelve tests pass. These guests reuse immutable qualified
+kernels with unchanged tracked sources; no new kernel build, guest sanitizer,
+whole-heap measurement or security claim beyond the exercised boundaries is made.
+
+The MAC policy guest (`f9ca26a2`, 661) preserves all 241 original assertion
+sites, 148 CHECK and 93 DENIED sites with their errno resets, architecture
+syscall diagnostic variants and native nominal integer/output record types.
+Its stack buffers, borrowed pthread arguments, actual C callback wrappers,
+16 concurrent exec/close races, 1,000 allowed/denied operations, 20 warmup
+iterations and 200 FIFO iterations retain their original lifetimes and order.
+Strict both-SDK original-C/V builds and independent source/ABI/lifetime review
+pass. All four frozen C/V controls and both actual maintained-runner V controls
+pass real MAC enforcement with the original 300-second allowance and no
+networking. Every control reports 16 close successes, zero retained operation
+bytes and zero FIFO interface bytes under the unchanged 1,024/512-byte bounds.
+The maintained compiler/link profile produces distinct ELFs; its two additional
+native controls are qualified separately. Final independent qualification:
+`mac-setpgid-denial-order/peer-final-kernel-MAC-native-qualification.json`
+(SHA256 `691b14e2e517af2351d6d01ae9df7e816c87ddbba1ff12f38b4080329cb64803`).
+The original C remained until this gate; the port commits only five paths.
+
+The unchanged original C and V MAC controls first reproduced a kernel failure
+at line 441: cross-domain `setpgid(parent, parent)` returned ESRCH before its
+MAC denial. Separate fix `13c5160a` checks the pure domain predicate after live
+target lookup and before parent/child eligibility, under the same table lock.
+Unrestricted nonchild calls still return ESRCH; stack allocation, orphan
+handling, deferred unlock/dispatch and borrowed process lifetimes are unchanged.
+It receives zero translation credit. Fresh isolated ARM and x86 kernel builds
+use LLVM/LLD 23.1.0 and the frozen V compiler; the first ARM build ran out of
+disk during generated-C filtering, and its failed artifacts remain preserved.
+The completed retry and x86 build pass. Tested kernel SHA256: ARM
+`d696eef89a17aa0c1a4d98ae231152ef1a5155b4b748ced0379c9720fb790644`;
+x86 `0514ef322e759cb96c6ad8fcf21e32b12075d1f0322e153733ee9971d7a7b620`.
+Both original four-CPU terminal regressions pass all session, exec, signal,
+orphan, hangup and owned-open races with their original 300-second limit and
+slab bounds. Controlling-terminal opens stay flat; rejected reads retain
+16 KiB ARM / 4 KiB x86, and owned-open slab falls 32 / 16 KiB after the original
+six-second grace. These bounded measurements are not whole-heap equality.
+Fresh independent extraction verifies all eight actual FAT/ISO boot kernels,
+ordered ARM init archives, x86 original archive headers/bodies and its sole
+17-byte image-ID addition. Root receipt:
+`mac-setpgid-denial-order/peer-root-final-all-eight-native-images.json` (SHA256
+`f5c8414d9f5e5f0f47356c3928c2306193cb76ce333ceeb80e2caee2c4e55e78`).
+Both original failing MAC images and all unchanged assertion/deadline evidence
+remain preserved. No guest sanitizer, full opt-in LinuxKPI or universal heap
+retirement result is added by this scope.
+
+The terminal-job-control fixture (`583b0b62`, 568) preserves all 89 original
+check sites, labels and ordering. Its signal/pthread callbacks use the actual
+C ABI wrappers; 32-bit volatile signal/transition words, acquire/release/relaxed
+atomics, stack buffers and shared 4,096-byte mappings retain their ownership.
+Strict both-SDK builds and 54 native layout/type checks pass. The optimized
+port has 46 volatile 32-bit accesses and unchanged 14 acquire, four release and
+two relaxed atomic sites, without implicit V allocator imports. Original
+50/1,000 open and 10/1,000 rejected-read warmup/workloads, three workers over
+100 epochs with 32 opens each, 100 descriptor-exhaustion rollbacks and six
+actual seconds of retirement grace remain unchanged.
+
+Two unchanged original x86 C controls failed the setpgid orphan assertion.
+A separate failure-only original-C diagnostic observed HUP=0, CONT=1 and
+mutation_done=1 at the first failed check, then HUP=1 after the parent's exit
+status 4. Earlier failing controls had no operand trace; the later diagnostic
+does not invent observations for them. Separate zero-credit fix `66513801`
+adds HUP readiness to the existing 5,000-by-1-ms poll before the unchanged
+assertion. It changes no assertion, count, bound, deadline or kernel code.
+Both full corrected-C controls passed and received independent actual-image
+qualification before that exact one-file fix was committed. The V port is
+compared against this separately corrected C control; canonical C remains
+recoverable at `13c5160a`, corrected C at `66513801`.
+
+The first corrected ARM control ran out of host disk before boot; the x86
+capture ended without its owned-open/main verdict. Neither is a pass.
+Their states and both earlier failures plus the diagnostic remain intact.
+After verified lossless compression recovered space, fresh sequential
+corrected-C and actual maintained-V controls all passed with four CPUs and
+the unchanged 300-second limit. C and V have identical slab measurements:
+opens stay flat, rejected reads retain 16 KiB ARM / 4 KiB x86, and owned-open
+slab falls 32 / 16 KiB after the original grace. All 100 rounds report zero
+errors. These are the original 8/64/64-KiB bounds, not whole-heap equality.
+Independent extraction verifies the actual ARM/x86 kernels from `13c5160a`,
+ordered ARM init modules and effective native init, and every original x86
+raw USTAR header and padded body plus its sole 17-byte image-ID addition.
+Final independent gate:
+`terminal-jobs-v-stage/readiness-v3/peer-all4-native-qualification-v1.json`
+(SHA256 `137ca61110b856e3b084526a92c4b0b96060909af8a564519aba4bf0978cf6e8`);
+root actual-image gate:
+`terminal-jobs-v-stage/readiness-v3/peer-root-all-native-images.json`
+(SHA256 `e8d9612d51b6d05b5b4a135f285feb7d67978b8ae58d03ccdbbc6ace990f4e82`).
+The corrected C remained until these gates; only five port paths were committed.
+`terminal-jobs-v-stage/readiness-v3/postcommit-qualified-validation.json`
+(SHA256 `821887ccc4294f1abe2cc9b9f6c4e2d61247639ac96e6f67a504ff748223b53e`)
+pins those paths and both immutable C revisions. The README's final addition
+records the already tested readiness fix.
+This scope adds no new kernel build, host syscall sanitizer or universal
+heap-retirement claim.
+
 The 395-line EXT2-xattr fixture remains unqualified and its original C is
 retained. ARM C/V controls pass, while x86 V fails the unchanged 32-byte-class
 retention equality. A read-only trace of the earlier frozen V ELF places its
@@ -1385,9 +1550,12 @@ or completed-retirement credit. Assertions, scanner, warmups and link placement
 remain unchanged. Receipt: `ext2-xattr-fixture/ownership-readonly/ownership-cause.json`
 (SHA256 `afb819c993eef3da618268940fb11b52d3f59c303fce106b0bcc61fa81ac738f`).
 
-These fixture stages reuse their individually recorded immutable kernels and
-do not claim host syscall sanitizers or fresh kernel builds. Kernel sources
-are unchanged between the validated CPU-storage stage and these port commits.
+The earlier fixture stages through sandbox enforcement `464e5ad3` reuse their
+individually recorded immutable kernels and add no host syscall sanitizer or
+fresh kernel build claim. Kernel sources
+are unchanged between the validated CPU-storage stage and the completed ports
+through sandbox enforcement `464e5ad3`. Later kernel fixes need their own builds
+and native regression evidence.
 
 Permanent CPU-mask storage (`f4d9ad6d`) now belongs to V. This retires the
 48-line first-party storage wrapper and 23-line host declaration wrapper with
@@ -1455,10 +1623,10 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `223b549e9d3094a503c54dc6bda9db667bbb0c82`,
+At committed source `583b0b621edd4760d9a57dc1b76e6f55e9de33c2`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 143 paths / 36,334 lines: 142 test paths
-(35,901 lines) and one build-support path (433 lines). All committed blob
+The non-vendored `.c` census contains 139 paths / 34,811 lines: 138 test paths
+(34,460 lines) and one build-support path (351 lines). All committed blob
 identities, byte sizes and line counts are checked with that revision's Git
 attributes and global/system attributes disabled. Genuine patched musl evidence
 remains included; the PS2 bridge remains first-party
@@ -1598,6 +1766,42 @@ unqualified inputs remain intact. Receipt:
 `completed-execute-efi-lossless-compression.json` (SHA256
 `39c0dd4efd1800cb8355b2b0f4a6216ef7ae6043e144700b19ccbf19bc0ea220`).
 
+Further completed, qualified EFI images and two CPU-storage/mask FAT boot
+images were preserved with lossless gzip and fresh decompressed byte checks.
+These receipts map each raw path to its compressed counterpart and record both
+hashes and sizes. Restore raw paths before replaying older frozen manifests;
+restore large FAT images sparsely. Original receipts remain unchanged.
+Failed and unqualified images, source, executables and logs were preserved.
+The sandbox's first compression met ENOSPC before mutation; a full byte-equal
+compressed backup outside the full filesystem preceded reuse of that owned
+image's inode. Its final compressed bytes were checked again before renaming.
+The later ELF EFI archive preserves the original launcher's absent private
+boot-disk limitation; PS2 supplemental EFI controls retain their disposable
+EXT2 adapter limitation. Eight completed sparse-test boot/data disks were
+also losslessly compressed. Their whole-disk hashes are fresh storage
+snapshots, not historical extracted boot-image evidence. The exact sparse
+candidate qualification is retained on disk in
+`docs-final-peer-EXT2-sparse-storage-candidates.json`; its preservation binding
+is `completed-ext2-sparse-full-disk-qualification-preservation.json` (SHA256
+`c7781c7b089b594bd85595968c700052730270d8e919e753bd2a5cf5f736f665`).
+
+| Additional lossless image receipt under the current cache | SHA256 |
+| --- | --- |
+| `completed-pci-sandbox-efi-lossless-compression.json` | `292984a317ff79c3bfd3e911e30a5cb1d293ea776123ceac426fea5155370271` |
+| `completed-mounted-secure-efi-lossless-compression.json` | `1e2c0b66b6d3fd43a62599c4cf3ff5d80288a5d71176ed6ef67c1797af72d991` |
+| `completed-mac-cli-efi-lossless-compression.json` | `23cb53d5722058e087b4c4e1c9b07a7470582e83053a81402aeea50031df136f` |
+| `completed-cpu-storage-mask-images-lossless-compression.json` | `b3553988bae3e923893249137db456d892a5c74dbdaad9929156a794aeab6782` |
+| `completed-ext2-sparse-efi-lossless-compression.json` | `79926f80303fdb80c4faa7a61340a8a401cec98f9eb7496c212e552851fe582a` |
+| `completed-pagecache-reboot-efi-lossless-compression.json` | `bd4188bfcd26d8d1d073871832aac69137364708852d2b9179d5e19d2fc93c69` |
+| `ps2-bridge-v-stage/completed-helper-arm-EFI-lossless-compression.json` | `99a245453fc1406008c86b9c3862006430409f288181b8ef0884f138a8f9eeab` |
+| `ps2-bridge-v-stage/qualified-caller-efi-lossless-compression.json` | `6114026954358e7ac2c60da3f109d6ba3b76babb2e928fe0b61c853c9679bd75` |
+| `application-sandbox-enforcement-fixture/qualified-sandbox-efi-lossless-compression.json` | `dec1dc22b19eec215541ea0924465d32672455b3487d402157fd25edc0f76b54` |
+| `ps2-bridge-eh-prototype/corrected-native-arm-efi-lossless-compression.json` | `5a9c2149a55787db4e2143dfb1d57fd16b3e5053d31ae584de7db18cef0d583c` |
+| `completed-early-native-efi-lossless-compression.json` | `d0fd4a3bd4b86d99d01504591dfccf8feec406d2811bcd0dd070a14d3e9aee9c` |
+| `completed-MAC-kernel-terminal-baseline-efi-lossless-compression.json` | `3ece8bd828720bd36726a96d8c0cc0fffc0bce439b32b362607cd9622d21ac94` |
+| `completed-ELF-PS2-supplemental-efi-lossless-compression.json` | `5f715badd372843b04fa439be039d75c154b9afccccb0b287e524412503dce04` |
+| `completed-ext2-sparse-full-disk-lossless-compression.json` | `57bac4340a39bdc9a2148dd9dfeb9e0bb1c6b65ee8791771fc186c3e99282d89` |
+
 Current machine-local evidence is under
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
 Snapshots, ELF hashes and full serial logs identify tested inputs. Completed
@@ -1605,8 +1809,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`223b549e9d3094a503c54dc6bda9db667bbb0c82` reports **V 72.52%, C 4.66%**,
-491 C files, 523 Python files and 287 shell files. All 2,741 classified blob
+`583b0b621edd4760d9a57dc1b76e6f55e9de33c2` reports **V 72.68%, C 4.51%**,
+491 C files, 523 Python files and 287 shell files. All 2,751 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;

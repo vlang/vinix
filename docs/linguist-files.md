@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `223b549e9d3094a503c54dc6bda9db667bbb0c82`,
+at source commit `583b0b621edd4760d9a57dc1b76e6f55e9de33c2`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,935,258 | 4.66% |
-| Python | 523 | 5,204,538 | 12.54% |
-| Shell | 287 | 1,275,317 | 3.07% |
+| C | 491 | 1,873,860 | 4.51% |
+| Python | 523 | 5,206,276 | 12.52% |
+| Shell | 287 | 1,279,545 | 3.08% |
 
-All `.v` files are classified as V. The resulting V share is 72.52%, with no
+All `.v` files are classified as V. The resulting V share is 72.68%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 223b549e9d3094a503c54dc6bda9db667bbb0c82 --breakdown --json
+github-linguist --rev 583b0b621edd4760d9a57dc1b76e6f55e9de33c2 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -80,7 +80,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ps2-homebrew/freestanding/stdio.h` | 302 |
 | `build-support/ps2-homebrew/iopcore/native-abi.h` | 227 |
 | `build-support/ps2-homebrew/native-abi.h` | 1,004 |
-| `build-support/ps2/bridge.c` | 19,851 |
+| `build-support/ps2/bridge.c` | 15,746 |
 | `build-support/ps2/bridge.h` | 697 |
 | `build-support/ps2/include/SDL3/SDL.h` | 640 |
 | `build-support/ps2/include/core.h` | 489 |
@@ -333,7 +333,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-spi-touchpad/touchpad-native-abi.h` | 610 |
 | `tests/apple_display_hotplug/hotplugfixture/hotplug-native-abi.h` | 229 |
 | `tests/apple_smc/fixture-v-abi.h` | 402 |
-| `tests/application-sandbox/guest.c` | 4,701 |
+| `tests/application-sandbox/guestfixture/native-abi.h` | 892 |
 | `tests/application-sandbox/hostfixture/native-abi.h` | 1,089 |
 | `tests/capability-exec/guest.c` | 7,634 |
 | `tests/clipboard/x11-client.c` | 1,901 |
@@ -499,8 +499,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/security-audit/collector_test.c` | 8,900 |
 | `tests/security-audit/collector_vm_test.c` | 5,103 |
 | `tests/security-audit/test.c` | 7,865 |
-| `tests/security-mac/cli_test.c` | 3,327 |
-| `tests/security-mac/test.c` | 28,855 |
+| `tests/security-mac/clifixture/native-abi.h` | 1,134 |
+| `tests/security-mac/guestfixture/native-abi.h` | 2,925 |
 | `tests/shared-streams/streamfixture/stream-native-abi.h` | 869 |
 | `tests/smt-policy/guestfixture/smt-native-abi.h` | 250 |
 | `tests/socket-io/socketfixture/socket-native-abi.h` | 884 |
@@ -514,7 +514,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/syscall-diagnostics/guestfixture/diagnostics-native-abi.h` | 267 |
 | `tests/syscall-policy/guest.c` | 18,139 |
 | `tests/sysvmsg/guest.c` | 12,890 |
-| `tests/terminal-jobs/guest.c` | 29,675 |
+| `tests/terminal-jobs/guestfixture/native-abi.h` | 4,314 |
 | `tests/tlb/guest.c` | 9,832 |
 | `tests/tmpfs-layout/guest.c` | 10,283 |
 | `tests/user-alloc/clock.c` | 4,903 |
@@ -598,7 +598,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ps1/build.py` | 8,162 |
 | `build-support/ps1/download-homebrew.py` | 1,628 |
 | `build-support/ps2-homebrew/build.py` | 4,642 |
-| `build-support/ps2/build.py` | 8,876 |
+| `build-support/ps2/build.py` | 9,982 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/build.py` | 7,918 |
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
@@ -1010,7 +1010,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/storage/test_split_desktop_initramfs.py` | 3,623 |
 | `tests/syscall-policy/run-host.py` | 11,663 |
 | `tests/syscall-policy/run.py` | 3,864 |
-| `tests/terminal-jobs/run.py` | 3,802 |
+| `tests/terminal-jobs/run.py` | 4,434 |
 | `tests/uname/run.py` | 2,859 |
 | `tests/user-access/sites.py` | 3,169 |
 | `tests/userland-demo/run.py` | 3,723 |
@@ -1329,8 +1329,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
 | `tests/security-audit/collector-run.sh` | 1,285 |
-| `tests/security-mac/host-run.sh` | 735 |
-| `tests/security-mac/run.sh` | 926 |
+| `tests/security-mac/host-run.sh` | 4,937 |
+| `tests/security-mac/run.sh` | 952 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/smt-policy/run-host.sh` | 1,181 |
 | `tests/sound/run.sh` | 1,419 |
