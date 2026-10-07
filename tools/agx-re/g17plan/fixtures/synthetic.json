@@ -1,0 +1,194 @@
+{
+  "channels": {
+    "command_3d_register_lists": {
+      "byte_length_offset": 1962,
+      "command_bytes": 8768,
+      "descriptor_summary": {
+        "offset": 2088,
+        "records": 4,
+        "stride": 16
+      },
+      "entry_bytes": 12,
+      "entry_count_offset": 1960,
+      "gpu_address_offset": 1952,
+      "passes": 4,
+      "record_framing_resolved": true,
+      "selector_template_mask": 4294705158,
+      "stream_bytes": 1792,
+      "stream_offset": 160,
+      "stride": 1824
+    },
+    "inline_register_records": {
+      "all_inline_forms_located": true,
+      "all_inline_values_recovered": true,
+      "dynamic_records": {},
+      "static_records": {
+        "3D": [
+          {
+            "mode": 1,
+            "producer_offset": 80,
+            "selector": 40,
+            "value": 1
+          }
+        ]
+      }
+    },
+    "register_emission_cfg": {
+      "machine_order_complete": true,
+      "predicate_expressions_complete": true,
+      "producers": {
+        "3D": {
+          "decisions": [
+            {
+              "condition": "bit_set",
+              "fallthrough": {
+                "can_return": false,
+                "next": [
+                  512
+                ]
+              },
+              "predicate": {
+                "bit": 0,
+                "bytes": 4,
+                "kind": "condition",
+                "operation": "test_bit",
+                "source": {
+                  "base": {
+                    "kind": "argument",
+                    "name": "channel"
+                  },
+                  "bytes": 4,
+                  "kind": "object_load",
+                  "member": 4,
+                  "signed": false
+                }
+              },
+              "producer_offset": 128,
+              "taken": {
+                "can_return": false,
+                "next": [
+                  256
+                ]
+              }
+            }
+          ],
+          "empty_return_path": false,
+          "entry": [
+            80
+          ],
+          "nodes": [
+            {
+              "can_return": false,
+              "next": [
+                256,
+                512
+              ],
+              "producer_offset": 80
+            },
+            {
+              "can_return": false,
+              "next": [
+                512
+              ],
+              "producer_offset": 256
+            },
+            {
+              "can_return": false,
+              "next": [
+                768
+              ],
+              "producer_offset": 512
+            },
+            {
+              "can_return": false,
+              "next": [
+                1024
+              ],
+              "producer_offset": 768
+            },
+            {
+              "can_return": true,
+              "next": [],
+              "producer_offset": 1024
+            }
+          ],
+          "predicates_complete": true
+        }
+      }
+    },
+    "register_entry_codec": {
+      "entry_bytes": 12,
+      "mode_mask": 1,
+      "preserved_template_mask": 4294705158,
+      "selector_mask": 262136,
+      "value_offset": 4
+    },
+    "register_selectors": {
+      "producers": {
+        "3D": {
+          "encoder_entries": [
+            {
+              "mode": 0,
+              "producer_offset": 256,
+              "selector": 8,
+              "value_source": {
+                "kind": "constant",
+                "value": 5
+              }
+            },
+            {
+              "mode": 1,
+              "producer_offset": 512,
+              "selector": 16,
+              "value_source": {
+                "bytes": 4,
+                "kind": "descriptor_load",
+                "member": 0,
+                "signed": false
+              }
+            },
+            {
+              "mode": 0,
+              "producer_offset": 768,
+              "selector": 24,
+              "value_source": {
+                "expression": {
+                  "bytes": 8,
+                  "immediate": 3,
+                  "kind": "expression",
+                  "operation": "add",
+                  "source": {
+                    "bytes": 4,
+                    "kind": "descriptor_load",
+                    "member": 0,
+                    "signed": false
+                  }
+                },
+                "kind": "computed"
+              }
+            },
+            {
+              "mode": 1,
+              "producer_offset": 1024,
+              "selector": 32,
+              "value_source": {
+                "base": {
+                  "kind": "argument",
+                  "name": "channel"
+                },
+                "bytes": 8,
+                "kind": "object_load",
+                "member": 8,
+                "signed": false
+              }
+            }
+          ]
+        }
+      },
+      "selector_formulas_complete": true
+    }
+  },
+  "driver_uuid": "driver-test-uuid",
+  "firmware_uuid": "firmware-test-uuid",
+  "schema": 1
+}

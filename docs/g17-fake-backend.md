@@ -110,7 +110,7 @@ The expected-write list is deliberately path-specific. The recovered virtual,
 inline and direct-append sites cover 3D, TA, FastBlit, and CL; they are not
 writes that every render must execute.
 
-`tools/agx-re/compile_fake_g17_plan.py` independently compiles a concrete 3D
+`tools/agx-re/compile_fake_g17_plan` independently compiles a concrete 3D
 trace from the UUID-pinned recovery output, an encoded command, and its staged
 descriptor. Each pass must be an exact path through the recovered emission
 CFG. Constant and descriptor-rooted expression values become full-mask golden
@@ -119,7 +119,7 @@ zero-mask entries instead of being guessed. The command-pool template bits are
 recorded for diagnosis but remain unconstrained until their initial contents
 are independently recovered.
 
-`tools/agx-re/encode_fake_g17_3d.py` is the host reference encoder. It evaluates
+`tools/agx-re/encode_fake_g17_3d` is the host reference encoder. It evaluates
 the recovered predicates into one concrete 3D path per pass, encodes recovered
 selector/mode/value formulas, publishes the four descriptor summaries, and
 then round-trips the result through the plan compiler. Expressions rooted in
@@ -128,7 +128,7 @@ branch outcomes or values explicitly. A captured command-pool template is
 preserved under the recovered template mask. A zero template is available for
 fake execution only and is not evidence that those bits are valid on hardware.
 
-`tools/agx-re/generate_fake_g17_3d_encoder.py` translates that same recovered
+`tools/agx-re/generate_fake_g17_3d_encoder` translates that same recovered
 graph into the freestanding, allocation-free
 `kernel/lib/agx_fake_g17_encode.v`. The generated encoder contains no JSON parser
 or dynamic expression interpreter: descriptor/command expressions are emitted
@@ -187,7 +187,7 @@ make -C tools/agx-re -f GNUmakefile check-fake-g17-encoder
 Compile a verifier plan for a captured or Vinix-generated command with:
 
 ```sh
-python3 tools/agx-re/compile_fake_g17_plan.py \
+tools/agx-re/compile_fake_g17_plan \
     --abi tools/agx-re/build/recovered-g17-abi.json \
     --command command-3d.bin \
     --descriptor descriptor-3d.bin \
@@ -202,7 +202,7 @@ honest recovered/external value coverage count.
 Build a fake-only command directly from the recovered graph with:
 
 ```sh
-python3 tools/agx-re/encode_fake_g17_3d.py \
+tools/agx-re/encode_fake_g17_3d \
     --abi tools/agx-re/build/recovered-g17-abi.json \
     --descriptor descriptor-input.bin \
     --command-gpu-address 0x700000000 \
