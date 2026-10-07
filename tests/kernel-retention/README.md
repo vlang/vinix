@@ -3,11 +3,20 @@
 Build the kernel in an isolated worktree with the pinned V compiler, then run:
 
 ```sh
-python3 tests/kernel-gaps/run.py --no-network --arch aarch64 --kernel-dir /path/to/kernel \
-  --source tests/kernel-retention/test.c --expect 'KERNEL RETENTION: PASS'
-python3 tests/kernel-gaps/run.py --no-network --arch x86_64 --kernel-dir /path/to/x86/kernel \
-  --source tests/kernel-retention/test.c --expect 'KERNEL RETENTION: PASS'
+VINIX_V_COMPILER=/path/to/v python3 tests/kernel-retention/run.py \
+  --arch aarch64 --kernel-dir /path/to/kernel --state-dir /tmp/retention-arm-build \
+  --guest-state-dir /tmp/retention-arm-guest
+VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
+  python3 tests/kernel-retention/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel \
+  --state-dir /tmp/retention-x86-build --guest-state-dir /tmp/retention-x86-guest
 ```
+
+The runner builds the maintained V fixture and its immutable original C control
+from Git, checks strict musl compilation and allocator imports, then boots each
+in a fresh guest. It records source, executable and kernel hashes, serial hashes,
+and exact C/V measurement rows. `--build-only` prepares both executables without
+starting QEMU. The original shared harness's 180-second outer budget is retained;
+the fixture has no internal deadline.
 
 The guest creates 128 tmpfs entries and verifies complete, duplicate-free
 enumeration through small `getdents64` buffers. A buffer too small for the first
