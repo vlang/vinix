@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec sh "$here/../../build-support/run-v-tool.sh" "$here/compare.v" "$@"

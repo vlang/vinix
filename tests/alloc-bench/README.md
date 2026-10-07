@@ -265,9 +265,10 @@ python3 tests/alloc-bench/compare-kernel.py \
 ## Compare and verify
 
 ```sh
-python3 tests/alloc-bench/compare.py \
+tests/alloc-bench/compare \
   build/alloc-vinix/serial.log build/alloc-macos/serial.log
-python3 tests/alloc-bench/compare_test.py
+. build-support/find-v.sh
+"$V" test tests/alloc-bench/comparecore
 ```
 
 The comparator recomputes medians from raw timing records, checks completion,
