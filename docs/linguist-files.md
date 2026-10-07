@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `e51f3fc0ff792d1465ac3f06440663215d14433a`,
+at source commit `b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 488 | 1,983,718 | 4.79% |
-| Python | 523 | 5,193,674 | 12.53% |
+| C | 491 | 1,975,382 | 4.76% |
+| Python | 523 | 5,194,680 | 12.53% |
 | Shell | 287 | 1,267,425 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 72.42%, with no
+All `.v` files are classified as V. The resulting V share is 72.44%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev e51f3fc0ff792d1465ac3f06440663215d14433a --breakdown --json
+github-linguist --rev b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -75,8 +75,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/n64/bridgecore/native-abi.h` | 1,574 |
 | `build-support/n64/bridgefixture/bridge-test-abi.h` | 558 |
 | `build-support/n64/budget.h` | 231 |
-| `build-support/ps2-homebrew/iop.c` | 2,741 |
-| `build-support/ps2-homebrew/paddle.c` | 7,675 |
+| `build-support/ps2-homebrew/eecore/native-abi.h` | 423 |
+| `build-support/ps2-homebrew/freestanding/inttypes.h` | 124 |
+| `build-support/ps2-homebrew/freestanding/stdio.h` | 302 |
+| `build-support/ps2-homebrew/iopcore/native-abi.h` | 227 |
+| `build-support/ps2-homebrew/native-abi.h` | 1,004 |
 | `build-support/ps2/bridge.c` | 19,851 |
 | `build-support/ps2/bridge.h` | 697 |
 | `build-support/ps2/include/SDL3/SDL.h` | 640 |
@@ -594,7 +597,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/patch-elf-interpreter.py` | 968 |
 | `build-support/ps1/build.py` | 8,162 |
 | `build-support/ps1/download-homebrew.py` | 1,628 |
-| `build-support/ps2-homebrew/build.py` | 3,636 |
+| `build-support/ps2-homebrew/build.py` | 4,642 |
 | `build-support/ps2/build.py` | 8,876 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/build.py` | 7,918 |

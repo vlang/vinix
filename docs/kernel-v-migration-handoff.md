@@ -2,7 +2,7 @@
 
 Updated 2026-10-07 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`e51f3fc0ff792d1465ac3f06440663215d14433a`. Re-read HEAD, `AGENTS.md` and
+`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,10 +28,10 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,844 original production C lines**, **18,106 original fixture/benchmark
+continuation adds **4,126 original production C lines**, **18,106 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel, eight
 Wi-Fi tool lines),
-counted separately. Twenty-nine stack-pointer/syscall/variadic/ordering boundary lines use
+counted separately. Thirty-one stack-pointer/syscall/variadic/ordering boundary lines use
 instruction-only assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
@@ -134,6 +134,7 @@ instruction-only assembly and receive no V algorithm credit.
 | Init-policy guest fixture (78) | `8fd0f13a` |
 | Init-policy syscall host fixture (178) | `b5245a13` |
 | Native PS2 emulator regression fixture (413) | `c411ab6a` |
+| Native PS2 EE/IOP PADDLE programs (282; two ordering lines excluded) | `b2f7f8a9` |
 | Executable-text/native interpreter fixture (116) | `e51f3fc0` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
 | Canonical callback contracts (zero credit) | `03ad7bb3` |
@@ -145,11 +146,11 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 150 paths / 37,635
-lines: 147 test paths / 36,918 lines and three build-support paths / 717 lines.
+source, the committed non-vendored `.c` census contains 148 paths / 37,351
+lines: 147 test paths / 36,918 lines and one build-support path / 433 lines.
 All committed identities/sizes/lines are verified using pinned-source Git
 attributes with global/system attributes disabled. Genuine patched musl evidence
-and first-party PS2 follow-up scopes remain included. This is a scope guide, not a translation tally; native headers and
+and the first-party PS2 bridge remain included. This is a scope guide, not a translation tally; native headers and
 authored embedded C are additional work.
 Do not mistake zero kernel C for completion of the repository-wide request.
 
@@ -410,8 +411,8 @@ leak detection disabled. The first cartridge assembly-MMIO-call timing mismatch
 is retained; direct volatile V views pass the exact comparison. Frozen kernels
 are reused, physical N64 operation and native x86 emulator execution remain
 unclaimed. Receipts are `n64-v-bridge-stage/native-comparison.json` and
-`n64-v-homebrew-stage/native-comparison.json`. PS2 bridge and homebrew implementations
-remain first-party follow-up work; the guest is recorded below.
+`n64-v-homebrew-stage/native-comparison.json`. The PS2 bridge remains
+first-party follow-up work; its guest and EE/IOP programs are recorded below.
 
 EXT2 read-ahead (`bb26e71d`, 113) and sparse (`0a7d88fb`, 185) pass strict SDK,
 original-C/V native pairs on both architectures, maintained ARM runners,
@@ -461,7 +462,27 @@ The 30-second pipe poll, 500×10-ms reap loop and 600-second guest deadline
 remain. `ps2-v-fixture-stage/final-validation.json` records both lifetime peers
 and frozen inputs. The recorded kernel and emulator are reused; x86 evidence
 is SDK-only, with no new kernel build, host sanitizer or physical PS2 claim.
-PS2 bridge and homebrew implementations remain first-party follow-up scopes.
+The PS2 bridge remains first-party follow-up work; the homebrew port follows.
+
+The PS2 EE/IOP homebrew (`b2f7f8a9`) moves 282 original C lines to V;
+two original ordering instructions remain assembly with zero V credit. Strict
+actual MIPS-III/n32 EE and MIPS-I/o32 IOP builds retain 32-bit native pointer
+widths, volatile MMIO polls, permanent aligned DMA/controller banks and
+synchronous stack digits/card records. Both ELFs have no unresolved imports
+or allocator calls. The unchanged complete ARM emulator fixture passes for
+original C and V under its original 600-second deadline. All five gameplay
+metrics and three complete RGB/PNG exports match the original controls and
+previous baseline. Supplemental EXT2 controls pass offline e2fsck and match
+the complete 8,650,752-byte cards, including the original baseline; this
+adapter does not replace the ordinary tmpfs qualification. Two independent
+source/ABI/lifetime/native evidence peers are recorded in
+`ps2-v-homebrew-stage/root-source-native-peer.json` and
+`root-final-native-peer.json` (SHA256
+`84bc286c9ec6c18ec7fc8aadde9f9ac917e0c68c7ba885b0f9c4e6a57f7a9d62`).
+`final-validation.json` and `commit.json` pin the sources and all four native
+runs. The stage reuses qualified kernels with unchanged production source;
+x86 emulator execution, fresh kernel builds, host MIPS sanitizers and physical
+PS2 operation remain unclaimed. The first-party PS2 core bridge remains C.
 
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, synchronous stack buffers/ELF records, file-backed volatile
@@ -825,9 +846,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`e51f3fc0ff792d1465ac3f06440663215d14433a` reports **V 72.42%, C 4.79%**,
-488 C files, 523 Python files and 287 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,728 classified blobs
+`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82` reports **V 72.44%, C 4.76%**,
+491 C files, 523 Python files and 287 shell files. The inventory records every
+committed blob size and pinned reproduction command. All 2,734 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

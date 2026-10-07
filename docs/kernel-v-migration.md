@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,844 original production/native-boundary C lines**, **18,106 original fixture/benchmark
+**4,126 original production/native-boundary C lines**, **18,106 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
-eight Wi-Fi tool lines). A further 29 original stack-pointer/syscall/variadic/ordering
+eight Wi-Fi tool lines). A further 31 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
@@ -485,7 +485,8 @@ committed and validated; pending stages are excluded.
 | Hello and native greeting builder entries | 17 | `47be3479` |
 | Native N64 core bridge (four variadic-capture lines excluded) | 366 | `320172df` |
 | Native MIPS PADDLE cartridge (four ordering lines excluded) | 227 | `41c9ddd6` |
-| **Production/native total** | **3,844** | |
+| Native PS2 EE/IOP PADDLE programs (two ordering lines excluded) | 282 | `b2f7f8a9` |
+| **Production/native total** | **4,126** | |
 
 Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
 tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
@@ -1190,7 +1191,27 @@ The 30-second pipe poll, 500×10-ms reap loop and 600-second guest deadline
 remain. `ps2-v-fixture-stage/final-validation.json` records both lifetime peers
 and frozen inputs. The recorded kernel and emulator are reused; x86 evidence
 is SDK-only, with no new kernel build, host sanitizer or physical PS2 claim.
-PS2 bridge and homebrew implementations remain first-party follow-up scopes.
+The PS2 bridge remains first-party follow-up work; the homebrew port follows.
+
+The PS2 EE/IOP homebrew (`b2f7f8a9`) moves 282 original C lines to V;
+two original ordering instructions remain assembly with zero V credit. Strict
+actual MIPS-III/n32 EE and MIPS-I/o32 IOP builds retain 32-bit native pointer
+widths, volatile MMIO polls, permanent aligned DMA/controller banks and
+synchronous stack digits/card records. Both ELFs have no unresolved imports
+or allocator calls. The unchanged complete ARM emulator fixture passes for
+original C and V under its original 600-second deadline. All five gameplay
+metrics and three complete RGB/PNG exports match the original controls and
+previous baseline. Supplemental EXT2 controls pass offline e2fsck and match
+the complete 8,650,752-byte cards, including the original baseline; this
+adapter does not replace the ordinary tmpfs qualification. Two independent
+source/ABI/lifetime/native evidence peers are recorded in
+`ps2-v-homebrew-stage/root-source-native-peer.json` and
+`root-final-native-peer.json` (SHA256
+`84bc286c9ec6c18ec7fc8aadde9f9ac917e0c68c7ba885b0f9c4e6a57f7a9d62`).
+`final-validation.json` and `commit.json` pin the sources and all four native
+runs. The stage reuses qualified kernels with unchanged production source;
+x86 emulator execution, fresh kernel builds, host MIPS sanitizers and physical
+PS2 operation remain unclaimed. The first-party PS2 core bridge remains C.
 
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, stack buffers/ELF records, file-backed initialized volatile
@@ -1280,13 +1301,13 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `e51f3fc0ff792d1465ac3f06440663215d14433a`,
+At committed source `b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 150 paths / 37,635 lines: 147 test paths
-(36,918 lines) and three build-support paths (717 lines). All committed blob
+The non-vendored `.c` census contains 148 paths / 37,351 lines: 147 test paths
+(36,918 lines) and one build-support path (433 lines). All committed blob
 identities, byte sizes and line counts are checked with that revision's Git
 attributes and global/system attributes disabled. Genuine patched musl evidence
-remains included; PS2 bridge/homebrew C remains first-party
+remains included; the PS2 bridge remains first-party
 follow-up work. Maintained host/native fixtures, header
 algorithms and authored embedded C also remain. Zero kernel C is not completion
 of the repository-wide request, and this census is not a translation tally.
@@ -1422,8 +1443,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`e51f3fc0ff792d1465ac3f06440663215d14433a` reports **V 72.42%, C 4.79%**,
-488 C files, 523 Python files and 287 shell files. All 2,728 classified blob
+`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82` reports **V 72.44%, C 4.76%**,
+491 C files, 523 Python files and 287 shell files. All 2,734 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
