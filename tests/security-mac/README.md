@@ -1,6 +1,14 @@
 # Mandatory filesystem and process domains
 
-The guest regression runs as initial-namespace root. It installs labels and a
+The independent guest regression is implemented in
+[`guestfixture`](guestfixture/core.v), with native SDK declarations in its
+[ABI header](guestfixture/native-abi.h). It preserves the original 241 assertion
+sites, including the 16 concurrent-close exec races, 1,000 allowed/denied
+operation iterations, 20-iteration warmups and 200 FIFO iterations. The live
+slab allowances remain 1,024 bytes overall and 512 bytes for the FIFO interface
+class. The runner retains its 300-second default deadline.
+
+The regression runs as initial-namespace root. It installs labels and a
 bounded permission matrix, seals both, then activates a domain through exec.
 It verifies that capabilities cannot bypass the policy on retained and
 SCM_RIGHTS descriptors, aliases, bind mounts, overlay copy-up, metadata,
@@ -48,6 +56,13 @@ the 300-second guest deadline. `VINIX_MAC_STATE_DIR` fixes the artifact director
 the shared kernel-gaps harness prints its location and retains the serial log.
 The runner disables guest networking to reduce unrelated allocation noise.
 Scheduling checks use direct syscalls because musl stubs several libc wrappers.
+Set `V`, `VEXE` and `VINIX_V_COMPILER` to the same verified V compiler when
+reproducing a specific source revision. Generated C is a temporary build
+artifact. The maintained V oracle uses fixed stack arrays and uninitialized
+native output storage; pthread callbacks receive borrowed stack descriptors
+through their actual exported C wrappers. The original join/exec lifetime
+boundaries and descriptor close order remain intact. Both musl SDKs check
+scalar widths and ELF, ancillary, scheduler, affinity and limit record layouts.
 
 These tests establish the listed enforcement boundaries. The policy is an
 initial bounded implementation, not a complete general LSM, network/IPC policy,
