@@ -64,6 +64,7 @@ fn C.perror(&char)
 fn C.memcpy(voidptr, voidptr, usize) voidptr
 fn C.memmove(voidptr, voidptr, usize) voidptr
 fn C.memset(voidptr, i32, usize) voidptr
+fn C.__builtin_alloca(usize) voidptr
 fn C.strcmp(&char, &char) i32
 fn C.strchr(&char, i32) &char
 fn C.unlink(&char) i32
@@ -490,7 +491,8 @@ fn focus_is_within(display &C.Display, top u64) bool {
 }
 fn focus_toplevel(display &C.Display, top u64) {
 	unsafe {
-		mut event := C.XEvent{}
+		event := &C.XEvent(C.__builtin_alloca(sizeof(C.XEvent)))
+		C.memset(event, 0, sizeof(C.XEvent))
 		C.XSetInputFocus(display, top, C.RevertToPointerRoot, 0)
 		event.xclient.@type = C.ClientMessage
 		event.xclient.window = top
@@ -498,7 +500,7 @@ fn focus_toplevel(display &C.Display, top u64) {
 		event.xclient.format = 32
 		event.xclient.data.l[0] = i64(C.XInternAtom(display, c'WM_TAKE_FOCUS', 0))
 		event.xclient.data.l[1] = 0
-		C.XSendEvent(display, top, 0, 0, &event)
+		C.XSendEvent(display, top, 0, 0, event)
 	}
 }
 fn focus_top_window(display &C.Display) {
@@ -548,7 +550,8 @@ fn paste_clipboard(display &C.Display, text &u8, length usize) {
 }
 fn clipboard_selection_request(display &C.Display, request &C.XSelectionRequestEvent) {
 	unsafe {
-		mut reply := C.XEvent{}
+		reply := &C.XEvent(C.__builtin_alloca(sizeof(C.XEvent)))
+		C.memset(reply, 0, sizeof(C.XEvent))
 		property := if request.property == 0 { request.target } else { request.property }
 		reply.xselection.@type = C.SelectionNotify
 		reply.xselection.display = display
@@ -578,7 +581,7 @@ fn clipboard_selection_request(display &C.Display, request &C.XSelectionRequestE
 				reply.xselection.property = property
 			}
 		}
-		C.XSendEvent(display, request.requestor, 0, 0, &reply)
+		C.XSendEvent(display, request.requestor, 0, 0, reply)
 		C.XFlush(display)
 	}
 }
@@ -725,18 +728,21 @@ pub fn host_main(argc i32, argv &&char) i32 {
 		if wine_pid < 0 { C.perror(c'vinix-wine-host: fork Wine'); C.vwh_set_running(0) }
 		stdin_flags := C.fcntl(0, C.F_GETFL)
 		if stdin_flags >= 0 { C.fcntl(0, C.F_SETFL, stdin_flags | C.O_NONBLOCK) }
+		// Reuse event buffers for the whole bridge loop; their pointers never
+		// outlive this call, and stack use must not grow with received events.
+		host_event := &HostEvent(C.__builtin_alloca(sizeof(HostEvent)))
+		x_event := &C.XEvent(C.__builtin_alloca(sizeof(C.XEvent)))
 		for C.vwh_running() != 0 {
 			count := C.read(0, &input[0] + used, sizeof(input) - used)
 			if count > 0 { used += usize(count) }
 			else if count == 0 { C.vwh_set_running(0) }
 			else if C.vwh_errno() != C.EAGAIN && C.vwh_errno() != C.EWOULDBLOCK && C.vwh_errno() != C.EINTR { C.vwh_set_running(0) }
 			for used >= sizeof(HostEvent) {
-				mut event := HostEvent{}
-				C.memcpy(&event, &input[0], sizeof(event))
-				if event.magic != u32(0x56574831) || event.length > 65536 || (event.kind != 4 && event.kind != 11 && event.length != 0) { C.vwh_set_running(0); break }
-				record_size := sizeof(event) + usize(event.length)
+				C.memcpy(host_event, &input[0], sizeof(HostEvent))
+				if host_event.magic != u32(0x56574831) || host_event.length > 65536 || (host_event.kind != 4 && host_event.kind != 11 && host_event.length != 0) { C.vwh_set_running(0); break }
+				record_size := sizeof(HostEvent) + usize(host_event.length)
 				if used < record_size { break }
-				process_event(display, &event, &input[0] + sizeof(event))
+				process_event(display, host_event, &input[0] + sizeof(HostEvent))
 				C.memmove(&input[0], &input[0] + record_size, used - record_size)
 				used -= record_size
 			}
@@ -744,10 +750,10 @@ pub fn host_main(argc i32, argv &&char) i32 {
 			if fill_surface { if fill_tick % 10 == 0 { fill_top_window(display) }; fill_tick++ }
 			mut drawn := false
 			for C.XPending(display) > 0 {
-				mut event := C.XEvent{}
-				C.XNextEvent(display, &event)
-				if event.@type == C.SelectionRequest { clipboard_selection_request(display, &event.xselectionrequest) }
-				if damage != 0 && event.@type == damage_event_base + C.XDamageNotify { drawn = true }
+				C.memset(x_event, 0, sizeof(C.XEvent))
+				C.XNextEvent(display, x_event)
+				if x_event.@type == C.SelectionRequest { clipboard_selection_request(display, &x_event.xselectionrequest) }
+				if damage != 0 && x_event.@type == damage_event_base + C.XDamageNotify { drawn = true }
 			}
 			if drawn { C.XDamageSubtract(display, damage, 0, 0); C.XFlush(display); damage_sequence++; C.vwh_damage_store(damage_counter, damage_sequence) }
 			if wine_pid > 0 && C.waitpid(wine_pid, &status, C.WNOHANG) == wine_pid { wine_pid = -1; C.vwh_set_running(0) }
