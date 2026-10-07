@@ -208,7 +208,7 @@ def main() -> int:
         # the same native ABI adapters as the installed utilities.
         security_sources = {
             ROOT / "tests/application-sandbox/guestfixture/core.v": ("sandbox", "tools/sandbox"),
-            ROOT / "tests/security-audit/collector_vm_test.c": ("audit", "tools/security-audit"),
+            ROOT / "tests/security-audit/collectorguestfixture/core.v": ("audit", "tools/security-audit"),
         }
         security = security_sources.get(args.source.resolve())
         if security:

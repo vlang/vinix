@@ -43,7 +43,7 @@ write may leave a partial final line; the next session starts on a fresh line.
 ```sh
 tests/security-audit/collector-run.sh
 # Guest integration: build each architecture's kernel separately, then run:
-python3 tests/kernel-gaps/run.py --source tests/security-audit/collector_vm_test.c \
+python3 tests/kernel-gaps/run.py --source tests/security-audit/collectorguestfixture/core.v \
   --arch aarch64 --kernel-dir /path/to/isolated/kernel \
   --expect 'SECURITY AUDIT COLLECTOR VM PASS' --fail 'SECURITY AUDIT COLLECTOR VM FAIL'
 # One authorized snapshot, including a session end:
