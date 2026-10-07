@@ -148,6 +148,34 @@ hidden interface copies and repeated stack-slot allocation in the fill loop.
 These measurements establish the read-ahead paths; unrelated kernel allocation
 sites remain subject to the repository's existing allocation audit.
 
+The native payload is maintained in `cachefixture/core.v`. The C ABI header
+contains native declarations and width/type assertions. All 31 independent
+checks from the 113-line original remain, including the exact 393,353-byte
+pattern, shared descriptor offsets, positional reads, 400 fetch/discard cycles
+and the original second-round 16 KiB slab tolerance. `--prebuilt-init` selects
+an independently built control; `--state-dir` retains fresh boot inputs and
+the disk. The default path compiles V with the repository's compiler helper.
+
+The 2026-10-07 port freezes original source at `ef42416d` (blob
+`a97975e4607ec0b853256d20f143a326bc798755`). Strict ARM LLVM and genuine x86
+GCC musl links and all four native original-C/V controls passed with the
+unchanged 300-second allowance. The maintained ARM runner also passed.
+Every disk passes `e2fsck -f -n`; extracted payloads match byte-for-byte,
+SHA256 `9dbf0b98c639ce074acf4fe1237411aa268a3771aed5d04374c7e77ab2f8ab75`.
+ARM slab stays 1424 KiB; the second x86 round stays 1096 KiB in both controls.
+The x86 RANDOM first-read metric is 4 KiB for C and 8 KiB for V, both below
+the unchanged 32 KiB limit; absolute metric identity is not required.
+
+These fixture-only guests reuse immutable tracked ARM/x86 kernel ELFs
+`388fa8f702fd5e574610cb326f4e8948b3af669f750a6ac5f4602f72d98f6bdf`
+and `38fd754c28595bfc7a9285fea37cac46bf8624a4acdb4e4eb0f120e4ebe370d2`.
+Generated code and optimized objects have no implicit allocator imports;
+the permanent byte bank and borrowed stack scan buffers passed peer lifetime
+review. No new production-kernel build or host sanitizer result is claimed.
+Local source, SDK, native and final ABI-constraint receipts are retained under
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/pagecache-fixture/`;
+this record is the durable evidence when that machine-local cache is absent.
+
 The complete ARM desktop `ops,churn,cache,idle,apps,drag` sweep finishes with
 all 43 measurements and no kernel panic. Idle/apps/drag CPU totals are
 0.27%/0.77%/4.55%; the 32 MiB cache scenario remains bounded at 16 MiB cached.

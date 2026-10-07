@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify read-ahead on a disposable, physically backed EXT2 guest root."""
 import argparse
+from contextlib import nullcontext
 import hashlib
 import importlib.util
 import os
@@ -26,6 +27,8 @@ def load(name, path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=("aarch64", "amd64"), default="aarch64")
+    parser.add_argument("--state-dir", type=Path, help="retain the native payload, disk and boot inputs")
+    parser.add_argument("--prebuilt-init", type=Path, help="use an independently built native control")
     args = parser.parse_args()
     runner = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     helper = load("readahead_powercut", runner / "tests/disk-no-sync/run_vm.py")
@@ -37,7 +40,10 @@ def main():
     if not tool:
         raise RuntimeError("e2fsprogs is required")
     timeout = int(os.environ.get("VINIX_QEMU_TIMEOUT", "300"))
-    with tempfile.TemporaryDirectory(prefix="vinix-readahead-") as directory:
+    if args.state_dir:
+        args.state_dir.mkdir(parents=True)
+    state = nullcontext(str(args.state_dir.resolve())) if args.state_dir else tempfile.TemporaryDirectory(prefix="vinix-readahead-")
+    with state as directory:
         work = Path(directory)
         if args.arch == "aarch64":
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
@@ -45,8 +51,14 @@ def main():
                   f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else:
             cc = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
-        subprocess.run(cc + ["-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector",
-            str(ROOT / "tests/pagecache/guest.c"), "-o", str(work / "init")], check=True)
+        if args.prebuilt_init:
+            shutil.copy2(args.prebuilt_init, work / "init")
+        else:
+            fixture = load("readahead_fixture_compile", ROOT / "tests/kernel-gaps/compile-v-fixture.py")
+            flags = cc + ["-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector"]
+            object_file = fixture.compile_module(ROOT / "tests/pagecache/cachefixture", work / "fixture.o",
+                                                 "aarch64" if args.arch == "aarch64" else "x86_64", flags)
+            subprocess.run(cc + ["-static", str(object_file), "-o", str(work / "init")], check=True)
         archive, disk = work / "initramfs.tar", work / "root.ext2"
         helper.initramfs(archive, "pass")
         environment = {**os.environ, "VINIX_INITRAMFS": str(archive), "VINIX_BOOT_DISK": str(work / "boot.img"),
