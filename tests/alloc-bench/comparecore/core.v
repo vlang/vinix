@@ -57,7 +57,7 @@ pub fn decode_config(text string) !Config {
 	return error('config must be a JSON object')
 }
 
-fn value(data Config, key string) Value { return data[key] or { Value(json2.null) } }
+pub fn value(data Config, key string) Value { return data[key] or { Value(json2.null) } }
 
 fn is_integer(n Number) bool { return !n.text.contains_any('.eE') }
 
@@ -109,7 +109,7 @@ pub fn quoted(text string) string {
 	return output + quote
 }
 
-fn repr(item Value) string {
+pub fn repr(item Value) string {
 	return match item {
 		string { quoted(item) }
 		bool {
@@ -134,7 +134,7 @@ fn repr(item Value) string {
 
 // Python compares numeric JSON values by value, including bool/int equality.
 // Keep integer comparison exact before handling a float alternative.
-fn equal(a Value, b Value) bool {
+pub fn equal(a Value, b Value) bool {
 	if a is Number && b is Number {
 		if is_integer(a) && is_integer(b) {
 			return big.integer_from_string(a.text) or { return false } ==
@@ -184,7 +184,7 @@ fn integer_equal_float(text string, floating f64) bool {
 
 fn whitespace(r rune) bool { return utf8.is_space(r) || r in [`\x1c`, `\x1d`, `\x1e`, `\x1f`] }
 
-fn tokens(text string) []string {
+pub fn tokens(text string) []string {
 	mut parts := []string{}
 	mut current := []rune{}
 	for r in text.runes() {
@@ -201,7 +201,7 @@ fn tokens(text string) []string {
 	return parts
 }
 
-fn lines(text string) []string {
+pub fn lines(text string) []string {
 	mut parts := []string{}
 	mut current := []rune{}
 	mut after_cr := false
@@ -309,7 +309,7 @@ fn parse_float(text string) !f64 {
 
 // Round an integer quotient once, as Python's integer true division does.
 // Converting a duration above 2^53 to f64 before dividing loses a low bit.
-fn ratio(numerator u64, denominator u64) f64 {
+pub fn ratio(numerator u64, denominator u64) f64 {
 	if numerator == 0 { return 0 }
 	a := big.integer_from_u64(numerator)
 	b := big.integer_from_u64(denominator)
@@ -508,7 +508,7 @@ pub fn read_run(log string, config string, name string) !Run {
 	return parse_log(contents, name, manifest)
 }
 
-fn sha(item Value) bool {
+pub fn sha(item Value) bool {
 	if item !is string { return false }
 	return item.len == 64 && item.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`))
 }

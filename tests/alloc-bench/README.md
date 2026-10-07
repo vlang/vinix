@@ -258,7 +258,7 @@ These checks do not claim new genuine Darwin GCC compilation or kext execution.
 Compare complete direct-kernel logs with:
 
 ```sh
-python3 tests/alloc-bench/compare-kernel.py \
+tests/alloc-bench/compare-kernel \
   build/kernel-alloc-vinix/serial.log build/kernel-alloc-macos/serial.log
 ```
 
@@ -268,7 +268,7 @@ python3 tests/alloc-bench/compare-kernel.py \
 tests/alloc-bench/compare \
   build/alloc-vinix/serial.log build/alloc-macos/serial.log
 . build-support/find-v.sh
-"$V" test tests/alloc-bench/comparecore
+"$V" test tests/alloc-bench/comparecore tests/alloc-bench/kernelcompare
 ```
 
 The comparator recomputes medians from raw timing records, checks completion,

@@ -7,7 +7,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import runpy
 import shutil
 import subprocess
 import tarfile
@@ -106,8 +105,9 @@ def main() -> int:
                 if any(marker in output for marker in ["KALLOC-ERROR", "KERNEL PANIC", "FATAL EXCEPTION"]):
                     raise RuntimeError(f"guest failed; see {serial}")
                 if "KALLOC-DONE" in output:
-                    validate = runpy.run_path(str(Path(__file__).with_name("compare-kernel.py")))["parse_log"]
-                    validate(output, "vinix")
+                    subprocess.run([str(Path(__file__).with_name("validate-kernel")),
+                                    "--stdin", "vinix"], input=output, text=True,
+                                   check=True, capture_output=True)
                     print("\n".join(line[line.index("KALLOC-"):]
                                     for line in output.splitlines() if "KALLOC-" in line), flush=True)
                     return 0
