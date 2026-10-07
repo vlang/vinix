@@ -460,10 +460,15 @@ fn selftest_free_baseline() u64 {
 pub fn initialise() {
 	$if linuxkpi ? {
 		initialise_cpu_features()
+		initialise_cpu_masks()
 		if !cpu_features_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Linux CPU feature policy self-test failed')
 		}
 		C.kprintf(c'linuxkpi: common MOVDIR CPU feature policy, caller state and query lifetimes passed; no pages or heap objects retained\n')
+		if !cpu_masks_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Linux boot CPU mask self-test failed')
+		}
+		C.kprintf(c'linuxkpi: original boot CPU masks, compressed constant masks and query lifetimes passed; no pages or heap objects retained\n')
 		initialise_pagefault_policy()
 		sched.register_preemption_guard(voidptr(may_preempt))
 		if C.vinix_linuxkpi_percpu_bootstrap(u32(cpu_locals.len)) != 0 {

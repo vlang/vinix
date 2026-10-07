@@ -82,8 +82,17 @@ after a filesystem failure. Mutable build inputs still require isolation.
   unresolved storage/map references. The exact x86 Kconfig frame-helper
   selection avoids a duplicate generic fallback; with frame pointers disabled,
   the original helper returns `NOT_STACK`, without stack validation. Remote
-  callbacks, CPU masks, hotplug, `smp_ops` and Linux thread-info/TIF ownership
+  callbacks, hotplug, `smp_ops` and Linux thread-info/TIF ownership
   remain separate runtime dependencies.
+- Original Linux possible, present, online and active masks describe Vinix's
+  initialized logical boot CPUs; the dying mask is empty. The boot owner writes
+  every word of the original four-word records and the original CPU counters
+  before publishing readiness, ahead of compatibility consumers and workers.
+  Original compressed `cpumask_of` constants and `cpu_all_mask` retain all 256
+  configured bits, independently of the installed CPU count. Publication is
+  permanent; hotplug, concurrent initialization, firmware-disabled CPU inventory
+  and `total_cpus` remain unsupported. This supplies no remote callback dispatch
+  or extension of the scheduler's 64-bit worker-affinity masks.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -648,6 +657,7 @@ python3 tests/linuxkpi/special_insns_test.py
 python3 tests/linuxkpi/cpu_feature_policy_test.py
 python3 tests/linuxkpi/smp_type_test.py
 python3 tests/linuxkpi/smp_header_test.py
+python3 tests/linuxkpi/cpu_mask_test.py
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1569,6 +1579,50 @@ the earlier stale pre-dump receipts are superseded.
 
 `current_thread_info()` still assumes a Linux task/thread-info layout which the
 native compatibility task view does not supply. TIF/status accessors and Linux
-stack ownership are not enabled by these declarations. CPU masks, early maps,
-hotplug, `smp_ops` and remote callback execution remain unresolved. Evidence:
+stack ownership are not enabled by these declarations. Early maps, hotplug,
+`smp_ops` and remote callback execution remain unresolved; the later boot-mask
+runtime is described below. Evidence:
 `/tmp/vinix-linuxkpi-smp-headers-oct06-final-validation.json`.
+
+Boot CPU mask validation was repeated on 2026-10-07 in isolated worktrees at
+`95234fa286b400561671ff68bcc3df45d026dd73`, with only the eleven CPU-mask
+implementation and harness paths overlaid. Enabled x86, default x86 and disabled
+ARM builds pass with the frozen V compiler and private LLVM compiler-runtime
+archives (160 members each). Default x86/ARM guests reach Linux-ABI PID 1 with LinuxKPI fixtures absent.
+The enabled ELF SHA256 is
+`65038097451fcddbfd33a764ee59fa24942b5967e424f1d12fcf54678af5530a`.
+
+Complete four-CPU normal (`max`) and SSE (`max,hypervisor=off`) guests pass all
+42 required markers and nineteen exact free-byte/heap equalities. Each fourth
+mask query batch preserves `390762496 -> 390762496` bytes and every live heap
+class after three warmups, including IRQ-on/off and nested preemption pins.
+The unchanged 3,600-second outer allowance and all intrinsic assertions remain;
+runs complete in 275.47/271.42 seconds. The earlier 41-marker FPU binaries are
+not evidence for this feature.
+
+The maintained `cpu_mask_test.py` passes 15,810,213 ASan/UBSan assertions per
+GNU99/GNU11 dialect across 17 cold processes. The test preserves 28 generated
+V bodies, fourteen native object proofs, every compressed constant view and
+exact readonly bytes from the pinned Linux 6.6.157 archive. Cases cover the
+64-bit boundaries through 256, invalid counts, repeat publication, complete
+mask tails and four joined immutable readers. Host scalar/TLS observers do not
+establish native 256-CPU operation, hotplug or remote callback execution.
+
+The publisher and queries introduce no allocation or reclamation. Peer source
+review confirms permanent borrowed original storage, a sole boot publisher,
+release/acquire readiness and publication before compatibility users. The new
+C data file contains pinned upstream constant definitions and native typed
+storage declarations; it has no functions or runtime imports. The surrounding
+file, declaration headers and authored embedded C test oracle/runner remain
+first-party maintained sources. They are not marked vendored and receive no
+C-to-V migration credit; they remain follow-up under the repository-wide
+first-party C removal instruction.
+
+The earlier draft cited `/tmp/vinix-linuxkpi-cpu-masks-oct06-final-validation.json`
+for normal/SSE guests, complete x86 host modules, baseline host-header failures,
+an allocation gate and desktop scenarios. That receipt and its worktrees are
+absent in this session. Those old claims are archived as unverified draft text,
+not carried forward as fresh validation. Durable current evidence is under
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`, beginning with
+`cpu-mask-oct07-final-validation.json`, with host, native and build receipts
+beside it.

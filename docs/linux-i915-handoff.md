@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
-Updated 2026-10-06 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current SMP-header feature: **`4052200b`** (common boot CPU direct-store capabilities, original instruction-helper closure, bounded native PCI topology and checked user-copy services). Recheck HEAD and the worktree before
+Updated 2026-10-07 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
+Committed implementation baseline before the current boot-mask feature: **`95234fa2`** (including the original SMP headers and native V FPU entry points). Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `b718a737` | Original SMP/CSD/header integration, genuine CPU accessor bindings and compiler provenance; remote dispatch remains pending |
 | `4052200b` | Immutable actual boot-CPU MOVDIRI/MOVDIR64B capability intersection and measured caller-state-preserving queries |
 | `909f6a4b` | Original x86 instruction-helper include closure, unchanged MOVDIR operands/opcodes and genuine unresolved privileged references |
 | `079e3ccd` | Native bounded PCI/CardBus topology, permanent scalar boot publication and read-only capability validation |
@@ -817,6 +818,48 @@ guest execution claim follows from this header feature. Full audit remains
 4/269; exactly seven CSD first errors advance to RCU (206 to 213). Masks,
 early maps, `smp_ops`, hotplug and remote callback services remain pending.
 Aggregate: `/tmp/vinix-linuxkpi-smp-headers-oct06-final-validation.json`.
+
+Original Linux boot CPU masks now publish Vinix's validated compact logical
+CPU set: possible, present, online and active contain every installed CPU;
+dying is empty. The sole boot publisher clears/writes all four original words,
+sets the genuine `nr_cpu_ids` and atomic online count, then release-publishes
+readiness before compatibility consumers. Original full-width `cpu_all_bits`
+and compressed `cpu_bit_bitmap` constants retain exact pinned bytes. No CPU
+hotplug, disabled-firmware inventory, `total_cpus`, early-map or remote callback
+runtime follows from these masks; bound worker affinity still has its 64-CPU
+restriction.
+
+Fresh 2026-10-07 isolated enabled/default x86 and disabled ARM builds pass at
+`95234fa286b400561671ff68bcc3df45d026dd73` plus eleven exact CPU-mask overlay
+paths. Default x86/ARM guests reach Linux-ABI PID 1 with LinuxKPI absent.
+Enabled ELF SHA256:
+`65038097451fcddbfd33a764ee59fa24942b5967e424f1d12fcf54678af5530a`.
+Both fresh complete four-CPU normal/SSE guests pass all 42 required markers
+and nineteen exact free-byte/heap equalities. The fourth mask batch in each
+preserves `390762496 -> 390762496` bytes and every live heap class; IRQ state
+and nested preemption pins remain intact. Runs complete in 275.47/271.42 seconds
+at the unchanged 3,600-second outer allowance. Old 41-marker FPU kernels do not
+validate this stage.
+
+The maintained GNU99/GNU11 host runs each pass 15,810,213 ASan/UBSan assertions
+across 17 cold processes, retaining 28 unchanged V bodies, fourteen native
+object proofs and exact pinned readonly bytes. Numerical 65/255 coverage does
+not boot those CPUs. Peer review confirms permanent borrowed storage, sole
+boot publication and acquire/release readiness, with no new allocations/frees.
+
+The data-only C file combines pinned Linux 6.6.157 constant definitions with
+native typed storage declarations and has no functions or runtime imports.
+Its maintained wrapper file, declaration headers and authored embedded C test
+oracle/runner are first-party follow-up under the C-removal instruction, not
+vendored implementations or migration credit.
+
+The earlier `/tmp/vinix-linuxkpi-cpu-masks-oct06-final-validation.json` receipt
+and its worktrees are absent. Its previous full native/host/desktop and baseline
+claims are archived as unverified draft text. Fresh evidence is kept in
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/` as
+`cpu-mask-oct07-final-validation.json`, with host, native and build receipts
+beside it. Preserve the broader allocation and
+host-suite baselines; fresh mask results do not establish their resolution.
 
 ## Bound and high-priority contracts
 
