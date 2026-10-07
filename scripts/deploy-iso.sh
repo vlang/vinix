@@ -228,7 +228,7 @@ if [ "$BUILD_AMD64" -eq 1 ]; then
     VINIX_AMD64_VLANG_STAGING="$SCRIPT_DIR/build-amd64-v/staging" \
     VINIX_AMD64_DESKTOP_BUILD_DIR="$WORK/amd64-desktop" \
     VINIX_AMD64_USERLAND_BUILD_DIR="$CACHE/amd64-userland" \
-    VINIX_AMD64_BUILD_DIR="$WORK/amd64-kernel" \
+    VINIX_AMD64_BUILD_DIR="$SRC/build-amd64-kernel" \
     VINIX_AMD64_DESKTOP_ISO="$OUT/vinix-amd64.iso" \
         "$SRC/scripts/build-desktop-amd64.sh"
     [ -f "$OUT/vinix-amd64.iso" ] || die "the amd64 build made no ISO"
@@ -252,7 +252,9 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
     ln -sf "$SCRIPT_DIR/build-support/init-aarch64/initramfs.tar" \
         "$SRC/build-support/init-aarch64/initramfs.tar"
 
-    VINIX_AARCH64_BUILD_DIR="$WORK/arm64-kernel" \
+    # Kernel generators resolve ../tests and ../build-support beside their
+    # build directory. Keep both builds inside the clean release checkout.
+    VINIX_AARCH64_BUILD_DIR="$SRC/build-arm64-kernel" \
         "$SRC/scripts/build-aarch64.sh" --no-userland --no-iso
 
     VINIX_UI2_SOURCE="$UI2_SOURCE" \
@@ -268,7 +270,7 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
         "$SRC/scripts/build-desktop-aarch64.sh" --compact-initramfs --without-firefox
 
     rm -f "$OUT/vinix-arm64.iso"
-    VINIX_AARCH64_KERNEL="$WORK/arm64-kernel/bin/vinix" \
+    VINIX_AARCH64_KERNEL="$SRC/build-arm64-kernel/bin/vinix" \
     VINIX_AARCH64_INITRAMFS="$WORK/arm64-initramfs-desktop.tar" \
     VINIX_AARCH64_ISO="$OUT/vinix-arm64.iso" \
     VINIX_AARCH64_ISO_BUILD_DIR="$WORK/arm64-iso" \
