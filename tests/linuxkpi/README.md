@@ -34,12 +34,25 @@ has the following results:
 | Native x86 original C, four CPUs, `qemu64`/TCG | Child status 9 (SIGKILL); cause unknown |
 | Native x86 V, four CPUs, `qemu64`/TCG | Original bound-CPU assertion, child status 6 (SIGABRT); cause unknown |
 | Separate failure-only x86 diagnostic | SIGKILL before routing operands were printed; cause unknown; no validation credit |
+| Fresh matched x86 original C on default kernel `a5ae7a96`, `qemu64`/TCG | Original first bound-CPU assertion; SIGABRT after 1,100.94 seconds |
+| Fresh matched x86 V on that same kernel and configuration | SIGKILL after 907.04 seconds; both required PASS markers absent |
 
 All original assertions, operation counts, deadlines, cleanup requirements and
 seven modes (`reversed`, `huge`, `clock-horizon`, `absolute-overflow`, `state`,
 `atomic`, `valid-horizon`) remain. The CPU and kernel configuration changes
 between attempts are recorded; no earlier failure is claimed resolved. A
 wait status alone establishes neither OOM nor a translation bug.
+
+The fresh pair used the exact previously recorded canonical ELFs, four CPUs,
+1,024 MiB, new guest states, all 26 fixture groups and seven boundary modes,
+and the unchanged 3,600-second maximum. The C control now fails the same
+expression that previously failed in V; the defect remains unlocated.
+Sequential pre-failure observations found a zero OOM counter, which does not
+establish the cause of SIGKILL. A source and actual supervisor-instruction
+audit found no internal 900-second watchdog. Neither fresh run qualifies the
+port. Receipts, captured boot inputs and failure logs are retained in
+`host-native-default-pair-20261007/`; cache-only diagnostic rebuilds are
+separate from these canonical controls and receive no qualification credit.
 
 The commit review matched all 96 owned input hashes to the passing dual-host
 receipt and all 27 deleted Git blobs to the immutable original scope. Three

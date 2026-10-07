@@ -659,5 +659,99 @@
     "kernel/asm/x86_64/linuxkpi_varargs.S": "0897fbff27f83b3a79fa61bf1ab35356ae28292f066616027fb39a9b8ca60a01",
     "kernel/asm/x86_64/linuxkpi_workqueue_abi.S": "4d6da2738ba61a68e12e9707213608f2421018f132defbebbc4b1780f3a3db7c",
     "kernel/asm/x86_64/linuxkpi_printk_fixture_abi.S": "efb0290dd5ecdfcc87e054eb3e7c11f79ea9dd87c22608e1ec35b8204c201f67"
+  },
+  "native_x86_current_default_20261007": {
+    "verdict": "FAIL; native x86 translation qualification unresolved",
+    "migration_credit": 0,
+    "scope_lines": 8929,
+    "canonical_controls_unchanged": true,
+    "matched_controls": "Both exact canonical final23 ELFs, fresh guest states, same actual default a5ae7a96 kernel, qemu64 TCG 4 CPU 1024 MiB, unchanged all 26 groups/seven boundary modes and original 3600-second maximum budgets.",
+    "actual_boot_kernel_sha256": "a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572",
+    "controls": {
+      "original-C": {
+        "exit_code": 1,
+        "elapsed_seconds": 1100.94,
+        "failure": "Untouched original first bound_callback observed_cpu == expected_cpu assertion, native SIGABRT status6",
+        "cause": "unknown; original C baseline reproduces same expression failure as prior V; no subtest/call/operand values captured",
+        "scope": "exact immutable final23 original C full workload; no assertion/count/budget/source changes",
+        "migration_credit": 0,
+        "boot_artifact_sha256": {
+          "kernel.elf": "a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572",
+          "init.elf": "ee0172693b442c2f43978aa982c5d8d4cece52dbf3d029bea9fb503c6ebcf06f",
+          "initramfs.tar": "2c43dd1ab3cf7da36f175b67b7bbd4d691032e730ceeeb7f891ed742fa785f30"
+        },
+        "artifact_sha256": {
+          "serial.log": {
+            "bytes": 938,
+            "sha256": "e0f8332404c77f34b0872d6aafa4ddd0568e8879dfc500d9ab9c47a1f1a403b8"
+          },
+          "init": {
+            "bytes": 2575472,
+            "sha256": "ee0172693b442c2f43978aa982c5d8d4cece52dbf3d029bea9fb503c6ebcf06f"
+          },
+          "initramfs.tar": {
+            "bytes": 2590720,
+            "sha256": "9776c68b6c1b0d769ea8944544953f661dcf54919010ffbed2868871ab0acbb7"
+          },
+          "test.iso": {
+            "bytes": 24305664,
+            "sha256": "777fe70585c136bdf1326485d3efca92e8561d129e21659acfd6a4ed595ca57f"
+          },
+          "original-C-qemu.log": {
+            "bytes": 2624,
+            "sha256": "223664cd5772cd039ab51ba997b1c0d645b40fe54ebe1a269b6499f15fe28ada"
+          }
+        }
+      },
+      "translated-V": {
+        "exit_code": 1,
+        "elapsed_seconds": 907.04,
+        "failure": "full original-scope translated V workload child returned native wait status 9 (SIGKILL); both required PASS markers absent",
+        "cause": "unknown; wait status does not establish OOM or a translation-specific failure",
+        "scope": "unmodified committed 705ce393 independent V model/fixtures with exact final23 production core, native x86 on current matched default kernel",
+        "migration_credit": 0,
+        "boot_artifact_sha256": {
+          "kernel.elf": "a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572",
+          "init.elf": "9263c09fc10af4f88bb8a732d28df5a2a4a10bc3fb17b7fec84b5ad2d79ca67f",
+          "initramfs.tar": "76fc071392af6461511d34c082f3563144b640471ac97264bf8225d284e04382"
+        },
+        "artifact_sha256": {
+          "serial.log": {
+            "bytes": 786,
+            "sha256": "b6221c14659a87d575e72e12a35663b1f12cdd3b6686609fdab76d9b1983d6e3"
+          },
+          "init": {
+            "bytes": 2853608,
+            "sha256": "9263c09fc10af4f88bb8a732d28df5a2a4a10bc3fb17b7fec84b5ad2d79ca67f"
+          },
+          "initramfs.tar": {
+            "bytes": 2867200,
+            "sha256": "3af1defc62717f87524c3ca359cf433c1c696a74edfbbb11f2286de126aca3fd"
+          },
+          "test.iso": {
+            "bytes": 24582144,
+            "sha256": "3020505118edf90c2a66f972c9f1f883a363a5fa6213fe879a7c449728eeb172"
+          },
+          "translated-V-qemu.log": {
+            "bytes": 2472,
+            "sha256": "c3d10893b49f5175e91152e04a9b2e912ab14a2e770a3ac46c6116652c70a584"
+          }
+        }
+      }
+    },
+    "limits": [
+      "The original C workload independently fails the same first bound CPU expression previously reported by V; current V instead receives SIGKILL. This does not locate the defect.",
+      "Prior default 076b9115 C SIGKILL/V first-bound CPU SIGABRT and diagnostic SIGKILL remain unknown-cause receipts. Prior max timeout remains retained.",
+      "No assertions, lifetimes, workload counts, group/boundary coverage or deadlines changed. No first-party C port credit until native qualification completes.",
+      "Read-only sequential QMP observations with zero OOM counters are observed samples, not causal evidence or proof that all SIGKILL mechanisms are excluded."
+    ],
+    "receipts": {
+      "paired-validation.json": "1539ae2179095eb1bcf824325538b1ef1f47b4e1f0979064c01270c823bfb303",
+      "source-audit/audit.json": "f7b24f0e2ab39f1629c53bb8ffb34671a86d4c9a66f980b6a53414c3c132f78c",
+      "deadline-audit/audit.json": "030c5de9fd085362b2d66c5c6ec47d2c75a287a0ef25216d5cfbc0d7b7f64ffa"
+    },
+    "deadline_audit": "No established intrinsic 900-second watchdog in frozen source or actual canonical supervisor instructions; outer maximum remains 3600. Native wait9 cause unknown.",
+    "cache_only_diagnostic_rebuild_qualifies_translation": false,
+    "record_directory": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007"
   }
 }
