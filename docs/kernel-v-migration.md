@@ -448,12 +448,12 @@ and serial logs identify the actual tested artifacts. These caches are local;
 this document and the handoff are the durable record.
 
 
-## First-party native boundaries and fixtures, 2026-10-06
+## First-party native boundaries and fixtures, 2026-10-07
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **14,710 original fixture/benchmark
-lines** and **258 header implementation lines** (111 desktop, 139 kernel and
+**3,251 original production/native-boundary C lines**, **16,933 original fixture/benchmark
+lines** and **265 header implementation lines** (111 desktop, 146 kernel and
 eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
 boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
@@ -548,6 +548,22 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Verified-boot standalone protocol fixture | 40 | `8b96b191` |
 | QEMU blocked-thread exit/exec independent scope | 38 | `22c5d6ee` |
 | QEMU pollfd ABI independent scope | 22 | `eecdee92` |
+| Native resource-open lifetime fixture | 133 | `b11fb04e` |
+| Shared pipe/socket stream fixture | 119 | `68c1e163` |
+| QEMU epoll independent scope | 30 | `b5f1c0f9` |
+| QEMU syscall argument independent scope | 10 | `3cf43ef1` |
+| Native socket I/O lifetime fixture | 234 | `bebccef1` |
+| Native fsync error-scope fixture | 76 | `5e6795e1` |
+| Procfs mount lifetime fixture | 242 | `2d9e508f` |
+| LinuxKPI native x86 FPU header operations | 7 | `56b89d09` |
+| Native x86 exception/reaping fixture | 97 | `369289a4` |
+| Procfs map lookup lifetime fixture | 221 | `94143cac` |
+| Native listen backlog/word-width fixture | 141 | `085f0347` |
+| Procfs thread/exec locking fixture | 174 | `090b78d8` |
+| Directory/procfs retention fixture | 131 | `42bcf709` |
+| Native dumpability/secure-loader fixture | 99 | `95234fa2` |
+| LinuxKPI native Linux-ABI PID 1 fixture | 28 | `a754ffc7` |
+| Native N64 emulator regression fixture | 488 | `b01fdc9f` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -866,8 +882,159 @@ expressions and logical lines. The actual thread callback, permanent child
 channel, 100-ms settling, exec/reap order, 32/16-bit poll fields and 1,000-ms
 poll deadline remain. Retained reap/exec-probe helpers receive zero credit.
 `qemu-{blocked38,poll22}-final-validation.json` records independent review;
-3,080 original QEMU lines plus 14 integration lines remain at this snapshot.
+3,080 original QEMU lines plus 14 integration lines remained at that stage.
 The broader 270-line scope and complete host-model workload remain uncredited.
+
+Thirteen further fixture scopes add 1,707 completed original lines; the later
+PID 1 and N64 fixtures add 516, bringing this update to 2,223 fixture lines
+and seven FPU header implementation lines. Each original is pinned independently;
+counts, failure predicates, intrinsic deadlines and ownership remain intact.
+Fixture-only stages reuse the recorded immutable kernels and do not claim new
+production builds or host sanitizer coverage unless stated below.
+
+Resource-open (`b11fb04e`, 133) preserves 52 checks per architecture, 200 warmup
+operations and two measured 200-operation cohorts with the original 11-second
+settling. Shared streams (`68c1e163`, 119) preserve 21 checks, eight readers
+and eight 512 KiB writers. Socket I/O (`bebccef1`, 234) preserves 79 checks,
+40 ms timing and five measured cohorts. Both strict musl SDK builds and all
+original-C/V native controls passed; measured resource/socket classes and
+large pages retained zero objects. The socket fixture's explicit 1 MiB
+allocation/free pair remains. Receipts are
+`resource-open-{arm-build,x86-build2}/validation.json`,
+`shared-streams-fixture/validation.json` and `socket-io-fixture/validation.json`.
+
+Fsync (`5e6795e1`, 76) retains 24 checks and passed ARM native NBD fault
+controls: clean/unrelated descriptors succeed, the target reports EIO and
+the read-only host backing hash remains unchanged. Both SDK links passed;
+native x86 NBD was not tested. Procfs mounts (`2d9e508f`, 242) retain 70 checks;
+eight original-C/V full/reuse guests passed with the 300-second budget and
+unchanged 16 KiB growth tolerance. Fresh x86 C pages stayed 1300→1300 while
+V decreased 1364→1348; these are successful predicates, not identical absolute
+baselines. Receipts are `fsync-scope-fixture/validation.json` and
+`procfs-mount-fixture/validation.json`.
+
+QEMU epoll (`b5f1c0f9`, 30) and syscall arguments (`3cf43ef1`, 10) retain
+14/two original checks. Both actual host sanitizer ABIs, strict SDK links
+and complete paired native feature/persistence guests passed. Their providers
+preserve the target syscall numbers, pointer widths and native variadic slots.
+These two scopes bring the completed QEMU subset to 381 original lines;
+3,040 original lines plus 18 integration lines remain. The committed pending
+base/memory and futex work (`909ae53d`) receives zero completed credit. Its
+README records the original x86 alarm failure and historical futex tags;
+the normal runner continues selecting the original C bodies.
+
+Native FPU header operations (`56b89d09`, seven implementation lines) preserve
+the original begin/end bridge order, x87 reset, 32-bit default MXCSR and
+volatile memory clobber. Generated code has no allocator imports. The actual
+x86 instruction fixture passed ASan/UBSan with 1,024 iterations across all
+four rounding modes. Both fresh default kernel builds/boots passed. Matching
+original-header and V opt-in kernels passed the complete four-CPU `qemu64`
+TCG guest, all 41 then-required markers and 18 exact memory equalities.
+Their ELF SHA256 values are respectively
+`050a6a757c7205758fbb076bd009aaacd1814d9a663180716b5d24942d5a50ba`
+and `6f3242dfa8d4d20eda39a582c21f5561e4310124e423686a293344431f6e97a7`.
+The later CPU-mask feature adds a 42nd marker; these older binaries do not
+validate it. `fpu-stage-validation.json` records source pin `99162a39`,
+instruction checks, independent lifetime review and unchanged full host suite.
+The original overflow/spin oracle declaration repairs (`47db8e1c`, `8ca75d10`)
+and host-only processor include boundary (`df855887`) receive zero credit.
+
+Native x86 exceptions (`369289a4`, 97) retain 15 ordered checks, 24 rounds,
+fatal child reaping, file/descriptor cleanup and 256 returning signal-handler
+traps. Strict native SDK original-C/V controls passed on one and four CPUs
+with equal 900-second outer budgets and unchanged intrinsic workloads.
+Actual `ucontext` RIP edits, exported callback identity, sequentially
+consistent atomics and `int3`/`ud2` instructions were checked. An initial
+original ISO preparation failed for disk space before any guest verdict;
+the successful fresh controls and that setup log remain preserved.
+`exceptions-stage-validation.json` records independent lifetime review.
+
+Procfs map lookup (`94143cac`, 221) retains 25 checks, three inspectors,
+4×12 children, 200 final reads and seven-second retirement; native C/V
+controls passed with every measured page/class/large/UAF counter exactly flat.
+Thread/exec locking (`090b78d8`, 174) retains 14 diagnostics, 128 joins,
+32 gated execs, the 120-second alarm and minimum 100 snapshots. Native C/V
+controls passed on both architectures; scheduler-dependent progress counts
+are recorded rather than required to match. Listen backlog (`085f0347`, 141)
+retains 22 checks, seven signed boundary backlogs, raw high-word arguments,
+queued Unix bytes and absolute five-second deadlines. All four native
+controls and its maintained ARM runner passed. Receipts are
+`proc-map-lookup-fixture/validation.json`,
+`proc-thread-lock-fixture/validation.json` and
+`listen-backlog-fixture/validation.json`.
+
+Directory/procfs retention (`42bcf709`, 131) retains 25 physical check sites
+(24 per architecture), 128 directory entries, 20 warmups, 200 enumerations
+and 200×six proc reads. All four strict SDK/native C/V controls passed.
+All 18 ARM and 14 x86 heap classes remained exactly flat in both measured
+cohorts, including large pages. The final ABI constraint edit generated
+byte-identical executable instructions to the tested binaries; its proof is
+`retention-final-constraint-instruction-proof.json`, with aggregate receipt
+`retention-stage-validation.json`. Dumpability (`95234fa2`, 99) retains
+14 static checks, 15 runtime verdicts, five child reaps, real exec/secure modes
+and native word-sized prctl arguments. All four native controls and the
+maintained x86 runner passed, with identical ordered verdicts and the original
+300-second budget. `dumpability-fixture/validation.json` records independent
+ABI/lifetime review. Neither stage adds a host sanitizer or new kernel claim.
+
+At the user's commit-first request, the 8,929-line LinuxKPI host fixture/model
+scope is committed as checkpoint `705ce393`. Complete actual ARM/x86 host
+ASan/UBSan workloads and ARM native original-C/identical-V controls passed.
+Native x86 remains unresolved: the original `max` control expired at 3,600
+seconds; `qemu64` original C ended with SIGKILL and V hit the original bound-CPU
+assertion. Causes remain unknown. All assertions, workloads and deadlines
+remain, and the scope receives zero completed translation credit. Its durable
+README and `host-fixture-validation.json` pin every input and retained outcome.
+Three whitespace-only cleanups generated identical C on both architectures.
+
+The concurrent N64 integration (`8d172d26`) adds first-party C bridge,
+MIPS homebrew and native guest code. These are explicit follow-up scopes,
+not vendored exceptions or completed migration credit. Its successful guest,
+frontend and desktop checks validate that feature on its recorded kernel;
+they do not validate a future V translation of those sources.
+
+The N64 guest fixture (`b01fdc9f`, 488) preserves all 45 failure guards,
+ten required features, the optional supplied-game feature and final verdict.
+Strict ARM/x86 musl builds have no implicit allocator imports. Original-C,
+V and maintained default-runner ARM guests passed on the same recorded kernel,
+frontend and redistributable homebrew. All nine metric lines and all three
+160×120 RGB frame artifacts match byte-for-byte. The 640×480 surface checks,
+input ages, SRAM record, 30-second pipe polls and 500×10-ms child retirement
+remain. The initial V prefix-length failure is retained; the corrected prefix
+matches the original 14 bytes. Fixed arrays remain stack values, with compiler
+memmove zeroing where required. `n64-v-fixture-stage/validation.json` records
+peer lifetime review and exact input hashes; generation with the committed
+compiler helper matches the tested artifacts. Native x86 emulator execution,
+Darwin host sanitizers and a new production-kernel build are not claimed.
+The first-party core bridge and MIPS homebrew remain separate follow-up work.
+
+Permanent CPU-mask storage (`f4d9ad6d`) now belongs to V. This retires the
+48-line first-party storage wrapper and 23-line host declaration wrapper with
+zero algorithm credit for upstream constants and metadata. V owns all nine
+exported objects and their literal initialization. A narrowly whitelisted native
+scalar qualifier emits only a typedef and width assertion. GNU99/GNU11 original
+C/V host comparisons each passed 15,810,213 assertions in 17 cold processes.
+All nine symbol payloads, required alignment and readonly/writable section flags
+match the original, including the 2,080-byte compressed bank and 32 all-bits
+bytes. Mutable section ordering/padding differs (0xac versus 0xa8 bytes), so
+whole-object/contiguous-layout identity is not claimed. Fresh enabled/default
+x86 and default ARM builds, the complete normal 42-marker/19-equality guest
+and both default boots passed; no new V-storage SSE run is claimed. Receipt:
+`cpu-storage-oct07-final-validation.json`. Authored embedded C test/oracle and
+native declaration headers remain follow-up work.
+
+The native LinuxKPI PID 1 (`a754ffc7`, 28) preserves the eight 2,000,000-spin
+volatile CPL3 intervals, ordinary getpid calls, original console open/write,
+21 verdict bytes and infinite nanosleep using the same 16-byte stack record.
+V inline assembly preserves the original syscall registers and memory clobbers;
+instruction-only ELF entry assembly establishes the native call stack alignment.
+Strict freestanding, LLVM musl and genuine GCC musl links have no undefined or
+allocator imports. Complete original-C/V controls on the same immutable kernel
+passed all 42 markers and 19 exact memory equalities; both default boots passed.
+The original control's executable sections were independently reproduced
+byte-for-byte from Git revision `2a5abc36`. `linuxkpi-init-stage-validation.json`
+records peer ABI/lifetime review. This x86 fixture adds no new ARM execution,
+host syscall sanitizer or production-kernel build claim.
 
 Native callback contracts (`03ad7bb3`, 18 paths) and const string/log-record
 contracts (`e79802e4`, five paths) receive zero algorithm credit. They preserve
@@ -907,14 +1074,16 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17`,
+At committed source `f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census still contains 166 test paths / 40,555 lines,
-including genuine patched musl evidence. Maintained first-party host/native
-fixtures and header algorithms remain to port; zero kernel C is not completion
-of the repository-wide request. This census is not a translation tally. The
-concurrent IRQ diagnostic added nine C guest-init lines; they receive no
-translation credit.
+The non-vendored `.c` census contains 159 paths / 39,409 lines: 154 test paths
+(38,091 lines) and five build-support paths (1,318 lines). Genuine patched
+musl evidence remains included; N64 and concurrent PS2 bridge/homebrew/test C
+are first-party follow-up scopes. Maintained host/native fixtures, header
+algorithms and authored embedded C also remain. Zero kernel C is not completion
+of the repository-wide request, and this census is not a translation tally.
+The nine IRQ diagnostic lines are included once in the completed 28-line PID 1
+port; no extra credit is assigned to the new diagnostic or assembly entry.
 
 The first kernel-fixture guest failed the unchanged i915 device-encoding
 condition. Its cause was signed literals passed to the foreign `MKDEV` macro:
@@ -1045,8 +1214,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17` reports **V 71.68%, C 5.90%**,
-469 C files, 492 Python files and 285 shell files. All 2,588 classified blob
+`f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98` reports **V 72.28%, C 4.95%**,
+484 C files, 520 Python files and 287 shell files. All 2,708 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
