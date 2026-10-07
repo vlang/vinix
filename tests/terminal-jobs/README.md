@@ -46,3 +46,14 @@ remain separate work; this result covers the controlling-terminal handoff.
 Run `python3 tests/terminal-jobs/run.py`, or add `--arch=amd64`. Isolated
 kernels and cached VM tooling use the same environment variables as
 `tests/stack-policy/run.py`. The test requires four virtual CPUs.
+
+The independent fixture is maintained in `guestfixture/core.v`; its native
+header contains libc declarations and layout assertions. Generated C is a
+build artifact. The port preserves the original 89 check sites, signal and
+pthread callback identities, volatile shared words, atomic memory orders,
+six elapsed seconds of retirement grace, loop counts and memory bounds.
+The runner keeps the original 300-second default deadline and four-CPU guests.
+The original 568-line C control remains available in Git revision `13c5160a`.
+Its separate readiness fix in `66513801` waits for both orphan-signal handlers
+within the original bounded poll before the unchanged assertions. The V
+fixture includes the same fix; the C and V controls pass on both architectures.
