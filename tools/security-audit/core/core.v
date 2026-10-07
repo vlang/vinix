@@ -30,6 +30,7 @@ fn C.vka_token(&char, &char, &&char) &char
 fn C.memset(voidptr, i32, usize) voidptr
 fn C.memcmp(voidptr, voidptr, usize) i32
 fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.__builtin_alloca(usize) voidptr
 fn C.memchr(voidptr, i32, usize) voidptr
 fn C.vka_stat(i32, &C.vka_stat) i32
 fn C.vka_path_max() usize
@@ -355,19 +356,25 @@ pub fn audit_main(argc i32, argv &&char) i32 {
   if C.vka_uid() != 0 || C.vka_euid() != 0 { C.vka_root_required(); return 1 }
   C.vka_umask()
   if C.vka_signals() != 0 { C.vka_perror(c'vinix-security-audit: signals'); return 1 }
-  mut collector := C.collector{}
+  // These buffers stay within this call. Allocate the candidate once, outside
+  // the polling loop, so stack use stays bounded across collection rounds.
+  collector := &C.collector(C.__builtin_alloca(sizeof(C.collector)))
+  next := &C.collector(C.__builtin_alloca(sizeof(C.collector)))
+  C.memset(collector, 0, sizeof(C.collector))
   if session_id(&collector.session[0]) != 0 { C.vka_perror(c'vinix-security-audit: session entropy'); return 1 }
-  mut snapshot := C.snapshot{}
+  snapshot := &C.snapshot(C.__builtin_alloca(sizeof(C.snapshot)))
+  C.memset(snapshot, 0, sizeof(C.snapshot))
   // Canonical authority is checked even for a diagnostic source override.
-  if read_snapshot(c'/proc/security_audit', &snapshot) != 0 || (C.strcmp(source, c'/proc/security_audit') != 0 && read_snapshot(source, &snapshot) != 0) { C.vka_perror(c'vinix-security-audit: snapshot'); return 1 }
+  if read_snapshot(c'/proc/security_audit', snapshot) != 0 || (C.strcmp(source, c'/proc/security_audit') != 0 && read_snapshot(source, snapshot) != 0) { C.vka_perror(c'vinix-security-audit: snapshot'); return 1 }
   mut fd := open_log(path, -1)
   if fd < 0 { C.vka_perror(c'vinix-security-audit: secure log'); return 1 }
-  mut output := C.output{}
-  mut failed := start_line(&output, &collector) != 0 || append(fd, &output, 0) != 0
+  output := &C.output(C.__builtin_alloca(sizeof(C.output)))
+  C.memset(output, 0, sizeof(C.output))
+  mut failed := start_line(output, collector) != 0 || append(fd, output, 0) != 0
   for !failed {
-   mut next := collector
-   if collect(&next, &snapshot, &output) != 0 || append(fd, &output, 0) != 0 { failed = true; break }
-   collector = next
+   C.memcpy(next, collector, sizeof(C.collector))
+   if collect(next, snapshot, output) != 0 || append(fd, output, 0) != 0 { failed = true; break }
+   C.memcpy(collector, next, sizeof(C.collector))
    if once || signal_stopping() != 0 { break }
    mut seconds := interval / 1000; mut nanoseconds := (interval % 1000) * 1000000
    for C.vka_sleep(&seconds, &nanoseconds) < 0 {
@@ -379,15 +386,15 @@ pub fn audit_main(argc i32, argv &&char) i32 {
     signal_clear_reopening()
     new_fd := open_log(path, fd); if new_fd < 0 { failed = true; break }
     C.vka_close(fd); fd = new_fd; output.used = 0
-    if reopen_line(&output, &collector) != 0 || append(fd, &output, 0) != 0 { failed = true; break }
+    if reopen_line(output, collector) != 0 || append(fd, output, 0) != 0 { failed = true; break }
    }
-   if read_snapshot(source, &snapshot) != 0 { failed = true; break }
+   if read_snapshot(source, snapshot) != 0 { failed = true; break }
   }
-  if !failed { output.used = 0; failed = end_line(&output, &collector, once) != 0 || append(fd, &output, 0) != 0 }
+  if !failed { output.used = 0; failed = end_line(output, collector, once) != 0 || append(fd, output, 0) != 0 }
   if failed {
    e := C.vka_errno(); C.vka_collection_error(e); output.used = 0
-   if put(&output, c'\ncollector_error session=') == 0 && put(&output, &collector.session[0]) == 0 && put(&output, c' wall_ns=') == 0
-    && decimal(&output, C.vka_wall_ns()) == 0 && put(&output, c' errno=') == 0 && decimal(&output, u64(e)) == 0 && put(&output, c'\n') == 0 { append(fd, &output, 0) }
+   if put(output, c'\ncollector_error session=') == 0 && put(output, &collector.session[0]) == 0 && put(output, c' wall_ns=') == 0
+    && decimal(output, C.vka_wall_ns()) == 0 && put(output, c' errno=') == 0 && decimal(output, u64(e)) == 0 && put(output, c'\n') == 0 { append(fd, output, 0) }
   }
   if C.vka_close(fd) != 0 { C.vka_perror(c'vinix-security-audit: log close'); failed = true }
   return if failed { 1 } else { 0 }

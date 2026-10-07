@@ -16,6 +16,7 @@ fn C.strncmp(&char, &char, usize) i32
 fn C.strchr(&char, i32) &char
 fn C.strspn(&char, &char) usize
 fn C.memset(voidptr, i32, usize) voidptr
+fn C.__builtin_alloca(usize) voidptr
 fn C.vksb_prctl(i32, u64) i32
 fn C.vksb_capget(voidptr) i32
 fn C.vksb_capset(voidptr) i32
@@ -186,10 +187,13 @@ pub fn run(argc i32, argv &&char) i32 {
    C.vksb_help(c'Usage: vinix-sandbox --promises \'stdio ...\' [--uid UID --gid GID]\n       [--unveil /path rwxc]... [--env NAME=VALUE]... -- /program [args...]\nDrops capabilities, supplementary groups and inherited FDs >=3; sets\nno_new_privs, locks unveil and keeps the target promises across exec.\nRoot must choose nonzero UID/GID. Environment is empty unless --env\nis supplied. The program is automatically unveiled rx; shared library\nand data paths must be explicitly unveiled. Setup failure exits 125.')
    return 0
   }
-  mut config := Config{}
-  mut result := parse(argc, argv, &config)
+  // Both helpers finish synchronously and retain no configuration pointer.
+  // Keep this call-local value on the stack in the allocation-free core.
+  config := &Config(C.__builtin_alloca(sizeof(Config)))
+  C.memset(config, 0, sizeof(Config))
+  mut result := parse(argc, argv, config)
   if result != 0 { return result }
-  result = harden(&config)
+  result = harden(config)
   if result != 0 { return result }
   program := argv[config.command]
   if C.vksb_unveil(program, c'rx') != 0 { return sb_error(c'unveil program') }
