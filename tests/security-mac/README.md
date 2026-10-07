@@ -13,6 +13,25 @@ reference lifetime. Repeated allowed and denied operations report their live
 slab retention. The FIFO check isolates the interface-box allocation class;
 the pre-existing unretired FIFO node is outside that check.
 
+The host CLI regression links the production V parser to the independent
+[`clifixture` oracle](clifixture/core.v). It preserves the original 17 assertion
+sites, eight invalid numbers, eight invalid permission lists and five command
+argument banks. Its `mock_prctl(int, ...)` entry uses instruction-only assembly
+to transport four native unsigned-long arguments to the V state callback;
+the label and exec mocks retain their original native const pointer types.
+The oracle borrows literal strings and keeps invocation arrays on the stack.
+This model checks CLI parsing and mock calls; the separate guests below check
+kernel policy enforcement.
+
+`host-run.sh` defaults to the V oracle and the original strict C11/O2
+AddressSanitizer/UndefinedBehaviorSanitizer profile. `--source` selects an
+immutable original `cli_test.c` control with its relative header tree intact,
+`--keep-dir` retains generated sources, commands, input hashes, objects, the
+executable and both output logs in a new directory, and `--arch arm64|x86_64`
+selects a Darwin host architecture. `CC` selects the host compiler. The default
+ASan options disable leak detection; these runs establish no LeakSanitizer
+result. The assembly transport is outside sanitizer instrumentation.
+
 Build each kernel in its own worktree with the dependency symlinks described in
 AGENTS.md, and prepare the musl sysroot/cross compiler as for the other kernel
 guest tests. Then run from this repository:
