@@ -20,7 +20,19 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 # Use the platform C compiler: TCC cannot resolve Boehm dlopen wrappers on macOS.
-"$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source"
+if [ "$(uname -s)" = Darwin ]; then
+    # A Rosetta shell can pass its architecture preference to cc even when V
+    # itself is ARM. Select the compiler binary's architecture for its children.
+    case "$(file -b "$V")" in
+        "Mach-O 64-bit executable arm64"*)
+            arch -arm64 "$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source" ;;
+        "Mach-O 64-bit executable x86_64"*)
+            arch -x86_64 "$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source" ;;
+        *) "$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source" ;;
+    esac
+else
+    "$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source"
+fi
 
 # Keep the caller's working directory and pass tool arguments without parsing.
 set +e
