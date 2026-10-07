@@ -616,14 +616,8 @@ fn run_compiler_profiles(work string, linux string, generated string, compiler [
 }
 
 fn main() {
-	mut keep := ''
-	mut index := 1
-	for index < os.args.len {
-		arg := os.args[index]
-		if arg in ['-h', '--help'] { println('usage: cpu_masks.v [--keep-dir KEEP_DIR]\n\n' + scope); return }
-		if arg == '--keep-dir' && index + 1 < os.args.len { keep = os.args[index + 1]; index += 2; continue }
-		if arg.starts_with('--keep-dir=') { keep = arg.all_after('='); index++; continue }
-		eprintln('Unrecognized or incomplete argument: ${arg}'); exit(2)
+	keep := hosttest.parse_keep_dir(os.args[1..], 'usage: cpu_masks.v [--keep-dir KEEP_DIR]', scope) or {
+		eprintln(err); exit(2)
 	}
 	run_profile(keep) or { eprintln(err); exit(1) }
 }
