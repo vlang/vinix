@@ -87,19 +87,17 @@ check-g17-power-model:
 	./generate_g17_power_model.py --check
 
 generate-fake-g17-encoder:
-	./generate_fake_g17_3d_encoder.py
+	./generate_fake_g17_3d_encoder
 
 check-fake-g17-encoder:
-	./generate_fake_g17_3d_encoder.py --check
+	./generate_fake_g17_3d_encoder --check
 
 test:
 	python3 -m unittest -v test_inspect_macos.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
 		test_recover_g17_abi.py \
-		test_generate_g17_power_model.py \
-		test_generate_fake_g17_3d_encoder.py \
-		test_compile_fake_g17_plan.py
-	. ../../build-support/find-v.sh; "$$V" test g13layout g13contract traceanalysis imageextract
+		test_generate_g17_power_model.py
+	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl

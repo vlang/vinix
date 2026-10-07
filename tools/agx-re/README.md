@@ -349,14 +349,14 @@ recovered and now have capability-specific, cache-correct DRM queue ownership
 with reverse-order unwind. What remains for submission is porting the complete
 register emission graph into the work-command encoder, implementing the four
 remaining callback error/control event actions, and work-command reclamation.
-`compile_fake_g17_plan.py` now consumes the recovered 3D emission CFG together
+`compile_fake_g17_plan` now consumes the recovered 3D emission CFG together
 with a raw HAL300 command and its staged descriptor. It rejects selector/mode
 sequences that are not a recovered execution path and independently evaluates
 constant and descriptor-rooted value expressions into the golden format used
 by Vinix's fake-G17 verifier. External object roots remain visibly
 unconstrained. See [the fake backend guide](../../docs/g17-fake-backend.md) for
 the command line and exact trust boundary.
-`encode_fake_g17_3d.py` is the matching host reference producer. It chooses a
+`encode_fake_g17_3d` is the matching host reference producer. It chooses a
 concrete path by evaluating the recovered predicates, emits all four register
 streams while preserving a supplied pool template, and compiles its own output
 back into a verifier plan. Unresolved channel/accelerator branches and values
@@ -390,13 +390,13 @@ accelerator methods are clears or fill arrays well away from both ranges.
 `compile_fake_g17_plan.fold_accelerator_inputs` folds these facts into every
 producer's value and branch expressions with a known-bits evaluator, shared by
 the plan compiler (`--column-count`), the reference encoder (`hardware` in the
-externals JSON) and the C generator.
-`generate_fake_g17_3d_encoder.py` lowers the same UUID-pinned graph into the
-checked-in, freestanding C encoder used by the kernel. It emits direct bounded
+externals JSON) and the V generator.
+`generate_fake_g17_3d_encoder` lowers the same UUID-pinned graph into the
+checked-in, freestanding V encoder used by the kernel. It emits direct bounded
 integer expressions and graph branches, not a runtime JSON interpreter, and
 returns a fixed-capacity verifier trace alongside the command. Its host test
 checks all 16 combinations of three descriptor branches and a narrow or wide
-column count against byte-exact hashes from the separate Python reference. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
+column count against byte-exact hashes from the independent reference fixture. Use `make -f GNUmakefile check-fake-g17-encoder` after a new
 recovery to catch any stale generated source.
 The first parser-to-descriptor bridge is executable: the recovery pins the
 retained render payload's `+0x2d0` common record, all 49 scatter-copy ranges,
