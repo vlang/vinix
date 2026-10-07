@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `5e1e3f3fc0f316ff136774faaeb2c23039a60d0b`, Linguist 7.27.0 reports
-**Python 11.74%** (506 files, 4,894,781 bytes) and **V 73.49%** (1,285 files,
-30,628,232 bytes). The complete committed-blob inventory and reproduction
+At source `6868e76fc6498c6efbb9a423972e10b0c9528e97`, Linguist 7.27.0 reports
+**Python 11.10%** (496 files, 4,626,591 bytes) and **V 74.14%** (1,309 files,
+30,907,910 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **311,504 Python bytes**. Roughly another
-2.81 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **579,694 Python bytes**. Roughly another
+2.54 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,11 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. Their gross scope is 322,171 bytes.
+tests, including comments and blank lines. Their gross scope is 603,164 bytes.
 The net reduction is smaller by 290 bytes of temporary G13 adapter code,
-10,311 bytes of retained extraction import bridges, and 66 bytes added while
+10,311 bytes of retained extraction import bridges, 12,803 bytes of G17
+foundation wrappers/import bridges and loader fingerprint changes, and 66
+bytes added while
 moving the existing guest runner's comparator call to native validation.
 Adapter additions receive no extra migration credit.
 
@@ -39,6 +41,12 @@ Adapter additions receive no extra migration credit.
 | Pagefault host controller and module generation | `tests/linuxkpi/pagefault.v`, `hosttest/module.v` | 22,314 / 486 | `7764654abe4b1e7eecfe2cf1f37fc1dd45adc394` |
 | AGX firmware, fileset and PMP extraction with tests | `tools/agx-re/imageextract`, `extractionabi` | 47,310 / 1,248 | `1eb9d935609b9c7bd2e7b5f2f668dcbe612845e1` |
 | Direct kernel allocation comparison, tests and validation | `tests/alloc-bench/kernelcompare`, `compare_kernel.v`, `validate_kernel.v` | 25,002 / 478 | `5e1e3f3fc0f316ff136774faaeb2c23039a60d0b` |
+| Scalar read/store host controllers | `tests/linuxkpi/scalar_reads.v`, `scalar_store.v` | 39,169 / 841 | `98a1d2b40c86217f2589065026cb9c542162d569` |
+| Fake-G17 plan/reference encoder/source generator and tests | `tools/agx-re/g17plan`, three V entrypoints | 120,096 / 3,008 | `e7807a42eeb0d2111ba011a17462ec8b235f5c8f` |
+| Usercopy and checked-access host controllers | `tests/linuxkpi/uaccess.v`, `user_access_scope.v` | 46,230 / 1,006 | `e973e7fbb1acc808b068b74b73ea6721ef3035cc` |
+| Nocache ABI/primitive host controller | `tests/linuxkpi/nocache.v` | 26,985 / 512 | `c395bd3093a50f1a42816984d1e22dbe0626ae25` |
+| User-pointer compiler controller | `tests/linuxkpi/user_pointer.v` | 9,179 / 214 | `95bcfdf680f943b6521593d4110f12c388f8521d` |
+| G17 Mach-O, instruction and static register recovery foundations | `tools/agx-re/g17decode` | 39,334 / 1,056 | `6868e76fc6498c6efbb9a423972e10b0c9528e97` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -51,7 +59,9 @@ Commits `2f201134` and `bc8577ef` select the platform C compiler and preserve
 the V compiler binary's architecture when launched through Rosetta. Actual
 x86 tests exercise shell routes as well as the independently compiled binaries.
 Commit `5bd3b6bb` preserves explicit empty Path options, option-value parsing,
-help actions and abbreviations across the LinuxKPI controllers.
+help actions and abbreviations across the LinuxKPI controllers. Commit
+`683cbc7c` preserves the argument error for a bare `--`; 310 actual CLI
+controls cover the ten prior controllers. These fixes receive no extra port credit.
 
 ## Validation
 
@@ -124,6 +134,46 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   stdin; benchmark deadlines and workloads stay unchanged. A peer reviewed
   numeric behavior, error ordering and host lifetimes.
 
+- Fake-G17 tools: 14 native tests per host, all 17 original test bodies routed
+  to native APIs, 3,944 exact API cases per host and ASan/UBSan, and 638 CLI
+  controls. Generated 51,435-byte kernel V and 1,583-byte ABI header remain
+  byte-exact. Wide offsets, selectors and external keys retain their full
+  integer values. The maintained make test/check targets and four shell routes
+  pass; integration is committed separately as `e54a156e`.
+- Scalar access: GNU99/GNU11 each retain 1,033 read and 26,260 store assertions
+  per host. The 123 read bodies, 123 store-frontend bodies, 124 word-module
+  bodies and independent invalid-width fixtures remain exact. Six x86
+  O0/O1/O2 proof objects retain CPUID and immediate MOV widths, with no RMW
+  or allocator imports. Supplied-header profiles and 32 CLI controls per controller pass.
+- Usercopy/checked access: 197/143 generated bodies remain exact. Usercopy
+  retains 9,200 assertions per standard on both LLVM 23 host ABIs; scope
+  retains 449,253 per standard on both AppleClang 21 ABIs. Untouched scope
+  fails on LLVM 23's unused-global diagnostic; native negative controls retain
+  that failure instead of weakening warning flags. Fixtures, headers,
+  compiler-only fences, normalized IR/width diagnostics and 29 CLI controls per
+  controller match. Runtime deadlines remain 30 seconds.
+- Nocache: 25,299,139 assertions per standard per host and a supplied-header
+  ARM profile, 123 frontend and 127 primitive bodies, all eight freestanding
+  frontend/ABI combinations and six x86 O0/O1/O2 primitive proofs. All 22 native
+  objects match the originals. Typed inline-assembly widths, memory operands,
+  CPUID ordering, NT instruction selection and the SFENCE memory clobber remain
+  checked, along with no runtime imports. The fixture retains its 60-second
+  deadline; 32 CLI controls pass.
+- User pointer: 25,603 assertions per standard per host, byte-exact fixtures,
+  headers and extracted pinned macro, all six wrong-type diagnostics and no
+  runtime imports. The 30-second fixture deadline remains; 32 CLI controls pass.
+- G17 foundations: 63 original functions moved to V. Each ARM/x86/ASan build
+  passes 121,304 decoder/Mach-O controls, including exhaustive UTF-8 byte pairs,
+  logical masks, random encodings, signed offsets and wide branches. The real
+  driver retains all 6,545 symbols, ten code spans and six vtable targets.
+  Nineteen recovery and 21 extraction native tests, 227 unchanged recovery tests
+  (12 original private-fixture skips) and the integrated 253 Python/six-module
+  suite pass. Foreign-thread tests retain zero owned output buffers and bounded
+  collector use. Net Python reduction is **26,531 bytes**, including the
+  loader's 13-byte fingerprint addition; `python-accounting.json` pins exact
+  committed blob sizes. The public alignment helper now accepts arbitrary
+  signed integers in native V.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -143,6 +193,12 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `pagefault-20261008` | `qualified-differential.json` | `b790c3692173edab83cc1d6c3d2d5908ec93ab72028c5a71f2fe1e2a75f47032` |
 | `agx-extract-20261008/final` | `precommit-validation.json` | `7494ef3012d3fd3ed1404f66c9beeecb7d0cdffc835e28a86935bca217da54af` |
 | `kernel-compare-20261008` | `final-qualification.json` | `51e8f6b99a83a0e1b324f93b7a2bd00fa6ba3b4becde57041596a9495699765b` |
+| `scalar-20261008` | `qualified-differential.json` | `7b6b7f1b49faab37067e01a634f9c2ef44ffef93fb86ff87d3f2cdcee0c383bd` |
+| `g17-plan-20261008` | `final-qualification-v1.json` | `654687dc35ee1c3f4a8b728b29973e7a0c3570623514c55cd1fdebb470ffcd05` |
+| `uaccess-20261008` | `qualified-differential.json` | `3a09d15a59eebbbfa52f4edf59495072941087cbe145fdb9fece37b3bb7ee730` |
+| `nocache-20261008` | `qualified-differential.json` | `db8fc5edcc7a632ad24ff8d52bf3725d84a9391c477988d88420fc879fd3b147` |
+| `user-pointer-20261008` | `qualified-differential.json` | `ffd668b7e0b1ce5ffc1de3b7faeed5b5f125b761f6a6a9b65a470ebc1f7aa6ae` |
+| `agx-recovery-20261008/final` | `precommit-validation.json` | `06dbaf60ec1254e4542815831d7cd956e0a90fd866941c379941750e2cd678f5` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -151,10 +207,11 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-The coupled fake-G17 plan compiler/reference encoder/generator, foundational
-G17 recovery decoders, power recovery/generation and further LinuxKPI compiler
+Power recovery/generation, Apple ADT/property recovery, the macOS inspection
+manifest, the shared ABI schema generator and further LinuxKPI compiler
 controllers are the next active scopes. They do not count as completed until
-qualified and committed. Native numeric decoding must preserve large provenance timestamps as
+qualified and committed. Native numeric decoding must preserve large provenance
+timestamps as
 well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
 narrow adapter to the native implementation until its caller is ported too.

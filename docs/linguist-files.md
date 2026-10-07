@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `5e1e3f3fc0f316ff136774faaeb2c23039a60d0b`,
+at source commit `6868e76fc6498c6efbb9a423972e10b0c9528e97`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,10 +12,10 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 491 | 1,863,972 | 4.47% |
-| Python | 506 | 4,894,781 | 11.74% |
-| Shell | 298 | 1,286,939 | 3.09% |
+| Python | 496 | 4,626,591 | 11.10% |
+| Shell | 301 | 1,287,444 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 73.49%, with no
+All `.v` files are classified as V. The resulting V share is 74.14%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 5e1e3f3fc0f316ff136774faaeb2c23039a60d0b --breakdown --json
+github-linguist --rev 6868e76fc6498c6efbb9a423972e10b0c9528e97 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -874,23 +874,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/fpu_header_test.py` | 4,937 |
 | `tests/linuxkpi/host_suite.py` | 5,431 |
-| `tests/linuxkpi/nocache_test.py` | 26,985 |
 | `tests/linuxkpi/overflow_test.py` | 12,342 |
 | `tests/linuxkpi/overflow_type_test.py` | 13,758 |
 | `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
-| `tests/linuxkpi/scalar_store_test.py` | 21,614 |
-| `tests/linuxkpi/scalar_uaccess_test.py` | 17,555 |
 | `tests/linuxkpi/smp_header_test.py` | 19,818 |
 | `tests/linuxkpi/smp_type_test.py` | 21,549 |
 | `tests/linuxkpi/special_insns_test.py` | 12,994 |
 | `tests/linuxkpi/spin_test.py` | 6,391 |
 | `tests/linuxkpi/standalone_test.py` | 4,640 |
 | `tests/linuxkpi/static_key_declaration_test.py` | 12,107 |
-| `tests/linuxkpi/uaccess_test.py` | 23,353 |
 | `tests/linuxkpi/upstream_test.py` | 3,013 |
-| `tests/linuxkpi/user_access_scope_test.py` | 22,877 |
-| `tests/linuxkpi/user_pointer_test.py` | 9,179 |
 | `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/compile-fixture.py` | 1,221 |
 | `tests/m1-wifi/compile-provider.py` | 2,106 |
@@ -1018,22 +1012,18 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tests/xnualloc/reference_test.py` | 15,234 |
 | `tests/xnualloc/zone_model_test.py` | 12,764 |
-| `tools/agx-re/_native_extract.py` | 5,379 |
+| `tools/agx-re/_native_extract.py` | 5,392 |
+| `tools/agx-re/_native_g17.py` | 3,868 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
-| `tools/agx-re/compile_fake_g17_plan.py` | 49,765 |
-| `tools/agx-re/encode_fake_g17_3d.py` | 10,642 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/generate_fake_g17_3d_encoder.py` | 33,570 |
 | `tools/agx-re/generate_g17_power_model.py` | 13,910 |
 | `tools/agx-re/inspect_macos.py` | 33,150 |
-| `tools/agx-re/recover_g17_abi.py` | 659,679 |
+| `tools/agx-re/recover_g17_abi.py` | 629,267 |
 | `tools/agx-re/recover_t6050_power.py` | 220,154 |
 | `tools/agx-re/recover_t8103_adt.py` | 19,033 |
-| `tools/agx-re/test_compile_fake_g17_plan.py` | 23,825 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_generate_fake_g17_3d_encoder.py` | 2,294 |
 | `tools/agx-re/test_generate_g17_power_model.py` | 3,426 |
 | `tools/agx-re/test_inspect_macos.py` | 21,643 |
 | `tools/agx-re/test_recover_g17_abi.py` | 332,984 |
@@ -1348,9 +1338,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x86-translation/smoke.sh` | 657 |
 | `tests/zsh/smoke.sh` | 561 |
 | `tools/agx-re/check_g13_reference_contract` | 180 |
+| `tools/agx-re/compile_fake_g17_plan` | 167 |
+| `tools/agx-re/encode_fake_g17_3d` | 164 |
 | `tools/agx-re/extract_fileset` | 161 |
 | `tools/agx-re/extract_firmware` | 162 |
 | `tools/agx-re/extract_pmp_firmware` | 166 |
+| `tools/agx-re/generate_fake_g17_3d_encoder` | 174 |
 | `tools/agx-re/generate_g13_initdata_layout` | 180 |
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
 | `tools/agx-re/trace_diff` | 156 |
