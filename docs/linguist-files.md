@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98`,
+at source commit `b5245a1330d8ce652b111552d5c0fcbdec64e915`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 484 | 2,047,518 | 4.95% |
-| Python | 520 | 5,176,458 | 12.50% |
-| Shell | 287 | 1,266,444 | 3.06% |
+| C | 488 | 2,002,574 | 4.83% |
+| Python | 523 | 5,192,331 | 12.53% |
+| Shell | 287 | 1,267,425 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 72.28%, with no
+All `.v` files are classified as V. The resulting V share is 72.37%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98 --breakdown --json
+github-linguist --rev b5245a1330d8ce652b111552d5c0fcbdec64e915 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -68,9 +68,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/dota2/mmap32-abi.h` | 501 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
 | `build-support/ios/cxx-abi.h` | 456 |
-| `build-support/n64-homebrew/paddle.c` | 9,190 |
-| `build-support/n64/bridge.c` | 14,296 |
+| `build-support/n64-homebrew/paddlecore/freestanding/inttypes.h` | 124 |
+| `build-support/n64-homebrew/paddlecore/freestanding/stdio.h` | 298 |
+| `build-support/n64-homebrew/paddlecore/native-abi.h` | 1,157 |
 | `build-support/n64/bridge.h` | 723 |
+| `build-support/n64/bridgecore/native-abi.h` | 1,574 |
+| `build-support/n64/bridgefixture/bridge-test-abi.h` | 558 |
 | `build-support/n64/budget.h` | 231 |
 | `build-support/ps2-homebrew/iop.c` | 2,741 |
 | `build-support/ps2-homebrew/paddle.c` | 7,675 |
@@ -355,7 +358,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dumpability/dumpfixture/dump-native-abi.h` | 685 |
 | `tests/elf-text/guest.c` | 4,434 |
 | `tests/execute-only/guest.c` | 8,192 |
-| `tests/ext2-sparse/guest.c` | 7,595 |
+| `tests/ext2-sparse/sparsefixture/sparse-native-abi.h` | 1,110 |
 | `tests/ext2-xattr/test.c` | 17,267 |
 | `tests/fsync-scope/syncfixture/fsync-native-abi.h` | 434 |
 | `tests/gl-triangle/guest_init.c` | 423 |
@@ -364,8 +367,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/abifixture/abi-fixture-native-abi.h` | 643 |
 | `tests/hypervisor/guestfixture/hypervisor-guest-native-abi.h` | 506 |
 | `tests/hypervisor/vmx_test.c` | 4,436 |
-| `tests/init-policy/guest.c` | 4,400 |
-| `tests/init-policy/test.c` | 11,180 |
+| `tests/init-policy/guestfixture/guest-native-abi.h` | 1,070 |
+| `tests/init-policy/hostfixture/host-native-abi.h` | 1,537 |
 | `tests/ios/calculator.c` | 2,085 |
 | `tests/ios/compression.c` | 2,291 |
 | `tests/ios/desktop-init.c` | 1,138 |
@@ -434,6 +437,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mount-policy/test.c` | 27,539 |
 | `tests/mounted-disk-policy/guest.c` | 9,548 |
 | `tests/n64/guestfixture/n64-guest-native-abi.h` | 1,072 |
+| `tests/n64/rspbudgetfixture/n64-rsp-native-abi.h` | 626 |
 | `tests/net-random/fixture/net-random-native-abi.h` | 351 |
 | `tests/network-ipv6/guestfixture/ipv6-guest-native-abi.h` | 558 |
 | `tests/network-ipv6/host.c` | 9,939 |
@@ -447,7 +451,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/oom/guest.c` | 19,200 |
 | `tests/openbsd-security/test.c` | 54,978 |
 | `tests/packages/gtk-smoke-auto-close.c` | 3,407 |
-| `tests/pagecache/guest.c` | 4,785 |
+| `tests/pagecache/cachefixture/cache-native-abi.h` | 726 |
 | `tests/pci-config/armfixture/pci-arm-fixture-native-abi.h` | 190 |
 | `tests/pci-config/config_test.c` | 19,430 |
 | `tests/pidfd/guest.c` | 28,993 |
@@ -483,7 +487,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/touchoracle/touch-oracle-native-abi.h` | 319 |
 | `tests/qemu-nested/inner-init.c` | 1,452 |
 | `tests/realtime/test.c` | 22,685 |
-| `tests/reboot-persistence/test.c` | 2,883 |
+| `tests/reboot-persistence/persistfixture/persistence-native-abi.h` | 605 |
 | `tests/resource-accounting/guest.c` | 21,009 |
 | `tests/resource-open/resourcefixture/resource-native-abi.h` | 683 |
 | `tests/scheduler-preemption/guest.c` | 5,391 |
@@ -583,8 +587,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/minecraft/minecraft-login` | 7,459 |
 | `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 13,020 |
-| `build-support/n64-homebrew/build.py` | 4,225 |
-| `build-support/n64/build.py` | 15,557 |
+| `build-support/n64-homebrew/build.py` | 5,005 |
+| `build-support/n64/build.py` | 17,077 |
+| `build-support/n64/test-bridge.py` | 2,530 |
 | `build-support/opengothic/build.py` | 10,713 |
 | `build-support/patch-elf-interpreter.py` | 968 |
 | `build-support/ps1/build.py` | 8,162 |
@@ -818,7 +823,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/elf-text/run.py` | 5,242 |
 | `tests/execute-only/check-generated.py` | 9,911 |
 | `tests/execute-only/run.py` | 3,981 |
-| `tests/ext2-sparse/run.py` | 6,802 |
+| `tests/ext2-sparse/run.py` | 7,614 |
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/fsync-scope/run.py` | 5,958 |
@@ -828,8 +833,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/host-test.py` | 3,871 |
 | `tests/hypervisor/run-abi.py` | 1,082 |
 | `tests/hypervisor/run-vm.py` | 1,253 |
-| `tests/init-policy/run-vm.py` | 3,896 |
-| `tests/init-policy/run.py` | 5,766 |
+| `tests/init-policy/compile-guest.py` | 1,044 |
+| `tests/init-policy/run-vm.py` | 4,345 |
+| `tests/init-policy/run.py` | 6,979 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/frame.py` | 1,860 |
 | `tests/ios/game2048.py` | 3,080 |
@@ -916,6 +922,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/run.py` | 7,112 |
 | `tests/n64/desktop.py` | 10,430 |
 | `tests/n64/frame.py` | 1,939 |
+| `tests/n64/rsp-budget.py` | 3,714 |
 | `tests/n64/run.py` | 7,152 |
 | `tests/native-boundaries/run.py` | 4,283 |
 | `tests/net-random/run.py` | 6,889 |
@@ -931,7 +938,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/test-qemu-package-store.py` | 10,794 |
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pagecache/check-generated.py` | 1,308 |
-| `tests/pagecache/run-guest.py` | 5,474 |
+| `tests/pagecache/run-guest.py` | 6,291 |
 | `tests/pci-config/arm_vm.py` | 14,616 |
 | `tests/pci-config/topology_test.py` | 36,084 |
 | `tests/posix-timer/check-generated.py` | 1,464 |
@@ -970,7 +977,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-module-iso/test_iso.py` | 1,677 |
 | `tests/qemu-ovmf/test_patch.py` | 16,807 |
 | `tests/realtime/run_vm.py` | 6,946 |
-| `tests/reboot-persistence/run_vm.py` | 6,140 |
+| `tests/reboot-persistence/run_vm.py` | 9,134 |
 | `tests/resource-accounting/check-generated.py` | 1,582 |
 | `tests/resource-accounting/run.py` | 5,734 |
 | `tests/resource-open/run.py` | 4,792 |
@@ -1316,7 +1323,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-nested/outer-init.sh` | 309 |
 | `tests/qemu-nested/run.sh` | 3,182 |
 | `tests/realtime/run.sh` | 1,513 |
-| `tests/reboot-persistence/run.sh` | 1,623 |
+| `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
 | `tests/security-audit/collector-run.sh` | 1,285 |
 | `tests/security-mac/host-run.sh` | 735 |

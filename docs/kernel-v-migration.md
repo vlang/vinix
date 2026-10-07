@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,251 original production/native-boundary C lines**, **16,933 original fixture/benchmark
+**3,844 original production/native-boundary C lines**, **17,577 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
-eight Wi-Fi tool lines). A further 21 original stack-pointer/syscall/variadic
+eight Wi-Fi tool lines). A further 29 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
@@ -483,7 +483,9 @@ committed and validated; pending stages are excluded.
 | Xinput native launcher and Wine host boundary | 95 | `bea41f8e` |
 | Office Windows PE API boundary | 123 | `7df94498` |
 | Hello and native greeting builder entries | 17 | `47be3479` |
-| **Production/native total** | **3,251** | |
+| Native N64 core bridge (four variadic-capture lines excluded) | 366 | `320172df` |
+| Native MIPS PADDLE cartridge (four ordering lines excluded) | 227 | `41c9ddd6` |
+| **Production/native total** | **3,844** | |
 
 Existing fixtures also became V: desktop execinfo 64 lines (`a2fa1fac`), AGX
 tracing 108 (`06fd0680`), Dota maps parser 150 and mapping probe 131
@@ -564,6 +566,11 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Native dumpability/secure-loader fixture | 99 | `95234fa2` |
 | LinuxKPI native Linux-ABI PID 1 fixture | 28 | `a754ffc7` |
 | Native N64 emulator regression fixture | 488 | `b01fdc9f` |
+| Native EXT2 page-cache read-ahead fixture | 113 | `bb26e71d` |
+| Native reboot-persistence fixture | 90 | `72a92ec8` |
+| Native sparse EXT2 fixture | 185 | `0a7d88fb` |
+| Init-policy native guest fixture | 78 | `8fd0f13a` |
+| Init-policy independent syscall host fixture | 178 | `b5245a13` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -886,7 +893,7 @@ poll deadline remain. Retained reap/exec-probe helpers receive zero credit.
 The broader 270-line scope and complete host-model workload remain uncredited.
 
 Thirteen further fixture scopes add 1,707 completed original lines; the later
-PID 1 and N64 fixtures add 516, bringing this update to 2,223 fixture lines
+PID 1 and N64 fixtures add 516, bringing that update to 2,223 fixture lines
 and seven FPU header implementation lines. Each original is pinned independently;
 counts, failure predicates, intrinsic deadlines and ownership remain intact.
 Fixture-only stages reuse the recorded immutable kernels and do not claim new
@@ -987,6 +994,21 @@ remain, and the scope receives zero completed translation credit. Its durable
 README and `host-fixture-validation.json` pin every input and retained outcome.
 Three whitespace-only cleanups generated identical C on both architectures.
 
+Fresh matched controls on default kernel
+`a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572`
+retain four `qemu64`/TCG CPUs, 1,024 MiB, all 26 groups/seven boundary modes
+and the original 3,600-second budget. C failed the first bound-CPU expression
+with SIGABRT after 1,100.94 seconds; V ended with SIGKILL after 907.04 seconds.
+Neither produced both required PASS markers. Earlier C-SIGKILL/V-assertion
+results remain recorded; no V-only cause is established. A cache-only original-C
+failure-print diagnostic also received SIGKILL after 437.62 seconds before
+printing routing operands. Its added failure tracing changes timing and gives
+no qualification credit. Source/supervisor audits found no internal 900-second
+alarm or watchdog; zero sampled OOM counters do not establish the kill cause.
+The source scope still receives zero credit. Receipts are
+`host-native-default-pair-20261007/paired-validation.json` and
+`host-native-default-pair-20261007/original-C-failure-diagnostic/native-run/validation.json`.
+
 The concurrent N64 integration (`8d172d26`) adds first-party C bridge,
 MIPS homebrew and native guest code. These are explicit follow-up scopes,
 not vendored exceptions or completed migration credit. Its successful guest,
@@ -1006,7 +1028,102 @@ memmove zeroing where required. `n64-v-fixture-stage/validation.json` records
 peer lifetime review and exact input hashes; generation with the committed
 compiler helper matches the tested artifacts. Native x86 emulator execution,
 Darwin host sanitizers and a new production-kernel build are not claimed.
-The first-party core bridge and MIPS homebrew remain separate follow-up work.
+The native core bridge (`320172df`) now ports 366 of its 370 original C lines;
+four native variadic-capture lines use instruction-only assembly with zero V
+credit. V preserves singleton/core ownership, ROM normalization, options,
+callbacks, save/reset/replacement and error cleanup. Strict ARM/x86 SDK builds,
+actual native layout/import probes and Darwin C/V ASan/UBSan controls pass,
+including mixed GP/FP/overflow variadic arguments and live-frame setjmp/longjmp.
+The final native ARM comparison uses the same upstream archive, including
+committed RSP patch `93b3c3b6`: all 162 archive members and 1,653 source inputs
+match. C/V feature guests pass all ten required checks, the optional game and
+final verdict, with identical nine metrics and three complete exported frames.
+Desktop pointer/pause/resume/close and native boundary cases pass; animated
+wall-clock counts differ and are not claimed identical. The upstream archive
+is not instrumented, Darwin leak detection is disabled, and no new kernel or
+x86 emulator execution is claimed. Receipts are
+`n64-v-bridge-stage/{source-audit,sdk-builds,upstream-parity,native-comparison}.json`.
+
+PADDLE (`41c9ddd6`) moves 227 of its 231 original lines to V, with four native
+`sync` lines in instruction-only assembly and zero extra credit. V's no-builtin
+backend uses a 32-bit type model; LLVM compiles the actual MIPS III/o32
+big-endian cartridge. Strict native assertions, all eight optimized repeated
+volatile polls, permanent initialized banks, font/character/color bytes and
+stack eight-byte decimal storage pass independent review. Only `n64_sync`
+remains an object import; the linked cartridge imports nothing. Frozen original
+C rebuilds reproduce its ROM byte for byte. V program/CIC checksum bytes differ.
+The final ARM C/V pair passes all ten required checks, the optional homebrew
+and final verdict: nine metrics and three complete RGB/PNG frames match exactly.
+A host pair passes reset/replacement/save/cleanup with identical complete
+296,960-byte save files and logs. Host ASan/UBSan covers the bridge/fixture,
+not the cartridge/upstream emulator; leak detection is disabled. The initial
+assembly-call MMIO version passed feature assertions but failed exact frames;
+that result is retained. V inline native volatile views fix the timing drift.
+No new kernel build or physical N64 operation is claimed. Receipts are
+`n64-v-homebrew-stage/{source-and-build-audit,polling-and-static-data-proof,native-comparison}.json`.
+
+EXT2 read-ahead (`bb26e71d`, 113) keeps all 31 check sites, two 200-cycle cold
+read cohorts, the 393,353-byte modulo-251 pattern, explicit discard and the
+original second-round 16-KiB slab tolerance. Strict original-C/V SDK and native
+controls pass on both architectures, as does the maintained ARM runner.
+All five offline file hashes match and e2fsck passes. Both measured cohorts
+stay within the original limits; absolute first-round random-read counts differ
+and are not required identical. Native layout, stack scanner/permanent buffer
+and generated allocator imports received peer review. Receipt:
+`pagecache-fixture/validation.json`.
+
+Reboot persistence (`72a92ec8`, 90) keeps the original one-process reset,
+fd duplication/closure, sync and unsynced buffered-close checks. Strict SDK
+builds pass on both architectures. Untouched ARM C and V pass; untouched x86 C
+fails its framebuffer `/dev/console` serial gate. An independently preserved
+x86 C control changes only that literal to `/dev/com1` and passes, as does V.
+The adaptation earns no credit. All passing controls have two START/two SYNC,
+one WROTE and one PASS marker within the original 240-second allowance.
+Receipt: `reboot-persistence-fixture/final-validation.json`.
+
+Sparse EXT2 (`0a7d88fb`, 185) keeps all 54 checks (53 on ARM), private/shared
+mapping writes and truncation isolation, the original 16-class bank, 32 warmups,
+500 measured iterations, six-second settling and exact free-block cleanup.
+Native volatile-byte stores/loads and printf native integer aliases preserve
+the actual ABI. Strict original-C/V SDK controls pass on both architectures;
+all four native C/V runs and the maintained ARM runner pass six phases across
+1,024/4,096-byte filesystems, including triple-indirect and above-4-GiB sparse
+writes. All 30 power-cut images pass offline e2fsck, with unchanged memory/time
+bounds. SDK and maintained helper profiles differ; each executed profile is
+pinned separately. An input-mutating peer objcopy command was caught by the
+hash guard before execution; exact restored inputs and recreated changed
+copies are recorded. Receipt: `ext2-sparse-fixture/validation.json`.
+
+Init-policy guest (`8fd0f13a`, 78) preserves all 30 mode-specific conditions,
+PID 1 arguments/environment/fds, child signal callback identity, volatile
+four-byte state and reap-before-restart ordering. Strict ARM/x86 SDK builds
+and no-allocator/optimized native signal accesses pass. Original C and V ARM
+guests pass all three shell/full/desktop policies within the original
+600-second allowance each; the production policy source, object and whole ELF
+are identical C/V. The initial overlong QMP socket path fails before boot and
+is retained; fresh short paths pass with no assertion or deadline changes.
+x86 SDK compilation is not x86 policy execution. Receipt:
+`init-policy-guest-fixture/final-validation.json`.
+
+Init-policy host (`b5245a13`, 178) preserves all 72 ordered assertions and
+both normal/BusyBox-echo variants. Original C and V each pass actual ARM/x86
+Darwin ASan/UBSan controls; strict native ARM LLVM/genuine x86 musl GCC fixture
+objects and all eight SDK links pass. The permanent 4,096-entry trace bank
+retains its 368-byte/8-aligned records, 32,768-byte output bank and synchronous
+borrowed strings/stack arguments. Four setjmp calls remain directly in live
+frames with native returns_twice and real longjmp; by-value 16-byte delay,
+32-byte action, volatile 32-bit foreign state and actual native callback
+addresses preserve the ABI. Generated code imports no allocator. Earlier ARM
+guest production sources, objects, ABI objects and whole ELFs are rebuilt with
+the original compiler/profile and match byte for byte. Initial different-profile
+object metadata and wrong supplemental IR sysroot diagnostics are retained.
+Darwin leak detection is disabled; SDK executables are link-only and no new
+guest/kernel execution is claimed. Receipt:
+`init-policy-host-fixture/final-validation.json`.
+
+These fixture stages reuse their individually recorded immutable kernels and
+do not claim host syscall sanitizers or fresh kernel builds. Kernel sources
+are unchanged between the validated CPU-storage stage and these port commits.
 
 Permanent CPU-mask storage (`f4d9ad6d`) now belongs to V. This retires the
 48-line first-party storage wrapper and 23-line host declaration wrapper with
@@ -1074,12 +1191,14 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98`,
+At committed source `b5245a1330d8ce652b111552d5c0fcbdec64e915`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 159 paths / 39,409 lines: 154 test paths
-(38,091 lines) and five build-support paths (1,318 lines). Genuine patched
-musl evidence remains included; N64 and concurrent PS2 bridge/homebrew/test C
-are first-party follow-up scopes. Maintained host/native fixtures, header
+The non-vendored `.c` census contains 152 paths / 38,164 lines: 149 test paths
+(37,447 lines) and three build-support paths (717 lines). All committed blob
+identities, byte sizes and line counts are checked with that revision's Git
+attributes and global/system attributes disabled. Genuine patched musl evidence
+remains included; concurrent PS2 bridge/homebrew/test C remains first-party
+follow-up work. Maintained host/native fixtures, header
 algorithms and authored embedded C also remain. Zero kernel C is not completion
 of the repository-wide request, and this census is not a translation tally.
 The nine IRQ diagnostic lines are included once in the completed 28-line PID 1
@@ -1214,8 +1333,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`f4d9ad6d7e0f963b5353100cbc4a595feb3b3e98` reports **V 72.28%, C 4.95%**,
-484 C files, 520 Python files and 287 shell files. All 2,708 classified blob
+`b5245a1330d8ce652b111552d5c0fcbdec64e915` reports **V 72.37%, C 4.83%**,
+488 C files, 523 Python files and 287 shell files. All 2,726 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
