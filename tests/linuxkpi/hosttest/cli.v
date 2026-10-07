@@ -22,7 +22,9 @@ pub fn parse_path_options(args []string, options []string, usage string, scope s
 	for index < args.len {
 		arg := args[index]
 		if arg == '--' {
-			unknown << args[index + 1..]
+			// These controllers have no positional arguments. argparse retains
+			// the separator as an unrecognized argument even when it is alone.
+			unknown << args[index..]
 			break
 		}
 		name := arg.all_before('=')
