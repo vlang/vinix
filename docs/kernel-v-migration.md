@@ -452,7 +452,7 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**3,844 original production/native-boundary C lines**, **17,577 original fixture/benchmark
+**3,844 original production/native-boundary C lines**, **17,990 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
 eight Wi-Fi tool lines). A further 29 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
@@ -571,6 +571,7 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Native sparse EXT2 fixture | 185 | `0a7d88fb` |
 | Init-policy native guest fixture | 78 | `8fd0f13a` |
 | Init-policy independent syscall host fixture | 178 | `b5245a13` |
+| Native PS2 emulator regression fixture | 413 | `c411ab6a` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -1146,6 +1147,25 @@ Darwin leak detection is disabled; SDK executables are link-only and no new
 guest/kernel execution is claimed. Receipt:
 `init-policy-host-fixture/final-validation.json`.
 
+The PS2 guest (`c411ab6a`, 413) preserves all 40 failure conditions, eight
+ordered verdicts, permanent frame banks, native 28/84/32/16-byte input/ELF/card
+records, acquire/release surface pinning and child reaping before unmapping.
+Strict ARM LLVM and genuine x86 musl GCC builds pass with no implicit allocator
+imports. The original tmpfs C/V ARM controls pass all six required checks,
+the optional PADDLE game and final verdict; all five metrics and three complete
+160×120 RGB/PNG exports match, while assertions retain the full 640×480 surface.
+The maintained V runner also passes and its generated source/object/ELF are
+independently reproduced byte-identical. Supplemental C/V controls use the
+same fixture with an explicitly separate EXT2 data-directory adapter; both
+pass offline e2fsck and their complete 8,650,752-byte cards match
+(`ab838fe785e50833eb7bef2bd532c19768d8bce9f88e3b61e3c4097e78d5e942`).
+These supplemental controls do not replace the original tmpfs qualification.
+The 30-second pipe poll, 500×10-ms reap loop and 600-second guest deadline
+remain. `ps2-v-fixture-stage/final-validation.json` records both lifetime peers
+and frozen inputs. The recorded kernel and emulator are reused; x86 evidence
+is SDK-only, with no new kernel build, host sanitizer or physical PS2 claim.
+PS2 bridge and homebrew implementations remain first-party follow-up scopes.
+
 These fixture stages reuse their individually recorded immutable kernels and
 do not claim host syscall sanitizers or fresh kernel builds. Kernel sources
 are unchanged between the validated CPU-storage stage and these port commits.
@@ -1216,13 +1236,13 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `b5245a1330d8ce652b111552d5c0fcbdec64e915`,
+At committed source `c411ab6a2ef22933e613924d76f1b4693c8b2006`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 152 paths / 38,164 lines: 149 test paths
-(37,447 lines) and three build-support paths (717 lines). All committed blob
+The non-vendored `.c` census contains 151 paths / 37,751 lines: 148 test paths
+(37,034 lines) and three build-support paths (717 lines). All committed blob
 identities, byte sizes and line counts are checked with that revision's Git
 attributes and global/system attributes disabled. Genuine patched musl evidence
-remains included; concurrent PS2 bridge/homebrew/test C remains first-party
+remains included; PS2 bridge/homebrew C remains first-party
 follow-up work. Maintained host/native fixtures, header
 algorithms and authored embedded C also remain. Zero kernel C is not completion
 of the repository-wide request, and this census is not a translation tally.
@@ -1358,8 +1378,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`b5245a1330d8ce652b111552d5c0fcbdec64e915` reports **V 72.37%, C 4.83%**,
-488 C files, 523 Python files and 287 shell files. All 2,726 classified blob
+`c411ab6a2ef22933e613924d76f1b4693c8b2006` reports **V 72.41%, C 4.79%**,
+488 C files, 523 Python files and 287 shell files. All 2,727 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;

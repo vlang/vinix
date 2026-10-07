@@ -2,7 +2,7 @@
 
 Updated 2026-10-07 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`b5245a1330d8ce652b111552d5c0fcbdec64e915`. Re-read HEAD, `AGENTS.md` and
+`c411ab6a2ef22933e613924d76f1b4693c8b2006`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,844 original production C lines**, **17,577 original fixture/benchmark
+continuation adds **3,844 original production C lines**, **17,990 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel, eight
 Wi-Fi tool lines),
 counted separately. Twenty-nine stack-pointer/syscall/variadic/ordering boundary lines use
@@ -133,6 +133,7 @@ instruction-only assembly and receive no V algorithm credit.
 | Sparse EXT2 fixture (185) | `0a7d88fb` |
 | Init-policy guest fixture (78) | `8fd0f13a` |
 | Init-policy syscall host fixture (178) | `b5245a13` |
+| Native PS2 emulator regression fixture (413) | `c411ab6a` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
 | Canonical callback contracts (zero credit) | `03ad7bb3` |
 | Const string/log-record contracts (zero credit) | `e79802e4` |
@@ -143,8 +144,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 152 paths / 38,164
-lines: 149 test paths / 37,447 lines and three build-support paths / 717 lines.
+source, the committed non-vendored `.c` census contains 151 paths / 37,751
+lines: 148 test paths / 37,034 lines and three build-support paths / 717 lines.
 All committed identities/sizes/lines are verified using pinned-source Git
 attributes with global/system attributes disabled. Genuine patched musl evidence
 and first-party PS2 follow-up scopes remain included. This is a scope guide, not a translation tally; native headers and
@@ -383,8 +384,8 @@ leak detection disabled. The first cartridge assembly-MMIO-call timing mismatch
 is retained; direct volatile V views pass the exact comparison. Frozen kernels
 are reused, physical N64 operation and native x86 emulator execution remain
 unclaimed. Receipts are `n64-v-bridge-stage/native-comparison.json` and
-`n64-v-homebrew-stage/native-comparison.json`. Concurrent PS2 first-party C
-remains follow-up work.
+`n64-v-homebrew-stage/native-comparison.json`. PS2 bridge and homebrew implementations
+remain first-party follow-up work; the guest is recorded below.
 
 EXT2 read-ahead (`bb26e71d`, 113) and sparse (`0a7d88fb`, 185) pass strict SDK,
 original-C/V native pairs on both architectures, maintained ARM runners,
@@ -416,6 +417,25 @@ rebuilt byte-identical with the frozen profile. Initial different-compiler
 metadata and supplemental IR sysroot diagnostics remain recorded. No new
 QEMU/kernel run or Darwin leak detector claim is made. Receipt:
 `init-policy-host-fixture/final-validation.json`.
+
+The PS2 guest (`c411ab6a`, 413) preserves all 40 failure conditions, eight
+ordered verdicts, permanent frame banks, native 28/84/32/16-byte input/ELF/card
+records, acquire/release surface pinning and child reaping before unmapping.
+Strict ARM LLVM and genuine x86 musl GCC builds pass with no implicit allocator
+imports. The original tmpfs C/V ARM controls pass all six required checks,
+the optional PADDLE game and final verdict; all five metrics and three complete
+160×120 RGB/PNG exports match, while assertions retain the full 640×480 surface.
+The maintained V runner also passes and its generated source/object/ELF are
+independently reproduced byte-identical. Supplemental C/V controls use the
+same fixture with an explicitly separate EXT2 data-directory adapter; both
+pass offline e2fsck and their complete 8,650,752-byte cards match
+(`ab838fe785e50833eb7bef2bd532c19768d8bce9f88e3b61e3c4097e78d5e942`).
+These supplemental controls do not replace the original tmpfs qualification.
+The 30-second pipe poll, 500×10-ms reap loop and 600-second guest deadline
+remain. `ps2-v-fixture-stage/final-validation.json` records both lifetime peers
+and frozen inputs. The recorded kernel and emulator are reused; x86 evidence
+is SDK-only, with no new kernel build, host sanitizer or physical PS2 claim.
+PS2 bridge and homebrew implementations remain first-party follow-up scopes.
 
 The portable benchmark (`5b37c952`) passed all 272 original-C/V host sanitizer
 cases, four native musl guests and genuine guest GCC 14.2.0 compilation through
@@ -763,9 +783,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`b5245a1330d8ce652b111552d5c0fcbdec64e915` reports **V 72.37%, C 4.83%**,
+`c411ab6a2ef22933e613924d76f1b4693c8b2006` reports **V 72.41%, C 4.79%**,
 488 C files, 523 Python files and 287 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,726 classified blobs
+committed blob size and pinned reproduction command. All 2,727 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

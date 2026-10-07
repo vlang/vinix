@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b5245a1330d8ce652b111552d5c0fcbdec64e915`,
+at source commit `c411ab6a2ef22933e613924d76f1b4693c8b2006`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 488 | 2,002,574 | 4.83% |
-| Python | 523 | 5,192,331 | 12.53% |
+| C | 488 | 1,986,543 | 4.79% |
+| Python | 523 | 5,193,125 | 12.53% |
 | Shell | 287 | 1,267,425 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 72.37%, with no
+All `.v` files are classified as V. The resulting V share is 72.41%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b5245a1330d8ce652b111552d5c0fcbdec64e915 --breakdown --json
+github-linguist --rev c411ab6a2ef22933e613924d76f1b4693c8b2006 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -466,7 +466,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-allocs/guest.c` | 8,473 |
 | `tests/procfs-mount/mountfixture/mount-native-abi.h` | 708 |
 | `tests/ps1/guest.c` | 13,415 |
-| `tests/ps2/guest.c` | 17,142 |
+| `tests/ps2/guestfixture/ps2-guest-native-abi.h` | 1,111 |
 | `tests/qemu-core/blockedfixture/blockedfixture_v_contract.h` | 577 |
 | `tests/qemu-core/blockedoracle/blocked-oracle-native-abi.h` | 1,147 |
 | `tests/qemu-core/epollfixture/epollfixture_v_contract.h` | 943 |
@@ -957,7 +957,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps1/run.py` | 6,744 |
 | `tests/ps2/desktop.py` | 10,452 |
 | `tests/ps2/frame.py` | 1,945 |
-| `tests/ps2/run.py` | 5,854 |
+| `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/compile-basefixture.py.pending` | 5,488 |
 | `tests/qemu-core/compile-fixtures.py` | 1,728 |
