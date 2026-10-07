@@ -71,6 +71,7 @@ QEMU_SYSTEM_STAGING="${VINIX_QEMU_SYSTEM_STAGING:-$SCRIPT_DIR/build-aarch64-qemu
 IOS_STAGING="${VINIX_IOS_STAGING:-$SCRIPT_DIR/build/ios/staging}"
 PS1_STAGING="${VINIX_PS1_STAGING:-$SCRIPT_DIR/build/ps1/staging}"
 PS2_STAGING="${VINIX_PS2_STAGING:-$SCRIPT_DIR/build/ps2/staging}"
+N64_STAGING="${VINIX_N64_STAGING:-$SCRIPT_DIR/build/n64/staging}"
 ANDROID_STAGING="${VINIX_ANDROID_STAGING:-$SCRIPT_DIR/build-aarch64-android/aarch64/staging}"
 ROBLOX_STAGING="${VINIX_ROBLOX_STAGING:-$SCRIPT_DIR/build-aarch64-roblox/aarch64/staging}"
 GPU_SYSROOT="${VINIX_GPU_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
@@ -1284,6 +1285,25 @@ if [ -x "$PS2_STAGING/usr/bin/vinix-ps2" ]; then
         cp -R "$PS2_STAGING/usr/share/licenses/vinix-ps2/." "$STAGING/usr/share/licenses/vinix-ps2/"
     fi
 fi
+# Nintendo 64 uses a static native frontend; homebrew is optional.
+# Refresh its entire payload so cached images cannot retain a removed game.
+rm -f "$STAGING/usr/bin/vinix-n64"
+rm -rf "$STAGING/usr/share/games/n64" "$STAGING/usr/share/licenses/vinix-n64" \
+    "$STAGING/usr/share/vinix/n64"
+if [ -x "$N64_STAGING/usr/bin/vinix-n64" ]; then
+    install -m755 "$N64_STAGING/usr/bin/vinix-n64" "$STAGING/usr/bin/vinix-n64"
+    mkdir -p "$STAGING/usr/share/games/n64" "$STAGING/usr/share/licenses/vinix-n64"
+    if [ -d "$N64_STAGING/usr/share/games/n64" ]; then
+        cp -R "$N64_STAGING/usr/share/games/n64/." "$STAGING/usr/share/games/n64/"
+    fi
+    if [ -d "$N64_STAGING/usr/share/licenses/vinix-n64" ]; then
+        cp -R "$N64_STAGING/usr/share/licenses/vinix-n64/." "$STAGING/usr/share/licenses/vinix-n64/"
+    fi
+    if [ -d "$N64_STAGING/usr/share/vinix/n64" ]; then
+        mkdir -p "$STAGING/usr/share/vinix/n64"
+        cp -R "$N64_STAGING/usr/share/vinix/n64/." "$STAGING/usr/share/vinix/n64/"
+    fi
+fi
 mkdir -p "$STAGING/root/.config/GIMP/2.10" "$STAGING/root/.cache"
 # Package layers unpacked from .apk files can leave the package's own control
 # files at the root of the image.
@@ -1731,6 +1751,10 @@ CONTENT_KEY_INPUTS=(
     "$STAGING/usr/bin/vinix-ps2"
     "$STAGING/usr/share/games/ps2"
     "$STAGING/usr/share/licenses/vinix-ps2"
+    "$STAGING/usr/bin/vinix-n64"
+    "$STAGING/usr/share/games/n64"
+    "$STAGING/usr/share/licenses/vinix-n64"
+    "$STAGING/usr/share/vinix/n64"
     "$SCRIPT_DIR/build-support/vinix-pkg"
     "$SCRIPT_DIR/build-support/v-command"
     "$SCRIPT_DIR/build-support/vinix-desktop-build"

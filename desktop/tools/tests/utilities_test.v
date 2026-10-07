@@ -606,7 +606,7 @@ fn test_terminal_can_edit_a_file_with_vim_over_its_real_pty() {
 }
 
 fn test_available_utility_applications_and_shortcut_layouts() {
-	assert available_apps.len == 45
+	assert available_apps.len == 46
 	assert available_apps[31].process_name == 'vinix-preview'
 	assert available_apps[31].keyboard && available_apps[31].pointer
 	assert available_apps[32].process_name == 'vinix-console'
@@ -645,6 +645,13 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[44].width == 800 && available_apps[44].height == 680 + default_title_height
 	assert app_matches(available_apps[44].title, 'playstation 2')
 	assert !app_matches(available_apps[43].title, 'playstation 2')
+	assert available_apps[45].title == 'Nintendo 64'
+	assert available_apps[45].process_name == 'vinix-n64'
+	assert available_apps[45].standalone && available_apps[45].keyboard && available_apps[45].pointer
+	assert available_apps[45].polling && available_apps[45].poll_interval_ms == 16
+	assert available_apps[45].width == 800 && available_apps[45].height == 680 + default_title_height
+	assert app_matches(available_apps[45].title, 'nintendo 64')
+	assert !app_matches(available_apps[44].title, 'nintendo 64')
 	assert available_apps[0].process_name == 'vinix-files'
 	assert available_apps[0].icon == 'asset:files'
 	assert available_apps[1].title == 'Firefox'
@@ -771,7 +778,7 @@ fn test_available_utility_applications_and_shortcut_layouts() {
 	assert available_apps[28].keyboard && available_apps[28].pointer
 	assert available_apps[28].polling && available_apps[28].poll_interval_ms == 50
 	assert available_apps[28].hide_body_cursor && available_apps[28].us_keys
-	assert available_apps.len == 45
+	assert available_apps.len == 46
 	assert app_start_actions.len == available_apps.len
 	assert app_start_jump_actions.len == available_apps.len
 	assert app_shortcut_actions.len == available_apps.len

@@ -91,14 +91,14 @@ their third-party application internals are outside the native-utility changes.
 | Wine Calculator, Wine Notepad, Microsoft Word 2013 | Compatibility programs; native Calculator and Text Editor provide the utility baseline. Clipboard, associations, accessibility and translated-process integration remain incomplete. |
 | VOffice Writer, VOffice Calc, LibreOffice | Optional office suites. Printing, document associations, clipboard and file-dialog integration are the relevant desktop gaps. |
 | Blender, GIMP, OBS Studio | Graphics/media applications, rather than replacements for the small macOS utilities. Keep their upstream functionality; improve file dialogs, clipboard, audio and surface integration as those services become available. |
-| Minecraft, DOOM, Steam, Gothic II, Roblox, Dota 2, PlayStation, PlayStation 2 | Games and stores, without a matching macOS system utility. Installation, graphics, sound, controller input and compatibility belong to their existing ports. |
+| Minecraft, DOOM, Steam, Gothic II, Roblox, Dota 2, PlayStation, PlayStation 2, Nintendo 64 | Games and stores, without a matching macOS system utility. Installation, graphics, sound, controller input and compatibility belong to their existing ports. |
 | Vinix in QEMU | Virtual-machine integration; no bundled macOS utility equivalent. Guest input, clipboard, storage and session management remain integration work. |
 | Android Calculator, iOS Calculator, iOS 2048, iOS PPSSPP | Compatibility demonstrations and mobile emulator integration. Platform API, graphics, input and lifecycle support belong to the Android/iOS layers. |
 
-These 24 entries plus the twenty-one native utilities account for the complete
-45-entry application catalog. PlayStation and PlayStation 2 remain game
-integrations. Vim and shell tools installed in the userland are terminal
-programs, not additional native desktop applications.
+These 25 entries plus the twenty-one native utilities account for the complete
+46-entry application catalog. PlayStation, PlayStation 2 and Nintendo 64
+remain game integrations. Vim and shell tools installed in the userland are
+terminal programs, not additional native desktop applications.
 
 The Start menu's All Programs and search results use readable 34-pixel rows
 with Previous/Next page controls and PageUp/PageDown navigation. Search covers
@@ -1257,6 +1257,6 @@ in `ipc/corrected-047`; final ARM builds, guest outputs, screenshots and review
 receipts in `notes-wording`. Previous snapshots and failure evidence remain
 alongside them.
 
-The inventory still covers 45 catalog entries and thirteen missing utility
+The inventory still covers 46 catalog entries and thirteen missing utility
 proposals with their dependencies. Remaining work includes rich-text/folder
 interchange, background task alerts and implicit/multiple/3D equations.

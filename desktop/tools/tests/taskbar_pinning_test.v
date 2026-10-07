@@ -94,11 +94,11 @@ fn test_last_catalog_application_can_be_pinned_and_persists_its_identity() {
 		unsafe { home.free(); desktop.pinned_apps.free(); desktop.native_asset_icons.free() }
 	}
 	index := available_apps.len - 1
-	assert available_apps[index].process_name == 'vinix-ps2'
+	assert available_apps[index].process_name == 'vinix-n64'
 	assert desktop.pin_taskbar_app_in(home, index)
 	path := taskbar_pins_path(home)
 	record := os.read_file(path)!
-	assert record == 'vinix-ps2\n'
+	assert record == 'vinix-n64\n'
 	unsafe { path.free(); record.free() }
 	loaded := load_taskbar_pins(home)
 	assert loaded.len == 1 && loaded[0] == index

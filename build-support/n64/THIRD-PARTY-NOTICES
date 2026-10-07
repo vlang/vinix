@@ -1,0 +1,37 @@
+Vinix Nintendo 64 optional payload
+=================================
+
+paraLLEl-N64 / Mupen64Plus CPU, libretro frontend, graphics emitter and HLE RSP
+Copyright the upstream authors named in the source file notices.
+GNU GPL version 2 or later. See GPL-2.0 and upstream per-file notices.
+Pinned source: https://github.com/libretro/parallel-n64/tree/ef73c7e6fa356262f88e05f85cdfad092f8f90e0
+
+CXD4 RSP interpreter
+Copyright Iconoclast and contributors. CC0 public-domain dedication.
+See CXD4-CC0 and upstream per-file notices.
+
+Angrylion RDP and VI software renderer
+Based on MAME Nintendo 64 video emulation and angrylion-rdp-plus.
+Copyright the upstream contributors including angrylion, ata4, Tyler J.
+Stachecki and Rupert Carmichael. See MAME-LICENSE and per-file notices.
+The legacy MAME terms prohibit commercial redistribution/use and require
+complete corresponding source for modified binary redistributions.
+
+libretro-common support routines
+Copyright the RetroArch team and individual authors.
+MIT, BSD, ISC and public-domain notices are retained in the pinned source.
+MD5 implementation: L. Peter Deutsch, zlib-style license in md5.c/md5.h.
+xxHash: Yann Collet, BSD 2-Clause license in xxhash.h.
+
+zlib 1.3.1
+Copyright Jean-loup Gailly and Mark Adler. See ZLIB-LICENSE.
+Pinned source: https://github.com/madler/zlib/tree/51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf
+
+Vinix adapter, build scripts and original PADDLE homebrew
+MIT, as indicated by their source SPDX notices and homebrew LICENSE.
+Vinix V frontend: GPL version 2 or later, as indicated by source SPDX notices.
+
+The complete upstream archive and local corresponding sources are installed
+under /usr/share/vinix/n64/source alongside the optional executable. Source
+build-support/n64/build.py applies the documented patches reproducibly.
+No commercial ROM or proprietary boot block is bundled.
