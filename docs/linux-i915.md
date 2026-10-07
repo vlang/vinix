@@ -657,7 +657,7 @@ python3 tests/linuxkpi/special_insns_test.py
 sh build-support/run-v-tool.sh tests/linuxkpi/cpu_feature_policy.v
 python3 tests/linuxkpi/smp_type_test.py
 python3 tests/linuxkpi/smp_header_test.py
-python3 tests/linuxkpi/cpu_mask_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/cpu_masks.v
 python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
@@ -1600,7 +1600,7 @@ The unchanged 3,600-second outer allowance and all intrinsic assertions remain;
 runs complete in 275.47/271.42 seconds. The earlier 41-marker FPU binaries are
 not evidence for this feature.
 
-The maintained `cpu_mask_test.py` passes 15,810,213 ASan/UBSan assertions per
+The maintained `cpu_masks.v` passes 15,810,213 ASan/UBSan assertions per
 GNU99/GNU11 dialect across 17 cold processes. The test preserves 28 generated
 V bodies, fourteen native object proofs, every compressed constant view and
 exact readonly bytes from the pinned Linux 6.6.157 archive. Cases cover the
