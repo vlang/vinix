@@ -17,6 +17,7 @@ def main():
     parser.add_argument('--kernel-dir',type=Path,required=True)
     parser.add_argument('--state-dir',type=Path,required=True)
     parser.add_argument('--timeout',type=int,default=600)
+    parser.add_argument('--reference-guest',type=Path,help='independent original C guest source')
     args=parser.parse_args()
     spec=importlib.util.spec_from_file_location('kernel_gap_runner',ROOT/'tests/kernel-gaps/run.py')
     runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
@@ -32,7 +33,14 @@ def main():
         run([linker,'-m','aarch64elf','--nostdlib','-static','--gc-sections','-o',binary,obj,abi])
         fixture=state/'native-program'
         defines={'shell':'INIT_SHELL_DRIVER','full':'INIT_FULL_PROGRAM','desktop':'INIT_DESKTOP_PROGRAM'}
-        run(['clang','--target=aarch64-linux-musl','--sysroot='+str(sysroot),'-static','-O2','-fno-stack-protector','-Wall','-Wextra','-Werror','-D'+defines[policy],HERE/'guest.c','-L'+str(sysroot/'lib'),'-fuse-ld=lld','-o',fixture])
+        if args.reference_guest:
+            source=args.reference_guest.resolve()
+            extra=['-D'+defines[policy]]
+        else:
+            source=state/'guest.c'
+            run(['python3',HERE/'compile-guest.py',policy,source])
+            extra=['-Wno-unused-function','-Wno-unused-parameter','-fPIC','-I'+str(HERE/'guestfixture')]
+        run(['clang','--target=aarch64-linux-musl','--sysroot='+str(sysroot),'-static','-std=gnu11','-O2','-fno-builtin','-fno-stack-protector','-Wall','-Wextra','-Werror',*extra,source,'-L'+str(sysroot/'lib'),'-fuse-ld=lld','-o',fixture])
         rootfs=state/'rootfs'
         for name in ('sbin','bin','usr/bin','dev','proc','sys','tmp','root','run'): (rootfs/name).mkdir(parents=True,exist_ok=True)
         if policy=='shell':
