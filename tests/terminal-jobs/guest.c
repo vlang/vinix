@@ -332,7 +332,7 @@ static void orphan_mutations(void) {
             _exit(valid ? 0 : 4);
         }
         close(gate[0]);
-        for (int i = 0; i < 5000 && (!transition_state[4] || !transition_state[1]); ++i) usleep(1000);
+        for (int i = 0; i < 5000 && (!transition_state[4] || !transition_state[0] || !transition_state[1]); ++i) usleep(1000);
         check(transition_state[3] && transition_state[0] == 1 && transition_state[1] == 1,
               change_session ? "setsid resumes newly orphaned stopped group" : "setpgid resumes newly orphaned stopped group");
         (void)write(gate[1], "r", 1); close(gate[1]);
