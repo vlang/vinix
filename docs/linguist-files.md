@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `161c0d7a40503a38f48fb021cf152c33f688ce98`,
+at source commit `223b549e9d3094a503c54dc6bda9db667bbb0c82`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,958,985 | 4.72% |
+| C | 491 | 1,935,258 | 4.66% |
 | Python | 523 | 5,204,538 | 12.54% |
-| Shell | 287 | 1,267,425 | 3.05% |
+| Shell | 287 | 1,275,317 | 3.07% |
 
-All `.v` files are classified as V. The resulting V share is 72.48%, with no
+All `.v` files are classified as V. The resulting V share is 72.52%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 161c0d7a40503a38f48fb021cf152c33f688ce98 --breakdown --json
+github-linguist --rev 223b549e9d3094a503c54dc6bda9db667bbb0c82 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -334,7 +334,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_display_hotplug/hotplugfixture/hotplug-native-abi.h` | 229 |
 | `tests/apple_smc/fixture-v-abi.h` | 402 |
 | `tests/application-sandbox/guest.c` | 4,701 |
-| `tests/application-sandbox/host.c` | 6,547 |
+| `tests/application-sandbox/hostfixture/native-abi.h` | 1,089 |
 | `tests/capability-exec/guest.c` | 7,634 |
 | `tests/clipboard/x11-client.c` | 1,901 |
 | `tests/clock-control/clockfixture/clock-fixture-native-abi.h` | 901 |
@@ -456,7 +456,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/gtk-smoke-auto-close.c` | 3,407 |
 | `tests/pagecache/cachefixture/cache-native-abi.h` | 726 |
 | `tests/pci-config/armfixture/pci-arm-fixture-native-abi.h` | 190 |
-| `tests/pci-config/config_test.c` | 19,430 |
+| `tests/pci-config/configfixture/native-abi.h` | 1,161 |
 | `tests/pidfd/guest.c` | 28,993 |
 | `tests/pidfd/job_guest.c` | 361 |
 | `tests/pidfd/mac_guest.c` | 6,237 |
@@ -1244,7 +1244,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_display_hotplug/run.sh` | 131 |
 | `tests/apple_smc/run.sh` | 158 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
-| `tests/application-sandbox/test-host.sh` | 691 |
+| `tests/application-sandbox/test-host.sh` | 4,343 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
@@ -1320,7 +1320,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
 | `tests/packages/test-vinix-pkg.sh` | 25,685 |
 | `tests/pagecache/run.sh` | 2,509 |
-| `tests/pci-config/run.sh` | 1,237 |
+| `tests/pci-config/run.sh` | 5,477 |
 | `tests/private-pages/run-host.sh` | 5,998 |
 | `tests/qemu-core/run.sh` | 4,009 |
 | `tests/qemu-nested/outer-init.sh` | 309 |

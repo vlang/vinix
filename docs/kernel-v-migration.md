@@ -452,11 +452,12 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**4,126 original production/native-boundary C lines**, **18,566 original fixture/benchmark
+**4,126 original production/native-boundary C lines**, **19,116 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
 eight Wi-Fi tool lines). A further 36 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
-assembly and receive no V algorithm credit. New tests, generated lvalue adapters
+assembly and receive no V algorithm credit. Two native TLS storage declaration
+lines in the PCI fixture also receive zero algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
 committed and validated; pending stages are excluded.
 
@@ -577,6 +578,8 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Mounted-disk native policy fixture | 176 | `1696dbaf` |
 | Execute-only native protection fixture (five assembly lines excluded) | 180 | `0c56640c` |
 | Securelevel native domain/device/concurrency fixture | 104 | `161c0d7a` |
+| PCI configuration/concurrency fixture (two TLS storage lines excluded) | 362 | `67fbd2fd` |
+| Application sandbox independent launcher fixture | 188 | `223b549e` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -1240,6 +1243,34 @@ is established by the plan. `ps2-bridge-v-feasibility-plan.json` (SHA256
 pins that design and its pending gates. The separate first-party
 `build-support/ps2/ioman.cpp` (121 lines) also remains follow-up work.
 
+The cached plan needs the separately reviewed handler-order correction:
+if copying `error.what()` fails inside the original catch, the replacement
+exception is constructed while the original exception is still alive. End the
+original catch during the replacement unwind, then resume outside the body
+handler; constructing the replacement after ending the catch changes behavior.
+`ps2-bridge-eh-prototype/handler-order-design-correction.json` (SHA256
+`730f61e1caab9308450702f328bad0ba627479133231c904fdc7c58734655347`)
+preserves this correction without rewriting the frozen plan. A cache-only
+synthetic prototype passed independent source, native ABI, CFI/LSDA and
+lifetime review, then both complete native guests under the unchanged
+300-second allowance. Each executes 32,000 C++/V operations with 44,000
+primary allocations freed, zero live exceptions and zero tracked new/malloc/
+traced-error owners. The exact inside-catch replacement trace preserves old
+exception destruction during replacement unwinding. ARM executes real map
+ownership cleanup; x86 also retains the vector, which ARM Clang optimizes away.
+Final peer: `ps2-bridge-eh-prototype/root-final-native-peer.json` (SHA256
+`2631155b518ffbeb34aba6a9fdfdf742ba79cfa552595f4820a9eb50232c60b0`).
+The production port remains pending. The prototype's host explicit-owner/sanitizer checks
+pass, but whole-zone and host exception-storage diagnostics remain failed and
+supply no reclamation proof. Full frontend/file/card/frame/post-swap failure,
+concurrent RTTI publication and arbitrary recursive captures remain future gates.
+An initial ARM runtime passed all assertions with 44,000 allocations/frees and
+zero live exceptions; its new harness incorrectly expected 40,000 and recorded
+FAIL. The corrected model includes unpublished constructor-failure storage:
+22 allocations per round × 2,000 rounds. Preserve the original failed receipt;
+fresh corrected ARM/x86 runs are separate evidence. This prototype earns zero
+433-line bridge or 121-line I/O-manager port credit.
+
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, stack buffers/ELF records, file-backed initialized volatile
 dynamic table and actual 16 KiB-aligned exported target wrapper. Native
@@ -1304,6 +1335,41 @@ Independent source/native/lifetime and final reviews are in
 `e9555a3d66fe626f9c104e0b5ba08e8960d8b3ef3a070681e6d614c630a9cfd1`)
 and `postcommit-final.json`. No new kernel build, native sanitizer,
 per-operation allocation measurement or physical-hardware claim is made.
+
+The PCI configuration fixture (`67fbd2fd`) ports 362 of 364 original C lines;
+two native TLS storage declarations receive zero algorithm credit. V owns all
+71 assertions, 30 atomic operations, four device vectors, 10-million-iteration
+spin bounds, CF8 locking and COMMAND/status behavior. Stack actors remain live
+until both native pthreads join, using the actual exported C callback wrapper.
+GNU99/GNU11 ARM host ASan/UBSan controls and strict original-C/V SDK links on
+both architectures pass; all 32 native layout words match. A supplementary
+three-thread check verifies independent TLS identity. All four complete native
+C/V controls pass under the unchanged 180-second deadline, with GNU99/GNU11
+loaded sections equivalent. Fresh boot-image extraction verifies each immutable
+kernel and archive init against the separately built SDK ELF. Independent final
+source/ABI/lifetime/native review: `pci-config-fixture/root-final-native-peer.json`
+(SHA256 `4c04f43fdc6b49669663b54b0b4e2320a91e720c9b0da5a6143138598f09a9ef`);
+`postcommit-qualified-validation.json` binds the exact five committed paths.
+These controls reuse qualified kernels; no new kernel build, x86 host sanitizer,
+guest sanitizer or physical PCI/IRQ masking claim is made.
+
+The application-sandbox host oracle (`223b549e`, 188) preserves all 22
+assertion sites, 18 fixed argv banks, 15 invalid vectors, five lying syscall
+cases and failure injection through the originally captured setup-call count.
+The original unsigned-long callback parameter is exact on Darwin and both
+musl SDKs; its native-word conversion uses an eight-byte stack copy that the
+optimizer removes. Synchronous callbacks retain only literal-string pointers,
+with no new owners or implicit allocator imports. Both actual ARM/Rosetta x86
+C/V ASan/UBSan host controls pass with byte-identical 125-line diagnostics.
+Strict both-architecture SDK links and all 16 layout words match. All four
+complete native C/V controls pass within the unchanged 180-second allowance,
+with identical per-architecture diagnostics. Fresh boot-image kernel/archive
+init extraction matches the immutable kernels and SDK executables. Independent
+final source/ABI/lifetime/native peer: `application-sandbox-host-fixture/root-final-native-peer.json`
+(SHA256 `c4538fd3dffbdbedf736ca34138a974628e8ff6fa79373ca6574b750b651b493`);
+`postcommit-final.json` pins the exact five committed paths. These injected
+callbacks establish the launcher oracle; they add no real kernel sandbox
+enforcement, new kernel build, guest sanitizer or heap-retirement claim.
 
 The 395-line EXT2-xattr fixture remains unqualified and its original C is
 retained. ARM C/V controls pass, while x86 V fails the unchanged 32-byte-class
@@ -1389,10 +1455,10 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `161c0d7a40503a38f48fb021cf152c33f688ce98`,
+At committed source `223b549e9d3094a503c54dc6bda9db667bbb0c82`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 145 paths / 36,886 lines: 144 test paths
-(36,453 lines) and one build-support path (433 lines). All committed blob
+The non-vendored `.c` census contains 143 paths / 36,334 lines: 142 test paths
+(35,901 lines) and one build-support path (433 lines). All committed blob
 identities, byte sizes and line counts are checked with that revision's Git
 attributes and global/system attributes disabled. Genuine patched musl evidence
 remains included; the PS2 bridge remains first-party
@@ -1524,6 +1590,14 @@ Security, Apple reporter, Venus and AGX native adapters passed their relevant
 host and native fixtures; physical Darwin/Apple operation remains untested.
 All new lifetime boundaries received independent review.
 
+Six completed execute-only EFI variable images were losslessly compressed
+after checking their original hashes and the decompressed bytes. Their original
+64 MiB `.fd` paths now have `.fd.gz` counterparts; decompress to the recorded
+paths before replaying older manifests. Boot disks, logs, executables and
+unqualified inputs remain intact. Receipt:
+`completed-execute-efi-lossless-compression.json` (SHA256
+`39c0dd4efd1800cb8355b2b0f4a6216ef7ae6043e144700b19ccbf19bc0ea220`).
+
 Current machine-local evidence is under
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
 Snapshots, ELF hashes and full serial logs identify tested inputs. Completed
@@ -1531,8 +1605,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`161c0d7a40503a38f48fb021cf152c33f688ce98` reports **V 72.48%, C 4.72%**,
-491 C files, 523 Python files and 287 shell files. All 2,739 classified blob
+`223b549e9d3094a503c54dc6bda9db667bbb0c82` reports **V 72.52%, C 4.66%**,
+491 C files, 523 Python files and 287 shell files. All 2,741 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;
