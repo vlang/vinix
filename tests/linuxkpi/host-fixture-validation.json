@@ -1,0 +1,663 @@
+{
+  "status": "committed pending native x86 completion",
+  "completed_v_translation_credit": 0,
+  "original_scope": {
+    "reference": "9f47270ee3c6754312bc09fc74d8f77e2cfe2229",
+    "removed_original_count": 27,
+    "original_lines": 8929,
+    "paths": [
+      {
+        "path": "tests/linuxkpi/test.c",
+        "lines": 1146,
+        "sha256": "ea1643ecc6236cdf5f2b99430a04f739f6b530d8e173e2380098d0b8694c525c"
+      },
+      {
+        "path": "tests/linuxkpi/sync_test.h",
+        "lines": 429,
+        "sha256": "12e38f47fe45f65589786669713a056c3e23fbb9dcb1073191e1af112e34f303"
+      },
+      {
+        "path": "tests/linuxkpi/ww_mutex_test.h",
+        "lines": 469,
+        "sha256": "342eaa5b720feabcc5e1c2d3740acb7b699ea9ae55a7069cb31735f2e5ebaba2"
+      },
+      {
+        "path": "tests/linuxkpi/time_test.h",
+        "lines": 326,
+        "sha256": "0afe8dee265f5c0d6f98aaa9b2df46e980c292aa25e4ed1c97d5ea49b8992cce"
+      },
+      {
+        "path": "tests/linuxkpi/usleep_range_test.h",
+        "lines": 236,
+        "sha256": "2521528ea4f3c3d7675d44ecb96a613109546b6d86e9f30b851239014b9c2de3"
+      },
+      {
+        "path": "tests/linuxkpi/timer_test.h",
+        "lines": 293,
+        "sha256": "564e81c5933436d7d19b35bd097de02d91519b05529595de24dc15a91fe87400"
+      },
+      {
+        "path": "tests/linuxkpi/workqueue_test.h",
+        "lines": 330,
+        "sha256": "6294d7f89c171643bde4683f7368b5e7105a54bf67bd557597a8ab2663f2e9f3"
+      },
+      {
+        "path": "tests/linuxkpi/delayed_work_test.h",
+        "lines": 338,
+        "sha256": "c34255b88187ab460ee4aa83d095940a9af48b72349edd17febab6bbd1f2c685"
+      },
+      {
+        "path": "tests/linuxkpi/unbound_work_test.h",
+        "lines": 221,
+        "sha256": "94f1cc0501e996ecf172b9520aa5a05ebf8b682056a1dd841b7dd0bd6f39d248"
+      },
+      {
+        "path": "tests/linuxkpi/bound_work_test.h",
+        "lines": 453,
+        "sha256": "7cdf8bfefb89331e22e1ef2284a4a20a7ed77840b30f4f20245f4966bcba6e94"
+      },
+      {
+        "path": "tests/linuxkpi/bitmap_runtime_test.h",
+        "lines": 251,
+        "sha256": "55acf58a63def5b38a48a5bdccf43fe27f27a8a05f811630d1686962f34c9b06"
+      },
+      {
+        "path": "tests/linuxkpi/srcu_test.h",
+        "lines": 577,
+        "sha256": "8efc8f46f1fd5b6c57c8f06a06d42a3ef99eeada10e554d382b4c0b144685230"
+      },
+      {
+        "path": "tests/linuxkpi/wait_bit_test.h",
+        "lines": 611,
+        "sha256": "4ae8f6a0e9805b9fddebea71dafb8bd427ddbc89236eb886b281a976bff610e6"
+      },
+      {
+        "path": "tests/linuxkpi/io_test.h",
+        "lines": 373,
+        "sha256": "401a484ba66cbc741b4918e83c6f3268496d8d85a44d0728d1dc32c6ef5218c7"
+      },
+      {
+        "path": "tests/linuxkpi/mutex_io_test.h",
+        "lines": 227,
+        "sha256": "7d7bdacbdb1298b8193058e9069b3f750fc5bc5925cceae2f913d85576fc5dea"
+      },
+      {
+        "path": "tests/linuxkpi/cache_test.h",
+        "lines": 347,
+        "sha256": "f9f8b548f4976433552a9121daf11269d35d7916efac76b57bf11b3743a8fa5b"
+      },
+      {
+        "path": "tests/linuxkpi/task_flag_test.h",
+        "lines": 177,
+        "sha256": "15996492a7037525522166d50f86e5c6a4004b438d363681a22acc052686b030"
+      },
+      {
+        "path": "tests/linuxkpi/seqcount_test.h",
+        "lines": 251,
+        "sha256": "44c0f857afd5425b399824b487d8d71e5ca96afd652bd70ca4fdaac72ee66ad3"
+      },
+      {
+        "path": "tests/linuxkpi/format_test.h",
+        "lines": 298,
+        "sha256": "abcf76e4ac2f26a6182efc6c52d99952981814c86f06dfdbf1a781482aeb9676"
+      },
+      {
+        "path": "tests/linuxkpi/printk_test.h",
+        "lines": 358,
+        "sha256": "6e2a2024dcc0da3bd5cf3c8a1067e5834bc203a5869189600f64575b7e2d379e"
+      },
+      {
+        "path": "tests/linuxkpi/warn_test.h",
+        "lines": 262,
+        "sha256": "80c038a5942e1a74204eb621a0842785b167904dc192ed4b1a2e67502e4bf085"
+      },
+      {
+        "path": "tests/linuxkpi/i915_config_test.h",
+        "lines": 53,
+        "sha256": "5b51ed48b73f1bf31627a2794916fb6e88cf2fe61531afab7cda8e11a1da871d"
+      },
+      {
+        "path": "tests/linuxkpi/kdev_test.h",
+        "lines": 118,
+        "sha256": "7578bf5b38d0079da432d2fcc55e34e926ab903f1a1ac5c71bdcce89da52adca"
+      },
+      {
+        "path": "tests/linuxkpi/qp_table_test.h",
+        "lines": 82,
+        "sha256": "0e0eebe7f49eff4e8f48199e54f0306ad27f4a8dfaf8e7d7849c1419ae6b8f6e"
+      },
+      {
+        "path": "tests/linuxkpi/string_helpers_test.h",
+        "lines": 137,
+        "sha256": "2112927817c2fe4e44908d2eeb71d1611aa0b2151d34fd9a857bbaadef776a84"
+      },
+      {
+        "path": "tests/linuxkpi/kstrtox_test.h",
+        "lines": 298,
+        "sha256": "8b30ac66ad190400387d7ae9fc62cac0f258e0cb173eff8e179a83ec3202bdbf"
+      },
+      {
+        "path": "tests/linuxkpi/string_tokens_test.h",
+        "lines": 268,
+        "sha256": "a10e17015f4a6baba5eb7e78513165ba8e829855b5999b1bf5d4d2b97cecb7a8"
+      }
+    ],
+    "scope": "original1146 main/model and26 independent host fixture headers; no additional credit for new contracts/helpers"
+  },
+  "toolchain": {
+    "source_revision": "95136d4de1dabe575e37fc36b5a3e793580c8f72",
+    "compiler_sha256": "335214a9c904435eb87e580948a7de76c2b4de03a65f0ee23babaa76981a7373",
+    "compiler_version": "V 0.5.2 e690943",
+    "source": "immutable detached worktree",
+    "compiler_binary_source": "/Users/alex/code/v/v"
+  },
+  "evidence_root": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023",
+  "owned_host_inputs": {
+    "tests/linuxkpi/hostfixtures/policyhostsuite/core.v": "49382df13c1c431e754b4c3636e858dfe90395a48b24c123438be6005e7d597f",
+    "tests/linuxkpi/hostfixtures/stringtokenshost/core.v": "2c85e6a7526c64b358a8723d7cc3d76cb6a2ae700b90704aa99f68db2476bc63",
+    "tests/linuxkpi/hostfixtures/cachehost/core.v": "84f343d65d78d77e7782eb4fd6bc96277fc8e8c0439542ef394f283fb5809647",
+    "tests/linuxkpi/hostfixtures/stringhelpershost/core.v": "a7cbe717d4348cf44229ff831b5c03a75aca34903f1af2d3d12a5606a85937be",
+    "tests/linuxkpi/hostfixtures/timehost/timehost_v_contract.h": "16232fb29570d9b465b99ec09581cd8a3ee88fcea3fcfb164e014f3dde50dcce",
+    "tests/linuxkpi/hostfixtures/timehost/core.v": "d1563364f190388bf512fecde5e2eed5de98d77625a7630e2c66de6b38aea4aa",
+    "tests/linuxkpi/hostfixtures/hostio/hostio_v_contract.h": "4fcee17a1f021a13b4f86bce848522028c16c0859d460d8e20e8275ad2fdf213",
+    "tests/linuxkpi/hostfixtures/hostio/core.v": "9ab233b2be34c4df166aaded8c04f78387fa2c3292621804d054c9837c9ee63d",
+    "tests/linuxkpi/hostfixtures/hostseq/hostseq_v_contract.h": "4f84dcf943487f12d923f93c8c09af150019cfe8a771fd4b9137105d8e342b7b",
+    "tests/linuxkpi/hostfixtures/hostseq/core.v": "eb8f237cf7650995a778d2c6c36401ea3e1c87c3edd311f0334606fab1b183b1",
+    "tests/linuxkpi/hostfixtures/waithost/core.v": "d255955445b27997dcbc1116224e83208abbbd2c130188053cd4986e359edd02",
+    "tests/linuxkpi/hostfixtures/waithost/waithost_v_contract.h": "37a08f02c132fa72db71d93ec62d58df65d9456891629bc17472278167848cde",
+    "tests/linuxkpi/hostfixtures/formathost/core.v": "a43e18f34595f432981bd60bcd46a981162754f8fde52842292f00bd9e293980",
+    "tests/linuxkpi/hostfixtures/kstrtoxhost/core.v": "ab68a76d452324c64cd6680dbc65d58c8cd9221bc6e14f4cf61c231d1d18d4d8",
+    "tests/linuxkpi/hostfixtures/bitmaphost/core.v": "dbdc2e8babb7e4e72d4fc86e7690bc6d7804a81721feecd4f7cdffa6aa40170e",
+    "tests/linuxkpi/hostfixtures/hostbase/percpu.v": "de0b298ea79f2c2ec5aed3dbdd0b922ec925e4a36d598d9c3ad98fcbd733a17d",
+    "tests/linuxkpi/hostfixtures/hostbase/bitmap.v": "2cc9c2021237c4ba737ebaddd331f6852f466a4eb0064f9c93c64575299e2d6a",
+    "tests/linuxkpi/hostfixtures/hostbase/atomic.v": "a3298fbe45a12021874e606fccb7e720f486493c79221d96cacac5edf3469c59",
+    "tests/linuxkpi/hostfixtures/hostbase/containers.v": "f6d318f49854a8d6c25594b8e30df694f89ef978e82b68d9b40b1f05ae960d85",
+    "tests/linuxkpi/hostfixtures/hostbase/core.v": "2586021514a14ea5297cc8ee84514e59a107fa43da22b883a8259ddde1816a99",
+    "tests/linuxkpi/hostfixtures/hostbase/hostbase_v_contract.h": "019e1340212f57232c06184a8c1a6ba82bb6b37f50cd1b55ec20a0054361e8d5",
+    "tests/linuxkpi/hostfixtures/hostbase/main.v": "22b40d84bce70df10f4e7c0e7698b50bfc49810ba7146447b88a2d1c25f65009",
+    "tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h": "e6752189060bfee9a935257a8b77045c26c6381e5889c831f9fccd08929f2c5a",
+    "tests/linuxkpi/hostfixtures/wwhost/core.v": "5fb93c16410dcc755c012d6d589c94dfebecffb93d9ec3a09730956ef1464f8a",
+    "tests/linuxkpi/hostfixtures/loghost/warn.v": "20f63c6f2afb34a30a0d70009b27f90015c05165b8588ba03463f87b376e5cb4",
+    "tests/linuxkpi/hostfixtures/loghost/core.v": "2a3143507d08282348df17b2a7d9214bb4a5cdecaba7b41dd0d88bddcee7d4b9",
+    "tests/linuxkpi/hostfixtures/hosttask/core.v": "c9dce17130f20ba6f454ef579436d5bc48be8cc4daabd7680bf6bd45714dbf67",
+    "tests/linuxkpi/hostfixtures/hosttask/hosttask_v_contract.h": "9cfd9f85dd894b66eadafb2f45d838ee59cb1e232f687e0de3efc16e660fe182",
+    "tests/linuxkpi/hostfixtures/synchost/synchost_v_contract.h": "f9ab51c2f99cd5f6558bda103596aa36e200b10bceaaf1f202113e9a24acb845",
+    "tests/linuxkpi/hostfixtures/synchost/core.v": "f66d6ff3cd67196d39c72855125f6d00595781f2e4ca3f916e6ad5d8c74be4a6",
+    "tests/linuxkpi/hostfixtures/hostwork/hostwork_v_contract.h": "db446b740f97be08eafcf48c7c4ff2f55e75840a849cf1db1090f1594336dfbb",
+    "tests/linuxkpi/hostfixtures/hostwork/srcu.v": "34688aa947547b1ea3459d626e8b1e1013e3368eb50110fca39dc1e9bf20925b",
+    "tests/linuxkpi/hostfixtures/hostwork/delayed.v": "9e94335cd0fae6fc7d3f7fa821c8a4893160ca549f4968b9552123ef3009db33",
+    "tests/linuxkpi/hostfixtures/hostwork/unbound.v": "9e77bdde876c9d5bd0b3ffb6b5f053fe19816ada7f19e27d3f9f1b1e5a2a30ad",
+    "tests/linuxkpi/hostfixtures/hostwork/bound.v": "88c212051568bf9609e11ef8bf12276dab8e6181289cc6822b5ad103fa9ab01c",
+    "tests/linuxkpi/hostfixtures/hostwork/core.v": "e5e3d95a12ecf45e61bb279f438f65237bf7b46f3b32926c348cbaad39c01ee6",
+    "tests/linuxkpi/hostfixtures/hosttaskflag/hosttaskflag_v_contract.h": "93a4201f7c08c8b43b63a167ae0085b81985871368af9b819a6b96131fd1bfec",
+    "tests/linuxkpi/hostfixtures/hosttaskflag/core.v": "93e5a423ce34f20dbebdf1c6922b2c981689d84efeaecc90a8a2c72008b260f8",
+    "tests/linuxkpi/hostfixtures/usleephost/usleephost_v_contract.h": "7230fbf5d813208673e146ba89d1d701f1448a8d39b829e3fa68c48973ecdf31",
+    "tests/linuxkpi/hostfixtures/usleephost/core.v": "fb31f523558ad1bf3d7ad02eef92ce5c9068c48b9903456c4f18582f185d0526",
+    "tests/linuxkpi/hostfixtures/timerhost/core.v": "8aa6a5a6051dae26e56fbb4cab1d5365cd425acff39dfad0e9dd93ac44398286",
+    "tests/linuxkpi/hostfixtures/timerhost/timerhost_v_contract.h": "2bde5f518d84e68241446b8defa5e3352e9fcc4ddc432585028b0e8cfedc06de",
+    "tests/linuxkpi/hostmodel/core.v": "6402c06562fba0f8b5f5001ebc307954ce53a8308b7e318343d86c69fd29154d",
+    "tests/linuxkpi/compile-v-host.py": "84ba28c84ac9b0a5a8517d7a35b92397d86b19eef301a5b645b099a5d3bf399d",
+    "tests/linuxkpi/host_model_foreign.v": "f2c5fa1c7dfe0484159dd3129e01149e709c6bff1d5acf3d72983adfe05bc3b1",
+    "tests/linuxkpi/host_model_tls.S": "9790206116d1273a3914861bcc7ef746d3a848c376f94214f558786cd4182662",
+    "tests/linuxkpi/host_model_v_contract.h": "fd4b1321d24cc1603083d1d67315ad4b642c44cae286c2bb57171e08065f022c",
+    "tests/linuxkpi/host_percpu_abi.json": "712d709cd3e89eb7e6da7562fc9bfad947bafe0e667a1e10167fbec05c974b58",
+    "tests/linuxkpi/host_suite.py": "222509fd8228bafba4b36a678298ab9133988352869e99ede88cf93731f96f43",
+    "tests/linuxkpi/policyhost_v_contract.h": "abd0a77a59f95b13886d48a28ba9fd6b159d64893ea2097e0ab01d0dcb609b48",
+    "tests/linuxkpi/kstrtoxhost_v_contract.h": "eb468860417aee457cb612111677219ea1dc686757f69dba250d54e73d9e3193",
+    "tests/linuxkpi/cachehost_v_contract.h": "92b2f127acdbc272350f38f8d6ff90706e19a9b657d697f655db03c90765a670",
+    "tests/linuxkpi/stringtokenshost_v_contract.h": "851cf4789c1e4094b971dbf4865aeb3df8d1abfdf709deb17a1a609228076e83",
+    "tests/linuxkpi/loghost_v_contract.h": "9479a3f78224fbe45310f8c4ff60a467cad54dc70086831a590c723cc2064657",
+    "tests/linuxkpi/bitmaphost_v_contract.h": "5591389ce0616aea33fbc865c33330bee999a414123baec68735fcd6ba6d5a04",
+    "tests/linuxkpi/formathost_v_contract.h": "b6a78f3ebf0a791d974bc95a52a390e03849ae101084c063ca0fcff978f104ca",
+    "tests/linuxkpi/stringhelpershost_v_contract.h": "6e9a33765b5855a603d09f47868bf543bed82e0f4f6d6c577ae3cb8dba75ee30",
+    "tests/linuxkpi/formathost_abi.S": "3a1569fd41fa6b9ed52d98ebb2b87f98c7e56ab1858b88e7fe2e1e80391aef71",
+    "tests/linuxkpi/loghost_abi.S": "9ef7b2fafc9e0370ee077e145dfa251d09b89c977d64a705777d4c7d39595216",
+    "tests/linuxkpi/test.c": null,
+    "tests/linuxkpi/sync_test.h": null,
+    "tests/linuxkpi/ww_mutex_test.h": null,
+    "tests/linuxkpi/time_test.h": null,
+    "tests/linuxkpi/usleep_range_test.h": null,
+    "tests/linuxkpi/timer_test.h": null,
+    "tests/linuxkpi/workqueue_test.h": null,
+    "tests/linuxkpi/delayed_work_test.h": null,
+    "tests/linuxkpi/unbound_work_test.h": null,
+    "tests/linuxkpi/bound_work_test.h": null,
+    "tests/linuxkpi/bitmap_runtime_test.h": null,
+    "tests/linuxkpi/srcu_test.h": null,
+    "tests/linuxkpi/wait_bit_test.h": null,
+    "tests/linuxkpi/io_test.h": null,
+    "tests/linuxkpi/mutex_io_test.h": null,
+    "tests/linuxkpi/cache_test.h": null,
+    "tests/linuxkpi/task_flag_test.h": null,
+    "tests/linuxkpi/seqcount_test.h": null,
+    "tests/linuxkpi/format_test.h": null,
+    "tests/linuxkpi/printk_test.h": null,
+    "tests/linuxkpi/warn_test.h": null,
+    "tests/linuxkpi/i915_config_test.h": null,
+    "tests/linuxkpi/kdev_test.h": null,
+    "tests/linuxkpi/qp_table_test.h": null,
+    "tests/linuxkpi/string_helpers_test.h": null,
+    "tests/linuxkpi/kstrtox_test.h": null,
+    "tests/linuxkpi/string_tokens_test.h": null,
+    "tests/linuxkpi/run.sh": "dc0a5ffa489d4bb301f4afdeffede7c2e5e2644b1a40cc553bf5062ab4405308",
+    "kernel/asm/x86_64/varargs.inc": "400bd49ea8abf415582edb49d78bb6c74a1c684d04a66a40ff4154b0d831a577",
+    "tests/linuxkpi/host_types.h": "668eb57dbac767dbeb340d368d5865e241f24b597e401729dde30ea5cc3192c5",
+    "tests/linuxkpi/compile-v-core.py": "d2ac140cca6947fa55be7d7ee6b176372cf0f457c6d0a5d9018bb7e47b57f7b3",
+    "tests/linuxkpi/compile-native-host.py": "1c2e9c7b68f647b2b45f5d5714f4d4db27d418504e6a70446ef8d29dbcba6ab7",
+    "tests/linuxkpi/hostguest/core.v": "fe8f4991512104b9d94c58fd4ff2003df26f32ed486d3f0afa3b6c801dd9d87d",
+    "tests/linuxkpi/hostguest/hostguest_v_contract.h": "a10092cf21fad83bfa6c49bee56eeeeaf68993e15f8a696bd5e85efb1e0fa69d",
+    "kernel/asm/x86_64/linuxkpi_varargs.S": "0897fbff27f83b3a79fa61bf1ab35356ae28292f066616027fb39a9b8ca60a01",
+    "kernel/asm/x86_64/linuxkpi_workqueue_abi.S": "4d6da2738ba61a68e12e9707213608f2421018f132defbebbc4b1780f3a3db7c",
+    "kernel/asm/x86_64/linuxkpi_printk_fixture_abi.S": "efb0290dd5ecdfcc87e054eb3e7c11f79ea9dd87c22608e1ec35b8204c201f67"
+  },
+  "host_validation": {
+    "x86": {
+      "result": "PASS exit0 full actual Darwin x86/Rosetta maintained trueV harness; all original checks and seven boundary modes retained",
+      "command": [
+        "arch",
+        "-x86_64",
+        "/bin/sh",
+        "/tmp/vmh-composed-host-snapshot/tests/linuxkpi/run.sh"
+      ],
+      "CC_actual": [
+        "/usr/bin/clang",
+        "-arch",
+        "x86_64"
+      ],
+      "sanitizers": "address,undefined",
+      "UBSAN_OPTIONS": "halt_on_error=1",
+      "ASAN_OPTIONS": "abort_on_error=1",
+      "sanitizer_suppressions": false,
+      "log_sha256": "a92de0686c51cbb7335edb3237d797cd40923b61e7d90ed8589a96814c90916c"
+    },
+    "ARM": {
+      "result": "PASS exit0 full actual Darwin ARM64 ASan+UBSan halt_on_error=1, same composed23 frozen source",
+      "log_sha256": "4b029c58597577d496453267f66fb4de1a02f26694d950f825e54ed8c8bbecdf",
+      "CC": "/usr/bin/clang",
+      "UBSAN_OPTIONS": "halt_on_error=1",
+      "ASAN_OPTIONS": "abort_on_error=1",
+      "all_original_26groups_7boundaries_unchanged": true
+    },
+    "original_C_x86": {
+      "all_original_assertions": "PASS",
+      "UBSAN_OPTIONS": "halt_on_error=1",
+      "diagnostics": 0,
+      "executable_sha256": "d216ef62db7c4c5a4c0d2cc891238362cd361d73414630e0f63de8aa48e4260d",
+      "log_sha256": "f8cbfe74cacfdbf57721eb138dc8eb4660fb30734cd7c38a9547a19491ffd0a1"
+    },
+    "production_dependency_snapshot": {
+      "base_callback_snapshot": "/tmp/vmh-callback-snapshot",
+      "const_overlay_paths": {
+        "kernel/linuxkpi/compatcore/string.v": "948bb636786eaf5fd0777bddcb7ff0e778f5daac1835b5db7206c63495fb7b4f",
+        "kernel/linuxkpi/compatcore/native_printk.v": "8b738cfe95c04407c329f9f7d1bba180d203eec4ff90e6198a2cb2c4aa89930e",
+        "kernel/linuxkpi/compatcore/printk.v": "68a3943a9799d055bf89360136fbbf22f3b1a96c7a7c5b73ccab866e37ab2af3",
+        "kernel/c/linuxkpi_v_primitives.h": "cc7d7af1776849a10c351c0667d4430848ecabf0761733b2870462574b0521b5",
+        "kernel/c/linuxkpi_runtime_v_primitives.h": "84d56a4c4c28c91f1ce15d4b0db928060bbd31bb842136c3d299fefd70e77f6c"
+      },
+      "compiler": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/toolchain-v/v",
+      "sanitizers": "address,undefined; UBSAN_OPTIONS=halt_on_error=1; no suppression",
+      "unchanged_PCI_dependency": {
+        "source_revision": "e29fe9529b8d998d28f17ac120b27fb93902c6f6",
+        "path": "kernel/pci/config_core.v",
+        "sha256": "15bc97d00753e08d8103b9f2facc79bb389b7aa575796834a68dfaa65bcb002d"
+      },
+      "complete_support_export": {
+        "path": "/tmp/vmh-source",
+        "provenance": "immutable committed e29 source plus exact reviewed own-host96 and committed0fe dependency; manifest /tmp/vinix-host-model-probe/native-source-snapshot.json",
+        "symlink_handling": "existing identical read-only dependency symlink retained; copy restored and exact overlays reverified before execution"
+      }
+    },
+    "receipt_sha256": "db342795b469ee7d9e949cbdfdc20ed36f511adf3cfb594f701dee2a156cd773"
+  },
+  "native_validation": {
+    "original-C-arm-validation.json": {
+      "receipt_sha256": "27bf159c0e6f033e30cb8bdb8497f360baa0457a9ad20492748c6b64db15ff15",
+      "receipt": {
+        "result": "PASS exit0",
+        "image_sha256": "44325f33fe61f0f4bd4e6cb5920d882c8dc579a4c2784a5b381cd6ddab7b54f3",
+        "kernel_sha256": "4fc0b532294aed340a6e45f47698dca22e2da5bb6c6dcc4923d4ef0f85e0bdc7",
+        "model_core": "reviewed final canonical23 production core, exact strict nativeSDK objects; original C main/model/26 groups unchanged",
+        "all_original_assertions_counts_deadlines_preserved": true,
+        "guest": "/tmp/vmh-final-c-arm23c",
+        "log_sha256": "4a772b7f7bd9f83d532ef820dd3ed68bdf45059247c97717f4ec6ddbefbf3158",
+        "expected_markers": [
+          "LinuxKPI: PASS",
+          "HOST MODEL GUEST PASS: original workload and all seven boundary cases",
+          "HOST MODEL BOUNDARY PASS: reversed",
+          "HOST MODEL BOUNDARY PASS: huge",
+          "HOST MODEL BOUNDARY PASS: clock-horizon",
+          "HOST MODEL BOUNDARY PASS: absolute-overflow",
+          "HOST MODEL BOUNDARY PASS: state",
+          "HOST MODEL BOUNDARY PASS: atomic",
+          "HOST MODEL BOUNDARY PASS: valid-horizon"
+        ],
+        "supervisor": "failure-only raw child-status diagnostics, no expectation changes"
+      }
+    },
+    "translated-V-arm-first-failure.json": {
+      "receipt_sha256": "9c95096075cc1b5ecd3e1eb909cc425c83bb283927e22cb201c86e0beef6e9bc",
+      "receipt": {
+        "result": "FAIL exit1 unchanged original CPU-routing assertion; raw child status6 SIGABRT",
+        "image_sha256": "a516220d803c0e95d4bfcdff1249123ab405fe78699137c63fd67ee79016577a",
+        "kernel_sha256": "4fc0b532294aed340a6e45f47698dca22e2da5bb6c6dcc4923d4ef0f85e0bdc7",
+        "log_sha256": "48cca27fea59e74fd20ab1aaf02c301ac2f1590b0d5ea7ffedfeb701d95a983b",
+        "source_assertion": "!test->check_cpu || (test->observed_cpu[call] == test->expected_cpu[call])",
+        "generated_location": "/tmp/vmh-frozen-arm/hostwork.c:hostwork__bound_callback:1534",
+        "same_platform_original_C_control": "PASS all26 groups and seven boundary modes using original-C-arm-validation.json",
+        "source_mutation": false,
+        "cause": "under investigation; no source discrepancy identified yet"
+      }
+    },
+    "translated-V-arm-repeat-validation.json": {
+      "receipt_sha256": "2c787b42a5de1bbdfdec9930942bd7dd928e2a8f7ed0f468320dcbb8f62bd93e",
+      "receipt": {
+        "result": "PASS exit0 identical immutable image repeat",
+        "image_sha256": "a516220d803c0e95d4bfcdff1249123ab405fe78699137c63fd67ee79016577a",
+        "kernel_sha256": "4fc0b532294aed340a6e45f47698dca22e2da5bb6c6dcc4923d4ef0f85e0bdc7",
+        "log_sha256": "b7ef8a427ead03ca3a96f49ffff1c2e369c7427daa14b6f9cfb2d0f710920509",
+        "all_original_assertions_counts_deadlines_preserved": true,
+        "expected_markers": [
+          "LinuxKPI: PASS",
+          "HOST MODEL GUEST PASS: original workload and all seven boundary cases",
+          "HOST MODEL BOUNDARY PASS: reversed",
+          "HOST MODEL BOUNDARY PASS: huge",
+          "HOST MODEL BOUNDARY PASS: clock-horizon",
+          "HOST MODEL BOUNDARY PASS: absolute-overflow",
+          "HOST MODEL BOUNDARY PASS: state",
+          "HOST MODEL BOUNDARY PASS: atomic",
+          "HOST MODEL BOUNDARY PASS: valid-horizon"
+        ],
+        "first_identical_image_attempt": "bound routing SIGABRT; retained translated-V-arm-first-failure.json, cause unknown; source/TLS/layout independent review found no mismatch",
+        "diagnostic_attempt": "separate cache-only conditional failure print full PASS; not substituted for immutable-image proof"
+      }
+    },
+    "original-C-x86-fourcpu-timeout.json": {
+      "receipt_sha256": "123a43e6bf13b71fd972cb7d17f80644bb7902e7c0fc15bd84e32c306dc93528",
+      "receipt": {
+        "result": "FAIL exit1 original C control timed out at original3600-second allowance",
+        "kernel_sha256": "d65cb7200cb214d78ceb532ca918b81f49a5e13e3ebf0e8449de06fdcf392bf8",
+        "image_sha256": "833c2e6356c099598857e2dc25a4374ba4eae6f19a98bde678493cd2ed18cac3",
+        "configuration": "PROD=true default kernel, x86 TCG cpu=max, -smp4,1024MiB; original assertions/counts unchanged; initial -smp2 C/V generic failure retained",
+        "log_sha256": "10bc608f7fe22db6b8a72dc478596c456ed691a892524594e5ef6ad6d5beccda",
+        "native_firstparty_source": "immutable original C main/model/26 fixture headers; pre-canonical bytefix production core; failure-only supervisor rawstatus diagnostic",
+        "observed": "no full workload/boundary PASS markers and no raw child status before outer timeout; read-only CPU-index-verified polling snapshot retained",
+        "cause": "unknown; no V fixture attribution",
+        "next": "runtime composed23 full kernel priority; final23 C/V x86 images queued"
+      }
+    },
+    "original-C-x86-qemu64-validation.json": {
+      "receipt_sha256": "942af1ae67493365d4460aa5d0b850fddb8fead474be9666285e659bcbb0341f",
+      "receipt": {
+        "result": "FAIL",
+        "exit_code": 1,
+        "scope": "untouched immutable original-C main/26 headers + same canonical production core on actual native x86",
+        "failure": "full original workload child returned native wait status9 (SIGKILL); both required PASS markers absent",
+        "cause": "unknown; wait status alone does not establish OOM or a translation failure",
+        "assertions_counts_budget": "unchanged, 3600seconds maximum, qemu64/TCG4CPU1024MiB",
+        "actual_boot_kernel_sha256": "076b9115fcb11e6b84362c1d1027c5561ddd24d6aa40f9041be21dc08b47d3f9",
+        "actual_boot_fixture_sha256": "ee0172693b442c2f43978aa982c5d8d4cece52dbf3d029bea9fb503c6ebcf06f",
+        "raw_serial": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-final23/original-C-x86-qemu64-serial.log",
+        "raw_serial_sha256": "f871cc0f9bb01e85e673d4ba954d285e8643924884b3ef5d328a06429967c58b",
+        "utc": "2026-10-06T14:48:47.089391+00:00",
+        "previous_max_failures_retained": true
+      }
+    },
+    "translated-V-x86-qemu64-validation.json": {
+      "receipt_sha256": "3f1d09d9ea9570c2dfa2bf79913ddd84a08f1f7b5ac610119ac7874951d60c8a",
+      "receipt": {
+        "result": "FAIL",
+        "exit_code": 1,
+        "failure": "original bound routing CPU equality assertion in translated-V fixture; full child waitstatus6(SIGABRT)",
+        "cause": "unknown; no assertion/count/budget changes",
+        "boot_kernel_sha256": "076b9115fcb11e6b84362c1d1027c5561ddd24d6aa40f9041be21dc08b47d3f9",
+        "boot_fixture_sha256": "9263c09fc10af4f88bb8a732d28df5a2a4a10bc3fb17b7fec84b5ad2d79ca67f",
+        "configuration": "qemu64 TCG4CPU1024MiB PRODtrue/LINUXKPI0/O2; original3600maximum",
+        "raw_serial": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-final23/translated-V-x86-qemu64-serial.log",
+        "raw_serial_sha256": "e70b9a8bb585ad1777a86edc2377276f0f15d7e3b651903855705c42335ac974",
+        "utc": "2026-10-06T14:57:10.011212+00:00",
+        "prior_ARM_same_assertion_failure": "retained; immutable ARM V repeat and original C native controls passed"
+      }
+    },
+    "bound-diag-x86-qemu64-validation.json": {
+      "receipt_sha256": "6b76ade9721d3d72f350ef2d93e4c60899c3c12d7592177c7aceec9fe02fefeb",
+      "receipt": {
+        "result": "FAIL",
+        "exit_code": 1,
+        "state": "/tmp/vmh-bdq64-x86-3",
+        "kind": "failure-only diagnostic, no source-stage validation credit",
+        "full_workload_child_status": 9,
+        "signal": "SIGKILL",
+        "failure_context_print_observed": false,
+        "bound_assertion_observed": false,
+        "cause": "unknown; no specific OOM/assertion/user-kill evidence in serial",
+        "ELF_sha256": "8d1b711d9d71b9881d9255629120b9c555331a5cfd82590762682dca9f6d4ce5",
+        "kernel_sha256": "076b9115fcb11e6b84362c1d1027c5561ddd24d6aa40f9041be21dc08b47d3f9",
+        "configuration": {
+          "cpu": "qemu64",
+          "TCG": true,
+          "CPUs": 4,
+          "memory_MiB": 1024,
+          "timeout_seconds": 3600
+        },
+        "setup_attempts": [
+          {
+            "state": "/tmp/vmh-bound-diag-q64-x86",
+            "result": "cancelled own QEMU to correct runner expected marker; no comparison verdict"
+          },
+          {
+            "state": "/tmp/vmh-bdq64-x86-2",
+            "result": "ISO install ENOSPC before QEMU"
+          }
+        ]
+      }
+    }
+  },
+  "native_qemu64_configuration": {
+    "base_runner": "/tmp/vmh-source/tests/kernel-gaps/run-host-fourcpu.py",
+    "base_sha256": "dcb8cd49212294182c60e84e649b07f07fd1c8d4f354cc3bd40625bf24bd8797",
+    "runner": "/tmp/vmh-source/tests/kernel-gaps/run-host-qemu64.py",
+    "runner_sha256": "67caad43af6150582fb51ab02139473628f88c0742dcd38c5ebeb8f019d6af10",
+    "only_change": "x86 -cpu max -> -cpu qemu64; existing4CPU/memory1024/deadline3600/all fixture markers/assertions/loops unchanged",
+    "images": "/tmp/vmh-final-native-core/native-final-links.json",
+    "production_kernel": {
+      "path": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/callback-const-x86-default-kernel-dir/bin/vinix",
+      "sha256": "076b9115fcb11e6b84362c1d1027c5561ddd24d6aa40f9041be21dc08b47d3f9",
+      "source_base": "770ba039+exactreviewed23",
+      "config": "ARCH=x86_64 LINUXKPI=0 PROD=true -O2 LIMINE_MP=1 STACK_GUARD_TEST=0; independent llvm-ar runtime archive",
+      "receipt": "callback-const-{production-inputs,default-kernels,default-validation}.json",
+      "validation": "Both fresh default boots PASS; composed23 full repeat38markers/exact16heap checks PASS, matching oldABI control38/exact16 PASS; production stages committed03ad7bb3/e79802e4"
+    },
+    "launch": "BothcontrolsendedFAIL: originalCfullchildstatus9causeunknown; translatedVoriginalboundCPUassertionstatus6causeunknown",
+    "limitations": "previous cpu=max 2CPU C/V generic failures and4CPU original C timeout retained; qemu64 comparison cannot claim max/LA57 platform coverage",
+    "native_images": {
+      "translated-V-x86_64": {
+        "path": "/tmp/vmh-final-native-core/translated-V-x86_64.elf",
+        "sha256": "9263c09fc10af4f88bb8a732d28df5a2a4a10bc3fb17b7fec84b5ad2d79ca67f"
+      },
+      "original-C-x86_64": {
+        "path": "/tmp/vmh-final-native-core/original-C-x86_64.elf",
+        "sha256": "ee0172693b442c2f43978aa982c5d8d4cece52dbf3d029bea9fb503c6ebcf06f"
+      }
+    },
+    "CPU_domain_review": "No CPUID/AVX/XSAVE/LA57-dependent assertions in immutable original main+26 headers or new model/groups; only runtimefixture SSE4.1 test lies behind !linuxkpi_host_test and is excluded from both native host images. qemu64 preserves SSE2/x86_64 required instructions and all original fake4CPU model cases; kernel domain differs, prior max limitations remain unverified.",
+    "prepared_commands": {
+      "translated-V-x86_64": [
+        "python3",
+        "/tmp/vmh-source/tests/kernel-gaps/run-host-qemu64.py",
+        "--arch",
+        "x86_64",
+        "--prebuilt-init",
+        "/tmp/vmh-final-native-core/translated-V-x86_64.elf",
+        "--kernel-dir",
+        "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/callback-const-x86-default-kernel-dir",
+        "--state-dir",
+        "/tmp/vmh-translated-v-q64-final23",
+        "--expect",
+        "LinuxKPI: PASS",
+        "--expect",
+        "HOST MODEL GUEST PASS: original workload and all seven boundary cases",
+        "--fail",
+        "HOST MODEL GUEST FAIL:",
+        "--timeout",
+        "3600"
+      ],
+      "original-C-x86_64": [
+        "python3",
+        "/tmp/vmh-source/tests/kernel-gaps/run-host-qemu64.py",
+        "--arch",
+        "x86_64",
+        "--prebuilt-init",
+        "/tmp/vmh-final-native-core/original-C-x86_64.elf",
+        "--kernel-dir",
+        "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/callback-const-x86-default-kernel-dir",
+        "--state-dir",
+        "/tmp/vmh-original-c-q64-final23",
+        "--expect",
+        "LinuxKPI: PASS",
+        "--expect",
+        "HOST MODEL GUEST PASS: original workload and all seven boundary cases",
+        "--fail",
+        "HOST MODEL GUEST FAIL:",
+        "--timeout",
+        "3600"
+      ]
+    },
+    "original_C_launch_utc": "2026-10-06T14:28:45.408174+00:00",
+    "translated_V_launch_utc": "2026-10-06T14:42:21.591702+00:00",
+    "original_C_verdict": "original-C-x86-qemu64-validation.json",
+    "translated_V_verdict": "translated-V-x86-qemu64-validation.json"
+  },
+  "commit_review": {
+    "date": "2026-10-07",
+    "stale_owned_inputs": 0,
+    "deleted_HEAD_blobs_matching_immutable_scope": 27,
+    "syntax_and_whitespace": "PASS exact-path staged git diff --check, compile of each owned Python source, /bin/sh -n run.sh",
+    "reruns": "Only before/after V generation for three whitespace-cleaned fixtures: all six artifacts byte-identical. No expensive complete host/native reruns; no native completion claimed.",
+    "lifetime_review": "Existing independent reviews preserved; task pins, queue/condition destruction, callback stack borrows, worker joins and exact page equality unchanged",
+    "limitations": "Native x86 comparison remains incomplete. Earlier ARM/x86 failures retain unknown causes. The frozen provider snapshot is not a fresh execution of the concurrently edited checkout.",
+    "whitespace_only_delta": {
+      "tests/linuxkpi/hostfixtures/policyhostsuite/core.v": {
+        "before_sha256": "49382df13c1c431e754b4c3636e858dfe90395a48b24c123438be6005e7d597f",
+        "after_sha256": "a714dc3627279f1c7ff5280f4aff4f421fc729b74be9009005dfad577359e7c9",
+        "only_change": "Remove trailing spaces and redundant final blank line",
+        "arm64_generated_C_sha256": "efe318812d6fc8afdb863e9c5a97c456c01569abe3eb5470aa0c8a76ff1373dd",
+        "amd64_generated_C_sha256": "efe318812d6fc8afdb863e9c5a97c456c01569abe3eb5470aa0c8a76ff1373dd"
+      },
+      "tests/linuxkpi/hostfixtures/stringtokenshost/core.v": {
+        "before_sha256": "2c85e6a7526c64b358a8723d7cc3d76cb6a2ae700b90704aa99f68db2476bc63",
+        "after_sha256": "4f5ea225e183318a35e1857344c3a42744a6d547656ce0fe349770bf12cea363",
+        "only_change": "Remove trailing spaces and redundant final blank line",
+        "arm64_generated_C_sha256": "094e4628e5498425a4f1b70cbe64c47606d427501fded48bc9febb63ccf18611",
+        "amd64_generated_C_sha256": "094e4628e5498425a4f1b70cbe64c47606d427501fded48bc9febb63ccf18611"
+      },
+      "tests/linuxkpi/hostfixtures/waithost/core.v": {
+        "before_sha256": "d255955445b27997dcbc1116224e83208abbbd2c130188053cd4986e359edd02",
+        "after_sha256": "c8045a6cd31f35986d9867cd477abd498cbd6b808eb12c826cff37dc3bd85ef6",
+        "only_change": "Remove trailing spaces and redundant final blank line",
+        "arm64_generated_C_sha256": "b23a6bc92a52503f661301ccaf21a88a24530502d1ed395f7ff605444611e63a",
+        "amd64_generated_C_sha256": "b23a6bc92a52503f661301ccaf21a88a24530502d1ed395f7ff605444611e63a"
+      }
+    },
+    "owned_inputs_matching_passing_receipt_before_whitespace_cleanup": 96,
+    "final_owned_inputs_matching_passing_receipt": 93,
+    "whitespace_cleanup_generated_C_byte_identical": "PASS all three changed files for arm64 and amd64; frozen V compiler"
+  },
+  "committed_host_inputs": {
+    "tests/linuxkpi/hostfixtures/policyhostsuite/core.v": "a714dc3627279f1c7ff5280f4aff4f421fc729b74be9009005dfad577359e7c9",
+    "tests/linuxkpi/hostfixtures/stringtokenshost/core.v": "4f5ea225e183318a35e1857344c3a42744a6d547656ce0fe349770bf12cea363",
+    "tests/linuxkpi/hostfixtures/cachehost/core.v": "84f343d65d78d77e7782eb4fd6bc96277fc8e8c0439542ef394f283fb5809647",
+    "tests/linuxkpi/hostfixtures/stringhelpershost/core.v": "a7cbe717d4348cf44229ff831b5c03a75aca34903f1af2d3d12a5606a85937be",
+    "tests/linuxkpi/hostfixtures/timehost/timehost_v_contract.h": "16232fb29570d9b465b99ec09581cd8a3ee88fcea3fcfb164e014f3dde50dcce",
+    "tests/linuxkpi/hostfixtures/timehost/core.v": "d1563364f190388bf512fecde5e2eed5de98d77625a7630e2c66de6b38aea4aa",
+    "tests/linuxkpi/hostfixtures/hostio/hostio_v_contract.h": "4fcee17a1f021a13b4f86bce848522028c16c0859d460d8e20e8275ad2fdf213",
+    "tests/linuxkpi/hostfixtures/hostio/core.v": "9ab233b2be34c4df166aaded8c04f78387fa2c3292621804d054c9837c9ee63d",
+    "tests/linuxkpi/hostfixtures/hostseq/hostseq_v_contract.h": "4f84dcf943487f12d923f93c8c09af150019cfe8a771fd4b9137105d8e342b7b",
+    "tests/linuxkpi/hostfixtures/hostseq/core.v": "eb8f237cf7650995a778d2c6c36401ea3e1c87c3edd311f0334606fab1b183b1",
+    "tests/linuxkpi/hostfixtures/waithost/core.v": "c8045a6cd31f35986d9867cd477abd498cbd6b808eb12c826cff37dc3bd85ef6",
+    "tests/linuxkpi/hostfixtures/waithost/waithost_v_contract.h": "37a08f02c132fa72db71d93ec62d58df65d9456891629bc17472278167848cde",
+    "tests/linuxkpi/hostfixtures/formathost/core.v": "a43e18f34595f432981bd60bcd46a981162754f8fde52842292f00bd9e293980",
+    "tests/linuxkpi/hostfixtures/kstrtoxhost/core.v": "ab68a76d452324c64cd6680dbc65d58c8cd9221bc6e14f4cf61c231d1d18d4d8",
+    "tests/linuxkpi/hostfixtures/bitmaphost/core.v": "dbdc2e8babb7e4e72d4fc86e7690bc6d7804a81721feecd4f7cdffa6aa40170e",
+    "tests/linuxkpi/hostfixtures/hostbase/percpu.v": "de0b298ea79f2c2ec5aed3dbdd0b922ec925e4a36d598d9c3ad98fcbd733a17d",
+    "tests/linuxkpi/hostfixtures/hostbase/bitmap.v": "2cc9c2021237c4ba737ebaddd331f6852f466a4eb0064f9c93c64575299e2d6a",
+    "tests/linuxkpi/hostfixtures/hostbase/atomic.v": "a3298fbe45a12021874e606fccb7e720f486493c79221d96cacac5edf3469c59",
+    "tests/linuxkpi/hostfixtures/hostbase/containers.v": "f6d318f49854a8d6c25594b8e30df694f89ef978e82b68d9b40b1f05ae960d85",
+    "tests/linuxkpi/hostfixtures/hostbase/core.v": "2586021514a14ea5297cc8ee84514e59a107fa43da22b883a8259ddde1816a99",
+    "tests/linuxkpi/hostfixtures/hostbase/hostbase_v_contract.h": "019e1340212f57232c06184a8c1a6ba82bb6b37f50cd1b55ec20a0054361e8d5",
+    "tests/linuxkpi/hostfixtures/hostbase/main.v": "22b40d84bce70df10f4e7c0e7698b50bfc49810ba7146447b88a2d1c25f65009",
+    "tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h": "e6752189060bfee9a935257a8b77045c26c6381e5889c831f9fccd08929f2c5a",
+    "tests/linuxkpi/hostfixtures/wwhost/core.v": "5fb93c16410dcc755c012d6d589c94dfebecffb93d9ec3a09730956ef1464f8a",
+    "tests/linuxkpi/hostfixtures/loghost/warn.v": "20f63c6f2afb34a30a0d70009b27f90015c05165b8588ba03463f87b376e5cb4",
+    "tests/linuxkpi/hostfixtures/loghost/core.v": "2a3143507d08282348df17b2a7d9214bb4a5cdecaba7b41dd0d88bddcee7d4b9",
+    "tests/linuxkpi/hostfixtures/hosttask/core.v": "c9dce17130f20ba6f454ef579436d5bc48be8cc4daabd7680bf6bd45714dbf67",
+    "tests/linuxkpi/hostfixtures/hosttask/hosttask_v_contract.h": "9cfd9f85dd894b66eadafb2f45d838ee59cb1e232f687e0de3efc16e660fe182",
+    "tests/linuxkpi/hostfixtures/synchost/synchost_v_contract.h": "f9ab51c2f99cd5f6558bda103596aa36e200b10bceaaf1f202113e9a24acb845",
+    "tests/linuxkpi/hostfixtures/synchost/core.v": "f66d6ff3cd67196d39c72855125f6d00595781f2e4ca3f916e6ad5d8c74be4a6",
+    "tests/linuxkpi/hostfixtures/hostwork/hostwork_v_contract.h": "db446b740f97be08eafcf48c7c4ff2f55e75840a849cf1db1090f1594336dfbb",
+    "tests/linuxkpi/hostfixtures/hostwork/srcu.v": "34688aa947547b1ea3459d626e8b1e1013e3368eb50110fca39dc1e9bf20925b",
+    "tests/linuxkpi/hostfixtures/hostwork/delayed.v": "9e94335cd0fae6fc7d3f7fa821c8a4893160ca549f4968b9552123ef3009db33",
+    "tests/linuxkpi/hostfixtures/hostwork/unbound.v": "9e77bdde876c9d5bd0b3ffb6b5f053fe19816ada7f19e27d3f9f1b1e5a2a30ad",
+    "tests/linuxkpi/hostfixtures/hostwork/bound.v": "88c212051568bf9609e11ef8bf12276dab8e6181289cc6822b5ad103fa9ab01c",
+    "tests/linuxkpi/hostfixtures/hostwork/core.v": "e5e3d95a12ecf45e61bb279f438f65237bf7b46f3b32926c348cbaad39c01ee6",
+    "tests/linuxkpi/hostfixtures/hosttaskflag/hosttaskflag_v_contract.h": "93a4201f7c08c8b43b63a167ae0085b81985871368af9b819a6b96131fd1bfec",
+    "tests/linuxkpi/hostfixtures/hosttaskflag/core.v": "93e5a423ce34f20dbebdf1c6922b2c981689d84efeaecc90a8a2c72008b260f8",
+    "tests/linuxkpi/hostfixtures/usleephost/usleephost_v_contract.h": "7230fbf5d813208673e146ba89d1d701f1448a8d39b829e3fa68c48973ecdf31",
+    "tests/linuxkpi/hostfixtures/usleephost/core.v": "fb31f523558ad1bf3d7ad02eef92ce5c9068c48b9903456c4f18582f185d0526",
+    "tests/linuxkpi/hostfixtures/timerhost/core.v": "8aa6a5a6051dae26e56fbb4cab1d5365cd425acff39dfad0e9dd93ac44398286",
+    "tests/linuxkpi/hostfixtures/timerhost/timerhost_v_contract.h": "2bde5f518d84e68241446b8defa5e3352e9fcc4ddc432585028b0e8cfedc06de",
+    "tests/linuxkpi/hostmodel/core.v": "6402c06562fba0f8b5f5001ebc307954ce53a8308b7e318343d86c69fd29154d",
+    "tests/linuxkpi/compile-v-host.py": "84ba28c84ac9b0a5a8517d7a35b92397d86b19eef301a5b645b099a5d3bf399d",
+    "tests/linuxkpi/host_model_foreign.v": "f2c5fa1c7dfe0484159dd3129e01149e709c6bff1d5acf3d72983adfe05bc3b1",
+    "tests/linuxkpi/host_model_tls.S": "9790206116d1273a3914861bcc7ef746d3a848c376f94214f558786cd4182662",
+    "tests/linuxkpi/host_model_v_contract.h": "fd4b1321d24cc1603083d1d67315ad4b642c44cae286c2bb57171e08065f022c",
+    "tests/linuxkpi/host_percpu_abi.json": "712d709cd3e89eb7e6da7562fc9bfad947bafe0e667a1e10167fbec05c974b58",
+    "tests/linuxkpi/host_suite.py": "222509fd8228bafba4b36a678298ab9133988352869e99ede88cf93731f96f43",
+    "tests/linuxkpi/policyhost_v_contract.h": "abd0a77a59f95b13886d48a28ba9fd6b159d64893ea2097e0ab01d0dcb609b48",
+    "tests/linuxkpi/kstrtoxhost_v_contract.h": "eb468860417aee457cb612111677219ea1dc686757f69dba250d54e73d9e3193",
+    "tests/linuxkpi/cachehost_v_contract.h": "92b2f127acdbc272350f38f8d6ff90706e19a9b657d697f655db03c90765a670",
+    "tests/linuxkpi/stringtokenshost_v_contract.h": "851cf4789c1e4094b971dbf4865aeb3df8d1abfdf709deb17a1a609228076e83",
+    "tests/linuxkpi/loghost_v_contract.h": "9479a3f78224fbe45310f8c4ff60a467cad54dc70086831a590c723cc2064657",
+    "tests/linuxkpi/bitmaphost_v_contract.h": "5591389ce0616aea33fbc865c33330bee999a414123baec68735fcd6ba6d5a04",
+    "tests/linuxkpi/formathost_v_contract.h": "b6a78f3ebf0a791d974bc95a52a390e03849ae101084c063ca0fcff978f104ca",
+    "tests/linuxkpi/stringhelpershost_v_contract.h": "6e9a33765b5855a603d09f47868bf543bed82e0f4f6d6c577ae3cb8dba75ee30",
+    "tests/linuxkpi/formathost_abi.S": "3a1569fd41fa6b9ed52d98ebb2b87f98c7e56ab1858b88e7fe2e1e80391aef71",
+    "tests/linuxkpi/loghost_abi.S": "9ef7b2fafc9e0370ee077e145dfa251d09b89c977d64a705777d4c7d39595216",
+    "tests/linuxkpi/test.c": null,
+    "tests/linuxkpi/sync_test.h": null,
+    "tests/linuxkpi/ww_mutex_test.h": null,
+    "tests/linuxkpi/time_test.h": null,
+    "tests/linuxkpi/usleep_range_test.h": null,
+    "tests/linuxkpi/timer_test.h": null,
+    "tests/linuxkpi/workqueue_test.h": null,
+    "tests/linuxkpi/delayed_work_test.h": null,
+    "tests/linuxkpi/unbound_work_test.h": null,
+    "tests/linuxkpi/bound_work_test.h": null,
+    "tests/linuxkpi/bitmap_runtime_test.h": null,
+    "tests/linuxkpi/srcu_test.h": null,
+    "tests/linuxkpi/wait_bit_test.h": null,
+    "tests/linuxkpi/io_test.h": null,
+    "tests/linuxkpi/mutex_io_test.h": null,
+    "tests/linuxkpi/cache_test.h": null,
+    "tests/linuxkpi/task_flag_test.h": null,
+    "tests/linuxkpi/seqcount_test.h": null,
+    "tests/linuxkpi/format_test.h": null,
+    "tests/linuxkpi/printk_test.h": null,
+    "tests/linuxkpi/warn_test.h": null,
+    "tests/linuxkpi/i915_config_test.h": null,
+    "tests/linuxkpi/kdev_test.h": null,
+    "tests/linuxkpi/qp_table_test.h": null,
+    "tests/linuxkpi/string_helpers_test.h": null,
+    "tests/linuxkpi/kstrtox_test.h": null,
+    "tests/linuxkpi/string_tokens_test.h": null,
+    "tests/linuxkpi/run.sh": "dc0a5ffa489d4bb301f4afdeffede7c2e5e2644b1a40cc553bf5062ab4405308",
+    "kernel/asm/x86_64/varargs.inc": "400bd49ea8abf415582edb49d78bb6c74a1c684d04a66a40ff4154b0d831a577",
+    "tests/linuxkpi/host_types.h": "668eb57dbac767dbeb340d368d5865e241f24b597e401729dde30ea5cc3192c5",
+    "tests/linuxkpi/compile-v-core.py": "d2ac140cca6947fa55be7d7ee6b176372cf0f457c6d0a5d9018bb7e47b57f7b3",
+    "tests/linuxkpi/compile-native-host.py": "1c2e9c7b68f647b2b45f5d5714f4d4db27d418504e6a70446ef8d29dbcba6ab7",
+    "tests/linuxkpi/hostguest/core.v": "fe8f4991512104b9d94c58fd4ff2003df26f32ed486d3f0afa3b6c801dd9d87d",
+    "tests/linuxkpi/hostguest/hostguest_v_contract.h": "a10092cf21fad83bfa6c49bee56eeeeaf68993e15f8a696bd5e85efb1e0fa69d",
+    "kernel/asm/x86_64/linuxkpi_varargs.S": "0897fbff27f83b3a79fa61bf1ab35356ae28292f066616027fb39a9b8ca60a01",
+    "kernel/asm/x86_64/linuxkpi_workqueue_abi.S": "4d6da2738ba61a68e12e9707213608f2421018f132defbebbc4b1780f3a3db7c",
+    "kernel/asm/x86_64/linuxkpi_printk_fixture_abi.S": "efb0290dd5ecdfcc87e054eb3e7c11f79ea9dd87c22608e1ec35b8204c201f67"
+  }
+}

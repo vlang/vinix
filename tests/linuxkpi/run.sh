@@ -6,7 +6,12 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-linuxkpi-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
 python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source_dir")"
 "$repo/tests/pci-config/run.sh"
-python3 "$repo/tests/linuxkpi/compile-v-core.py" "$work/compat.c"
+case $(uname -m) in
+    arm64|aarch64) native_asm=aarch64; native_v_arch=arm64 ;;
+    x86_64|amd64) native_asm=x86_64; native_v_arch=amd64 ;;
+    *) printf '%s\n' 'Unsupported LinuxKPI host assembly architecture' >&2; exit 1 ;;
+esac
+python3 "$repo/tests/linuxkpi/compile-v-core.py" "$work/compat.c" --arch "$native_v_arch"
 ${CC:-clang} -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer -ffreestanding -fno-builtin \
     -fwrapv -fno-strict-aliasing -DVINIX_V_RUNTIME -DVINIX_LINUXKPI_HOST_TEST -I"$repo/kernel/c" \
@@ -17,11 +22,6 @@ symbols = subprocess.check_output(["nm", "-u", sys.argv[1]], text=True)
 assert not re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", symbols), symbols
 print("LinuxKPI: V core has no implicit allocator imports")
 CHECK
-case $(uname -m) in
-    arm64|aarch64) native_asm=aarch64; native_v_arch=arm64 ;;
-    x86_64|amd64) native_asm=x86_64; native_v_arch=amd64 ;;
-    *) printf '%s\n' 'Unsupported LinuxKPI host assembly architecture' >&2; exit 1 ;;
-esac
 ${CC:-clang} -DVINIX_LINUXKPI -I"$repo/kernel/asm/$native_asm" \
     -Dsnprintf=vinix_linuxkpi_format_test_snprintf \
     -Dscnprintf=vinix_linuxkpi_format_test_scnprintf \
@@ -113,6 +113,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -ffreestanding -fno-builtin \
     -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
     -c "$work/policyhost.c" -o "$work/policyhost.o"
+python3 "$repo/tests/linuxkpi/host_suite.py" "$work" --arch "$native_v_arch"
 # Link production implementations with the independent runtime and sync fixtures.
 # Upstream Linux enables -Wall/-Wextra but disables unused-parameter warnings.
 ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror -Wno-unused-parameter \
@@ -121,7 +122,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" "$repo/tests/linuxkpi/test.c" \
+    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" @"$work/host-fixtures.rsp" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \

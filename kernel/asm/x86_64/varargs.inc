@@ -1,8 +1,15 @@
 // Preserve the six integer registers and SysV overflow stack cursor.
+#ifdef __APPLE__
+#define ABI_SYMBOL_INNER(name) _##name
+#define ABI_SYMBOL(name) ABI_SYMBOL_INNER(name)
+#else
 #define ABI_SYMBOL(name) name
+#endif
 .macro VINIX_VARIADIC name, target, named
     .global \name
+#ifndef __APPLE__
     .type \name, @function
+#endif
 \name:
     pushq %rbp
     movq %rsp, %rbp
@@ -24,11 +31,15 @@
         leaq 48(%rsp), %rdx
     .elseif \named == 3
         leaq 48(%rsp), %rcx
+    .elseif \named == 4
+        leaq 48(%rsp), %r8
     .else
         .error "Unsupported variadic named-argument count"
     .endif
     call \target
     leave
     ret
+#ifndef __APPLE__
     .size \name, .-\name
+#endif
 .endm

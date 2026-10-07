@@ -3,6 +3,8 @@
 #ifdef VINIX_LINUXKPI
 #include "varargs.inc"
 .text
-VINIX_VARIADIC alloc_workqueue, vinix_linuxkpi_alloc_workqueue_entry, 3
+VINIX_VARIADIC ABI_SYMBOL(alloc_workqueue), ABI_SYMBOL(vinix_linuxkpi_alloc_workqueue_entry), 3
+#ifndef __APPLE__
 .section .note.GNU-stack,"",@progbits
+#endif
 #endif

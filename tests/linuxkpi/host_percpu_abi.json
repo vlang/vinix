@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "guard": "VINIX_HOST_PERCPU_LVALUE_ADAPTER_H",
+  "sources": [],
+  "boundary": {"kind": "upstream_lvalue_address_adapter", "v_algorithm_credit": 0},
+  "native_expression_imports": [{"name":"get_cpu_var","header":"linux/percpu.h","parameters":["operand"]}],
+  "native_expression_adapters": [{
+    "name":"vmh_get_cpu_var_address",
+    "parameters":[{"name":"variable","kind":"operand"}],
+    "expression":{"address":{"call":"get_cpu_var","arguments":[{"operand":"variable"}]}}
+  }]
+}
