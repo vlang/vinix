@@ -47,6 +47,30 @@ VINIX_QEMU_RT_NO_BUILD=1 \
 python3 tests/mounted-disk-policy/run.py --arch=amd64
 ```
 
+The maintained native guest is V in `diskfixture/core.v`. Its declaration-only
+header checks the native directory, device-stat, filesystem-stat, transfer-vector
+and scalar layouts. The original 176-line C guest is frozen at
+`e51f3fc0ff792d1465ac3f06440663215d14433a` (blob
+`bd3a12b132b9dff5527f59c8cdbb3cb9cb1994e5`). Independent comparisons can pass
+that Git blob's contents with `--source=/absolute/original-guest.c`.
+`--state-dir=/absolute/new-state` retains the actual guest ELF, disk images,
+compiler inputs, EXT2-tool logs and complete payload. The state must be fresh.
+`--kernel-dir=/absolute/worktree/kernel` copies an existing matching kernel
+immutably and disables rebuilding it during the guest run. Without this option,
+the existing environment and build behavior apply.
+
+V retains all 72 original source checks: 70 compile on ARM and 64 on AMD.
+Failure messages preserve each native line number and C expression. The native
+directory entry stays borrowed until the next `readdir`; transfer vectors,
+offset outparameters and pipe descriptors remain stack values borrowed by
+synchronous libc calls. The permanent 512-byte buffers use static storage.
+No V allocator is imported by the native fixture object. The 50 warmup batches,
+6,000 measured denials, `after <= old + 16` slab assertion, all source-consumption
+and offset checks, 128 writeback operations and original 300-second guest
+allowance remain unchanged. `host.py` and `check-generated.py` remain independent
+production-policy checks; their embedded C fixtures are a separate migration
+scope.
+
 Each guest uses disposable 64 MiB EXT2 and 16 MiB raw disks. It tests mounted
 disk writes, existing descriptors, `mknod` block and misleading character
 aliases, symlinks, unknown block nodes, unrelated raw writes at level 1, and
@@ -98,6 +122,30 @@ allowance file still fails in the same 157 baseline groups, with no new
 identity, policy or transfer allocation categories; allowances are unchanged.
 The audit's AMD compiler invocation still exits 1 on the known unrelated DRM
 module issue while producing its allocation report. Production builds pass.
+
+The 2026-10-07 guest C-to-V migration passed strict native SDK builds and four
+complete QEMU TCG controls: the frozen C guest and maintained V replacement
+on each architecture. After all 6,000 denials, each ARM control retained
+1584 -> 1584 KiB of Slab and each AMD control retained 1168 -> 1168 KiB. All
+four guests reached every policy/writeback marker and `SECUREDISK DONE` with
+the original assertions and 300-second allowance, passed `e2fsck -f -n`, and
+persisted the identical 65,536-byte `0x59` payload (SHA256
+`fe6eacdc96297d25999ecef8aed549094a25a6baa699a0b60cdc5fba75ce5291`).
+
+The actual V guest ELFs match the independently reviewed native SDK artifacts:
+ARM `62d6ac59ade22e22f2e87de2c0439981e0a31b9041623ba01a1e0e0fccfaca1d`
+and AMD `22495c2a592dcb341e9a34285d18da7735ab2e088acf1a47a1b7fa2b5e1abb26`.
+The source, native layout and lifetime review covered all original checks,
+stack borrows and descriptor closure order. The unchanged host policy and
+generated geometry checks passed ASan/UBSan; leak sanitizer was disabled.
+
+These guest controls reused previously qualified immutable kernels with
+unchanged tracked kernel source: ARM SHA256
+`05ce36f10282f9ed7263d560fc60b5a4b057e3fdf0158fb07d3fa41a27f048ed`
+and AMD SHA256
+`b871254e8493566beb5b2e4436a06765a05db7d0f8fae561bb448d135f9c4199`.
+This fixture stage made no kernel change and claims no fresh kernel build.
+The native guests themselves were not instrumented with sanitizers.
 
 ## Limits
 

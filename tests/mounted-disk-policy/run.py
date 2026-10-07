@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Verify mounted-disk policy on a disposable, physically backed EXT2 guest root."""
 import argparse
+from contextlib import nullcontext
 import hashlib
 import importlib.util
+import json
 import os
 from pathlib import Path
 import platform
 import re
+import runpy
 import shutil
 import subprocess
 import tarfile
@@ -27,6 +30,9 @@ def load(name, path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=("aarch64", "amd64"), default="aarch64")
+    parser.add_argument("--state-dir", type=Path, help="keep the guest disks, native artifacts and validation evidence")
+    parser.add_argument("--source", type=Path, help="independent C control; default builds the maintained V fixture")
+    parser.add_argument("--kernel-dir", type=Path, help="copy an existing kernel immutably and disable guest rebuilding")
     args = parser.parse_args()
     runner = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     helper = load("securedisk_powercut", runner / "tests/disk-no-sync/run_vm.py")
@@ -38,16 +44,46 @@ def main():
     if not tool:
         raise RuntimeError("e2fsprogs is required")
     timeout = int(os.environ.get("VINIX_QEMU_TIMEOUT", "300"))
-    with tempfile.TemporaryDirectory(prefix="vinix-securedisk-") as directory:
+    if args.state_dir:
+        args.state_dir = args.state_dir.resolve()
+        if any((args.state_dir / name).exists() for name in ("init", "root.ext2", "spare.raw", "kernel", "evidence.json")):
+            parser.error("Use a fresh state directory for independent guest disks and evidence")
+        args.state_dir.mkdir(parents=True, exist_ok=True)
+    context = nullcontext(str(args.state_dir)) if args.state_dir else tempfile.TemporaryDirectory(prefix="vinix-securedisk-")
+    with context as directory:
         work = Path(directory)
+        kernel = None
+        if args.kernel_dir:
+            source_kernel = args.kernel_dir.resolve() / "bin/vinix"
+            if not source_kernel.is_file():
+                parser.error(f"Build the requested kernel first: {source_kernel}")
+            if struct.unpack_from("<H", source_kernel.read_bytes(), 18)[0] != {"aarch64": 183, "amd64": 62}[args.arch]:
+                parser.error("Kernel ELF architecture does not match --arch")
+            kernel = work / "kernel/bin/vinix"
+            kernel.parent.mkdir(parents=True)
+            shutil.copy2(source_kernel, kernel)
         if args.arch == "aarch64":
             sysroot = Path(os.environ.get("VINIX_AARCH64_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
             cc = [os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
                   f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else:
             cc = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
-        subprocess.run(cc + ["-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector", "-pthread",
-            str(ROOT / "tests/mounted-disk-policy/guest.c"), "-o", str(work / "init")], check=True)
+        flags = cc + ["-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector", "-pthread"]
+        module = ROOT / "tests/mounted-disk-policy/diskfixture"
+        compiler = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+        fixture = args.source.resolve() if args.source else compiler["compile_module"](module, work / "fixture.o",
+            "aarch64" if args.arch == "aarch64" else "x86_64", flags)
+        subprocess.run(flags + [str(fixture), "-o", str(work / "init")], check=True)
+        evidence = {"arch": args.arch, "timeout": timeout, "independent_C_control": bool(args.source),
+                    "source_sha256": hashlib.sha256(args.source.resolve().read_bytes()).hexdigest() if args.source else
+                        {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(module.iterdir()) if path.is_file()},
+                    "fixture_elf_sha256": hashlib.sha256((work / "init").read_bytes()).hexdigest(),
+                    "native_link_flags": flags, "runner_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
+        if kernel:
+            evidence["immutable_kernel_sha256"] = hashlib.sha256(kernel.read_bytes()).hexdigest()
+            evidence["kernel_rebuilt_by_runner"] = False
+        (work / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        print(f"Guest artifacts: {work}", flush=True)
         archive, disk = work / "initramfs.tar", work / "root.ext2"
         spare = work / "spare.raw"
         with spare.open("wb") as output:
@@ -64,16 +100,18 @@ def main():
             "VINIX_KEEP_TEMP_BOOT_DISK": "1", "VINIX_QEMU_PACKAGE_STORE_PORT": helper.available_port()}
         environment.pop("VINIX_QEMU_PERSIST", None)
         environment.pop("VINIX_QEMU_PERSIST_SEED", None)
+        if kernel:
+            environment.update(VINIX_KERNEL_DIR=str(work / "kernel"), VINIX_AMD64_KERNEL=str(kernel), VINIX_QEMU_RT_NO_BUILD="1")
         if platform.system() != "Darwin":
             environment.setdefault("USE_TCG", "1")
         if args.arch == "aarch64":
             environment["VINIX_QEMU_EXTRA"] = f"-drive if=none,format=raw,file={spare},id=policy-spare -device virtio-blk-device,drive=policy-spare"
             passed, _ = helper.boot(runner, SimpleNamespace(init=work / "init", timeout=timeout), environment,
-                os.environ.get("VINIX_QEMU_RT_NO_BUILD") != "1", "pass")
+                environment.get("VINIX_QEMU_RT_NO_BUILD") != "1", "pass")
         else:
             with tarfile.open(archive, "a", format=tarfile.USTAR_FORMAT) as f:
                 f.add(work / "init", "sbin/init")
-            isoenv = {**environment, "VINIX_AMD64_KERNEL": os.environ.get("VINIX_AMD64_KERNEL", str(ROOT / "kernel/bin/vinix")),
+            isoenv = {**environment, "VINIX_AMD64_KERNEL": environment.get("VINIX_AMD64_KERNEL", str(ROOT / "kernel/bin/vinix")),
                 "VINIX_AMD64_INITRAMFS": str(archive), "VINIX_AMD64_ISO": str(work / "test.iso"),
                 "VINIX_AMD64_ISO_BUILD_DIR": str(work / "iso")}
             subprocess.run([str(runner / "build-support/build-amd64-iso.sh")], env=isoenv, check=True,
@@ -109,14 +147,20 @@ def main():
         if not passed:
             return 1
         check = subprocess.run([str(Path(tool).with_name("e2fsck")), "-f", "-n", str(disk)], capture_output=True, text=True)
+        (work / "e2fsck.log").write_text(check.stdout + check.stderr)
         if check.returncode:
             raise RuntimeError(f"EXT2 check after guest:\n{check.stdout}\n{check.stderr}")
         payload = work / "writeback.bin"
         guest_path = "/policy-writeback" if args.arch == "aarch64" else "/root/policy-writeback"
-        subprocess.run([str(tool), "-R", f"dump {guest_path} {payload}", str(disk)],
-                       check=True, capture_output=True, text=True)
+        dumped = subprocess.run([str(tool), "-R", f"dump {guest_path} {payload}", str(disk)],
+                                check=True, capture_output=True, text=True)
+        (work / "debugfs.log").write_text(dumped.stdout + dumped.stderr)
         if not payload.exists() or payload.read_bytes() != bytes([0x59]) * (128 * 512):
             raise RuntimeError("filesystem writeback did not persist its complete payload")
+        evidence.update(complete_native_verdict=True, e2fsck_returncode=check.returncode,
+                        persisted_payload_sha256=hashlib.sha256(payload.read_bytes()).hexdigest(),
+                        persisted_payload_bytes=payload.stat().st_size)
+        (work / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
         print(f"PASS {args.arch}: mounted-disk capabilities, denial retention, persisted writeback and EXT2 consistency", flush=True)
     return 0
 
