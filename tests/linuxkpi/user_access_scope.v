@@ -1,30 +1,156 @@
-#!/usr/bin/env python3
-# SPDX-License-Identifier: GPL-2.0-or-later
-"""Exercise checked-access scopes with the real V range/scalar frontends.
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Native orchestration of the independent original checked-access fixture.
+module main
+
+import os
+import json2
+import hosttest
+
+const sources = ['primitives.v', 'uaccess_d_linuxkpi.v', 'scalar_store_d_linuxkpi.v']
+const contracts = ['linuxkpi_uaccess_v_contract.h', 'linuxkpi_scalar_store_v_contract.h']
+
+fn command(argv []string) !hosttest.Result {
+	result := hosttest.capture(argv, '', -1, os.environ())!
+	if result.code != 0 { return error(result.stdout + result.stderr) }
+	return result
+}
+
+fn allocation_import(imports string) bool {
+	for line in imports.split_into_lines() {
+		fields := line.fields()
+		if fields.len == 0 { continue }
+		name := fields.last().trim_left('_')
+		if name in ['malloc', 'calloc', 'realloc', 'free', 'memdup', 'v_malloc', 'vcalloc', 'v_realloc'] ||
+			name.starts_with('new_array') { return true }
+	}
+	return false
+}
+
+fn run_profile(keep string) ! {
+	root := hosttest.root()
+	arch := $if arm64 { 'arm64' } $else $if amd64 { 'amd64' } $else { '' }
+	if arch == '' { return error('Unsupported host architecture') }
+	work := hosttest.work_dir(keep, 'vinix-user-access-scope-')!
+	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	core := os.join_path(work, 'compatcore')
+	os.mkdir(core)!
+	mut observed := [@FILE]
+	for name in sources {
+		path := os.join_path(root, 'kernel/linuxkpi/compatcore', name)
+		observed << path
+		os.cp(path, os.join_path(core, name))!
+	}
+	include := os.join_path(work, 'include')
+	os.mkdir_all(os.join_path(include, 'linux'))!
+	os.mkdir(os.join_path(include, 'vinix'))!
+	for name in contracts {
+		path := os.join_path(root, 'kernel/c', name)
+		observed << path
+		os.cp(path, os.join_path(include, name))!
+	}
+	for name in ['linux/uaccess.h', 'vinix/user_access_scope.h'] {
+		path := os.join_path(root, 'kernel/linuxkpi/include', name)
+		observed << path
+		os.cp(path, os.join_path(include, name))!
+	}
+	observed << os.walk_ext(os.join_path(os.dir(@FILE), 'hosttest'), '.v')
+	initial := hosttest.hashes(observed)!
+	generated := os.join_path(work, 'core.c')
+	hosttest.generate_module(core, generated, arch, ['linuxkpi', 'nofloat'])!
+	os.write_file(os.join_path(work, 'test.c'), c_test)!
+	os.write_file(os.join_path(work, 'invalid-width.c'), invalid_width)!
+	os.write_file(os.join_path(work, 'end-probe.c'), end_probe)!
+	common := [hosttest.env_default('CC', 'clang'), '-O1', '-g', '-ffreestanding', '-fno-builtin',
+		'-fwrapv', '-fno-strict-aliasing', '-ffunction-sections', '-fdata-sections', '-Wall',
+		'-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-parameter', '-fsanitize=address,undefined',
+		'-fno-omit-frame-pointer']
+	linux := hosttest.env_default('LINUXKPI_SOURCE_DIR', os.join_path(root, 'third_party/linux-i915/linux-6.6.157'))
+	callers := ['-DVINIX_LINUXKPI_HOST_TEST', '-D__KERNEL__', '-D_FORTIFY_SOURCE=0',
+		'-include', os.join_path(root, 'tests/linuxkpi/host_types.h'), '-include', 'linux/kconfig.h',
+		'-include', os.join_path(linux, 'include/linux/compiler_types.h'), '-I' + include,
+		'-I' + os.join_path(root, 'kernel/linuxkpi/include'), '-I' + os.join_path(linux, 'include'),
+		'-I' + os.join_path(linux, 'include/uapi'), '-I' + os.join_path(linux, 'arch/x86/include'),
+		'-I' + os.join_path(linux, 'arch/x86/include/uapi')]
+	native := ['-DVINIX_V_RUNTIME', '-I' + include, '-I' + os.join_path(root, 'kernel/c')]
+	strip := $if macos { '-Wl,-dead_strip' } $else { '-Wl,--gc-sections' }
+	mut env := os.environ(); env['ASAN_OPTIONS'] = 'detect_stack_use_after_return=1'; env['UBSAN_OPTIONS'] = 'halt_on_error=1'
+	mut results := map[string]json2.Any{}
+	for standard in ['gnu99', 'gnu11'] {
+		mut flags := common.clone(); flags << '-std=' + standard
+		obj := os.join_path(work, standard + '-core.o')
+		mut argv := flags.clone(); argv << native; argv << ['-c', generated, '-o', obj]
+		command(argv)!
+		imports := command(['nm', '-u', obj])!.stdout
+		os.write_file(os.join_path(work, standard + '-core-imports.log'), imports)!
+		if allocation_import(imports) { return error('Implicit production allocation:\n${imports}') }
+		executable := os.join_path(work, standard + '-test')
+		mut link := flags.clone(); link << callers; link << [os.join_path(work, 'test.c'), obj, strip, '-o', executable]
+		command(link)!
+		passed := hosttest.command([executable], '', 30, env)!
+		os.write_file(os.join_path(work, standard + '-run.log'), passed.stdout + passed.stderr)!
+		if passed.stderr != '' { return error(passed.stderr) }
+		mut reject := flags.clone(); reject << callers
+		reject << ['-c', os.join_path(work, 'invalid-width.c'), '-o', os.join_path(work, standard + '-invalid-width.o')]
+		rejected := hosttest.capture(reject, '', -1, os.environ())!
+		os.write_file(os.join_path(work, standard + '-invalid-width.log'), rejected.stderr)!
+		if rejected.code == 0 || !rejected.stderr.contains('unsupported put_user scalar width') {
+			return error('Unsafe store did not reject width16:\n${rejected.stderr}')
+		}
+		end_obj := os.join_path(work, standard + '-end.o')
+		end_flags := flags.filter(!it.starts_with('-fsanitize='))
+		mut end_compile := end_flags.clone(); end_compile << callers
+		end_compile << ['-c', os.join_path(work, 'end-probe.c'), '-o', end_obj]
+		command(end_compile)!
+		end_imports := command(['nm', '-u', end_obj])!.stdout
+		if end_imports.trim_space() != '' { return error('Scope end has a runtime dependency:\n${end_imports}') }
+		ir := os.join_path(work, standard + '-end.ll')
+		mut end_ir := end_flags.clone(); end_ir << callers
+		end_ir << ['-S', '-emit-llvm', os.join_path(work, 'end-probe.c'), '-o', ir]
+		command(end_ir)!
+		if !os.read_file(ir)!.contains('fence syncscope("singlethread") seq_cst') {
+			return error('Scope end lost its compiler barrier intrinsic')
+		}
+		results[standard] = map[string]json2.Any{
+			'stdout': json2.Any(passed.stdout.trim_space())
+			'stderr': passed.stderr
+			'unsupported_width16_rejected': rejected.code
+			'end_runtime_imports': end_imports
+			'end_object_sha256': hosttest.sha(end_obj)!
+			'end_llvm_sha256': hosttest.sha(ir)!
+			'compiler_signal_fence_present': true
+		}
+		println('${standard}: ${passed.stdout.trim_space()}')
+	}
+	mut hashes := map[string]string{}
+	for name in sources { hashes[name] = hosttest.sha(os.join_path(core, name))! }
+	for name in contracts { hashes[name] = hosttest.sha(os.join_path(include, name))! }
+	for name in ['linux/uaccess.h', 'vinix/user_access_scope.h'] { hashes[name] = hosttest.sha(os.join_path(include, name))! }
+	hashes['core.c'] = hosttest.sha(generated)!
+	hashes['test.c'] = hosttest.sha(os.join_path(work, 'test.c'))!
+	hashes['user_access_scope.v'] = hosttest.sha(@FILE)!
+	hashes['pinned_i915_drm.h'] = hosttest.sha(os.join_path(linux, 'include/uapi/drm/i915_drm.h'))!
+	if initial != hosttest.hashes(observed)! { return error('Owned/profile sources changed during isolated checks') }
+	hosttest.write_json(os.join_path(work, 'result.json'), map[string]json2.Any{
+		'scope': json2.Any('Production V range/store frontends and production scope macros with independent synthetic native callbacks under strict host ASan/UBSan. No native map/IRQ/fault lifecycle or raw virtual/GPU permission claim.')
+		'host_arch': arch
+		'sources': hosttest.string_map(hashes)
+		'results': results
+	})!
+}
+
+fn main() {
+	options := hosttest.parse_path_options(os.args[1..], ['--keep-directory'],
+		'usage: user_access_scope.v [--keep-directory KEEP_DIRECTORY]', scope) or { eprintln(err); exit(2) }
+	run_profile(options['--keep-directory']) or { eprintln(err); exit(1) }
+}
+
+const scope = 'Exercise checked-access scopes with the real V range/scalar frontends.
 
 The independent callback model uses synthetic user addresses. It establishes
 compiler evaluation, conversion and goto contracts, not native map ownership,
-IRQ accounting, fault resolution, raw virtual access permission or GPU support.
-"""
+IRQ accounting, fault resolution, raw virtual access permission or GPU support.'
 
-import argparse
-import hashlib
-import importlib.util
-import json
-import os
-from pathlib import Path
-import platform
-import re
-import shutil
-import subprocess
-import tempfile
-
-ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "kernel/linuxkpi/include/vinix/user_access_scope.h"
-SOURCES = ("primitives.v", "uaccess_d_linuxkpi.v", "scalar_store_d_linuxkpi.v")
-CONTRACTS = ("linuxkpi_uaccess_v_contract.h", "linuxkpi_scalar_store_v_contract.h")
-
-C_TEST = r'''
+const c_test = '
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -49,13 +175,13 @@ static uint64_t last_value;
 static size_t last_size;
 static void *last_destination;
 
-#define CHECK(condition) do { \
-    assertions++; \
-    if (!(condition)) { \
-        fprintf(stderr, "access-scope assertion failed at line %d: %s\n", \
-                __LINE__, #condition); \
-        abort(); \
-    } \
+#define CHECK(condition) do { \\
+    assertions++; \\
+    if (!(condition)) { \\
+        fprintf(stderr, "access-scope assertion failed at line %d: %s\\n", \\
+                __LINE__, #condition); \\
+        abort(); \\
+    } \\
 } while (0)
 
 unsigned long vinix_linuxkpi_user_address_limit(void) {
@@ -65,7 +191,7 @@ unsigned long vinix_linuxkpi_user_address_limit(void) {
 
 /* Independent synthetic-map model. The real V frontend dispatches its exact
  * scalar bits and propagates this result. A missing mapping may resolve only
- * in the model's ordinary context; an accessible prefix can precede a fault. */
+ * in the model\'s ordinary context; an accessible prefix can precede a fault. */
 int vinix_linuxkpi_write_user_scalar(void *destination, size_t size, uint64_t value) {
     bridge_calls++;
     last_destination = destination;
@@ -166,21 +292,21 @@ static void range_tests(void) {
     CHECK(pointer == USER_BASE + 1 && length == 9);
 }
 
-#define TYPED_STORE(type, source, expected) do { \
-    __label__ failed, finished; \
-    reset_model(); \
-    unsigned faults = 0; \
-    __typeof__(source) source_value = (source); \
-    CHECK(user_write_access_begin((void *)USER_BASE, sizeof(type))); \
-    unsafe_put_user(source_value, (type *)USER_BASE, failed); \
-    goto finished; \
-failed: \
-    faults++; \
-finished: \
-    user_write_access_end(); \
-    CHECK(faults == 0 && bridge_calls == 1 && last_size == sizeof(type)); \
-    CHECK(last_value == (expected)); \
-    check_bytes(0, sizeof(type), (expected)); \
+#define TYPED_STORE(type, source, expected) do { \\
+    __label__ failed, finished; \\
+    reset_model(); \\
+    unsigned faults = 0; \\
+    __typeof__(source) source_value = (source); \\
+    CHECK(user_write_access_begin((void *)USER_BASE, sizeof(type))); \\
+    unsafe_put_user(source_value, (type *)USER_BASE, failed); \\
+    goto finished; \\
+failed: \\
+    faults++; \\
+finished: \\
+    user_write_access_end(); \\
+    CHECK(faults == 0 && bridge_calls == 1 && last_size == sizeof(type)); \\
+    CHECK(last_value == (expected)); \\
+    check_bytes(0, sizeof(type), (expected)); \\
 } while (0)
 
 static void conversion_tests(void) {
@@ -248,7 +374,7 @@ finished:
     }
 }
 
-/* Match the unchanged driver's -1 presumed_offset writes using its actual
+/* Match the unchanged driver\'s -1 presumed_offset writes using its actual
  * pinned UAPI record, not a replacement relocation struct. */
 static int relocation_loop(unsigned count, unsigned *ends) {
     struct drm_i915_gem_relocation_entry *entries = (void *)USER_BASE;
@@ -369,12 +495,12 @@ int main(void) {
     evaluation_and_partial_fault_tests();
     driver_loop_tests();
     context_and_control_flow_tests();
-    printf("LinuxKPI checked user-access scopes: %u assertions passed\n", assertions);
+    printf("LinuxKPI checked user-access scopes: %u assertions passed\\n", assertions);
     return 0;
 }
-'''
+'
 
-INVALID_WIDTH = r'''
+const invalid_width = '
 #include <linux/uaccess.h>
 #include <vinix/user_access_scope.h>
 int bad_width(void) {
@@ -384,9 +510,9 @@ int bad_width(void) {
 failed:
     return -14;
 }
-'''
+'
 
-END_PROBE = r'''
+const end_probe = '
 #include <linux/uaccess.h>
 #include <vinix/user_access_scope.h>
 void scope_end_probe(void) {
@@ -394,132 +520,4 @@ void scope_end_probe(void) {
     user_read_access_end();
     user_write_access_end();
 }
-'''
-
-
-def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def load_compiler():
-    spec = importlib.util.spec_from_file_location(
-        "scope_native_compiler", ROOT / "build-support/compile-v-module.py")
-    compiler = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(compiler)
-    return compiler
-
-
-def run(keep_directory=None):
-    machine = platform.machine().lower()
-    if machine not in ("arm64", "aarch64", "x86_64", "amd64"):
-        raise ValueError("Unsupported host architecture: " + machine)
-    arch = "arm64" if machine in ("arm64", "aarch64") else "amd64"
-    linux = Path(os.environ.get(
-        "LINUXKPI_SOURCE_DIR", ROOT / "third_party/linux-i915/linux-6.6.157"))
-    temporary = (tempfile.TemporaryDirectory(prefix="vinix-user-access-scope-")
-                 if keep_directory is None else None)
-    work = Path(temporary.name) if temporary else Path(keep_directory).resolve()
-    if not temporary:
-        work.mkdir(parents=True, exist_ok=False)
-    try:
-        core = work / "compatcore"
-        core.mkdir()
-        for name in SOURCES:
-            shutil.copyfile(ROOT / "kernel/linuxkpi/compatcore" / name, core / name)
-        include = work / "include"
-        (include / "linux").mkdir(parents=True)
-        (include / "vinix").mkdir()
-        for name in CONTRACTS:
-            shutil.copyfile(ROOT / "kernel/c" / name, include / name)
-        shutil.copyfile(ROOT / "kernel/linuxkpi/include/linux/uaccess.h", include / "linux/uaccess.h")
-        shutil.copyfile(HEADER, include / "vinix/user_access_scope.h")
-        compiler = load_compiler()
-        compiler.generate(core, work / "core.c", arch, ["linuxkpi", "nofloat"])
-        (work / "test.c").write_text(C_TEST)
-        (work / "invalid-width.c").write_text(INVALID_WIDTH)
-        (work / "end-probe.c").write_text(END_PROBE)
-        common = [os.environ.get("CC", "clang"), "-O1", "-g", "-ffreestanding",
-                  "-fno-builtin", "-fwrapv", "-fno-strict-aliasing",
-                  "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror",
-                  "-Wno-unused-function", "-Wno-unused-parameter",
-                  "-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
-        callers = ["-DVINIX_LINUXKPI_HOST_TEST", "-D__KERNEL__", "-D_FORTIFY_SOURCE=0",
-                   "-include", str(ROOT / "tests/linuxkpi/host_types.h"),
-                   "-include", "linux/kconfig.h", "-include",
-                   str(linux / "include/linux/compiler_types.h"),
-                   "-I" + str(include), "-I" + str(ROOT / "kernel/linuxkpi/include"),
-                   "-I" + str(linux / "include"), "-I" + str(linux / "include/uapi"),
-                   "-I" + str(linux / "arch/x86/include"),
-                   "-I" + str(linux / "arch/x86/include/uapi")]
-        native = ["-DVINIX_V_RUNTIME", "-I" + str(include), "-I" + str(ROOT / "kernel/c")]
-        strip = "-Wl,-dead_strip" if platform.system() == "Darwin" else "-Wl,--gc-sections"
-        results = {}
-        for standard in ("gnu99", "gnu11"):
-            flags = common + ["-std=" + standard]
-            obj = work / (standard + "-core.o")
-            subprocess.run(flags + native + ["-c", str(work / "core.c"), "-o", str(obj)], check=True)
-            imports = subprocess.check_output(["nm", "-u", str(obj)], text=True)
-            (work / (standard + "-core-imports.log")).write_text(imports)
-            if re.search(r"\b_*(?:malloc|calloc|realloc|free|memdup|v_malloc|vcalloc|"
-                         r"v_realloc|new_array\w*)\b", imports):
-                raise AssertionError("Implicit production allocation:\n" + imports)
-            executable = work / (standard + "-test")
-            subprocess.run(flags + callers + [str(work / "test.c"), str(obj), strip,
-                           "-o", str(executable)], check=True)
-            result = subprocess.run([str(executable)], capture_output=True, text=True, check=True,
-                                    timeout=30, env={**os.environ,
-                                    "ASAN_OPTIONS": "detect_stack_use_after_return=1",
-                                    "UBSAN_OPTIONS": "halt_on_error=1"})
-            (work / (standard + "-run.log")).write_text(result.stdout + result.stderr)
-            if result.stderr:
-                raise AssertionError(result.stderr)
-            rejected = subprocess.run(flags + callers + ["-c", str(work / "invalid-width.c"),
-                                      "-o", str(work / (standard + "-invalid-width.o"))],
-                                      capture_output=True, text=True)
-            (work / (standard + "-invalid-width.log")).write_text(rejected.stderr)
-            if rejected.returncode == 0 or "unsupported put_user scalar width" not in rejected.stderr:
-                raise AssertionError("Unsafe store did not reject width16:\n" + rejected.stderr)
-            end_obj = work / (standard + "-end.o")
-            end_flags = [flag for flag in flags if not flag.startswith("-fsanitize=")]
-            subprocess.run(end_flags + callers + ["-c", str(work / "end-probe.c"),
-                           "-o", str(end_obj)], check=True)
-            end_imports = subprocess.check_output(["nm", "-u", str(end_obj)], text=True)
-            if end_imports.strip():
-                raise AssertionError("Scope end has a runtime dependency:\n" + end_imports)
-            ir = work / (standard + "-end.ll")
-            subprocess.run(end_flags + callers + ["-S", "-emit-llvm", str(work / "end-probe.c"),
-                           "-o", str(ir)], check=True)
-            if 'fence syncscope("singlethread") seq_cst' not in ir.read_text():
-                raise AssertionError("Scope end lost its compiler barrier intrinsic")
-            results[standard] = {"stdout": result.stdout.strip(), "stderr": result.stderr,
-                                 "unsupported_width16_rejected": rejected.returncode,
-                                 "end_runtime_imports": end_imports,
-                                 "end_object_sha256": sha256(end_obj),
-                                 "end_llvm_sha256": sha256(ir),
-                                 "compiler_signal_fence_present": True}
-            print(standard + ": " + result.stdout.strip())
-        report = {
-            "scope": "Production V range/store frontends and production scope macros with "
-                     "independent synthetic native callbacks under strict host ASan/UBSan. "
-                     "No native map/IRQ/fault lifecycle or raw virtual/GPU permission claim.",
-            "host_arch": arch,
-            "sources": {**{name: sha256(core / name) for name in SOURCES},
-                        **{name: sha256(include / name) for name in CONTRACTS},
-                        "linux/uaccess.h": sha256(include / "linux/uaccess.h"),
-                        "vinix/user_access_scope.h": sha256(include / "vinix/user_access_scope.h"),
-                        "core.c": sha256(work / "core.c"), "test.c": sha256(work / "test.c"),
-                        "user_access_scope_test.py": sha256(Path(__file__)),
-                        "pinned_i915_drm.h": sha256(linux / "include/uapi/drm/i915_drm.h")},
-            "results": results,
-        }
-        (work / "result.json").write_text(json.dumps(report, indent=2) + "\n")
-    finally:
-        if temporary:
-            temporary.cleanup()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keep-directory", type=Path)
-    arguments = parser.parse_args()
-    run(arguments.keep_directory)
+'
