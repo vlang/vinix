@@ -10,16 +10,14 @@ their source and fail on drift before constructing another boot image.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 from pathlib import Path
 
-import generate_g13_initdata_layout as initdata_layout
-
-
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
-DEFAULT_M1N1 = initdata_layout.DEFAULT_M1N1
+DEFAULT_M1N1 = Path(os.environ.get("VINIX_M1N1", Path.home() / "code/3rd/m1n1"))
 
 
 class ContractError(Exception):
@@ -81,7 +79,19 @@ def git_revision(path: Path) -> str:
 def check_m1n1(m1n1: Path) -> list[str]:
     results: list[str] = []
     raw_rs = m1n1 / "rust/src/gpu/raw.rs"
-    generated = initdata_layout.generate(raw_rs)
+    generated = subprocess.run(
+        [
+            "sh",
+            str(REPO_ROOT / "build-support/run-v-tool.sh"),
+            str(SCRIPT_DIR / "generate_g13_initdata_layout.v"),
+            "--raw-rs",
+            str(raw_rs),
+            "--stdout",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
     checked_in = read(REPO_ROOT / "kernel/gpu/agx/fw/g13_initdata_layout.v")
     require(generated == checked_in, "Vinix G13 InitData layout is stale against m1n1")
     results.append("InitData 12.3/13.5 generated layouts")
