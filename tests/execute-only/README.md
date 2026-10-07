@@ -63,6 +63,44 @@ VINIX_AMD64_KERNEL=/path/to/worktree/build-amd64-kernel/bin/vinix \
 Use `--expect-readable` for an ARM CPU lacking enhanced PAN. The runner treats
 warnings as errors and requires all feature markers plus the final verdict.
 
+The maintained independent guest is `execfixture/core.v`. It uses fixed stack
+storage, native libc declarations and a volatile byte declaration in
+`execfixture/native-abi.h`. Permission checks, cache-line walks and cleanup are
+V; five original ARM register/cache/barrier boundary lines remain inline
+assembly. Native process/status/transfer widths, callback casts, child reaping,
+pipe consumption and mapping lifetimes retain the original C behavior.
+The runner uses `build-support/find-v.sh` through the shared fixture compiler.
+Set `VINIX_V_COMPILER=/path/to/v` to select a compiler explicitly.
+
+Use `--state-dir /path/to/new-directory` to retain generated C, objects,
+guest ELF, input hashes and VM artifacts. `--kernel-dir /path/to/worktree/kernel`
+selects an existing matching architecture kernel and skips rebuilding it.
+For an independent control, recover `guest.c` from immutable source
+`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82` and pass `--source /path/to/guest.c`.
+That option retains the original C compiler flags and assertions.
+
+On 2026-10-07, all eight original C/V native controls passed with the unchanged
+300-second deadline, all 24 assertions, 100 warmups and 3,000 measured attempts.
+The measured Slab values were:
+
+| Configuration | C before / after KiB | V before / after KiB |
+| --- | ---: | ---: |
+| ARM `max`, enhanced PAN, strict | 1,440 / 1,440 | 1,472 / 1,472 |
+| ARM `max`, PAN disabled | 1,504 / 1,504 | 1,472 / 1,472 |
+| ARM Cortex-A76, ordinary PAN | 1,472 / 1,472 | 1,504 / 1,504 |
+| AMD64, readable fallback | 1,020 / 1,020 | 1,020 / 1,020 |
+
+Each deployed ELF matched its separately compiled native SDK control. Both
+architecture builds and the three strict/readable fixture profiles were
+checked for scalar widths, cache maintenance, volatile reads and implicit
+allocations. The existing production-code ASan/UBSan models also passed again
+for both architectures. These fixture-only controls reused the previously
+qualified immutable ARM and AMD64 kernels, whose tracked sources were
+unchanged; they do not claim a new kernel build or native guest sanitizers.
+Frozen sources, strict builds, assembly, hashes, peer reviews and complete raw
+logs are in the machine-local
+`/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/execute-only-fixture/`.
+
 On 2026-10-02, both tracked production builds passed. QEMU's ARM `max` CPU
 passed the execute-only guest, including the actual data-read SIGSEGV and COW
 mutation, with Slab at 1,488 / 1,488 KiB across repeated denials. The same kernel
