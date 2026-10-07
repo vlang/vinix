@@ -16,7 +16,7 @@ fn main() {
 		match argument {
 			'--raw-rs', '--output' {
 				index++
-				if index == os.args.len {
+				if index == os.args.len || option_like(os.args[index]) {
 					eprintln('${argument}: expected one argument')
 					exit(2)
 				}
@@ -75,4 +75,8 @@ fn main() {
 			exit(1)
 		}
 	}
+}
+
+fn option_like(text string) bool {
+	return text.len > 1 && text[0] == `-` && !text[1].is_digit() && text[1] != `.`
 }
