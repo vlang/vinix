@@ -1,6 +1,8 @@
 module main
 
 import imageextract as image
+import g17decode
+import math.big
 import strconv
 import sync.stdatomic as atom
 import traceanalysis as j
@@ -48,9 +50,11 @@ pub fn query(data &u8, byte_count usize, operation &char, options &char) &char {
 		return allocated_json({
 			'error': j.Value(err.msg())
 		})
-	}) or { return allocated_json({
-		'error': j.Value(err.msg())
-	}) }
+	}) or {
+		return allocated_json({
+			'error': j.Value(err.msg())
+		})
+	}
 	input := unsafe { data.vbytes(int(byte_count)) }
 	result := dispatch(input, op, request) or {
 		return allocated_json({
@@ -88,9 +92,11 @@ struct Response {
 }
 
 fn scalar(value j.Value) Response {
-	return Response{ payload: {
-		'result': value
-	} }
+	return Response{
+		payload: {
+			'result': value
+		}
+	}
 }
 
 fn span_value(span image.Span) j.Value {
@@ -124,7 +130,15 @@ fn parameter(request map[string]j.Value, name string, fallback int) !int {
 	return strconv.atoi(text)
 }
 
+fn signed_integer(value j.Value) !big.Integer {
+	if value is bool { return big.integer_from_int(if value { 1 } else { 0 }) }
+	return big.integer_from_string(j.string_value(value))
+}
+
 fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
+	if operation.starts_with('g17:') {
+		return scalar(g17decode.query(data, operation[4..], request)!)
+	}
 	match operation {
 		'default_entries' {
 			mut entries := []j.Value{}
@@ -132,7 +146,9 @@ fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
 			return scalar(j.Value(entries))
 		}
 		'align_up' {
-			return scalar(j.Value(image.align_up(parameter(request, 'value', 0)!, parameter(request, 'alignment', 1)!)))
+			value := signed_integer(j.value(request, 'value'))!
+			alignment := signed_integer(j.value(request, 'alignment'))!
+			return scalar(j.Value(j.Number{image.align_up_integer(value, alignment).str()}))
 		}
 		'safe_filename' {
 			return scalar(j.Value(j.string_value(j.value(request, 'identifier')).trim_string_left('com.apple.') + '.macho'))
@@ -176,9 +192,12 @@ fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
 			response := binary_result(selected)!
 			mut result := j.value(response.payload, 'result').as_map()
 			result['tag'] = j.Value(tag)
-			return Response{ payload: {
-				'result': j.Value(result)
-			}, binary: response.binary }
+			return Response{
+				payload: {
+					'result': j.Value(result)
+				}
+				binary:  response.binary
+			}
 		}
 		'im4p_payload' { return scalar(span_value(image.im4p_payload(data)!)) }
 		'kernel_im4p_payload' { return scalar(span_value(image.kernel_im4p_payload(data)!)) }

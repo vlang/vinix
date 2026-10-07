@@ -83,6 +83,12 @@ The native V tools use the compiler selected by `build-support/find-v.sh`.
 Their shell launchers compile into a temporary directory and preserve the
 caller’s arguments and working directory. `make test` includes their V tests.
 
+The G17, T6050 and T8103 recovery tools share native V Mach-O symbol lookup,
+instruction decoding, bounded constant-register resolution and store-span
+coverage in `g17decode`. Their Python import adapters use the same synchronous
+ABI as image extraction while the remaining recovery families migrate. See
+[`g17decode/README.md`](g17decode/README.md) for the boundary and validation.
+
 `trace_diff` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
 primary-extension framing recovered from

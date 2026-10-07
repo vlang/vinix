@@ -530,6 +530,19 @@ fn utf8_message(data []u8, start int, end int, reason string) string {
 
 pub fn align_up(value int, alignment int) int { return (value + alignment - 1) & -alignment }
 
+// Python's public helper accepts arbitrary signed integers. Native Mach-O
+// offsets use the fixed-width routine above after bounds checking.
+pub fn align_up_integer(value big.Integer, alignment big.Integer) big.Integer {
+	first := value + alignment - big.one_int
+	second := alignment.neg()
+	if first.signum >= 0 && second.signum >= 0 { return first.bitwise_and(second) }
+	if first.signum < 0 && second.signum < 0 {
+		return first.bitwise_com().bitwise_or(second.bitwise_com()).bitwise_com()
+	}
+	if first.signum >= 0 { return first - first.bitwise_and(second.bitwise_com()) }
+	return second - second.bitwise_and(first.bitwise_com())
+}
+
 fn rebase_linkedit_offset(mut image []u8, offset int, delta i64) ! {
 	if offset < 0 || offset > image.len - 4 { return error('truncated Mach-O linkedit command') }
 	old := u32_at(image, offset)

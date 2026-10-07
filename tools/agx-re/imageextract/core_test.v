@@ -1,5 +1,6 @@
 module imageextract
 
+import math.big
 import os
 import traceanalysis as j
 
@@ -323,4 +324,13 @@ fn test_strict_utf8_name_errors_preserve_byte_positions() {
 	assert utf8_error([u8(0x80)]) == "'utf-8' codec can't decode byte 0x80 in position 0: invalid start byte"
 	assert utf8_error([u8(0xe0), 0xa0]) == "'utf-8' codec can't decode bytes in position 0-1: unexpected end of data"
 	assert utf8_error([u8(0xe0), 0xa0, `x`]) == "'utf-8' codec can't decode bytes in position 0-1: invalid continuation byte"
+}
+
+fn test_public_alignment_preserves_unbounded_signed_integers() {
+	a := big.integer_from_string('1267650600228229401496703205377')!
+	assert align_up_integer(a, big.integer_from_int(4096)).str() == '1267650600228229401496703209472'
+	assert align_up_integer(a.neg(), big.integer_from_int(4096)).str() == '-1267650600228229401496703205376'
+	assert align_up_integer(a, big.integer_from_int(0)).str() == '0'
+	assert align_up_integer(a, big.integer_from_int(-8)).str() == '8'
+	assert align_up_integer(a.neg(), big.integer_from_int(-8)).str() == '0'
 }

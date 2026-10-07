@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import struct
+import _native_g17
 from pathlib import Path
 
 from extract_fileset import LC_SEGMENT_64, LC_SYMTAB, LC_UUID, load_commands, parse_segment
@@ -755,674 +756,151 @@ G17_FIRMWARE_EVENT_VALIDATORS = {
 
 
 def macho_uuid(image: bytes) -> str | None:
-    for item in load_commands(image):
-        if item.command == LC_UUID:
-            if item.size < 24:
-                raise ValueError("truncated LC_UUID")
-            raw = image[item.offset + 8 : item.offset + 24].hex().upper()
-            return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"
-    return None
+    return _native_g17.macho_uuid(image)
 
 
 def macho_symbols(image: bytes) -> dict[str, int]:
-    result: dict[str, int] = {}
-    for item in load_commands(image):
-        if item.command != LC_SYMTAB:
-            continue
-        if item.size < 24:
-            raise ValueError("truncated LC_SYMTAB")
-        symbol_offset, count, string_offset, string_size = struct.unpack_from(
-            "<IIII", image, item.offset + 8
-        )
-        if symbol_offset + count * 16 > len(image):
-            raise ValueError("Mach-O symbol table extends past the image")
-        if string_offset + string_size > len(image):
-            raise ValueError("Mach-O string table extends past the image")
-        string_end = string_offset + string_size
-        for index in range(count):
-            name_offset, _kind, _section, _description, value = struct.unpack_from(
-                "<IBBHQ", image, symbol_offset + index * 16
-            )
-            if not name_offset or name_offset >= string_size:
-                continue
-            start = string_offset + name_offset
-            end = image.find(b"\0", start, string_end)
-            if end < 0:
-                raise ValueError("unterminated Mach-O symbol name")
-            result[image[start:end].decode("utf-8", "replace")] = value
-        return result
-    raise ValueError("Mach-O has no symbol table")
+    return _native_g17.macho_symbols(image)
 
 
 def virtual_to_file(image: bytes, address: int) -> int:
-    for item in load_commands(image):
-        if item.command != LC_SEGMENT_64:
-            continue
-        segment = parse_segment(image, item)
-        if segment.virtual_address <= address < segment.virtual_address + segment.file_size:
-            return segment.file_offset + address - segment.virtual_address
-    raise ValueError(f"virtual address {address:#x} is not backed by a Mach-O segment")
+    return _native_g17.virtual_to_file(image, address)
 
 
 def read_adrp_add_cstring(
     image: bytes, function_address: int, code: bytes, adrp_offset: int, add_offset: int
 ) -> str:
-    address = read_adrp_add_address(
-        function_address, code, adrp_offset, add_offset
-    )
-    offset = virtual_to_file(image, address)
-    end = image.find(b"\0", offset)
-    if end < 0:
-        raise ValueError("unterminated PC-relative C string")
-    return image[offset:end].decode("utf-8", "replace")
+    return _native_g17.read_adrp_add_cstring(image, function_address, code, adrp_offset, add_offset)
 
 
 def read_adrp_add_address(
     function_address: int, code: bytes, adrp_offset: int, add_offset: int
 ) -> int:
-    if adrp_offset + 4 > len(code) or add_offset + 4 > len(code):
-        raise ValueError("truncated PC-relative address reference")
-    page = decode_adrp(
-        function_address + adrp_offset,
-        struct.unpack_from("<I", code, adrp_offset)[0],
-    )
-    add = decode_add_immediate(struct.unpack_from("<I", code, add_offset)[0])
-    if page is None or add is None or page[0] != add[1]:
-        raise ValueError("invalid PC-relative address reference")
-    return (page[1] + add[2]) & 0xFFFFFFFFFFFFFFFF
+    return _native_g17.read_adrp_add_address(function_address, code, adrp_offset, add_offset)
 
 
 def read_virtual_u32_table(image: bytes, address: int, count: int) -> tuple[int, ...]:
-    if count < 0:
-        raise ValueError("negative virtual table element count")
-    offset = virtual_to_file(image, address)
-    size = count * 4
-    if offset + size > len(image):
-        raise ValueError("truncated virtual u32 table")
-    return struct.unpack_from(f"<{count}I", image, offset)
+    return _native_g17.read_virtual_u32_table(image, address, count)
 
 
 def symbol_code(image: bytes, name: str) -> tuple[int, bytes]:
-    symbols = macho_symbols(image)
-    if name not in symbols:
-        raise ValueError(f"Mach-O has no {name} symbol")
-    address = symbols[name]
-    offset = virtual_to_file(image, address)
-    following = sorted(value for value in symbols.values() if value > address)
-    end_address = following[0] if following else address + 0x10000
-    try:
-        end = virtual_to_file(image, end_address - 1) + 1
-    except ValueError:
-        end = min(len(image), offset + 0x10000)
-    return address, image[offset:end]
+    return _native_g17.symbol_code(image, name)
 
 
 def words(code: bytes):
-    for offset in range(0, len(code) - 3, 4):
-        yield offset, struct.unpack_from("<I", code, offset)[0]
+    yield from _native_g17.words(code)
 
 
 def decode_move_wide(word: int) -> tuple[str, int, int, int] | None:
-    opcode = word & 0xFF800000
-    if opcode == 0x92800000:
-        kind = "movn"
-    elif opcode == 0xD2800000:
-        kind = "movz"
-    elif opcode == 0xF2800000:
-        kind = "movk"
-    else:
-        return None
-    register = word & 0x1F
-    shift = ((word >> 21) & 0x3) * 16
-    immediate = (word >> 5) & 0xFFFF
-    return kind, register, immediate, shift
+    return _native_g17.decode("decode_move_wide", word=word)
 
 
 def find_materialized_constant(code: bytes, target: int) -> list[tuple[int, int, int]]:
-    result = []
-    decoded = list(words(code))
-    for index, (offset, word) in enumerate(decoded):
-        move = decode_move_wide(word)
-        if move is None or move[0] != "movz":
-            continue
-        _kind, register, immediate, shift = move
-        value = immediate << shift
-        end = offset + 4
-        for next_offset, next_word in decoded[index + 1 : index + 5]:
-            if next_offset != end:
-                break
-            update = decode_move_wide(next_word)
-            if update is None or update[0] != "movk" or update[1] != register:
-                break
-            _kind, _register, immediate, shift = update
-            mask = 0xFFFF << shift
-            value = (value & ~mask) | immediate << shift
-            end += 4
-            if value == target:
-                result.append((offset, end, register))
-        if value == target and not result:
-            result.append((offset, end, register))
-    return result
+    return _native_g17.find_materialized_constant(code, target)
 
 
 def decode_add_immediate(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFF000000 != 0x91000000:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    immediate = (word >> 10) & 0xFFF
-    if word & (1 << 22):
-        immediate <<= 12
-    return destination, source, immediate
+    return _native_g17.decode("decode_add_immediate", word=word)
 
 
 def decode_ldp_x(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFFC00000 != 0xA9400000:
-        return None
-    first = word & 0x1F
-    base = (word >> 5) & 0x1F
-    second = (word >> 10) & 0x1F
-    immediate = (word >> 15) & 0x7F
-    if immediate & 0x40:
-        immediate -= 0x80
-    return first, second, base, immediate * 8
+    return _native_g17.decode("decode_ldp_x", word=word)
 
 
 def decode_str_x(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFC00000 != 0xF9000000:
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 8
-    return source, base, immediate
+    return _native_g17.decode("decode_str_x", word=word)
 
 
 def decode_ldr_x(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFC00000 != 0xF9400000:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 8
-    return destination, base, immediate
+    return _native_g17.decode("decode_ldr_x", word=word)
 
 
 def decode_ldr_w(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFC00000 != 0xB9400000:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 4
-    return destination, base, immediate
+    return _native_g17.decode("decode_ldr_w", word=word)
 
 
 def decode_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
-    kinds = {
-        0x39400000: 1,
-        0x79400000: 2,
-        0xB9400000: 4,
-        0xF9400000: 8,
-        0xBD400000: 4,
-        0xFD400000: 8,
-        0x3DC00000: 16,
-    }
-    width = kinds.get(word & 0xFFC00000)
-    if width is None:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * width
-    return destination, base, immediate, width
+    return _native_g17.decode("decode_load_unsigned", word=word)
 
 
 def decode_integer_load_unsigned(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFFC00000 not in (
-        0x39400000,
-        0x79400000,
-        0xB9400000,
-        0xF9400000,
-    ):
-        return None
-    return decode_load_unsigned(word)
+    return _native_g17.decode("decode_integer_load_unsigned", word=word)
 
 
 def decode_integer_store_unsigned(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFFC00000 not in (
-        0x39000000,
-        0x79000000,
-        0xB9000000,
-        0xF9000000,
-    ):
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    width = 1 << ((word >> 30) & 0x3)
-    immediate = ((word >> 10) & 0xFFF) * width
-    return source, base, immediate, width
+    return _native_g17.decode("decode_integer_store_unsigned", word=word)
 
 
 def decode_load_register(word: int) -> tuple[int, int, int, int] | None:
-    kinds = {
-        0x38600800: 1,
-        0x78600800: 2,
-        0xB8600800: 4,
-        0xF8600800: 8,
-    }
-    width = kinds.get(word & 0xFFE00C00)
-    if width is None:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    offset = (word >> 16) & 0x1F
-    return destination, base, offset, width
+    return _native_g17.decode("decode_load_register", word=word)
 
 
 def decode_add_register(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFF200000 != 0x8B000000:
-        return None
-    destination = word & 0x1F
-    first = (word >> 5) & 0x1F
-    second = (word >> 16) & 0x1F
-    shift = (word >> 10) & 0x3F
-    return destination, first, second, shift
+    return _native_g17.decode("decode_add_register", word=word)
 
 
 def decode_cmp_w_immediate(word: int) -> tuple[int, int] | None:
-    if word & 0xFF00001F != 0x7100001F:
-        return None
-    source = (word >> 5) & 0x1F
-    immediate = (word >> 10) & 0xFFF
-    if word & (1 << 22):
-        immediate <<= 12
-    return source, immediate
+    return _native_g17.decode("decode_cmp_w_immediate", word=word)
 
 
 def decode_movz_w(word: int) -> tuple[int, int] | None:
-    if word & 0xFF800000 != 0x52800000:
-        return None
-    register = word & 0x1F
-    shift = ((word >> 21) & 0x1) * 16
-    immediate = ((word >> 5) & 0xFFFF) << shift
-    return register, immediate
+    return _native_g17.decode("decode_movz_w", word=word)
 
 
 def decode_movk_w(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFF800000 != 0x72800000:
-        return None
-    register = word & 0x1F
-    shift = ((word >> 21) & 0x1) * 16
-    immediate = (word >> 5) & 0xFFFF
-    return register, immediate, shift
+    return _native_g17.decode("decode_movk_w", word=word)
 
 
 def decode_movn_w(word: int) -> tuple[int, int] | None:
-    if word & 0xFF800000 != 0x12800000:
-        return None
-    register = word & 0x1F
-    shift = ((word >> 21) & 0x1) * 16
-    immediate = ((word >> 5) & 0xFFFF) << shift
-    return register, (~immediate) & 0xFFFFFFFF
+    return _native_g17.decode("decode_movn_w", word=word)
 
 
 def decode_add_sub_immediate_w(word: int) -> tuple[str, int, int, int] | None:
-    opcode = word & 0xFF000000
-    if opcode == 0x11000000:
-        kind = "add"
-    elif opcode == 0x51000000:
-        kind = "sub"
-    else:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    immediate = (word >> 10) & 0xFFF
-    if word & (1 << 22):
-        immediate <<= 12
-    return kind, destination, source, immediate
+    return _native_g17.decode("decode_add_sub_immediate_w", word=word)
 
 
 def decode_logical_immediate_w(word: int) -> tuple[str, int, int, int] | None:
-    """Decode a 32-bit logical-immediate instruction and expand its mask."""
-
-    opcode = word & 0xFF800000
-    kinds = {
-        0x12000000: "and",
-        0x32000000: "orr",
-        0x52000000: "eor",
-        0x72000000: "ands",
-    }
-    kind = kinds.get(opcode)
-    if kind is None:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    immr = (word >> 16) & 0x3F
-    imms = (word >> 10) & 0x3F
-
-    # ARM's DecodeBitMasks algorithm. N is necessarily zero for the W form.
-    length_source = (~imms) & 0x3F
-    length = length_source.bit_length() - 1
-    if length < 1:
-        return None
-    levels = (1 << length) - 1
-    rotation = immr & levels
-    ones = imms & levels
-    if ones == levels:
-        return None
-    element_bits = 1 << length
-    element_mask = (1 << element_bits) - 1
-    element = (1 << (ones + 1)) - 1
-    if rotation:
-        element = (
-            (element >> rotation) | (element << (element_bits - rotation))
-        ) & element_mask
-    immediate = 0
-    for shift in range(0, 32, element_bits):
-        immediate |= element << shift
-    return kind, destination, source, immediate
+    return _native_g17.decode("decode_logical_immediate_w", word=word)
 
 
 def resolve_static_w_register(
     instructions: list[tuple[int, int]], before: int, register: int, depth: int = 0
 ) -> int | None:
-    """Resolve the local constant feeding a 32-bit register use.
-
-    The G17 register-list producers keep a few selector bases in callee-saved
-    registers and derive individual selectors with ADD/SUB immediates. This
-    deliberately narrow backwards slice handles only those forms and rejects
-    loads or calls which could make the value runtime-dependent.
-    """
-
-    if depth > 8:
-        return None
-
-    use_offset = instructions[before][0] if before < len(instructions) else 1 << 63
-    for index in range(before - 1, -1, -1):
-        offset, word = instructions[index]
-        inverted = decode_movn_w(word)
-        if inverted is not None and inverted[0] == register:
-            return inverted[1]
-        materialized = decode_movz_w(word)
-        if materialized is not None and materialized[0] == register:
-            return materialized[1] & 0xFFFFFFFF
-        updated = decode_movk_w(word)
-        if updated is not None and updated[0] == register:
-            base = resolve_static_w_register(instructions, index, register, depth + 1)
-            if base is None:
-                return None
-            _destination, immediate, shift = updated
-            mask = 0xFFFF << shift
-            return ((base & ~mask) | immediate << shift) & 0xFFFFFFFF
-        arithmetic = decode_add_sub_immediate_w(word)
-        if arithmetic is not None and arithmetic[1] == register:
-            kind, _destination, source, immediate = arithmetic
-            base = resolve_static_w_register(instructions, index, source, depth + 1)
-            if base is None:
-                return None
-            if kind == "add":
-                return (base + immediate) & 0xFFFFFFFF
-            return (base - immediate) & 0xFFFFFFFF
-
-        logical = decode_logical_immediate_w(word)
-        if logical is not None and logical[1] == register:
-            kind, _destination, source, immediate = logical
-            base = 0 if source == 31 else resolve_static_w_register(
-                instructions, index, source, depth + 1
-            )
-            if base is None:
-                return None
-            if kind == "and" or kind == "ands":
-                return base & immediate
-            if kind == "orr":
-                return base | immediate
-            return base ^ immediate
-
-        logical_register = decode_orr_register(word)
-        if logical_register is not None and logical_register[0] == register:
-            _destination, first, second = logical_register
-            first_value = 0 if first == 31 else resolve_static_w_register(
-                instructions, index, first, depth + 1
-            )
-            second_value = 0 if second == 31 else resolve_static_w_register(
-                instructions, index, second, depth + 1
-            )
-            if first_value is None or second_value is None:
-                return None
-            return first_value | second_value
-
-        # A load makes the value data-dependent. Direct and authenticated
-        # calls clobber the caller-saved registers under AAPCS64.
-        load = decode_load_unsigned(word)
-        if load is not None and load[0] == register:
-            return None
-        load = decode_load_register(word)
-        if load is not None and load[0] == register:
-            return None
-
-        # Reject instruction families which write the register but are not in
-        # the intentionally small constant-expression language above. This is
-        # especially important for callee-saved selector bases: several are
-        # reused for runtime data later in the same producer.
-        destination = word & 0x1F
-        instruction_class = word & 0x1F000000
-        if destination == register and instruction_class in (
-            0x0A000000,  # logical shifted-register, including shifted ORR
-            0x0B000000,  # add/subtract shifted or extended register
-            0x10000000,  # PC-relative address generation
-            0x11000000,  # other add/subtract immediate forms
-            0x12000000,  # other logical-immediate forms
-            0x13000000,  # bitfield/extract forms
-            0x1A000000,  # conditional/data-processing register forms
-            0x1B000000,  # multiply-add forms
-        ):
-            return None
-        wide = decode_move_wide(word)
-        if wide is not None and wide[1] == register:
-            return None
-        if register <= 18 and (
-            decode_bl_target(offset, word) is not None
-            or word & 0xFFFFFC00 == 0xD73F0800
-        ):
-            # The producers occasionally lower two mutually exclusive call
-            # paths as call; b join; call; join. The first call cannot clobber
-            # the second path when its following unconditional branch skips
-            # the current use, so continue through that dead linear range.
-            skipped = any(
-                (target := decode_b_target(branch_offset, branch_word)) is not None
-                and target > use_offset
-                for branch_offset, branch_word in instructions[index + 1 : before]
-            )
-            if not skipped:
-                return None
-    return None
+    return _native_g17.resolve_static_w_register(instructions, before, register, depth)
 
 
 def resolve_static_x_register(
     instructions: list[tuple[int, int]], before: int, register: int, depth: int = 0
 ) -> int | None:
-    """Resolve a move-wide constant feeding a 64-bit argument register."""
-
-    if depth > 8:
-        return None
-    for index in range(before - 1, -1, -1):
-        _offset, word = instructions[index]
-        inverted_w = decode_movn_w(word)
-        if inverted_w is not None and inverted_w[0] == register:
-            return inverted_w[1]
-        materialized_w = decode_movz_w(word)
-        if materialized_w is not None and materialized_w[0] == register:
-            return materialized_w[1] & 0xFFFFFFFF
-        updated_w = decode_movk_w(word)
-        if updated_w is not None and updated_w[0] == register:
-            return resolve_static_w_register(instructions, before, register)
-
-        wide = decode_move_wide(word)
-        if wide is not None and wide[1] == register:
-            kind, _destination, immediate, shift = wide
-            if kind == "movn":
-                return (~(immediate << shift)) & 0xFFFFFFFFFFFFFFFF
-            if kind == "movz":
-                return immediate << shift
-            base = resolve_static_x_register(instructions, index, register, depth + 1)
-            if base is None:
-                return None
-            mask = 0xFFFF << shift
-            return ((base & ~mask) | immediate << shift) & 0xFFFFFFFFFFFFFFFF
-
-        load = decode_load_unsigned(word)
-        if load is not None and load[0] == register:
-            return None
-        load = decode_load_register(word)
-        if load is not None and load[0] == register:
-            return None
-        destination = word & 0x1F
-        if destination == register and word & 0x1F000000 in (
-            0x0A000000,
-            0x0B000000,
-            0x11000000,
-            0x12000000,
-            0x13000000,
-            0x1A000000,
-            0x1B000000,
-        ):
-            return None
-        if register <= 18 and (
-            decode_bl_target(0, word) is not None
-            or word & 0xFFFFFC00 == 0xD73F0800
-        ):
-            return None
-    return None
+    return _native_g17.resolve_static_x_register(instructions, before, register, depth)
 
 
 def decode_register_copy(word: int) -> tuple[int, int, int] | None:
-    """Decode the MOV alias of ORR with the zero register."""
-
-    # sf | 01 | 01010 | 0 | 00 | Rm | 000000 | 11111 | Rd
-    if word & 0x7FE0FFE0 != 0x2A0003E0:
-        return None
-    width = 8 if word & 0x80000000 else 4
-    return word & 0x1F, (word >> 16) & 0x1F, width
+    return _native_g17.decode("decode_register_copy", word=word)
 
 
 def decode_local_branch_target(address: int, word: int) -> int | None:
-    """Decode direct intra-function branches used by dominance checks."""
-
-    target = decode_b_target(address, word)
-    if target is not None:
-        return target
-    if word & 0xFF000010 == 0x54000000:  # B.cond
-        immediate = (word >> 5) & 0x7FFFF
-        bits = 19
-    elif word & 0x7E000000 == 0x34000000:  # CBZ / CBNZ
-        immediate = (word >> 5) & 0x7FFFF
-        bits = 19
-    elif word & 0x7E000000 == 0x36000000:  # TBZ / TBNZ
-        immediate = (word >> 5) & 0x3FFF
-        bits = 14
-    else:
-        return None
-    if immediate & (1 << (bits - 1)):
-        immediate -= 1 << bits
-    return address + immediate * 4
+    return _native_g17.decode("decode_local_branch_target", address=address, word=word)
 
 
 def decode_conditional_branch(
     address: int, word: int
 ) -> tuple[int, str] | None:
-    if word & 0xFF000010 != 0x54000000:
-        return None
-    target = decode_local_branch_target(address, word)
-    if target is None:
-        return None
-    condition = (
-        "eq",
-        "ne",
-        "cs",
-        "cc",
-        "mi",
-        "pl",
-        "vs",
-        "vc",
-        "hi",
-        "ls",
-        "ge",
-        "lt",
-        "gt",
-        "le",
-        "al",
-        "nv",
-    )[word & 0xF]
-    if condition in ("al", "nv"):
-        return None
-    return target, condition
+    return _native_g17.decode("decode_conditional_branch", address=address, word=word)
 
 
 def decode_test_bit_branch(address: int, word: int) -> dict[str, object] | None:
-    if word & 0x7E000000 != 0x36000000:
-        return None
-    target = decode_local_branch_target(address, word)
-    if target is None:
-        return None
-    bit = ((word >> 31) & 0x1) << 5 | (word >> 19) & 0x1F
-    return {
-        "target": target,
-        "condition": "bit_set" if word & (1 << 24) else "bit_clear",
-        "register": word & 0x1F,
-        "bit": bit,
-        "bytes": 8 if bit >= 32 else 4,
-    }
+    return _native_g17.decode("decode_test_bit_branch", address=address, word=word)
 
 
 def decode_compare_zero_branch(
     address: int, word: int
 ) -> dict[str, object] | None:
-    if word & 0x7E000000 != 0x34000000:
-        return None
-    target = decode_local_branch_target(address, word)
-    if target is None:
-        return None
-    return {
-        "target": target,
-        "condition": "nonzero" if word & (1 << 24) else "zero",
-        "register": word & 0x1F,
-        "bytes": 8 if word & (1 << 31) else 4,
-    }
+    return _native_g17.decode("decode_compare_zero_branch", address=address, word=word)
 
 
 def g17_register_is_written(word: int, register: int) -> bool:
-    """Recognize the integer writers present in the register-list producers."""
-
-    load = decode_integer_load_unsigned(word)
-    if load is not None and load[0] == register:
-        return True
-    load = decode_load_register(word)
-    if load is not None and load[0] == register:
-        return True
-    if word & 0xFFC0001F == 0xB9800000 | register:  # LDRSW Xt, [Xn, #imm]
-        return True
-    pair = decode_ldp_x(word)
-    if pair is not None and register in pair[:2]:
-        return True
-    move = decode_move_wide(word)
-    if move is not None and move[1] == register:
-        return True
-    move_w = decode_movz_w(word)
-    if move_w is not None and move_w[0] == register:
-        return True
-    move_n_w = decode_movn_w(word)
-    if move_n_w is not None and move_n_w[0] == register:
-        return True
-    update_w = decode_movk_w(word)
-    if update_w is not None and update_w[0] == register:
-        return True
-    return word & 0x1F == register and word & 0x1F000000 in (
-        0x0A000000,
-        0x0B000000,
-        0x10000000,
-        0x11000000,
-        0x12000000,
-        0x13000000,
-        0x1A000000,
-        0x1B000000,
-    )
+    return _native_g17.g17_register_is_written(word, register)
 
 
 def find_dominating_g17_register_write(
@@ -1727,166 +1205,27 @@ def trace_g17_register_copy(
 
 
 def decode_logical_shifted_register(word: int) -> dict[str, object] | None:
-    if word & 0x1F000000 != 0x0A000000:
-        return None
-    width = 8 if word & 0x80000000 else 4
-    amount = (word >> 10) & 0x3F
-    if width == 4 and amount >= 32:
-        return None
-    kinds = ("and", "orr", "eor", "ands")
-    kind = kinds[(word >> 29) & 0x3]
-    if word & (1 << 21):
-        kind = {"and": "bic", "orr": "orn", "eor": "eon", "ands": "bics"}[
-            kind
-        ]
-    return {
-        "operation": kind,
-        "destination_register": word & 0x1F,
-        "first_register": (word >> 5) & 0x1F,
-        "second_register": (word >> 16) & 0x1F,
-        "shift": ("lsl", "lsr", "asr", "ror")[(word >> 22) & 0x3],
-        "amount": amount,
-        "bytes": width,
-    }
+    return _native_g17.decode("decode_logical_shifted_register", word=word)
 
 
 def decode_logical_immediate_x(word: int) -> tuple[str, int, int, int] | None:
-    kinds = {
-        0x92000000: "and",
-        0xB2000000: "orr",
-        0xD2000000: "eor",
-        0xF2000000: "ands",
-    }
-    kind = kinds.get(word & 0xFF800000)
-    if kind is None:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    n = (word >> 22) & 0x1
-    immr = (word >> 16) & 0x3F
-    imms = (word >> 10) & 0x3F
-    length_source = n << 6 | (~imms & 0x3F)
-    length = length_source.bit_length() - 1
-    if length < 1:
-        return None
-    levels = (1 << length) - 1
-    rotation = immr & levels
-    ones = imms & levels
-    if ones == levels:
-        return None
-    element_bits = 1 << length
-    element_mask = (1 << element_bits) - 1
-    element = (1 << (ones + 1)) - 1
-    if rotation:
-        element = (
-            (element >> rotation) | (element << (element_bits - rotation))
-        ) & element_mask
-    immediate = 0
-    for shift in range(0, 64, element_bits):
-        immediate |= element << shift
-    return kind, destination, source, immediate
+    return _native_g17.decode("decode_logical_immediate_x", word=word)
 
 
 def decode_add_sub_immediate_value(word: int) -> dict[str, object] | None:
-    if word & 0x1F000000 != 0x11000000:
-        return None
-    immediate = (word >> 10) & 0xFFF
-    if word & (1 << 22):
-        immediate <<= 12
-    return {
-        "operation": "sub" if word & (1 << 30) else "add",
-        "destination_register": word & 0x1F,
-        "source_register": (word >> 5) & 0x1F,
-        "immediate": immediate,
-        "bytes": 8 if word & 0x80000000 else 4,
-    }
+    return _native_g17.decode("decode_add_sub_immediate_value", word=word)
 
 
 def decode_add_sub_register_value(word: int) -> dict[str, object] | None:
-    if word & 0x1F000000 != 0x0B000000:
-        return None
-    result: dict[str, object] = {
-        "operation": "sub" if word & (1 << 30) else "add",
-        "destination_register": word & 0x1F,
-        "first_register": (word >> 5) & 0x1F,
-        "second_register": (word >> 16) & 0x1F,
-        "bytes": 8 if word & 0x80000000 else 4,
-    }
-    if word & (1 << 21):
-        result["extend"] = (
-            "uxtb",
-            "uxth",
-            "uxtw",
-            "uxtx",
-            "sxtb",
-            "sxth",
-            "sxtw",
-            "sxtx",
-        )[(word >> 13) & 0x7]
-        result["amount"] = (word >> 10) & 0x7
-    else:
-        shift = (word >> 22) & 0x3
-        if shift == 3:
-            return None
-        result["shift"] = ("lsl", "lsr", "asr")[shift]
-        result["amount"] = (word >> 10) & 0x3F
-    return result
+    return _native_g17.decode("decode_add_sub_register_value", word=word)
 
 
 def decode_bitfield_value(word: int) -> dict[str, object] | None:
-    if word & 0x1F800000 != 0x13000000:
-        return None
-    opcode = (word >> 29) & 0x3
-    if opcode == 3:
-        return None
-    width = 8 if word & 0x80000000 else 4
-    if ((word >> 22) & 0x1) != (width == 8):
-        return None
-    return {
-        "operation": ("sbfm", "bfm", "ubfm")[opcode],
-        "destination_register": word & 0x1F,
-        "source_register": (word >> 5) & 0x1F,
-        "rotate": (word >> 16) & 0x3F,
-        "mask_end": (word >> 10) & 0x3F,
-        "bytes": width,
-    }
+    return _native_g17.decode("decode_bitfield_value", word=word)
 
 
 def decode_conditional_select_value(word: int) -> dict[str, object] | None:
-    if word & 0x1FE00000 != 0x1A800000:
-        return None
-    op2 = (word >> 10) & 0x3
-    if op2 > 1:
-        return None
-    operation = (
-        ("csel", "csinc"),
-        ("csinv", "csneg"),
-    )[(word >> 30) & 0x1][op2]
-    return {
-        "operation": operation,
-        "destination_register": word & 0x1F,
-        "first_register": (word >> 5) & 0x1F,
-        "second_register": (word >> 16) & 0x1F,
-        "condition": (
-            "eq",
-            "ne",
-            "cs",
-            "cc",
-            "mi",
-            "pl",
-            "vs",
-            "vc",
-            "hi",
-            "ls",
-            "ge",
-            "lt",
-            "gt",
-            "le",
-            "al",
-            "nv",
-        )[(word >> 12) & 0xF],
-        "bytes": 8 if word & 0x80000000 else 4,
-    }
+    return _native_g17.decode("decode_conditional_select_value", word=word)
 
 
 def trace_g17_condition_expression(
@@ -3335,160 +2674,55 @@ def classify_g17_value_argument(
 
 
 def decode_umaddl(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFFE08000 != 0x9BA00000:
-        return None
-    destination = word & 0x1F
-    first = (word >> 5) & 0x1F
-    addend = (word >> 10) & 0x1F
-    second = (word >> 16) & 0x1F
-    return destination, first, second, addend
+    return _native_g17.decode("decode_umaddl", word=word)
 
 
 def decode_bfi_x(word: int) -> tuple[int, int, int, int] | None:
-    """Decode the 64-bit BFI alias of BFM."""
-    if word & 0xFFC00000 != 0xB3400000:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    immr = (word >> 16) & 0x3F
-    imms = (word >> 10) & 0x3F
-    if imms >= immr:
-        return None
-    lsb = (-immr) & 0x3F
-    width = imms + 1
-    return destination, source, lsb, width
+    return _native_g17.decode("decode_bfi_x", word=word)
 
 
 def decode_ubfiz_x(word: int) -> tuple[int, int, int, int] | None:
-    """Decode the 64-bit UBFIZ alias, including the LSL immediate alias."""
-    if word & 0xFFC00000 != 0xD3400000:
-        return None
-    destination = word & 0x1F
-    source = (word >> 5) & 0x1F
-    immr = (word >> 16) & 0x3F
-    imms = (word >> 10) & 0x3F
-    if imms >= immr:
-        return None
-    lsb = (-immr) & 0x3F
-    width = imms + 1
-    return destination, source, lsb, width
+    return _native_g17.decode("decode_ubfiz_x", word=word)
 
 
 def decode_str_unsigned(word: int) -> tuple[int, int, int, int] | None:
-    kinds = {
-        0x39000000: 1,
-        0x79000000: 2,
-        0xB9000000: 4,
-        0xF9000000: 8,
-        0xBD000000: 4,
-        0xFD000000: 8,
-        0x3D800000: 16,
-    }
-    width = kinds.get(word & 0xFFC00000)
-    if width is None:
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * width
-    return source, base, immediate, width
+    return _native_g17.decode("decode_str_unsigned", word=word)
 
 
 def decode_stur_x(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFE00C00 != 0xF8000000:
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = (word >> 12) & 0x1FF
-    if immediate & 0x100:
-        immediate -= 0x200
-    return source, base, immediate
+    return _native_g17.decode("decode_stur_x", word=word)
 
 
 def decode_pair_q(word: int) -> tuple[str, int, int, int, int] | None:
-    opcode = word & 0xFFC00000
-    if opcode == 0xAD400000:
-        kind = "load"
-    elif opcode == 0xAD000000:
-        kind = "store"
-    else:
-        return None
-    first = word & 0x1F
-    base = (word >> 5) & 0x1F
-    second = (word >> 10) & 0x1F
-    immediate = (word >> 15) & 0x7F
-    if immediate & 0x40:
-        immediate -= 0x80
-    return kind, first, second, base, immediate * 16
+    return _native_g17.decode("decode_pair_q", word=word)
 
 
 def decode_adrp(address: int, word: int) -> tuple[int, int] | None:
-    if word & 0x9F000000 != 0x90000000:
-        return None
-    register = word & 0x1F
-    immediate = ((word >> 5) & 0x7FFFF) << 2 | ((word >> 29) & 0x3)
-    if immediate & (1 << 20):
-        immediate -= 1 << 21
-    target = (address & ~0xFFF) + (immediate << 12)
-    return register, target & 0xFFFFFFFFFFFFFFFF
+    return _native_g17.decode("decode_adrp", address=address, word=word)
 
 
 def decode_bl_target(address: int, word: int) -> int | None:
-    if word & 0xFC000000 != 0x94000000:
-        return None
-    immediate = word & 0x03FFFFFF
-    if immediate & (1 << 25):
-        immediate -= 1 << 26
-    return (address + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+    return _native_g17.decode("decode_bl_target", address=address, word=word)
 
 
 def decode_b_target(address: int, word: int) -> int | None:
-    if word & 0xFC000000 != 0x14000000:
-        return None
-    immediate = word & 0x03FFFFFF
-    if immediate & (1 << 25):
-        immediate -= 1 << 26
-    return (address + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+    return _native_g17.decode("decode_b_target", address=address, word=word)
 
 
 def decode_stp_x(word: int) -> tuple[int, int, int, int] | None:
-    if word & 0xFFC00000 != 0xA9000000:
-        return None
-    first = word & 0x1F
-    base = (word >> 5) & 0x1F
-    second = (word >> 10) & 0x1F
-    immediate = (word >> 15) & 0x7F
-    if immediate & 0x40:
-        immediate -= 0x80
-    return first, second, base, immediate * 8
+    return _native_g17.decode("decode_stp_x", word=word)
 
 
 def decode_ldr_d(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFC00000 != 0xFD400000:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 8
-    return destination, base, immediate
+    return _native_g17.decode("decode_ldr_d", word=word)
 
 
 def decode_str_d(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFC00000 != 0xFD000000:
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 8
-    return source, base, immediate
+    return _native_g17.decode("decode_str_d", word=word)
 
 
 def decode_stur_d(word: int) -> tuple[int, int, int] | None:
-    if word & 0xFFE00C00 != 0xFC000000:
-        return None
-    source = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = (word >> 12) & 0x1FF
-    if immediate & 0x100:
-        immediate -= 0x200
-    return source, base, immediate
+    return _native_g17.decode("decode_stur_d", word=word)
 
 
 def recover_firmware_root(code: bytes) -> dict[str, object]:
@@ -3967,23 +3201,13 @@ def recover_hardware_config(
 
 
 def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, ...]) -> None:
-    encoded = struct.pack(f"<{len(sequence)}I", *sequence)
-    if encoded not in code:
-        raise ValueError(f"missing {label} instruction sequence")
+    return _native_g17.require_instruction_sequence(code, label, sequence)
 
 
 def require_instruction_words_at(
     code: bytes, label: str, expected: dict[int, int]
 ) -> None:
-    for offset, wanted in expected.items():
-        if offset + 4 > len(code):
-            raise ValueError(f"truncated {label} at {offset:#x}")
-        actual = struct.unpack_from("<I", code, offset)[0]
-        if actual != wanted:
-            raise ValueError(
-                f"unexpected {label} instruction at {offset:#x}: "
-                f"{actual:#010x}, expected {wanted:#010x}"
-            )
+    return _native_g17.require_instruction_words_at(code, label, expected)
 
 
 def find_direct_symbol_callers(image: bytes, target: int) -> set[str]:
@@ -4008,37 +3232,15 @@ def find_direct_symbol_callers(image: bytes, target: int) -> set[str]:
 
 
 def find_authenticated_target_references(image: bytes, target: int) -> list[int]:
-    references = []
-    for offset in range(0, len(image) - 7, 8):
-        raw = struct.unpack_from("<Q", image, offset)[0]
-        try:
-            decoded = decode_kernel_auth_rebase(raw)
-        except ValueError:
-            continue
-        if decoded == target:
-            references.append(offset)
-    return references
+    return _native_g17.find_authenticated_target_references(image, target)
 
 
 def decode_kernel_auth_rebase(raw: int) -> int:
-    """Decode the target field of an arm64e kernel authenticated rebase."""
-
-    if raw & 0xC000000000000000 != 0x8000000000000000:
-        raise ValueError(f"not an authenticated kernel rebase: {raw:#x}")
-    return KERNEL_COLLECTION_BASE + (raw & 0xFFFFFFFF)
+    return _native_g17.decode_kernel_auth_rebase(raw)
 
 
 def recover_vtable_target(image: bytes, vtable_name: str, slot: int) -> int:
-    symbols = macho_symbols(image)
-    if vtable_name not in symbols:
-        raise ValueError(f"Mach-O has no {vtable_name} symbol")
-    # A C++ vtable symbol begins with two header pointers before virtual slot 0.
-    entry_address = symbols[vtable_name] + 0x10 + slot
-    entry_offset = virtual_to_file(image, entry_address)
-    if entry_offset + 8 > len(image):
-        raise ValueError(f"truncated {vtable_name} entry at slot {slot:#x}")
-    raw_entry = struct.unpack_from("<Q", image, entry_offset)[0]
-    return decode_kernel_auth_rebase(raw_entry)
+    return _native_g17.recover_vtable_target(image, vtable_name, slot)
 
 
 def recover_g17_constant_virtual_returns(image: bytes) -> dict[str, object]:
@@ -4133,21 +3335,7 @@ def read_adrp_load(
     load_offset: int,
     expected_width: int,
 ) -> bytes:
-    if min(adrp_offset, load_offset) < 0 or max(adrp_offset, load_offset) + 4 > len(code):
-        raise ValueError("PC-relative load is outside its function")
-    adrp = decode_adrp(
-        function_address + adrp_offset,
-        struct.unpack_from("<I", code, adrp_offset)[0],
-    )
-    load = decode_load_unsigned(struct.unpack_from("<I", code, load_offset)[0])
-    if adrp is None or load is None:
-        raise ValueError("expected ADRP/load pair was not found")
-    page_register, page = adrp
-    _destination, base, immediate, width = load
-    if base != page_register or width != expected_width:
-        raise ValueError("unexpected PC-relative load shape")
-    file_offset = virtual_to_file(image, page + immediate)
-    return image[file_offset : file_offset + width]
+    return _native_g17.read_adrp_load(image, function_address, code, adrp_offset, load_offset, expected_width)
 
 
 def recover_g17_init_sequence_provider(image: bytes) -> dict[str, object]:
@@ -9290,98 +8478,11 @@ def recover_g17_linear_power_transfer_tables(
 
 
 def stores_covering_any(code: bytes, targets: set[int]) -> dict[int, list[tuple[int, int]]]:
-    """One decode pass returning covering stores for every target and base.
-
-    Same coverage rules as stores_covering, but sweeping each base register
-    separately costs a full rescan per register; this walks the code once.
-    """
-
-    unscaled_widths = {
-        0x38000000: 1, 0x78000000: 2, 0xB8000000: 4, 0xF8000000: 8,
-        0xBC000000: 4, 0xFC000000: 8, 0x3C800000: 16,
-    }
-    pair_widths = {
-        0x29000000: 4, 0xA9000000: 8, 0x2D000000: 4, 0x6D000000: 8, 0xAD000000: 16,
-    }
-    hits: dict[int, list[tuple[int, int]]] = {}
-
-    def record(base: int, low: int, high: int, site: int) -> None:
-        for target in targets:
-            if low <= target < high:
-                hits.setdefault(target, []).append((base, site))
-
-    for offset, word in words(code):
-        store = decode_str_unsigned(word)
-        if store is not None:
-            _source, base, immediate, width = store
-            record(base, immediate, immediate + width, offset)
-            continue
-        width = unscaled_widths.get(word & 0xFFE00C00)
-        if width is not None:
-            immediate = (word >> 12) & 0x1FF
-            if immediate & 0x100:
-                immediate -= 0x200
-            record((word >> 5) & 0x1F, immediate, immediate + width, offset)
-            continue
-        width = pair_widths.get(word & 0xFFC00000)
-        if width is not None:
-            immediate = (word >> 15) & 0x7F
-            if immediate & 0x40:
-                immediate -= 0x80
-            immediate *= width
-            record((word >> 5) & 0x1F, immediate, immediate + width * 2, offset)
-    return hits
+    return _native_g17.stores_covering_any(code, targets)
 
 
 def stores_covering(code: bytes, base: int, target: int) -> list[int]:
-    """Offsets of any store through `base` whose bytes cover `target`.
-
-    Used to prove a struct byte is never written, so it keeps whatever cleared
-    it. Widths matter: a byte can be covered by a wider store at a lower
-    offset, or by either half of a store pair.
-    """
-
-    hits: list[int] = []
-    unscaled_widths = {
-        0x38000000: 1,
-        0x78000000: 2,
-        0xB8000000: 4,
-        0xF8000000: 8,
-        0xBC000000: 4,
-        0xFC000000: 8,
-        0x3C800000: 16,
-    }
-    pair_widths = {
-        0x29000000: 4,
-        0xA9000000: 8,
-        0x2D000000: 4,
-        0x6D000000: 8,
-        0xAD000000: 16,
-    }
-    for offset, word in words(code):
-        store = decode_str_unsigned(word)
-        if store is not None:
-            _source, store_base, immediate, width = store
-            if store_base == base and immediate <= target < immediate + width:
-                hits.append(offset)
-            continue
-        width = unscaled_widths.get(word & 0xFFE00C00)
-        if width is not None and (word >> 5) & 0x1F == base:
-            immediate = (word >> 12) & 0x1FF
-            if immediate & 0x100:
-                immediate -= 0x200
-            if immediate <= target < immediate + width:
-                hits.append(offset)
-            continue
-        width = pair_widths.get(word & 0xFFC00000)
-        if width is not None and (word >> 5) & 0x1F == base:
-            immediate = (word >> 15) & 0x7F
-            if immediate & 0x40:
-                immediate -= 0x80
-            immediate *= width
-            if immediate <= target < immediate + width * 2:
-                hits.append(offset)
-    return hits
+    return _native_g17.stores_covering(code, base, target)
 
 
 # Store encodings understood by census_g17_member_writes, keyed by the opcode
@@ -11298,20 +10399,11 @@ def recover_g17_channel_layout(reset_code: bytes, write_code: bytes) -> dict[str
 
 
 def decode_orr_register(word: int) -> tuple[int, int, int] | None:
-    """Decode the 32-bit register form of ORR (shifted register, no shift)."""
-    if word & 0xFFE0FC00 != 0x2A000000:
-        return None
-    return word & 0x1F, (word >> 5) & 0x1F, (word >> 16) & 0x1F
+    return _native_g17.decode("decode_orr_register", word=word)
 
 
 def decode_ldr_q(word: int) -> tuple[int, int, int] | None:
-    """Decode LDR (immediate, unsigned offset) for a 128-bit SIMD register."""
-    if word & 0xFFC00000 != 0x3DC00000:
-        return None
-    destination = word & 0x1F
-    base = (word >> 5) & 0x1F
-    immediate = ((word >> 10) & 0xFFF) * 16
-    return destination, base, immediate
+    return _native_g17.decode("decode_ldr_q", word=word)
 
 
 def recover_g17_secondary_performance_block(image: bytes) -> dict[str, object]:
