@@ -452,9 +452,9 @@ this document and the handoff are the durable record.
 
 The continued request now includes all maintained first-party C. Completed
 ports since the preceding 10,191-line implementation batch remove another
-**4,126 original production/native-boundary C lines**, **18,106 original fixture/benchmark
+**4,126 original production/native-boundary C lines**, **18,566 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel and
-eight Wi-Fi tool lines). A further 31 original stack-pointer/syscall/variadic/ordering
+eight Wi-Fi tool lines). A further 36 original stack-pointer/syscall/variadic/ordering
 boundary lines now use instruction-only
 assembly and receive no V algorithm credit. New tests, generated lvalue adapters
 and archived evidence do not count as translations. The following stages are
@@ -574,6 +574,9 @@ Linux, lwIP, nanoprintf, flanterm, musl and other libraries remain unchanged.
 | Init-policy independent syscall host fixture | 178 | `b5245a13` |
 | Native PS2 emulator regression fixture | 413 | `c411ab6a` |
 | Executable-text/native interpreter fixture | 116 | `e51f3fc0` |
+| Mounted-disk native policy fixture | 176 | `1696dbaf` |
+| Execute-only native protection fixture (five assembly lines excluded) | 180 | `0c56640c` |
+| Securelevel native domain/device/concurrency fixture | 104 | `161c0d7a` |
 
 The hypervisor/PCI scope originally contained 86 lines; nine syscall boundary
 lines use instruction-only assembly and receive zero V algorithm credit. Its
@@ -1052,6 +1055,19 @@ proves it. This run neither explains the earlier OOM nor qualifies the pending
 `host-native-default-pair-20261007/allocation-provenance/validation.json`
 (SHA256 `a1a1ad15739a2933dccf4e48a37c8a90b881a65b833b0566c17e15705b00120b`).
 
+A subsequent read-only route diagnostic selected the same unchanged original
+C ELF/kernel and 3,600-second workload. Its tracer stopped at an unexpected
+PC after two baselines, two allocations and two prequeue captures, with
+1.800986 seconds of debugger pauses. It captured no self-free, routing branch,
+unlink or failure event, and no complete address-reuse history. Breakpoint
+removals replied OK, but detach replied E22. The launcher/runner/tracer PIDs
+were absent at the later root observation; no guest verdict or recorded exit
+status was available. Actual retained ISO kernel and init still match the
+canonical inputs. This attempt is incomplete, proves no routing defect or
+absence, and adds zero migration credit. Receipt:
+`host-native-default-pair-20261007/route-provenance/root-incomplete-route-validation.json`
+(SHA256 `acc6d66df08de99e142a803a4bbea0371650156c66d404fb84fd9b29074b0cdf`).
+
 The OOM trace does not establish why memory was exhausted. Victim accounting
 was 32.75390625 MiB with 204 live threads and 7.203125 MiB free physical pages;
 heap/slab ownership, retired-thread backlog and a time series were not captured.
@@ -1213,6 +1229,17 @@ runs. The stage reuses qualified kernels with unchanged production source;
 x86 emulator execution, fresh kernel builds, host MIPS sanitizers and physical
 PS2 operation remain unclaimed. The first-party PS2 core bridge remains C.
 
+The remaining 433-line PS2 bridge is compiled as C++20 and needs a native
+exception-ABI gate before translation. Its cached EE core owns live STL
+containers; longjmp would skip their destructors. The reviewed cache-only
+design uses real unwinding, caller-owned transaction cleanup, coordinate
+restoration before renderer exceptions propagate, and the original teardown
+and post-swap allocation-failure behavior. No prototype or translation credit
+is established by the plan. `ps2-bridge-v-feasibility-plan.json` (SHA256
+`eef4d6c11c9bf8dfec3f3900433a40ccae5a3aa942bbcfa41fa9cfe4bf9929fe`)
+pins that design and its pending gates. The separate first-party
+`build-support/ps2/ioman.cpp` (121 lines) also remains follow-up work.
+
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, stack buffers/ELF records, file-backed initialized volatile
 dynamic table and actual 16 KiB-aligned exported target wrapper. Native
@@ -1230,6 +1257,67 @@ there is no fresh kernel build or sanitizer claim. Extracted x86 boot kernels
 and archive members match, with only the normal builder-added image identity.
 ARM's launcher removed its private boot disks, so only selected kernel hashes
 and copy/boot logs are retained for those runs.
+
+The mounted-disk fixture (`1696dbaf`, 176) retains all 72 source checks
+(70 ARM / 64 x86), native directory borrowing, stack vectors/offsets,
+levels 0/1/2/0 and the original 300-second allowance. Strict original-C/V
+SDK links and native layout/allocator checks pass. All four complete native
+controls pass with 50 warmups and 6,000 denied operations: ARM Slab stays
+1,584→1,584 KiB and x86 stays 1,168→1,168 KiB for both C and V. All four
+images pass offline e2fsck and retain the exact 65,536-byte persisted payload.
+Unchanged production host/model sanitizer checks pass too. Independent source,
+ABI/lifetime and final native reviews are in
+`mounted-disk-policy-fixture/root-final-native-peer.json` (SHA256
+`19326ab8ea18414c6e25a0561414c262dbd26e4be1865d5b40c775152f4e7312`)
+and `postcommit-final.json`. No kernel source changes or fresh builds are claimed.
+
+The execute-only fixture (`0c56640c`) moves 180 of 185 original C lines to V;
+five original ARM cache/register/barrier lines remain inline assembly with
+zero V algorithm credit. All 24 ordered checks, native volatile reads,
+fork/COW/reap/unmap lifetimes and the original 300-second allowance remain.
+Strict ARM/x86 SDK C/V controls and production ASan/UBSan models pass.
+All eight complete native guests pass: ARM enhanced-PAN strict, PAN-off and
+ordinary-PAN configurations plus x86 readable fallback, each original C/V.
+Every 100-warmup/3,000-operation Slab measurement stays flat. Actual kernels
+and archive init members extracted from all six ARM boot disks and both x86
+ISOs match the immutable kernels and separately built SDK ELFs. Generated
+sources, objects and all six SDK ELFs are also byte-identical under explicit
+frozen V/VEXE/VINIX compiler settings. Independent full native evidence peer:
+`execute-only-fixture/peer-final-native-validation-ps2-port.json` (SHA256
+`2e762dbe6a9db09c0d14b95876bc0982ee5bfa723657116ab2167ae30ad2811c`);
+`postcommit-final.json` pins the exact five committed paths. These fixture
+controls reuse qualified kernels and claim no new kernel build or guest sanitizer.
+
+The securelevel fixture (`161c0d7a`, 104) preserves all 19 source checks,
+17 success verdicts, levels 0/1/2/0, saved 32-bit errno across close, private
+UTS policy and retained device descriptions. Its original 50 concurrent-raise
+children pass the same actual C-wrapper address to two native pthreads, join
+both before exit, and are reaped with the original EINTR-aware loop. Strict
+original-C/V ARM and x86 SDK links/layouts pass with no implicit allocator
+imports; all four complete native controls pass within the original
+300-second allowance with identical per-architecture verdict/errno sequences.
+Fresh actual boot-image extraction verifies each kernel and archive init
+against the immutable kernels and separately built SDK ELFs. Additional
+read-only ARM inspection passes e2fsck and retains the fsynced byte `x`.
+Independent source/native/lifetime and final reviews are in
+`securelevel-fixture/root-final-native-peer.json` (SHA256
+`e9555a3d66fe626f9c104e0b5ba08e8960d8b3ef3a070681e6d614c630a9cfd1`)
+and `postcommit-final.json`. No new kernel build, native sanitizer,
+per-operation allocation measurement or physical-hardware claim is made.
+
+The 395-line EXT2-xattr fixture remains unqualified and its original C is
+retained. ARM C/V controls pass, while x86 V fails the unchanged 32-byte-class
+retention equality. A read-only trace of the earlier frozen V ELF places its
+scanner's first RX-page demand fault after the baseline counters were sampled,
+with no new mapping fault during the 200 measured operations. One 32-byte
+`EXT2MappedPage` record represents that live private file-backed code page;
+the original C places malloc and the scanner on an already-touched page.
+The current strict V ELF retains separate malloc/scanner RX pages, like the
+earlier V ELF, but was not hardware-traced. Source ownership review predicts cleanup after unmapping;
+actual post-exit retirement was not measured. This supplies no port, leak-absence
+or completed-retirement credit. Assertions, scanner, warmups and link placement
+remain unchanged. Receipt: `ext2-xattr-fixture/ownership-readonly/ownership-cause.json`
+(SHA256 `afb819c993eef3da618268940fb11b52d3f59c303fce106b0bcc61fa81ac738f`).
 
 These fixture stages reuse their individually recorded immutable kernels and
 do not claim host syscall sanitizers or fresh kernel builds. Kernel sources
@@ -1301,10 +1389,10 @@ four-CPU compatibility guest with exact page equality; its tested ELF is
 `0076705124da9532dee648347d28941f027d09b58d4f6c5dba6140aa8fcd2d01`.
 It receives zero additional port credit.
 
-At committed source `b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`,
+At committed source `161c0d7a40503a38f48fb021cf152c33f688ce98`,
 `kernel/c/*.c` has zero maintained first-party files, including fixtures.
-The non-vendored `.c` census contains 148 paths / 37,351 lines: 147 test paths
-(36,918 lines) and one build-support path (433 lines). All committed blob
+The non-vendored `.c` census contains 145 paths / 36,886 lines: 144 test paths
+(36,453 lines) and one build-support path (433 lines). All committed blob
 identities, byte sizes and line counts are checked with that revision's Git
 attributes and global/system attributes disabled. Genuine patched musl evidence
 remains included; the PS2 bridge remains first-party
@@ -1443,8 +1531,8 @@ disposable image files may be retired after recording their hashes; their
 manifests and logs remain. This document and the handoff are the durable record.
 
 Linguist 7.27.0 at committed source
-`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82` reports **V 72.44%, C 4.76%**,
-491 C files, 523 Python files and 287 shell files. All 2,734 classified blob
+`161c0d7a40503a38f48fb021cf152c33f688ce98` reports **V 72.48%, C 4.72%**,
+491 C files, 523 Python files and 287 shell files. All 2,739 classified blob
 identities and sizes were checked against Git, including every inventory row.
 No Verilog or vendored trees appear and `.gitattributes` is unchanged.
 Concurrent commits include an 18,008,664-byte `desktop/font_data.v` blob;

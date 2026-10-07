@@ -2,7 +2,7 @@
 
 Updated 2026-10-07 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`. Re-read HEAD, `AGENTS.md` and
+`161c0d7a40503a38f48fb021cf152c33f688ce98`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,10 +28,10 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **4,126 original production C lines**, **18,106 original fixture/benchmark
+continuation adds **4,126 original production C lines**, **18,566 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel, eight
 Wi-Fi tool lines),
-counted separately. Thirty-one stack-pointer/syscall/variadic/ordering boundary lines use
+counted separately. Thirty-six stack-pointer/syscall/variadic/ordering boundary lines use
 instruction-only assembly and receive no V algorithm credit.
 
 | Completed continuation | Commit |
@@ -136,6 +136,9 @@ instruction-only assembly and receive no V algorithm credit.
 | Native PS2 emulator regression fixture (413) | `c411ab6a` |
 | Native PS2 EE/IOP PADDLE programs (282; two ordering lines excluded) | `b2f7f8a9` |
 | Executable-text/native interpreter fixture (116) | `e51f3fc0` |
+| Mounted-disk native policy fixture (176) | `1696dbaf` |
+| Execute-only native protection fixture (180; five assembly lines excluded) | `0c56640c` |
+| Securelevel native domain/device/concurrency fixture (104) | `161c0d7a` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
 | Canonical callback contracts (zero credit) | `03ad7bb3` |
 | Const string/log-record contracts (zero credit) | `e79802e4` |
@@ -146,8 +149,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 148 paths / 37,351
-lines: 147 test paths / 36,918 lines and one build-support path / 433 lines.
+source, the committed non-vendored `.c` census contains 145 paths / 36,886
+lines: 144 test paths / 36,453 lines and one build-support path / 433 lines.
 All committed identities/sizes/lines are verified using pinned-source Git
 attributes with global/system attributes disabled. Genuine patched musl evidence
 and the first-party PS2 bridge remain included. This is a scope guide, not a translation tally; native headers and
@@ -266,6 +269,17 @@ continuing; preserve the unresolved results below:
   protocol fixtures remain to port. Keep immutable original Git references for
   comparison. Declaration-only native ABI headers do not justify retaining
   first-party C implementation bodies.
+- EXT2-xattr (395) remains unqualified with original C retained. ARM C/V pass;
+  x86 V fails the original 32-byte-class equality. A read-only trace of an
+  earlier frozen ELF places the scanner's first RX-page fault after baseline
+  counters, and none during the 200 measured operations. The live private
+  code page owns one 32-byte `EXT2MappedPage` record. Original C malloc touches
+  its shared scanner page earlier; the current strict V ELF retains separate
+  pages, but was not hardware-traced. Source cleanup review is not measured
+  post-exit retirement. Keep zero credit and preserve assertions, scanner,
+  warmups and link placement. Receipt:
+  `ext2-xattr-fixture/ownership-readonly/ownership-cause.json` (SHA256
+  `afb819c993eef3da618268940fb11b52d3f59c303fce106b0bcc61fa81ac738f`).
 
 ## Validation and evidence
 
@@ -354,6 +368,19 @@ proves it. This run neither explains the earlier OOM nor qualifies the pending
 8,929 lines. Receipts are in
 `host-native-default-pair-20261007/allocation-provenance/validation.json`
 (SHA256 `a1a1ad15739a2933dccf4e48a37c8a90b881a65b833b0566c17e15705b00120b`).
+
+A subsequent read-only route diagnostic selected the same unchanged original
+C ELF/kernel and 3,600-second workload. Its tracer stopped at an unexpected
+PC after two baselines, two allocations and two prequeue captures, with
+1.800986 seconds of debugger pauses. It captured no self-free, routing branch,
+unlink or failure event, and no complete address-reuse history. Breakpoint
+removals replied OK, but detach replied E22. The launcher/runner/tracer PIDs
+were absent at the later root observation; no guest verdict or recorded exit
+status was available. Actual retained ISO kernel and init still match the
+canonical inputs. This attempt is incomplete, proves no routing defect or
+absence, and adds zero migration credit. Receipt:
+`host-native-default-pair-20261007/route-provenance/root-incomplete-route-validation.json`
+(SHA256 `acc6d66df08de99e142a803a4bbea0371650156c66d404fb84fd9b29074b0cdf`).
 
 The OOM trace does not establish why memory was exhausted. Victim accounting
 was 32.75390625 MiB with 204 live threads and 7.203125 MiB free physical pages;
@@ -484,6 +511,16 @@ runs. The stage reuses qualified kernels with unchanged production source;
 x86 emulator execution, fresh kernel builds, host MIPS sanitizers and physical
 PS2 operation remain unclaimed. The first-party PS2 core bridge remains C.
 
+The 433-line PS2 bridge is C++20 despite its `.c` suffix. Its live EE/STL
+owners require actual native exception unwinding, so do not copy the N64
+longjmp escape. A reviewed cache-only design preserves transaction cleanup,
+renderer coordinate restoration, teardown order and post-swap allocation
+failure behavior. The design supplies zero completed port/prototype credit;
+native EH/layout/fault-order gates precede any translation. Plan:
+`ps2-bridge-v-feasibility-plan.json` (SHA256
+`eef4d6c11c9bf8dfec3f3900433a40ccae5a3aa942bbcfa41fa9cfe4bf9929fe`).
+The separate first-party `build-support/ps2/ioman.cpp` (121) also remains.
+
 The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
 errno checks, synchronous stack buffers/ELF records, file-backed volatile
 dynamic table and actual 16 KiB-aligned exported target wrapper. Native
@@ -499,6 +536,46 @@ Qualified default kernels are reused with unchanged production source, with
 no fresh kernel build or sanitizer claim. Extracted x86 boot kernels/archive
 members match plus the normal image identity; ARM's cleaned boot disks limit
 its evidence to selected kernel hashes and copy/boot logs.
+
+The mounted-disk fixture (`1696dbaf`, 176) retains all 72 source checks
+(70 ARM / 64 x86), directory/vector/offset borrowing and levels 0/1/2/0.
+Strict original-C/V SDK links, native ABI/lifetime checks, unchanged production
+sanitizer models and all four full native controls pass. Original 50 warmups,
+6,000 denials and 300-second allowance remain; Slab stays 1,584→1,584 KiB
+on ARM and 1,168→1,168 KiB on x86 for both C and V. All four images pass
+offline e2fsck with the exact 65,536-byte persisted payload. Evidence peer:
+`mounted-disk-policy-fixture/root-final-native-peer.json` (SHA256
+`19326ab8ea18414c6e25a0561414c262dbd26e4be1865d5b40c775152f4e7312`).
+
+The execute-only fixture (`0c56640c`) ports 180 original C lines; five ARM
+cache/register/barrier lines remain inline assembly with zero V algorithm credit.
+All 24 ordered checks, volatile reads, fork/COW/reap/unmap lifetimes,
+100 warmups, 3,000 measured attempts and original 300-second allowance remain.
+Strict original-C/V SDK profiles and production ASan/UBSan models pass.
+All eight full native C/V controls pass: ARM enhanced-PAN strict, PAN-off,
+ordinary PAN, and x86 readable fallback. Every Slab pair stays flat. Actual
+boot kernels/archive init members from six ARM disks and two x86 ISOs match
+the immutable kernels and separately built SDK ELFs. Explicit frozen compiler
+environment regeneration preserves every source/object/ELF byte. Full peer:
+`execute-only-fixture/peer-final-native-validation-ps2-port.json` (SHA256
+`2e762dbe6a9db09c0d14b95876bc0982ee5bfa723657116ab2167ae30ad2811c`).
+Both fixture stages reuse qualified kernels with unchanged production sources;
+neither claims fresh kernel builds or guest sanitizers. Their
+`postcommit-final.json` receipts pin only the exact owned committed paths.
+
+Securelevel (`161c0d7a`, 104) preserves 19 source checks/17 success verdicts,
+native 32-bit saved errno, levels 0/1/2/0, private UTS policy and retained disk
+descriptions. All 50 concurrency children use two native pthreads with the
+same actual C callback wrapper, join before exit and undergo EINTR-aware
+reaping. Strict original-C/V ARM/x86 SDK layouts/links and all four full native
+controls pass under the original 300-second limit, with identical per-arch
+verdict/errno sequences. Fresh boot kernel/archive init extraction matches
+the immutable kernels and separate SDK controls. Additional read-only ARM
+e2fsck and fsynced-byte `x` checks pass. Peer:
+`securelevel-fixture/root-final-native-peer.json` (SHA256
+`e9555a3d66fe626f9c104e0b5ba08e8960d8b3ef3a070681e6d614c630a9cfd1`).
+No fresh kernel build, native sanitizer, per-operation allocation measurement
+or physical-hardware validation is claimed.
 
 The portable benchmark (`5b37c952`) passed all 272 original-C/V host sanitizer
 cases, four native musl guests and genuine guest GCC 14.2.0 compilation through
@@ -846,9 +923,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82` reports **V 72.44%, C 4.76%**,
+`161c0d7a40503a38f48fb021cf152c33f688ce98` reports **V 72.48%, C 4.72%**,
 491 C files, 523 Python files and 287 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,734 classified blobs
+committed blob size and pinned reproduction command. All 2,739 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

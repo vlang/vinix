@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82`,
+at source commit `161c0d7a40503a38f48fb021cf152c33f688ce98`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,975,382 | 4.76% |
-| Python | 523 | 5,194,680 | 12.53% |
-| Shell | 287 | 1,267,425 | 3.06% |
+| C | 491 | 1,958,985 | 4.72% |
+| Python | 523 | 5,204,538 | 12.54% |
+| Shell | 287 | 1,267,425 | 3.05% |
 
-All `.v` files are classified as V. The resulting V share is 72.44%, with no
+All `.v` files are classified as V. The resulting V share is 72.48%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b2f7f8a9c1d7a6526e36401dfa44011dd4a51f82 --breakdown --json
+github-linguist --rev 161c0d7a40503a38f48fb021cf152c33f688ce98 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -360,7 +360,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/wake-op.c` | 7,524 |
 | `tests/dumpability/dumpfixture/dump-native-abi.h` | 685 |
 | `tests/elf-text/textfixture/elf-text-native-abi.h` | 1,609 |
-| `tests/execute-only/guest.c` | 8,192 |
+| `tests/execute-only/execfixture/native-abi.h` | 937 |
 | `tests/ext2-sparse/sparsefixture/sparse-native-abi.h` | 1,110 |
 | `tests/ext2-xattr/test.c` | 17,267 |
 | `tests/fsync-scope/syncfixture/fsync-native-abi.h` | 434 |
@@ -438,7 +438,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memory/pagetablefixture/pagetable-native-abi.h` | 903 |
 | `tests/memory/runtimefixture/memory-runtime-native-abi.h` | 605 |
 | `tests/mount-policy/test.c` | 27,539 |
-| `tests/mounted-disk-policy/guest.c` | 9,548 |
+| `tests/mounted-disk-policy/diskfixture/disk-native-abi.h` | 2,953 |
 | `tests/n64/guestfixture/n64-guest-native-abi.h` | 1,072 |
 | `tests/n64/rspbudgetfixture/n64-rsp-native-abi.h` | 626 |
 | `tests/net-random/fixture/net-random-native-abi.h` | 351 |
@@ -495,7 +495,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/resource-open/resourcefixture/resource-native-abi.h` | 683 |
 | `tests/scheduler-preemption/guest.c` | 5,391 |
 | `tests/securelevel-boot/guest.c` | 15,666 |
-| `tests/securelevel/guest.c` | 4,379 |
+| `tests/securelevel/securefixture/native-abi.h` | 1,832 |
 | `tests/security-audit/collector_test.c` | 8,900 |
 | `tests/security-audit/collector_vm_test.c` | 5,103 |
 | `tests/security-audit/test.c` | 7,865 |
@@ -825,7 +825,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dumpability/run.py` | 3,975 |
 | `tests/elf-text/run.py` | 5,791 |
 | `tests/execute-only/check-generated.py` | 9,911 |
-| `tests/execute-only/run.py` | 3,981 |
+| `tests/execute-only/run.py` | 6,678 |
 | `tests/ext2-sparse/run.py` | 7,614 |
 | `tests/ext2-xattr/host.py` | 6,498 |
 | `tests/ext2-xattr/run.py` | 11,512 |
@@ -922,7 +922,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mount-policy/run_vm.py` | 1,615 |
 | `tests/mounted-disk-policy/check-generated.py` | 7,984 |
 | `tests/mounted-disk-policy/host.py` | 7,901 |
-| `tests/mounted-disk-policy/run.py` | 7,112 |
+| `tests/mounted-disk-policy/run.py` | 10,413 |
 | `tests/n64/desktop.py` | 10,430 |
 | `tests/n64/frame.py` | 1,939 |
 | `tests/n64/rsp-budget.py` | 3,714 |
@@ -958,7 +958,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps1/desktop.py` | 9,729 |
 | `tests/ps1/frame.py` | 1,895 |
 | `tests/ps1/run.py` | 6,744 |
-| `tests/ps2/desktop.py` | 10,452 |
+| `tests/ps2/desktop.py` | 11,078 |
 | `tests/ps2/frame.py` | 1,945 |
 | `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
@@ -993,7 +993,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/securelevel-boot/host.py` | 854 |
 | `tests/securelevel-boot/persistent.py` | 4,121 |
 | `tests/securelevel-boot/run.py` | 2,460 |
-| `tests/securelevel/run.py` | 3,794 |
+| `tests/securelevel/run.py` | 7,028 |
 | `tests/shared-streams/run.py` | 4,049 |
 | `tests/smt-policy/run.py` | 3,248 |
 | `tests/socket-io/check-generated.py` | 3,504 |
