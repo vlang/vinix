@@ -37,6 +37,7 @@ has the following results:
 | Fresh matched x86 original C on default kernel `a5ae7a96`, `qemu64`/TCG | Original first bound-CPU assertion; SIGABRT after 1,100.94 seconds |
 | Fresh matched x86 V on that same kernel and configuration | SIGKILL after 907.04 seconds; both required PASS markers absent |
 | Failure-only debugger on the untouched C ELF and same kernel | SIGKILL after 661.61 seconds; captured OOM kill route; diagnostic only |
+| Read-only allocator debugger on that untouched C ELF and kernel | Original bound-CPU assertion after 168.39 seconds; SIGABRT, no OOM; diagnostic only |
 
 All original assertions, operation counts, deadlines, cleanup requirements and
 seven modes (`reversed`, `huge`, `clock-horizon`, `absolute-overflow`, `state`,
@@ -104,6 +105,31 @@ selection remain unchanged, but debugger pauses alter timing. Receipts live
 under `host-native-default-pair-20261007/kill9-provenance`, with
 `validation.json` SHA256
 `7be4df826c6de9eefb97076d7108d0350d1475404aa755642698725553a6dafd`.
+
+A later read-only allocator diagnostic used the same untouched canonical C
+ELF and default kernel, qemu64 TCG, four CPUs, 1,024 MiB and the original
+3,600-second limit. It ended after 168.39 seconds (10:10:42.463817–
+10:13:30.854365 UTC on 2026-10-07) at the original bound-CPU assertion,
+with SIGABRT 6 and both required PASS markers absent. Native 128-byte record
+and TLS evidence shows logical CPU 0 versus expected CPU 2 at call zero in
+the 200-object self-free batch. At that stop there were 215,772 free pages
+(842.859375 MiB), zero accepted OOM kills, three distinct attached native
+threads and two model workers. No allocation peak was captured.
+
+Baseline, periodic, failure and post-waitpid captures retain 383 raw ranges
+and 449 frozen artifacts. All ranges, actual boot ELFs and native offsets were
+reviewed; no read caps, errors or whole-pause overruns occurred. Debugger
+pauses totaled 3.195 seconds and alter scheduling. Actual parent PID 1
+returned child PID 33072 with status 6; one dying thread and a quarantined
+process remained immediately afterward, so this is no settled retirement or
+leak-absence result. A terminal BrokenPipe after complete records is retained.
+Address-only running-work routing could confuse a newly initialized object
+with a self-freed predecessor at the same address; source and instructions
+support this hypothesis, but no enqueue-time predecessor/generation capture
+proves it. This run neither explains the earlier OOM nor qualifies the pending
+8,929 lines. Receipts are in
+`host-native-default-pair-20261007/allocation-provenance/validation.json`
+(SHA256 `a1a1ad15739a2933dccf4e48a37c8a90b881a65b833b0566c17e15705b00120b`).
 
 The commit review matched all 96 owned input hashes to the passing dual-host
 receipt and all 27 deleted Git blobs to the immutable original scope. Three

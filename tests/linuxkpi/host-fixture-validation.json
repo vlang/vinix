@@ -1290,5 +1290,122 @@
         "sha256": "b678ffda28c3a3346b9d2b23f452f637ff69e6ab4db5c2b93bcd25d4ff43612d"
       }
     }
+  },
+  "native_x86_readonly_allocator_diagnostic_20261007": {
+    "status": "FAIL unchanged original-C bound-CPU assertion; read-only diagnostic only",
+    "completed_v_translation_credit": 0,
+    "actual_kernel_sha256": "a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572",
+    "actual_original_C_init_sha256": "ee0172693b442c2f43978aa982c5d8d4cece52dbf3d029bea9fb503c6ebcf06f",
+    "configuration": {
+      "kernel": "current default",
+      "LINUXKPI": 0,
+      "PROD": true,
+      "optimization": "O2",
+      "LIMINE_MP": 1,
+      "STACK_GUARD_TEST": 0,
+      "cpu": "qemu64",
+      "accel": "tcg",
+      "machine": "q35,smm=off",
+      "CPUs": 4,
+      "memory_MiB": 1024,
+      "timeout_seconds": 3600,
+      "all_original_groups": 26,
+      "all_original_boundary_modes": 7,
+      "assertions_counts_deadlines_ownership": "unchanged"
+    },
+    "utc_start": "2026-10-07T10:10:42.463817+00:00",
+    "utc_end": "2026-10-07T10:13:30.854365+00:00",
+    "elapsed_seconds": 168.39,
+    "child_status": 6,
+    "required_PASS_markers_present": false,
+    "assertion": {
+      "expression": "!test->check_cpu || test->observed_cpu[call] == test->expected_cpu[call]",
+      "file": "/tmp/vmh-c-baseline/bound_work_test.h",
+      "line": 23,
+      "function": "bound_callback",
+      "ABI": "actual musl __assert_fail(expr,file,int line,function), SysV AMD64"
+    },
+    "captured_operands": {
+      "call": 0,
+      "expected_cpu": [
+        2,
+        2,
+        2,
+        2
+      ],
+      "observed_cpu": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "check_cpu": 1,
+      "free_self": 1,
+      "calls": 1,
+      "active": 1,
+      "native_model_CPU": 0,
+      "native_TLS_read_and_bind_offset": -12,
+      "native_record_bytes": 128,
+      "native_WorkRun_bytes": 88,
+      "prior_generation_or_enqueue_route_captured": false
+    },
+    "failure_memory": {
+      "free_physical_pages": 215772,
+      "page_bytes": 4096,
+      "free_MiB": 842.859375,
+      "accepted_OOM_kills": 0,
+      "target_distinct_attached_Threads": 3,
+      "model_workers": 2,
+      "deferred_and_graveyard_entries": 0,
+      "dying_Threads": 0,
+      "coverage_limit": "Bounded all-stop snapshot includes held locks and unowned completed mappings; missing owners are not leaks."
+    },
+    "sampler": {
+      "raw_ranges": 383,
+      "raw_range_bytes": 7521050,
+      "frozen_artifact_files": 449,
+      "complete_candidate_and_sample_pause_seconds": 3.195022,
+      "caps_or_read_errors_or_whole_pause_overruns": false,
+      "terminal": "BrokenPipe after complete baseline, periodic, assertion and post-waitpid records were written"
+    },
+    "post_waitpid": {
+      "qualified_actual_supervisor_mapping": true,
+      "parent_PID": 1,
+      "child_PID_and_native_RAX_and_R13d": 33072,
+      "wait_status": 6,
+      "immediate_dying_Threads": 1,
+      "quarantined_Processes": 1,
+      "settled_retirement_or_leak_absence_claim": false
+    },
+    "route_hypothesis": "Captured free_self1/freed-pointer record identifies immutable200-bound-freebatch. Source/actual instruction address-only running-work override may confuse a freshly initialized object reusing a self-freed address before old WorkRun retires. No enqueue-time oldRun/newinit/routebranch capture yet; hypothesis only. Native actual TLS bind and read both use FS-12; physicalCPU index is not proof of logicalCPU contract failure.",
+    "evidence_root": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007/allocation-provenance",
+    "receipts": {
+      "validation.json": {
+        "sha256": "a1a1ad15739a2933dccf4e48a37c8a90b881a65b833b0566c17e15705b00120b",
+        "bytes": 14629
+      },
+      "artifact-manifest.json": {
+        "sha256": "1a93e249872b9637380d0bc0897bba8f8255f8c94c9f8cc06fc60b527b5e488d",
+        "bytes": 77694
+      },
+      "native-offset-review.json": {
+        "sha256": "877ad4aee87b0dfa13b33cf77deee363e2505cb24c2f99c87cd17e47b145d720",
+        "bytes": 6001
+      },
+      "root-final-diagnostic-peer.json": {
+        "sha256": "f09859eb1bfb1ed80525354b4b3471be7700e3b1a400d6b5509a0d3d9011a8cd",
+        "bytes": 1423
+      },
+      "root-implementation-review.json": {
+        "sha256": "c436818e2e8329cf5666e70bce06b6fb06ef680e163eac3f9f909073581b7c71",
+        "bytes": 1470
+      }
+    },
+    "limits": [
+      "Earlier proven OOM diagnostic and earlier unknown-cause failures retain their separate evidence and causes",
+      "This run captured no allocation peak or runtime proof of recycled-address routing",
+      "Debugger pauses alter scheduling; full original selected workload, assertions, counts, ownership and3600-second deadline remain unchanged",
+      "The assertion prevented completing all26groups and sevenboundarymodes; no8929-line qualification credit"
+    ]
   }
 }
