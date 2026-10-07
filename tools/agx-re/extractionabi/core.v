@@ -2,6 +2,7 @@ module main
 
 import imageextract as image
 import g17decode
+import g17power
 import math.big
 import strconv
 import sync.stdatomic as atom
@@ -136,6 +137,10 @@ fn signed_integer(value j.Value) !big.Integer {
 }
 
 fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
+	if operation == 'g17:recover_g17_linear_power_transfer_tables' {
+		code := j.bytes_fromhex(j.string_value(j.value(request, 'code')))!
+		return scalar(j.Value(g17power.recover_linear_power_transfer_tables(data, code)!))
+	}
 	if operation.starts_with('g17:') {
 		return scalar(g17decode.query(data, operation[4..], request)!)
 	}

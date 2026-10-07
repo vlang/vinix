@@ -12,6 +12,8 @@ def _query(data, operation, **options):
             raise struct.error(message.removeprefix("struct.error: ")) from None
         if message.startswith("IndexError: "):
             raise IndexError(message.removeprefix("IndexError: ")) from None
+        if message.startswith("KeyError: "):
+            raise KeyError(message.removeprefix("KeyError: ")) from None
         raise
 
 
