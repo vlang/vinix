@@ -22,7 +22,7 @@ SOURCE_SHA256 = "0be08e52bb9a759253b802a546a699dc5cc8e2799f9234e45e64550b09ffc39
 ZLIB_REVISION = "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf"
 ZLIB_URL = f"https://codeload.github.com/madler/zlib/tar.gz/{ZLIB_REVISION}"
 ZLIB_SHA256 = "d9e270d46252734aa49770fbc544125391617956266f220bd63216c834f3a522"
-PATCH_VERSION = "vinix-interpreter-4"
+PATCH_VERSION = "vinix-interpreter-5"
 
 
 def sha256(path: Path) -> str:
@@ -100,12 +100,15 @@ void* init_mem_base(void)
             "void InterpretOpcode(struct r4300_core* r4300)\n{\n"
             "    if (vinix_n64_cpu_budget && !--vinix_n64_cpu_budget) {\n"
             "        vinix_n64_budget_exhausted(); return;\n    }")
+    # Static-PC branches dispatch their delay slot with goto EX, bypassing
+    # the outer loop. Count at the shared execution entry so those instructions
+    # cannot evade the per-frame limit.
     replace(source / "mupen64plus-rsp-cxd4/su.c",
-            "    for (;;) {\n        inst_word = *(pi32)(IMEM + FIT_IMEM(PC));",
-            "    for (;;) {\n"
+            "EX:\n#endif\n#ifdef SP_EXECUTE_LOG",
+            "EX:\n#endif\n"
             "        if (vinix_n64_rsp_budget && !--vinix_n64_rsp_budget) {\n"
             "            vinix_n64_budget_exhausted(); goto RSP_halted_CPU_exit_point;\n        }\n"
-            "        inst_word = *(pi32)(IMEM + FIT_IMEM(PC));")
+            "#ifdef SP_EXECUTE_LOG")
     # Cartridge-only frontend never mounts 64DD disks. Avoid clearing 67 MiB
     # of unused global disk storage on each ROM load.
     replace(source / "libretro/libretro.c", "   format_disk(saved_memory.disk);", "   /* Vinix: no 64DD disk. */")

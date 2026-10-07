@@ -24,6 +24,19 @@ The same real homebrew also boots in `.v64` and `.n64` byte orders.
 An otherwise valid ROM with stalled boot code must report its instruction
 limit, stay responsive and run a new valid cartridge in the same process.
 
+The independent host RSP regression exercises the same pinned interpreter
+directly, including malformed branches in branch delay slots. It recompiles
+the RSP translation unit using the host core's recorded flags and links a
+freestanding V fixture with independent instruction memory. Sixteen steps
+must exhaust its budget, then a normal `BREAK` task must still run. A short
+subprocess timeout catches loops that bypass the budget; the old loop-top
+guard fails this test. No cartridge or firmware is needed.
+
+```sh
+python3 build-support/n64/build.py --host --output build/n64-host
+python3 tests/n64/rsp-budget.py --build build/n64-host
+```
+
 The guest is maintained in the freestanding V module `guestfixture`. The
 normal runner generates temporary C outside the checkout with the existing
 native fixture compiler and links against the actual musl SDK. Its header
