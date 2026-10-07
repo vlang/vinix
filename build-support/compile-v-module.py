@@ -12,6 +12,37 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def native_scalar_metadata(source, text):
+    """Supply foreign scalar qualifiers omitted by V's type declaration syntax.
+
+    V still owns each object's initializer, symbol, type use and storage. This
+    metadata emits only one whitelisted native typedef and its width check.
+    """
+    aliases = {}
+    for path in sorted(source.glob("*.v")):
+        raw = path.read_text()
+        for line in raw.splitlines():
+            if not line.startswith("// ABI native-scalar:"):
+                continue
+            match = re.fullmatch(r"// ABI native-scalar: ([A-Za-z_]\w*) (\w+)", line)
+            if not match or match[2] != "const_unsigned_long_64":
+                raise ValueError(f"Invalid native scalar metadata in {path}: {line}")
+            name = match[1]
+            if name in aliases:
+                raise ValueError(f"Duplicate native scalar alias: {name}")
+            declaration = r"@\[typedef\]\s*struct C\." + re.escape(name) + r"\s*\{\s*\}"
+            if len(re.findall(declaration, raw)) != 1:
+                raise ValueError(f"Native scalar metadata lacks one foreign V declaration: {name}")
+            if re.search(r"\btypedef\b[^;]*\b" + re.escape(name) + r"\s*;", text):
+                raise ValueError(f"Native scalar alias conflicts with compiler declaration: {name}")
+            aliases[name] = "const unsigned long"
+    declarations = []
+    for name, scalar in aliases.items():
+        declarations += [f"typedef {scalar} {name};",
+                         f'_Static_assert(sizeof({name}) == 8, "native 64-bit readonly scalar");']
+    return "\n".join(declarations) + ("\n" if declarations else "") + text
+
+
 def emit_header(source, output, header):
     """Derive public declarations from compiler output and V readonly metadata.
 
@@ -104,7 +135,7 @@ def generate(source, output, arch="amd64", defines=()):
         # Independently compiled V modules otherwise export identical shared
         # library initialization symbols. Preserve their constructor/destructor
         # behavior while giving each module its own generated scaffolding.
-        text = output.read_text()
+        text = native_scalar_metadata(source, output.read_text())
         text = re.sub(r"\b(_vinit|_vcleanup|_vinit_caller|_vcleanup_caller|"
                       r"_vno_main_init_caller|_v3_no_main_initialized)\b",
                       lambda match: source.name + "_" + match[1], text)

@@ -43,7 +43,9 @@ audit = load("cpu_mask_audit", HERE / "audit.py")
 bounds = load("cpu_mask_bounds", HERE / "generate-bounds.py")
 CORE = HERE / "compatcore/smp_masks.v"
 QUERIES = HERE / "headercore/smp_masks.v"
-DATA = ROOT / "kernel/c/linuxkpi_cpu_masks_data.c"
+STORAGE = HERE / "headercore/smp_masks_storage.v"
+ORIGINAL_STORAGE_REVISION = "2a5abc36175a5177828d86aad71667787eb68110"
+ORIGINAL_STORAGE_PATH = "kernel/c/linuxkpi_cpu_masks_data.c"
 PRIMITIVES = ROOT / "kernel/c/linuxkpi_smp_masks_v_primitives.h"
 CONTRACT = ROOT / "kernel/c/linuxkpi_smp_masks_v_contract.h"
 
@@ -344,10 +346,10 @@ def symbol_table(obj):
     return result,output
 
 
-def dump_rodata(obj,work):
-    before=sha(obj);output=work/(obj.stem+".rodata");derived=work/(obj.stem+".dump-copy.o")
-    command([tool("llvm-objcopy"),"--dump-section",".rodata="+str(output),str(obj),str(derived)],
-        work/(obj.stem+".dump.log"))
+def dump_rodata(obj,work,section=".rodata"):
+    before=sha(obj);output=work/(obj.stem+section);derived=work/(obj.stem+section+".dump-copy.o")
+    command([tool("llvm-objcopy"),"--dump-section",section+"="+str(output),str(obj),str(derived)],
+        work/(obj.stem+section+".dump.log"))
     if sha(obj)!=before:
         raise AssertionError("Readonly dump rewrote the original compiler object")
     return output.read_bytes(),{"original_sha256":before,"derived_sha256":sha(derived),"bytes_sha256":sha(output)}
@@ -361,11 +363,11 @@ def run(keep_dir):
     linux=Path(os.environ.get("LINUXKPI_SOURCE_DIR",audit.upstream.DEFAULT/
         ("linux-"+audit.upstream.PIN["version"]))).resolve()
     compiler=shlex.split(os.environ.get("CC","clang"))
-    observed=(Path(__file__),CORE,QUERIES,DATA,PRIMITIVES,CONTRACT,
+    observed=(Path(__file__),CORE,QUERIES,STORAGE,PRIMITIVES,CONTRACT,
         HERE/"compatcore/bitmap.v",HERE/"compatcore/primitives.v",HERE/"headercore/primitive.v",
         HERE/"headercore/wait.v",HERE/"include/generated/autoconf.h",ROOT/"kernel/GNUmakefile",
         ROOT/"kernel/c/linuxkpi_header_primitive_v_contract.h",
-        ROOT/"kernel/c/linuxkpi_common_v_contract.h",
+        ROOT/"kernel/c/linuxkpi_common_v_contract.h",ROOT/"build-support/compile-v-module.py",
         linux/"include/linux/cpumask.h",linux/"include/linux/smp.h",linux/"lib/find_bit.c",linux/"lib/hweight.c")
     initial={str(path):sha(path) for path in observed}
     (work/"initial-source-sha256.json").write_text(json.dumps(initial,indent=2)+"\n")
@@ -394,6 +396,9 @@ def run(keep_dir):
             raise AssertionError("Selected warning policy differs from exact original Kbuild")
         (work/"original-Makefile.extrawarn").write_bytes(warning)
         (work/"original-kernel-cpu.c").write_bytes(original)
+        original_storage = subprocess.check_output(["git", "show",
+            ORIGINAL_STORAGE_REVISION + ":" + ORIGINAL_STORAGE_PATH], cwd=ROOT)
+        (work/"original-storage.c").write_bytes(original_storage)
         begin=original.index(b"/* cpu_bit_bitmap[0] is empty")
         end=original.index(b"EXPORT_SYMBOL(cpu_all_bits);",begin)+len(b"EXPORT_SYMBOL(cpu_all_bits);")
         constant_source=original[begin:end].decode()
@@ -414,6 +419,7 @@ def run(keep_dir):
         (stage/"entry.v").write_text("module main\nimport compatcore as _\nimport headercore as _\nfn main() {}\n")
         shutil.copyfile(CORE,stage/"compatcore/smp_masks.v")
         shutil.copyfile(QUERIES,stage/"headercore/smp_masks.v")
+        shutil.copyfile(STORAGE,stage/"headercore/smp_masks_storage.v")
         weight=vfunction((HERE/"compatcore/bitmap.v").read_text(),"bitmap_weight")
         hweight=vfunction((HERE/"compatcore/primitives.v").read_text(),"native_hweight_long")
         (stage/"compatcore/weight.v").write_text("@[translated]\nmodule compatcore\n"+weight+hweight)
@@ -429,11 +435,54 @@ def run(keep_dir):
         generation=[str(v),"-no-builtin","-no-closures","-os","vinix","-arch","amd64",
             "-target-libc-headers","-gc","none","-manualfree","-o",str(native_c),str(stage)]
         command(generation,work/"generation.log",environment)
-        raw=native_c.read_text()
+        module_compiler=load("cpu_mask_module_compiler",ROOT/"build-support/compile-v-module.py")
+        rejection_cases=[]
+        metadata_probe=work/"metadata-rejections";metadata_probe.mkdir()
+        valid_metadata="// ABI native-scalar: probe_word const_unsigned_long_64\n@[typedef]\nstruct C.probe_word {}\n"
+        for name,source,compiler_text,duplicate in (
+            ("unknown-type",valid_metadata.replace("const_unsigned_long_64","writable_word"),"",False),
+            ("invalid-identifier",valid_metadata.replace("probe_word const","probe_word; const"),"",False),
+            ("missing-foreign-type",valid_metadata.split("@[typedef]")[0],"",False),
+            ("duplicate-alias",valid_metadata,"",True),
+            ("compiler-conflict",valid_metadata,"typedef unsigned long probe_word;",False)):
+            case=metadata_probe/name;case.mkdir();(case/"a.v").write_text(source)
+            if duplicate:(case/"b.v").write_text(source)
+            try:module_compiler.native_scalar_metadata(case,compiler_text)
+            except ValueError as error:rejection_cases.append({"case":name,"error":str(error)})
+            else:raise AssertionError("Invalid scalar producer metadata was accepted: "+name)
+        raw=module_compiler.native_scalar_metadata(stage/"headercore",native_c.read_text())
+        native_c.write_text(raw)
+        host_c=work/"actual-host-v.c"
+        host_generation=generation[:-3]+["-d","linuxkpi_host_test","-o",str(host_c),str(stage)]
+        command(host_generation,work/"host-generation.log",environment)
+        host_raw=module_compiler.native_scalar_metadata(stage/"headercore",host_c.read_text())
+        host_c.write_text(host_raw)
+        storage_symbols=("cpu_bit_bitmap","cpu_all_bits","__cpu_possible_mask","__cpu_online_mask",
+            "__cpu_present_mask","__cpu_active_mask","__cpu_dying_mask","__num_online_cpus","nr_cpu_ids")
+        def storage_source(generated):
+            declarations=[]
+            for symbol in storage_symbols:
+                found=re.findall(r"^(?:__attribute__\s*\(\([^\n;]*?\)\)\s*)?"
+                    r"(?:vkms_const_word|struct cpumask|cpumask|atomic_t|u32)\s+"+re.escape(symbol)+
+                    r"(?:\[[^\n;]*?\])?(?: = [^\n;]+)?;",generated,re.M)
+                if len(found)!=1:
+                    raise AssertionError("Missing unique V-owned storage definition "+symbol+": "+str(found))
+                declarations.append(found[0])
+            return '#include <linux/cache.h>\n#include <linux/cpumask.h>\n'+\
+                'typedef struct cpumask cpumask;\n'+\
+                module_compiler.native_scalar_metadata(stage/"headercore", "")+\
+                "\n".join(declarations)+"\n",declarations
+        data_source,data_definitions=storage_source(raw)
+        host_data_source,host_data_definitions=storage_source(host_raw)
+        strip_sections=lambda value:re.sub(r'__attribute__\s*\(\(\s*section\s*\(\s*"[^"]+"\s*\)\s*\)\)\s*',"",value)
+        if [strip_sections(value) for value in data_definitions]!=host_data_definitions:
+            raise AssertionError("Host profile changed V-owned storage types/initializers")
+        (work/"data.c").write_text(data_source)
+        (work/"host-data.c").write_text(host_data_source)
         # Ordinary native generation retains the actual export name but does
         # not add shared-library visibility annotations to its declarations.
         staged_sources="\n".join(path.read_text() for path in stage.rglob("*.v"))
-        names=re.findall(r"@\[export: '([\w]+)'\]",staged_sources)
+        names=re.findall(r"@\[export: '([\w]+)'\]\s*(?:@\[[^\n]+\]\s*)*(?:pub )?fn ",staged_sources)
         core_internal={"compatcore__"+name for name in re.findall(r"^pub fn (\w+)\(",CORE.read_text(),re.M)}
         query_internal={"headercore__"+name for name in re.findall(r"^(?:pub )?fn (\w+)\(",QUERIES.read_text(),re.M)}
         names=set(names)|core_internal|query_internal|{"compatcore__native_hweight_long",
@@ -523,7 +572,8 @@ def run(keep_dir):
             native_flags=flags(linux,generated,standard,"x86_64-unknown-none")
             objects={}
             for name,source in (("cold",work/"cold.c"),("references",work/"references.c"),
-                ("data",DATA),("original-data",work/"original-constants.c"),
+                ("data",work/"data.c"),("original-data",work/"original-constants.c"),
+                ("original-storage",work/"original-storage.c"),
                 ("core",work/"core.c"),("queries",work/"queries.c"),("weight",work/"weight.c")):
                 obj=work/(standard+"-native-"+name+".o")
                 argv=compiler+native_flags+["-c",str(source),"-o",str(obj)]
@@ -532,7 +582,7 @@ def run(keep_dir):
                 imports=subprocess.check_output([tool("llvm-nm"),"--undefined-only",str(obj)],text=True)
                 actual_imports={line.split()[-1] for line in imports.splitlines() if line.strip()}
                 allowed={
-                    "cold":set(),"data":set(),"original-data":set(),"weight":set(),
+                    "cold":set(),"data":set(),"original-data":set(),"original-storage":set(),"weight":set(),
                     "core":{"vkm_cpu_ids_storage","vkm_mask_storage","vkm_online_storage"},
                     "queries":{"__cpu_possible_mask","__cpu_online_mask","__cpu_present_mask",
                         "__cpu_active_mask","__cpu_dying_mask","__num_online_cpus","nr_cpu_ids",
@@ -546,18 +596,21 @@ def run(keep_dir):
             cold_symbols=subprocess.check_output([tool("llvm-nm"),str(objects["cold"])],text=True)
             if cold_symbols.strip():
                 raise AssertionError("Cold original declarations created storage/runtime")
-            observed_imports={line.split()[-1] for line in proofs[-6]["undefined_symbols"].splitlines()}
+            reference_proof=next(item for item in reversed(proofs)
+                if item["standard"]==standard and item["variant"]=="references")
+            observed_imports={line.split()[-1] for line in reference_proof["undefined_symbols"].splitlines()}
             expected={"total_cpus","cpus_booted_once_mask","set_cpu_online","init_cpu_present",
                 "init_cpu_possible","init_cpu_online","smp_call_function_single"}
             if observed_imports!=expected:
                 raise AssertionError("Pending genuine services were concealed: "+str(observed_imports))
             constants={}
-            for name in ("data","original-data"):
+            storage_inventory={};mutable_bytes={}
+            for name in ("data","original-data","original-storage"):
                 symbols,table=symbol_table(objects[name]);data,receipt=dump_rodata(objects[name],work)
                 section_report=subprocess.check_output([tool("llvm-readelf"),"--sections","--wide",
                     str(objects[name])],text=True)
                 values={}
-                if name=="data":
+                if name in ("data","original-storage"):
                     expected_sizes={"cpu_bit_bitmap":2080,"cpu_all_bits":32,
                         "__cpu_possible_mask":32,"__cpu_online_mask":32,"__cpu_present_mask":32,
                         "__cpu_active_mask":32,"__cpu_dying_mask":32,"__num_online_cpus":4,"nr_cpu_ids":4}
@@ -566,6 +619,23 @@ def run(keep_dir):
                     if re.search(r"\bFUNC\b",table) or subprocess.check_output(
                             [tool("llvm-nm"),"--undefined-only",str(objects[name])],text=True).strip():
                         raise AssertionError("Constant/storage translation unit contains code or runtime imports")
+                    storage_inventory[name]={key:(value["size"],value["value"]% (8 if value["size"]>=32 else 4))
+                        for key,value in symbols.items()}
+                    relocations=subprocess.check_output([tool("llvm-readelf"),"--relocations",str(objects[name])],text=True)
+                    if "There are no relocations" not in relocations:
+                        raise AssertionError("Permanent V/original storage acquired relocations")
+                    payload,_=dump_rodata(objects[name],work,".data..read_mostly")
+                    mutable_bytes[name]={}
+                    for symbol in storage_symbols[2:]:
+                        field=symbols[symbol]
+                        section=re.search(r"\[\s*"+field["section"]+r"\]\s+\.data\.\.read_mostly\s+([^\n]+)",section_report)
+                        if not section or "W" not in section[1].split()[-4]:
+                            raise AssertionError("Original writable storage section changed: "+symbol)
+                        value=payload[field["value"]:field["value"]+field["size"]]
+                        expected=(256).to_bytes(4,"little") if symbol=="nr_cpu_ids" else bytes(field["size"])
+                        if value!=expected:
+                            raise AssertionError("Original permanent storage cold bytes changed: "+symbol)
+                        mutable_bytes[name][symbol]=value.hex()
                 for symbol,size in (("cpu_bit_bitmap",2080),("cpu_all_bits",32)):
                     field=symbols[symbol]
                     section=re.search(r"\[\s*"+field["section"]+r"\]\s+\.rodata\s+([^\n]+)",section_report)
@@ -575,8 +645,12 @@ def run(keep_dir):
                 constants[name]=values
                 proofs.append({"standard":standard,"variant":name+"-readonly",
                     "symbols":table,"sections":section_report,"constant_sha256":values,"dump":receipt})
-            if constants["data"]!=constants["original-data"]:
+            if constants["data"]!=constants["original-data"] or constants["data"]!=constants["original-storage"]:
                 raise AssertionError("Production readonly constant bytes differ from actual pinned definitions")
+            if storage_inventory["data"]!=storage_inventory["original-storage"]:
+                raise AssertionError("V/original permanent storage symbol size/alignment differs")
+            if mutable_bytes["data"]!=mutable_bytes["original-storage"]:
+                raise AssertionError("V/original permanent storage bytes differ")
             native_alias=work/(standard+"-native-word-alias.c")
             native_alias.write_text(TYPE_CHECKS+"\n_Static_assert(__builtin_types_compatible_p(uint64_t,unsigned long),"
                 '"native scalar view exact alias");\n')
@@ -591,7 +665,7 @@ def run(keep_dir):
                 "-fsanitize=address,undefined","-fno-omit-frame-pointer"]
             host_objects=[]
             for name,source in (("core",work/"core.c"),("queries",work/"host-queries.c"),
-                ("weight",work/"weight.c"),("data",DATA),("fixture",work/"fixture.c"),
+                ("weight",work/"weight.c"),("data",work/"host-data.c"),("fixture",work/"fixture.c"),
                 ("find-bit",linux/"lib/find_bit.c"),("hweight",linux/"lib/hweight.c")):
                 obj=work/(standard+"-host-"+name+".o")
                 command(compiler+host_flags+["-c",str(source),"-o",str(obj)],obj.with_suffix(".log"))
@@ -600,24 +674,34 @@ def run(keep_dir):
             command(compiler+["-std="+standard,"-O1","-g","-Wall","-Wextra","-Werror",
                 "-iquote",str(ROOT/"kernel/c"),"-fsanitize=address,undefined","-fno-omit-frame-pointer",
                 "-c",str(work/"runner.c"),"-o",str(runner)],runner.with_suffix(".log"))
-            executable=work/(standard+"-runtime")
-            command(compiler+["-fsanitize=address,undefined",*[str(p) for p in host_objects],str(runner),
-                "-pthread","-o",str(executable)],executable.with_suffix(".link.log"))
-            total=0
-            count_cases=(1,2,4,63,64,65,127,128,129,191,192,193,255,256,0,257,0xffffffff)
-            for count in count_cases:
-                result=command([str(executable),str(count)],work/(standard+"-count-"+str(count)+".log"),
-                    env={**os.environ,"UBSAN_OPTIONS":"halt_on_error=1",
-                        "ASAN_OPTIONS":"detect_stack_use_after_return=1"})
-                match=re.fullmatch(r"PASS: (\d+) original mask/publisher assertions \(count="+str(count)+r"\)\n",result.stdout)
-                if not match or result.stderr:
-                    raise AssertionError("Unclean original mask sanitizer execution")
-                total+=int(match[1])
-            runtime.append({"standard":standard,"assertions":total,"process_count":len(count_cases),
-                "count_cases":list(count_cases),
-                "executable_sha256":sha(executable),"actual_objects":{str(p):sha(p) for p in host_objects},
-                "scope":"Separate cold processes and joined immutable reader actors; no live reset/constructor races/native CPU execution"})
-            print(standard+": "+str(total)+" clean original mask and unchanged V publisher assertions")
+            original_host_data=work/(standard+"-host-original-storage.o")
+            command(compiler+host_flags+["-c",str(work/"original-storage.c"),"-o",str(original_host_data)],
+                original_host_data.with_suffix(".log"))
+            variant_totals=[]
+            for variant in ("V","original-C"):
+                selected_objects=list(host_objects)
+                if variant=="original-C":selected_objects[3]=original_host_data
+                executable=work/(standard+"-"+variant+"-runtime")
+                command(compiler+["-fsanitize=address,undefined",*[str(p) for p in selected_objects],str(runner),
+                    "-pthread","-o",str(executable)],executable.with_suffix(".link.log"))
+                total=0
+                count_cases=(1,2,4,63,64,65,127,128,129,191,192,193,255,256,0,257,0xffffffff)
+                for count in count_cases:
+                    result=command([str(executable),str(count)],work/(standard+"-"+variant+"-count-"+str(count)+".log"),
+                        env={**os.environ,"UBSAN_OPTIONS":"halt_on_error=1",
+                            "ASAN_OPTIONS":"detect_stack_use_after_return=1"})
+                    match=re.fullmatch(r"PASS: (\d+) original mask/publisher assertions \(count="+str(count)+r"\)\n",result.stdout)
+                    if not match or result.stderr:
+                        raise AssertionError("Unclean original mask sanitizer execution")
+                    total+=int(match[1])
+                variant_totals.append(total)
+                runtime.append({"standard":standard,"storage_variant":variant,"assertions":total,
+                    "process_count":len(count_cases),"count_cases":list(count_cases),
+                    "executable_sha256":sha(executable),"actual_objects":{str(p):sha(p) for p in selected_objects},
+                    "scope":"Separate cold processes and joined immutable reader actors; no live reset/constructor races/native CPU execution"})
+                print(standard+" "+variant+": "+str(total)+" clean original mask and unchanged V publisher assertions")
+            if len(set(variant_totals))!=1:
+                raise AssertionError("Original-C/V storage assertion totals differ")
         if initial!={str(path):sha(path) for path in observed}:
             raise AssertionError("Owned source/profile changed during isolated validation")
         for item in proofs:
@@ -631,6 +715,10 @@ def run(keep_dir):
             "pinned_warning_policy_sha256":sha(work/"original-Makefile.extrawarn"),
             "v":str(v),"v_sha256":sha(v),"generation_argv":generation,"generated_c_sha256":sha(native_c),
             "actual_selected_body_sha256":{name:hashlib.sha256(body.encode()).hexdigest() for name,body in bodies.items()},
+            "original_storage_revision":ORIGINAL_STORAGE_REVISION,"original_storage_path":ORIGINAL_STORAGE_PATH,
+            "original_storage_sha256":hashlib.sha256(original_storage).hexdigest(),
+            "actual_storage_definitions":data_definitions,"host_storage_definitions":host_data_definitions,
+            "native_storage_cold_bytes":mutable_bytes,"producer_metadata_rejections":rejection_cases,
             "native_proofs":proofs,"runtime":runtime,
             "host_foreign_aliases":foreign,"host_cache_metadata_adapter_sha256":sha(host_include/"asm/cache.h"),
             "host_section_metadata_adapter_sha256":sha(host_include/"linux/compiler_attributes.h"),
