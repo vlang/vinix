@@ -292,9 +292,13 @@ if [ -d "$BUILD_DIR/wallpapers" ]; then
         "$BUILD_DIR/wallpapers"/SOURCES.txt \
         "$STAGING/usr/share/vinix/wallpapers/" 2>/dev/null || true
 fi
-cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
-    "$APP_SRC/app_icon_data.h" "$SCRIPT_DIR/desktop/README.md" \
-    "$STAGING/root/desktop/"
+(
+    # The V migration may leave no handwritten C sources to ship.
+    shopt -s nullglob
+    cp "$SCRIPT_DIR/desktop"/*.v "$SCRIPT_DIR/desktop"/*.c "$SCRIPT_DIR/desktop"/*.h \
+        "$APP_SRC/app_icon_data.h" "$SCRIPT_DIR/desktop/README.md" \
+        "$STAGING/root/desktop/"
+)
 
 INITRAMFS="$BUILD_DIR/initramfs-desktop.tar"
 INITRAMFS_TMP="$(mktemp "$BUILD_DIR/.initramfs-desktop.tar.XXXXXX")"
