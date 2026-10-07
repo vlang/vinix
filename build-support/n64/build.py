@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import runpy
 import shlex
 import shutil
 import subprocess
@@ -194,7 +195,6 @@ def main() -> None:
     values = dict(line.split("=", 1) for line in lines if "=" in line)
     files = [(source / name, False) for name in values["C_SOURCES"].split()]
     files += [(source / name, True) for name in values["CXX_SOURCES"].split()]
-    files += [(SUPPORT / "bridge.c", False)]
     zlib_archive, zlib_source = output / "zlib-source.tar.gz", output / "zlib-source"
     fetch(zlib_archive, ZLIB_URL, ZLIB_SHA256)
     zlib_stamp = zlib_source / ".vinix-source"
@@ -251,6 +251,25 @@ def main() -> None:
         log.write_text(str(error))
         raise
     log.write_bytes(b"".join(data for _, data in results))
+    # First-party bridge algorithms are maintained in V. Its generated C is
+    # a disposable build artifact; assembly captures native variadic registers.
+    bridge = SUPPORT / "bridgecore"
+    generated = output / "bridge.generated.c"
+    generate = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
+    host_arm64 = os.uname().machine in ("arm64", "aarch64")
+    generate(bridge, generated, "arm64" if not args.host or host_arm64 else "amd64")
+    bridge_flags = shlex.split(values["C_FLAGS"])
+    bridge_flags = [flag for flag in bridge_flags if flag != "-MMD" and not flag.startswith("-DGIT_VERSION=")]
+    bridge_flags += [flag for flag in common if flag != "-Wno-everything"]
+    bridge_flags += ["-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-parameter",
+                     f"-I{bridge}"]
+    bridge_object, abi_object = obj / "bridge-v.o", obj / "bridge-abi.o"
+    subprocess.run([str(llvm / "clang")] + bridge_flags + ["-c", str(generated), "-o", str(bridge_object)],
+                   cwd=source, check=True)
+    abi_flags = [] if args.host else ["--target=aarch64-linux-musl", f"--sysroot={sysroot}"]
+    subprocess.run([str(llvm / "clang")] + abi_flags + ["-c", str(bridge / "varargs.S"), "-o", str(abi_object)],
+                   check=True)
+    results += [(bridge_object, b""), (abi_object, b"")]
     library = output / "libvinix_n64.a"
     temporary = output / "libvinix_n64.new.a"
     temporary.unlink(missing_ok=True)
@@ -272,7 +291,8 @@ def main() -> None:
         if directory.exists():
             shutil.copytree(directory, corresponding / relative, dirs_exist_ok=True,
                             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for name in ("build-n64-aarch64.sh", "build-support/find-v.sh", "build-support/aarch64-cc-shim"):
+    for name in ("build-n64-aarch64.sh", "build-support/find-v.sh", "build-support/compile-v-module.py",
+                 "build-support/aarch64-cc-shim"):
         relative = Path(name) if name.startswith("build-support/") else Path("scripts") / name
         original = ROOT / relative
         if original.is_dir():

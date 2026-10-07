@@ -13,6 +13,46 @@ Run `python3 build-support/n64/build.py` for ARM64 musl; the app builder is
 `scripts/build-n64-aarch64.sh`. `--host --output=build/n64-host` builds an
 archive suitable for a native host smoke test.
 
+The first-party adapter is maintained in `bridgecore/core.v`. Its public
+callbacks retain the native const-qualified libretro types, and its native
+header contains declarations and ABI assertions. `varargs.S` captures the
+complete native integer, floating-point and overflow-stack argument cursor
+for the logging callback; the V entry filters severity and calls libc's
+formatter synchronously. Generated C stays in the build directory. The
+bridge object builds with `-Wall -Wextra -Werror`, with exceptions for unused
+compiler-generated functions and parameters.
+
+The independent original is frozen at
+`b01fdc9f8e88d0075eb580560a3b50b130f26242:build-support/n64/bridge.c`, blob
+`f19daaf248feb3728d8f02e284ba28c81220e243`, SHA256
+`2400ac12452d0fbb8e94606a28cdcc09771226435f33ab2b3f37daffa45316dc`.
+Recover it outside the maintained checkout for comparisons. Of its 370
+source lines, 366 belong to the V replacement; original lines 63, 66, 67 and
+69 belong to the native variadic boundary and receive no V migration credit.
+Strict ARM64 and genuine x86 musl SDK objects preserve the original core
+size and every field offset. Emulator execution is validated on ARM64;
+the x86 object build establishes no native x86 emulator result.
+
+Paired original/V ARM64 Vinix guests pass all ten feature checks and the
+optional homebrew run, with all nine metrics and three complete frames
+identical. Paired desktop guests pass actual pointer input, pause/resume and
+close; paired native boundary guests pass mixed integer/FP arguments including
+register overflow, borrowed callbacks, saves and reset/reload. Darwin ARM64
+original/V bridge and fixture ASan/UBSan runs also pass. Those sanitizer runs
+leave the upstream archive uninstrumented and disable leak detection.
+
+After building a host archive, run the V boundary fixture with:
+
+```sh
+python3 build-support/n64/test-bridge.py --rom build/n64/homebrew/paddle.z64
+```
+
+It checks native mixed variadic arguments, borrowed callback addresses,
+audio-rate rounding, invalid handles, singleton ownership and clean teardown.
+The optional ROM also exercises real frames, failed replacement, saves and
+repeated reset/reload. `--archive` selects an independently built comparison
+archive. Save writes go into the test's temporary directory.
+
 The adapter permits one core per process because upstream hardware and
 libretro state are global. It owns paths and the core lifecycle, validates
 complete cartridge headers before replacing content, converts `.z64`, `.v64`
