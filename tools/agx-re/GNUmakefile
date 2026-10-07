@@ -67,10 +67,10 @@ recover-g17-abi: firmware kernel-kexts
 # The 13.5 firmware ABI layout, computed from m1n1's versioned definitions.
 # Needs the m1n1 checkout: git clone https://github.com/AsahiLinux/m1n1 ~/code/3rd/m1n1
 generate-g13-initdata-layout:
-	./generate_g13_initdata_layout.py
+	./generate_g13_initdata_layout
 
 check-g13-initdata-layout:
-	./generate_g13_initdata_layout.py --check
+	./generate_g13_initdata_layout --check
 
 # Compare the contracts that have caused hardware-only failures against the
 # reverse-engineered m1n1 source. Set ASAHI_LINUX to include its MMU ordering.
@@ -78,7 +78,7 @@ check-g13-reference: check-g13-initdata-layout
 	./check_g13_reference_contract.py $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
 
 report-g13-initdata-layout:
-	./generate_g13_initdata_layout.py --report
+	./generate_g13_initdata_layout --report
 
 generate-g17-power-model:
 	./generate_g17_power_model.py
@@ -97,13 +97,11 @@ test:
 		test_extract_pmp_firmware.py test_extract_fileset.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
 		test_check_g13_reference_contract.py \
-		test_generate_g13_initdata_layout.py \
 		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
 		test_generate_fake_g17_3d_encoder.py \
-		test_compile_fake_g17_plan.py \
-		test_map_g17_resource_descriptors.py \
-		test_trace_diff.py
+		test_compile_fake_g17_plan.py
+	. ../../build-support/find-v.sh; "$$V" test g13layout traceanalysis
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
@@ -114,7 +112,7 @@ trace: all
 		AGX_TRACE_BYTES=16384 \
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle pair
-	./trace_diff.py $(BUILD)/agx_trace.jsonl
+	./trace_diff $(BUILD)/agx_trace.jsonl
 
 trace-resources: all
 	rm -f $(BUILD)/agx_trace_resources.jsonl
@@ -123,7 +121,7 @@ trace-resources: all
 		AGX_TRACE_RESOURCES=1 \
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle pair
-	./trace_diff.py $(BUILD)/agx_trace_resources.jsonl
+	./trace_diff $(BUILD)/agx_trace_resources.jsonl
 
 trace-depth-resources: all
 	rm -f $(BUILD)/agx_trace_depth_resources.jsonl
@@ -132,7 +130,7 @@ trace-depth-resources: all
 		AGX_TRACE_RESOURCES=1 \
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle depth-pair
-	./trace_diff.py $(BUILD)/agx_trace_depth_resources.jsonl \
+	./trace_diff $(BUILD)/agx_trace_depth_resources.jsonl \
 		--left depth-clear --right depth-triangle
 
 trace-stencil-resources: all
@@ -142,7 +140,7 @@ trace-stencil-resources: all
 		AGX_TRACE_RESOURCES=1 \
 		DYLD_INSERT_LIBRARIES=$(CURDIR)/$(BUILD)/agx_trace.dylib \
 		$(CURDIR)/$(BUILD)/metal_triangle stencil-pair
-	./trace_diff.py $(BUILD)/agx_trace_stencil_resources.jsonl \
+	./trace_diff $(BUILD)/agx_trace_stencil_resources.jsonl \
 		--left stencil-clear --right stencil-triangle
 
 clean:

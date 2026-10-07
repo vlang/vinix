@@ -79,7 +79,11 @@ combined `Depth32Float_Stencil8` target and enable stencil replacement, keeping
 the stencil recovery artifact separate from both color-only and depth-only
 captures.
 
-`trace_diff.py` defaults to comparing the clear and triangle command segments.
+The native V tools use the compiler selected by `build-support/find-v.sh`.
+Their shell launchers compile into a temporary directory and preserve the
+caller’s arguments and working directory. `make test` includes their V tests.
+
+`trace_diff` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
 primary-extension framing recovered from
 `AGXHardwareKernelCommand::parseAndValidate`, and reports the gates and byte
@@ -89,17 +93,17 @@ the two parser cursors.
 It can also select a shared allocation by an observed JSON field:
 
 ```sh
-./trace_diff.py build/agx_trace_resources.jsonl \
+./trace_diff build/agx_trace_resources.jsonl \
   --event resource_snapshot \
   --where resource_gpu_address=0x10000138000
 ```
 
-`map_g17_resource_descriptors.py` propagates resource-valued qwords observed
+`map_g17_resource_descriptors` propagates resource-valued qwords observed
 in the private Apple render payload through the independently recovered TA and
 3D-common copy maps:
 
 ```sh
-./map_g17_resource_descriptors.py build/agx_trace_resources.jsonl \
+./map_g17_resource_descriptors build/agx_trace_resources.jsonl \
   --abi build/recovered-g17-abi.json
 ```
 
