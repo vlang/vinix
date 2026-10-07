@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `583b0b621edd4760d9a57dc1b76e6f55e9de33c2`,
+at source commit `9a70678887e1188926d6c8eacfc6b8f1432438f6`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,873,860 | 4.51% |
-| Python | 523 | 5,206,276 | 12.52% |
-| Shell | 287 | 1,279,545 | 3.08% |
+| C | 491 | 1,863,972 | 4.48% |
+| Python | 523 | 5,206,285 | 12.51% |
+| Shell | 287 | 1,283,861 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 72.68%, with no
+All `.v` files are classified as V. The resulting V share is 72.71%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 583b0b621edd4760d9a57dc1b76e6f55e9de33c2 --breakdown --json
+github-linguist --rev 9a70678887e1188926d6c8eacfc6b8f1432438f6 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -496,8 +496,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/scheduler-preemption/guest.c` | 5,391 |
 | `tests/securelevel-boot/guest.c` | 15,666 |
 | `tests/securelevel/securefixture/native-abi.h` | 1,832 |
-| `tests/security-audit/collector_test.c` | 8,900 |
-| `tests/security-audit/collector_vm_test.c` | 5,103 |
+| `tests/security-audit/collectorguestfixture/native-abi.h` | 2,380 |
+| `tests/security-audit/collectorhostfixture/native-abi.h` | 1,735 |
 | `tests/security-audit/test.c` | 7,865 |
 | `tests/security-mac/clifixture/native-abi.h` | 1,134 |
 | `tests/security-mac/guestfixture/native-abi.h` | 2,925 |
@@ -852,7 +852,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
-| `tests/kernel-gaps/run.py` | 12,485 |
+| `tests/kernel-gaps/run.py` | 12,494 |
 | `tests/kernel-gaps/test_runner.py` | 4,085 |
 | `tests/kernel-job-control/run.py` | 5,293 |
 | `tests/kernel-link-layout/check.py` | 2,215 |
@@ -1328,7 +1328,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
-| `tests/security-audit/collector-run.sh` | 1,285 |
+| `tests/security-audit/collector-run.sh` | 5,601 |
 | `tests/security-mac/host-run.sh` | 4,937 |
 | `tests/security-mac/run.sh` | 952 |
 | `tests/security-policy/run.sh` | 2,109 |

@@ -2,7 +2,7 @@
 
 Updated 2026-10-07 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`583b0b621edd4760d9a57dc1b76e6f55e9de33c2`. Re-read HEAD, `AGENTS.md` and
+`9a70678887e1188926d6c8eacfc6b8f1432438f6`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **4,209 original production C lines**, **20,550 original fixture/benchmark
+continuation adds **4,209 original production C lines**, **20,884 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel, eight
 Wi-Fi tool lines),
 counted separately. Forty-three stack-pointer/syscall/variadic/ordering boundary lines use
@@ -147,6 +147,7 @@ Two PCI native TLS storage declaration lines receive zero algorithm credit too.
 | Application sandbox native enforcement fixture (129) | `464e5ad3` |
 | MAC native policy regression fixture (661) | `f9ca26a2` |
 | Terminal-job-control native fixture (568) | `583b0b62` |
+| Audit-collector host/native fixtures (334) | `9a706788` |
 | MAC process-group denial ordering (zero port credit) | `13c5160a` |
 | Terminal fixture orphan-signal readiness (zero port credit) | `66513801` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
@@ -159,8 +160,8 @@ Two PCI native TLS storage declaration lines receive zero algorithm credit too.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 139 paths / 34,811
-lines: 138 test paths / 34,460 lines and one build-support path / 351 lines.
+source, the committed non-vendored `.c` census contains 137 paths / 34,477
+lines: 136 test paths / 34,126 lines and one build-support path / 351 lines.
 All committed identities/sizes/lines are verified using pinned-source Git
 attributes with global/system attributes disabled. Genuine patched musl evidence
 and the first-party PS2 bridge remain included. This is a scope guide, not a translation tally; native headers and
@@ -806,6 +807,55 @@ records the already tested readiness fix.
 This scope adds no new kernel build, host syscall sanitizer or universal
 heap-retirement claim.
 
+The audit-collector fixtures (`9a706788`, 334 original C lines: 213 host,
+121 guest) preserve all 93 original assertion sites, their predicates, diagnostic
+labels, original line numbers and order. Fixed collector/snapshot/output records
+and native `PATH_MAX` stack buffers retain synchronous borrowed lifetimes.
+Independent native type/layout measurements cover Darwin's 16-bit `mode_t`,
+musl's 32-bit `mode_t`, 32-bit C integers, LP64 syscall arguments, native
+`stat` records and four BPF instructions. Variadic open modes retain the
+original promoted C `int` type; optimized objects have no implicit V allocator
+imports. Declaration-only headers contain no relocated implementation bodies.
+
+Canonical C and the maintained V host runner pass actual ARM and Rosetta x86
+ASan/UBSan controls, including all seven malformed parser rows, snapshot copying,
+ring eviction/loss/reset and file permission/link/symlink/FIFO/locking cleanup.
+The installed production collector also passes the original non-root denial.
+Strict native C/V SDK links pass on both architectures; V uses the maintained
+kernel-gaps source-map route. Fresh C and V QEMU controls all pass every original
+phase and final marker with the unchanged 180-second deadline, 1,024 MiB and
+network enabled: ARM uses four CPUs/HVF, x86 two CPUs/TCG. The workload still
+creates 200 LOG events, retains exactly 128 decisions and checks loss of IDs
+1–72. It preserves distinct 32-byte session IDs, log permission/rotation checks
+and child namespace behavior: actual snapshot reads and log opening succeed,
+the production CLI denies non-initial-namespace root, and the parent's exact
+log-size equality proves that denial appended nothing.
+
+Independent source/ABI/whole-body lifetime gate:
+`security-audit-collector-stage-20261007/peer-source-native-v3/peer-source-native-lifetime-launch-v3.json`
+(SHA256 `9882994e9a3186272ce98ca2661fcdc0cbbf1b38c1d7a9764dc4605888cb33f0`).
+Root and independent review extract the actual kernels and native init ELFs
+from all four boot images, check both ordered ARM init archives, and compare
+every original x86 raw USTAR header and padded body with its sole 17-byte
+image-ID addition. Root gate: `root-all4-native-images-v2.json`
+(SHA256 `d47237e3d6298fac35d42d8f30f875b8d0482d9cf441524bb0a7f6fb4c0e8efe`);
+independent gate: `peer-all4-native-images-v1.json`
+(SHA256 `67dfd6882be31fb7880d57e52d1758b35f91304a20bca6193028871d69b94766`).
+All these collector receipts are in `security-audit-collector-stage-20261007/`.
+
+Both original C files remained until those gates and are byte-exact recoverable
+from `583b0b62` and the retirement parent `d9acdb4f`. Only nine owned port
+paths were committed. `post-retirement-source-qualification-v1.json`
+(SHA256 `801e6319de4a9615383c70bee2848745e76c6b7f0abaa114df77a6ace30be5c2`)
+and independent `peer-postretirement-v1.json`
+(SHA256 `5c2b3771b669bfb1a0a17296c2e5efea4bd68db9b7eb595abafb45cb01353fc8`)
+verify all seven retained committed blobs match the tested source. Preliminary
+strict char-pointer compile failures and superseded ABI captures remain
+preserved; no original native control failed and no assertion or deadline was
+changed. The production audit core and kernel tree remain unchanged. This
+scope reuses the qualified kernels from `13c5160a` and adds no new kernel
+build, guest sanitizer, whole-heap or physical-hardware claim.
+
 The portable benchmark (`5b37c952`) passed all 272 original-C/V host sanitizer
 cases, four native musl guests and genuine guest GCC 14.2.0 compilation through
 its maintained Vinix runner. All six workloads, failure cleanup and checksum
@@ -931,6 +981,15 @@ candidate qualification is retained on disk in
 is `completed-ext2-sparse-full-disk-qualification-preservation.json` (SHA256
 `c7781c7b089b594bd85595968c700052730270d8e919e753bd2a5cf5f736f665`).
 
+The two selected, completed ARM terminal C/V EFI images were also preserved
+as lossless gzip streams after full byte-equal comparisons and durable
+pre-unlink receipts. Independent fresh decompression verifies both original
+64 MiB hashes: `docs-final-peer-terminal-readiness-EFI-stream-verification.json`
+(SHA256 `6bcbc3a1cc485a296595bd10f50bab93aa63e705aecc002d69bba296539671fb`).
+Restore their exact raw paths before replaying older terminal manifests.
+The actual boot/root disks remain raw; all five failed or unqualified terminal
+states remain intact. This storage operation adds no test or translation credit.
+
 | Additional lossless image receipt under the current cache | SHA256 |
 | --- | --- |
 | `completed-pci-sandbox-efi-lossless-compression.json` | `292984a317ff79c3bfd3e911e30a5cb1d293ea776123ceac426fea5155370271` |
@@ -947,6 +1006,7 @@ is `completed-ext2-sparse-full-disk-qualification-preservation.json` (SHA256
 | `completed-MAC-kernel-terminal-baseline-efi-lossless-compression.json` | `3ece8bd828720bd36726a96d8c0cc0fffc0bce439b32b362607cd9622d21ac94` |
 | `completed-ELF-PS2-supplemental-efi-lossless-compression.json` | `5f715badd372843b04fa439be039d75c154b9afccccb0b287e524412503dce04` |
 | `completed-ext2-sparse-full-disk-lossless-compression.json` | `57bac4340a39bdc9a2148dd9dfeb9e0bb1c6b65ee8791771fc186c3e99282d89` |
+| `completed-terminal-readiness-EFI-lossless-compression.json` | `9eaf949dfd974c79c0c1d119bb24fb34c4fddd5c42cc434c728e035ea022e76d` |
 
 Current local cache:
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`.
@@ -1196,9 +1256,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`583b0b621edd4760d9a57dc1b76e6f55e9de33c2` reports **V 72.68%, C 4.51%**,
+`9a70678887e1188926d6c8eacfc6b8f1432438f6` reports **V 72.71%, C 4.48%**,
 491 C files, 523 Python files and 287 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,751 classified blobs
+committed blob size and pinned reproduction command. All 2,753 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.
