@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `8828abbeb4497d76998d477cf5402c6c7c4cf70b`,
+at source commit `5e1e3f3fc0f316ff136774faaeb2c23039a60d0b`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,863,972 | 4.48% |
-| Python | 512 | 5,048,421 | 12.13% |
-| Shell | 293 | 1,285,495 | 3.09% |
+| C | 491 | 1,863,972 | 4.47% |
+| Python | 506 | 4,894,781 | 11.74% |
+| Shell | 298 | 1,286,939 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 73.09%, with no
+All `.v` files are classified as V. The resulting V share is 73.49%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 8828abbeb4497d76998d477cf5402c6c7c4cf70b --breakdown --json
+github-linguist --rev 5e1e3f3fc0f316ff136774faaeb2c23039a60d0b --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -646,7 +646,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run_vm.py` | 10,384 |
 | `tests/agx-trace/run.py` | 10,891 |
 | `tests/alloc-bench/build-macos-kext.py` | 6,112 |
-| `tests/alloc-bench/compare-kernel.py` | 11,492 |
 | `tests/alloc-bench/compile-v-bench.py` | 2,110 |
 | `tests/alloc-bench/compile-v-kmod-info.py` | 3,828 |
 | `tests/alloc-bench/compile-v-sampler.py` | 2,480 |
@@ -732,10 +731,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-x86-driver.py` | 469 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run.py` | 8,275 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize.py` | 7,668 |
-| `tests/alloc-bench/run-kernel-vinix.py` | 6,927 |
+| `tests/alloc-bench/run-kernel-vinix.py` | 6,993 |
 | `tests/alloc-bench/run-macos.py` | 7,482 |
 | `tests/alloc-bench/run-vinix.py` | 9,619 |
-| `tests/alloc-bench/test_compare_kernel.py` | 13,510 |
 | `tests/alloc-bench/test_kmod_info.py` | 4,484 |
 | `tests/alloc-bench/test_v_bench.py` | 10,787 |
 | `tests/alloc-bench/test_v_sampler.py` | 7,089 |
@@ -872,16 +870,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
 | `tests/linuxkpi/compile-v-host.py` | 1,765 |
 | `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
-| `tests/linuxkpi/cpu_mask_test.py` | 43,864 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/fpu_header_test.py` | 4,937 |
 | `tests/linuxkpi/host_suite.py` | 5,431 |
-| `tests/linuxkpi/irq_context_test.py` | 25,527 |
 | `tests/linuxkpi/nocache_test.py` | 26,985 |
 | `tests/linuxkpi/overflow_test.py` | 12,342 |
 | `tests/linuxkpi/overflow_type_test.py` | 13,758 |
-| `tests/linuxkpi/pagefault_test.py` | 22,314 |
 | `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
 | `tests/linuxkpi/scalar_store_test.py` | 21,614 |
@@ -1023,12 +1018,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tests/xnualloc/reference_test.py` | 15,234 |
 | `tests/xnualloc/zone_model_test.py` | 12,764 |
+| `tools/agx-re/_native_extract.py` | 5,379 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/compile_fake_g17_plan.py` | 49,765 |
 | `tools/agx-re/encode_fake_g17_3d.py` | 10,642 |
-| `tools/agx-re/extract_fileset.py` | 17,676 |
-| `tools/agx-re/extract_firmware.py` | 10,355 |
-| `tools/agx-re/extract_pmp_firmware.py` | 5,414 |
+| `tools/agx-re/extract_fileset.py` | 2,339 |
+| `tools/agx-re/extract_firmware.py` | 1,432 |
+| `tools/agx-re/extract_pmp_firmware.py` | 949 |
 | `tools/agx-re/generate_fake_g17_3d_encoder.py` | 33,570 |
 | `tools/agx-re/generate_g17_power_model.py` | 13,910 |
 | `tools/agx-re/inspect_macos.py` | 33,150 |
@@ -1036,9 +1032,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/recover_t6050_power.py` | 220,154 |
 | `tools/agx-re/recover_t8103_adt.py` | 19,033 |
 | `tools/agx-re/test_compile_fake_g17_plan.py` | 23,825 |
-| `tools/agx-re/test_extract_fileset.py` | 7,035 |
-| `tools/agx-re/test_extract_firmware.py` | 3,431 |
-| `tools/agx-re/test_extract_pmp_firmware.py` | 3,399 |
+| `tools/agx-re/test_extract_firmware.py` | 212 |
 | `tools/agx-re/test_generate_fake_g17_3d_encoder.py` | 2,294 |
 | `tools/agx-re/test_generate_g17_power_model.py` | 3,426 |
 | `tools/agx-re/test_inspect_macos.py` | 21,643 |
@@ -1097,7 +1091,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/qemu-system/vinix-qemu-desktop` | 851 |
 | `build-support/roblox/run-roblox` | 1,318 |
 | `build-support/roblox/run-roblox-client` | 182 |
-| `build-support/run-v-tool.sh` | 803 |
+| `build-support/run-v-tool.sh` | 1,449 |
 | `build-support/security-audit/run-collector` | 396 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
@@ -1221,11 +1215,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-t8103-opp/run.sh` | 791 |
 | `tests/agx-vm/run.sh` | 159 |
 | `tests/alloc-bench/compare` | 141 |
+| `tests/alloc-bench/compare-kernel` | 148 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
+| `tests/alloc-bench/validate-kernel` | 161 |
 | `tests/android/guest-init.sh` | 25,551 |
 | `tests/android/run-activity-dispatch-test.sh` | 1,212 |
 | `tests/android/run-cookie-store-test.sh` | 1,299 |
@@ -1352,6 +1348,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x86-translation/smoke.sh` | 657 |
 | `tests/zsh/smoke.sh` | 561 |
 | `tools/agx-re/check_g13_reference_contract` | 180 |
+| `tools/agx-re/extract_fileset` | 161 |
+| `tools/agx-re/extract_firmware` | 162 |
+| `tools/agx-re/extract_pmp_firmware` | 166 |
 | `tools/agx-re/generate_g13_initdata_layout` | 180 |
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
 | `tools/agx-re/trace_diff` | 156 |
