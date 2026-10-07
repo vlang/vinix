@@ -8,6 +8,7 @@ import contextlib
 import importlib.util
 import os
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
@@ -54,6 +55,8 @@ def main() -> int:
     parser.add_argument("--no-build", action="store_true", help="reuse the PS2 staging directory")
     parser.add_argument("--game", type=Path, help="also boot a user-provided PS2 executable or disc")
     parser.add_argument("--bios", type=Path, help="stage a user-provided PS2 BIOS dump")
+    parser.add_argument("--prebuilt-init", type=Path,
+                        help="boot an existing guest fixture for an explicit native comparison")
     parser.add_argument("--timeout", type=int, default=600)
     parser.add_argument("--log", type=Path, help="retain the VM transcript (default: build/ps2/qemu.log)")
     arguments = parser.parse_args()
@@ -63,6 +66,8 @@ def main() -> int:
         parser.error("--game must name an existing file")
     if arguments.bios is not None and not arguments.bios.is_file():
         parser.error("--bios must name an existing file")
+    if arguments.prebuilt_init is not None and not arguments.prebuilt_init.is_file():
+        parser.error("--prebuilt-init must name an existing guest executable")
     build = Path(os.environ.get("VINIX_PS2_BUILD_DIR", ROOT / "build/ps2")).resolve()
     if not arguments.no_build:
         subprocess.run(["bash", str(ROOT / "scripts/build-ps2-aarch64.sh")], check=True)
@@ -99,12 +104,18 @@ def main() -> int:
             guest_game = Path("opt/ps2/game") / arguments.game.name
             stage_game(arguments.game, rootfs / guest_game)
             (rootfs / "opt/ps2/game-path").write_text("/" + str(guest_game) + "\n")
-        subprocess.run([
-            os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
-            "-static", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-            str(ROOT / "tests/ps2/guest.c"), f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
-            "-o", str(work / "init"),
-        ], check=True)
+        if arguments.prebuilt_init is not None:
+            shutil.copy2(arguments.prebuilt_init, work / "init")
+        else:
+            compile_flags = [
+                os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
+                "-static", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
+                "-D_GNU_SOURCE", "-fno-strict-aliasing", f"-L{sysroot / 'lib'}", "-fuse-ld=lld",
+            ]
+            helper = runpy.run_path(str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"))
+            fixture = helper["compile_module"](ROOT / "tests/ps2/guestfixture", work / "fixture.o",
+                                               "aarch64", compile_flags)
+            subprocess.run(compile_flags + [str(fixture), "-o", str(work / "init")], check=True)
         archive = work / "initramfs.tar"
         subprocess.run(["tar", "--format=ustar", "-cf", str(archive), "-C", str(rootfs), "."],
                        env={**os.environ, "COPYFILE_DISABLE": "1"}, check=True)
