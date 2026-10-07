@@ -110,6 +110,7 @@ pub fn env_default(name string, fallback string) string {
 // prevent the other from being read. The timeout uses a monotonic clock.
 // kill(2) leaves Process running until wait() reaps it; signal_kill() marks it
 // aborted before wait(), which would leave a timed-out child unreaped.
+// A negative timeout retains an original command's lack of a deadline.
 pub fn capture(argv []string, log string, timeout int, env map[string]string) !Result {
 	if argv.len == 0 {
 		return error('Empty command')
@@ -133,7 +134,7 @@ pub fn capture(argv []string, log string, timeout int, env map[string]string) !R
 		if !child.is_alive() {
 			break
 		}
-		if time.sys_mono_now() - started >= u64(timeout) * u64(time.second) {
+		if timeout >= 0 && time.sys_mono_now() - started >= u64(timeout) * u64(time.second) {
 			unsafe { C.kill(i32(child.pid), 9) }
 			child.wait()
 			timed_out = true
