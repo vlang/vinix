@@ -88,6 +88,7 @@ __global (
 	neutral      [pixels]u32
 	child        i32
 	frame_count  u32
+	face_icons   u32
 )
 
 fn print_log() {
@@ -191,21 +192,47 @@ fn toolbar(name &char, x i32, y i32) {
 	pointer(2, x, y)
 }
 
+fn matches(offset usize, length usize, text &char) bool {
+	unsafe { return length == C.strlen(text) && C.memcmp(&bytes[offset], text, length) == 0 }
+}
+
 fn parse(start_offset usize, depth u32) usize {
 	unsafe {
 		mut offset := start_offset
 		if depth > 32 || offset + 274 > byte_count { fail(c'view element size') }
 		kind := bytes[offset]
+		mut status_label := false
+		mut face_button := u32(0)
 		offset += 274
 		for index := u32(0); index < 12; index++ {
 			if offset + 4 > byte_count { fail(c'view string boundary') }
 			length := usize(number(&bytes[offset]))
 			offset += 4
 			if length > byte_count - offset { fail(c'view string size') }
-			if kind == 2 && index == 3 {
+			if index == 0 {
+				status_label = kind == 2 && matches(offset, length, c'status')
+				if kind == 4 {
+					if matches(offset, length, c'ps2.cross') { face_button = 1 }
+					else if matches(offset, length, c'ps2.circle') { face_button = 2 }
+					else if matches(offset, length, c'ps2.square') { face_button = 4 }
+					else if matches(offset, length, c'ps2.triangle') { face_button = 8 }
+				}
+			}
+			if status_label && index == 3 {
 				if length >= sizeof(status_text) { fail(c'status label size') }
 				C.memcpy(&status_text[0], &bytes[offset], length)
 				status_text[length] = 0
+			}
+			if index == 4 {
+				mut icon := u32(0)
+				if matches(offset, length, c'builtin:ps_cross') { icon = 1 }
+				else if matches(offset, length, c'builtin:ps_circle') { icon = 2 }
+				else if matches(offset, length, c'builtin:ps_square') { icon = 4 }
+				else if matches(offset, length, c'builtin:ps_triangle') { icon = 8 }
+				if icon != 0 {
+					if face_button != icon { fail(c'PlayStation glyph is not its matching controller button') }
+					face_icons |= icon
+				}
 			}
 			prefix := &char(c'vinix-surface:')
 			// sizeof the original NUL-terminated prefix minus its terminator.
@@ -314,7 +341,9 @@ fn start(game &char) {
 		reply()
 		command(1, c'')
 		surface_path[0] = 0
+		face_icons = 0
 		if parse(0, 0) != byte_count || surface_path[0] == 0 { fail(c'shared surface view missing') }
+		if face_icons != 15 { fail(c'PlayStation controller glyphs missing from native view') }
 		fd := C.open(&surface_path[0], C.O_RDWR)
 		mut info := C.stat{}
 		if fd < 0 || C.fstat(fd, &info) != 0 || info.st_size != surface_bytes { fail(c'surface file size') }
@@ -481,10 +510,10 @@ pub fn run() i32 {
 		snapshot(&neutral[0])
 		action(c'reset')
 		begin_paddle()
-		pointer(1, 348, 613)
+		pointer(1, 144, 614)
 		action(c'ps2.right')
 		ticks(12)
-		pointer(2, 348, 613)
+		pointer(2, 144, 614)
 		ticks(8)
 		snapshot(&last[0])
 		moved := changed(&neutral[0], &last[0])
@@ -493,14 +522,14 @@ pub fn run() i32 {
 		C.puts(c'PS2 PASS: controller input changes the emulated game')
 		export_frame(&last[0])
 
-		toolbar(c'ps2.pause', 184, 575)
+		toolbar(c'ps2.pause', 700, 538)
 		snapshot(&first[0])
 		action(c'open')
 		command(3, c'\x1b')
 		ticks(4)
 		snapshot(&last[0])
 		if changed(&first[0], &last[0]) != 0 { fail(c'emulation drew while paused') }
-		toolbar(c'ps2.pause', 184, 575)
+		toolbar(c'ps2.pause', 700, 538)
 		ticks(8)
 		snapshot(&last[0])
 		if changed(&first[0], &last[0]) < 16 { fail(c'emulation did not resume') }

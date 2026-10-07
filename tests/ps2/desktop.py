@@ -16,7 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 WIDTH, HEIGHT = 2048, 1536
 # The app's 800x680 content opens below the title bar at (120, 94).
-GAME_RECT = (167, 94, 706, 529)
+GAME_RECT = (176, 94, 688, 516)
 
 
 class QMP:
@@ -146,7 +146,7 @@ def main():
                 # boot protocol before controller input enters SIO2.
                 time.sleep(2)
                 title = capture("desktop-title.ppm")
-                qmp.click(120 + 547, 94 + 613)  # Start, on the app's joypad toolbar.
+                qmp.click(120 + 438, 94 + 606)  # Start, on the controller strip.
                 time.sleep(2)
                 playing = capture("desktop-gameplay.ppm")
                 if changed(title, playing) < 1000:
@@ -157,17 +157,17 @@ def main():
                 if animation < 16:
                     raise RuntimeError(f"desktop game did not animate; see {log_path}")
                 print(f"PS2 desktop: pointer input started gameplay; {animation} pixels animate", flush=True)
-                qmp.hold(120 + 348, 94 + 613, .8)  # Hold the real Right button.
+                qmp.hold(120 + 144, 94 + 614, .8)  # Hold the real Right button.
                 moved = capture("desktop-controller.ppm")
                 # Count only the lower court: animated ball/stars elsewhere
                 # cannot satisfy the paddle movement test.
-                row_start, row_end = 442, 478
+                row_start, row_end = round(GAME_RECT[3] * .835), round(GAME_RECT[3] * .905)
                 lower = slice(row_start * GAME_RECT[2] * 3, row_end * GAME_RECT[2] * 3)
                 movement = changed(animated[lower], moved[lower])
                 if movement < 500:
                     raise RuntimeError(f"desktop controller did not move the emulated paddle; see {log_path}")
                 print(f"PS2 desktop: pointer hold moves the PS2 paddle; {movement} court pixels changed", flush=True)
-                qmp.click(120 + 184, 94 + 575)  # Pause the native emulator.
+                qmp.click(120 + 700, 94 + 538)  # Pause the native emulator.
                 time.sleep(.7)
                 paused = capture("desktop-paused.ppm")
                 time.sleep(2)
@@ -175,8 +175,16 @@ def main():
                 if changed(paused, still):
                     raise RuntimeError(f"desktop pause did not freeze game pixels; see {log_path}")
                 print("PS2 desktop: pause freezes game pixels", flush=True)
-                qmp.click(120 + 184, 94 + 575)
+                qmp.click(120 + 700, 94 + 538)
                 time.sleep(2)
+                # Clear the toolbar hover before saving the final screenshot.
+                # Enter the app once so it receives the pointer move, then
+                # leave the window to keep the captured controls unobscured.
+                for x, y in ((130, 350), (1940, 1400)):
+                    qmp.call("input-send-event", {"events": [
+                        {"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / WIDTH)}},
+                        {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / HEIGHT)}}]})
+                    time.sleep(.2)
                 resumed = capture("desktop-gameplay.ppm")
                 if changed(paused, resumed) < 16:
                     raise RuntimeError(f"desktop resume did not animate; see {log_path}")

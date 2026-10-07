@@ -1274,6 +1274,9 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 		// String slicing owns its result in V's manual-free mode.
 		unsafe { name.free() }
 	}
+	if name.starts_with('ps_') && d.draw_controller_glyph(name, x, y, w, h, color) {
+		return
+	}
 	cx := x + w / 2
 	cy := y + h / 2
 	// The glyph box is a fixed fraction of the button so the three symbols

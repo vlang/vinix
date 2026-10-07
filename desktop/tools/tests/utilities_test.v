@@ -97,6 +97,78 @@ fn test_vinix_start_glyph_uses_the_wordmark_v_polygon() {
 	assert unsafe { canvas.pixels[24 * canvas.stride + 24] } == 0xffffff
 }
 
+fn test_controller_glyphs_keep_controller_shapes_colour_and_clear_surroundings() {
+	background := u32(0x141b28)
+	colour := u32(0x54b1ff)
+	for scale in [1, 2]! {
+		for size in [16, 34]! {
+			mut desktop := Desktop{ canvas: new_scaled_canvas(56, 56, 56 * scale, 56 * scale, scale) }
+			defer { unsafe { free(desktop.canvas.pixels) } }
+			mut hashes := [8]u32{}
+			for index, name in ['ps_cross', 'ps_circle', 'ps_square', 'ps_triangle',
+				'ps_select', 'ps_start', 'ps_pause', 'ps_reset']! {
+				desktop.canvas.clear(background)
+				assert desktop.draw_controller_glyph(name, 9, 11, size, size, colour)
+				mut painted := 0
+				mut solid := 0
+				mut hash := u32(2166136261)
+				for y in 0 .. 56 * scale {
+					for x in 0 .. 56 * scale {
+						pixel := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+						if x < 9 * scale || x >= (9 + size) * scale || y < 11 * scale
+							|| y >= (11 + size) * scale {
+							assert pixel == background
+						} else if pixel != background {
+							painted++
+							if pixel == colour { solid++ }
+						}
+						hash = (hash ^ pixel) * 16777619
+					}
+				}
+				assert painted > 8 * scale * scale
+				// Small circular outlines can cover only fractions of pixels;
+				// a larger or denser icon must reach the requested colour.
+				if size > 16 || scale > 1 { assert solid > 0 }
+				// All eight symbols must stay distinguishable at toolbar size;
+				// a missing glyph or shared fallback cannot pass this check.
+				for previous in 0 .. index { assert hashes[previous] != hash }
+				hashes[index] = hash
+				center := unsafe { desktop.canvas.pixels[(11 + size / 2) * scale * desktop.canvas.stride +
+					(9 + size / 2) * scale] }
+				if name in ['ps_circle', 'ps_square', 'ps_triangle', 'ps_pause', 'ps_reset'] {
+					assert center == background
+				} else {
+					assert center == colour
+				}
+			}
+		}
+	}
+}
+
+fn test_controller_glyphs_obey_physical_clipping_and_leave_unknown_names_untouched() {
+	mut desktop := Desktop{ canvas: new_scaled_canvas(40, 40, 80, 80, 2) }
+	defer { unsafe { free(desktop.canvas.pixels) } }
+	desktop.canvas.clear(0x102030)
+	desktop.canvas.clip = Clip{ x: 17, y: 13, w: 4, h: 10 }
+	assert desktop.draw_controller_glyph('ps_cross', 8, 8, 24, 24, 0xf2a5cd)
+	mut painted := 0
+	for y in 0 .. 80 {
+		for x in 0 .. 80 {
+			pixel := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+			if x < 34 || x >= 42 || y < 26 || y >= 46 {
+				assert pixel == 0x102030
+			} else if pixel != 0x102030 { painted++ }
+		}
+	}
+	assert painted > 0
+	desktop.canvas.clear(0x102030)
+	assert !desktop.draw_controller_glyph('ps_unknown', 8, 8, 24, 24, 0xffffff)
+	assert desktop.draw_controller_glyph('ps_circle', 8, 8, 0, 24, 0xffffff)
+	for index in 0 .. 80 * 80 {
+		assert unsafe { desktop.canvas.pixels[index] } == 0x102030
+	}
+}
+
 fn test_wallpaper_copy_respects_canvas_clip() {
 	mut canvas := new_canvas(4, 3)
 	defer {

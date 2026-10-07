@@ -39,27 +39,33 @@ fn wire_number(bytes []u8, offset int) u32 {
 	return u32(bytes[offset]) | u32(bytes[offset + 1]) << 8 | u32(bytes[offset + 2]) << 16 | u32(bytes[offset + 3]) << 24
 }
 
+struct ElementStyle {
+	bg          u32 = 0x111824
+	radius      f64
+	color       u32 = 0xe1e7f0
+	size        f64 = 13
+	align       u8 = 1
+	bold        bool
+	transparent bool
+	tooltip     string
+}
+
 fn encode_element(mut bytes []u8, kind u8, x f64, y f64, width f64, height f64,
-	id string, text string, image string, children int) {
+	id string, text string, image string, children int, style ElementStyle) {
 	bytes << kind
-	bytes << u8(64 | if kind == 4 {
-		8
-	} else if kind == 2 {
-		1
-	} else {
-		0
-	})
-	bytes << u8(1) // centered text
+	bytes << u8(64 | if kind == 4 { 8 } else { 0 }
+		| if style.transparent { 1 } else { 0 } | if style.bold { 2 } else { 0 })
+	bytes << style.align
 	for _ in 0 .. 3 { bytes << u8(0) }
 	wire_u32(mut bytes, 0)
 	for value in [x, y, width, height]! { wire_f64(mut bytes, value) }
-	wire_u32(mut bytes, if kind == 4 { u32(0x344156) } else { u32(0x141b28) })
-	wire_f64(mut bytes, if kind == 4 { f64(5) } else { f64(0) })
+	wire_u32(mut bytes, style.bg)
+	wire_f64(mut bytes, style.radius)
 	wire_u32(mut bytes, 0)
 	for _ in 0 .. 4 { wire_f64(mut bytes, 0) }
-	wire_u32(mut bytes, 0xf5f7fa)
+	wire_u32(mut bytes, style.color)
 	wire_u32(mut bytes, 0)
-	wire_f64(mut bytes, 14)
+	wire_f64(mut bytes, style.size)
 	for _ in 0 .. 3 { wire_f64(mut bytes, 0) }
 	wire_u32(mut bytes, 1)
 	for _ in 0 .. 3 { wire_u32(mut bytes, 0) }
@@ -75,7 +81,8 @@ fn encode_element(mut bytes []u8, kind u8, x f64, y f64, width f64, height f64,
 	wire_string(mut bytes, '')
 	wire_string(mut bytes, text)
 	wire_string(mut bytes, image)
-	for _ in 0 .. 5 { wire_string(mut bytes, '') }
+	wire_string(mut bytes, style.tooltip)
+	for _ in 0 .. 4 { wire_string(mut bytes, '') }
 	wire_string(mut bytes, 'middle')
 	wire_string(mut bytes, '')
 	wire_u32(mut bytes, 0)

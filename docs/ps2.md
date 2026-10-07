@@ -43,9 +43,13 @@ desktop. The regression harness supplies those descriptors for isolated tests.
 | 1 / 3 | L2 / R2 |
 | P or Escape | Pause / Resume |
 
-On-screen buttons support pointer holds. **Pause** freezes emulation;
-**Reset** boots the current game again. Opening a path temporarily pauses the
-game; Escape cancels and restores the previous pause state.
+The on-screen controller uses the PlayStation's colored Cross, Circle,
+Square and Triangle symbols in their controller arrangement, with a D-pad,
+Select/Start and shoulder buttons. Hovering shows the keyboard shortcut;
+buttons highlight while held, and dragging away releases them. **Pause**
+freezes emulation; the circular-arrow **Reset** button boots the current game
+again. Opening a path temporarily pauses the game; Escape cancels and restores
+the previous pause state.
 
 ## BIOS, cards and compatibility
 
@@ -90,8 +94,9 @@ The desktop test accepts another compositor containing the PS2 catalog entry
 with `--desktop`. Development validation used an isolated build at
 `build/ps2/vinix-desktop`.
 
-Both regressions passed on ARM64 Vinix in QEMU on 2026-10-06. The guest produced
+Both regressions passed on ARM64 Vinix in QEMU on 2026-10-07. The guest produced
 eleven frame colors, 410 animated pixels, and 1,758 pixels changed by input at
-equal emulated ages. The desktop test verified real pointer input, paddle
+equal emulated ages and verified the controller's four symbol buttons. The
+desktop test verified real pointer input through the controller layout, paddle
 movement, pause/resume, and window close; its screenshot is above. BIOS-backed
 commercial games have not been validated in this port.

@@ -174,7 +174,7 @@ fn load_game(path string) ! {
 	emulator.pulse = 0
 	emulator.pulse_frames = 0
 	emulator.frames = 0
-	status := 'Playing ${name} — arrows/WASD to move, Enter to start'
+	status := 'Playing ${name}'
 	set_status(status)
 	unsafe { status.free() }
 	println('PS2: loaded ${emulator.game}')
