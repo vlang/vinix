@@ -75,7 +75,7 @@ check-g13-initdata-layout:
 # Compare the contracts that have caused hardware-only failures against the
 # reverse-engineered m1n1 source. Set ASAHI_LINUX to include its MMU ordering.
 check-g13-reference: check-g13-initdata-layout
-	./check_g13_reference_contract.py $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
+	./check_g13_reference_contract $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
 
 report-g13-initdata-layout:
 	./generate_g13_initdata_layout --report
@@ -96,12 +96,11 @@ test:
 	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
 		test_extract_pmp_firmware.py test_extract_fileset.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
-		test_check_g13_reference_contract.py \
 		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
 		test_generate_fake_g17_3d_encoder.py \
 		test_compile_fake_g17_plan.py
-	. ../../build-support/find-v.sh; "$$V" test g13layout traceanalysis
+	. ../../build-support/find-v.sh; "$$V" test g13layout g13contract traceanalysis
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
