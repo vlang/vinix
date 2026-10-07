@@ -2,7 +2,7 @@
 
 Updated 2026-10-07 in `/Users/alex/code/vinix` on macOS ARM64/zsh.
 The language snapshot below pins committed source
-`c411ab6a2ef22933e613924d76f1b4693c8b2006`. Re-read HEAD, `AGENTS.md` and
+`e51f3fc0ff792d1465ac3f06440663215d14433a`. Re-read HEAD, `AGENTS.md` and
 working-tree status: other sessions actively edit and commit this checkout.
 
 ## Current request
@@ -28,7 +28,7 @@ The preceding requested implementation batch completed **at least 10,191
 original C implementation lines** in 15 scopes. Its stage arithmetic, commits,
 full tests, measured residuals and limitations remain in
 [kernel-v-migration.md](kernel-v-migration.md). The current native-boundary
-continuation adds **3,844 original production C lines**, **17,990 original fixture/benchmark
+continuation adds **3,844 original production C lines**, **18,106 original fixture/benchmark
 lines** and **265 header implementation lines** (111 desktop, 146 kernel, eight
 Wi-Fi tool lines),
 counted separately. Twenty-nine stack-pointer/syscall/variadic/ordering boundary lines use
@@ -134,6 +134,7 @@ instruction-only assembly and receive no V algorithm credit.
 | Init-policy guest fixture (78) | `8fd0f13a` |
 | Init-policy syscall host fixture (178) | `b5245a13` |
 | Native PS2 emulator regression fixture (413) | `c411ab6a` |
+| Executable-text/native interpreter fixture (116) | `e51f3fc0` |
 | Native kmod descriptor (29 metadata lines, zero credit) | `ad0ba5d0` |
 | Canonical callback contracts (zero credit) | `03ad7bb3` |
 | Const string/log-record contracts (zero credit) | `e79802e4` |
@@ -144,8 +145,8 @@ instruction-only assembly and receive no V algorithm credit.
 `kernel/c/*.c` now has **zero maintained first-party files**, including
 fixtures. Public header algorithms and independent host/native fixtures still
 remain C. The instruction applies throughout the repository. At the pinned
-source, the committed non-vendored `.c` census contains 151 paths / 37,751
-lines: 148 test paths / 37,034 lines and three build-support paths / 717 lines.
+source, the committed non-vendored `.c` census contains 150 paths / 37,635
+lines: 147 test paths / 36,918 lines and three build-support paths / 717 lines.
 All committed identities/sizes/lines are verified using pinned-source Git
 attributes with global/system attributes disabled. Genuine patched musl evidence
 and first-party PS2 follow-up scopes remain included. This is a scope guide, not a translation tally; native headers and
@@ -436,6 +437,22 @@ remain. `ps2-v-fixture-stage/final-validation.json` records both lifetime peers
 and frozen inputs. The recorded kernel and emulator are reused; x86 evidence
 is SDK-only, with no new kernel build, host sanitizer or physical PS2 claim.
 PS2 bridge and homebrew implementations remain first-party follow-up scopes.
+
+The executable-text fixture (`e51f3fc0`, 116) retains all 26 original guards,
+errno checks, synchronous stack buffers/ELF records, file-backed volatile
+dynamic table and actual 16 KiB-aligned exported target wrapper. Native
+fork/exec children are reaped before checking their status. Strict original-C/V
+ARM LLVM and genuine x86 musl GCC static/real dynamic PIE links and all four
+native guests pass. Both original verdicts, strict SMAP/PAN and the 240-second
+deadline remain; actual guest ELFs, generated objects and serial objects match
+SDK artifacts byte for byte. Both production scanner host tests pass, with no
+implicit fixture allocator imports. Independent source/ABI/lifetime/evidence
+reviews are in `elf-text-fixture/final-validation.json` (SHA256
+`b4c78292c16eea9e9f61ac81158ec2745144bc021b3fdd6059ba8a4360d97f3a`).
+Qualified default kernels are reused with unchanged production source, with
+no fresh kernel build or sanitizer claim. Extracted x86 boot kernels/archive
+members match plus the normal image identity; ARM's cleaned boot disks limit
+its evidence to selected kernel hashes and copy/boot logs.
 
 The portable benchmark (`5b37c952`) passed all 272 original-C/V host sanitizer
 cases, four native musl guests and genuine guest GCC 14.2.0 compilation through
@@ -783,9 +800,9 @@ Inspect `git diff HEAD -- <owned paths>` before every exact-path commit. Plain
 staging, checkout-wide cleanup/reset, or unrelated desktop/build commits.
 
 Linguist 7.27.0 at committed source
-`c411ab6a2ef22933e613924d76f1b4693c8b2006` reports **V 72.41%, C 4.79%**,
+`e51f3fc0ff792d1465ac3f06440663215d14433a` reports **V 72.42%, C 4.79%**,
 488 C files, 523 Python files and 287 shell files. The inventory records every
-committed blob size and pinned reproduction command. All 2,727 classified blobs
+committed blob size and pinned reproduction command. All 2,728 classified blobs
 were verified against Git; no Verilog or vendored trees appear. The archive
 changes maintained source inventory but contributes no translation credit.
 `.gitattributes` remains unchanged, with own fixtures/headers counted honestly.

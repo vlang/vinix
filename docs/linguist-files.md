@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `c411ab6a2ef22933e613924d76f1b4693c8b2006`,
+at source commit `e51f3fc0ff792d1465ac3f06440663215d14433a`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 488 | 1,986,543 | 4.79% |
-| Python | 523 | 5,193,125 | 12.53% |
+| C | 488 | 1,983,718 | 4.79% |
+| Python | 523 | 5,193,674 | 12.53% |
 | Shell | 287 | 1,267,425 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 72.41%, with no
+All `.v` files are classified as V. The resulting V share is 72.42%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev c411ab6a2ef22933e613924d76f1b4693c8b2006 --breakdown --json
+github-linguist --rev e51f3fc0ff792d1465ac3f06440663215d14433a --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -356,7 +356,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/steam-smoke.c` | 4,979 |
 | `tests/dota2/wake-op.c` | 7,524 |
 | `tests/dumpability/dumpfixture/dump-native-abi.h` | 685 |
-| `tests/elf-text/guest.c` | 4,434 |
+| `tests/elf-text/textfixture/elf-text-native-abi.h` | 1,609 |
 | `tests/execute-only/guest.c` | 8,192 |
 | `tests/ext2-sparse/sparsefixture/sparse-native-abi.h` | 1,110 |
 | `tests/ext2-xattr/test.c` | 17,267 |
@@ -820,7 +820,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/vulkan-stage-test.py` | 18,459 |
 | `tests/dota2/wake-op-run.py` | 11,937 |
 | `tests/dumpability/run.py` | 3,975 |
-| `tests/elf-text/run.py` | 5,242 |
+| `tests/elf-text/run.py` | 5,791 |
 | `tests/execute-only/check-generated.py` | 9,911 |
 | `tests/execute-only/run.py` | 3,981 |
 | `tests/ext2-sparse/run.py` | 7,614 |
