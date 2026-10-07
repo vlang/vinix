@@ -39,13 +39,13 @@ inspect:
 	./inspect_macos.py
 
 firmware:
-	./extract_firmware.py
+	./extract_firmware
 
 pmp-firmware:
-	./extract_pmp_firmware.py
+	./extract_pmp_firmware
 
 kernel-kexts:
-	./extract_fileset.py
+	./extract_fileset
 
 recover-t6050-power: kernel-kexts pmp-firmware
 	./recover_t6050_power.py
@@ -53,7 +53,7 @@ recover-t6050-power: kernel-kexts pmp-firmware
 # The base-M1 GPU driver and DeviceTree ship on every Mac, staged under Preboot
 # for restore, so this needs no M1 to run.
 g13g-kexts:
-	./extract_fileset.py --platform mac13g --output build/kext/g13g \
+	./extract_fileset --platform mac13g --output build/kext/g13g \
 		--entry com.apple.AGXG13G --entry com.apple.AGXFirmwareKextG13GRTBuddy
 
 recover-t8103-adt: g13g-kexts
@@ -93,14 +93,13 @@ check-fake-g17-encoder:
 	./generate_fake_g17_3d_encoder.py --check
 
 test:
-	python3 -m unittest -v test_inspect_macos.py test_extract_firmware.py \
-		test_extract_pmp_firmware.py test_extract_fileset.py \
+	python3 -m unittest -v test_inspect_macos.py \
 		test_recover_t6050_power.py test_recover_t8103_adt.py \
 		test_recover_g17_abi.py \
 		test_generate_g17_power_model.py \
 		test_generate_fake_g17_3d_encoder.py \
 		test_compile_fake_g17_plan.py
-	. ../../build-support/find-v.sh; "$$V" test g13layout g13contract traceanalysis
+	. ../../build-support/find-v.sh; "$$V" test g13layout g13contract traceanalysis imageextract
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
