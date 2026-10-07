@@ -4,11 +4,13 @@
 from __future__ import annotations
 import argparse
 from pathlib import Path
+import runpy
 import shutil
 import struct
 import subprocess
 
 SOURCE = Path(__file__).resolve().parent
+ROOT = SOURCE.parents[1]
 
 
 def tool(name: str, directory: Path | None) -> str:
@@ -73,11 +75,22 @@ def main() -> None:
     flags = ["--target=mips-none-elf", "-march=mips3", "-mabi=32", "-mno-abicalls",
              "-fno-pic", "-G0", "-msoft-float", "-ffreestanding", "-fno-builtin",
              "-fno-stack-protector", "-O2", "-Wall", "-Wextra", "-Werror"]
-    for source in ("ipl3.S", "start.S", "paddle.c"):
-        subprocess.run([clang, *flags, "-c", str(SOURCE / source), "-o", str(output / (source + ".o"))], check=True)
-    for name, sources in (("ipl3", ("ipl3.S",)), ("game", ("start.S", "paddle.c"))):
+    for source in ("ipl3.S", "start.S", "paddlecore/mmio.S"):
+        target = output / (Path(source).name + ".o")
+        subprocess.run([clang, *flags, "-c", str(SOURCE / source), "-o", str(target)], check=True)
+    # V has no MIPS target. Its no-builtin C backend uses a 32-bit type model;
+    # actual o32 widths, big-endian data and instructions belong to LLVM MIPS.
+    # This module contains no architecture-selected V code or hosted runtime.
+    core = SOURCE / "paddlecore"
+    generated = output / "paddle.generated.c"
+    generate = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
+    generate(core, generated, "x86")
+    subprocess.run([clang, *flags, "-Wno-unused-function", "-Wno-unused-parameter",
+                    "-I" + str(core), "-I" + str(core / "freestanding"),
+                    "-c", str(generated), "-o", str(output / "paddle.v.o")], check=True)
+    for name, sources in (("ipl3", ("ipl3.S.o",)), ("game", ("start.S.o", "paddle.v.o", "mmio.S.o"))):
         subprocess.run([linker, "-m", "elf32btsmip", "-T", str(SOURCE / (name + ".ld")),
-                        *(str(output / (source + ".o")) for source in sources), "-o", str(output / (name + ".elf"))], check=True)
+                        *(str(output / source) for source in sources), "-o", str(output / (name + ".elf"))], check=True)
     rom = bytearray(0x100000)
     struct.pack_into(">IIII", rom, 0, 0x80371240, 0x0000000f, 0x80000400, 0x00000000)
     rom[0x20:0x34] = b"VINIX PADDLE".ljust(20, b" ")
