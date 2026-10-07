@@ -36,6 +36,7 @@ has the following results:
 | Separate failure-only x86 diagnostic | SIGKILL before routing operands were printed; cause unknown; no validation credit |
 | Fresh matched x86 original C on default kernel `a5ae7a96`, `qemu64`/TCG | Original first bound-CPU assertion; SIGABRT after 1,100.94 seconds |
 | Fresh matched x86 V on that same kernel and configuration | SIGKILL after 907.04 seconds; both required PASS markers absent |
+| Failure-only debugger on the untouched C ELF and same kernel | SIGKILL after 661.61 seconds; captured OOM kill route; diagnostic only |
 
 All original assertions, operation counts, deadlines, cleanup requirements and
 seven modes (`reversed`, `huge`, `clock-horizon`, `absolute-overflow`, `state`,
@@ -76,6 +77,33 @@ preprocessed inputs, patches and raw disassemblies are retained under
 `host-native-default-pair-20261007/original-C-failure-diagnostic`; its
 `native-run/validation.json` SHA256 is
 `0bc6a77924ed8d4b28362b9474c7afedb5e78d82a6447a7ec5f1f1f6b0cdc058`.
+
+A later failure-only debugger run used the untouched canonical original-C
+ELF `ee017269…` and the same verified `a5ae7a96…` kernel, qemu64 TCG,
+four CPUs, 1,024 MiB and the original 3,600-second maximum. It ended after
+661.61 seconds (08:41:22.446684–08:52:24.050962 UTC on 2026-10-07) with
+full-workload status 9. Four captured events establish the kernel OOM route
+for this run: page-fault memory recovery called `oom_kill`, which requested
+SIGKILL for PID 34932; delivery selected TID 34932, and that thread entered
+fatal process exit with encoded status 9. The current faulting worker was
+TID 57001 on CPU 2; fatal delivery ran on CPU 1. The victim's OOM flag was set,
+and the accepted-kill counter advanced from zero to one. Its CPU limits were
+infinite, with no CPU-limit kill, seccomp mode or parent-death signal active.
+
+This establishes the signal's origin for this debugger run only. It neither
+explains the earlier unknown-cause C/V SIGKILL or bound-CPU assertions nor
+qualifies the pending 8,929-line translation. The victim accounting was
+32.75390625 MiB, with 204 live threads and 1,844 free physical pages
+(7.203125 MiB); no heap/slab breakdown, reaper backlog or allocation time
+series was captured. The saved page-fault frame covered only its first
+40 bytes and did not include the faulting user PC. Both the initial debugger
+XML-parser failure and a later EOF while reading registers after QEMU shutdown
+are retained; all four complete event records were written before that EOF.
+The kernel, executable, all original assertions/counts/ownership and workload
+selection remain unchanged, but debugger pauses alter timing. Receipts live
+under `host-native-default-pair-20261007/kill9-provenance`, with
+`validation.json` SHA256
+`7be4df826c6de9eefb97076d7108d0350d1475404aa755642698725553a6dafd`.
 
 The commit review matched all 96 owned input hashes to the passing dual-host
 receipt and all 27 deleted Git blobs to the immutable original scope. Three

@@ -312,6 +312,31 @@ its timing changes are diagnostic only. Causes remain unknown. No internal
 establish the kill cause. Preserve `host-native-default-pair-20261007/paired-validation.json`
 and `host-native-default-pair-20261007/original-C-failure-diagnostic/native-run/validation.json`.
 
+A cache-only debugger run of the exact canonical original-C x86 ELF on the
+same default `a5ae7a96…` kernel ended after 661.61 seconds with SIGKILL.
+Four complete failure events establish an OOM kill for this run: the
+page-fault recovery stack called `oom_kill`, requested signal 9 for PID
+34932, delivered it to TID 34932 and reached fatal process exit. The accepted
+OOM counter advanced from zero to one; the process had infinite CPU limits,
+no CPU-limit kill, seccomp mode or parent-death signal. All original groups,
+seven boundary modes, assertions/counts/ownership and the 3,600-second maximum
+were selected unchanged. Debugger pauses make this diagnostic-only, with zero
+credit for the pending 8,929 lines; earlier C/V SIGKILL and bound-CPU failures
+retain their unknown causes. Exact events, raw frames, debugger errors and
+verified boot inputs are in `host-native-default-pair-20261007/kill9-provenance`
+(`validation.json` SHA256
+`7be4df826c6de9eefb97076d7108d0350d1475404aa755642698725553a6dafd`).
+
+The OOM trace does not establish why memory was exhausted. Victim accounting
+was 32.75390625 MiB with 204 live threads and 7.203125 MiB free physical pages;
+heap/slab ownership, retired-thread backlog and a time series were not captured.
+The actual saved fault frame covered only its first 40 bytes, excluding the
+faulting user PC. Continue with reviewed read-only baseline/failure allocation
+and reaper measurements on the immutable kernel and original workload, keeping
+assertions, limits and RAM fixed. Do not substitute stale saved scheduler PCs,
+ASan runs with leak detection disabled, source inspection or this diagnostic
+for qualified original-C/V native completion.
+
 The QEMU pending checkpoint (`909ae53d`) likewise retains zero credit for 270
 base/memory and 18 futex lines until complete native comparisons and integration.
 
