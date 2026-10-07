@@ -662,7 +662,7 @@ python3 tests/linuxkpi/user_access_scope_test.py
 python3 tests/linuxkpi/static_key_declaration_test.py
 python3 tests/linuxkpi/pgtable_type_test.py
 python3 tests/linuxkpi/pagefault_test.py
-python3 tests/linuxkpi/irq_context_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/irq_context.v
 python3 tests/linuxkpi/uaccess_test.py
 python3 tests/linuxkpi/bounds_generation_test.py
 python3 tests/linuxkpi/audit_generation_test.py
