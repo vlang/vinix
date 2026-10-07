@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 import time
 
@@ -82,10 +83,18 @@ def main():
     (rootfs / "sbin").mkdir(parents=True)
     for name in ["dev", "proc", "sys", "root"]:
         (rootfs / name).mkdir()
+    generated_init = state / "guest_init.c"
+    subprocess.run([sys.executable, str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"),
+                    str(generated_init), "--arch", "x86_64", "--module",
+                    str(ROOT / "tests/linuxkpi/initfixture")], check=True)
     subprocess.run([args.cc, "--target=x86_64-linux-musl", "-std=gnu11", "-O2",
                     "-nostdlib", "-ffreestanding", "-fno-stack-protector", "-fno-pie",
+                    "-Wno-unused-function", "-Wno-unused-parameter",
+                    "-I", str(ROOT / "kernel/c"),
+                    "-isystem", str(ROOT / "kernel/freestnd-c-hdrs"),
                     "-static", "-fuse-ld=lld", "-Wl,-e,_start", "-Wl,--build-id=none",
-                    str(ROOT / "tests/linuxkpi/guest_init.c"), "-o", str(rootfs / "sbin/init")], check=True)
+                    str(generated_init), str(ROOT / "tests/linuxkpi/initfixture/entry.S"),
+                    "-o", str(rootfs / "sbin/init")], check=True)
     initramfs = state / "initramfs.tar"
     with tarfile.open(initramfs, "w", format=tarfile.USTAR_FORMAT) as archive:
         archive.add(rootfs, arcname=".")

@@ -72,3 +72,18 @@ V=/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/toolchain-v/v 
 Native compilation alone does not complete the required original-C/V guest
 comparison. Keep the original failures, identical-image identities and equal
 comparison budgets when continuing that work.
+
+The separate native PID 1 is maintained in `initfixture/core_amd64.v`.
+`run_vm.py` generates its freestanding build artifact and links the
+instruction-only ELF entry in `initfixture/entry.S`, which supplies the native
+stack alignment. The immutable original is
+`2a5abc36175a5177828d86aad71667787eb68110:tests/linuxkpi/guest_init.c`
+(28 lines, SHA256 `eb6ad04b78a6bfee92a4c32fe3aa2ae26a1158de21cd379da2a70430610f06e9`).
+The port preserves eight 2,000,000-iteration volatile userspace intervals,
+the syscall registers/barriers, all 21 verdict bytes and the borrowed 16-byte
+nanosleep record. Strict freestanding and both genuine x86 musl compiler
+builds passed without allocator imports. Complete original-C/V controls
+passed all 42 markers and 19 exact memory equalities on the same recorded
+kernel; both default boots passed too. This x86 fixture adds no new ARM,
+host syscall sanitizer or production kernel-build claim. Local receipt:
+`linuxkpi-init-stage-validation.json` in the campaign cache above.
