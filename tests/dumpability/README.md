@@ -18,6 +18,11 @@ matching credentials emit zero. The guest checks these after real execs on both
 architectures. This closes the existing-credential secure-loader part of SEC4;
 executable set-ID and file-capability transitions remain separate work.
 
+The independent guest is maintained in `dumpfixture/core.v`, using native libc
+declarations from its ABI header. Both real exec child modes and all 14 original
+check sites are retained, producing 15 verdicts across the UID/GID cases. The
+runner compiles the selected V target and preserves its 300-second budget.
+
 This addresses the dumpability portion of OB2. ELF core writing, RLIMIT_CORE
 output limits, privileged dump destinations and file-capability/set-ID exec
 integration remain to be implemented; this change does not create core files.
