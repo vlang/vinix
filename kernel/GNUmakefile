@@ -427,14 +427,16 @@ $(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
 # structured ABI metadata. Their headers contain no maintained algorithms.
 $(LINUXKPI_COBJ) $(LINUXKPI_OBJ) obj/linuxkpi/exchange128core.o obj/blob.c.o: $(LINUXKPI_GENERATED_HEADERS)
 
-obj/linuxkpi/include/vinix/spinlock_adapters.h: linuxkpi/abi/spinlock.json linuxkpi/generate-abi.py linuxkpi/headercore/primitive.v
-	python3 linuxkpi/generate-abi.py $< $@
+LINUXKPI_ABI_GENERATOR := ../tests/linuxkpi/generate_abi.v $(wildcard ../tests/linuxkpi/hosttest/*.v) ../build-support/run-v-tool.sh ../build-support/find-v.sh
 
-obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json linuxkpi/generate-abi.py linuxkpi/exchangecore/core.v linuxkpi/exchange128core/core.v
-	python3 linuxkpi/generate-abi.py $< $@
+obj/linuxkpi/include/vinix/spinlock_adapters.h: linuxkpi/abi/spinlock.json $(LINUXKPI_ABI_GENERATOR) linuxkpi/headercore/primitive.v
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_abi.v $< $@
 
-obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json linuxkpi/generate-abi.py linuxkpi/headercore/policy.v
-	python3 linuxkpi/generate-abi.py $< $@
+obj/linuxkpi/include/vinix/atomic_exchange.h: linuxkpi/abi/atomic-exchange.json $(LINUXKPI_ABI_GENERATOR) linuxkpi/exchangecore/core.v linuxkpi/exchange128core/core.v
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_abi.v $< $@
+
+obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json $(LINUXKPI_ABI_GENERATOR) linuxkpi/headercore/policy.v
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_abi.v $< $@
 
 # Compiler-derived bounds use the actual native MMU/config/header profile.
 # Reevaluate the command stamp on every invocation, preserving its timestamp
