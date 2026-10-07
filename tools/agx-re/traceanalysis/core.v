@@ -83,6 +83,7 @@ pub fn encode(item Value, pretty bool) string {
 fn encode_depth(item Value, pretty bool, depth int) string {
 	match item {
 		Number { return item.text }
+		int, i64, u8, u32, u64 { return item.str() }
 		json2.Null { return 'null' }
 		[]Value {
 			mut values := []string{}

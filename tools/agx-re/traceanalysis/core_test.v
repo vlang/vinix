@@ -311,6 +311,17 @@ fn test_dynamic_json_null_is_a_scalar() {
 	assert encode(decode('{"missing":null}')!, false) == '{"missing":null}'
 }
 
+fn test_native_integer_variants_encode_without_sum_type_narrowing() {
+	if sizeof(int) == 8 {
+		wide := int(u64(1099511627856))
+		assert encode(Value(wide), false) == '1099511627856'
+		assert encode(decode(encode(Value([Value(wide)]), false))!, false) == '[1099511627856]'
+	}
+	assert encode(Value(i64(-1099511627856)), false) == '-1099511627856'
+	assert encode(Value(~u64(0)), false) == '18446744073709551615'
+	assert encode(Value(int(2147483647)), false) == '2147483647'
+}
+
 fn test_snapshot_filter_values_keep_python_container_and_float_spelling() {
 	assert string_value(decode('[1,{"yes":true,"missing":null,"text":"a\\tb"}]')!) == "[1, {'yes': True, 'missing': None, 'text': 'a\\tb'}]"
 	for text, expected in {
