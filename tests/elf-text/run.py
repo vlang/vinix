@@ -18,6 +18,8 @@ def main():
     parser.add_argument('--arch', choices=('aarch64', 'x86_64'), required=True)
     parser.add_argument('--kernel-dir', type=Path, required=True)
     parser.add_argument('--state-dir', type=Path)
+    parser.add_argument('--source', type=Path,
+                        help='compile an explicit C control instead of the maintained V fixture')
     args = parser.parse_args()
     runner_root = Path(os.environ.get('VINIX_VM_RUNNER_ROOT', ROOT))
     state = args.state_dir or Path(tempfile.mkdtemp(prefix='vinix-elf-text-vm-'))
@@ -25,14 +27,18 @@ def main():
     rootfs = state / 'rootfs'
     for name in ('sbin', 'lib', 'tmp', 'dev', 'proc', 'sys', 'root'):
         (rootfs / name).mkdir(parents=True, exist_ok=True)
-    source = ROOT / 'tests/elf-text/guest.c'
-    compile_serial = runpy.run_path(str(runner_root / 'tests/kernel-gaps/compile-v-fixture.py'))['compile_serial']
+    if args.source is not None and not args.source.is_file():
+        parser.error('--source must name an existing C control')
+    helper = runpy.run_path(str(runner_root / 'tests/kernel-gaps/compile-v-fixture.py'))
+    compile_serial = helper['compile_serial']
     flags = ['-O2', '-Wall', '-Wextra', '-Werror']
     if args.arch == 'aarch64':
         sysroot = Path(os.environ.get('VINIX_AARCH64_SYSROOT', runner_root / 'build-aarch64-userland/sysroot'))
         loader = Path(os.environ.get('VINIX_AARCH64_LOADER', runner_root / 'build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1'))
         cc = [os.environ.get('CC', 'clang'), '--target=aarch64-linux-musl', f'--sysroot={sysroot}', '-fuse-ld=lld', '-fno-stack-protector']
         serial = compile_serial(state / 'serial.o', args.arch, cc + flags)
+        source = args.source or helper['compile_module'](
+            ROOT / 'tests/elf-text/textfixture', state / 'fixture.o', args.arch, cc + flags)
         subprocess.run(cc + flags + ['-static', str(serial), str(source), f'-L{sysroot / "lib"}', '-o', str(rootfs / 'sbin/init')], check=True)
         # The build sysroot contains static libc; use the real Alpine loader
         # as the shared libc instead of silently producing a static PIE.
@@ -41,6 +47,8 @@ def main():
     else:
         cc = [os.environ.get('CC_AMD64', 'x86_64-linux-musl-gcc')]
         serial = compile_serial(state / 'serial.o', args.arch, cc + flags)
+        source = args.source or helper['compile_module'](
+            ROOT / 'tests/elf-text/textfixture', state / 'fixture.o', args.arch, cc + flags)
         subprocess.run(cc + flags + ['-static', str(serial), str(source), '-o', str(rootfs / 'sbin/init')], check=True)
         subprocess.run(cc + flags + ['-fPIE', '-pie', str(serial), str(source), '-o', str(rootfs / 'elf-pie')], check=True)
         loader = Path(subprocess.check_output(cc + ['-print-file-name=libc.so'], text=True).strip())
