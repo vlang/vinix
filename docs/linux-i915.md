@@ -654,7 +654,7 @@ tests/linuxkpi/run.sh
 python3 tests/linuxkpi/nocache_test.py
 python3 tests/linuxkpi/asm_generated_headers_test.py
 python3 tests/linuxkpi/special_insns_test.py
-python3 tests/linuxkpi/cpu_feature_policy_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/cpu_feature_policy.v
 python3 tests/linuxkpi/smp_type_test.py
 python3 tests/linuxkpi/smp_header_test.py
 python3 tests/linuxkpi/cpu_mask_test.py
@@ -1536,7 +1536,7 @@ disabled and two nested preemption pins; caller state is restored. Both guests
 observe a valid zero intersection across four actual initialized CPUs. Default
 x86 and disabled ARM reach Linux-ABI PID 1 with LinuxKPI fixtures absent.
 
-`tests/linuxkpi/cpu_feature_policy_test.py` executes unchanged generated policy
+`tests/linuxkpi/cpu_feature_policy.v` executes unchanged generated policy
 and frontend bodies with explicit scalar CPU/atomic/fatal observers. GNU99 and
 GNU11 each pass 1,116,514 ASan/UBSan assertions, including all 256 member
 positions, genuine 64-bit online acknowledgements and 64-bit V array lengths,
