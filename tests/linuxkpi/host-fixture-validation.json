@@ -753,5 +753,135 @@
     "deadline_audit": "No established intrinsic 900-second watchdog in frozen source or actual canonical supervisor instructions; outer maximum remains 3600. Native wait9 cause unknown.",
     "cache_only_diagnostic_rebuild_qualifies_translation": false,
     "record_directory": "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007"
+  },
+  "native_x86_failure_diagnostic_20261007": {
+    "verdict": "FAIL; failure-only original C diagnostic inconclusive",
+    "scope_lines": 8929,
+    "migration_credit": 0,
+    "diagnostic_unqualified": true,
+    "canonical_original_C_V_controls_unchanged": true,
+    "utc_start": "2026-10-07T08:11:55.957136+00:00",
+    "utc_end": "2026-10-07T08:19:13.508734+00:00",
+    "elapsed_seconds": 437.62,
+    "native_wait_status": 9,
+    "signal": "SIGKILL",
+    "cause": "unknown; no diagnostic operands emitted, no OOM/resource-limit samples made during this diagnostic; timing/waitstatus does not establish deadline, OOM or algorithm/translation cause",
+    "configuration": {
+      "kernel": "current default",
+      "LINUXKPI": 0,
+      "PROD": true,
+      "optimization": "O2",
+      "LIMINE_MP": 1,
+      "STACK_GUARD_TEST": 0,
+      "cpu": "qemu64",
+      "accel": "tcg",
+      "machine": "q35,smm=off",
+      "CPUs": 4,
+      "memory_MiB": 1024,
+      "timeout_seconds": 3600,
+      "all_original_groups": 26,
+      "all_original_boundary_modes": 7,
+      "assertions_counts_deadlines_ownership": "unchanged"
+    },
+    "actual_boot_artifact_sha256": {
+      "kernel.elf": "a5ae7a96d0eacf07230146b86ced66e4ee939f3b55b65de8afaad23487e1a572",
+      "init.elf": "b5a16b58bddba4d0e52243d5ef8d982c0ca3042e9e314d70952a89e77126f797",
+      "initramfs.tar": "f86c5b74096f229e04564f3655f775ad87324472ee09b77c1eb91282545633db"
+    },
+    "artifact_sha256": {
+      "serial.log": {
+        "bytes": 786,
+        "sha256": "d667ae777e209740f72829235400e882e6bd8c319d67343e8456b75c4bcc44d7"
+      },
+      "init": {
+        "bytes": 2588256,
+        "sha256": "b5a16b58bddba4d0e52243d5ef8d982c0ca3042e9e314d70952a89e77126f797"
+      },
+      "initramfs.tar": {
+        "bytes": 2600960,
+        "sha256": "9662f7ce18100bb752d0ab80fefe56362b3e658d102467cd9edf12f8aa3e1af4"
+      },
+      "test.iso": {
+        "bytes": 24315904,
+        "sha256": "28d8150e2200612a175abc34220de81a624c082da91f4b7d4a7dc9f32cebffcd"
+      },
+      "original-C-diagnostic-qemu.log": {
+        "bytes": 2496,
+        "sha256": "2bb7cdd367dc52c58c03089d57b127cc17d0ccb69e3fae23bedf67e191b1254a"
+      }
+    },
+    "command": [
+      "python3",
+      "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007/source/tests/kernel-gaps/run-host-qemu64.py",
+      "--arch",
+      "x86_64",
+      "--prebuilt-init",
+      "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007/original-C-failure-diagnostic/diagnostic-C.elf",
+      "--kernel-dir",
+      "/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/host-native-default-pair-20261007/kernel",
+      "--state-dir",
+      "/tmp/vmh-o7-cdiag-a5-081500",
+      "--expect",
+      "LinuxKPI: PASS",
+      "--expect",
+      "HOST MODEL GUEST PASS: original workload and all seven boundary cases",
+      "--fail",
+      "HOST MODEL GUEST FAIL:",
+      "--timeout",
+      "3600"
+    ],
+    "source_preservation": {
+      "original_ref": "9f47270ee3c6754312bc09fc74d8f77e2cfe2229",
+      "original_assertion_expressions_unchanged": true,
+      "only_original_mutation": "bound_work_test.h: immortal atomically published subtest labels and conditional mismatch stderr print/flush immediately before unchanged first CPU equality assertion",
+      "full_workload_counts_deadlines_ownership": "unchanged; full original workload and all seven boundary modes selected, 3600-second maximum",
+      "original_main_and_25_other_headers_byte_identical": true
+    },
+    "build_differences": [
+      "Canonical temporary common objects absent; common objects rebuilt from frozen source and frozen V/GCC SDK tools.",
+      "Generated compat.c and headercore.c hashes exactly match final23 receipts.",
+      "Reused recorded core -Wno-sign-compare warning policy for shared upstream header consumers; original C initializer -Wno-missing-braces mirrors existing native host fixture compiler policy. All other errors remain fatal.",
+      "Cache-only include_next wrappers retain actual native assert/limits bodies, undef only libc static_assert and pre-Linux PAGE_SIZE aliases. Original test/source and imported Linux algorithms are unchanged.",
+      "Common instruction comparison 1226/1267 match after relocation-symbol/string normalization; remaining 41 retained raw differences include source file strings, a jump table relocation, independent instruction scheduling/padding and supervisor array initialization via memmove in the rebuild versus direct copies in canonical. Original temporary wrapper compile flags are unrecovered. No full binary equivalence or qualification claim."
+    ],
+    "common_function_comparison_counts": {
+      "common_function_names": 1267,
+      "pass": 1226,
+      "absent": 0,
+      "differences": 41
+    },
+    "generated_common_C_sha256": {
+      "compat.c": "00d74a8b299f611c5dd63e4f60fbfbf576a0b4d530181f7780315e0d9953215e",
+      "headercore.c": "4dfc0ff928c57a2038730cb5e6373e9f09ddbb39251fc7806e3c0f5bbff636ac"
+    },
+    "tool_V_sha256": "335214a9c904435eb87e580948a7de76c2b4de03a65f0ee23babaa76981a7373",
+    "tool_GCC_sha256": "b36dc26ec4f18d72cd9eb9667dd718baeece2120e94b6142ec8131073b2926cf",
+    "limits": [
+      "Canonical original C/V pair remains FAIL and unmodified. This cache-only rebuilt original C diagnostic cannot qualify the translation.",
+      "All original expressions/counts/ownership/deadlines remain exact; the unchanged 3600-second maximum was not reached.",
+      "Strict rebuild retains namespace/warning adapters and documented common instruction differences from canonical objects. No full binary equivalence claimed.",
+      "No OOM or complete runtime resource-limit sample was made during this diagnostic; earlier zero OOM samples from canonical controls remain observational only.",
+      "No positive subtest tracing was added. Failure before diagnostic output does not establish how far the workload progressed.",
+      "Copied launcher startup label exact final23 image is stale for this case; actual verified boot init is rebuilt diagnostic b5a16b58, as frozen inputs show."
+    ],
+    "receipt_sha256": {
+      "native-run/validation.json": "0bc6a77924ed8d4b28362b9474c7afedb5e78d82a6447a7ec5f1f1f6b0cdc058",
+      "native-run/inputs.json": "27a24d60f1e8a44f4e49caf7f4ded6c8121048d97423bda740c32e50865053aa",
+      "native-run/actual-process.json": "d568f1ff4859e415626069c6b9278ee62135aaf64d7dab40ba15f9448a0370b7",
+      "native-run/launcher-label-note.json": "2af72a567aefb5aa6975d1a9aa68be927ca0c55b4c900136cbbdf45f0410c005",
+      "reviewed-manifest.json": "5b83d27ef8a0667b3d32bbb481c045af39e58eadb5751e177e459eab935b9950",
+      "source-verification.json": "1f81fa812903e812c77ed6306797dec80c4c63cb00e5454345b8ee21334c71f2",
+      "diagnostic.patch": "16e95578663c0726d7fb32f8e3c21702346fe3c696d703e7b7e1ef0275959dc4",
+      "cache-builder.patch": "213145bcc4489ef8f34031862940235905b601eb89fc00a389f58a4aa95ec31b",
+      "cache-builder-changes.json": "80d16a1b31ab2739359b82a933d0d7d44781441b7c0c594295b811b03bbadd66",
+      "native-libc-annotations.json": "f28ac6e646bb2f270f6b43a2fce1c2691027f24723e8b8c37ba531a5dcc7d6eb",
+      "common-actual-build-commands.json": "7d7cd1ac2cc046c56b557105b3b1695e02bc4f314fbff3e3db95a8f14a7a2e4b",
+      "common-preprocessed-inputs.json": "58bb32efaa760ed238d6bef86ca87cebb5825bb7bdc172f18864e24d3ba36cde",
+      "common-instruction-comparison.json": "3dcf57dacefa8df48c8d5d40f6fab5f458210774a60b3d36a3c29320df478c8d",
+      "common-instruction-difference-review.json": "042d688ebc7de5b05d6df27823814ce90c4c8c48228d315b89769bb5ecc0a8b2"
+    },
+    "evidence_directory": "host-native-default-pair-20261007/original-C-failure-diagnostic",
+    "complete_commands_and_preprocessed_inputs": "Actual common Python-supervised compiler/assembly/generator commands, both original/diagnostic full preprocess/compile/link commands, and all compiler-visible common translation units and original/diagnostic .i files retained. Nested V generator commands specified by frozen outer command/script/tool hashes.",
+    "validation_receipt_sha256": "0bc6a77924ed8d4b28362b9474c7afedb5e78d82a6447a7ec5f1f1f6b0cdc058"
   }
 }
