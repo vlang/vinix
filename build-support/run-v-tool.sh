@@ -19,7 +19,8 @@ trap 'rm -rf "$tool_temp_dir"' 0
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
-"$V" -o "$tool_temp_dir/tool" "$tool_source"
+# Use the platform C compiler: TCC cannot resolve Boehm dlopen wrappers on macOS.
+"$V" -cc cc -o "$tool_temp_dir/tool" "$tool_source"
 
 # Keep the caller's working directory and pass tool arguments without parsing.
 set +e
