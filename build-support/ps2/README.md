@@ -22,6 +22,15 @@ and reset can safely overlap old and new SPU2 instances without sharing a FILE.
 The downloaded source stays unchanged; the build renames just those two
 upstream symbols and uses the lifecycle functions in `bridge.c`.
 
+File-size queries, ELF validation, bare-metal CPU setup, bounded CPU stepping
+and BIOS path patching are maintained in `vbridge/core.v`. The module is built
+with `-gc none -manualfree` without the V runtime. Its constant error messages
+construct the SDK's native `std::runtime_error`; an instruction-only unwinding
+envelope frees unpublished exception storage if that constructor throws.
+The remaining C++ bridge keeps the existing machine, frontend and STL ownership
+scopes during this migration stage. Native EE scalar writes use byte copies at
+offsets checked against the actual C++ EE definition by the SDK compiler.
+
 Iris is MIT licensed. Its original license is staged next to the executable.
 The compiled IPU VLC decoder includes attribution to Play!; the BSD license
 notices for Play! and its Framework, and the MPEG IDCT copyright notice, are

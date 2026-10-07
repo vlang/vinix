@@ -17,12 +17,12 @@
 #include "ee/ee_def.hpp"
 #include "elf.h"
 #include "gs/renderer/software.hpp"
+#include "vbridge/native-abi.h"
 extern "C" void vinix_ps2_ioman_destroy(struct iop_state *);
 
 namespace {
 constexpr unsigned CARD_BYTES = 0x4000 * (512 + 16);
 constexpr unsigned MAX_FRAME_BLOCKS = 1000000;
-constexpr unsigned MAX_BOOT_BLOCKS = 10000000;
 struct core_exit : std::exception {
     const char *what() const noexcept override { return "The PS2 core encountered unsupported hardware or an instruction"; }
 };
@@ -87,13 +87,7 @@ void line(ps2_gs *gs, void *userdata) { primitive(gs, userdata, software_render_
 void triangle(ps2_gs *gs, void *userdata) { primitive(gs, userdata, software_render_triangle); }
 void sprite(ps2_gs *gs, void *userdata) { primitive(gs, userdata, software_render_sprite); }
 
-bool file_size(FILE *file, size_t &size) {
-    if (fseek(file, 0, SEEK_END)) return false;
-    long end = ftell(file);
-    if (end < 0 || fseek(file, 0, SEEK_SET)) return false;
-    size = static_cast<size_t>(end);
-    return true;
-}
+bool file_size(FILE *file, size_t &size) { return vinix_ps2_file_size(file, &size) != 0; }
 
 std::vector<unsigned char> read_file(const char *path, size_t maximum) {
     FILE *file = fopen(path, "rb");
@@ -111,93 +105,17 @@ std::vector<unsigned char> read_file(const char *path, size_t maximum) {
 }
 
 void check_elf(const std::vector<unsigned char> &bytes, Elf32_Ehdr &header) {
-    if (bytes.size() < sizeof header) throw std::runtime_error("Truncated PS2 ELF header");
-    memcpy(&header, bytes.data(), sizeof header);
-    if (memcmp(header.e_ident, "\x7f" "ELF", 4) || header.e_ident[4] != 1 ||
-        header.e_ident[5] != 1 || header.e_machine != 8 || header.e_type != 2 ||
-        header.e_phentsize != sizeof(Elf32_Phdr) || !header.e_phnum || header.e_phnum > 128 ||
-        header.e_phoff > bytes.size() ||
-        size_t(header.e_phnum) * sizeof(Elf32_Phdr) > bytes.size() - header.e_phoff ||
-        (header.e_entry & 3) || (header.e_entry & 0x1fffffff) >= RAM_SIZE_32MB)
-        throw std::runtime_error("Expected a little-endian executable PS2 MIPS ELF");
-    bool entry_loaded = false;
-    for (unsigned i = 0; i < header.e_phnum; ++i) {
-        Elf32_Phdr segment;
-        memcpy(&segment, bytes.data() + header.e_phoff + i * sizeof segment, sizeof segment);
-        if (segment.p_type != PT_LOAD) continue;
-        uint32_t address = segment.p_vaddr & 0x1fffffff;
-        if (address >= RAM_SIZE_32MB || segment.p_memsz > RAM_SIZE_32MB - address ||
-            segment.p_filesz > segment.p_memsz || segment.p_offset > bytes.size() ||
-            segment.p_filesz > bytes.size() - segment.p_offset)
-            throw std::runtime_error("PS2 ELF segment is outside RAM or the file");
-        uint32_t entry = header.e_entry & 0x1fffffff;
-        if ((segment.p_flags & 1) && entry >= address && entry - address < segment.p_memsz)
-            entry_loaded = true;
-    }
-    if (!entry_loaded) throw std::runtime_error("PS2 ELF entry is outside its executable segments");
+    vinix_ps2_check_elf(bytes.data(), bytes.size(), &header);
 }
 
 void load_baremetal(machine &m, const std::vector<unsigned char> &bytes, const Elf32_Ehdr &header) {
-    for (unsigned i = 0; i < header.e_phnum; ++i) {
-        Elf32_Phdr segment;
-        memcpy(&segment, bytes.data() + header.e_phoff + i * sizeof segment, sizeof segment);
-        if (segment.p_type != PT_LOAD) continue;
-        unsigned char *dest = m.ps2->ee_ram->buf + (segment.p_vaddr & 0x1fffffff);
-        memset(dest, 0, segment.p_memsz);
-        memcpy(dest, bytes.data() + segment.p_offset, segment.p_filesz);
-    }
-    auto *ee = m.ps2->ee;
-    ee->pc = header.e_entry;
-    ee->next_pc = header.e_entry + 4;
-    ee->status = 0x70000000; // Kernel mode, COP0/1/2 enabled, interrupts off.
-    ee->r[29].u64[0] = 0x01fff000;
-    // Generic bare-metal IOP reset: idle at RAM0. An EE program may install
-    // an IOP worker through the real shared RAM window and replace this jump.
-    const uint32_t idle[2] = {0x08000000, 0};
-    memcpy(m.ps2->iop_ram->buf, idle, sizeof idle);
-    m.ps2->iop->pc = 0;
-    m.ps2->iop->next_pc = 4;
-    m.ps2->iop->cop0_r[COP0_SR] = 0;
-    ee_bus_init_fastmem(m.ps2->ee_bus);
-    iop_bus_init_fastmem(m.ps2->iop_bus);
+    vinix_ps2_load_baremetal(m.ps2, bytes.data(), &header);
 }
 
-void tick(machine &m) {
-    // Iris's public ps2_cycle retries indefinitely on zero cycles. Retry only
-    // its initial cache compilation once; handle an interrupt on the next call.
-    int cycles = ee_run_block(m.ps2->ee, 128);
-    if (!cycles) cycles = ee_run_block(m.ps2->ee, 128);
-    if (!cycles) return;
-    if (cycles < 0 || cycles > 4096) throw std::runtime_error("Invalid PS2 CPU cycle count");
-    auto *ps2 = m.ps2;
-    ps2->ee_cycles += cycles;
-    sched_tick(ps2->sched, ps2->timescale * cycles);
-    ps2_ipu_run(ps2->ipu);
-    for (int i = 0; i < cycles; ++i) ps2_ee_timers_tick(ps2->ee_timers);
-    while (ps2->ee_cycles > 8) {
-        iop_cycle(ps2->iop);
-        ps2_iop_timers_tick(ps2->iop_timers);
-        ps2->ee_cycles -= 8;
-    }
-}
+void tick(machine &m) { vinix_ps2_tick(m.ps2); }
 
 void boot_bios(machine &m, const std::string &path) {
-    bool reached = false;
-    for (unsigned i = 0; i < MAX_BOOT_BLOCKS; ++i) {
-        if (ee_get_pc(m.ps2->ee) == 0x00082000) { reached = true; break; }
-        tick(m);
-    }
-    if (!reached) throw std::runtime_error("PS2 BIOS did not reach its boot entry within the cycle limit");
-    if (path.size() >= 256) throw std::runtime_error("PS2 boot path is too long");
-    bool patched = false;
-    for (unsigned i = 0; i + 256 <= RAM_SIZE_32MB; i += 16) {
-        char *dest = reinterpret_cast<char *>(m.ps2->ee_ram->buf + i);
-        if (!memcmp(dest, "rom0:OSDSYS", 12)) {
-            memcpy(dest, path.c_str(), path.size() + 1);
-            patched = true;
-        }
-    }
-    if (!patched) throw std::runtime_error("PS2 BIOS boot path was not found");
+    vinix_ps2_boot_bios(m.ps2, path.c_str(), path.size());
 }
 
 void attach_card(machine &m, const std::string &path) {

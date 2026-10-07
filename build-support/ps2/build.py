@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import runpy
 import shutil
 import subprocess
 import tarfile
@@ -139,6 +140,7 @@ def main() -> None:
                                   "shim": sha256(SUPPORT / "include/SDL3/SDL.h"),
                                   "exit_shim": sha256(SUPPORT / "include/core.h"),
                                   "bridge_header": sha256(SUPPORT / "bridge.h"),
+                                  "native_abi": sha256(SUPPORT / "vbridge/native-abi.h"),
                                   "compiler": compiler_version,
                                   "libc": libc_digest}, sort_keys=True)
         stamp = target.with_suffix(".stamp")
@@ -160,6 +162,21 @@ def main() -> None:
         log_path.write_text(str(error))
         raise
     log_path.write_bytes(b"".join(data for _, data in results))
+    # The V helper module has no V runtime. Its native exception constructor
+    # uses a cleanup-only instruction envelope with C++ CFI and LSDA metadata.
+    bridge = SUPPORT / "vbridge"
+    generated = output / "bridge.generated.c"
+    generate = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
+    generate(bridge, generated, "arm64")
+    bridge_flags = [flag for flag in common if flag != "-Wno-everything"]
+    bridge_flags += ["-Wall", "-Wextra", "-Werror", "-Wno-unused-function",
+                     "-Wno-unused-parameter", f"-I{bridge}"]
+    bridge_object, unwind_object = obj / "bridge-v.o", obj / "bridge-unwind.o"
+    subprocess.run([str(llvm / "clang")] + bridge_flags +
+                   ["-c", str(generated), "-o", str(bridge_object)], check=True)
+    subprocess.run([str(llvm / "clang")] + common +
+                   ["-c", str(bridge / "unwind-arm.S"), "-o", str(unwind_object)], check=True)
+    results += [(bridge_object, b""), (unwind_object, b"")]
     library = output / "libvinix_ps2.a"
     temporary_library = output / "libvinix_ps2.new.a"
     temporary_library.unlink(missing_ok=True)
