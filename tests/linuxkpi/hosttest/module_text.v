@@ -117,6 +117,11 @@ fn module_write(path string, text string) ! {
 	}
 }
 
+// Rewrite an actual generated artifact with the checked module I/O policy.
+pub fn rewrite_generated_text(path string, before string, after string) ! {
+	module_write(path, module_read(path)!.replace(before, after))!
+}
+
 fn module_read(path string) !string {
 	if path.contains('\x00') { return error('embedded null byte') }
 	mut stream := os.open(path) or { return ModuleFileError{path, err.code(), err.msg()} }
