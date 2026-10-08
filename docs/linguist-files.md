@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `5675044ef5f91f75116027d2a479b656390efbc5`,
+at source commit `8ead088e53de1613cb33a2698ebe31a4da75ece6`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 493 | 1,865,422 | 4.47% |
-| Python | 485 | 3,966,503 | 9.51% |
-| Shell | 305 | 1,288,120 | 3.09% |
+| C | 493 | 1,865,482 | 4.48% |
+| Python | 479 | 3,346,571 | 8.03% |
+| Shell | 306 | 1,288,471 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 75.73%, with no
+All `.v` files are classified as V. The resulting V share is 77.20%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 5675044ef5f91f75116027d2a479b656390efbc5 --breakdown --json
+github-linguist --rev 8ead088e53de1613cb33a2698ebe31a4da75ece6 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -412,7 +412,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/hostfixtures/waithost/waithost_v_contract.h` | 680 |
 | `tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h` | 365 |
 | `tests/linuxkpi/hostguest/hostguest_v_contract.h` | 269 |
-| `tests/linuxkpi/hosttest/archive_abi.h` | 1,181 |
+| `tests/linuxkpi/hosttest/archive_abi.h` | 1,241 |
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
@@ -796,8 +796,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-bootstrap/test_prepare.py` | 9,429 |
 | `tests/desktop-bootstrap/test_recovery.py` | 8,983 |
 | `tests/desktop-bootstrap/test_runner.py` | 5,644 |
-| `tests/desktop-perf/run.py` | 29,227 |
-| `tests/desktop-perf/test_runner.py` | 24,585 |
+| `tests/desktop-perf/_native_report.py` | 2,681 |
+| `tests/desktop-perf/run.py` | 23,596 |
+| `tests/desktop-perf/test_runner.py` | 13,158 |
 | `tests/dhewm3/prepare-debian.py` | 2,639 |
 | `tests/dhewm3/run.py` | 12,457 |
 | `tests/disk-no-sync/run_vm.py` | 10,512 |
@@ -864,7 +865,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
-| `tests/linuxkpi/asm_generated_headers_test.py` | 17,568 |
 | `tests/linuxkpi/audit_generation_test.py` | 8,245 |
 | `tests/linuxkpi/compile-native-host.py` | 7,958 |
 | `tests/linuxkpi/compile-v-core.py` | 1,929 |
@@ -873,17 +873,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
-| `tests/linuxkpi/fpu_header_test.py` | 4,937 |
 | `tests/linuxkpi/host_suite.py` | 5,431 |
 | `tests/linuxkpi/overflow_test.py` | 12,342 |
-| `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
-| `tests/linuxkpi/smp_header_test.py` | 19,818 |
-| `tests/linuxkpi/smp_type_test.py` | 21,549 |
-| `tests/linuxkpi/special_insns_test.py` | 12,994 |
 | `tests/linuxkpi/spin_test.py` | 6,391 |
 | `tests/linuxkpi/standalone_test.py` | 4,640 |
-| `tests/linuxkpi/static_key_declaration_test.py` | 12,107 |
 | `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/compile-fixture.py` | 1,221 |
 | `tests/m1-wifi/compile-provider.py` | 2,106 |
@@ -1009,17 +1003,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tools/agx-re/_native_adt.py` | 1,968 |
 | `tools/agx-re/_native_extract.py` | 5,441 |
-| `tools/agx-re/_native_g17.py` | 4,560 |
-| `tools/agx-re/_native_t6050.py` | 1,114 |
+| `tools/agx-re/_native_g17.py` | 4,928 |
+| `tools/agx-re/_native_t6050.py` | 1,976 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 432,503 |
-| `tools/agx-re/recover_t6050_power.py` | 167,647 |
+| `tools/agx-re/recover_g17_abi.py` | 237,577 |
+| `tools/agx-re/recover_t6050_power.py` | 50,661 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 201,111 |
-| `tools/agx-re/test_recover_t6050_power.py` | 86,249 |
+| `tools/agx-re/test_recover_g17_abi.py` | 84,416 |
+| `tools/agx-re/test_recover_t6050_power.py` | 9,325 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
@@ -1223,6 +1217,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/desktop-perf/perf-init.sh` | 9,247 |
+| `tests/desktop-perf/run-host-tests.sh` | 286 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
 | `tests/developer-tools/smoke.sh` | 4,577 |
 | `tests/devicetree-string-list/run.sh` | 240 |
@@ -1251,7 +1246,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/run.sh` | 4,069 |
 | `tests/krandom/run.sh` | 1,747 |
-| `tests/linuxkpi/run.sh` | 10,984 |
+| `tests/linuxkpi/run.sh` | 11,049 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
 | `tests/m1-wifi/run.sh` | 100 |

@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `5675044ef5f91f75116027d2a479b656390efbc5`, Linguist 7.27.0 reports
-**Python 9.51%** (485 files, 3,966,503 bytes) and **V 75.73%** (1,391 files,
-31,592,799 bytes). The complete committed-blob inventory and reproduction
+At source `8ead088e53de1613cb33a2698ebe31a4da75ece6`, Linguist 7.27.0 reports
+**Python 8.03%** (479 files, 3,346,571 bytes) and **V 77.20%** (1,442 files,
+32,178,109 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **1,239,782 Python bytes**. Roughly another
-1.88 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **1,859,714 Python bytes**. Roughly another
+1.27 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,17 +21,10 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. Their gross scope is 1,287,109 bytes.
-The net reduction is smaller by 290 bytes of temporary G13 adapter code,
-10,311 bytes of extraction bridges, 12,803 bytes of G17 foundation wrappers and
-fingerprint changes, 66 bytes in the guest comparator caller, 713 bytes of the
-ABI import facade, 362 bytes of power wrappers/bridges, and 5,228 bytes of ADT
-wrappers/bridges after import cleanup, 4,837 bytes of G17 expression wrappers
-and fingerprint changes, 2,882 bytes of the bounds import facade, 2,614 bytes of the first T6050
-bridge/wrapper stage,
-4,817 bytes of G17 command wrappers, 818 bytes of the second T6050 wrappers,
-and 1,586 bytes of the upstream import facade. Adapter
-additions receive no extra migration credit.
+tests, including comments and blank lines. The 45 completed stages have a gross
+scope of **1,928,770 bytes**. Counted import bridges, forwarders and caller changes
+account for **69,056 bytes** between gross scope and the measured net
+reduction. Adapter additions receive no extra migration credit.
 
 | Stage | Native source | Original Python bytes / lines | Source commit |
 | --- | --- | ---: | --- |
@@ -68,6 +61,18 @@ additions receive no extra migration credit.
 | T6050 readiness and transport contracts | `tools/agx-re/t6050power/transport.v` | 33,982 / 829 | `e4917cc2c2a1a3c388d66e5ca8e2304817051f83` |
 | Pinned upstream fetch/verify and tests | `tests/linuxkpi/upstreamsource` | 7,651 / 198 | `97eab0f419b1e832de3ed98046df0692c83d6860` |
 | Independent allocator reference/model harness | `tests/xnualloc/refmodel` | 15,234 / 350 | `7b45ee15947d3d93b1503c35af3bc901dc3f54e4` |
+| G17 work/resource/runtime recovery and tests | `tools/agx-re/g17expr/runtime*.v` | 177,382 / 4,842 | `817216de7261cde54bd9f8f3f210d8afd468bd17` |
+| T6050 diagnostic/dashboard contracts | `tools/agx-re/t6050power/dashboard*.v` | 54,938 / 1,339 | `250a71e8df694f1fb02521d899d18f091feff882` |
+| Original generated-ASM header controller | `tests/linuxkpi/asm_generated_headers.v` | 17,568 / 355 | `20be6f5958ed9e57b32b985940149c0ae6ee0c10` |
+| T6050 PMP firmware and RTKit boot contracts | `tools/agx-re/t6050power/firmware*.v` | 61,485 / 1,555 | `17f53d17dfe6b34db3e4752e5eeb44d6d4d6a5d5` |
+| SMP/CSD type and generated-header controllers | `tests/linuxkpi/smp_types.v`, `smp_headers.v` | 41,367 / 709 | `212eb9dbe0da88be25e0203b51dd1ebba7a38132` |
+| Captured desktop transcript verdicts and tests | `tests/desktop-perf/perfreport` | 19,333 / 345 | `f4b8496f83c2bfa155ac95c308e2b62519166380` |
+| T6050 image instruction proofs | `tools/agx-re/t6050power/image_proofs.v` | 44,775 / 1,102 | `6c150c08da46466209b4c8d0d10d9c3d302ba077` |
+| Static-key declarations and page types | `tests/linuxkpi/static_key_declarations.v`, `pgtable_types.v` | 24,388 / 493 | `55ec8ab8b3021b5ebc7342980cf4f1b046282e43` |
+| G17 configuration/channel recovery and tests | `tools/agx-re/g17expr/config*.v` | 146,167 / 3,803 | `2909aa80ab11b007910962308f5432f2abc08d86` |
+| Original special-instruction compiler controller | `tests/linuxkpi/special_insns.v` | 12,994 / 244 | `18daaab0ed1bda245c96c70a05ad23297deed7d4` |
+| T6050 power and PMP DART topology | `tools/agx-re/t6050power/topology*.v` | 36,327 / 870 | `9238aaf2920c12292c9a09a3d7642ec1d93b8c83` |
+| Original/V FPU instruction controller | `tests/linuxkpi/fpu_headers.v` | 4,937 / 89 | `8ead088e53de1613cb33a2698ebe31a4da75ece6` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -334,6 +339,54 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   stopped, so they receive no success claim. CI now runs the models separately
   from the actual allocator tests. No production allocator or SMP port occurred.
 
+- G17 runtime: 42 unchanged original methods, 45 native functions and 14,086
+  complete controls pass on both architectures and ARM sanitizers, along with
+  30 real-driver outputs and foreign-thread ownership checks. Commit
+  `a82845e9` separately corrects unsigned segment-size narrowing: 11,872 exact
+  caller outputs, populated highword/overflow images, immutability and 10,000
+  sanitized ABI exchanges pass. That correction receives no port credit.
+- T6050 dashboard and firmware: 22,600 and 9,864 complete API controls per
+  architecture, 16 and 14 frozen original tests, exact real-driver manifests,
+  native regression suites, sanitizers and 8,000-call/32-thread ownership
+  batches pass. Shared ABI stress retains zero owned response buffers.
+- ASM/SMP controllers: original C fixture text and complete compiler arguments,
+  headers, dependency receipts and result reports match after private paths and
+  independently checked producer/stat identities. ASM retains 16 objects/eight
+  rejections; SMP headers retain 22 objects/six rejections. GNU99/GNU11 SMP
+  fixtures retain 420,004 CSD initializer sanitizer assertions per host.
+  Current and pinned V compile the controllers on both actual architectures.
+  Untouched strict sign-compare failures remain recorded; supported profiles
+  keep that diagnostic visible. Controller deadlines and child reaping remain.
+- Desktop verdicts: 23 native functions, 41,003 numeric/transcript controls,
+  all 29 unchanged original harness tests, 800 summaries and 120 complete
+  stdout/stderr/JSON byte comparisons pass on both hosts. ARM ASan/UBSan and
+  success/failure installer stress preserve exact FD sets and remove private
+  executables after exit. All Unicode13 nonprintable/digit properties were
+  checked exhaustively. Qualified production summaries contain finite rows;
+  long direct NaN lists have interpreter-specific unordered-sort artifacts and
+  are outside the qualified summary domain. Guest workloads remain unchanged.
+- T6050 image/topology: 15,001 evidence and 6,549 raw-image controls, then
+  21,898 complete topology controls per architecture and sanitizers, match the
+  originals. Frozen tests, native suites and full manifests pass. Synchronous
+  inputs, copied outputs, 10,000 sanitized ABI exchanges and foreign-thread
+  batches retain zero owned responses. Wide SID tests check canonical key
+  enumeration separately; no billions-of-iterations original replay is claimed.
+- G17 configuration: 48,313 complete boundary/mutation outcomes per host,
+  34 unchanged methods, 38 native configuration functions plus 131 regressions,
+  24 recursively typed real-driver outputs and 13,201 public type/error cases
+  pass. Highword MOVZ offsets and INT32_MIN negation retain their widths.
+  Sanitizers, fake-stack checks and 10,000 shared-ABI exchanges pass with no
+  owned response remaining after foreign-thread batches.
+- Static/page/instruction/FPU controllers preserve every original C fixture,
+  full report/dependency/Clang argument checks and actual host profiles.
+  Static keys retain six objects/four rejections and 4,001 sanitizer assertions
+  per standard per host; pages retain four objects/two rejections with visible
+  sign-compare warnings. Instruction headers retain 16 objects/four rejections
+  and exact disassembly without executing privileged or MOVDIR64B instructions.
+  FPU's unchanged x86 fixtures retain 1,024 x87/MXCSR borrows under sanitizers.
+  Current/pinned controller CLI gates and ARM controller sanitizers pass.
+  These host checks make no new kernel, QEMU, device or scheduler claim.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -379,6 +432,19 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `agx-t6050-contracts2-20261008/final` | `qualification.json` | `e8f16f73c39fce61da58defb41e017c41ce34abcbdb241a2eeeff9c7eb737d5e` |
 | `upstream-source-20261008` | `qualification.json` | `6462c4c499f7327d56d21646a958309fcde3dae93ad37715ab6a30630b43b801` |
 | `xnu-reference-20261008/final-v4` | `qualification.json` | `d758074c6892ec7e0ce35359e3210224dcc7b581b038b5373d22b2a731f67a56` |
+| `g17-runtime-20261008` | `final-qualification-v1.json` | `6220ca770db0656414899153fd0513f99991eea7a617b72021ab1823c0dd7206` |
+| `agx-t6050-dashboard-20261008/final` | `qualification.json` | `769475a6e350a79417d93334a11e1432b8bb2668b7696b9b89720a1c7403bb68` |
+| `asm-headers-20261008` | `qualification.json` | `f69848e63d5df306b45d763e6d1b69e6107d84a6612ab76bf34693c68d42611b` |
+| `agx-t6050-firmware-20261008/final` | `qualification.json` | `f1732269659b7160451dcf7baf9099975d38052c7cc263570b1b96a023f3e970` |
+| `smp-types-20261008` | `qualification.json` | `06bae0188c0dd854a5f03cf60aeaf1326098b59f04c4cad4781e56a59451f850` |
+| `desktop-perf-foundation-20261008/final-v3` | `qualification.json` | `30ea179c963746ce60b9aaec1e89887ac4e0605129180c289fe2ead56200877f` |
+| `agx-t6050-image-proofs-20261008/final` | `qualification.json` | `40e4a1721b7e4aad3f7c5a7a1a99ceb87d626cb1239d531095f9835080076e29` |
+| `static-page-types-20261008` | `qualification.json` | `489b78a3bf256e75e4e1b1100e55f2e25ee59e0f8a3b9a86e38faeecdd721780` |
+| `g17-config-20261008` | `final-qualification-v2.json` | `a82b731d518630334c59710da44e3c8a41788c8d31f08259f3d578772cda4324` |
+| `special-insns-20261008` | `qualification.json` | `30ac4df57a0f9d2cef4fe1218d221f4f31ad941cf2d088f8a677ca44868d019b` |
+| `agx-t6050-topology-20261008/final` | `qualification.json` | `08fd4006fa1aa8563fc4ab4a90ba48985d284834e35f18cccfec52b611c64c18` |
+| `fpu-headers-20261008` | `qualification.json` | `c52fe2ee6f994e25d9690cd623338b69f85b18092a159bfa07d407daa6369998` |
+| `g17-caller-span-20261008` | `qualification.json` | `61b651601e28491fa91a15fee410fefe7219ff5572ee9189db9870f36fa23dcf` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -387,10 +453,8 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-G17 late configuration/channel/event recovery, further T6050 code contracts,
-LinuxKPI compiler controllers and desktop performance verdicts are active.
-The later G17 runtime commit `817216de` follows the snapshot above and will
-enter the next measured inventory.
+G17 event recovery, remaining T6050 image contracts, LinuxKPI compiler
+controllers and verified-root image tooling are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a

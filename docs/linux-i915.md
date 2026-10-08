@@ -653,7 +653,7 @@ incomplete.
 tests/linuxkpi/run.sh
 sh build-support/run-v-tool.sh tests/linuxkpi/nocache.v
 sh build-support/run-v-tool.sh tests/linuxkpi/asm_generated_headers.v
-python3 tests/linuxkpi/special_insns_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/special_insns.v
 sh build-support/run-v-tool.sh tests/linuxkpi/cpu_feature_policy.v
 sh build-support/run-v-tool.sh tests/linuxkpi/smp_types.v
 sh build-support/run-v-tool.sh tests/linuxkpi/smp_headers.v
