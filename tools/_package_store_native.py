@@ -29,13 +29,21 @@ def call(operation, arguments, namespace, *, controller=None):
     active = None
 
     class Owner:
-        def __init__(self, manager, method=None, kwargs=None, condition=None, function=None):
+        def __init__(self, manager, method=None, kwargs=None, condition=None, function=None, methods=None):
             self.manager, self.method, self.active = manager, method, True
             self.kwargs, self.condition, self.function = kwargs or {}, condition, function
+            self.methods = methods
         def __exit__(self, *error):
             if not self.active:
                 return False
             self.active = False
+            if self.methods is not None:
+                for path in self.methods:
+                    target = self.manager
+                    for name in path.split("."):
+                        target = getattr(target, name)
+                    target()
+                return False
             if self.method or self.function:
                 if self.condition and not getattr(self.manager, self.condition)():
                     return False
@@ -86,7 +94,14 @@ def call(operation, arguments, namespace, *, controller=None):
                 result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
             else:
                 result = target
-            return result if row.get("data") else retain(result)
+            if row.get("data"):
+                return result
+            ident = retain(result)
+            if "own_methods" in row:
+                owner = Owner(result, methods=row["own_methods"])
+                closers[ident] = owner
+                stack.push(owner)
+            return ident
         if method == "unbound_local":
             def unbound():
                 if False:
