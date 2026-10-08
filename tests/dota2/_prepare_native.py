@@ -47,10 +47,13 @@ def _exit_stream(manager, cause):
     try:
         raise cause.with_traceback(traceback)
     except BaseException:
+        replay = cause.__traceback__
+        cause.__traceback__ = traceback
         try:
             return bool(manager.__exit__(type(cause), cause, traceback))
         finally:
-            cause.__traceback__ = traceback
+            if cause.__traceback__ is replay:
+                cause.__traceback__ = traceback
 
 
 def _binary():

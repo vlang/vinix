@@ -26,10 +26,13 @@ def _exit(manager, error, traceback):
     try:
         raise error.with_traceback(traceback)
     except BaseException:
+        replay = error.__traceback__
+        error.__traceback__ = traceback
         try:
             return bool(manager.__exit__(type(error), error, traceback))
         finally:
-            error.__traceback__ = traceback
+            if error.__traceback__ is replay:
+                error.__traceback__ = traceback
 
 
 def _primitive(operation, row, context, owners):
