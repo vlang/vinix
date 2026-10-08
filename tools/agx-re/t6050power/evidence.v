@@ -77,6 +77,9 @@ pub fn query_evidence(reader EvidenceReader, operation string, request map[strin
 }
 
 pub fn query_image(data []u8, operation string, request map[string]j.Value) !j.Value {
+	if operation in ['_macho_segment_table', 'recover_t6050_pmp_patchbay'] {
+		return query_patchbay(data, operation, request)!
+	}
 	if operation in ['recover_t6050_power', 'recover_t6050_pmp_darts'] {
 		return query_topology(operation, request)!
 	}

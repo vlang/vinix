@@ -37,6 +37,14 @@ visited in numeric order, preserving the original SID-range result even for
 wide counts. `topology_test.v` keeps the complete independently authored
 synthetic topology and both original SGX/AGX rejection fixtures.
 
+The patchbay module owns the protected Mach-O segment table, RTKit identity
+selection and aligned patch-region record walk. It preserves version4/5 field
+locations, mapped span and file slice behavior, writable reporting, mandatory
+tags, ASCII replacement and exact rejection/struct diagnostics. Native virtual
+span arithmetic retains integer width until validated physical slicing. The
+independent synthetic preload-image fixtures retain complete results for all
+alignments and both segment protections; no real firmware image is committed.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V

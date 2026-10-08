@@ -4,6 +4,8 @@ Code bytes become explicit native-owned request data. The shared boundary is
 synchronous; its owned JSON is copied and released before this call returns.
 """
 from __future__ import annotations
+import json
+import struct
 from _native_extract import query
 
 
@@ -52,4 +54,12 @@ def _contract(image, name, functions, parameters):
             raise KeyError(message.removeprefix("KeyError: ")) from None
         if message.startswith("TypeError: "):
             raise TypeError(message.removeprefix("TypeError: ")) from None
+        if message.startswith("struct.error: "):
+            raise struct.error(message.removeprefix("struct.error: ")) from None
+        if message.startswith("OverflowError: "):
+            raise OverflowError(message.removeprefix("OverflowError: ")) from None
+        if message.startswith("UnicodeDecodeError: "):
+            fields = json.loads(message.removeprefix("UnicodeDecodeError: "))
+            raise UnicodeDecodeError(fields["encoding"], bytes.fromhex(fields["object"]),
+                                     fields["start"], fields["end"], fields["reason"]) from None
         raise
