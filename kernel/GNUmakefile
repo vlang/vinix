@@ -427,7 +427,9 @@ $(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
 # structured ABI metadata. Their headers contain no maintained algorithms.
 $(LINUXKPI_COBJ) $(LINUXKPI_OBJ) obj/linuxkpi/exchange128core.o obj/blob.c.o: $(LINUXKPI_GENERATED_HEADERS)
 
-LINUXKPI_ABI_GENERATOR := ../tests/linuxkpi/generate_abi.v $(wildcard ../tests/linuxkpi/hosttest/*.v) ../build-support/run-v-tool.sh ../build-support/find-v.sh
+LINUXKPI_V_TOOL_HELPERS := $(wildcard ../tests/linuxkpi/hosttest/*.v ../tests/linuxkpi/hosttest/*.h) ../build-support/run-v-tool.sh ../build-support/find-v.sh
+LINUXKPI_ABI_GENERATOR := ../tests/linuxkpi/generate_abi.v $(LINUXKPI_V_TOOL_HELPERS)
+LINUXKPI_BOUNDS_GENERATOR := ../tests/linuxkpi/generate_bounds.v $(LINUXKPI_V_TOOL_HELPERS)
 
 obj/linuxkpi/include/vinix/spinlock_adapters.h: linuxkpi/abi/spinlock.json $(LINUXKPI_ABI_GENERATOR) linuxkpi/headercore/primitive.v
 	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_abi.v $< $@
@@ -443,10 +445,10 @@ obj/linuxkpi/include/vinix/integer_policy.h: linuxkpi/abi/overflow.json $(LINUXK
 # when flags are unchanged. Header dependencies include all discovered inputs.
 .PHONY: linuxkpi-bounds-command
 obj/linuxkpi/.bounds-command: linuxkpi-bounds-command
-	python3 linuxkpi/generate-bounds.py --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --command-stamp $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_bounds.v --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --command-stamp $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
 
-$(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) obj/linuxkpi/.bounds-command linuxkpi/generate-bounds.py linuxkpi/upstream.py linuxkpi/upstream.json linuxkpi/include/generated/autoconf.h $(LINUXKPI_ARCHIVE) GNUmakefile $(V_CONFIG_STAMP)
-	python3 linuxkpi/generate-bounds.py --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --output $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
+$(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) obj/linuxkpi/.bounds-command $(LINUXKPI_BOUNDS_GENERATOR) linuxkpi/upstream.json linuxkpi/include/generated/autoconf.h $(LINUXKPI_ARCHIVE) GNUmakefile $(V_CONFIG_STAMP)
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_bounds.v --source-dir "$(LINUXKPI_SOURCE_DIR)" --archive "$(LINUXKPI_ARCHIVE)" --output $@ --cc "$(CC)" -- $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -std=gnu11
 # Native consumers must recompile after a compiler/config change even when
 # numeric bounds are equal. Mark successful validation newer than its inputs;
 # the standalone generator still preserves unchanged bytes and timestamps.

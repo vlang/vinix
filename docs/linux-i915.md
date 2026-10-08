@@ -664,7 +664,7 @@ python3 tests/linuxkpi/pgtable_type_test.py
 sh build-support/run-v-tool.sh tests/linuxkpi/pagefault.v
 sh build-support/run-v-tool.sh tests/linuxkpi/irq_context.v
 sh build-support/run-v-tool.sh tests/linuxkpi/uaccess.v
-python3 tests/linuxkpi/bounds_generation_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/bounds_generation.v
 python3 tests/linuxkpi/audit_generation_test.py
 python3 kernel/linuxkpi/audit.py
 python3 tests/linuxkpi/run_vm.py \
