@@ -26,9 +26,8 @@ _LOCK = threading.Lock()
 _BINARY = None
 
 
-def command(operation, **fields):
+def controller():
     global _BINARY
-    fields["host_arch"] = platform.machine()
     with _LOCK:
         if _BINARY is None:
             override = os.environ.get("VINIX_AGX_HOST_CONTROLLER")
@@ -47,6 +46,12 @@ def command(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
+    return _BINARY
+
+
+def command(operation, **fields):
+    fields["host_arch"] = platform.machine()
+    controller()
     if operation == "vm_stop_child":
         primitives = {
             "write": lambda fd: os.write(fd, b"\x01x"),

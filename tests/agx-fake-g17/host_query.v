@@ -174,6 +174,16 @@ fn evaluate(text string, inherited bool) map[string]json2.Any {
 }
 
 fn main() {
+	if os.args.len == 2 && os.args[1] == '--linux-guest-callback' {
+		row := hosttest.decode_json(os.get_raw_line()) or { eprintln(err); exit(1) }.as_map()
+		value := agxhost.linux_guest(row) or {
+			detail := if err is agxhost.GuestBindingFailure { err.value } else { {'message_hex': json2.Any(hex.encode(err.msg().bytes()))} }
+			println(json2.encode({'error': json2.Any(detail)}, escape_unicode: true))
+			return
+		}
+		println(json2.encode({'value': json2.Any(value)}))
+		return
+	}
 	if os.args.len == 4 && os.args[1] == '--stop-child-callback' {
 		agxhost.vm_stop_child(i32(os.args[2].int()), i32(os.args[3].int()), true) or {
 			println(json2.encode(json2.Any(failure(err, agxhost.Transcript{}, 'vm_stop_child'))))
