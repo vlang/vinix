@@ -4,6 +4,10 @@ import os
 import runtimefixture
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--child-boot' {
+		runtimefixture.run_boot(os.args[2]) or { panic(err) }
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--child-runtime' {
 		runtimefixture.run(os.args[2]) or { panic(err) }
 		return

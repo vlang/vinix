@@ -35,3 +35,17 @@ standard-library bindings and receive no algorithm retirement credit.
 The standalone musl-runtime-test.v entry and original unittest method names
 exercise the same native cases, qualified against the full frozen corpus on
 both host architectures and with ASan/UBSan.
+
+The nine complete BootclasspathTests cases and their DEX builders also run in
+V, frozen at source commit edb0b66cfcd29b150f36f246754130239548d6df and full
+file SHA256 414a3f237e77ecde182445ef6645f5636773e30b309c06ea4cc179cf5c98c4a7.
+The native corpus keeps every malformed DEX, required-class subset, preserved
+resource, deterministic JAR, duplicate-class, cached-download, strict-number
+and compiler/source receipt assertion. Complete original DEX bytes and full
+many-class map hashes/sizes are durable builder vectors. ZIP read/write,
+typed Python arguments and the request-local subprocess recorder are narrow
+standard-library bindings; production bootclasspath policy remains unchanged
+and receives no retirement credit here. A parent owns all scratch files even
+after a failed native assertion. ARM64, x86_64 and sanitizer runs compare the
+whole original corpus and preserve compatibility method names/filters.
+No Java compiler, network download, Android application or guest is executed.

@@ -1,0 +1,14 @@
+{
+  "original_source_sha256": "414a3f237e77ecde182445ef6645f5636773e30b309c06ea4cc179cf5c98c4a7",
+  "methods": [
+    "test_reads_real_dex_class_descriptor_and_bootstrap_count",
+    "test_rejects_invalid_or_escaping_dex_data",
+    "test_reconstructs_only_required_classfiles_and_rejects_missing_input",
+    "test_jar_replacement_preserves_resources_and_is_deterministic",
+    "test_rejects_duplicate_classes_across_multidex",
+    "test_rejects_corrupted_pinned_download_without_network",
+    "test_validates_real_dex_counts_and_pinned_compiler_receipt",
+    "test_rejects_library_receipt_that_lies_about_original_or_output_dex",
+    "test_rejects_checksum_consistent_dex_with_bootstrap_calls"
+  ]
+}
