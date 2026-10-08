@@ -274,7 +274,7 @@ def _build_snapshot(value):
 
 def _build_arguments(items, resources):
     return [resources[value] if kind == 'object' else resources['values'][value] if kind == 'owned'
-            else Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
+            else getattr(resources[value[0]], value[1]) if kind == 'attribute' else Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
             else value for kind, value in items]
 
 
@@ -357,6 +357,11 @@ def _build_primitive(operation, row, context, resources):
             result = list(pool.map(lambda item: build_call(row['operation'], {}, context,
                                values=dict(shared, item=item)), resources[row['records']]))
         return _register(resources, result)
+    if operation == 'pool_function':
+        with context[row['factory']](max_workers=row['workers']) as pool:
+            result = list(pool.map(lambda item: context[row['name']](*_build_arguments(row.get('before', []), resources),
+                                  item, *_build_arguments(row.get('after', []), resources)), resources[row['id']]))
+        return _register(resources, result)
     if operation == 'getattr':
         value = getattr(resources[row['id']], row['name'])
         return _register(resources, value) if row.get('object') else _build_snapshot(value)
@@ -378,17 +383,22 @@ def _build_primitive(operation, row, context, resources):
             error = resources['errors'][value['binding_error']] if 'binding_error' in value else getattr(_builtins, value['kind'])(value['message'])
             exception = (type(error), error, error.__traceback__)
         return _build_exit(manager, exception)
+    if operation == 'raise':
+        raise getattr(_builtins, row['kind'])(*_build_arguments(row.get('arguments', []), resources))
     if operation == 'exception_is':
         return isinstance(resources['errors'][row['error']['binding_error']],
                           tuple(getattr(_builtins, name) for name in row['kinds']))
     if operation == 'function':
-        value = context[row['name']](*_build_arguments(row.get('arguments', []), resources),
-                                    **row.get('options', {}))
+        options = dict(row.get('options', {}))
+        options.update({key: resources[value] for key, value in row.get('keyword_objects', {}).items()})
+        value = context[row['name']](*_build_arguments(row.get('arguments', []), resources), **options)
         return _register(resources, value) if row.get('object') else _build_snapshot(value)
     if operation == 'function_is':
         return context[row['name']] is context[row['reference']]
     if operation == 'print':
-        context.get('print', print)(row['data'], **row.get('options', {}))
+        options = dict(row.get('options', {}))
+        options.update({key: resources[value] for key, value in row.get('keyword_objects', {}).items()})
+        context.get('print', print)(row['data'], **options)
         return None
     return _primitive(operation, row, context, resources)
 
