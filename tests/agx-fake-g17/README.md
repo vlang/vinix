@@ -51,3 +51,23 @@ spawn attribute, including Rosetta callers and the fallback for single-slice
 executables. Mixed ARM/x86 controller and caller combinations preserve original
 fixture output and command arguments. These are host controller and native ABI
 checks; the separate VM runner retains its own guest deadlines and markers.
+
+The native guest builder also lives in `agxhost/`. `run_encode_native.py` keeps
+its original CLI and transports the caller's interpreter and inherited child
+environment. V owns source staging, target/compiler flags, immutable C reference
+selection, allocator guards, static linking, input hashes and the exact receipt.
+The unchanged kernel-gap harness receives the original timeout and pass/fail
+markers. Python's implicit Darwin child environment is captured per invocation;
+explicit generator environments retain their separate original values.
+
+All eight ARM/x86 encoder/verifier and native/frozen-C combinations produce
+byte-identical ELF inputs and receipts against the original Python builder on
+actual ARM, x86 and ASan controller profiles. Eighteen ordered failure controls
+per profile cover directory ownership, literal backslashes, symlink loops,
+compiler/reference failures and allocation guards. Four inherited-environment
+pairs per profile compare every raw child environment field. Three native tests
+per profile include source retirement and always enabled ASan fake stacks.
+Fresh encoder and verifier guests pass on both architectures using explicitly
+hashed prepared kernels; these results validate the new builder and fixture
+inputs without claiming fresh kernel builds. Original source and receipts are
+under `~/.cache/vinix-python-to-v/agx-native-builder-20261008/`.

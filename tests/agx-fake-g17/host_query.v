@@ -24,6 +24,11 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 		out.generate_trace(root, (row['output'] or { return error('Missing output') }).str(), row['arch'] or { json2.Any('arm64') }.str(), (row['temp_dir'] or { return error('Missing temp_dir') }).str())!
 	} else if operation == 'trace_test' {
 		out.trace_test(root, (row['baseline'] or { return error('Missing baseline') }).str(), (row['temp_dir'] or { return error('Missing temp_dir') }).str())!
+	} else if operation == 'native_fixture' {
+		environment := agxhost.native_environment(row['inherited_environment_hex'] or { json2.Any('') }.str())!
+		return out.native_fixture(root, row['arch'] or { json2.Any('') }.str(), row['kernel'] or { json2.Any('') }.str(),
+			row['state'] or { json2.Any('') }.str(), row['reference'] or { json2.Any('') }.str(), row['fixture'] or { json2.Any('encoder') }.str(),
+			row['timeout_text'] or { json2.Any('600') }.str(), row['python'] or { json2.Any('python3') }.str(), environment)!
 	} else {
 		return error('Unknown AGX host operation ' + operation)
 	}
@@ -85,6 +90,10 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 		response['argument_text'] = if err.has_argument { j.encode(err.argument, false) } else { 'null' }
 		response['tuple_argument'] = err.tuple_argument
 	}
+	if err is agxhost.NativeFailure {
+		response['kind'] = err.kind
+		if err.kind == 'NativeResolveError' { response['path_hex'] = hex.encode(err.message.bytes()) }
+	}
 	if (response['kind'] or { json2.Any('') }).str() == 'CalledProcessError' {
 		response['path_arguments'] = out.path_arguments.map(json2.Any(it))
 	}
@@ -94,7 +103,7 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 fn evaluate(text string, inherited bool) map[string]json2.Any {
 	mut out := agxhost.Transcript{ inherit: inherited }
 	mut row := hosttest.decode_json(text) or { return failure(err, out, '') }.as_map()
-	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline'] {
+	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline', 'kernel', 'state', 'reference', 'python'] {
 		if encoded := row[name + '_hex'] {
 			bytes := hex.decode(encoded.str()) or { return failure(err, out, '') }
 			row[name] = bytes.bytestr()

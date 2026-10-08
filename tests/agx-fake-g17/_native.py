@@ -36,7 +36,7 @@ def command(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
-    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline"):
+    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline", "kernel", "state", "reference", "python"):
         if name in fields:
             fields[name + "_hex"] = os.fsencode(fields.pop(name)).hex()
     with tempfile.TemporaryDirectory(prefix="vinix-agx-result-") as directory:
@@ -75,4 +75,8 @@ def command(operation, **fields):
     if response["kind"] == "JSONDecodeError":
         json.loads(json.loads(response["argument_text"]))
         raise ValueError("native JSON decoder disagreed with the original error formatter")
-    raise {"ValueError": ValueError, "RuntimeError": RuntimeError}[response["kind"]](response["error"])
+    if response["kind"] == "NativeResolveError":
+        Path(os.fsdecode(bytes.fromhex(response["path_hex"]))).resolve()
+        raise RuntimeError("native path resolver disagreed with the original error formatter")
+    raise {"ValueError": ValueError, "RuntimeError": RuntimeError,
+           "SpecialFileError": shutil.SpecialFileError}[response["kind"]](response["error"])

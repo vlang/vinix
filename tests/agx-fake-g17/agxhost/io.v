@@ -108,6 +108,10 @@ pub fn (mut out Transcript) generate_module(source string, output string, arch s
 }
 
 pub fn (mut out Transcript) compile_module(source string, output string, arch string, flags []string) ! {
+	out.compile_module_environment(source, output, arch, flags, os.environ())!
+}
+
+fn (mut out Transcript) compile_module_environment(source string, output string, arch string, flags []string, environment map[string]string) ! {
 	resolved := hosttest.module_resolve(source)!
 	generated := hosttest.replace_suffix(output, '.c')
 	out.generate_module(resolved, hosttest.module_resolve(generated)!, if arch == 'aarch64' {
@@ -126,5 +130,5 @@ pub fn (mut out Transcript) compile_module(source string, output string, arch st
 	mut argv := filtered.clone()
 	argv << ['-Wno-unused-function', '-Wno-unused-parameter', '-fPIC', '-I', resolved, '-c', generated,
 		'-o', output]
-	out.command(argv, os.environ())!
+	out.command(argv, environment)!
 }
