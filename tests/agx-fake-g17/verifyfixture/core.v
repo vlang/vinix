@@ -138,6 +138,13 @@ fn verify(fixture &C.vg17_verifier_fixture, writes &C.vinix_fake_g17_expected_wr
 fn verify_resource(fixture &C.vg17_verifier_fixture, writes &C.vinix_fake_g17_expected_write, ranges &C.vinix_fake_g17_address_range, resource &C.vinix_fake_g17_resource_reference, count u32, report &C.vinix_fake_g17_report) i32 {
 	return unsafe { C.vinix_fake_g17_verify(&fixture.command[0], sizeof(fixture.command), &fixture.descriptor[0], sizeof(fixture.descriptor), gpu_base, writes, 4, ranges, 1, resource, count, report) }
 }
+// All interior views are consumed inside the owning caller's stack frame.
+// Carry its address as a scalar past the compiler's conservative fixed-array
+// reference promotion; the original buffers and allocation policy stay intact.
+fn fixture_address(address usize) &C.vg17_verifier_fixture {
+	return unsafe { &C.vg17_verifier_fixture(address) }
+}
+
 fn test_exact_trace() i32 {
 	unsafe {
 		mut fixture := C.vg17_verifier_fixture{}
@@ -146,38 +153,38 @@ fn test_exact_trace() i32 {
 		mut report := C.vinix_fake_g17_report{}
 		counts := [u16(1), u16(1), u16(1), u16(1)]!
 		write_count := u32(4)
-		build_fixture(&fixture, &writes[0], &counts[0])
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_OK, 153) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_OK, 153) { return 1 }
 		if !check(report.observed_writes == write_count, 154, c'report.observed_writes == write_count') { return 1 }
 		if !check(report.expected_writes == write_count, 155, c'report.expected_writes == write_count') { return 1 }
-		stream(&fixture, 0)[0] ^= u8(8)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_SELECTOR, 158) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		stream(&fixture, 0)[0] ^= u8(C.VINIX_FAKE_G17_MODE_FIELD)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_MODE, 162) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		stream(&fixture, 0)[0] ^= u8(2)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_TEMPLATE_BITS, 166) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		stream(&fixture, 0)[4] ^= u8(0x80)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_VALUE, 170) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
+		stream(fixture_address(usize(&fixture)), 0)[0] ^= u8(8)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_SELECTOR, 158) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		stream(fixture_address(usize(&fixture)), 0)[0] ^= u8(C.VINIX_FAKE_G17_MODE_FIELD)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_MODE, 162) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		stream(fixture_address(usize(&fixture)), 0)[0] ^= u8(2)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_TEMPLATE_BITS, 166) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		stream(fixture_address(usize(&fixture)), 0)[4] ^= u8(0x80)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_VALUE, 170) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
 		writes[0].value = address_base + 1
-		write_le64(stream(&fixture, 0) + 4, writes[0].value)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_ADDRESS, 175) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
+		write_le64(stream(fixture_address(usize(&fixture)), 0) + 4, writes[0].value)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_ADDRESS, 175) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
 		writes[0].pass = 1
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_PASS_ORDER, 179) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		metadata(&fixture, 0)[10]++
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_STREAM_COUNTERS, 183) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		summary(&fixture, 0)[10] = 1
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_DESCRIPTOR_SUMMARY, 187) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
-		metadata(&fixture, 0)[0] ^= u8(0x10)
-		if !check_error(verify(&fixture, &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_STREAM_ADDRESS, 191) { return 1 }
-		build_fixture(&fixture, &writes[0], &counts[0])
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_PASS_ORDER, 179) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		metadata(fixture_address(usize(&fixture)), 0)[10]++
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_STREAM_COUNTERS, 183) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		summary(fixture_address(usize(&fixture)), 0)[10] = 1
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_DESCRIPTOR_SUMMARY, 187) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		metadata(fixture_address(usize(&fixture)), 0)[0] ^= u8(0x10)
+		if !check_error(verify(fixture_address(usize(&fixture)), &writes[0], write_count, &ranges[0], 1, &report), C.VINIX_FAKE_G17_STREAM_ADDRESS, 191) { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
 		if !check(C.vinix_fake_g17_verify(&fixture.command[0], usize(C.VINIX_FAKE_G17_COMMAND_BYTES) - 1, &fixture.descriptor[0], sizeof(fixture.descriptor), gpu_base, &writes[0], write_count, &ranges[0], 1, nil, 0, &report) == C.VINIX_FAKE_G17_COMMAND_TOO_SMALL, 194, c'vinix_fake_g17_verify(fixture.command, VINIX_FAKE_G17_COMMAND_BYTES - 1, fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, write_count, ranges, 1, NULL, 0, &report) == VINIX_FAKE_G17_COMMAND_TOO_SMALL') { return 1 }
 		if !check(C.vinix_fake_g17_verify(&fixture.command[0], sizeof(fixture.command), &fixture.descriptor[0], usize(C.VINIX_FAKE_G17_DESCRIPTOR_BYTES) - 1, gpu_base, &writes[0], write_count, &ranges[0], 1, nil, 0, &report) == C.VINIX_FAKE_G17_DESCRIPTOR_TOO_SMALL, 199, c'vinix_fake_g17_verify(fixture.command, sizeof(fixture.command), fixture.descriptor, VINIX_FAKE_G17_DESCRIPTOR_BYTES - 1, GPU_BASE, writes, write_count, ranges, 1, NULL, 0, &report) == VINIX_FAKE_G17_DESCRIPTOR_TOO_SMALL') { return 1 }
 		if !check(C.vinix_fake_g17_verify(&fixture.command[0], sizeof(fixture.command), &fixture.descriptor[0], sizeof(fixture.descriptor), u64(0xffffffffffffffff) - u64(0x50), &writes[0], write_count, &ranges[0], 1, nil, 0, &report) == C.VINIX_FAKE_G17_STREAM_ADDRESS, 204, c'vinix_fake_g17_verify(fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), UINT64_MAX - 0x50, writes, write_count, ranges, 1, NULL, 0, &report) == VINIX_FAKE_G17_STREAM_ADDRESS') { return 1 }
@@ -192,10 +199,10 @@ fn test_recovered_call_site_scale() i32 {
 		mut report := C.vinix_fake_g17_report{}
 		counts := [u16(79), u16(79), u16(78), u16(78)]!
 		if !check(writes != nil, 229, c'writes != NULL') { return 1 }
-		build_fixture(&fixture, writes, &counts[0])
-		if !check(verify(&fixture, writes, 314, &ranges[0], 1, &report) == C.VINIX_FAKE_G17_OK, 231, c'verify(&fixture, writes, recovered_calls, ranges, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), writes, &counts[0])
+		if !check(verify(fixture_address(usize(&fixture)), writes, 314, &ranges[0], 1, &report) == C.VINIX_FAKE_G17_OK, 231, c'verify(&fixture, writes, recovered_calls, ranges, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		if !check(report.observed_writes == 314, 233, c'report.observed_writes == recovered_calls') { return 1 }
-		if !check(verify(&fixture, writes, 313, &ranges[0], 1, &report) == C.VINIX_FAKE_G17_WRITE_COUNT, 237, c'verify(&fixture, writes, recovered_calls - 1, ranges, 1, &report) == VINIX_FAKE_G17_WRITE_COUNT') { return 1 }
+		if !check(verify(fixture_address(usize(&fixture)), writes, 313, &ranges[0], 1, &report) == C.VINIX_FAKE_G17_WRITE_COUNT, 237, c'verify(&fixture, writes, recovered_calls - 1, ranges, 1, &report) == VINIX_FAKE_G17_WRITE_COUNT') { return 1 }
 		C.free(writes)
 	}
 	return 0
@@ -208,32 +215,32 @@ fn test_descriptor_resource_provenance() i32 {
 		mut resource := C.vinix_fake_g17_resource_reference{address: address_base + 0x100, size: 0x80, field: u32(C.VINIX_FAKE_G17_RESOURCE_DEPTH_BUFFER_LOAD), provenance: u32(C.VINIX_FAKE_G17_PROVENANCE_GPU_VA), descriptor_member: u32(C.VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING), access: u32(C.VINIX_FAKE_G17_VM_READ)}
 		mut report := C.vinix_fake_g17_report{}
 		counts := [u16(1), u16(1), u16(1), u16(1)]!
-		build_fixture(&fixture, &writes[0], &counts[0])
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 264, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 264, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		resource.field = u32(C.VINIX_FAKE_G17_RESOURCE_PARTIAL_STORE_PIPELINE)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 272, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 272, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		resource.field = u32(C.VINIX_FAKE_G17_RESOURCE_FIELD_COUNT)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 277, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 277, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
 		resource.field = u32(C.VINIX_FAKE_G17_RESOURCE_DEPTH_BUFFER_LOAD)
 		resource.access = u32(C.VINIX_FAKE_G17_VM_WRITE)
 		ranges[0].access = u32(C.VINIX_FAKE_G17_VM_READ)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 285, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 285, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
 		resource.access = u32(C.VINIX_FAKE_G17_VM_READ)
 		ranges[0].access |= u32(C.VINIX_FAKE_G17_VM_WRITE)
 		resource.address = address_base + 0xff0
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 293, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 293, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
 		resource.address = address_base + 0x100
 		resource.descriptor_member = 0x100
 		resource.descriptor_bytes = 8
 		write_le64(&fixture.descriptor[resource.descriptor_member], resource.address)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 303, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_OK, 303, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		fixture.descriptor[resource.descriptor_member] ^= u8(1)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_VALUE, 308, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_VALUE') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_VALUE, 308, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_VALUE') { return 1 }
 		resource.descriptor_member = u32(C.VINIX_FAKE_G17_DESCRIPTOR_MEMBER_PENDING)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 314, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 314, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
 		resource.descriptor_bytes = 0
 		resource.provenance = u32(C.VINIX_FAKE_G17_PROVENANCE_CONSTANT)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 320, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resource, 1, &report) == C.VINIX_FAKE_G17_RESOURCE_METADATA, 320, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, &resource, 1, &report) == VINIX_FAKE_G17_RESOURCE_METADATA') { return 1 }
 	}
 	return 0
 }
@@ -248,20 +255,20 @@ fn test_depth_stencil_resource_rejections() i32 {
 		]!
 		mut report := C.vinix_fake_g17_report{}
 		counts := [u16(1), u16(1), u16(1), u16(1)]!
-		build_fixture(&fixture, &writes[0], &counts[0])
+		build_fixture(fixture_address(usize(&fixture)), &writes[0], &counts[0])
 		write_le64(&fixture.descriptor[resources[0].descriptor_member], resources[0].address)
 		write_le64(&fixture.descriptor[resources[1].descriptor_member], resources[1].address)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resources[0], 1, &report) == C.VINIX_FAKE_G17_OK, 365, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resources[0], 1, &report) == C.VINIX_FAKE_G17_OK, 365, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 1, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		resources[0].address = address_base + 0x2000
 		write_le64(&fixture.descriptor[resources[0].descriptor_member], resources[0].address)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resources[0], 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 375, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resources[0], 1, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 375, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 1, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
 		resources[0].address = address_base + 0x200
 		write_le64(&fixture.descriptor[resources[0].descriptor_member], resources[0].address)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 386, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_RESOURCE_ADDRESS, 386, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_ADDRESS') { return 1 }
 		ranges[0].access |= u32(C.VINIX_FAKE_G17_VM_WRITE)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_OK, 391, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_OK') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_OK, 391, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_OK') { return 1 }
 		fixture.descriptor[resources[1].descriptor_member] ^= u8(1)
-		if !check(verify_resource(&fixture, &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_RESOURCE_VALUE, 397, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_VALUE') { return 1 }
+		if !check(verify_resource(fixture_address(usize(&fixture)), &writes[0], &ranges[0], &resources[0], 2, &report) == C.VINIX_FAKE_G17_RESOURCE_VALUE, 397, c'vinix_fake_g17_verify( fixture.command, sizeof(fixture.command), fixture.descriptor, sizeof(fixture.descriptor), GPU_BASE, writes, 4, ranges, 1, resources, 2, &report) == VINIX_FAKE_G17_RESOURCE_VALUE') { return 1 }
 	}
 	return 0
 }
