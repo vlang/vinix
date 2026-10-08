@@ -6,12 +6,15 @@ import crypto.sha256
 #include <sys/stat.h>
 
 fn C.fstat(i32, &C.stat) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.lseek(i32, i64, i32) i64
 
 pub struct FileError {
-	message   string
-	number    int
-	filename  string
-	filename2 string
+	message          string
+	number           int
+	filename         string
+	filename2        string
+	filename_is_path bool
 }
 
 pub fn (e FileError) msg() string { return e.message }
@@ -70,12 +73,13 @@ fn read_part(mut stream os.File, count int, path string) ![]u8 {
 	mut bytes := []u8{len: count}
 	mut cursor := 0
 	for cursor < count {
-		n := stream.read_into_ptr(unsafe { &u8(bytes.data) + cursor }, count - cursor) or {
-			if err is os.Eof { break }
+		n := C.read(i32(stream.fd), unsafe { &u8(bytes.data) + cursor }, usize(count - cursor))
+		if n < 0 {
+			if C.errno == C.EINTR { continue }
 			return file_error(path)
 		}
 		if n == 0 { break }
-		cursor += n
+		cursor += int(n)
 	}
 	return bytes[..cursor].clone()
 }
@@ -111,7 +115,7 @@ pub fn check_elf(path string, required bool) ! {
 	if entry_size != 56 || count == 0 || offset > size || u64(count) * entry_size > size - offset {
 		return error('ART overlay has invalid ELF program headers: ${path}')
 	}
-	stream.seek(i64(offset), .start) or { return file_error('') }
+	if C.lseek(i32(stream.fd), i64(offset), C.SEEK_SET) < 0 { return file_error('') }
 	headers := read_part(mut stream, int(count) * int(entry_size), '')!
 	mut loads := 0
 	for index in 0 .. int(count) {

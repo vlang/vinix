@@ -28,7 +28,7 @@ def _run(arguments, **options):
         return subprocess.CompletedProcess(arguments, process.returncode, output, errors)
 
 
-def request(operation, **fields):
+def _binary():
     global _BINARY
     with _LOCK:
         if _BINARY is None:
@@ -47,26 +47,55 @@ def request(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
+    return _BINARY
+
+
+def _payload(operation, fields):
     # Unsupported observed values are type-check failures in the controller.
     # Marshal them as null, including non-finite floats accepted by json.loads.
-    payload = json.loads(json.dumps({"operation": operation, **fields}, skipkeys=True,
+    return json.loads(json.dumps({"operation": operation, **fields}, skipkeys=True,
                                    default=lambda _: None), parse_constant=lambda _: None)
-    result = _run([str(_BINARY)], input=json.dumps(payload) + "\n",
+
+
+def request(operation, **fields):
+    result = _run([str(_binary())], input=json.dumps(_payload(operation, fields)) + "\n",
                             text=True, capture_output=True)
-    value = json.loads(result.stdout)
+    return _response(json.loads(result.stdout))
+
+
+def command(operation, **fields):
+    # Inherit child output, while a separate result file carries exceptions.
+    with tempfile.TemporaryDirectory(prefix="vinix-android-command-") as directory:
+        result = Path(directory) / "result.json"
+        _run([str(_binary()), "--command", str(result),
+              json.dumps(_payload(operation, fields))], text=True)
+        return _response(json.loads(result.read_text()))
+
+
+def _response(value):
     if "result" in value:
         return value["result"]
     kind = value["kind"]
+    if kind == "PlainOSError":
+        raise OSError(value["error"])
+    if kind == "SystemExit":
+        raise SystemExit(value["error"])
+    if kind == "CalledProcessError":
+        raise subprocess.CalledProcessError(value["returncode"], value["args"])
+    if kind == "BadZipFile":
+        import zipfile
+        raise zipfile.BadZipFile(value["error"])
     if kind == "SymlinkLoop":
         raise RuntimeError(f"Symlink loop from {value['filename']!r}")
     if kind == "UnicodeDecodeError":
         raise UnicodeDecodeError(value["encoding"], bytes.fromhex(value["object"]),
                                  value["start"], value["end"], value["reason"])
     if kind == "OSError":
+        filename = Path(value["filename"]) if value.get("filename_is_path") else value["filename"] or None
         if value.get("filename2"):
-            raise OSError(value["errno"], value["error"], value["filename"] or None,
+            raise OSError(value["errno"], value["error"], filename,
                           None, value["filename2"])
-        raise OSError(value["errno"], value["error"], value["filename"] or None)
+        raise OSError(value["errno"], value["error"], filename)
     if kind == "struct.error":
         raise struct.error(value["error"])
     if kind == "TypeError":

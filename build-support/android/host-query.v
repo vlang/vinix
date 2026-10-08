@@ -4,6 +4,14 @@ import androidhost
 import os
 
 fn main() {
+	if os.args.len == 4 && os.args[1] == '--command' {
+		response := androidhost.query(os.args[3]) or {
+			os.write_file(os.args[2], androidhost.error_json(err)) or { panic(err) }
+			return
+		}
+		os.write_file(os.args[2], '{"result":' + response + '}') or { panic(err) }
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--install-query' {
 		os.cp(os.executable(), os.args[2]) or {
 			eprintln(err)

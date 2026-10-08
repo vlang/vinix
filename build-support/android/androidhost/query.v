@@ -61,12 +61,35 @@ pub fn query(request string) !string {
 			info := dex_info(hex.decode(text(row, 'data')!)!)!
 			Value([Value(info.classes.map(Value(it))), Value(info.callsites)])
 		}
+		'build_probe' {
+			build_probe(row)!
+			Value(json2.null)
+		}
 		else { return error('unknown Android host operation ' + operation) }
 	}
 	return encode(result)
 }
 
 pub fn error_json(err IError) string {
+	if err is ProbeFilesystemError {
+		return encode(Value(map[string]Value{
+			'kind':  Value('PlainOSError')
+			'error': Value(err.msg())
+		}))
+	}
+	if err is ProbeExit || err is ZipError {
+		return encode(Value(map[string]Value{
+			'kind':  Value(if err is ProbeExit { 'SystemExit' } else { 'BadZipFile' })
+			'error': Value(err.msg())
+		}))
+	}
+	if err is ProbeCommandError {
+		return encode(Value(map[string]Value{
+			'kind':       Value('CalledProcessError')
+			'args':       Value(err.arguments.map(Value(it)))
+			'returncode': Value(err.status)
+		}))
+	}
 	if err is SymlinkLoop {
 		return encode(Value(map[string]Value{
 			'kind':     Value('SymlinkLoop')
@@ -81,6 +104,7 @@ pub fn error_json(err IError) string {
 			'filename': Value(err.filename)
 		}
 		if err.filename2 != '' { fields['filename2'] = Value(err.filename2) }
+		if err.filename_is_path { fields['filename_is_path'] = Value(true) }
 		return encode(Value(fields))
 	}
 	if err is AsciiError {

@@ -255,7 +255,8 @@ def stage(args: argparse.Namespace, lock: dict, downloads: Path) -> Path:
                    ROOT / "build-support/musl/alpine-1.2.6/manifest.json",
                    ROOT / "build-support/java-cacerts.py",
                    SUPPORT / "_native.py", SUPPORT / "host-query.v",
-                   *sorted((SUPPORT / "androidhost").glob("*.v"))):
+                   *sorted((SUPPORT / "androidhost").glob("*.v")),
+                   *sorted((SUPPORT / "androidhost").glob("*.h"))):
         inputs += source.read_bytes()
     cache_key = hashlib.sha256(inputs).hexdigest()
     cache = args.build_dir / ".staging-cache-key"
