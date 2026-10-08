@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+tool_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec sh "$tool_dir/../../build-support/run-v-tool.sh" "$tool_dir/recover_t8103_adt.v" "$@"

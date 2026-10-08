@@ -88,7 +88,7 @@ build InitData.
 
 ## Native Apple DeviceTree
 
-`tools/agx-re/recover_t8103_adt.py` reads a base-M1 Apple DeviceTree and Apple's
+`tools/agx-re/recover_t8103_adt` reads a base-M1 Apple DeviceTree and Apple's
 own `AGXG13G` and reports what the native path is actually short of. Both are
 staged under `/System/Volumes/Preboot/*/restore-staged` on **any** Apple Silicon
 Mac — a macOS install keeps one kernel collection and one DeviceTree per
@@ -123,7 +123,7 @@ above was re-run against a real MacBookAir10,1 (j313ap, t8103) on macOS 26.3.1:
 # on the M1
 ioreg -rw0 -p IODeviceTree -n sgx -d1 -a > sgx.plist
 # here
-./recover_t8103_adt.py --live-sgx sgx.plist
+./recover_t8103_adt --live-sgx sgx.plist
 ```
 
 A live tree has 68 sgx properties against the template's 53, and it supplies
