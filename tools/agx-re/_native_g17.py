@@ -1,5 +1,6 @@
 """Narrow import adapter for the native V G17 decoding and Mach-O core."""
 import struct
+import json
 from _native_extract import query as _native_query
 
 
@@ -14,6 +15,14 @@ def _query(data, operation, **options):
             raise IndexError(message.removeprefix("IndexError: ")) from None
         if message.startswith("KeyError: "):
             raise KeyError(message.removeprefix("KeyError: ")) from None
+        if message.startswith("TypeError: "):
+            raise TypeError(message.removeprefix("TypeError: ")) from None
+        if message.startswith("OverflowError: "):
+            raise OverflowError(message.removeprefix("OverflowError: ")) from None
+        if message.startswith("UnicodeDecodeError: "):
+            record = json.loads(message.removeprefix("UnicodeDecodeError: "))
+            raise UnicodeDecodeError("utf-8", bytes.fromhex(record["bytes"]),
+                                     record["start"], record["end"], record["reason"]) from None
         raise
 
 

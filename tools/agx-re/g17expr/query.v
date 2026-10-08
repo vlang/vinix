@@ -57,17 +57,29 @@ pub fn fixture_image(request map[string]j.Value) !FixtureImage {
 }
 
 pub fn handles(operation string) bool {
-	return operation in ['find_dominating_g17_register_write', 'g17_definition_dominates_use',
-		'trace_g17_known_call_return', 'trace_g17_stack_load', 'trace_g17_register_copy',
-		'trace_g17_condition_expression', 'trace_g17_four_way_compare_merge',
-		'trace_g17_optional_bit_set_merge', 'trace_g17_cl_base_merge', 'trace_g17_cl_mode_bit_merge',
-		'trace_g17_control_flow_merge', 'trace_g17_value_expression', 'classify_g17_value_argument',
-		'recover_g17_register_selectors', 'recover_g17_inline_register_records']
+	return command_handles(operation) || operation in [
+		'find_dominating_g17_register_write',
+		'g17_definition_dominates_use',
+		'trace_g17_known_call_return',
+		'trace_g17_stack_load',
+		'trace_g17_register_copy',
+		'trace_g17_condition_expression',
+		'trace_g17_four_way_compare_merge',
+		'trace_g17_optional_bit_set_merge',
+		'trace_g17_cl_base_merge',
+		'trace_g17_cl_mode_bit_merge',
+		'trace_g17_control_flow_merge',
+		'trace_g17_value_expression',
+		'classify_g17_value_argument',
+		'recover_g17_register_selectors',
+		'recover_g17_inline_register_records',
+	]
 }
 
 // This JSON entrypoint preserves the remaining Python callers while recovery
 // algorithms and native tests use typed instructions and image providers.
 pub fn query(data []u8, operation string, request map[string]j.Value) !j.Value {
+	if command_handles(operation) { return command_query(data, operation, request) }
 	if operation == 'recover_g17_register_selectors' || operation == 'recover_g17_inline_register_records' {
 		if 'symbols' in request {
 			source := fixture_image(request)!

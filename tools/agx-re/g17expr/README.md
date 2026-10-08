@@ -38,3 +38,26 @@ ASan/UBSan executables. Machine-local controls remain under
 `~/.cache/vinix-python-to-v/g17-expression-20261008/`; the repository migration
 record holds the durable evidence summary. These are host analysis checks;
 physical Apple GPU behavior is outside this stage.
+
+The command recovery extension owns record parsing maps, checked scatter copies,
+normalized descriptor provenance, register-emission graphs and predicates,
+command-pool geometry and reclamation, queue/device/runtime/scheduler inputs,
+and the handoff/dual-role/RTBuddy transport contracts. Fixed instruction and
+field maps are V literals; image reads, target validation, graph traversal and
+metadata reconstruction execute in native V. Provider fixture addresses remain
+arbitrary precision through comparisons. Checked binary reads preserve negative
+relative offsets and index-overflow diagnostics; pool names use strict UTF-8.
+
+The 35 original command tests are retained as independent byte fixtures and
+complete results in `fixtures/original-commands.json`. Native tests also check
+wide addresses, negative byte indexes, UTF-8 error spans and nonfinite metadata.
+The compatibility adapter transports render metadata as JSON text so native
+parsing preserves NaN/Infinity and Python's integer conversion errors. Its only
+exception work is constructing the original built-in exception from native
+error metadata. There is no Python analysis implementation behind these calls.
+
+Command qualification is frozen under
+`~/.cache/vinix-python-to-v/g17-command-20261008/`, with full original-body
+replay, randomized/mutated full-output controls, actual-image comparisons,
+ARM64 and x86-64 shared ABI checks and host sanitizer gates. Existing power
+suites qualify the two visibility-only shared JSON/integer helper changes.

@@ -75,7 +75,7 @@ fn decimal_string(text string) !big.Integer {
 	return if negative { number.neg() } else { number }
 }
 
-fn decimal_integer(value j.Value) !big.Integer {
+pub fn decimal_integer(value j.Value) !big.Integer {
 	return match value {
 		bool { big.integer_from_int(if value { 1 } else { 0 }) }
 		j.Number {
@@ -126,7 +126,7 @@ fn decoded_strings_contain(source string, marker string) bool {
 
 // Python's JSON reader accepts three non-finite numeric constants. Give the
 // strict JSON decoder unique string tokens, then restore their numeric kind.
-fn decode_device_json(source string) !j.Value {
+pub fn decode_device_json(source string) !j.Value {
 	mut marker := '__vinix_g17_nonfinite_'
 	for source.contains(marker) || decoded_strings_contain(source, marker) { marker += '_' }
 	mut rewritten := strings.new_builder(source.len)
