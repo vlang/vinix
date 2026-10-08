@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `42c0c8dd4e40b170d9035c88eaf879e246f2da21`,
+at source commit `51de8b2a1ce7097de3dbe1d6bb77208bbea1db02`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 495 | 1,866,663 | 4.47% |
-| Python | 476 | 3,095,722 | 7.41% |
-| Shell | 307 | 1,288,912 | 3.08% |
+| C | 495 | 1,866,663 | 4.46% |
+| Python | 474 | 3,052,180 | 7.29% |
+| Shell | 307 | 1,288,992 | 3.08% |
 
-All `.v` files are classified as V. The resulting V share is 77.86%, with no
+All `.v` files are classified as V. The resulting V share is 77.99%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 42c0c8dd4e40b170d9035c88eaf879e246f2da21 --breakdown --json
+github-linguist --rev 51de8b2a1ce7097de3dbe1d6bb77208bbea1db02 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -562,11 +562,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/ioreg_adt.py` | 3,303 |
 | `apple-boot/tests/qemu_iboot.py` | 16,230 |
 | `apple-boot/tests/run-v-core.py` | 3,917 |
-| `build-support/_cache_native.py` | 1,934 |
+| `build-support/_cache_native.py` | 2,147 |
 | `build-support/alpine-resolve.py` | 2,946 |
-| `build-support/android/_native.py` | 2,565 |
+| `build-support/android/_native.py` | 3,146 |
 | `build-support/android/art-bootclasspath.py` | 16,397 |
-| `build-support/android/art-runtime.py` | 17,713 |
+| `build-support/android/art-runtime.py` | 10,978 |
 | `build-support/android/atl-dex.py` | 3,456 |
 | `build-support/android/build.py` | 21,890 |
 | `build-support/android/compile-v-atl-configuration.py` | 622 |
@@ -579,7 +579,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/desktop-build-key.py` | 4,588 |
 | `build-support/dhewm3/build.py` | 7,608 |
 | `build-support/dictionary/prepare.py` | 5,197 |
-| `build-support/dota2/compile-v-compat.py` | 1,457 |
+| `build-support/dota2/compile-v-compat.py` | 393 |
 | `build-support/dota2/mesa-build.py` | 15,669 |
 | `build-support/dota2/qemu-stage.py` | 14,044 |
 | `build-support/dota2/venus-build.py` | 10,283 |
@@ -609,7 +609,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/roblox/build.py` | 7,918 |
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
 | `build-support/security-tools/stage.py` | 3,614 |
-| `build-support/staging-cache.py` | 3,403 |
+| `build-support/staging-cache.py` | 2,980 |
 | `build-support/steam/compile-v-robust.py` | 2,967 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
@@ -623,8 +623,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/patch-wine-x86_64-context.py` | 4,549 |
 | `build-support/x86-translation/patch-wine-x86_64-qemu.py` | 3,263 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
-| `desktop/tools/build_cache.py` | 4,257 |
-| `desktop/tools/build_voffice.py` | 16,429 |
+| `desktop/tools/build_cache.py` | 848 |
+| `desktop/tools/build_voffice.py` | 13,112 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 20,406 |
 | `desktop/tools/input.py` | 8,219 |
@@ -817,8 +817,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/run-test.py` | 5,348 |
 | `tests/dota2/run.py` | 28,015 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
-| `tests/dota2/test-early-client.py` | 3,634 |
-| `tests/dota2/test-mmap32.py` | 2,868 |
 | `tests/dota2/vulkan-run-test.py` | 2,434 |
 | `tests/dota2/vulkan-run.py` | 14,280 |
 | `tests/dota2/vulkan-stage-test.py` | 18,459 |
@@ -1007,10 +1005,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 149,465 |
+| `tools/agx-re/recover_g17_abi.py` | 129,009 |
 | `tools/agx-re/recover_t6050_power.py` | 18,468 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 23,951 |
+| `tools/agx-re/test_recover_g17_abi.py` | 21,521 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
@@ -1212,7 +1210,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/browsers/desktop-init.sh` | 5,084 |
 | `tests/browsers/firefox-init.sh` | 3,839 |
 | `tests/browsers/pkg-init.sh` | 1,786 |
-| `tests/build-cache/run.sh` | 307 |
+| `tests/build-cache/run.sh` | 387 |
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |

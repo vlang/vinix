@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `42c0c8dd4e40b170d9035c88eaf879e246f2da21`, Linguist 7.27.0 reports
-**Python 7.41%** (476 files, 3,095,722 bytes) and **V 77.86%** (1,496 files,
-32,540,012 bytes). The complete committed-blob inventory and reproduction
+At source `51de8b2a1ce7097de3dbe1d6bb77208bbea1db02`, Linguist 7.27.0 reports
+**Python 7.29%** (474 files, 3,052,180 bytes) and **V 77.99%** (1,509 files,
+32,643,446 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,110,563 Python bytes**. Roughly another
-1.01 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,154,105 Python bytes**. Roughly another
+0.96 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 57 completed stages have a gross
-scope of **2,211,860 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **101,297 bytes**
+tests, including comments and blank lines. The 61 completed stages have a gross
+scope of **2,263,829 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **109,724 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -86,6 +86,10 @@ no extra migration credit.
 | G17 firmware, hardware and allocation layouts with fixtures | `tools/agx-re/g17expr/layout*.v` | 74,464 / 2,375 | `c5577fae4bd4a55dd498ffc5b4ae4c0ee9ade7b3` |
 | Content and desktop cache keys with fixtures | `build-support/cachekey` | 20,145 / 501 | `8902fbff78630752ab73e3a32233747be65bc81f` |
 | Generic V module producer and metadata contracts | `tests/linuxkpi/hosttest/module*.v`, `generate_module.v` | 8,940 / 162 | `42c0c8dd4e40b170d9035c88eaf879e246f2da21` |
+| G17 executable-memory store census and decoder fixture | `tools/agx-re/g17expr/census*.v` | 23,623 / 542 | `71ff04f9102adb23269430272853828b5cfdcb06` |
+| Staging and VOffice cache policies | `build-support/cachekey/build.v, source_text.v` | 10,382 / 276 | `07266f68972c3680451c45b649ea548c11fe3f1f` |
+| Android ART runtime manifests, path policy and installation | `build-support/android/androidhost/runtime*.v` | 10,005 / 162 | `332d24b8ee49c46dcc062488810b33fae4149c6d` |
+| Dota compatibility producer and constructor/mmap controllers | `build-support/dota2/compat.v`, `tests/dota2/{early_client,mmap32}.v` | 7,959 / 136 | `51de8b2a1ce7097de3dbe1d6bb77208bbea1db02` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -480,6 +484,32 @@ algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
 workloads were not weakened.
 
+- G17 census: 3,304 exact typed result/error controls per ARM/x86/sanitizer profile,
+  10,896 conservative decoder controls, four actual driver invocations, all
+  16 remaining original tests on both hosts, and 1,600 foreign calls per host
+  retaining zero results. The 10,000-call sanitizer harness also used fake-stack
+  C callers. Kernel alias last-wins behavior remains intact.
+- Staging/VOffice: 2,121 full original tree, predicate, resolver and source-parser
+  controls per profile; 186 complete consumer key/completion controls per profile;
+  11 CLI/state-publication cases per host. The explicit v2 reference changes only
+  the namespace and three native-helper source inputs. All 16 retained compiler
+  and orchestration bodies have identical ASTs. Twenty native tests include every
+  Unicode13 valid scalar and 200 decode plus 200 directory failures with an exact
+  descriptor baseline. Both shell routes and 128-request/eight-thread cold
+  installers preserve private cleanup and descriptor counts. A peer reviewed lifetimes.
+- Android runtime: 1,248 full policy/path/metadata controls and 30 installation
+  states per ARM/x86/sanitizer profile, eight native tests and all 45 retained
+  host fixtures per architecture. Literal Unix backslashes, embedded NUL rejection,
+  preflight-before-mutation, modes and hardlink isolation remain covered. Failed
+  installations retire descriptors and temporary files. Python JSON/ZIP/XML codec
+  and arbitrary-key pair-validator bindings remain counted with zero extra credit.
+- Dota controllers: complete original/native source, Clang/nm argv, environment,
+  fixture output and cleanup controls on both host ABIs; 24 actual producer/source
+  pairs, 336 CLI controls plus 132 prior shared-parser controls, 20 genuine failure
+  and cleanup pairs, and four real shell-route fixture runs. Constructor and
+  mmap checks retain their independent C/V inputs. The sparse ext2 exporter is
+  separate unfinished work and receives no credit here.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -546,6 +576,10 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `g17-layout-20261008` | `qualification.json` | `726b88833cccd40064fe112f1c879cb9476952517f705ba22d0cdbd532c21fcc` |
 | `build-cache-20261008` | `qualification.json` | `453886473c329517cd7c9c5eceb557209af1de7aeb040adcb1c67dd6ea27cb18` |
 | `module-generator-20261008` | `qualification.json` | `4cab5ece6d867dac5b0bbe2a6dd007b9ccd16e5c3d74bec00ec8698c8534cf38` |
+| `g17-census-20261008` | `qualification.json` | `d1ba91e4503688fcf807f9474253a6c7fc9a4f3ba96d985629c5fd2a1abeb495` |
+| `build-cache-staging-20261008` | `qualification.json` | `a6334328981ffb818a3da6e54cc45bd2d46158473045a821d2be745db4faeb1d` |
+| `android-runtime-20261008/final` | `qualification.json` | `914f968431675a87ce21018953e425836e5020921f724b632af0edaaf13963bf` |
+| `dota-family-20261008` | `controller-qualification.json` | `0ca063ee1f03719bfe5f23cefc7efb4c29a1e74244258ddcbae64ea1adbdbb41` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -554,7 +588,7 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-Remaining G17 census/channel recovery, Android runtime/install tooling, Dota
+Remaining G17 channel recovery, Android build/runtime tooling, Dota
 host controllers and staging/VOffice cache policies are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
