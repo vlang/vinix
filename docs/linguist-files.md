@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `789653b1cd264861631988ceece785af2dc7f0f5`,
+at source commit `7fa9a2fbc0150dcfce24b763369ecfed6edc6178`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 491 | 1,863,972 | 4.47% |
-| Python | 492 | 4,481,678 | 10.74% |
-| Shell | 303 | 1,287,788 | 3.09% |
+| C | 492 | 1,865,153 | 4.47% |
+| Python | 488 | 4,265,707 | 10.22% |
+| Shell | 305 | 1,288,120 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 74.52%, with no
+All `.v` files are classified as V. The resulting V share is 75.03%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 789653b1cd264861631988ceece785af2dc7f0f5 --breakdown --json
+github-linguist --rev 7fa9a2fbc0150dcfce24b763369ecfed6edc6178 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -412,6 +412,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/hostfixtures/waithost/waithost_v_contract.h` | 680 |
 | `tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h` | 365 |
 | `tests/linuxkpi/hostguest/hostguest_v_contract.h` | 269 |
+| `tests/linuxkpi/hosttest/archive_abi.h` | 1,181 |
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
@@ -633,7 +634,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
 | `kernel/linuxkpi/generate-abi.py` | 713 |
-| `kernel/linuxkpi/generate-bounds.py` | 20,254 |
+| `kernel/linuxkpi/generate-bounds.py` | 2,882 |
 | `kernel/linuxkpi/upstream.py` | 4,638 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
 | `tests/aarch64-sigreturn/run.py` | 5,300 |
@@ -898,7 +899,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/m1-wifi/verify_test.py` | 2,428 |
 | `tests/mapped-writeback/run.py` | 7,942 |
 | `tests/memlock/run_vm.py` | 1,113 |
-| `tests/memory/heap_model_test.py` | 13,042 |
 | `tests/memory/run-pagetable.py` | 4,105 |
 | `tests/memory/run-runtime.py` | 7,331 |
 | `tests/memory/test-big-io.py` | 6,072 |
@@ -928,7 +928,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pagecache/check-generated.py` | 1,308 |
 | `tests/pagecache/run-guest.py` | 6,291 |
 | `tests/pci-config/arm_vm.py` | 14,616 |
-| `tests/pci-config/topology_test.py` | 36,084 |
 | `tests/posix-timer/check-generated.py` | 1,464 |
 | `tests/posix-timer/run.py` | 4,098 |
 | `tests/proc-map-lookup/run.py` | 5,764 |
@@ -1012,19 +1011,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/xnualloc/reference_test.py` | 15,234 |
 | `tests/xnualloc/zone_model_test.py` | 12,764 |
 | `tools/agx-re/_native_adt.py` | 1,968 |
-| `tools/agx-re/_native_extract.py` | 5,416 |
+| `tools/agx-re/_native_extract.py` | 5,427 |
 | `tools/agx-re/_native_g17.py` | 3,986 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 611,265 |
+| `tools/agx-re/recover_g17_abi.py` | 534,181 |
 | `tools/agx-re/recover_t6050_power.py` | 207,933 |
-| `tools/agx-re/recover_t8103_adt.py` | 19,033 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 320,245 |
+| `tools/agx-re/test_recover_g17_abi.py` | 282,858 |
 | `tools/agx-re/test_recover_t6050_power.py` | 106,694 |
-| `tools/agx-re/test_recover_t8103_adt.py` | 15,980 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
@@ -1294,6 +1291,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/test-vinix-pkg.sh` | 25,685 |
 | `tests/pagecache/run.sh` | 2,509 |
 | `tests/pci-config/run.sh` | 5,477 |
+| `tests/pci-config/topology` | 169 |
 | `tests/private-pages/run-host.sh` | 5,998 |
 | `tests/qemu-core/run.sh` | 4,009 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
@@ -1344,6 +1342,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/generate_g17_power_model` | 170 |
 | `tools/agx-re/inspect_macos` | 174 |
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
+| `tools/agx-re/recover_t8103_adt` | 163 |
 | `tools/agx-re/trace_diff` | 156 |
 | `tools/apple-backlight/test.sh` | 415 |
 | `tools/m1-wifi/get-v.sh` | 2,538 |

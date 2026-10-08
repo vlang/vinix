@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `789653b1cd264861631988ceece785af2dc7f0f5`, Linguist 7.27.0 reports
-**Python 10.74%** (492 files, 4,481,678 bytes) and **V 74.52%** (1,335 files,
-31,104,611 bytes). The complete committed-blob inventory and reproduction
+At source `7fa9a2fbc0150dcfce24b763369ecfed6edc6178`, Linguist 7.27.0 reports
+**Python 10.22%** (488 files, 4,265,707 bytes) and **V 75.03%** (1,363 files,
+31,322,230 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **724,607 Python bytes**. Roughly another
-2.39 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **940,578 Python bytes**. Roughly another
+2.18 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,13 +21,14 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. Their gross scope is 754,380 bytes.
+tests, including comments and blank lines. Their gross scope is 978,070 bytes.
 The net reduction is smaller by 290 bytes of temporary G13 adapter code,
 10,311 bytes of extraction bridges, 12,803 bytes of G17 foundation wrappers and
 fingerprint changes, 66 bytes in the guest comparator caller, 713 bytes of the
 ABI import facade, 362 bytes of power wrappers/bridges, and 5,228 bytes of ADT
-wrappers/bridges after import cleanup. Adapter additions receive no extra
-migration credit.
+wrappers/bridges after import cleanup, 4,837 bytes of G17 expression wrappers
+and fingerprint changes, and 2,882 bytes of the bounds import facade. Adapter
+additions receive no extra migration credit.
 
 | Stage | Native source | Original Python bytes / lines | Source commit |
 | --- | --- | ---: | --- |
@@ -52,6 +53,11 @@ migration credit.
 | Overflow type compiler controller | `tests/linuxkpi/overflow_type.v` | 13,758 / 273 | `4069c0c7430ce41033f7376dc9cadc2c7ef3edd2` |
 | Apple DeviceTree/PMGR/PMP primitives | `tools/agx-re/appleadt` | 15,469 / 347 | `5c9b3749bb722a6c8a20f1fb6a776323b81416f1` |
 | macOS inspection, property lists and tests | `tools/agx-re/macinspect`, `inspect_macos.v` | 54,793 / 1,388 | `bb18890e06488335a8e2e69ea10b8348900b721d` |
+| PCI topology compiler controller | `tests/pci-config/topology.v` | 36,084 / 673 | `3befd345377bad2ce884c456e39086c7cda0a6c4` |
+| Complete T8103 recovery and tests | `tools/agx-re/t8103adt`, `recover_t8103_adt.v` | 35,013 / 918 | `50ca897fcbe4aed8d06c2a182b9103d2a07ec8a2` |
+| G17 expressions, CFG and selector recovery with tests | `tools/agx-re/g17expr` | 119,297 / 3,050 | `7e8c6874ac10d893d9e49d0f88574b7973856d7d` |
+| LinuxKPI bounds generator foundation | `tests/linuxkpi/hosttest/bounds.v`, `generate_bounds.v` | 20,254 / 423 | `f662e77d095afed829c6dd2efecd05b4094a1747` |
+| Independent heap transition specification | `tests/memory/heapmodel` | 13,042 / 360 | `7fa9a2fbc0150dcfce24b763369ecfed6edc6178` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -227,6 +233,44 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   the complete AGX test suite; original generated producer comments remain
   unchanged to preserve the byte-exact table provenance.
 
+- PCI topology: GNU99/GNU11 retain 7,150,771 assertions per compiler profile
+  and host, with current and pinned production generation. All five complete
+  independent fixture/header inputs, selected bodies and compile/link arguments
+  match. Seven native metadata tests, 138 API controls, 32 CLI statuses and
+  three maintained shell routes pass per host. ARM sanitizer controls cover
+  parsing and lifetime behavior; 300 KB simultaneous output pipes retain
+  literal arguments. A real 120-second timeout terminates and reaps the child
+  while preserving its log. This is a host config model, not hardware execution.
+- T8103: 32 native tests, all 23 unchanged original tests, 11,224 exact API,
+  169 file and 239 CLI controls per host. Three malformed help controls retain
+  status 1 with a clean diagnostic. Real driver/live-capture dictionaries and
+  actual shell routes match; 8,000 calls across 32 simultaneous foreign workers
+  return to zero owned outputs and bounded collector retention. ARM sanitizer
+  gates retain every numeric and file assertion. Native recovery and the AGX
+  make/test callers are integrated by `7c2b42c5`.
+- G17 expression/CFG/selector: 33 native tests, 30 unchanged original test-body
+  replays and 24,416 exact full-output controls per architecture and sanitizer
+  profile. The actual ABI covers 20,384 cases per host, including 4,032 rank
+  controls preserving unsigned target versus arbitrary signed use-offset
+  comparisons. The actual 25 MB driver selector/inline maps match, with inputs
+  unchanged. Each host completes 1,600 simultaneous foreign-thread calls with
+  zero owned outputs. Native instruction offsets keep arbitrary precision.
+- Bounds foundation: four real GNU99/GNU11 generations, 11 publication/input
+  rejection cases, three malformed markers and seven stamp cases per host.
+  Headers, assembly and native compiler flags match byte for byte. Fifty-three
+  API, 44 CLI and eight execute-only compiler-cache controls cover exact wide
+  constants and compiler identities. ASan covers archive extraction and error
+  lifetimes; copied libarchive path/error strings survive archive retirement.
+  Streaming SHA, source identity and ordered atomic publication live in V.
+  The 1,181-byte system archive declaration header remains counted as C.
+- Heap specification: all ten unchanged original scenarios and ten native
+  scenarios pass on both hosts. Each host matches 106,066 seeded MT19937/bit
+  controls and 7,154 complete PMM/slab state snapshots, including every payload
+  byte through hashes, recycling order, invalid frees and exact arithmetic
+  boundaries. ARM ASan/UBSan retains all ten native scenarios. A peer reviewed
+  model ownership and invariants. This remains an independent executable model
+  and source check; it does not execute the kernel allocator or concurrency.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -258,6 +302,11 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `overflow-types-20261008` | `qualified-differential.json` | `8b405a83166d6bc694d2db9d037397c70c4d106585e81f004cec7b1284f8ca68` |
 | `agx-adt-20261008/final` | `precommit-validation-v2.json` | `576bcd4ed65b47c183390c22af548c5ad1bf0eb5025183b9413b3788affb84a6` |
 | `mac-inspect-20261008/final-v2` | `qualification.json` | `d35a167b17766851319a55692d435a80c10e3794d923f5a3e4481f28e7f72aa3` |
+| `pci-topology-20261008/final-v2` | `qualified-final.json` | `80ce667aaefeca08f348c33756926daa9d98f653fc25c91a8992bf7daed0230a` |
+| `agx-t8103-20261008/final` | `qualification.json` | `a49e0a3a0d1c24926c214ebf0557281ca09d94246e314855b849ed48e2eb66c8` |
+| `g17-expression-20261008` | `final-qualification-v1.json` | `275e897b66eda2a44802fd6fec9837936de072d048aa511ff4efd4972ee235b4` |
+| `bounds-foundation-20261008` | `qualified-differential.json` | `f622b8fa789e0c6ac48834dd30d85c1981ba7efbf3ed259546488688295ca76c` |
+| `heap-model-20261008/final-v2` | `qualification.json` | `0fbd8e02f55065e26be8d1a531924cba8ad9d20f7618286580215c3c86c01c60` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -266,8 +315,8 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-G17 expression/CFG/selector recovery, complete T8103 recovery, PCI topology
-compiler orchestration and the LinuxKPI bounds/audit foundation are active.
+G17 command/transport recovery, T6050 code contracts, the XNU zone protocol
+model and LinuxKPI bounds/audit controllers are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
