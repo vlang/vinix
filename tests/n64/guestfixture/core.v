@@ -88,6 +88,15 @@ __global (
 	controlled   [pixels]u32
 	child        i32
 	frame_count  u32
+	controller_buttons u32
+	controller_colors u32
+	controller_icons u32
+	controller_x [18]i32
+	controller_y [18]i32
+	pause_x i32
+	pause_y i32
+	view_width i32 = window_width
+	view_height i32 = window_height
 )
 
 fn print_log() {
@@ -112,6 +121,14 @@ fn fail(reason &char) {
 fn number(pointer voidptr) u32 {
 	unsafe {
 		mut value := u32(0)
+		C.memcpy(&value, pointer, sizeof(value))
+		return value
+	}
+}
+
+fn real(pointer voidptr) f64 {
+	unsafe {
+		mut value := f64(0)
 		C.memcpy(&value, pointer, sizeof(value))
 		return value
 	}
@@ -156,8 +173,8 @@ fn command_data(kind u32, payload voidptr, length u32) {
 	unsafe {
 		mut header := [136]u8{}
 		mut magic := u32(0x56415050)
-		mut request_width := u32(window_width)
-		mut request_height := u32(window_height)
+		mut request_width := u32(view_width)
+		mut request_height := u32(view_height)
 		C.memcpy(&header[0], &magic, 4)
 		header[4] = 10
 		header[5] = u8(kind)
@@ -179,7 +196,7 @@ fn press(name &char) { action(name); ticks(12) }
 
 fn pointer(phase u32, x i32, y i32) {
 	unsafe {
-		mut payload := [i32(phase), 1, 0, x, y, window_width, window_height]!
+		mut payload := [i32(phase), 1, 0, x, y, view_width, view_height]!
 		command_data(5, &payload[0], u32(sizeof(payload)))
 	}
 }
@@ -191,21 +208,77 @@ fn toolbar(name &char, x i32, y i32) {
 	pointer(2, x, y)
 }
 
-fn parse(start_offset usize, depth u32) usize {
+fn matches(offset usize, length usize, text &char) bool {
+	unsafe { return length == C.strlen(text) && C.memcmp(&bytes[offset], text, length) == 0 }
+}
+
+fn controller_index(offset usize, length usize) i32 {
+	// These controller actions are an independent list of the N64's physical
+	// inputs, rather than frontend implementation constants.
+	unsafe {
+		names := [&char(c'n64.a'), &char(c'n64.b'), &char(c'n64.z'), &char(c'n64.start'),
+			&char(c'n64.up'), &char(c'n64.down'), &char(c'n64.left'), &char(c'n64.right'),
+			&char(c'n64.c_up'), &char(c'n64.c_down'), &char(c'n64.c_left'), &char(c'n64.c_right'),
+			&char(c'n64.l'), &char(c'n64.r'), &char(c'n64.stick_up'), &char(c'n64.stick_down'),
+			&char(c'n64.stick_left'), &char(c'n64.stick_right')]!
+		for index := usize(0); index < sizeof(names) / sizeof(names[0]); index++ {
+			if matches(offset, length, names[index]) { return i32(index) }
+		}
+	}
+	return -1
+}
+
+fn parse_element(start_offset usize, depth u32, parent_x f64, parent_y f64) usize {
 	unsafe {
 		mut offset := start_offset
 		if depth > 32 || offset + 274 > byte_count { fail(c'view element size') }
 		kind := bytes[offset]
+		x := parent_x + real(&bytes[offset + 10])
+		y := parent_y + real(&bytes[offset + 18])
+		w := real(&bytes[offset + 26])
+		h := real(&bytes[offset + 34])
+		center_x := i32(x + w / 2)
+		center_y := i32(y + h / 2)
+		bg := number(&bytes[offset + 42])
+		mut status_label := false
+		mut control_button := i32(-1)
 		offset += 274
 		for index := u32(0); index < 12; index++ {
 			if offset + 4 > byte_count { fail(c'view string boundary') }
 			length := usize(number(&bytes[offset]))
 			offset += 4
 			if length > byte_count - offset { fail(c'view string size') }
-			if kind == 2 && index == 3 {
+			if index == 0 {
+				status_label = kind == 2 && matches(offset, length, c'status')
+				if kind == 4 {
+					if x < 0 || y < 0 || w < 20 || h < 20 || x + w > view_width || y + h > view_height {
+						fail(c'N64 control does not fit the window or has an unusable target')
+					}
+					control_button = controller_index(offset, length)
+					if control_button >= 0 {
+						controller_buttons |= u32(1) << control_button
+						controller_x[control_button] = center_x
+						controller_y[control_button] = center_y
+						if (control_button == 0 && bg == 0x357fdf) || (control_button == 1 && bg == 0x27985b) ||
+							(control_button == 3 && bg == 0xd85459) || (control_button >= 8 && control_button <= 11 && bg == 0xe8c64a) {
+							controller_colors |= u32(1) << control_button
+						}
+					}
+					if matches(offset, length, c'n64.pause') { pause_x = center_x; pause_y = center_y }
+				}
+			}
+			if index == 3 && ((control_button == 0 && !matches(offset, length, c'A')) ||
+				(control_button == 1 && !matches(offset, length, c'B'))) { fail(c'face button label is missing') }
+			if status_label && index == 3 {
 				if length >= sizeof(status_text) { fail(c'status label size') }
 				C.memcpy(&status_text[0], &bytes[offset], length)
 				status_text[length] = 0
+			}
+			if index == 4 && control_button >= 8 && control_button <= 11 {
+				expected := [&char(c'builtin:n64_c_up'), &char(c'builtin:n64_c_down'),
+					&char(c'builtin:n64_c_left'), &char(c'builtin:n64_c_right')]!
+				if !matches(offset, length, expected[control_button - 8]) { fail(c'C-button direction does not match its action') }
+				controller_icons |= u32(1) << control_button
 			}
 			prefix := &char(c'vinix-surface:')
 			// sizeof the original NUL-terminated prefix minus its terminator.
@@ -221,8 +294,32 @@ fn parse(start_offset usize, depth u32) usize {
 		children := number(&bytes[offset + 4])
 		offset += 8
 		if children > 64 { fail(c'view child count') }
-		for index := u32(0); index < children; index++ { offset = parse(offset, depth + 1) }
+		for index := u32(0); index < children; index++ { offset = parse_element(offset, depth + 1, x, y) }
 		return offset
+	}
+}
+
+fn parse(start_offset usize, depth u32) usize {
+	return parse_element(start_offset, depth, 0, 0)
+}
+
+fn inspect_controller_view() {
+	controller_buttons = 0
+	controller_colors = 0
+	controller_icons = 0
+	pause_x = 0
+	pause_y = 0
+	if parse(0, 0) != byte_count || surface_path[0] == 0 { fail(c'shared surface view missing') }
+	if controller_buttons != 0x3ffff || pause_x <= 0 || pause_y <= 0 { fail(c'N64 controller view is missing a clickable input') }
+	if controller_colors != 0xf0b || controller_icons != 0xf00 { fail(c'N64 controller colors or C-button glyphs are missing') }
+	if controller_x[4] != controller_x[5] || controller_y[6] != controller_y[7] ||
+		controller_y[4] >= controller_y[6] || controller_y[5] <= controller_y[6] ||
+		controller_x[6] >= controller_x[4] || controller_x[7] <= controller_x[4] ||
+		controller_x[8] != controller_x[9] || controller_y[10] != controller_y[11] ||
+		controller_y[8] >= controller_y[10] || controller_y[9] <= controller_y[10] ||
+		controller_x[10] >= controller_x[8] || controller_x[11] <= controller_x[8] ||
+		controller_x[1] >= controller_x[0] || controller_y[1] >= controller_y[0] {
+		fail(c'N64 controls do not follow the physical controller layout')
 	}
 }
 
@@ -325,11 +422,21 @@ fn start(game &char) {
 		request_fd = requests[1]
 		response_fd = responses[0]
 		frame_count = 0
+		view_width = window_width
+		view_height = window_height
 		C.memset(&state[0], 0, sizeof(state))
 		reply()
 		command(1, c'')
 		surface_path[0] = 0
-		if parse(0, 0) != byte_count || surface_path[0] == 0 { fail(c'shared surface view missing') }
+		inspect_controller_view()
+		view_width = 400
+		view_height = 300
+		command(1, c'')
+		inspect_controller_view()
+		view_width = window_width
+		view_height = window_height
+		command(1, c'')
+		inspect_controller_view()
 		fd := C.open(&surface_path[0], C.O_RDWR)
 		mut info := C.stat{}
 		if fd < 0 || C.fstat(fd, &info) != 0 || info.st_size != surface_bytes { fail(c'surface file size') }
@@ -530,10 +637,10 @@ pub fn run() i32 {
 		snapshot(&neutral[0])
 		action(c'reset')
 		begin_paddle()
-		pointer(1, 352, 613)
+		pointer(1, controller_x[7], controller_y[7])
 		action(c'n64.right')
 		ticks(12)
-		pointer(2, 352, 613)
+		pointer(2, controller_x[7], controller_y[7])
 		ticks(8)
 		snapshot(&last[0])
 		moved := changed(&neutral[0], &last[0])
@@ -545,13 +652,41 @@ pub fn run() i32 {
 
 		action(c'reset')
 		begin_paddle()
-		action(c'stick_right')
-		ticks(20)
+		pointer(1, controller_x[17], controller_y[17])
+		action(c'n64.stick_right')
+		ticks(12)
+		pointer(2, controller_x[17], controller_y[17])
+		ticks(8)
 		snapshot(&last[0])
 		analog := changed_court(&neutral[0], &last[0])
 		C.printf(c'N64-ANALOG: equal-age input changed=%u\n', analog)
 		if analog < 16 { fail(c'analog stick did not change the emulated game') }
 		C.puts(c'N64 PASS: analog stick reaches the emulated controller')
+
+		// Dragging away releases a digital button, while the physical-style
+		// analog well keeps the stick captured until pointer up. Compare both
+		// against the same independently captured 12-frame Right hold.
+		action(c'reset')
+		begin_paddle()
+		pointer(1, controller_x[7], controller_y[7])
+		action(c'n64.right')
+		ticks(12)
+		pointer(0, 20, 20)
+		ticks(8)
+		snapshot(&last[0])
+		if changed_court(&controlled[0], &last[0]) != 0 { fail(c'dragging away did not release the D-pad') }
+		pointer(2, 20, 20)
+		action(c'reset')
+		begin_paddle()
+		pointer(1, controller_x[17], controller_y[17])
+		action(c'n64.stick_right')
+		pointer(0, window_width - 4, controller_y[17])
+		ticks(12)
+		pointer(2, window_width - 4, controller_y[17])
+		ticks(8)
+		snapshot(&last[0])
+		if changed_court(&controlled[0], &last[0]) != 0 { fail(c'analog drag capture or release did not match the real controller') }
+		C.puts(c'N64-CONTROLLER: digital drag releases; analog drag stays captured and releases cleanly')
 
 		action(c'reset')
 		begin_paddle()
@@ -567,14 +702,14 @@ pub fn run() i32 {
 		if changed_court(&controlled[0], &last[0]) != 0 { fail(c'batched WASD keys did not match the analog stick') }
 		C.puts(c'N64 PASS: batched arrow and WASD input stays running and moves the game')
 
-		toolbar(c'n64.pause', 184, 575)
+		toolbar(c'n64.pause', pause_x, pause_y)
 		snapshot(&first[0])
 		action(c'open')
 		command(3, c'\x1b')
 		ticks(4)
 		snapshot(&last[0])
 		if changed(&first[0], &last[0]) != 0 { fail(c'emulation drew while paused') }
-		toolbar(c'n64.pause', 184, 575)
+		toolbar(c'n64.pause', pause_x, pause_y)
 		ticks(8)
 		snapshot(&last[0])
 		if changed(&first[0], &last[0]) < 16 { fail(c'emulation did not resume') }

@@ -169,6 +169,97 @@ fn test_controller_glyphs_obey_physical_clipping_and_leave_unknown_names_untouch
 	}
 }
 
+fn test_n64_c_symbols_keep_direction_colour_and_clear_surroundings() {
+	background := u32(0x141b28)
+	colour := u32(0x42380d)
+	for scale in [1, 2]! {
+		for size in [16, 24]! {
+			mut desktop := Desktop{ canvas: new_scaled_canvas(40, 40, 40 * scale, 40 * scale, scale) }
+			defer { unsafe { free(desktop.canvas.pixels) } }
+			mut hashes := [4]u32{}
+			for index, name in ['n64_c_up', 'n64_c_down', 'n64_c_left', 'n64_c_right']! {
+				desktop.canvas.clear(background)
+				assert desktop.draw_n64_controller_glyph(name, 8, 8, size, size, colour)
+				mut painted := 0
+				mut hash := u32(2166136261)
+				for y in 0 .. 40 * scale {
+					for x in 0 .. 40 * scale {
+						pixel := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+						if x < 8 * scale || x >= (8 + size) * scale || y < 8 * scale
+							|| y >= (8 + size) * scale { assert pixel == background }
+						if pixel != background { painted++ }
+						hash = (hash ^ pixel) * 16777619
+					}
+				}
+				assert painted > 10 * scale * scale
+				assert unsafe { desktop.canvas.pixels[(8 + size / 2) * scale * desktop.canvas.stride +
+					(8 + size / 2) * scale] } == colour
+				for previous in 0 .. index { assert hashes[previous] != hash }
+				hashes[index] = hash
+			}
+		}
+	}
+}
+
+fn test_n64_body_keeps_three_grips_open_notches_and_physical_clip() {
+	// Both notches make this polygon concave. Every subpixel row must fit
+	// its six fixed intersections, including curve extrema and empty rows.
+	for row in -20 * 128 .. 244 * 128 {
+		mut intersections := [6]f64{}
+		count := n64_shell_intersections(f64(row) / 128, mut intersections)
+		assert count <= 6 && count % 2 == 0
+		for index in 1 .. count { assert intersections[index] >= intersections[index - 1] }
+	}
+	background := u32(0x141b28)
+	for scale in [1, 2]! {
+		mut desktop := Desktop{ canvas: new_scaled_canvas(376, 242, 376 * scale, 242 * scale, scale) }
+		defer { unsafe { free(desktop.canvas.pixels) } }
+		desktop.canvas.clear(background)
+		assert desktop.draw_n64_controller_glyph('n64_body', 8, 9, 360, 224, 0xa2aab4)
+		// Each grip survives scaling, with both hand openings transparent.
+		for x in [30, 180, 330]! {
+			assert unsafe { desktop.canvas.pixels[(9 + 184) * scale * desktop.canvas.stride +
+				(8 + x) * scale] } != background
+		}
+		for x in [100, 260]! {
+			assert unsafe { desktop.canvas.pixels[(9 + 175) * scale * desktop.canvas.stride +
+				(8 + x) * scale] } == background
+		}
+		assert unsafe { desktop.canvas.pixels[(9 + 219) * scale * desktop.canvas.stride +
+			(8 + 180) * scale] } != background
+		assert unsafe { desktop.canvas.pixels[(9 + 129) * scale * desktop.canvas.stride +
+			(8 + 180) * scale] } == 0x636d79
+		for y in 0 .. 242 * scale {
+			for x in 0 .. 376 * scale {
+				if x < 8 * scale || x >= 368 * scale || y < 9 * scale || y >= 233 * scale {
+					assert unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] } == background
+				}
+			}
+		}
+		desktop.canvas.clear(background)
+		desktop.canvas.clip = Clip{ x: 180, y: 120, w: 8, h: 20 }
+		assert desktop.draw_n64_controller_glyph('n64_body', 8, 9, 360, 224, 0xa2aab4)
+		assert desktop.draw_n64_controller_glyph('n64_stick', 168, 114, 32, 32, 0xcfd3d8)
+		mut painted := 0
+		for y in 0 .. 242 * scale {
+			for x in 0 .. 376 * scale {
+				pixel := unsafe { desktop.canvas.pixels[y * desktop.canvas.stride + x] }
+				if x < 180 * scale || x >= 188 * scale || y < 120 * scale || y >= 140 * scale {
+					assert pixel == background
+				} else if pixel != background { painted++ }
+			}
+		}
+		assert painted > 0
+		desktop.canvas.clear(background)
+		assert !desktop.draw_n64_controller_glyph('n64_unknown', 8, 9, 360, 224, 0xffffff)
+		assert desktop.draw_n64_controller_glyph('n64_body', 8, 9, 0, 224, 0xffffff)
+		assert desktop.draw_n64_controller_glyph('n64_stick', 8, 9, 24, 0, 0xffffff)
+		for index in 0 .. desktop.canvas.stride * desktop.canvas.physical_height {
+			assert unsafe { desktop.canvas.pixels[index] } == background
+		}
+	}
+}
+
 fn test_wallpaper_copy_respects_canvas_clip() {
 	mut canvas := new_canvas(4, 3)
 	defer {

@@ -188,7 +188,7 @@ fn load_game(path string) bool {
 	emulator.pulse = 0
 	emulator.pulse_frames = 0
 	emulator.frames = 0
-	status := 'Playing ${name} — arrows: D-pad, WASD: stick, Enter: Start'
+	status := 'Playing ${name}'
 	set_status(status)
 	unsafe { status.free() }
 	loaded_message := 'N64: loaded ${emulator.game}'

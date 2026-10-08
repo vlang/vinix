@@ -1277,6 +1277,9 @@ fn (mut d Desktop) draw_builtin_glyph(path string, x int, y int, w int, h int, c
 	if name.starts_with('ps_') && d.draw_controller_glyph(name, x, y, w, h, color) {
 		return
 	}
+	if name.starts_with('n64_') && d.draw_n64_controller_glyph(name, x, y, w, h, color) {
+		return
+	}
 	cx := x + w / 2
 	cy := y + h / 2
 	// The glyph box is a fixed fraction of the button so the three symbols

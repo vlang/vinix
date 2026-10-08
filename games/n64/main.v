@@ -20,48 +20,13 @@ __global path_text = ''
 __global app_width = 800
 __global app_height = 680
 
-fn control_rect(index int) (int, int, int, int) {
-	if index < 3 { return 8 + index * 120, app_height - 120, 112, 30 }
-	if index < 11 {
-		width := (app_width - 16) / 8
-		return 8 + (index - 3) * width, app_height - 82, width - 6, 30
-	}
-	width := (app_width - 16) / 10
-	return 8 + (index - 11) * width, app_height - 44, width - 6, 30
-}
-
-fn ui_build(mut out []u8) {
-	encode_element(mut out, 0, 0, 0, f64(app_width), f64(app_height), '', '', '', control_ids.len + 2)
-	path := 'vinix-surface:${emulator.surface_path}'
-	defer { unsafe { path.free() } }
-	// Scale the original 4:3 framebuffer uniformly, with dark letterboxing.
-	available_height := app_height - 150
-	width := if app_width * 3 <= available_height * 4 {
-		app_width
-	} else {
-		available_height * 4 / 3
-	}
-	height := width * 3 / 4
-	encode_element(mut out, 3, f64((app_width - width) / 2), f64((available_height - height) / 2), f64(width), f64(height), '', '', path, 0)
-	label := if opening {
-		'Game path: ${path_text}_ (Enter to open, Esc to cancel)'
-	} else {
-		emulator.status.clone()
-	}
-	defer { unsafe { label.free() } }
-	encode_element(mut out, 2, 8, f64(app_height - 148), f64(app_width - 16), 22, '', label, '', 0)
-	for index, id in control_ids {
-		x, y, button_width, button_height := control_rect(index)
-		text := if id == 'pause' && emulator.paused { 'Resume' } else { control_names[index] }
-		encode_element(mut out, 4, f64(x), f64(y), f64(button_width), f64(button_height), id, text, '', 0)
-	}
-}
-
 fn action(id string) {
 	name := if id.starts_with('n64.') { id[4..] } else { id }
 	defer { if name != id { unsafe { name.free() } } }
 	match name {
 		'open' {
+			pointer_held = false
+			stick_held = false
 			if !opening { paused_before_open = emulator.paused }
 			opening = true
 			emulator.paused = true
@@ -72,12 +37,16 @@ fn action(id string) {
 			path_text = ''
 		}
 		'pause' {
+			pointer_held = false
+			stick_held = false
 			emulator.paused = !emulator.paused
 			emulator.buttons = 0
 			emulator.pulse = 0
 			emulator.pulse_frames = 0
 		}
 		'reset' {
+			pointer_held = false
+			stick_held = false
 			if emulator.loaded {
 				game_save()
 				if !emulator_reset() {
@@ -191,28 +160,23 @@ fn keyboard(text string) {
 fn pointer(payload []u8) {
 	if payload.len != 28 { return }
 	phase := wire_number(payload, 0)
+	button := wire_number(payload, 4)
+	if phase > 2 || (phase != 0 && button != 1) { return }
+	x := int(i32(wire_number(payload, 12)))
+	y := int(i32(wire_number(payload, 16)))
+	hovered_control = control_at(x, y)
 	if phase == 2 {
+		pointer_held = false
+		stick_held = false
 		emulator.buttons = 0
 		return
 	}
-	if phase != 1 { return }
-	x := int(i32(wire_number(payload, 12)))
-	y := int(i32(wire_number(payload, 16)))
-	for index, id in control_ids {
-		left, top, width, height := control_rect(index)
-		if x >= left && x < left + width && y >= top && y < top + height {
-			// The desktop also sends toolbar clicks through command 2. Only
-			// joypad buttons use raw pointer down/up for continuous holds.
-			if index >= 3 {
-				for button, name in joy_ids {
-					if name == id {
-						emulator.buttons |= u32(1) << button
-						break
-					}
-				}
-			}
-			break
-		}
+	if phase == 1 {
+		pointer_held = true
+		stick_held = in_stick_well(x, y)
+	}
+	if pointer_held {
+		emulator.buttons = if stick_held { stick_mask_at(x, y) } else { control_mask(hovered_control) }
 	}
 }
 

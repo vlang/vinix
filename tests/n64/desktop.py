@@ -16,7 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 WIDTH, HEIGHT = 2048, 1536
 # The app's 800x680 content opens below the title bar at (120, 94).
-GAME_RECT = (167, 94, 706, 529)
+GAME_RECT = (261, 94, 517, 387)
 
 
 class QMP:
@@ -49,6 +49,26 @@ class QMP:
         time.sleep(seconds)
         self.call("input-send-event", {"events": [
             {"type": "btn", "data": {"button": "left", "down": False}}]})
+
+    def move(self, x, y):
+        self.call("input-send-event", {"events": [
+            {"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / WIDTH)}},
+            {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / HEIGHT)}}]})
+
+    def drag(self, start_x, start_y, end_x, end_y, seconds):
+        # Let the guest consume the preceding button release before another
+        # press; virtio tablet reports can otherwise coalesce the transition.
+        time.sleep(.25)
+        self.call("input-send-event", {"events": [
+            {"type": "abs", "data": {"axis": "x", "value": round(start_x * 32767 / WIDTH)}},
+            {"type": "abs", "data": {"axis": "y", "value": round(start_y * 32767 / HEIGHT)}},
+            {"type": "btn", "data": {"button": "left", "down": True}}]})
+        time.sleep(.25)
+        self.move(end_x, end_y)
+        time.sleep(seconds)
+        self.call("input-send-event", {"events": [
+            {"type": "btn", "data": {"button": "left", "down": False}}]})
+        time.sleep(.25)
 
     def close(self):
         self.file.close()
@@ -146,7 +166,7 @@ def main():
                 # controller input through SI/PIF.
                 time.sleep(2)
                 title = capture("desktop-title.ppm")
-                qmp.click(120 + 450, 94 + 613)  # Start, on the app's joypad toolbar.
+                qmp.click(120 + 400, 94 + 487)  # Red Start button on the controller.
                 time.sleep(2)
                 playing = capture("desktop-gameplay.ppm")
                 if changed(title, playing) < 1000:
@@ -157,17 +177,25 @@ def main():
                 if animation < 16:
                     raise RuntimeError(f"desktop game did not animate; see {log_path}")
                 print(f"N64 desktop: pointer input started gameplay; {animation} pixels animate", flush=True)
-                qmp.hold(120 + 352, 94 + 613, .8)  # Hold the real Right button.
+                qmp.hold(120 + 321, 94 + 512, .8)  # Hold the physical D-pad's Right arm.
                 moved = capture("desktop-controller.ppm")
                 # Count only the lower court: animated ball/stars elsewhere
                 # cannot satisfy the paddle movement test.
-                row_start, row_end = 442, 478
+                row_start, row_end = round(GAME_RECT[3] * .835), round(GAME_RECT[3] * .905)
                 lower = slice(row_start * GAME_RECT[2] * 3, row_end * GAME_RECT[2] * 3)
                 movement = changed(animated[lower], moved[lower])
                 if movement < 500:
                     raise RuntimeError(f"desktop controller did not move the emulated paddle; see {log_path}")
                 print(f"N64 desktop: pointer hold moves the N64 paddle; {movement} court pixels changed", flush=True)
-                qmp.click(120 + 184, 94 + 575)  # Pause the native emulator.
+                # The center of the analog well has no directional button.
+                # Drag outside its left edge to exercise actual mouse capture.
+                qmp.drag(120 + 400, 94 + 569, 120 + 260, 94 + 569, .8)
+                analog = capture("desktop-analog.ppm")
+                analog_movement = changed(moved[lower], analog[lower])
+                if analog_movement < 500:
+                    raise RuntimeError(f"desktop stick drag did not move the emulated paddle; see {log_path}")
+                print(f"N64 desktop: analog drag moves the paddle outside the stick well; {analog_movement} court pixels changed", flush=True)
+                qmp.click(120 + 700, 94 + 410)  # Pause the native emulator.
                 time.sleep(.7)
                 paused = capture("desktop-paused.ppm")
                 time.sleep(2)
@@ -175,8 +203,13 @@ def main():
                 if changed(paused, still):
                     raise RuntimeError(f"desktop pause did not freeze game pixels; see {log_path}")
                 print("N64 desktop: pause freezes game pixels", flush=True)
-                qmp.click(120 + 184, 94 + 575)
+                qmp.click(120 + 700, 94 + 410)
                 time.sleep(2)
+                # Clear the toolbar hover, then move the cursor away from
+                # the controller before saving the final gameplay capture.
+                for x, y in ((130, 350), (1940, 1400)):
+                    qmp.move(x, y)
+                    time.sleep(.2)
                 resumed = capture("desktop-gameplay.ppm")
                 if changed(paused, resumed) < 16:
                     raise RuntimeError(f"desktop resume did not animate; see {log_path}")
