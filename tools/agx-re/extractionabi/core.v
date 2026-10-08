@@ -3,6 +3,7 @@ module main
 import imageextract as image
 import appleadt
 import g17decode
+import g17expr
 import g17power
 import math.big
 import strconv
@@ -31,7 +32,7 @@ __global owned_output_count i64
 // response and optional binary output use libc malloc, never collector-owned
 // memory; the import adapter copies each output and calls release exactly once.
 @[export: 'vinix_agx_extract_query']
-pub fn query(data &u8, byte_count usize, operation &char, options &char) &char {
+pub fn native_extraction_json_abi_entry(data &u8, byte_count usize, operation &char, options &char) &char {
 	mut registered := false
 	if C.GC_thread_is_registered() == 0 {
 		mut stack := C.GC_stack_base{}
@@ -152,6 +153,9 @@ fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
 	if operation == 'g17:recover_g17_linear_power_transfer_tables' {
 		code := j.bytes_fromhex(j.string_value(j.value(request, 'code')))!
 		return scalar(j.Value(g17power.recover_linear_power_transfer_tables(data, code)!))
+	}
+	if operation.starts_with('g17:') && g17expr.handles(operation[4..]) {
+		return scalar(g17expr.query(data, operation[4..], request)!)
 	}
 	if operation.starts_with('g17:') {
 		return scalar(g17decode.query(data, operation[4..], request)!)
