@@ -287,7 +287,7 @@ pub fn capture_preferred(argv []string, log string, env map[string]string, merge
 	return capture_in_preferred(argv, log, env, merge, '', false, host_arch)
 }
 
-fn capture_in_preferred(argv []string, log string, env map[string]string, merge bool, directory string, binary_output bool, host_arch string) !string {
+pub fn capture_in_preferred(argv []string, log string, env map[string]string, merge bool, directory string, binary_output bool, host_arch string) !string {
 	mut pipes := [2]i32{}
 	if C.pipe(&pipes[0]) != 0 {
 		number := C.errno
