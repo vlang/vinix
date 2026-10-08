@@ -2,6 +2,7 @@ module main
 
 import imageextract as image
 import appleadt
+import t6050power as power
 import g17decode
 import g17expr
 import g17power
@@ -146,6 +147,9 @@ fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
 		return Response{ payload: {
 			'result': j.Value(metadata)
 		}, binary: result.binary }
+	}
+	if operation.starts_with('t6050:') {
+		return scalar(power.query(operation['t6050:'.len..], request)!)
 	}
 	if operation.starts_with('adt:') {
 		return scalar(appleadt.query(data, operation[4..], request)!)

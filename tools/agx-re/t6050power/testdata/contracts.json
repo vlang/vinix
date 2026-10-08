@@ -1,0 +1,1434 @@
+[
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d528034039c8010036800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052828080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391ffd0371e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d528034039c8010036800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052628080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391ffd0371e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d5280340391f2003d5800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052828080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391ffd0371e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d528034039c8010036800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052828080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91115881d2"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391ffd0371e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d528034039c8010036800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052828080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2e2130094"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391ffd0371e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_apple_ptd_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": [
+          4096,
+          {
+            "$bytes": "00040014"
+          }
+        ],
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": [
+          8192,
+          {
+            "$bytes": "283800511f090071fe070014fd03001408004039c8032036083cc0398803f837"
+          }
+        ],
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": [
+          12288,
+          {
+            "$bytes": "7f080071080c4039fe070094fd0b0094696b40b92821161b530140b9887b8352080140391f010072d5129f1a290080523a21d39a611b40f909011aaa08013a8a3f0300710301899a611b40f9480140b9c812083608090253800c805201488852e101a072e0018052014099524173a772800340f9612b40f9220440b9a3a301d1e40315aadf070094a88359f81f0100f1e8079f1a280300391f2003d528034039c8010036800340f9611f40f9220440b9a3a301d1e40315aad2070094b3a379a914014a9234f2ffb4680208ca08011a8aa8f1ffb5682f40f914008052"
+          }
+        ],
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": [
+          16384,
+          {
+            "$bytes": "7f080071080c40394a313191790140b9fc070094"
+          }
+        ],
+        "__ZN9ApplePMGR10_initPMPv2Ev": [
+          28672,
+          {
+            "$bytes": "68ca419117212191e00317aae11f8052828080520000009468ca419118313191e00318aae11f80528280805200000094cb0240b96bf57ed31f2003d5880100b908050091d6f201911f2003d5cb2e40b900000034cb0240b91f2003d5890100b929050011115781d260c24df9100000d010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": [
+          32768,
+          {
+            "$bytes": "080c403969ca419129e12091290140b92821141b1f01047169ca419129212191400140b91f040031"
+          }
+        ],
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": [
+          36864,
+          {
+            "$bytes": "88608c5208f8409117f50591d801805239008052080140391f3d0071f9070094f8230094a8024039a8010836081d00131f05003101c7981aa836407948000035a80e4039e8e700a9eedfff975f7f0cf1f7820c91"
+          }
+        ],
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": [
+          81920,
+          {
+            "$bytes": "00c04df9b0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": [
+          86016,
+          {
+            "$bytes": "e20301aa00c04df9d0ffffb010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR5startEP9IOService": [
+          77824,
+          {
+            "$bytes": "00d0ff97"
+          }
+        ],
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": [
+          90112,
+          {
+            "$bytes": "68fe409117810491115781d2e84240391f2003d5e80240b90908c81a2881081be94240391f01096b68ca419118812091d0ffff9010020091113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": [
+          73728,
+          {
+            "$bytes": "3734407957000035370c4039cd264039ed000037114080d2c126009102008052c892403868fe0737"
+          }
+        ],
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": [
+          40960,
+          {
+            "$bytes": "00140094115881d210093fd7a1024079fc03009408004039c8010836a1024079f8dbff9708004039c8010836"
+          }
+        ],
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": [
+          49152,
+          {
+            "$bytes": "115681d2113d80d2115781d2113d80d2"
+          }
+        ],
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": [
+          53248,
+          {
+            "$bytes": "00f05bb988ca419108f12091a802403988ce419117c1219188ca41911881209180c24df908420891e00240f9010340f9220440b9e82340f9880100b528008052a8020039efdfff97"
+          }
+        ],
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": [
+          57344,
+          {
+            "$bytes": "115681d2115781d268ca419108f12091280080522800003960c24df9114180d202008052"
+          }
+        ],
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": [
+          20480,
+          {
+            "$bytes": "280840b9000040f901018052e20304aafc2b0094080c40f9896e1c530801098b082540a92afd41d36b3e40392cfd4ad32c0149b389e10baa49014ab3682600a9"
+          }
+        ],
+        "__ZNK8ApplePTD9_writePTDEPvjyj": [
+          24576,
+          {
+            "$bytes": "280840b9000040f948701d530241401101018052fb2b0014"
+          }
+        ],
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": [
+          69632,
+          {
+            "$bytes": "f50303aaf30302aaf60301aae20314aafcfbff97080c40f9154933f8"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN9ApplePMGR15_sendPMPCommandENS_10PMPCommandEPmj": 4096,
+        "__ZN9ApplePMGR18_pmpWriteDashBoardENS_10PMPCommandEPmj": 8192,
+        "__ZN9ApplePMGR32_pmpWriteDashBoardSetDeviceStateEtjj": 12288,
+        "__ZN9ApplePMGR39_pmpWriteDashBoardSetVirtualDeviceStateEtjj": 16384,
+        "__ZN9ApplePMGR10_initPMPv2Ev": 28672,
+        "__ZN9ApplePMGR18_getPMPDeviceIndexEtj": 32768,
+        "__ZN9ApplePMGR34_notifyPMPInitialDeviceStatusGatedEv": 36864,
+        "__ZN9ApplePMGR28notifyPMPInitialDeviceStatusEv": 81920,
+        "__ZN9ApplePMGR17_pmpReadyActionv2Em": 86016,
+        "__ZN9ApplePMGR5startEP9IOService": 77824,
+        "__ZN9ApplePMGR19_handleInterruptAllEP22IOInterruptEventSourcei": 90112,
+        "__ZN9ApplePMGR22_waitForClusterPowerUpEPNS_10DeviceDataEm": 73728,
+        "__ZN9ApplePMGR18_enableDeviceGatedEmmmm": 40960,
+        "__ZN9ApplePMGR21_deviceIDToDeviceDataEt": 45056,
+        "__ZN9ApplePMGR15_checkNotifyPMPEt": 61440,
+        "__ZN9ApplePMGR22_waitForPMPReadyActionEm": 49152,
+        "__ZN9ApplePMGR29_waitForPMPReadyActionGatedv2Ej": 53248,
+        "__ZN9ApplePMGR20_pmpReadyActionGatedEj": 57344,
+        "__ZNK8ApplePTD8_readPTDEPvjPNS_5EntryEj": 20480,
+        "__ZNK8ApplePTD9_writePTDEPvjyj": 24576,
+        "__ZN9ApplePMGR9getRegMapENS_6RegMapEj": 65536,
+        "__ZN9ApplePMGR10writeReg64ENS_6RegMapEjyj": 69632
+      }
+    },
+    "result": {
+      "reg_map": 8,
+      "read": {
+        "base_offset": 0,
+        "entry_stride": 16,
+        "width_bytes": 16,
+        "operation": "one 16-byte load of data and raw metadata"
+      },
+      "write": {
+        "base_offset": 65536,
+        "entry_stride": 8,
+        "width_bytes": 8,
+        "operation": "one 64-bit store through ApplePMGR::writeReg64"
+      },
+      "decoded_entry": {
+        "data_word": 0,
+        "metadata_word": 1,
+        "raw_bits_10_63": "decoded metadata bits 0..53",
+        "raw_bit_1": "decoded metadata bit 54 (newData)",
+        "raw_bit_0": "decoded metadata bit 55",
+        "caller_tag": "decoded metadata bits 56..63, retained from output +0xf"
+      },
+      "range_check": "entry_count must be nonzero; callers supply the entry index",
+      "ordering": "no explicit lock or DMB/DSB appears in the UUID-pinned read, write, or final register-store sequence; ordering depends on the Device MMIO mapping"
+    }
+  },
+  {
+    "function": "recover_rtbuddy_segment_flag_contract",
+    "arguments": {
+      "functions": {
+        "__ZNK7RTBuddy13getSegmentMapEv": [
+          65536,
+          {
+            "$bytes": "562341290909025309011f33087d015308051e123b01082a65031f52f9030094"
+          }
+        ],
+        "__ZNK14RTBuddySegment10isWritableEv": [
+          73728,
+          {
+            "$bytes": "5f2403d50800413900050153c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZNK7RTBuddy13getSegmentMapEv": 65536,
+        "__ZN14RTBuddySegment17withPhysicalRangeEyyyyP8OSStringj": 69632,
+        "__ZNK14RTBuddySegment10isWritableEv": 73728
+      }
+    },
+    "result": {
+      "device_tree_flags_offset": 28,
+      "translation": {
+        "segment_bit_0": "DeviceTree bit 2",
+        "segment_bit_1": "DeviceTree bit 0, inverted",
+        "segment_bit_2": "DeviceTree bit 3",
+        "segment_bit_3": "DeviceTree bit 4",
+        "object_offset": 64
+      },
+      "writable": {
+        "predicate": "__ZNK14RTBuddySegment10isWritableEv",
+        "segment_bit": 1,
+        "device_tree_rule": "writable when DeviceTree flag bit 0 is clear"
+      },
+      "dart_skip": {
+        "device_tree_bit": 1,
+        "meaning": "iBoot already installed this mapping; do not insert it"
+      },
+      "scope": "bit 0 is read-only and bit 1 is iBoot-installed; they are distinct and a record commonly sets one without the other"
+    }
+  },
+  {
+    "function": "recover_rtbuddy_segment_flag_contract",
+    "arguments": {
+      "functions": {
+        "__ZNK7RTBuddy13getSegmentMapEv": [
+          65536,
+          {
+            "$bytes": "562341290909025309011f33087d015308051e123b01082a1f2003d5f9030094"
+          }
+        ],
+        "__ZNK14RTBuddySegment10isWritableEv": [
+          73728,
+          {
+            "$bytes": "5f2403d50800413900050153c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZNK7RTBuddy13getSegmentMapEv": 65536,
+        "__ZN14RTBuddySegment17withPhysicalRangeEyyyyP8OSStringj": 69632,
+        "__ZNK14RTBuddySegment10isWritableEv": 73728
+      }
+    },
+    "error": "RTBuddy segment flag translation changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_segment_flag_contract",
+    "arguments": {
+      "functions": {
+        "__ZNK7RTBuddy13getSegmentMapEv": [
+          65536,
+          {
+            "$bytes": "562341290909025309011f33087d015308051e123b01082a65031f52f9030094"
+          }
+        ],
+        "__ZNK14RTBuddySegment10isWritableEv": [
+          73728,
+          {
+            "$bytes": "5f2403d50800413900040053c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZNK7RTBuddy13getSegmentMapEv": 65536,
+        "__ZN14RTBuddySegment17withPhysicalRangeEyyyyP8OSStringj": 69632,
+        "__ZNK14RTBuddySegment10isWritableEv": 73728
+      }
+    },
+    "error": "RTBuddySegment writability predicate changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_iodart_family_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZNK12IODARTMapper11getPageSizeEv": [
+          4096,
+          {
+            "$bytes": "5f2403d5089040f9001940f9c0035fd6"
+          }
+        ],
+        "__ZN12IODARTMapper10iovmInsertEjyyyy": [
+          8192,
+          {
+            "$bytes": "28040012375968b8088440f9080102aa1801038b081940f9681641b91627c89a9b26c89a63ffff97"
+          }
+        ],
+        "__ZN12IODARTMapper11_iovmInsertEP13IODARTVMSpacejjjj": [
+          12288,
+          {
+            "$bytes": "e10315aae20317aa43008052e40316aa120c009422008052"
+          }
+        ]
+      },
+      "vtable_targets": {
+        "2184": 4096,
+        "2208": 8192
+      },
+      "direction_lookup": [
+        0,
+        2,
+        1,
+        3
+      ]
+    },
+    "result": {
+      "mapper": {
+        "get_page_size_vtable_slot": 2184,
+        "iovm_insert_vtable_slot": 2208,
+        "direction_lookup": [
+          0,
+          2,
+          1,
+          3
+        ],
+        "direction_1_protection": 2,
+        "direction_3_protection": 3,
+        "page_type": 2,
+        "invalidation": "one DART page after each inserted page"
+      }
+    }
+  },
+  {
+    "function": "recover_apple_t8110_dart_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN14AppleT8110DART5startEP9IOService": [
+          10240,
+          {
+            "$bytes": "ec257694611a46f9e2a3009164423191032d8152c77e7594"
+          }
+        ],
+        "__ZN14AppleT8110DART10_dartSetupER19t8110dart_init_data": [
+          12288,
+          {
+            "$bytes": "08018052e84f00f9e3630291e20318aadf0f0094e8a2003908011aaa"
+          }
+        ],
+        "__ZN14AppleT8110DART15_getSidPropertyEPKcjPm": [
+          13312,
+          {
+            "$bytes": "e10b00a9e083009101048052"
+          }
+        ],
+        "__ZNK14AppleT8110DART12_getSIDCountEj": [
+          14336,
+          {
+            "$bytes": "08810091090e8052297ca99b080d40b900210012"
+          }
+        ],
+        "__ZNK14AppleT8110DART13isBypassedSIDEj": [
+          15360,
+          {
+            "$bytes": "3f800071298144f92825c89a00010012"
+          }
+        ],
+        "__ZN14AppleT8110DART17enableTranslationEjb": [
+          16384,
+          {
+            "$bytes": "5f000071882290520105889a83008052"
+          }
+        ],
+        "__ZN14AppleT8110DART14setTranslationEjjjj": [
+          20480,
+          {
+            "$bytes": "1a7d72d302008852087f72d3faa305a9e8ff06a9ff3f00f968008052e87300b922008052"
+          }
+        ],
+        "__ZN14AppleT8110DART14setTranslationEP13IODARTVMSpacejPvjjjjjj": [
+          22528,
+          {
+            "$bytes": "69864cb9480bc91a08e9091b0a09c91a4aa1091b290500511b011a6ba87e72d308413a8b297f72d329413a8b6807001122008052"
+          }
+        ],
+        "__ZN14AppleT8110DART13invalidateTLBEP13IODARTVMSpacejjj": [
+          24576,
+          {
+            "$bytes": "5f2403d5c0035fd6"
+          }
+        ]
+      },
+      "bypass_property_prefix": "bypass",
+      "sid_property_format": "%s-%d"
+    },
+    "result": {
+      "translation": {
+        "page_shift": 14,
+        "page_size": 16384,
+        "disable_selector": 33044,
+        "enable_selector": 33045,
+        "sid_payload_bytes": 4,
+        "driver_invalidate_method": "no-op",
+        "hardware_update_owner": "kernel PPL/SPTM IOMMU request",
+        "protected_context": {
+          "descriptor_source": "_t8110dart_get_desc",
+          "initializer": "_pmap_iommu_init",
+          "init_data_bytes": 2408,
+          "object_context_offset": 3152
+        },
+        "map_request": {
+          "segment_bytes": 40,
+          "segment_count": 1,
+          "physical_offset": 0,
+          "iova_offset": 8,
+          "byte_length_offset": 16,
+          "protection_offset": 24,
+          "protection": 3,
+          "reserved_offset": 32,
+          "meaning_of_3": "read/write protection, not segment count"
+        },
+        "partial_range": {
+          "alignment_object_offset": 3204,
+          "start_must_be_aligned": true,
+          "end_is_inclusive": true,
+          "end_remainder": "alignment - 1",
+          "byte_length": "end - start + 1",
+          "entry_encoding_owner": "kernel PPL/SPTM IOMMU request"
+        },
+        "mapper_index_semantics": "DART hardware instance, not SID",
+        "hardware_instance_stride": 112,
+        "sid_count_register_offset": 12,
+        "sid_count_mask": 511,
+        "sid_property_format": "%s-%d",
+        "bypass_property_prefix": "bypass",
+        "bypass_bitset_object_offset": 2304
+      }
+    }
+  },
+  {
+    "function": "recover_apple_t8110_dart_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN14AppleT8110DART5startEP9IOService": [
+          10240,
+          {
+            "$bytes": "ec257694611a46f9e2a3009164423191032d8152c77e7594"
+          }
+        ],
+        "__ZN14AppleT8110DART10_dartSetupER19t8110dart_init_data": [
+          12288,
+          {
+            "$bytes": "08018052e84f00f9e3630291e20318aadf0f0094e8a2003908011aaa"
+          }
+        ],
+        "__ZN14AppleT8110DART15_getSidPropertyEPKcjPm": [
+          13312,
+          {
+            "$bytes": "e10b00a9e083009101048052"
+          }
+        ],
+        "__ZNK14AppleT8110DART12_getSIDCountEj": [
+          14336,
+          {
+            "$bytes": "08810091090e8052297ca99b080d40b900210012"
+          }
+        ],
+        "__ZNK14AppleT8110DART13isBypassedSIDEj": [
+          15360,
+          {
+            "$bytes": "3f800071298144f92825c89a00010012"
+          }
+        ],
+        "__ZN14AppleT8110DART17enableTranslationEjb": [
+          16384,
+          {
+            "$bytes": "5f000071882290520105889a83008052"
+          }
+        ],
+        "__ZN14AppleT8110DART14setTranslationEjjjj": [
+          20480,
+          {
+            "$bytes": "1a7d72d302008852087f72d3faa305a9e8ff06a9ff3f00f968008052e87300b942008052"
+          }
+        ],
+        "__ZN14AppleT8110DART14setTranslationEP13IODARTVMSpacejPvjjjjjj": [
+          22528,
+          {
+            "$bytes": "69864cb9480bc91a08e9091b0a09c91a4aa1091b290500511b011a6ba87e72d308413a8b297f72d329413a8b6807001122008052"
+          }
+        ],
+        "__ZN14AppleT8110DART13invalidateTLBEP13IODARTVMSpacejjj": [
+          24576,
+          {
+            "$bytes": "5f2403d5c0035fd6"
+          }
+        ]
+      },
+      "bypass_property_prefix": "bypass",
+      "sid_property_format": "%s-%d"
+    },
+    "error": "AppleT8110DART 16 KiB translation path changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_t8110_kernel_code_contract",
+    "arguments": {
+      "functions": {
+        "_t8110dart_max_translation_levels": [
+          28672,
+          {
+            "$bytes": "680080520005881a"
+          }
+        ],
+        "_t8110dart_vo_tt_index": [
+          32768,
+          {
+            "$bytes": ""
+          }
+        ],
+        "_t8110dart_vo_tte": [
+          36864,
+          {
+            "$bytes": "ea0300364aed7cd3406d7292"
+          }
+        ]
+      },
+      "index_masks": [
+        266287972352,
+        8585740288,
+        4192256,
+        2047
+      ],
+      "index_shifts": [
+        33,
+        22,
+        11,
+        0
+      ]
+    },
+    "result": {
+      "page_table": {
+        "max_levels": 4,
+        "valid_bit": 0,
+        "physical_decode_shift": 4,
+        "physical_decode_mask": 4398046494720,
+        "index_masks_on_page_number": [
+          266287972352,
+          8585740288,
+          4192256,
+          2047
+        ],
+        "index_shifts_on_page_number": [
+          33,
+          22,
+          11,
+          0
+        ]
+      }
+    }
+  },
+  {
+    "function": "recover_iodart_family_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZNK12IODARTMapper11getPageSizeEv": [
+          4096,
+          {
+            "$bytes": "5f2403d5089040f9001940f9c0035fd6"
+          }
+        ],
+        "__ZN12IODARTMapper10iovmInsertEjyyyy": [
+          8192,
+          {
+            "$bytes": "28000012375968b8088440f9080102aa1801038b081940f9681641b91627c89a9b26c89a63ffff97"
+          }
+        ],
+        "__ZN12IODARTMapper11_iovmInsertEP13IODARTVMSpacejjjj": [
+          12288,
+          {
+            "$bytes": "e10315aae20317aa43008052e40316aa120c009422008052"
+          }
+        ]
+      },
+      "vtable_targets": {
+        "2184": 4096,
+        "2208": 8192
+      },
+      "direction_lookup": [
+        0,
+        2,
+        1,
+        3
+      ]
+    },
+    "error": "IODARTMapper iovmInsert argument conversion changed",
+    "kind": "ValueError"
+  }
+]
