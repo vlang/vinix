@@ -210,3 +210,16 @@ fn test_direct_callers_keep_symbol_ownership_and_typed_targets() {
 		assert image == before
 	}
 }
+
+fn test_direct_callers_clip_unsigned_segment_spans_without_narrowing() {
+	rows := j.decode(os.read_file(os.join_path(os.dir(@FILE), 'fixtures/caller-segment-boundaries.json')) or { panic(err) }) or { panic(err) }
+	for value in rows.arr() {
+		row := value.as_map()
+		request := at(row, 'request').as_map()
+		data := hex.decode(text(request, 'image')) or { panic(err) }
+		before := data.clone()
+		result := runtime_direct_callers(data, at(request, 'target')) or { panic(err) }
+		assert result == at(row, 'result').arr().map(j.string_value(it))
+		assert data == before
+	}
+}

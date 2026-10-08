@@ -33,7 +33,10 @@ fn runtime_direct_callers(data []u8, target j.Value) ![]string {
 		if command.command != image.lc_segment_64 { continue }
 		segment := image.parse_segment(data, command)!
 		if segment.name != '__TEXT_EXEC' { continue }
-		code := runtime_slice(data, big.integer_from_u64(segment.file_offset), int(segment.file_size))
+		start := big.integer_from_u64(segment.file_offset)
+		begin := string_offset(data, start)
+		end := string_offset(data, start + big.integer_from_u64(segment.file_size))
+		code := if begin < end { data[begin..end] } else { []u8{} }
 		mut owner := 0
 		wide_address := segment.virtual_address > ~u64(0) - u64(code.len)
 		for instruction in arm.words(code) {

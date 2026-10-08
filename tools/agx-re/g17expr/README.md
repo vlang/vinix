@@ -103,3 +103,9 @@ computed-base write streams and unsigned segment boundaries. Qualification in
 compares complete results and error ordering across mutation controls and real
 driver images, and checks native ARM64, native x86-64, sanitizers and foreign
 thread response ownership. These checks exercise host recovery and its C ABI.
+
+The direct-call scan clips executable segment spans with full unsigned Mach-O
+file widths, matching Python slices even when a file size exceeds a host index.
+`fixtures/caller-segment-boundaries.json` preserves independent synthetic-Mach-O
+results for truncated, oversized and wrapped-address spans. Its qualification
+record is under `~/.cache/vinix-python-to-v/g17-caller-span-20261008/`.
