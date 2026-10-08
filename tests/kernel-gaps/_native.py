@@ -76,9 +76,16 @@ def call(operation, arguments, namespace, resources=None, controller=None):
     def interrupt(signum, frame):
         try:
             previous(signum, frame)
+            inherited = getattr(previous, "_vinix_native_pending", ())
+            if inherited:
+                pending.append(inherited.pop(0))
+                mask()
         except BaseException as error:
             pending.append(error)
             mask()
+
+    interrupt._vinix_native_pending = pending
+    interrupt._vinix_native_restore = lambda: signal.SIG_IGN if masked else interrupt
 
     def resolve(name):
         parts = name.split(".")
@@ -101,7 +108,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
         return ident
 
     def library_primitive(method, row):
-        nonlocal completed
+        nonlocal completed, masked
         if method == "finished":
             completed = True
             return None
@@ -113,11 +120,19 @@ def call(operation, arguments, namespace, resources=None, controller=None):
         if method == "retiring":
             mask()
             return None
+        if method == "retired":
+            if previous is not None and masked:
+                signal.signal(signal.SIGINT, interrupt)
+                masked = False
+            return None
         if method == "fork":
+            if "command" in row:
+                resources["command"] = resources[row["command"]]
+                resources["env"] = resources[row["env"]]
             pid, master = namespace["pty"].fork()
             if pid == 0:
                 try:
-                    namespace["os"].chdir(namespace["ROOT"])
+                    namespace["os"].chdir(namespace[row.get("root", "ROOT")])
                     namespace["os"].execvpe(resources["command"][0], resources["command"], resources["env"])
                 except BaseException:
                     import traceback
@@ -273,4 +288,4 @@ def call(operation, arguments, namespace, resources=None, controller=None):
         return restore(result)
     finally:
         if previous is not None:
-            signal.signal(signal.SIGINT, previous)
+            signal.signal(signal.SIGINT, getattr(previous, "_vinix_native_restore", lambda: previous)())
