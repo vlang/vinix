@@ -112,7 +112,7 @@ fn run_profile(keep string, supplied_header string) ! {
 	arch := $if arm64 { 'arm64' } $else $if amd64 { 'amd64' } $else { '' }
 	if arch == '' { return error('Unsupported host architecture') }
 	work := hosttest.work_dir(keep, 'vinix-scalar-store-host-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	core := os.join_path(work, 'compatcore')
 	os.mkdir(core)!
 	mut observed := [@FILE, os.join_path(root, 'kernel/c', contract),

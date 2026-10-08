@@ -157,7 +157,7 @@ fn (fixture Fixture) launched(launch Launch) ! {
 
 fn run_case(name string) ! {
 	work := hosttest.work_dir('', 'vinix-dota2-test-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	base := hosttest.module_resolve(work)!
 	mut fixture := create(base)!
 	match name {

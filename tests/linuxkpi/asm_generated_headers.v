@@ -120,7 +120,7 @@ fn run_profile(keep string) ! {
 	compiler_argv := hosttest.shell_split(compiler)!
 	nm := hosttest.tool(hosttest.env_default('NM', 'llvm-nm'))
 	work := hosttest.work_dir(keep, 'vinix-asm-generated-headers-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	mut guarded := [@FILE, os.join_path(here, 'upstream.json'),
 		os.join_path(here, 'include/generated/autoconf.h'), x86_kbuild, generic_kbuild, fixmap,
 		...owned, ...originals]

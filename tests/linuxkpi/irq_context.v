@@ -216,7 +216,7 @@ fn run_profile(keep string) ! {
 	thunks := os.join_path(root, 'kernel/asm/int_thunks_asm.S')
 	speculation := os.join_path(root, 'kernel/asm/x86_64/speculation.h')
 	work := hosttest.work_dir(keep, 'vinix-irq-context-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	mut sources := [core, local_source, contract, thunks, speculation, @FILE]
 	sources << os.walk_ext(os.join_path(os.dir(@FILE), 'hosttest'), '.v')
 	initial := hosttest.hashes(sources)!

@@ -192,7 +192,7 @@ fn (mut context Context) probe(standard string, name string, code string, expect
 
 fn run_profile(keep string) ! {
 	work := hosttest.work_dir(keep, 'vinix-smp-headers-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	root := hosttest.root()
 	here := hosttest.upstream_here()
 	pin := hosttest.upstream_pin()!

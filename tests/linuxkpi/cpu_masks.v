@@ -179,7 +179,7 @@ fn run_profile(keep string) ! {
 		os.join_path(root, 'third_party/linux-i915/linux-' + version)))
 	compiler := hosttest.shell_split(hosttest.env_default('CC', 'clang'))!
 	work := hosttest.work_dir(keep, 'vinix-cpu-masks-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	mut observed := [@FILE, core, queries, storage, primitives, contract,
 		os.join_path(here, 'compatcore/bitmap.v'), os.join_path(here, 'compatcore/primitives.v'),
 		os.join_path(here, 'headercore/primitive.v'), os.join_path(here, 'headercore/wait.v'),

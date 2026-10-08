@@ -174,21 +174,42 @@ pub fn run(argv []string, log string) !Result {
 
 pub fn work_dir(keep string, prefix string) !string {
 	if keep != '' {
-		path := os.abs_path(keep)
+		path := module_resolve(keep)!
 		if os.exists(path) {
 			return error('Output directory already exists: ${path}')
 		}
-		os.mkdir_all(os.dir(path))!
+		work_dir_parents(path.all_before_last('/'))!
 		os.mkdir(path)!
-		return os.real_path(path)
+		return path
 	}
-	mut pattern := (os.join_path(os.temp_dir(), prefix + 'XXXXXX') + '\x00').bytes()
+	if prefix.contains('\x00') { return error('embedded null byte') }
+	mut pattern := (module_join(os.temp_dir(), prefix + 'XXXXXX') + '\x00').bytes()
 	unsafe {
 		result := C.mkdtemp(&char(pattern.data))
 		if result == nil {
 			return error('Cannot create private temporary directory')
 		}
-		return result.vstring()
+		return result.vstring().clone()
+	}
+}
+
+// Retire only a private scratch tree owned by the calling controller. Unix
+// backslashes remain filename bytes, and links are removed without traversal.
+pub fn remove_work_dir(path string) ! {
+	module_remove_tree(path)!
+}
+
+// mkdir_all treats backslashes as separators even on Unix. Preserve the
+// resolved parent's literal components and the caller's existing umask.
+fn work_dir_parents(path string) ! {
+	if path == '' || path == '/' { return }
+	os.mkdir(path) or {
+		if os.is_dir(path) { return }
+		if err.code() != C.ENOENT { return err }
+		work_dir_parents(path.all_before_last('/'))!
+		os.mkdir(path) or {
+			if !os.is_dir(path) { return err }
+		}
 	}
 }
 

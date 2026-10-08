@@ -209,7 +209,7 @@ fn run_profile(keep string, supplied_header string) ! {
 	arch := $if arm64 { 'arm64' } $else $if amd64 { 'amd64' } $else { '' }
 	if arch == '' { return error('Unsupported host architecture') }
 	work := hosttest.work_dir(keep, 'vinix-nocache-host-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	core := os.join_path(work, 'compatcore')
 	os.mkdir(core)!
 	production_source := os.join_path(root, 'kernel/linuxkpi/compatcore', source_name)

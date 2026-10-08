@@ -78,7 +78,7 @@ fn run_profile(keep string) ! {
 	nm := tool(hosttest.env_default('NM', 'llvm-nm'))!
 	objdump := tool(hosttest.env_default('OBJDUMP', 'llvm-objdump'))!
 	work := hosttest.work_dir(keep, 'vinix-special-insns-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	archive := os.join_path(os.dir(linux), 'linux-' + pin['version']!.str() + '.tar.xz')
 	original := original_headers(work, linux, archive, pin)!
 	processor := os.join_path(here, 'include/asm/processor.h')

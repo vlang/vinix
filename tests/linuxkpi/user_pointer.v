@@ -37,7 +37,7 @@ fn run_profile(keep string) ! {
 		return error('u64_to_user_ptr differs from the pinned original')
 	}
 	work := hosttest.work_dir(keep, 'vinix-user-pointer-')!
-	defer { if keep == '' { os.rmdir_all(work) or {} } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or {} } }
 	include := os.join_path(work, 'include')
 	os.mkdir_all(os.join_path(include, 'linux'))!
 	os.write_file(os.join_path(include, 'linux/kernel.h'), header_text)!

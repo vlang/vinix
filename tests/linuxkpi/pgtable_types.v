@@ -20,7 +20,7 @@ fn run_profile(keep string) ! {
 	compiler_text := hosttest.env_default('CC', 'clang')
 	compiler := hosttest.shell_split(compiler_text)!
 	work := hosttest.work_dir(keep, 'vinix-pgtable-types-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	include := os.join_path(work, 'include')
 	hosttest.audit_headers(include)!
 	source := os.join_path(work, 'page-types.c')

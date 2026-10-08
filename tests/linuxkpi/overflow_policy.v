@@ -163,7 +163,7 @@ fn run_profile(requested_arch string) ! {
 	native_arch := if machine in ['arm64', 'aarch64'] { 'arm64' } else { 'amd64' }
 	arch := if requested_arch != '' { requested_arch } else { native_arch }
 	work := hosttest.work_dir('', 'vinix-overflow-policy-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	prepare(work, arch)!
 	mut flags := [hosttest.env_default('CC', 'clang'), '-std=gnu11', '-fgnu89-inline', '-O1', '-g',
 		'-ffreestanding', '-fno-builtin', '-fwrapv', '-fno-strict-aliasing', '-ffunction-sections', '-fdata-sections',

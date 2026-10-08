@@ -56,7 +56,7 @@ pub fn generate_header_primitives(output string, arch string, host bool, impleme
 		return
 	}
 	work := work_dir('', 'vinix-header-implementations-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { remove_work_dir(work) or { eprintln(err) } }
 	isolated := os.join_path(work, 'headercore')
 	os.mkdir(isolated)!
 	for name in ['primitive.v', 'policy.v'] {

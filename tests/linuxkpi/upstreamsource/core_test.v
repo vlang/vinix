@@ -69,7 +69,7 @@ fn fixture_pin(base string) !map[string]json2.Any {
 
 fn test_modifications_and_added_files_are_rejected() {
 	base := hosttest.work_dir('', 'vinix-source-integrity-')!
-	defer { os.rmdir_all(base) or {} }
+	defer { hosttest.remove_work_dir(base) or {} }
 	fixture_archive(base, [Member{'driver/a.c', 'unmodified\n'}, Member{'unwanted.c', 'excluded\n'}])!
 	pin := fixture_pin(base)!
 	root := fetch(base, pin)!
@@ -95,7 +95,7 @@ fn test_modifications_and_added_files_are_rejected() {
 
 fn test_manifest_pin_rejects_rewritten_checksums() {
 	base := hosttest.work_dir('', 'vinix-source-manifest-')!
-	defer { os.rmdir_all(base) or {} }
+	defer { hosttest.remove_work_dir(base) or {} }
 	fixture_archive(base, [Member{'driver/a.c', 'unmodified\n'}, Member{'unwanted.c', 'excluded\n'}])!
 	mut pin := fixture_pin(base)!
 	root := fetch(base, pin)!
@@ -118,7 +118,7 @@ fn test_manifest_pin_rejects_rewritten_checksums() {
 
 fn test_path_escape_is_rejected() {
 	base := hosttest.work_dir('', 'vinix-source-traversal-')!
-	defer { os.rmdir_all(base) or {} }
+	defer { hosttest.remove_work_dir(base) or {} }
 	fixture_archive(base, [Member{'driver/../../outside.c', 'x'}])!
 	pin := fixture_pin(base)!
 	mut rejected := false

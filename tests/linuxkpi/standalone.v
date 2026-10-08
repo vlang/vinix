@@ -35,7 +35,7 @@ fn run_profile(options map[string]string) ! {
 	$if macos { flags << ['-arch', if arch == 'arm64' { 'arm64' } else { 'x86_64' }] }
 	$else { if arch != native { return error('run target architecture fixtures on a native host') } }
 	work := hosttest.work_dir('', 'vinix-standalone-v-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	include_dir := if '--include' in options { if options['--include'] == '' { '.' } else { options['--include'] } } else { os.join_path(work, 'include') }
 	if '--include' !in options {
 		for schema, header in {'spinlock': 'spinlock_adapters', 'atomic-exchange': 'atomic_exchange', 'overflow': 'integer_policy'} {

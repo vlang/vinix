@@ -139,7 +139,7 @@ fn run_profile(keep string) ! {
 		if !production_text.contains(declaration) { return error('Existing V ABI declaration changed: ' + declaration) }
 	}
 	work := hosttest.work_dir(keep, 'vinix-overflow-type-')!
-	defer { if keep == '' { os.rmdir_all(work) or {} } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or {} } }
 	preload := os.join_path(work, 'preload.h')
 	os.write_file(preload, '#include "' + os.join_path(root, 'tests/linuxkpi/host_types.h') + '"\n#include <stdio.h>\n#include <stdint.h>\n')!
 	source, cases := test_source()

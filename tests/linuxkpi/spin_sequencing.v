@@ -36,7 +36,7 @@ fn run_profile() ! {
 	if machine !in ['arm64', 'aarch64', 'x86_64', 'amd64'] { return error('Unsupported native host: ' + machine) }
 	arch := if machine in ['arm64', 'aarch64'] { 'arm64' } else { 'amd64' }
 	work := hosttest.work_dir('', 'vinix-spin-sequencing-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	fixture := os.join_path(work, 'spinfixture')
 	os.mkdir(fixture)!
 	os.cp(os.join_path(root, 'tests/linuxkpi/spinfixture/core.v'), os.join_path(fixture, 'core.v'))!

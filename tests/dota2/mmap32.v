@@ -9,7 +9,7 @@ fn run(baseline string, has_baseline bool) ! {
 	root := hosttest.root()
 	arch := if os.uname().machine in ['arm64', 'aarch64'] { 'arm64' } else { 'amd64' }
 	work := hosttest.work_dir('', 'vinix-dota-mmap32-')!
-	defer { os.rmdir_all(work) or { eprintln(err) } }
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	flags := [hosttest.env_default('CC', 'clang'), '-O1', '-g', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
 		'-Wno-unused-function', '-Wno-unused-label', '-Wno-unused-parameter',
 		'-fsanitize=address,undefined', '-fno-omit-frame-pointer']

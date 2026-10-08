@@ -178,7 +178,7 @@ fn run_profile(keep string) ! {
 		os.join_path(root, 'third_party/linux-i915/linux-6.6.157')))
 	work := hosttest.work_dir(keep, 'vinix-cpu-feature-policy-')!
 	defer {
-		if keep == '' { os.rmdir_all(work) or { eprintln(err) } }
+		if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } }
 	}
 	observed := [policy, bridge, local, @FILE,
 		os.join_path(os.dir(@FILE), 'hosttest/core.v'),

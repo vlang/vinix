@@ -74,7 +74,7 @@ fn run_profile(keep string) ! {
 	}
 	compiler := hosttest.shell_split(hosttest.env_default('CC', 'clang'))!
 	work := hosttest.work_dir(keep, 'vinix-static-key-declaration-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	include := os.join_path(work, 'include')
 	hosttest.audit_headers(include)!
 	for name, code in {

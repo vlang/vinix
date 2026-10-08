@@ -324,7 +324,7 @@ fn run_profile(keep string) ! {
 	archive := os.join_path(os.dir(linux), 'linux-' + version + '.tar.xz')
 	compiler := hosttest.env_default('CC', 'clang')
 	work := hosttest.work_dir(keep, 'vinix-bounds-generation-')!
-	defer { if keep == '' { os.rmdir_all(work) or { eprintln(err) } } }
+	defer { if keep == '' { hosttest.remove_work_dir(work) or { eprintln(err) } } }
 	mut guarded := [@FILE, os.join_path(root, 'tests/linuxkpi/bounds_compiler_probe.v'),
 		os.join_path(root, 'tests/linuxkpi/generate_bounds.v'),
 		os.join_path(root, 'tests/linuxkpi/generate_abi.v'),
