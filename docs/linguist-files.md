@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `6868e76fc6498c6efbb9a423972e10b0c9528e97`,
+at source commit `789653b1cd264861631988ceece785af2dc7f0f5`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,10 +12,10 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 491 | 1,863,972 | 4.47% |
-| Python | 496 | 4,626,591 | 11.10% |
-| Shell | 301 | 1,287,444 | 3.09% |
+| Python | 492 | 4,481,678 | 10.74% |
+| Shell | 303 | 1,287,788 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 74.14%, with no
+All `.v` files are classified as V. The resulting V share is 74.52%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 6868e76fc6498c6efbb9a423972e10b0c9528e97 --breakdown --json
+github-linguist --rev 789653b1cd264861631988ceece785af2dc7f0f5 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -632,7 +632,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
-| `kernel/linuxkpi/generate-abi.py` | 18,887 |
+| `kernel/linuxkpi/generate-abi.py` | 713 |
 | `kernel/linuxkpi/generate-bounds.py` | 20,254 |
 | `kernel/linuxkpi/upstream.py` | 4,638 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
@@ -875,7 +875,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/fpu_header_test.py` | 4,937 |
 | `tests/linuxkpi/host_suite.py` | 5,431 |
 | `tests/linuxkpi/overflow_test.py` | 12,342 |
-| `tests/linuxkpi/overflow_type_test.py` | 13,758 |
 | `tests/linuxkpi/pgtable_type_test.py` | 12,281 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
 | `tests/linuxkpi/smp_header_test.py` | 19,818 |
@@ -1012,21 +1011,18 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tests/xnualloc/reference_test.py` | 15,234 |
 | `tests/xnualloc/zone_model_test.py` | 12,764 |
-| `tools/agx-re/_native_extract.py` | 5,392 |
-| `tools/agx-re/_native_g17.py` | 3,868 |
+| `tools/agx-re/_native_adt.py` | 1,968 |
+| `tools/agx-re/_native_extract.py` | 5,416 |
+| `tools/agx-re/_native_g17.py` | 3,986 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/generate_g17_power_model.py` | 13,910 |
-| `tools/agx-re/inspect_macos.py` | 33,150 |
-| `tools/agx-re/recover_g17_abi.py` | 629,267 |
-| `tools/agx-re/recover_t6050_power.py` | 220,154 |
+| `tools/agx-re/recover_g17_abi.py` | 611,265 |
+| `tools/agx-re/recover_t6050_power.py` | 207,933 |
 | `tools/agx-re/recover_t8103_adt.py` | 19,033 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_generate_g17_power_model.py` | 3,426 |
-| `tools/agx-re/test_inspect_macos.py` | 21,643 |
-| `tools/agx-re/test_recover_g17_abi.py` | 332,984 |
+| `tools/agx-re/test_recover_g17_abi.py` | 320,245 |
 | `tools/agx-re/test_recover_t6050_power.py` | 106,694 |
 | `tools/agx-re/test_recover_t8103_adt.py` | 15,980 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
@@ -1345,6 +1341,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/extract_pmp_firmware` | 166 |
 | `tools/agx-re/generate_fake_g17_3d_encoder` | 174 |
 | `tools/agx-re/generate_g13_initdata_layout` | 180 |
+| `tools/agx-re/generate_g17_power_model` | 170 |
+| `tools/agx-re/inspect_macos` | 174 |
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
 | `tools/agx-re/trace_diff` | 156 |
 | `tools/apple-backlight/test.sh` | 415 |

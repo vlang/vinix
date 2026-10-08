@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `6868e76fc6498c6efbb9a423972e10b0c9528e97`, Linguist 7.27.0 reports
-**Python 11.10%** (496 files, 4,626,591 bytes) and **V 74.14%** (1,309 files,
-30,907,910 bytes). The complete committed-blob inventory and reproduction
+At source `789653b1cd264861631988ceece785af2dc7f0f5`, Linguist 7.27.0 reports
+**Python 10.74%** (492 files, 4,481,678 bytes) and **V 74.52%** (1,335 files,
+31,104,611 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **579,694 Python bytes**. Roughly another
-2.54 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **724,607 Python bytes**. Roughly another
+2.39 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,13 +21,13 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. Their gross scope is 603,164 bytes.
+tests, including comments and blank lines. Their gross scope is 754,380 bytes.
 The net reduction is smaller by 290 bytes of temporary G13 adapter code,
-10,311 bytes of retained extraction import bridges, 12,803 bytes of G17
-foundation wrappers/import bridges and loader fingerprint changes, and 66
-bytes added while
-moving the existing guest runner's comparator call to native validation.
-Adapter additions receive no extra migration credit.
+10,311 bytes of extraction bridges, 12,803 bytes of G17 foundation wrappers and
+fingerprint changes, 66 bytes in the guest comparator caller, 713 bytes of the
+ABI import facade, 362 bytes of power wrappers/bridges, and 5,228 bytes of ADT
+wrappers/bridges after import cleanup. Adapter additions receive no extra
+migration credit.
 
 | Stage | Native source | Original Python bytes / lines | Source commit |
 | --- | --- | ---: | --- |
@@ -47,6 +47,11 @@ Adapter additions receive no extra migration credit.
 | Nocache ABI/primitive host controller | `tests/linuxkpi/nocache.v` | 26,985 / 512 | `c395bd3093a50f1a42816984d1e22dbe0626ae25` |
 | User-pointer compiler controller | `tests/linuxkpi/user_pointer.v` | 9,179 / 214 | `95bcfdf680f943b6521593d4110f12c388f8521d` |
 | G17 Mach-O, instruction and static register recovery foundations | `tools/agx-re/g17decode` | 39,334 / 1,056 | `6868e76fc6498c6efbb9a423972e10b0c9528e97` |
+| Structured ABI header generator | `tests/linuxkpi/hosttest/abi.v`, `generate_abi.v` | 18,887 / 349 | `5c3e48b4e94a6b5d629996f68faa76522e4bfa8b` |
+| G17 power model/generator and linear recovery with tests | `tools/agx-re/g17power`, `generate_g17_power_model.v` | 48,309 / 1,240 | `87b211013d61f77cf24396cdf1c50fdd78fc0946` |
+| Overflow type compiler controller | `tests/linuxkpi/overflow_type.v` | 13,758 / 273 | `4069c0c7430ce41033f7376dc9cadc2c7ef3edd2` |
+| Apple DeviceTree/PMGR/PMP primitives | `tools/agx-re/appleadt` | 15,469 / 347 | `5c9b3749bb722a6c8a20f1fb6a776323b81416f1` |
+| macOS inspection, property lists and tests | `tools/agx-re/macinspect`, `inspect_macos.v` | 54,793 / 1,388 | `bb18890e06488335a8e2e69ea10b8348900b721d` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -174,6 +179,54 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   committed blob sizes. The public alignment helper now accepts arbitrary
   signed integers in native V.
 
+- ABI generator: 123 original/native source and metadata controls, 44 CLI
+  controls and 19 decimal rounding/limit controls. Three actual production
+  headers match byte for byte with both pinned and x86 host compilers. Exact
+  unbounded constants, source-root confinement, adapter arity, local capture,
+  type/width validation and JSON error category remain checked. Original
+  overflow/exchange and all four ABI audit-generation fixture tests pass.
+  The unchanged spin controller fails in current transitive headers on both
+  hosts; native negative gates preserve that baseline diagnostic. Commit
+  `52a79217` changes the kernel make recipes to native V; 12 isolated make and
+  original-generation controls verify exact headers, repeat timestamps and
+  helper-triggered regeneration. This does not claim kernel execution.
+- G17 power: 13 native tests, 4,307 model and 197 recovery controls per host
+  and sanitizer profile, 48 CLI controls, four original generator tests and
+  three original recovery tests. The actual driver recovery dictionary and
+  11,490-byte generated kernel table match exactly. Arbitrary-width voltages,
+  Q40 arithmetic, binary32 overflow and original instruction-proof mutations
+  retain their errors. Platform `powf` rounding is compared with the original
+  oracle running on the same architecture. Foreign-worker import calls return
+  to zero owned output buffers. Net retirement is 47,947 bytes.
+- Overflow types: the complete C fixture is byte-exact. Both production and
+  immutable original headers retain 454 boundary cases and 4,099 assertions
+  for GNU99/GNU11 on ARM/x86. Nine provenance/header/declaration mutation
+  controls, 32 CLI controls, exact file-scope diagnostics, no runtime imports
+  and the original 30-second deadline remain checked.
+- Apple ADT: 23 native tests and 54,690 exact API controls per architecture,
+  including the production import boundary. All 43 original T6050/T8103
+  fixture tests and both actual T6050 manifests pass. Real LZFSE growth and
+  scratch retirement, copied payloads, numeric predicates, error ordering and
+  unaligned instruction matching are covered. Each host completes 8,000 calls
+  across 32 distinct simultaneous foreign workers with zero owned outputs and
+  bounded collector retention. ASan/UBSan also covers 10,000 direct ABI calls.
+  Gross scope is 15,469 bytes; counted wrappers/bridges leave 10,241 net bytes.
+- macOS inspection: 28 native tests, all 22 unchanged original test bodies,
+  36 full original contracts, 2,383 additional API controls, 2,472 property-list
+  controls and 168 CLI controls on each host. Binary/XML integers retain
+  arbitrary precision; literal read-only registry commands, simultaneous pipe
+  draining, Unicode, sorted ASCII JSON, selected-property filtering and saved
+  plist behavior match. Four maintained shell routes pass from `/tmp`.
+  Sanitizer gates use Boehm with the real stack and a separate `-gc none`
+  fake-stack build, retaining every wide-integer assertion. An independent
+  unchanged `math.big` test reproduces corruption when Boehm is combined with
+  ASan fake-stack relocation; the incompatible configuration is recorded
+  separately. System Expat remains an upstream parser primitive; conversions
+  and binary-plist parsing are V, with parser retirement reviewed by a peer.
+  Commits `5c9b3749`/`789653b1` integrate native power/ADT/inspection callers and
+  the complete AGX test suite; original generated producer comments remain
+  unchanged to preserve the byte-exact table provenance.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -199,6 +252,12 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `nocache-20261008` | `qualified-differential.json` | `db8fc5edcc7a632ad24ff8d52bf3725d84a9391c477988d88420fc879fd3b147` |
 | `user-pointer-20261008` | `qualified-differential.json` | `ffd668b7e0b1ce5ffc1de3b7faeed5b5f125b761f6a6a9b65a470ebc1f7aa6ae` |
 | `agx-recovery-20261008/final` | `precommit-validation.json` | `06dbaf60ec1254e4542815831d7cd956e0a90fd866941c379941750e2cd678f5` |
+| `abi-generator-20261008` | `qualified-differential.json` | `5dfac93ff16b90315ce8a4f72e9ce18ce4a57d9054b7acd4e4d1db7069a619a3` |
+| `abi-make-20261008` | `qualification.json` | `a2d4cd0684cbcac830672234255faa17f56091855cec15dfeb6db99b63784f8d` |
+| `g17-power-20261008` | `final-qualification-v1.json` | `db7ca98b76c32ff4d812db2ad2250b6276f433efa2a84641360b75a5161d0162` |
+| `overflow-types-20261008` | `qualified-differential.json` | `8b405a83166d6bc694d2db9d037397c70c4d106585e81f004cec7b1284f8ca68` |
+| `agx-adt-20261008/final` | `precommit-validation-v2.json` | `576bcd4ed65b47c183390c22af548c5ad1bf0eb5025183b9413b3788affb84a6` |
+| `mac-inspect-20261008/final-v2` | `qualification.json` | `d35a167b17766851319a55692d435a80c10e3794d923f5a3e4481f28e7f72aa3` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -207,12 +266,10 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-Power recovery/generation, Apple ADT/property recovery, the macOS inspection
-manifest, the shared ABI schema generator and further LinuxKPI compiler
-controllers are the next active scopes. They do not count as completed until
-qualified and committed. Native numeric decoding must preserve large provenance
-timestamps as
-well as addresses; decoding an unconstrained JSON integer through `f64` loses
+G17 expression/CFG/selector recovery, complete T8103 recovery, PCI topology
+compiler orchestration and the LinuxKPI bounds/audit foundation are active.
+They count only after qualification and exact-path commits. Native numeric
+decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
 narrow adapter to the native implementation until its caller is ported too.
 
