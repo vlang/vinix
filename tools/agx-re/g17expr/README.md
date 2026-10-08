@@ -146,3 +146,18 @@ Qualification under `~/.cache/vinix-python-to-v/g17-layout-20261008/` passed
 12,773 complete typed result and error controls on ARM64, x86-64 and ASan/UBSan,
 all 11 real-driver outputs, original assertions, remaining Python assertions,
 fake-stack checks and foreign thread response ownership.
+
+The conservative member-write census now runs in `census.v` and
+`census_decode.v`. It retains pointer derivations and full-width symbol
+ownership, original confident-writer masks, pre/post-index writeback, argument
+escapes and memory-writer identity. Kernel aliases retain the original final
+mapping. Executable segment slices are clipped after unsigned 64-bit span
+arithmetic; outputs contain owned metadata only.
+
+The independent census fixture and 10,896 decoder controls run in
+`census_test.v`, together with boundary and error cases. Qualification compared
+3,304 complete typed results/errors on actual ARM64, x86-64 and ARM64 ASan/UBSan
+builds, four real-driver invocations, 16 remaining original Python methods on
+both public ABIs, 1,600 foreign calls per architecture with zero owned responses,
+10,000 sanitizer CFFI iterations, and a fake-stack lifetime check. These are
+host recovery-tool checks; no GPU or kernel execution is claimed.

@@ -409,63 +409,6 @@ class RecoverG17AbiTests(unittest.TestCase):
 
 
 
-    def test_census_finds_direct_derived_and_escaping_member_writes(self) -> None:
-        base = 0x100000
-        second = base + 0x100
-        deadline = 0x900000
-        bzero = 0x900100
-        code = bytearray(0x200)
-        instructions = [
-            str_x(8, 0, 0x6D0),  # this->flags
-            add_immediate(9, 19, 0x600),
-            str_unsigned(1, 9, 0xD0, 4),  # interior pointer + 0xd0
-            adrp(base + 0xC, 0x200000, 8),
-            str_x(0, 8, 0x6D0),  # a global
-            str_x(8, 31, 0x6D0),  # the stack is not an object
-            stp_x(8, 10, 9, 0xC8),  # a pair through the interior pointer
-            movz(9, 0x6D0),
-            str_register_x(8, 0, 9),  # this + constant index
-            str_post_x(8, 0, 0x10),
-            str_x(9, 0, 0x6C0),  # after writeback: this + 0x6d0
-            add_immediate(2, 20, 0x6C8),
-            bl(base + 0x30, deadline),  # escapes this + 0x6c8
-            add_immediate(0, 19, 0x600),
-            movz_w(1, 0x100),
-            bl(base + 0x3C, bzero),  # clears 0x600..0x700
-            ldr_x(0, 0, 0),
-            str_x(8, 0, 0x6D0),  # through a loaded pointer
-        ]
-        struct.pack_into(f"<{len(instructions)}I", code, 0, *instructions)
-        # A new symbol forgets every derivation.
-        struct.pack_into("<I", code, 0x100, str_unsigned(8, 9, 0xD0, 4))
-        result = recover_g17_abi.census_g17_code_member_writes(
-            bytes(code),
-            base,
-            [(base, "first"), (second, "second")],
-            0x6D0,
-            0x6D8,
-            {bzero: ("___bzero", (0, 1))},
-        )
-
-        stores = [(item["offset"], item["member"], item["origin"]) for item in result["stores"]]
-        self.assertEqual(
-            stores,
-            [
-                (0x00, 0x6D0, "arg0"),
-                (0x08, 0x6D0, "unknown"),
-                (0x18, 0x6C8, "unknown"),
-                (0x20, 0x6D0, "arg0"),
-                (0x28, 0x6D0, "arg0"),
-                (0x44, 0x6D0, "unknown"),
-            ],
-        )
-        self.assertEqual([item["offset"] for item in result["global_stores"]], [0x10])
-        self.assertEqual(
-            [(item["offset"], item["member"], item["argument"]) for item in result["escapes"]],
-            [(0x30, 0x6C8, 2)],
-        )
-        routine = result["memory_routines"][0]
-        self.assertEqual((routine["member"], routine["bytes"], routine["clears_only"]), (0x600, 0x100, True))
 
     def test_recovers_g17_accelerator_channel_inputs(self) -> None:
         addresses = {

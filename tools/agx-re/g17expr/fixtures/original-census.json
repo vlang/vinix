@@ -1,0 +1,136 @@
+[
+  {
+    "request": {
+      "operation": "census_g17_code_member_writes",
+      "fixture_test": "test_census_finds_direct_derived_and_escaping_member_writes",
+      "code": "086803f96902189121d100b908080090006903f9e86b03f928a90ca909da80d2086829f8080401f8096003f982221b91f4ff1f94600218910120805231002094000040f9086803f90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000028d100b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "code_address": 1048576,
+      "ordered": [
+        [
+          1048576,
+          "first"
+        ],
+        [
+          1048832,
+          "second"
+        ]
+      ],
+      "low": 1744,
+      "high": 1752,
+      "memory_writers": {
+        "9437440": [
+          "___bzero",
+          [
+            0,
+            1
+          ]
+        ]
+      }
+    },
+    "result": {
+      "stores": [
+        {
+          "symbol": "first",
+          "offset": 0,
+          "word": 4177750024,
+          "kind": "store",
+          "member": 1744,
+          "bytes": 8,
+          "origin": "arg0",
+          "derived": false
+        },
+        {
+          "symbol": "first",
+          "offset": 8,
+          "word": 3103838497,
+          "kind": "store",
+          "member": 1744,
+          "bytes": 4,
+          "origin": "unknown",
+          "derived": true
+        },
+        {
+          "symbol": "first",
+          "offset": 24,
+          "word": 2836179240,
+          "kind": "store",
+          "member": 1736,
+          "bytes": 16,
+          "origin": "unknown",
+          "derived": true
+        },
+        {
+          "symbol": "first",
+          "offset": 32,
+          "word": 4163463176,
+          "kind": "store",
+          "member": 1744,
+          "bytes": 8,
+          "origin": "arg0",
+          "derived": true
+        },
+        {
+          "symbol": "first",
+          "offset": 40,
+          "word": 4177747977,
+          "kind": "store",
+          "member": 1744,
+          "bytes": 8,
+          "origin": "arg0",
+          "derived": true
+        },
+        {
+          "symbol": "first",
+          "offset": 68,
+          "word": 4177750024,
+          "kind": "store",
+          "member": 1744,
+          "bytes": 8,
+          "origin": "unknown",
+          "derived": false
+        }
+      ],
+      "global_stores": [
+        {
+          "symbol": "first",
+          "offset": 16,
+          "word": 4177750272,
+          "kind": "global",
+          "bytes": 8
+        }
+      ],
+      "memory_routines": [
+        {
+          "symbol": "first",
+          "offset": 60,
+          "word": 2485125169,
+          "kind": "memory_routine",
+          "routine": "___bzero",
+          "member": 1536,
+          "bytes": 256,
+          "origin": "unknown",
+          "clears_only": true
+        }
+      ],
+      "escapes": [
+        {
+          "symbol": "first",
+          "offset": 48,
+          "word": 2485125108,
+          "kind": "escape",
+          "member": 1736,
+          "argument": 2,
+          "origin": "unknown",
+          "target": 9437184
+        }
+      ],
+      "unbounded_sites": [],
+      "unbounded": [
+        {
+          "register_indexed_stores": 0,
+          "untracked_memory_routines": 0
+        }
+      ]
+    }
+  }
+]
