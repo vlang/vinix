@@ -74,3 +74,19 @@ does; a separate zero-credit follow-up passed 18 file/manager controls per
 profile, including suppression, distinct entered handles and truth-result
 exception context. The result evidence is under
 `~/.cache/vinix-python-to-v/android-run-result-20261008/`.
+
+`vm.v` owns pre-fork kernel snapshot sequencing, materialized-overlay payload
+accounting, boot disk sizing, environment updates and QEMU runner arguments.
+Its environment, argv and arbitrary-width integer values are GC-owned copies;
+the original PTY/thread ownership begins only after the plan returns. The
+remaining supervisor and input/reader loops are unchanged Python.
+
+Qualification from source `35c6681c` passed 57 complete original/native plan
+pairs per ARM64, Rosetta x86_64 and ARM ASan/UBSan profile: exact environment,
+argv, stat/platform call order, kernel snapshot bytes/modes, partial failure
+state and original exception identity. Controls cover 100-digit payload sizes,
+MiB/512-MiB boundaries, overlay hardlinks and symlinks, inherited environment,
+platform/display choices, missing inputs/attributes and blocked snapshots.
+All ten unchanged interactive tests and cold source-closure installations also
+passed on both native host ABIs. Evidence is machine-local under
+`~/.cache/vinix-python-to-v/android-vm-plan-20261008/`.

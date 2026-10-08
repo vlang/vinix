@@ -163,44 +163,9 @@ def stop_vm(pid: int, master: int) -> None:
 
 
 def run(args: argparse.Namespace, overlay: Path | None) -> int:
-    state = args.state_dir
-    socket_path = state / "qmp.sock"
-    if socket_path.exists():
-        raise SystemExit(f"QMP socket already exists: {socket_path}; choose another --state-dir")
-    # A private snapshot also keeps concurrent kernel rebuilds out of this boot.
-    snapshot = state / "kernel/bin"
-    snapshot.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(args.kernel_dir / "bin/vinix", snapshot / "vinix")
-    boot_payload = args.initramfs.stat().st_size
-    if overlay is not None:
-        boot_payload += sum(path.stat().st_size for path in overlay.rglob("*")
-                            if path.is_file() and not path.is_symlink())
-    # The runner materializes overlay hardlinks. Leave space for its tar,
-    # the kernel and EFI files even when testing a complete desktop image.
-    boot_size_mb = max(4096, ((boot_payload // (1024 * 1024) + 256 + 511) // 512) * 512)
-    environment = os.environ.copy()
-    environment.update({
-        "VINIX_KERNEL_DIR": str(snapshot.parent), "VINIX_INITRAMFS": str(args.initramfs),
-        "VINIX_INITRAMFS_COMPRESSED": "1" if args.initramfs.suffix == ".gz" else "0",
-        "VINIX_QEMU_ROOT_DISK": "0",
-        "VINIX_BOOT_DISK": str(state / "boot.img"), "VINIX_EFIVARS": str(state / "efivars.fd"),
-        "VINIX_BOOT_DISK_SIZE_MB": str(boot_size_mb), "VINIX_QEMU_PACKAGE_STORE": str(state / "packages.tar"),
-        "VINIX_QEMU_PACKAGE_PERSIST": "0", "VINIX_QEMU_HOST_SOURCE": "0",
-        "VINIX_KEEP_TEMP_BOOT_DISK": "1", "VINIX_QEMU_AUDIO": "off", "VINIX_QEMU_SMP": str(args.cpus),
-        "VINIX_QEMU_EXTRA": f"-qmp unix:{socket_path},server=on,wait=off",
-    })
-    if overlay is not None:
-        environment["VINIX_QEMU_OVERLAY"] = str(overlay)
-    else:
-        environment.pop("VINIX_QEMU_OVERLAY", None)
-    if platform.system() != "Darwin":
-        environment["USE_TCG"] = "1"
-    elif args.interactive:
-        environment["QEMU_DISPLAY_BACKEND"] = "cocoa"
-    command = [str(args.repo / "scripts/run-aarch64.sh"), "--no-build", "--no-persist",
-               f"--mem={args.memory}", f"--guest-init={ROOT / 'tests/android/guest-init.sh'}"]
-    if not args.interactive:
-        command.append("--serial")
+    plan = _runner.call("vm_plan", {"args": vars(args), "overlay": overlay}, globals(), args=args)
+    state, socket_path = Path(plan["state"]), Path(plan["socket"])
+    environment, command = plan["environment"], plan["command"]
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(args.repo)

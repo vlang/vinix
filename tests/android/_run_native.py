@@ -190,6 +190,10 @@ def _primitive(operation, row, context, resources):
         return context['subprocess'].run(row['arguments'], check=True)
     if operation == 'which':
         return context['shutil'].which(row['name'])
+    if operation == 'environ':
+        return context['os'].environ.copy()
+    if operation == 'platform':
+        return context['platform'].system()
     if operation == 'strip':
         return row['data'].strip()
     if operation == 'import':
