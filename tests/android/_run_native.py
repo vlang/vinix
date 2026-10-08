@@ -11,13 +11,36 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 _HERE = Path(__file__).resolve().parent
 _BINARY = None
 _LOCK = threading.RLock()
+_WAITPID = os.waitpid
+_MONOTONIC = time.monotonic
 _spec = importlib.util.spec_from_file_location('android_runner_wire', _HERE.parents[1] / 'build-support/android/_boot_native.py')
 _wire = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_wire)
+
+
+class _Controller(subprocess.Popen):
+    def _try_wait(self, wait_flags):
+        try:
+            return _WAITPID(self.pid, wait_flags)
+        except ChildProcessError:
+            return self.pid, 0
+
+    def _wait(self, timeout):
+        if timeout is None:
+            return super()._wait(timeout)
+        deadline = _MONOTONIC() + timeout
+        pause = threading.Event()
+        while self.poll() is None:
+            remaining = deadline - _MONOTONIC()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(self.args, timeout)
+            pause.wait(min(remaining, 0.05))
+        return self.returncode
 
 
 def _binary():
@@ -30,9 +53,22 @@ def _binary():
             owner = tempfile.TemporaryDirectory(prefix='vinix-android-run-controller-')
             try:
                 binary = str(Path(owner.name) / 'query')
-                subprocess.run([str(_HERE.parents[1] / 'build-support/run-v-tool.sh'),
-                                str(_HERE / 'run-query.v'), '--install-query', binary],
-                               check=True, stdout=subprocess.DEVNULL, env=os.environ)
+                command = [str(_HERE.parents[1] / 'build-support/run-v-tool.sh'),
+                           str(_HERE / 'run-query.v'), '--install-query', binary]
+                with _Controller(command, stdout=subprocess.DEVNULL, env=os.environ) as child:
+                    try:
+                        status = child.wait()
+                    except BaseException:
+                        previous = signal.signal(signal.SIGINT, signal.SIG_IGN) if threading.current_thread() is threading.main_thread() else None
+                        try:
+                            child.kill()
+                            child.wait()
+                        finally:
+                            if previous is not None:
+                                signal.signal(signal.SIGINT, previous)
+                        raise
+                    if status:
+                        raise subprocess.CalledProcessError(status, command)
             except BaseException:
                 owner.cleanup()
                 raise
@@ -131,10 +167,18 @@ def _primitive(operation, row, context, resources):
         return _exit(stream, _exception(row.get('error'), context, resources))
     if operation == 'json_loads':
         return context['json'].loads(row['data'])
+    if operation == 'json_dumps':
+        return context['json'].dumps(row['data'], **row.get('options', {}))
+    if operation == 'bytes_decode':
+        return bytes.fromhex(row['data']).decode(**row.get('options', {}))
+    if operation == 'bytes_int':
+        return int(bytes.fromhex(row['data']))
     if operation == 'type_name':
         return type(row['value']).__name__
     if operation == 'attribute':
         return _snapshot(getattr(resources['args'], row['name']))
+    if operation == 'attribute_bytes':
+        return getattr(resources['args'], row['name']).read_bytes().hex()
     if operation == 'str_attribute':
         value = getattr(resources['args'], row['name'])
         return str(value[row['index']] if 'index' in row else value)
@@ -172,7 +216,7 @@ def _primitive(operation, row, context, resources):
     if operation == 'parser_error':
         return resources['parser'].error(row['message'])
     if operation == 'print':
-        print(row['data'])
+        print(row['data'], file=context['sys'].stderr if row.get('stderr') else context['sys'].stdout)
         return None
     if operation == 'roblox_validate':
         spec = context['importlib'].util.spec_from_file_location('vinix_roblox_builder', Path(row['source']))
@@ -222,8 +266,8 @@ def call(operation, arguments, context, args=None, parser=None, inodes=None):
                      'inodes': {} if inodes is None else inodes}
         errors = []
         resources['errors'] = errors
-        process = subprocess.Popen([_binary()], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                   text=True, encoding='utf-8', env=os.environ)
+        process = _Controller([_binary()], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              text=True, encoding='utf-8', env=os.environ)
         try:
             process.stdin.write(json.dumps(_wire._pack({'operation': operation, 'arguments': _snapshot(arguments),
                                                        'root': str(context['ROOT'])})) + '\n')

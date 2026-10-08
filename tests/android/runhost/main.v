@@ -179,6 +179,7 @@ fn main_policy(mut args map[string]ah.Value) !ah.Value {
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
 	mut args := ah.field(row, 'arguments').object()
 	return match text(row, 'operation') {
+		'finalize' { finalize(ah.field(args, 'args').object(), args)! }
 		'main' { main_policy(mut args)! }
 		'prepare' { prepare(mut args, text(row, 'root'))! }
 		'copy_layer' {

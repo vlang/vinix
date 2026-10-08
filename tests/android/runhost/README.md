@@ -7,8 +7,14 @@ USTAR payload deduplication and streaming SHA-256, optional probe staging and
 checksum publication, deployment field assembly, and main validation, path
 resolution and prepare/run sequencing. Previously native ELF extraction,
 split planning and deployment text generation are reused without additional
-migration credit. The live PTY supervisor, QMP helpers and result policy are
-still Python at this stage.
+migration credit. The live PTY supervisor and QMP helpers are still Python.
+
+`result.v` owns complete post-session probe verification, marker and failure
+precedence, optional preflight identities, result fields, JSON/status publication
+and exit status. The transcript remains an owned byte snapshot: exact-line and
+substring marker checks retain their original distinctions. CPython bindings
+retain byte decoding, arbitrary-width integer conversion and JSON encoding;
+V owns selection, validation and all result policy.
 
 Python binds pathlib/shutil/tarfile operations, process execution, imports,
 original caller functions and mutable Namespace/inode collections. The bridge
@@ -49,3 +55,22 @@ Independent fixed stdlib timestamps make archive bytes comparable; the original
 algorithms and assertions remain unchanged. Qualification data is machine-local
 under `~/.cache/vinix-python-to-v/android-run-orchestration-20261008/`.
 This host stage does not claim a new kernel/QEMU/Android application boot.
+
+The result follow-up at original source `4d5b5e18` passed 239 paired controls on
+ARM64, Rosetta x86_64 and ARM ASan/UBSan. These compare complete raw JSON and
+field order, probe/failure precedence, malformed serial UTF-8, Unicode and lone
+surrogates, 100-digit queue exit statuses, zip truncation, wide/non-finite fields,
+missing/malformed caller attributes and original library exception identities.
+All ten unchanged interactive PTY tests passed on both original host ABIs and
+all three new profiles, including cold private installation inside the VM mocks
+on both ABIs. Eight forced controller retirement controls passed per profile;
+three compiler-error/interrupt/scratch retirement controls passed on both ABIs.
+
+Private controller reaping uses captured waitpid/monotonic primitives and
+Event.wait, preserving Popen's waitpid lock and the five-second retirement bound
+while VM waitpid/sleep mocks continue to apply only to the VM operations.
+Successful context-manager exits ignore their return object, as Python `with`
+does; a separate zero-credit follow-up passed 18 file/manager controls per
+profile, including suppression, distinct entered handles and truth-result
+exception context. The result evidence is under
+`~/.cache/vinix-python-to-v/android-run-result-20261008/`.
