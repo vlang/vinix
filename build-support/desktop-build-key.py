@@ -32,6 +32,7 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"cannot load {CONTENT_KEY_PATH}")
 CONTENT_KEY = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CONTENT_KEY)
+_native = CONTENT_KEY._native
 
 
 def add_text(digest: "hashlib._Hash", name: str, value: str) -> None:
@@ -40,218 +41,38 @@ def add_text(digest: "hashlib._Hash", name: str, value: str) -> None:
 
 
 def resolved_env_path(env: dict[str, str], name: str, default: Path) -> Path:
-    return Path(os.path.expanduser(env.get(name, str(default)))).resolve()
+    value = _native.request("env_path", env=_native.environment(env),
+                            name=_native.wire(name), fallback=_native.wire(default))
+    return Path(os.fsdecode(bytes.fromhex(value)))
 
 
 def root_generation(path: Path) -> str:
-    digest = hashlib.sha256()
-    CONTENT_KEY.add_field(digest, b"vinix-root-generation-v1")
-    try:
-        info = path.lstat()
-    except FileNotFoundError:
-        CONTENT_KEY.add_field(digest, b"missing")
-        return digest.hexdigest()
-    CONTENT_KEY.add_generation_metadata(digest, info)
-    if path.is_symlink():
-        CONTENT_KEY.add_field(
-            digest, os.readlink(path).encode("utf-8", "surrogateescape")
-        )
-    return digest.hexdigest()
+    return _native.request("root", path=_native.wire(path))
 
 
 def tree_key(paths: list[Path], metadata_only: bool) -> str:
-    digest = hashlib.sha256()
-    CONTENT_KEY.add_field(
-        digest,
-        b"vinix-desktop-build-metadata-v1"
-        if metadata_only
-        else b"vinix-desktop-build-content-v1",
-    )
-    for index, path in enumerate(paths):
-        CONTENT_KEY.hash_path(digest, path, f"root-{index}".encode(), metadata_only)
-    return digest.hexdigest()
+    namespace = "vinix-desktop-build-metadata-v1" if metadata_only else "vinix-desktop-build-content-v1"
+    return _native.request("tree", paths=[_native.wire(path) for path in paths],
+                            metadata=metadata_only, namespace=_native.wire(namespace))
 
 
 def tool_path(env: dict[str, str], variable: str, fallback: str) -> Path | None:
-    selected = env.get(variable, "")
-    if selected:
-        return Path(os.path.expanduser(selected)).resolve()
-    found = shutil.which(fallback, path=env.get("PATH"))
-    return Path(found).resolve() if found else None
+    value = _native.request("tool_path", env=_native.environment(env),
+                            name=_native.wire(variable), fallback=_native.wire(fallback))
+    return Path(os.fsdecode(bytes.fromhex(value))) if value else None
 
 
 def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
-    root = root.resolve()
-    v_compiler = v_compiler.resolve()
-
-    userland_build = resolved_env_path(
-        env, "VINIX_AARCH64_USERLAND_BUILD_DIR", root / "build-aarch64-userland"
-    )
-    sysroot = resolved_env_path(env, "VINIX_AARCH64_SYSROOT", userland_build / "staging")
-    devtools_archive = resolved_env_path(
-        env, "VINIX_AARCH64_DEVTOOLS_ARCHIVE", userland_build / "alpine-devtools.tar"
-    )
-    python_staging = resolved_env_path(
-        env, "VINIX_PYTHON_STAGING", root / "build-aarch64-python/staging"
-    )
-    network_staging = resolved_env_path(
-        env, "VINIX_NETWORK_TOOLS_STAGING", root / "build-aarch64-network-tools/staging"
-    )
-    vlang_staging = resolved_env_path(
-        env, "VINIX_VLANG_STAGING", root / "build-aarch64-v/staging"
-    )
-    x11_staging = resolved_env_path(
-        env, "VINIX_X11_STAGING", root / "build-aarch64-x11/staging"
-    )
-    firefox_staging = resolved_env_path(
-        env, "VINIX_FIREFOX_STAGING", root / "build-aarch64-firefox/staging"
-    )
-    chromium_staging = resolved_env_path(
-        env, "VINIX_CHROMIUM_STAGING", root / "build-aarch64-chromium/staging"
-    )
-    libreoffice_staging = resolved_env_path(
-        env, "VINIX_LIBREOFFICE_STAGING", root / "build-aarch64-libreoffice/staging"
-    )
-    minecraft_staging = resolved_env_path(
-        env, "VINIX_MINECRAFT_STAGING", root / "build-aarch64-minecraft/staging"
-    )
-    doom_staging = resolved_env_path(
-        env, "VINIX_DOOM_STAGING", root / "build-aarch64-doom/staging"
-    )
-    asahi_staging = resolved_env_path(
-        env, "VINIX_ASAHI_STAGING", root / "build-aarch64-asahi/staging"
-    )
-    hyprland_staging = resolved_env_path(
-        env, "VINIX_HYPRLAND_STAGING", root / "build-aarch64-hyprland/staging"
-    )
-    blender_staging = resolved_env_path(
-        env, "VINIX_BLENDER_NATIVE_STAGING", root / "build-aarch64-blender-native/staging"
-    )
-    x86_staging = resolved_env_path(
-        env, "VINIX_X86_TRANSLATION_STAGING", root / "build-aarch64-x86-translation/staging"
-    )
-    roblox_staging = resolved_env_path(
-        env, "VINIX_ROBLOX_STAGING", root / "build-aarch64-roblox/aarch64/staging"
-    )
-    android_staging = resolved_env_path(
-        env, "VINIX_ANDROID_STAGING", root / "build-aarch64-android/aarch64/staging"
-    )
-    gpu_sysroot = resolved_env_path(
-        env, "VINIX_GPU_SYSROOT", root / "build-aarch64-x11/sysroot"
-    )
-    sibling_ui2 = root.parent / "ui2"
-    default_ui2 = sibling_ui2 if (sibling_ui2 / "v.mod").is_file() else root / "third_party/ui2"
-    ui2_source = resolved_env_path(env, "VINIX_UI2_SOURCE", default_ui2)
-
-    source_paths = [
-        root / "scripts/build-desktop-aarch64.sh",
-        root / "build-support/content-key.py",
-        root / "build-support/musl/stage.py",
-        root / "build-support/musl/malloc-retain.patch",
-        root / "build-support/musl/alpine",
-        root / "build-support/musl/alpine-1.2.6",
-        root / "build-support/desktop-build-key.py",
-        root / "desktop",
-        ui2_source / "v.mod",
-        ui2_source / "ui",
-        ui2_source / "uikit",
-        ui2_source / "windows",
-        ui2_source / "linux",
-        ui2_source / "assets",
-        ui2_source / "examples",
-        root / "build-support/aarch64-cc-shim",
-        root / "build-support/init-aarch64/initcore",
-        root / "build-support/init-aarch64/syscall_abi.S",
-        root / "build-support/init-aarch64/syscall_abi.h",
-        root / "build-support/init-aarch64/compile-v.py",
-        root / "tools/m1-wifi/compile-v.py",
-        root / "tools/m1-wifi/wifi_v.h",
-        root / "tools/m1-wifi/core/core.v",
-        root / "kernel/c",
-        root / "build-support/vinix-pkg",
-        root / "build-support/v-command",
-        root / "build-support/java-cacerts.py",
-        root / "build-support/minecraft",
-        root / "build-support/doom",
-        root / "build-support/vinix-desktop-build",
-        root / "build-support/vinix-desktop-reload",
-        root / "build-support/vinix-host-sync",
-        root / "build-support/xorg-server/startx",
-        root / "build-support/xorg-server/winehost",
-        root / "build-support/xorg-server/wine-host-v-abi.h",
-        root / "build-support/xorg-server/compile-v-host.py",
-        root / "build-support/xorg-server/xinputcore",
-        root / "build-support/xorg-server/xinput_abi.h",
-        root / "build-support/xorg-server/build-wine-host.sh",
-        root / "build-support/compile-v-module.py",
-        root / "build-support/x86-translation/officecore",
-        root / "build-support/x86-translation/compile-v-office.py",
-        root / "build-support/x86-translation/sppc-office-v-abi.h",
-        root / "build-support/x86-translation/sppc-office.def",
-        root / "build-support/firefox",
-        root / "build-support/gimp",
-        root / "build-support/libreoffice",
-        root / "build-support/chromium",
-        root / "build-support/hyprland",
-        root / "build-support/roblox",
-        root / "build-support/android",
-        root / "gl-triangle/run-m1-agx-smoke",
-        root / "gl-triangle/eglcore",
-        root / "gl-triangle/glutcore",
-        root / "gl-triangle/legacycore",
-        root / "gl-triangle/gl_v.h",
-        root / "gl-triangle/compile-v.py",
-        root / "gl-triangle/stage.py",
-        root / "tests/browsers/firefox-smoke.html",
-        root / "tests/browsers/chromium-smoke.html",
-        root / "tests/packages/x-window-check.py",
-        root / "build/wallpapers-cache",
-    ]
-    wifi_bundle = env.get("VINIX_WIFI_BUNDLE", "")
-    if wifi_bundle:
-        source_paths.append(Path(os.path.expanduser(wifi_bundle)).resolve())
-
-    layer_roots = [
-        root / "build-support/init-aarch64/initramfs.tar",
-        devtools_archive,
-        sysroot,
-        python_staging,
-        network_staging,
-        vlang_staging,
-        firefox_staging,
-        chromium_staging,
-        libreoffice_staging,
-        minecraft_staging,
-        doom_staging,
-        asahi_staging,
-        hyprland_staging,
-        blender_staging,
-        x86_staging,
-        roblox_staging,
-        android_staging,
-    ]
-
-    llvm_bin = Path(os.path.expanduser(env.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin")))
-    if not (llvm_bin / "clang").is_file():
-        fallback_clang = shutil.which("clang", path=env.get("PATH"))
-        if fallback_clang:
-            llvm_bin = Path(fallback_clang).resolve().parent
-
-    tools: list[tuple[str, Path | None]] = [
-        ("v", v_compiler),
-        ("llvm-clang", (llvm_bin / "clang").resolve()),
-        ("llvm-strip", (llvm_bin / "llvm-strip").resolve()),
-        ("ld-lld", tool_path(env, "LD_LLD", "ld.lld")),
-        ("host-clang", tool_path(env, "CLANG", "clang")),
-        ("ld64-lld", tool_path(env, "LD64_LLD", "ld64.lld")),
-        ("python", Path(sys.executable).resolve()),
-    ]
-
+    prepared = _native.request("desktop_prepare", root=_native.wire(root), v=_native.wire(v_compiler),
+                               env=_native.environment(env), python=_native.wire(sys.executable))
+    # These bindings retain Python's shlex, subprocess text decoding and
+    # interpreter/package version conventions; V owns input selection and hashes.
     musl_cc = shlex.split(env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
     musl_executable = shutil.which(musl_cc[0], path=env.get("PATH")) if musl_cc else None
+    musl_path = ""
     musl_version = "missing"
     if musl_executable:
-        tools.append(("musl-cc", Path(musl_executable).resolve()))
+        musl_path = os.fsdecode(bytes.fromhex(_native.request("resolve", path=_native.wire(musl_executable))))
         try:
             musl_version = subprocess.check_output(
                 [musl_executable, *musl_cc[1:], "--version"], text=True,
@@ -259,38 +80,17 @@ def compute_key(root: Path, v_compiler: Path, env: dict[str, str]) -> str:
             ).splitlines()[0]
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, IndexError):
             musl_version = "unavailable"
-
-    digest = hashlib.sha256()
-    CONTENT_KEY.add_field(digest, b"vinix-desktop-run-build-key-v1")
-    add_text(digest, "platform", platform.system())
-    add_text(digest, "python-version", platform.python_version())
+    platform_name = platform.system()
+    python_version = platform.python_version()
     try:
         import PIL  # type: ignore
-
-        add_text(digest, "pillow-version", getattr(PIL, "__version__", "unknown"))
+        pillow_version = getattr(PIL, "__version__", "unknown")
     except ImportError:
-        add_text(digest, "pillow-version", "missing")
-    add_text(digest, "optimized-musl", env.get("VINIX_OPTIMIZED_MUSL", "1"))
-    add_text(digest, "musl-retain", env.get("VINIX_MUSL_RETAIN", "1"))
-    add_text(digest, "musl-compiler", env.get("VINIX_MUSL_CC_AARCH64", "aarch64-linux-musl-gcc"))
-    add_text(digest, "musl-compiler-version", musl_version)
-    add_text(digest, "with-asahi", env.get("VINIX_WITH_ASAHI_GPU", "0"))
-    add_text(digest, "macho-linker", env.get("VINIX_MACHO_LINKER", "auto"))
-    add_text(digest, "sources", tree_key(source_paths, metadata_only=False))
-    add_text(
-        digest,
-        "inplace-layer-generation",
-        tree_key([x11_staging, gpu_sysroot, doom_staging], metadata_only=True),
-    )
-    for path in layer_roots:
-        add_text(digest, f"layer:{path}", root_generation(path))
-    for name, path in tools:
-        add_text(
-            digest,
-            f"tool:{name}:{path if path is not None else 'missing'}",
-            root_generation(path) if path is not None else "missing",
-        )
-    return digest.hexdigest()
+        pillow_version = "missing"
+    return _native.request("desktop_complete", prepared=prepared, env=_native.environment(env),
+                            platform=_native.wire(platform_name), python_version=_native.wire(python_version),
+                            pillow_version=_native.wire(pillow_version), musl_path=_native.wire(musl_path),
+                            musl_version=_native.wire(musl_version))
 
 
 def main() -> int:
