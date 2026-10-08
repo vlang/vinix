@@ -112,11 +112,18 @@ pub fn env_default(name string, fallback string) string {
 // aborted before wait(), which would leave a timed-out child unreaped.
 // A negative timeout retains an original command's lack of a deadline.
 pub fn capture(argv []string, log string, timeout int, env map[string]string) !Result {
+	return capture_in(argv, log, timeout, env, '')
+}
+
+// Keep the parent process in its caller's directory while a private Kbuild
+// subprocess runs with the original working-directory contract.
+pub fn capture_in(argv []string, log string, timeout int, env map[string]string, working_directory string) !Result {
 	if argv.len == 0 {
 		return error('Empty command')
 	}
 	mut child := os.new_process(argv[0])
 	child.set_args(argv[1..])
+	if working_directory != '' { child.set_work_folder(working_directory) }
 	child.set_environment(env)
 	child.set_redirect_stdio()
 	defer { child.close() }
