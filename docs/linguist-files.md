@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `8aaf12979e5d2c704e34782921cd82c30250ab83`,
+at source commit `d858ea106c61ad58784ea370277f4708f2d8eb9d`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 500 | 1,872,135 | 4.38% |
-| Python | 495 | 2,551,922 | 5.98% |
-| Shell | 307 | 1,288,992 | 3.02% |
+| C | 501 | 1,873,708 | 4.38% |
+| Python | 496 | 2,524,439 | 5.90% |
+| Shell | 307 | 1,289,199 | 3.01% |
 
-All `.v` files are classified as V. The resulting V share is 79.59%, with no
+All `.v` files are classified as V. The resulting V share is 79.68%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 8aaf12979e5d2c704e34782921cd82c30250ab83 --breakdown --json
+github-linguist --rev d858ea106c61ad58784ea370277f4708f2d8eb9d --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -381,10 +381,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/compression.c` | 2,291 |
 | `tests/ios/desktop-init.c` | 1,138 |
 | `tests/ios/gles-guest.c` | 27,817 |
-| `tests/ios/guest.c` | 7,515 |
+| `tests/ios/guest.c` | 7,850 |
 | `tests/ios/lazy.c` | 305 |
 | `tests/ios/lifecycle.c` | 1,633 |
 | `tests/ios/mach-memory.c` | 3,400 |
+| `tests/ios/pointer-tags.c` | 1,238 |
 | `tests/ios/stdio.c` | 9,244 |
 | `tests/ios/uikit-guest.c` | 9,708 |
 | `tests/ios/unsupported.c` | 190 |
@@ -568,8 +569,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/qemu_iboot.py` | 16,230 |
 | `apple-boot/tests/run-v-core.py` | 3,917 |
 | `build-support/_cache_native.py` | 2,147 |
-| `build-support/alpine-resolve.py` | 2,946 |
-| `build-support/android/_boot_native.py` | 18,095 |
+| `build-support/alpine-resolve.py` | 1,830 |
+| `build-support/android/_boot_native.py` | 18,605 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/android/art-bootclasspath.py` | 4,172 |
 | `build-support/android/art-runtime.py` | 10,978 |
@@ -605,7 +606,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 13,020 |
 | `build-support/n64-homebrew/build.py` | 5,005 |
-| `build-support/n64/build.py` | 17,077 |
+| `build-support/n64/build.py` | 2,829 |
 | `build-support/n64/test-bridge.py` | 2,530 |
 | `build-support/native_host.py` | 4,681 |
 | `build-support/opengothic/build.py` | 1,979 |
@@ -635,7 +636,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_stage_native.py` | 6,520 |
 | `desktop/tools/build_cache.py` | 848 |
-| `desktop/tools/build_voffice.py` | 13,112 |
+| `desktop/tools/build_voffice.py` | 5,635 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/input.py` | 8,219 |
@@ -823,6 +824,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/disk-root/run_vm.py` | 7,127 |
 | `tests/disk-writeback/run_vm.py` | 6,351 |
 | `tests/docker/run_vm.py` | 5,032 |
+| `tests/dota2/_game_vm_native.py` | 2,621 |
 | `tests/dota2/_lavapipe_native.py` | 795 |
 | `tests/dota2/_native.py` | 3,559 |
 | `tests/dota2/_prepare_native.py` | 9,578 |
@@ -834,7 +836,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/lavapipe-run.py` | 3,703 |
 | `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
-| `tests/dota2/run.py` | 15,405 |
+| `tests/dota2/run.py` | 6,163 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
 | `tests/dota2/vulkan-run.py` | 2,115 |
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
@@ -860,7 +862,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/frame.py` | 1,860 |
 | `tests/ios/game2048.py` | 3,080 |
-| `tests/ios/run.py` | 14,714 |
+| `tests/ios/run.py` | 14,810 |
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/ipv6-multicast/check-generated.py` | 1,613 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
@@ -1022,7 +1024,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/wine-host/run-vm.py` | 2,988 |
 | `tests/x11-input/run-vm.py` | 2,597 |
 | `tests/x11-input/run.py` | 3,372 |
-| `tools/_package_store_native.py` | 7,602 |
+| `tools/_package_store_native.py` | 8,975 |
 | `tools/agx-re/_native_adt.py` | 1,968 |
 | `tools/agx-re/_native_extract.py` | 5,441 |
 | `tools/agx-re/_native_g17.py` | 9,448 |
@@ -1262,7 +1264,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hyprland/smoke.sh` | 413 |
 | `tests/ios/build-2048-model.sh` | 1,128 |
 | `tests/ios/build-cxx-fixture.sh` | 1,400 |
-| `tests/ios/build-fixture.sh` | 3,252 |
+| `tests/ios/build-fixture.sh` | 3,459 |
 | `tests/ios/build-gles-fixture.sh` | 2,735 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ipv6-multicast/run-host.sh` | 137 |

@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `8aaf12979e5d2c704e34782921cd82c30250ab83`, Linguist 7.27.0 reports
-**Python 5.98%** (495 files, 2,551,922 bytes) and **V 79.59%** (1,735 files,
-33,988,341 bytes). The complete committed-blob inventory and reproduction
+At source `d858ea106c61ad58784ea370277f4708f2d8eb9d`, Linguist 7.27.0 reports
+**Python 5.90%** (496 files, 2,524,439 bytes) and **V 79.68%** (1,757 files,
+34,079,254 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,654,363 Python bytes**. Roughly another
-0.42 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,681,846 Python bytes**. Roughly another
+0.39 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 114 completed stages have a gross
-scope of **2,978,234 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **323,871 bytes**
+tests, including comments and blank lines. The 118 completed stages have a gross
+scope of **3,016,741 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **334,895 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -143,6 +143,10 @@ no extra migration credit.
 | Complete Android runtime and archive build workflow | `build-support/android/runtimebuild` | 17,986 / 314 | `e498309c4cad1e073e40509c953a28b033b911cb` |
 | Ext2 source cache and read-only NBD protocol | `tools/dota2/ext2build/{export,protocol}.v` | 7,180 / 143 | `d1918f0ccfe70330d666817ff9b1dd5cb0b1f436` |
 | Complete OpenGothic cross-build and game staging | `build-support/opengothic/gothicbuild` | 10,713 / 222 | `8aaf12979e5d2c704e34782921cd82c30250ab83` |
+| Alpine index parser and provider closure | `build-support/alpinecore` | 2,174 / 56 | `77d02a150cb1e224654a521eb0d4c23e882b1dbc` |
+| Complete N64 upstream archives and staged source workflow | `build-support/n64/n64build` | 17,077 / 308 | `a084b53a29d54bc497b15d2f2cf2238144e82212` |
+| Complete Dota game launch, observation and retirement | `tests/dota2/gamecore` | 10,440 / 208 | `e2271dba1f4b43d9b3580a7cd6f12dd4ec6d70da` |
+| Complete VOffice compilation and incremental build workflow | `desktop/tools/officebuild` | 8,816 / 255 | `d858ea106c61ad58784ea370277f4708f2d8eb9d` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -194,6 +198,14 @@ cause during exit, suppression/error precedence and deliberate traceback
 clearing or replacement by libraries such as `unittest.assertRaises`.
 Exact traceback frame lists and Python 3.9 `sys.exc_info()[2]` parity are not
 claimed. Query resources remain independent across concurrent callers.
+
+The next four stages remove 27,483 measured Python bytes overall,
+including all counted adapters and simultaneous committed changes. Native
+exception-constructor binding `d8ed6c81` and N64 parser correction `31fda527`
+receive zero additional algorithm credit; their 137- and 906-byte Python
+binding growth remains counted. The N64 CLI parses help, usage and the jobs
+argument before starting its native controller. VOffice follows the same
+frontend ordering. Neither CLI requires a compiler for these parser results.
 
 ## Validation
 
@@ -956,6 +968,47 @@ workloads were not weakened.
   kernel build or guest result. New host managers and borrowed lifetimes were
   reviewed independently; no kernel manual-free lifetime was changed.
 
+- Alpine resolution passes 172 frozen/native parsing, Unicode, repository,
+  provider, dependency and public-override controls per profile plus 26 CLI,
+  error, EOF, spawn, 100 exact-FD and group-interrupt controls. Android's
+  112 workflow, 13 retirement and 45 original fixture regressions, CLI/curl
+  controls and both cold installers also pass. Counted shared library binding
+  growth is included in the stage's 606-byte net reduction. An identified
+  1,000-record resolution workload retains exact output; native timings are
+  slower than the frozen Python implementation and are recorded in its receipt.
+- N64 construction passes 73 complete frozen/native controls per profile,
+  three actual HTTP comparisons, 100 exact-FD hashes, a group interruption
+  pair and five forced exits. All 81 OpenGothic and 74 shared package controls
+  repeat. Fresh pinned upstream archives are byte-identical to the original
+  builds on ARM64 and x86-64, with the unchanged bridge fixture passing. Cold
+  distributed source builds and five CLI controls pass on both ABIs. The
+  zero-credit parser correction repeats the whole corpus and actual archives,
+  adding ten unavailable-compiler/query help/usage/argument comparisons.
+- Dota launch workflows pass 152 complete comparisons, 18 signatures, ten
+  markers, four actual module imports, nine screenshots, six reader policies,
+  twelve weak-owner controls and the unchanged eight original/native fixtures
+  per profile. Nine stop, four dynamic exception-class, fifteen read-context
+  and fifteen owner controls pass, with 100 complete PTY/server/worker
+  retirements returning to the exact final FD baseline. Both ABIs pass cold
+  installation and seven CLI plus six unavailable-compiler controls. Frozen
+  and native prepared ARM guests preserve the same `VINIX-DOTA2-PROBE-FAIL`
+  before game launch, 25 reads/51,200 bytes/zero errors and final capture.
+  This is baseline-failure parity; no game, rendering or fresh kernel pass
+  is claimed. Original non-OSError stop cleanup omissions are identified
+  separately from preserved normal cleanup behavior.
+- VOffice passes 111 helper/thread-worker comparisons, 41 complete build/cache
+  plans and 37 manager, suppression, exception-class and caller-binding
+  controls per profile, 100 queries with exact final FD equality and group
+  interruption after all three workers start. The unchanged independent
+  complete shell fixture passes per profile and with actual cold compilation
+  on both ABIs. Five unavailable-compiler/query CLI pairs preserve the parser;
+  65 native source inputs and three module symlinks each invalidate the key,
+  and restoring each input restores the exact original key. New inputs follow
+  the unchanged ordered cache policy. ENOSPC interrupted intermediate source
+  and cold fixtures; all affected gates passed after disk recovery, without
+  changing fixture assertions or deadlines. These host checks use the original
+  fake-toolchain fixture and claim no fresh VOffice application or guest build.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1152,6 +1205,18 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `vulkan-stage-20261008` | `traceback-postcommit.json` | `7be13b99afd7b3bbc91835af62d10087d34acdbc7ce0249cc02f03a7bb8dbdd3` |
 | `traceback-property-20261009` | `qualification.json` | `e857590956c08c8cf8426a926f2e010106fe8135266d4de652bac939bba6507c` |
 | `traceback-property-20261009` | `postcommit.json` | `392dd4eb273c35d7605e5227629bb028e492f36d2783055117e5bece6a527ec1` |
+| `alpine-resolver-20261009` | `qualification.json` | `8e77dbe90ab4b46ce8011569ebcc5cb92a4e97ce4dbc27a46fcac0ba22a8ad4c` |
+| `alpine-resolver-20261009` | `post-commit.json` | `3abce422d46e15f5dfd39402eddbaf1bf890983a166cf833221cf151128421cd` |
+| `n64-builder-20261009` | `qualification-final.json` | `b318d71ae65f03a9e6605b3c19ba26d1759c979fc17d0a90ddd9b065dbf40cf4` |
+| `n64-builder-20261009` | `postcommit.json` | `fa5fc711fcbe2179760d9409c0064c84f26270609edf6afec977235ff726197d` |
+| `dota-game-guest-20261009` | `qualification.json` | `b295ae8bc2035d4f2c84cf0113c64e6da6e3962e6ddb3e960b15255e3231035a` |
+| `dota-game-guest-20261009` | `post-commit.json` | `00cb37b2ce84f07057e9e09ab5b265a0962dbd39ed437987e0715642f5d7459a` |
+| `voffice-builder-20261009` | `qualification.json` | `b846fa9f503e2898c8a583057104cfecade44f23386c4f28dd8d648b2ca2607d` |
+| `voffice-builder-20261009` | `postcommit.json` | `e394599bb3aca630d3a29a40cc67c10a412c8902e4cefc25bc76e29c0c4f25fb` |
+| `package-raise-binding-20261009` | `qualification.json` | `09014b2ff5a1c66f9cefd002db10211a4ac247d07d3f1f3459cc55b854796fd2` |
+| `package-raise-binding-20261009` | `postcommit.json` | `38eeaef6c6eeb803a1c6bb3795d4891b372d83f29e953728ce969ebf7cc95ded` |
+| `n64-cli-20261009` | `qualification.json` | `53ad69397b85f0e804a37ddca585fa65d6da027568a99496a8b118f088a5024a` |
+| `n64-cli-20261009` | `postcommit.json` | `d2088754fa0a1387ae9a40b6659e41b87c606274006b48e89f1200be1945389c` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
