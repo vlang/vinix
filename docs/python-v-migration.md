@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `f1ad647b5f7ce14832569f32a8548953ae32e16f`, Linguist 7.27.0 reports
-**Python 7.64%** (476 files, 3,190,292 bytes) and **V 77.61%** (1,470 files,
-32,392,174 bytes). The complete committed-blob inventory and reproduction
+At source `42c0c8dd4e40b170d9035c88eaf879e246f2da21`, Linguist 7.27.0 reports
+**Python 7.41%** (476 files, 3,095,722 bytes) and **V 77.86%** (1,496 files,
+32,540,012 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,015,993 Python bytes**. Roughly another
-1.11 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,110,563 Python bytes**. Roughly another
+1.01 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 53 completed stages have a gross
-scope of **2,102,863 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **86,870 bytes**
+tests, including comments and blank lines. The 57 completed stages have a gross
+scope of **2,211,860 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **101,297 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -82,6 +82,10 @@ no extra migration credit.
 | T6050 public constants and final fixtures | `tools/agx-re/t6050power/public_constants.v, frontend_test.v` | 16,097 / 390 | `7841d5a689c4bcc1cfbf8676ac1b426c058aac27` |
 | G17 event recovery and validators with fixtures | `tools/agx-re/g17expr/events*.v` | 83,043 / 1,924 | `2a21daef57eebb71b35c8eb5b54a464e5f45ce89` |
 | Verified-boot literal policy and PE/ELF helpers | `tools/verified-boot/bootpolicy` | 7,380 / 122 | `cd6abfb63ab0eb89720a4f336c57dff9e3c1377c` |
+| Android host DEX, ELF and path validators | `build-support/android/androidhost` | 5,448 / 111 | `c3bdbff00efd57c7e879a495ce835215ff42e3be` |
+| G17 firmware, hardware and allocation layouts with fixtures | `tools/agx-re/g17expr/layout*.v` | 74,464 / 2,375 | `c5577fae4bd4a55dd498ffc5b4ae4c0ee9ade7b3` |
+| Content and desktop cache keys with fixtures | `build-support/cachekey` | 20,145 / 501 | `8902fbff78630752ab73e3a32233747be65bc81f` |
+| Generic V module producer and metadata contracts | `tests/linuxkpi/hosttest/module*.v`, `generate_module.v` | 8,940 / 162 | `42c0c8dd4e40b170d9035c88eaf879e246f2da21` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -432,6 +436,41 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   remain counted; real signing tools are absent, so no new signature, Secure
   Boot or QEMU execution is claimed. Qualified PE buffers are bytes and
   bytearrays, alongside the documented scalar/path policy inputs.
+- Android validators: 1,212 full original outcomes per actual host and sanitizer
+  profile include two real ART boot DEX payloads. All 45 retained original
+  fixtures, four native functions, independent DEX cases and 200 repeated ELF
+  reads pass with exact descriptor baselines. JSON, ZIP and runtime/install
+  frontends remain counted; this stage ports six validator bodies.
+- G17 layouts: 12,773 exact typed/error controls per profile, 15 native tests,
+  11 real-driver outputs and all original/remaining methods pass. Missing-read
+  subsets, wide signed addresses and callback ordering remain intact. Two
+  production shared ABIs, fake-stack checks and foreign-thread stress retain
+  zero owned outputs. Eleven algorithms, twelve methods and seventeen audited
+  sole-use fixture recipes are retired without overlapping previous credit.
+- Content/desktop caches: 1,332 full tree/root/resolver controls, 46 direct
+  environment/tool controls and 20 complete desktop keys per host/sanitizer
+  profile pass. All eleven original methods pass the final production facades
+  on both hosts before retirement; thirteen native functions and both shell
+  launchers pass. Streaming boundaries, wide signed nanoseconds, symlink loops,
+  Unix backslashes and filesystem errors retain their original behavior.
+  Content formats retain v1; desktop v2 adds three native implementation inputs
+  to invalidate cached images after implementation changes. Cold 128-request,
+  eight-thread installers preserve exact descriptor sets, private 0700 mode
+  and cleanup after success/failure. Retained Python shlex, version/package
+  probes and compatibility framing receive no algorithm credit.
+- Generic module producer: 28 complete original/native generation pairs cover
+  seven real families, two targets and both actual hosts; 16 whole primitive
+  outputs, 14 functional CLI pairs and 264 argument/error controls pass.
+  Another 1,507 parser/header and 33 filesystem/error controls per profile,
+  five native tests, real copy failures/metadata and constrained EFBIG writes
+  preserve diagnostics, partial bytes and descriptors. Exhaustive Unicode13
+  word/uppercase checks cover 1,112,064 valid scalars across current/pinned host
+  profiles. A 256-request, sixteen-thread installer retires private storage on
+  success/failure with exact descriptor sets. Unordered readonly set diagnostics
+  compare membership rather than process-dependent repr order; directory atimes
+  are normalized only in cross-run comparison evidence, with raw evidence kept.
+  The remaining Python file is a counted import/process binding. These host
+  checks do not establish new kernel or QEMU execution.
 - FPU argument ordering: commit `64b19e9f` preserves eager rejection before
   help actions; 212 current/pinned CLI cases pass on both hosts. It receives
   no additional migration credit and supersedes the earlier CLI receipt.
@@ -503,6 +542,10 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `g17-events-20261008` | `qualification.json` | `264d3280901c3cffeefaf9d34d013f67185c77c687ee4ce2d3bc8ff48cbea9cd` |
 | `verified-boot-policy-20261008` | `qualification-final.json` | `ed7773e94dbc37de08d302aabbc9d436a61d389e7f90759e185d577d092c8b2c` |
 | `fpu-cli-order-20261008` | `qualification.json` | `bb2bc4e0f863003a688a041f3e8853c15305b00a4d2fb76ef20d151dee16a057` |
+| `android-tools-20261008/validators-final` | `qualification.json` | `7b69bf3434e5a7c607ea14305cf1c83ff03365e3b15ab14821c750e6440c1a75` |
+| `g17-layout-20261008` | `qualification.json` | `726b88833cccd40064fe112f1c879cb9476952517f705ba22d0cdbd532c21fcc` |
+| `build-cache-20261008` | `qualification.json` | `453886473c329517cd7c9c5eceb557209af1de7aeb040adcb1c67dd6ea27cb18` |
+| `module-generator-20261008` | `qualification.json` | `4cab5ece6d867dac5b0bbe2a6dd007b9ccd16e5c3d74bec00ec8698c8534cf38` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -511,15 +554,15 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-Remaining G17 layout recovery, generic LinuxKPI module generation, Android
-host tooling and build-cache fingerprints are active.
+Remaining G17 census/channel recovery, Android runtime/install tooling, Dota
+host controllers and staging/VOffice cache policies are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
 narrow adapter to the native implementation until its caller is ported too.
 
-Remaining large scopes include G17 ABI and T6050 power recovery, Android/Dota
-build and guest runners, shared compiler tooling, and benchmark controllers.
+Remaining large scopes include the G17 ABI frontend, Android/Dota build and
+guest runners, other build tooling, desktop generators and benchmark controllers.
 Keep original protocol, build profile, fixture identity, deadlines, allocation
 and lifetime behavior. Commit finished stages using only reviewed owned paths,
 then regenerate the language inventory from an explicit committed source SHA.

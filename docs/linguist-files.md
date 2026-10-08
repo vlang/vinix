@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `f1ad647b5f7ce14832569f32a8548953ae32e16f`,
+at source commit `42c0c8dd4e40b170d9035c88eaf879e246f2da21`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 493 | 1,865,482 | 4.47% |
-| Python | 476 | 3,190,292 | 7.64% |
-| Shell | 306 | 1,288,605 | 3.09% |
+| C | 495 | 1,866,663 | 4.47% |
+| Python | 476 | 3,095,722 | 7.41% |
+| Shell | 307 | 1,288,912 | 3.08% |
 
-All `.v` files are classified as V. The resulting V share is 77.61%, with no
+All `.v` files are classified as V. The resulting V share is 77.86%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev f1ad647b5f7ce14832569f32a8548953ae32e16f --breakdown --json
+github-linguist --rev 42c0c8dd4e40b170d9035c88eaf879e246f2da21 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -64,6 +64,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/atl-configuration-v-abi.h` | 1,394 |
 | `build-support/android/musl-statistics.h` | 486 |
 | `build-support/android/runtime-v-abi.h` | 1,598 |
+| `build-support/cachekey/stat_abi.h` | 700 |
 | `build-support/dota2/early-client-abi.h` | 574 |
 | `build-support/dota2/mmap32-abi.h` | 501 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
@@ -413,6 +414,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h` | 365 |
 | `tests/linuxkpi/hostguest/hostguest_v_contract.h` | 269 |
 | `tests/linuxkpi/hosttest/archive_abi.h` | 1,241 |
+| `tests/linuxkpi/hosttest/module_fs_abi.h` | 481 |
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
@@ -560,19 +562,21 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/ioreg_adt.py` | 3,303 |
 | `apple-boot/tests/qemu_iboot.py` | 16,230 |
 | `apple-boot/tests/run-v-core.py` | 3,917 |
+| `build-support/_cache_native.py` | 1,934 |
 | `build-support/alpine-resolve.py` | 2,946 |
-| `build-support/android/art-bootclasspath.py` | 18,938 |
-| `build-support/android/art-runtime.py` | 19,557 |
+| `build-support/android/_native.py` | 2,565 |
+| `build-support/android/art-bootclasspath.py` | 16,397 |
+| `build-support/android/art-runtime.py` | 17,713 |
 | `build-support/android/atl-dex.py` | 3,456 |
-| `build-support/android/build.py` | 21,754 |
+| `build-support/android/build.py` | 21,890 |
 | `build-support/android/compile-v-atl-configuration.py` | 622 |
 | `build-support/android/compile-v-runtime.py` | 3,918 |
-| `build-support/android/musl-runtime.py` | 2,590 |
+| `build-support/android/musl-runtime.py` | 2,803 |
 | `build-support/check-screenshot.py` | 5,382 |
-| `build-support/compile-v-module.py` | 8,940 |
-| `build-support/content-key.py` | 3,563 |
+| `build-support/compile-v-module.py` | 2,801 |
+| `build-support/content-key.py` | 1,440 |
 | `build-support/debian-root.py` | 10,017 |
-| `build-support/desktop-build-key.py` | 12,160 |
+| `build-support/desktop-build-key.py` | 4,588 |
 | `build-support/dhewm3/build.py` | 7,608 |
 | `build-support/dictionary/prepare.py` | 5,197 |
 | `build-support/dota2/compile-v-compat.py` | 1,457 |
@@ -779,8 +783,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_smc/run.py` | 7,170 |
 | `tests/block-storage/run.py` | 6,237 |
 | `tests/browsers/run_vm.py` | 13,762 |
-| `tests/build-cache/test_content_key.py` | 3,015 |
-| `tests/build-cache/test_desktop_build_key.py` | 5,744 |
 | `tests/build-cache/test_prune_build_artifacts.py` | 6,929 |
 | `tests/capability-exec/run.py` | 4,183 |
 | `tests/claude/smoke.py` | 7,250 |
@@ -1005,10 +1007,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 183,349 |
+| `tools/agx-re/recover_g17_abi.py` | 149,465 |
 | `tools/agx-re/recover_t6050_power.py` | 18,468 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 60,507 |
+| `tools/agx-re/test_recover_g17_abi.py` | 23,951 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
@@ -1210,6 +1212,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/browsers/desktop-init.sh` | 5,084 |
 | `tests/browsers/firefox-init.sh` | 3,839 |
 | `tests/browsers/pkg-init.sh` | 1,786 |
+| `tests/build-cache/run.sh` | 307 |
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
