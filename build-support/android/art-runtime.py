@@ -79,6 +79,11 @@ ATL_REQUIRED = ATL_ELFS | ATL_JARS | {ATL_RESOURCES, ATL_FONTS}
 ATL_CORE_CLASSES_SHA256 = "f47736d9d410766a20ae1f60d679607d8e85241e8cdeb5a0c040ab260ba68f42"
 
 
+_native_spec = importlib.util.spec_from_file_location("vinix_android_native", Path(__file__).with_name("_native.py"))
+_native = importlib.util.module_from_spec(_native_spec)
+_native_spec.loader.exec_module(_native)
+
+
 def _boot_tools():
     specification = importlib.util.spec_from_file_location(
         "art_bootclasspath", Path(__file__).with_name("art-bootclasspath.py"))
@@ -89,11 +94,7 @@ def _boot_tools():
 
 
 def _digest(path: Path) -> str:
-    result = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            result.update(block)
-    return result.hexdigest()
+    return _native.request("digest", path=str(path))
 
 
 def configuration_probe_digest() -> str:
@@ -119,13 +120,7 @@ def _regular(path: Path) -> None:
 
 
 def _relative(name: object) -> Path:
-    if not isinstance(name, str):
-        raise RuntimeError("ART overlay path must be a string")
-    relative = PurePosixPath(name)
-    if ("\x00" in name or relative.is_absolute() or len(relative.parts) < 2 or relative.parts[0] != "usr"
-            or ".." in relative.parts or str(relative) != name):
-        raise RuntimeError(f"unsafe ART overlay path: {name}")
-    return Path(*relative.parts)
+    return Path(_native.request("relative", name=name))
 
 
 def _inside(root: Path, relative: Path) -> Path:
@@ -143,36 +138,7 @@ def _inside(root: Path, relative: Path) -> Path:
 
 
 def _elf(path: Path, required: bool = False) -> None:
-    size = path.stat().st_size
-    with path.open("rb") as stream:
-        header = stream.read(64)
-        if header[:4] != b"\x7fELF":
-            if required:
-                raise RuntimeError(f"Android runtime payload is not an ELF: {path}")
-            return
-        if (len(header) != 64 or header[:7] != b"\x7fELF\x02\x01\x01"
-                or struct.unpack_from("<H", header, 18)[0] != 183
-                or struct.unpack_from("<I", header, 20)[0] != 1):
-            raise RuntimeError(f"ART overlay is not a native ARM64 ELF: {path}")
-        offset = struct.unpack_from("<Q", header, 32)[0]
-        entry_size, count = struct.unpack_from("<HH", header, 54)
-        if entry_size != 56 or count == 0 or offset > size or count * entry_size > size - offset:
-            raise RuntimeError(f"ART overlay has invalid ELF program headers: {path}")
-        stream.seek(offset)
-        headers = stream.read(count * entry_size)
-        loads = 0
-        for index in range(count):
-            kind, _, file_offset, address, _, file_size, memory_size, _ = struct.unpack_from(
-                "<IIQQQQQQ", headers, index * entry_size)
-            if kind != 1:
-                continue
-            loads += 1
-            if (file_size > memory_size or file_offset > size or file_size > size - file_offset
-                    or memory_size > (1 << 64) - 1 - address
-                    or address % PAGE_SIZE != file_offset % PAGE_SIZE):
-                raise RuntimeError(f"ART overlay ELF cannot load with 16 KiB pages: {path}")
-        if loads == 0:
-            raise RuntimeError(f"ART overlay ELF has no loadable segments: {path}")
+    _native.request("elf", path=str(path), required=bool(required))
 
 
 def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = False) -> None:

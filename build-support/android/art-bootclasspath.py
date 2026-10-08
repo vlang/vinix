@@ -43,12 +43,13 @@ BOOT_ORIGINAL = {
 }
 
 
+_native_spec = importlib.util.spec_from_file_location("vinix_android_native", Path(__file__).with_name("_native.py"))
+_native = importlib.util.module_from_spec(_native_spec)
+_native_spec.loader.exec_module(_native)
+
+
 def digest(path: Path) -> str:
-    result = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            result.update(block)
-    return result.hexdigest()
+    return _native.request("digest", path=str(path))
 
 
 def download(record: dict, directory: Path) -> Path:
@@ -84,63 +85,8 @@ def extract_member(archive: Path, name: str, output: Path) -> None:
 
 
 def dex_info(data: bytes) -> tuple[set[str], int]:
-    """Read DEX class descriptors and its bootstrap call-site table size."""
-    if len(data) < 112 or data[:4] != b"dex\n" or data[7] != 0:
-        raise RuntimeError("invalid bootclasspath DEX header")
-    declared, header_size, endian = struct.unpack_from("<III", data, 32)
-    if declared != len(data) or header_size != 112 or endian != 0x12345678:
-        raise RuntimeError("unsupported bootclasspath DEX layout")
-
-    def u32(offset: int) -> int:
-        if offset < 0 or offset + 4 > len(data):
-            raise RuntimeError("truncated bootclasspath DEX table")
-        return struct.unpack_from("<I", data, offset)[0]
-
-    strings, string_offset = u32(56), u32(60)
-    types, type_offset = u32(64), u32(68)
-    classes, class_offset = u32(96), u32(100)
-    if (string_offset + strings * 4 > len(data) or type_offset + types * 4 > len(data)
-            or class_offset + classes * 32 > len(data)):
-        raise RuntimeError("truncated bootclasspath DEX tables")
-    names = set()
-    for index in range(classes):
-        type_id = u32(class_offset + index * 32)
-        if type_id >= types:
-            raise RuntimeError("invalid bootclasspath DEX class type")
-        string_id = u32(type_offset + type_id * 4)
-        if string_id >= strings:
-            raise RuntimeError("invalid bootclasspath DEX class descriptor index")
-        cursor = u32(string_offset + string_id * 4)
-        for _ in range(5):
-            if cursor >= len(data):
-                raise RuntimeError("truncated bootclasspath DEX string")
-            byte = data[cursor]
-            cursor += 1
-            if byte & 0x80 == 0:
-                break
-        else:
-            raise RuntimeError("invalid bootclasspath DEX string length")
-        end = data.find(b"\0", cursor)
-        if end < 0:
-            raise RuntimeError("unterminated bootclasspath DEX descriptor")
-        descriptor = data[cursor:end].decode("ascii")
-        if (not descriptor.startswith("L") or not descriptor.endswith(";")
-                or descriptor[1:2] == "/" or ".." in descriptor or "\\" in descriptor):
-            raise RuntimeError(f"unsafe bootclasspath class descriptor: {descriptor}")
-        name = descriptor[1:-1] + ".class"
-        if name in names:
-            raise RuntimeError(f"duplicate bootclasspath DEX class: {name}")
-        names.add(name)
-    callsites = 0
-    map_offset = u32(52)
-    map_size = u32(map_offset)
-    if map_offset + 4 + map_size * 12 > len(data):
-        raise RuntimeError("truncated bootclasspath DEX map")
-    for index in range(map_size):
-        kind, _, count, _ = struct.unpack_from("<HHII", data, map_offset + 4 + index * 12)
-        if kind == 7:
-            callsites += count
-    return names, callsites
+    classes, callsites = _native.request("dex_info", data=bytes(data).hex())
+    return set(classes), callsites
 
 
 def jar_info(path: Path) -> tuple[set[str], int]:

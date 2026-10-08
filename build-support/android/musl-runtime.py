@@ -16,8 +16,13 @@ SOURCE_SHA256 = "d585fd3b613c66151fc3249e8ed44f77020cb5e6c1e635a616d3f9f82460512
 LIBRARIES = ("lib/ld-musl-aarch64.so.1", "lib/libc.musl-aarch64.so.1")
 
 
+_native_spec = importlib.util.spec_from_file_location("vinix_android_native", Path(__file__).with_name("_native.py"))
+_native = importlib.util.module_from_spec(_native_spec)
+_native_spec.loader.exec_module(_native)
+
+
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _native.request("digest", path=str(path))
 
 
 def source_patches() -> list[dict]:
