@@ -17,7 +17,6 @@ import shutil
 import signal
 import socket
 import subprocess
-import struct
 import sys
 import tarfile
 import threading
@@ -30,6 +29,20 @@ _native_spec.loader.exec_module(_native)
 CALCULATOR_SHA256 = "1928e65ced8cbe78be2ff3cb4c321e9e75d138e8e30ea1368fbb772a86827d1d"
 FAILURES = (b"ANDROID-FAIL", b"KERNEL PANIC", b"FATAL EXCEPTION",
             b"JNI DETECTED ERROR IN APPLICATION", b"Fatal signal ")
+
+
+def deployment_fields(args, split_paths):
+    fields = dict(mode=args.mode, launcher=args.launcher, split_paths=split_paths,
+                  flags={key: bool(getattr(args, key)) for key in
+                         ['linker_diagnostics', 'loader_probe', 'layout_probe', 'pointer_probe',
+                          'lifecycle_probe', 'cookie_probe', 'autofill_probe', 'location_probe',
+                          'egl_queue_probe', 'split_probe', 'egl_probe', 'tls_probe', 'boot_probe']})
+    fields.update(input=args.input, keys=args.keys, title=args.title,
+                  startup_timeout=str(args.startup_timeout), expect=args.expect,
+                  runtime_arch=args.runtime_arch)
+    fields['flags']['strace'] = bool(args.strace)
+    fields.update(focus_0=str(args.focus[0]), focus_1=str(args.focus[1]))
+    return fields
 
 
 def prepare_split_probe(source: Path, destination: Path) -> dict[str, str]:
@@ -295,111 +308,20 @@ def prepare(args: argparse.Namespace) -> Path | None:
     if args.boot_probe:
         shutil.copy2(args.boot_probe, test / "art-boot-probe.jar")
         args.boot_probe_sha256 = hashlib.sha256((test / "art-boot-probe.jar").read_bytes()).hexdigest()
-    configuration = {
-        "TEST_APK": "/opt/android-test/application.apk", "TEST_MODE": args.mode,
-        "TEST_DESKTOP_APP": "Roblox" if args.launcher == "roblox" else "Android Calculator",
-        "TEST_HOSTED_NAME": "roblox" if args.launcher == "roblox" and args.mode == "desktop" else "android",
-        "TEST_GEOMETRY": "1280x720x24" if args.launcher == "roblox" else "480x640x24",
-        "VINIX_ROBLOX_APK": "/opt/android-test/application.apk",
-        "VINIX_ROBLOX_SPLIT_APKS": ":".join(split_paths) if args.launcher == "roblox" else "",
-        "VINIX_ANDROID_LINKER_DIAGNOSTICS": "1" if args.linker_diagnostics else "0",
-        "TEST_BIONIC_LOADER_PROBE": "/opt/android-test/loader" if args.loader_probe else "",
-        "TEST_LAYOUT_PROBE": "/opt/android-test/android-layout-focus-probe.jar" if args.layout_probe else "",
-        "TEST_POINTER_PROBE": "/opt/android-test/android-pointer-capture-probe.jar" if args.pointer_probe else "",
-        "TEST_LIFECYCLE_PROBE": "/opt/android-test/android-activity-lifecycle-probe.apk" if args.lifecycle_probe else "",
-        "TEST_COOKIE_PROBE": "/opt/android-test/android-cookie-probe.apk" if args.cookie_probe else "",
-        "TEST_AUTOFILL_PROBE": "/opt/android-test/android-autofill-probe.apk" if args.autofill_probe else "",
-        "TEST_LOCATION_PROBE": "/opt/android-test/android-location-probe.apk" if args.location_probe else "",
-        "TEST_EGL_QUEUE_PROBE": "/opt/android-test/android-egl-queue-probe.apk" if args.egl_queue_probe else "",
-        "TEST_SPLIT_PROBE": "/opt/android-test/split-probe" if args.split_probe else "",
-        "TEST_EGL_PROBE": "/opt/android-test/egl-interop-test" if args.egl_probe else "",
-        "TEST_TLS_PROBE": "/opt/android-test/android-tls-probe.jar" if args.tls_probe else "",
-        "TEST_ART_BOOT_PROBE": "/opt/android-test/art-boot-probe.jar" if args.boot_probe else "",
-        "TEST_INPUT": args.input, "TEST_KEYS": args.keys, "TEST_TITLE": args.title,
-        "TEST_TIMEOUT": str(args.startup_timeout), "VINIX_ANDROID_EXPECTED_RESULT": args.expect,
-        "TEST_RUNTIME_ARCH": args.runtime_arch, "TEST_STRACE": "1" if args.strace else "0",
-        "TEST_FOCUS_X": str(args.focus[0]), "TEST_FOCUS_Y": str(args.focus[1]),
-        "TEST_WAIT_FOR_RESUME": "1" if hashlib.sha256(args.apk.read_bytes()).hexdigest() == CALCULATOR_SHA256 else "0",
-        "TEST_OBSERVE": "1" if args.observe else "0",
-        "TEST_INTERACTIVE": "1" if args.interactive else "0",
-        "TEST_OBSERVATION_SECONDS": str(args.observation_seconds),
-    }
-    (test / "config.sh").write_text("".join(f"{key}={shlex.quote(value)}\n" for key, value in configuration.items()))
-    if args.lifecycle_probe:
-        (test / "lifecycle-launch").write_text(
-            "#!/bin/sh\n. /opt/android-test/config.sh\n"
-            '/usr/bin/run-android "$TEST_LIFECYCLE_PROBE" '
-            "-l 'android/app/AndroidActivityLifecycleProbe$BootstrapActivity' -w 128 -h 128 "
-            '-X "-Djava.class.path=/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/api-impl.jar:'
-            '/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk:$TEST_LIFECYCLE_PROBE"\n'
-            'lifecycle_status=$?\nprintf \'%s\\n\' "$lifecycle_status" >/tmp/android-lifecycle-status\n'
-            'exit "$lifecycle_status"\n')
-        (test / "lifecycle-launch").chmod(0o755)
-    if args.cookie_probe:
-        for phase, activity in (("cookie", "BootstrapActivity"), ("cookie-reload", "PersistenceActivity")):
-            launcher = test / f"{phase}-launch"
-            launcher.write_text(
-                "#!/bin/sh\n. /opt/android-test/config.sh\n"
-                '/usr/bin/run-android "$TEST_COOKIE_PROBE" '
-                f"-l 'org/vinix/tests/AndroidCookieProbe${activity}' -w 128 -h 128\n"
-                f'cookie_status=$?\nprintf \'%s\\n\' "$cookie_status" >/tmp/android-{phase}-status\n'
-                'exit "$cookie_status"\n')
-            launcher.chmod(0o755)
-    if args.autofill_probe:
-        launcher = test / "autofill-launch"
-        launcher.write_text(
-            "#!/bin/sh\n. /opt/android-test/config.sh\n"
-            '/usr/bin/run-android "$TEST_AUTOFILL_PROBE" '
-            "-l 'org/vinix/tests/AndroidAutofillProbe$BootstrapActivity' -w 128 -h 128\n"
-            'autofill_status=$?\nprintf \'%s\\n\' "$autofill_status" >/tmp/android-autofill-status\n'
-            'exit "$autofill_status"\n')
-        launcher.chmod(0o755)
-    if args.location_probe:
-        launcher = test / "location-launch"
-        launcher.write_text(
-            "#!/bin/sh\n. /opt/android-test/config.sh\n"
-            '/usr/bin/run-android "$TEST_LOCATION_PROBE" '
-            "-l 'org/vinix/tests/AndroidLocationProbe$BootstrapActivity' -w 128 -h 128\n"
-            'location_status=$?\nprintf \'%s\\n\' "$location_status" >/tmp/android-location-status\n'
-            'exit "$location_status"\n')
-        launcher.chmod(0o755)
-    if args.egl_queue_probe:
-        launcher = test / "egl-queue-launch"
-        launcher.write_text(
-            "#!/bin/sh\n. /opt/android-test/config.sh\n"
-            '/usr/bin/run-android "$TEST_EGL_QUEUE_PROBE" '
-            "-l 'org/vinix/tests/AndroidEglQueueProbe$BootstrapActivity' -w 128 -h 128\n"
-            'egl_queue_status=$?\nprintf \'%s\\n\' "$egl_queue_status" >/tmp/android-egl-queue-status\n'
-            'exit "$egl_queue_status"\n')
-        launcher.chmod(0o755)
-    if args.egl_probe:
-        launcher = test / "egl-launch"
-        launcher.write_text(
-            "#!/bin/sh\n. /opt/android-test/config.sh\n"
-            "(\n runtime=/opt/vinix-android-aarch64\n unset LD_LIBRARY_PATH LD_PRELOAD\n"
-            ' export VINIX_ALLOW_WX=1 LD_LIBRARY_PATH="$runtime/lib:$runtime/usr/lib"\n'
-            ' export LD_PRELOAD="$runtime/usr/lib/libvinix-android-compat.so"\n'
-            ' export GDK_BACKEND=x11 GDK_DISABLE="${GDK_DISABLE:+$GDK_DISABLE,}glx" GSK_RENDERER=cairo\n'
-            ' export GTK_A11Y=none GSETTINGS_BACKEND=memory\n'
-            ' export FONTCONFIG_PATH="$runtime/etc/fonts" FONTCONFIG_FILE="$runtime/etc/fonts/fonts.conf"\n'
-            ' export GSETTINGS_SCHEMA_DIR="$runtime/usr/share/glib-2.0/schemas"\n'
-            ' export LIBGL_DRIVERS_PATH="$runtime/usr/lib/dri"\n'
-            ' exec "$runtime/lib/ld-musl-aarch64.so.1" --library-path "$LD_LIBRARY_PATH" "$TEST_EGL_PROBE"\n'
-            ')\negl_status=$?\nprintf \'%s\\n\' "$egl_status" >/tmp/android-egl-status\n'
-            'exit "$egl_status"\n')
-        launcher.chmod(0o755)
-    (test / "launch").write_text(
-        "#!/bin/sh\n. /opt/android-test/config.sh\n"
-        "export VINIX_ANDROID_EXPECTED_RESULT VINIX_ROBLOX_SPLIT_APKS\n"
-        "[ \"$TEST_STRACE\" = 0 ] || export QEMU_STRACE=1\n"
-        + ("export VINIX_ANDROID_TEST_PRELOAD=/opt/android-test/text-observer.so\n" if not args.observe else "")
-        + ("export LD_PRELOAD=\"$VINIX_ANDROID_TEST_PRELOAD\"\n" if args.runtime_arch == "aarch64" and not args.observe else "")
-        +
-        (f'exec /usr/bin/run-android "$TEST_APK" -l {shlex.quote(args.activity)} -w 480 -h 640'
-         if args.launcher == "android" else 'exec /usr/bin/run-roblox "$TEST_APK"')
-        + "".join(" " + shlex.quote(argument) for argument in args.runtime_arg)
-        + ("".join(" --split-apk " + shlex.quote(path) for path in split_paths)
-           if args.launcher == "android" else "") + "\n")
+    deployment = deployment_fields(args, split_paths)
+    deployment["apk_checksum"] = _native.request("runner_digest", path_hex=os.fsencode(args.apk).hex())
+    deployment['flags'].update(observe=bool(args.observe), interactive=bool(args.interactive))
+    deployment['observation_seconds'] = str(args.observation_seconds)
+    (test / "config.sh").write_text(_native.unpack_strings(_native.request(
+        "runner_configuration", fields_encoded=_native.pack_strings(deployment))))
+    for launch in _native.unpack_strings(_native.request("runner_optional", fields_encoded=_native.pack_strings(deployment))):
+        target = test / launch["name"]
+        target.write_text(launch["script"])
+        target.chmod(0o755)
+    deployment.update(activity=args.activity if args.launcher == "android" else "",
+                      runtime_arg=args.runtime_arg)
+    (test / "launch").write_text(_native.unpack_strings(_native.request(
+        "runner_launch", fields_encoded=_native.pack_strings(deployment))))
     (test / "launch").chmod(0o755)
     if args.launcher == "android":
         launcher = overlay / "usr/bin/run-android-calculator"

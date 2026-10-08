@@ -86,3 +86,15 @@ bindings. Original controls compare full pipeline output and partial archive
 state, malformed ELF and UTF-8 cases, complete commands/status/errors and
 actual child architecture. Compiler producers are controlled real processes;
 these checks do not execute javac/D8/AAPT2 production compilers or Android apps.
+
+Android runner configuration and launch generation also run in V. It retains
+configuration insertion order, calculator resume-wait identity, probe selection,
+optional script order, preload branches, runtime arguments and shell quoting.
+The frontend marshals parsed command-line fields in the original phases and
+keeps write_text/chmod as standard-library bindings with no port credit.
+Frozen original controls compare complete file bytes, modes, exceptions and
+partial files, including the real pinned calculator APK, both runtime targets,
+Android/Roblox launchers, Unicode and surrogate encoding errors, write/chmod
+failures and launch-only fields that remain unused until their original phase.
+Native controls also mutate transport input after return to check output
+ownership. These checks do not execute generated scripts or boot Android.

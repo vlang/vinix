@@ -66,6 +66,9 @@ pub fn query(request string) !string {
 			info := dex_info(hex.decode(text(row, 'data')!)!)!
 			Value([Value(info.classes.map(Value(it))), Value(info.callsites)])
 		}
+		'runner_configuration', 'runner_optional', 'runner_launch' {
+			deployment_query(row, operation)!
+		}
 		'build_advanced_probe', 'advanced_native_elf' { advanced_query(row, operation)! }
 		'build_simple_probe' { Value(build_simple_probe(row)!) }
 		'archive_simple_classes' {
