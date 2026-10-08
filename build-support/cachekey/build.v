@@ -243,6 +243,15 @@ pub fn office_shared(input OfficeInputs) !string {
 		build_hash_path(mut digest, item.path, item.label, item.metadata, item.policy, mut active)!
 	}
 	native_inputs(mut digest, input.repo, mut active)!
+	// The builder now executes these maintained native policies and bindings.
+	for path in ['desktop/tools/office_query.v', 'desktop/tools/officebuild', 'tools/packagestore',
+		'tools/_package_store_native.py', 'build-support/native_host.py',
+		'build-support/android/_boot_native.py', 'build-support/android/androidhost',
+		'build-support/android/boothost', 'build-support/run-v-tool.sh', 'build-support/find-v.sh',
+		'desktop/tools/stage_query.v', 'desktop/tools/stagehost', 'desktop/tools/_stage_native.py',
+		'desktop/tools/androidhost', 'desktop/tools/boothost', 'desktop/tools/packagestore'] {
+		build_hash_path(mut digest, join_path(input.repo, path), 'office-native/' + path, false, '', mut active)!
+	}
 	build_hash_path(mut digest, join_path(input.vroot, 'vlib'), 'vlib', true, 'vlib', mut active)!
 	build_hash_path(mut digest, join_path(input.vroot, 'thirdparty/mbedtls'), 'mbedtls', true, 'v', mut active)!
 	for name in module_subdirs(input.ui2)! {
