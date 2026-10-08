@@ -20,87 +20,70 @@ _native_request, _policy_value = _native["request"], _native["policy_value"]
 
 REPO = Path(__file__).resolve().parents[2]
 GLIBC_PIN = REPO / "build-support/dota2/glibc-package.json"
-GLIBC_MARKER = ".vinix-dota2-glibc-package.json"
-GLIBC_ALIAS_POLICY = "bookworm-lib-to-usrmerged-libc-relative-v1"
-GLIBC_LIBRARIES = ("ld-linux-x86-64.so.2", "libc.so.6", "libm.so.6",
-                   "libresolv.so.2", "libpthread.so.0", "libdl.so.2")
-MMAP32_SOURCE = REPO / "build-support/dota2/mmapcore/core.v"
-MMAP32_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-mmap32.so"
-MMAP32_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
-                  "-nostdlib", "-ffreestanding", "-O2", "-fvisibility=hidden",
-                  "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
-                  "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
-                  "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "build-support/dota2"),
-                  "-Wl,--version-script=" + str(REPO / "build-support/dota2/mmap32.exports"),
-                  "-Wl,-soname,libvinix-dota2-mmap32.so"]
-EARLY_CLIENT_SOURCE = REPO / "build-support/dota2/earlycore/core.v"
-EARLY_CLIENT_LIBRARY = "usr/lib/x86_64-linux-gnu/libvinix-dota2-steam-loader.so"
-EARLY_CLIENT_COMPILE = ["clang", "--target=x86_64-linux-gnu", "-fPIC", "-shared",
-                        "-nostdlib", "-ffreestanding", "-O2", "-fvisibility=hidden",
-                        "-fuse-ld=lld", "-Wall", "-Wextra", "-Werror",
-                        "-Wno-unused-function", "-Wno-unused-label", "-Wno-unused-parameter",
-                        "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "build-support/dota2"),
-                        "-Wl,-soname,libvinix-dota2-steam-loader.so"]
-MESA_BUILDER = REPO / "build-support/dota2/mesa-build.py"
-LAVAPIPE_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
-LAVAPIPE_MARKER = ".vinix-dota2-lavapipe.json"
-VENUS_BUILDER = REPO / "build-support/dota2/venus-build.py"
-VENUS_LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_virtio.so"
-VENUS_ICD = "usr/share/vulkan/icd.d/virtio_icd.x86_64.json"
-VENUS_MARKER = ".vinix-dota2-venus.json"
+
+spec = importlib.util.spec_from_file_location("dota2_vulkan_native", Path(__file__).with_name("_vulkan_native.py"))
+native = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(native)
+
+
+def _call(operation, **arguments):
+    return native.query(operation, arguments, globals())
+
+
+_PATH_CONSTANTS = {"MMAP32_SOURCE", "EARLY_CLIENT_SOURCE", "MESA_BUILDER", "VENUS_BUILDER"}
+_CONSTANTS = _PATH_CONSTANTS | {"GLIBC_MARKER", "GLIBC_ALIAS_POLICY", "GLIBC_LIBRARIES", "MMAP32_LIBRARY",
+    "MMAP32_COMPILE", "EARLY_CLIENT_LIBRARY", "EARLY_CLIENT_COMPILE", "LAVAPIPE_LIBRARY", "LAVAPIPE_MARKER",
+    "VENUS_LIBRARY", "VENUS_ICD", "VENUS_MARKER"}
+
+
+def __getattr__(name):
+    if name in globals():
+        return globals()[name]
+    if name not in _CONSTANTS:
+        raise AttributeError("module " + repr(__name__) + " has no attribute " + repr(name))
+    value = _call("constant", name=name)
+    if name in _PATH_CONSTANTS: value = Path(value)
+    if name == "GLIBC_LIBRARIES": value = tuple(value)
+    globals()[name] = value
+    return value
+
+
+_prior_policy_sources = _native["policy_sources"]
+
+
+def _stager_policy_sources():
+    return [*_prior_policy_sources(), *(Path(path) for path in _call("policy_sources"))]
+
+
+_native["policy_sources"] = _stager_policy_sources
 
 
 def clone_tree(source: Path, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if sys.platform == "darwin":
-        subprocess.run(["/bin/cp", "-cRp", str(source), str(destination)], check=True)
-    else:
-        shutil.copytree(source, destination, symlinks=True)
+    return _call('clone_tree', source=source, destination=destination)
 
 
 def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _call('file_sha256', path=path)
 
 
 def compatibility_inputs(module: str, header: str, extra=()) -> dict:
-    paths = [*sorted((REPO / "build-support/dota2" / module).glob("*.v")),
-             REPO / "build-support/dota2" / header, *extra,
-             REPO / "build-support/dota2/compile-v-compat.py",
-             REPO / "build-support/compile-v-module.py", REPO / "build-support/find-v.sh"]
-    inputs = {str(path.relative_to(REPO)): file_sha256(path) for path in paths}
-    inputs["v_compiler"] = subprocess.check_output([
-        "sh", "-c", '. "$1/build-support/find-v.sh"; "$V" -version',
-        "find-v", str(REPO)], text=True).strip()
-    return inputs
+    return _call('compatibility_inputs', module=module, header=header, extra=extra)
 
 
 def early_client_inputs() -> dict:
-    return compatibility_inputs("earlycore", "early-client-abi.h")
+    return _call('early_client_inputs')
 
 
 def mmap32_inputs() -> dict:
-    return compatibility_inputs("mmapcore", "mmap32-abi.h",
-                                [REPO / "build-support/dota2/mmap32.exports"])
+    return _call('mmap32_inputs')
 
 
 def build_mmap32(destination: Path, artifacts: Path) -> None:
-    artifacts.mkdir(parents=True, exist_ok=True)
-    generated = artifacts / "mmap32-v.c"
-    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
-                    "mmap32", str(generated), "--bare"], check=True)
-    subprocess.run([*MMAP32_COMPILE, str(generated), "-o", str(destination)], check=True)
+    return _call('build_mmap32', destination=destination, artifacts=artifacts)
 
 
 def build_early_client(destination: Path, artifacts: Path) -> None:
-    artifacts.mkdir(parents=True, exist_ok=True)
-    generated = artifacts / "early-client-v.c"
-    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
-                    "early", str(generated), "--bare"], check=True)
-    subprocess.run([*EARLY_CLIENT_COMPILE, str(generated), "-o", str(destination)], check=True)
+    return _call('build_early_client', destination=destination, artifacts=artifacts)
 
 
 def load_glibc_pin(path: Path = GLIBC_PIN) -> dict:
@@ -109,157 +92,97 @@ def load_glibc_pin(path: Path = GLIBC_PIN) -> dict:
     return pin
 
 
+
 def package_files(root: Path) -> dict:
-    files = {}
-    for path in sorted(root.rglob("*")):
-        relative = path.relative_to(root).as_posix()
-        if path.is_symlink():
-            files[relative] = {"target": os.readlink(path)}
-        elif path.is_file():
-            files[relative] = {"sha256": file_sha256(path),
-                               "mode": path.stat().st_mode & 0o7777}
-    return files
+    return _call('package_files', root=root)
 
 
 def stage_glibc_package(resolver, pin: dict, cache: Path, root: Path) -> None:
     # Keep the proven Mesa/LLVM and Steam library closure. Only Dota's private
     # libc family advances: glibc 2.41 retains environment arrays while getenv
     # is reading them on another thread (upstream glibc bug 15607).
-    package = resolver.Package(pin["package"], pin["version"], pin["architecture"],
-                               pin["filename"], pin["sha256"], pin["size"], (), ())
-    archive = resolver.download(pin["mirror"], package, cache)
-    if archive.stat().st_size != pin["size"] or file_sha256(archive) != pin["sha256"]:
-        raise SystemExit(f"checksum or size mismatch for pinned libc6: {archive}")
-    with tempfile.TemporaryDirectory(prefix="dota2-libc6-", dir=cache) as directory:
-        payload = Path(directory)
-        resolver.extract_deb(archive, payload)
-        canonical = payload / "usr/lib/x86_64-linux-gnu"
-        if not all((canonical / name).is_file() and not (canonical / name).is_symlink()
-                   for name in GLIBC_LIBRARIES):
-            raise SystemExit("pinned libc6 must contain the complete usrmerged amd64 family")
-        files = package_files(payload)
-        resolver.extract_deb(archive, root)
-        aliases = {}
-        # The existing Bookworm root has distinct /lib and /usr/lib directories.
-        # Redirect old lookup paths to the same new files, including the loader.
-        for path in sorted(canonical.iterdir()):
-            if not path.is_file() or path.is_symlink():
-                continue
-            legacy = root / "lib/x86_64-linux-gnu" / path.name
-            if not legacy.exists() and not legacy.is_symlink():
-                continue
-            legacy.unlink()
-            target = "../../usr/lib/x86_64-linux-gnu/" + path.name
-            legacy.symlink_to(target)
-            aliases[legacy.relative_to(root).as_posix()] = target
-        loader = root / "lib64/ld-linux-x86-64.so.2"
-        loader.parent.mkdir(parents=True, exist_ok=True)
-        if loader.exists() or loader.is_symlink():
-            loader.unlink()
-        target = "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
-        loader.symlink_to(target)
-        aliases[loader.relative_to(root).as_posix()] = target
-        marker = {"package": pin, "alias_policy": GLIBC_ALIAS_POLICY,
-                  "files": files, "aliases": aliases}
-        (root / GLIBC_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+    return _call('stage_glibc_package', resolver=resolver, pin=pin, cache=cache, root=root)
 
 
 def glibc_package_valid(root: Path, pin: dict) -> bool:
     try:
-        marker = json.loads((root / GLIBC_MARKER).read_text())
+        marker = json.loads((root / __getattr__('GLIBC_MARKER')).read_text())
         return _native_request("glibc-valid", b"", root=str(root),
                                marker=_policy_value(marker), pin=_policy_value(pin),
-                               alias_policy=GLIBC_ALIAS_POLICY, libraries=list(GLIBC_LIBRARIES))
+                               alias_policy=__getattr__('GLIBC_ALIAS_POLICY'), libraries=list(__getattr__('GLIBC_LIBRARIES')))
     except (OSError, ValueError, KeyError, TypeError, RuntimeError):
         return False
 
 
+
 def load_mesa_builder():
-    spec = importlib.util.spec_from_file_location("vinix_dota2_mesa_build", MESA_BUILDER)
+    spec = importlib.util.spec_from_file_location("vinix_dota2_mesa_build", __getattr__('MESA_BUILDER'))
     builder = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = builder
     spec.loader.exec_module(builder)
     return builder
 
 
+
 def lavapipe_inputs() -> dict:
-    builder = load_mesa_builder()
-    inputs = builder.load_inputs()
-    return {"debian_version": inputs["debian_version"], "builder": file_sha256(MESA_BUILDER),
-            "inputs": file_sha256(builder.SUPPORT / "inputs.json"),
-            "patches": {name: file_sha256(builder.SUPPORT / name) for name in inputs["patches"]}}
+    return _call('lavapipe_inputs')
 
 
 def build_lavapipe(base: Path, work: Path) -> Path:
     return load_mesa_builder().build(base, work)
 
 
+
 def stage_lavapipe(selected, root: Path, work: Path, expected: dict) -> None:
     # Debian's 22.3.6 Lavapipe dereferences null descriptor sets, which Dota
     # binds for compute while loading a map. Replace only that library, with
     # one built from the same Debian source and linked against this root.
-    mesa = next(p for p in selected if p.name == "mesa-vulkan-drivers")
-    if mesa.version != expected["debian_version"]:
-        raise SystemExit(f"Debian's mesa-vulkan-drivers is {mesa.version}; the Lavapipe "
-                         f"patch is pinned to {expected['debian_version']}")
-    library = build_lavapipe(root, work)
-    destination = root / LAVAPIPE_LIBRARY
-    shutil.copy2(library, destination)
-    destination.chmod(0o644)
-    marker = {"inputs": expected, "sha256": file_sha256(destination)}
-    (root / LAVAPIPE_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+    return _call('stage_lavapipe', selected=selected, root=root, work=work, expected=expected)
 
 
 def lavapipe_valid(root: Path, expected: dict) -> bool:
     try:
-        marker = json.loads((root / LAVAPIPE_MARKER).read_text())
+        marker = json.loads((root / __getattr__('LAVAPIPE_MARKER')).read_text())
         return _native_request("driver-valid", b"", root=str(root), marker=_policy_value(marker),
-                               expected=_policy_value(expected), library=LAVAPIPE_LIBRARY, icd="")
+                               expected=_policy_value(expected), library=__getattr__('LAVAPIPE_LIBRARY'), icd="")
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
 
+
 def load_venus_builder():
-    spec = importlib.util.spec_from_file_location("vinix_dota2_venus_build", VENUS_BUILDER)
+    spec = importlib.util.spec_from_file_location("vinix_dota2_venus_build", __getattr__('VENUS_BUILDER'))
     builder = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = builder
     spec.loader.exec_module(builder)
     return builder
 
 
+
 def venus_inputs() -> dict:
-    builder = load_venus_builder()
-    return {"version": builder.VERSION, "source": builder.SOURCE_SHA256,
-            "builder": file_sha256(VENUS_BUILDER),
-            "patches": {patch.name: file_sha256(patch) for patch in builder.PATCHES}}
+    return _call('venus_inputs')
 
 
 def build_venus(base: Path, work: Path) -> tuple[Path, Path]:
     return load_venus_builder().build(base, work)
 
 
+
 def stage_venus(root: Path, work: Path, guest_root: str, expected: dict) -> None:
     # The translated game cannot load the native ARM64 Venus driver. Its own
     # x86-64 build reaches the host GPU through Vinix's virtio-gpu node on
     # KekVM; run-dota2 selects it only when that GPU is present.
-    library, manifest = build_venus(root, work)
-    destination = root / VENUS_LIBRARY
-    shutil.copy2(library, destination)
-    destination.chmod(0o644)
-    data = json.loads(manifest.read_text())
-    data["ICD"]["library_path"] = guest_root.rstrip("/") + "/" + VENUS_LIBRARY
-    (root / VENUS_ICD).write_text(json.dumps(data, indent=2) + "\n")
-    marker = {"inputs": expected, "sha256": file_sha256(destination)}
-    (root / VENUS_MARKER).write_text(json.dumps(marker, sort_keys=True, indent=2) + "\n")
+    return _call('stage_venus', root=root, work=work, guest_root=guest_root, expected=expected)
 
 
 def venus_valid(root: Path, expected: dict) -> bool:
     try:
-        marker = json.loads((root / VENUS_MARKER).read_text())
+        marker = json.loads((root / __getattr__('VENUS_MARKER')).read_text())
         return _native_request("driver-valid", b"", root=str(root), marker=_policy_value(marker),
-                               expected=_policy_value(expected), library=VENUS_LIBRARY, icd=VENUS_ICD)
+                               expected=_policy_value(expected), library=__getattr__('VENUS_LIBRARY'), icd=__getattr__('VENUS_ICD'))
     except (OSError, ValueError, KeyError, TypeError):
         return False
+
 
 
 def main() -> None:
@@ -278,123 +201,10 @@ def main() -> None:
     parser.add_argument("--no-venus", action="store_true",
                         help="omit the x86-64 Venus driver for KekVM's GPU")
     args = parser.parse_args()
-    steam = args.steam_build.resolve()
-    build = args.build.resolve()
-    source = steam / "staging/usr/libexec/vinix-steam/root"
-    root = (args.root or build / "staging/usr/libexec/vinix-dota2/root").resolve()
-    index = steam / f"downloads/{args.release}_amd64_Packages"
-    manifest = steam / "amd64-packages"
-    if not (source / "lib64/ld-linux-x86-64.so.2").exists() or not index.exists():
-        parser.error("scripts/build-steam-aarch64.sh must stage the glibc root and package index first")
-    if root == source or source in root.parents or root in source.parents:
-        parser.error("the Vulkan build must be separate from the Steam build")
-
-    spec = importlib.util.spec_from_file_location("vinix_debian_root", REPO / "build-support/debian-root.py")
-    resolver = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = resolver
-    spec.loader.exec_module(resolver)
-    existing = {line.split("\t")[0] for line in manifest.read_text().splitlines()}
-    # vulkan-tools also carries a Python report utility; vulkaninfo and
-    # vkcube are ELF programs, so neither Python nor dpkg is needed here.
-    packages = resolver.parse_index(index)
-    selected = resolver.resolve(packages,
-                                ["libvulkan1", "mesa-vulkan-drivers", "vulkan-tools",
-                                 "libpipewire-0.3-0", "libopenal1", "libnm0"],
-                                existing | {"python3", "dpkg"})
-    # Only the public trust data is needed from this package. Its dependencies
-    # run the maintainer script; generate the PEM bundle directly below instead.
-    certificates = next(p for p in packages if p.name == "ca-certificates")
-    selected = sorted({p.name: p for p in [*selected, certificates]}.values(),
-                      key=lambda p: p.name)
-    rows = [{"package": p.name, "version": p.version, "filename": p.filename,
-             "sha256": p.sha256} for p in selected]
-    glibc_pin = None if args.keep_steam_libc else load_glibc_pin()
-    lavapipe = None if args.debian_lavapipe else lavapipe_inputs()
-    venus = None if args.no_venus else venus_inputs()
-    inputs = {"format": 6, "source": str(source), "guest_root": args.guest_root,
-              "release": args.release, "packages": rows,
-              "builder_sha256": file_sha256(Path(__file__)),
-              "native_policy": {str(path.relative_to(REPO)): file_sha256(path) for path in _native["policy_sources"]()},
-              "glibc_package": glibc_pin,
-              "glibc_alias_policy": GLIBC_ALIAS_POLICY,
-              "lavapipe": lavapipe,
-              "venus": venus,
-              "amd64": manifest.read_text(),
-              "i386": (steam / "i386-packages").read_text(),
-              "mmap32_source": hashlib.sha256(MMAP32_SOURCE.read_bytes()).hexdigest(),
-              "mmap32_compile": MMAP32_COMPILE,
-              "mmap32_v_inputs": mmap32_inputs(),
-              "early_client_source": hashlib.sha256(EARLY_CLIENT_SOURCE.read_bytes()).hexdigest(),
-              "early_client_v_inputs": early_client_inputs(),
-              "early_client_compile": EARLY_CLIENT_COMPILE}
-    generation = hashlib.sha256(json.dumps(inputs, sort_keys=True).encode()).hexdigest()
-    stamp = root / ".vinix-dota2-vulkan-generation"
-    if root.exists() and not stamp.exists() and not args.refresh:
-        parser.error("existing destination has no generation stamp; use --refresh to replace this private root")
-    required = ["lib64/ld-linux-x86-64.so.2", "usr/bin/vulkaninfo", "usr/bin/vkcube",
-                "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so", "usr/lib/x86_64-linux-gnu/libvulkan.so.1",
-                "usr/share/vulkan/icd.d/lvp_icd.x86_64.json", "etc/ssl/certs/ca-certificates.crt",
-                "usr/lib/x86_64-linux-gnu/libfreetype.so.6",
-                MMAP32_LIBRARY, EARLY_CLIENT_LIBRARY]
-    build.mkdir(parents=True, exist_ok=True)
-    reported_packages = rows + ([glibc_pin] if glibc_pin is not None else [])
-    (build / "vulkan-packages.json").write_text(json.dumps(reported_packages, indent=2) + "\n")
-    if (stamp.exists() and stamp.read_text().strip() == generation and
-            all((root / p).exists() for p in required) and
-            (glibc_pin is None or glibc_package_valid(root, glibc_pin)) and
-            (lavapipe is None or lavapipe_valid(root, lavapipe)) and
-            (venus is None or venus_valid(root, venus))):
-        print(root)
-        return
-    pending = root.with_name(root.name + f".vulkan-stage-{os.getpid()}")
-    clone_tree(source, pending)
-    cache = build / "downloads"
-    cache.mkdir(parents=True, exist_ok=True)
-    for package in selected:
-        archive = resolver.download(args.mirror, package, cache)
-        resolver.extract_deb(archive, pending)
-    # Both drivers link against Bookworm's libc, before Dota's newer libc replaces it.
-    if lavapipe is not None:
-        stage_lavapipe(selected, pending, build / "mesa", lavapipe)
-    if venus is not None:
-        stage_venus(pending, build / "venus", args.guest_root, venus)
-    if glibc_pin is not None:
-        stage_glibc_package(resolver, glibc_pin, cache, pending)
-    # Resolve libc symbols only inside the translated process. No native
-    # headers, startup files, or x86 development packages are required.
-    build_mmap32(pending / MMAP32_LIBRARY, build / "native-v")
-    build_early_client(pending / EARLY_CLIENT_LIBRARY, build / "native-v")
-    public_certificates = sorted((pending / "usr/share/ca-certificates/mozilla").glob("*.crt"))
-    if not public_certificates:
-        raise SystemExit("ca-certificates package contains no public trust certificates")
-    bundle = pending / "etc/ssl/certs/ca-certificates.crt"
-    bundle.parent.mkdir(parents=True, exist_ok=True)
-    bundle.write_bytes(b"".join(p.read_bytes().rstrip() + b"\n" for p in public_certificates))
-    # An absolute private path also works when an application's own loader
-    # opens the ICD without QEMU's -L path redirection.
-    icd = pending / "usr/share/vulkan/icd.d/lvp_icd.x86_64.json"
-    data = json.loads(icd.read_text())
-    data["ICD"]["library_path"] = args.guest_root.rstrip("/") + "/usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
-    icd.write_text(json.dumps(data, indent=2) + "\n")
-    if glibc_pin is not None and not glibc_package_valid(pending, glibc_pin):
-        raise SystemExit("staged Dota libc6 package or loader aliases do not match the pin")
-    if lavapipe is not None and not lavapipe_valid(pending, lavapipe):
-        raise SystemExit("staged Lavapipe does not match its patched build")
-    if venus is not None and not venus_valid(pending, venus):
-        raise SystemExit("staged Venus driver does not match its build")
-    (pending / stamp.name).write_text(generation + "\n")
-    if root.exists():
-        old = root.with_name(root.name + f".vulkan-old-{os.getpid()}")
-        root.rename(old)
-        try:
-            pending.rename(root)
-        except BaseException:
-            old.rename(root)
-            raise
-        shutil.rmtree(old)
-    else:
-        pending.rename(root)
-    print(root)
+    try:
+        _call("main", options=vars(args))
+    except native.ArgumentError as error:
+        parser.error(str(error))
 
 
 if __name__ == "__main__":
