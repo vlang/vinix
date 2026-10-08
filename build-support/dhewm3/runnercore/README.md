@@ -24,3 +24,19 @@ used with compiler and guest callbacks; no full game build or guest boot is
 claimed.
 
 Evidence: `~/.cache/vinix-python-to-v/dhewm-runner-20261009/`.
+
+The next result stage moves 2,195 bytes / 36 lines of transcript/artifact and
+benchmark policy, removing a net 2,032 Python bytes / 31 lines. A narrow lazy
+projection supplies an actual generator to the unchanged statistics library;
+rows, warmup, runs and median inputs retain their original object relationships.
+Marker parsing, base64 line filtering, counter pairing, consistency guards and
+artifact output order remain native policy. Syntax path joins use interpreter
+operators, including reflected fallback; the prior staging helper correction
+adds no migration credit.
+
+Result qualification compares the frozen `a3cf88a8` source on all three profiles:
+125 direct result/error/override and rich path controls, 28 complete mocked guest
+workflows and 201 retained-generator/file/error-identity/FD checks. Existing
+staging controls and cold installation are repeated for the final source closure.
+No new guest execution claim is made by mocked PTY fixtures.
+Evidence: `~/.cache/vinix-python-to-v/dhewm-runner-result-20261009/`.

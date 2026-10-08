@@ -44,6 +44,10 @@ def _call_name(name, *args, **kwargs):
     return _builtins.globals().get(name, _builtins.getattr(_builtins, name))(*args, **kwargs)
 
 
+def _iter_items(records, key):
+    return (row[key] for row in records)
+
+
 def copy_layer(source: Path, dest: Path) -> None:
     return _query("copy_layer", source=source, dest=dest)
 
@@ -144,42 +148,7 @@ def run_guest(args, work: Path, root: Path, os_name: str) -> dict:
             # A blocking wait here would prevent the next guest from running.
             os.waitpid(pid, os.WNOHANG)
         os.close(master)
-    if b"DHEWM3-DONE" not in transcript:
-        raise SystemExit(f"{os_name} did not finish; inspect {work}/{os_name}.log")
-    if args.clock_only:
-        return {"os": os_name, "clock_probe": "passed"}
-    if args.record or args.screenshot:
-        normalized = bytes(transcript).replace(b"\r", b"")
-        files = [(b"SHOT", f"{os_name}.xwd")]
-        if args.record:
-            files.insert(0, (b"DEMO", "vinix-demo.demo"))
-        for marker, filename in files:
-            data = normalized.split(b"DHEWM3-" + marker + b"-BEGIN\n", 1)[1]
-            data = data.split(b"DHEWM3-" + marker + b"-END", 1)[0]
-            # Vinix emits exec diagnostics before base64 starts; retain only
-            # complete base64 lines, so those diagnostics cannot corrupt it.
-            lines = [line for line in data.splitlines()
-                     if re.fullmatch(rb"[A-Za-z0-9+/]+={0,2}", line)]
-            (work / filename).write_bytes(base64.b64decode(b"".join(lines), validate=True))
-        if shutil.which("ffmpeg"):
-            png = work / f"{os_name}.png"
-            subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i",
-                            str(work / f"{os_name}.xwd"), "-frames:v", "1", str(png)], check=True)
-            files.append((b"PNG", png.name))
-        return {"os": os_name, "artifacts": [str(work / filename) for _, filename in files]}
-    rows = [{"frames": int(m[1]), "seconds": float(m[2]), "fps": float(m[3])}
-            for m in FPS.finditer(transcript)]
-    elapsed = [int(m[1]) / 1000000000 for m in
-               re.finditer(rb"DHEWM3-ELAPSED ns=(\d+) status=0", transcript)]
-    if len(elapsed) != len(rows):
-        raise SystemExit("Missing independent counter measurements")
-    for row, seconds in zip(rows, elapsed):
-        row["process_seconds"] = seconds
-    # Round zero warms caches; retain it separately so it is reviewable.
-    if len(rows) != args.rounds + 1 or len({row["frames"] for row in rows}) != 1:
-        raise SystemExit(f"Incomplete or inconsistent timedemos: {rows}")
-    return {"os": os_name, "warmup": rows[0], "runs": rows[1:],
-            "median_fps": statistics.median(row["fps"] for row in rows[1:])}
+    return _query("result", args=args, work=work, transcript=transcript, os_name=os_name)
 
 
 def main() -> None:

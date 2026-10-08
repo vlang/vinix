@@ -68,6 +68,9 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'image' {
 			image(rb.borrow('root')!, rb.borrow('output')!, rb.bool_object(rb.borrow('linux')!)!)!
 		}
+		'result' {
+			return rb.result_object(result(rb.borrow('args')!, rb.borrow('work')!, rb.borrow('transcript')!, rb.borrow('os_name')!)!)
+		}
 		'main' { main_workflow(rb.borrow('args')!, rb.borrow('parser')!)! }
 		else { return error('Unknown dhewm3 runner operation') }
 	}

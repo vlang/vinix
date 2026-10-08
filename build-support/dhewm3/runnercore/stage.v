@@ -9,7 +9,7 @@ fn copy_layer(source ah.Value, dest ah.Value) ! {
 	for {
 		entry := rb.next(iter)!
 		if entry == rb.null() { break }
-		target := method(dest, '__truediv__', [o(attr(entry, 'name')!)])!
+		target := rb.call('acquire', 'operator', 'truediv', [o(dest), o(attr(entry, 'name')!)], {})!
 		if test(entry, 'is_symlink')! {
 			if test(target, 'is_dir')! && !test(target, 'is_symlink')! { continue }
 			if test(target, 'exists')! || test(target, 'is_symlink')! {

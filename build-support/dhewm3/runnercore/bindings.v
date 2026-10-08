@@ -27,7 +27,7 @@ fn py_str(value ah.Value) !ah.Value {
 }
 
 fn join(base ah.Value, name string) !ah.Value {
-	return rb.method('acquire', base, '__truediv__', [v(name)], {})!
+	return rb.call('acquire', 'operator', 'truediv', [o(base), v(name)], {})!
 }
 
 fn method(value ah.Value, name string, arguments []ah.Value) !ah.Value {
