@@ -120,6 +120,7 @@ def _exit(owner, exception):
     try:
         raise error.with_traceback(traceback)
     except BaseException:
+        error.__traceback__ = traceback
         try:
             return bool(owner.__exit__(*exception))
         finally:
