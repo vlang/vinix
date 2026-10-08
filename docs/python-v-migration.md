@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `821b88a8d1751e887386b69995abcd92bc2a63ed`, Linguist 7.27.0 reports
-**Python 6.17%** (489 files, 2,622,571 bytes) and **V 79.31%** (1,677 files,
-33,690,057 bytes). The complete committed-blob inventory and reproduction
+At source `8aaf12979e5d2c704e34782921cd82c30250ab83`, Linguist 7.27.0 reports
+**Python 5.98%** (495 files, 2,551,922 bytes) and **V 79.59%** (1,735 files,
+33,988,341 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,583,714 Python bytes**. Roughly another
-0.50 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,654,363 Python bytes**. Roughly another
+0.42 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 102 completed stages have a gross
-scope of **2,836,464 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **252,750 bytes**
+tests, including comments and blank lines. The 114 completed stages have a gross
+scope of **2,978,234 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **323,871 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -131,6 +131,18 @@ no extra migration credit.
 | Android pre-fork VM snapshot and boot plan | `tests/android/runhost/vm.v` | 2,181 / 38 | `74c18849102a5056f109b86dea78d3704ffb939f` |
 | Android QMP, keyboard, screenshot and shutdown policies | `tests/android/runhost/input.v` | 3,894 / 98 | `017ea1a761338a63c2da19ef90e3d334739a8b1d` |
 | Desktop performance setup and serial supervision | `tests/desktop-perf/runnercore` | 10,056 / 186 | `821b88a8d1751e887386b69995abcd92bc2a63ed` |
+| Complete kernel-gap disposable guest and hypervisor forwarding | `tests/kernel-gaps/gapcore` | 11,449 / 234 | `30f971351d3c85edc95b77bc93e016cc219c6f59` |
+| Loopback QEMU package-store and clipboard policy | `tools/packagestore` | 16,798 / 443 | `89ee70b6829fd6de8093acb85ade4b14331afcd2` |
+| Complete independent private Vulkan fixtures | `tests/dota2/vulkanfixture` | 18,652 / 333 | `0f462c73a3862732987df768d9b854eba2363abc` |
+| Android serial workers and foreground supervision | `tests/android/runhost/supervisor.v` | 3,352 / 66 | `76e20056a2b52ee3ae381906746f6401c31f6f08` |
+| Complete lavapipe compute guest workflow | `tests/dota2/lavacore` | 12,047 / 192 | `1a6d769b3ac822bba2eb8d3cf4c296469477834c` |
+| Complete independent package-store fixtures | `tests/packages/packagefixture` | 11,421 / 253 | `e13414842c314c690032035dc79c78f4243dbb39` |
+| Complete ext2 image and manifest construction | `tools/dota2/ext2build` | 11,962 / 256 | `da3885cafa750831a11db8ada48aa81e14d7e5c1` |
+| Complete independent ext2 NBD fixtures | `tests/dota2/ext2fixture` | 8,563 / 147 | `a1c58a96c20e13b4d8b45d6463e61704e8621936` |
+| Complete translated Vulkan rendering guest workflow | `tests/dota2/vkcore` | 11,647 / 236 | `653cc62818bf17ac62540839534d94f6592cd4b3` |
+| Complete Android runtime and archive build workflow | `build-support/android/runtimebuild` | 17,986 / 314 | `e498309c4cad1e073e40509c953a28b033b911cb` |
+| Ext2 source cache and read-only NBD protocol | `tools/dota2/ext2build/{export,protocol}.v` | 7,180 / 143 | `d1918f0ccfe70330d666817ff9b1dd5cb0b1f436` |
+| Complete OpenGothic cross-build and game staging | `build-support/opengothic/gothicbuild` | 10,713 / 222 | `8aaf12979e5d2c704e34782921cd82c30250ab83` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -172,6 +184,16 @@ transport onto the shared owned controller, removes 1,745 counted Python bytes
 and receives zero repeated port credit. Shared factory/EOF configuration in
 `30c75713` and `53f28be4` adds 175 counted bytes and receives zero algorithm
 credit; default consumer behavior and exact caller-specific errors stay checked.
+
+The subsequent twelve stages remove 70,649 measured Python bytes overall,
+including all counted adapters and simultaneous committed changes. Five
+context/error/concurrency corrections (`2bd0606f`, `cdc36ad7`, `c48777c8`,
+`ff66bafb`, `52bc7b30`) receive zero additional algorithm credit. Native
+contexts preserve the original exception object, supplied traceback, active
+cause during exit, suppression/error precedence and deliberate traceback
+clearing or replacement by libraries such as `unittest.assertRaises`.
+Exact traceback frame lists and Python 3.9 `sys.exc_info()[2]` parity are not
+claimed. Query resources remain independent across concurrent callers.
 
 ## Validation
 
@@ -874,6 +896,66 @@ workloads were not weakened.
   eighteen retirement controls and 100 requests per profile. These API changes
   leave their original default consumer behavior intact.
 
+- Kernel-gap/hypervisor workflows pass 58 builder/helper, 12 QMP, 29
+  forwarding, 123 whole-policy and retirement/API controls per profile,
+  including 100 exact-FD requests and all 12 original fixtures. Prepared,
+  hashed ARM/x86 guests pass frozen and native full suites; these inputs are
+  not fresh kernel builds and do not establish actual VMX execution.
+- Package-store policy passes 150 whole, 14 API, five broken-controller and
+  two group-interrupt controls per profile, all six real local-HTTP fixtures
+  and cold CLI checks on both ABIs. Its independent fixture port repeats
+  every original case and exact byte/mode/assertion plan on all profiles,
+  22 owner and 13 API controls, 74 production regressions and both cold CLIs.
+- Private Vulkan independent fixtures preserve all 18 cases and original
+  assertion/deadline plans; 15 owner and six late API controls pass per
+  profile, with cold complete fixtures on both ABIs. The zero-credit traceback
+  correction adds 16 manager/mutation controls and repeats 107 production
+  controls per profile. No physical renderer validation is inferred.
+- Android supervision passes 54 worker/observer, 75 foreground, five whole
+  PTY and four retirement controls per profile, all ten unchanged fixtures
+  and both cold installs. Concurrency/context corrections repeat 649 prior
+  controls, 34 decoding and 14 retirement controls and exercise real QMP,
+  screenshots, keyboard input, concurrent errors and traceback ownership.
+- Lavapipe compute workflows pass 56 whole/helper, 19 owner, 100 exact-FD,
+  seven fallback-context controls per profile and cold CLIs on both ABIs.
+  Prepared, hashed ARM kernels pass all 12 compute cases against both
+  workflows. Vulkan rendering workflows pass 104 whole, 17 helper, 16 prepare,
+  13 owner, two nested-interrupt and 100 actual-PTY controls per profile,
+  with all preceding kernel-gap/lavapipe controls and both cold CLIs.
+  Frozen/native prepared ARM guests complete 3,000 translated-rendering
+  frames; both independent color samples exceed the original >8 threshold.
+  This evidence establishes neither a fresh kernel/Mesa build nor a game,
+  physical GPU or Venus result.
+- Android runtime construction passes 112 frozen/native filesystem, archive,
+  six-worker, stage/cache and workflow controls per profile, 13 retirement
+  controls and 100 exact-FD requests. All 45 original Android fixtures,
+  five CLI pairs, three actual curl transfers and group interruption pass per
+  profile, plus both cold installers. Two original key identities and 51
+  independently checked new source-closure invalidations preserve ordered
+  original inputs and cover the translated implementation.
+- Ext2 construction passes 480 frozen/native controls per profile, 17 owners,
+  100 exact-FD requests and independent image/manifest/e2fsck/debugfs/QEMU NBD
+  checks. The independent fixture port preserves all six cases/assertion
+  plans on every profile, 73 ownership/protocol controls and both cold suites.
+  Earlier original APFS sparse-size assertions failed in both implementations;
+  final real runs pass after allocation reuse. An additional positive stat
+  control is identified separately. No assertion or deadline was weakened.
+- Ext2 cache/NBD policy passes 562 protocol/cache comparisons and 64 ownership,
+  partial-initialization, mutation and property-order controls per profile,
+  500 source reads with the original 64-descriptor cache limit and 200 reads
+  from eight concurrent callers, with exact final FD equality. All six frozen
+  and native real fixtures pass per profile, including QEMU NBD reads, plus
+  seven no-compiler CLI pairs and actual cold build/fsck/full fixtures on both
+  ABIs. One competing sanitizer attempt exceeded the unchanged shortened
+  100 ms negotiation deadline; the isolated complete rerun passes.
+- OpenGothic construction passes 81 whole frozen/native controls, twelve real
+  curl/Git/command/six-worker controls, two blocked group interruptions and
+  five forced exits per profile, four CLI/cold/atexit controls on both ABIs,
+  and all 74 shared package regressions per profile. Offline complete builds
+  use identified source/compiler fixtures and claim no new upstream renderer,
+  kernel build or guest result. New host managers and borrowed lifetimes were
+  reviewed independently; no kernel manual-free lifetime was changed.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1036,6 +1118,40 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `shared-host-process-20261008` | `postcommit.json` | `7837217300bf52bb647cf7a8f0d709521968c38296de5c1668e6f496d21f185a` |
 | `shared-host-process-20261008` | `eof-qualification.json` | `a8909fcaa2199f7e758cb319e7315d629d7620cc368fb6fcc042a754166e491f` |
 | `shared-host-process-20261008` | `eof-postcommit.json` | `1be60100faa37fce168615b86bbd728079ffa7457d787182af24766fea8816dc` |
+| `kernel-gap-guest-20261008` | `qualification.json` | `d50e7b74456a68051b19989173d1ad453e606d2aa792420c9fd03804d98c716c` |
+| `kernel-gap-guest-20261008` | `post-commit.json` | `11a0d991bb1c948f0f1bb0660ea0a7bf8f29c0c59291d2817a69598d8ce8a1e7` |
+| `qemu-package-store-20261008` | `production-qualification-final.json` | `ab27fd1e167bd2e3693c63912d93a8ac648a81fc0056d98d913463e00a5ad55e` |
+| `qemu-package-store-20261008` | `production-postcommit.json` | `bf336339b78b9fc4e54d21cecb8ebac18adc694c1442469b0e9c2123e51f4d08` |
+| `vulkan-stage-20261008` | `fixture-qualification-final.json` | `ae91d7a55cf2c62cd448d893050237e1249f44cb0d0222e8925bd451272f73d0` |
+| `vulkan-stage-20261008` | `fixture-postcommit.json` | `faadafce7b1fd5c1658b1f312512a00beb9bddb452859f26fd9f8e2b31f25d5f` |
+| `android-supervisor-20261008` | `qualification.json` | `4bf06671b73925df5bb5062bd7f3e70e0e8f7024c204aeb8b6574f7d07d1106f` |
+| `android-supervisor-20261008` | `postcommit.json` | `ccf415ea1e76d1ea28a40ae7cf1b2ed72c93e9a91aeb0dcd776707c7e090c76a` |
+| `dota-guest-workflow-20261008` | `qualification.json` | `14ab28e5d9ca7f00760564bdf091d77dc5b40d628196a23e63fd7287458474dc` |
+| `dota-guest-workflow-20261008` | `post-commit.json` | `0059d32760f12181e166853da4dc0fc5c65c4b289e0374529631b484f6e5a08c` |
+| `qemu-package-store-20261008` | `fixture-qualification-final.json` | `b2f33885de4f056722d8f57f898af08684cc5ec150dcbc32aa40a187a90f01a9` |
+| `qemu-package-store-20261008` | `fixture-postcommit.json` | `6bc39b9efd868c853c181a7e83e610ab219ff2a1ac578a6bcbf7a7443e9df41a` |
+| `dota-ext2-export-20261008` | `qualification.json` | `c8f47d2b75bf40bc3d38d9cb165919224fe38244e8990f4e04d30e3a76a97d24` |
+| `dota-ext2-export-20261008` | `postcommit.json` | `949b91e50c004ed5e5324f40cdb4a9d74581323cf02f9dbf7ec331173f3aa39f` |
+| `dota-ext2-fixture-20261009` | `qualification.json` | `f84d1b7f77f2dd11aa4ce29133ec285d5114789b61c52229900fa8017d128fe0` |
+| `dota-ext2-fixture-20261009` | `postcommit.json` | `9194fe02e18089a735814f6bdd31441730184b7fe7602cf8eb4e9b5cd8e6b641` |
+| `dota-vulkan-guest-20261009` | `qualification.json` | `37ca72d804c4a294ad1b4546349a1cdd80f2778e38550e777c7e09c7ce1eb1af` |
+| `dota-vulkan-guest-20261009` | `post-commit.json` | `53563c7a3f522a4d81074bb94ae4367e3c1ea7e9b1cdd0b5a37ca7cc5ee62b13` |
+| `android-runtime-builder-20261009` | `qualification.json` | `f4c7eebe02dcc7fd51f23a0ac30d83ce2cb763087e27b9f4dd4c14d8f0c214a4` |
+| `android-runtime-builder-20261009` | `post-commit.json` | `6da726a60a1234b53486dc318032097d3db1b81921ef6b4f2a40a597aa36bc16` |
+| `dota-ext2-protocol-20261009` | `qualification.json` | `12f32d8dbac63485c220da9c768af50d5a2cd6233292ec9776866af69e7d5375` |
+| `dota-ext2-protocol-20261009` | `postcommit.json` | `f135e2ffacd697f1d9a077eafb95e7ac400cee337f011b283b13d7cc4627bdc9` |
+| `opengothic-build-20261009` | `qualification-final.json` | `d268fb87df1e0b9e1e4bec206b03794ced9b72c4657532c695bfa15d85e7af45` |
+| `opengothic-build-20261009` | `postcommit.json` | `a9b1c869464bb788be6705a23ea13029ea812ecdb12fd8bcdf4af718e57a363b` |
+| `android-helper-concurrency-20261008` | `qualification.json` | `c64f1fa1f7b0985e6bd8ea20c2b35545fcd754871bd4b3eb0835752e15638656` |
+| `android-helper-concurrency-20261008` | `postcommit.json` | `3d8fb191902f072d83c615a9eddd162ea1dca6406888334d0272710fefe4f9ed` |
+| `android-manager-traceback-20261009` | `qualification.json` | `4ec6d6dcdacd8a6e771cae598fe21814f96241b85b41a7a9feda8c2f9081cc2c` |
+| `android-manager-traceback-20261009` | `postcommit.json` | `1e4f7fd01597f75b39224c5eeb7ed2d397eb042b763c38bd96cd7d180c2cfec6` |
+| `android-manager-mutation-20261009` | `qualification.json` | `abc91b395906b7c7e84de38bc53ee9baaaaf11287a8e445ee9d899351b1891e0` |
+| `android-manager-mutation-20261009` | `postcommit.json` | `d8486361cfd94f9340a03278f47f4ff8e07e534685ab7d5198d890db0b6ca261` |
+| `vulkan-stage-20261008` | `traceback-qualification-final.json` | `0affc3f50de32c4ec1a9d294556f3aee76e58f0816e5b09b586f38010d1c469c` |
+| `vulkan-stage-20261008` | `traceback-postcommit.json` | `7be13b99afd7b3bbc91835af62d10087d34acdbc7ce0249cc02f03a7bb8dbdd3` |
+| `traceback-property-20261009` | `qualification.json` | `e857590956c08c8cf8426a926f2e010106fe8135266d4de652bac939bba6507c` |
+| `traceback-property-20261009` | `postcommit.json` | `392dd4eb273c35d7605e5227629bb028e492f36d2783055117e5bece6a527ec1` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
