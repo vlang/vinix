@@ -20,6 +20,11 @@
 #undef posix_spawn_file_actions_addclose
 
 #include <signal.h>
+#ifdef __APPLE__
+#include <stdint.h>
+#include <mach/machine.h>
+_Static_assert(sizeof(cpu_type_t) == sizeof(int32_t), "SDK cpu preference width");
+#endif
 #ifdef SIGXFZ
 #define VINIX_QEMU_SIGXFZ SIGXFZ
 #else

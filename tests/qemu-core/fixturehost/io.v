@@ -167,7 +167,7 @@ pub fn write(path string, text string) ! {
 
 // Capture one merged pipe with inherited stdin and no deadline. POSIX spawn
 // reports exec errors directly, before any compile log is materialized.
-fn spawn_command(argv []string, env map[string]string, actions voidptr, excluded []i32) !i32 {
+fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr, excluded []i32, host_arch string) !i32 {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('embedded null byte') }
 	mut c_arguments := []&char{cap: argv.len + 1}
 	for item in argv { c_arguments << &char(item.str) }
@@ -224,6 +224,7 @@ fn spawn_command(argv []string, env map[string]string, actions voidptr, excluded
 	}
 	configured := C.posix_spawnattr_setflags(&attributes, i16(C.POSIX_SPAWN_SETSIGDEF))
 	if configured != 0 { return file_error('', configured) }
+	apply_arch_preference(&attributes, host_arch)!
 	mut pid := i32(0)
 	result := if argv[0].contains('/') {
 		C.posix_spawn(&pid, argv[0].str, action_pointer, &attributes, c_arguments.data, environment.data)
@@ -253,7 +254,13 @@ pub fn inherited_command(argv []string) ! {
 
 // Explicit copies preserve a caller's original subprocess environment policy.
 pub fn inherited_command_environment(argv []string, env map[string]string) ! {
-	pid := spawn_command(argv, env, unsafe { nil }, []i32{})!
+	inherited_command_environment_preferred(argv, env, '')!
+}
+
+// Preserve the original caller's universal-binary preference without changing
+// command arguments, environment, signal restoration or descriptor ownership.
+pub fn inherited_command_environment_preferred(argv []string, env map[string]string, host_arch string) ! {
+	pid := spawn_command_preferred(argv, env, unsafe { nil }, []i32{}, host_arch)!
 	status := wait(pid)!
 	if status != 0 {
 		return CommandError{ argv: argv.clone(), status: status, output: '', inherited: true }
@@ -273,6 +280,14 @@ pub fn capture(argv []string, log string, env map[string]string, merge bool) !st
 
 // Oracle Git calls retain their original cwd, inherited stderr and raw bytes.
 pub fn capture_in(argv []string, log string, env map[string]string, merge bool, directory string, binary_output bool) !string {
+	return capture_in_preferred(argv, log, env, merge, directory, binary_output, '')
+}
+
+pub fn capture_preferred(argv []string, log string, env map[string]string, merge bool, host_arch string) !string {
+	return capture_in_preferred(argv, log, env, merge, '', false, host_arch)
+}
+
+fn capture_in_preferred(argv []string, log string, env map[string]string, merge bool, directory string, binary_output bool, host_arch string) !string {
 	mut pipes := [2]i32{}
 	if C.pipe(&pipes[0]) != 0 {
 		number := C.errno
@@ -310,7 +325,7 @@ pub fn capture_in(argv []string, log string, env map[string]string, merge bool, 
 		C.posix_spawn_file_actions_addclose(&actions, pipes[1])] {
 		if close_status != 0 { return file_error('', close_status) }
 	}
-	pid := spawn_command(argv, env, &actions, [pipes[0], pipes[1]])!
+	pid := spawn_command_preferred(argv, env, &actions, [pipes[0], pipes[1]], host_arch)!
 	mut reaped := false
 	defer {
 		if !reaped {
