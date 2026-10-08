@@ -1,0 +1,2015 @@
+{
+  "test_recovers_g17_data_master_ring_matrix": [
+    {
+      "request": {
+        "operation": "recover_g17_data_master_ring_bindings",
+        "fixture_test": "test_recovers_g17_data_master_ring_matrix",
+        "allocations": [
+          {
+            "host_cpu_member": 952,
+            "host_gpu_member": 960,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 968,
+            "host_gpu_member": 976,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 992,
+            "host_gpu_member": 1000,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1008,
+            "host_gpu_member": 1016,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1032,
+            "host_gpu_member": 1040,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1048,
+            "host_gpu_member": 1056,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1072,
+            "host_gpu_member": 1080,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1088,
+            "host_gpu_member": 1096,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1112,
+            "host_gpu_member": 1120,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1128,
+            "host_gpu_member": 1136,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1152,
+            "host_gpu_member": 1160,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1168,
+            "host_gpu_member": 1176,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1192,
+            "host_gpu_member": 1200,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1208,
+            "host_gpu_member": 1216,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1232,
+            "host_gpu_member": 1240,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1248,
+            "host_gpu_member": 1256,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1272,
+            "host_gpu_member": 1280,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1288,
+            "host_gpu_member": 1296,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1312,
+            "host_gpu_member": 1320,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1328,
+            "host_gpu_member": 1336,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1352,
+            "host_gpu_member": 1360,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1368,
+            "host_gpu_member": 1376,
+            "bytes": 6144
+          },
+          {
+            "host_cpu_member": 1392,
+            "host_gpu_member": 1400,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 1408,
+            "host_gpu_member": 1416,
+            "bytes": 6144
+          }
+        ],
+        "init_code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f7a20091ff8202f100000000160080d200000000000000000000000000000000000000000000000000000000000000000000000000000000170b805200000000000000007802168b15c30e9100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811af800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011bf80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811bf800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011cf80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811cf800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011df80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811df800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011ef80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811ef800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011ff80000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000811ff8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100f9f7820191d6a20091ff6207f1"
+      },
+      "result": {
+        "priorities": 4,
+        "command_types": 3,
+        "host_object_stride": 40,
+        "address_record_bytes": 32,
+        "priority_record_bytes": 96,
+        "primary_large_region_offset": 0,
+        "primary_large_region_bytes": 384,
+        "bindings": [
+          {
+            "priority": 0,
+            "command": "TA",
+            "command_type": 0,
+            "host_object_member": 944,
+            "host_state_cpu_member": 952,
+            "host_state_gpu_member": 960,
+            "host_entries_cpu_member": 968,
+            "host_entries_gpu_member": 976,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 0
+          },
+          {
+            "priority": 0,
+            "command": "3D",
+            "command_type": 1,
+            "host_object_member": 1104,
+            "host_state_cpu_member": 1112,
+            "host_state_gpu_member": 1120,
+            "host_entries_cpu_member": 1128,
+            "host_entries_gpu_member": 1136,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 32
+          },
+          {
+            "priority": 0,
+            "command": "CL",
+            "command_type": 2,
+            "host_object_member": 1264,
+            "host_state_cpu_member": 1272,
+            "host_state_gpu_member": 1280,
+            "host_entries_cpu_member": 1288,
+            "host_entries_gpu_member": 1296,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 64
+          },
+          {
+            "priority": 1,
+            "command": "TA",
+            "command_type": 0,
+            "host_object_member": 984,
+            "host_state_cpu_member": 992,
+            "host_state_gpu_member": 1000,
+            "host_entries_cpu_member": 1008,
+            "host_entries_gpu_member": 1016,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 96
+          },
+          {
+            "priority": 1,
+            "command": "3D",
+            "command_type": 1,
+            "host_object_member": 1144,
+            "host_state_cpu_member": 1152,
+            "host_state_gpu_member": 1160,
+            "host_entries_cpu_member": 1168,
+            "host_entries_gpu_member": 1176,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 128
+          },
+          {
+            "priority": 1,
+            "command": "CL",
+            "command_type": 2,
+            "host_object_member": 1304,
+            "host_state_cpu_member": 1312,
+            "host_state_gpu_member": 1320,
+            "host_entries_cpu_member": 1328,
+            "host_entries_gpu_member": 1336,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 160
+          },
+          {
+            "priority": 2,
+            "command": "TA",
+            "command_type": 0,
+            "host_object_member": 1024,
+            "host_state_cpu_member": 1032,
+            "host_state_gpu_member": 1040,
+            "host_entries_cpu_member": 1048,
+            "host_entries_gpu_member": 1056,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 192
+          },
+          {
+            "priority": 2,
+            "command": "3D",
+            "command_type": 1,
+            "host_object_member": 1184,
+            "host_state_cpu_member": 1192,
+            "host_state_gpu_member": 1200,
+            "host_entries_cpu_member": 1208,
+            "host_entries_gpu_member": 1216,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 224
+          },
+          {
+            "priority": 2,
+            "command": "CL",
+            "command_type": 2,
+            "host_object_member": 1344,
+            "host_state_cpu_member": 1352,
+            "host_state_gpu_member": 1360,
+            "host_entries_cpu_member": 1368,
+            "host_entries_gpu_member": 1376,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 256
+          },
+          {
+            "priority": 3,
+            "command": "TA",
+            "command_type": 0,
+            "host_object_member": 1064,
+            "host_state_cpu_member": 1072,
+            "host_state_gpu_member": 1080,
+            "host_entries_cpu_member": 1088,
+            "host_entries_gpu_member": 1096,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 288
+          },
+          {
+            "priority": 3,
+            "command": "3D",
+            "command_type": 1,
+            "host_object_member": 1224,
+            "host_state_cpu_member": 1232,
+            "host_state_gpu_member": 1240,
+            "host_entries_cpu_member": 1248,
+            "host_entries_gpu_member": 1256,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 320
+          },
+          {
+            "priority": 3,
+            "command": "CL",
+            "command_type": 2,
+            "host_object_member": 1384,
+            "host_state_cpu_member": 1392,
+            "host_state_gpu_member": 1400,
+            "host_entries_cpu_member": 1408,
+            "host_entries_gpu_member": 1416,
+            "state_bytes": 48,
+            "entries_bytes": 6144,
+            "primary_large_region_offset": 352
+          }
+        ]
+      }
+    }
+  ],
+  "test_rejects_wrong_g17_data_master_ring_backing": [
+    {
+      "request": {
+        "operation": "recover_g17_data_master_ring_bindings",
+        "fixture_test": "test_rejects_wrong_g17_data_master_ring_backing",
+        "allocations": [],
+        "init_code": ""
+      },
+      "error": "G17 TA priority 0 state allocation is not 0x30 bytes",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_g17_data_master_doorbells": [
+    {
+      "request": {
+        "operation": "recover_g17_data_master_doorbells",
+        "fixture_test": "test_recovers_g17_data_master_doorbells",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN14AGXArmFirmware15submitTAChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": 1048576,
+            "__ZN11AGXFirmware15submitTAChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": 2097152,
+            "__ZN14AGXArmFirmware15submit3DChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjbb": 1052672,
+            "__ZN11AGXFirmware15submit3DChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjbb": 2101248,
+            "__ZN14AGXArmFirmware15submitCLChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": 1056768,
+            "__ZN11AGXFirmware15submitCLChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": 2105344
+          },
+          "codes": {
+            "__ZN14AGXArmFirmware15submitTAChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": {
+              "address": 1048576,
+              "code": "00000494680a1e5380ee4cf96910e0d2100040f9f10300aa31b4f9f2301ac1da111581d21002118b0a0240f9e30310aa010109aaf0030aaa02008052"
+            },
+            "__ZN14AGXArmFirmware15submit3DChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjbb": {
+              "address": 1052672,
+              "code": "00000494680a1e5380ee4cf9290080d26910e0f2100040f9f10300aa31b4f9f2301ac1da111581d21002118b0a0240f9e30310aa010109aaf0030aaa02008052"
+            },
+            "__ZN14AGXArmFirmware15submitCLChannelEP10AGXChannelRK22_AGXChannelSubmitInfo_jjb": {
+              "address": 1056768,
+              "code": "00000494680a1e5380ee4cf9490080d26910e0f2100040f9f10300aa31b4f9f2301ac1da111581d21002118b0a0240f9e30310aa010109aaf0030aaa02008052"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "message_type": 131,
+        "transport_host_member": 6616,
+        "transport_role": 0,
+        "transport_send_vtable_slot": 2216,
+        "priority_shift": 2,
+        "priority_bits": 3,
+        "formula": "(0x83 << 48) | (priority << 2) | command_type",
+        "commands": {
+          "TA": {
+            "command_type": 0,
+            "low_bits": 0
+          },
+          "3D": {
+            "command_type": 1,
+            "low_bits": 1
+          },
+          "CL": {
+            "command_type": 2,
+            "low_bits": 2
+          }
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_channel_priority_profiles": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_priority",
+        "fixture_test": "test_recovers_g17_channel_priority_profiles",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN10AGXChannel11getPriorityEv": 0,
+            "__ZN14AGXArmFirmware18setChannelPriorityEP17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": 0,
+            "__ZN15AGXCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs": 0
+          },
+          "codes": {
+            "__ZN10AGXChannel11getPriorityEv": {
+              "address": 0,
+              "code": "5f2403d5082c40f9002940b9c0035fd6"
+            },
+            "__ZN14AGXArmFirmware18setChannelPriorityEP17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": {
+              "address": 0,
+              "code": "000000005f040071000000005f080071000000005f100071000000005f14007100000000000000003f2800b900000000293800b9e9ff9f9200000000c203003400000000000000009f04007100000000840600349f0400710000000000000000282800b900000000e9ffffd2291800f900000000294000b90000000028008052282800b900000000e97f60b2291800f90000000068008052282800b9000000003f1800f93f4000b9282c00b9233c00b900000000080080523f2800b90000000000000000eaff9f922a1800f9294000b9000000009f0800710000000000000000000000006800805200000000000000003f1800f900000000294000b900000000480080520000000000000000e9ffffd2000000006900805200000000000000000000000000000000480080520000000000000000e9ffffd200000000284000b900000000"
+            },
+            "__ZN15AGXCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs": {
+              "address": 0,
+              "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000048008052681a08b9"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "state_offset": 40,
+        "bytes": 28,
+        "reset_priority": 4,
+        "field_offsets": [
+          40,
+          44,
+          48,
+          56,
+          60,
+          64
+        ],
+        "field_bytes": [
+          4,
+          4,
+          8,
+          4,
+          4,
+          4
+        ],
+        "default_subpriority": 2,
+        "profiles": [
+          {
+            "priority": 0,
+            "context_priority": 0,
+            "qos": 2,
+            "fields": [
+              0,
+              0,
+              18446744073709486080,
+              1,
+              2,
+              1
+            ]
+          },
+          {
+            "priority": 1,
+            "context_priority": 4,
+            "qos": 2,
+            "fields": [
+              1,
+              1,
+              18446744069414584320,
+              0,
+              2,
+              0
+            ]
+          },
+          {
+            "priority": 2,
+            "context_priority": 1,
+            "qos": 2,
+            "fields": [
+              2,
+              2,
+              18446462598732840960,
+              0,
+              2,
+              2
+            ]
+          },
+          {
+            "priority": 3,
+            "context_priority": 2,
+            "qos": 2,
+            "fields": [
+              3,
+              3,
+              0,
+              0,
+              2,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "test_rejects_modified_g17_channel_priority_profile": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_priority",
+        "fixture_test": "test_rejects_modified_g17_channel_priority_profile",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN10AGXChannel11getPriorityEv": 0,
+            "__ZN14AGXArmFirmware18setChannelPriorityEP17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": 0,
+            "__ZN15AGXCommandQueue4initEP5IOGPUP11IOGPUDeviceP30IOGPUDeviceNewCommandQueueArgs": 0
+          },
+          "codes": {
+            "__ZN10AGXChannel11getPriorityEv": {
+              "address": 0,
+              "code": "5f2403d5082c40f9002940b9c0035fd6"
+            },
+            "__ZN14AGXArmFirmware18setChannelPriorityEP17_AGFIChannelState23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": {
+              "address": 0,
+              "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "error": "unexpected G17 channel-priority profiles instruction at 0x4: 0x00000000, expected 0x7100045f",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_g17_channel_submit_info": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_submit_info",
+        "fixture_test": "test_recovers_g17_channel_submit_info",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": 0
+          },
+          "codes": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": {
+              "address": 0,
+              "code": "000000000000000000000000000000000000000000000000000000000000000000000000135042a9081840f9000000000000000000000000093540f9ff7f01a900000000000000000000000000000000000000008ade40b98b5240b900000000000000008c6a40f9000000000000000000000000000000000000000000000000a90100f94905001189de00b98a3240f9564140b9000000000000000000000000000000000000000000000000000000000000000000000000f627012988f240b9e81300b9680140f9082540f9e80f00f90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000088ca40b900000000000000000000000000000000606640f9e223009143030012e10314aa0000000011093fd700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "bytes": 24,
+        "fields": {
+          "submission_index": {
+            "offset": 0,
+            "bytes": 4,
+            "source": "uncached_control.write_index_after_pointer_publication",
+            "outer_entry_bytes": 2
+          },
+          "host_sequence": {
+            "offset": 4,
+            "bytes": 4,
+            "source": "channel.host_sequence_after_increment"
+          },
+          "channel_counter": {
+            "offset": 8,
+            "bytes": 4,
+            "source_channel_member": 240
+          },
+          "reserved_00c": {
+            "offset": 12,
+            "bytes": 4,
+            "value": 0
+          },
+          "metadata": {
+            "offset": 16,
+            "bytes": 8,
+            "selected_object_member": 72
+          }
+        },
+        "dispatch": {
+          "data_master_type_channel_member": 200,
+          "accelerator_work_queue_member": 200
+        }
+      }
+    }
+  ],
+  "test_rejects_modified_g17_channel_submit_info": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_submit_info",
+        "fixture_test": "test_rejects_modified_g17_channel_submit_info",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": 0
+          },
+          "codes": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": {
+              "address": 0,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "error": "unexpected G17 channel submit-info construction instruction at 0x24: 0x00000000, expected 0xa9425013",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_g17_channel_submission_flag": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_submission_flag",
+        "fixture_test": "test_recovers_g17_channel_submission_flag",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": 0,
+            "__ZN10AGXChannel11setPriorityE23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": 0,
+            "__ZN10AGXChannel32markCommandsSubmittedToAccelRingEv.1": 0,
+            "__ZN10AGXChannel34unmarkCommandsSubmittedToAccelRingEv.1": 0
+          },
+          "codes": {
+            "__ZN10AGXChannel32markCommandsSubmittedToAccelRingEv.1": {
+              "address": 0,
+              "code": "5f2403d52800805208f00039c0035fd6"
+            },
+            "__ZN10AGXChannel34unmarkCommandsSubmittedToAccelRingEv.1": {
+              "address": 0,
+              "code": "5f2403d51ff00039c0035fd6"
+            },
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": {
+              "address": 0,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060010034900240f9000000000000000000000000114080d21002118b080240f9e00314aa0000000010093fd7"
+            },
+            "__ZN10AGXChannel11setPriorityE23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": {
+              "address": 0,
+              "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000682e40f9092940b99f02096ba001005409008012094500b900000000000000000000000000000000114180d21002118b080240f9e00313aa0000000010093fd7bf3b03d5"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "channel_member": 60,
+        "bytes": 1,
+        "initial": 0,
+        "outer_flags_formula": "1 & ~channel_flag",
+        "first_submission_flags": 1,
+        "following_submission_flags": 0,
+        "mark_vtable_slot": 512,
+        "mark_after_successful_outer_submission": true,
+        "unmark_vtable_slot": 520,
+        "unmark_on_priority_change": true,
+        "implementations": 1
+      }
+    }
+  ],
+  "test_rejects_modified_g17_channel_submission_flag": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_submission_flag",
+        "fixture_test": "test_rejects_modified_g17_channel_submission_flag",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": 0,
+            "__ZN10AGXChannel11setPriorityE23eAGXContextPriorityTypej26eIOGPUCommandQueueQosLevel": 0,
+            "__ZN10AGXChannel32markCommandsSubmittedToAccelRingEv.1": 0,
+            "__ZN10AGXChannel34unmarkCommandsSubmittedToAccelRingEv.1": 0
+          },
+          "codes": {
+            "__ZN10AGXChannel32markCommandsSubmittedToAccelRingEv.1": {
+              "address": 0,
+              "code": "5f2403d52800805208f00039c0035fd6"
+            },
+            "__ZN10AGXChannel34unmarkCommandsSubmittedToAccelRingEv.1": {
+              "address": 0,
+              "code": "5f2403d51ff00039c0035fd6"
+            },
+            "____ZN12AGXWorkQueue23submitCommandToFirmwareEP10AGXChannelP20AGXCommandDescriptorb_block_invoke": {
+              "address": 0,
+              "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "error": "unexpected G17 channel submitted transition instruction at 0x2d4: 0x00000000, expected 0x34000160",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_g17_channel_pool_geometry": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_pool_geometry",
+        "fixture_test": "test_recovers_g17_channel_pool_geometry",
+        "code": "08398252021880522401805225008052140e8052146d79b3086982522401805205008052088182522401805225008052"
+      },
+      "result": {
+        "channel_state": {
+          "host_pool_member": 4552,
+          "element_bytes": 192,
+          "caching": 1
+        },
+        "uncached_memory": {
+          "host_pool_member": 4936,
+          "element_base_bytes": 112,
+          "bytes_per_configured_queue": 128,
+          "caching": 0
+        },
+        "cached_memory": {
+          "host_pool_member": 5128,
+          "element_base_bytes": 112,
+          "bytes_per_configured_queue": 128,
+          "caching": 1
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_channel_layout": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_layout",
+        "fixture_test": "test_recovers_g17_channel_layout",
+        "reset_code": "09a845a9083440f9000100ad000101ad000102ad000103ad000104ad000105ad280100f9280500f9280900f9281900b9281d00b9282100b9282500b9282900b9284500b9284900b9288500b928c109f8480100b9481100b9482100b9483100b9484100b9485100b9486100b9",
+        "write_code": "083040f9096140b90a4140b90b0140b9095440b9093440f90af17dd3610100f9bf3b03d5284100b9"
+      },
+      "result": {
+        "host_channel_members": {
+          "state_cpu": 88,
+          "uncached_cpu": 96,
+          "cached_cpu": 104,
+          "ring_entries": 84,
+          "state_gpu": 128,
+          "uncached_gpu": 136,
+          "cached_gpu": 144
+        },
+        "state": {
+          "bytes": 192,
+          "uncached_gpu_address": 0,
+          "cached_gpu_address": 8,
+          "context_cookie": 16,
+          "mode": 40,
+          "value_048": 72,
+          "flag_084": 132,
+          "address_09c": 156
+        },
+        "uncached_control": {
+          "header_bytes": 112,
+          "read_index": 0,
+          "write_index": 64,
+          "sentinel": 80,
+          "ring_entries": 96
+        },
+        "cached_command_pointer_bytes": 8,
+        "enqueue": {
+          "reserved_entries": 1,
+          "pointer_barrier": "dmb ish",
+          "write_index_published_last": true
+        }
+      }
+    }
+  ],
+  "test_rejects_incomplete_g17_channel_layout": [
+    {
+      "request": {
+        "operation": "recover_g17_channel_layout",
+        "fixture_test": "test_rejects_incomplete_g17_channel_layout",
+        "reset_code": "",
+        "write_code": ""
+      },
+      "error": "missing G17 channel CPU bindings: []",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_g17_relative_boost_frequency_table": [
+    {
+      "request": {
+        "operation": "recover_g17_relative_boost_frequency_table",
+        "fixture_test": "test_recovers_g17_relative_boost_frequency_table",
+        "image": "6770752d706572662d626173652d70737461746500",
+        "arm_power_code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b21835234010b8ba9864bb9eba390526b3daa72297dab9b3afd65d3086d409116610c91c80a1a8b170140b9590500d138f77ed300000000000000000000000000000000000000001b0140b941f57ed3e00314aa000000003f031aeb00000000680317cb490700118a0c80520000000000000000000000000000000000000000000000008c0140b98c0117cb00000000000000000000000000000000000000008b7d0a9b6b09c89aab0100b900000000290500113f031aeba8fdff540000000000000000000000000000000000000000890c8052090100b9",
+        "image_fixture": {
+          "data": "6770752d706572662d626173652d70737461746500",
+          "symbols": {
+            "__ZN11AGXFirmware11setupConfigEv": 1048576
+          },
+          "codes": {
+            "__ZN11AGXFirmware11setupConfigEv": {
+              "address": 1048576,
+              "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000684e41f915414091a9ce4eb9eaa390526a3daa72297daa9b36fd65d30000000000000000000000000000000000000000000000000000000000000000c13ffff0210c3d91000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000160040b99648003468364fb90901166b000000008a0c8052000000000000000000000000000000000000000000000000c97e0a1ba9c60eb9087d0a1ba8ca0eb9a9ce0eb9"
+            }
+          },
+          "virtual": {
+            "18446744073685417795": 0
+          },
+          "vtable": {}
+        }
+      },
+      "result": {
+        "offset": 6408,
+        "entries": 16,
+        "base_state_property": "gpu-perf-base-pstate",
+        "base_state_scaled_source_offset": 69324,
+        "frequency_source_offset": 111384,
+        "formula": "100 * (frequency - base_frequency) / (max_frequency - base_frequency)",
+        "states_at_or_below_base": 0,
+        "maximum_state_value": 100
+      }
+    }
+  ],
+  "test_recovers_g17_sram_power_scale_table": [
+    {
+      "request": {
+        "operation": "recover_g17_sram_power_scale_table",
+        "fixture_test": "test_recovers_g17_sram_power_scale_table",
+        "image": "",
+        "base_power_code": "0000000000000000000000000000000000000000000000000000000000000000006c41f901ba83522100a0723964aa94686e41f90091029161c23391022c8052c863aa94",
+        "arm_power_code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000686e41f90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006b5e41f90a0182526a010a8b081104910c1183526b010c8b0c0280520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000015cbc60011cbc29010191004540bc604500bc4a0101918c0500f121f7ff54",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN11AGXFirmware11setupConfigEv": 1048576,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": 1052672,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX33populatePowerEstimationConfigDataEj": 1056768,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX26populateSRAMPowerScaleDataEv": 1060864,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX23populateChipLeakageDataEj": 1064960
+          },
+          "codes": {
+            "__ZN11AGXFirmware11setupConfigEv": {
+              "address": 1048576,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000604e41f961364fb9100040f9000000000000000000000000119881d21002118b080240f90000000010093fd7"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": {
+              "address": 1052672,
+              "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000686a43f94900a3d22900e0f2080109aa686a03f9"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX33populatePowerEstimationConfigDataEj": {
+              "address": 1056768,
+              "code": "000000000000000000000000000000000000000008485b39080508360000000008d842f908c133910944409129210791280100f900000000000000000000000000000000119e81d21002118b080240f9000000000000000010093fd700000000000000000000000000000000000000000000000000000000000000000000000002c23291105a46f9"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX26populateSRAMPowerScaleDataEv": {
+              "address": 1060864,
+              "code": "00000000086c409108410c91080140b9000000000944409129210791290140f90000000000000000000000000000000000000000000000000000000000000000000000002b4101918ceb91524cf0a772000000000000000060813ead60813fad0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008deb91524df0a772000000008005813c000000000000000000000000000000000000000000000000000000008aeb91524af0a7722a4500b8080500f1c1ffff5400000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {
+            "__ZTV18AGXAcceleratorG17X:3264": 1056768,
+            "__ZTV18AGXAcceleratorG17X:3312": 1060864,
+            "__ZTV18AGXAcceleratorG17X:3248": 1064960
+          }
+        }
+      },
+      "result": {
+        "offset": 6216,
+        "entries": 16,
+        "active_entries": "gpu-perf-state-count",
+        "state_count_source_offset": 111376,
+        "accelerator_config_offset": 3344,
+        "runtime_source_offset": 196,
+        "raw_float": 1065520988,
+        "value": 1.0199999809265137,
+        "feature_bit": 17,
+        "producer_vtable_slot": 3264,
+        "producer": "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX33populatePowerEstimationConfigDataEj"
+      }
+    }
+  ],
+  "test_recovers_zero_g17_static_power_scale_table": [
+    {
+      "request": {
+        "operation": "recover_g17_static_power_scale_table",
+        "fixture_test": "test_recovers_zero_g17_static_power_scale_table",
+        "image": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000002029000000000000000000000000000000000000",
+        "kernel_image": "6b65726e656c",
+        "arm_power_code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000081104910c1183526b010c8b0c02805200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004540bc604500bc000000008c0500f121f7ff54",
+        "image_fixture": {
+          "data": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000002029000000000000000000000000000000000000",
+          "symbols": {
+            "__ZNK17AGXArmFirmwareASC9MetaClass5allocEv": 1048576,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX26populateSRAMPowerScaleDataEv": 3145728,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX23populateChipLeakageDataEj": 3149824,
+            "__ZN14AGXAccelerator23populateStaticPowerDataEv.8120": 6291456
+          },
+          "codes": {
+            "__ZNK17AGXArmFirmwareASC9MetaClass5allocEv": {
+              "address": 1048576,
+              "code": "0000000000000000000000000000000000000000000000000008009000c00c9101248552f7ff0f94f30300aa000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX26populateSRAMPowerScaleDataEv": {
+              "address": 3145728,
+              "code": "000000000000000000000000080140b9000000000000000000000000290140f90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000029090a8b2981009100000000000000002a4500b8"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX23populateChipLeakageDataEj": {
+              "address": 3149824,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bada42f94843399149433a910000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000048433b9149433c910000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000048833c9149a33c9100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "__ZN14AGXAccelerator23populateStaticPowerDataEv.8120": {
+              "address": 6291456,
+              "code": "5f2403d5c0035fd6"
+            }
+          },
+          "virtual": {
+            "2097968": 0
+          },
+          "vtable": {
+            "__ZTV18AGXAcceleratorG17X:3296": 6291456
+          }
+        },
+        "kernel_image_fixture": {
+          "data": "6b65726e656c",
+          "symbols": {
+            "_OSObject_typed_operator_new": 5242880,
+            "_kalloc_type_impl": 5246976
+          },
+          "codes": {
+            "_OSObject_typed_operator_new": {
+              "address": 5242880,
+              "code": "0000000000000000000000000000000000000000082c40b9085d40923f0008eb29010054000000000000000000000000000000000000000000000000000000000000000081008052ee030094000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "offset": 6280,
+        "entries": 16,
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "accelerator_config_offset": 3408,
+        "runtime_source_offset": 260,
+        "allocator": "_OSObject_typed_operator_new",
+        "allocator_flag": 4,
+        "allocator_flag_name": "Z_ZERO",
+        "type_view_address": 2097968,
+        "type_bytes": 10528,
+        "static_provider_vtable_slot": 3296,
+        "static_provider": "__ZN14AGXAccelerator23populateStaticPowerDataEv.8120"
+      }
+    }
+  ],
+  "test_recovers_g17_secondary_performance_block": [
+    {
+      "request": {
+        "operation": "recover_g17_secondary_performance_block",
+        "fixture_test": "test_recovers_g17_secondary_performance_block",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv": 11534336,
+            "__ZN20AGXFamilyAccelerator13getProbeScoreEv": 11599872
+          },
+          "codes": {
+            "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv": {
+              "address": 11534336,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c81654390806003600000000755e41f9089b8352000000000109815200000000885a4bb909050051a9da1cb9000000000000000000000000000000008a9b8352000000008b822e918ca38352000000006dd09b526d63a8720000000000000000000000006b0101918c01019100000000000000002e7968b8ce7dad9bcefd72d34e7928b88e5e4bb9000000000000000000000000000000000000000000000000110244b9f10104b9000000000000000000000000000000000000000000000000"
+            },
+            "__ZN20AGXFamilyAccelerator13getProbeScoreEv": {
+              "address": 11599872,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a002c83c6042813d0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "populated_on_g17": false,
+        "gate_chip_info_byte": 133,
+        "gate_reason": "getProbeScore clears the chip-info record and no selected G17C reader writes +0x85, so the producer's TBZ always skips",
+        "offset": 7384,
+        "zeroed_bytes": 2120,
+        "gate_byte": 1285,
+        "max_state_offset": 7384,
+        "frequency_offset": 7388,
+        "voltage_offset": 7452,
+        "sram_voltage_offset": 8476,
+        "row_bytes": 64,
+        "state_count_source": 113496,
+        "column_count_source": 113500,
+        "frequency_source": 113504,
+        "voltage_source": 113568,
+        "frequency_conversion": {
+          "input": "Hz",
+          "output": "MHz",
+          "multiplier": 1125899907,
+          "right_shift": 50
+        },
+        "trailing_bytes": 4
+      }
+    }
+  ],
+  "test_recovers_g17_final_late_controls": [
+    {
+      "request": {
+        "operation": "recover_g17_final_late_controls",
+        "fixture_test": "test_recovers_g17_final_late_controls",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "converted_field": {
+          "config": 9884,
+          "firmware_member": 6840,
+          "converter": "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb",
+          "identity": true,
+          "value": 0
+        },
+        "literal_field": {
+          "config": 9920,
+          "value": 1
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_remaining_late_controls": [
+    {
+      "request": {
+        "operation": "recover_g17_remaining_late_controls",
+        "fixture_test": "test_recovers_g17_remaining_late_controls",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "ones_run": {
+          "offset": 9660,
+          "bytes": 48,
+          "value": 255
+        },
+        "copied_bytes": {
+          "9976": 1776,
+          "9977": 1784
+        },
+        "guarded": {
+          "offset": 9644,
+          "feature_bit": 38,
+          "would_be": 4294967297,
+          "written": false
+        }
+      }
+    }
+  ],
+  "test_ones_run_stops_before_the_next_field": [
+    {
+      "request": {
+        "operation": "recover_g17_remaining_late_controls",
+        "fixture_test": "test_ones_run_stops_before_the_next_field",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "ones_run": {
+          "offset": 9660,
+          "bytes": 48,
+          "value": 255
+        },
+        "copied_bytes": {
+          "9976": 1776,
+          "9977": 1784
+        },
+        "guarded": {
+          "offset": 9644,
+          "feature_bit": 38,
+          "would_be": 4294967297,
+          "written": false
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_cleared_accelerator_inputs": [
+    {
+      "request": {
+        "operation": "recover_g17_cleared_accelerator_inputs",
+        "fixture_test": "test_recovers_g17_cleared_accelerator_inputs",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "accelerator_bytes": 117712,
+        "zeroed_allocation": true,
+        "cleared_members": [
+          1836,
+          1840,
+          63764,
+          63772,
+          63832
+        ],
+        "fields": {
+          "9540": 1836,
+          "9716": 1840,
+          "9720": 63772,
+          "9892": 63764,
+          "9916": 63832
+        },
+        "guarded_field": {
+          "config": 9540,
+          "note": "only written when its source is nonzero, so it stays clear"
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_unit_mask_field": [
+    {
+      "request": {
+        "operation": "recover_g17_unit_mask_field",
+        "fixture_test": "test_recovers_g17_unit_mask_field",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "config_offset": 9556,
+        "identity_register": 13647896,
+        "nibble_products": [
+          {
+            "chip_info": 72,
+            "shifts": [
+              0,
+              16
+            ]
+          },
+          {
+            "chip_info": 76,
+            "shifts": [
+              4,
+              20
+            ]
+          },
+          {
+            "chip_info": 80,
+            "shifts": [
+              8,
+              24
+            ]
+          }
+        ],
+        "count_chip_info": 80,
+        "count_accelerator_member": 1232,
+        "saturate_above": 63,
+        "formula": "count >= 64 ? 0xffffffff : low32(~(~0 << count))"
+      }
+    }
+  ],
+  "test_recovers_g17_core_count_gate": [
+    {
+      "request": {
+        "operation": "recover_g17_core_count_gate",
+        "fixture_test": "test_recovers_g17_core_count_gate",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "config_offset": 9584,
+        "gate": {
+          "accelerator_byte": 1286,
+          "chip_info_byte": 134,
+          "value": 1,
+          "always_set": true
+        },
+        "selected": "popcount",
+        "unused_fallback": {
+          "accelerator_member": 1200,
+          "chip_info": 48,
+          "reason": "gate bit is always set, so this producer never runs"
+        },
+        "popcount_source": {
+          "accelerator_member": 1168,
+          "chip_info": 16,
+          "words": 3,
+          "note": "first pair is the cleared record head, so the select steps on by 0x10"
+        },
+        "mask_registers": {
+          "base": "getGPUPhysicalAddress",
+          "base_source": "IOMemoryDescriptor::getPhysicalAddress of device memory 0",
+          "offset": 14685440,
+          "words": [
+            14685440,
+            14685444,
+            14685448
+          ],
+          "layout": "words 0 and 1 form a 64-bit mask, word 2 a 32-bit mask"
+        },
+        "formula": "popcount(mask0) + popcount(mask1)",
+        "resolved": true
+      }
+    }
+  ],
+  "test_scaled_core_count_is_not_the_core_count_field_source": [
+    {
+      "request": {
+        "operation": "recover_g17_chip_info_decode",
+        "fixture_test": "test_scaled_core_count_is_not_the_core_count_field_source",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "source_register": 13647888,
+        "fields": {
+          "power_group_count": {
+            "chip_info": 108,
+            "accelerator_member": 1260,
+            "shift": 16,
+            "mask": 15
+          },
+          "columns_per_group": {
+            "shift": 8,
+            "mask": 255
+          },
+          "power_column_count": {
+            "chip_info": 100,
+            "accelerator_member": 1252,
+            "formula": "columns_per_group * power_group_count"
+          },
+          "units_per_column": {
+            "chip_info": 120,
+            "shift": 0,
+            "mask": 255
+          },
+          "scaled_column_count": {
+            "chip_info": 48,
+            "formula": "power_column_count * units_per_column",
+            "accelerator_member": 1200
+          }
+        }
+      }
+    },
+    {
+      "request": {
+        "operation": "recover_g17_core_count_gate",
+        "fixture_test": "test_scaled_core_count_is_not_the_core_count_field_source",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "config_offset": 9584,
+        "gate": {
+          "accelerator_byte": 1286,
+          "chip_info_byte": 134,
+          "value": 1,
+          "always_set": true
+        },
+        "selected": "popcount",
+        "unused_fallback": {
+          "accelerator_member": 1200,
+          "chip_info": 48,
+          "reason": "gate bit is always set, so this producer never runs"
+        },
+        "popcount_source": {
+          "accelerator_member": 1168,
+          "chip_info": 16,
+          "words": 3,
+          "note": "first pair is the cleared record head, so the select steps on by 0x10"
+        },
+        "mask_registers": {
+          "base": "getGPUPhysicalAddress",
+          "base_source": "IOMemoryDescriptor::getPhysicalAddress of device memory 0",
+          "offset": 14685440,
+          "words": [
+            14685440,
+            14685444,
+            14685448
+          ],
+          "layout": "words 0 and 1 form a 64-bit mask, word 2 a 32-bit mask"
+        },
+        "formula": "popcount(mask0) + popcount(mask1)",
+        "resolved": true
+      }
+    }
+  ],
+  "test_recovers_g17_chip_info_decode": [
+    {
+      "request": {
+        "operation": "recover_g17_chip_info_decode",
+        "fixture_test": "test_recovers_g17_chip_info_decode",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": 13631488
+          },
+          "codes": {
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": {
+              "address": 13631488,
+              "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a84e1053686e00b9a93e0853287d081b686600b9a91e0012697a00b9097d091b00000000000000000000000000000000692a06290000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "source_register": 13647888,
+        "fields": {
+          "power_group_count": {
+            "chip_info": 108,
+            "accelerator_member": 1260,
+            "shift": 16,
+            "mask": 15
+          },
+          "columns_per_group": {
+            "shift": 8,
+            "mask": 255
+          },
+          "power_column_count": {
+            "chip_info": 100,
+            "accelerator_member": 1252,
+            "formula": "columns_per_group * power_group_count"
+          },
+          "units_per_column": {
+            "chip_info": 120,
+            "shift": 0,
+            "mask": 255
+          },
+          "scaled_column_count": {
+            "chip_info": 48,
+            "formula": "power_column_count * units_per_column",
+            "accelerator_member": 1200
+          }
+        }
+      }
+    }
+  ],
+  "test_chip_info_power_dimensions_match_their_consumers": [
+    {
+      "request": {
+        "operation": "recover_g17_chip_info_decode",
+        "fixture_test": "test_chip_info_power_dimensions_match_their_consumers",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "source_register": 13647888,
+        "fields": {
+          "power_group_count": {
+            "chip_info": 108,
+            "accelerator_member": 1260,
+            "shift": 16,
+            "mask": 15
+          },
+          "columns_per_group": {
+            "shift": 8,
+            "mask": 255
+          },
+          "power_column_count": {
+            "chip_info": 100,
+            "accelerator_member": 1252,
+            "formula": "columns_per_group * power_group_count"
+          },
+          "units_per_column": {
+            "chip_info": 120,
+            "shift": 0,
+            "mask": 255
+          },
+          "scaled_column_count": {
+            "chip_info": 48,
+            "formula": "power_column_count * units_per_column",
+            "accelerator_member": 1200
+          }
+        }
+      }
+    }
+  ],
+  "test_recovers_g17_chip_info_registers": [
+    {
+      "request": {
+        "operation": "recover_g17_chip_info_registers",
+        "fixture_test": "test_recovers_g17_chip_info_registers",
+        "image": "",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": 12582912
+          },
+          "codes": {
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": {
+              "address": 12582912,
+              "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001a0088521a1aa0720000000000000000000000000000000001008852011aa072000000000000000000000000000000000000000041430091000000000000000000000000000000000000000000000000415300910000000000000000000000000000000000000000000000004163009100000000000000000000000000000000000000000000000041730091000000000000000000000000000000000000000000000000000000000000000000000000e87e18531f2d007100000000e85e10531f110071000000001f0d0071000000001f0900710000000048018052687600b908048052682200b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000880280520000000028048052000000000000000048048052682200b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "register_block": 13647872,
+        "registers": {
+          "version": 13647872,
+          "count": 13647880,
+          "cluster_config": 13647888,
+          "identity_14": 13647892,
+          "identity_18": 13647896,
+          "identity_1c": 13647900
+        },
+        "version_family_byte": {
+          "shift": 24,
+          "value": 11
+        },
+        "variant_selector": {
+          "shift": 16,
+          "mask": 255
+        },
+        "variants": {
+          "2": 32,
+          "3": 33,
+          "4": 34
+        },
+        "companion_values": {
+          "2": 10,
+          "3": 20,
+          "4": 40
+        },
+        "chip_info_variant_offset": 32,
+        "chip_info_companion_offset": 116,
+        "accelerator_variant_member": 1184,
+        "variant_consumers": [
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX33populateMaximumPerformancePowerCSEv",
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX22calculateVddGpuLeakageEddd"
+        ]
+      }
+    }
+  ],
+  "test_chip_variant_reaches_the_power_model_field": [
+    {
+      "request": {
+        "operation": "recover_g17_chip_info_registers",
+        "fixture_test": "test_chip_variant_reaches_the_power_model_field",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "register_block": 13647872,
+        "registers": {
+          "version": 13647872,
+          "count": 13647880,
+          "cluster_config": 13647888,
+          "identity_14": 13647892,
+          "identity_18": 13647896,
+          "identity_1c": 13647900
+        },
+        "version_family_byte": {
+          "shift": 24,
+          "value": 11
+        },
+        "variant_selector": {
+          "shift": 16,
+          "mask": 255
+        },
+        "variants": {
+          "2": 32,
+          "3": 33,
+          "4": 34
+        },
+        "companion_values": {
+          "2": 10,
+          "3": 20,
+          "4": 40
+        },
+        "chip_info_variant_offset": 32,
+        "chip_info_companion_offset": 116,
+        "accelerator_variant_member": 1184,
+        "variant_consumers": [
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX33populateMaximumPerformancePowerCSEv",
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX22calculateVddGpuLeakageEddd"
+        ]
+      }
+    },
+    {
+      "request": {
+        "operation": "recover_g17_core_mask_relay",
+        "fixture_test": "test_chip_variant_reaches_the_power_model_field",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "record_delta": 1152,
+        "accelerator_members": [
+          1152,
+          1160
+        ],
+        "chip_info_bytes": [
+          0,
+          8
+        ],
+        "written": false,
+        "writers": []
+      }
+    }
+  ],
+  "test_cleared_hardware_config_gaps_are_supported": [
+    {
+      "request": {
+        "operation": "recover_g17_late_controls",
+        "fixture_test": "test_cleared_hardware_config_gaps_are_supported",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "region": {
+          "offset": 9536,
+          "bytes": 464
+        },
+        "producer": "__ZN14AGXArmFirmware16initFirmwareDataEv",
+        "written_offsets": 36,
+        "feature_mask": 281475379494912,
+        "feature_bit_fields": {
+          "9628": 37,
+          "9636": 38,
+          "9652": 7,
+          "9924": 53
+        },
+        "fixed": {
+          "9536": 0,
+          "9540": 0,
+          "9544": 0,
+          "9564": 0,
+          "9568": 0,
+          "9588": 0,
+          "9592": 1,
+          "9612": 0,
+          "9628": 0,
+          "9632": 1,
+          "9636": 0,
+          "9640": 0,
+          "9644": 0,
+          "9652": 0,
+          "9656": 0,
+          "9660": 255,
+          "9692": 255,
+          "9708": 0,
+          "9712": 0,
+          "9716": 0,
+          "9720": 0,
+          "9728": 0,
+          "9884": 0,
+          "9892": 0,
+          "9896": 0,
+          "9916": 0,
+          "9920": 1,
+          "9924": 0,
+          "9952": 0,
+          "9968": 1,
+          "9976": 0,
+          "9977": 0,
+          "9990": 0,
+          "9994": 0
+        },
+        "wide_fixed": {
+          "9568": 16,
+          "9728": 8,
+          "9968": 8
+        },
+        "core_mask_relay": {
+          "record_delta": 1152,
+          "accelerator_members": [
+            1152,
+            1160
+          ],
+          "chip_info_bytes": [
+            0,
+            8
+          ],
+          "written": false,
+          "writers": []
+        },
+        "cleared_accelerator_inputs": {
+          "accelerator_bytes": 117712,
+          "zeroed_allocation": true,
+          "cleared_members": [
+            1836,
+            1840,
+            63764,
+            63772,
+            63832
+          ],
+          "fields": {
+            "9540": 1836,
+            "9716": 1840,
+            "9720": 63772,
+            "9892": 63764,
+            "9916": 63832
+          },
+          "guarded_field": {
+            "config": 9540,
+            "note": "only written when its source is nonzero, so it stays clear"
+          }
+        },
+        "remaining_late_controls": {
+          "ones_run": {
+            "offset": 9660,
+            "bytes": 48,
+            "value": 255
+          },
+          "copied_bytes": {
+            "9976": 1776,
+            "9977": 1784
+          },
+          "guarded": {
+            "offset": 9644,
+            "feature_bit": 38,
+            "would_be": 4294967297,
+            "written": false
+          }
+        },
+        "final_late_controls": {
+          "converted_field": {
+            "config": 9884,
+            "firmware_member": 6840,
+            "converter": "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb",
+            "identity": true,
+            "value": 0
+          },
+          "literal_field": {
+            "config": 9920,
+            "value": 1
+          }
+        },
+        "derived": [
+          9556,
+          9584
+        ],
+        "runtime_dependent": [],
+        "complete": true
+      }
+    }
+  ],
+  "test_recovers_g17_late_controls_from_the_real_producer": [
+    {
+      "request": {
+        "operation": "recover_g17_late_controls",
+        "fixture_test": "test_recovers_g17_late_controls_from_the_real_producer",
+        "native_source": "AGXG17X.macho"
+      },
+      "result": {
+        "region": {
+          "offset": 9536,
+          "bytes": 464
+        },
+        "producer": "__ZN14AGXArmFirmware16initFirmwareDataEv",
+        "written_offsets": 36,
+        "feature_mask": 281475379494912,
+        "feature_bit_fields": {
+          "9628": 37,
+          "9636": 38,
+          "9652": 7,
+          "9924": 53
+        },
+        "fixed": {
+          "9536": 0,
+          "9540": 0,
+          "9544": 0,
+          "9564": 0,
+          "9568": 0,
+          "9588": 0,
+          "9592": 1,
+          "9612": 0,
+          "9628": 0,
+          "9632": 1,
+          "9636": 0,
+          "9640": 0,
+          "9644": 0,
+          "9652": 0,
+          "9656": 0,
+          "9660": 255,
+          "9692": 255,
+          "9708": 0,
+          "9712": 0,
+          "9716": 0,
+          "9720": 0,
+          "9728": 0,
+          "9884": 0,
+          "9892": 0,
+          "9896": 0,
+          "9916": 0,
+          "9920": 1,
+          "9924": 0,
+          "9952": 0,
+          "9968": 1,
+          "9976": 0,
+          "9977": 0,
+          "9990": 0,
+          "9994": 0
+        },
+        "wide_fixed": {
+          "9568": 16,
+          "9728": 8,
+          "9968": 8
+        },
+        "core_mask_relay": {
+          "record_delta": 1152,
+          "accelerator_members": [
+            1152,
+            1160
+          ],
+          "chip_info_bytes": [
+            0,
+            8
+          ],
+          "written": false,
+          "writers": []
+        },
+        "cleared_accelerator_inputs": {
+          "accelerator_bytes": 117712,
+          "zeroed_allocation": true,
+          "cleared_members": [
+            1836,
+            1840,
+            63764,
+            63772,
+            63832
+          ],
+          "fields": {
+            "9540": 1836,
+            "9716": 1840,
+            "9720": 63772,
+            "9892": 63764,
+            "9916": 63832
+          },
+          "guarded_field": {
+            "config": 9540,
+            "note": "only written when its source is nonzero, so it stays clear"
+          }
+        },
+        "remaining_late_controls": {
+          "ones_run": {
+            "offset": 9660,
+            "bytes": 48,
+            "value": 255
+          },
+          "copied_bytes": {
+            "9976": 1776,
+            "9977": 1784
+          },
+          "guarded": {
+            "offset": 9644,
+            "feature_bit": 38,
+            "would_be": 4294967297,
+            "written": false
+          }
+        },
+        "final_late_controls": {
+          "converted_field": {
+            "config": 9884,
+            "firmware_member": 6840,
+            "converter": "__ZNK14AGXArmFirmware18convertGPUVAToFWVAEyb",
+            "identity": true,
+            "value": 0
+          },
+          "literal_field": {
+            "config": 9920,
+            "value": 1
+          }
+        },
+        "derived": [
+          9556,
+          9584
+        ],
+        "runtime_dependent": [],
+        "complete": true
+      }
+    }
+  ],
+  "test_config_pointer_stores_ignores_foreign_bases": [
+    {
+      "request": {
+        "operation": "config_pointer_stores",
+        "fixture_test": "test_config_pointer_stores_ignores_foreign_bases",
+        "code": "685e41f9094125b9a94125b9",
+        "low": 9536,
+        "high": 10000
+      },
+      "result": [
+        {
+          "offset": 9536,
+          "site": 4,
+          "zero_source": false
+        }
+      ]
+    }
+  ],
+  "test_config_pointer_stores_follows_computed_bases": [
+    {
+      "request": {
+        "operation": "config_pointer_stores",
+        "fixture_test": "test_config_pointer_stores_follows_computed_bases",
+        "code": "685e41f9094c85520801098b1f0100b9",
+        "low": 9536,
+        "high": 11008
+      },
+      "result": [
+        {
+          "offset": 10848,
+          "site": 12,
+          "zero_source": true
+        }
+      ]
+    }
+  ],
+  "test_recovers_g17_afr_relative_boost_frequency_table": [
+    {
+      "request": {
+        "operation": "recover_g17_afr_relative_boost_frequency_table",
+        "fixture_test": "test_recovers_g17_afr_relative_boost_frequency_table",
+        "image": "6166722d706572662d73746174657300",
+        "arm_power_code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000695e41f90a31835234010a8ba9864bb9eaa390526a3daa72297daa9b35fd65d3e972409136c11391c90a158b370140b9190500d10000000000000000000000000000000000000000000000000000000001f57ed3e00314aa000000000000000000000000480317cb000000008a0c805200000000000000008c0140b98c0117cb8c7d0a9b8c09c89a000000006c0100b9b5060091bf0209ebc3feff540000000000000000000000000000000000000000890c8052090100b9",
+        "image_fixture": {
+          "data": "6166722d706572662d73746174657300",
+          "symbols": {
+            "__ZN14AGXAccelerator34populateAFRFastDieDeviceConfigDataEP32AGXFastDieControllerDeviceConfig": 2097152
+          },
+          "codes": {
+            "__ZN14AGXAccelerator34populateAFRFastDieDeviceConfigDataEP32AGXFastDieControllerDeviceConfig": {
+              "address": 2097152,
+              "code": "000000000000000000000000000000000000000000000000000000000870409114a1139100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000890240b9000000002929081b"
+            }
+          },
+          "virtual": {},
+          "vtable": {}
+        }
+      },
+      "result": {
+        "offset": 6536,
+        "entries": 16,
+        "domain": "AFR",
+        "state_property": "afr-perf-states",
+        "base_state_scaled_source_offset": 69324,
+        "state_count_source_offset": 115944,
+        "frequency_source_offset": 115952,
+        "formula": "100 * (frequency - base_frequency) / (max_frequency - base_frequency)",
+        "states_at_or_below_base": 0,
+        "maximum_state_value": 100
+      }
+    }
+  ],
+  "test_recovers_g17_performance_state_map_block": [
+    {
+      "request": {
+        "operation": "recover_g17_perf_state_map_block",
+        "fixture_test": "test_recovers_g17_performance_state_map_block",
+        "image": "",
+        "arm_power_code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000685e41f9093983520a01098b694e41f92969409100e4006f400103ad400102ad400101ad400100ad2a494ab90ac919b92a894ab90a091ab900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002a854ab90a051ab929c54ab909451ab9",
+        "image_fixture": {
+          "data": "",
+          "symbols": {
+            "__ZN20AGXFamilyAccelerator13getProbeScoreEv": 1048576,
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": 2097152,
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX12readChipInfoEP16AGXGPUCoreConfig": 2101248,
+            "__ZN20AGXFamilyAccelerator21parsePerfStateMapRegsEv.8015": 2105344
+          },
+          "codes": {
+            "__ZN20AGXFamilyAccelerator21parsePerfStateMapRegsEv.8015": {
+              "address": 2105344,
+              "code": "5f2403d5c0035fd6"
+            },
+            "__ZNK31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator12readChipInfoEP16AGXGPUCoreConfig": {
+              "address": 2097152,
+              "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX12readChipInfoEP16AGXGPUCoreConfig": {
+              "address": 2101248,
+              "code": "0000000000000000000000000000000000000000fbfbff970000000000000000609208bc7f120239000000000000000000000000"
+            },
+            "__ZN20AGXFamilyAccelerator13getProbeScoreEv": {
+              "address": 1048576,
+              "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e4006fe08302ade08303ade027803dff5300f9e08301ade08300ad000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e8574239480100360000000000000000000000000000000000000000000000000000000000000000000000000000000000000000686a4091092129912001803d09212a9100e4006f2001803d096129910a612a9100000000000000002101803d4001803d09a129910aa12a9100000000000000002101803d4001803d09e1299108e12a9100000000000000002101803d0001803d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            }
+          },
+          "virtual": {},
+          "vtable": {
+            "__ZTV18AGXAcceleratorG17X:4632": 2105344
+          },
+          "adrp_load": {
+            "1048576:2988:2992:16": "00000000010000000200000003000000",
+            "1048576:3028:3032:16": "04000000050000000600000007000000",
+            "1048576:3052:3056:16": "08000000090000000a0000000b000000",
+            "1048576:3076:3080:16": "0c0000000d0000000e0000000f000000"
+          }
+        }
+      },
+      "result": {
+        "offset": 6600,
+        "bytes": 128,
+        "entries_per_bank": 16,
+        "source_offsets": [
+          109128,
+          109192
+        ],
+        "enable_byte_offset": 133,
+        "enable_byte_value": 0,
+        "parser_vtable_slot": 4632,
+        "parser": "__ZN20AGXFamilyAccelerator21parsePerfStateMapRegsEv.8015",
+        "banks": [
+          {
+            "offset": 6600,
+            "values": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15
+            ]
+          },
+          {
+            "offset": 6664,
+            "values": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "test_recovers_g17_auxiliary_performance_layout": [
+    {
+      "request": {
+        "operation": "recover_g17_aux_performance_layout",
+        "fixture_test": "test_recovers_g17_auxiliary_performance_layout",
+        "image": "63732d706572662d737461746573006166722d706572662d73746174657300",
+        "arm_power_code": "09a143b92b050051ab491ab96b3e4fb9ab4d1ab989040034090080d24a7140914aa10e910b4a8352ab010b8b0ca111910e628352ad010e8b000258b8200218b8004640b8204600b809e944b92b050051ab911bb96b424fb9ab951bb989040034090080d24a7140914ac113910b738352ab010b8b0cc116910e8b8352ad010e8b",
+        "image_fixture": {
+          "data": "63732d706572662d737461746573006166722d706572662d73746174657300",
+          "symbols": {
+            "__ZN14AGXAccelerator21populatePerfStateInfoILj16ELj2EEEbP9IOService14AGXClockDomainR13PerfStateInfoIXT_EXT0_EE": 4096,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15getPerfStateCapE14AGXClockDomainRb": 8192
+          },
+          "codes": {
+            "__ZN14AGXAccelerator21populatePerfStateInfoILj16ELj2EEEbP9IOService14AGXClockDomainR13PerfStateInfoIXT_EXT0_EE": {
+              "address": 4096,
+              "code": "5f04007128a180520805889a0800088b080140397fa000f900e4006f600009ad600008ad600007ad600006ad600005ad600004ad600003ad600002ad600001ad600000ad88050036cb2a40a90801805208110a2a0902805208250b1b494500511f00086b20294f3a43100054a8ee44b97f09007100914b7ac10f00548a2e0029ab070034300e40a910fe43d3107ecc9b10fe44d3108400b830420091234400b88f4540b8b00158b81f020f6b0f828f1aaf4500b8"
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15getPerfStateCapE14AGXClockDomainRb": {
+              "address": 8192,
+              "code": "5f2403d53f781e72810000545f000039c0018052c0035fd6"
+            }
+          },
+          "virtual": {},
+          "vtable": {
+            "__ZTV18AGXAcceleratorG17X:4568": 8192
+          }
+        }
+      },
+      "result": {
+        "properties": [
+          "cs-perf-states",
+          "afr-perf-states"
+        ],
+        "device_tree_encoding": {
+          "word_bytes": 8,
+          "header": [
+            "rail_count",
+            "state_count"
+          ],
+          "records": [
+            "voltage_uv",
+            "frequency_hz"
+          ],
+          "trailer": "default_sram_voltage_uv_per_rail",
+          "voltage_divisor": 1000,
+          "sram_policy": "max(core_mv, default_sram_mv)"
+        },
+        "source_layout": {
+          "bytes": 328,
+          "state_capacity": 16,
+          "rail_capacity": 2,
+          "state_count_offset": 0,
+          "rail_count_offset": 4,
+          "frequency_offset": 8,
+          "voltage_offset": 72,
+          "sram_voltage_offset": 200
+        },
+        "firmware_blocks": [
+          {
+            "domain": "CS",
+            "offset": 6728,
+            "bytes": 328
+          },
+          {
+            "domain": "AFR",
+            "offset": 7056,
+            "bytes": 328
+          }
+        ],
+        "firmware_layout": {
+          "max_state_offset": 0,
+          "domain_cap_offset": 4,
+          "frequency_offset": 8,
+          "voltage_offset": 72,
+          "sram_voltage_offset": 200
+        },
+        "domain_cap": 14,
+        "cap_vtable_slot": 4568
+      }
+    }
+  ]
+}

@@ -118,3 +118,13 @@ def require_instruction_words_at(code, label, expected):
 
 def find_authenticated_target_references(image, target):
     return _query(image, "find_authenticated_target_references", target=target)
+
+
+def _integer_keys(value):
+    """Restore integer map keys in native config results after JSON transport."""
+    if isinstance(value, dict):
+        return {int(key) if key.isdecimal() else key: _integer_keys(item)
+                for key, item in value.items()}
+    if isinstance(value, list):
+        return [_integer_keys(item) for item in value]
+    return value

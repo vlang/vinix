@@ -57,7 +57,7 @@ pub fn fixture_image(request map[string]j.Value) !FixtureImage {
 }
 
 pub fn handles(operation string) bool {
-	return command_handles(operation) || runtime_handles(operation) || operation in [
+	return command_handles(operation) || runtime_handles(operation) || config_handles(operation) || operation in [
 		'find_dominating_g17_register_write',
 		'g17_definition_dominates_use',
 		'trace_g17_known_call_return',
@@ -79,6 +79,7 @@ pub fn handles(operation string) bool {
 // This JSON entrypoint preserves the remaining Python callers while recovery
 // algorithms and native tests use typed instructions and image providers.
 pub fn query(data []u8, operation string, request map[string]j.Value) !j.Value {
+	if config_handles(operation) { return config_query(data, operation, request) }
 	if runtime_handles(operation) { return runtime_query(data, operation, request) }
 	if command_handles(operation) { return command_query(data, operation, request) }
 	if operation == 'recover_g17_register_selectors' || operation == 'recover_g17_inline_register_records' {

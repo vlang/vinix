@@ -85,3 +85,21 @@ actual ARM64/x86-64 shared libraries and sanitizer tests qualify the production
 V routines. Foreign-thread checks retain borrowed input bytes and verify that
 every libc-owned response is released. Host GC checks use Boehm with real stacks;
 a separate GC-free native test also runs with ASan fake stacks enabled.
+
+The configuration extension owns performance-state and power-scale publication,
+channel rings, doorbells, pools, priority and submission contracts, chip-info
+selection, and the late-control write scan. Its 24 routines validate producer
+instructions and consumers before reconstructing metadata; fixed proof words
+and metadata are native V literals. Executable segment slices retain the full
+unsigned 64-bit file offset and size before clipping to available image bytes.
+The compatibility adapter restores the original integer dictionary keys and
+transports allocation values and scan bounds as JSON text, including nonfinite
+values and integers wider than a host word.
+
+The 34 original configuration test methods retain their independent inputs and
+complete outcomes in `fixtures/original-config.json`. Additional fixtures pin
+computed-base write streams and unsigned segment boundaries. Qualification in
+`~/.cache/vinix-python-to-v/g17-config-20261008/` replays those unchanged methods,
+compares complete results and error ordering across mutation controls and real
+driver images, and checks native ARM64, native x86-64, sanitizers and foreign
+thread response ownership. These checks exercise host recovery and its C ABI.

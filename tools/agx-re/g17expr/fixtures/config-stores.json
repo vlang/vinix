@@ -1,0 +1,1583 @@
+[
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b92e266df905b010b953d0dabc40000b8b7a71b9e23b2c0cad2b810df80ccf4eb9799b11ade6e620adde5a815295a6e3b83bb0a8b9201019f8694106f8f94181526b3e193948682c916a5e41f9c86920ad944a2e39ec833191b9fa1791e76102f8695206f80ef413ad81020d8b6f5e41f926e858f9509d75b9587b283950f517f9e33f3a397b5b0391b7b26df9",
+      "low": -1267650600228229401496703205376,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9cbf16db9715e41f9c4f72ff95e097af9715e41f92f6518adc01011b9c78a29b9f9900af80e2e96e58b9b47d5011b13390f5e24f91e0b4df95a1c52f929563df96d5e41f96e5e41f959dd1ef9dd2703b9ed7f4df99c6a0739bc001a8b8aaf0891ab0832f9db210891d43b45b963028052e3020d8bf38fa341e2a10af841d152b9e7b006f8077109f87f202b91d2276bf9b92a8052e1305eb9236159b92d7d8052e3a45df9755e41f9a85947f9f9e011f93dcc2739",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 31400,
+        "site": 76,
+        "zero_source": false
+      },
+      {
+        "offset": 10999,
+        "site": 148,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b91901108b675e41f9dac533ade2d54ef9915d3eb9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c0624fb9c0cf25f93602008ba46815ad6b5e41f9ca2328f9e9420ef87c5e41f96f5e41f9016a24f916b2673e685e41f9be084df949328052077012f8735e41f9ab7b0a39c4ac28adec33279194010f8bfe0955b9cb3a63b9a9b70ff96f5e41f91224e1d797680db9bef262b9b7542739454565f9",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9e02100f82ec80c9134c839b9219d3339445033b947a281522e5217f8d11d3139484b49b98e822c917d5e41f985e30ef8823d8152779c1bb9693b52f9cd3d8052cc496aaf645e41f9a3715cb9634210f8348946f979e954f94f3b70b9360d4adce8031d8b41811bf84fc83f39679747b9cf0a5df91e001b8b26e312f831441eb984f1dc101c9f2291745016f92c8a2391d0442f91cfa90591d86041f992d31591be02038bc303068bc16121ad6a5e41f965ea289162620df8",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9cc6e04ad6f4212f884ca73b94b5b5cb93df438b91d8d09c09cb020f96c9b3bf90403198b",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b901d781527e851eb9d7a30ff8f8ba805240e00ef8313c10912b8b08391b664db952111639c1ff07ad1e290f9179200cf825a01939ddda2cf9de3328396b5e41f93ac57008b24002f8c43e5cb953038152234f2af9171303f87d5e41f9226b36b97803068b64cd33b992c019f8",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 13260,
+        "site": 116,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b90a6418f9635e41f93a7659f9740f05b952f24ab909a675b9f9a3815284af16f93ef136ada18632ad93f02ab93a14cd0b61e90aadc4ca81524d673a91685e41f9d19b66f992fc72f98afa1eb9067f2a91cb9305f8c0001d8b3a1836b96b5e41f9fa4d6cb913d43ef9349114f8d42b4df99b1e53f938af14f9",
+      "low": 9536,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c98542b98d7d80523000108b3de804ad47873df98c65815229d279b956778052ce2e65b9f5020b8b7a93169184d61cf92f01088b95010f8b615e41f9615e41f97e5e41f9057140b97f5e41f9655e41f949c014f9504133526a030d8bc68a5bb9654352b9cb29333930620ef8620035b9c29c06f9f0f455f99bef6eb9b7ad32ad473a0791d3e98052905637f916d21cf8cd6d70b97d9424adc48331b9cc020a8b3e2924f93d02148b5a631bf89ded3039481313f84e0b0f39bd341139",
+      "low": 1099511627776,
+      "high": 1267650600228229401496703205376
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9bbdc3439b1001a8b98b21b3992be1b9118863630e0058152cd01009193a338b9a6395eb92e802ab9fa35cc78e63b8052a0d861f97224b04f5d73249189a703b98a00198b09ba2fb9b9825bb9746957b9427f2cf90d221af892a469b9675e41f9a29072f945e007f815ed1eb965a94ff99a931af8358805916a442db9e4bb1691",
+      "low": -1,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b91ea646f9d47c278e90e30bf891e171b9b16313f8969a5af9e61b05b9112109b90f340db9915013390a5d44f9c1f1815285ab81524c00148b087f27914c03158b747a13394b021b8bcb748152b500178bb5560239e9d773b9e000158bd1942df9876103f9afe235ade75c12aded0f69b9606b8052485e18f9705e41f9f0042a919650ae0ccea314b90d450bad3fa880524af23ab9d76329f98ef4bbc776587bf9caf80df9f98d35ad420230f93f8f2e915c4372f9e74305adb41e3af9",
+      "low": 1099511627776,
+      "high": 1267650600228229401496703205376
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b99ffd04627b5e41f96c2380527c02058bd3e381527e5e41f9404c4df9dd1436f97b9a05f960721b9102eb13addf5833393e3e44f9fe0f5bf9e3bafd2988ab42f982452391520573f90319ad8c09030c8bf0a933ad4dc105b96f7181521903058bd7ac41b9fd3f5cac5a512b91b3c217ad3c02018bdf0481527a5e41f96b0c21b9e49024ad",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b991d63791a30b0991f73422f963b871b92f4515b99ba78052ad4516f96f5e41f933d460b9b39e60b9f7382c91f47b0cadc5c534f9dc4f1b397403058bd9fb0db98dcd19b96e83059129c57db9cbd116ad72b000f8057b69b92ea112f83ca50039219f8152fcb9624f296751f997463391296922f9b31081527e376ab9675e41f955ae6db9eb635a5912c239b99d221bf81ae20af978b2805226420291c4b51291",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b902f225ad16f414b9c8b139b927be2ff9daf90a91c8010c8b310e2bf94db812912852815288d33439e1781af9a5784fb97b680739635e41f9959638ad2a862339ec01058b566459b9c8d418ad09031a8be2d077b94e1381527a5e41f97a5e41f9bd00168b",
+      "low": 9536,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b93801188b96b425f9fd03108b8c400bf8204b8052b9315cb96a5c8901c1a532adc7da73b923340ff92ee94cf9c14b22adfc8476b9e0b549f9675e41f9",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f456c74f200107f96e1103f87c5e41f922030b8b236a8052785e41f9f0553dad5d150bf99b7257ae0bfb80526cb8815255238052c1d51bb9795e41f914ac4ef9a8800ef8e36339ad755e41f90869755688cd2791c2ae3a9186001e8bb7ab03ad7fa826b952884ab9d3515eb9533431910e0231ada6760dad611848b9f50f74f9d6d21af8cdce37caf70714b97d5e41f9dd010e8b9aba1df985a68152fc5d3291b7310bf8117b7cf9625e41f9c601068b63a868f9",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b979101ef9d50a81529eb7805266b201f856a78052752c1eb9718f37b9cc262db9b7dd0c397e4bf580755e41f9924f41b99c00148b43d59d07f0780b2a6e03108bc1793b918af20939059512ad8e7425912f4b33b9b3305db9745e41f9ea000e8bb7b42539913423ad49eb6df942393c397d6a16a17b5e41f9fc5d25ad1ed92ef942ee54b9735e41f9918030f9a8ad11f96f4d12f97b5e41f9f7c925aded28412f238781520a770791996c37b95e4318ad625e41f9859008f8785e41f9",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 11440,
+        "site": 88,
+        "zero_source": false
+      },
+      {
+        "offset": 34832,
+        "site": 140,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f59e33378a9166f3a74931d84c1211f820f117f87c01078be106e56cb9c12191665e41f9906e3fb9645e41f99fdb0291b302108b705e41f96b8f2cad41d211f829c40aad28fb47f9c8f13af98fe533f9f2b105f80e6d81520fcf57b9878be002614c8152705e41f957c62ef94b772cb913df80528aab6eb9b72b3cf91003148ba8db1dade7246bf9",
+      "low": -1267650600228229401496703205376,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b957ba22f9fe03068bbcd01df805253d910f14118d9d731dad8d8c8052905a1ead0276805263921df884b68052f0031d8ba530d5545400118b88e18052b1d89263a4637cb9987f0d39c7920991f83401f94702098b28031e8bca7f66b9e38571f93fc681526c6a60f9f3662fad6fd610ad2b6e2cb9b25a1bb9566523b952c86cf9615e1db9af234cb92d2a38f94ee11c39e8593bf92cf6f4108cda22397103198b",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b961eb41f9277a7ff9448428f92cc81a913ca429f90a91faa1fd00048bb0011b8bec81e29f80d92f9153d7279131322191824f06917d5e41f9523078f9622751b919011e8b131747bc80d14ab996973cb95deb05adb3b216f8aedc2af961c71039418d2739bd5f8052ed291691fc5610910dea01914fe33ab9ccea20adfd6dda2091b514ad04e20af8536663f98e4a2e39695e41f9876f0991ab8f8596",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c4ce19b97e9a805252f029f9f8f235b90de2e40be7f03d39ba6e40f9735e41f9d97d4bb9dcd88052084312f8967774f921b60239e1241a91e3f53df93b670aad7e5e41f9e201178bb58a7ab9ba01188bb3df0b394e4f1ab9fcb642b991bf2bb9139756b9e5520ef9",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b0a065b9046301f826020c8b648d1bb3c55f06f9ac2309adb3751791e900188b3a927cf94a000a8b071f3cad1ce71f91133681520a03148b2ae530b9e1cb4c81e1fd50f9755e41f99157c740afe8009152118052cf00018b3e4a2ef99d114ef989462f397aa871f927aa6fb962e302b9197e3939",
+      "low": 9536,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b954c33fad47020b8bb66e8152b88553b9a1298052d0840f39970121ad0c86bfda471302f8b22207f87701048b46e806b90b031c8b585331b91f3001911e26179147fb18f943011e8b655e41f9635e41f98b5e2439fff01df803936db9923104391aa847b9bebb0cf9d1ad4e0a348120392ad01ef85b973145726019f8c4fa60f92ad62b39e46026f953b233b950a10ff8755e41f9d5a78152",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9517a30f9768e08916c5e41f95c5e80523e1220b96b5e41f99197133933052af93daf12ad93f202f8230a2039cef081523003158bc0d11ef87e03158b39d967b9880f5ff9681d81527fdf8152",
+      "low": 0,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9a17127f9ff1c6af956f508397b4954f925c22af924d308f8927a51f953330bf8",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96ae21af86f9a5cb949e83091438504b9c08210f84bed4eb9",
+      "low": 0,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b90c6c3fad5af32391e8fb6bf957b54cb9725e41f98cb20af80f7377b902e51091",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b977584667de453dad019181526b5e41f9",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b984124cf9673526f911cf00ad0df631b9625e41f941894bf91d7118f87b030a8ba9bcb0d261ef81526f64ba72497317ad837d093955bc35915500148bc16108f93b00098b943b1f9fc203038bbc371539a8fe3bf9785e41f95f3128b9f74969f98d095df9665e41f9a1b2c5dbe1560bb96a021f8b685e41f9ccaa1dad135627ad34df53b981f98052338c3b91470214f8",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 10727,
+        "site": 40,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9833d8052b8ec11911c7f81528e303839c5b219f8b6e73cf9fc726cf9407b32f9be5c51f92d220ab9685e41f9ea0d54f94bfe0e912ec272f9ed1910913dfc7ab98b4023b9f3018052570137f9578e0cb9a3d10af89ee30b39c5951b39842636adcfdd5ef9ec3617f98e230939f99860b93a33339128aa3f8862a368b93cdb1eb9eb958052bc00068b8a2e4fb9d791113969c107f8f6730d91755e41f9",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9a22a67f97e02168be44b8052e4b06bf96ce9063955011c8bd6c95ff9fa2b06b96f8202f8b57304f8665e41f914c116f8eb9307f97ce20bf8785e41f96d5e41f95a0103a4419c7cf9704b283973430291b5040891d57a35390f9ec88e5f9663f91eb53291794a0339268615adf60b815224462691f9111ff8286011f8f101038b5aac8052",
+      "low": 0,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ca451a271d03158b6d5e41f94b1f18b9259a80526c9a45b94b420cf8147335b9c1944b323f4909f9bf9478f9c3b43e91436710ad645e41f97d4862b97100038b6d5e41f9a47836398500028b798e14b9da6267b9d3240aad20f72fad7602098b88f41e911100188be53350f983328052c15204f9490924918c7f6eb9aba20191c83a323986094d08fb704ef97751259151bc8052",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b942015db95401188b42133239962043c96d8832f9774b74f978a408b95b3027ad44900c91b8ea5df9",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f5531ff84be914f97b2a3191bd6d8052645e41f9490770f9f8a74ab9244318f834a22991fd4a0f39357d5bb985b04cb933031af8f87978b93a4d2fb9151843b9279e2a39ca48399194841239e1ad0d3908403991c4482badf0208f69585a2039d08f1d3cf8c218f8240622f9914112b9dfb035b915800cf8368d8152d9441e395d4d54f986a442f9b14b8152592a0eb9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c7726bf9df4c38f9733d80527df707701e0818f9",
+      "low": 9536,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9dfc30df84cd79d2acad47ef97b722439845c18add67150f15303138b8dea4cf9745e41f9057105adadb98152448e2839b34b3db9765e41f93e02118bf51645f9876269f90e8678b98b4d0291",
+      "low": -1,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9829b6eb9ed622aad3ec757b96b966ab9e070bcbad91477b9",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b970a130b97900158bf6465ab9f801128bcfdc08394c9116399b620cf86e5e41f9198638b922120ef807163891f3db815208e335b9bb861639605e41f91a4930913002108b033948b9bcec4bb960b57bb982a215915b9681521ea90f91e0df30f9916f29b9d8b202adbe550ead5a030f8b869f4cf9ad011a8b50ce05014dee0cad96738152ce4c58f9e83e2739eadc8a2bf503158bf800138bd021e2b46cf513ad371f52b9b378c19e6ae901f95aad0cf9eb340eb9ccd311f87c1d19b9",
+      "low": 9536,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96e5e41f925942739c24314f9d4c03e91812849f96e4a2aadb3ff313996a306f8ee0929b92a6e21b915601cf8725e41f9efb83b391d8d2d3984530bf81bc42391d85d3939c74321912b280439539f33ad6c5e41f9cfe851f9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b941d650f9263008ade9253091df0032b937c11ff8400581520f0f31ad8ffc68b9546852b9c6c20cf8765e41f970c212f867bc57f9ca01038bff0857b95fe128f9f69115390ba327f9fa02168b725e41f9eef94cb9b0cd37b9",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97b5e41f96ae20bf8a42329ad8d0668b9d33a6bf95de70f39060d7cb9e81f41af9c7b61b9d7441cad15c21bb969c12eb91d188152ca7f35f9232d0e91c3c11df923dd2bf9775e41f9142b8052",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b946ce2b915f5920b9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9665e41f965050b9139421f3911c8099135a437b924bd36f97002108bf88935398a784cb936ff5ef959890891d3b24c64e700068bc82b81523c7c26b9cc7dd5f0653c805231b610b99f002ef92ee315393901158b0f0208f8d9ad05f95101078b39ce27f978eb04b9f3e53df9451d27adf3701ff878fe69f9c303068b3cbf8152c9cb27b9541c3f39",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9735e41f9abc88152ebdd96ede5cd40f91ef84cf99fdb08396f5e41f9b3690439528a78b9e0633291717538ad84b276b957bb937ec38f08919c2b3239ac822bb932c1947b66da1739c03210b91ffe81525c7e0839",
+      "low": 0,
+      "high": 10000
+    },
+    "result": [
+      {
+        "offset": 1526,
+        "site": 84,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b979ae4a6896a72739a16c37398102128b5af18152191102b9b98649f9528a07f9becb3091246a805244de1b39655e41f9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9769704f982f316918fa11b3905213d6cf03439b9b5501aad635e41f91ed34ff9655e41f958668152705e41f9649117f89f000d8b5bc137ad07001f8b8403068bda698052e3de52b92ad581522abd2891cf268052d5c916ad895e15ada5021a8bc7e51db92ca16ff941ed2a916c2236912ced0ef93ca1fa045eb82f399c03178b5d2504954a8106ad996d84bf150a5fb993a1353951c563f9753b05b97f980ef993dd5ab9",
+      "low": 9536,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c9c618adc04132f968b37fb9d615a4a0e92619f9c00625f9058a3139d0311eb954ca59f94a5205f865de73f9ee64059114e6805254e42cad568b3ff9b8be5db9c14065b9f2dc3139c8ba805296538052705e41f97b0f38f9d0387bb9e7872239b28552f93baf0591d0311ef8bf340ef9d78745b9b3003c91b8733d39775e41f9fcf34ef9516e8052c03a78f9559c68f9625e41f9ce7d26adfe5c0c3922c51139f29c13f9775e41f99903118b31b21291bd5c8152c3420bf80a03118b",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9797164b9bd6d0aad5bab1a39d89d18b9810405919f2d17adbdfd58b91f321df8d70d79b9c6502b91605e41f9f4db7ab94c000d8b738a06b99d313fad6fdff7b18b543fad6dcf8052b51912b91c001a8b6c646fb9b1c42591a2be4ef9d8176bb96a5e41f94ca658b940991e3901bc1af97b2d78b9d8b76ef9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 1958,
+        "site": 120,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9893f3339c900188b7eb22a395e1a09b9771e53f9796141f90e8a2691",
+      "low": -1,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9eff78052736b910388193a3916011e8b017715f91aa220b9d95d6246f2dd3df9655e41f93800048b1b053b39b3521ef8401157b9e6702a39308812adbf4f57f90602018b17190cb96b5e41f9605e41f9615e41f905a10af8a919b93b9d0c2c918ad6815289263391d3a3399185c424837fbc69f91e3a11ad7f6f0bb983a33df92dd310f8b6432db91214263951001c8bcc341db98ade08ad691055751500128b755e41f9",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b92db104ad3d768734bce9815277e04bb96e5e41f91d1731b9f62b6cb92d00168b91021b8bf12a5cf98b439ffc2dc636b9929009f8fd600339832729b9afbbaf58725e41f989351e391d00138b7d970ef9bf0107f82b5edd1163074ff93e5713396a5e41f966df26394d8a2739e01861df5cb315f8bdbc45f9ceed22915e01148bd1c7815221a3805264568152345c8052bdf756b93d221eb92c5b3991a5a851b91ada5bf9f3512ead4902028b6c840891db240cad605e41f9",
+      "low": 9536,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b90a5978b9e86743f9a4490e39345179b96fe42a91675e41f914c638ad348e01b9d36d6ef93d184df95cdb5db901020e8b3f523df9f43828f926682ef9a8d93ead7e211cad393e0939401f70b9625e41f9efe816f936d904b9da0527396b778152c6010d8bcc5e0f917f5e41f988a10e39023f8152287e3badf21038adbe00108b7d5e41f946188152",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97f02088be8050291ccc8143953f37db9",
+      "low": 1099511627776,
+      "high": 1267650600228229401496703205376
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b95ca741b94be921916a6e24b9811c04b967e92fb998d204f945be62f9a9120af82ea179b9c000028b",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9765e41f9c760039191e98152092c33f9b97415f95e360ef9491e320f441d12399b2c09f98402008b0dd46c9d4bfa79f9735e41f9b2548052625b3fad201203f8066b18ad803bce9ff1518052b4cf2cf922040ab9",
+      "low": 0,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b93ece7cf94c8641b96b5e41f9ce634db9bc69389197d40039db0e2fad725e41f9f17712b9b0d10b3996e32206d0101ef8f72425ad054534f967212db976f62d9118585db94e171a393b5968b9bac30bf836d21df8bd727e16cd55189163171ff9b4a70c3916c412f9",
+      "low": -1267650600228229401496703205376,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9cf9d6faa8502128b665e41f9849d76b970f22591a198df08ce248152695e41f96c5e41f9016208f9c13063b9715e41f9e47166f9959f1991aa8346f9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97d5e41f9657d0f3900b129f9df01088b687772f9ac2a59f915501bf884765ef9ffb36e4d30a01df83e6569f930261fb90e560c9188f300f8dc8c80522777133974cc3aadc800078b6c5e41f9a2bc0191f93301f9a4cd1cb9b098805285633791bf6b1e394f5080525dc00fb922000c8b93ca51b9c7898152bfaf67f911740aad9602128b7a5e41f9ca996ace3b2513b960dd3d91d167293958f45cb9bcf336ad685e41f9",
+      "low": -1,
+      "high": 10000
+    },
+    "result": [
+      {
+        "offset": 1946,
+        "site": 112,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b93f5855b9d7893a39280b65b94b01198bb56147b96f535cf9fb9278b9794103ad",
+      "low": 1099511627776,
+      "high": 1267650600228229401496703205376
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9503b23f9cf9d8052e4942eb95b408152ffab1a39ab9d36ad655e41f9",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9e8830af8209054b9fa00168b2903068bc2b44af906c102f8fb6415f99f3b2db9b902148bc9c13b39ce3051b9e7920a91a3b802f9",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 10892,
+        "site": 36,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b921d324b9626916ad9abc4ff9fc0e2639069018f8516d2eb9318ebf16c12564b963f83a39bb5f29ad68021b8bd3280badb08635b9492334f92b2061b95b3f22b9675e41f97702108b681269f97c9360b9785e41f99a1b2bb9e8f255b980bc75b97402138b2dd90046b6933badafd58152",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96d5e41f9698627adb2b101f8278119f8775e41f90c5623f9ff3f3b912e09a49fbd8a504203fd69b95ffd2139ffc50b397a5e41f93f02058b09c266b9ef423ef93b5942b932f224ade3992f39168f53f907f01ef8064f39f94100088bc20acecebbb781526d778052a17b31f48d4fcdc5acfa80524b2381524c071f233d00098bfc413bad",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97ebc71f9735e41f9e2071d39bca533393e9d75f94003148bed8023ad755e41f944543fb9001541f9de771ff9be083f391dcb2a39753e81523e020b8b6e5e41f95118ec30a7011c8bb4da31ad85320d91d802138babea3df9847624f93f202fad63aa0391f6c87cf9afd069b985661b91fa3e79b9dd00158bf6c21939a8d5b9d0931d35b9",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97ead32adffc001b9a5c034b9676df8116f010e8b29471639cf648152e86f02911ee247f958431df87f5e41f9373003f8c94f5cb9bfc410f9b1bd7ab9d60cc3fce0174eb98b6922f92d5b5fb97e5e41f9765e41f9bcb63e91267306a307a64eb95aec02ad4f9a68b904113e91516f06eec3a325912b301ff8f4663e39888e0badce4c4ef9d3030b8bd4512bf91f2601b9758e70f9eb307cf9785e41f9",
+      "low": 9536,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ef3d75b918513db92753020e4373cf9c635e41f91de232499c56815239132b910dd84bf9708130917d5e41f92ffa0ab98c0b9b455efc24f971c579b9c4cd20f94d6b47b9f402128b92110f3978021b8b6d5e41f9785e41f95ffd0badedda60f9063117f91d1536910f71223929bd15f9ce030f8bfd8d8152781f16b9dcac1e91756800ad962452f9",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9645e41f934f315ad7a5e41f9bd0aa158c21b1b918da7815235d147b9695e41f99e223cf918570591ba8779b9cd9237b9281466f94a031c8b749210f82840abcf81848052a9e439ade1bf3ab9a6df52b9610a15adb7661bad59603c39ef0f16ad8ebb3eb906138052fae03aade7e3815293f137f9596f3691685e41f95cc832b92af064b96a731ef89f9aa8c9867d8152e91b18adb22b0eb9c4c12ab9622115f8c86e28f900180eb980301bf8",
+      "low": 9536,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96f4e6eb9ff8367b916602c91b1e177b99c3b0fb9b69038ad695e41f9",
+      "low": 0,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9241578b98da22aaddca82119715e41f9fb832f912b108152f09018b936851d914153626a309218f8610c4bb91f1231ad50c400f9ae8114f8605e41f90702148be7df6bf9321a8c4eb22244b97d5e41f92d70805239c34ef9da81db5aa3530df8071833adf2488052778623ad43e019f83a230cad2c3315f874758152ca5a1af9d5b68152fb5110f8bcda199117b33891",
+      "low": 0,
+      "high": 10000
+    },
+    "result": [
+      {
+        "offset": 213,
+        "site": 108,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9dbe42dad56001a8bb5b20ff936742291887329f96b4553b91ff76bb9ee3959cdc502048b6e442b39b2ee805242c333b9f6bb12b9e35c36b9f36b57f9ae6f80528b950dad618f69b9a18f13adcf2741f9299b04391203108b5a2f45f41613cf0b5600168b655e41f97700098b908779b97e374a407a881f39cd730fb94d3a44b9418e0339625006f8b4fe7cf9",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b92cd110f86e5e41f9737975b9715e41f9a23019f87bd112ada0a22491636310f8205b34f9640233b97bc555f92b5071f9a24f0d9111ab0aadc102038b6f5e41f93ab322ad54c51ab9d3d004397d02158beadd08b95477815281c715ad",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ded60eb9466406ad7b5e41f9717202ad727a129128a2ccd14f090b91807d1bb94442e2e8635e41f9164d81526d4e7eb99c908152e96c8052695e41f9dd020b8bba7e717c11490e39880c8152",
+      "low": -1,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b986892f392c4370f9f91f1b39b8f8182da6011e8b62a49d9bd71876b9404015f8ac871fb9d4192739c34722ad135b7450c8021a8b78e009f83cdd3dada90164f9c5b011f9a4ae3291d603188b284d2991a98763b9f85863b93200048b",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9363e04916a33524bf9d90d912ee5d86e9a258052",
+      "low": 0,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f19112f8ecc445b9c7be39b9a84c3ff98a7977f9b73300f8da1874b9925f3d396e00038b755e41f907711839857e5af9e69210912e0325f9685e41f9949b45b9e4d917f9a4d88f113ace47b9dfb66ff90ab042f9a6999d5bf5a4036f018d1c9164f810b90f8957f918020e8babe228ad",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 12412,
+        "site": 56,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9795a7ab937997df991f33191c502078bd8367db968021a8b739b18917d5005f814ae13f940ee2239832b80526f4c74b9e6021d8b735e41f9dc511239477a02f93eee0ef92fd85925735e1bf9665e41f9b39e4ab9430405b9f5424cf9ceb00639f2bc44b92fc105f8",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b957c01cf85fbb2639f2702794a08b3af9745e41f9ae00038b2e851791c81c1f912ca31bf8ce9d21390cbcc8dceb6377c8665e41f98ecc0ab91a8150b984291e390ba920b97902008b5d84053955f429ad",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97f5e41f9f8a80cad03d380524ae71fa548582dad695e41f9635e41f927e256f9d12975f931010d8b15c72f919ea64ab9d4de8052665e41f9f37713b9f9b215f859bb6fb9775d199170ca4a91525c8152795e41f9205f8052",
+      "low": -1,
+      "high": 10000
+    },
+    "result": [
+      {
+        "offset": 4980,
+        "site": 72,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96e0f0ff9b62a06b9c4f023f9655e41f91f6a5c14655e41f917716df9858369f9236481520da227f9685e41f9234461c7391b10f9ee547bf9b16442f9d20d1cad389833ad504367f968b2ebd1b60576b94d5e5bf94f3114f874e952b950b780522dac2cade3b407ad73020c8ba5a925f9235fafda7c5e41f9e901048b9bc040f9be4329910e802cf9a9c95bf97bcb21f998c758f9f78c273942912e399fa81291",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9675e41f94da36ab97f5e41f9775e41f9393c2539f5835eb975d556f9cd912f91725e41f9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9313f13391c81dd2b3e9714b9b9f303f8d7dde799484c3d9126d55bd366e462b96b6c4bb9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b90d5709ad2803088b1b894eb9185314f817000a8be81a13f9279004f8cb32805201a9269132471091819f1691c0938052726816b9d903178ba56428f9a42e1df9425005f8695e41f9d26709f9e12071f99c393c3919b860f97aa61191437a77f9cb00168b5bfa37b9d6626bb903a434f92caa1b91d8ce33add7be77f9ecad73b9f803068b48723739715e41f921b8163962b203f842b209f99f8b79f9a5203939",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9614b70f9570202f8ed9721ad757804022eb402f9f7000f8baa488152cc3303f8e2355bf9034f01ada2426df9287281523c8a60b97f86029135fd11b9d80e4db9625e41f9",
+      "low": 9536,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9d5cc09b9745e41f993240491078530b9",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97a5e41f9d352805250b000f8382a1139b3e9815212001b8be1d072b9dec353b9068314f9780848b9b503058b1c230cf8fd528052beaa383910b321f9f10c6db95cda49b91df732f98e031a8b0c010a8bdd9f27f908e87cb9b10523540a120af9cc953bb9cf5f4bb99a3f8152f5845ff9021638914e5f71f904d326f9af8e8052d91072b9119367b94b100bf9aa374bf99703038b0ee53f819b0e2cf9cddc2d39c37713394a01028b",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ead02791a903188bade2f6c48a010d8bd2e009b9bfcbc82077020d8b7b5e41f932680ef9",
+      "low": -1267650600228229401496703205376,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96e5e41f9eb483539625e41f9797d5ef96103108b3e69013962870badb2f113ad321109b9b5e34ee3aabb23f96eda8f9982d938f90c3107397a5e41f9852219f86dd43aad765e41f9d9622c399e9d74f9474080528ddd3b8ef1a239b98d01058bb9f726adf25461b96f00008bcc450491aca20bf83e8e11ad96198052963107f881f048b93a242eb963ec50b9b0e63a39cbdaf9a3cf8813b970021c8b75da8152",
+      "low": 0,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b91fb71b393a294bf986de27ba03d01af88d604b8ac76008f802193b91ede23891df2120919ba2a2d97db413b96fe91ab9795e41f9556510919bfe4eb9543f47f9f0b43f39795e41f9d35018f880008152c1e308b9d6473cf990d310f858b40239f68735b9910331b9cd3c8152e9567eb9732417395b2850f9599d06b98b7a00ad9ad51c9172b63aad",
+      "low": 9536,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9593a07b9695e41f917030b8b3303138b695e41f96c008152209734ada70b353990cf5eb9e8298052e47d45f9343eba6c28c754b9f7c6c296403744f965f646e950010b8b675e41f9a1a968f94a8618911c7754b99d985ff9ca4c3dad82d741dab9c40791",
+      "low": -1,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b700058bbfda8052c5337fb9da5911f9e18709b9de6a7bf9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9748a14f9473413f9f0ab3af9425218f8613920ad54f245b9d34e8052ca4423ef165831add1d8cc6dc10b1d396b341fad6fc10425449a1aadad782df95101018b715e41f9c37312f8f946b8d9e8b113f9520d42f90eeb2dadb86b52f999e214f862843191be6f4eb905d580523b1008f8ce9f78b9f8b63b060f143badb4c458325a4749f96c981e39",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b938e56cf9c4b21cf8e15a19911a070ef9f77979b97c5e41f9655e41f9665e41f92be208f9badc58f9fb7d019138f665f949fe52b9c5a5637a2d9c8052ef0213f87c5e41f95c3d5cf9605e41f9ad6107f8795213f89ed206b91a592a397ee12e7c3e1c8052fcd90291a45f6af9bada0d39cb7327917eb03e91d7bc3ff9d7a315f8ae8028916b8d5ab9784a04f921b103f8d4be41f9",
+      "low": -1267650600228229401496703205376,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b98fff41f939b11bf825ce28ad3903058b0f4015f8d2a50091ccb80eb90e4216f83901188b4ca52a911c182bad367b74f964d955f9c2c502f9897648f97d5e41f957d6805263e102f8775e41f98efa43b9fe1c04f9",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b948a68052ecc146f912fd59f9775e41f992db8052795e41f9f56334b91f793eb9bd5213f8ea0c13f934ad0b39eabc37915ab241b9c915815228510cf89fc000f8ebc749b90a4a8052e92357b9a77309f849a63caded01038b735e41f964b02df96802108be7020d8b3d0c1139dad2815296a30d397b5e41f9d71b07f9132c01f990766eb9d85b37f963f30df84846172494031d8b000635f9",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 223,
+        "site": 152,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b04346bb",
+      "low": 9536,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b3011d8b156402b979cb60b9458061b9bbfc01398e5942b9de176bf9ec8d23913f356e3e85d63eb96f0162f992020d8b828e27ad785e41f9c65f9843715e41f9f2ba2cad1f5815ad09228052ca02058b50bec8d6cf000f8b228201f8f2713e9129ed805263d454f9db8d03b9e7880791eb601cf89f4209f808c246f9bb042cb948c171b9f7c70939bf9803b9f8a916ad89f39138ae7526f9007323f905665df9d5467eb90b9e41f93d023c39",
+      "low": -1,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 24,
+        "site": 104,
+        "zero_source": false
+      },
+      {
+        "offset": 3840,
+        "site": 184,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b91896bee653220a91132e2aad49d88152d15f32b9033726ad78190b91a2491491eb01319145a207f8b52649b98fc250b9f60c57f914621ef8272a0e3970523e2a832c1f9107b901b92e9324f92d5100f878563691fa02148b744879b9645e41f9cff223b940892291279a22b9c70d07f9b7cb2491e6831ff9715e41f9ec0706ad5ac304f8fc3209b9f0055ef9dcb70139750845b9509257b9cff249f90d7d39b923dd3aad",
+      "low": 0,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 11288,
+        "site": 84,
+        "zero_source": false
+      },
+      {
+        "offset": 25564,
+        "site": 172,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b93be726f9dfa313f87eca8152a40d7cf9957109f80420f85eb86444f915a415b9d4d97c450bd265f9134008f9d1700bf8a102178bac3536ad56b52df9645e41f9393d7ab9f31d0e39569b69b937453dad569007f858e20af8dba85ff8725e41f98b152391e93b7ff944854df9e59210916a5e41f978ac3391871107f883502dadfad072b9b2f108f8cdba2439947b63f9b26c77b9fa8845b97de641b98d0e42f9635e41f96f1d06ad056247b9aa56266112dc805231ad18b9",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b95a912491aa4855b972bb0e9187f6b75d9d3c2cf949d67c94b7030c8b0d1b7ff991bd02ad10514ff963e40391555a56f94dc63139aa3225f99fc317f9ef372b39645e41f92f4a72f978d83891125070b9202307f8673804f903b20039e7ce31f9ef011f8be903399118d31af816001c8bb8121bb9a1d63fb9670d8052d9d205b92b6656b9027133ade2f431b9eb79209101321af8",
+      "low": -1,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9c66579b96eeb1c39e99102f9c78755f90d4c50b90e02148b84d537f9d18919ad180366b9bb718052075081526b5e41f9bc7dee566c5e41f9871818b9bd4d0c91fa860ff931a662f9d3fc64f9830b14b95a7477b2785e41f9243ca6c1706c31f9fdbb1f39f39015f8725e41f99d9738912e3b22f90c6425f9746752b901490e39d2020b8b591c099141b83db97d6c0491",
+      "low": 0,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b95a02058bedd96db9006571f9477447b9841f5eb9e48018f8e5dbb659b78f34f92ae73239da702cf95f001c8beb74339110d2b57e821c1ead8fa26df9411d46b98e3d0291",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b92a1500f91e2104b960d20df821162e3967575af9665e41f94603058b0c753091f21117f8a8e17fb98df91db9a2901cadd68d3df9e03518f99a5e393970ac00ad",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b918445af9c4c13a39b3cb09f92e1967b9d36e8152581837adfe3969b97e4111f89e6374b97ea62b9177ea8152e2e175f9dcf819b9a6bb55f9f3a98152ba1e1b392fd609f9a65134ad6f5e41f934c210ad92a000f87bb959f9fb778052b47209f84c300d39a448a5d214230ff8",
+      "low": 9536,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b59c20f93e1572f97edd81527a4e0ab945d30ef883c601adee5a7db9823b2e1f07f465b9645e41f971f85ef97d5e41f9470767b9af351ab93afb8052c91aa8709f820dad725e41f9e54819b92f71ccdb675e41f9b3198152725e41f9493a37ad0403148bc8ec2af989e010919b0f40f9655e41f994a9856732ccb0c21d8f97033cad1e39cc330df8d02530b9f9680cb939630bf871243eada1a53691ebd13539725e41f9e7610656755e41f9a3754ab9",
+      "low": 1099511627776,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b97e5e41f97c4251f9ff021e8b84985cb9e0a642b9b3273c39491d37f937ef32b90a5010b98f226251176453f98c4d36ad",
+      "low": 0,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b83d22f9390102f80101088b833edd944df31cf84c3716f984f96af97d5e41f955011e8b4eaf25b9f12733ad72f037f92703098b15f52f39648238f9b83539399b938052e08359b9765e41f96a5e41f9d5f31cf87a5e41f97f5e41f960bf2639260f11ad6a001f8b4f8e8052b2ee50b913b75eb95476239100d407ad67923b39346224b9ae5b1991625e41f9",
+      "low": 0,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b997e8805211988152725e41f902bb5eb96ebe21b94b4542b9655e41f9237043b9665e41f9e23e8052eba21bf8c7955b5a2da100f80b01008beb4e1191d92181526b5e41f94ac610917e4004391301038b",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f3a932f9226072b9795e41f984203291ce061badc2a98152100267f9b4ae12917a5e41f9132453b993012c91146211f892a00ef871f1011c779a46b99f8328f9615e41f926f520b93a859881056951b9b6fd1039918902b94b00158bcf04482787a275b9bcc63591c20d7db91ce548f9b59110f816bb8052715e41f95d7c691c56ec76b91c03188b37ee21b9206821ad",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ffde63b939001b8b4d00008b2375094b144215ade1e10cf825a33b91fc1928398224815291c62939735e41f92998223983f213f9ec1c2b912eaa18ad71020e8bd59d3dad745e41f99dbb3091ad2d31b9b2fb1039ffba8152b7031d8b6df180528002128bb1ef2c91002910e47f5e41f9864418ad1ac001f858bf3f395a1b2db99c2933f91cde24b9a0973bad01ae0ef9e24505ad2457163931f47eb17a0326b9",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9fb5206f8cb1c3aada50b805271bc04ad916d2691d25e3cb981a70ab9ada70339d58b02add4401af8655e41f95a4003f9d09b14ad401313b9268071f9c0930ef9ac048052ddda47f9c30311adb23281522d031e8ba2612eb9ebf22bf925a420912a4261b9739e31917f8a13391ceb729a90626cf99f17a0179d1206f8ea2202f8f1c327f97e5e41f9",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ca362a39be3c05f9a6d04eb90cc919ada05204f8ca6c3791d0be8052c19c8052906ceed84f04353946010b8b7b5e41f9b702118b29931df8",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b985b01cf855fd8052ba4160f946e12439058003f8017648f98f400f39a7fcccd162f8e61adf01048b854808f9530080522fe81139392d334ce207cbbad9a642f945693e39cba930f91ff18152751957b9f79e815210083191d6c533ad0dab3e39808a08f952830bf9e27718ad2a30cab91edf22919a06f5515a1f06912b6fa64106d97cb9d5f31af8aef88152c4db14915fdc15917e5e41f9265d25910e9e70b92301068bc9c12ab9e9f443f9",
+      "low": -1267650600228229401496703205376,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b99f01168b8d1c00b94c28289a225616f9791435ad68906fb934d21639828018f802c945b9b8d521bad7302c3974b43a91a991d678685e41f97ed21c918624805213480df921c11bf8555e52f94afe60f91f031f8b72038052fd1c08ad41cd8152ca8b8058cbe60fb9655e41f947301ef86b5e41f9755e41f9383c8052",
+      "low": 9536,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9f65581520d7377f9a8f5fce7c1445359655e41f9071808ad0af719b9d8030a8b064112f9b46d22b9765e41f91d35805241411cb9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b99d2d3139344c70f97b5e41f9a3ccaeede03d6bf9da8f815251d646f9383d6df957020a8b078350b9c87272b9fcd607ad91f62991a35d22ad01a66d00b2011b8b2bcbf8c15a168152060119f94bef21394fab22ad21255db976da20f953000e8baad830918b7b15b9b9510bf8c002018b",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96c5e41f949b924f9d5e935f945578152678e71f676633dadcb181cf9145e8052655e41f980a158f9",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9665e41f9250846f9662001b962388152e0c28052eb8304f80e01008b0fa01cf8c45e02adaa1bab0773303fad128209ad6d5e41f9878b20ad745e41f9",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b927bf0fad45d839ad77ff62f9428b03ad26ec08b97e5e41f9e26b0d3996463eb96f5e41f967e16af9b6913991ab141a910b7971b9424d4ab9c401018b529b22394a630939b90c48b90b624ab916d30bf9cffe80526185383930b7379110fe61f9d6e0243931001a8bc8a224ad24809aef7ecdabe9b2e28052bdb808ad5fa8062a4be3ee0721710e91765e41f9c4cd20b9a2a004f8cf2a22adb77b0aad871c1cb9",
+      "low": 1099511627776,
+      "high": 1267650600228229401496703205376
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9ad8880527e5e41f97d3d4db9190900397b1088f747373badde1013f8b04718b97a021d8b1801118b00030ef87a831ef8c1f98052775e41f94f1a81529b2075f97c5e41f90401098b887e14b96d5e41f968f90db96b5e41f956493091936804f9c0da1df97201128b6d6703ad7c5e41f9947720cf665e41f9",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      },
+      {
+        "offset": 10850,
+        "site": 28,
+        "zero_source": false
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b932a444b9dac63a14ad0f66b989430af8cb471891aec25ab9b2723391615e41f9cad31ff8eac302f877c52eb967f10cf8bd9f48b905818052705e41f9e50620912b6d24913200088b30b12b39804aed3e35354af96dd11af84b862a396e89815253b20ef8ca8666b9775e41f9b1d03ab9f07f43751ee1b17ec1e00ff8fecc29b9c7c460f97f1902911e6f21b90d401d39dacabb888c00018bf0127cb9384b2aadba03138b30b249b9e6f53e916a0734f9",
+      "low": 0,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9a95157b9",
+      "low": -1267650600228229401496703205376,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96c5280524807a99ddf901bb970300bf8199734f9b89a04b9114f2aad705e41f94eed29b9f701108b66ad7ff96c3c91792c630bf84f012e39d1140839c44f01b9bd6d74f95ffa34ad16370a3906fb12ad3c480091dcf550f9ffd880521d3ca4171f7d53f94b3959f9427c8152e01617ad772557f9675e41f9c7550eb9cae204f8",
+      "low": 1099511627776,
+      "high": 11008
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9d902058b9f00018b19678152bba05db990132aad",
+      "low": 9536,
+      "high": -1
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b974c0263961db78b9a1362af95e02048bf61467f98bc315f8db7205f8f0e208f8890125ad625e41f955b31df821ad21ade34c39ad8af17af9399f21ade0e100f8191315f9502a69f9ee5002f87337b36cd4f73db930098052615e41f9963d8152665e41f9c71728b9f500158bfbec8052e2ea7f47f35061f9b7020c8b18383bf9ac001fb981048052797d32f951010691f7057db9",
+      "low": 9536,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b96f5014f870c013f8a9974ff9a1f000f918792c39d49262f907b080521edb2b915355283997bc1bf95c1473b9675e41f9e79222b9612c8152caa531f927d12291",
+      "low": -1267650600228229401496703205376,
+      "high": 11008
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9428b80527466b60f874217f8fb2d48b928224bf9d10c06ad54551fb950922dadd3431fad15f42ef96f5e41f9ab072d39d95d4af9839303f850720ef87229a96a1b3a8f1033ea0badab411739663512ad605e41f9f2a01ef9ef973fb9824621ad124d13adbd123c9140511bf87e0014ad3d030a8b9f031e8b2593660675300fb9",
+      "low": -1,
+      "high": 1267650600228229401496703205376
+    },
+    "result": [
+      {
+        "offset": 10848,
+        "site": 12,
+        "zero_source": true
+      }
+    ]
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9a12281520600188b6def58b9517731f9401219f8ff8303f8a87243f979b4c16f02c60fad6f4e139120691e3920b31dad8229805243020c8b",
+      "low": 0,
+      "high": 10000
+    },
+    "result": []
+  },
+  {
+    "request": {
+      "operation": "config_pointer_stores",
+      "code": "685e41f9094c85520801098b1f0100b9b700168b618014f80800188b9d130bf8695e41f993231cf8cf02128b5ede69f9bdddbce04c7b58f9006109f8b9e114f8054536b9beb27df9e99a2dadf3c833b92c9d71b94f4e133981760c39e29c07392a608152e3e0283903b11039ea9e1a39539433f99c414eb9df5644b9b61e6cb9785a0c91da03028b0000078b094a08b9e57310f8139c18b9865d1f39665e41f9ce800cf87103038b",
+      "low": 1099511627776,
+      "high": 10000
+    },
+    "result": []
+  }
+]
