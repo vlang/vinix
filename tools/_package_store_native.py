@@ -22,7 +22,7 @@ _wire = _module("package_store_wire", _ROOT / "build-support/android/_boot_nativ
 _controller = _host.Controller(_ROOT / "tools/package_store_query.v", "VINIX_PACKAGE_STORE_QUERY")
 
 
-def call(operation, arguments, namespace):
+def call(operation, arguments, namespace, *, controller=None):
     objects, errors, entered, closers = {}, [], {}, {}
     stack = contextlib.ExitStack()
     active = None
@@ -64,10 +64,13 @@ def call(operation, arguments, namespace):
         try:
             raise error.with_traceback(traceback)
         except BaseException:
+            replay = error.__traceback__
+            error.__traceback__ = traceback
             try:
                 return bool(owner.__exit__(type(error), error, traceback))
             finally:
-                error.__traceback__ = traceback
+                if error.__traceback__ is replay:
+                    error.__traceback__ = traceback
 
     def library_primitive(method, row):
         if method == "function":
@@ -134,23 +137,26 @@ def call(operation, arguments, namespace):
         try:
             raise error.with_traceback(traceback)
         except BaseException:
+            replay = error.__traceback__
+            error.__traceback__ = traceback
             try:
                 return library_primitive(method, row)
             finally:
-                error.__traceback__ = traceback
+                if error.__traceback__ is replay:
+                    error.__traceback__ = traceback
 
     keys = [retain(item) for item in arguments]
-    result = _controller.call({"operation": operation, "arguments": keys}, primitive,
+    result = (_controller if controller is None else controller).call({"operation": operation, "arguments": keys}, primitive,
         pack=_wire._pack, unpack=_wire._unpack, errors=errors,
         cleanup=lambda: stack.__exit__(*sys.exc_info()),
         error_fields=lambda error: {
             "os_error": isinstance(error, OSError), "missing": isinstance(error, FileNotFoundError),
             "tar_error": isinstance(error, namespace["tarfile"].TarError),
-            "overlay": isinstance(error, namespace["OverlayError"]),
-            "source": isinstance(error, namespace["SourceSnapshotError"]),
+            "overlay": isinstance(error, namespace.get("OverlayError", ())),
+            "source": isinstance(error, namespace.get("SourceSnapshotError", ())),
             "value_error": isinstance(error, ValueError),
             "called_process": isinstance(error, namespace["subprocess"].CalledProcessError),
             "shutil_error": isinstance(error, namespace["shutil"].Error),
-            "clipboard": isinstance(error, namespace["ClipboardError"]),
+            "clipboard": isinstance(error, namespace.get("ClipboardError", ())),
             "interrupt": isinstance(error, KeyboardInterrupt)})
     return objects[result] if result is not None else None

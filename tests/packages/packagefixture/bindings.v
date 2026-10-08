@@ -1,34 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-module packagestore
+module packagefixture
 
 import androidhost as ah
-import boothost
 import json2
-import os
+import packagestore
 
-pub struct BindingError {
-pub:
-	value map[string]ah.Value
-}
-
-pub fn (e BindingError) msg() string { return ah.field(e.value, 'message').text() }
-
-pub fn (e BindingError) code() int { return 0 }
-
-fn callback(name string, args map[string]ah.Value) !ah.Value {
-	println(ah.encode(boothost.pack(ah.Value({
-		'callback':  ah.Value(name)
-		'arguments': ah.Value(args)
-	}))))
-	row := boothost.unpack(json2.decode[ah.Value](os.get_raw_line())!)!.object()
-	if 'error' in row { return BindingError{ah.field(row, 'error').object()} }
-	return ah.field(row, 'value')
-}
-
-// The independent native fixture shares the same borrowed-object ABI.
-pub fn borrowed_binding(name string, args map[string]ah.Value) !ah.Value {
-	return callback(name, args)!
-}
+fn callback(name string, args map[string]ah.Value) !ah.Value { return packagestore.borrowed_binding(name, args)! }
 
 fn v(value ah.Value) ah.Value { return ah.Value([ah.Value('value'), value]) }
 
@@ -127,12 +104,12 @@ fn next(id string) !Next {
 }
 
 fn kind(err IError, name string) bool {
-	if err is BindingError { return ah.field(err.value, name) as bool }
+	if err is packagestore.BindingError { return ah.field(err.value, name) as bool }
 	return false
 }
 
 fn detail(err IError) ah.Value {
-	if err is BindingError { return ah.Value(err.value) }
+	if err is packagestore.BindingError { return ah.Value(err.value) }
 	return ah.Value(json2.Null{})
 }
 
