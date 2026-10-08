@@ -1,0 +1,2098 @@
+[
+  {
+    "test": "test_decodes_active_die_count_from_arm_io",
+    "request": {
+      "op": "arm",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "YXJtLWlvLHQ2MDUwAA=="
+        },
+        "die-count": {
+          "__vinix_binary": "AQAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "arm-io,t6050"
+      ],
+      "die_count": 1
+    }
+  },
+  {
+    "test": "test_decodes_apple_device_tree_little_endian_values",
+    "request": {
+      "op": "sgx",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "Z3B1LHQ2MDUwAA=="
+        },
+        "reg": {
+          "__vinix_binary": "AAAAACMAAAAAwP0DAAAAAAAA0AAjAAAAAHAXAAAAAAA="
+        },
+        "gpu-num-perf-states": {
+          "__vinix_binary": "AQAAAA=="
+        },
+        "perf-state-count": {
+          "__vinix_binary": "AgAAAA=="
+        },
+        "perf-state-table-count": {
+          "__vinix_binary": "AgAAAA=="
+        },
+        "perf-states": {
+          "__vinix_binary": "AGXNHbwCAAAAypo7vAIAAABlzR3GAgAAAMqaO8YCAAA="
+        },
+        "perf-states-sram": {
+          "__vinix_binary": "AGXNHSADAAAAypo7IAMAAABlzR0gAwAAAMqaOyADAAA="
+        },
+        "gfx-handoff-base": {
+          "__vinix_binary": "AAAg/x8BAAA="
+        },
+        "rtkit-private-vm-region-base": {
+          "__vinix_binary": "AAAAAAD8//8="
+        },
+        "interrupts": {
+          "__vinix_binary": "kAkAAJEJAACSCQAAkwkAAMIBAAD2CgAAnwkAAKEJAAA="
+        },
+        "interrupts-valid": {
+          "__vinix_binary": "3wAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "gpu,t6050"
+      ],
+      "register_ranges": [
+        {
+          "base": 150323855360,
+          "size": 66961408
+        },
+        {
+          "base": 150337486848,
+          "size": 1536000
+        }
+      ],
+      "gpu_num_perf_states": 1,
+      "perf_state_count": 2,
+      "perf_state_table_count": 2,
+      "gfx_handoff_base": 1236935901184,
+      "rtkit_private_vm_region_base": 18446739675663040512,
+      "interrupts": [
+        2448,
+        2449,
+        2450,
+        2451,
+        450,
+        2806,
+        2463,
+        2465
+      ],
+      "interrupt_count": 8,
+      "interrupts_valid": 223,
+      "perf_states": [
+        [
+          {
+            "frequency_hz": 500000000,
+            "voltage_mv": 700
+          },
+          {
+            "frequency_hz": 1000000000,
+            "voltage_mv": 700
+          }
+        ],
+        [
+          {
+            "frequency_hz": 500000000,
+            "voltage_mv": 710
+          },
+          {
+            "frequency_hz": 1000000000,
+            "voltage_mv": 710
+          }
+        ]
+      ],
+      "perf_states_sram": [
+        [
+          {
+            "frequency_hz": 500000000,
+            "voltage_mv": 800
+          },
+          {
+            "frequency_hz": 1000000000,
+            "voltage_mv": 800
+          }
+        ],
+        [
+          {
+            "frequency_hz": 500000000,
+            "voltage_mv": 800
+          },
+          {
+            "frequency_hz": 1000000000,
+            "voltage_mv": 800
+          }
+        ]
+      ]
+    }
+  },
+  {
+    "test": "test_decodes_g17_asc_firmware_segments",
+    "request": {
+      "op": "asc",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "R0ZYMQA="
+        },
+        "reg": {
+          "__vinix_binary": "AABgAiEAAAAAgAgAAAAAAAAABQIhAAAACAAAAAAAAAA="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAQABAAAAAAAAAPz//wAAAAEAAQAAAMAEAAEAAAAAAG8CAAEAAADABAAA/P//AABvAgABAAAAABMAAAAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 141773766656,
+          "size": 557056
+        },
+        {
+          "base": 141767802880,
+          "size": 8
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 1099528404992,
+          "iova": 18446739675663040512,
+          "remap": 1099528404992,
+          "size": 311296,
+          "flags": 1
+        },
+        {
+          "name": "__DATA",
+          "physical": 1099552456704,
+          "iova": 18446739675663351808,
+          "remap": 1099552456704,
+          "size": 1245184,
+          "flags": 0
+        }
+      ],
+      "role": "GFX1"
+    }
+  },
+  {
+    "test": "test_decodes_g17_auxiliary_performance_states",
+    "request": {
+      "op": "sgx",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "Z3B1LHQ2MDUwAA=="
+        },
+        "reg": {
+          "__vinix_binary": "AAAAACMAAAAAwP0DAAAAAA=="
+        },
+        "cs-perf-states": {
+          "__vinix_binary": "AQAAAAAAAAACAAAAAAAAAMAnCQAAAAAAAITXFwAAAABQ+AwAAAAAAADppDUAAAAAWNMLAAAAAAA="
+        },
+        "afr-perf-states": {
+          "__vinix_binary": "AQAAAAAAAAACAAAAAAAAAMAnCQAAAAAAAITXFwAAAABQ+AwAAAAAAADppDUAAAAAWNMLAAAAAAA="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "gpu,t6050"
+      ],
+      "register_ranges": [
+        {
+          "base": 150323855360,
+          "size": 66961408
+        }
+      ],
+      "cs_perf_states": {
+        "state_count": 2,
+        "rail_count": 1,
+        "tables": [
+          [
+            {
+              "frequency_hz": 400000000,
+              "voltage_uv": 600000
+            },
+            {
+              "frequency_hz": 900000000,
+              "voltage_uv": 850000
+            }
+          ]
+        ],
+        "default_sram_voltage_uv": [
+          775000
+        ]
+      },
+      "afr_perf_states": {
+        "state_count": 2,
+        "rail_count": 1,
+        "tables": [
+          [
+            {
+              "frequency_hz": 400000000,
+              "voltage_uv": 600000
+            },
+            {
+              "frequency_hz": 900000000,
+              "voltage_uv": 850000
+            }
+          ]
+        ],
+        "default_sram_voltage_uv": [
+          775000
+        ]
+      }
+    }
+  },
+  {
+    "test": "test_decodes_pmp_application_endpoint_service",
+    "request": {
+      "op": "endpoint",
+      "node": {
+        "IORegistryEntryName": "PMP0Endpoint1",
+        "IOObjectClass": "RTBuddyEndpointService",
+        "IORegistryEntryID": 123456
+      }
+    },
+    "result": {
+      "name": "PMP0Endpoint1",
+      "class": "RTBuddyEndpointService",
+      "role": "PMP0",
+      "service_suffix": 1,
+      "wire_endpoint": 32
+    }
+  },
+  {
+    "test": "test_decodes_t6050_pmp_preloaded_firmware",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADgBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17162240,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_opted_out_pmp_nub_without_preload_uses_service_firmware",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp0-nub",
+        "IOObjectClass": "AppleA7IOPNub",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "no-firmware-service": {
+          "__vinix_binary": "AQAAAA=="
+        }
+      },
+      "role": "PMP0"
+    },
+    "result": {
+      "name": "iop-pmp0-nub",
+      "role": "PMP0",
+      "properties": {
+        "pre-loaded": false,
+        "running": false,
+        "no-firmware-service": true
+      },
+      "has_segment_ranges": true,
+      "skip_firmware_service": true,
+      "firmware_load_path": "service-firmware"
+    }
+  },
+  {
+    "test": "test_preloaded_pmp_nub_still_awaits_a_firmware_service",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp0-nub",
+        "IOObjectClass": "AppleA7IOPNub",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "pre-loaded": {
+          "__vinix_binary": "AQAAAA=="
+        }
+      },
+      "role": "PMP0"
+    },
+    "result": {
+      "name": "iop-pmp0-nub",
+      "role": "PMP0",
+      "properties": {
+        "pre-loaded": true,
+        "running": false,
+        "no-firmware-service": false
+      },
+      "has_segment_ranges": true,
+      "skip_firmware_service": false,
+      "firmware_load_path": "await-firmware-service"
+    }
+  },
+  {
+    "test": "test_rejects_mismatched_or_malformed_pmp_nub",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp0-nub",
+        "IOObjectClass": "AppleA7IOPNub",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "role": "PMP1"
+    },
+    "error": "PMP1 nub plist is not iop-pmp1-nub"
+  },
+  {
+    "test": "test_rejects_mismatched_or_malformed_pmp_nub",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp0-nub",
+        "IOObjectClass": "IOService",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        }
+      },
+      "role": "PMP0"
+    },
+    "error": "iop-pmp0-nub has an unexpected IOObjectClass"
+  },
+  {
+    "test": "test_rejects_mismatched_or_malformed_pmp_nub",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp0-nub",
+        "IOObjectClass": "AppleA7IOPNub",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "pre-loaded": {
+          "__vinix_binary": "AgAAAA=="
+        }
+      },
+      "role": "PMP0"
+    },
+    "error": "iop-pmp0-nub pre-loaded is not the expected flag"
+  },
+  {
+    "test": "test_rejects_short_patchbay_input",
+    "request": {
+      "op": "patchbay",
+      "node": {
+        "chosen": {
+          "board-id": {
+            "__vinix_binary": "Dg=="
+          }
+        },
+        "pmgr": {},
+        "provider": {
+          "soc-chip-variant": {
+            "__vinix_binary": "AQI="
+          }
+        }
+      }
+    },
+    "error": "patchbay input CVAR is shorter than four bytes"
+  },
+  {
+    "test": "test_rejects_truncated_g17_auxiliary_performance_states",
+    "request": {
+      "op": "aux",
+      "node": {
+        "__vinix_binary": "AQAAAAAAAAACAAAAAAAAAMAnCQAAAAAAAITXFwAAAABQ+AwAAAAAAADppDUAAAAA"
+      },
+      "name": "cs-perf-states"
+    },
+    "error": "cs-perf-states must contain 1 x 2 records and SRAM defaults"
+  },
+  {
+    "test": "test_rejects_truncated_interrupt_specifiers",
+    "request": {
+      "op": "sgx",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "Z3B1LHQ2MDUwAA=="
+        },
+        "reg": {
+          "__vinix_binary": "AAAAACMAAAAAwP0DAAAAAA=="
+        },
+        "interrupts": {
+          "__vinix_binary": "AQID"
+        }
+      }
+    },
+    "error": "interrupts must contain little-endian 32-bit specifiers"
+  },
+  {
+    "test": "test_resolves_patchbay_inputs_and_zero_fills_absent_ones",
+    "request": {
+      "op": "patchbay",
+      "node": {
+        "chosen": {
+          "board-id": {
+            "__vinix_binary": "DgAAAA=="
+          },
+          "dram-vendor-id": {
+            "__vinix_binary": "/wAAAA=="
+          }
+        },
+        "pmgr": {
+          "pmc": {
+            "__vinix_binary": "AQAAAA=="
+          },
+          "pmc-pmgr": {
+            "__vinix_binary": "PwAAAA=="
+          }
+        },
+        "provider": {
+          "soc-chip-variant": {
+            "__vinix_binary": "AQAAAA=="
+          }
+        }
+      }
+    },
+    "result": [
+      {
+        "tag": "BDID",
+        "property": "board-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 14
+      },
+      {
+        "tag": "DVID",
+        "property": "dram-vendor-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 255
+      },
+      {
+        "tag": "DCAP",
+        "property": "dram-capacity",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "DCHD",
+        "property": "dram-channel-disable",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "PMC_",
+        "property": "pmc",
+        "node": "pmgr",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCV",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "value & 1",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCB",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "(value >> 3) & 1",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCX",
+        "property": "pmc-msg-disabled",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "CVAR",
+        "property": "soc-chip-variant",
+        "node": "provider",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      }
+    ]
+  },
+  {
+    "test": "test_resolves_patchbay_inputs_and_zero_fills_absent_ones",
+    "request": {
+      "op": "patchbay",
+      "node": {
+        "chosen": {
+          "board-id": {
+            "__vinix_binary": "DgAAAA=="
+          },
+          "dram-vendor-id": {
+            "__vinix_binary": "/wAAAA=="
+          }
+        },
+        "pmgr": {
+          "pmc": {
+            "__vinix_binary": "AQAAAA=="
+          },
+          "pmc-pmgr": {
+            "__vinix_binary": "NwAAAA=="
+          }
+        },
+        "provider": {
+          "soc-chip-variant": {
+            "__vinix_binary": "AQAAAA=="
+          }
+        }
+      }
+    },
+    "result": [
+      {
+        "tag": "BDID",
+        "property": "board-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 14
+      },
+      {
+        "tag": "DVID",
+        "property": "dram-vendor-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 255
+      },
+      {
+        "tag": "DCAP",
+        "property": "dram-capacity",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "DCHD",
+        "property": "dram-channel-disable",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "PMC_",
+        "property": "pmc",
+        "node": "pmgr",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCV",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "value & 1",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCB",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "(value >> 3) & 1",
+        "present": true,
+        "value": 0
+      },
+      {
+        "tag": "PMCX",
+        "property": "pmc-msg-disabled",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "CVAR",
+        "property": "soc-chip-variant",
+        "node": "provider",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      }
+    ]
+  },
+  {
+    "test": "test_resolves_patchbay_inputs_and_zero_fills_absent_ones",
+    "request": {
+      "op": "patchbay",
+      "node": {
+        "chosen": {
+          "board-id": {
+            "__vinix_binary": "DgAAAAAAAAA="
+          },
+          "dram-vendor-id": {
+            "__vinix_binary": "/wAAAA=="
+          }
+        },
+        "pmgr": {
+          "pmc": {
+            "__vinix_binary": "AQAAAA=="
+          },
+          "pmc-pmgr": {
+            "__vinix_binary": "NwAAAA=="
+          }
+        },
+        "provider": {
+          "soc-chip-variant": {
+            "__vinix_binary": "AQAAAA=="
+          }
+        }
+      }
+    },
+    "result": [
+      {
+        "tag": "BDID",
+        "property": "board-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "rejected width"
+      },
+      {
+        "tag": "DVID",
+        "property": "dram-vendor-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 255
+      },
+      {
+        "tag": "DCAP",
+        "property": "dram-capacity",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "DCHD",
+        "property": "dram-channel-disable",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "PMC_",
+        "property": "pmc",
+        "node": "pmgr",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCV",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "value & 1",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCB",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "(value >> 3) & 1",
+        "present": true,
+        "value": 0
+      },
+      {
+        "tag": "PMCX",
+        "property": "pmc-msg-disabled",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "CVAR",
+        "property": "soc-chip-variant",
+        "node": "provider",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      }
+    ]
+  },
+  {
+    "test": "test_resolves_patchbay_inputs_and_zero_fills_absent_ones",
+    "request": {
+      "op": "patchbay",
+      "node": {
+        "chosen": {
+          "board-id": {
+            "__vinix_binary": "DgAAAAAAAAA="
+          },
+          "dram-vendor-id": {
+            "__vinix_binary": "/wAAAA=="
+          }
+        },
+        "pmgr": {
+          "pmc": {
+            "__vinix_binary": "AQAAAA=="
+          },
+          "pmc-pmgr": {
+            "__vinix_binary": "NwAAAA=="
+          }
+        },
+        "provider": {
+          "soc-chip-variant": {
+            "__vinix_binary": "BwAAAAAAAAA="
+          }
+        }
+      }
+    },
+    "result": [
+      {
+        "tag": "BDID",
+        "property": "board-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "rejected width"
+      },
+      {
+        "tag": "DVID",
+        "property": "dram-vendor-id",
+        "node": "chosen",
+        "derivation": "value",
+        "present": true,
+        "value": 255
+      },
+      {
+        "tag": "DCAP",
+        "property": "dram-capacity",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "DCHD",
+        "property": "dram-channel-disable",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "PMC_",
+        "property": "pmc",
+        "node": "pmgr",
+        "derivation": "value",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCV",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "value & 1",
+        "present": true,
+        "value": 1
+      },
+      {
+        "tag": "PMCB",
+        "property": "pmc-pmgr",
+        "node": "pmgr",
+        "derivation": "(value >> 3) & 1",
+        "present": true,
+        "value": 0
+      },
+      {
+        "tag": "PMCX",
+        "property": "pmc-msg-disabled",
+        "node": "provider",
+        "derivation": "value",
+        "present": false,
+        "value": 0,
+        "reason": "property absent"
+      },
+      {
+        "tag": "CVAR",
+        "property": "soc-chip-variant",
+        "node": "provider",
+        "derivation": "value",
+        "present": true,
+        "value": 7
+      }
+    ]
+  },
+  {
+    "test": "test_running_pmp_nub_takes_the_preload_path",
+    "request": {
+      "op": "nub",
+      "node": {
+        "IORegistryEntryName": "iop-pmp1-nub",
+        "IOObjectClass": "AppleA7IOPNub",
+        "segment-ranges": {
+          "__vinix_binary": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        },
+        "pre-loaded": {
+          "__vinix_binary": "AQAAAA=="
+        },
+        "running": {
+          "__vinix_binary": "AQAAAA=="
+        }
+      },
+      "role": "PMP1"
+    },
+    "result": {
+      "name": "iop-pmp1-nub",
+      "role": "PMP1",
+      "properties": {
+        "pre-loaded": true,
+        "running": true,
+        "no-firmware-service": false
+      },
+      "has_segment_ranges": true,
+      "skip_firmware_service": true,
+      "firmware_load_path": "preload"
+    }
+  },
+  {
+    "test": "test_selects_only_non_secret_accelerator_properties",
+    "request": {
+      "op": "accelerator",
+      "node": {
+        "IORegistryEntryID": 123456,
+        "model": "Apple M5 Max",
+        "gpu-core-count": 40,
+        "MetalPluginName": "AGXMetalG17X",
+        "GPUConfigurationVariable": {
+          "gpu_gen": 17,
+          "gpu_var": "C",
+          "num_cores": 40,
+          "num_mgpus": 4,
+          "private_unknown": 99
+        }
+      }
+    },
+    "result": {
+      "configuration": {
+        "gpu_gen": 17,
+        "gpu_var": "C",
+        "num_cores": 40,
+        "num_mgpus": 4
+      },
+      "gpu_core_count": 40,
+      "model": "Apple M5 Max",
+      "metal_plugin": "AGXMetalG17X"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_accepts_one_active_pmp_for_one_die",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADgBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17162240,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_accepts_one_active_pmp_for_one_die",
+    "request": {
+      "op": "validate",
+      "node": {
+        "platform": {
+          "compatible": [
+            "arm-io,t6050"
+          ],
+          "die_count": 1
+        },
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ]
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX1"
+          }
+        ],
+        "pmp_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 10809769984,
+                "iova": 16777216,
+                "remap": 10809769984,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 10810155008,
+                "iova": 17162240,
+                "remap": 10810155008,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP0"
+          }
+        ],
+        "accelerator": {
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C"
+          }
+        }
+      }
+    },
+    "result": []
+  },
+  {
+    "test": "test_t6050_manifest_cross_checks_topology",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADgBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17162240,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_cross_checks_topology",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMQA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhEIAAAAAAAABAAAAAAAAUIRCAAAAAOAFAAMAAAAA4FWEQgAAAADgBQEAAAAAAOBVhEIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 285687676928,
+          "iova": 16777216,
+          "remap": 285687676928,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 285688061952,
+          "iova": 17162240,
+          "remap": 285688061952,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP1"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_cross_checks_topology",
+    "request": {
+      "op": "endpoint",
+      "node": {
+        "IORegistryEntryName": "PMP0Endpoint1",
+        "IOObjectClass": "RTBuddyEndpointService"
+      }
+    },
+    "result": {
+      "name": "PMP0Endpoint1",
+      "class": "RTBuddyEndpointService",
+      "role": "PMP0",
+      "service_suffix": 1,
+      "wire_endpoint": 32
+    }
+  },
+  {
+    "test": "test_t6050_manifest_cross_checks_topology",
+    "request": {
+      "op": "endpoint",
+      "node": {
+        "IORegistryEntryName": "PMP1Endpoint1",
+        "IOObjectClass": "RTBuddyEndpointService"
+      }
+    },
+    "result": {
+      "name": "PMP1Endpoint1",
+      "class": "RTBuddyEndpointService",
+      "role": "PMP1",
+      "service_suffix": 1,
+      "wire_endpoint": 32
+    }
+  },
+  {
+    "test": "test_t6050_manifest_cross_checks_topology",
+    "request": {
+      "op": "validate",
+      "node": {
+        "platform": {
+          "compatible": [
+            "arm-io,t6050"
+          ],
+          "die_count": 2
+        },
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ],
+          "rtkit_private_vm_region_base": 18446739675663040512,
+          "gfx_data_base": 1099552456704,
+          "gfx_data_size": 1245184
+        },
+        "asc": {
+          "compatible": [
+            "iop,ascwrap-v6"
+          ],
+          "role": "GFX",
+          "segments": [
+            {
+              "name": "__TEXT",
+              "physical": 1099528404992,
+              "iova": 18446739675663040512,
+              "size": 311296
+            },
+            {
+              "name": "__DATA",
+              "physical": 1099552456704,
+              "iova": 18446739675663351808,
+              "size": 1245184
+            }
+          ]
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX1"
+          }
+        ],
+        "pmp_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 10809769984,
+                "iova": 16777216,
+                "remap": 10809769984,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 10810155008,
+                "iova": 17162240,
+                "remap": 10810155008,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP0"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 285687676928,
+                "iova": 16777216,
+                "remap": 285687676928,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 285688061952,
+                "iova": 17162240,
+                "remap": 285688061952,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP1"
+          }
+        ],
+        "pmp_endpoint_services": [
+          {
+            "name": "PMP0Endpoint1",
+            "class": "RTBuddyEndpointService",
+            "role": "PMP0",
+            "service_suffix": 1,
+            "wire_endpoint": 32
+          },
+          {
+            "name": "PMP1Endpoint1",
+            "class": "RTBuddyEndpointService",
+            "role": "PMP1",
+            "service_suffix": 1,
+            "wire_endpoint": 32
+          }
+        ],
+        "accelerator": {
+          "gpu_core_count": 40,
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C",
+            "num_cores": 40,
+            "core_mask_list": [
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          }
+        }
+      }
+    },
+    "result": []
+  },
+  {
+    "test": "test_t6050_manifest_rejects_changed_pmp_application_endpoint",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADgBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17162240,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_rejects_changed_pmp_application_endpoint",
+    "request": {
+      "op": "validate",
+      "node": {
+        "platform": {
+          "compatible": [
+            "arm-io,t6050"
+          ],
+          "die_count": 1
+        },
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ]
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX1"
+          }
+        ],
+        "pmp_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 10809769984,
+                "iova": 16777216,
+                "remap": 10809769984,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 10810155008,
+                "iova": 17162240,
+                "remap": 10810155008,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP0"
+          }
+        ],
+        "pmp_endpoint_services": [
+          {
+            "name": "PMP0Endpoint2",
+            "class": "RTBuddyEndpointService",
+            "role": "PMP0",
+            "service_suffix": 2,
+            "wire_endpoint": 33
+          }
+        ],
+        "accelerator": {
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C"
+          }
+        }
+      }
+    },
+    "result": [
+      "t6050 PMP0 application endpoint changed"
+    ]
+  },
+  {
+    "test": "test_t6050_manifest_rejects_changed_pmp_preload_mapping",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADwBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17166336,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_rejects_changed_pmp_preload_mapping",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMQA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhEIAAAAAAAABAAAAAAAAUIRCAAAAAOAFAAMAAAAA4FWEQgAAAADgBQEAAAAAAOBVhEIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 285687676928,
+          "iova": 16777216,
+          "remap": 285687676928,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 285688061952,
+          "iova": 17162240,
+          "remap": 285688061952,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP1"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_rejects_changed_pmp_preload_mapping",
+    "request": {
+      "op": "validate",
+      "node": {
+        "platform": {
+          "compatible": [
+            "arm-io,t6050"
+          ],
+          "die_count": 2
+        },
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ]
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX1"
+          }
+        ],
+        "pmp_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 10809769984,
+                "iova": 16777216,
+                "remap": 10809769984,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 10810155008,
+                "iova": 17166336,
+                "remap": 10810155008,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP0"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 285687676928,
+                "iova": 16777216,
+                "remap": 285687676928,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 285688061952,
+                "iova": 17162240,
+                "remap": 285688061952,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP1"
+          }
+        ],
+        "accelerator": {
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C"
+          }
+        }
+      }
+    },
+    "result": [
+      "t6050 PMP0 iBoot firmware map changed"
+    ]
+  },
+  {
+    "test": "test_t6050_manifest_rejects_pmp_count_that_differs_from_die_count",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMAA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhAIAAAAAAAABAAAAAAAAUIQCAAAAAOAFAAMAAAAA4FWEAgAAAADgBQEAAAAAAOBVhAIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 10809769984,
+          "iova": 16777216,
+          "remap": 10809769984,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 10810155008,
+          "iova": 17162240,
+          "remap": 10810155008,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP0"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_rejects_pmp_count_that_differs_from_die_count",
+    "request": {
+      "op": "pmp",
+      "node": {
+        "compatible": {
+          "__vinix_binary": "aW9wLGFzY3dyYXAtdjYA"
+        },
+        "role": {
+          "__vinix_binary": "UE1QMQA="
+        },
+        "reg": {
+          "__vinix_binary": "AADghAAAAAAAgAgAAAAAAA=="
+        },
+        "segment-names": {
+          "__vinix_binary": "X19URVhUO19fREFUQQA="
+        },
+        "segment-ranges": {
+          "__vinix_binary": "AABQhEIAAAAAAAABAAAAAAAAUIRCAAAAAOAFAAMAAAAA4FWEQgAAAADgBQEAAAAAAOBVhEIAAAAAoAkABgAAAA=="
+        }
+      }
+    },
+    "result": {
+      "compatible": [
+        "iop,ascwrap-v6"
+      ],
+      "register_ranges": [
+        {
+          "base": 2229272576,
+          "size": 557056
+        }
+      ],
+      "segments": [
+        {
+          "name": "__TEXT",
+          "physical": 285687676928,
+          "iova": 16777216,
+          "remap": 285687676928,
+          "size": 385024,
+          "flags": 3,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": false
+        },
+        {
+          "name": "__DATA",
+          "physical": 285688061952,
+          "iova": 17162240,
+          "remap": 285688061952,
+          "size": 630784,
+          "flags": 6,
+          "apple_driver_mapper_insert": false,
+          "mapping_owner": "iboot-preinstalled",
+          "writable": true
+        }
+      ],
+      "role": "PMP1"
+    }
+  },
+  {
+    "test": "test_t6050_manifest_rejects_pmp_count_that_differs_from_die_count",
+    "request": {
+      "op": "validate",
+      "node": {
+        "platform": {
+          "compatible": [
+            "arm-io,t6050"
+          ],
+          "die_count": 1
+        },
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ]
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX1"
+          }
+        ],
+        "pmp_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 10809769984,
+                "iova": 16777216,
+                "remap": 10809769984,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 10810155008,
+                "iova": 17162240,
+                "remap": 10810155008,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP0"
+          },
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "register_ranges": [
+              {
+                "base": 2229272576,
+                "size": 557056
+              }
+            ],
+            "segments": [
+              {
+                "physical": 285687676928,
+                "iova": 16777216,
+                "remap": 285687676928,
+                "size": 385024,
+                "flags": 3,
+                "name": "__TEXT",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": false
+              },
+              {
+                "physical": 285688061952,
+                "iova": 17162240,
+                "remap": 285688061952,
+                "size": 630784,
+                "flags": 6,
+                "name": "__DATA",
+                "apple_driver_mapper_insert": false,
+                "mapping_owner": "iboot-preinstalled",
+                "writable": true
+              }
+            ],
+            "role": "PMP1"
+          }
+        ],
+        "accelerator": {
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C"
+          }
+        }
+      }
+    },
+    "result": [
+      "t6050 active PMP wrapper count differs from arm-io die count"
+    ]
+  },
+  {
+    "test": "test_t6050_manifest_requires_both_firmware_roles",
+    "request": {
+      "op": "validate",
+      "node": {
+        "device_tree": {
+          "compatible": [
+            "gpu,t6050"
+          ]
+        },
+        "asc": {
+          "compatible": [
+            "iop,ascwrap-v6"
+          ],
+          "role": "GFX"
+        },
+        "asc_roles": [
+          {
+            "compatible": [
+              "iop,ascwrap-v6"
+            ],
+            "role": "GFX"
+          }
+        ],
+        "accelerator": {
+          "gpu_core_count": 40,
+          "configuration": {
+            "gpu_gen": 17,
+            "gpu_var": "C",
+            "num_cores": 40,
+            "core_mask_list": [
+              1023,
+              1023,
+              1023,
+              1023
+            ]
+          }
+        }
+      }
+    },
+    "result": [
+      "t6050 does not expose both GFX and GFX1 firmware ASCs",
+      "t6050 platform is not arm-io,t6050",
+      "t6050 arm-io die count is not one or two",
+      "t6050 does not expose an active PMP firmware wrapper"
+    ]
+  }
+]
