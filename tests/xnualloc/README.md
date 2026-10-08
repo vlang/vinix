@@ -8,15 +8,17 @@ From the repository root, the independent model and reference checks are:
 
 ```sh
 . build-support/find-v.sh
+export VEXE="$V"
 "$V" -cc cc test tests/memory/heapmodel
-python3 tests/xnualloc/reference_test.py
-"$V" -cc cc -path "$(pwd)/tests/memory|@vlib|@vmodules" test tests/xnualloc/zonemodel
+VMODULES="$(pwd)/tests/memory" "$V" -cc cc test tests/xnualloc/refmodel
+VMODULES="$(pwd)/tests/memory" "$V" -cc cc test tests/xnualloc/zonemodel
 ```
 
 They retain 10 independent slab-model tests, 4 C-reference/model tests
 and 6 non-SMR zone-protocol/source tests. The V models remain independent of the
-production allocator and share the original seeded MT19937 operation plan. The reference
-suite requires a C compiler with UBSan; set `CC` to its executable if necessary.
+production allocator and share the original seeded MT19937 operation plan.
+The reference suite retains its independent C fixture and requires a C compiler
+with UBSan; set `CC` to its executable if necessary.
 The zone model uses four logical CPU caches, not concurrent hardware threads.
 
 CI retains the checksum-pinned V 0.5.2 release compiler for these host tests.
@@ -29,8 +31,8 @@ Actual V host tests (18 functions):
 v_host=/absolute/path/to/v-0.5.2/v
 export VEXE="$v_host"
 export V_C_ERROR_BUG_REPORT_DISABLED=1
-VMODULES="$(pwd)/kernel" "$v_host" -cc gcc -gc none test tests/xnualloc
-VMODULES="$(pwd)/kernel" "$v_host" -prod -cc gcc -gc none test tests/xnualloc
+VMODULES="$(pwd)/kernel" "$v_host" -cc gcc -gc none test tests/xnualloc/*_test.v
+VMODULES="$(pwd)/kernel" "$v_host" -prod -cc gcc -gc none test tests/xnualloc/*_test.v
 ```
 
 On a normal Linux x86-64 Vinix build machine, with a compatible V compiler:

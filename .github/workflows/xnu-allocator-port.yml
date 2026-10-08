@@ -45,13 +45,15 @@ jobs:
           name: xnu-port-host-toolchain
           path: ${{ runner.temp }}/v_linux.zip
           retention-days: 1
-      - name: Model and extracted C-reference checks (not V execution)
+      - name: Independent V models and extracted C-reference checks
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/memory/heap_model_test.py
-          python3 tests/xnualloc/reference_test.py
-          python3 tests/xnualloc/zone_model_test.py
+          V="$RUNNER_TEMP/xnu-port-v/v/v"
+          export VEXE="$V"
+          "$V" -cc gcc test tests/memory/heapmodel
+          VMODULES="$GITHUB_WORKSPACE/tests/memory" "$V" -cc gcc \
+            test tests/xnualloc/refmodel tests/xnualloc/zonemodel
       - name: Actual V tests (debug and production)
         shell: bash
         run: |
@@ -59,8 +61,8 @@ jobs:
           V="$RUNNER_TEMP/xnu-port-v/v/v"
           export VEXE="$V"
           export VMODULES="$GITHUB_WORKSPACE/kernel"
-          "$V" -cc gcc -gc none test tests/xnualloc
-          "$V" -prod -cc gcc -gc none test tests/xnualloc
+          "$V" -cc gcc -gc none test tests/xnualloc/*_test.v
+          "$V" -prod -cc gcc -gc none test tests/xnualloc/*_test.v
 
   kernel-smoke:
     needs: host-tests
