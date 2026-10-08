@@ -4,13 +4,14 @@ This directory contains read-only host tools used to replace guesses in the
 Vinix AGX driver with observations from Apple hardware and software. It does
 not contain or redistribute Apple firmware, kernel collections, or drivers.
 
-`inspect_macos.py` collects a sanitized JSON hardware manifest from `arm-io`,
+`inspect_macos` collects a sanitized JSON hardware manifest from `arm-io`,
 the `sgx` Apple DeviceTree node, the active GFX/PMP firmware wrappers, the AGX
 accelerator, and the installed driver Info.plist:
 
 ```sh
-./inspect_macos.py
-python3 -m unittest -v test_inspect_macos.py
+./inspect_macos
+. ../../build-support/find-v.sh
+"$V" -cc cc test macinspect
 ```
 
 Apple DeviceTree numeric data exposed by `ioreg -a` is native little-endian.
