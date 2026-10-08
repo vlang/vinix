@@ -471,11 +471,6 @@ G17_RUNTIME_ACCESSORS = {
 ROOT_FIELDS = (0x18, 0x20, 0xA8, 0xB0, 0xB8, 0xC0)
 DATA_MASTER_RING = "__ZN18AGXAcceleratorRingI30AGFIAcceleratorDataMasterEntryE"
 DEVICE_CONTROL_RING = "__ZN18AGXAcceleratorRingI33AGFIAcceleratorDeviceControlEntryE"
-RING_ACCESSORS = {
-    "read_index": "12getReadIndexEv",
-    "cfi_index": "11getCFIIndexEv",
-    "write_index": "13getWriteIndexEv",
-}
 NEXT_DATA_MASTER_ENTRY = DATA_MASTER_RING + "9nextEntryEP13IOCommandGate"
 ENCODE_ACCELERATOR_COMMAND = (
     "__ZN14AGXArmFirmware28encodeAcceleratorRingCommandE"
@@ -1465,251 +1460,26 @@ def recover_g17_feature_defaults(
 # Every accelerator site that stores the +0x6d0 feature-flag word. Each is a
 # read-modify-write of the word; `sets` names how the bits it can newly set
 # are recovered from the pinned instructions ("none" for AND-only sites).
-G17_FEATURE_FLAG_WRITERS: tuple[tuple[str, int, dict[int, int], tuple], ...] = (
-    (BASE_CONFIGURE_DEVICE, 0x22C,
-     {0x208: 0xF9436A68, 0x20C: 0x9261F908, 0x228: 0xB2400108, 0x22C: 0xF9036A68},
-     ("orr_immediate", 0x228)),
-    # (old & 0xffffffffff061281) | (0x100 or 0) | (6 or 4)
-    (BASE_CONFIGURE_DEVICE, 0x310,
-     {0x26C: 0xF9436A68, 0x274: 0x52800095, 0x278: 0x528000C9, 0x27C: 0x9A951129,
-      0x28C: 0x929DAFCA, 0x290: 0xF2BFE0CA, 0x294: 0x8A0A010A, 0x29C: 0x92620108,
-      0x2A4: 0x52802008, 0x2A8: 0x9A9F0108, 0x2AC: 0xAA0A0108, 0x2B0: 0xAA090108,
-      0x310: 0xF9036A68},
-     ("movz_w", 0x2A4, 0x278, 0x274)),
-    (BASE_CONFIGURE_DEVICE, 0x524,
-     {0x4F0: 0xF9436A68, 0x4F4: 0x92B7E009, 0x4F8: 0xF2DFFE29, 0x4FC: 0x8A090108,
-      0x524: 0xF9036A68},
-     ("none",)),
-    (BASE_CONFIGURE_DEVICE, 0x60C,
-     {0x5A4: 0xF9436A69, 0x5E4: 0x92801008, 0x5E8: 0xF2D003E8, 0x5EC: 0xF2FFBE88,
-      0x5F0: 0x8A080128, 0x600: 0xD2C50009, 0x604: 0xF2E04009, 0x608: 0xAA090108,
-      0x60C: 0xF9036A68},
-     ("move_wide_x", 0x600, 0x604)),
-    (BASE_CONFIGURE_DEVICE, 0x684,
-     {0x67C: 0xF9436A68, 0x680: 0x925BF908, 0x684: 0xF9036A68}, ("none",)),
-    (BASE_CONFIGURE_DEVICE, 0x71C,
-     {0x714: 0xF9436A68, 0x718: 0x9246F908, 0x71C: 0xF9036A68}, ("none",)),
-    (BASE_CONFIGURE_DEVICE, 0xB8C,
-     {0xB7C: 0xF9436A68, 0xB80: 0x92830009, 0xB84: 0xF2BFFD69, 0xB88: 0x8A090108,
-      0xB8C: 0xF9036A68},
-     ("none",)),
-    # Only when the power-column count is at least two.
-    (BASE_CONFIGURE_DEVICE, 0xBA0,
-     {0xB90: 0xB944E669, 0xB94: 0x7100093F, 0xB9C: 0xB26B0108, 0xBA0: 0xF9036A68},
-     ("orr_immediate", 0xB9C)),
-    (BASE_CONFIGURE_DEVICE, 0xCD4,
-     {0xCCC: 0xF9436A69, 0xCD0: 0x9269F928, 0xCD4: 0xF9036A68}, ("none",)),
-    # Copies the old bit 30 into bit 25.
-    (BASE_CONFIGURE_DEVICE, 0xD0C,
-     {0xCD8: 0xD35EFD35, 0xD04: 0xF9436A68, 0xD08: 0xB36702A8, 0xD0C: 0xF9036A68},
-     ("bfi", 0xD08)),
-    (BASE_CONFIGURE_DEVICE, 0xD80,
-     {0xD38: 0xF9436A68, 0xD7C: 0x924BF908, 0xD80: 0xF9036A68}, ("none",)),
-    (BASE_CONFIGURE_DEVICE, 0x1FE8,
-     {0x1FE0: 0xF9436A68, 0x1FE4: 0x924AF908, 0x1FE8: 0xF9036A68}, ("none",)),
-    (BASE_CONFIGURE_DEVICE, 0x24AC,
-     {0x24A4: 0xF9436A68, 0x24A8: 0x9247F908, 0x24AC: 0xF9036A68}, ("none",)),
-    (PI300_CONFIGURE_DEVICE, 0xA8,
-     {0x84: 0xF9436A68, 0x9C: 0x52909809, 0xA0: 0x72B00029, 0xA4: 0xAA090108,
-      0xA8: 0xF9036A68},
-     ("move_wide_w", 0x9C, 0xA0)),
-    (PI300_CONFIGURE_DEVICE, 0x278,
-     {0x224: 0xF9436A69, 0x26C: 0xD2C00C0A, 0x270: 0xF2E0004A, 0x274: 0xAA0A0129,
-      0x278: 0xF9036A69},
-     ("move_wide_x", 0x26C, 0x270)),
-    (G17_CONFIGURE_DEVICE, 0xA4,
-     {0x94: 0xF9436A68, 0x98: 0xD2A30049, 0x9C: 0xF2E00029, 0xA0: 0xAA090108,
-      0xA4: 0xF9036A68},
-     ("move_wide_x", 0x98, 0x9C)),
-    (G17_CONFIGURE_DEVICE, 0x62C,
-     {0x61C: 0xF9436A6A, 0x620: 0xB25E014A, 0x62C: 0xF9036A6A},
-     ("orr_immediate", 0x620)),
-    # Reached through firmware +0x298; it can only toggle bit 1.
-    (G17_SET_SMART_IDLE_OFF_ENABLE, 0x20,
-     {0x08: 0xF9436909, 0x10: 0x5280004A, 0x14: 0x9A9F114A, 0x18: 0x927EF929,
-      0x1C: 0xAA0A0129, 0x20: 0xF9036909},
-     ("movz_w", 0x10)),
-)
 
 # Census entries that write +0x6d0..+0x6d7 of some *other* object, with the
 # reason they cannot be the accelerator. Keys are (kind, symbol, offset).
-G17_FEATURE_FLAG_OTHER_OBJECTS: dict[tuple[str, str, int], str] = {
-    ("store", "__ZN22AGXCLCommandDescriptor4initEP5IOGPUP17IOGPUCommandQueueP9IOGPUTaskPKcyP19AGXDebugBufferShmem", 0x114):
-        "this is the AGXCLCommandDescriptor being initialized",
-    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x1A50):
-        "zero store to firmware power data [firmware+0x2d8]+0x46d0",
-    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x24F0):
-        "firmware runtime data [firmware+0x380]+0x12c+0x5a0",
-    ("store", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x24F8):
-        "firmware runtime data [firmware+0x380]+0x12c+0x5a8",
-    ("store", "__ZN28AGXHardwareKernelCommandUtil27copy3DCommonPassthroughDataEP22AGX3DCommandDescriptorRK21AGX3DCommandCommonRec", 0xF0):
-        "the first argument is the AGX3DCommandDescriptor",
-    ("global", "__GLOBAL__sub_I_agxk_firmware.cpp", 0x44):
-        "static initializer storing an ADRP-addressed global",
-    ("global", "__GLOBAL__sub_I_agxk_internal_resource.cpp", 0xBC):
-        "static initializer storing an ADRP-addressed global",
-    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x25EC):
-        "copies into the IOMallocData buffer allocated just before",
-    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x26C8):
-        "copies into the IOMallocData buffer allocated just before",
-    ("memory_routine", "__ZN11AGXFirmware23ensureStatisticsUpdatedEv", 0x1A0):
-        "copies into AGXStatistics +0x480, reached through accelerator +0x1cb20",
-    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x2B64):
-        "copies a table into firmware power data",
-    ("memory_routine", "__ZN22AGXPerfCtrSamplerGen1123commitSourceCounterListEv", 0x214):
-        "refills the 0x800-byte source array cleared at the same address",
-    ("memory_routine", "__ZN16AGXRestartReport22finalizeAndSendReportsEP14AGXAccelerator", 0x91C):
-        "copies into the IOMallocData report buffer allocated just before",
-}
 
 # Escaped interior pointers are accepted by callee when the callee cannot write
 # the word: event tokens, noreturn traps, IOGPUEvent members (0x40 bytes; the
 # accelerator keeps an 8-byte deadline at +0x6c8, so none sits there) and the
 # 8-byte deadline itself.
-G17_FEATURE_FLAG_SAFE_CALLEES = {
-    "_clock_interval_to_deadline": "writes one u64 deadline ending before the word",
-    "_IOLockWakeup": "the pointer is an event token",
-    "__ZN14AGXAccelerator16acceleratorSleepEPv": "the pointer is an event token",
-    "_panic": "does not return",
-    "__ZN9os_detail21panic_trapping_policy4trapEPKc": "does not return",
-    "__ZN9os_detail21panic_trapping_policy4trapEPKc.232": "does not return",
-    "__ZNK17IOGPUEventMachine9copyEventEPK10IOGPUEventPS0_": "IOGPUEvent member",
-    "__ZNK17IOGPUEventMachine10mergeEventEPK10IOGPUEventPS0_": "IOGPUEvent member",
-    "__ZNK17IOGPUEventMachine10scrubEventEP10IOGPUEvent": "IOGPUEvent member",
-    "__ZN17IOGPUEventMachine9initEventEP10IOGPUEvent": "IOGPUEvent member",
-    "__ZNK17IOGPUEventMachine17isStampIdxInEventEP10IOGPUEventiPj": "IOGPUEvent member",
-    "__ZNK17IOGPUEventMachine18eventHasStampIndexEPK10IOGPUEventi": "IOGPUEvent member",
-    "__ZN15AGXEventMachine10traceEventE18AGXSTraceEventTypeP10IOGPUEventy": "IOGPUEvent member",
-    "__ZN13AGXStatistics22updateThrottleCountersEP29AGFPowerThrottleCountersStatsPVj21AGFAControlDomainType":
-        "a u32 counter in the firmware statistics object",
-    "__ZN15AGXCommandQueue25populateCommandHWDSIDDataERK24AGXHardwareKernelCommandP12IOGPUChanneljP20AGXCommandHWDSIDData":
-        "the AGXCommandHWDSIDData of a compute descriptor",
-}
 # Escapes through a virtual call, which the census cannot name, by site.
-G17_FEATURE_FLAG_VIRTUAL_ESCAPES: dict[tuple[str, int], str] = {
-    ("__ZN14AGXAccelerator25mcacheApertureBufferSetupER20AGXCommandHWDSIDDataiR25_AGFICommandKSMBufferInfoi", 0xF0):
-        "member of the _AGFICommandKSMBufferInfo argument",
-    ("__ZN14AGXAccelerator18drainCommandsTimerEv", 0x88):
-        "event token for a wakeup; the byte at +0x681 is below the word",
-    ("__ZN14AGXAccelerator17drainDeviceEventsEv", 0x124):
-        "event token for a wakeup; the byte at +0x681 is below the word",
-    ("__ZN16AGXCLChannelSKSM12submitBufferEP22IOGPUCommandDescriptor", 0x6A4):
-        "member of the IOGPUCommandDescriptor argument",
-}
-G17_FEATURE_FLAG_VIRTUAL_ESCAPE_PREFIXES = (
-    # Float out-parameters of the firmware power-controller configuration.
-    "__ZN14AGXArmFirmware31getPIControllerConfigDictionaryE",
-)
 
 # Census entries writing accelerator +0xf7ec..+0xf7ff that are not the chip
 # information override, with the reason they cannot change its final value.
-G17_CHIP_INFO_OTHER_WRITERS: dict[tuple[str, str, int], str] = {
-    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x25EC):
-        "copies into the IOMallocData buffer allocated just before",
-    ("memory_routine", BASE_CONFIGURE_DEVICE, 0x26C8):
-        "copies into the IOMallocData buffer allocated just before",
-    ("memory_routine", "__ZN11AGXFirmware27initPowerAndPerformanceDataEv", 0x2C):
-        "clears the firmware power data [firmware+0x2d8]",
-    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0xD38):
-        "clears a firmware power-data table",
-    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0xE30):
-        "clears a firmware power-data table",
-    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x1F78):
-        "clears firmware power data [firmware+0x2d8]+0x52d4",
-    ("memory_routine", "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv", 0x2B64):
-        "copies a table into firmware power data",
-    ("memory_routine", "__ZN22AGXPerfCtrSamplerGen1123commitSourceCounterListEv", 0x214):
-        "refills the 0x800-byte source array cleared at the same address",
-    ("memory_routine", "__ZN16AGXRestartReport22finalizeAndSendReportsEP14AGXAccelerator", 0x91C):
-        "copies into the IOMallocData report buffer allocated just before",
-    # retrieveChipInfo fills AGXSChipInfo at +0xf7c8 from inside the base
-    # configureDevice, which returns before the override is stored.
-    ("escape", BASE_CONFIGURE_DEVICE, 0x64C):
-        "retrieveChipInfo, called before the override",
-}
 
 
-def _feature_flag_set_bits(code: bytes, recipe: tuple) -> int:
-    kind = recipe[0]
-    word = lambda offset: struct.unpack_from("<I", code, offset)[0]  # noqa: E731
-    if kind == "none":
-        return 0
-    if kind == "orr_immediate":
-        decoded = decode_logical_immediate_x(word(recipe[1]))
-        if decoded is None or decoded[0] != "orr":
-            raise ValueError("feature-flag OR immediate no longer decodes")
-        return decoded[3]
-    if kind == "movz_w":
-        bits = 0
-        for offset in recipe[1:]:
-            move = decode_movz_w(word(offset))
-            if move is None:
-                raise ValueError("feature-flag MOVZ no longer decodes")
-            bits |= move[1]
-        return bits
-    if kind == "move_wide_w":
-        low = decode_movz_w(word(recipe[1]))
-        high = decode_movk_w(word(recipe[2]))
-        if low is None or high is None:
-            raise ValueError("feature-flag 32-bit constant no longer decodes")
-        return (low[1] & ~(0xFFFF << high[2])) | high[1] << high[2]
-    if kind == "move_wide_x":
-        value = 0
-        for offset in recipe[1:]:
-            move = decode_move_wide(word(offset))
-            if move is None or move[0] not in ("movz", "movk"):
-                raise ValueError("feature-flag 64-bit constant no longer decodes")
-            _kind, _register, immediate, shift = move
-            if move[0] == "movz":
-                value = immediate << shift
-            else:
-                value = (value & ~(0xFFFF << shift)) | immediate << shift
-        return value
-    if kind == "bfi":
-        decoded = decode_bfi_x(word(recipe[1]))
-        if decoded is None:
-            raise ValueError("feature-flag BFI no longer decodes")
-        _destination, _source, lsb, width = decoded
-        return ((1 << width) - 1) << lsb
-    raise ValueError(f"unknown feature-flag recipe {kind!r}")
 
 
-def _census_key(entry: dict[str, object]) -> tuple[str, str, int]:
-    return str(entry["kind"]), str(entry["symbol"]), int(entry["offset"])
 
 
 def require_zeroed_accelerator_allocation(image: bytes, kernel_image: bytes) -> dict[str, object]:
-    """Prove the G17 accelerator object starts zero-filled."""
-
-    symbols = macho_symbols(image)
-    kernel_symbols = macho_symbols(kernel_image)
-    if G17_ACCELERATOR_META_ALLOC not in symbols:
-        raise ValueError(f"Mach-O has no {G17_ACCELERATOR_META_ALLOC} symbol")
-    for name in (OS_OBJECT_TYPED_OPERATOR_NEW, KALLOC_TYPE_IMPL):
-        if name not in kernel_symbols:
-            raise ValueError(f"kernel Mach-O has no {name} symbol")
-    address, code = symbol_code(image, G17_ACCELERATOR_META_ALLOC)
-    require_instruction_words_at(
-        code,
-        "G17 accelerator typed allocation",
-        {0x18: 0x52997A01, 0x1C: 0x72A00021},  # w1 = 0x1cbd0
-    )
-    call = decode_bl_target(address + 0x20, struct.unpack_from("<I", code, 0x20)[0])
-    if call != kernel_symbols[OS_OBJECT_TYPED_OPERATOR_NEW]:
-        raise ValueError("G17 accelerator is not allocated by OSObject typed operator new")
-    new_address, new_code = symbol_code(kernel_image, OS_OBJECT_TYPED_OPERATOR_NEW)
-    require_instruction_words_at(
-        new_code, "OSObject zeroed typed allocation", {0x44: 0x52800081}
-    )
-    if decode_bl_target(
-        new_address + 0x48, struct.unpack_from("<I", new_code, 0x48)[0]
-    ) != kernel_symbols[KALLOC_TYPE_IMPL]:
-        raise ValueError("OSObject typed operator new has an unexpected allocator target")
-    return {
-        "allocator": OS_OBJECT_TYPED_OPERATOR_NEW,
-        "object_bytes": G17_ACCELERATOR_OBJECT_BYTES,
-        "allocator_flag_name": "Z_ZERO",
-    }
+    return _native_g17._query(image, 'require_zeroed_accelerator_allocation', legacy_options_text=json.dumps({'kernel_image': kernel_image.hex()}))
 
 
 def recover_g17_accelerator_channel_inputs(
@@ -1718,229 +1488,7 @@ def recover_g17_accelerator_channel_inputs(
     iogpu_image: bytes,
     chip_info_decode: dict[str, object],
 ) -> dict[str, object]:
-    """Recover the accelerator members the channel register producers read.
-
-    The 3D, TA, FastBlit and CL producers load three accelerator members:
-    the power-column count at +0x4e4, bits of the 64-bit feature-flag word at
-    +0x6d0, and chip information at +0xf7ec..+0xf7fb. The first is hardware
-    topology. For the other two, a census of every instruction in the driver
-    that can write those bytes shows which bits can ever become set and that
-    AcceleratorX::configureDevice overrides chip-information bytes
-    +0x28..+0x37 with a fixed literal after retrieveChipInfo fills them.
-    """
-
-    symbols = macho_symbols(image)
-    kernel_symbols = macho_symbols(kernel_image)
-    required = (
-        BASE_CONFIGURE_DEVICE,
-        PI300_CONFIGURE_DEVICE,
-        G17_CONFIGURE_DEVICE,
-        G17_SET_SMART_IDLE_OFF_ENABLE,
-        G17_RETRIEVE_CHIP_INFO,
-    )
-    missing = [name for name in required if name not in symbols]
-    if missing:
-        raise ValueError(f"Mach-O has no {missing[0]} symbol")
-    if recover_vtable_target(
-        image, G17_ACCELERATOR_VTABLE, G17_RETRIEVE_CHIP_INFO_VTABLE_SLOT
-    ) != symbols[G17_RETRIEVE_CHIP_INFO]:
-        raise ValueError("unexpected G17 retrieveChipInfo provider")
-    column = chip_info_decode["fields"]["power_column_count"]
-    if column.get("accelerator_member") != G17_ACCELERATOR_POWER_COLUMN_COUNT:
-        raise ValueError("power-column count is no longer copied to accelerator +0x4e4")
-    allocation = require_zeroed_accelerator_allocation(image, kernel_image)
-
-    # Feature flags: every census entry is either a pinned accelerator
-    # read-modify-write, a write to another object, or a clear.
-    flags = census_g17_member_writes(
-        image, G17_ACCELERATOR_FEATURE_FLAGS, G17_ACCELERATOR_FEATURE_FLAGS + 8,
-        kernel_symbols,
-    )
-    writers = {(symbol, offset): (pins, recipe) for symbol, offset, pins, recipe in G17_FEATURE_FLAG_WRITERS}
-    may_set = 0
-    seen_writers: set[tuple[str, int]] = set()
-    other_objects: list[dict[str, object]] = []
-    for entry in flags["stores"] + flags["global_stores"] + flags["memory_routines"]:
-        key = _census_key(entry)
-        if entry["kind"] == "store" and (key[1], key[2]) in writers:
-            pins, recipe = writers[(key[1], key[2])]
-            _address, code = symbol_code(image, key[1])
-            require_instruction_words_at(code, f"feature-flag writer {key[2]:#x}", pins)
-            may_set |= _feature_flag_set_bits(code, recipe)
-            seen_writers.add((key[1], key[2]))
-        elif entry.get("clears_only"):
-            other_objects.append({**entry, "reason": "clears only"})
-        elif key in G17_FEATURE_FLAG_OTHER_OBJECTS:
-            other_objects.append({**entry, "reason": G17_FEATURE_FLAG_OTHER_OBJECTS[key]})
-        else:
-            raise ValueError(
-                f"unclassified write to feature flags: {key[0]} {key[1]}+{key[2]:#x}"
-            )
-    if seen_writers != set(writers):
-        raise ValueError(f"feature-flag writers not found: {sorted(set(writers) - seen_writers)}")
-    reverse = {address: name for name, address in kernel_symbols.items()}
-    reverse.update({address: name for name, address in macho_symbols(iogpu_image).items()})
-    reverse.update({address: name for name, address in symbols.items()})
-    for entry in flags["escapes"]:
-        callee = reverse.get(entry.get("target"))
-        site = (str(entry["symbol"]), int(entry["offset"]))
-        if callee in G17_FEATURE_FLAG_SAFE_CALLEES:
-            reason = G17_FEATURE_FLAG_SAFE_CALLEES[callee]
-        elif site in G17_FEATURE_FLAG_VIRTUAL_ESCAPES:
-            reason = G17_FEATURE_FLAG_VIRTUAL_ESCAPES[site]
-        elif any(site[0].startswith(prefix) for prefix in G17_FEATURE_FLAG_VIRTUAL_ESCAPE_PREFIXES) and entry["member"] < G17_ACCELERATOR_FEATURE_FLAGS - 4:
-            reason = "4-byte float out-parameter below the word"
-        else:
-            raise ValueError(
-                f"unclassified pointer to feature flags passed by {site[0]}+{site[1]:#x}"
-            )
-        other_objects.append({**entry, "reason": reason, "callee": callee})
-
-    # Chip information: exactly one store, the unconditional override.
-    chip = census_g17_member_writes(
-        image, G17_ACCELERATOR_CHIP_INFO + 0x24, G17_ACCELERATOR_CHIP_INFO + 0x38,
-        kernel_symbols,
-    )
-    override_sites = [
-        entry for entry in chip["stores"]
-        if (entry["symbol"], entry["offset"]) == (G17_CONFIGURE_DEVICE, 0x748)
-    ]
-    others = [entry for entry in chip["stores"] + chip["global_stores"] if entry not in override_sites]
-    others += chip["memory_routines"] + chip["escapes"]
-    if len(override_sites) != 1:
-        raise ValueError("chip-information override store is missing")
-    for entry in others:
-        if _census_key(entry) not in G17_CHIP_INFO_OTHER_WRITERS:
-            raise ValueError(
-                f"unclassified write to chip information: {entry['kind']} "
-                f"{entry['symbol']}+{entry['offset']:#x}"
-            )
-    address, code = symbol_code(image, G17_CONFIGURE_DEVICE)
-    require_instruction_words_at(
-        code,
-        "G17 chip-information override",
-        {0x744: 0x3DC35500, 0x748: 0x3DBDFE60},  # ldr q0, =literal; str q0, [x19, #0xf7f0]
-    )
-    _base_address, base_code = symbol_code(image, BASE_CONFIGURE_DEVICE)
-    require_instruction_words_at(
-        base_code,
-        "G17 retrieveChipInfo call",
-        {
-            0x610: 0x529EF908,  # mov w8, #0xf7c8
-            0x638: 0xF946B20A,  # vtable slot 0xd60
-            0x63C: 0x8B080261,  # x1 = this + 0xf7c8
-            0x640: 0xAA1303E0,  # x0 = this
-            0x64C: 0xD73F0951,  # blraa
-        },
-    )
-    page = decode_adrp(address + 0x740, struct.unpack_from("<I", code, 0x740)[0])
-    if page is None or page[0] != 8:
-        raise ValueError("chip-information override literal is no longer PC-relative")
-    literal_address = page[1] + ((0x3DC35500 >> 10) & 0xFFF) * 16
-    literal_offset = virtual_to_file(image, literal_address)
-    literal = image[literal_offset : literal_offset + 16]
-    # The PI_300 base (which runs retrieveChipInfo) returns before the store,
-    # and the store is reached on every path that does not panic.
-    if decode_bl_target(address + 0x70, struct.unpack_from("<I", code, 0x70)[0]) != symbols[PI300_CONFIGURE_DEVICE]:
-        raise ValueError("AcceleratorX configureDevice no longer calls its PI_300 base first")
-    panic = kernel_symbols.get("_panic")
-    for offset, word in words(code[:0x748]):
-        branch_address = address + offset
-        if word & 0xFFFFFC1F == 0xD65F0000 or word in (0xD65F0BFF, 0xD65F0FFF):
-            raise ValueError("AcceleratorX configureDevice returns before the override")
-        if word & 0xFFFFFC1F == 0xD61F0000 or word & 0xFFFFF800 == 0xD71F0800:
-            raise ValueError("AcceleratorX configureDevice branches indirectly before the override")
-        target = decode_local_branch_target(branch_address, word)
-        if target is None or target <= address + 0x748:
-            continue
-        panic_offset = target - address
-        tail = code[panic_offset : panic_offset + 0x30]
-        if not any(
-            decode_bl_target(target + index, value) == panic
-            for index, value in words(tail)
-        ):
-            raise ValueError(
-                f"AcceleratorX configureDevice can skip the override from +{offset:#x}"
-            )
-
-    # The 3D, TA and FastBlit producers add two register-entry appends while
-    # the performance-counter sampler at +0x111d0 is running.
-    for name in (G17_ACCELERATOR_X_START, G17_PERF_SAMPLER_VTABLE, G17_PERF_SAMPLER_INIT, G17_PERF_SAMPLER_START):
-        if name not in symbols:
-            raise ValueError(f"Mach-O has no {name} symbol")
-    start_address, start_code = symbol_code(image, G17_ACCELERATOR_X_START)
-    require_instruction_words_at(
-        start_code,
-        "G17 performance-counter sampler creation",
-        {
-            0x1E4: 0x91404668,  # x8 = this + 0x11000
-            0x1E8: 0x91074116,  # x22 = this + 0x111d0
-            0x1F4: 0x52802301,  # a 0x118-byte object
-            0x220: 0x91166210,  # vtable page offset
-            0x224: 0x91004210,  # past the vtable header
-            0x248: 0xF9000010,  # installed as the object's vtable
-            0x264: 0xF90002D4,  # object stored at this + 0x111d0
-        },
-    )
-    page = decode_adrp(start_address + 0x21C, struct.unpack_from("<I", start_code, 0x21C)[0])
-    if page is None or page[1] + 0x598 != symbols[G17_PERF_SAMPLER_VTABLE]:
-        raise ValueError("accelerator +0x111d0 is no longer an AGXPerfCtrSamplerGen15")
-    require_instruction_words_at(
-        symbol_code(image, G17_PERF_SAMPLER_INIT)[1],
-        "performance-counter sampler init",
-        {0x88: 0x3901529F},  # running byte cleared
-    )
-    require_instruction_words_at(
-        symbol_code(image, G17_PERF_SAMPLER_START)[1],
-        "performance-counter sampler start",
-        {0x150: 0x39015268, 0x184: 0x39015268, 0x1AC: 0x39015268},
-    )
-
-    never_set = ~may_set & 0xFFFFFFFFFFFFFFFF
-    return {
-        "power_column_count": {
-            "member": G17_ACCELERATOR_POWER_COLUMN_COUNT,
-            "bytes": 4,
-            "source": "hardware_config.chip_info_decode.fields.power_column_count",
-            "hardware_input": "column_count",
-        },
-        "feature_flags": {
-            "member": G17_ACCELERATOR_FEATURE_FLAGS,
-            "bytes": 8,
-            "initial": allocation,
-            "may_set_mask": may_set,
-            "never_set_mask": never_set,
-            "writers": [
-                {"symbol": symbol, "offset": offset} for symbol, offset, _pins, _recipe in G17_FEATURE_FLAG_WRITERS
-            ],
-            "other_objects": len(other_objects),
-            "unbounded": flags["unbounded"][0],
-        },
-        "chip_information": {
-            "member": G17_ACCELERATOR_CHIP_INFO,
-            "producer": G17_RETRIEVE_CHIP_INFO,
-            "override_member": G17_ACCELERATOR_CHIP_INFO_OVERRIDE,
-            "override_bytes": 16,
-            "override_value": literal.hex(),
-            "override_producer": G17_CONFIGURE_DEVICE,
-            "unbounded": chip["unbounded"][0],
-        },
-        "perf_counter_sampler": {
-            "pointer_member": G17_ACCELERATOR_PERF_SAMPLER,
-            "vtable": G17_PERF_SAMPLER_VTABLE,
-            "object_bytes": 0x118,
-            "running_member": G17_PERF_SAMPLER_RUNNING,
-            "running_bytes": 1,
-            "cleared_by": G17_PERF_SAMPLER_INIT,
-            "set_by": G17_PERF_SAMPLER_START,
-            # A Vinix decision, not a property of the Apple driver.
-            "vinix_policy": {
-                "running": 0,
-                "reason": "Vinix has no AGX performance-counter sampler, so "
-                "sourceSamplerStart never runs",
-            },
-        },
-    }
+    return _native_g17._query(image, 'recover_g17_accelerator_channel_inputs', legacy_options_text=json.dumps({'kernel_image': kernel_image.hex(), 'iogpu_image': iogpu_image.hex(), 'chip_info_decode': chip_info_decode}))
 
 
 def recover_g17_relative_boost_frequency_table(
@@ -2029,155 +1577,25 @@ def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
 def recover_device_control_ring_bindings(
     allocations: list[dict[str, int]], code: bytes
 ) -> list[dict[str, object]]:
-    by_members = {
-        (item["host_cpu_member"], item["host_gpu_member"]): item["bytes"]
-        for item in allocations
-    }
-    roles = (
-        (0, 0xAD8, 0xAE0, 0xAE8, 0xAF0, 0xAF8, 0xAA0),
-        (1, 0xC08, 0xC10, 0xC18, 0xC20, 0xC28, 0xBD0),
-    )
-    published: dict[int, set[int]] = {}
-    instructions = list(words(code))
-    for index, (_offset, word) in enumerate(instructions):
-        store = decode_str_x(word)
-        if store is None or store[0] != 0 or store[1] != 8:
-            continue
-        for _previous_offset, previous_word in instructions[max(0, index - 3) : index]:
-            load = decode_ldr_x(previous_word)
-            if load is not None and load[0] == 8 and load[1] == 19:
-                published.setdefault(load[2], set()).add(store[2])
-
-    result = []
-    for role, obj, state_cpu, state_gpu, entries_cpu, entries_gpu, shared in roles:
-        if by_members.get((state_cpu, state_gpu)) != 0x30:
-            raise ValueError(
-                f"role {role} device-control state allocation is not 0x30 bytes"
-            )
-        if by_members.get((entries_cpu, entries_gpu)) != 0x4000:
-            raise ValueError(
-                f"role {role} device-control entries allocation is not 0x4000 bytes"
-            )
-        offsets = published.get(shared, set())
-        expected = {0x180, 0x188, 0x190, 0x198}
-        if not expected.issubset(offsets):
-            raise ValueError(
-                f"role {role} device-control addresses are not published through "
-                f"host member {shared:#x}: {sorted(offsets)}"
-            )
-        result.append(
-            {
-                "role": role,
-                "host_object_member": obj,
-                "host_state_cpu_member": state_cpu,
-                "host_state_gpu_member": state_gpu,
-                "host_entries_cpu_member": entries_cpu,
-                "host_entries_gpu_member": entries_gpu,
-                "state_bytes": 0x30,
-                "entries_bytes": 0x4000,
-                "firmware_shared_offsets": {
-                    "read_index_address": 0x1A0,
-                    "cfi_index_address": 0x1A8,
-                    "write_index_address": 0x1B0,
-                    "entries_address": 0x1B8,
-                },
-            }
-        )
-    return result
+    return _native_g17._query(b"", 'recover_device_control_ring_bindings', legacy_options_text=json.dumps({'allocations': allocations, 'code': code.hex()}))
 
 
 def recover_ring_accessor(code: bytes) -> tuple[int, int]:
-    loads = []
-    bounds = []
-    for _offset, word in words(code):
-        load = decode_ldr_w(word)
-        if load is not None and load[0] == 0:
-            loads.append(load)
-        compare = decode_cmp_w_immediate(word)
-        if compare is not None and compare[0] == 0:
-            bounds.append(compare[1])
-    if len(loads) != 1 or len(bounds) != 1:
-        raise ValueError("accelerator ring accessor is not a single checked load")
-    return loads[0][2], bounds[0]
+    return tuple(_native_g17._query(b"", 'recover_ring_accessor', legacy_options_text=json.dumps({'code': code.hex()})))
 
 
 def recover_entry_stride(code: bytes) -> int:
-    candidates = []
-    previous: tuple[int, int] | None = None
-    for _offset, word in words(code):
-        move = decode_movz_w(word)
-        if move is not None:
-            previous = move
-            continue
-        multiply = decode_umaddl(word)
-        if multiply is not None and multiply[3] == 31 and previous is not None:
-            register, value = previous
-            if register in multiply[1:3]:
-                candidates.append(value)
-        previous = None
-    if len(candidates) != 1:
-        raise ValueError(f"expected one ring entry stride, found {candidates}")
-    return candidates[0]
+    return _native_g17._query(b"", 'recover_entry_stride', legacy_options_text=json.dumps({'code': code.hex()}))
 
 
 def recover_accelerator_command_fields(code: bytes) -> dict[str, dict[str, int]]:
-    expected = {
-        0x08: (8, "channel_data_address"),
-        0x10: (4, "command_type"),
-        0x14: (2, "submission_index"),
-        0x16: (1, "channel_id"),
-        0x17: (1, "flags"),
-    }
-    fields: dict[str, dict[str, int]] = {}
-    for _offset, word in words(code):
-        store = decode_str_unsigned(word)
-        if store is None or store[1] != 1 or store[2] not in expected:
-            continue
-        _source, _base, field_offset, width = store
-        expected_width, name = expected[field_offset]
-        if width != expected_width:
-            raise ValueError(f"unexpected width for accelerator command field {field_offset:#x}")
-        fields[name] = {"offset": field_offset, "bytes": width}
-    if set(fields) != {item[1] for item in expected.values()}:
-        raise ValueError(f"incomplete accelerator command fields: {sorted(fields)}")
-    return fields
+    return _native_g17._query(b"", 'recover_accelerator_command_fields', legacy_options_text=json.dumps({'code': code.hex()}))
 
 
 def recover_accelerator_command_contract(code: bytes) -> dict[str, object]:
     # This is the complete pinned G17C encoder, not just a sample of its
     # stores. In particular, it proves that the first qword is preserved.
-    require_instruction_sequence(
-        code,
-        "complete accelerator data-master encoder",
-        (
-            0xD503245F,  # bti c
-            0xB9001022,  # command type -> entry +0x10
-            0xF9404068,  # channel state GPU address <- channel +0x80
-            0xF9000428,  # -> entry +0x08
-            0x79002824,  # submission index -> entry +0x14
-            0xB9401868,  # channel ID <- channel +0x18
-            0x39005828,  # -> entry +0x16
-            0x3940F068,  # channel flag <- channel +0x3c
-            0x52800029,  # 1
-            0x0A280128,  # flags = 1 & ~channel_flag
-            0x39005C28,  # -> entry +0x17
-            0xD65F03C0,  # ret
-        ),
-    )
-    return {
-        "reserved_000": {
-            "offset": 0,
-            "bytes": 8,
-            "encoder_action": "preserved",
-            "vinix_policy": "zero_before_encode",
-        },
-        "channel_sources": {
-            "channel_data_address": {"channel_offset": 0x80, "bytes": 8},
-            "channel_id": {"channel_offset": 0x18, "bytes": 4},
-            "channel_flag": {"channel_offset": 0x3C, "bytes": 1},
-        },
-        "flags_formula": "1 & ~channel_flag",
-    }
+    return _native_g17._query(b"", 'recover_accelerator_command_contract', legacy_options_text=json.dumps({'code': code.hex()}))
 
 
 def recover_data_master_submission_sequence(
@@ -2185,74 +1603,13 @@ def recover_data_master_submission_sequence(
 ) -> dict[str, object]:
     # The three producers have the same publication tail. The only changing
     # instruction is the immediate command type passed to the virtual encoder.
-    if not 0 <= command_type <= 2:
-        raise ValueError(f"invalid data-master command type {command_type}")
-    type_instruction = 0x52800002 | (command_type << 5)
-    require_instruction_sequence(
-        code,
-        f"data-master command type {command_type} publication",
-        (
-            0xB9400284,  # submission index
-            0xF94002B0,
-            0xAA1503F1,
-            0xF2F9B431,
-            0xDAC11A30,
-            0xD2804F11,  # encoder vtable slot 0x278
-            0x8B110210,
-            0xF9400208,
-            0xAA1503E0,
-            0xF94007E1,  # entry returned by nextEntry
-            type_instruction,
-            0xAA1303E3,  # channel
-            0xF2E058F0,
-            0xD73F0910,  # encodeAcceleratorRingCommand
-            0xD5033BBF,  # dmb ish before publishing the index
-            0xF94002D0,
-            0xAA1603F1,
-            0xF2F3D511,
-            0xDAC11A30,
-            0xF8438E08,  # getWriteIndex vtable slot 0x38
-            0xAA1603E0,
-            0xF2F0EB70,
-            0xD73F0910,
-            0x11000408,  # write + 1
-            0xF94002D0,
-            0xAA1603F1,
-            0xF2F3D511,
-            0xDAC11A30,
-            0xF8410E09,  # setWriteIndex vtable slot 0x10
-            0x12001D01,  # & 0xff
-            0xAA1603E0,
-            0xF2E27510,
-            0xD73F0930,
-        ),
-    )
-    return {
-        "command_type": command_type,
-        "publish_barrier": "dmb ish",
-        "next_write_index": "(write_index + 1) & 0xff",
-    }
+    return _native_g17._query(b"", 'recover_data_master_submission_sequence', legacy_options_text=json.dumps({'code': code.hex(), 'command_type': command_type}))
 
 
 def recover_data_master_submission_protocol(
     image: bytes, next_entry_address: int
 ) -> dict[str, object]:
-    commands = {}
-    for label, (symbol, command_type) in SUBMIT_DATA_MASTER_CHANNELS.items():
-        _address, code = symbol_code(image, symbol)
-        if not any(
-            decode_bl_target(_address + offset, word) == next_entry_address
-            for offset, word in words(code)
-        ):
-            raise ValueError(f"{label} submission does not reserve a data-master entry")
-        commands[label] = recover_data_master_submission_sequence(code, command_type)
-
-    return {
-        "serialized_by": "IOCommandGate",
-        "usable_entries": 255,
-        "full_condition": "((write_index + 1) & 0xff) == read_index",
-        "commands": commands,
-    }
+    return _native_g17._query(image, 'recover_data_master_submission_protocol', legacy_options_text=json.dumps({'next_entry_address': next_entry_address}))
 
 
 def recover_g17_data_master_ring_bindings(
@@ -2266,64 +1623,11 @@ def recover_g17_data_master_doorbells(image: bytes) -> dict[str, object]:
 
 
 def recover_vector_copy_size(code: bytes) -> int:
-    ranges: dict[tuple[str, int], set[int]] = {}
-    for _offset, word in words(code):
-        pair = decode_pair_q(word)
-        if pair is None:
-            continue
-        kind, _first, _second, base, immediate = pair
-        ranges.setdefault((kind, base), set()).add(immediate)
-    complete = [
-        max(offsets) + 32
-        for offsets in ranges.values()
-        if offsets == {0, 0x20}
-    ]
-    if complete.count(0x40) < 2:
-        raise ValueError("device-control path does not contain matching 64-byte vector copies")
-    return 0x40
+    return _native_g17._query(b"", 'recover_vector_copy_size', legacy_options_text=json.dumps({'code': code.hex()}))
 
 
 def recover_driver_accelerator_layouts(image: bytes) -> dict[str, object]:
-    layouts = []
-    for entry, prefix in (
-        ("data_master", DATA_MASTER_RING),
-        ("device_control", DEVICE_CONTROL_RING),
-    ):
-        offsets = {}
-        limits = set()
-        for field, suffix in RING_ACCESSORS.items():
-            _address, code = symbol_code(image, prefix + suffix)
-            offset, limit = recover_ring_accessor(code)
-            offsets[field] = offset
-            limits.add(limit)
-        if offsets != {"read_index": 0, "cfi_index": 0x10, "write_index": 0x20}:
-            raise ValueError(f"unexpected {entry} ring offsets: {offsets}")
-        if limits != {256}:
-            raise ValueError(f"unexpected {entry} ring entry limits: {limits}")
-        layouts.append({"entry": entry, "indices": offsets, "entries": 256})
-
-    next_entry_address, next_entry = symbol_code(image, NEXT_DATA_MASTER_ENTRY)
-    data_master_size = recover_entry_stride(next_entry)
-    _address, encoder = symbol_code(image, ENCODE_ACCELERATOR_COMMAND)
-    fields = recover_accelerator_command_fields(encoder)
-    contract = recover_accelerator_command_contract(encoder)
-    submission = recover_data_master_submission_protocol(image, next_entry_address)
-    _address, submit_control = symbol_code(image, SUBMIT_DEVICE_CONTROL)
-    device_control_size = recover_vector_copy_size(submit_control)
-    if data_master_size != 0x18 or device_control_size != 0x40:
-        raise ValueError(
-            f"unexpected accelerator entry sizes: {data_master_size:#x}, "
-            f"{device_control_size:#x}"
-        )
-    return {
-        "rings": layouts,
-        "state_bytes": 0x30,
-        "data_master_entry_bytes": data_master_size,
-        "data_master_fields": fields,
-        "data_master_contract": contract,
-        "data_master_submission": submission,
-        "device_control_entry_bytes": device_control_size,
-    }
+    return _native_g17._query(image, 'recover_driver_accelerator_layouts', legacy_options_text=json.dumps({}))
 
 
 def recover_g17_channel_pool_geometry(code: bytes) -> dict[str, object]:
@@ -2415,80 +1719,7 @@ def recover_g17_3d_common_passthrough(image: bytes) -> dict[str, object]:
 def explain_g17_3d_common_boolean_accounting(
     render_payload: dict[str, object], common_passthrough: dict[str, object]
 ) -> dict[str, object]:
-    """Reconcile parser booleans with the common descriptor-copy helper."""
-
-    source = common_passthrough["source"]
-    common_start = int(source["payload_offset"])
-    common_bytes = int(source["bytes"])
-    common_end = common_start + common_bytes
-    helper_fields = common_passthrough["bit_fields"]
-    mask_operations = common_passthrough["mask_operations"]
-    helper_sources = {
-        common_start + int(field["source_offset"]) for field in helper_fields
-    }
-    helper_destinations = {
-        int(field["descriptor_member"]) for field in helper_fields
-    }
-
-    def mentions_payload_offset(value: object, target: int) -> bool:
-        if isinstance(value, dict):
-            if value.get("payload_offset") == target:
-                return True
-            return any(mentions_payload_offset(item, target) for item in value.values())
-        if isinstance(value, list):
-            return any(mentions_payload_offset(item, target) for item in value)
-        return False
-
-    validation = render_payload["validation"]
-    parser_only = []
-    for field in render_payload["bit_fields"]:
-        payload_offset = int(field["payload_offset"])
-        if not common_start <= payload_offset < common_end:
-            continue
-        if payload_offset in helper_sources:
-            continue
-        parser_only.append(
-            {
-                "payload_offset": payload_offset,
-                "common_source_offset": payload_offset - common_start,
-                "command_member": int(field["command_member"]),
-                "mask": int(field["mask"]),
-                "validation_operand": mentions_payload_offset(validation, payload_offset),
-            }
-        )
-
-    combined_sources = helper_sources | {
-        int(field["payload_offset"]) for field in parser_only
-    }
-    if (
-        len(mask_operations) != 8
-        or len(helper_sources) != 8
-        or len(helper_destinations) != 8
-        or {field["payload_offset"] for field in parser_only} != {0x646, 0x650}
-        or len(combined_sources) != 10
-    ):
-        raise ValueError("unexpected G17 common-record boolean accounting")
-
-    return {
-        "counting_rule": "one field per LDRB -> AND #1 -> STRB chain in the helper",
-        "helper": {
-            "mask_operations": len(mask_operations),
-            "unique_source_fields": len(helper_sources),
-            "unique_descriptor_fields": len(helper_destinations),
-            "one_to_one": len(mask_operations)
-            == len(helper_sources)
-            == len(helper_destinations),
-        },
-        "parser_only_fields_within_common_record": parser_only,
-        "combined_distinct_raw_boolean_sources": len(combined_sources),
-        "nine_field_count": {
-            "supported": False,
-            "reason": (
-                "the helper maps eight sources to eight destinations; including the "
-                "two parser-only fields in the same raw record yields ten, not nine"
-            ),
-        },
-    }
+    return _native_g17._query(b"", 'explain_g17_3d_common_boolean_accounting', legacy_options_text=json.dumps({'render_payload': render_payload, 'common_passthrough': common_passthrough}))
 
 
 def recover_g17_render_descriptor_fields(
@@ -2514,33 +1745,7 @@ def recover_g17_register_entry_codec(image: bytes) -> dict[str, object]:
 
 
 def recover_g17_random_provider(driver: bytes, kernel: bytes) -> dict[str, object]:
-    """Cross-check the CL mode-2 low-bit source against the kernel image."""
-
-    symbols = macho_symbols(kernel)
-    if KERNEL_RANDOM not in symbols:
-        raise ValueError(f"Mach-O is missing {KERNEL_RANDOM}")
-    function_address, code = symbol_code(
-        driver, REGISTER_LIST_PRODUCERS["CL"]
-    )
-    require_instruction_words_at(
-        code,
-        "G17 CL random-bit provider",
-        {G17_CL_RANDOM_CALL_OFFSET: G17_CL_RANDOM_CALL_WORD},
-    )
-    target = decode_bl_target(
-        function_address + G17_CL_RANDOM_CALL_OFFSET,
-        G17_CL_RANDOM_CALL_WORD,
-    )
-    if target != symbols[KERNEL_RANDOM]:
-        raise ValueError(
-            f"G17 CL random call targets {target:#x}, not "
-            f"{KERNEL_RANDOM} at {symbols[KERNEL_RANDOM]:#x}"
-        )
-    return {
-        "provider": KERNEL_RANDOM,
-        "call_offset": G17_CL_RANDOM_CALL_OFFSET,
-        "return_mask": 1,
-    }
+    return _native_g17._query(driver, 'recover_g17_random_provider', legacy_options_text=json.dumps({'kernel': kernel.hex()}))
 
 
 def recover_g17_register_selectors(image: bytes) -> dict[str, object]:

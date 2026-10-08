@@ -17,6 +17,8 @@ def _query(data, operation, **options):
             raise KeyError(message.removeprefix("KeyError: ")) from None
         if message.startswith("TypeError: "):
             raise TypeError(message.removeprefix("TypeError: ")) from None
+        if message.startswith("AttributeError: "):
+            raise AttributeError(message.removeprefix("AttributeError: ")) from None
         if message.startswith("OverflowError: "):
             raise OverflowError(message.removeprefix("OverflowError: ")) from None
         if message.startswith("UnicodeDecodeError: "):

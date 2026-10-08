@@ -161,3 +161,24 @@ builds, four real-driver invocations, 16 remaining original Python methods on
 both public ABIs, 1,600 foreign calls per architecture with zero owned responses,
 10,000 sanitizer CFFI iterations, and a fake-stack lifetime check. These are
 host recovery-tool checks; no GPU or kernel execution is claimed.
+
+The accelerator channel and command contracts now run in `legacy.v`,
+`legacy_channels.v` and `legacy_contracts.v`. They preserve checked ring
+accessors, submission publication order, vector-copy spans, zeroed allocation,
+feature writers and escapes, chip-info overrides, random-provider identity,
+and boolean accounting. Seven sole-use literal tables are native data;
+production allocation and census analysis stays independent from explicitly
+marked fixture overrides.
+
+The final 16 original methods retain their complete inputs and outcomes in
+`fixtures/original-legacy.json`, together with the original unit-mask assertions.
+Boundary fixtures cover instruction mutations, malformed provider data, numeric
+types and widths, alias replacement and ordered errors. Qualification under
+`~/.cache/vinix-python-to-v/g17-legacy-20261008/` passed 3,919 complete typed
+controls on actual ARM64, x86-64 and ASan/UBSan builds, 17 native test functions,
+all 16 untouched original methods on both public ABIs, real-driver outputs,
+1,600 foreign calls per architecture with zero owned responses, two profiles
+of 10,000 sanitizer CFFI iterations, and fake-stack checks. The second CFFI
+profile uses a genuine Mach-O primary buffer, mutates and frees borrowed input
+and options after return, and retains the independently checked result until
+release. These checks qualify host tools and their C ABI.
