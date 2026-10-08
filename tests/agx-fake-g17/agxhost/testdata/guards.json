@@ -1,0 +1,530 @@
+[
+  {
+    "operation": "imports",
+    "text": "",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": " U _malloc\n",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": " U _malloc\n",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": " U _malloc\n",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": " U _malloc\n",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "mallocx xmalloc __malloc",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "mallocx xmalloc __malloc",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "mallocx xmalloc __malloc",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "mallocx xmalloc __malloc",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "calloc free",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "calloc free",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc free",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc free",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": " U realloc memdup",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": " U realloc memdup",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": " U realloc memdup",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": " U realloc memdup",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "new_array_from_c_array",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "new_array_from_c_array",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "new_array_from_c_array",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "new_array_from_c_array",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "_new_array",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "_new_array",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "_new_array",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "_new_array",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "__new_array",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "__new_array",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "__new_array",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "__new_array",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "vagt_test_malloc vagt_test_free",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "vagt_test_malloc vagt_test_free",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "vagt_test_malloc vagt_test_free",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "vagt_test_malloc vagt_test_free",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u00e9",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u00e9",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u00e9",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u00e9",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "\u00e9_malloc",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "\u00e9_malloc",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "\u00e9_malloc",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "\u00e9_malloc",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u0301",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u0301",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u0301",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u0301",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\ud838\ude90",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\ud838\ude90",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\ud838\ude90",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\ud838\ude90",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\ud807\udf02",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\ud807\udf02",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\ud807\udf02",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\ud807\udf02",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u00b2",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u00b2",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u00b2",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u00b2",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u200b",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "malloc\u200b",
+    "scale": true,
+    "expected": true
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u200b",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "malloc\u200b",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "calloc( free(",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "calloc( free(",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc( free(",
+    "name": "calloc",
+    "expected": 1
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc( free(",
+    "name": "free",
+    "expected": 1
+  },
+  {
+    "operation": "imports",
+    "text": "_calloc( __free(",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "_calloc( __free(",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "_calloc( __free(",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "_calloc( __free(",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "\u00e9calloc( \u00b2free(",
+    "scale": false,
+    "expected": false
+  },
+  {
+    "operation": "imports",
+    "text": "\u00e9calloc( \u00b2free(",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "\u00e9calloc( \u00b2free(",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "\u00e9calloc( \u00b2free(",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": ";calloc( ;free(",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": ";calloc( ;free(",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": ";calloc( ;free(",
+    "name": "calloc",
+    "expected": 1
+  },
+  {
+    "operation": "call_count",
+    "text": ";calloc( ;free(",
+    "name": "free",
+    "expected": 1
+  },
+  {
+    "operation": "imports",
+    "text": "calloc ( free (",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "calloc ( free (",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc ( free (",
+    "name": "calloc",
+    "expected": 0
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc ( free (",
+    "name": "free",
+    "expected": 0
+  },
+  {
+    "operation": "imports",
+    "text": "calloc(calloc(free(free(",
+    "scale": false,
+    "expected": true
+  },
+  {
+    "operation": "imports",
+    "text": "calloc(calloc(free(free(",
+    "scale": true,
+    "expected": false
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc(calloc(free(free(",
+    "name": "calloc",
+    "expected": 2
+  },
+  {
+    "operation": "call_count",
+    "text": "calloc(calloc(free(free(",
+    "name": "free",
+    "expected": 2
+  }
+]
