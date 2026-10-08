@@ -26,6 +26,32 @@ pub mut:
 	stderr    string
 	inherit   bool
 	host_arch string
+	path_arguments []int
+	path_executable string
+}
+
+fn (mut out Transcript) typed_arguments(argv []string, paths []int) {
+	out.path_arguments = paths.clone()
+	out.path_executable = if 0 in paths { argv[0] } else { '' }
+}
+
+fn (mut out Transcript) typed_done() {
+	out.path_arguments = []int{}
+	out.path_executable = ''
+}
+
+fn (mut out Transcript) command_typed(argv []string, environment map[string]string, paths []int) !string {
+	out.typed_arguments(argv, paths)
+	value := out.command(argv, environment)!
+	out.typed_done()
+	return value
+}
+
+fn (mut out Transcript) capture_typed(argv []string, environment map[string]string, paths []int) !string {
+	out.typed_arguments(argv, paths)
+	value := out.capture_output(argv, environment)!
+	out.typed_done()
+	return value
 }
 
 pub fn private_directory(base string, prefix string) !string {

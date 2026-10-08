@@ -2,6 +2,7 @@
 module main
 
 import agxhost
+import traceanalysis as j
 import fixturehost
 import hosttest
 import encoding.hex
@@ -21,6 +22,8 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 		out.host_verifier(root, row['machine'] or { json2.Any('') }.str(), row['encoder_reference'] or { json2.Any('') }.str(), row['verifier_reference'] or { json2.Any('') }.str())!
 	} else if operation == 'trace_generate' {
 		out.generate_trace(root, (row['output'] or { return error('Missing output') }).str(), row['arch'] or { json2.Any('arm64') }.str(), (row['temp_dir'] or { return error('Missing temp_dir') }).str())!
+	} else if operation == 'trace_test' {
+		out.trace_test(root, (row['baseline'] or { return error('Missing baseline') }).str(), (row['temp_dir'] or { return error('Missing temp_dir') }).str())!
 	} else {
 		return error('Unknown AGX host operation ' + operation)
 	}
@@ -49,11 +52,15 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 		} else {
 			json2.Any(err.output)
 		}
+		if err.binary_output {
+			response['output_hex'] = hex.encode(err.output.bytes())
+		}
 	}
 	if err is fixturehost.FileError {
 		response['kind'] = 'OSError'
 		response['errno'] = err.number
 		response['filename'] = hex.encode(err.filename.bytes())
+		response['filename_path'] = out.path_executable != '' && out.path_executable == err.filename
 	}
 	if err is hosttest.ModuleFileError {
 		response['kind'] = 'OSError'
@@ -72,13 +79,22 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 		response['end'] = err.end
 		response['reason'] = err.reason
 	}
+	if err is agxhost.TraceFailure {
+		response['kind'] = err.kind
+		response['has_argument'] = err.has_argument
+		response['argument_text'] = if err.has_argument { j.encode(err.argument, false) } else { 'null' }
+		response['tuple_argument'] = err.tuple_argument
+	}
+	if (response['kind'] or { json2.Any('') }).str() == 'CalledProcessError' {
+		response['path_arguments'] = out.path_arguments.map(json2.Any(it))
+	}
 	return response
 }
 
 fn evaluate(text string, inherited bool) map[string]json2.Any {
 	mut out := agxhost.Transcript{ inherit: inherited }
 	mut row := hosttest.decode_json(text) or { return failure(err, out, '') }.as_map()
-	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference'] {
+	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline'] {
 		if encoded := row[name + '_hex'] {
 			bytes := hex.decode(encoded.str()) or { return failure(err, out, '') }
 			row[name] = bytes.bytestr()

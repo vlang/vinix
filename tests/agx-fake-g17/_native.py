@@ -36,7 +36,7 @@ def command(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
-    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference"):
+    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline"):
         if name in fields:
             fields[name + "_hex"] = os.fsencode(fields.pop(name)).hex()
     with tempfile.TemporaryDirectory(prefix="vinix-agx-result-") as directory:
@@ -48,14 +48,31 @@ def command(operation, **fields):
     if "error" not in response:
         return response["value"]
     if response["kind"] == "CalledProcessError":
+        argv = [os.fsdecode(bytes.fromhex(arg)) for arg in response["argv"]]
+        for index in response.get("path_arguments", ()):
+            argv[index] = Path(argv[index])
         raise subprocess.CalledProcessError(response["returncode"],
-                [os.fsdecode(bytes.fromhex(arg)) for arg in response["argv"]], response["output"])
+                argv,
+                output=bytes.fromhex(response["output_hex"]) if "output_hex" in response else response["output"])
     if response["kind"] == "OSError":
         filename = os.fsdecode(bytes.fromhex(response["filename"])) or None
+        if response.get("filename_path"):
+            filename = Path(filename)
         raise OSError(response["errno"], os.strerror(response["errno"]), filename)
     if response["kind"] == "CopyError":
         raise shutil.Error([tuple(entry) for entry in response["entries"]])
     if response["kind"] == "UnicodeDecodeError":
         raise UnicodeDecodeError("utf-8", bytes.fromhex(response["data"]),
                                  response["start"], response["end"], response["reason"])
+    if response["kind"] in ("AssertionError", "KeyError", "IndexError", "TypeError", "AttributeError"):
+        kind = {"AssertionError": AssertionError, "KeyError": KeyError, "IndexError": IndexError, "TypeError": TypeError, "AttributeError": AttributeError}[response["kind"]]
+        if not response["has_argument"]:
+            raise kind()
+        value = json.loads(response["argument_text"])
+        raise kind(tuple(value) if response["tuple_argument"] else value)
+    if response["kind"] == "HexIntegerError":
+        raise ValueError(f"invalid literal for int() with base 16: {json.loads(response['argument_text'])!r}")
+    if response["kind"] == "JSONDecodeError":
+        json.loads(json.loads(response["argument_text"]))
+        raise ValueError("native JSON decoder disagreed with the original error formatter")
     raise {"ValueError": ValueError, "RuntimeError": RuntimeError}[response["kind"]](response["error"])
