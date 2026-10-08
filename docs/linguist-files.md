@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `8ead088e53de1613cb33a2698ebe31a4da75ece6`,
+at source commit `f1ad647b5f7ce14832569f32a8548953ae32e16f`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 493 | 1,865,482 | 4.48% |
-| Python | 479 | 3,346,571 | 8.03% |
-| Shell | 306 | 1,288,471 | 3.09% |
+| C | 493 | 1,865,482 | 4.47% |
+| Python | 476 | 3,190,292 | 7.64% |
+| Shell | 306 | 1,288,605 | 3.09% |
 
-All `.v` files are classified as V. The resulting V share is 77.20%, with no
+All `.v` files are classified as V. The resulting V share is 77.61%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 8ead088e53de1613cb33a2698ebe31a4da75ece6 --breakdown --json
+github-linguist --rev f1ad647b5f7ce14832569f32a8548953ae32e16f --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -866,18 +866,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
 | `tests/linuxkpi/audit_generation_test.py` | 8,245 |
-| `tests/linuxkpi/compile-native-host.py` | 7,958 |
+| `tests/linuxkpi/compile-native-host.py` | 7,987 |
 | `tests/linuxkpi/compile-v-core.py` | 1,929 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
 | `tests/linuxkpi/compile-v-host.py` | 1,765 |
-| `tests/linuxkpi/compile-v-primitives.py` | 2,702 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/host_suite.py` | 5,431 |
-| `tests/linuxkpi/overflow_test.py` | 12,342 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
-| `tests/linuxkpi/spin_test.py` | 6,391 |
-| `tests/linuxkpi/standalone_test.py` | 4,640 |
 | `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/compile-fixture.py` | 1,221 |
 | `tests/m1-wifi/compile-provider.py` | 2,106 |
@@ -901,7 +897,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/check-generated.py` | 7,984 |
 | `tests/mounted-disk-policy/host.py` | 7,901 |
 | `tests/mounted-disk-policy/run.py` | 10,413 |
-| `tests/n64/desktop.py` | 10,430 |
+| `tests/n64/desktop.py` | 12,446 |
 | `tests/n64/frame.py` | 1,939 |
 | `tests/n64/rsp-budget.py` | 3,714 |
 | `tests/n64/run.py` | 7,152 |
@@ -992,10 +988,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/user-access/sites.py` | 3,169 |
 | `tests/userland-demo/run.py` | 3,723 |
 | `tests/verified-boot/runtime.py` | 10,385 |
-| `tests/verified-boot/test.py` | 13,268 |
+| `tests/verified-boot/test.py` | 11,627 |
 | `tests/verified-root/run-host.py` | 7,267 |
 | `tests/verified-root/runtime.py` | 14,950 |
-| `tests/verified-root/test.py` | 9,535 |
+| `tests/verified-root/test.py` | 3,150 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 11,608 |
 | `tests/virtio-ro/run.py` | 6,225 |
 | `tests/wine-host/run-vm.py` | 2,988 |
@@ -1004,16 +1000,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/_native_adt.py` | 1,968 |
 | `tools/agx-re/_native_extract.py` | 5,441 |
 | `tools/agx-re/_native_g17.py` | 4,928 |
-| `tools/agx-re/_native_t6050.py` | 1,976 |
+| `tools/agx-re/_native_t6050.py` | 3,110 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 237,577 |
-| `tools/agx-re/recover_t6050_power.py` | 50,661 |
+| `tools/agx-re/recover_g17_abi.py` | 183,349 |
+| `tools/agx-re/recover_t6050_power.py` | 18,468 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 84,416 |
-| `tools/agx-re/test_recover_t6050_power.py` | 9,325 |
+| `tools/agx-re/test_recover_g17_abi.py` | 60,507 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
@@ -1025,9 +1020,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/qemu-package-store.py` | 16,798 |
 | `tools/split-desktop-initramfs.py` | 5,461 |
 | `tools/split-qemu-initramfs.py` | 5,012 |
-| `tools/verified-boot/build.py` | 17,423 |
+| `tools/verified-boot/_native.py` | 2,322 |
+| `tools/verified-boot/build.py` | 13,701 |
 | `tools/verified-boot/get-loader.py` | 3,705 |
-| `tools/verified-root/build.py` | 10,455 |
+| `tools/verified-root/_native.py` | 2,226 |
+| `tools/verified-root/build.py` | 3,927 |
 
 ## Shell files
 
@@ -1246,7 +1243,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/run.sh` | 4,069 |
 | `tests/krandom/run.sh` | 1,747 |
-| `tests/linuxkpi/run.sh` | 11,049 |
+| `tests/linuxkpi/run.sh` | 11,183 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
 | `tests/m1-wifi/run.sh` | 100 |

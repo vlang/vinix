@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `8ead088e53de1613cb33a2698ebe31a4da75ece6`, Linguist 7.27.0 reports
-**Python 8.03%** (479 files, 3,346,571 bytes) and **V 77.20%** (1,442 files,
-32,178,109 bytes). The complete committed-blob inventory and reproduction
+At source `f1ad647b5f7ce14832569f32a8548953ae32e16f`, Linguist 7.27.0 reports
+**Python 7.64%** (476 files, 3,190,292 bytes) and **V 77.61%** (1,470 files,
+32,392,174 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **1,859,714 Python bytes**. Roughly another
-1.27 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,015,993 Python bytes**. Roughly another
+1.11 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,10 +21,11 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 45 completed stages have a gross
-scope of **1,928,770 bytes**. Counted import bridges, forwarders and caller changes
-account for **69,056 bytes** between gross scope and the measured net
-reduction. Adapter additions receive no extra migration credit.
+tests, including comments and blank lines. The 53 completed stages have a gross
+scope of **2,102,863 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **86,870 bytes**
+between gross scope and the measured net reduction. Adapter additions receive
+no extra migration credit.
 
 | Stage | Native source | Original Python bytes / lines | Source commit |
 | --- | --- | ---: | --- |
@@ -73,6 +74,14 @@ reduction. Adapter additions receive no extra migration credit.
 | Original special-instruction compiler controller | `tests/linuxkpi/special_insns.v` | 12,994 / 244 | `18daaab0ed1bda245c96c70a05ad23297deed7d4` |
 | T6050 power and PMP DART topology | `tools/agx-re/t6050power/topology*.v` | 36,327 / 870 | `9238aaf2920c12292c9a09a3d7642ec1d93b8c83` |
 | Original/V FPU instruction controller | `tests/linuxkpi/fpu_headers.v` | 4,937 / 89 | `8ead088e53de1613cb33a2698ebe31a4da75ece6` |
+| Header primitives, spin and standalone controllers | `tests/linuxkpi/{compile_primitives,spin_sequencing,standalone}.v` | 13,733 / 251 | `9fe8543a87a6d7b82fe4560e4f54e4fb3e0c3a7f` |
+| T6050 patchbay image proofs and fixtures | `tools/agx-re/t6050power/patchbay*.v` | 12,332 / 300 | `7d20071e6a19c53e3ebe85f5f659afcb81e795d3` |
+| Original overflow arithmetic controller | `tests/linuxkpi/overflow_policy.v` | 12,342 / 211 | `0be99bc503222705cb26fdd32e18c0035672e09f` |
+| Verified-root geometry, image builder and Merkle checks | `tools/verified-root/verityimage` | 14,421 / 254 | `f61b6c420aae82d52a38be67a9e32fae62ba737b` |
+| T6050 complete controller compositions | `tools/agx-re/t6050power/controllers.v` | 14,745 / 399 | `350662064f72406a6b2d48b5a8aa1a5dd76aec9d` |
+| T6050 public constants and final fixtures | `tools/agx-re/t6050power/public_constants.v, frontend_test.v` | 16,097 / 390 | `7841d5a689c4bcc1cfbf8676ac1b426c058aac27` |
+| G17 event recovery and validators with fixtures | `tools/agx-re/g17expr/events*.v` | 83,043 / 1,924 | `2a21daef57eebb71b35c8eb5b54a464e5f45ce89` |
+| Verified-boot literal policy and PE/ELF helpers | `tools/verified-boot/bootpolicy` | 7,380 / 122 | `cd6abfb63ab0eb89720a4f336c57dff9e3c1377c` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -387,6 +396,46 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   Current/pinned controller CLI gates and ARM controller sanitizers pass.
   These host checks make no new kernel, QEMU, device or scheduler claim.
 
+- Header primitives: 16 complete generated-C comparisons cover all eight modes
+  on both actual host ABIs; 528 CLI and 345 allocation-regex controls pass.
+  The supported x86 spin fixture reports zero errors, and standalone preserves
+  all seven sanitizer markers. Untouched strict ARM/x86 compile failures retain
+  their original warnings and target restrictions.
+- Overflow arithmetic: independent unchanged fixtures retain 589,824 checks,
+  the exact digest and 13 type domains (nine accepted, four rejected) in each
+  supported host/controller profile. All 176 CLI and 28 macro controls pass;
+  strict original target failures remain recorded.
+- T6050 patchbay/controller/public stages: 5,283 and 1,505 complete original
+  outcomes, exact reader-callback traces and all 199 public values/types pass
+  on both hosts. Native suites, unchanged fixtures, real-image manifests,
+  sanitizers and foreign-thread exchanges return zero owned responses.
+  Secondary image decoding remains lazy at the original reader boundary.
+- G17 events: 36,349 exact typed results/errors, all original methods, eight
+  real-driver outputs and complete controller reports pass on both hosts.
+  Sanitizers, fake-stack and four real shared-ABI profiles retain zero owned
+  outputs. Numeric equality, float rounding and callback tuple/list identity
+  retain their original conventions.
+- Verified-root: 5,661 full original helper outcomes per host/sanitizer profile,
+  46 CLI cases per host and all four original tests pass. Private executable
+  installation/retirement, publication races and failed builds are checked.
+  The unchanged independent production verifier passes on both host ABIs under
+  sanitizers for images of 1, 2, 128, 129, 16,384 and 16,385 blocks; its source
+  remains independent. This is host validation of image algorithms, not a
+  new kernel boot or actual Linux veritysetup claim.
+- Verified-boot: 7,223 original PE/command-line/configuration outcomes per host
+  and sanitizer profile, streaming digest boundaries, ELF header checks and
+  21 filesystem error cases per profile pass. All five original policy/bundle
+  tests pass through the facade, and their two maintained bundle bodies remain
+  unchanged. A genuine ARM64 Limine 12.8 loader is accepted; the older cached
+  x86 loader retains its original rejection. Native executable installation
+  and retirement pass under concurrency. Signing/CLI/integration controllers
+  remain counted; real signing tools are absent, so no new signature, Secure
+  Boot or QEMU execution is claimed. Qualified PE buffers are bytes and
+  bytearrays, alongside the documented scalar/path policy inputs.
+- FPU argument ordering: commit `64b19e9f` preserves eager rejection before
+  help actions; 212 current/pinned CLI cases pass on both hosts. It receives
+  no additional migration credit and supersedes the earlier CLI receipt.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -445,6 +494,15 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `agx-t6050-topology-20261008/final` | `qualification.json` | `08fd4006fa1aa8563fc4ab4a90ba48985d284834e35f18cccfec52b611c64c18` |
 | `fpu-headers-20261008` | `qualification.json` | `c52fe2ee6f994e25d9690cd623338b69f85b18092a159bfa07d407daa6369998` |
 | `g17-caller-span-20261008` | `qualification.json` | `61b651601e28491fa91a15fee410fefe7219ff5572ee9189db9870f36fa23dcf` |
+| `header-fixtures-20261008` | `qualification.json` | `c4fb28c74dca09be4b64f9b9de8f14c122558b23d7b1ad906f6e3fac7b12d5ff` |
+| `agx-t6050-patchbay-20261008/final` | `qualification.json` | `ba5d8acd7f5f9aaa60aff479c94adfe24f5f923e8b8ac1ed8878e887f822bc4b` |
+| `overflow-policy-20261008` | `qualification.json` | `db2f40b1b3a90ef9571fe3e766d09148f9350018babcd75ba69fc000259f6ca1` |
+| `verified-root-20261008` | `qualification-final.json` | `fa1e9f27d62e28b6bda0b36afacaf28dc8cb567204fb1c78ef3b84ff95fc79b8` |
+| `agx-t6050-controllers-20261008/final` | `qualification.json` | `e18557239ff281a223b1ad21ad3d666a29394637d1e7092f84d55a926a33a328` |
+| `agx-t6050-public-20261008/final` | `qualification.json` | `52d3e62152da8c99fb6c451d21ead069c450584f75d27a5ab28c5126fa54ba3a` |
+| `g17-events-20261008` | `qualification.json` | `264d3280901c3cffeefaf9d34d013f67185c77c687ee4ce2d3bc8ff48cbea9cd` |
+| `verified-boot-policy-20261008` | `qualification-final.json` | `ed7773e94dbc37de08d302aabbc9d436a61d389e7f90759e185d577d092c8b2c` |
+| `fpu-cli-order-20261008` | `qualification.json` | `bb2bc4e0f863003a688a041f3e8853c15305b00a4d2fb76ef20d151dee16a057` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -453,8 +511,8 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-G17 event recovery, remaining T6050 image contracts, LinuxKPI compiler
-controllers and verified-root image tooling are active.
+Remaining G17 layout recovery, generic LinuxKPI module generation, Android
+host tooling and build-cache fingerprints are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
