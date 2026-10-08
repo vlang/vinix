@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86`, Linguist 7.27.0 reports
-**Python 6.38%** (483 files, 2,699,963 bytes) and **V 79.05%** (1,647 files,
-33,444,039 bytes). The complete committed-blob inventory and reproduction
+At source `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2`, Linguist 7.27.0 reports
+**Python 6.18%** (488 files, 2,624,167 bytes) and **V 79.29%** (1,671 files,
+33,657,080 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,506,322 Python bytes**. Roughly another
-0.58 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,582,118 Python bytes**. Roughly another
+0.50 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 94 completed stages have a gross
-scope of **2,746,072 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **239,750 bytes**
+tests, including comments and blank lines. The 99 completed stages have a gross
+scope of **2,820,333 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **238,215 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -123,6 +123,11 @@ no extra migration credit.
 | Complete QEMU core guest controller | `tests/agx-fake-g17/agxhost/core_vm.v` | 8,478 / 238 | `11e7c8e5ea5a84ca12adad5c90724782472c33cd` |
 | Independent LinuxKPI audit regression controller | `tests/linuxkpi/auditfixture` | 8,245 / 170 | `9587ce0d1f13b5d2923b431756178750bac37639` |
 | Complete Dota game fixture preparation | `tests/dota2/prepcore` | 14,524 / 276 | `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86` |
+| Complete LinuxKPI disposable guest workflow | `tests/agx-fake-g17/agxhost/linux_guest.v` | 5,981 / 93 | `4541994a0aa1a76b39463005b081fe2e47f18381` |
+| Android image preparation and runner validation | `tests/android/runhost` | 24,592 / 406 | `4d5b5e18737218eccb73d4d687d073ab9a6ad988` |
+| Android session result and probe verification | `tests/android/runhost/result.v` | 10,692 / 176 | `35c6681c63a8f41040d668d58c7ff316ae777150` |
+| Complete Minecraft fetch and staging workflow | `build-support/minecraft/fetchcore` | 13,897 / 315 | `3a036e652430a9a021cbdd8528da793ed02cc7dc` |
+| Private Vulkan staging workflow | `build-support/dota2/vulkanbuild` | 19,099 / 375 | `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -140,6 +145,22 @@ help actions and abbreviations across the LinuxKPI controllers. Commit
 controls cover the ten prior controllers. Commit `bc28715b` adds the malformed
 `-h=` status edge across all ten (370 CLI controls); `fbae5cba` covers the same
 edge in both ABI/bounds generators (200 controls). These fixes receive no extra port credit.
+
+Commits `51f8b95e` and `2c64eab9` consolidate already-native G17 and T6050
+public forwarding declarations into structured V metadata and one stdlib
+function binder. They remove 41,583 and 10,263 counted Python bytes, including
+shared binding changes, and receive **zero repeated algorithm credit**. G17
+retains 191 public declarations; T6050 retains 54 native forwarders and its
+unported Python tree helpers. Function signatures, annotations, defaults,
+argument errors, dynamic module globals and generator laziness remain checked.
+Linux guest fixed marker data moves another 4,771 original bytes/46 lines to V;
+its table row counts only the 5,981-byte workflow, with data accounted separately.
+Commits `9f19e7d2` and `e575156d` preserve context-manager entry/exit, exception
+context, suppression and ignored successful-exit return values, with zero new
+migration credit. The Minecraft first consumer counts all 4,506 bytes of new
+shared transport and adds 29 Python bytes overall. Vulkan's 19,099-byte newly
+ported scope excludes 1,458 bytes of prior native forwarders; its counted
+bindings exceed that eligible scope by 499 bytes. Those bindings stay counted.
 
 ## Validation
 
@@ -755,6 +776,54 @@ workloads were not weakened.
   mutation and preload iterator failure order remain intact. Whole fixture
   compiler commands are controlled; no new game/kernel/rendering claim is made.
 
+- LinuxKPI's disposable guest workflow compares 24 complete frozen/native
+  branches per profile, single and repeated interrupts, exact descriptor
+  baselines, cold entry and marker-list identity. Both frozen and native default
+  x86 guests pass on the same hashed four-CPU prepared inputs, with a final new
+  state repeat. Earlier fake-compiler path mismatches are excluded. This is a
+  default guest check; it does not claim the full opt-in LinuxKPI suite or a new
+  kernel build. Existing 9,105 AGX and 8,644 core policy regressions also pass.
+- Android image orchestration compares 22 complete preparations, 49 main
+  controls, 140 split cases and 14 file/archive cases per profile. Eight forced
+  retirements, seven CLI pairs, both cold installs and the unchanged ten-case
+  PTY corpus pass. The separate manager fix extends file/manager coverage to
+  18 cases, preserving partial tar bytes and exception context. No Android
+  device, Java runtime or kernel/QEMU boot claim is made.
+- Android results compare 239 frozen/native transcript, wide-numeric, namespace,
+  probe-precedence, raw-JSON and exception controls per profile, alongside the
+  original ten PTY assertions, eight retirements and both cold installs. Private
+  controller reaping retains the five-second bound while remaining independent
+  of the caller's VM wait/sleep mocks. No guest functionality is inferred.
+- Minecraft compares 284 policy/type/error and 48 complete workflow controls,
+  18 manager/process retirement controls and eight actual local HTTP main/cache/
+  retry cases per profile. The three independent original tests pass unchanged.
+  Both hosts retain 16 public metadata contracts, nine CLI/cold controls and
+  exact descriptor equality across 100 repeated hashes. Parallel worker call
+  order is scheduler-dependent; its exact invocation set and ordered map
+  results are checked. Original ordering-only qualification failures remain
+  recorded. No official game download, launch, kernel or rendering claim is made.
+- Vulkan production compares all 18 unchanged independent staging snapshots and
+  ordered effect plans, plus 107 original/native controls per profile. Actual
+  bare mmap32 and early-client helper rebuilds retain identical generated C,
+  x86 ELF and undefined symbols on both hosts. Five CLI/cold entries pass per
+  host; the existing unused-import warning remains an explicit cold stderr
+  difference. APFS rejects invalid UTF-8 names for both candidates. Fake driver
+  builds do not establish GPU or guest operation, and no C port credit is taken.
+- Binding-only G17 checks cover all 191 metadata records and 1,542 call controls
+  on both hosts, actual image/public outputs, 264 constants, a byte-exact
+  935,250-byte ordered report and owner retirement. Its 181-case older mock
+  suite retains 95 PASS, 12 SKIP and 74 identical baseline failures; Python mocks
+  cannot enter its existing native provider. T6050 checks 54 bindings/445 call
+  controls, lazy constants, three public fixtures and the exact 49,676-byte
+  manifest on both hosts. Its older 20-case suite retains 17 PASS and three
+  identical errors. Shared G17 requalification also passes after the module
+  globals adjustment. Both native metadata modules pass sanitizer gates.
+- The separate Dota stream manager correction compares 198 complete original/
+  native controls per profile, all eight unchanged host fixtures and seven
+  forced retirements. Successful exit results are ignored; exception-time
+  truth errors retain the read exception context. Both cold entries and
+  100-request descriptor checks pass. This correction has zero port credit.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -887,6 +956,24 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `linuxkpi-host-controllers-20261008` | `audit-postcommit.json` | `0981d12ae3eb10bbb9ae399bfc5450a1ef143991b8d2be36d8b24adfaac4ef3e` |
 | `dota-preparation-20261008` | `qualification.json` | `1c0088a171894ccaeb4cfb8ca9222a0ab05e88d7b225c455d8b55aed48d3ad2c` |
 | `dota-preparation-20261008` | `post-commit.json` | `e1eb4e9e82cc0a927850279a43f7540ae9fabf0def4435e6ad2733196442f1e1` |
+| `linuxkpi-guest-20261008` | `qualification.json` | `7c6b2910d08aeac98a85278afa4bae2f0958d757334447304ce49e686c00def0` |
+| `linuxkpi-guest-20261008` | `post-commit.json` | `ec199dacf1e4b12b2650cfb95b0d0b893040d8f545e005622d96fe9c398527f8` |
+| `android-run-orchestration-20261008` | `qualification.json` | `b8993234dd6074b8fdc0dbfec896e34de16d9f9ea0a304df738bb6c5d98be670` |
+| `android-run-orchestration-20261008` | `postcommit.json` | `0aa30ef012fb8d860fa018f32bb439eb03bdc4f3db2aba8b854feffa37bbf626` |
+| `android-run-result-20261008` | `qualification.json` | `6177db32240029f3604ed9431df5a698df988e01af7fd6748fd4119777f85b84` |
+| `android-run-result-20261008` | `postcommit.json` | `88a2cdad4ea8b12625334d19a0154356389821c1e860193b6e35ce1101384ba4` |
+| `minecraft-fetcher-20261008` | `qualification.json` | `db89ad28755f2a1e79937a695cccf3c0099e340ed0f209ea6baf25f9ec2a8cdc` |
+| `minecraft-fetcher-20261008` | `post-commit.json` | `3f39d77d9d09e13fc2f11e182902900f9f267b4548888572a012212d85056f05` |
+| `vulkan-stage-20261008` | `qualification-final.json` | `7027d3a2336fbc3bf834911b60933f631991010ec3f8f6cbbb399ce4c496c5dd` |
+| `vulkan-stage-20261008` | `postcommit.json` | `522edbf55f6ec086195a742c08271d83117072b44f07e7a3550b84d603601b50` |
+| `android-run-orchestration-20261008` | `manager-qualification.json` | `bd4eb1ef5e734702b03d0a95f31f5319a939c0b2d01f006129e4713e560d787c` |
+| `android-run-orchestration-20261008` | `manager-postcommit.json` | `b1fd606117d0cf1f4be64a861592bbe5e44fe3aab631d5bf75366d1142d03378` |
+| `dota-preparation-context-20261008` | `qualification.json` | `7bf8ba05e9c81a26bd4aa7aaff840072192b93aff45c971a39325fcf7079b99e` |
+| `dota-preparation-context-20261008` | `post-commit.json` | `c40b650eb84c629ecd56c9a9284d46fce3795bd2aa52a0ed3ca7ef8aa6331bdd` |
+| `g17-binding-20261008` | `qualification.json` | `c9c553bfe6b994f5b09852f00e220a4aa431ca04e5d718431a640f7f3c6d5e4b` |
+| `g17-binding-20261008` | `post-commit.json` | `4e41b3495290304f8a6f3b7f0b53ee9c2927e3497a97a96e4f410ba16b4ffbc8` |
+| `t6050-binding-20261008` | `qualification.json` | `521a1def63db203ec967489a7d29e33ce67b34070100a1a6738c36c864f1e091` |
+| `t6050-binding-20261008` | `post-commit.json` | `a0dfe0547a037809b2af3910fc52e09e0c85b29d4b58fdab70189613a638d79d` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -902,8 +989,8 @@ decoding must preserve large provenance timestamps as well as addresses; decodin
 information. When an unported Python caller still imports an API, retain a
 narrow adapter to the native implementation until its caller is ported too.
 
-Remaining large scopes include the G17 ABI frontend, Android/Dota build and
-guest runners, other build tooling, desktop generators and benchmark controllers.
+Remaining large scopes include Android/Dota build and guest runners,
+other build tooling, desktop generators and benchmark controllers.
 Keep original protocol, build profile, fixture identity, deadlines, allocation
 and lifetime behavior. Commit finished stages using only reviewed owned paths,
 then regenerate the language inventory from an explicit committed source SHA.

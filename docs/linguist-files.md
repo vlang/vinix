@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86`,
+at source commit `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 500 | 1,872,135 | 4.42% |
-| Python | 483 | 2,699,963 | 6.38% |
-| Shell | 307 | 1,288,992 | 3.05% |
+| C | 500 | 1,872,135 | 4.41% |
+| Python | 488 | 2,624,167 | 6.18% |
+| Shell | 307 | 1,288,992 | 3.04% |
 
-All `.v` files are classified as V. The resulting V share is 79.05%, with no
+All `.v` files are classified as V. The resulting V share is 79.29%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 2b4ff1ce4c661c427027b381c7c8ac1f0047eb86 --breakdown --json
+github-linguist --rev bf87b9fe9dae758ee6656aaaf0f983eafeee31f2 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -585,11 +585,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/desktop-build-key.py` | 4,588 |
 | `build-support/dhewm3/build.py` | 7,608 |
 | `build-support/dictionary/prepare.py` | 5,197 |
+| `build-support/dota2/_vulkan_native.py` | 11,801 |
 | `build-support/dota2/compile-v-compat.py` | 393 |
 | `build-support/dota2/mesa-build.py` | 14,932 |
 | `build-support/dota2/qemu-stage.py` | 3,871 |
 | `build-support/dota2/venus-build.py` | 10,411 |
-| `build-support/dota2/vulkan-stage.py` | 20,557 |
+| `build-support/dota2/vulkan-stage.py` | 7,797 |
 | `build-support/ext2-set-root-owner.py` | 3,743 |
 | `build-support/init-aarch64/compile-v.py` | 2,875 |
 | `build-support/ios/build-cxx.py` | 6,554 |
@@ -598,13 +599,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/java-cacerts.py` | 2,285 |
 | `build-support/link-duplicate-files.py` | 4,475 |
 | `build-support/make-docker-image.py` | 2,796 |
-| `build-support/minecraft/fetch-minecraft.py` | 16,351 |
+| `build-support/minecraft/_native_fetcher.py` | 6,031 |
+| `build-support/minecraft/fetch-minecraft.py` | 5,843 |
 | `build-support/minecraft/minecraft-login` | 7,459 |
 | `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 13,020 |
 | `build-support/n64-homebrew/build.py` | 5,005 |
 | `build-support/n64/build.py` | 17,077 |
 | `build-support/n64/test-bridge.py` | 2,530 |
+| `build-support/native_host.py` | 4,506 |
 | `build-support/opengothic/build.py` | 10,713 |
 | `build-support/patch-elf-interpreter.py` | 968 |
 | `build-support/ps1/build.py` | 8,162 |
@@ -655,7 +658,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/acpi-sync/compile-v-native.py` | 816 |
 | `tests/acpi-sync/run.py` | 2,414 |
 | `tests/activity-monitor/run.py` | 5,933 |
-| `tests/agx-fake-g17/_native.py` | 7,357 |
+| `tests/agx-fake-g17/_native.py` | 7,413 |
 | `tests/agx-fake-g17/run.py` | 1,075 |
 | `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
 | `tests/agx-fake-g17/run_vm.py` | 4,186 |
@@ -758,6 +761,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/amd64-console/run.py` | 1,040 |
 | `tests/amd64-exceptions/run.py` | 5,611 |
 | `tests/amd64-poll/run.py` | 2,839 |
+| `tests/android/_run_native.py` | 14,100 |
 | `tests/android/activity-lifecycle-test.py` | 1,750 |
 | `tests/android/art-runtime-test.py` | 2,297 |
 | `tests/android/atl-configuration.py` | 7,854 |
@@ -771,7 +775,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/musl-runtime-test.py` | 723 |
 | `tests/android/pointer-capture-test.py` | 1,879 |
 | `tests/android/run-runtime-vm.py` | 9,175 |
-| `tests/android/run.py` | 54,296 |
+| `tests/android/run.py` | 20,168 |
 | `tests/android/runtime-binding.py` | 5,461 |
 | `tests/android/split-test.py` | 2,283 |
 | `tests/android/test-runtime-v.py` | 4,546 |
@@ -819,7 +823,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/disk-writeback/run_vm.py` | 6,351 |
 | `tests/docker/run_vm.py` | 5,032 |
 | `tests/dota2/_native.py` | 3,559 |
-| `tests/dota2/_prepare_native.py` | 8,704 |
+| `tests/dota2/_prepare_native.py` | 9,451 |
 | `tests/dota2/env-run.py` | 10,741 |
 | `tests/dota2/export-run.py` | 6,102 |
 | `tests/dota2/export-test.py` | 10,464 |
@@ -877,6 +881,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
 | `tests/linuxkpi/_audit_native.py` | 7,668 |
+| `tests/linuxkpi/_guest_native.py` | 6,611 |
 | `tests/linuxkpi/_host_native.py` | 4,257 |
 | `tests/linuxkpi/audit_generation_test.py` | 1,281 |
 | `tests/linuxkpi/compile-native-host.py` | 7,987 |
@@ -886,7 +891,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/host_suite.py` | 1,162 |
-| `tests/linuxkpi/run_vm.py` | 12,077 |
+| `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/compile-fixture.py` | 1,221 |
 | `tests/m1-wifi/compile-provider.py` | 2,106 |
@@ -1014,14 +1019,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tools/agx-re/_native_adt.py` | 1,968 |
 | `tools/agx-re/_native_extract.py` | 5,441 |
-| `tools/agx-re/_native_g17.py` | 5,698 |
-| `tools/agx-re/_native_t6050.py` | 3,110 |
+| `tools/agx-re/_native_g17.py` | 9,448 |
+| `tools/agx-re/_native_t6050.py` | 3,221 |
 | `tools/agx-re/compile-v-trace.py` | 737 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 47,166 |
-| `tools/agx-re/recover_t6050_power.py` | 18,468 |
+| `tools/agx-re/recover_g17_abi.py` | 2,516 |
+| `tools/agx-re/recover_t6050_power.py` | 7,411 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
