@@ -32,6 +32,58 @@ fn request(line string) !string {
 	row := json2.decode[map[string]json2.Any](line, strict: true)!
 	operation := (row['operation'] or { return error('Missing operation') }).str()
 	return match operation {
+		'build_tree' {
+			mut inputs := []cachekey.BuildInput{}
+			for value in (row['inputs'] or { return error('Missing inputs') }).as_array() {
+				item := value.as_map()
+				inputs << cachekey.BuildInput{bytes_field(item, 'path')!, bytes_field(item, 'label')!, item['metadata'].bool(), item['policy'].str()}
+			}
+			json2.encode(cachekey.build_tree_key(bytes_field(row, 'namespace')!, bytes_list(row, 'fields')!, inputs)!)
+		}
+		'ignored_source' {
+			json2.encode(cachekey.ignored_source(bytes_field(row, 'path')!, row['policy'].str())!)
+		}
+		'module_subdirs' { json2.encode(cachekey.module_subdirs(bytes_field(row, 'path')!)!) }
+		'subdirs_text' { json2.encode(cachekey.subdirs_text(bytes_field(row, 'text')!)) }
+		'office_imports' { json2.encode(cachekey.office_imports(bytes_field(row, 'text')!)) }
+		'resolved_tool' {
+			json2.encode(cachekey.resolved_tool(bytes_field(row, 'path')!)!.bytes().hex())
+		}
+		'office_source_files' {
+			json2.encode(cachekey.office_source_files(bytes_field(row, 'path')!)!.map(it.bytes().hex()))
+		}
+		'office_modules' {
+			json2.encode(cachekey.office_modules(bytes_field(row, 'office')!, bytes_field(row, 'app')!)!)
+		}
+		'office_key' {
+			json2.encode(cachekey.office_key(bytes_field(row, 'office')!, bytes_field(row, 'shared')!, bytes_field(row, 'app')!)!)
+		}
+		'office_shared' {
+			input := cachekey.OfficeInputs{
+				repo:          bytes_field(row, 'repo')!
+				builder:       bytes_field(row, 'builder')!
+				office:        bytes_field(row, 'office')!
+				ui2:           bytes_field(row, 'ui2')!
+				v:             bytes_field(row, 'v')!
+				vroot:         bytes_field(row, 'vroot')!
+				arch:          bytes_field(row, 'arch')!
+				target:        bytes_field(row, 'target')!
+				clang:         bytes_field(row, 'clang')!
+				strip:         bytes_field(row, 'strip')!
+				clang_headers: bytes_field(row, 'clang_headers')!
+				sysroot:       bytes_field(row, 'sysroot')!
+				gcclib:        bytes_field(row, 'gcclib')!
+				cc_shim:       bytes_field(row, 'cc_shim')!
+				llvm:          bytes_field(row, 'llvm')!
+			}
+			json2.encode(cachekey.office_shared(input)!)
+		}
+		'staging_key' {
+			json2.encode(cachekey.staging_key(bytes_field(row, 'root')!, bytes_list(row, 'values')!, bytes_list(row, 'sources')!, bytes_list(row, 'metadata')!, bytes_list(row, 'vlib')!)!)
+		}
+		'staging_complete' {
+			json2.encode(cachekey.staging_complete(bytes_field(row, 'staging')!, bytes_list(row, 'required')!, bytes_list(row, 'executable')!, bytes_list(row, 'any')!)!)
+		}
 		'content' {
 			json2.encode(cachekey.content_key(bytes_list(row, 'paths')!, (row['metadata'] or { return error('Missing metadata') }).bool())!)
 		}
@@ -73,7 +125,15 @@ fn main() {
 		line := os.get_raw_line()
 		if line == '' { break }
 		result := request(line) or {
-			if err is cachekey.FileError {
+			if err is cachekey.TextDecodeError {
+				println(json2.encode({
+					'error': json2.Any(err.reason)
+					'kind':  json2.Any('UnicodeDecodeError')
+					'data':  json2.Any(err.data.hex())
+					'start': json2.Any(err.start)
+					'end':   json2.Any(err.end)
+				}))
+			} else if err is cachekey.FileError {
 				println(json2.encode({
 					'error':        json2.Any(err.msg())
 					'errno':        json2.Any(err.number)

@@ -11,16 +11,14 @@ import shutil
 import subprocess
 import sys
 
-from build_cache import add_hash_field, hash_path, ignored_v_source_entry
-from build_cache import ignored_vlib_entry, module_subdirs, new_digest
-from build_cache import resolved_tool
+from build_cache import _native
 
 
 APPS = {
     "calc": "cmd/excel",
     "writer": "cmd/word",
 }
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 CACHE_STATE_NAME = ".vinix-voffice-build-state.json"
 EXCLUDED_UI2_SUBDIRS = {"appkit"}
 OFFICE_SOURCE_SUFFIXES = (".c", ".h", ".m", ".v")
@@ -41,147 +39,37 @@ def run(command, quiet=False):
 
 
 def ignored_office_source(path: Path) -> bool:
-    """Match the files V ignores when compiling one directory as a module."""
-    if path.is_dir():
-        return True
-    return path.name.endswith("_test.v") or not path.name.endswith(
-        OFFICE_SOURCE_SUFFIXES
-    )
+    return _native.request("ignored_source", path=_native.wire(path), policy="office")
 
 
 def office_source_files(source: Path):
-    return sorted(
-        (
-            path
-            for path in source.iterdir()
-            if path.is_file() and not ignored_office_source(path)
-        ),
-        key=lambda path: os.fsencode(path.name),
-    )
+    return [Path(os.fsdecode(bytes.fromhex(path))) for path in
+            _native.request("office_source_files", path=_native.wire(source))]
 
 
 def imported_office_modules(args, app_name: str):
-    """Find the app's transitive office.* modules from its production source."""
-    pending = [args.office_source / APPS[app_name]]
-    visited = set()
-    modules = set()
-    while pending:
-        source = pending.pop()
-        source_id = source.resolve()
-        if source_id in visited:
-            continue
-        visited.add(source_id)
-        for path in office_source_files(source):
-            if not path.name.endswith(".v"):
-                continue
-            for name in OFFICE_IMPORT_RE.findall(path.read_text()):
-                if name in modules:
-                    continue
-                module_source = args.office_source / name
-                if module_source.is_dir():
-                    modules.add(name)
-                    pending.append(module_source)
-    return sorted(modules)
+    APPS[app_name]
+    return _native.request("office_modules", office=_native.wire(args.office_source),
+                           app=_native.wire(app_name))
 
 
 def shared_build_key(args, vroot: Path):
-    """Fingerprint inputs shared by both independently built Office apps."""
-    digest = new_digest("vinix-voffice-cache", CACHE_VERSION)
-    v_compiler = resolved_tool(args.v)
-    for name, value in (("arch", args.arch), ("target", args.target)):
-        add_hash_field(digest, name)
-        add_hash_field(digest, value)
-
-    for label, path in (
-        ("builder", Path(__file__)),
-        ("cache-helper", Path(__file__).with_name("build_cache.py")),
-        ("stager", args.repo / "desktop/tools/stage_ui2.py"),
-        ("backend", args.repo / "desktop/tools/ui2_vinix_backend.v"),
-        ("ui2-manifest", args.ui2_source / "v.mod"),
-        ("office-manifest", args.office_source / "v.mod"),
-        ("office-version", args.office_source / "VERSION"),
-        ("v-compiler", v_compiler),
-    ):
-        hash_path(digest, path, label)
-
-    # Compiler libraries and bundled TLS sources are large but change in place
-    # during V development. Metadata fingerprints make repeat checks cheap
-    # while still noticing normal edits, compiler rebuilds and checkouts.
-    hash_path(
-        digest,
-        vroot / "vlib",
-        "vlib",
-        metadata_only=True,
-        ignore=ignored_vlib_entry,
-    )
-    hash_path(
-        digest,
-        vroot / "thirdparty/mbedtls",
-        "mbedtls",
-        metadata_only=True,
-        ignore=ignored_v_source_entry,
-    )
-
-    ui2_dirs = [
-        name
-        for name in module_subdirs(args.ui2_source)
-        if name not in EXCLUDED_UI2_SUBDIRS
-    ]
-    for name in ui2_dirs:
-        hash_path(
-            digest,
-            args.ui2_source / name,
-            "ui2/" + name,
-            ignore=ignored_v_source_entry,
-        )
-    hash_path(digest, args.ui2_source / "assets", "ui2/assets")
-
-    for label, path in (
-        ("clang", resolved_tool(args.clang)),
-        ("strip", resolved_tool(args.strip)),
-        ("clang-resource-headers", args.clang_resource_include),
-        ("sysroot-headers", args.sysroot / "usr/include"),
-        ("gcc-headers", args.gcclib / "include"),
-        ("crt1", args.sysroot / "usr/lib/crt1.o"),
-        ("crti", args.sysroot / "usr/lib/crti.o"),
-        ("crtn", args.sysroot / "usr/lib/crtn.o"),
-        ("libc", args.sysroot / "usr/lib/libc.a"),
-        ("libm", args.sysroot / "usr/lib/libm.a"),
-        ("crtbegin", args.gcclib / "crtbeginT.o"),
-        ("crtend", args.gcclib / "crtend.o"),
-        ("libgcc", args.gcclib / "libgcc.a"),
-        ("libgcc-eh", args.gcclib / "libgcc_eh.a"),
-    ):
-        hash_path(digest, path, label, metadata_only=True)
-    if args.cc_shim:
-        hash_path(digest, args.cc_shim, "cc-shim")
-    if args.llvm_bin:
-        hash_path(
-            digest,
-            args.llvm_bin / "ld.lld",
-            "ld.lld",
-            metadata_only=True,
-        )
-    return digest.hexdigest()
+    return _native.request("office_shared", repo=_native.wire(args.repo),
+                           builder=_native.wire(Path(__file__)),
+                           office=_native.wire(args.office_source), ui2=_native.wire(args.ui2_source),
+                           v=_native.wire(args.v), vroot=_native.wire(vroot),
+                           arch=_native.wire(args.arch), target=_native.wire(args.target),
+                           clang=_native.wire(args.clang), strip=_native.wire(args.strip),
+                           clang_headers=_native.wire(args.clang_resource_include),
+                           sysroot=_native.wire(args.sysroot), gcclib=_native.wire(args.gcclib),
+                           cc_shim=_native.wire(args.cc_shim) if args.cc_shim else "",
+                           llvm=_native.wire(args.llvm_bin) if args.llvm_bin else "")
 
 
 def app_build_key(args, shared_key: str, name: str):
-    digest = new_digest("vinix-voffice-app", CACHE_VERSION)
-    add_hash_field(digest, shared_key)
-    hash_path(
-        digest,
-        args.office_source / APPS[name],
-        "office/" + APPS[name],
-        ignore=ignored_office_source,
-    )
-    for module_name in imported_office_modules(args, name):
-        hash_path(
-            digest,
-            args.office_source / module_name,
-            "office/" + module_name,
-            ignore=ignored_office_source,
-        )
-    return digest.hexdigest()
+    APPS[name]
+    return _native.request("office_key", office=_native.wire(args.office_source),
+                           shared=_native.wire(shared_key), app=_native.wire(name))
 
 
 def load_build_state(output: Path):

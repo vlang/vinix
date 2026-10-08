@@ -46,6 +46,9 @@ def request(operation, **fields):
     value = json.loads(result.stdout)
     if isinstance(value, dict) and "error" in value:
         filename = os.fsdecode(bytes.fromhex(value.get("filename_hex", "")))
+        if value.get("kind") == "UnicodeDecodeError":
+            raise UnicodeDecodeError("utf-8", bytes.fromhex(value["data"]),
+                                     value["start"], value["end"], value["error"])
         if value.get("kind") == "PathLoopError":
             raise RuntimeError(f"Symlink loop from {filename!r}")
         if value.get("errno"):

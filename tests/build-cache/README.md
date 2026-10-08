@@ -16,3 +16,16 @@ in Python; input selection, path resolution and hashing execute in V.
 
 `test_prune_build_artifacts.py` remains an independent Python test for the
 unrelated build artifact pruning tool.
+
+The staging and VOffice policies also run in V. Their v2 keys fingerprint the
+native helpers, follow symlink targets, detect directory cycles and omit
+directory generation when recursively hashing metadata. V compiler inputs
+exclude tests/generated files and the compiler sources already fingerprinted
+by the compiler executable. Office app keys include each app's transitive
+production modules. The additional native suite covers these invalidation
+rules and compares Unicode13 word/space membership for every valid scalar.
+
+Staging record publication and the VOffice compiler controller retain their
+existing Python command frontends. The former incremental Python hashing
+helpers had only these two in-repository consumers; both now request complete
+native keys through the counted import transport.

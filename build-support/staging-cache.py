@@ -22,28 +22,20 @@ SPEC.loader.exec_module(BUILD_CACHE)
 
 
 def cache_key(args: argparse.Namespace) -> str:
-    digest = BUILD_CACHE.new_digest("vinix-staging-cache", 1)
-    BUILD_CACHE.hash_path(digest, HERE / "staging-cache.py", "staging-helper")
-    BUILD_CACHE.hash_path(digest, HERE.parent / "desktop/tools/build_cache.py", "hash-helper")
-    for value in args.value:
-        BUILD_CACHE.add_hash_field(digest, value)
-    for index, path in enumerate(args.source):
-        BUILD_CACHE.hash_path(digest, path, f"source-{index}")
-    for index, path in enumerate(args.metadata):
-        BUILD_CACHE.hash_path(digest, path, f"metadata-{index}", metadata_only=True)
-    for index, path in enumerate(args.vlib):
-        BUILD_CACHE.hash_path(digest, path, f"vlib-{index}", metadata_only=True,
-                              ignore=BUILD_CACHE.ignored_vlib_entry)
-    return digest.hexdigest()
+    native = BUILD_CACHE._native
+    return native.request("staging_key", root=native.wire(HERE.parent),
+                          values=[native.wire(value) for value in args.value],
+                          sources=[native.wire(path) for path in args.source],
+                          metadata=[native.wire(path) for path in args.metadata],
+                          vlib=[native.wire(path) for path in args.vlib])
 
 
 def complete(args: argparse.Namespace) -> bool:
-    return args.staging.is_dir() and all(
-        (args.staging / path).exists() for path in args.required
-    ) and all((args.staging / path).is_file() and os.access(args.staging / path, os.X_OK)
-              for path in args.executable) and (not args.executable_any or any(
-                  (args.staging / path).is_file() and os.access(args.staging / path, os.X_OK)
-                  for path in args.executable_any))
+    native = BUILD_CACHE._native
+    return native.request("staging_complete", staging=native.wire(args.staging),
+                          required=[native.wire(path) for path in args.required],
+                          executable=[native.wire(path) for path in args.executable],
+                          any=[native.wire(path) for path in args.executable_any])
 
 
 def main() -> int:
