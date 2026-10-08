@@ -45,6 +45,15 @@ span arithmetic retains integer width until validated physical slicing. The
 independent synthetic preload-image fixtures retain complete results for all
 alignments and both segment protections; no real firmware image is committed.
 
+The controller layer owns identity validation, ordered symbol/function collection,
+required property strings, vtable slots and component-proof composition for the
+nine PMGR/PMP/firmware/A7IOP/DART/kernel/ASCWrap recovery entry points.
+`ControllerReader` is synchronous. Paired RTBuddy bytes are decoded only on
+their first reader call, preserving each controller's validation order. Native
+fixtures retain selected read-only symbol/code/property/table evidence, source
+image identities and complete independent Python results and call traces.
+They contain no complete firmware image.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V

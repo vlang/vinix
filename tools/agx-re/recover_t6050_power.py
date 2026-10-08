@@ -520,41 +520,7 @@ def recover_pmp_code_contract(
 
 
 def recover_apple_pmgr(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_PMGR_UUID:
-        raise ValueError(f"unsupported ApplePMGR UUID {identity}")
-    symbols = macho_symbols(image)
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            PMP_SEND_COMMAND,
-            PMP_WRITE_DASHBOARD,
-            PMP_SET_DEVICE_STATE,
-            PMP_SET_VIRTUAL_DEVICE_STATE,
-            PMP_INIT_V2,
-            PMP_GET_DEVICE_INDEX,
-            PMP_NOTIFY_INITIAL,
-            PMP_NOTIFY_INITIAL_ENTRY,
-            PMP_WAIT_CLUSTER_POWER_UP,
-            PMP_ENABLE_DEVICE_GATED,
-            PMP_WAIT_READY,
-            PMP_WAIT_READY_V2,
-            PMP_READY_GATED,
-            PMP_READY_ACTION_V2,
-            PMGR_START,
-            PMGR_HANDLE_INTERRUPT_ALL,
-            PMGR_INIT_DRIVER,
-            PMGR_CONSTRUCTOR,
-            APPLE_PTD_READ,
-            APPLE_PTD_WRITE,
-            PMGR_WRITE_REG64,
-        )
-    }
-    interrupt_config = recover_pmgr_interrupt_config(image, functions)
-    return {
-        "uuid": identity,
-        "pmp_v2": recover_pmp_code_contract(functions, symbols, interrupt_config),
-    }
+    return _native_t6050.image_contract("recover_apple_pmgr", image, {})
 
 
 def _decode_movz_w(word: int, register: int) -> int | None:
@@ -573,30 +539,7 @@ def recover_t6050_pmgr_code_contract(
 def recover_apple_t6050_pmgr(
     image: bytes, apple_pmgr_symbols: dict[str, int]
 ) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_T6050_PMGR_UUID:
-        raise ValueError(f"unsupported AppleT6050PMGR UUID {identity}")
-    symbols = macho_symbols(image)
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            T6050_INIT_REG_MAPS,
-            PMGR_PMP_V1,
-            PMGR_PMP_V2,
-            T6050_RESTORE_HW,
-            T6050_UPDATE_HIB_DEVICE_STATUS,
-        )
-    }
-    slots = {
-        slot: recover_vtable_target(image, APPLE_T6050_PMGR_VTABLE, slot)
-        for slot in (0xAB0, 0xAB8, 0xAC0, 0xAC8, 0xB30)
-    }
-    return {
-        "uuid": identity,
-        "power": recover_t6050_pmgr_code_contract(
-            functions, symbols, apple_pmgr_symbols, slots
-        ),
-    }
+    return _native_t6050.image_contract("recover_apple_t6050_pmgr", image, {}, apple_pmgr_symbols=apple_pmgr_symbols)
 
 
 def recover_apple_pmp_code_contract(
@@ -608,48 +551,7 @@ def recover_apple_pmp_code_contract(
 
 
 def recover_apple_pmp(image: bytes, rtbuddy_image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_PMP_UUID:
-        raise ValueError(f"unsupported ApplePMP UUID {identity}")
-    symbols = macho_symbols(image)
-    rtbuddy_identity = macho_uuid(rtbuddy_image)
-    if rtbuddy_identity != RTBUDDY_UUID:
-        raise ValueError(f"unsupported RTBuddy UUID {rtbuddy_identity}")
-    rtbuddy_symbols = macho_symbols(rtbuddy_image)
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            APPLE_PMP_V2_START,
-            APPLE_PMP_V2_MESSAGE_HANDLER,
-            APPLE_PMP_V2_HANDLE_POWER,
-            APPLE_PMP_V2_SEND_MESSAGE,
-            APPLE_PMP_V2_WRITE_DASHBOARD,
-            APPLE_PMP_V2_PING_GATED,
-        )
-    }
-    start_address, start_code = functions[APPLE_PMP_V2_START]
-    expected_start_strings = {
-        (0x94, 0x98): "role",
-        (0x154, 0x158): "ptd-update-reg-index",
-        (0x260, 0x264): "setActive",
-        (0x328, 0x32C): "PMP workloop",
-        (0x3F8, 0x3FC): "wait-for",
-    }
-    for (adrp_offset, add_offset), expected in expected_start_strings.items():
-        actual = read_adrp_add_cstring(
-            image, start_address, start_code, adrp_offset, add_offset
-        )
-        if actual != expected:
-            raise ValueError(
-                f"ApplePMPv2 start string changed at {adrp_offset:#x}: {actual!r}"
-            )
-    return {
-        "uuid": identity,
-        "rtbuddy_uuid": rtbuddy_identity,
-        "pmp_v2": recover_apple_pmp_code_contract(
-            functions, symbols, rtbuddy_symbols
-        ),
-    }
+    return _native_t6050.image_contract("recover_apple_pmp", image, {}, rtbuddy_image=rtbuddy_image)
 
 
 def recover_apple_pmp_firmware_code_contract(
@@ -713,124 +615,7 @@ def recover_rtbuddy_boot_handshake_code_contract(
 def recover_apple_pmp_firmware(
     image: bytes, rtbuddy_image: bytes
 ) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_PMP_FIRMWARE_UUID:
-        raise ValueError(f"unsupported ApplePMPFirmware UUID {identity}")
-    rtbuddy_identity = macho_uuid(rtbuddy_image)
-    if rtbuddy_identity != RTBUDDY_UUID:
-        raise ValueError(f"unsupported RTBuddy UUID {rtbuddy_identity}")
-    pmp_symbols = macho_symbols(image)
-    rtbuddy_symbols = macho_symbols(rtbuddy_image)
-    pmp_functions = {
-        name: symbol_code(image, name)
-        for name in (APPLE_PMP_FIRMWARE_START, APPLE_PMP_FIRMWARE_PATCH)
-    }
-    rtbuddy_function_names = (
-        RTBUDDY_FIRMWARE_FIXUP,
-        RTBUDDY_LOAD_FIRMWARE_GATED,
-        RTBUDDY_LOAD_FIRMWARE,
-        RTBUDDY_PERFORM_POWER_STATE_GATED,
-        RTBUDDY_IOP_VALIDATE,
-        RTBUDDY_IOP_VALIDATE_POLLING,
-        RTBUDDY_IOP_VALIDATE_BLOCKING,
-        RTBUDDY_SET_IOP_STATUS,
-        RTBUDDY_SET_IOP_STATUS_PUBLIC,
-        RTBUDDY_MANAGEMENT_HANDLE_HELLO,
-        RTBUDDY_MANAGEMENT_HANDLE_EP_ROLLCALL,
-        RTBUDDY_BUILD_ROLL_CALL,
-        RTBUDDY_GET_ENDPOINT,
-        RTBUDDY_CREATE_ENDPOINT,
-        RTBUDDY_ENDPOINT_SERVICE_CREATE_NAME,
-        RTBUDDY_INIT_CONFIG_EDT,
-        RTBUDDY_ATTEMPT_FIRMWARE_LOAD,
-        RTBUDDY_HANDLE_PRELOAD_FIRMWARE,
-        RTBUDDY_FIRMWARE_PRELOADED,
-        RTBUDDY_FIRMWARE_IBOOT_LOADED,
-        RTBUDDY_FIRMWARE_COPY_ID_BLOCK,
-        RTBUDDY_FIRMWARE_FIND_PATCHBAY,
-        RTBUDDY_PATCHBAY_INIT_WITH_DATA,
-        RTBUDDY_PATCHBAY_FIND,
-        RTBUDDY_FIRMWARE_GET_PATCHBAY,
-        RTBUDDY_FIRMWARE_COPY_PATCHBAY_DATA,
-        RTBUDDY_FIRMWARE_PATCH_U32,
-        RTBUDDY_FIRMWARE_WRITE_BACK_PATCHBAY,
-        RTBUDDY_MEMCPY_TO32,
-        RTBUDDY_GET_SEGMENT_MAP,
-        RTBUDDY_SEGMENT_IS_WRITABLE,
-    )
-    rtbuddy_functions = {
-        name: symbol_code(rtbuddy_image, name) for name in rtbuddy_function_names
-    }
-    start_address, start_code = pmp_functions[APPLE_PMP_FIRMWARE_START]
-    expected_start_strings = {
-        (0xE0, 0xE4): "role",
-        (0x128, 0x12C): "firmware-name",
-        (0x1C8, 0x1CC): "IODeviceTree:/chosen",
-        (0x210, 0x214): "board-id",
-        (0x2A0, 0x2A4): "dram-vendor-id",
-        (0x358, 0x35C): "dram-capacity",
-        (0x3C0, 0x3C4): "dram-channel-disable",
-        (0x408, 0x40C): "IODeviceTree:/arm-io/pmgr",
-        (0x450, 0x454): "pmc",
-        (0x4E0, 0x4E4): "pmc-pmgr",
-        (0x5A0, 0x5A4): "pmc-msg-disabled",
-        (0x608, 0x60C): "soc-chip-variant",
-        (0x670, 0x674): "Role",
-    }
-    for (adrp_offset, add_offset), expected in expected_start_strings.items():
-        actual = read_adrp_add_cstring(
-            image, start_address, start_code, adrp_offset, add_offset
-        )
-        if actual != expected:
-            raise ValueError(
-                "ApplePMPFirmware start string changed at "
-                f"{adrp_offset:#x}: {actual!r}"
-            )
-    pmp_vtable_targets = {
-        slot: recover_vtable_target(image, APPLE_PMP_FIRMWARE_VTABLE, slot)
-        for slot in (0x5F0, 0x898)
-    }
-    service_vtable_targets = {
-        slot: recover_vtable_target(
-            rtbuddy_image, RTBUDDY_FIRMWARE_SERVICE_VTABLE, slot
-        )
-        for slot in (0x890, 0x898)
-    }
-    firmware_vtable_targets = {
-        slot: recover_vtable_target(rtbuddy_image, RTBUDDY_FIRMWARE_VTABLE, slot)
-        for slot in (0x8A8, 0x8B0)
-    }
-    return {
-        "uuid": identity,
-        "rtbuddy_uuid": rtbuddy_identity,
-        "firmware_load": recover_apple_pmp_firmware_code_contract(
-            pmp_functions,
-            pmp_symbols,
-            rtbuddy_functions,
-            rtbuddy_symbols,
-            pmp_vtable_targets,
-            service_vtable_targets,
-            firmware_vtable_targets,
-        ),
-        "segment_flags": recover_rtbuddy_segment_flag_contract(
-            rtbuddy_functions, rtbuddy_symbols
-        ),
-        "patchbay_write": recover_rtbuddy_patchbay_write_contract(
-            rtbuddy_functions, rtbuddy_symbols
-        ),
-        "patchbay_format": recover_rtbuddy_patchbay_contract(
-            rtbuddy_image, rtbuddy_functions, rtbuddy_symbols
-        ),
-        "firmware_source": recover_rtbuddy_firmware_source_contract(
-            rtbuddy_image,
-            rtbuddy_functions,
-            rtbuddy_symbols,
-            recover_vtable_target(rtbuddy_image, RTBUDDY_VTABLE, 0x9D8),
-        ),
-        "rtkit_boot": recover_rtbuddy_boot_handshake_code_contract(
-            rtbuddy_functions, rtbuddy_symbols
-        ),
-    }
+    return _native_t6050.image_contract("recover_apple_pmp_firmware", image, {}, rtbuddy_image=rtbuddy_image)
 
 
 def recover_apple_a7iop_code_contract(
@@ -842,47 +627,7 @@ def recover_apple_a7iop_code_contract(
 
 
 def recover_apple_a7iop(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_A7IOP_UUID:
-        raise ValueError(f"unsupported AppleA7IOP UUID {identity}")
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            APPLE_WRAPPER_MAILBOX_START,
-            APPLE_WRAPPER_MAILBOX_REG,
-            APPLE_WRAPPER_MAILBOX_PHYSICAL,
-            APPLE_A7IOP_START,
-            APPLE_A7IOP_START_CPU_OPTIONS,
-            APPLE_A7IOP_REG,
-            APPLE_A7IOP_PHYSICAL,
-            APPLE_A7IOP_ENABLE_SRAM,
-            APPLE_A7IOP_ENABLE_POWER,
-            APPLE_A7IOP_DART_MAP_IBOOT_FIRMWARE,
-            APPLE_A7IOP_HAS_IBOOT_FIRMWARE,
-        )
-    }
-    a7_start_address, a7_start_code = functions[APPLE_A7IOP_START]
-    for (adrp_offset, add_offset), expected in {
-        (0x794, 0x798): "sram-index",
-        (0x80C, 0x810): "should-control-sram",
-        (0x88C, 0x890): "cpu-ctrl-filtered",
-    }.items():
-        actual = read_adrp_add_cstring(
-            image, a7_start_address, a7_start_code, adrp_offset, add_offset
-        )
-        if actual != expected:
-            raise ValueError(
-                f"AppleA7IOP start string changed at {adrp_offset:#x}: {actual!r}"
-            )
-    vtable_targets = {
-        APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT: recover_vtable_target(
-            image, APPLE_A7IOP_VTABLE, APPLE_A7IOP_ENABLE_POWER_VTABLE_SLOT
-        )
-    }
-    return {
-        "uuid": identity,
-        **recover_apple_a7iop_code_contract(image, functions, vtable_targets),
-    }
+    return _native_t6050.image_contract("recover_apple_a7iop", image, {})
 
 
 def recover_iodart_family_code_contract(
@@ -894,32 +639,7 @@ def recover_iodart_family_code_contract(
 
 
 def recover_iodart_family(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != IODART_FAMILY_UUID:
-        raise ValueError(f"unsupported IODARTFamily UUID {identity}")
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            IODART_MAPPER_GET_PAGE_SIZE,
-            IODART_MAPPER_IOVM_INSERT,
-            IODART_MAPPER_IOVM_INSERT_ONE,
-        )
-    }
-    vtable_targets = {
-        slot: recover_vtable_target(image, IODART_MAPPER_VTABLE, slot)
-        for slot in (0x888, 0x8A0)
-    }
-    insert_address, insert_code = functions[IODART_MAPPER_IOVM_INSERT]
-    table_address = read_adrp_add_address(
-        insert_address, insert_code, 0x34, 0x38
-    )
-    direction_lookup = read_virtual_u32_table(image, table_address, 4)
-    return {
-        "uuid": identity,
-        **recover_iodart_family_code_contract(
-            functions, vtable_targets, direction_lookup
-        ),
-    }
+    return _native_t6050.image_contract("recover_iodart_family", image, {})
 
 
 def recover_apple_t8110_dart_code_contract(
@@ -931,39 +651,7 @@ def recover_apple_t8110_dart_code_contract(
 
 
 def recover_apple_t8110_dart(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_T8110_DART_UUID:
-        raise ValueError(f"unsupported AppleT8110DART UUID {identity}")
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            APPLE_T8110_DART_START,
-            APPLE_T8110_DART_SETUP,
-            APPLE_T8110_DART_GET_SID_PROPERTY,
-            APPLE_T8110_DART_GET_SID_COUNT,
-            APPLE_T8110_DART_IS_BYPASSED_SID,
-            APPLE_T8110_DART_ENABLE_TRANSLATION,
-            APPLE_T8110_DART_SET_TRANSLATION,
-            APPLE_T8110_DART_SET_TRANSLATION_RANGE,
-            APPLE_T8110_DART_INVALIDATE_TLB,
-        )
-    }
-    setup_address, setup_code = functions[APPLE_T8110_DART_SETUP]
-    bypass_property_prefix = read_adrp_add_cstring(
-        image, setup_address, setup_code, 0xDE8, 0xDEC
-    )
-    property_address, property_code = functions[
-        APPLE_T8110_DART_GET_SID_PROPERTY
-    ]
-    sid_property_format = read_adrp_add_cstring(
-        image, property_address, property_code, 0x3C, 0x40
-    )
-    return {
-        "uuid": identity,
-        **recover_apple_t8110_dart_code_contract(
-            functions, bypass_property_prefix, sid_property_format
-        ),
-    }
+    return _native_t6050.image_contract("recover_apple_t8110_dart", image, {})
 
 
 def recover_t8110_kernel_code_contract(
@@ -975,29 +663,7 @@ def recover_t8110_kernel_code_contract(
 
 
 def recover_t8110_kernel(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != T6050_KERNEL_UUID:
-        raise ValueError(f"unsupported T6050 kernel UUID {identity}")
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            T8110_DART_MAX_TRANSLATION_LEVELS,
-            T8110_DART_VO_TT_INDEX,
-            T8110_DART_VO_TTE,
-        )
-    }
-    index_address, index_code = functions[T8110_DART_VO_TT_INDEX]
-    masks_address = read_adrp_add_address(index_address, index_code, 0x78, 0x7C)
-    shifts_address = read_adrp_add_address(index_address, index_code, 0x88, 0x8C)
-    masks_offset = virtual_to_file(image, masks_address)
-    index_masks = struct.unpack_from("<4Q", image, masks_offset)
-    index_shifts = read_virtual_u32_table(image, shifts_address, 4)
-    return {
-        "uuid": identity,
-        **recover_t8110_kernel_code_contract(
-            functions, index_masks, index_shifts
-        ),
-    }
+    return _native_t6050.image_contract("recover_t8110_kernel", image, {})
 
 
 def recover_apple_ascwrap_v6_code_contract(
@@ -1008,50 +674,7 @@ def recover_apple_ascwrap_v6_code_contract(
 
 
 def recover_apple_ascwrap_v6(image: bytes) -> dict[str, object]:
-    identity = macho_uuid(image)
-    if identity != APPLE_ASCWRAP_V6_UUID:
-        raise ValueError(f"unsupported AppleASCWrapV6 UUID {identity}")
-    functions = {
-        name: symbol_code(image, name)
-        for name in (
-            APPLE_ASCWRAP_V6_INITIALIZE,
-            APPLE_ASCWRAP_V6_SET_IORVBAR,
-            APPLE_ASCWRAP_V6_IS_IORVBAR_LOCKED,
-            APPLE_ASCWRAP_V6_MAP_FIRMWARE,
-            APPLE_ASCWRAP_V6_RUN_CPU,
-            APPLE_ASCWRAP_V6_INBOX,
-            APPLE_ASCWRAP_V6_OUTBOX,
-            APPLE_ASCWRAP_V6_KIC_INBOX_ENABLED,
-            APPLE_ASCWRAP_V6_INBOX_EMPTY,
-            APPLE_ASCWRAP_V6_INBOX_FULL,
-            APPLE_ASCWRAP_V6_OUTBOX_EMPTY,
-            APPLE_ASCWRAP_V6_MAILBOX_ITEM_SIZE,
-        )
-    }
-    initialize_address, initialize_code = functions[APPLE_ASCWRAP_V6_INITIALIZE]
-    for (adrp_offset, add_offset), expected in {
-        (0x84, 0x88): "nmi-ext-irq",
-        (0xA4, 0xA8): "ext-irq-reg-index",
-        (0x21C, 0x220): "idle-ctrl-check",
-    }.items():
-        actual = read_adrp_add_cstring(
-            image, initialize_address, initialize_code, adrp_offset, add_offset
-        )
-        if actual != expected:
-            raise ValueError(
-                "AppleASCWrapV6 initialize string changed at "
-                f"{adrp_offset:#x}: {actual!r}"
-            )
-    vtable_targets = {
-        slot: recover_vtable_target(image, APPLE_ASCWRAP_V6_VTABLE, slot)
-        for slot in (0x970, 0xA18, 0xA28)
-    }
-    return {
-        "uuid": identity,
-        "wrapper_v6": recover_apple_ascwrap_v6_code_contract(
-            functions, vtable_targets
-        ),
-    }
+    return _native_t6050.image_contract("recover_apple_ascwrap_v6", image, {})
 
 
 def recover_t6050_pmp_darts(
