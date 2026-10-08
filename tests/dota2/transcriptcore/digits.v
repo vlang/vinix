@@ -14,7 +14,7 @@ const decimal_starts = [rune(0x30), rune(0x660), rune(0x6f0), rune(0x7c0), rune(
 	rune(0x1d7e2), rune(0x1d7ec), rune(0x1d7f6), rune(0x1e140), rune(0x1e2f0), rune(0x1e950),
 	rune(0x1fbf0)]
 
-fn decimal_digit(ch rune) int {
+pub fn decimal_digit(ch rune) int {
 	for start in decimal_starts { if ch >= start && ch < start + 10 { return int(ch - start) } }
 	return -1
 }
