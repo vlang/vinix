@@ -3,6 +3,7 @@ module mmap
 
 import memory
 import resource
+import klock
 
 const page_size = u64(4096)
 const higher_half = u64(0)
@@ -12,6 +13,7 @@ const prot_write = 2
 const prot_exec = 4
 const map_shared = 1
 const map_anonymous = 0x20
+const map_locked = 0x2000
 
 struct MmapRangeGlobal {
 mut:
@@ -29,10 +31,14 @@ mut:
     file_data_length u64
     shadow_pagemap memory.Pagemap
     pte_extra u64
+    paged_pages &PagedPage = unsafe { nil }
+    locals []&MmapRangeLocal
 }
 struct MmapRangeLocal {
 mut:
 	generation u64 = 1
+    pagemap &memory.Pagemap = unsafe { nil }
+    immutable bool
     base u64 = 4096
     length u64 = 4096
     offset i64
@@ -46,6 +52,7 @@ __global (
     active_map &memory.Pagemap = unsafe { nil }
     race_mode int
     handle_refs int = 1
+    range_locals_lock klock.Lock
 )
 fn addr2range(_map &memory.Pagemap, virt u64) ?(&MmapRangeLocal, u64, u64) {
     if fixture_local == unsafe { nil } || virt < fixture_local.base || virt >= fixture_local.base + fixture_local.length { return none }

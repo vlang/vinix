@@ -122,6 +122,8 @@ fn main() {
     security.set_level(0)
     writer := spawn hold_raw_write(&disk)
     C.host_wait_started()
+    during_write := security.claim_swap(volume) or { assert errno.get() == errno.ebusy; -1 }
+    assert during_write == -1
     security.set_level(1)
     token := security.begin_block_mount(volume) or {
         assert errno.get() == errno.ebusy
@@ -133,6 +135,8 @@ fn main() {
     C.host_signal_release()
     writer.wait()
     reserved := security.begin_block_mount(volume) or { panic('completed writer must release reservation conflict') }
+    during_mount := security.claim_swap(volume) or { assert errno.get() == errno.ebusy; -1 }
+    assert during_mount == -1
     assert !security.user_device_write_allowed(mut disk)
     assert !security.user_device_write_allowed(mut part)
     assert security.user_device_write_allowed(mut neighbor) && security.user_device_write_allowed(mut spare)
@@ -140,6 +144,23 @@ fn main() {
     assert security.user_device_write_allowed(mut disk) // Failed mount cancels protection.
     cancelled := security.begin_user_device_write(mut part) or { panic('cancelled mount should permit raw writes') }
     security.end_user_device_write(cancelled)
+    security.set_level(0)
+    swap := security.claim_swap(volume) or { panic('unmounted extent should permit swap') }
+    assert !security.user_device_write_allowed(mut alias) && errno.get() == errno.ebusy
+    assert !security.user_device_write_allowed(mut disk)
+    assert !security.user_device_write_allowed(mut part)
+    assert security.user_device_write_allowed(mut neighbor) && security.user_device_write_allowed(mut spare)
+    denied_write := security.begin_user_device_write(mut disk) or { assert errno.get() == errno.ebusy; -1 }
+    assert denied_write == -1
+    denied_mount := security.begin_block_mount(overlap) or { assert errno.get() == errno.ebusy; -1 }
+    assert denied_mount == -1
+    denied_swap := security.claim_swap(whole) or { assert errno.get() == errno.ebusy; -1 }
+    assert denied_swap == -1
+    adjacent := security.begin_block_mount(sibling) or { panic('disjoint mount must remain available') }
+    security.finish_block_mount(adjacent, false)
+    security.release_swap(swap)
+    assert security.user_device_write_allowed(mut disk)
+    security.set_level(1)
     committed := security.begin_block_mount(volume) or { panic('mount should reserve') }
     security.finish_block_mount(committed, true)
     for _ in 0 .. 10000 {
@@ -156,7 +177,9 @@ fn main() {
     assert !security.user_device_write_allowed(mut spare) && !security.user_device_write_allowed(mut alias)
     security.set_level(0)
     assert security.user_device_write_allowed(mut disk)
-    println('PASS: production topology, provenance, mount/write interleaving, cancellation, inventory growth and securelevels')
+    protected_swap := security.claim_swap(volume) or { assert errno.get() == errno.ebusy; -1 }
+    assert protected_swap == -1
+    println('PASS: production topology, provenance, swap exclusivity, mount/write interleaving, cancellation, inventory growth and securelevels')
 }
 """
 

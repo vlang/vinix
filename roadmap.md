@@ -55,7 +55,7 @@ code; this roadmap does not reclassify their historical test results.
 | Area | Existing foundation | Work still needed for parity |
 | --- | --- | --- |
 | Kernel and userland | x86-64 and AArch64 builds; Linux-compatible interfaces; Alpine/musl userland; SMP, NUMA and real-time scheduling | Complete ABI semantics, paging, scalability, hardening, lifetime and long-running reliability checks. See [kernel comparison status](docs/macos-xnu-implementation-status.md) and [integrated gap status](docs/openbsd-feature-implementation.md). |
-| Memory pressure | Cache reclaim, pressure reporting, allocation reserves and process OOM recovery | Swap/compression, broader reclaim and resource charging; exhausting kernel-owned resources still needs protection. See [OOM behavior and limits](tests/oom/README.md). |
+| Memory pressure | Cache reclaim, pressure reporting, allocation reserves, compressed anonymous memory, encrypted swap and process OOM recovery | Mapped-file aging/reclaim and broader resource charging; exhausting kernel-owned resources still needs protection. See [anonymous paging](docs/anonymous-paging.md) and [OOM behavior and limits](tests/oom/README.md). |
 | Storage and installation | ext2, persistent VM roots, block drivers, flush paths, optional verified root and an M1 installer | Crash-safe filesystem, encryption, snapshots, autonomous disk boot, recovery and physical storage qualification. See [image installation](README.md#download-an-image), [M1 installer](installer/macos/README.md) and [ANS limits](docs/apple-ans-rw-root.md). |
 | Native desktop | Window management, tiling, overview, workspaces, taskbar, Settings, Files and 21 native utilities | Multiple displays, full desktop services, accessibility and remaining utility workflows. See [window experience](desktop/WINDOW_EXPERIENCE.md), [utility inventory](desktop/UTILITIES.md) and [Settings](desktop/SETTINGS.md). |
 | Networking and peripherals | Ethernet networking, IPv4/IPv6, selected USB/input paths, sound playback, experimental M1 Wi-Fi and Apple drivers | General hotplug/classes, wireless IP connectivity, Bluetooth, recording, peripheral coverage and power management. See [networking status](docs/openbsd-feature-implementation.md#networking), [Wi-Fi limits](docs/apple-wifi.md) and [M1 audio](docs/m1-speakers.md). |
@@ -109,8 +109,9 @@ upgrade, rollback and recovery are repeatable from published images.
 
 ### 2. Memory, process management and kernel reliability
 
-- [ ] Add disk-backed anonymous paging, encrypted swap, memory compression and
-  pageout/refault with correct shared/private mapping behavior.
+- [x] Add disk-backed anonymous paging, encrypted swap, memory compression and
+  pageout/refault with correct shared/private mapping behavior. See
+  [implementation and limits](docs/anonymous-paging.md) and [acceptance tests](tests/paging/README.md).
 - [ ] Finish dirty/reference tracking and reclaim for mapped file pages; retain
   correct writeback through unmap, unlink, truncation and storage failures.
 - [ ] Extend current OOM recovery to bounded, charged kernel resources, including

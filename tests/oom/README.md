@@ -78,5 +78,7 @@ one panics.
 - A process reading another's memory (`process_vm_readv`) holds that address
   space while it waits; if the other is the one killed, it is waited for the
   full five seconds before another is chosen.
-- Nothing is swapped or compressed: memory is either resident or its process
-  is killed.
+- Anonymous memory can now be compressed or stored on an explicitly activated
+  encrypted swap device before process OOM recovery. Compression capacity and
+  swap space are bounded; mapped-file eviction and kernel-resource charging
+  remain incomplete. See [anonymous paging](../../docs/anonymous-paging.md).

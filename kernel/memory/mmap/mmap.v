@@ -10,6 +10,7 @@ import errno
 import lib
 import event
 import security
+import pager
 
 pub const prot_none = 0x00
 pub const prot_read = 0x01
@@ -135,6 +136,7 @@ pub mut:
 	// installed. top_level is created under shadow_pagemap.l at that point.
 	serial u64
 	private_cow bool
+	paged_pages &PagedPage = unsafe { nil }
 	shadow_pagemap    memory.Pagemap
 	locals            []&MmapRangeLocal
 	resource          &resource.Resource = unsafe { nil }
@@ -737,6 +739,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 			}
 			new_local_range.global = new_global_range
 			new_global_range.add_local(new_local_range)
+			fork_paged_span(global_range, mut new_global_range, shadow_begin(local_range),
+				shadow_begin(local_range) + local_range.length)
 
 			// Only the pages there are: a large reservation holds few.
 			range_end := local_range.base + local_range.length
@@ -753,7 +757,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					return none
 				}
 				new_pte := new_pagemap.virt2pte(i, true) or { return none }
-				new_spte := new_global_range.shadow_pagemap.virt2pte(i, true) or { return none }
+				new_spte := new_global_range.shadow_pagemap.virt2pte(shadow_address(local_range, i), true) or { return none }
 				unsafe {
 					*new_pte = *old_pte
 					*new_spte = *new_pte
@@ -902,27 +906,39 @@ fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u
 		source.give_back(file_page, page)
 		return
 	}
-	local := current
+	mut local := unsafe { current }
 	mut g := local.global
 	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
 	mut phys := u64(page)
 	mut surplus := false
 	g.shadow_pagemap.l.acquire()
+	key := shadow_address(local, virt)
+	stored := paged_find(g.paged_pages, key)
+	current_backing := if stored == unsafe { nil } { unsafe { &pager.Backing(nil) } } else { stored.backing }
+	if voidptr(current_backing) != voidptr(source.backing) {
+		g.shadow_pagemap.l.release()
+		pagemap.l.release()
+		source.give_back(file_page, page)
+		errno.set(errno.eagain)
+		return none
+	}
 	if g.shadow_pagemap.top_level == unsafe { nil } {
 		g.shadow_pagemap.top_level = &u64(memory.pmm_alloc(1))
 	}
-	if existing := g.shadow_pagemap.virt2phys(virt) {
+	if existing := g.shadow_pagemap.virt2phys(key) {
 		// Another thread got the page in first; ours goes back.
 		phys = existing
 		surplus = true
 	} else {
-		g.shadow_pagemap.map_page_unlocked(virt, phys, shadow_flags) or {
+		g.shadow_pagemap.map_page_unlocked(key, phys, shadow_flags) or {
 			g.shadow_pagemap.l.release()
 			pagemap.l.release()
 			source.give_back(file_page, page)
 			return none
 		}
 	}
+	forget_paged_locked(mut g, key)
+	if source.backing != unsafe { nil } && local.flags & map_shared == 0 { local.cow = true }
 	g.shadow_pagemap.l.release()
 	// A private page that a fork child still shares stays read-only, so that
 	// the first write copies it instead of changing both processes.
@@ -1026,7 +1042,8 @@ fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRa
 		C.memcpy(voidptr(u64(new_page) + higher_half), voidptr(old_phys + higher_half), page_size)
 	}
 	shadow_flags := memory.pte_present | memory.pte_writable | memory.pte_noexec
-	local_range.global.shadow_pagemap.map_page(virt, u64(new_page), shadow_flags) or {
+	key := shadow_address(local_range, virt)
+	local_range.global.shadow_pagemap.map_page(key, u64(new_page), shadow_flags) or {
 		memory.pmm_free(new_page, 1)
 		return none
 	}
@@ -1034,7 +1051,7 @@ fn unshare_private_page_unlocked(mut pagemap memory.Pagemap, local_range &MmapRa
 		local_range.global.pte_extra, writable)) or {
 		// The shadow still owns the old page when installing the local PTE
 		// fails. Restore it before returning the new allocation.
-		local_range.global.shadow_pagemap.map_page(virt, old_phys, shadow_flags) or {}
+		local_range.global.shadow_pagemap.map_page(key, old_phys, shadow_flags) or {}
 		memory.pmm_free(new_page, 1)
 		return none
 	}
@@ -1182,6 +1199,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	// so the resolver is in place before anything can copy from one.
 	memory.register_cow_resolver(resolve_cow_waiting)
 	register_page_in_resolver()
+	register_paging()
 
 	validate_protection(prot)?
 	memory.register_locked_bytes_resolver(locked_bytes)
@@ -1913,6 +1931,7 @@ pub fn munmap_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64) ? 
 // the last local (and destroy the global) in the middle of the walk.
 fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin u64, end u64,
 	flags int) {
+	reclaim_uncovered_paged_locked(mut global_range, begin, end)
 	// There are no pages to reclaim from a reservation never touched. The
 	// shadow lock also serializes a sharer installing its very first page.
 	global_range.shadow_pagemap.l.acquire()
@@ -1932,7 +1951,7 @@ fn reclaim_uncovered_shadow_pages_locked(mut global_range MmapRangeGlobal, begin
 		cursor = page + page_size
 		mut covered := false
 		for local in global_range.locals {
-			if page >= local.base && page < local.base + local.length {
+			if shadow_covered(local, page) {
 				covered = true
 				break
 			}
@@ -1986,6 +2005,8 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 		i = snip_end_of(local_range, u64(addr) + length, snip_begin)
 		snip_end := i
 		snip_size := snip_end - snip_begin
+		shadow_start := shadow_address(local_range, snip_begin)
+		shadow_end := shadow_start + snip_size
 
 		if snip_begin > local_range.base && snip_end < local_range.base + local_range.length {
 			// Create new range for portion after snip
@@ -2022,11 +2043,12 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			last := global_range.locals.len == 1
 			if !last {
 				global_range.locals.delete(global_range.locals.index(local_range))
-				reclaim_uncovered_shadow_pages_locked(mut global_range, snip_begin, snip_end,
+				reclaim_uncovered_shadow_pages_locked(mut global_range, shadow_start, shadow_end,
 					local_range.flags)
 			}
 			range_locals_lock.release()
 			if last {
+				release_paged_pages(mut global_range)
 				global_end := global_range.base + global_range.length
 				mut next_shadow := if global_range.shadow_pagemap.top_level == unsafe { nil } {
 					global_end
@@ -2073,7 +2095,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				local_range.base = snip_end
 			}
 			local_range.length -= snip_size
-			reclaim_uncovered_shadow_pages_locked(mut global_range, snip_begin, snip_end,
+			reclaim_uncovered_shadow_pages_locked(mut global_range, shadow_start, shadow_end,
 				local_range.flags)
 			range_locals_lock.release()
 		}

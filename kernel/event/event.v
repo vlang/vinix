@@ -310,6 +310,24 @@ pub fn await_one_masked(mut e eventstruct.Event, interrupt_mask u64) ?u64 {
 	return await_valid(mut events, true, false, 0, 0, []u64{}, true, interrupt_mask)
 }
 
+// Page-in completion is not a syscall cancellation point. Ordinary pending
+// signals must not turn a valid user mapping into a failed fault. Generation
+// checking still prevents a lost completion; must_exit remains interruptible.
+pub fn await_one_from_generation_masked(mut e eventstruct.Event, generation u64) ?u64 {
+	mut storage := [unsafe { &e }]!
+	mut events := unsafe { stack_list(&storage[0], 1) }
+	for {
+		return await_valid(mut events, true, true, 0, generation, []u64{}, true, 0) or {
+			if katomic.load(&proc.current_thread().must_exit) { return none }
+			// The bounded listener array may be full. Yield and retry with
+			// the same generation instead of reporting a bad user mapping.
+			sched.yield(true)
+			continue
+		}
+	}
+	return none
+}
+
 pub fn generation(mut e eventstruct.Event) u64 {
 	interrupts := interrupt_state()
 	interrupt_toggle(false)

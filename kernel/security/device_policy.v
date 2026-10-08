@@ -12,6 +12,7 @@ mut:
 	active_writes u64
 	pending_mounts u64
 	protected bool
+	swap_claimed bool
 }
 
 __global (
@@ -40,6 +41,11 @@ fn block_policy_index(identity resource.BlockIdentity) int {
 }
 
 fn block_write_allowed_locked(identity resource.BlockIdentity) bool {
+	for entry in block_device_policies {
+		if entry.swap_claimed && identity.overlaps(entry.identity) {
+			errno.set(errno.ebusy); return false
+		}
+	}
 	level := securelevel()
 	if level >= 2 || (level >= 1 && !identity.valid()) {
 		errno.set(errno.eperm)
@@ -109,7 +115,7 @@ pub fn begin_block_mount(identity resource.BlockIdentity) ?int {
 		return none
 	}
 	for entry in block_device_policies {
-		if entry.active_writes != 0 && identity.overlaps(entry.identity) {
+		if (entry.active_writes != 0 || entry.swap_claimed) && identity.overlaps(entry.identity) {
 			errno.set(errno.ebusy)
 			return none
 		}
@@ -120,6 +126,27 @@ pub fn begin_block_mount(identity resource.BlockIdentity) ?int {
 	}
 	block_device_policies[index].pending_mounts++
 	return index
+}
+
+// Swap owns its whole physical extent at every securelevel. Reservations
+// exclude mounts, existing raw writes, and alias/whole-disk userspace writes.
+pub fn claim_swap(identity resource.BlockIdentity) ?int {
+	block_policy_lock.acquire()
+	defer { block_policy_lock.release() }
+	index := block_policy_index(identity)
+	if !identity.valid() || index < 0 { errno.set(errno.enodev); return none }
+	for entry in block_device_policies {
+		if identity.overlaps(entry.identity) && (entry.protected || entry.pending_mounts != 0
+			|| entry.active_writes != 0 || entry.swap_claimed) { errno.set(errno.ebusy); return none }
+	}
+	block_device_policies[index].swap_claimed = true
+	return index
+}
+
+pub fn release_swap(token int) {
+	block_policy_lock.acquire()
+	if token >= 0 && token < block_device_policies.len { block_device_policies[token].swap_claimed = false }
+	block_policy_lock.release()
 }
 
 pub fn finish_block_mount(token int, committed bool) {

@@ -22,6 +22,7 @@ pub const mremap_fixed = 2
 const madv_dontneed = 4
 
 const madv_free = 8
+const madv_pageout = 21
 
 // The program break lives in its own arena, well clear of the thread stacks at
 // 0x70000000000 and the anonymous mmap region at 0x80000000000.
@@ -192,6 +193,11 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	}
 
 	anonymous := map_flags & map_anonymous != 0
+	if anonymous && map_flags & map_shared != 0 {
+		moved := remap_shared_anonymous(mut pagemap, old_address, old_length, new_length,
+			flags, new_address, source_options.credit_serial) or { return errno.err, errno.get() }
+		return moved, 0
+	}
 
 	mut destination_flags := map_flags & ~(map_fixed | map_fixed_noreplace | map_brk_reservation)
 	mut destination_hint := voidptr(0)
@@ -306,7 +312,7 @@ fn copy_between_mappings(mut pagemap memory.Pagemap, destination u64, source u64
 // physical reads/writes occur under pagemap.l; driver callbacks occur outside.
 fn copy_remapped_page(mut pagemap memory.Pagemap, destination u64, source u64,
 	source_serial u64, destination_serial u64, source_file_page u64) bool {
-	for _ in 0 .. 3 {
+	for _ in 0 .. 8 {
 		pagemap.l.acquire()
 		if !remap_span_unlocked(&pagemap, source, page_size, source_serial, false)
 			|| !remap_span_unlocked(&pagemap, destination, page_size, destination_serial, true) {
@@ -315,6 +321,16 @@ fn copy_remapped_page(mut pagemap memory.Pagemap, destination u64, source u64,
 		}
 		_, _, first_page := addr2range(&pagemap, source) or { pagemap.l.release(); errno.set(errno.efault); return false }
 		if first_page != source_file_page { pagemap.l.release(); errno.set(errno.efault); return false }
+		from_local, _, _ := addr2range(&pagemap, source) or { pagemap.l.release(); return false }
+		mut from_global := from_local.global
+		from_global.shadow_pagemap.l.acquire()
+		nonresident := paged_find(from_global.paged_pages, shadow_address(from_local, source)) != unsafe { nil }
+		from_global.shadow_pagemap.l.release()
+		if nonresident {
+			pagemap.l.release()
+			if !memory.resolve_missing_page(&pagemap, source) { return false }
+			continue
+		}
 		source_phys := pagemap.virt2phys(source) or { pagemap.l.release(); return true }
 		destination_phys := pagemap.virt2phys(destination) or {
 			pagemap.l.release()
@@ -346,7 +362,9 @@ fn copy_remapped_page(mut pagemap memory.Pagemap, destination u64, source u64,
 		_, _, from_page := addr2range(&pagemap, source) or { pagemap.l.release(); errno.set(errno.efault); return false }
 		if from_page != source_file_page { pagemap.l.release(); errno.set(errno.efault); return false }
 		physical := pagemap.virt2phys(destination) or { pagemap.l.release(); errno.set(errno.efault); return false }
-		from := pagemap.virt2phys(source) or { pagemap.l.release(); return true }
+		// Pageout may have detached this source while the destination's
+		// resource pin was acquired. Retry its backing lookup and refault.
+		from := pagemap.virt2phys(source) or { pagemap.l.release(); continue }
 		// A fork may have made the destination private page shared too.
 		mut target := physical
 		if current.flags & map_shared == 0 {
@@ -446,6 +464,25 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 	if address % guest_page_size != 0 {
 		return errno.err, errno.einval
 	}
+	if advice == madv_pageout {
+		if address % page_size != 0 || length > u64(-1) - (page_size - 1) {
+			return errno.err, errno.einval
+		}
+		span := lib.align_up(length, page_size)
+		if address >= memory.user_address_limit() || span > memory.user_address_limit() - address {
+			return errno.err, errno.einval
+		}
+		pagemap.l.acquire()
+		mut cursor := address
+		for cursor < address + span {
+			local, _, _ := addr2range(pagemap, cursor) or { pagemap.l.release(); return errno.err, errno.enomem }
+			cursor = min_u64(address + span, local.base + local.length)
+		}
+		if immutable_overlap_unlocked(pagemap, address, span) { pagemap.l.release(); return errno.err, errno.eperm }
+		pagemap.l.release()
+		pageout(pagemap, address, span)
+		return 0, 0
+	}
 	if advice != madv_dontneed && advice != madv_free {
 		return 0, 0
 	}
@@ -513,6 +550,24 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 			global.shadow_pagemap.l.release()
 		}
 		if local_range.flags & map_anonymous != 0 && local_range.flags & map_shared == 0 {
+			mut owner := local_range.global
+			owner.shadow_pagemap.l.acquire()
+			stored := paged_find(owner.paged_pages, shadow_address(local_range, lib.align_down(virt, page_size))) != unsafe { nil }
+			owner.shadow_pagemap.l.release()
+			if stored && (in_page != 0 || chunk != page_size) {
+				// Restore the entire host page before a translated subpage
+				// discard. Recheck the mapping and its policy after the I/O.
+				pagemap.l.release()
+				loaded := memory.resolve_missing_page(pagemap, virt)
+				pagemap.l.acquire()
+				if !loaded { return errno.err, errno.enomem }
+				continue
+			}
+			if in_page == 0 && chunk == page_size {
+				owner.shadow_pagemap.l.acquire()
+				forget_paged_locked(mut owner, shadow_address(local_range, virt))
+				owner.shadow_pagemap.l.release()
+			}
 			mut phys := pagemap.virt2phys(virt) or {
 				virt += chunk
 				continue

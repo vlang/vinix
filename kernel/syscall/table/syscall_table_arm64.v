@@ -571,6 +571,8 @@ pub fn init_syscall_table() {
 	syscall_table[230] = voidptr(mmap.syscall_mlockall) // __NR_mlockall
 	syscall_table[231] = voidptr(mmap.syscall_munlockall) // __NR_munlockall
 	syscall_table[233] = voidptr(mmap.syscall_madvise) // __NR_madvise
+	syscall_table[224] = voidptr(fs.syscall_swapon) // __NR_swapon
+	syscall_table[225] = voidptr(fs.syscall_swapoff) // __NR_swapoff
 	syscall_table[284] = voidptr(mmap.syscall_mlock2) // __NR_mlock2
 
 	// Misc

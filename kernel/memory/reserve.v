@@ -189,6 +189,21 @@ pub fn reserve_half_left() bool {
 // `sleepable` is for a caller that knows it holds no lock and may sleep; one
 // that cannot tell says false, and is not made to wait unless that is plain.
 pub fn recover_from_exhaustion(sleepable bool) bool {
+	if sleepable {
+		// Pageout metadata also consumes RAM. Cover the actual reserve deficit
+		// and retry bounded passes while they make progress before selecting
+		// an OOM victim; a single fixed batch may not restore the watermark.
+		for _ in 0 .. 4 {
+			before := free_pages
+			minimum := user_reserve_pages() + reserve_reclaim_batch
+			mut wanted := if before < minimum { minimum - before } else { reserve_reclaim_batch }
+			budget := u64(4 * 1024 * 1024) / page_size
+			if wanted > budget { wanted = budget }
+			reclaimed := pageout_anonymous_wait(wanted)
+			if user_memory_available() { return true }
+			if reclaimed == 0 || free_pages <= before { break }
+		}
+	}
 	if exhaustion_handler == unsafe { nil } {
 		return false
 	}

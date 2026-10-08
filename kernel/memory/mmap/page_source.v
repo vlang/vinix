@@ -4,6 +4,7 @@ import errno
 import memory
 import numa
 import resource
+import pager
 
 // Captured with the pagemap lock held. Nothing here borrows a VMA/global
 // pointer after that lock is released: identities are compared, never read.
@@ -26,6 +27,7 @@ mut:
 	direct bool
 	data_begin u64
 	data_end u64 = page_size
+	backing voidptr
 }
 
 fn range_page_source(local &MmapRangeLocal, virt u64) RangePageSource {
@@ -45,6 +47,14 @@ fn range_page_source(local &MmapRangeLocal, virt u64) RangePageSource {
 		direct: local.flags & map_anonymous != 0
 			|| (global.segmented_file && !range_page_has_file_data(global, virt))
 	}
+	mut owner := unsafe { global }
+	owner.shadow_pagemap.l.acquire()
+	node := paged_find(owner.paged_pages, shadow_address(local, virt))
+	if node != unsafe { nil } {
+		source.backing = voidptr(node.backing)
+		pager.retain(node.backing)
+	}
+	owner.shadow_pagemap.l.release()
 	if !source.direct {
 		if source.handle != unsafe { nil } && global.handle_ref != unsafe { nil } {
 			global.handle_ref(source.handle)
@@ -81,6 +91,7 @@ fn (mut source RangePageSource) prepare() bool {
 }
 
 fn (source RangePageSource) close() {
+	pager.release(unsafe { &pager.Backing(source.backing) })
 	if source.direct { return }
 	mut res := source.resource
 	if source.owns_range {
@@ -117,13 +128,34 @@ fn (source RangePageSource) give_back_cow(physical voidptr) {
 fn fill_range_page(mut pagemap memory.Pagemap, _source RangePageSource,
 	virt u64, file_page u64) ? {
 	mut source := _source
-	defer { source.close() }
-	if !source.prepare() { return none }
-	page := acquire_range_page(source, file_page)?
-	install_range_page(mut pagemap, source, virt, file_page, page)?
+	for _ in 0 .. 8 {
+		if !source.prepare() { source.close(); return none }
+		page := acquire_range_page(source, file_page) or { source.close(); return none }
+		install_range_page(mut pagemap, source, virt, file_page, page) or {
+			failure := errno.get()
+			source.close()
+			if failure != errno.eagain { return none }
+			pagemap.l.acquire()
+			current, _, current_page := addr2range(&pagemap, virt) or {
+				pagemap.l.release(); return none
+			}
+			if current.global.serial != source.global_serial || current_page != file_page {
+				pagemap.l.release(); return none
+			}
+			source = range_page_source(current, virt)
+			pagemap.l.release()
+			continue
+		}
+		source.close()
+		return
+	}
+	source.close()
+	errno.set(errno.eagain)
+	return none
 }
 
 fn acquire_range_page(source RangePageSource, file_page u64) ?voidptr {
+	if source.backing != unsafe { nil } { return pager.load(unsafe { &pager.Backing(source.backing) }) }
 	if source.direct {
 		page := numa.alloc_user_page()
 		if page == unsafe { nil } {

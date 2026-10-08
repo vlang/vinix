@@ -78,7 +78,15 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// instruction-cache maintenance are complete.
 	fault_timeslice := if current_thread.timeslice != 0 { current_thread.timeslice } else { u64(1) }
 	timer.stop()
+	// A user refault can wait for pending pageout or disk I/O. Keep the
+	// preemption timer stopped, but permit device interrupts and explicit
+	// event waits. Kernel faults retain their caller's interrupt discipline.
+	previous_interrupt_state := cpu.interrupt_state()
+	user_fault := gpr_state.pstate & 0xf == 0
+	if user_fault { current_thread.user_page_fault = true; cpu.interrupt_toggle(true) }
 	defer {
+		cpu.interrupt_toggle(previous_interrupt_state)
+		if user_fault { current_thread.user_page_fault = false }
 		timer.oneshot(fault_timeslice)
 	}
 

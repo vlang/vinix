@@ -7,6 +7,7 @@ import event.eventstruct
 import memory
 import proc
 import usercopy
+import pager
 
 pub fn nsleep(ns i64) {
 	mut interval := time.TimeSpec{
@@ -125,6 +126,9 @@ pub fn syscall_sysinfo(_ voidptr, info u64) (u64, u64) {
 	result[0] = u64(if clock.tv_sec > 0 { clock.tv_sec } else { 0 })
 	result[4] = memory.total_bytes()
 	result[5] = memory.free_bytes()
+	swap := pager.snapshot()
+	result[8] = swap.total
+	result[9] = swap.total - swap.used
 	unsafe {
 		*&u16(u64(&result[0]) + 80) = proc.process_count()
 		*&u32(u64(&result[0]) + 104) = 1

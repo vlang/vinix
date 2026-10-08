@@ -249,7 +249,7 @@ fn scheduler_gpu_sync_exit_trace(raw_state voidptr) {
 	clear_gpu_exec_sync_trace()
 	katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
 	if deferred_slice != 0 {
-		timer.oneshot(deferred_slice)
+		arm_thread_timer(deferred_slice)
 	}
 }
 
@@ -287,7 +287,7 @@ pub fn scheduler_gpu_interrupt_trace(raw_state voidptr, phase u64) {
 			clear_gpu_exec_interrupt_trace()
 			katomic.store(mut &gpu_exec_deferred_timeslice, u64(0))
 			if deferred_slice != 0 {
-				timer.oneshot(deferred_slice)
+				arm_thread_timer(deferred_slice)
 			}
 		}
 		else {
@@ -642,7 +642,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 					u64(next_slice))
 				katomic.store(mut &gpu_exec_deferred_timeslice, next_slice)
 			} else {
-				timer.oneshot(next_slice)
+				arm_thread_timer(next_slice)
 			}
 			return
 		}
@@ -792,7 +792,7 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		C.kprintf(c'exec[gpu]/sched: deferring %llu us timeslice until final low-level checkpoint\n',
 			u64(next_slice))
 	} else {
-		timer.oneshot(next_slice)
+		arm_thread_timer(next_slice)
 		if trace_gpu_restore {
 			println('exec[gpu]/sched: timeslice armed; entering low-level context restore')
 		}
@@ -951,7 +951,7 @@ fn idle_after_dying_thread(trace bool) {
 	if trace {
 		println('exec[gpu]/sched: idle handoff stopped old timeslice; arming immediate timer')
 	}
-	timer.oneshot(1)
+	arm_thread_timer(1)
 	if trace {
 		println('exec[gpu]/sched: immediate timer armed; enabling interrupts')
 	}
@@ -1091,7 +1091,7 @@ pub fn yield(save_ctx bool) {
 	}
 
 	// Thread re-enqueued. Re-arm timer for normal scheduling.
-	timer.oneshot(effective_timeslice(current_thread))
+	arm_thread_timer(effective_timeslice(current_thread))
 	cpu.interrupt_toggle(true)
 }
 
@@ -1254,7 +1254,7 @@ pub fn reschedule() {
 	// comes back here is not necessarily the one that left.
 	current_thread = proc.current_thread()
 	if unsafe { current_thread != 0 } {
-		timer.oneshot(effective_timeslice(current_thread))
+		arm_thread_timer(effective_timeslice(current_thread))
 	}
 	cpu.interrupt_toggle(true)
 }
@@ -1618,4 +1618,12 @@ fn itimer_armed() {}
 // build_initial_stack().
 fn user_hwcaps() (u64, u64) {
 	return cpu.user_hwcaps()
+}
+
+// A synchronous user page fault may explicitly sleep, but its continuation
+// finishes PTE and instruction-cache updates before timer preemption resumes.
+fn arm_thread_timer(slice u64) {
+    current := proc.current_thread()
+    if current != unsafe { nil } && current.user_page_fault { timer.stop() }
+    else { timer.oneshot(slice) }
 }

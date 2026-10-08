@@ -26,9 +26,9 @@ This ledger was refreshed on **2026-10-03** alongside [the 49-finding comparison
 | SC5 | Efficient spawn and correct vfork/CLONE_VM semantics | Queued | IPC worker 7 | No completed implementation claimed. |
 | SC6 | Request-context propagation and delegated charging | Queued | IPC worker 7 | No completed implementation claimed. |
 | SC7 | Kernel-coordinated userspace workqueues/workloops | Queued | IPC worker 7 | No completed implementation claimed. |
-| VM1 | Anonymous-memory compression | Queued | VM worker 2 | No completed implementation claimed. |
-| VM2 | Disk-backed anonymous paging | Queued | VM worker 2 | No completed implementation claimed. |
-| VM3 | Proactive VM-wide reclaim | Partial implementation | VM worker 2 | `2f7e0cd5`: bounded background clean-cache reclaim with a reserve target. Both builds and pressure/recovery guests pass. Anonymous and mapped-page eviction, swap/compression and global OOM remain. |
+| VM1 | Anonymous-memory compression | Implemented | VM worker 2 | Bounded LZ storage with shared/private refault, fork, discard and remap lifetimes. Production host sanitizer tests and both architecture guests pass; see [paging evidence and limits](../tests/paging/README.md). |
+| VM2 | Disk-backed anonymous paging | Implemented | VM worker 2 | Explicit single-device swap activation, ephemeral ChaCha20/HMAC-SHA256 slots and retryable swapoff drain. Both architecture guests verify encrypted disk refaults, shared/private behavior and automatic low-memory reclaim; see [anonymous paging](anonymous-paging.md). |
+| VM3 | Proactive VM-wide reclaim | Partial implementation | VM worker 2 | `2f7e0cd5`: bounded background clean-cache reclaim with a reserve target. Anonymous compression/swap reclaim now follows cache reclaim, including foreground recovery before OOM. Both builds and low-memory paging guests pass. Mapped-file aging/eviction and broader OOM/resource charging remain. |
 | VM4 | System pressure levels and notifications | Partial implementation | VM worker 2 | `2f7e0cd5`, `77ae6496`: hysteretic global pressure levels, independent pollable subscriptions and reclaim/failure counters. ARM64/x86 guests cover transitions, recovery, epoll, dup, capacity and reuse. Per-cgroup pressure and PSI remain. |
 | VM5 | Global OOM recovery | Queued | VM worker 2 | No completed implementation claimed. |
 | VM6 | Explicit huge-page mappings | Queued | CPU worker 9 | No completed implementation claimed. |

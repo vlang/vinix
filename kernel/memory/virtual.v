@@ -138,6 +138,7 @@ pub mut:
 	// Address-space inspection survives exec/exit detaching this map from
 	// its process. The counter and final wake are protected by l.
 	inspection_refs int
+	pageout_cursor u64
 	inspection_drained eventstruct.Event
 	// ARM64: exclusive ownership of a nonzero 8-bit ASID until destruction.
 	// Zero uses the conservative flush-on-switch path; x86 does not use it.

@@ -617,6 +617,8 @@ pub fn init_syscall_table() {
 	syscall_table[155] = voidptr(fs.syscall_pivot_root) // pivot_root
 	syscall_table[161] = voidptr(fs.syscall_chroot) // chroot
 	syscall_table[165] = voidptr(fs.syscall_mount) // mount
+	syscall_table[167] = voidptr(fs.syscall_swapon) // swapon
+	syscall_table[168] = voidptr(fs.syscall_swapoff) // swapoff
 	syscall_table[166] = voidptr(fs.syscall_umount) // umount2
 	syscall_table[272] = voidptr(fs.syscall_unshare) // unshare
 	syscall_table[308] = voidptr(fs.syscall_setns) // setns

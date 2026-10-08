@@ -24,6 +24,7 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
+	user_page_fault bool
 	tid int
 	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.
 	ns_tid      int

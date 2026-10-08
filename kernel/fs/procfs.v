@@ -32,6 +32,7 @@ import pagecache
 import numa
 import security
 import time
+import pager
 import drm
 
 pub type NetTcpSnapshot = fn () string
@@ -563,7 +564,22 @@ fn (this &ProcFSResource) contents() string {
 			meminfo_builder.add_unsigned(free_kb)
 			meminfo_builder.add(' kB\nBuffers:               0 kB\nCached:         ')
 			meminfo_builder.add_unsigned(cached_kb)
-			meminfo_builder.add(' kB\nSwapTotal:             0 kB\nSwapFree:              0 kB\nSlab:           ')
+			swap := pager.snapshot()
+			meminfo_builder.add(' kB\nSwapTotal:      ')
+			meminfo_builder.add_unsigned(swap.total / 1024)
+			meminfo_builder.add(' kB\nSwapFree:       ')
+			meminfo_builder.add_unsigned((swap.total - swap.used) / 1024)
+			meminfo_builder.add(' kB\nZswap:          ')
+			meminfo_builder.add_unsigned(swap.compressed_bytes / 1024)
+			meminfo_builder.add(' kB\nZswapped:       ')
+			meminfo_builder.add_unsigned(swap.compressed_pages * memory.page_size / 1024)
+			meminfo_builder.add(' kB\nVinixPageouts:  ')
+			meminfo_builder.add_unsigned(swap.pageouts)
+			meminfo_builder.add('\nVinixRefaults:  ')
+			meminfo_builder.add_unsigned(swap.refaults)
+			meminfo_builder.add('\nVinixSwapErrors: ')
+			meminfo_builder.add_unsigned(swap.io_errors)
+			meminfo_builder.add('\nSlab:           ')
 			meminfo_builder.add_unsigned(slab_kb)
 			meminfo_builder.add(' kB\nVinixMemoryPressure: ')
 			meminfo_builder.add_decimal(memory.pressure_snapshot().level)
