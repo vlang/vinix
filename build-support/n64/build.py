@@ -60,7 +60,19 @@ def _compile_one(item, *, context):
 
 
 def main() -> None:
-    return _call("main", [])
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=ROOT / "build/n64")
+    parser.add_argument("--sysroot", type=Path, default=ROOT / "build-aarch64-userland/staging")
+    parser.add_argument("--linux-headers", type=Path,
+                        default=Path(os.environ.get("VINIX_AARCH64_LINUX_HEADERS",
+                                                    str(ROOT / "build-aarch64-userland/sysroot/include"))))
+    parser.add_argument("--llvm-bin", type=Path, default=Path(os.environ.get("LLVM_BIN", "/opt/homebrew/opt/llvm/bin")))
+    parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 8))
+    parser.add_argument("--host", action="store_true", help="build a native host archive for emulator smoke tests")
+    args = parser.parse_args()
+    if args.jobs < 1:
+        parser.error("--jobs must be positive")
+    return _call("main", [args, parser])
 
 
 if __name__ == "__main__":

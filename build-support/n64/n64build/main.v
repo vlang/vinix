@@ -7,48 +7,10 @@ fn append(id string, item string) ! { method(id, 'append', [o(item)], {})! }
 
 fn extend(id string, items string) ! { method(id, 'extend', [o(items)], {})! }
 
-fn parser_policy() ![]string {
-	parser := invoke('argparse.ArgumentParser', [], {
-		'description': o(global('__doc__')!)
-	})!
-	for row in [['--output', 'build/n64'], ['--sysroot', 'build-aarch64-userland/staging']] {
-		method(parser, 'add_argument', [v(ah.Value(row[0]))], {
-			'type':    o(global('Path')!)
-			'default': o(join(global('ROOT')!, row[1])!)
-		})!
-	}
-	linux := env('VINIX_AARCH64_LINUX_HEADERS', str(join(global('ROOT')!, 'build-aarch64-userland/sysroot/include')!)!)!
-	method(parser, 'add_argument', [v(ah.Value('--linux-headers'))], {
-		'type':    o(global('Path')!)
-		'default': o(call('Path', o(linux))!)
-	})!
-	method(parser, 'add_argument', [v(ah.Value('--llvm-bin'))], {
-		'type':    o(global('Path')!)
-		'default': o(call('Path', o(env('LLVM_BIN', lit('/opt/homebrew/opt/llvm/bin')!)!))!)
-	})!
-	cpu := call('os.cpu_count')!
-	jobs := if truth(cpu)! { cpu } else { literal(ah.Value(2))! }
-	method(parser, 'add_argument', [v(ah.Value('--jobs'))], {
-		'type':    o(global('int')!)
-		'default': o(call('min', o(jobs), v(ah.Value(8)))!)
-	})!
-	method(parser, 'add_argument', [v(ah.Value('--host'))], {
-		'action': v(ah.Value('store_true'))
-		'help':   v(ah.Value('build a native host archive for emulator smoke tests'))
-	})!
-	args := method(parser, 'parse_args', [], {})!
+fn main_policy(args string, parser string) ! {
 	output := method(attribute(args, 'output')!, 'resolve', [], {})!
 	sysroot := method(attribute(args, 'sysroot')!, 'resolve', [], {})!
 	llvm := method(attribute(args, 'llvm_bin')!, 'resolve', [], {})!
-	if compare('lt', attribute(args, 'jobs')!, literal(ah.Value(1))!)! {
-		method(parser, 'error', [v(ah.Value('--jobs must be positive'))], {})!
-	}
-	return [parser, args, output, sysroot, llvm]
-}
-
-fn main_policy() ! {
-	parsed := parser_policy()!
-	parser, args, output, sysroot, llvm := parsed[0], parsed[1], parsed[2], parsed[3], parsed[4]
 	common := words(['-O2', '-DNDEBUG', '-D_GNU_SOURCE', '-DNO_ASM', '-DVINIX_NO_FALLOC', '-fcommon',
 		'-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wno-everything'])!
 	mut cxx := list([])!
@@ -296,7 +258,7 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'replace' { replace(args[0], args[1], args[2])! }
 		'patch' { patch(args[0])! }
 		'compile_one' { return ah.Value(compile_one(args[0], args[1])!) }
-		'main' { main_policy()! }
+		'main' { main_policy(args[0], args[1])! }
 		else { return error('unknown N64 build operation') }
 	}
 	return ah.Value(null()!)
