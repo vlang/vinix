@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2`,
+at source commit `821b88a8d1751e887386b69995abcd92bc2a63ed`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,10 +12,10 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 500 | 1,872,135 | 4.41% |
-| Python | 488 | 2,624,167 | 6.18% |
-| Shell | 307 | 1,288,992 | 3.04% |
+| Python | 489 | 2,622,571 | 6.17% |
+| Shell | 307 | 1,288,992 | 3.03% |
 
-All `.v` files are classified as V. The resulting V share is 79.29%, with no
+All `.v` files are classified as V. The resulting V share is 79.31%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev bf87b9fe9dae758ee6656aaaf0f983eafeee31f2 --breakdown --json
+github-linguist --rev 821b88a8d1751e887386b69995abcd92bc2a63ed --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -607,7 +607,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/n64-homebrew/build.py` | 5,005 |
 | `build-support/n64/build.py` | 17,077 |
 | `build-support/n64/test-bridge.py` | 2,530 |
-| `build-support/native_host.py` | 4,506 |
+| `build-support/native_host.py` | 4,681 |
 | `build-support/opengothic/build.py` | 10,713 |
 | `build-support/patch-elf-interpreter.py` | 968 |
 | `build-support/ps1/build.py` | 8,162 |
@@ -761,7 +761,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/amd64-console/run.py` | 1,040 |
 | `tests/amd64-exceptions/run.py` | 5,611 |
 | `tests/amd64-poll/run.py` | 2,839 |
-| `tests/android/_run_native.py` | 14,100 |
+| `tests/android/_run_native.py` | 15,534 |
 | `tests/android/activity-lifecycle-test.py` | 1,750 |
 | `tests/android/art-runtime-test.py` | 2,297 |
 | `tests/android/atl-configuration.py` | 7,854 |
@@ -775,7 +775,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/musl-runtime-test.py` | 723 |
 | `tests/android/pointer-capture-test.py` | 1,879 |
 | `tests/android/run-runtime-vm.py` | 9,175 |
-| `tests/android/run.py` | 20,168 |
+| `tests/android/run.py` | 15,091 |
 | `tests/android/runtime-binding.py` | 5,461 |
 | `tests/android/split-test.py` | 2,283 |
 | `tests/android/test-runtime-v.py` | 4,546 |
@@ -813,7 +813,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-bootstrap/test_recovery.py` | 8,983 |
 | `tests/desktop-bootstrap/test_runner.py` | 5,644 |
 | `tests/desktop-perf/_native_report.py` | 2,681 |
-| `tests/desktop-perf/run.py` | 23,596 |
+| `tests/desktop-perf/_runner_native.py` | 11,403 |
+| `tests/desktop-perf/run.py` | 14,065 |
 | `tests/desktop-perf/test_runner.py` | 13,158 |
 | `tests/dhewm3/prepare-debian.py` | 2,639 |
 | `tests/dhewm3/run.py` | 12,457 |

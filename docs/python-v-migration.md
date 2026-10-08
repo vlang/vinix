@@ -2,14 +2,14 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2`, Linguist 7.27.0 reports
-**Python 6.18%** (488 files, 2,624,167 bytes) and **V 79.29%** (1,671 files,
-33,657,080 bytes). The complete committed-blob inventory and reproduction
+At source `821b88a8d1751e887386b69995abcd92bc2a63ed`, Linguist 7.27.0 reports
+**Python 6.17%** (489 files, 2,622,571 bytes) and **V 79.31%** (1,677 files,
+33,690,057 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,582,118 Python bytes**. Roughly another
+The measured net reduction so far is **2,583,714 Python bytes**. Roughly another
 0.50 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 99 completed stages have a gross
-scope of **2,820,333 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **238,215 bytes**
+tests, including comments and blank lines. The 102 completed stages have a gross
+scope of **2,836,464 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **252,750 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -128,6 +128,9 @@ no extra migration credit.
 | Android session result and probe verification | `tests/android/runhost/result.v` | 10,692 / 176 | `35c6681c63a8f41040d668d58c7ff316ae777150` |
 | Complete Minecraft fetch and staging workflow | `build-support/minecraft/fetchcore` | 13,897 / 315 | `3a036e652430a9a021cbdd8528da793ed02cc7dc` |
 | Private Vulkan staging workflow | `build-support/dota2/vulkanbuild` | 19,099 / 375 | `bf87b9fe9dae758ee6656aaaf0f983eafeee31f2` |
+| Android pre-fork VM snapshot and boot plan | `tests/android/runhost/vm.v` | 2,181 / 38 | `74c18849102a5056f109b86dea78d3704ffb939f` |
+| Android QMP, keyboard, screenshot and shutdown policies | `tests/android/runhost/input.v` | 3,894 / 98 | `017ea1a761338a63c2da19ef90e3d334739a8b1d` |
+| Desktop performance setup and serial supervision | `tests/desktop-perf/runnercore` | 10,056 / 186 | `821b88a8d1751e887386b69995abcd92bc2a63ed` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -161,6 +164,14 @@ migration credit. The Minecraft first consumer counts all 4,506 bytes of new
 shared transport and adds 29 Python bytes overall. Vulkan's 19,099-byte newly
 ported scope excludes 1,458 bytes of prior native forwarders; its counted
 bindings exceed that eligible scope by 499 bytes. Those bindings stay counted.
+
+The desktop supervision stage counts all stdlib/owner bindings and adds
+1,872 Python bytes overall. Android VM-plan and input stages remove 1,800 and
+98 bytes respectively. Commit `92998c1c` consolidates Android's already-native
+transport onto the shared owned controller, removes 1,745 counted Python bytes
+and receives zero repeated port credit. Shared factory/EOF configuration in
+`30c75713` and `53f28be4` adds 175 counted bytes and receives zero algorithm
+credit; default consumer behavior and exact caller-specific errors stay checked.
 
 ## Validation
 
@@ -824,6 +835,45 @@ workloads were not weakened.
   truth errors retain the read exception context. Both cold entries and
   100-request descriptor checks pass. This correction has zero port credit.
 
+- Android's pre-fork VM plan compares 57 complete original/native branches
+  per profile, including 100-digit payload sizes, boot-size boundaries, snapshot
+  bytes/modes, partial failures, exact environment/argv and original exception
+  identity. All ten unchanged interactive fixtures and both cold installs pass;
+  this stage does not establish a new Android or kernel boot.
+- Android input/QMP policies compare 98 exact API branches, eleven actual-library
+  pairs including blocked UNIX-QMP interruption, six unexpected resource exits,
+  eight transport retirement controls and ten unchanged interactive fixtures
+  per profile. The default 8-second key acknowledgment and shutdown phases
+  remain intact. Parent managers retain entered-value and exit-error context.
+- Android transport consolidation repeats 539 preceding workflow/file/result/
+  VM-plan pairs, 98 helper pairs, twelve actual-library pairs including process-
+  group interruption, 34 previous-binding error reconstruction/identity pairs,
+  fourteen retirement controls and all ten unchanged interactive tests per
+  profile, plus cold installs on both hosts. Query-only session isolation lets
+  terminal interrupts reach the caller's cleanup; compiler installation keeps
+  its original session. This is a binding correction with zero new port credit.
+- Desktop supervision compares 80 complete dictionary/manager/compiler/main
+  workflows, ten actual stream/controller/guest retirement branches, exact FD
+  equality across 100 dictionary requests and two actual group-interruption
+  pairs while blocked on a serial queue or UNIX QMP per profile. The 12 original
+  runner fixtures remain unchanged. Both hosts preserve 13 public metadata
+  contracts, the complete argparse AST, six CLI pairs and twelve cold fixtures
+  under the original guest mocks. Captured private primitives keep controller
+  retirement independent of VM wait/sleep/temp mocks.
+- Prepared, copied and hashed four-CPU ARM inputs pass frozen/native desktop-idle
+  and wakeup checks with identical 15-second settling/five-second sampling plans.
+  A native pointer sweep also passes with an actual 2048x1536 QMP screendump and
+  independent serial draining. Two earlier one-second native attempts complete
+  but fail intact report checks because concurrent kernel diagnostics corrupt
+  metric fields; those logs are retained. No fresh kernel build or new manual-
+  free kernel lifetime result is inferred from these host controller ports.
+- Shared transport factory/default/argv checks pass, and all preceding Minecraft
+  284+48 workflow controls, eighteen manager/retirement controls, 100 FD requests
+  and eight actual local HTTP cases pass per profile. Default/custom EOF texts
+  and exact descriptor retirement also pass; the EOF follow-up repeats all
+  eighteen retirement controls and 100 requests per profile. These API changes
+  leave their original default consumer behavior intact.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -974,6 +1024,18 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `g17-binding-20261008` | `post-commit.json` | `4e41b3495290304f8a6f3b7f0b53ee9c2927e3497a97a96e4f410ba16b4ffbc8` |
 | `t6050-binding-20261008` | `qualification.json` | `521a1def63db203ec967489a7d29e33ce67b34070100a1a6738c36c864f1e091` |
 | `t6050-binding-20261008` | `post-commit.json` | `a0dfe0547a037809b2af3910fc52e09e0c85b29d4b58fdab70189613a638d79d` |
+| `android-vm-plan-20261008` | `qualification.json` | `e1222df03ed021dc372f44a7a9275d7a9b6f0bfbbf10d00b384b4cf2a575632c` |
+| `android-vm-plan-20261008` | `postcommit.json` | `5e10de64fa7186b45915b818db4393295a9d1e18d3977d89441d5a7a3ae6ec0f` |
+| `android-input-policy-20261008` | `qualification.json` | `f968245858dfc30ef4f09b58a5562959c585d5a2a12392c9d9fbce57f433e6f4` |
+| `android-input-policy-20261008` | `postcommit.json` | `8d0226b4146e7d8c3c074d12c2ff73576340fd4acb3fe453bde978b83f883c2b` |
+| `desktop-perf-runner-20261008` | `qualification.json` | `9d2693eaaa53a2ad3513c43b97b5f019a14e426737cbfbba7fb7b6f125a66378` |
+| `desktop-perf-runner-20261008` | `postcommit.json` | `5f98723986191ad03664ba75f99010b5286cb58f27af02a6aa98c57b9fea10a6` |
+| `android-run-transport-20261008` | `qualification.json` | `cebf595aeb33b442ab3a898e469dbf4f5598c2dc2ead6098b2c14b6fb94b147a` |
+| `android-run-transport-20261008` | `postcommit.json` | `46c14c0ca7d4b36204c6a4a3dd786f6200d711471233c7b46a542d44325ee122` |
+| `shared-host-process-20261008` | `qualification.json` | `59d1fcbc8614c03c39f34f2f0fc817212959b5937a4f10a07bc55496ab86fde5` |
+| `shared-host-process-20261008` | `postcommit.json` | `7837217300bf52bb647cf7a8f0d709521968c38296de5c1668e6f496d21f185a` |
+| `shared-host-process-20261008` | `eof-qualification.json` | `a8909fcaa2199f7e758cb319e7315d629d7620cc368fb6fcc042a754166e491f` |
+| `shared-host-process-20261008` | `eof-postcommit.json` | `1be60100faa37fce168615b86bbd728079ffa7457d787182af24766fea8816dc` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
