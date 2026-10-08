@@ -1,5 +1,12 @@
 # Android calculator smoke test
 
+Run the native host checks for launcher arguments, private environment,
+helper caches, status propagation and stack limits with:
+
+```sh
+build-support/run-v-tool.sh tests/android/launcher-test.v
+```
+
 Build the native 16 KiB ART, bionic and coherent ATL overlays as described in
 [Android APKs](../../docs/android.md),
 then build the Android runtime and sample APK, desktop and kernel:
