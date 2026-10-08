@@ -93,8 +93,7 @@ check-fake-g17-encoder:
 	./generate_fake_g17_3d_encoder --check
 
 test:
-	python3 -m unittest -v test_recover_t6050_power.py \
-		test_recover_g17_abi.py
+	python3 -m unittest -v test_recover_g17_abi.py
 	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan g17decode g17power appleadt macinspect t8103adt g17expr t6050power
 
 layout: all

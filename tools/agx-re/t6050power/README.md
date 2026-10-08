@@ -90,3 +90,11 @@ real-image manifest on ARM64 and x86_64. Repeated foreign-thread calls measure
 both post-collection V retention and outstanding explicit output allocations;
 an independent ASan/UBSan C caller verifies borrowed-input and output-release
 lifetimes at the native ABI.
+
+`public_constants.v` supplies the original public symbol, UUID, layout and
+patchbay-input constants, sharing existing native contract values. Python
+provides lazy import, directory and star-import compatibility, including Path
+defaults and the original nested tuple type. Its remaining frontend preserves
+argparse/file I/O, dataclass object identity and lazy traversal callbacks.
+`frontend_test.v` retains the final three independent Python fixtures for IMG4
+DeviceTree payload selection, ADT exact consumption and PMGR interrupt records.

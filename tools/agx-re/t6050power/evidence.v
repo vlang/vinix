@@ -77,6 +77,7 @@ pub fn query_evidence(reader EvidenceReader, operation string, request map[strin
 }
 
 pub fn query_image(data []u8, operation string, request map[string]j.Value) !j.Value {
+	if operation == 'public_constants' { return j.Value(public_constants()) }
 	if operation in ['recover_apple_a7iop', 'recover_apple_ascwrap_v6', 'recover_apple_pmgr',
 		'recover_apple_pmp', 'recover_apple_pmp_firmware', 'recover_apple_t6050_pmgr',
 		'recover_apple_t8110_dart', 'recover_iodart_family', 'recover_t8110_kernel'] {

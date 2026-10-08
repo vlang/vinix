@@ -63,3 +63,20 @@ def _contract(image, name, functions, parameters):
             raise UnicodeDecodeError(fields["encoding"], bytes.fromhex(fields["object"]),
                                      fields["start"], fields["end"], fields["reason"]) from None
         raise
+
+
+_public_constants = None
+
+
+def public_constants():
+    global _public_constants
+    if _public_constants is None:
+        from pathlib import Path
+        values = contract("public_constants", {})
+        for name, value in values.items():
+            if name.startswith("DEFAULT_"):
+                values[name] = Path(value)
+        values["PMP_MANDATORY_PATCHBAY_INPUTS"] = tuple(
+            tuple(row) for row in values["PMP_MANDATORY_PATCHBAY_INPUTS"])
+        _public_constants = values
+    return _public_constants
