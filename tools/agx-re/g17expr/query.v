@@ -57,7 +57,7 @@ pub fn fixture_image(request map[string]j.Value) !FixtureImage {
 }
 
 pub fn handles(operation string) bool {
-	return legacy_handles(operation) || operation in ['census_g17_member_writes', 'census_g17_code_member_writes'] || layout_handles(operation) || event_handles(operation) || command_handles(operation) || runtime_handles(operation) || config_handles(operation) || operation in [
+	return operation == 'recover_g17_report' || legacy_handles(operation) || operation in ['census_g17_member_writes', 'census_g17_code_member_writes'] || layout_handles(operation) || event_handles(operation) || command_handles(operation) || runtime_handles(operation) || config_handles(operation) || operation in [
 		'find_dominating_g17_register_write',
 		'g17_definition_dominates_use',
 		'trace_g17_known_call_return',
@@ -79,6 +79,7 @@ pub fn handles(operation string) bool {
 // This JSON entrypoint preserves the remaining Python callers while recovery
 // algorithms and native tests use typed instructions and image providers.
 pub fn query(data []u8, operation string, request map[string]j.Value) !j.Value {
+	if operation == 'recover_g17_report' { return controller_report(data, request) }
 	if legacy_handles(operation) { return legacy_query(data, operation, request) }
 	if operation in ['census_g17_member_writes', 'census_g17_code_member_writes'] { return census_query(data, operation, request) }
 	if layout_handles(operation) { return layout_query(data, operation, request) }

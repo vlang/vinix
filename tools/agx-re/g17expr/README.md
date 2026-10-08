@@ -182,3 +182,22 @@ of 10,000 sanitizer CFFI iterations, and fake-stack checks. The second CFFI
 profile uses a genuine Mach-O primary buffer, mutates and frees borrowed input
 and options after return, and retains the independently checked result until
 release. These checks qualify host tools and their C ABI.
+
+The report controller now composes the checked recovery operations in V.
+`controller.v` retains the original UUID parse/validation order, producer reads,
+allocation checks, nested additions and selector/inline alias updates. Its
+argparse frontend reads the same six files in the original order and restores
+integer keys only in the two original hardware-config result subtrees. Reader
+bytes stay borrowed synchronously; the returned report owns its metadata.
+
+Qualification under `~/.cache/vinix-python-to-v/g17-controller-20261008/` passed
+52 independent original startup/error controls, native ARM64/x86-64 and
+sanitizer tests, complete recursive value/container/key-type equality against
+the untouched original report, exact 935,250-byte CLI text against the committed
+frontend, 400 foreign calls per public ABI with zero owned responses, and a
+fake-stack check. The full sanitizer C ABI report remained valid after its
+primary buffer and secondary-image options were mutated and freed; another
+10,000 iterations covered four foreign threads and ordered error responses.
+Earlier native families use a different nested dictionary insertion order from
+the original Python implementations; this controller preserves the committed
+frontend's order while independently checking all original typed values.

@@ -1,0 +1,730 @@
+[
+  {
+    "label": "driver truncation 0",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": ""
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 4",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 7",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 8",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c000001"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 15",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c00000102000000020000"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 23",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c000001020000000200000001000000180000"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 28",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 31",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 32",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c000001020000000200000001000000180000000000000000000000"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 39",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 40",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 47",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab1330"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver truncation 55",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f79"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver unsupported UUID",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7976"
+    },
+    "error": "unsupported AGXG17X UUID 680ACC23-AB13-301C-B28A-3A2A257F7976",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver UUID absent",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c000001020000000200000000000000000000000000000000000000"
+    },
+    "error": "unsupported AGXG17X UUID None",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver undersized UUID command",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000010000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load-command size does not match its header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 0",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 4",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 7",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 8",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c000001",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 15",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c00000102000000020000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 23",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c000001020000000200000001000000180000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 28",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 31",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 32",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c000001020000000200000001000000180000000000000000000000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 39",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 40",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 47",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware truncation 55",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware unsupported UUID",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d10",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "unsupported G17 firmware UUID 0EDFE976-E37B-3E68-9D64-E3ABF7772D10",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware UUID absent",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c000001020000000200000000000000000000000000000000000000",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "unsupported G17 firmware UUID None",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware undersized UUID command",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000100000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load-command size does not match its header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 0",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 4",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 7",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 8",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c000001",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 15",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c00000102000000020000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 23",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c000001020000000200000001000000180000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 28",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 31",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 32",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c000001020000000200000001000000180000000000000000000000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 39",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 40",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 47",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy truncation 55",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load commands extend past the image",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy unsupported UUID",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1c",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "unsupported G17 RTBuddy UUID 93F44AA7-63B3-3D75-8A9E-E4095ABBDD1C",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy UUID absent",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c000001020000000200000000000000000000000000000000000000",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "unsupported G17 RTBuddy UUID None",
+    "exception": "ValueError"
+  },
+  {
+    "label": "rtbuddy undersized UUID command",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001000000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O load-command size does not match its header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver UUID mismatch plus firmware parse failure",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7976"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "driver UUID mismatch plus rtbuddy parse failure",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7976"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "firmware UUID mismatch plus rtbuddy parse failure",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d10",
+      "rtbuddy": "",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "truncated Mach-O header",
+    "exception": "ValueError"
+  },
+  {
+    "label": "valid UUIDs then first symbol-table failure",
+    "request": {
+      "operation": "recover_g17_report",
+      "firmware": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b000000180000000edfe976e37b3e689d64e3abf7772d11",
+      "rtbuddy": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b0000001800000093f44aa763b33d758a9ee4095abbdd1d",
+      "kernel": "",
+      "iogpu": "",
+      "iosurface": "",
+      "image": "cffaedfe0c0000010200000002000000010000001800000000000000000000001b00000018000000680acc23ab13301cb28a3a2a257f7977"
+    },
+    "error": "Mach-O has no symbol table",
+    "exception": "ValueError"
+  }
+]
