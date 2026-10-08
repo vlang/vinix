@@ -11,7 +11,8 @@ import threading
 
 
 class Controller:
-    def __init__(self, source, override, *, install="--install-query", prefix="vinix-native-host-"):
+    def __init__(self, source, override, *, install="--install-query", prefix="vinix-native-host-", process=None):
+        self.process = process
         self.source = Path(source)
         self.override = override
         self.install = install
@@ -46,7 +47,7 @@ class Controller:
              unpack=lambda value: value, exception=None, cleanup=lambda: None,
              error_fields=lambda error: {}, errors=None):
         errors = [] if errors is None else errors
-        child = subprocess.Popen([self.executable()], stdin=subprocess.PIPE,
+        child = (subprocess.Popen if self.process is None else self.process)([self.executable()], stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, text=True, encoding="utf-8", env=os.environ)
         try:
             child.stdin.write(json.dumps(pack(request)) + "\n")
