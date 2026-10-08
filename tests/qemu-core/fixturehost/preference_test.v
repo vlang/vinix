@@ -34,3 +34,21 @@ fn test_universal_child_selects_explicit_preference_and_preserves_environment() 
 		assert capture(['/usr/bin/uname', '-m'], '', env, false) or { panic(err) } == os.uname().machine + '\n'
 	}
 }
+
+fn test_preferred_raw_capture_preserves_directory_and_error_bytes() {
+	$if darwin {
+		work := os.temp_dir() + '/vinix-preference-' + os.getpid().str()
+		os.mkdir(work) or { panic(err) }
+		defer { os.rmdir(work) or { panic(err) } }
+		for arch in ['arm64', 'x86_64'] {
+			assert capture_in_preferred(['/bin/sh', '-c', 'printf "$PWD"'], '', os.environ(), false, work, true, arch) or { panic(err) } == os.real_path(work)
+			assert capture_in_preferred(['/usr/bin/uname', '-m'], '', os.environ(), false, work, true, arch) or { panic(err) } == arch + '\n'
+			capture_in_preferred(['/bin/sh', '-c', 'printf "raw\\377\\r\\n"; exit 7'], '', os.environ(), false, work, true, arch) or {
+				assert err is CommandError && err.binary_output && err.status == 7
+				assert err.output.bytes().hex() == '726177ff0d0a'
+				continue
+			}
+			assert false
+		}
+	}
+}
