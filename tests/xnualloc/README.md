@@ -4,16 +4,18 @@ Experimental, partial translation. Read `docs/xnualloc/PORT_STATUS.md` before
 using this kernel backend. Source and extracted-reference notices are retained;
 APPLE_LICENSE accompanies this directory. This is not a GPL relicensing.
 
-From the repository root, the checks executable without V are:
+From the repository root, the independent model and reference checks are:
 
 ```sh
-python3 tests/memory/heap_model_test.py
+. build-support/find-v.sh
+"$V" -cc cc test tests/memory/heapmodel
 python3 tests/xnualloc/reference_test.py
-python3 tests/xnualloc/zone_model_test.py
+"$V" -cc cc -path "$(pwd)/tests/memory|@vlib|@vmodules" test tests/xnualloc/zonemodel
 ```
 
-They passed locally: 10 independent slab-model tests, 4 C-reference/model tests
-and 6 non-SMR zone-protocol/source tests. They do not execute V. The reference
+They retain 10 independent slab-model tests, 4 C-reference/model tests
+and 6 non-SMR zone-protocol/source tests. The V models remain independent of the
+production allocator and share the original seeded MT19937 operation plan. The reference
 suite requires a C compiler with UBSan; set `CC` to its executable if necessary.
 The zone model uses four logical CPU caches, not concurrent hardware threads.
 
