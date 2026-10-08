@@ -19,7 +19,7 @@ pub mut:
 pub struct Cache {
 pub mut:
 	alloc &Magazine
-	free  &Magazine
+	free_mag &Magazine
 	depot Depot
 	rr    int
 }
@@ -27,22 +27,22 @@ pub mut:
 pub fn new_cache() &Cache {
 	mut empty := []&Magazine{}
 	for _ in 0 .. 4 { empty << &Magazine{} }
-	return &Cache{alloc: &Magazine{}, free: &Magazine{}, depot: Depot{empty: empty}}
+	return &Cache{alloc: &Magazine{}, free_mag: &Magazine{}, depot: Depot{empty: empty}}
 }
 
 pub fn (mut cache Cache) pop() u64 {
-	if cache.alloc.items.len == 0 && cache.free.items.len != 0 {
-		cache.alloc, cache.free = cache.free, cache.alloc
+	if cache.alloc.items.len == 0 && cache.free_mag.items.len != 0 {
+		cache.alloc, cache.free_mag = cache.free_mag, cache.alloc
 	}
 	return if cache.alloc.items.len != 0 { cache.alloc.items.pop() } else { 0 }
 }
 
 pub fn (mut cache Cache) push(address u64) bool {
-	if cache.free.items.len == magazine_capacity && cache.alloc.items.len < magazine_capacity {
-		cache.alloc, cache.free = cache.free, cache.alloc
+	if cache.free_mag.items.len == magazine_capacity && cache.alloc.items.len < magazine_capacity {
+		cache.alloc, cache.free_mag = cache.free_mag, cache.alloc
 	}
-	if cache.free.items.len == magazine_capacity { return false }
-	cache.free.items << address
+	if cache.free_mag.items.len == magazine_capacity { return false }
+	cache.free_mag.items << address
 	return true
 }
 
@@ -130,7 +130,7 @@ fn move(mut source []&Magazine, mut destination []&Magazine, count int, head boo
 	assert count > 0 && count <= source.len
 	items := source[..count].clone()
 	source.delete_many(0, count)
-	if head { destination.insert(0, items) }
+	if head { for index := items.len - 1; index >= 0; index-- { destination.insert(0, items[index]) } }
 	else { destination << items }
 }
 
@@ -194,8 +194,8 @@ pub fn (mut zone Zone) release(address u64, mut cache Cache) bool {
 			}
 			if cache.depot.empty.len != 0 { magazine = take_first(mut cache.depot.empty) }
 			if magazine != unsafe { nil } {
-				old := cache.free
-				cache.free = magazine
+				old := cache.free_mag
+				cache.free_mag = magazine
 				assert old.items.len == magazine_capacity && magazine.items.len == 0
 				cache.depot.full << old
 			}
@@ -203,8 +203,8 @@ pub fn (mut zone Zone) release(address u64, mut cache Cache) bool {
 			if zone.recirc.empty.len != 0 { magazine = take_first(mut zone.recirc.empty) }
 			else if cache.depot.empty.len != 0 { magazine = take_first(mut cache.depot.empty) }
 			if magazine != unsafe { nil } {
-				old := cache.free
-				cache.free = magazine
+				old := cache.free_mag
+				cache.free_mag = magazine
 				assert old.items.len == magazine_capacity && magazine.items.len == 0
 				zone.recirc.full << old
 			}
@@ -222,7 +222,7 @@ pub fn (mut zone Zone) drain_mag(mut magazine Magazine) {
 
 pub fn (mut zone Zone) drain(mut cache Cache) {
 	zone.drain_mag(mut cache.alloc)
-	zone.drain_mag(mut cache.free)
+	zone.drain_mag(mut cache.free_mag)
 	for cache.depot.full.len != 0 {
 		mut magazine := take_first(mut cache.depot.full)
 		zone.drain_mag(mut magazine)
@@ -252,9 +252,9 @@ pub fn (zone Zone) check(caches []&Cache) {
 	magazines << zone.recirc.empty
 	mut depots := [zone.recirc]
 	for cache in caches {
-		assert cache.alloc.items.len <= magazine_capacity && cache.free.items.len <= magazine_capacity
+		assert cache.alloc.items.len <= magazine_capacity && cache.free_mag.items.len <= magazine_capacity
 		magazines << cache.alloc
-		magazines << cache.free
+		magazines << cache.free_mag
 		magazines << cache.depot.full
 		magazines << cache.depot.empty
 		depots << cache.depot

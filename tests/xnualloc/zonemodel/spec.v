@@ -88,9 +88,9 @@ pub fn failed_batch() {
 pub fn partial_swap() {
 	mut cache := new_cache()
 	cache.alloc.items = [u64(1), 2]
-	for address in 3 .. 35 { cache.free.items << u64(address) }
+	for address in 3 .. 35 { cache.free_mag.items << u64(address) }
 	assert cache.push(99)
-	assert cache.free.items == [u64(1), 2, 99]
+	assert cache.free_mag.items == [u64(1), 2, 99]
 	assert cache.alloc.items.len == magazine_capacity
 }
 
