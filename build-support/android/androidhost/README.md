@@ -50,3 +50,11 @@ original controllers. External compilers are controlled child
 processes, with the two expected pins set to immutable fixture input hashes;
 production pins stay unchanged. Full deterministic archive bytes are checked
 against original zipfile outputs, with ARM64/x86_64 and sanitizer validation.
+
+Pointer-capture and layout-focus compile/DEX/archive orchestration also runs
+in V. Their argparse entries retain pin-mismatch usage errors and the public
+layout archive helper. V owns unique scratch directories, slash-only input
+resolution, the fixture logger, deterministic mode-0644 archives, compiler
+arguments, partial-output publication and scratch retirement before reporting
+success or failure. Original host controls compare whole child-process and
+archive observations; these checks do not run the Android Java probes.

@@ -61,6 +61,11 @@ pub fn query(request string) !string {
 			info := dex_info(hex.decode(text(row, 'data')!)!)!
 			Value([Value(info.classes.map(Value(it))), Value(info.callsites)])
 		}
+		'build_simple_probe' { Value(build_simple_probe(row)!) }
+		'archive_simple_classes' {
+			archive_simple_classes(text(row, 'source')!, text(row, 'output')!)!
+			Value(json2.null)
+		}
 		'build_probe' {
 			build_probe(row)!
 			Value(json2.null)
