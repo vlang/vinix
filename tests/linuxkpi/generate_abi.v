@@ -14,6 +14,10 @@ fn parse_abi_arguments(args []string) ![]string {
 		arg := args[index]
 		if arg == '--' { positional << args[index + 1..]; break }
 		name := arg.all_before('=')
+		if arg == '-h=' {
+			eprintln('argument -h/--help: ignored explicit argument')
+			exit(1)
+		}
 		if arg.starts_with('-h') {
 			if !arg[1..].bytes().all(it == `h`) { return error('argument -h/--help: ignored explicit argument') }
 			println('Usage: generate_abi.v SCHEMA OUTPUT [--source-root DIRECTORY]\n\nGenerate LinuxKPI declaration/type-capture adapters from V and structured ABI metadata.')

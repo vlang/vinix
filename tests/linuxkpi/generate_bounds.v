@@ -88,6 +88,10 @@ fn parse_options(args []string) !(map[string]string, []string) {
 			break
 		}
 		name := argument.all_before('=')
+		if argument == '-h=' {
+			eprintln('argument -h/--help: ignored explicit argument')
+			exit(1)
+		}
 		if argument.starts_with('-h') {
 			if !argument[1..].bytes().all(it == `h`) {
 				return error('argument -h/--help: ignored explicit argument')
