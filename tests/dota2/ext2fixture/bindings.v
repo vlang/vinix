@@ -1,33 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-module ext2build
+module ext2fixture
 
 import androidhost as ah
-import boothost
+import ext2build
 import json2
-import os
-
-pub struct BindingError {
-pub:
-	value map[string]ah.Value
-}
-
-pub fn (e BindingError) msg() string { return ah.field(e.value, 'message').text() }
-
-pub fn (e BindingError) code() int { return 0 }
 
 fn callback(name string, args map[string]ah.Value) !ah.Value {
-	println(ah.encode(boothost.pack(ah.Value({
-		'callback':  ah.Value(name)
-		'arguments': ah.Value(args)
-	}))))
-	row := boothost.unpack(json2.decode[ah.Value](os.get_raw_line())!)!.object()
-	if 'error' in row { return BindingError{ah.field(row, 'error').object()} }
-	return ah.field(row, 'value')
-}
-
-// Independent fixtures share the transport, without production dispatch.
-pub fn borrowed_binding(name string, args map[string]ah.Value) !ah.Value {
-	return callback(name, args)!
+	return ext2build.borrowed_binding(name, args)!
 }
 
 fn v(value ah.Value) ah.Value { return ah.Value([ah.Value('value'), value]) }
@@ -46,35 +25,6 @@ fn invoke(name string, args []ah.Value, kwargs map[string]ah.Value) !string {
 
 fn call(name string, args ...ah.Value) !string { return invoke(name, args, {})! }
 
-fn api(name string, args ...ah.Value) !string {
-	row := callback('dispatch', {
-		'name': ah.Value(name)
-		'args': ah.Value(args)
-	})!.object()
-	if ah.field(row, 'native') as bool {
-		return dispatch({
-			'operation': ah.Value(name)
-			'arguments': ah.field(row, 'arguments')
-		})!.text()
-	}
-	return method(ah.field(row, 'target').text(), '__call__', args, {})!
-}
-
-fn api_method(id string, name string, args []ah.Value) !string {
-	row := callback('dispatch', {
-		'owner': ah.Value(id)
-		'name':  ah.Value(name)
-		'args':  ah.Value(args)
-	})!.object()
-	if ah.field(row, 'native') as bool {
-		return dispatch({
-			'operation': ah.Value(name)
-			'arguments': ah.field(row, 'arguments')
-		})!.text()
-	}
-	return method(ah.field(row, 'target').text(), '__call__', args, {})!
-}
-
 fn method(id string, name string, args []ah.Value, kwargs map[string]ah.Value) !string {
 	return callback('function', {
 		'owner':  ah.Value(id)
@@ -82,6 +32,22 @@ fn method(id string, name string, args []ah.Value, kwargs map[string]ah.Value) !
 		'args':   ah.Value(args)
 		'kwargs': ah.Value(kwargs)
 	})!.text()
+}
+
+fn active_method(id string, name string, args []ah.Value, cause ?IError) !string {
+	mut row := {
+		'owner': ah.Value(id)
+		'name':  ah.Value(name)
+		'args':  ah.Value(args)
+	}
+	if failure := cause {
+		if failure is ext2build.BindingError {
+			row['active_error'] = ah.Value(failure.value)
+		} else {
+			return failure
+		}
+	}
+	return callback('function', row)!.text()
 }
 
 fn attribute(id string, name string) !string {
@@ -124,7 +90,13 @@ fn datum(name string, args []ah.Value) !ah.Value {
 
 fn truth(id string) !bool { return datum('builtins.bool', [o(id)])! as bool }
 
-fn text(id string) !string { return datum('builtins.str', [o(id)])!.text() }
+fn text(id string) !string { return datum('builtins.format', [o(id), v(ah.Value(''))])!.text() }
+
+fn lookup(name string) !string {
+	return callback('resolve', {
+		'name': ah.Value(name)
+	})!.text()
+}
 
 fn hex_data(id string) !string {
 	return callback('function', {
@@ -200,7 +172,7 @@ fn own(id string, function string) ! {
 fn retire(id string, cause ?IError) !bool {
 	mut record := ah.Value(json2.Null{})
 	if error := cause {
-		if error is BindingError { record = ah.Value(error.value) } else { return error }
+		if error is ext2build.BindingError { record = ah.Value(error.value) } else { return error }
 	}
 	return callback('exit', {
 		'owner': ah.Value(id)

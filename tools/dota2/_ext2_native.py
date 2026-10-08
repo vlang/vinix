@@ -35,7 +35,7 @@ def bind(namespace):
         ("allocate", "write", "address_tree", "add_node", "finish"))
 
 
-def call(operation, arguments, namespace):
+def call(operation, arguments, namespace, *, controller=None):
     objects, errors, owners = {}, [], {}
     stack = contextlib.ExitStack()
 
@@ -88,6 +88,25 @@ def call(operation, arguments, namespace):
                     error.__traceback__ = traceback
 
     def primitive(method, row):
+        if "active_error" in row:
+            error = errors[row["active_error"]["binding_error"]]
+            arguments = {key: item for key, item in row.items() if key != "active_error"}
+            traceback = error.__traceback__
+            try:
+                raise error.with_traceback(traceback)
+            except BaseException:
+                replay = error.__traceback__
+                error.__traceback__ = traceback
+                try:
+                    return primitive(method, arguments)
+                finally:
+                    if error.__traceback__ is replay:
+                        error.__traceback__ = traceback
+        if method == "assertion":
+            assert value(row["value"])
+            return None
+        if method == "resolve":
+            return retain(resolve(row["name"]))
         if method == "dispatch":
             arguments = [value(item) for item in row["args"]]
             if "owner" in row:
@@ -143,7 +162,7 @@ def call(operation, arguments, namespace):
             raise resolve(row["kind"])(*[value(item) for item in row["args"]])
         raise RuntimeError("unknown ext2 construction binding: " + method)
 
-    result = _controller.call({"operation": operation, "arguments": [retain(item) for item in arguments]},
+    result = (_controller if controller is None else controller).call({"operation": operation, "arguments": [retain(item) for item in arguments]},
         primitive, pack=_wire._pack, unpack=_wire._unpack, errors=errors,
         cleanup=lambda: stack.__exit__(*sys.exc_info()))
     return objects[result] if result is not None else None
