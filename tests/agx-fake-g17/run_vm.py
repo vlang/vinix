@@ -1,22 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Boot Vinix and exercise Mesa's fake-G17 render/fence lifecycle."""
-
 from __future__ import annotations
 
 import argparse
-import errno
 import os
 from pathlib import Path
-import pty
 import re
-import select
-import signal
-import socket
 import sys
-import tempfile
-import time
 
+from _native import command
 
 PASS_LINE = re.compile(rb"(?:^|\r*\n)VINIX_FAKE_G17_VM_PASS\r*(?:\n|$)")
 FAIL_LINE = re.compile(
@@ -77,203 +70,29 @@ GUEST_COMMAND = (
 
 
 def available_port() -> str:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return str(listener.getsockname()[1])
+    return command("vm_available_port")
 
 
 def child_exit_code(status: int) -> int:
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return 128 + os.WTERMSIG(status)
-    return 1
+    # Preserve the stdlib C-int argument validation before crossing JSON.
+    os.WIFEXITED(status)
+    return command("vm_exit_code", status=int(status))
 
 
 def quit_monitor(path: Path) -> bool:
-    try:
-        with socket.socket(socket.AF_UNIX) as monitor:
-            monitor.settimeout(2)
-            monitor.connect(str(path))
-            monitor.recv(4096)
-            monitor.sendall(b'{"execute":"qmp_capabilities"}\n')
-            monitor.recv(4096)
-            monitor.sendall(b'{"execute":"quit"}\n')
-        return True
-    except OSError:
-        return False
+    return command("vm_quit_monitor", path=path)
 
 
 def stop_child(pid: int, master: int) -> None:
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
-
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        waited, _status = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _status = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+    command("vm_stop_child", pid=pid, master=master)
 
 
 def run_vm(root: Path, timeout: int) -> int:
-    kernel = root / "kernel/bin/vinix"
-    if not kernel.is_file():
-        print(
-            "ERROR: kernel/bin/vinix is missing; build the AArch64 kernel first",
-            file=sys.stderr,
-        )
-        return 2
-
-    with tempfile.TemporaryDirectory(prefix="vinix-fake-g17-vm.") as scratch:
-        environment = os.environ.copy()
-        environment.setdefault("VINIX_BOOT_DISK", str(Path(scratch) / "boot.img"))
-        environment.setdefault("VINIX_EFIVARS", str(Path(scratch) / "efivars.fd"))
-        environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-
-        monitor_path = Path(scratch) / "qmp.sock"
-        environment["VINIX_QEMU_EXTRA"] = (environment.get("VINIX_QEMU_EXTRA", "")
-            + f" -qmp unix:{monitor_path},server=on,wait=off")
-
-        command = [
-            str(root / "scripts/run-aarch64.sh"),
-            "--no-build",
-            "--serial",
-            "--fake-g17",
-            "--no-persist",
-            "--mem=8192",
-        ]
-        pid, master = pty.fork()
-        if pid == 0:
-            os.chdir(root)
-            os.execve(command[0], command, environment)
-
-        transcript = bytearray()
-        command_sent = False
-        pass_seen = False
-        fail_seen = False
-        shutdown_sent = False
-        forced_stop = False
-        status: int | None = None
-        deadline = time.monotonic() + timeout
-        try:
-            while time.monotonic() < deadline:
-                waited, child_status = os.waitpid(pid, os.WNOHANG)
-                if waited == pid:
-                    status = child_status
-                    break
-
-                readable, _, _ = select.select([master], [], [], 0.25)
-                if not readable:
-                    continue
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                if not chunk:
-                    continue
-                transcript.extend(chunk)
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
-
-                recent = bytes(transcript[-131072:])
-                if not command_sent and SHELL_PROMPT.search(recent):
-                    os.write(master, GUEST_COMMAND)
-                    command_sent = True
-                pass_seen = PASS_LINE.search(recent) is not None
-                fail_seen = FAIL_LINE.search(recent) is not None
-                if (pass_seen or fail_seen) and not shutdown_sent:
-                    if quit_monitor(monitor_path):
-                        shutdown_sent = True
-                        continue
-                    try:
-                        os.write(master, b"\x01x")
-                    except OSError as error:
-                        if error.errno != errno.EIO:
-                            raise
-                    shutdown_sent = True
-
-            if status is None:
-                waited, child_status = os.waitpid(pid, os.WNOHANG)
-                if waited == pid:
-                    status = child_status
-        finally:
-            if status is None:
-                forced_stop = True
-                stop_child(pid, master)
-            os.close(master)
-
-        output = bytes(transcript)
-        missing = []
-        if not command_sent:
-            missing.append("guest shell prompt")
-        if output.count(RENDERER_MARKER) != 8:
-            missing.append("Mesa G17 renderer for all eight cases")
-        expected_attachment_counts = (1, 1, 6)
-        for marker, count in zip(ATTACHMENT_MARKERS,
-                                 expected_attachment_counts):
-            if output.count(marker) != count:
-                missing.append(
-                    f"{marker.decode('ascii')} exactly {count} time(s)"
-                )
-        if output.count(COMPLETION_MARKER) != 6:
-            missing.append("render/fence completion for six valid cases")
-        resource_states = RESOURCE_MARKER.findall(output)
-        if tuple(resource_states) != EXPECTED_RESOURCES:
-            observed = [b"/".join(state).decode("ascii")
-                        for state in resource_states]
-            missing.append(
-                "depth/stencil descriptor resources "
-                f"(observed {observed or 'none'})"
-            )
-        for marker in FAULT_MARKERS:
-            if output.count(marker) != 1:
-                missing.append(marker.decode("ascii"))
-        if output.count(FAULT_REJECTION_MARKER) != 2:
-            missing.append("both invalid Mesa resource submissions rejected")
-        if not pass_seen:
-            missing.append("guest PASS marker")
-        if fail_seen:
-            missing.append("guest command returned failure")
-        if forced_stop:
-            missing.append("VM did not exit after the test")
-        if status is not None and child_exit_code(status) != 0:
-            missing.append(f"VM exit status {child_exit_code(status)}")
-        if missing:
-            print(
-                "\nFAIL fake G17 VM smoke test: " + ", ".join(missing),
-                file=sys.stderr,
-            )
-            return 1
-
-        print(
-            "\nPASS Mesa fake-G17 depth/stencil descriptor lifecycle and "
-            "adversarial in-flight GEM/VM lifetime checks"
-        )
-        return 0
+    return command("vm_test", root=root,
+                   timeout_text=str(int(timeout) if isinstance(timeout, int) else timeout),
+                   timeout_kind="number" if isinstance(timeout, (int, float)) else type(timeout).__name__,
+                   python=sys.executable,
+                   child_binding=Path(__file__).with_name("_native.py"))
 
 
 def main() -> int:

@@ -17,6 +17,21 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 	if operation == 'call_count' {
 		return agxhost.allocation_call_count(row['text'] or { json2.Any('') }.str(), row['name'] or { json2.Any('calloc') }.str())
 	}
+	if operation == 'vm_policy' {
+		text := hex.decode(row['text_hex'] or { json2.Any('') }.str())!.bytestr()
+		return {
+			'prompt': json2.Any(agxhost.vm_shell_prompt(text))
+			'pass': json2.Any(agxhost.vm_line_marker(text, false))
+			'fail': json2.Any(agxhost.vm_line_marker(text, true))
+			'resources': json2.Any(agxhost.vm_resource_states(text).map(json2.Any(it)))
+			'missing': json2.Any(agxhost.vm_missing(text, row['command_sent'] or { json2.Any(false) }.bool(), row['pass_seen'] or { json2.Any(false) }.bool(),
+				row['fail_seen'] or { json2.Any(false) }.bool(), row['forced_stop'] or { json2.Any(false) }.bool(), row['status'] or { json2.Any(0) }.int(), row['has_status'] or { json2.Any(false) }.bool()).map(json2.Any(it)))
+			'exit_code': json2.Any(agxhost.vm_child_exit_code(row['status'] or { json2.Any(0) }.int()))
+		}
+	}
+	if operation == 'vm_available_port' { return agxhost.vm_available_port()! }
+	if operation == 'vm_quit_monitor' { return agxhost.vm_quit_monitor((row['path'] or { json2.Any('') }).str())! }
+	if operation == 'vm_exit_code' { return agxhost.vm_child_exit_code((row['status'] or { json2.Any(0) }).int()) }
 	root := (row['root'] or { return error('Missing root') }).str()
 	if operation == 'host' {
 		out.host_verifier(root, row['machine'] or { json2.Any('') }.str(), row['encoder_reference'] or { json2.Any('') }.str(), row['verifier_reference'] or { json2.Any('') }.str())!
@@ -29,6 +44,9 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 		return out.native_fixture(root, row['arch'] or { json2.Any('') }.str(), row['kernel'] or { json2.Any('') }.str(),
 			row['state'] or { json2.Any('') }.str(), row['reference'] or { json2.Any('') }.str(), row['fixture'] or { json2.Any('encoder') }.str(),
 			row['timeout_text'] or { json2.Any('600') }.str(), row['python'] or { json2.Any('python3') }.str(), environment)!
+	} else if operation == 'vm_test' {
+		return out.vm_test(root, row['timeout_text'] or { json2.Any('180') }.str(), row['timeout_kind'] or { json2.Any('number') }.str(), row['python'] or { json2.Any('python3') }.str(),
+			(row['child_binding'] or { return error('Missing child binding') }).str())!
 	} else {
 		return error('Unknown AGX host operation ' + operation)
 	}
@@ -103,7 +121,7 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 fn evaluate(text string, inherited bool) map[string]json2.Any {
 	mut out := agxhost.Transcript{ inherit: inherited }
 	mut row := hosttest.decode_json(text) or { return failure(err, out, '') }.as_map()
-	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline', 'kernel', 'state', 'reference', 'python'] {
+	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline', 'kernel', 'state', 'reference', 'python', 'child_binding', 'path'] {
 		if encoded := row[name + '_hex'] {
 			bytes := hex.decode(encoded.str()) or { return failure(err, out, '') }
 			row[name] = bytes.bytestr()
@@ -130,6 +148,14 @@ fn evaluate(text string, inherited bool) map[string]json2.Any {
 }
 
 fn main() {
+	if os.args.len == 4 && os.args[1] == '--stop-child-callback' {
+		agxhost.vm_stop_child(i32(os.args[2].int()), i32(os.args[3].int()), true) or {
+			println(json2.encode(json2.Any(failure(err, agxhost.Transcript{}, 'vm_stop_child'))))
+			return
+		}
+		println('{"value":null}')
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--install-query' {
 		hosttest.module_copy_file(os.executable(), os.args[2]) or {
 			eprintln(err)

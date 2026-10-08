@@ -9,6 +9,15 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import sys
+import signal
+
+# No installation, imports of the frontend, or policy runs in a forked child.
+# These two stdlib primitives retain Python's original exec/chdir exceptions.
+if __name__ == "__main__" and sys.argv[1:2] == ["--vinix-pty-child"]:
+    os.chdir(os.fsdecode(bytes.fromhex(sys.argv[2])))
+    argv = json.loads(sys.argv[3])
+    os.execve(argv[0], argv, os.environ)
 
 ROOT = Path(__file__).resolve().parents[2]
 _LOCK = threading.Lock()
@@ -36,15 +45,63 @@ def command(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
-    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline", "kernel", "state", "reference", "python"):
+    if operation == "vm_stop_child":
+        primitives = {
+            "write": lambda fd: os.write(fd, b"\x01x"),
+            "waitpid": os.waitpid,
+            "killpg": os.killpg,
+        }
+        with subprocess.Popen([str(_BINARY), "--stop-child-callback",
+                               str(fields["pid"]), str(fields["master"])],
+                              stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              text=True, env=os.environ) as child:
+            response = None
+            try:
+                for line in child.stdout:
+                    response = json.loads(line)
+                    if "method" not in response:
+                        break
+                    try:
+                        value = primitives[response["method"]](*response["arguments"])
+                        answer = {"value": value}
+                    except OSError as error:
+                        answer = {"errno": error.errno}
+                    child.stdin.write(json.dumps(answer) + "\n")
+                    child.stdin.flush()
+            except BaseException:
+                child.kill()
+                child.wait()
+                raise
+            if child.wait():
+                raise subprocess.CalledProcessError(child.returncode, child.args)
+            if response is None:
+                raise RuntimeError("native retirement transport ended without a response")
+    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline", "kernel", "state", "reference", "python", "child_binding", "path"):
         if name in fields:
             fields[name + "_hex"] = os.fsencode(fields.pop(name)).hex()
-    with tempfile.TemporaryDirectory(prefix="vinix-agx-result-") as directory:
-        result = Path(directory) / "result.json"
-        subprocess.run([str(_BINARY), "--command", str(result),
-                        json.dumps({"operation": operation, **fields})],
-                       check=True, env=os.environ)
-        response = json.loads(result.read_text())
+    if operation != "vm_stop_child":
+        with tempfile.TemporaryDirectory(prefix="vinix-agx-result-") as directory:
+            result = Path(directory) / "result.json"
+            argv = [str(_BINARY), "--command", str(result),
+                    json.dumps({"operation": operation, **fields})]
+            if operation == "vm_test":
+                with subprocess.Popen(argv, env=os.environ) as child:
+                    try:
+                        status = child.wait()
+                    except KeyboardInterrupt:
+                        if child.poll() is None:
+                            child.send_signal(signal.SIGINT)
+                        previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+                        try:
+                            child.wait()
+                        finally:
+                            signal.signal(signal.SIGINT, previous)
+                        raise
+                    if status:
+                        raise subprocess.CalledProcessError(status, argv)
+            else:
+                subprocess.run(argv, check=True, env=os.environ)
+            response = json.loads(result.read_text())
     if "error" not in response:
         return response["value"]
     if response["kind"] == "CalledProcessError":
@@ -58,6 +115,8 @@ def command(operation, **fields):
         filename = os.fsdecode(bytes.fromhex(response["filename"])) or None
         if response.get("filename_path"):
             filename = Path(filename)
+        if filename is None:
+            raise OSError(response["errno"], os.strerror(response["errno"]))
         raise OSError(response["errno"], os.strerror(response["errno"]), filename)
     if response["kind"] == "CopyError":
         raise shutil.Error([tuple(entry) for entry in response["entries"]])
@@ -66,6 +125,8 @@ def command(operation, **fields):
                                  response["start"], response["end"], response["reason"])
     if response["kind"] in ("AssertionError", "KeyError", "IndexError", "TypeError", "AttributeError"):
         kind = {"AssertionError": AssertionError, "KeyError": KeyError, "IndexError": IndexError, "TypeError": TypeError, "AttributeError": AttributeError}[response["kind"]]
+        if "has_argument" not in response:
+            raise kind(response["error"])
         if not response["has_argument"]:
             raise kind()
         value = json.loads(response["argument_text"])
@@ -78,5 +139,7 @@ def command(operation, **fields):
     if response["kind"] == "NativeResolveError":
         Path(os.fsdecode(bytes.fromhex(response["path_hex"]))).resolve()
         raise RuntimeError("native path resolver disagreed with the original error formatter")
-    raise {"ValueError": ValueError, "RuntimeError": RuntimeError,
+    if response["kind"] == "KeyboardInterrupt":
+        raise KeyboardInterrupt()
+    raise {"ValueError": ValueError, "OverflowError": OverflowError, "RuntimeError": RuntimeError,
            "SpecialFileError": shutil.SpecialFileError}[response["kind"]](response["error"])
