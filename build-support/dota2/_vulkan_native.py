@@ -181,6 +181,16 @@ def query(operation, arguments, namespace):
                     raise _failure(context, errors)
                 except BaseException:
                     return bool(owner.__exit__(*sys.exc_info()))
+            if kind == "context_exit":
+                manager = decode(row["target"])
+                context = row.get("context")
+                if context is None:
+                    manager.__exit__(None, None, None)
+                    return False
+                try:
+                    raise _failure(context, errors)
+                except BaseException:
+                    return bool(manager.__exit__(*sys.exc_info()))
             if kind == "print":
                 print(*values, **keywords)
                 return None
