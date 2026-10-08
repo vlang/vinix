@@ -37,12 +37,20 @@ def module(name: str, path: Path):
     return value
 
 
+_PREPARATION = None
+
+
+def _preparation():
+    global _PREPARATION
+    if _PREPARATION is None:
+        spec = importlib.util.spec_from_file_location("dota2_prepare_binding", Path(__file__).with_name("_prepare_native.py"))
+        _PREPARATION = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_PREPARATION)
+    return _PREPARATION
+
+
 def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for data in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(data)
-    return digest.hexdigest()
+    return _preparation().call("sha256", path)
 
 
 def game_start_observed(transcript: bytes) -> bool:
@@ -94,291 +102,44 @@ class ExportReads:
 
 
 def install(source: Path, target: Path) -> None:
-    if source.resolve() == target.resolve():
-        return
-    target.parent.mkdir(parents=True, exist_ok=True)
-    # Pinned inputs retain their read-only modes in the fixture. Replace the
-    # previous file rather than opening it for writing on a repeated prepare.
-    if target.exists() or target.is_symlink():
-        target.unlink()
-    shutil.copy2(source, target)
+    _preparation().call("install", source, target)
 
 
 def stage_vulkan_query(gldriverquery: Path, root: Path) -> None:
     """Copy the actual optional Linux64 helper beside the supplied GL query."""
-    source = gldriverquery.with_name("vulkandriverquery")
-    target = root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery"
-    if not source.is_file():
-        # A reused fixture must reflect the current supplied SDK, including
-        # the absence of this optional helper.
-        if target.exists() or target.is_symlink():
-            target.unlink()
-        return
-    with source.open("rb") as stream:
-        header = stream.read(64)
-    if (len(header) != 64 or header[:7] != b"\x7fELF\x02\x01\x01" or
-            header[16:18] not in (b"\x02\x00", b"\x03\x00") or
-            header[18:20] != b"\x3e\x00"):
-        raise SystemExit(f"Expected Valve's actual Linux x86-64 Vulkan helper: {source}")
-    install(source, target)
+    _preparation().call("stage_vulkan_query", gldriverquery, root)
 
 
 def probe_preloads(paths: list[Path]) -> tuple[list[dict], list[bytes]]:
-    records, contents = [], []
-    for index, path in enumerate(paths):
-        path = path.resolve()
-        if not path.is_file():
-            raise SystemExit(f"Extra preload is not a file: {path}")
-        data = path.read_bytes()
-        if (len(data) < 64 or data[:7] != b"\x7fELF\x02\x01\x01" or
-                data[16:18] != b"\x03\x00" or data[18:20] != b"\x3e\x00"):
-            raise SystemExit(f"Extra preload must be a Linux x86-64 shared ELF: {path}")
-        records.append({"source": str(path), "sha256": hashlib.sha256(data).hexdigest(),
-                        "guest_path": f"/usr/libexec/vinix-dota2/probes/extra-{index}.so"})
-        contents.append(data)
-    return records, contents
+    records, contents = _preparation().call("probe_preloads", iterable=paths)
+    return ([{"source": _preparation()._untext(row["source"]), "sha256": row["sha256"],
+              "guest_path": _preparation()._untext(row["guest_path"])} for row in records],
+            [bytes.fromhex(value) for value in contents])
 
 
 def trim_runtime(root: Path) -> None:
-    # Xvfb/SDL and the game supply their own graphics and UI assets.
-    for relative in ("usr/lib/i386-linux-gnu", "lib/i386-linux-gnu",
-                     "usr/share/doc",
-                     "usr/share/man", "usr/share/locale", "usr/share/icons"):
-        path = root / relative
-        if path.exists():
-            shutil.rmtree(path)
-    dri = root / "usr/lib/x86_64-linux-gnu/dri"
-    if dri.is_dir():
-        # Steam's real gldriverquery uses EGL/GL even when the game uses Vulkan.
-        for path in dri.iterdir():
-            if path.name in SOFTWARE_GL_DRIVERS:
-                continue
-            if path.is_dir() and not path.is_symlink():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
+    _preparation().call("trim_runtime", root)
 
 
 def refresh_runtime(args, root: Path) -> None:
-    relative = "usr/libexec/vinix-dota2/root"
-    source = args.base_root / relative
-    target = root / relative
-    stamp = ".vinix-dota2-vulkan-generation"
-    generation = (source / stamp).read_text()
-    dri = "usr/lib/x86_64-linux-gnu/dri"
-    drivers_present = all(
-        not (source / dri / name).is_file() or
-        ((target / dri / name).is_file() and
-         (target / dri / name).stat().st_size == (source / dri / name).stat().st_size)
-        for name in SOFTWARE_GL_DRIVERS)
-    if ((target / stamp).is_file() and (target / stamp).read_text() == generation and
-            drivers_present):
-        return
-    pending = target.with_name(f"root-refresh-{os.getpid()}")
-    if platform.system() == "Darwin":
-        subprocess.run(["cp", "-cRp", str(source), str(pending)], check=True)
-    else:
-        shutil.copytree(source, pending, symlinks=True)
-    trim_runtime(pending)
-    if target.exists():
-        shutil.rmtree(target)
-    pending.rename(target)
+    _preparation().call("refresh_runtime", root, namespace=args)
 
 
 def complete_native_closure(root: Path, binaries: list[Path]) -> None:
-    userland = REPO / "build-aarch64-userland/staging"
-    seen = set()
-    while binaries:
-        binary = binaries.pop()
-        if binary in seen:
-            continue
-        seen.add(binary)
-        output = subprocess.check_output(["aarch64-linux-musl-readelf", "-d", str(binary)], text=True)
-        for name in re.findall(r"\(NEEDED\).*\[([^]]+)\]", output):
-            library = next((root / directory / name for directory in ("usr/lib", "lib")
-                            if (root / directory / name).exists()), None)
-            if library is None:
-                source = next((userland / directory / name for directory in ("usr/lib", "lib")
-                               if (userland / directory / name).exists()), None)
-                if source is None:
-                    raise SystemExit(f"Missing native dependency: {name}")
-                library = root / "usr/lib" / name
-                install(source, library)
-            binaries.append(library)
+    _preparation().call("complete_native_closure", root, sequence=binaries, repo=REPO)
 
 
 def verify_sdk_closure(root: Path) -> None:
-    runtime = root / "usr/libexec/vinix-dota2/root"
-    sdk = root / "home/dota2/.steam/sdk64"
-    libraries = [sdk, runtime / "usr/lib/x86_64-linux-gnu",
-                 runtime / "lib/x86_64-linux-gnu", runtime / "lib64"]
-    queue = list(sdk.glob("*.so"))
-    queue.append(root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
-    vulkan_query = root / "home/dota2/.steam/ubuntu12_64/vulkandriverquery"
-    if vulkan_query.is_file():
-        queue.append(vulkan_query)
-    for name in SOFTWARE_GL_DRIVERS:
-        driver = runtime / "usr/lib/x86_64-linux-gnu/dri" / name
-        if driver.is_file():
-            queue.append(driver)
-        elif name == "swrast_dri.so":
-            raise SystemExit(f"Steam's GPU helper needs the software GL driver: {driver}")
-    for name in ("libEGL_mesa.so.0", "libGLX_mesa.so.0"):
-        library = runtime / "usr/lib/x86_64-linux-gnu" / name
-        if not library.is_file():
-            raise SystemExit(f"Steam's GPU helper needs the private GL library: {library}")
-        queue.append(library)
-    seen = set()
-    missing = set()
-    while queue:
-        binary = queue.pop()
-        if binary in seen:
-            continue
-        seen.add(binary)
-        output = subprocess.check_output(["x86_64-linux-musl-readelf", "-d", str(binary)], text=True)
-        for name in re.findall(r"\(NEEDED\).*\[([^]]+)\]", output):
-            library = next((directory / name for directory in libraries
-                            if (directory / name).exists()), None)
-            if library is None:
-                missing.add(name)
-            else:
-                queue.append(library)
-    if missing:
-        raise SystemExit("Private runtime lacks Steam client dependencies: " + ", ".join(sorted(missing)))
+    _preparation().call("verify_sdk_closure", root)
 
 
 def overlay_translator(source: Path, root: Path) -> None:
-    binary = source / "usr/bin/qemu-x86_64"
-    with binary.open("rb") as stream:
-        header = stream.read(64)
-    if (len(header) != 64 or header[:7] != b"\x7fELF\x02\x01\x01" or
-            header[18:20] != b"\xb7\x00" or not os.access(binary, os.X_OK)):
-        raise SystemExit(f"Expected an executable native ARM64 translator: {binary}")
-    # Kernel helper exec and partial-page madvise recognize this standard path.
-    install(binary, root / "usr/bin/qemu-x86_64")
-    for directory in ("lib", "usr/lib"):
-        for path in sorted((source / directory).rglob("*")):
-            target = root / path.relative_to(source)
-            if path.is_symlink():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                if target.exists() or target.is_symlink():
-                    target.unlink()
-                target.symlink_to(os.readlink(path))
-            elif path.is_file():
-                install(path, target)
-    complete_native_closure(root, [root / "usr/bin/qemu-x86_64"])
+    _preparation().call("overlay_translator", source, root, repo=REPO)
 
 
 def prepare(args, work: Path) -> tuple[Path, Path]:
-    root = work / "root"
-    if not root.exists():
-        if not (args.base_root / ".prepared").is_file():
-            raise SystemExit(f"Prepare tests/dota2/vulkan-run.py's root first: {args.base_root}")
-        # APFS copies share blocks. Fall back to normal copies on other hosts.
-        if platform.system() == "Darwin":
-            subprocess.run(["cp", "-cRp", str(args.base_root), str(root)], check=True)
-        else:
-            shutil.copytree(args.base_root, root, symlinks=True)
-    refresh_runtime(args, root)
-    trim_runtime(root / "usr/libexec/vinix-dota2/root")
-    if args.translator_staging is not None:
-        overlay_translator(args.translator_staging, root)
-    for name in ("sh", "cat", "mkdir", "chmod", "sleep", "kill", "tail", "uname",
-                 "mount", "od", "tr", "ps", "grep", "ln", "ls", "readlink", "date"):
-        target = root / "bin" / name
-        if target.exists() or target.is_symlink():
-            target.unlink()
-        target.symlink_to("busybox")
-    for directory in ("usr/share/games/dota2", "home/dota2/.steam/sdk64", "run", "root"):
-        (root / directory).mkdir(parents=True, exist_ok=True)
-    install(args.desktop, root / "usr/bin/vinix-desktop")
-    link = root / "usr/bin/vinix-dota2"
-    if link.exists() or link.is_symlink():
-        link.unlink()
-    link.symlink_to("vinix-desktop")
-    install(REPO / "tests/dota2/game-init.sh", root / "sbin/init")
-    install(REPO / "build-support/dota2/run-dota2", root / "usr/libexec/vinix-dota2/run-dota2")
-    install(REPO / "build-aarch64-userland/staging/bin/zsh", root / "bin/zsh")
-    # Copy only these published Linux client libraries, never the Steam home.
-    for name in ("steamclient.so", "libtier0_s.so", "libvstdlib_s.so"):
-        source = args.steamclient / name
-        with source.open("rb") as stream:
-            ident = stream.read(7)
-        if ident != b"\x7fELF\x02\x01\x01":
-            raise SystemExit(f"Expected Valve's actual Linux64 library: {source}")
-        install(source, root / "home/dota2/.steam/sdk64" / name)
-    install(args.gldriverquery, root / "home/dota2/.steam/ubuntu12_64/gldriverquery")
-    stage_vulkan_query(args.gldriverquery, root)
-    verify_sdk_closure(root)
-    runtime = root / "usr/libexec/vinix-dota2/root"
-    generated_probe = work / "mmap32-probe-v.c"
-    subprocess.run([sys.executable, str(REPO / "build-support/dota2/compile-v-compat.py"),
-                    "mmap-probe", str(generated_probe), "--bare"], check=True)
-    subprocess.run(["clang", "--target=x86_64-linux-gnu", "-fPIE", "-pie",
-                    "-ffreestanding", "-fno-stack-protector", "-nostdlib", "-fuse-ld=lld",
-                    "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-label",
-                    "-Wno-unused-parameter", "-DVINIX_DOTA_BARE_FFI", "-I", str(REPO / "tests/dota2"),
-                    "-Wl,--dynamic-linker=/lib64/ld-linux-x86-64.so.2", "-Wl,-e,_start",
-                    str(generated_probe), str(REPO / "tests/dota2/mmap-probe-start.S"),
-                    str(runtime / "lib/x86_64-linux-gnu/libc.so.6"),
-                    "-o", str(root / "usr/libexec/vinix-dota2/mmap32-probe")], check=True)
-    game_environment = {
-        "HOME": "/home/dota2", "XDG_RUNTIME_DIR": "/run/user/0", "VALVE_TESTMODE": "1",
-        "LP_NUM_THREADS": "2", "MESA_SHADER_CACHE_DISABLE": "true",
-        "VINIX_DOTA2_LD_LIBRARY_PATH": "/home/dota2/.steam/sdk64",
-    }
-    for setting in args.game_env:
-        name, separator, value = setting.partition("=")
-        if not separator or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name):
-            raise SystemExit(f"Invalid --game-env: {setting}")
-        game_environment[name] = value
-    if args.preload_records:
-        for record, contents in zip(args.preload_records, args.preload_contents):
-            target = root / record["guest_path"].lstrip("/")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            if target.is_symlink():
-                target.unlink()
-            target.write_bytes(contents)
-            target.chmod(0o644)
-        preloads = ":".join(record["guest_path"] for record in args.preload_records)
-        existing = game_environment.get("VINIX_X86_64_PRELOAD", "")
-        game_environment["VINIX_X86_64_PRELOAD"] = preloads + (":" + existing if existing else "")
-    launcher = root / "usr/bin/run-dota2"
-    if launcher.is_symlink():
-        launcher.unlink()
-    launcher.write_text("#!/bin/sh\n" + "\n".join(
-        f"export {name}={shlex.quote(value)}" for name, value in game_environment.items()) +
-        "\n/usr/libexec/vinix-dota2/run-dota2 -insecure -novid -vulkan " +
-        " ".join(shlex.quote(value) for value in args.extra_game_arg) +
-        ' "$@" &\npid=$!\necho "$pid" > /run/dota2-game.pid\n'
-        'echo "VINIX-DOTA2-GAME-STARTED: $pid"\nstatus=0\nwait "$pid" || status=$?\n'
-        'echo "VINIX-DOTA2-GAME-EXIT: $status"\nexit "$status"\n')
-    launcher.chmod(0o755)
-    # Build the input/X11 host from the same isolated source as the desktop.
-    sysroot = REPO / "build-aarch64-x11/sysroot"
-    host_sources = [str(args.host_source)]
-    if args.host_source == REPO / "build-support/xorg-server/winehost/core.v":
-        host_core = work / "wine-host-core.c"
-        subprocess.run(["python3", str(REPO / "build-support/xorg-server/compile-v-host.py"),
-                        "winehost", str(host_core), "--arch", "arm64"], check=True)
-        host_sources = [str(host_core),
-                        f"-I{REPO}/build-support/xorg-server"]
-    subprocess.run(["aarch64-linux-musl-gcc", "-O2", "-w", "-D__vinix__",
-                    f"-I{sysroot}/usr/include", *host_sources,
-                    f"-L{sysroot}/usr/lib", f"-L{sysroot}/lib", "-Wl,--allow-shlib-undefined",
-                    "-lXtst", "-lXdamage", "-lX11", "-lXext", "-lxcb",
-                    "-o", str(root / "usr/bin/vinix-wine-host")], check=True)
-    complete_native_closure(root, [root / "usr/bin/vinix-wine-host", root / "bin/zsh"])
-    archive = work / "initramfs.tar.gz"
-    with tarfile.open(archive, "w:gz", compresslevel=1, format=tarfile.USTAR_FORMAT) as tar:
-        tar.add(root, arcname=".")
-    pinned = work / "kernel/bin/vinix"
-    install(args.kernel_dir / "bin/vinix", pinned)
-    disk = work / "unused.raw"
-    if not disk.exists():
-        with disk.open("xb") as output:
-            output.truncate(16 * 1024 * 1024)
-    return root, archive
+    paths = _preparation().call("prepare", work, namespace=args, repo=REPO)
+    return tuple(Path(_preparation()._untext(value)) for value in paths)
 
 
 def screenshot(socket: Path, target: Path) -> bool:
