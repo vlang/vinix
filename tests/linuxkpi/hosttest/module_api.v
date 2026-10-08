@@ -16,3 +16,8 @@ pub fn module_decode_utf8(text string) ! {
 pub fn module_word_rune(ch rune) bool {
 	return module_word(ch)
 }
+
+// Host producers share the checked text-mode file policy, including original
+// UTF-8 failures, newline conversion and literal Unix path bytes.
+pub fn module_read_text(path string) !string { return module_read(path)! }
+pub fn module_write_text(path string, text string) ! { module_write(path, text)! }

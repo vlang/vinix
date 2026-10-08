@@ -3,33 +3,21 @@
 """Stage an independent V host fixture with shared native model declarations."""
 import argparse
 import importlib.util
+import os
 from pathlib import Path
-import re
-import shutil
-import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("linuxkpi_host_native", Path(__file__).with_name("_host_native.py"))
+native = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(native)
 
 
 def existing(path):
-    return path if path.exists() else path.with_name(path.name + ".pending")
+    return Path(os.fsdecode(bytes.fromhex(native.request("existing", source=path))))
 
 
 def generate(source, output, arch="arm64", shared_model=True):
-    spec = importlib.util.spec_from_file_location("v_module", ROOT / "build-support/compile-v-module.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    with tempfile.TemporaryDirectory(prefix="vinix-v-host-") as directory:
-        stage = Path(directory) / source.name
-        stage.mkdir()
-        for item in source.iterdir():
-            if item.is_file() and (item.suffix == ".v" or item.name.endswith(".v.pending")):
-                shutil.copyfile(item, stage / item.name.removesuffix(".pending"))
-        if shared_model:
-            text = existing(ROOT / "tests/linuxkpi/host_model_foreign.v").read_text()
-            text = re.sub(r"^module \w+$", "module " + source.name, text, count=1, flags=re.M)
-            (stage / "model_foreign.v").write_text(text)
-        module.generate(stage, output, arch, ("nofloat",))
+    native.request("generate", source=source, output=output, arch=arch, shared_model=shared_model)
 
 
 if __name__ == "__main__":
