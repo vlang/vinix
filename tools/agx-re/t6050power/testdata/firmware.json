@@ -1,0 +1,814 @@
+[
+  {
+    "function": "recover_apple_pmp_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN10ApplePMPv25startEP9IOService": [
+          4096,
+          {
+            "$bytes": "004440f9604600f9088840b9689200b9fc230094604e00f9605a00f9004840f9605e00f9010040b9605e40f902008052606200f9605e40f921008052756600f9604640f9b0ffffb010022791110283d23002c1dae20310aae10313aa030080d2e8270094604640f9e10310aae52b0094"
+          }
+        ],
+        "__ZN10ApplePMPv214messageHandlerEPvS0_": [
+          8192,
+          {
+            "$bytes": "28dc74d3090d00513f0900711f0900711f050071fb030094fa070094f90b0094"
+          }
+        ],
+        "__ZN10ApplePMPv215handlePMMessageEy": [
+          16384,
+          {
+            "$bytes": "280c50922900e0d21f0109eb1f2004391f2003d501200491"
+          }
+        ],
+        "__ZN10ApplePMPv211sendMessageEy": [
+          24576,
+          {
+            "$bytes": "e10700f9004440f9113d80d2e1230091020080d223008052"
+          }
+        ],
+        "__ZN10ApplePMPv214writeDashboardEjy": [
+          28672,
+          {
+            "$bytes": "006040f9f40302aaf50301aaa105ffd021000c91fb030094340100f9"
+          }
+        ],
+        "__ZN10ApplePMPv29pingGatedEPv": [
+          36864,
+          {
+            "$bytes": "082044391704e0d2177c40b31f2003d5b72204391f2003d5a1220491"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN10ApplePMPv25startEP9IOService": 4096,
+        "__ZN10ApplePMPv214messageHandlerEPvS0_": 8192,
+        "__ZN10ApplePMPv216handleMemMessageEy": 12288,
+        "__ZN10ApplePMPv215handlePMMessageEy": 16384,
+        "__ZN10ApplePMPv221handleRegistryMessageEy": 20480,
+        "__ZN10ApplePMPv211sendMessageEy": 24576,
+        "__ZN10ApplePMPv214writeDashboardEjy": 28672,
+        "__ZN10ApplePMPv215getPropertyDataEPKc": 32768,
+        "__ZN10ApplePMPv29pingGatedEPv": 36864
+      },
+      "rtbuddy_symbols": {
+        "__ZN15RTBuddyEndpoint17getSlaveProcessorEv": 40960,
+        "__ZN15RTBuddyEndpoint12initForOwnerEP8OSObjectPFvS1_PvS2_ES2_": 45056,
+        "__ZN15RTBuddyEndpoint19setPowerStateActionEPFiP8OSObjectmmE": 49152
+      }
+    },
+    "result": {
+      "attachment": {
+        "provider": "RTBuddyEndpointService",
+        "provider_endpoint_offset": 136,
+        "endpoint_identifier_offset": 136,
+        "slave_processor_object_offset": 152,
+        "wrapper_service_object_offset": 184,
+        "ptd_update_property": "ptd-update-reg-index",
+        "ptd_update_memory_object_offset": 192,
+        "mapper_index": 1,
+        "mapper_object_offset": 200,
+        "ordering": [
+          "resolve endpoint and slave processor",
+          "resolve wrapper PTD-update memory and mapper",
+          "install message callback",
+          "install power-state callback"
+        ],
+        "scope": "host attachment only; does not start or prove PMP firmware ready"
+      },
+      "mailbox": {
+        "word_bits": 64,
+        "message_class": {
+          "shift": 52,
+          "bits": 4
+        },
+        "classes": {
+          "memory": [
+            1
+          ],
+          "power": [
+            2
+          ],
+          "registry": [
+            3,
+            4
+          ]
+        },
+        "rtbuddy_object_offset": 136,
+        "send_vtable_slot": 488,
+        "send_word_count": 1
+      },
+      "ping": {
+        "request_class": 2,
+        "request_payload": "low 32 bits of host timestamp",
+        "completion_power_subtype": 1,
+        "power_subtype": {
+          "shift": 48,
+          "bits": 4
+        },
+        "in_flight_byte_offset": 264,
+        "completion": "clear in-flight byte and wake its sleepers",
+        "scope": "ping completion, not proof of AGX dashboard readiness"
+      },
+      "diagnostic_dashboard": {
+        "object_offset": 192,
+        "configuration_property": "pmptool-config",
+        "index_unit_bits": 64,
+        "write_bits": 64,
+        "scope": "diagnostic API, not the ApplePMGR AGX state request"
+      }
+    }
+  },
+  {
+    "function": "recover_apple_pmp_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN10ApplePMPv25startEP9IOService": [
+          4096,
+          {
+            "$bytes": "004440f9604600f9088840b9689200b9fc230094604e00f9605a00f9004840f9605e00f9010040b9605e40f902008052606200f9605e40f921008052756600f9604640f9b0ffffb010022791110283d23002c1dae20310aae10313aa030080d2e8270094604640f9e10310aae52b0094"
+          }
+        ],
+        "__ZN10ApplePMPv214messageHandlerEPvS0_": [
+          8192,
+          {
+            "$bytes": "28dc74d3090d00513f0900711f0900711f050071fb030094fa070094f90b0094"
+          }
+        ],
+        "__ZN10ApplePMPv215handlePMMessageEy": [
+          16384,
+          {
+            "$bytes": "280c50922900e0d21f0109eb1f2004391f2003d501200491"
+          }
+        ],
+        "__ZN10ApplePMPv211sendMessageEy": [
+          24576,
+          {
+            "$bytes": "e10700f9004440f9113d80d2e1230091020080d223008052"
+          }
+        ],
+        "__ZN10ApplePMPv214writeDashboardEjy": [
+          28672,
+          {
+            "$bytes": "006040f9f40302aaf50301aaa105ffd021000c91fb030094340100f9"
+          }
+        ],
+        "__ZN10ApplePMPv29pingGatedEPv": [
+          36864,
+          {
+            "$bytes": "082044391706e0d2177c40b31f2003d5b72204391f2003d5a1220491"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN10ApplePMPv25startEP9IOService": 4096,
+        "__ZN10ApplePMPv214messageHandlerEPvS0_": 8192,
+        "__ZN10ApplePMPv216handleMemMessageEy": 12288,
+        "__ZN10ApplePMPv215handlePMMessageEy": 16384,
+        "__ZN10ApplePMPv221handleRegistryMessageEy": 20480,
+        "__ZN10ApplePMPv211sendMessageEy": 24576,
+        "__ZN10ApplePMPv214writeDashboardEjy": 28672,
+        "__ZN10ApplePMPv215getPropertyDataEPKc": 32768,
+        "__ZN10ApplePMPv29pingGatedEPv": 36864
+      },
+      "rtbuddy_symbols": {
+        "__ZN15RTBuddyEndpoint17getSlaveProcessorEv": 40960,
+        "__ZN15RTBuddyEndpoint12initForOwnerEP8OSObjectPFvS1_PvS2_ES2_": 45056,
+        "__ZN15RTBuddyEndpoint19setPowerStateActionEPFiP8OSObjectmmE": 49152
+      }
+    },
+    "error": "ApplePMPv2 ping request/wait protocol changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_apple_pmp_firmware_code_contract",
+    "arguments": {
+      "pmp_functions": {
+        "__ZN16ApplePMPFirmware5startEP9IOService": [
+          4096,
+          {
+            "$bytes": "804e00f911d680d2805200f91f10007188ca00b91f10007188ce00b988d200b988d600b91f10007188da00b91f10007109010012080d035389a21b2988e600b988ea00b9825e40f9"
+          }
+        ],
+        "__ZN16ApplePMPFirmware13patchFirmwareEP15RTBuddyFirmware": [
+          8192,
+          {
+            "$bytes": "1f2003d51f2003d51f2003d51f2003d51f2003d51f2003d51f2003d51f2003d555688852b509aa72162a88527688a8721f2003d5022003911f2003d5812889528148a872ef070094823203911f2003d581288952c18aa872ea070094824203911f2003d5012a88526188a872e5070094c1d21b11825203911f2003d5e1070094a8038052a102082a826203911f2003d5dc07009488028052a102082a827203911f2003d5d7070094828203911f2003d541688852a109aa72d2070094a15a0011829203911f2003d5ce07009482a203911f2003d5412a8852c16aa872c9070094"
+          }
+        ]
+      },
+      "pmp_symbols": {
+        "__ZN16ApplePMPFirmware5startEP9IOService": 4096,
+        "__ZN16ApplePMPFirmware13patchFirmwareEP15RTBuddyFirmware": 8192,
+        "__ZN15RTBuddyFirmware13patchBayWriteIjEEbjRKT_": 16384
+      },
+      "rtbuddy_functions": {
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          20480,
+          {
+            "$bytes": "c00e0094111281d210093fd77d0c0094bc0c0094111381d210093fd7790e0094111581d210093fd7111681d210093fd7f40c0094330d0094"
+          }
+        ],
+        "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware": [
+          24576,
+          {
+            "$bytes": "000a0094ff0a009474f610f962ba50f9fcfbff9728008052682e043960f650f9380a0094"
+          }
+        ]
+      },
+      "rtbuddy_symbols": {
+        "__ZN22RTBuddyFirmwareService15preFirmwareLoadEP15RTBuddyFirmware": 32768,
+        "__ZN22RTBuddyFirmwareService13patchFirmwareEP15RTBuddyFirmware": 33024,
+        "__ZN15RTBuddyFirmware12copyToTargetEP7RTBuddy": 33280,
+        "__ZN15RTBuddyFirmware17createCoredumpMapEP7RTBuddy": 33536,
+        "__ZN15RTBuddyFirmware19publishToIORegistryEP7RTBuddy": 33792,
+        "__ZN15RTBuddyFirmware17writeBackPatchBayEv": 34048,
+        "__ZN15RTBuddyFirmware14updatePatchBayEP7RTBuddy": 34304,
+        "__ZN15RTBuddyFirmware26updateCoredumpWithPatchBayEv": 34560,
+        "__ZNK15RTBuddyFirmware7getRoleEv": 34816,
+        "__ZNK15RTBuddyFirmware8announceEv": 35072,
+        "__ZN7RTBuddy20callPatchbayCallbackEP15RTBuddyFirmware": 35328,
+        "__ZN7RTBuddy7powerOnEv": 35584,
+        "__ZN7RTBuddy28_waitForFirmwareServiceGatedEv": 35840,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 20480,
+        "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware": 24576
+      },
+      "pmp_vtable_targets": {
+        "1520": 4096,
+        "2200": 8192
+      },
+      "service_vtable_targets": {
+        "2192": 32768,
+        "2200": 33024
+      },
+      "firmware_vtable_targets": {
+        "2216": 34304,
+        "2224": 34560
+      }
+    },
+    "result": {
+      "service": {
+        "start_vtable_slot": 1520,
+        "pre_firmware_load_vtable_slot": 2192,
+        "patch_firmware_vtable_slot": 2200,
+        "patch_override": "ApplePMPFirmware::patchFirmware"
+      },
+      "mandatory_patchbay_writes": [
+        {
+          "tag": "BDID",
+          "property": "board-id",
+          "node": "IODeviceTree:/chosen",
+          "derivation": "value",
+          "service_object_offset": 200,
+          "value_bits": 32,
+          "rejects_wrong_width": true
+        },
+        {
+          "tag": "DVID",
+          "property": "dram-vendor-id",
+          "node": "IODeviceTree:/chosen",
+          "derivation": "value",
+          "service_object_offset": 204,
+          "value_bits": 32,
+          "rejects_wrong_width": true
+        },
+        {
+          "tag": "DCAP",
+          "property": "dram-capacity",
+          "node": "the RTBuddy provider nub",
+          "derivation": "value",
+          "service_object_offset": 208,
+          "value_bits": 32,
+          "rejects_wrong_width": false
+        },
+        {
+          "tag": "DCHD",
+          "property": "dram-channel-disable",
+          "node": "the RTBuddy provider nub",
+          "derivation": "value",
+          "service_object_offset": 212,
+          "value_bits": 32,
+          "rejects_wrong_width": false
+        },
+        {
+          "tag": "PMC_",
+          "property": "pmc",
+          "node": "IODeviceTree:/arm-io/pmgr",
+          "derivation": "value",
+          "service_object_offset": 216,
+          "value_bits": 32,
+          "rejects_wrong_width": true
+        },
+        {
+          "tag": "PMCV",
+          "property": "pmc-pmgr",
+          "node": "IODeviceTree:/arm-io/pmgr",
+          "derivation": "value & 1",
+          "service_object_offset": 220,
+          "value_bits": 32,
+          "rejects_wrong_width": true
+        },
+        {
+          "tag": "PMCB",
+          "property": "pmc-pmgr",
+          "node": "IODeviceTree:/arm-io/pmgr",
+          "derivation": "(value >> 3) & 1",
+          "service_object_offset": 224,
+          "value_bits": 32,
+          "rejects_wrong_width": true
+        },
+        {
+          "tag": "PMCX",
+          "property": "pmc-msg-disabled",
+          "node": "the RTBuddy provider nub",
+          "derivation": "value",
+          "service_object_offset": 228,
+          "value_bits": 32,
+          "rejects_wrong_width": false
+        },
+        {
+          "tag": "CVAR",
+          "property": "soc-chip-variant",
+          "node": "the RTBuddy provider nub",
+          "derivation": "value",
+          "service_object_offset": 232,
+          "value_bits": 32,
+          "rejects_wrong_width": false
+        }
+      ],
+      "mandatory_patchbay_inputs": {
+        "width_bytes": 4,
+        "width_checked_nodes": [
+          "IODeviceTree:/chosen",
+          "IODeviceTree:/arm-io/pmgr"
+        ],
+        "unchecked_node": "the RTBuddy provider nub",
+        "provider_chain": "the retained RTBuddy at +0x98, its vtable slot 0x6b0 provider, cast and retained at +0xa0",
+        "absent_behavior": "the store is skipped and patchFirmware still writes the field, so an absent property publishes the allocator's zero"
+      },
+      "rtbuddy_fixup": {
+        "ordering": [
+          "power on RTBuddy target",
+          "service preFirmwareLoad",
+          "copy firmware to target when required",
+          "create coredump map when required",
+          "service patchFirmware",
+          "invoke registered patchbay callback",
+          "firmware updatePatchBay",
+          "firmware updateCoredumpWithPatchBay when required",
+          "publish firmware to IORegistry",
+          "write patchbay back to the target image"
+        ],
+        "firmware_object_offset": 8680,
+        "firmware_service_object_offset": 8560,
+        "firmware_loaded_byte_offset": 267,
+        "completion": "set firmware-loaded byte, then announce firmware",
+        "scope": "image preparation and RTBuddy bookkeeping only; no PMP run-state or dashboard-ready acknowledgement is established"
+      }
+    }
+  },
+  {
+    "function": "recover_apple_pmp_firmware_code_contract",
+    "arguments": {
+      "pmp_functions": {
+        "__ZN16ApplePMPFirmware5startEP9IOService": [
+          4096,
+          {
+            "$bytes": "804e00f911d680d2805200f91f10007188ca00b91f10007188ce00b988d200b988d600b91f10007188da00b91f10007109010012080d035389a21b2988e600b988ea00b9825e40f9"
+          }
+        ],
+        "__ZN16ApplePMPFirmware13patchFirmwareEP15RTBuddyFirmware": [
+          8192,
+          {
+            "$bytes": "1f2003d51f2003d51f2003d51f2003d51f2003d51f2003d51f2003d51f2003d555688852b509aa72162a88527688a8721f2003d5022003911f2003d5812889528148a872ef070094823203911f2003d581288952c18aa872ea070094824203911f2003d5012a88526188a872e5070094c1d21b11825203911f2003d5e1070094a8038052a102082a826203911f2003d5dc07009488028052a102082a827203911f2003d5d7070094828203911f2003d541688852a109aa72d2070094a15a0011829203911f2003d5ce07009482a203911f2003d5412a8852e16aa872c9070094"
+          }
+        ]
+      },
+      "pmp_symbols": {
+        "__ZN16ApplePMPFirmware5startEP9IOService": 4096,
+        "__ZN16ApplePMPFirmware13patchFirmwareEP15RTBuddyFirmware": 8192,
+        "__ZN15RTBuddyFirmware13patchBayWriteIjEEbjRKT_": 16384
+      },
+      "rtbuddy_functions": {
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          20480,
+          {
+            "$bytes": "c00e0094111281d210093fd77d0c0094bc0c0094111381d210093fd7790e0094111581d210093fd7111681d210093fd7f40c0094330d0094"
+          }
+        ],
+        "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware": [
+          24576,
+          {
+            "$bytes": "000a0094ff0a009474f610f962ba50f9fcfbff9728008052682e043960f650f9380a0094"
+          }
+        ]
+      },
+      "rtbuddy_symbols": {
+        "__ZN22RTBuddyFirmwareService15preFirmwareLoadEP15RTBuddyFirmware": 32768,
+        "__ZN22RTBuddyFirmwareService13patchFirmwareEP15RTBuddyFirmware": 33024,
+        "__ZN15RTBuddyFirmware12copyToTargetEP7RTBuddy": 33280,
+        "__ZN15RTBuddyFirmware17createCoredumpMapEP7RTBuddy": 33536,
+        "__ZN15RTBuddyFirmware19publishToIORegistryEP7RTBuddy": 33792,
+        "__ZN15RTBuddyFirmware17writeBackPatchBayEv": 34048,
+        "__ZN15RTBuddyFirmware14updatePatchBayEP7RTBuddy": 34304,
+        "__ZN15RTBuddyFirmware26updateCoredumpWithPatchBayEv": 34560,
+        "__ZNK15RTBuddyFirmware7getRoleEv": 34816,
+        "__ZNK15RTBuddyFirmware8announceEv": 35072,
+        "__ZN7RTBuddy20callPatchbayCallbackEP15RTBuddyFirmware": 35328,
+        "__ZN7RTBuddy7powerOnEv": 35584,
+        "__ZN7RTBuddy28_waitForFirmwareServiceGatedEv": 35840,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 20480,
+        "__ZN7RTBuddy18_loadFirmwareGatedEP15RTBuddyFirmware": 24576
+      },
+      "pmp_vtable_targets": {
+        "1520": 4096,
+        "2200": 8192
+      },
+      "service_vtable_targets": {
+        "2192": 32768,
+        "2200": 33024
+      },
+      "firmware_vtable_targets": {
+        "2216": 34304,
+        "2224": 34560
+      }
+    },
+    "error": "ApplePMPFirmware mandatory patchbay writes changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_boot_handshake_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": [
+          4096,
+          {
+            "$bytes": "6836443968010037110381d2e00313aa21008052020080d210093fd7"
+          }
+        ],
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": [
+          8192,
+          {
+            "$bytes": "e1008052ff0f009481008052fd0f0094605a40f961f650f9111181d210093fd7e00313aaf7030094"
+          }
+        ],
+        "__ZN7RTBuddy12_iopValidateEv": [
+          12288,
+          {
+            "$bytes": "0800443968224439d400805214018052609a00f9084b8452fa030094f9070094"
+          }
+        ],
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": [
+          16384,
+          {
+            "$bytes": "002841b9113d81d2885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": [
+          20480,
+          {
+            "$bytes": "15600591802a41b908420891885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": [
+          24576,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": [
+          28672,
+          {
+            "$bytes": "00fcff97111181d26162059102008052"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": [
+          32768,
+          {
+            "$bytes": "085841b91f1100711f214071610601b9283c00121f31007128fc50d3083d00121f310071a1008052f6fbff9701009052f4fbff97"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": [
+          36864,
+          {
+            "$bytes": "085841b91f150071369460d3d56a1b5397000036fb030094b5060011f77e0153f80b0094e0179f1af40098b6894e609229c94d92080149b210093fd780010035603a40f9c1008052eef7ff97"
+          }
+        ],
+        "__ZN7RTBuddy14createEndpointEj": [
+          40960,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": [
+          45056,
+          {
+            "$bytes": "337c0051e04f00a9"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": [
+          49152,
+          {
+            "$bytes": "000400946102160be822d61a9402082adf820071"
+          }
+        ],
+        "__ZN7RTBuddy11getEndpointEj": [
+          53248,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": 4096,
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": 8192,
+        "__ZN7RTBuddy12_iopValidateEv": 12288,
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": 16384,
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": 20480,
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": 24576,
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": 28672,
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": 32768,
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": 36864,
+        "__ZN7RTBuddy14createEndpointEj": 40960,
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": 45056,
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": 49152,
+        "__ZN7RTBuddy11getEndpointEj": 53248
+      }
+    },
+    "result": {
+      "firmware_load_power_transition": {
+        "set_power_state_vtable_slot": 2072,
+        "requested_state": 1,
+        "transition_suppression_byte_offset": 269
+      },
+      "managed_cpu_start": {
+        "status_before_start": 4,
+        "wrapper_object_offset": 176,
+        "firmware_object_offset": 8680,
+        "start_cpu_with_options_vtable_slot": 2184,
+        "completion": "enter IOP validation immediately after CPU start"
+      },
+      "rtkit_handshake": {
+        "status_object_offset": 344,
+        "timeout_object_offset": 296,
+        "protocol_version": 12,
+        "states": [
+          {
+            "status": 4,
+            "meaning": "CPU start issued; awaiting Hello"
+          },
+          {
+            "status": 5,
+            "meaning": "Hello accepted at protocol 12"
+          },
+          {
+            "status": 6,
+            "meaning": "endpoint roll-call reply sent successfully"
+          },
+          {
+            "status": 8,
+            "meaning": "alternate power-state target"
+          },
+          {
+            "status": 32768,
+            "meaning": "terminal validation failure"
+          }
+        ],
+        "validation_modes": [
+          "poll mailbox",
+          "block on status word"
+        ],
+        "validation_target_selection": "status 6 when RTBuddy byte 0x100 or 0x108 is set; otherwise status 8",
+        "validation_success": "target status reached",
+        "validation_failure": "status 0x8000 or configured timeout",
+        "transport_ready_status": 6,
+        "endpoint_roll_call": {
+          "bitmap_word_bits": 32,
+          "group_field": {
+            "shift": 32,
+            "bits": 6
+          },
+          "wire_endpoint": "group * 32 + set-bit index",
+          "reply": {
+            "preserved_fields": [
+              "group at bits 32..37",
+              "last at bit 51"
+            ],
+            "management_type": 8,
+            "payload": "a bitmap of the endpoints the host already has in that group, so the first reply sets only bit 0 and only for group 0",
+            "builder": "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj",
+            "precondition": "IOP status 5"
+          },
+          "application_service_suffix": "wire endpoint - 0x1f",
+          "endpoint1_wire_endpoint": 32,
+          "scope": "Endpoint1 is a service-name suffix, not RTKit wire endpoint 1"
+        },
+        "scope": "RTBuddy transport and endpoint discovery only; it does not prove ApplePMGR observed PMP-STATUS or an AGX dashboard ack"
+      }
+    }
+  },
+  {
+    "function": "recover_rtbuddy_boot_handshake_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": [
+          4096,
+          {
+            "$bytes": "6836443968010037110381d2e00313aa21008052020080d210093fd7"
+          }
+        ],
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": [
+          8192,
+          {
+            "$bytes": "e1008052ff0f009481008052fd0f0094605a40f961f650f9111181d210093fd7e00313aaf7030094"
+          }
+        ],
+        "__ZN7RTBuddy12_iopValidateEv": [
+          12288,
+          {
+            "$bytes": "0800443968224439d400805214018052609a00f9084b8452fa030094f9070094"
+          }
+        ],
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": [
+          16384,
+          {
+            "$bytes": "002841b9113d81d2885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": [
+          20480,
+          {
+            "$bytes": "15600591802a41b908420891885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": [
+          24576,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": [
+          28672,
+          {
+            "$bytes": "00fcff97111181d26162059102008052"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": [
+          32768,
+          {
+            "$bytes": "085841b91f1100711f214071610601b9283c00121f31007128fc50d3083d00121f310071a1008052f6fbff9701009052f4fbff97"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": [
+          36864,
+          {
+            "$bytes": "085841b91f150071369460d3d56a1b5397000036fb030094b5060011f77e0153f80b0094e0179f1af40098b6894e609229c94d92080149b210093fd780010035603a40f9e1008052eef7ff97"
+          }
+        ],
+        "__ZN7RTBuddy14createEndpointEj": [
+          40960,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": [
+          45056,
+          {
+            "$bytes": "337c0051e04f00a9"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": [
+          49152,
+          {
+            "$bytes": "000400946102160be822d61a9402082adf820071"
+          }
+        ],
+        "__ZN7RTBuddy11getEndpointEj": [
+          53248,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": 4096,
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": 8192,
+        "__ZN7RTBuddy12_iopValidateEv": 12288,
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": 16384,
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": 20480,
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": 24576,
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": 28672,
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": 32768,
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": 36864,
+        "__ZN7RTBuddy14createEndpointEj": 40960,
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": 45056,
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": 49152,
+        "__ZN7RTBuddy11getEndpointEj": 53248
+      }
+    },
+    "error": "RTBuddy endpoint roll-call readiness changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_boot_handshake_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": [
+          4096,
+          {
+            "$bytes": "6836443968010037110381d2e00313aa21008052020080d210093fd7"
+          }
+        ],
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": [
+          8192,
+          {
+            "$bytes": "e1008052ff0f009481008052fd0f0094605a40f961f650f9111181d210093fd7e00313aaf7030094"
+          }
+        ],
+        "__ZN7RTBuddy12_iopValidateEv": [
+          12288,
+          {
+            "$bytes": "0800443968224439d400805214018052609a00f9084b8452fa030094f9070094"
+          }
+        ],
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": [
+          16384,
+          {
+            "$bytes": "002841b9113d81d2885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": [
+          20480,
+          {
+            "$bytes": "15600591802a41b908420891885a41b97f02086b1f214071e95880520900bc722a3d0011"
+          }
+        ],
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": [
+          24576,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": [
+          28672,
+          {
+            "$bytes": "00fcff97111181d26162059102008052"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": [
+          32768,
+          {
+            "$bytes": "085841b91f1100711f214071610601b9283c00121f31007128fc50d3083d00121f310071a1008052f6fbff9701009052f4fbff97"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": [
+          36864,
+          {
+            "$bytes": "085841b91f150071369460d3d56a1b5397000036fb030094b5060011f77e0153f80b0094e0179f1af40098b6894e609229c94d92080149b210093fd780010035603a40f9c1008052eef7ff97"
+          }
+        ],
+        "__ZN7RTBuddy14createEndpointEj": [
+          40960,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ],
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": [
+          45056,
+          {
+            "$bytes": "33800051e04f00a9"
+          }
+        ],
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": [
+          49152,
+          {
+            "$bytes": "000400946102160be822d61a9402082adf820071"
+          }
+        ],
+        "__ZN7RTBuddy11getEndpointEj": [
+          53248,
+          {
+            "$bytes": "c0035fd6"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy12loadFirmwareEP15RTBuddyFirmware": 4096,
+        "__ZN7RTBuddy29_performPowerStateChangeGatedEPK17RTBuddyPowerState": 8192,
+        "__ZN7RTBuddy12_iopValidateEv": 12288,
+        "__ZN7RTBuddy19_iopValidatePollingE12RtbIopStatus": 16384,
+        "__ZN7RTBuddy20_iopValidateBlockingE12RtbIopStatus": 20480,
+        "__ZN7RTBuddy13_setIopStatusE12RtbIopStatus": 24576,
+        "__ZN7RTBuddy12setIopStatusE12RtbIopStatus": 28672,
+        "__ZN25RTBuddyManagementEndpoint12_handleHelloEy": 32768,
+        "__ZN25RTBuddyManagementEndpoint17_handleEPRollCallEy": 36864,
+        "__ZN7RTBuddy14createEndpointEj": 40960,
+        "__ZN22RTBuddyEndpointService10createNameEP9IOServicej": 45056,
+        "__ZN25RTBuddyManagementEndpoint14_buildRollCallEj": 49152,
+        "__ZN7RTBuddy11getEndpointEj": 53248
+      }
+    },
+    "error": "RTBuddy application endpoint service-name mapping changed",
+    "kind": "ValueError"
+  }
+]

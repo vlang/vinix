@@ -46,6 +46,9 @@ pub fn query(operation string, request map[string]j.Value) !j.Value {
 		'recover_t6050_pmgr_code_contract' {
 			recover_t6050_pmgr_code_contract(functions, j.value(request, 'symbols').as_map(), j.value(request, 'apple_pmgr_symbols').as_map(), j.value(request, 'vtable_targets').as_map())!
 		}
+		'recover_apple_pmp_code_contract' { recover_apple_pmp_code_contract(functions,j.value(request,'symbols').as_map(),j.value(request,'rtbuddy_symbols').as_map())! }
+		'recover_apple_pmp_firmware_code_contract' { recover_apple_pmp_firmware_code_contract(functions_from_json(j.value(request,'pmp_functions'))!,j.value(request,'pmp_symbols').as_map(),functions_from_json(j.value(request,'rtbuddy_functions'))!,j.value(request,'rtbuddy_symbols').as_map(),j.value(request,'pmp_vtable_targets').as_map(),j.value(request,'service_vtable_targets').as_map(),j.value(request,'firmware_vtable_targets').as_map())! }
+		'recover_rtbuddy_boot_handshake_code_contract' { recover_rtbuddy_boot_handshake_code_contract(functions,j.value(request,'symbols').as_map())! }
 		else { return error('unknown T6050 recovery operation ${operation}') }
 	}
 	return j.Value(result)

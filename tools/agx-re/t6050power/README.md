@@ -15,6 +15,12 @@ and hibernation republication sites. These proofs keep byte-search offsets and
 arbitrary integer address arithmetic separate until the decoder applies the
 original 64-bit address mask.
 
+The ApplePMP firmware module proves endpoint attachment and mailbox/ping
+completion, all nine unconditional patchbay writes and their exact call sites,
+RTBuddy fixup/load ordering, and the CPU-start/Hello/roll-call status machine.
+Firmware-loaded and transport-ready metadata retain their original limited
+meaning; the dashboard readiness proof remains a separate requirement.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V
@@ -33,6 +39,11 @@ full-output and rejection check.
 `dashboard_test.v` retains the independent dashboard and PMGR fixtures in
 `testdata/dashboard.json`, together with byte-search, wide MOVZ operand and
 vtable diagnostic controls.
+
+`firmware_test.v` retains the independent attachment, mandatory patch/fixup,
+and RTKit boot fixtures in `testdata/firmware.json`, including full results and
+original rejection checks. Additional controls preserve call cardinality,
+negative word offsets and exact readiness dictionary numeric equality.
 
 The original functions and fixtures remain available in Git. Qualification
 compares each instruction mutation, truncation, missing symbol and malformed
