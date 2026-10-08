@@ -160,3 +160,18 @@ describes enrolled configuration hashes, required file hashes, forced failure
 on mismatches, and disabled configuration editing under Secure Boot.
 The enrolled configuration hash is checked even when Secure Boot is disabled
 in [its configuration loader](https://github.com/Limine-Bootloader/Limine/blob/v12.8.0/common/lib/config.c).
+
+The literal command-line policy, PE enrollment-field parser, ELF header check,
+BLAKE2b streaming checksums and configuration generator are implemented in
+`bootpolicy` in V. The Python import interface forwards those calls to a private
+query executable installed through `build-support/run-v-tool.sh`; its directory
+is removed at process exit. The `verityimage` dependency is a relative symlink
+to the shared verified-root V module. Native parser regressions run with:
+
+```sh
+build-support/run-v-tool.sh tools/verified-boot/bootpolicy/core_test.v
+```
+
+Signing, bundle publication and the optional genuine PE-signature integration
+retain their existing controller. Parser fixtures remain separate from signed
+loaders and runtime boot validation.

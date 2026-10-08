@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -30,32 +29,30 @@ class InvalidBundle(ValueError):
     pass
 
 
+_native_spec = importlib.util.spec_from_file_location("vinix_boot_policy_native", Path(__file__).with_name("_native.py"))
+_native = importlib.util.module_from_spec(_native_spec)
+_native_spec.loader.exec_module(_native)
+
+
+def _call(operation, **fields):
+    try:
+        return _native.request(operation, **fields)
+    except ValueError as error:
+        raise InvalidBundle(str(error)) from error
+
+
 def digest(path: Path) -> str:
-    result = hashlib.blake2b()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            result.update(chunk)
-    return result.hexdigest()
+    return _call("digest", path=str(path))
 
 
 def check_cmdline(value: str, verity_token: str | None = None) -> str:
     # Limine expands ${macros} and accepts multiline configuration. Accept only
     # literal, printable tokens; no shell quoting or config/macros are needed.
-    if len(value) > 2048 or not re.fullmatch(r"[A-Za-z0-9_.,=+:/ -]*", value):
-        raise InvalidBundle("command line must contain literal ASCII tokens (at most 2048 bytes)")
-    # Several existing disk selectors use substring matching, so testing only
-    # token prefixes would allow e.g. x=vinix.disk=auto to bypass this profile.
-    if any(option in value for option in DISK_OPTIONS):
-        raise InvalidBundle("verified initramfs profile forbids disk root and persistence selectors")
-    if verity_token:
-        root_call(verity.parse_command_line, verity_token)
-        tokens = value.split()
-        if (not tokens or tokens[-1] != verity_token or tokens.count(verity_token) != 1
-                or "vinix.verity" in " ".join(tokens[:-1])):
-            raise InvalidBundle("verified root policy must contain exactly one generated final token")
-    elif "vinix.verity" in value:
-        raise InvalidBundle("verified block roots require the explicit --verity-root options")
-    return value.strip()
+    if not isinstance(value, str):
+        if len(value) > 2048:
+            raise InvalidBundle("command line must contain literal ASCII tokens (at most 2048 bytes)")
+        re.fullmatch("", value)  # Preserve the Python buffer/type boundary.
+    return _call("check_cmdline", value=value, verity_token=verity_token or "")
 
 
 def root_call(function, *args):
@@ -66,69 +63,19 @@ def root_call(function, *args):
 
 
 def pe_info(data: bytes, arch: str) -> tuple[int, int]:
-    """Validate the PE and locate Limine's hash field in a mapped section."""
-    try:
-        if data[:2] != b"MZ":
-            raise InvalidBundle("loader is not a PE executable")
-        pe = struct.unpack_from("<I", data, 0x3C)[0]
-        if data[pe:pe + 4] != b"PE\0\0":
-            raise InvalidBundle("invalid PE signature")
-        machine, sections = struct.unpack_from("<HH", data, pe + 4)
-        optional_size = struct.unpack_from("<H", data, pe + 20)[0]
-        optional = pe + 24
-        if machine != ARCHES[arch][0] or struct.unpack_from("<H", data, optional)[0] != 0x20B:
-            raise InvalidBundle("loader architecture does not match the requested architecture")
-        if struct.unpack_from("<H", data, optional + 68)[0] != 10:
-            raise InvalidBundle("loader is not an EFI application")
-        if optional_size < 152 or struct.unpack_from("<I", data, optional + 108)[0] < 5:
-            raise InvalidBundle("PE has no certificate data directory")
-        certificate, certificate_size = struct.unpack_from("<II", data, optional + 144)
-        if bool(certificate) != bool(certificate_size) or certificate + certificate_size > len(data):
-            raise InvalidBundle("invalid PE certificate directory")
-        locations = [match.start() for match in re.finditer(re.escape(CONFIG_MARKER), data)]
-        if len(locations) != 1:
-            raise InvalidBundle("loader must contain exactly one Limine config hash field")
-        start = locations[0] + len(CONFIG_MARKER)
-        if not re.fullmatch(b"[0-9a-fA-F]{128}", data[start:start + 128]):
-            raise InvalidBundle("invalid Limine config hash field")
-        mapped = False
-        for index in range(sections):
-            section = optional + optional_size + index * 40
-            size, offset = struct.unpack_from("<II", data, section + 16)
-            if offset + size > len(data):
-                raise InvalidBundle("truncated PE section")
-            if offset <= locations[0] and start + 128 <= offset + size:
-                mapped = True
-        if not mapped or (certificate and locations[0] < certificate + certificate_size
-                          and start + 128 > certificate):
-            raise InvalidBundle("Limine config hash field must be in a signed, mapped PE section")
-        loader_arch = "x86-64" if arch == "x86_64" else arch
-        if f"Limine 12.8.0 ({loader_arch}, UEFI)".encode() not in data:
-            raise InvalidBundle("a trusted Limine 12.8.0 loader is required")
-        return start, certificate_size
-    except (struct.error, IndexError) as error:
-        raise InvalidBundle("truncated PE executable") from error
+    return tuple(_call("pe_info", data=memoryview(data).hex(), arch=arch))
 
 
 def check_kernel(path: Path, arch: str) -> None:
-    with path.open("rb") as stream:
-        header = stream.read(64)
-    if (len(header) != 64 or header[:6] != b"\x7fELF\x02\x01"
-            or struct.unpack_from("<H", header, 18)[0] != ARCHES[arch][1]):
-        raise InvalidBundle("kernel must be a little-endian ELF64 image for the requested architecture")
+    _call("check_kernel", path=str(path), arch=arch)
 
 
 def config_text(kernel_hash: str, module_hashes: list[str], cmdline: str,
                 dtb_hash: str | None = None, verity_token: str | None = None) -> str:
-    lines = ["timeout: 0", "verbose: yes", "serial: yes", "editor_enabled: no", "hash_mismatch_panic: yes",
-             "", "/Vinix verified initramfs", "    protocol: limine",
-             f"    path: boot():/boot/vinix#{kernel_hash}",
-             f"    cmdline: {check_cmdline(cmdline, verity_token)}", "    resolution: 1024x768x32", "    kaslr: yes"]
-    for index, module_hash in enumerate(module_hashes):
-        lines.append(f"    module_path: boot():/boot/root-{index}.tar#{module_hash}")
-    if dtb_hash:
-        lines.append(f"    dtb_path: boot():/boot/platform.dtb#{dtb_hash}")
-    return "\n".join(lines) + "\n"
+    checked = check_cmdline(cmdline, verity_token)
+    return _call("config_text", kernel_hash=f"{kernel_hash}",
+                 module_hashes=[f"{value}" for value in module_hashes], cmdline=checked,
+                 dtb_hash=f"{dtb_hash}" if dtb_hash else "", verity_token=verity_token or "")
 
 
 def command(args: list[str]) -> None:
@@ -152,8 +99,7 @@ def verify_signature(loader: Path, certificate: Path, backend: str) -> None:
 
 
 def regular_file(path: Path) -> Path:
-    if path.is_symlink() or not path.is_file():
-        raise InvalidBundle(f"bundle file is missing, not regular, or a symlink: {path}")
+    _call("regular_file", path=str(path))
     return path
 
 

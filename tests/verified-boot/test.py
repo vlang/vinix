@@ -47,43 +47,6 @@ def pe(arch="x86_64"):
 
 
 class Policy(unittest.TestCase):
-    def test_disk_selectors_and_substring_bypasses(self):
-        for selector in boot.DISK_OPTIONS:
-            for prefix in ("", "x=", "quiet x="):
-                with self.subTest(selector=selector, prefix=prefix):
-                    with self.assertRaises(boot.InvalidBundle):
-                        boot.check_cmdline(prefix + selector + "auto")
-
-    def test_commandline_injection(self):
-        for value in ("quiet\n    cmdline: vinix.disk=auto", "quiet\rhidden", "${ARCH}",
-                      "quiet\0hidden", "é", "a" * 2049,
-                      "vinix.verity=1,/dev/vda,2," + "0" * 64,
-                      "x=vinix.verity=1,/dev/vda,2," + "0" * 64):
-            with self.subTest(value=value):
-                with self.assertRaises(boot.InvalidBundle):
-                    boot.check_cmdline(value)
-        self.assertEqual(boot.check_cmdline(" vinix.qemu_platform=1 quiet "), "vinix.qemu_platform=1 quiet")
-
-    def test_pe_architecture_field_and_signed_section(self):
-        for arch in boot.ARCHES:
-            field, signature_size = boot.pe_info(pe(arch), arch)
-            self.assertEqual(signature_size, 0)
-            self.assertEqual(pe(arch)[field:field + 128], b"0" * 128)
-            with self.assertRaises(boot.InvalidBundle):
-                boot.pe_info(pe(arch), "aarch64" if arch == "x86_64" else "x86_64")
-        malformed = pe()
-        malformed[512] = 0
-        with self.assertRaises(boot.InvalidBundle):
-            boot.pe_info(malformed, "x86_64")
-        malformed = pe()
-        struct.pack_into("<II", malformed, 408, 32, 512)
-        with self.assertRaises(boot.InvalidBundle):
-            boot.pe_info(malformed, "x86_64")
-        malformed = pe()
-        struct.pack_into("<II", malformed, 296, 512, 1536)
-        with self.assertRaises(boot.InvalidBundle):
-            boot.pe_info(malformed, "x86_64")
-
     def test_bundle_enforces_all_artifacts_and_root_profile(self):
         with tempfile.TemporaryDirectory() as temporary:
             work = Path(temporary)
@@ -234,6 +197,10 @@ if __name__ == "__main__":
     parser.add_argument("--aarch64-loader", type=Path)
     parser.add_argument("--backend", choices=("sbsign", "osslsigncode"), default="sbsign")
     args = parser.parse_args()
+    native = subprocess.run([str(ROOT / "build-support/run-v-tool.sh"),
+                             str(ROOT / "tools/verified-boot/bootpolicy/core_test.v")])
+    if native.returncode:
+        sys.exit(native.returncode)
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(Policy)
     if not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful():
         sys.exit(1)
