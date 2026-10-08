@@ -9,7 +9,7 @@ fn error_argument(parser string, message string) ! {
 
 fn stage_source(archive string, source string, output string) ! {
 	stamp := join(source, '.vinix-source')!
-	if is_file(stamp)! && compare('eq', method(stamp, 'read_text', [], {})!, global('SOURCE_SHA256')!)! {
+	if is_file(stamp)! && !compare('ne', method(stamp, 'read_text', [], {})!, global('SOURCE_SHA256')!)! {
 		return
 	}
 	temporary := call('Path', o(invoke('tempfile.mkdtemp', [], {
