@@ -23,3 +23,15 @@ Qualification runs the full frozen 26-test Python corpus and the combined
 17-native-plus-nine-original entry on ARM64 and x86_64, and all native cases
 with ASan/UBSan. These are host filesystem and controller checks; no Android
 application, production cross compiler, kernel or guest is executed.
+
+The complete ten-case musl fixture from source commit
+f75ef88bbf2c74347adec79a26d910d4b562ee7a also runs in V. Its original full
+file SHA256 is b02ac26ff056e6e30131bde1ea0284de6c709cb41695391fb848c53c95b7e1b5.
+It preserves all receipt, source patch, loader alias, tampering, ELF, symlink,
+missing-file and malformed-JSON assertions. Each musl invocation has a waiting
+parent that owns the entire scratch tree, including assertion-failure cleanup.
+The original copytree/copy2 primitives and public musl API remain synchronous
+standard-library bindings and receive no algorithm retirement credit.
+The standalone musl-runtime-test.v entry and original unittest method names
+exercise the same native cases, qualified against the full frozen corpus on
+both host architectures and with ASan/UBSan.

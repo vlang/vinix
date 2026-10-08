@@ -5,11 +5,18 @@ import json
 from pathlib import Path
 import sys
 
-ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("art_runtime", ROOT / "build-support/android/art-runtime.py")
-art = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(art)
 request = json.loads(sys.argv[1])
+ROOT = Path(__file__).resolve().parents[2]
+module = request.get("module", "art")
+if module == "shutil":
+    import shutil as art
+else:
+    spec = importlib.util.spec_from_file_location("android_runtime",
+        ROOT / "build-support/android" / ("musl-runtime.py" if module == "musl" else "art-runtime.py"))
+    art = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(art)
+for name, path in request.get("overrides", {}).items():
+    setattr(art, name, Path(path))
 try:
     if "attributes" in request:
         result = {name: getattr(art, name) for name in request["attributes"]}

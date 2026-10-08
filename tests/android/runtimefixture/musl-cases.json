@@ -1,0 +1,15 @@
+{
+  "original_source_sha256": "b02ac26ff056e6e30131bde1ea0284de6c709cb41695391fb848c53c95b7e1b5",
+  "methods": [
+    "test_accepts_verified_private_runtime_with_materialized_loader_alias",
+    "test_rejects_loader_or_libc_tampering",
+    "test_rejects_wrong_architecture_or_page_layout_even_with_matching_hash",
+    "test_rejects_missing_libraries_and_unmaterialized_symlinks",
+    "test_rejects_missing_or_symlinked_build_receipt",
+    "test_rejects_an_ordinary_source_built_libc_without_statistics_patch",
+    "test_rejects_source_and_build_settings_outside_private_android_recipe",
+    "test_rejects_stale_reordered_or_incomplete_patch_receipts",
+    "test_source_patch_changes_invalidate_an_existing_receipt",
+    "test_rejects_invalid_receipt_format"
+  ]
+}

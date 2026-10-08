@@ -312,7 +312,8 @@ def _native_fixture(self):
             raise
         atexit.register(shutil.rmtree, directory)
         _NATIVE_FIXTURE, _NATIVE_ENVIRONMENT = binary, environment
-    subprocess.run([_NATIVE_FIXTURE, ".".join(self.id().split(".")[-2:])],
+    selection = getattr(self, "_native_case_group", self.__class__.__name__) + "." + self._testMethodName
+    subprocess.run([_NATIVE_FIXTURE, selection],
                    check=True, env=_NATIVE_ENVIRONMENT)
 
 

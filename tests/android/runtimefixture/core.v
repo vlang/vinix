@@ -216,6 +216,21 @@ fn record_copy(value map[string]json2.Any) map[string]json2.Any {
 
 pub fn source_identity() string { return original_source_sha256 }
 
+// The child may terminate on an assertion. Its waiting parent owns every
+// descendant scratch directory and retires them after status propagation.
+fn guarded(selection string, child_mode string) ! {
+	root := temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	mut environment := os.environ()
+	environment['VINIX_RUNTIME_FIXTURE_WORK'] = root
+	output := fixturehost.capture_preferred([os.executable(), child_mode, selection], '', environment, false, os.uname().machine)!
+	print(output)
+}
+
+pub fn run_guarded(selection string) ! {
+	guarded(selection, '--child-runtime')!
+}
+
 fn verify_original_builders() ! {
 	gold := json2.decode[map[string]json2.Any](os.read_file(os.dir(@FILE) + '/elf.json')!)!
 	assert text(gold, 'original_source_sha256') == original_source_sha256

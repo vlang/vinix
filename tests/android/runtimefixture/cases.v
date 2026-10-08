@@ -245,6 +245,10 @@ fn rejects_duplicate_or_escaping_paths(mut c Context) ! {
 }
 
 pub fn run(selection string) ! {
+	if selection.starts_with('MuslRuntimeTests.') {
+		run_musl_guarded(selection)!
+		return
+	}
 	verify_original_builders()!
 	cases := map[string]fn (mut Context) !{
 		'RuntimeTests.test_verified_native_payload_and_jar_install_without_mutating_old_alias': verified_native_payload_and_jar_install_without_mutating_old_alias
