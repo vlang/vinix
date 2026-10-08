@@ -19,6 +19,7 @@ int archive_read_support_format_tar(struct archive *);
 int archive_read_open_filename(struct archive *, const char *, size_t);
 int archive_read_next_header(struct archive *, struct archive_entry **);
 const char *archive_entry_pathname(struct archive_entry *);
+const char *archive_entry_hardlink(struct archive_entry *);
 mode_t archive_entry_filetype(struct archive_entry *);
 int64_t archive_entry_size(struct archive_entry *);
 ssize_t archive_read_data(struct archive *, void *, size_t);

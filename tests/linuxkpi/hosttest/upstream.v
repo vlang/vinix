@@ -20,6 +20,7 @@ fn C.archive_read_support_format_tar(&C.archive) i32
 fn C.archive_read_open_filename(&C.archive, &char, usize) i32
 fn C.archive_read_next_header(&C.archive, &&C.archive_entry) i32
 fn C.archive_entry_pathname(&C.archive_entry) &char
+fn C.archive_entry_hardlink(&C.archive_entry) &char
 fn C.archive_entry_filetype(&C.archive_entry) u32
 fn C.archive_entry_size(&C.archive_entry) i64
 fn C.archive_read_data(&C.archive, voidptr, usize) isize
@@ -131,6 +132,54 @@ pub fn archive_members(archive string, names []string) !map[string][]u8 {
 		}
 		found[name] = bytes
 		if found.len == names.len { break }
+	}
+	return found
+}
+
+// Copy selected regular-file bytes for the pinned ASCII compiler inventory.
+// Apple's libarchive normalizes Unicode names, so reject non-ASCII members
+// rather than publish a different archive spelling. No archive paths are extracted.
+// Like the original tar iteration, later duplicate regular members replace
+// earlier ones while links/directories are ignored.
+pub fn archive_ascii_members(archive string, prefixes []string, names []string) !map[string][]u8 {
+	reader := C.archive_read_new()
+	if reader == unsafe { nil } { return error('Cannot allocate archive reader') }
+	defer { C.archive_read_free(reader) }
+	if C.archive_read_support_filter_xz(reader) != 0
+		|| C.archive_read_support_format_tar(reader) != 0
+		|| C.archive_read_open_filename(reader, archive.str, 10240) != 0 {
+		return archive_error(reader)
+	}
+	mut found := map[string][]u8{}
+	mut entry := &C.archive_entry(unsafe { nil })
+	for {
+		status := C.archive_read_next_header(reader, &entry)
+		if status == 1 { break }
+		if status != 0 { return archive_error(reader) }
+		pathname := C.archive_entry_pathname(entry)
+		if pathname == unsafe { nil } { return error('Archive entry has no pathname') }
+		name := unsafe { cstring_to_vstring(pathname) }
+		if name !in names && !prefixes.any(name.starts_with(it)) { continue }
+		if C.archive_entry_filetype(entry) != 0o100000
+			|| C.archive_entry_hardlink(entry) != unsafe { nil } {
+			continue
+		}
+		if name.bytes().any(it >= 0x80) {
+			return error('Pinned compiler archive member must have an ASCII pathname: ' + name)
+		}
+		size := C.archive_entry_size(entry)
+		if size < 0 || size > i64(0x7fffffff) {
+			return error('Archive member is too large: ' + name)
+		}
+		mut bytes := []u8{len: int(size)}
+		mut position := 0
+		for position < bytes.len {
+			read := unsafe { C.archive_read_data(reader, &bytes[position], usize(bytes.len - position)) }
+			if read < 0 { return archive_error(reader) }
+			if read == 0 { return error('Unexpected end of archive member: ' + name) }
+			position += int(read)
+		}
+		found[name] = bytes
 	}
 	return found
 }
