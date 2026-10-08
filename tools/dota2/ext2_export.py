@@ -8,6 +8,7 @@ import bisect
 from collections import OrderedDict
 from dataclasses import dataclass, field
 import errno
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -17,6 +18,10 @@ import stat
 import struct
 import threading
 import uuid
+
+_NATIVE_SPEC = importlib.util.spec_from_file_location("ext2_native", Path(__file__).with_name("_ext2_native.py"))
+_NATIVE = importlib.util.module_from_spec(_NATIVE_SPEC)
+_NATIVE_SPEC.loader.exec_module(_NATIVE)
 
 BLOCK = 4096
 GROUP_BLOCKS = BLOCK * 8
@@ -32,7 +37,7 @@ EXPORT_FLAGS = 3  # HAS_FLAGS | READ_ONLY
 
 
 def rounded(value: int, unit: int) -> int:
-    return (value + unit - 1) // unit
+    return _NATIVE.call('rounded', (value, unit), globals())
 
 
 def identity(info: os.stat_result) -> list[int]:
@@ -55,292 +60,49 @@ class Node:
 
 
 def scan(path: Path, existing: Node | None = None) -> Node:
-    info = path.lstat()
-    if stat.S_ISDIR(info.st_mode):
-        node = existing if existing and stat.S_ISDIR(existing.info.st_mode) else Node(path, info)
-        node.path, node.info = path, info
-        with os.scandir(path) as entries:
-            for entry in sorted(entries, key=lambda item: os.fsencode(item.name)):
-                name = os.fsencode(entry.name)
-                if not name or len(name) > 255:
-                    raise ValueError(f"Invalid ext2 filename: {entry.path}")
-                node.children[entry.name] = scan(Path(entry.path), node.children.get(entry.name))
-        return node
-    if stat.S_ISREG(info.st_mode):
-        if info.st_size > MAX_FILE:
-            raise ValueError(f"Vinix cannot read a file larger than 4 GiB: {path}")
-        return Node(path, info)
-    if stat.S_ISLNK(info.st_mode):
-        return Node(path, info)
-    raise ValueError(f"Only directories, regular files and symlinks can be exported: {path}")
+    return _NATIVE.call('scan', (path, existing), globals())
 
 
 def flatten(root: Node) -> list[Node]:
-    nodes = [root]
-    root.inode, root.parent = 2, 2
-    next_inode = 11
-
-    def visit(parent: Node) -> None:
-        nonlocal next_inode
-        for child in parent.children.values():
-            child.inode, child.parent = next_inode, parent.inode
-            next_inode += 1
-            nodes.append(child)
-            visit(child)
-
-    visit(root)
-    return nodes
+    return _NATIVE.call('flatten', (root,), globals())
 
 
 def directory_data(node: Node) -> bytes:
-    entries = [(node.inode, b".", 2), (node.parent, b"..", 2)]
-    for name, child in node.children.items():
-        kind = 2 if stat.S_ISDIR(child.info.st_mode) else 7 if stat.S_ISLNK(child.info.st_mode) else 1
-        entries.append((child.inode, os.fsencode(name), kind))
-    blocks = []
-    block = bytearray(BLOCK)
-    offset, previous = 0, None
-    for inode, name, kind in entries:
-        size = rounded(8 + len(name), 4) * 4
-        if offset + size > BLOCK:
-            struct.pack_into("<H", block, previous + 4, BLOCK - previous)
-            blocks.append(bytes(block))
-            block, offset = bytearray(BLOCK), 0
-        struct.pack_into("<IHBB", block, offset, inode, size, len(name), kind)
-        block[offset + 8:offset + 8 + len(name)] = name
-        previous, offset = offset, offset + size
-    struct.pack_into("<H", block, previous + 4, BLOCK - previous)
-    blocks.append(bytes(block))
-    return b"".join(blocks)
+    return _NATIVE.call('directory_data', (node,), globals())
 
 
 def pointer_count(count: int) -> int:
-    remaining = max(0, count - 12)
-    total = 0
-    for level in (1, 2, 3):
-        covered = min(remaining, POINTERS ** level)
-        if covered:
-            total += sum(rounded(covered, POINTERS ** index) for index in range(1, level + 1))
-        remaining -= covered
-    if remaining:
-        raise ValueError("File exceeds ext2's triple-indirect addressing")
-    return total
+    return _NATIVE.call('pointer_count', (count,), globals())
 
 
 def backup_group(group: int) -> bool:
-    if group in (0, 1):
-        return True
-    for base in (3, 5, 7):
-        value = group
-        while value and value % base == 0:
-            value //= base
-        if value == 1:
-            return True
-    return False
+    return _NATIVE.call('backup_group', (group,), globals())
 
 
 class Builder:
     def __init__(self, state: Path, nodes: list[Node]):
-        self.nodes, self.state = nodes, state
-        required = 0
-        for node in nodes:
-            if stat.S_ISDIR(node.info.st_mode):
-                count = len(directory_data(node)) // BLOCK
-            elif stat.S_ISLNK(node.info.st_mode):
-                size = len(os.fsencode(os.readlink(node.path)))
-                count = rounded(size, BLOCK) if size > 60 else 0
-            else:
-                count = rounded(node.info.st_size, BLOCK)
-            required += count + pointer_count(count)
-        # Group metadata is small; iterate until there is room for all of it.
-        self.groups = max(1, rounded(required + 16, GROUP_BLOCKS - 8))
-        while True:
-            self.inodes_per_group = max(32, rounded(len(nodes) + 9, self.groups * 32) * 32)
-            self.gdt_blocks = rounded(self.groups * 32, BLOCK)
-            self.table_blocks = self.inodes_per_group * INODE_SIZE // BLOCK
-            self.used = []
-            self.tables = []
-            for group in range(self.groups):
-                prefix = 1 + self.gdt_blocks if backup_group(group) else 0
-                self.used.append(prefix + 2 + self.table_blocks)
-                self.tables.append(group * GROUP_BLOCKS + prefix + 2)
-            if self.groups * GROUP_BLOCKS - sum(self.used) >= required:
-                break
-            self.groups += 1
-        self.block_count = self.groups * GROUP_BLOCKS
-        if self.block_count > 0xFFFFFFFF or self.inodes_per_group > GROUP_BLOCKS:
-            raise ValueError("Export exceeds this ext2 layout's limits")
-        self.group = 0
-        self.files: list[dict] = []
-        self.regions: list[list[int]] = []
+        _NATIVE.call("initialize", (self, state, nodes), globals())
         self.fd = os.open(state / "metadata.ext2", os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
         os.ftruncate(self.fd, self.block_count * BLOCK)
 
     def allocate(self, count: int) -> list[tuple[int, int]]:
-        runs = []
-        while count:
-            if self.group >= self.groups:
-                raise ValueError("Export ran out of blocks")
-            available = GROUP_BLOCKS - self.used[self.group]
-            if not available:
-                self.group += 1
-                continue
-            take = min(count, available)
-            runs.append((self.group * GROUP_BLOCKS + self.used[self.group], take))
-            self.used[self.group] += take
-            count -= take
-        return runs
+        return _NATIVE.call('allocate', (self, count), globals())
 
     def write(self, offset: int, data: bytes) -> None:
-        while data:
-            written = os.pwrite(self.fd, data, offset)
-            if not written:
-                raise OSError("Short metadata write")
-            offset += written
-            data = data[written:]
+        return _NATIVE.call('write', (self, offset, data), globals())
 
     def address_tree(self, runs: list[tuple[int, int]]) -> tuple[list[int], int]:
-        def blocks():
-            for start, count in runs:
-                yield from range(start, start + count)
-
-        iterator = iter(blocks())
-        count = sum(length for _, length in runs)
-        pointers = [next(iterator) for _ in range(min(count, 12))]
-        pointers += [0] * (12 - len(pointers))
-        indirect = 0
-
-        def tree(level: int, length: int) -> int:
-            nonlocal indirect
-            block = self.allocate(1)[0][0]
-            indirect += 1
-            if level == 1:
-                values = [next(iterator) for _ in range(length)]
-            else:
-                values = [tree(level - 1, min(POINTERS ** (level - 1), length - offset))
-                          for offset in range(0, length, POINTERS ** (level - 1))]
-            values += [0] * (POINTERS - len(values))
-            self.write(block * BLOCK, struct.pack("<1024I", *values))
-            return block
-
-        remaining = max(0, count - 12)
-        for level in (1, 2, 3):
-            take = min(remaining, POINTERS ** level)
-            pointers.append(tree(level, take) if take else 0)
-            remaining -= take
-        return pointers, indirect
+        return _NATIVE.call('address_tree', (self, runs), globals())
 
     def add_node(self, node: Node) -> None:
-        mode = node.info.st_mode & 0xFFFF & ~0o222
-        data = None
-        inline = None
-        if stat.S_ISDIR(mode):
-            data = directory_data(node)
-            size = len(data)
-            links = 2 + sum(stat.S_ISDIR(child.info.st_mode) for child in node.children.values())
-        elif stat.S_ISLNK(mode):
-            data = os.fsencode(os.readlink(node.path))
-            size, links = len(data), 1
-            if size <= 60:
-                inline, data = data, None
-        else:
-            size, links = node.info.st_size, 1
-        count = 0 if inline is not None else rounded(size, BLOCK)
-        runs = self.allocate(count)
-        if data is not None:
-            position = 0
-            for start, length in runs:
-                chunk = data[position:position + length * BLOCK]
-                self.write(start * BLOCK, chunk)
-                position += length * BLOCK
-        elif stat.S_ISREG(mode):
-            index = len(self.files)
-            self.files.append({"path": str(node.path), "identity": identity(node.info)})
-            position = 0
-            for start, length in runs:
-                self.regions.append([start * BLOCK, length * BLOCK, index, position])
-                position += length * BLOCK
-        pointers, indirect = self.address_tree(runs)
-        inode = bytearray(INODE_SIZE)
-        timestamp = max(0, min(0xFFFFFFFF, int(node.info.st_mtime)))
-        struct.pack_into("<HHIIIIIHHIII", inode, 0, mode, 0, size, timestamp,
-                         timestamp, timestamp, 0, 0, links, (count + indirect) * 8, 0, 0)
-        if inline is not None:
-            inode[40:40 + len(inline)] = inline
-        else:
-            struct.pack_into("<15I", inode, 40, *pointers)
-        group, index = divmod(node.inode - 1, self.inodes_per_group)
-        self.write(self.tables[group] * BLOCK + index * INODE_SIZE, inode)
+        return _NATIVE.call('add_node', (self, node), globals())
 
     def finish(self) -> dict:
-        try:
-            for node in self.nodes:
-                self.add_node(node)
-            gdt = bytearray(self.gdt_blocks * BLOCK)
-            last_inode = len(self.nodes) + 9
-            directory_counts = [0] * self.groups
-            for node in self.nodes:
-                if stat.S_ISDIR(node.info.st_mode):
-                    directory_counts[(node.inode - 1) // self.inodes_per_group] += 1
-            free_inodes = 0
-            for group in range(self.groups):
-                prefix = 1 + self.gdt_blocks if backup_group(group) else 0
-                base = group * GROUP_BLOCKS
-                used_inodes = max(0, min(self.inodes_per_group, last_inode - group * self.inodes_per_group))
-                free = self.inodes_per_group - used_inodes
-                free_inodes += free
-                struct.pack_into("<IIIHHH", gdt, group * 32, base + prefix, base + prefix + 1,
-                                 self.tables[group], GROUP_BLOCKS - self.used[group], free, directory_counts[group])
-                bitmap = bytearray(BLOCK)
-                full, tail = divmod(self.used[group], 8)
-                bitmap[:full] = b"\xff" * full
-                if tail:
-                    bitmap[full] = (1 << tail) - 1
-                self.write((base + prefix) * BLOCK, bitmap)
-                bitmap = bytearray(b"\xff" * BLOCK)
-                for index in range(used_inodes, self.inodes_per_group):
-                    bitmap[index // 8] &= ~(1 << (index % 8))
-                self.write((base + prefix + 1) * BLOCK, bitmap)
-            superblock = bytearray(1024)
-            struct.pack_into("<11I", superblock, 0, self.groups * self.inodes_per_group,
-                             self.block_count, 0, self.block_count - sum(self.used), free_inodes,
-                             0, 2, 2, GROUP_BLOCKS, GROUP_BLOCKS, self.inodes_per_group)
-            struct.pack_into("<HHHHHH", superblock, 52, 0, 0xFFFF, 0xEF53, 1, 1, 0)
-            struct.pack_into("<IIIIHH", superblock, 64, 0, 0, 0, 1, 0, 0)
-            struct.pack_into("<IHHIII", superblock, 84, 11, INODE_SIZE, 0, 0, 2, 3)
-            superblock[104:120] = uuid.uuid4().bytes
-            superblock[120:136] = b"Vinix game data\x00"
-            for group in range(self.groups):
-                if backup_group(group):
-                    struct.pack_into("<H", superblock, 90, group)
-                    self.write(group * GROUP_BLOCKS * BLOCK + (1024 if group == 0 else 0), superblock)
-                    self.write((group * GROUP_BLOCKS + 1) * BLOCK, gdt)
-            os.fsync(self.fd)
-            manifest = {"version": 1, "size": self.block_count * BLOCK,
-                        "files": self.files, "regions": sorted(self.regions)}
-            with (self.state / "manifest.json").open("x") as output:
-                json.dump(manifest, output, separators=(",", ":"))
-            return manifest
-        finally:
-            os.close(self.fd)
+        return _NATIVE.call('finish', (self,), globals())
 
 
 def build(source: Path, state: Path, overlays: list[Path] = ()) -> dict:
-    state = state.resolve()
-    roots = [source.resolve(), *(path.resolve() for path in overlays)]
-    for path in roots:
-        if not path.is_dir():
-            raise ValueError(f"Export root is not a directory: {path}")
-        if state.is_relative_to(path):
-            raise ValueError("Metadata directory must be outside every exported root")
-    root = scan(roots[0])
-    for path in roots[1:]:
-        root = scan(path, root)
-    nodes = flatten(root)
-    state.mkdir(parents=True, exist_ok=True)
-    if (state / "metadata.ext2").exists() or (state / "manifest.json").exists():
-        raise ValueError("Use a fresh export state directory")
-    return Builder(state, nodes).finish()
+    return _NATIVE.call('build', (source, state, overlays), globals())
 
 
 class Export:
@@ -549,6 +311,9 @@ def main() -> None:
                 server.serve_forever()
             except KeyboardInterrupt:
                 pass
+
+
+_NATIVE.bind(globals())
 
 
 if __name__ == "__main__":
