@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
+from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location("dota2_vulkan_stage", REPO / "build-support/dota2/vulkan-stage.py")
@@ -124,7 +125,9 @@ class StageTests(unittest.TestCase):
             return library, manifest
         arguments = [str(stage.__file__), "--steam-build", str(self.steam), "--build", str(self.build), *extra]
         with patch.object(sys, "argv", arguments), patch.object(stage, "load_glibc_pin", return_value=self.pin), \
-                patch.object(stage.subprocess, "run", side_effect=compile_library), \
+                patch.object(stage, "subprocess", SimpleNamespace(**dict(vars(stage.subprocess),
+                    run=compile_library, check_output=lambda command, **kwargs:
+                    compile_library(command, **kwargs).stdout))), \
                 patch.object(stage, "build_lavapipe", side_effect=build_lavapipe), \
                 patch.object(stage, "build_venus", side_effect=build_venus), \
                 patch.object(stage.sys, "platform", "linux"), redirect_stdout(io.StringIO()):

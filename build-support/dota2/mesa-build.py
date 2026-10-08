@@ -13,6 +13,11 @@ import shutil
 import subprocess
 import sys
 
+from runpy import run_path
+
+_native = run_path(str(Path(__file__).resolve().parents[2] / "tests/dota2/_native.py"))
+_native_request, _policy_value = _native["request"], _native["policy_value"]
+
 REPO = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).with_name("mesa")
 LIBRARY = "usr/lib/x86_64-linux-gnu/libvulkan_lvp.so"
@@ -88,16 +93,7 @@ def load_resolver():
 
 def load_inputs(path: Path = SUPPORT / "inputs.json") -> dict:
     inputs = json.loads(path.read_text())
-    files = [inputs.get("source", {}), inputs.get("debian_diff", {})]
-    if (inputs.get("format") != 2 or not isinstance(inputs.get("debian_version"), str) or
-            not inputs.get("mirror", "").startswith("https://") or
-            any(not isinstance(f.get("filename"), str) or Path(f["filename"]).is_absolute() or
-                ".." in Path(f["filename"]).parts or len(f.get("sha256", "")) != 64
-                for f in files) or
-            not isinstance(inputs.get("patches"), dict) or not inputs["patches"] or
-            any("/" in name or len(value) != 64 for name, value in inputs["patches"].items()) or
-            not isinstance(inputs.get("packages"), list)):
-        raise SystemExit(f"invalid pinned Mesa inputs: {path}")
+    _native_request("mesa-pin", b"", data=_policy_value(inputs), path=str(path))
     return inputs
 
 
@@ -239,15 +235,10 @@ cpp_link_args = {links!r}
 
 def verify_library(path: Path, base: Path, tools: Path) -> None:
     header = path.read_bytes()[:20]
-    if header[:6] != b"\x7fELF\x02\x01" or header[16:20] != b"\x03\x00\x3e\x00":
+    if not _native_request("shared-elf", header):
         raise SystemExit(f"Lavapipe must be an x86-64 shared library: {path}")
     dynamic = subprocess.check_output([str(tools / "llvm-readelf"), "-d", "--dyn-syms", str(path)], text=True)
-    if "vk_icdNegotiateLoaderICDInterfaceVersion" not in dynamic:
-        raise SystemExit("built Lavapipe lacks the Vulkan ICD entry point")
-    for name in re.findall(r"\(NEEDED\).*\[([^]]+)\]", dynamic):
-        if not any((base / directory / name).exists()
-                   for directory in ("lib/x86_64-linux-gnu", "usr/lib/x86_64-linux-gnu")):
-            raise SystemExit(f"built Lavapipe needs a library the runtime lacks: {name}")
+    _native_request("verify-dynamic", dynamic.encode("utf-8", "surrogatepass"), base=str(base))
 
 
 def build(base: Path, work: Path, jobs: int = os.cpu_count() or 1, refresh: bool = False) -> Path:
@@ -265,6 +256,7 @@ def build(base: Path, work: Path, jobs: int = os.cpu_count() or 1, refresh: bool
             raise SystemExit(f"missing LLVM tool {name} in {tools}; set VINIX_DOTA2_LLVM_BIN")
     generation = hashlib.sha256(json.dumps({
         "inputs": inputs, "builder": digest(Path(__file__)),
+        "native_policy": {str(path.relative_to(REPO)): digest(path) for path in _native["policy_sources"]()},
         "patches": {name: digest(SUPPORT / name) for name in inputs["patches"]},
         "options": MESON_OPTIONS, "python_packages": PYTHON_PACKAGES,
         "clang": subprocess.check_output([str(tools / "clang"), "--version"], text=True),

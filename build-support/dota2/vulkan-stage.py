@@ -13,6 +13,11 @@ import subprocess
 import sys
 import tempfile
 
+from runpy import run_path
+
+_native = run_path(str(Path(__file__).resolve().parents[2] / "tests/dota2/_native.py"))
+_native_request, _policy_value = _native["request"], _native["policy_value"]
+
 REPO = Path(__file__).resolve().parents[2]
 GLIBC_PIN = REPO / "build-support/dota2/glibc-package.json"
 GLIBC_MARKER = ".vinix-dota2-glibc-package.json"
@@ -100,16 +105,7 @@ def build_early_client(destination: Path, artifacts: Path) -> None:
 
 def load_glibc_pin(path: Path = GLIBC_PIN) -> dict:
     pin = json.loads(path.read_text())
-    if (pin.get("package") != "libc6" or pin.get("architecture") != "amd64" or
-            not isinstance(pin.get("version"), str) or not pin["version"] or
-            not isinstance(pin.get("size"), int) or pin["size"] <= 0 or
-            not isinstance(pin.get("sha256"), str) or len(pin["sha256"]) != 64 or
-            any(c not in "0123456789abcdef" for c in pin["sha256"]) or
-            not isinstance(pin.get("mirror"), str) or not pin["mirror"].startswith("https://") or
-            not isinstance(pin.get("filename"), str) or
-            not pin["filename"] or
-            Path(pin["filename"]).is_absolute() or ".." in Path(pin["filename"]).parts):
-        raise SystemExit(f"invalid pinned amd64 libc6 package: {path}")
+    _native_request("glibc-pin", b"", data=_policy_value(pin), path=str(path))
     return pin
 
 
@@ -169,44 +165,11 @@ def stage_glibc_package(resolver, pin: dict, cache: Path, root: Path) -> None:
 
 
 def glibc_package_valid(root: Path, pin: dict) -> bool:
-    # A generation stamp alone cannot detect a copied-back Bookworm loader or
-    # libc. Verify the whole package and legacy aliases before reusing a root.
     try:
         marker = json.loads((root / GLIBC_MARKER).read_text())
-        if marker["package"] != pin or marker["alias_policy"] != GLIBC_ALIAS_POLICY:
-            return False
-        files, aliases = marker["files"], marker["aliases"]
-        if not isinstance(files, dict) or not isinstance(aliases, dict):
-            return False
-        required = ["usr/lib/x86_64-linux-gnu/" + name for name in GLIBC_LIBRARIES]
-        if not all(name in files and "sha256" in files[name] for name in required):
-            return False
-        if aliases.get("lib64/ld-linux-x86-64.so.2") != "../usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2":
-            return False
-        for name in GLIBC_LIBRARIES:
-            relative = "lib/x86_64-linux-gnu/" + name
-            legacy = root / relative
-            if ((legacy.exists() or legacy.is_symlink()) and
-                    aliases.get(relative) != "../../usr/lib/x86_64-linux-gnu/" + name):
-                return False
-        for relative, expected in files.items():
-            if Path(relative).is_absolute() or ".." in Path(relative).parts:
-                return False
-            path = root / relative
-            if "target" in expected:
-                if not path.is_symlink() or os.readlink(path) != expected["target"]:
-                    return False
-            elif (path.is_symlink() or not path.is_file() or
-                  path.stat().st_mode & 0o7777 != expected["mode"] or
-                  file_sha256(path) != expected["sha256"]):
-                return False
-        for relative, target in aliases.items():
-            path = root / relative
-            if (Path(relative).is_absolute() or ".." in Path(relative).parts or
-                    not path.is_symlink() or os.readlink(path) != target or
-                    not path.resolve().is_relative_to(root.resolve())):
-                return False
-        return True
+        return _native_request("glibc-valid", b"", root=str(root),
+                               marker=_policy_value(marker), pin=_policy_value(pin),
+                               alias_policy=GLIBC_ALIAS_POLICY, libraries=list(GLIBC_LIBRARIES))
     except (OSError, ValueError, KeyError, TypeError, RuntimeError):
         return False
 
@@ -250,8 +213,8 @@ def stage_lavapipe(selected, root: Path, work: Path, expected: dict) -> None:
 def lavapipe_valid(root: Path, expected: dict) -> bool:
     try:
         marker = json.loads((root / LAVAPIPE_MARKER).read_text())
-        return (marker["inputs"] == expected and
-                file_sha256(root / LAVAPIPE_LIBRARY) == marker["sha256"])
+        return _native_request("driver-valid", b"", root=str(root), marker=_policy_value(marker),
+                               expected=_policy_value(expected), library=LAVAPIPE_LIBRARY, icd="")
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
@@ -293,8 +256,8 @@ def stage_venus(root: Path, work: Path, guest_root: str, expected: dict) -> None
 def venus_valid(root: Path, expected: dict) -> bool:
     try:
         marker = json.loads((root / VENUS_MARKER).read_text())
-        return (marker["inputs"] == expected and (root / VENUS_ICD).is_file() and
-                file_sha256(root / VENUS_LIBRARY) == marker["sha256"])
+        return _native_request("driver-valid", b"", root=str(root), marker=_policy_value(marker),
+                               expected=_policy_value(expected), library=VENUS_LIBRARY, icd=VENUS_ICD)
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
@@ -348,9 +311,10 @@ def main() -> None:
     glibc_pin = None if args.keep_steam_libc else load_glibc_pin()
     lavapipe = None if args.debian_lavapipe else lavapipe_inputs()
     venus = None if args.no_venus else venus_inputs()
-    inputs = {"format": 5, "source": str(source), "guest_root": args.guest_root,
+    inputs = {"format": 6, "source": str(source), "guest_root": args.guest_root,
               "release": args.release, "packages": rows,
               "builder_sha256": file_sha256(Path(__file__)),
+              "native_policy": {str(path.relative_to(REPO)): file_sha256(path) for path in _native["policy_sources"]()},
               "glibc_package": glibc_pin,
               "glibc_alias_policy": GLIBC_ALIAS_POLICY,
               "lavapipe": lavapipe,

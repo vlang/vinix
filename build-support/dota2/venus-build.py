@@ -135,6 +135,7 @@ def build(base: Path, work: Path, jobs: int = os.cpu_count() or 1, refresh: bool
             raise SystemExit(f"missing LLVM tool {name} in {tools}; set VINIX_DOTA2_LLVM_BIN")
     generation = hashlib.sha256(json.dumps({
         "version": VERSION, "source": SOURCE_SHA256, "builder": lavapipe.digest(Path(__file__)),
+        "native_policy": {str(path.relative_to(REPO)): lavapipe.digest(path) for path in lavapipe._native["policy_sources"]()},
         "sysroot_packages": mesa_inputs["packages"],
         "patches": {patch.name: lavapipe.digest(patch) for patch in PATCHES},
         "options": MESON_OPTIONS, "python_packages": PYTHON_PACKAGES,

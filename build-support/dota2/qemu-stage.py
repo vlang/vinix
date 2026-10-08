@@ -12,6 +12,11 @@ import shutil
 import subprocess
 import sys
 
+from runpy import run_path
+
+_native = run_path(str(Path(__file__).resolve().parents[2] / "tests/dota2/_native.py"))
+_native_request, _policy_value = _native["request"], _native["policy_value"]
+
 REPO = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).with_name("qemu")
 CONFIGURE = (
@@ -145,6 +150,7 @@ def main() -> None:
         "configuration": configuration,
         "patches": {str(path.relative_to(SUPPORT)): digest(path) for path in patches},
         "builder": digest(Path(__file__)), "configure": CONFIGURE,
+        "native_policy": {str(path.relative_to(REPO)): digest(path) for path in _native["policy_sources"]()},
         "python_packages": PYTHON_PACKAGES, "python": sys.version,
         "clang": subprocess.check_output([clang, "--version"], text=True),
         "host_cc": subprocess.check_output([host_cc, "--version"], text=True),
@@ -232,21 +238,8 @@ def main() -> None:
     logged([tool("ninja"), "-j", str(args.jobs), "qemu-x86_64"], build, build / "build.log")
     binary = build / "qemu-x86_64"
     contents = binary.read_bytes()
-    header = contents[:64]
     dynamic = subprocess.check_output([tool("aarch64-linux-musl-readelf"), "-d", str(binary)], text=True)
-    program_offset = int.from_bytes(header[32:40], "little")
-    program_size = int.from_bytes(header[54:56], "little")
-    program_count = int.from_bytes(header[56:58], "little")
-    table_valid = (program_size >= 56 and program_count > 0 and
-                   program_offset + program_count * program_size <= len(contents))
-    interpreter = table_valid and any(
-        int.from_bytes(contents[program_offset + index * program_size:
-                                program_offset + index * program_size + 4], "little") == 3
-        for index in range(program_count))
-    if (len(header) != 64 or header[:6] != b"\x7fELF\x02\x01" or
-            int.from_bytes(header[16:18], "little") not in (2, 3) or
-            int.from_bytes(header[18:20], "little") != 183 or
-            not table_valid or interpreter or "(NEEDED)" in dynamic):
+    if not _native_request("static-translator", contents, dynamic=dynamic):
         raise SystemExit("the translator must be a static native AArch64 ELF")
     destination = staging / "usr/bin/qemu-x86_64"
     destination.parent.mkdir(parents=True, exist_ok=True)
