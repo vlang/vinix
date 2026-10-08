@@ -130,3 +130,25 @@ def _integer_keys(value):
     if isinstance(value, list):
         return [_integer_keys(item) for item in value]
     return value
+
+
+_public_constants = None
+
+
+def _constant_value(node):
+    kind, value = node
+    if kind == "dict":
+        return {_constant_value(key): _constant_value(item) for key, item in value}
+    if kind == "tuple":
+        return tuple(_constant_value(item) for item in value)
+    if kind == "list":
+        return [_constant_value(item) for item in value]
+    return value
+
+
+def public_constants():
+    global _public_constants
+    if _public_constants is None:
+        _public_constants = {name: _constant_value(value) for name, value
+                             in _query(b"", "public_constants").items()}
+    return _public_constants

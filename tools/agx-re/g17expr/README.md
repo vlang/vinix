@@ -201,3 +201,16 @@ primary buffer and secondary-image options were mutated and freed; another
 Earlier native families use a different nested dictionary insertion order from
 the original Python implementations; this controller preserves the committed
 frontend's order while independently checking all original typed values.
+
+The remaining public contract constants are maintained in
+`public_constants.v`. Its container tags preserve tuple/list distinctions and
+integer dictionary keys at the Python import boundary. Eager publication keeps
+the original module namespace, ordinary imports and mutable dictionary identity.
+The native algorithms and controller continue to own their checked contracts.
+
+Qualification under `~/.cache/vinix-python-to-v/g17-public-20261008/` passed all
+264 final original values from 266 definitions with complete recursive type
+comparison on ARM64 and x86-64, normal and cold foreign-thread module imports,
+namespace/from-import/identity checks, unchanged T6050 imports, 400 foreign calls
+per import profile with zero owned responses, native sanitizer/fake-stack tests,
+and 10,000 sanitizer C ABI iterations against the independent complete manifest.
