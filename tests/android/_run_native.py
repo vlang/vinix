@@ -68,7 +68,8 @@ def _exception(row, context, resources):
 
 def _exit(owner, exception):
     if exception[1] is None:
-        return bool(owner.__exit__(*exception))
+        owner.__exit__(*exception)
+        return False
     error, traceback = exception[1:]
     try:
         raise error.with_traceback(traceback)
