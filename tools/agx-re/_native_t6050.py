@@ -26,6 +26,22 @@ def image_contract(name, image, functions, **parameters):
     return _contract(image, name, functions, parameters)
 
 
+
+def _node(value):
+    return {"properties": {name: {"data": _encode(prop.data), "flags": prop.flags}
+                           for name, prop in value.properties.items()},
+            "children": [_node(child) for child in value.children]}
+
+
+def tree_contract(name, root, **parameters):
+    if "pmp_wrappers" in parameters:
+        parameters["pmp_wrappers"] = {
+            role: [path, _node(node)]
+            for role, (path, node) in parameters["pmp_wrappers"].items()
+        }
+    return _contract(b"", name, {}, {"root": _node(root), **parameters})
+
+
 def _contract(image, name, functions, parameters):
     try:
         return query(image, "t6050:" + name,

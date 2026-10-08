@@ -28,6 +28,15 @@ instruction proofs so the original reader fixtures remain independent.
 `MachOEvidence.image` is borrowed only during the synchronous call; returned
 strings, tables and proof metadata own their storage.
 
+The topology module owns T6050 PMGR/PMP DeviceTree validation, both die
+wrappers and DART/mapper bindings, interrupt overlays, gate routes and packed
+SoC-device dashboard layout. Preorder predicates retain the original validation
+order. The public Python node objects are marshalled once; native property
+buffers and returned metadata own their storage. Published bypass keys are
+visited in numeric order, preserving the original SID-range result even for
+wide counts. `topology_test.v` keeps the complete independently authored
+synthetic topology and both original SGX/AGX rejection fixtures.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V
