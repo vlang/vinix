@@ -1,0 +1,992 @@
+{
+  "test_recovers_firmware_root_pointer_offsets": [
+    {
+      "request": {
+        "operation": "recover_firmware_root",
+        "fixture_test": "test_recovers_firmware_root_pointer_offsets",
+        "code": "0a9880d20ae5a0f24a64d8f26a91e1f229a10e914a010f91532d40a94d3949a94d294aa9"
+      },
+      "result": {
+        "interface_magic": 904030701134283968,
+        "magic_code_offset": 0,
+        "copied_bytes": 200,
+        "pointer_offsets": [
+          24,
+          32,
+          168,
+          176,
+          184,
+          192
+        ]
+      }
+    }
+  ],
+  "test_recovers_driver_root_stores": [
+    {
+      "request": {
+        "operation": "recover_driver_root",
+        "fixture_test": "test_recovers_driver_root_stores",
+        "code": "159880d215e5a0f25564d8f27591e1f2602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9684e41f9172995523700a0720801178b080140f90081c13c0181c23c0281c33c810a02ad800e803d0081c43c0181c53c0281c63c083d40f9884a00f9818a03ad801a803d801600fd2004000f801600fd615e45f9800e00f961c641f9801200f9616a45f9805600f961f645f9800e00f961c641f9801200f9610246f9805600f9617246f9805a00f9617646f9805e00f961ce41f9806200f9"
+      },
+      "result": {
+        "interface_magic": 904030701134283968,
+        "magic_code_offset": 0,
+        "pointer_offsets": [
+          24,
+          32,
+          168,
+          176,
+          184,
+          192
+        ],
+        "firmware_role_offset": 40,
+        "host_mapped_allocations_offset": 44,
+        "bootstrap_provider_host_member": 6744,
+        "bootstrap_region": {
+          "root_offset": 8,
+          "host_cpu_member": 6736,
+          "host_gpu_mapping_member": 6744,
+          "mapping_address_vtable_offset": 344,
+          "firmware_address_conversion_vtable_offset": 728
+        },
+        "platform_config": {
+          "host_platform_member": 664,
+          "host_platform_pointer_offset": 108872,
+          "root_offset": 48,
+          "bytes": 104
+        },
+        "roles": [
+          {
+            "role": 0,
+            "bindings": [
+              {
+                "host_gpu_member": 2744,
+                "root_offset": 24
+              },
+              {
+                "host_gpu_member": 904,
+                "root_offset": 32
+              },
+              {
+                "host_gpu_member": 2768,
+                "root_offset": 168
+              },
+              {
+                "host_gpu_member": 3296,
+                "root_offset": 176
+              }
+            ]
+          },
+          {
+            "role": 1,
+            "bindings": [
+              {
+                "host_gpu_member": 3048,
+                "root_offset": 24
+              },
+              {
+                "host_gpu_member": 904,
+                "root_offset": 32
+              },
+              {
+                "host_gpu_member": 3072,
+                "root_offset": 168
+              },
+              {
+                "host_gpu_member": 3304,
+                "root_offset": 184
+              },
+              {
+                "host_gpu_member": 920,
+                "root_offset": 192
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "test_rejects_incomplete_driver_layout": [
+    {
+      "request": {
+        "operation": "recover_driver_root",
+        "fixture_test": "test_rejects_incomplete_driver_layout",
+        "code": "159880d215e5a0f25564d8f27591e1f2800e00f9"
+      },
+      "error": "unexpected driver root stores: ['0x18']",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_firmware_shared_data_publications": [
+    {
+      "request": {
+        "operation": "recover_firmware_shared_data_layout",
+        "fixture_test": "test_recovers_firmware_shared_data_publications",
+        "allocations": [
+          {
+            "host_cpu_member": 760,
+            "host_gpu_member": 768,
+            "bytes": 10000
+          },
+          {
+            "host_cpu_member": 768,
+            "host_gpu_member": 776,
+            "bytes": 3096
+          },
+          {
+            "host_cpu_member": 776,
+            "host_gpu_member": 784,
+            "bytes": 4168
+          },
+          {
+            "host_cpu_member": 784,
+            "host_gpu_member": 792,
+            "bytes": 3600
+          },
+          {
+            "host_cpu_member": 792,
+            "host_gpu_member": 800,
+            "bytes": 73168
+          },
+          {
+            "host_cpu_member": 800,
+            "host_gpu_member": 808,
+            "bytes": 104
+          },
+          {
+            "host_cpu_member": 808,
+            "host_gpu_member": 816,
+            "bytes": 2048
+          },
+          {
+            "host_cpu_member": 816,
+            "host_gpu_member": 824,
+            "bytes": 0
+          },
+          {
+            "host_cpu_member": 824,
+            "host_gpu_member": 832,
+            "bytes": 136
+          },
+          {
+            "host_cpu_member": 2744,
+            "host_gpu_member": 2752,
+            "bytes": 497664
+          },
+          {
+            "host_cpu_member": 2760,
+            "host_gpu_member": 2768,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 3048,
+            "host_gpu_member": 3056,
+            "bytes": 497664
+          },
+          {
+            "host_cpu_member": 3064,
+            "host_gpu_member": 3072,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 2872,
+            "host_gpu_member": 2880,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2880,
+            "host_gpu_member": 2888,
+            "bytes": 432
+          },
+          {
+            "host_cpu_member": 2888,
+            "host_gpu_member": 2896,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2896,
+            "host_gpu_member": 2904,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2904,
+            "host_gpu_member": 2912,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 2912,
+            "host_gpu_member": 2920,
+            "bytes": 165888
+          },
+          {
+            "host_cpu_member": 2920,
+            "host_gpu_member": 2928,
+            "bytes": 36864
+          },
+          {
+            "host_cpu_member": 2928,
+            "host_gpu_member": 2936,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 3176,
+            "host_gpu_member": 3184,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3184,
+            "host_gpu_member": 3192,
+            "bytes": 432
+          },
+          {
+            "host_cpu_member": 3192,
+            "host_gpu_member": 3200,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3200,
+            "host_gpu_member": 3208,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3208,
+            "host_gpu_member": 3216,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 3216,
+            "host_gpu_member": 3224,
+            "bytes": 165888
+          },
+          {
+            "host_cpu_member": 3224,
+            "host_gpu_member": 3232,
+            "bytes": 36864
+          },
+          {
+            "host_cpu_member": 3232,
+            "host_gpu_member": 3240,
+            "bytes": 18432
+          }
+        ],
+        "shared_code": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9",
+        "base_code": "61a245f9685645f9000100f961b245f9685645f9000500f961a645f9685645f9000900f961b645f9685645f9000d00f961aa45f9685645f9001100f961ba45f9685645f9001500f961ae45f9685645f9001900f961be45f9685645f9001d00f9613a46f968ee45f9000100f9614a46f968ee45f9000500f9613e46f968ee45f9000900f9614e46f968ee45f9000d00f9614246f968ee45f9001100f9615246f968ee45f9001500f9614646f968ee45f9001900f9615646f968ee45f9001d00f9"
+      },
+      "result": {
+        "bytes": 1216,
+        "roles": [
+          {
+            "role": 0,
+            "shared_cpu_member": 2712,
+            "shared_gpu_member": 2744,
+            "direct_publications": [
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 768,
+                "shared_offset": 0,
+                "source_bytes": 10000
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 776,
+                "shared_offset": 596,
+                "source_bytes": 3096
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 784,
+                "shared_offset": 604,
+                "source_bytes": 4168
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 792,
+                "shared_offset": 612,
+                "source_bytes": 3600
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 808,
+                "shared_offset": 620,
+                "source_bytes": 104
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 816,
+                "shared_offset": 628,
+                "source_bytes": 2048
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 824,
+                "shared_offset": 8,
+                "source_bytes": 0
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 832,
+                "shared_offset": 16,
+                "source_bytes": 136
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2752,
+                "shared_offset": 512,
+                "source_bytes": 497664
+              }
+            ],
+            "auxiliary_publications": [
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2880,
+                "shared_offset": 448,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2888,
+                "shared_offset": 464,
+                "source_bytes": 432
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2896,
+                "shared_offset": 480,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2904,
+                "shared_offset": 496,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2912,
+                "shared_offset": 456,
+                "source_bytes": 18432
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2920,
+                "shared_offset": 472,
+                "source_bytes": 165888
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2928,
+                "shared_offset": 488,
+                "source_bytes": 36864
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2936,
+                "shared_offset": 504,
+                "source_bytes": 18432
+              }
+            ]
+          },
+          {
+            "role": 1,
+            "shared_cpu_member": 3016,
+            "shared_gpu_member": 3048,
+            "direct_publications": [
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 768,
+                "shared_offset": 0,
+                "source_bytes": 10000
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 800,
+                "shared_offset": 1137,
+                "source_bytes": 73168
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 824,
+                "shared_offset": 8,
+                "source_bytes": 0
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 832,
+                "shared_offset": 16,
+                "source_bytes": 136
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3056,
+                "shared_offset": 512,
+                "source_bytes": 497664
+              }
+            ],
+            "auxiliary_publications": [
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3184,
+                "shared_offset": 448,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3192,
+                "shared_offset": 464,
+                "source_bytes": 432
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3200,
+                "shared_offset": 480,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3208,
+                "shared_offset": 496,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3216,
+                "shared_offset": 456,
+                "source_bytes": 18432
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3224,
+                "shared_offset": 472,
+                "source_bytes": 165888
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3232,
+                "shared_offset": 488,
+                "source_bytes": 36864
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3240,
+                "shared_offset": 504,
+                "source_bytes": 18432
+              }
+            ]
+          }
+        ],
+        "conditional_platform_publication": {
+          "host_platform_member": 664,
+          "enabled_offset": 63316,
+          "pointer_offset": 79720,
+          "shared_cpu_member": 2712,
+          "shared_offset": 720
+        }
+      }
+    }
+  ],
+  "test_rejects_incomplete_firmware_shared_data_publications": [
+    {
+      "request": {
+        "operation": "recover_firmware_shared_data_layout",
+        "fixture_test": "test_rejects_incomplete_firmware_shared_data_publications",
+        "allocations": [
+          {
+            "host_cpu_member": 760,
+            "host_gpu_member": 768,
+            "bytes": 10000
+          },
+          {
+            "host_cpu_member": 768,
+            "host_gpu_member": 776,
+            "bytes": 3096
+          },
+          {
+            "host_cpu_member": 776,
+            "host_gpu_member": 784,
+            "bytes": 4168
+          },
+          {
+            "host_cpu_member": 784,
+            "host_gpu_member": 792,
+            "bytes": 3600
+          },
+          {
+            "host_cpu_member": 792,
+            "host_gpu_member": 800,
+            "bytes": 73168
+          },
+          {
+            "host_cpu_member": 800,
+            "host_gpu_member": 808,
+            "bytes": 104
+          },
+          {
+            "host_cpu_member": 808,
+            "host_gpu_member": 816,
+            "bytes": 2048
+          },
+          {
+            "host_cpu_member": 816,
+            "host_gpu_member": 824,
+            "bytes": 0
+          },
+          {
+            "host_cpu_member": 824,
+            "host_gpu_member": 832,
+            "bytes": 136
+          },
+          {
+            "host_cpu_member": 2744,
+            "host_gpu_member": 2752,
+            "bytes": 497664
+          },
+          {
+            "host_cpu_member": 2760,
+            "host_gpu_member": 2768,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 3048,
+            "host_gpu_member": 3056,
+            "bytes": 497664
+          },
+          {
+            "host_cpu_member": 3064,
+            "host_gpu_member": 3072,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 2872,
+            "host_gpu_member": 2880,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2880,
+            "host_gpu_member": 2888,
+            "bytes": 432
+          },
+          {
+            "host_cpu_member": 2888,
+            "host_gpu_member": 2896,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2896,
+            "host_gpu_member": 2904,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 2904,
+            "host_gpu_member": 2912,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 2912,
+            "host_gpu_member": 2920,
+            "bytes": 165888
+          },
+          {
+            "host_cpu_member": 2920,
+            "host_gpu_member": 2928,
+            "bytes": 36864
+          },
+          {
+            "host_cpu_member": 2928,
+            "host_gpu_member": 2936,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 3176,
+            "host_gpu_member": 3184,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3184,
+            "host_gpu_member": 3192,
+            "bytes": 432
+          },
+          {
+            "host_cpu_member": 3192,
+            "host_gpu_member": 3200,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3200,
+            "host_gpu_member": 3208,
+            "bytes": 48
+          },
+          {
+            "host_cpu_member": 3208,
+            "host_gpu_member": 3216,
+            "bytes": 18432
+          },
+          {
+            "host_cpu_member": 3216,
+            "host_gpu_member": 3224,
+            "bytes": 165888
+          },
+          {
+            "host_cpu_member": 3224,
+            "host_gpu_member": 3232,
+            "bytes": 36864
+          },
+          {
+            "host_cpu_member": 3232,
+            "host_gpu_member": 3240,
+            "bytes": 18432
+          }
+        ],
+        "shared_code": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9",
+        "base_code": ""
+      },
+      "error": "unexpected auxiliary firmware-shared publications: []",
+      "exception": "ValueError"
+    }
+  ],
+  "test_recovers_firmware_shared_platform_fields": [
+    {
+      "request": {
+        "operation": "recover_firmware_shared_platform_fields",
+        "fixture_test": "test_recovers_firmware_shared_platform_fields",
+        "code": "754e45f90844409108811591080140f9a06e01f9bf6e01f9000080d2a07201f90844409108a11591080140f9a07601f9bf7601f9000080d2a07a01f9bf7e01f969e645f9aa6e41f92a6d01f9287501f93f7d01f9093d40912ac147b96be645f96a0103b9293548b9a90603b9694e45f929e5119100e5fd3d2001803d684e41f969e645f929e5119100e5fd3d2001803de81f8052a8820f39a8860f9100e4006f000100ad000101ad000102ad000103ad0021803d"
+      },
+      "result": {
+        "platform_host_member": 664,
+        "primary_service_sources": [
+          {
+            "platform_pointer_offset": 71008,
+            "primary_shared_offsets": [
+              728,
+              736
+            ],
+            "primary_object_member": 104,
+            "secondary_object_member": 88,
+            "mapping_address_vtable_offset": 344,
+            "nullable": true
+          },
+          {
+            "platform_pointer_offset": 71016,
+            "primary_shared_offsets": [
+              744,
+              752
+            ],
+            "primary_object_member": 104,
+            "secondary_object_member": 88,
+            "mapping_address_vtable_offset": 344,
+            "nullable": true
+          }
+        ],
+        "secondary_mirrors": [
+          {
+            "primary_shared_offset": 728,
+            "secondary_shared_offset": 728
+          },
+          {
+            "primary_shared_offset": 744,
+            "secondary_shared_offset": 744
+          }
+        ],
+        "scalars": [
+          {
+            "platform_offset": 63424,
+            "role": 1,
+            "shared_offset": 768
+          },
+          {
+            "platform_offset": 63540,
+            "role": 0,
+            "shared_offset": 772
+          }
+        ],
+        "calibration": {
+          "platform_offset": 63376,
+          "shared_offset": 1145,
+          "bytes": 16,
+          "roles": [
+            0,
+            1
+          ]
+        },
+        "primary_state": {
+          "state_offset": 992,
+          "state_initial": 255,
+          "status_offset": 993,
+          "status_bytes": 144
+        }
+      }
+    }
+  ],
+  "test_rejects_incomplete_firmware_shared_platform_fields": [
+    {
+      "request": {
+        "operation": "recover_firmware_shared_platform_fields",
+        "fixture_test": "test_rejects_incomplete_firmware_shared_platform_fields",
+        "code": ""
+      },
+      "error": "missing primary shared platform service pair instruction sequence",
+      "exception": "ValueError"
+    }
+  ],
+  "test_validates_root_allocation_sizes": [
+    {
+      "request": {
+        "operation": "recover_root_allocation_sizes",
+        "fixture_test": "test_validates_root_allocation_sizes",
+        "allocations": [
+          {
+            "host_cpu_member": 2736,
+            "host_gpu_member": 2744,
+            "bytes": 1216
+          },
+          {
+            "host_cpu_member": 3040,
+            "host_gpu_member": 3048,
+            "bytes": 1216
+          },
+          {
+            "host_cpu_member": 896,
+            "host_gpu_member": 904,
+            "bytes": 7328
+          },
+          {
+            "host_cpu_member": 2760,
+            "host_gpu_member": 2768,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 3064,
+            "host_gpu_member": 3072,
+            "bytes": 32
+          },
+          {
+            "host_cpu_member": 3288,
+            "host_gpu_member": 3296,
+            "bytes": 58432
+          },
+          {
+            "host_cpu_member": 3296,
+            "host_gpu_member": 3304,
+            "bytes": 1776
+          },
+          {
+            "host_cpu_member": 912,
+            "host_gpu_member": 920,
+            "bytes": 168
+          }
+        ]
+      },
+      "result": {
+        "firmware_shared_data": 1216,
+        "secondary_firmware_shared_data": 1216,
+        "runtime_data": 7328,
+        "small_shared_data": 32,
+        "secondary_small_shared_data": 32,
+        "primary_region": 58432,
+        "secondary_region": 1776,
+        "secondary_aux": 168
+      }
+    }
+  ],
+  "test_recovers_firmware_hardware_config_reads": [
+    {
+      "request": {
+        "operation": "recover_firmware_config_reads",
+        "fixture_test": "test_recovers_firmware_hardware_config_reads",
+        "firmware": "0a9880d20ae5a0f24a64d8f26a91e1f26b0240f9687944f96b0240f960a5c33d6d0240f9ad010e8badc94fb9700240f91002118b100a50b9700240f91002118b100a54b9680240f9093983520801098b000540ad6b0240f96b0953f9680240f929df845208696938680240f909728352c04214910101098b022980520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "result": {
+        "firmware_direct_reads": [
+          {
+            "offset": 2288,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3728,
+            "bytes": 16,
+            "indexed": false
+          },
+          {
+            "offset": 4040,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4104,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5128,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6600,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 9744,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9977,
+            "bytes": 1,
+            "indexed": false
+          }
+        ],
+        "firmware_bulk_reads": [
+          {
+            "offset": 6600,
+            "bytes": 128
+          },
+          {
+            "offset": 7056,
+            "bytes": 328
+          }
+        ]
+      }
+    }
+  ],
+  "test_recovers_hardware_config_allocation_and_publication": [
+    {
+      "request": {
+        "operation": "recover_hardware_config",
+        "fixture_test": "test_recovers_hardware_config_allocation_and_publication",
+        "allocations": [
+          {
+            "host_cpu_member": 696,
+            "host_gpu_member": 768,
+            "bytes": 10000
+          }
+        ],
+        "shared_code": "618241f9684e45f9000100f9618241f968e645f9000100f9",
+        "firmware": "0a9880d20ae5a0f24a64d8f26a91e1f26b0240f9687944f96b0240f960a5c33d6d0240f9ad010e8badc94fb9700240f91002118b100a50b9700240f91002118b100a54b9680240f9093983520801098b000540ad6b0240f96b0953f9680240f929df845208696938680240f909728352c04214910101098b022980520000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "result": {
+        "bytes": 10000,
+        "host_cpu_member": 696,
+        "host_gpu_member": 768,
+        "firmware_shared_offset": 0,
+        "published_shared_cpu_members": [
+          2712,
+          3016
+        ],
+        "firmware_direct_reads": [
+          {
+            "offset": 2288,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3728,
+            "bytes": 16,
+            "indexed": false
+          },
+          {
+            "offset": 4040,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4104,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5128,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6600,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 9744,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9977,
+            "bytes": 1,
+            "indexed": false
+          }
+        ],
+        "firmware_bulk_reads": [
+          {
+            "offset": 6600,
+            "bytes": 128
+          },
+          {
+            "offset": 7056,
+            "bytes": 328
+          }
+        ]
+      }
+    }
+  ],
+  "test_recovers_driver_hardware_config_table_layout": [
+    {
+      "request": {
+        "operation": "recover_driver_hardware_config_layout",
+        "fixture_test": "test_recovers_driver_hardware_config_table_layout",
+        "base_init_code": "0a0480520b0140f92b1d00f90b8141f92b9d01f90b0540f92b2100f90b8541f92ba101f90b0940f92b2500f90b8941f92ba501f908610091296100914a0500f121feff54080080d20a0080d2695e41f9209512f9604e41f90b00088b6c8949b96d8547b9ad7d0c1b2e010a8bcd5106b96dc543f9cd2103f96dc944f9cd2d03f9cc5506b96b8147b96b011f12cb6106b9df2503f94aa1009108e110915f2121f1c1fdff54",
+        "base_power_code": "685e41f909c50fb9694e41f9296d40912b1943b96ad09b526a63a8726b7daa9b6bfd72d30bc90fb92b614bb96b7daa9b6bfd72d30b0918b909c50fb90bc90fb90bcd0fb90bd10fb90bd50fb90bd90fb90bdd0fb90be10fb90be50fb90be90fb90bed0fb90bf10fb90bf50fb90bf90fb90bfd0fb90b0110b90b0510b90b0918b90b0d18b90b1118b90b1518b90b1918b90b1d18b90b2118b90b2518b90b2918b90b2d18b90b3118b90b3518b90b3918b90b3d18b90b4118b90b4518b9",
+        "arm_power_code": "6b5e41f90a0182526a010a8b081104910c1183526b010c8b0c0280524d0100b94d0500b94d0900b94d0d00b94d1100b94d1500b94d1900b94d1d00b94d2100b94d2500b94d2900b94d2d00b94d3100b94d3500b94d3900b94d3d00b94d0104b94d0504b94d0904b94d0d04b94d1104b94d1504b94d1904b94d1d04b94d2104b94d2504b94d2904b94d2d04b94d3104b94d3504b94d3904b94d3d04b900015cbc60011cbc29010191004540bc604500bc4a0101918c0500f121f7ff54685e41f9091983520101098b020080520b21835234010b8b0b2983522b010b8b093983520a01098b"
+      },
+      "result": {
+        "color_matrices": {
+          "offset": 56,
+          "records": 64,
+          "record_bytes": 24,
+          "banks": 2
+        },
+        "io_mappings": {
+          "offset": 1600,
+          "records": 53,
+          "record_bytes": 40
+        },
+        "performance_states": {
+          "capacity": 16,
+          "max_state_offset": 4036,
+          "frequency_offset": 4040,
+          "voltage_offset": 4104,
+          "sram_voltage_offset": 5128,
+          "secondary_frequency_offset": 6152,
+          "primary_frequency_source_offset": 111384,
+          "secondary_frequency_source_offset": 113504,
+          "frequency_conversion": {
+            "input": "Hz",
+            "output": "MHz",
+            "multiplier": 1125899907,
+            "right_shift": 50
+          },
+          "derived_table_offsets": [
+            6216,
+            6280,
+            6344,
+            6408,
+            6472
+          ]
+        }
+      }
+    }
+  ],
+  "test_rejects_incomplete_driver_hardware_config_layout": [
+    {
+      "request": {
+        "operation": "recover_driver_hardware_config_layout",
+        "fixture_test": "test_rejects_incomplete_driver_hardware_config_layout",
+        "base_init_code": "",
+        "base_power_code": "",
+        "arm_power_code": ""
+      },
+      "error": "missing color-matrix copy loop instruction sequence",
+      "exception": "ValueError"
+    }
+  ]
+}

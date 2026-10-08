@@ -1,0 +1,3816 @@
+[
+  {
+    "name": "driver_root_code",
+    "request": {
+      "operation": "recover_driver_root",
+      "fixture_test": "test_recovers_driver_root_stores",
+      "code": "159880d215e5a0f25564d8f27591e1f2602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9684e41f9172995523700a0720801178b080140f90081c13c0181c23c0281c33c810a02ad800e803d0081c43c0181c53c0281c63c083d40f9884a00f9818a03ad801a803d801600fd2004000f801600fd615e45f9800e00f961c641f9801200f9616a45f9805600f961f645f9800e00f961c641f9801200f9610246f9805600f9617246f9805a00f9617646f9805e00f961ce41f9806200f9",
+      "retired_recipe_input": {
+        "bytes_hex": "159880d215e5a0f25564d8f27591e1f2602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9602e4df9f10300aa100040f931b4f9f2301ac1daf10310aaf147c1da1f0211eb40000054408e38d40862059109ae40f9f10308aa3135e6f231093fd7e10300aaf10316aa700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d408620b91096e41f9e00313aa02008052f10308aa114af2f231093fd7800600f9684e41f9172995523700a0720801178b080140f90081c13c0181c23c0281c33c810a02ad800e803d0081c43c0181c53c0281c63c083d40f9884a00f9818a03ad801a803d801600fd2004000f801600fd615e45f9800e00f961c641f9801200f9616a45f9805600f961f645f9800e00f961c641f9801200f9610246f9805600f9617246f9805a00f9617646f9805e00f961ce41f9806200f9"
+      }
+    },
+    "result": {
+      "interface_magic": 904030701134283968,
+      "magic_code_offset": 0,
+      "pointer_offsets": [
+        24,
+        32,
+        168,
+        176,
+        184,
+        192
+      ],
+      "firmware_role_offset": 40,
+      "host_mapped_allocations_offset": 44,
+      "bootstrap_provider_host_member": 6744,
+      "bootstrap_region": {
+        "root_offset": 8,
+        "host_cpu_member": 6736,
+        "host_gpu_mapping_member": 6744,
+        "mapping_address_vtable_offset": 344,
+        "firmware_address_conversion_vtable_offset": 728
+      },
+      "platform_config": {
+        "host_platform_member": 664,
+        "host_platform_pointer_offset": 108872,
+        "root_offset": 48,
+        "bytes": 104
+      },
+      "roles": [
+        {
+          "role": 0,
+          "bindings": [
+            {
+              "host_gpu_member": 2744,
+              "root_offset": 24
+            },
+            {
+              "host_gpu_member": 904,
+              "root_offset": 32
+            },
+            {
+              "host_gpu_member": 2768,
+              "root_offset": 168
+            },
+            {
+              "host_gpu_member": 3296,
+              "root_offset": 176
+            }
+          ]
+        },
+        {
+          "role": 1,
+          "bindings": [
+            {
+              "host_gpu_member": 3048,
+              "root_offset": 24
+            },
+            {
+              "host_gpu_member": 904,
+              "root_offset": 32
+            },
+            {
+              "host_gpu_member": 3072,
+              "root_offset": 168
+            },
+            {
+              "host_gpu_member": 3304,
+              "root_offset": 184
+            },
+            {
+              "host_gpu_member": 920,
+              "root_offset": 192
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "firmware_shared_allocations",
+    "request": {
+      "operation": "recover_firmware_shared_data_layout",
+      "fixture_test": "test_recovers_firmware_shared_data_publications",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        }
+      ],
+      "shared_code": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9",
+      "base_code": "61a245f9685645f9000100f961b245f9685645f9000500f961a645f9685645f9000900f961b645f9685645f9000d00f961aa45f9685645f9001100f961ba45f9685645f9001500f961ae45f9685645f9001900f961be45f9685645f9001d00f9613a46f968ee45f9000100f9614a46f968ee45f9000500f9613e46f968ee45f9000900f9614e46f968ee45f9000d00f9614246f968ee45f9001100f9615246f968ee45f9001500f9614646f968ee45f9001900f9615646f968ee45f9001d00f9",
+      "retired_recipe_input": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        }
+      ]
+    },
+    "result": {
+      "bytes": 1216,
+      "roles": [
+        {
+          "role": 0,
+          "shared_cpu_member": 2712,
+          "shared_gpu_member": 2744,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 776,
+              "shared_offset": 596,
+              "source_bytes": 3096
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 784,
+              "shared_offset": 604,
+              "source_bytes": 4168
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 792,
+              "shared_offset": 612,
+              "source_bytes": 3600
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 808,
+              "shared_offset": 620,
+              "source_bytes": 104
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 816,
+              "shared_offset": 628,
+              "source_bytes": 2048
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2752,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2880,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2888,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2896,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2904,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2912,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2920,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2928,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2936,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        },
+        {
+          "role": 1,
+          "shared_cpu_member": 3016,
+          "shared_gpu_member": 3048,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 800,
+              "shared_offset": 1137,
+              "source_bytes": 73168
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3056,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3184,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3192,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3200,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3208,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3216,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3224,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3232,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3240,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        }
+      ],
+      "conditional_platform_publication": {
+        "host_platform_member": 664,
+        "enabled_offset": 63316,
+        "pointer_offset": 79720,
+        "shared_cpu_member": 2712,
+        "shared_offset": 720
+      }
+    }
+  },
+  {
+    "name": "firmware_shared_code",
+    "request": {
+      "operation": "recover_firmware_shared_data_layout",
+      "fixture_test": "test_recovers_firmware_shared_data_publications",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        }
+      ],
+      "shared_code": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9",
+      "base_code": "61a245f9685645f9000100f961b245f9685645f9000500f961a645f9685645f9000900f961b645f9685645f9000d00f961aa45f9685645f9001100f961ba45f9685645f9001500f961ae45f9685645f9001900f961be45f9685645f9001d00f9613a46f968ee45f9000100f9614a46f968ee45f9000500f9613e46f968ee45f9000900f9614e46f968ee45f9000d00f9614246f968ee45f9001100f9615246f968ee45f9001500f9614646f968ee45f9001900f9615646f968ee45f9001d00f9",
+      "retired_recipe_input": {
+        "bytes_hex": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9"
+      }
+    },
+    "result": {
+      "bytes": 1216,
+      "roles": [
+        {
+          "role": 0,
+          "shared_cpu_member": 2712,
+          "shared_gpu_member": 2744,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 776,
+              "shared_offset": 596,
+              "source_bytes": 3096
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 784,
+              "shared_offset": 604,
+              "source_bytes": 4168
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 792,
+              "shared_offset": 612,
+              "source_bytes": 3600
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 808,
+              "shared_offset": 620,
+              "source_bytes": 104
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 816,
+              "shared_offset": 628,
+              "source_bytes": 2048
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2752,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2880,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2888,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2896,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2904,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2912,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2920,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2928,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2936,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        },
+        {
+          "role": 1,
+          "shared_cpu_member": 3016,
+          "shared_gpu_member": 3048,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 800,
+              "shared_offset": 1137,
+              "source_bytes": 73168
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3056,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3184,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3192,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3200,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3208,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3216,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3224,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3232,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3240,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        }
+      ],
+      "conditional_platform_publication": {
+        "host_platform_member": 664,
+        "enabled_offset": 63316,
+        "pointer_offset": 79720,
+        "shared_cpu_member": 2712,
+        "shared_offset": 720
+      }
+    }
+  },
+  {
+    "name": "auxiliary_shared_code",
+    "request": {
+      "operation": "recover_firmware_shared_data_layout",
+      "fixture_test": "test_recovers_firmware_shared_data_publications",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        }
+      ],
+      "shared_code": "154c45f9b6520991018441f9c00200f9618a41f9c00600f9618e41f9c00a00f9619641f9c00e00f9619a41f9c01200f961a241f9684e45f9000900f9619e41f9684e45f9000500f9618241f9684e45f9000100f9616245f9684e45f9000101f9684e41f989ea9e520901098b290140b9084d409108a11d91010140f9a06a01f975e645f9619241f9a8c61191000100f961a241f968e645f9000900f9619e41f968e645f9000500f9618241f968e645f9000100f961fa45f968e645f9000101f9",
+      "base_code": "61a245f9685645f9000100f961b245f9685645f9000500f961a645f9685645f9000900f961b645f9685645f9000d00f961aa45f9685645f9001100f961ba45f9685645f9001500f961ae45f9685645f9001900f961be45f9685645f9001d00f9613a46f968ee45f9000100f9614a46f968ee45f9000500f9613e46f968ee45f9000900f9614e46f968ee45f9000d00f9614246f968ee45f9001100f9615246f968ee45f9001500f9614646f968ee45f9001900f9615646f968ee45f9001d00f9",
+      "retired_recipe_input": {
+        "bytes_hex": "61a245f9685645f9000100f961b245f9685645f9000500f961a645f9685645f9000900f961b645f9685645f9000d00f961aa45f9685645f9001100f961ba45f9685645f9001500f961ae45f9685645f9001900f961be45f9685645f9001d00f9613a46f968ee45f9000100f9614a46f968ee45f9000500f9613e46f968ee45f9000900f9614e46f968ee45f9000d00f9614246f968ee45f9001100f9615246f968ee45f9001500f9614646f968ee45f9001900f9615646f968ee45f9001d00f9"
+      }
+    },
+    "result": {
+      "bytes": 1216,
+      "roles": [
+        {
+          "role": 0,
+          "shared_cpu_member": 2712,
+          "shared_gpu_member": 2744,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 776,
+              "shared_offset": 596,
+              "source_bytes": 3096
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 784,
+              "shared_offset": 604,
+              "source_bytes": 4168
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 792,
+              "shared_offset": 612,
+              "source_bytes": 3600
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 808,
+              "shared_offset": 620,
+              "source_bytes": 104
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 816,
+              "shared_offset": 628,
+              "source_bytes": 2048
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2752,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2880,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2888,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2896,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2904,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2912,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2920,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2928,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 2712,
+              "source_gpu_member": 2936,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        },
+        {
+          "role": 1,
+          "shared_cpu_member": 3016,
+          "shared_gpu_member": 3048,
+          "direct_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 768,
+              "shared_offset": 0,
+              "source_bytes": 10000
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 800,
+              "shared_offset": 1137,
+              "source_bytes": 73168
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 824,
+              "shared_offset": 8,
+              "source_bytes": 0
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 832,
+              "shared_offset": 16,
+              "source_bytes": 136
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3056,
+              "shared_offset": 512,
+              "source_bytes": 497664
+            }
+          ],
+          "auxiliary_publications": [
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3184,
+              "shared_offset": 448,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3192,
+              "shared_offset": 464,
+              "source_bytes": 432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3200,
+              "shared_offset": 480,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3208,
+              "shared_offset": 496,
+              "source_bytes": 48
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3216,
+              "shared_offset": 456,
+              "source_bytes": 18432
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3224,
+              "shared_offset": 472,
+              "source_bytes": 165888
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3232,
+              "shared_offset": 488,
+              "source_bytes": 36864
+            },
+            {
+              "shared_cpu_member": 3016,
+              "source_gpu_member": 3240,
+              "shared_offset": 504,
+              "source_bytes": 18432
+            }
+          ]
+        }
+      ],
+      "conditional_platform_publication": {
+        "host_platform_member": 664,
+        "enabled_offset": 63316,
+        "pointer_offset": 79720,
+        "shared_cpu_member": 2712,
+        "shared_offset": 720
+      }
+    }
+  },
+  {
+    "name": "firmware_shared_platform_code",
+    "request": {
+      "operation": "recover_firmware_shared_platform_fields",
+      "fixture_test": "test_recovers_firmware_shared_platform_fields",
+      "code": "754e45f90844409108811591080140f9a06e01f9bf6e01f9000080d2a07201f90844409108a11591080140f9a07601f9bf7601f9000080d2a07a01f9bf7e01f969e645f9aa6e41f92a6d01f9287501f93f7d01f9093d40912ac147b96be645f96a0103b9293548b9a90603b9694e45f929e5119100e5fd3d2001803d684e41f969e645f929e5119100e5fd3d2001803de81f8052a8820f39a8860f9100e4006f000100ad000101ad000102ad000103ad0021803d",
+      "retired_recipe_input": {
+        "bytes_hex": "754e45f90844409108811591080140f9a06e01f9bf6e01f9000080d2a07201f90844409108a11591080140f9a07601f9bf7601f9000080d2a07a01f9bf7e01f969e645f9aa6e41f92a6d01f9287501f93f7d01f9093d40912ac147b96be645f96a0103b9293548b9a90603b9694e45f929e5119100e5fd3d2001803d684e41f969e645f929e5119100e5fd3d2001803de81f8052a8820f39a8860f9100e4006f000100ad000101ad000102ad000103ad0021803d"
+      }
+    },
+    "result": {
+      "platform_host_member": 664,
+      "primary_service_sources": [
+        {
+          "platform_pointer_offset": 71008,
+          "primary_shared_offsets": [
+            728,
+            736
+          ],
+          "primary_object_member": 104,
+          "secondary_object_member": 88,
+          "mapping_address_vtable_offset": 344,
+          "nullable": true
+        },
+        {
+          "platform_pointer_offset": 71016,
+          "primary_shared_offsets": [
+            744,
+            752
+          ],
+          "primary_object_member": 104,
+          "secondary_object_member": 88,
+          "mapping_address_vtable_offset": 344,
+          "nullable": true
+        }
+      ],
+      "secondary_mirrors": [
+        {
+          "primary_shared_offset": 728,
+          "secondary_shared_offset": 728
+        },
+        {
+          "primary_shared_offset": 744,
+          "secondary_shared_offset": 744
+        }
+      ],
+      "scalars": [
+        {
+          "platform_offset": 63424,
+          "role": 1,
+          "shared_offset": 768
+        },
+        {
+          "platform_offset": 63540,
+          "role": 0,
+          "shared_offset": 772
+        }
+      ],
+      "calibration": {
+        "platform_offset": 63376,
+        "shared_offset": 1145,
+        "bytes": 16,
+        "roles": [
+          0,
+          1
+        ]
+      },
+      "primary_state": {
+        "state_offset": 992,
+        "state_initial": 255,
+        "status_offset": 993,
+        "status_bytes": 144
+      }
+    }
+  },
+  {
+    "name": "bootstrap_region_code",
+    "request": {
+      "operation": "recover_g17_bootstrap_region",
+      "fixture_test": "test_recovers_bootstrap_region",
+      "allocation_code": "290080522a21c01a4bfd3f11ea030a4b61010a0a2821c81a027d409360028052602a0df9a05b00b4e00313aae10314aa02008052030180526b8fff97602e0df9",
+      "prepare_code": "f30300aa1fc01ab9115181d21002118b080240f92100805268c25ab90900088b3f1100b93f7d00a90861001168c21ab9",
+      "page_shift_code": "5f2403d5c0018052c0035fd6",
+      "set_64_pa_code": "6a00805233a90129350100f9360900b90861001188c21ab9",
+      "set_64_code": "350900b9340100f92a3efff040c543fd20c100fc0861001168c21ab9",
+      "set_32_code": "340900b9350100f92a3efff040f143fd20c100fc0861001168c21ab9",
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "290080522a21c01a4bfd3f11ea030a4b61010a0a2821c81a027d409360028052602a0df9a05b00b4e00313aae10314aa02008052030180526b8fff97602e0df9"
+          },
+          {
+            "bytes_hex": "f30300aa1fc01ab9115181d21002118b080240f92100805268c25ab90900088b3f1100b93f7d00a90861001168c21ab9"
+          },
+          {
+            "bytes_hex": "5f2403d5c0018052c0035fd6"
+          },
+          {
+            "bytes_hex": "6a00805233a90129350100f9360900b90861001188c21ab9"
+          },
+          {
+            "bytes_hex": "350900b9340100f92a3efff040c543fd20c100fc0861001168c21ab9"
+          },
+          {
+            "bytes_hex": "340900b9350100f92a3efff040f143fd20c100fc0861001168c21ab9"
+          }
+        ]
+      }
+    },
+    "result": {
+      "bytes": 16384,
+      "requested_bytes": 4096,
+      "page_shift": 14,
+      "host_cpu_member": 6736,
+      "host_gpu_mapping_member": 6744,
+      "cursor_host_member": 6848,
+      "entry": {
+        "bytes": 24,
+        "value_offset": 0,
+        "register_offset": 8,
+        "auxiliary_offset": 12,
+        "kind_offset": 16,
+        "padding_offset": 20,
+        "kinds": {
+          "terminator": 0,
+          "write_32": 1,
+          "write_64": 2,
+          "write_64_physical_address": 3
+        }
+      },
+      "terminator": {
+        "offset": 0,
+        "zeroed_bytes": 20,
+        "padding_bytes": 4
+      }
+    }
+  },
+  {
+    "name": "bootstrap_roots_code",
+    "request": {
+      "operation": "recover_g17_bootstrap_roots",
+      "fixture_test": "test_recovers_bootstrap_root_mappings",
+      "allocation_code": "e80240b9380080520823c81a190080122923c01aea03084b2901084b4101290a027d409360028052114580d21002118b080240f901008052d0dae7f210093fd760f20cf9000000b4e00313aae10314aa02008052030180520000009460f60cf9e80240b90823c81a2923c01aea03084b2901084b4101290a027d409360028052114580d21002118b080240f901008052d0dae7f210093fd7600e0df9000000b4e00313aae10314aa02008052030180520000009460120df9",
+      "init_code": "60f24cf908e20491099e40f9600e4df908e20491099e40f9",
+      "prepare_code": "60f64cf90000009460124df900000094",
+      "complete_code": "60f64cf90000009460124df900000094",
+      "page_shift_code": "5f2403d5c0018052c0035fd6",
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "e80240b9380080520823c81a190080122923c01aea03084b2901084b4101290a027d409360028052114580d21002118b080240f901008052d0dae7f210093fd760f20cf9000000b4e00313aae10314aa02008052030180520000009460f60cf9e80240b90823c81a2923c01aea03084b2901084b4101290a027d409360028052114580d21002118b080240f901008052d0dae7f210093fd7600e0df9000000b4e00313aae10314aa02008052030180520000009460120df9"
+          },
+          {
+            "bytes_hex": "60f24cf908e20491099e40f9600e4df908e20491099e40f9"
+          },
+          {
+            "bytes_hex": "60f64cf90000009460124df900000094"
+          },
+          {
+            "bytes_hex": "60f64cf90000009460124df900000094"
+          },
+          {
+            "bytes_hex": "5f2403d5c0018052c0035fd6"
+          }
+        ]
+      }
+    },
+    "result": {
+      "bytes": 16384,
+      "firmware_page_shift": 14,
+      "host_page_aligned": true,
+      "memory_options": 19,
+      "cpu_mapping_vtable_offset": 552,
+      "cpu_address_vtable_offset": 312,
+      "firmware_gart_range": 8,
+      "prepared_by": "__ZN14AGXArmFirmware19prepareFirmwareDataEv",
+      "completed_by": "__ZN14AGXArmFirmware20completeFirmwareDataEv",
+      "roles": [
+        {
+          "role": 0,
+          "host_cpu_mapping_member": 6624,
+          "host_gpu_mapping_member": 6632
+        },
+        {
+          "role": 1,
+          "host_cpu_mapping_member": 6680,
+          "host_gpu_mapping_member": 6688
+        }
+      ]
+    }
+  },
+  {
+    "name": "small_shared_data_code",
+    "request": {
+      "operation": "recover_g17_small_shared_data",
+      "fixture_test": "test_recovers_small_shared_data",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        }
+      ],
+      "shared_init_code": "688e4bb9696645f9280100b968be4cb969fe45f9280100b9",
+      "base_init_code": "360080526b6645f9760500b96bfe45f9760500b9",
+      "ktrace_code": "082680526800a89b2900805209112e3909894bb9098d0bb9086545f9090100b9",
+      "wait_power_off_code": "086445f9081140b968fe45f9081140b9",
+      "wait_generation_code": "086445f9081d40b968fe45f9081d40b9",
+      "snapshot_generation_code": "086445f9081d40b908fc45f9081d40b9",
+      "get_sleep_code": "086445f9080940b909fc45f9290940b9",
+      "set_sleep_code": "086445f929008052090900b908fc45f9090900b9",
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "688e4bb9696645f9280100b968be4cb969fe45f9280100b9"
+          },
+          {
+            "bytes_hex": "360080526b6645f9760500b96bfe45f9760500b9"
+          },
+          {
+            "bytes_hex": "082680526800a89b2900805209112e3909894bb9098d0bb9086545f9090100b9"
+          },
+          {
+            "bytes_hex": "086445f9081140b968fe45f9081140b9"
+          },
+          {
+            "bytes_hex": "086445f9081d40b968fe45f9081d40b9"
+          },
+          {
+            "bytes_hex": "086445f9081d40b908fc45f9081d40b9"
+          },
+          {
+            "bytes_hex": "086445f9080940b909fc45f9290940b9"
+          },
+          {
+            "bytes_hex": "086445f929008052090900b908fc45f9090900b9"
+          }
+        ]
+      }
+    },
+    "result": {
+      "bytes": 32,
+      "roles": [
+        {
+          "role": 0,
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "trace_state_host_member": 2956
+        },
+        {
+          "role": 1,
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "trace_state_host_member": 3260
+        }
+      ],
+      "fields": [
+        {
+          "offset": 0,
+          "bytes": 4,
+          "name": "ktrace_state",
+          "owner": "host"
+        },
+        {
+          "offset": 4,
+          "bytes": 4,
+          "name": "host_ready",
+          "initial": 1
+        },
+        {
+          "offset": 8,
+          "bytes": 4,
+          "name": "system_sleep_notification"
+        },
+        {
+          "offset": 12,
+          "bytes": 4,
+          "name": "reserved_00c"
+        },
+        {
+          "offset": 16,
+          "bytes": 4,
+          "name": "firmware_power_state",
+          "owner": "firmware"
+        },
+        {
+          "offset": 20,
+          "bytes": 4,
+          "name": "reserved_014"
+        },
+        {
+          "offset": 24,
+          "bytes": 4,
+          "name": "reserved_018"
+        },
+        {
+          "offset": 28,
+          "bytes": 4,
+          "name": "asc_power_generation",
+          "owner": "firmware"
+        }
+      ]
+    }
+  },
+  {
+    "name": "runtime_control_code",
+    "request": {
+      "operation": "recover_g17_runtime_controls",
+      "fixture_test": "test_recovers_runtime_controls",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 896,
+          "host_gpu_member": 904,
+          "bytes": 7328
+        }
+      ],
+      "accessor_code": {
+        "__ZN14AGXArmFirmware14setDMPauseModeEj": {
+          "bytes_hex": "08c041f9010d00b9"
+        },
+        "__ZN14AGXArmFirmware15setDMPauseTimerEj": {
+          "bytes_hex": "08c041f9011500b9"
+        },
+        "__ZN14AGXArmFirmware17setFRGTaskTimeoutEj": {
+          "bytes_hex": "08c041f9012900b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffEnableEb": {
+          "bytes_hex": "08c041f9013500b9"
+        },
+        "__ZN14AGXArmFirmware17setCPMSWindowSizeEj": {
+          "bytes_hex": "08c041f9014100b9"
+        },
+        "__ZN14AGXArmFirmware15setCPMSTFCASizeEj": {
+          "bytes_hex": "08c041f9014500b9"
+        },
+        "__ZN14AGXArmFirmware27setCommandSubmissionEnabledEb.4234": {
+          "bytes_hex": "08c041f9017900b9"
+        },
+        "__ZN14AGXArmFirmware30setPerformanceControllerTargetEj": {
+          "bytes_hex": "08c041f901a500b9"
+        },
+        "__ZN14AGXArmFirmware32setPerformanceControllerDeadZoneEj": {
+          "bytes_hex": "08c041f901a900b9"
+        },
+        "__ZN14AGXArmFirmware38setPerformanceControllerTransferOutputEj": {
+          "bytes_hex": "08c041f901ad00b9"
+        },
+        "__ZN14AGXArmFirmware34setPerformanceControllerDualFilterEb": {
+          "bytes_hex": "08c041f90155033901710339"
+        },
+        "__ZN14AGXArmFirmware28setCLPCDeadlineControlEffortEj": {
+          "bytes_hex": "08c041f901e500b9"
+        },
+        "__ZN14AGXArmFirmware29setSmartIdleOffStandbyTimerUSEj": {
+          "bytes_hex": "08c041f901c507b9"
+        },
+        "__ZN14AGXArmFirmware26setSmartIdleOffProbInitValEf": {
+          "bytes_hex": "08c041f901c907b9"
+        },
+        "__ZN14AGXArmFirmware20setSmartIdleOffFnHitEf": {
+          "bytes_hex": "08c041f901cd07b9"
+        },
+        "__ZN14AGXArmFirmware20setSmartIdleOffFiHitEf": {
+          "bytes_hex": "08c041f901d107b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffFnMissEf": {
+          "bytes_hex": "08c041f901d507b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffFiMissEf": {
+          "bytes_hex": "08c041f901d907b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffNeiHitEf": {
+          "bytes_hex": "08c041f901dd07b9"
+        },
+        "__ZN14AGXArmFirmware31setSmartIdleOffGPUMinConfidenceEf": {
+          "bytes_hex": "08c041f901e107b9"
+        },
+        "__ZN14AGXArmFirmware32setSmartIdleOffGPUHighConfidenceEf": {
+          "bytes_hex": "08c041f901e507b9"
+        },
+        "__ZN14AGXArmFirmware30setSmartIdleOffResetIterationsEj": {
+          "bytes_hex": "08c041f901e907b9"
+        },
+        "__ZN14AGXArmFirmware18enableUTEngagementEb": {
+          "bytes_hex": "08c041f901ed07b901f107b9"
+        },
+        "__ZN14AGXArmFirmware19enablePMUEngagementEb": {
+          "bytes_hex": "08c041f901f507b9"
+        },
+        "__ZN14AGXArmFirmware22resetRegisterOverridesEv": {
+          "bytes_hex": "08c041f9018509b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckInterval3DEj": {
+          "bytes_hex": "08c041f9019d09b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalTAEj": {
+          "bytes_hex": "08c041f901a109b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalCLEj": {
+          "bytes_hex": "08c041f901a509b9"
+        },
+        "__ZN14AGXArmFirmware25setProgressCheckThresholdEj": {
+          "bytes_hex": "08c041f901a909b9"
+        },
+        "__ZN14AGXArmFirmware24setProgressCheckDmConfigE16AGXSLockupConfig19_AGFIDataMasterType": {
+          "bytes_hex": "08c041f901ad09b9"
+        },
+        "__ZN14AGXArmFirmware18setGPUIdleOffDelayEjj": {
+          "bytes_hex": "08c041f901bd09b9"
+        },
+        "__ZN14AGXArmFirmware21setFenderIdleOffDelayEjj": {
+          "bytes_hex": "08c041f901c109b9"
+        },
+        "__ZN14AGXArmFirmware21setFWEarlyWakeTimeoutEjj": {
+          "bytes_hex": "08c041f901c509b9"
+        },
+        "__ZN14AGXArmFirmware20setGVDMTimerIntervalEj": {
+          "bytes_hex": "08c041f901c909b9"
+        },
+        "__ZN14AGXArmFirmware25setCLContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901cd09b9"
+        },
+        "__ZN14AGXArmFirmware16setCLKillTimeoutEj": {
+          "bytes_hex": "08c041f901d109b9"
+        },
+        "__ZN14AGXArmFirmware34setPhaseOneCDMContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901d509b9"
+        },
+        "__ZN14AGXArmFirmware26setFRGContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901d909b9"
+        },
+        "__ZN14AGXArmFirmware17setFRGKillTimeoutEj": {
+          "bytes_hex": "08c041f901dd09b9"
+        },
+        "__ZN14AGXArmFirmware25setFwUtilDefaultFabPStateEy": {
+          "bytes_hex": "08c041f901a1273901a52739"
+        },
+        "__ZN14AGXArmFirmware20setFwUtilTimerPeriodEy": {
+          "bytes_hex": "08c041f901a92739"
+        },
+        "__ZN14AGXArmFirmware24setFwUtilDebouncePeriodsEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21ad273921b12739"
+        },
+        "__ZN14AGXArmFirmware24setFwUtilPStateThresholdEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21b5273921b92739"
+        },
+        "__ZN14AGXArmFirmware23setFwUtilPStateStepSizeEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21bd273921c12739"
+        },
+        "__ZN14AGXArmFirmware23setGPUKeepAliveOverrideE13AGXSKeepAlive": {
+          "bytes_hex": "08c041f901311cb9"
+        },
+        "__ZN14AGXArmFirmware24setGFXCKeepAliveOverrideE13AGXSKeepAlive": {
+          "bytes_hex": "08c041f901351cb9"
+        },
+        "__ZN14AGXArmFirmware32setGPUKeepAlivePerfModeThresholdEj": {
+          "bytes_hex": "08c041f901391cb9"
+        },
+        "__ZN14AGXArmFirmware31setGPUKeepAliveOffModeThresholdEj": {
+          "bytes_hex": "08c041f9013d1cb9"
+        },
+        "__ZN14AGXArmFirmware19addRegisterOverrideEjyy": {
+          "bytes_hex": "4a050a8b4af17dd32b010a8b611508b929112091820100f969312091230100f908c141f9098549b929050011098509b9"
+        }
+      },
+      "retired_recipe_input": {
+        "__ZN14AGXArmFirmware14setDMPauseModeEj": {
+          "bytes_hex": "08c041f9010d00b9"
+        },
+        "__ZN14AGXArmFirmware15setDMPauseTimerEj": {
+          "bytes_hex": "08c041f9011500b9"
+        },
+        "__ZN14AGXArmFirmware17setFRGTaskTimeoutEj": {
+          "bytes_hex": "08c041f9012900b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffEnableEb": {
+          "bytes_hex": "08c041f9013500b9"
+        },
+        "__ZN14AGXArmFirmware17setCPMSWindowSizeEj": {
+          "bytes_hex": "08c041f9014100b9"
+        },
+        "__ZN14AGXArmFirmware15setCPMSTFCASizeEj": {
+          "bytes_hex": "08c041f9014500b9"
+        },
+        "__ZN14AGXArmFirmware27setCommandSubmissionEnabledEb.4234": {
+          "bytes_hex": "08c041f9017900b9"
+        },
+        "__ZN14AGXArmFirmware30setPerformanceControllerTargetEj": {
+          "bytes_hex": "08c041f901a500b9"
+        },
+        "__ZN14AGXArmFirmware32setPerformanceControllerDeadZoneEj": {
+          "bytes_hex": "08c041f901a900b9"
+        },
+        "__ZN14AGXArmFirmware38setPerformanceControllerTransferOutputEj": {
+          "bytes_hex": "08c041f901ad00b9"
+        },
+        "__ZN14AGXArmFirmware34setPerformanceControllerDualFilterEb": {
+          "bytes_hex": "08c041f90155033901710339"
+        },
+        "__ZN14AGXArmFirmware28setCLPCDeadlineControlEffortEj": {
+          "bytes_hex": "08c041f901e500b9"
+        },
+        "__ZN14AGXArmFirmware29setSmartIdleOffStandbyTimerUSEj": {
+          "bytes_hex": "08c041f901c507b9"
+        },
+        "__ZN14AGXArmFirmware26setSmartIdleOffProbInitValEf": {
+          "bytes_hex": "08c041f901c907b9"
+        },
+        "__ZN14AGXArmFirmware20setSmartIdleOffFnHitEf": {
+          "bytes_hex": "08c041f901cd07b9"
+        },
+        "__ZN14AGXArmFirmware20setSmartIdleOffFiHitEf": {
+          "bytes_hex": "08c041f901d107b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffFnMissEf": {
+          "bytes_hex": "08c041f901d507b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffFiMissEf": {
+          "bytes_hex": "08c041f901d907b9"
+        },
+        "__ZN14AGXArmFirmware21setSmartIdleOffNeiHitEf": {
+          "bytes_hex": "08c041f901dd07b9"
+        },
+        "__ZN14AGXArmFirmware31setSmartIdleOffGPUMinConfidenceEf": {
+          "bytes_hex": "08c041f901e107b9"
+        },
+        "__ZN14AGXArmFirmware32setSmartIdleOffGPUHighConfidenceEf": {
+          "bytes_hex": "08c041f901e507b9"
+        },
+        "__ZN14AGXArmFirmware30setSmartIdleOffResetIterationsEj": {
+          "bytes_hex": "08c041f901e907b9"
+        },
+        "__ZN14AGXArmFirmware18enableUTEngagementEb": {
+          "bytes_hex": "08c041f901ed07b901f107b9"
+        },
+        "__ZN14AGXArmFirmware19enablePMUEngagementEb": {
+          "bytes_hex": "08c041f901f507b9"
+        },
+        "__ZN14AGXArmFirmware22resetRegisterOverridesEv": {
+          "bytes_hex": "08c041f9018509b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckInterval3DEj": {
+          "bytes_hex": "08c041f9019d09b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalTAEj": {
+          "bytes_hex": "08c041f901a109b9"
+        },
+        "__ZN14AGXArmFirmware26setProgressCheckIntervalCLEj": {
+          "bytes_hex": "08c041f901a509b9"
+        },
+        "__ZN14AGXArmFirmware25setProgressCheckThresholdEj": {
+          "bytes_hex": "08c041f901a909b9"
+        },
+        "__ZN14AGXArmFirmware24setProgressCheckDmConfigE16AGXSLockupConfig19_AGFIDataMasterType": {
+          "bytes_hex": "08c041f901ad09b9"
+        },
+        "__ZN14AGXArmFirmware18setGPUIdleOffDelayEjj": {
+          "bytes_hex": "08c041f901bd09b9"
+        },
+        "__ZN14AGXArmFirmware21setFenderIdleOffDelayEjj": {
+          "bytes_hex": "08c041f901c109b9"
+        },
+        "__ZN14AGXArmFirmware21setFWEarlyWakeTimeoutEjj": {
+          "bytes_hex": "08c041f901c509b9"
+        },
+        "__ZN14AGXArmFirmware20setGVDMTimerIntervalEj": {
+          "bytes_hex": "08c041f901c909b9"
+        },
+        "__ZN14AGXArmFirmware25setCLContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901cd09b9"
+        },
+        "__ZN14AGXArmFirmware16setCLKillTimeoutEj": {
+          "bytes_hex": "08c041f901d109b9"
+        },
+        "__ZN14AGXArmFirmware34setPhaseOneCDMContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901d509b9"
+        },
+        "__ZN14AGXArmFirmware26setFRGContextSwitchTimeoutEj": {
+          "bytes_hex": "08c041f901d909b9"
+        },
+        "__ZN14AGXArmFirmware17setFRGKillTimeoutEj": {
+          "bytes_hex": "08c041f901dd09b9"
+        },
+        "__ZN14AGXArmFirmware25setFwUtilDefaultFabPStateEy": {
+          "bytes_hex": "08c041f901a1273901a52739"
+        },
+        "__ZN14AGXArmFirmware20setFwUtilTimerPeriodEy": {
+          "bytes_hex": "08c041f901a92739"
+        },
+        "__ZN14AGXArmFirmware24setFwUtilDebouncePeriodsEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21ad273921b12739"
+        },
+        "__ZN14AGXArmFirmware24setFwUtilPStateThresholdEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21b5273921b92739"
+        },
+        "__ZN14AGXArmFirmware23setFwUtilPStateStepSizeEy": {
+          "bytes_hex": "09c041f9cc0080522d044092a925ac9b21bd273921c12739"
+        },
+        "__ZN14AGXArmFirmware23setGPUKeepAliveOverrideE13AGXSKeepAlive": {
+          "bytes_hex": "08c041f901311cb9"
+        },
+        "__ZN14AGXArmFirmware24setGFXCKeepAliveOverrideE13AGXSKeepAlive": {
+          "bytes_hex": "08c041f901351cb9"
+        },
+        "__ZN14AGXArmFirmware32setGPUKeepAlivePerfModeThresholdEj": {
+          "bytes_hex": "08c041f901391cb9"
+        },
+        "__ZN14AGXArmFirmware31setGPUKeepAliveOffModeThresholdEj": {
+          "bytes_hex": "08c041f9013d1cb9"
+        },
+        "__ZN14AGXArmFirmware19addRegisterOverrideEjyy": {
+          "bytes_hex": "4a050a8b4af17dd32b010a8b611508b929112091820100f969312091230100f908c141f9098549b929050011098509b9"
+        }
+      }
+    },
+    "result": {
+      "bytes": 7328,
+      "host_cpu_member": 896,
+      "host_gpu_member": 904,
+      "fields": [
+        {
+          "name": "dm_pause_mode",
+          "accessor": "__ZN14AGXArmFirmware14setDMPauseModeEj",
+          "stores": [
+            {
+              "offset": 12,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "dm_pause_timer",
+          "accessor": "__ZN14AGXArmFirmware15setDMPauseTimerEj",
+          "stores": [
+            {
+              "offset": 20,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "frg_task_timeout",
+          "accessor": "__ZN14AGXArmFirmware17setFRGTaskTimeoutEj",
+          "stores": [
+            {
+              "offset": 40,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_enabled",
+          "accessor": "__ZN14AGXArmFirmware21setSmartIdleOffEnableEb",
+          "stores": [
+            {
+              "offset": 52,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "cpms_window_size",
+          "accessor": "__ZN14AGXArmFirmware17setCPMSWindowSizeEj",
+          "stores": [
+            {
+              "offset": 64,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "cpms_tfca_size",
+          "accessor": "__ZN14AGXArmFirmware15setCPMSTFCASizeEj",
+          "stores": [
+            {
+              "offset": 68,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "command_submission_enabled",
+          "accessor": "__ZN14AGXArmFirmware27setCommandSubmissionEnabledEb.4234",
+          "stores": [
+            {
+              "offset": 120,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "performance_controller_target",
+          "accessor": "__ZN14AGXArmFirmware30setPerformanceControllerTargetEj",
+          "stores": [
+            {
+              "offset": 164,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "performance_controller_dead_zone",
+          "accessor": "__ZN14AGXArmFirmware32setPerformanceControllerDeadZoneEj",
+          "stores": [
+            {
+              "offset": 168,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "performance_controller_transfer_output",
+          "accessor": "__ZN14AGXArmFirmware38setPerformanceControllerTransferOutputEj",
+          "stores": [
+            {
+              "offset": 172,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "performance_controller_dual_filter",
+          "accessor": "__ZN14AGXArmFirmware34setPerformanceControllerDualFilterEb",
+          "stores": [
+            {
+              "offset": 213,
+              "bytes": 1
+            },
+            {
+              "offset": 220,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "clpc_deadline_control_effort",
+          "accessor": "__ZN14AGXArmFirmware28setCLPCDeadlineControlEffortEj",
+          "stores": [
+            {
+              "offset": 228,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_standby_timer_us",
+          "accessor": "__ZN14AGXArmFirmware29setSmartIdleOffStandbyTimerUSEj",
+          "stores": [
+            {
+              "offset": 1988,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_probability_initial",
+          "accessor": "__ZN14AGXArmFirmware26setSmartIdleOffProbInitValEf",
+          "stores": [
+            {
+              "offset": 1992,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_fn_hit",
+          "accessor": "__ZN14AGXArmFirmware20setSmartIdleOffFnHitEf",
+          "stores": [
+            {
+              "offset": 1996,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_fi_hit",
+          "accessor": "__ZN14AGXArmFirmware20setSmartIdleOffFiHitEf",
+          "stores": [
+            {
+              "offset": 2000,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_fn_miss",
+          "accessor": "__ZN14AGXArmFirmware21setSmartIdleOffFnMissEf",
+          "stores": [
+            {
+              "offset": 2004,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_fi_miss",
+          "accessor": "__ZN14AGXArmFirmware21setSmartIdleOffFiMissEf",
+          "stores": [
+            {
+              "offset": 2008,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_neighbor_hit",
+          "accessor": "__ZN14AGXArmFirmware21setSmartIdleOffNeiHitEf",
+          "stores": [
+            {
+              "offset": 2012,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_gpu_min_confidence",
+          "accessor": "__ZN14AGXArmFirmware31setSmartIdleOffGPUMinConfidenceEf",
+          "stores": [
+            {
+              "offset": 2016,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_gpu_high_confidence",
+          "accessor": "__ZN14AGXArmFirmware32setSmartIdleOffGPUHighConfidenceEf",
+          "stores": [
+            {
+              "offset": 2020,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "smart_idle_reset_iterations",
+          "accessor": "__ZN14AGXArmFirmware30setSmartIdleOffResetIterationsEj",
+          "stores": [
+            {
+              "offset": 2024,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "ut_engagement",
+          "accessor": "__ZN14AGXArmFirmware18enableUTEngagementEb",
+          "stores": [
+            {
+              "offset": 2028,
+              "bytes": 4
+            },
+            {
+              "offset": 2032,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "pmu_engagement",
+          "accessor": "__ZN14AGXArmFirmware19enablePMUEngagementEb",
+          "stores": [
+            {
+              "offset": 2036,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "register_override_count",
+          "accessor": "__ZN14AGXArmFirmware22resetRegisterOverridesEv",
+          "stores": [
+            {
+              "offset": 2436,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "progress_check_interval_3d",
+          "accessor": "__ZN14AGXArmFirmware26setProgressCheckInterval3DEj",
+          "stores": [
+            {
+              "offset": 2460,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "progress_check_interval_ta",
+          "accessor": "__ZN14AGXArmFirmware26setProgressCheckIntervalTAEj",
+          "stores": [
+            {
+              "offset": 2464,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "progress_check_interval_cl",
+          "accessor": "__ZN14AGXArmFirmware26setProgressCheckIntervalCLEj",
+          "stores": [
+            {
+              "offset": 2468,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "progress_check_threshold",
+          "accessor": "__ZN14AGXArmFirmware25setProgressCheckThresholdEj",
+          "stores": [
+            {
+              "offset": 2472,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "progress_check_dm_config",
+          "accessor": "__ZN14AGXArmFirmware24setProgressCheckDmConfigE16AGXSLockupConfig19_AGFIDataMasterType",
+          "stores": [
+            {
+              "offset": 2476,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "gpu_idle_off_delay",
+          "accessor": "__ZN14AGXArmFirmware18setGPUIdleOffDelayEjj",
+          "stores": [
+            {
+              "offset": 2492,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "fender_idle_off_delay",
+          "accessor": "__ZN14AGXArmFirmware21setFenderIdleOffDelayEjj",
+          "stores": [
+            {
+              "offset": 2496,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "firmware_early_wake_timeout",
+          "accessor": "__ZN14AGXArmFirmware21setFWEarlyWakeTimeoutEjj",
+          "stores": [
+            {
+              "offset": 2500,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "gvdm_timer_interval",
+          "accessor": "__ZN14AGXArmFirmware20setGVDMTimerIntervalEj",
+          "stores": [
+            {
+              "offset": 2504,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "cl_context_switch_timeout",
+          "accessor": "__ZN14AGXArmFirmware25setCLContextSwitchTimeoutEj",
+          "stores": [
+            {
+              "offset": 2508,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "cl_kill_timeout",
+          "accessor": "__ZN14AGXArmFirmware16setCLKillTimeoutEj",
+          "stores": [
+            {
+              "offset": 2512,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "phase_one_cdm_context_switch_timeout",
+          "accessor": "__ZN14AGXArmFirmware34setPhaseOneCDMContextSwitchTimeoutEj",
+          "stores": [
+            {
+              "offset": 2516,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "frg_context_switch_timeout",
+          "accessor": "__ZN14AGXArmFirmware26setFRGContextSwitchTimeoutEj",
+          "stores": [
+            {
+              "offset": 2520,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "frg_kill_timeout",
+          "accessor": "__ZN14AGXArmFirmware17setFRGKillTimeoutEj",
+          "stores": [
+            {
+              "offset": 2524,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "fw_util_default_fab_pstate",
+          "accessor": "__ZN14AGXArmFirmware25setFwUtilDefaultFabPStateEy",
+          "stores": [
+            {
+              "offset": 2536,
+              "bytes": 1
+            },
+            {
+              "offset": 2537,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "fw_util_timer_period",
+          "accessor": "__ZN14AGXArmFirmware20setFwUtilTimerPeriodEy",
+          "stores": [
+            {
+              "offset": 2538,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "fw_util_debounce_periods",
+          "accessor": "__ZN14AGXArmFirmware24setFwUtilDebouncePeriodsEy",
+          "stores": [
+            {
+              "offset": 2539,
+              "bytes": 1
+            },
+            {
+              "offset": 2540,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "fw_util_pstate_threshold",
+          "accessor": "__ZN14AGXArmFirmware24setFwUtilPStateThresholdEy",
+          "stores": [
+            {
+              "offset": 2541,
+              "bytes": 1
+            },
+            {
+              "offset": 2542,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "fw_util_pstate_step_size",
+          "accessor": "__ZN14AGXArmFirmware23setFwUtilPStateStepSizeEy",
+          "stores": [
+            {
+              "offset": 2543,
+              "bytes": 1
+            },
+            {
+              "offset": 2544,
+              "bytes": 1
+            }
+          ]
+        },
+        {
+          "name": "gpu_keepalive_override",
+          "accessor": "__ZN14AGXArmFirmware23setGPUKeepAliveOverrideE13AGXSKeepAlive",
+          "stores": [
+            {
+              "offset": 7216,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "gfxc_keepalive_override",
+          "accessor": "__ZN14AGXArmFirmware24setGFXCKeepAliveOverrideE13AGXSKeepAlive",
+          "stores": [
+            {
+              "offset": 7220,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "gpu_keepalive_perf_mode_threshold",
+          "accessor": "__ZN14AGXArmFirmware32setGPUKeepAlivePerfModeThresholdEj",
+          "stores": [
+            {
+              "offset": 7224,
+              "bytes": 4
+            }
+          ]
+        },
+        {
+          "name": "gpu_keepalive_off_mode_threshold",
+          "accessor": "__ZN14AGXArmFirmware31setGPUKeepAliveOffModeThresholdEj",
+          "stores": [
+            {
+              "offset": 7228,
+              "bytes": 4
+            }
+          ]
+        }
+      ],
+      "register_overrides": {
+        "offset": 2052,
+        "entries": 16,
+        "stride": 24,
+        "count_offset": 2436,
+        "fields": [
+          {
+            "offset": 0,
+            "bytes": 8,
+            "name": "value"
+          },
+          {
+            "offset": 8,
+            "bytes": 8,
+            "name": "mask"
+          },
+          {
+            "offset": 16,
+            "bytes": 4,
+            "name": "register"
+          }
+        ]
+      },
+      "fw_util_pstate_controls": {
+        "offset": 2539,
+        "entries": 4,
+        "stride": 6,
+        "fields": [
+          {
+            "offset": 0,
+            "bytes": 2,
+            "name": "debounce_periods"
+          },
+          {
+            "offset": 2,
+            "bytes": 2,
+            "name": "pstate_threshold"
+          },
+          {
+            "offset": 4,
+            "bytes": 2,
+            "name": "pstate_step_size"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "runtime_initialization_code",
+    "request": {
+      "operation": "recover_g17_runtime_initialization",
+      "fixture_test": "test_recovers_runtime_initialization",
+      "allocations": [
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 768,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 776,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 784,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 792,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 800,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 808,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 816,
+          "host_gpu_member": 824,
+          "bytes": 0
+        },
+        {
+          "host_cpu_member": 824,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 2744,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3048,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2880,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2888,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2896,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2904,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2912,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2920,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2928,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3184,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3192,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3200,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3208,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3216,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3224,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3232,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 896,
+          "host_gpu_member": 904,
+          "bytes": 7328
+        }
+      ],
+      "base_init_code": "0c0100b91f0500b91f0900b91f1900b91f1d00b968c241f900e105b81fe145b86ac241f9492106b8090140b9492100b96ac241f95f4900b968c241f9299083520901098b2a0080522a0100b9a99083520901098b3f0100b9299183520901098b3f0100b9a99183520801098b1f0100b9",
+      "arm_init_code": "69c241f93fc909b968c241f91fa105b869c241f93f1500b9684e41f90a3940910bd14e792ba900790bd54e792bad00790bd94e792bb100796b6a46f90ce598526b010c8b7f0100b93f5100b93f4d00b96c0140b98c0000347f0140b93f5140b93f4d40b93fe109b9405149bd20cd07bd405549bd20d107bd405949bd20d507bd405d49bd20d907bd406149bd20dd07bd406549bd20e107bd406949bd20e507bd406d49bd00d8217e0b00391e2be907b94b4949b92bc507b9404d49bd20c907bd00e4006f60a907fd7f5d0fb960b107fd7f950fb909d146b92961185369810fb969d54eb93f05007129859f1a6ac241f949a106b82c8883524c010c8b890100b9a98883524901098b200100fda98983524901098b3f0100b93fb925b91f4100b91f4500b969c241f9282d1cb9",
+      "base_power_code": "69c241f9281128912b3100b94b0147b92b2d00b94afd46b96a0000342a9500b92aad00b900e4006f000100ad1f1100f9",
+      "arm_power_code": "08c041f909f984520900098b210141ad220d40ad03418b3c01418c3c00418d3c02418a3c68c241f909b104918a6240b90aed00b98a6640b90af100b9aa4640914a8107910bd112910c0880524d0140f96e2109d1cd0100f94d2541f96d8500f84a2100918c0500f121ffff548a1643f92ac502f98a1a43f92ac902f98a9643f92a4503f98a9a43f92a4903f968c241f91f9d00b91fa100b9",
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "0c0100b91f0500b91f0900b91f1900b91f1d00b968c241f900e105b81fe145b86ac241f9492106b8090140b9492100b96ac241f95f4900b968c241f9299083520901098b2a0080522a0100b9a99083520901098b3f0100b9299183520901098b3f0100b9a99183520801098b1f0100b9"
+          },
+          {
+            "bytes_hex": "69c241f93fc909b968c241f91fa105b869c241f93f1500b9684e41f90a3940910bd14e792ba900790bd54e792bad00790bd94e792bb100796b6a46f90ce598526b010c8b7f0100b93f5100b93f4d00b96c0140b98c0000347f0140b93f5140b93f4d40b93fe109b9405149bd20cd07bd405549bd20d107bd405949bd20d507bd405d49bd20d907bd406149bd20dd07bd406549bd20e107bd406949bd20e507bd406d49bd00d8217e0b00391e2be907b94b4949b92bc507b9404d49bd20c907bd00e4006f60a907fd7f5d0fb960b107fd7f950fb909d146b92961185369810fb969d54eb93f05007129859f1a6ac241f949a106b82c8883524c010c8b890100b9a98883524901098b200100fda98983524901098b3f0100b93fb925b91f4100b91f4500b969c241f9282d1cb9"
+          },
+          {
+            "bytes_hex": "69c241f9281128912b3100b94b0147b92b2d00b94afd46b96a0000342a9500b92aad00b900e4006f000100ad1f1100f9"
+          },
+          {
+            "bytes_hex": "08c041f909f984520900098b210141ad220d40ad03418b3c01418c3c00418d3c02418a3c68c241f909b104918a6240b90aed00b98a6640b90af100b9aa4640914a8107910bd112910c0880524d0140f96e2109d1cd0100f94d2541f96d8500f84a2100918c0500f121ffff548a1643f92ac502f98a1a43f92ac902f98a9643f92a4503f98a9a43f92a4903f968c241f91f9d00b91fa100b9"
+          }
+        ]
+      }
+    },
+    "result": {
+      "bytes": 7328,
+      "host_cpu_member": 896,
+      "host_gpu_member": 904,
+      "zero_initialized": [
+        {
+          "offset": 4,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 8,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 20,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 24,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 28,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 64,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 68,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 72,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 76,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 80,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 90,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 156,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 160,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 2504,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 2528,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 2564,
+          "bytes": 40,
+          "value": 0
+        },
+        {
+          "offset": 7237,
+          "bytes": 8,
+          "value": 0
+        },
+        {
+          "offset": 7245,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 7297,
+          "bytes": 4,
+          "value": 1
+        },
+        {
+          "offset": 7301,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 7305,
+          "bytes": 4,
+          "value": 0
+        },
+        {
+          "offset": 7309,
+          "bytes": 4,
+          "value": 0
+        }
+      ],
+      "platform_copies": [
+        {
+          "destination_offset": 84,
+          "bytes": 6,
+          "source": "platform_config+0x768"
+        },
+        {
+          "destination_offset": 164,
+          "bytes": 64,
+          "source": "firmware_host_object+0x27c8"
+        },
+        {
+          "destination_offset": 236,
+          "bytes": 1752,
+          "source": "power_controller_snapshot",
+          "complete_destination_range": true
+        },
+        {
+          "destination_offset": 1988,
+          "bytes": 40,
+          "source": "accelerator+0xe948",
+          "converted_tail": true
+        }
+      ],
+      "power_controller_tables": [
+        {
+          "destination_offset": 620,
+          "source_offset": 0,
+          "bytes": 512
+        },
+        {
+          "destination_offset": 1204,
+          "source_offset": 584,
+          "bytes": 512
+        }
+      ],
+      "dynamic_fields": [
+        {
+          "offset": 0,
+          "bytes": 4,
+          "source": "platform_feature_mask"
+        },
+        {
+          "offset": 32,
+          "bytes": 4,
+          "source": "platform_config+0x131f8"
+        },
+        {
+          "offset": 44,
+          "bytes": 4,
+          "source": "platform_config+0x700"
+        },
+        {
+          "offset": 48,
+          "bytes": 4,
+          "source": "platform_feature_bit_0"
+        },
+        {
+          "offset": 94,
+          "bytes": 4,
+          "source": "virtual_device_callback"
+        },
+        {
+          "offset": 98,
+          "bytes": 4,
+          "source": "platform_feature_state"
+        },
+        {
+          "offset": 106,
+          "bytes": 4,
+          "source": "normalized_role_count"
+        },
+        {
+          "offset": 7212,
+          "bytes": 4,
+          "source": "firmware_callback"
+        },
+        {
+          "offset": 7233,
+          "bytes": 4,
+          "source": "normalized_role_count"
+        }
+      ]
+    }
+  },
+  {
+    "name": "runtime_power_policy_code",
+    "request": {
+      "operation": "recover_g17_runtime_power_policy",
+      "fixture_test": "test_recovers_zeroed_runtime_power_policy",
+      "image": "696d616765",
+      "arm_power_code": "756e41f9b4464091604e41f90802369109c246f9aa46409141710191",
+      "populate_code": "5f2403d5e00301aa01dc805200000014",
+      "image_fixture": {
+        "data": "696d616765",
+        "symbols": {
+          "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData": 305419896
+        },
+        "codes": {},
+        "virtual": {},
+        "vtable": {
+          "__ZTV18AGXAcceleratorG17X:3456": 305419896
+        }
+      },
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "756e41f9b4464091604e41f90802369109c246f9aa46409141710191"
+          },
+          {
+            "bytes_hex": "5f2403d5e00301aa01dc805200000014"
+          }
+        ]
+      }
+    },
+    "result": {
+      "producer": "__ZN14AGXAccelerator24populateDPEPPTConfigDataEP19AGFDPEPPTConfigData",
+      "accelerator_vtable_slot": 3456,
+      "host_object_base": 69632,
+      "cleared_source_offset": 92,
+      "cleared_source_bytes": 1760,
+      "copied_source_range": {
+        "offset": 96,
+        "bytes": 1752
+      },
+      "runtime_range": {
+        "offset": 236,
+        "bytes": 1752,
+        "value": 0
+      }
+    }
+  },
+  {
+    "name": "runtime_performance_policy_code",
+    "request": {
+      "operation": "recover_g17_runtime_performance_policy",
+      "fixture_test": "test_recovers_zeroed_runtime_performance_policy",
+      "setup_code": "08a71f9109c71f910a871f911f0100b93f0100b95f0100b91feb1f391ff31f391ffb1f3908b71f911f0100b908d71f911f0100b908971f911f0100b91fef1f391ff71f391fff1f391fe71f391f0320397fca27b97fd227b97fd627b91f831f397fda27b97fce27b97fde27b9",
+      "arm_power_code": "08c041f909f984520900098b210141ad220d40ad03418b3c01418c3c00418d3c02418a3c",
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "08a71f9109c71f910a871f911f0100b93f0100b95f0100b91feb1f391ff31f391ffb1f3908b71f911f0100b908d71f911f0100b908971f911f0100b91fef1f391ff71f391fff1f391fe71f391f0320397fca27b97fd227b97fd627b91f831f397fda27b97fce27b97fde27b9"
+          },
+          {
+            "bytes_hex": "08c041f909f984520900098b210141ad220d40ad03418b3c01418c3c00418d3c02418a3c"
+          }
+        ]
+      }
+    },
+    "result": {
+      "producer": "__ZN14AGXArmFirmware11setupConfigEv",
+      "host_object_offset": 10184,
+      "cleared_source_bytes": 57,
+      "copied_source_bytes": 64,
+      "runtime_range": {
+        "offset": 164,
+        "bytes": 64
+      },
+      "initial_value": 0,
+      "reserved_tail_bytes": 7
+    }
+  },
+  {
+    "name": "runtime_platform_policy_code",
+    "request": {
+      "operation": "recover_g17_runtime_platform_policy",
+      "fixture_test": "test_recovers_runtime_platform_policy",
+      "image": "696d616765",
+      "image_fixture": {
+        "data": "696d616765",
+        "symbols": {
+          "__ZN14AGXAccelerator15configureDeviceEP9IOService": 1048576,
+          "__ZN31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator15configureDeviceEP9IOService": 1052672,
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": 1056768,
+          "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv": 1060864,
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX38configurePowerAndPerformanceControllerEv": 1064960
+        },
+        "codes": {
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": {
+            "address": 1056768,
+            "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e4fbff97"
+          },
+          "__ZN31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator15configureDeviceEP9IOService": {
+            "address": 1052672,
+            "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eefbff9700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c83dfff0008944fd08008012687207b9483effd008a51191684234f939a4ff9039db41f9280340b90823c81ae9ff8f520901090be803084b2801080a9f62063960b603fd"
+          },
+          "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv": {
+            "address": 1060864,
+            "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c841fff00095c23de042813cc8008052e82600b988578052e80200b9c841fff00099c23de042803c"
+          },
+          "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX38configurePowerAndPerformanceControllerEv": {
+            "address": 1064960,
+            "code": "0000000000000000000000000000000000000000000000000000000000000000f8fbff970000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004833935228e3a77288e602b9091f805289ba02b98ab242b92909ca1a89b602b9893209916a3dffd040b944fd200100fd4933935229d3a772892e00b90931a852892200b909028052890200b9693dffd020bd44fda00200fd693dffd020c144fda0ce04fdc81e00b988bb8052c80200b9"
+          }
+        },
+        "virtual": {},
+        "vtable": {
+          "__ZTV18AGXAcceleratorG17X:2392": 1056768,
+          "__ZTV18AGXAcceleratorG17X:2592": 1064960
+        },
+        "adrp_load": {
+          "1052672:188:192:8": "ffff2800ffffffff",
+          "1060864:900:904:16": "cdcccc3d0000803e3333333f6666663f",
+          "1060864:928:932:16": "0000803fcdcc4c3fcdcc4c3e6666663f"
+        }
+      },
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "__ZN14AGXAccelerator15configureDeviceEP9IOService": 1048576,
+            "__ZN31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator15configureDeviceEP9IOService": 1052672,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": 1056768,
+            "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv": 1060864,
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX38configurePowerAndPerformanceControllerEv": 1064960
+          },
+          {
+            "__ZN14AGXAccelerator15configureDeviceEP9IOService": {
+              "tuple": [
+                1048576,
+                {
+                  "bytes_hex": "00000000"
+                }
+              ]
+            },
+            "__ZN31AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7Accelerator15configureDeviceEP9IOService": {
+              "tuple": [
+                1052672,
+                {
+                  "bytes_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000eefbff9700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c83dfff0008944fd08008012687207b9483effd008a51191684234f939a4ff9039db41f9280340b90823c81ae9ff8f520901090be803084b2801080a9f62063960b603fd"
+                }
+              ]
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX15configureDeviceEP9IOService": {
+              "tuple": [
+                1056768,
+                {
+                  "bytes_hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e4fbff97"
+                }
+              ]
+            },
+            "__ZN14AGXAccelerator38configurePowerAndPerformanceControllerEv": {
+              "tuple": [
+                1060864,
+                {
+                  "bytes_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c841fff00095c23de042813cc8008052e82600b988578052e80200b9c841fff00099c23de042803c"
+                }
+              ]
+            },
+            "__ZN32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX38configurePowerAndPerformanceControllerEv": {
+              "tuple": [
+                1064960,
+                {
+                  "bytes_hex": "0000000000000000000000000000000000000000000000000000000000000000f8fbff970000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004833935228e3a77288e602b9091f805289ba02b98ab242b92909ca1a89b602b9893209916a3dffd040b944fd200100fd4933935229d3a772892e00b90931a852892200b909028052890200b9693dffd020bd44fda00200fd693dffd020c144fda0ce04fdc81e00b988bb8052c80200b9"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "result": {
+      "configure_device_vtable_slot": 2392,
+      "configure_power_vtable_slot": 2592,
+      "platform_halfwords": {
+        "source_offset": 1896,
+        "runtime_offset": 84,
+        "values": [
+          65535,
+          40,
+          65535
+        ],
+        "bytes": "ffff2800ffff"
+      },
+      "smart_idle": {
+        "source_offset": 59720,
+        "runtime_offset": 1988,
+        "bytes": 40,
+        "source_bytes": "dc0500000000803fcdcc4c3fcdcc4c3e6666663fcdcccc3d0000803e9a99193f6666663f06000000",
+        "runtime_bytes": "dc0500000000803fcdcc4c3fcdcc4c3e6666663fcdcccc3d0000803e9a99193f6666663f0000c040",
+        "runtime_fields": {
+          "standby_timer_us": 1500,
+          "probability_initial_bits": 1065353216,
+          "fn_hit_bits": 1061997773,
+          "fi_hit_bits": 1045220557,
+          "fn_miss_bits": 1063675494,
+          "fi_miss_bits": 1036831949,
+          "neighbor_hit_bits": 1048576000,
+          "gpu_min_confidence_bits": 1058642330,
+          "gpu_high_confidence_bits": 1063675494,
+          "reset_iterations_float_bits": 1086324736
+        }
+      }
+    }
+  },
+  {
+    "name": "zero_initialized_allocations_code",
+    "request": {
+      "operation": "recover_g17_zero_initialized_allocations",
+      "fixture_test": "test_recovers_zero_initialized_allocations",
+      "code": "687241f91f3100f900e4006f000102ad000101ad000100ad607641f901008152c15caa94687e41f91f4100f900e4006f000103ad000102ad000101ad000100ad",
+      "retired_recipe_input": {
+        "bytes_hex": "687241f91f3100f900e4006f000102ad000101ad000100ad607641f901008152c15caa94687e41f91f4100f900e4006f000103ad000102ad000101ad000100ad"
+      }
+    },
+    "result": [
+      {
+        "name": "role0_region_26c",
+        "bytes": 104,
+        "host_cpu_member": 736,
+        "host_gpu_member": 808,
+        "firmware_shared_offsets": [
+          {
+            "role": 0,
+            "offset": 620
+          }
+        ]
+      },
+      {
+        "name": "role0_region_274",
+        "bytes": 2048,
+        "host_cpu_member": 744,
+        "host_gpu_member": 816,
+        "firmware_shared_offsets": [
+          {
+            "role": 0,
+            "offset": 628
+          }
+        ]
+      },
+      {
+        "name": "shared_control",
+        "bytes": 136,
+        "host_cpu_member": 760,
+        "host_gpu_member": 832,
+        "firmware_shared_offsets": [
+          {
+            "role": 0,
+            "offset": 16
+          },
+          {
+            "role": 1,
+            "offset": 16
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "role0_bootstrap_regions_code",
+    "request": {
+      "operation": "recover_g17_role0_bootstrap_regions",
+      "fixture_test": "test_recovers_role0_bootstrap_regions",
+      "code": "606241f901838152b65eaa94606641f901098252b35eaa94606a41f901c28152b05eaa94686641f90900801209190ab909310ab9",
+      "retired_recipe_input": {
+        "bytes_hex": "606241f901838152b65eaa94606641f901098252b35eaa94606a41f901c28152b05eaa94686641f90900801209190ab909310ab9"
+      }
+    },
+    "result": [
+      {
+        "name": "role0_region_254",
+        "bytes": 3096,
+        "host_cpu_member": 704,
+        "host_gpu_member": 776,
+        "firmware_shared_offset": 596,
+        "initial": "zero"
+      },
+      {
+        "name": "role0_region_25c",
+        "bytes": 4168,
+        "host_cpu_member": 712,
+        "host_gpu_member": 784,
+        "firmware_shared_offset": 604,
+        "initial": "zero_with_sentinels",
+        "sentinels": [
+          {
+            "offset": 2584,
+            "bytes": 4,
+            "value": 4294967295
+          },
+          {
+            "offset": 2608,
+            "bytes": 4,
+            "value": 4294967295
+          }
+        ]
+      },
+      {
+        "name": "role0_region_264",
+        "bytes": 3600,
+        "host_cpu_member": 720,
+        "host_gpu_member": 792,
+        "firmware_shared_offset": 612,
+        "initial": "zero"
+      }
+    ]
+  },
+  {
+    "name": "g17_pio_mapping_fixture",
+    "request": {
+      "operation": "recover_g17_pio_mappings",
+      "fixture_test": "test_recovers_g17_pio_mappings",
+      "image": "11000000000000000015020000000000000000000000000000000000000000002f000000003d02000002000000000000000000000000000000000000000000001a0000000040d0000080000000000000dadadada0000000000000000000000001d0000000000d1000040000000000000dadadada0000000000000000000000001f0000000000d4000040000000000000dadadada000000000000000000000000210000000040d4000040000000000000dadadada0000000000000000000000002200000000c0d4000002000000000000dadadada0000000000000000000000001c0000000000d5000000010000000000dadadada000000000000000000000000200000000000d6000000020000000000dadadada000000000000000000000000230000000000e0000040000000000000dadadada000000000000000000000000250000000000e4000040000000000000dadadada0000000000000000000000002b0000000000e6005800000000000000dadadada00000000000000000000000014000000ffffffff00000000000000000000000000000000000000000000000015000000ffffffff00000000000000000000000000000000000000000000000012000000ffffffff00000000000000000000000000000000000000000000000013000000ffffffff00000000000000000000000000000000000000000000000018000000ffffffff00000000000000000000000000000000000000000000000017000000ffffffff0000000000000000000000000000000000000000000000002c000000ffffffff00000000000000000040d200000100000000000000000000",
+      "image_fixture": {
+        "data": "11000000000000000015020000000000000000000000000000000000000000002f000000003d02000002000000000000000000000000000000000000000000001a0000000040d0000080000000000000dadadada0000000000000000000000001d0000000000d1000040000000000000dadadada0000000000000000000000001f0000000000d4000040000000000000dadadada000000000000000000000000210000000040d4000040000000000000dadadada0000000000000000000000002200000000c0d4000002000000000000dadadada0000000000000000000000001c0000000000d5000000010000000000dadadada000000000000000000000000200000000000d6000000020000000000dadadada000000000000000000000000230000000000e0000040000000000000dadadada000000000000000000000000250000000000e4000040000000000000dadadada0000000000000000000000002b0000000000e6005800000000000000dadadada00000000000000000000000014000000ffffffff00000000000000000000000000000000000000000000000015000000ffffffff00000000000000000000000000000000000000000000000012000000ffffffff00000000000000000000000000000000000000000000000013000000ffffffff00000000000000000000000000000000000000000000000018000000ffffffff00000000000000000000000000000000000000000000000017000000ffffffff0000000000000000000000000000000000000000000000002c000000ffffffff00000000000000000040d200000100000000000000000000",
+        "symbols": {
+          "__ZN14AGXAccelerator15configureDeviceEP9IOService": 1048576,
+          "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX25getPIORelativeOffsetTableEv": 8192,
+          "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX31getPIORelativeOffsetTableLengthEv": 8448
+        },
+        "codes": {
+          "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX31getPIORelativeOffsetTableLengthEv": {
+            "address": 8448,
+            "code": "5f2403d560028052c0035fd6"
+          },
+          "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX25getPIORelativeOffsetTableEv": {
+            "address": 8192,
+            "code": "5f2403d50000009000001291c0035fd6"
+          },
+          "__ZN14AGXAccelerator15configureDeviceEP9IOService": {
+            "address": 1048576,
+            "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076021e91e00316aa01369c522b64ab9454008052b4aa0cb9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000144304b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000540300b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000547308b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000054ab0cb900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000344304b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000347b08b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034b30cb9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000940b00b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000944304b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000094b30cb900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f44204b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000082d82520000000009b648f900000000000000000000000031093fd7000000000000000000000000000000000000000000000000000000000000000000000000082e82520000000009ba48f900000000000000000000000031093fd7c00b00b400000000148780525a5b9b525a5bbb720000000000000000000000000000000000000000000000000000000000000000080740b90000000000000000080340b9000000000000000000000000000000000000000000000000280140390000000000000000000000000000000000000000080240f900000000010080520000000010093fd709234029297db49b00000000000000000000000000000000000000000900088b490500f9090740f9490902b9480901f95c0500b9"
+          }
+        },
+        "virtual": {
+          "9344": 0
+        },
+        "vtable": {
+          "__ZTV18AGXAcceleratorG17X:4456": 8192,
+          "__ZTV18AGXAcceleratorG17X:4464": 8448
+        }
+      },
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "11000000000000000015020000000000000000000000000000000000000000002f000000003d02000002000000000000000000000000000000000000000000001a0000000040d0000080000000000000dadadada0000000000000000000000001d0000000000d1000040000000000000dadadada0000000000000000000000001f0000000000d4000040000000000000dadadada000000000000000000000000210000000040d4000040000000000000dadadada0000000000000000000000002200000000c0d4000002000000000000dadadada0000000000000000000000001c0000000000d5000000010000000000dadadada000000000000000000000000200000000000d6000000020000000000dadadada000000000000000000000000230000000000e0000040000000000000dadadada000000000000000000000000250000000000e4000040000000000000dadadada0000000000000000000000002b0000000000e6005800000000000000dadadada00000000000000000000000014000000ffffffff00000000000000000000000000000000000000000000000015000000ffffffff00000000000000000000000000000000000000000000000012000000ffffffff00000000000000000000000000000000000000000000000013000000ffffffff00000000000000000000000000000000000000000000000018000000ffffffff00000000000000000000000000000000000000000000000017000000ffffffff0000000000000000000000000000000000000000000000002c000000ffffffff00000000000000000040d200000100000000000000000000"
+          },
+          {
+            "__ZN14AGXAccelerator15configureDeviceEP9IOService": 1048576,
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX25getPIORelativeOffsetTableEv": 8192,
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX31getPIORelativeOffsetTableLengthEv": 8448
+          },
+          {
+            "__ZN14AGXAccelerator15configureDeviceEP9IOService": {
+              "tuple": [
+                1048576,
+                {
+                  "bytes_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000076021e91e00316aa01369c522b64ab9454008052b4aa0cb9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000144304b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000540300b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000547308b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000054ab0cb900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000344304b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000347b08b900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034b30cb9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000940b00b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000944304b90000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000094b30cb900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000f44204b9000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000082d82520000000009b648f900000000000000000000000031093fd7000000000000000000000000000000000000000000000000000000000000000000000000082e82520000000009ba48f900000000000000000000000031093fd7c00b00b400000000148780525a5b9b525a5bbb720000000000000000000000000000000000000000000000000000000000000000080740b90000000000000000080340b9000000000000000000000000000000000000000000000000280140390000000000000000000000000000000000000000080240f900000000010080520000000010093fd709234029297db49b00000000000000000000000000000000000000000900088b490500f9090740f9490902b9480901f95c0500b9"
+                }
+              ]
+            },
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX25getPIORelativeOffsetTableEv": {
+              "tuple": [
+                8192,
+                {
+                  "bytes_hex": "5f2403d50000009000001291c0035fd6"
+                }
+              ]
+            },
+            "__ZNK32AGX\u00b7PI_300\u00b7X\u00b7A0\u00b7AcceleratorX31getPIORelativeOffsetTableLengthEv": {
+              "tuple": [
+                8448,
+                {
+                  "bytes_hex": "5f2403d560028052c0035fd6"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "result": {
+      "table_vtable_slot": 4456,
+      "length_vtable_slot": 4464,
+      "table_address": 9344,
+      "table_entries": 19,
+      "source_record_stride": 1080,
+      "firmware_record_offset": 1600,
+      "firmware_record_stride": 40,
+      "records": [
+        {
+          "index": 17,
+          "relative_offset": 0,
+          "total_size": 136448,
+          "element_size": 136448,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 47,
+          "relative_offset": 146688,
+          "total_size": 512,
+          "element_size": 512,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 26,
+          "relative_offset": 13647872,
+          "total_size": 32768,
+          "element_size": 32768,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 29,
+          "relative_offset": 13697024,
+          "total_size": 16384,
+          "element_size": 16384,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 31,
+          "relative_offset": 13893632,
+          "total_size": 16384,
+          "element_size": 16384,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 33,
+          "relative_offset": 13910016,
+          "total_size": 16384,
+          "element_size": 16384,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 34,
+          "relative_offset": 13942784,
+          "total_size": 512,
+          "element_size": 512,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 28,
+          "relative_offset": 13959168,
+          "total_size": 65536,
+          "element_size": 65536,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 32,
+          "relative_offset": 14024704,
+          "total_size": 131072,
+          "element_size": 131072,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 35,
+          "relative_offset": 14680064,
+          "total_size": 16384,
+          "element_size": 16384,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 37,
+          "relative_offset": 14942208,
+          "total_size": 16384,
+          "element_size": 16384,
+          "flags": 2,
+          "writable": true
+        },
+        {
+          "index": 43,
+          "relative_offset": 15073280,
+          "total_size": 88,
+          "element_size": 88,
+          "flags": 2,
+          "writable": true
+        }
+      ],
+      "alternate_entries": [
+        {
+          "index": 20,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 21,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 18,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 19,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 24,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 23,
+          "primary_offset": 4294967295,
+          "alternate_offset": 0,
+          "alternate_size": 0
+        },
+        {
+          "index": 44,
+          "primary_offset": 4294967295,
+          "alternate_offset": 13778944,
+          "alternate_size": 256
+        }
+      ]
+    }
+  },
+  {
+    "name": "g17_pio_uat_fixture",
+    "request": {
+      "operation": "recover_g17_pio_uat_mapping",
+      "fixture_test": "test_recovers_g17_pio_uat_mapping",
+      "image": "0000008021fcffff000040010000000018000000000000000000000000000000",
+      "image_fixture": {
+        "data": "0000008021fcffff000040010000000018000000000000000000000000000000",
+        "symbols": {
+          "__ZN14AGXAccelerator5startEP9IOService": 18446741874829982748,
+          "__ZN14AGXArmFirmware16initFirmwareDataEv": 18446741874830396060,
+          "__ZN11AGXFirmware18createFWPIOMappingEPKyjPjbj10eGartRange": 18446741874830286716,
+          "__ZN11AGXFirmware18createFWGPUMappingEP18IOMemoryDescriptorb10eGartRange": 18446741874830287188,
+          "__ZL11gart_ranges.12908": 18446741874805036896
+        },
+        "codes": {
+          "__ZN14AGXAccelerator5startEP9IOService": {
+            "address": 18446741874829982748,
+            "code": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018f09352b941ffb039831d9100000000000000000000000000000000000000000000000000000000000000002817088b0000000000000000092940a93625dc9a4925dc9a"
+          },
+          "__ZN11AGXFirmware18createFWPIOMappingEPKyjPjbj10eGartRange": {
+            "address": 18446741874830286716,
+            "code": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bf04007100000000280040f900000000000000000000000000000000000000000a012a0a6a0000b9000000000000000000000000000000000000000000010a8a000000000841228b0000000000000000000000000801098a010100cb9f0200716800805202159f1a000000000000000000000000e00315aae10316aae20314aae30313aa49000094"
+          },
+          "__ZN11AGXFirmware18createFWGPUMappingEP18IOMemoryDescriptorb10eGartRange": {
+            "address": 18446741874830287188,
+            "code": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c87e60d3df2600710000000000000000bf020071e9008052aa0080d20a20c0f229118a9a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000220108aa"
+          },
+          "__ZN14AGXArmFirmware16initFirmwareDataEv": {
+            "address": 18446741874830396060,
+            "code": "f508819217598352188e835209000014685e41f90801158b1f4907f9f72200911813009194e21091b5a200b1a0050054880640f9e8feffb4880a42b9a8feff348802403968fe07376802178b000140f9100040f9f10300aa31b4f9f2301ac1da112b80d21002118b080240f93035e6f210093fd7f10316aa6802188b080140b9700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d409620b910a6e41f90100088be00313aa02008052f10309aa114af2f251093fd7685e41f90801158b004907f9"
+          }
+        },
+        "virtual": {
+          "18446741874805037216": 0
+        },
+        "vtable": {}
+      },
+      "retired_recipe_input": {
+        "tuple": [
+          {
+            "bytes_hex": "0000008021fcffff000040010000000018000000000000000000000000000000"
+          },
+          {
+            "__ZN14AGXAccelerator5startEP9IOService": 18446741874829982748,
+            "__ZN14AGXArmFirmware16initFirmwareDataEv": 18446741874830396060,
+            "__ZN11AGXFirmware18createFWPIOMappingEPKyjPjbj10eGartRange": 18446741874830286716,
+            "__ZN11AGXFirmware18createFWGPUMappingEP18IOMemoryDescriptorb10eGartRange": 18446741874830287188,
+            "__ZL11gart_ranges.12908": 18446741874805036896
+          },
+          {
+            "__ZN14AGXAccelerator5startEP9IOService": {
+              "tuple": [
+                18446741874829982748,
+                {
+                  "bytes_hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018f09352b941ffb039831d9100000000000000000000000000000000000000000000000000000000000000002817088b0000000000000000092940a93625dc9a4925dc9a"
+                }
+              ]
+            },
+            "__ZN14AGXArmFirmware16initFirmwareDataEv": {
+              "tuple": [
+                18446741874830396060,
+                {
+                  "bytes_hex": "f508819217598352188e835209000014685e41f90801158b1f4907f9f72200911813009194e21091b5a200b1a0050054880640f9e8feffb4880a42b9a8feff348802403968fe07376802178b000140f9100040f9f10300aa31b4f9f2301ac1da112b80d21002118b080240f93035e6f210093fd7f10316aa6802188b080140b9700240f9301ac1daf10310aaf147c1da1f0211eb40000054408e38d409620b910a6e41f90100088be00313aa02008052f10309aa114af2f251093fd7685e41f90801158b004907f9"
+                }
+              ]
+            },
+            "__ZN11AGXFirmware18createFWPIOMappingEPKyjPjbj10eGartRange": {
+              "tuple": [
+                18446741874830286716,
+                {
+                  "bytes_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000bf04007100000000280040f900000000000000000000000000000000000000000a012a0a6a0000b9000000000000000000000000000000000000000000010a8a000000000841228b0000000000000000000000000801098a010100cb9f0200716800805202159f1a000000000000000000000000e00315aae10316aae20314aae30313aa49000094"
+                }
+              ]
+            },
+            "__ZN11AGXFirmware18createFWGPUMappingEP18IOMemoryDescriptorb10eGartRange": {
+              "tuple": [
+                18446741874830287188,
+                {
+                  "bytes_hex": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c87e60d3df2600710000000000000000bf020071e9008052aa0080d20a20c0f229118a9a00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000220108aa"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "result": {
+      "gart_range": 10,
+      "va_start": 18446739819544444928,
+      "va_size": 20971520,
+      "va_end": 18446739819565416448,
+      "range_flags": 24,
+      "uat_page_bytes": 16384,
+      "single_element_mapping": "align_down_physical_and_round_up_end",
+      "writable_descriptor_options": 3,
+      "read_only_descriptor_options": 1,
+      "writable_gpu_mapping_options": 7,
+      "read_only_gpu_mapping_options": 1099511627781,
+      "firmware_virtual_address": "mapping_gpu_va_plus_physical_page_offset"
+    }
+  }
+]

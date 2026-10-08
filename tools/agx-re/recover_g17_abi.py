@@ -1132,189 +1132,21 @@ def decode_stur_d(word: int) -> tuple[int, int, int] | None:
 
 
 def recover_firmware_root(code: bytes) -> dict[str, object]:
-    magic = find_materialized_constant(code, INTERFACE_MAGIC)
-    if len(magic) != 1:
-        raise ValueError(f"expected one firmware interface magic sequence, found {len(magic)}")
-    magic_start, magic_end, _register = magic[0]
-    window = code[magic_end : magic_end + 0x100]
-    additions: list[tuple[int, int, int, int]] = []
-    for offset, word in words(window):
-        decoded = decode_add_immediate(word)
-        if decoded is not None:
-            additions.append((magic_end + offset, *decoded))
-    copy_base = next((item for item in additions if item[3] == 0x3A8), None)
-    consume_base = next((item for item in additions if item[3] == 0x3C0), None)
-    if copy_base is None or consume_base is None:
-        raise ValueError("could not recover copied-root and consumer addresses")
-    root_bias = consume_base[3] - copy_base[3]
-    consume_register = consume_base[1]
-    pair_offsets = []
-    for offset, word in words(code[consume_base[0] : consume_base[0] + 0x40]):
-        decoded = decode_ldp_x(word)
-        if decoded is not None and decoded[2] == consume_register:
-            pair_offsets.append(decoded[3])
-    fields = sorted(
-        root_bias + pair_offset + element
-        for pair_offset in pair_offsets
-        for element in (0, 8)
-    )
-    if tuple(fields) != ROOT_FIELDS:
-        raise ValueError(f"unexpected firmware root pointers: {[hex(field) for field in fields]}")
-    return {
-        "interface_magic": INTERFACE_MAGIC,
-        "magic_code_offset": magic_start,
-        "copied_bytes": 0xC8,
-        "pointer_offsets": fields,
-    }
+    result = _native_g17._query(
+        b"", 'recover_firmware_root',
+        layout_options_text=json.dumps({
+            'code': code.hex(),
+        }))
+    return result
 
 
 def recover_driver_root(code: bytes) -> dict[str, object]:
-    magic = find_materialized_constant(code, INTERFACE_MAGIC)
-    if len(magic) != 1:
-        raise ValueError(f"expected one driver interface magic sequence, found {len(magic)}")
-    magic_start, _magic_end, _register = magic[0]
-    found: set[int] = set()
-    for _offset, word in words(code[magic_start : magic_start + 0x500]):
-        decoded = decode_str_x(word)
-        if decoded is not None and decoded[2] in ROOT_FIELDS:
-            found.add(decoded[2])
-    if tuple(sorted(found)) != ROOT_FIELDS:
-        raise ValueError(f"unexpected driver root stores: {[hex(field) for field in sorted(found)]}")
-
-    instructions = list(words(code))
-    bindings: list[tuple[int, int]] = []
-    for index, (_offset, word) in enumerate(instructions):
-        load = decode_ldr_x(word)
-        if load is None or load[0] != 1 or load[1] != 19:
-            continue
-        for _following_offset, following_word in instructions[index + 1 : index + 28]:
-            following_load = decode_ldr_x(following_word)
-            if following_load is not None and following_load[0] == 1 and following_load[1] == 19:
-                break
-            store = decode_str_x(following_word)
-            if store is not None and store[0] == 0 and store[2] in ROOT_FIELDS:
-                bindings.append((load[2], store[2]))
-                break
-    expected_bindings = [
-        (0xAB8, 0x18),
-        (0x388, 0x20),
-        (0xAD0, 0xA8),
-        (0xBE8, 0x18),
-        (0x388, 0x20),
-        (0xC00, 0xA8),
-        (0xCE0, 0xB0),
-        (0xCE8, 0xB8),
-        (0x398, 0xC0),
-    ]
-    if bindings != expected_bindings:
-        raise ValueError(
-            "unexpected driver root allocation bindings: "
-            f"{[(hex(member), hex(offset)) for member, offset in bindings]}"
-        )
-
-    bootstrap_publication = struct.pack(
-        "<32I",
-        0xF94D2E60,  # ldr x0, [x19, #0x1a58]
-        0xAA0003F1,
-        0xF9400010,
-        0xF2F9B431,
-        0xDAC11A30,
-        0xAA1003F1,
-        0xDAC147F1,
-        0xEB11021F,
-        0x54000040,
-        0xD4388E40,
-        0x91056208,  # mapping vtable + 0x158
-        0xF940AE09,
-        0xAA0803F1,
-        0xF2E63531,
-        0xD73F0931,
-        0xAA0003E1,  # mapping address becomes conversion argument
-        0xAA1603F1,
-        0xF9400270,
-        0xDAC11A30,
-        0xAA1003F1,
-        0xDAC147F1,
-        0xEB11021F,
-        0x54000040,
-        0xD4388E40,
-        0x910B6208,  # firmware vtable + 0x2d8
-        0xF9416E09,
-        0xAA1303E0,
-        0x52800002,
-        0xAA0803F1,
-        0xF2F24A11,
-        0xD73F0931,
-        0xF9000680,  # str x0, [x20, #8]
-    )
-    if code.count(bootstrap_publication) != 2:
-        raise ValueError("driver root bootstrap mapping is not converted for both roles")
-
-    require_instruction_sequence(
-        code,
-        "root platform-data copy",
-        (
-            0xF9414E68,  # ldr x8, [x19, #0x298]
-            0x52952917,  # mov w23, #0xa948
-            0x72A00037,  # movk w23, #1, lsl #16
-            0x8B170108,  # add x8, x8, x23
-            0xF9400108,  # ldr x8, [x8]
-            0x3CC18100,
-            0x3CC28101,
-            0x3CC38102,
-            0xAD020A81,  # first 0x30 bytes to root+0x30
-            0x3D800E80,
-            0x3CC48100,
-            0x3CC58101,
-            0x3CC68102,
-            0xF9403D08,
-            0xF9004A88,  # final qword at root+0x90
-            0xAD038A81,
-            0x3D801A80,  # vector data through root+0x8f
-        ),
-    )
-    if code.count(struct.pack("<I", 0xFD001680)) != 2:  # str d0, [x20, #0x28]
-        raise ValueError("driver root role/host-mapping words were not both written")
-    if struct.pack("<I", 0x0F000420) not in code:  # movi v0.2s, #1
-        raise ValueError("driver secondary root role word was not found")
-
-    return {
-        "interface_magic": INTERFACE_MAGIC,
-        "magic_code_offset": magic_start,
-        "pointer_offsets": sorted(found),
-        "firmware_role_offset": 0x28,
-        "host_mapped_allocations_offset": 0x2C,
-        "bootstrap_provider_host_member": 0x1A58,
-        "bootstrap_region": {
-            "root_offset": 8,
-            "host_cpu_member": 0x1A50,
-            "host_gpu_mapping_member": 0x1A58,
-            "mapping_address_vtable_offset": 0x158,
-            "firmware_address_conversion_vtable_offset": 0x2D8,
-        },
-        "platform_config": {
-            "host_platform_member": 0x298,
-            "host_platform_pointer_offset": 0x1A948,
-            "root_offset": 0x30,
-            "bytes": 0x68,
-        },
-        "roles": [
-            {
-                "role": 0,
-                "bindings": [
-                    {"host_gpu_member": member, "root_offset": offset}
-                    for member, offset in expected_bindings[:3] + expected_bindings[6:7]
-                ],
-            },
-            {
-                "role": 1,
-                "bindings": [
-                    {"host_gpu_member": member, "root_offset": offset}
-                    for member, offset in expected_bindings[3:6] + expected_bindings[7:]
-                ],
-            },
-        ],
-    }
+    result = _native_g17._query(
+        b"", 'recover_driver_root',
+        layout_options_text=json.dumps({
+            'code': code.hex(),
+        }))
+    return result
 
 
 def recover_g17_bootstrap_roots(
@@ -1328,153 +1160,35 @@ def recover_g17_bootstrap_roots(
 
 
 def recover_firmware_allocations(image: bytes, address: int, code: bytes) -> list[dict[str, int]]:
-    registers: dict[int, tuple[str, int]] = {19: ("this", 0)}
-    vectors: dict[int, int] = {}
-    stack: dict[int, tuple[str, int] | int] = {}
-    frame: dict[int, tuple[str, int] | int] = {}
-    allocations: set[tuple[int, int, int]] = set()
-
-    def collect(storage: dict[int, tuple[str, int] | int], size_offset: int) -> None:
-        cpu = storage.get(size_offset - 16)
-        gpu = storage.get(size_offset - 8)
-        size = storage.get(size_offset)
-        if (
-            isinstance(cpu, tuple)
-            and cpu[0] == "this"
-            and isinstance(gpu, tuple)
-            and gpu[0] == "this"
-            and isinstance(size, int)
-        ):
-            allocations.add((cpu[1], gpu[1], size))
-
-    for offset, word in words(code):
-        pc = address + offset
-        page = decode_adrp(pc, word)
-        if page is not None:
-            registers[page[0]] = ("absolute", page[1])
-            continue
-        addition = decode_add_immediate(word)
-        if addition is not None:
-            destination, source, immediate = addition
-            if source in registers:
-                kind, value = registers[source]
-                registers[destination] = (kind, value + immediate)
-            continue
-        load_d = decode_ldr_d(word)
-        if load_d is not None:
-            destination, base, immediate = load_d
-            if base in registers and registers[base][0] == "absolute":
-                location = registers[base][1] + immediate
-                file_offset = virtual_to_file(image, location)
-                vectors[destination] = struct.unpack_from("<Q", image, file_offset)[0]
-            continue
-        pair = decode_stp_x(word)
-        if pair is not None and pair[2] in (29, 31):
-            first, second, _base, stack_offset = pair
-            storage = frame if pair[2] == 29 else stack
-            if first in registers:
-                storage[stack_offset] = registers[first]
-            if second in registers:
-                storage[stack_offset + 8] = registers[second]
-            continue
-        store_x = decode_str_x(word)
-        if store_x is not None and store_x[1] == 31 and store_x[0] in registers:
-            stack[store_x[2]] = registers[store_x[0]]
-            continue
-        store_d = decode_str_d(word)
-        if store_d is not None and store_d[1] == 31 and store_d[0] in vectors:
-            stack[store_d[2]] = vectors[store_d[0]]
-            collect(stack, store_d[2])
-            continue
-        store_unscaled_d = decode_stur_d(word)
-        if (
-            store_unscaled_d is not None
-            and store_unscaled_d[1] == 29
-            and store_unscaled_d[0] in vectors
-        ):
-            frame[store_unscaled_d[2]] = vectors[store_unscaled_d[0]]
-            collect(frame, store_unscaled_d[2])
-
-    return [
-        {"host_cpu_member": cpu, "host_gpu_member": gpu, "bytes": size}
-        for cpu, gpu, size in sorted(allocations)
-    ]
+    result = _native_g17._query(
+        image, 'recover_firmware_allocations',
+        layout_options_text=json.dumps({
+            'address': address,
+            'code': code.hex(),
+        }))
+    return result
 
 
 def recover_root_allocation_sizes(allocations: list[dict[str, int]]) -> dict[str, int]:
-    by_gpu_member = {item["host_gpu_member"]: item["bytes"] for item in allocations}
-    expected = {
-        "firmware_shared_data": (0xAB8, 0x4C0),
-        "secondary_firmware_shared_data": (0xBE8, 0x4C0),
-        "runtime_data": (0x388, 0x1CA0),
-        "small_shared_data": (0xAD0, 0x20),
-        "secondary_small_shared_data": (0xC00, 0x20),
-        "primary_region": (0xCE0, 0xE440),
-        "secondary_region": (0xCE8, 0x6F0),
-        "secondary_aux": (0x398, 0xA8),
-    }
-    result = {}
-    for name, (member, expected_size) in expected.items():
-        size = by_gpu_member.get(member)
-        if size != expected_size:
-            raise ValueError(
-                f"unexpected {name} allocation through host member {member:#x}: {size}"
-            )
-        result[name] = size
+    result = _native_g17._query(
+        b"", 'recover_root_allocation_sizes',
+        layout_options_text=json.dumps({
+            'allocations': allocations,
+        }))
     return result
 
 
 def recover_hardware_config(
     allocations: list[dict[str, int]], shared_code: bytes, firmware: bytes
 ) -> dict[str, object]:
-    expected_cpu_member = 0x2B8
-    expected_gpu_member = 0x300
-    expected_size = 0x2710
-    size = next(
-        (
-            item["bytes"]
-            for item in allocations
-            if item["host_cpu_member"] == expected_cpu_member
-            and item["host_gpu_member"] == expected_gpu_member
-        ),
-        None,
-    )
-    if size != expected_size:
-        raise ValueError(f"unexpected hardware config allocation size: {size}")
-
-    instructions = list(words(shared_code))
-    published: set[int] = set()
-    for index, (_offset, word) in enumerate(instructions):
-        source = decode_ldr_x(word)
-        if source != (1, 19, expected_gpu_member):
-            continue
-        for following_index in range(index + 1, min(index + 24, len(instructions))):
-            load = decode_ldr_x(instructions[following_index][1])
-            if load is None or load[0] != 8 or load[1] != 19:
-                continue
-            shared_cpu_member = load[2]
-            for _store_offset, store_word in instructions[
-                following_index + 1 : following_index + 18
-            ]:
-                store = decode_str_x(store_word)
-                if store == (0, 8, 0):
-                    published.add(shared_cpu_member)
-                    break
-    if published != {0xA98, 0xBC8}:
-        raise ValueError(
-            "hardware config address was not published to both firmware roles: "
-            f"{[hex(member) for member in sorted(published)]}"
-        )
-
-    reads = recover_firmware_config_reads(firmware)
-    return {
-        "bytes": expected_size,
-        "host_cpu_member": expected_cpu_member,
-        "host_gpu_member": expected_gpu_member,
-        "firmware_shared_offset": 0,
-        "published_shared_cpu_members": sorted(published),
-        **reads,
-    }
+    result = _native_g17._query(
+        b"", 'recover_hardware_config',
+        layout_options_text=json.dumps({
+            'allocations': allocations,
+            'shared_code': shared_code.hex(),
+            'firmware': firmware.hex(),
+        }))
+    return result
 
 
 def require_instruction_sequence(code: bytes, label: str, sequence: tuple[int, ...]) -> None:
@@ -1557,410 +1271,43 @@ def recover_direct_shared_publications(code: bytes) -> list[tuple[int, int, int]
     stores x0 through a direct shared-object pointer or a biased interior
     pointer.
     """
-
-    instructions = list(words(code))
-    publications: set[tuple[int, int, int]] = set()
-    current_shared: int | None = None
-    shared_members = {0xA98, 0xBC8}
-
-    for index, (_offset, word) in enumerate(instructions):
-        load = decode_ldr_x(word)
-        if (
-            load is not None
-            and load[0] == 21
-            and load[1] in (0, 19)
-            and load[2] in shared_members
-        ):
-            current_shared = load[2]
-        if load is None or load[0] != 1 or load[1] not in (0, 19):
-            continue
-
-        source_member = load[2]
-        for following_index, (_following_offset, following_word) in enumerate(
-            instructions[index + 1 : index + 36], index + 1
-        ):
-            following_load = decode_ldr_x(following_word)
-            if (
-                following_load is not None
-                and following_load[0] == 1
-                and following_load[1] in (0, 19)
-            ):
-                break
-            store = decode_str_x(following_word)
-            if store is None or store[0] != 0 or current_shared is None:
-                continue
-
-            _source, base, target_offset = store
-            if base == 22:
-                publications.add((current_shared, source_member, 0x254 + target_offset))
-                break
-            if base == 21:
-                publications.add((current_shared, source_member, target_offset))
-                break
-            if base != 8:
-                continue
-
-            target_shared = None
-            target_bias = 0
-            for _prior_offset, prior_word in reversed(
-                instructions[index + 1 : following_index]
-            ):
-                prior_load = decode_ldr_x(prior_word)
-                if (
-                    prior_load is not None
-                    and prior_load[0] == 8
-                    and prior_load[1] == 19
-                    and prior_load[2] in shared_members
-                ):
-                    target_shared = prior_load[2]
-                    break
-                prior_add = decode_add_immediate(prior_word)
-                if (
-                    prior_add is not None
-                    and prior_add[0] == 8
-                    and prior_add[1] == 21
-                ):
-                    target_shared = current_shared
-                    target_bias = prior_add[2]
-                    break
-            if target_shared is not None:
-                publications.add(
-                    (target_shared, source_member, target_bias + target_offset)
-                )
-                break
-
-    return sorted(publications)
+    result = _native_g17._query(
+        b"", 'recover_direct_shared_publications',
+        layout_options_text=json.dumps({
+            'code': code.hex(),
+        }))
+    return [tuple(row) for row in result]
 
 
 def recover_auxiliary_shared_publications(code: bytes) -> list[tuple[int, int, int]]:
-    instructions = list(words(code))
-    target_members = {0xAA8: (0xA98, 0x1C0), 0xBD8: (0xBC8, 0x1C0)}
-    publications: set[tuple[int, int, int]] = set()
-
-    for index, (_offset, word) in enumerate(instructions):
-        source = decode_ldr_x(word)
-        if source is None or source[0] != 1 or source[1] != 19:
-            continue
-        for following_index, (_following_offset, following_word) in enumerate(
-            instructions[index + 1 : index + 36], index + 1
-        ):
-            following_source = decode_ldr_x(following_word)
-            if (
-                following_source is not None
-                and following_source[0] == 1
-                and following_source[1] == 19
-            ):
-                break
-            store = decode_str_x(following_word)
-            if store is None or store[0] != 0 or store[1] != 8:
-                continue
-            for _prior_offset, prior_word in reversed(
-                instructions[index + 1 : following_index]
-            ):
-                target = decode_ldr_x(prior_word)
-                if (
-                    target is not None
-                    and target[0] == 8
-                    and target[1] == 19
-                    and target[2] in target_members
-                ):
-                    shared_member, bias = target_members[target[2]]
-                    publications.add((shared_member, source[2], bias + store[2]))
-                    break
-            break
-
-    return sorted(publications)
+    result = _native_g17._query(
+        b"", 'recover_auxiliary_shared_publications',
+        layout_options_text=json.dumps({
+            'code': code.hex(),
+        }))
+    return [tuple(row) for row in result]
 
 
 def recover_firmware_shared_data_layout(
     allocations: list[dict[str, int]], shared_code: bytes, base_code: bytes
 ) -> dict[str, object]:
-    direct = recover_direct_shared_publications(shared_code)
-    expected_direct = sorted(
-        (
-            (0xA98, 0x300, 0x000),
-            (0xA98, 0x338, 0x008),
-            (0xA98, 0x340, 0x010),
-            (0xA98, 0xAC0, 0x200),
-            (0xA98, 0x308, 0x254),
-            (0xA98, 0x310, 0x25C),
-            (0xA98, 0x318, 0x264),
-            (0xA98, 0x328, 0x26C),
-            (0xA98, 0x330, 0x274),
-            (0xBC8, 0x300, 0x000),
-            (0xBC8, 0x338, 0x008),
-            (0xBC8, 0x340, 0x010),
-            (0xBC8, 0xBF0, 0x200),
-            (0xBC8, 0x320, 0x471),
-        )
-    )
-    if direct != expected_direct:
-        raise ValueError(
-            "unexpected direct firmware-shared publications: "
-            f"{[(hex(shared), hex(source), hex(offset)) for shared, source, offset in direct]}"
-        )
-
-    auxiliary = recover_auxiliary_shared_publications(base_code)
-    expected_auxiliary = sorted(
-        (shared, source, 0x1C0 + index * 8)
-        for shared, sources in (
-            (0xA98, (0xB40, 0xB60, 0xB48, 0xB68, 0xB50, 0xB70, 0xB58, 0xB78)),
-            (0xBC8, (0xC70, 0xC90, 0xC78, 0xC98, 0xC80, 0xCA0, 0xC88, 0xCA8)),
-        )
-        for index, source in enumerate(sources)
-    )
-    if auxiliary != expected_auxiliary:
-        raise ValueError(
-            "unexpected auxiliary firmware-shared publications: "
-            f"{[(hex(shared), hex(source), hex(offset)) for shared, source, offset in auxiliary]}"
-        )
-
-    require_instruction_sequence(
-        shared_code,
-        "conditional platform shared-address source",
-        (
-            0xF9414E68,  # ldr x8, [x19, #0x298]
-            0x529EEA89,  # mov w9, #0xf754
-            0x8B090109,  # add x9, x8, x9
-            0xB9400129,  # ldr w9, [x9]
-        ),
-    )
-    require_instruction_sequence(
-        shared_code,
-        "conditional platform shared-address pointer",
-        (
-            0x91404D08,  # add x8, x8, #0x13000
-            0x911DA108,  # add x8, x8, #0x768
-            0xF9400101,  # ldr x1, [x8]
-        ),
-    )
-    if struct.pack("<I", 0xF9016AA0) not in shared_code:  # str x0, [x21, #0x2d0]
-        raise ValueError("missing conditional platform shared-address publication")
-
-    allocation_sizes = {
-        item["host_gpu_member"]: item["bytes"] for item in allocations
-    }
-    expected_sizes = {
-        0x300: 0x2710,
-        0x308: 0xC18,
-        0x310: 0x1048,
-        0x318: 0xE10,
-        0x320: 0x11DD0,
-        0x328: 0x68,
-        0x330: 0x800,
-        0x338: 0,
-        0x340: 0x88,
-        0xAC0: 0x79800,
-        0xBF0: 0x79800,
-        0xB40: 0x30,
-        0xB48: 0x1B0,
-        0xB50: 0x30,
-        0xB58: 0x30,
-        0xB60: 0x4800,
-        0xB68: 0x28800,
-        0xB70: 0x9000,
-        0xB78: 0x4800,
-        0xC70: 0x30,
-        0xC78: 0x1B0,
-        0xC80: 0x30,
-        0xC88: 0x30,
-        0xC90: 0x4800,
-        0xC98: 0x28800,
-        0xCA0: 0x9000,
-        0xCA8: 0x4800,
-    }
-    mismatched = {
-        member: (allocation_sizes.get(member), size)
-        for member, size in expected_sizes.items()
-        if allocation_sizes.get(member) != size
-    }
-    if mismatched:
-        raise ValueError(
-            "unexpected firmware-shared target allocations: "
-            f"{[(hex(member), actual, expected) for member, (actual, expected) in mismatched.items()]}"
-        )
-
-    def render(items: list[tuple[int, int, int]]) -> list[dict[str, int]]:
-        return [
-            {
-                "shared_cpu_member": shared,
-                "source_gpu_member": source,
-                "shared_offset": offset,
-                **(
-                    {"source_bytes": allocation_sizes[source]}
-                    if source in allocation_sizes
-                    else {}
-                ),
-            }
-            for shared, source, offset in items
-        ]
-
-    return {
-        "bytes": 0x4C0,
-        "roles": [
-            {
-                "role": role,
-                "shared_cpu_member": shared,
-                "shared_gpu_member": gpu,
-                "direct_publications": render(
-                    [item for item in direct if item[0] == shared]
-                ),
-                "auxiliary_publications": render(
-                    [item for item in auxiliary if item[0] == shared]
-                ),
-            }
-            for role, shared, gpu in ((0, 0xA98, 0xAB8), (1, 0xBC8, 0xBE8))
-        ],
-        "conditional_platform_publication": {
-            "host_platform_member": 0x298,
-            "enabled_offset": 0xF754,
-            "pointer_offset": 0x13768,
-            "shared_cpu_member": 0xA98,
-            "shared_offset": 0x2D0,
-        },
-    }
+    result = _native_g17._query(
+        b"", 'recover_firmware_shared_data_layout',
+        layout_options_text=json.dumps({
+            'allocations': allocations,
+            'shared_code': shared_code.hex(),
+            'base_code': base_code.hex(),
+        }))
+    return result
 
 
 def recover_firmware_shared_platform_fields(code: bytes) -> dict[str, object]:
-    require_instruction_sequence(
-        code,
-        "primary shared platform service pair",
-        (
-            0xF9454E75,  # ldr x21, [x19, #0xa98]
-            0x91404408,  # add x8, x0, #0x11000
-            0x91158108,  # add x8, x8, #0x560
-            0xF9400108,  # ldr x8, [x8]
-        ),
-    )
-    require_instruction_sequence(
-        code,
-        "primary shared second platform service pair",
-        (
-            0x91404408,  # add x8, x0, #0x11000
-            0x9115A108,  # add x8, x8, #0x568
-            0xF9400108,  # ldr x8, [x8]
-        ),
-    )
-    for instruction, label in (
-        (0xF9016EA0, "primary platform address 0x2d8"),
-        (0xF90172A0, "primary platform address 0x2e0"),
-        (0xF90176A0, "primary platform address 0x2e8"),
-        (0xF9017AA0, "primary platform address 0x2f0"),
-        (0xF9017EBF, "primary reserved address 0x2f8"),
-    ):
-        if struct.pack("<I", instruction) not in code:
-            raise ValueError(f"missing {label} store")
-
-    for instruction, label in (
-        (0xF9016EBF, "nullable primary platform address 0x2d8"),
-        (0xF90176BF, "nullable primary platform address 0x2e8"),
-    ):
-        if struct.pack("<I", instruction) not in code:
-            raise ValueError(f"missing {label} zero store")
-    if code.count(struct.pack("<I", 0xD2800000)) < 2:  # mov x0, #0
-        raise ValueError("missing nullable secondary platform-service addresses")
-
-    require_instruction_sequence(
-        code,
-        "secondary shared platform mirrors",
-        (
-            0xF945E669,  # ldr x9, [x19, #0xbc8]
-            0xF9416EAA,  # ldr x10, [x21, #0x2d8]
-            0xF9016D2A,  # str x10, [x9, #0x2d8]
-            0xF9017528,  # str x8, [x9, #0x2e8]
-            0xF9017D3F,  # str xzr, [x9, #0x2f8]
-        ),
-    )
-    require_instruction_sequence(
-        code,
-        "role-specific shared platform scalars",
-        (
-            0x91403D09,  # add x9, x8, #0xf000
-            0xB947C12A,  # ldr w10, [x9, #0x7c0]
-            0xF945E66B,  # ldr x11, [x19, #0xbc8]
-            0xB903016A,  # str w10, [x11, #0x300]
-            0xB9483529,  # ldr w9, [x9, #0x834]
-            0xB90306A9,  # str w9, [x21, #0x304]
-        ),
-    )
-    require_instruction_sequence(
-        code,
-        "primary shared calibration copy",
-        (
-            0xF9454E69,  # ldr x9, [x19, #0xa98]
-            0x9111E529,  # add x9, x9, #0x479
-            0x3DFDE500,  # ldr q0, [x8, #0xf790]
-            0x3D800120,  # str q0, [x9]
-        ),
-    )
-    require_instruction_sequence(
-        code,
-        "secondary shared calibration copy",
-        (
-            0xF9414E68,  # ldr x8, [x19, #0x298]
-            0xF945E669,  # ldr x9, [x19, #0xbc8]
-            0x9111E529,  # add x9, x9, #0x479
-            0x3DFDE500,  # ldr q0, [x8, #0xf790]
-            0x3D800120,  # str q0, [x9]
-        ),
-    )
-    require_instruction_sequence(
-        code,
-        "primary shared state initialization",
-        (
-            0x52801FE8,  # mov w8, #0xff
-            0x390F82A8,  # strb w8, [x21, #0x3e0]
-            0x910F86A8,  # add x8, x21, #0x3e1
-            0x6F00E400,  # movi v0.2d, #0
-            0xAD000100,
-            0xAD010100,
-            0xAD020100,
-            0xAD030100,
-            0x3D802100,
-        ),
-    )
-
-    return {
-        "platform_host_member": 0x298,
-        "primary_service_sources": [
-            {
-                "platform_pointer_offset": 0x11560,
-                "primary_shared_offsets": [0x2D8, 0x2E0],
-                "primary_object_member": 0x68,
-                "secondary_object_member": 0x58,
-                "mapping_address_vtable_offset": 0x158,
-                "nullable": True,
-            },
-            {
-                "platform_pointer_offset": 0x11568,
-                "primary_shared_offsets": [0x2E8, 0x2F0],
-                "primary_object_member": 0x68,
-                "secondary_object_member": 0x58,
-                "mapping_address_vtable_offset": 0x158,
-                "nullable": True,
-            },
-        ],
-        "secondary_mirrors": [
-            {"primary_shared_offset": 0x2D8, "secondary_shared_offset": 0x2D8},
-            {"primary_shared_offset": 0x2E8, "secondary_shared_offset": 0x2E8},
-        ],
-        "scalars": [
-            {"platform_offset": 0xF7C0, "role": 1, "shared_offset": 0x300},
-            {"platform_offset": 0xF834, "role": 0, "shared_offset": 0x304},
-        ],
-        "calibration": {
-            "platform_offset": 0xF790,
-            "shared_offset": 0x479,
-            "bytes": 0x10,
-            "roles": [0, 1],
-        },
-        "primary_state": {
-            "state_offset": 0x3E0,
-            "state_initial": 0xFF,
-            "status_offset": 0x3E1,
-            "status_bytes": 0x90,
-        },
-    }
+    result = _native_g17._query(
+        b"", 'recover_firmware_shared_platform_fields',
+        layout_options_text=json.dumps({
+            'code': code.hex(),
+        }))
+    return result
 
 
 def recover_g17_small_shared_data(
@@ -2037,184 +1384,14 @@ def recover_driver_hardware_config_layout(
     Validate loop instructions as well as constants so a coincidental use of
     an offset elsewhere cannot become a claimed firmware structure field.
     """
-
-    require_instruction_sequence(
-        base_init_code,
-        "color-matrix copy loop",
-        (
-            0x5280040A,  # mov w10, #32
-            0xF940010B,  # ldr x11, [x8]
-            0xF9001D2B,  # str x11, [x9, #0x38]
-            0xF941810B,  # ldr x11, [x8, #0x300]
-            0xF9019D2B,  # str x11, [x9, #0x338]
-            0xF940050B,
-            0xF900212B,
-            0xF941850B,
-            0xF901A12B,
-            0xF940090B,
-            0xF900252B,
-            0xF941890B,
-            0xF901A52B,
-            0x91006108,  # add x8, x8, #0x18
-            0x91006129,  # add x9, x9, #0x18
-            0xF100054A,  # subs x10, x10, #1
-            0x54FFFE21,  # b.ne
-        ),
-    )
-    require_instruction_sequence(
-        base_init_code,
-        "I/O-mapping copy loop",
-        (
-            0xD2800008,  # mov x8, #0
-            0xD280000A,  # mov x10, #0
-            0xF9415E69,  # ldr config CPU address, [x19, #0x2b8]
-            0xF9129520,
-            0xF9414E60,
-            0x8B08000B,
-            0xB949896C,
-            0xB947856D,
-            0x1B0C7DAD,
-            0x8B0A012E,
-            0xB90651CD,  # record +0x10
-            0xF943C56D,
-            0xF90321CD,  # config +0x640 + record
-            0xF944C96D,
-            0xF9032DCD,  # record +0x18
-            0xB90655CC,  # record +0x14
-            0xB947816B,
-            0x121F016B,
-            0xB90661CB,  # record +0x20
-            0xF90325DF,  # record +0x08
-            0x9100A14A,  # add x10, x10, #0x28
-            0x9110E108,  # add x8, x8, #0x438
-            0xF121215F,  # cmp x10, #0x848
-            0x54FFFDC1,  # b.ne
-        ),
-    )
-
-    base_stores = {
-        immediate
-        for _offset, word in words(base_power_code)
-        if (store := decode_str_unsigned(word)) is not None
-        for _source, base, immediate, width in (store,)
-        if base == 8 and width == 4
-    }
-    frequency_offsets = set(range(0xFC8, 0x1008, 4))
-    secondary_frequency_offsets = set(range(0x1808, 0x1848, 4))
-    required_base_stores = {0xFC4} | frequency_offsets | secondary_frequency_offsets
-    if not required_base_stores.issubset(base_stores):
-        missing = sorted(required_base_stores - base_stores)
-        raise ValueError(
-            "hardware-config producer has incomplete performance tables: "
-            f"{[hex(offset) for offset in missing]}"
-        )
-
-    require_instruction_sequence(
-        base_power_code,
-        "primary and SRAM frequency-table conversion",
-        (
-            0xF9415E68,  # hardware config at firmware object +0x2b8
-            0xB90FC509,  # maximum performance-state index -> +0xfc4
-            0xF9414E69,  # accelerator at firmware object +0x298
-            0x91406D29,  # accelerator +0x1b000
-            0xB943192B,  # primary frequency[0] at +0x1b318
-            0x529BD06A,
-            0x72A8636A,  # reciprocal multiplier 0x431bde83
-            0x9BAA7D6B,
-            0xD372FD6B,  # unsigned product >> 50: Hz to MHz
-            0xB90FC90B,  # primary frequency[0] -> config +0xfc8
-            0xB94B612B,  # SRAM frequency[0] at +0x1bb60
-            0x9BAA7D6B,
-            0xD372FD6B,
-            0xB918090B,  # SRAM frequency[0] -> config +0x1808
-        ),
-    )
-
-    require_instruction_sequence(
-        arm_power_code,
-        "voltage-table loop setup",
-        (
-            0xF9415E6B,  # ldr config CPU address, [x19, #0x2b8]
-            0x5282010A,  # mov w10, #0x1008
-            0x8B0A016A,  # add x10, x11, x10
-            0x91041108,
-            0x5283110C,  # mov w12, #0x1888
-            0x8B0C016B,  # add x11, x11, x12
-            0x5280020C,  # mov w12, #16
-        ),
-    )
-    arm_stores = {
-        (base, immediate, width)
-        for _offset, word in words(arm_power_code)
-        if (store := decode_str_unsigned(word)) is not None
-        for _source, base, immediate, width in (store,)
-    }
-    voltage_columns = {
-        (10, offset, 4) for offset in range(0, 0x40, 4)
-    } | {(10, 0x400 + offset, 4) for offset in range(0, 0x40, 4)}
-    if not voltage_columns.issubset(arm_stores):
-        raise ValueError("hardware-config producer has incomplete 16-column voltage rows")
-    require_instruction_sequence(
-        arm_power_code,
-        "voltage-table row advance",
-        (
-            0xBC5C0100,
-            0xBC1C0160,  # table at 0x1848 through x11 - 0x40
-            0x91010129,  # add source row, #0x40
-            0xBC404500,
-            0xBC004560,  # table at 0x1888, post-increment #4
-            0x9101014A,  # add destination row, #0x40
-            0xF100058C,  # subs x12, x12, #1
-            0x54FFF721,  # b.ne
-        ),
-    )
-    require_instruction_sequence(
-        arm_power_code,
-        "linear-power table binding",
-        (
-            0xF9415E68,
-            0x52831909,  # mov w9, #0x18c8
-            0x8B090101,  # add x1, x8, x9
-            0x52800002,  # mov w2, #0
-        ),
-    )
-    for offset, materialization in (
-        (0x1908, (0x5283210B, 0x8B0B0134)),
-        (0x1948, (0x5283290B, 0x8B0B012B)),
-        (0x19C8, (0x52833909, 0x8B09010A)),
-    ):
-        require_instruction_sequence(
-            arm_power_code,
-            f"table binding at {offset:#x}",
-            materialization,
-        )
-
-    return {
-        "color_matrices": {
-            "offset": 0x38,
-            "records": 64,
-            "record_bytes": 0x18,
-            "banks": 2,
-        },
-        "io_mappings": {"offset": 0x640, "records": 53, "record_bytes": 0x28},
-        "performance_states": {
-            "capacity": 16,
-            "max_state_offset": 0xFC4,
-            "frequency_offset": 0xFC8,
-            "voltage_offset": 0x1008,
-            "sram_voltage_offset": 0x1408,
-            "secondary_frequency_offset": 0x1808,
-            "primary_frequency_source_offset": 0x1B318,
-            "secondary_frequency_source_offset": 0x1BB60,
-            "frequency_conversion": {
-                "input": "Hz",
-                "output": "MHz",
-                "multiplier": 0x431BDE83,
-                "right_shift": 50,
-            },
-            "derived_table_offsets": [0x1848, 0x1888, 0x18C8, 0x1908, 0x1948],
-        },
-    }
+    result = _native_g17._query(
+        b"", 'recover_driver_hardware_config_layout',
+        layout_options_text=json.dumps({
+            'base_init_code': base_init_code.hex(),
+            'base_power_code': base_power_code.hex(),
+            'arm_power_code': arm_power_code.hex(),
+        }))
+    return result
 
 
 def recover_g17_address_space_layout(
@@ -3308,120 +2485,12 @@ def recover_g17_aux_performance_layout(
 
 
 def recover_firmware_config_reads(firmware: bytes) -> dict[str, object]:
-    magic = find_materialized_constant(firmware, INTERFACE_MAGIC)
-    if len(magic) != 1:
-        raise ValueError(f"expected one firmware interface magic sequence, found {len(magic)}")
-    _magic_start, magic_end, _register = magic[0]
-    code = firmware[magic_end : magic_end + 0x800]
-    origins: dict[int, tuple[int, bool]] = {}
-    constants: dict[int, int] = {}
-    reads: set[tuple[int, int, bool]] = set()
-
-    for _offset, word in words(code):
-        move_x = decode_move_wide(word)
-        move_w = decode_movz_w(word)
-        if move_x is not None and move_x[0] == "movz":
-            constants[move_x[1]] = move_x[2] << move_x[3]
-            origins.pop(move_x[1], None)
-            continue
-        if move_w is not None:
-            constants[move_w[0]] = move_w[1]
-            origins.pop(move_w[0], None)
-            continue
-
-        load = decode_load_unsigned(word)
-        if load is not None:
-            destination, base, immediate, width = load
-            if base in origins:
-                base_offset, indexed = origins[base]
-                reads.add((base_offset + immediate, width, indexed))
-            if width == 8 and base == 19 and immediate == 0:
-                origins[destination] = (0, False)
-            else:
-                origins.pop(destination, None)
-            constants.pop(destination, None)
-            continue
-
-        register_load = decode_load_register(word)
-        if register_load is not None:
-            destination, base, offset_register, width = register_load
-            if base in origins and offset_register in constants:
-                base_offset, indexed = origins[base]
-                reads.add((base_offset + constants[offset_register], width, indexed))
-            origins.pop(destination, None)
-            constants.pop(destination, None)
-            continue
-
-        addition = decode_add_immediate(word)
-        if addition is not None:
-            destination, source, immediate = addition
-            if source in origins:
-                base_offset, indexed = origins[source]
-                origins[destination] = (base_offset + immediate, indexed)
-            else:
-                origins.pop(destination, None)
-            if source in constants:
-                constants[destination] = constants[source] + immediate
-            else:
-                constants.pop(destination, None)
-            continue
-
-        register_add = decode_add_register(word)
-        if register_add is not None:
-            destination, first, second, shift = register_add
-            if first in origins:
-                base_offset, indexed = origins[first]
-                if second in constants:
-                    origins[destination] = (
-                        base_offset + (constants[second] << shift), indexed
-                    )
-                else:
-                    origins[destination] = (base_offset, True)
-            else:
-                origins.pop(destination, None)
-            constants.pop(destination, None)
-            continue
-
-        pair = decode_pair_q(word)
-        if pair is not None and pair[0] == "load" and pair[3] in origins:
-            _kind, _first, _second, base, immediate = pair
-            base_offset, indexed = origins[base]
-            reads.add((base_offset + immediate, 32, indexed))
-
-    required = {
-        (0x8F0, 8, False),
-        (0xE90, 16, False),
-        (0xFC8, 4, True),
-        (0x1008, 4, True),
-        (0x1408, 4, True),
-        (0x19C8, 32, False),
-        (0x2610, 8, False),
-        (0x26F9, 1, False),
-    }
-    if not required.issubset(reads):
-        raise ValueError(f"incomplete firmware hardware-config read map: {required - reads}")
-
-    copied_pattern = struct.pack(
-        "<5I",
-        0xF9400268,  # ldr x8, [x19]
-        0x52837209,  # mov w9, #0x1b90
-        0x911442C0,  # add x0, x22, #0x510
-        0x8B090101,  # add x1, x8, x9
-        0x52802902,  # mov w2, #0x148
-    )
-    if copied_pattern not in code:
-        raise ValueError("firmware 0x1b90 configuration copy was not found")
-
-    return {
-        "firmware_direct_reads": [
-            {"offset": offset, "bytes": width, "indexed": indexed}
-            for offset, width, indexed in sorted(reads)
-        ],
-        "firmware_bulk_reads": [
-            {"offset": 0x19C8, "bytes": 0x80},
-            {"offset": 0x1B90, "bytes": 0x148},
-        ],
-    }
+    result = _native_g17._query(
+        b"", 'recover_firmware_config_reads',
+        layout_options_text=json.dumps({
+            'firmware': firmware.hex(),
+        }))
+    return result
 
 
 def recover_device_control_ring_bindings(

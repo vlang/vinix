@@ -126,3 +126,23 @@ Qualification under `~/.cache/vinix-python-to-v/g17-events-20261008/` passed
 the eight real-driver outputs and the complete original controller report on
 both architectures, original assertions, native fake-stack checks, and foreign
 thread response ownership. These checks qualify host recovery and its C ABI.
+
+The layout extension owns firmware and driver root pointers, tagged allocation
+descriptors, shared publications, platform fields and hardware-config producer
+and consumer maps. Instruction-derived addresses and configuration offsets keep
+their full width; allocation metadata preserves numeric types, last matching
+dictionary entries and first matching hardware-config allocations. Missing
+read-map diagnostics retain the original integer-tuple set formatting.
+
+The 12 original layout methods and 968 boundary cases are independent native
+fixtures, including all 256 missing read subsets and 640 signed or overflowing
+allocation-read cases and 72 address-type and error-ordering cases. Real-image
+fixture descriptors retain artifact hashes, symbol names, scalar inputs and
+complete original outputs. Seventeen retired
+fixture recipes retain their complete typed input data, including unused
+provider entries, alongside their original native query outcomes; their spans
+were excluded from the earlier runtime and command retirement totals.
+Qualification under `~/.cache/vinix-python-to-v/g17-layout-20261008/` passed
+12,773 complete typed result and error controls on ARM64, x86-64 and ASan/UBSan,
+all 11 real-driver outputs, original assertions, remaining Python assertions,
+fake-stack checks and foreign thread response ownership.

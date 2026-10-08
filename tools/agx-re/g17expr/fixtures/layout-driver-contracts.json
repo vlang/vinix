@@ -1,0 +1,3267 @@
+{
+  "driver_sha256": "32c6e5c3e82cb2c2d91846f958868ac862070319766ec9e8a3eab86d38d5e845",
+  "firmware_sha256": "86200982612ec222748a48d9b4397a41ea17cf24e682bc2a656d610096a2d196",
+  "records": [
+    {
+      "operation": "recover_driver_root",
+      "arguments": {
+        "code": {
+          "symbol": "__ZN14AGXArmFirmware16initFirmwareDataEv"
+        }
+      },
+      "result": {
+        "interface_magic": 904030701134283968,
+        "magic_code_offset": 2220,
+        "pointer_offsets": [
+          24,
+          32,
+          168,
+          176,
+          184,
+          192
+        ],
+        "firmware_role_offset": 40,
+        "host_mapped_allocations_offset": 44,
+        "bootstrap_provider_host_member": 6744,
+        "bootstrap_region": {
+          "root_offset": 8,
+          "host_cpu_member": 6736,
+          "host_gpu_mapping_member": 6744,
+          "mapping_address_vtable_offset": 344,
+          "firmware_address_conversion_vtable_offset": 728
+        },
+        "platform_config": {
+          "host_platform_member": 664,
+          "host_platform_pointer_offset": 108872,
+          "root_offset": 48,
+          "bytes": 104
+        },
+        "roles": [
+          {
+            "role": 0,
+            "bindings": [
+              {
+                "host_gpu_member": 2744,
+                "root_offset": 24
+              },
+              {
+                "host_gpu_member": 904,
+                "root_offset": 32
+              },
+              {
+                "host_gpu_member": 2768,
+                "root_offset": 168
+              },
+              {
+                "host_gpu_member": 3296,
+                "root_offset": 176
+              }
+            ]
+          },
+          {
+            "role": 1,
+            "bindings": [
+              {
+                "host_gpu_member": 3048,
+                "root_offset": 24
+              },
+              {
+                "host_gpu_member": 904,
+                "root_offset": 32
+              },
+              {
+                "host_gpu_member": 3072,
+                "root_offset": 168
+              },
+              {
+                "host_gpu_member": 3304,
+                "root_offset": 184
+              },
+              {
+                "host_gpu_member": 920,
+                "root_offset": 192
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "operation": "recover_firmware_allocations",
+      "arguments": {
+        "image": {
+          "artifact": "driver"
+        },
+        "address": {
+          "value": 18446741874830240124
+        },
+        "code": {
+          "symbol": "__ZN11AGXFirmware17allocFirmwareDataEv"
+        }
+      },
+      "result": [
+        {
+          "host_cpu_member": 696,
+          "host_gpu_member": 768,
+          "bytes": 10000
+        },
+        {
+          "host_cpu_member": 704,
+          "host_gpu_member": 776,
+          "bytes": 3096
+        },
+        {
+          "host_cpu_member": 712,
+          "host_gpu_member": 784,
+          "bytes": 4168
+        },
+        {
+          "host_cpu_member": 720,
+          "host_gpu_member": 792,
+          "bytes": 3600
+        },
+        {
+          "host_cpu_member": 728,
+          "host_gpu_member": 800,
+          "bytes": 73168
+        },
+        {
+          "host_cpu_member": 736,
+          "host_gpu_member": 808,
+          "bytes": 104
+        },
+        {
+          "host_cpu_member": 744,
+          "host_gpu_member": 816,
+          "bytes": 2048
+        },
+        {
+          "host_cpu_member": 760,
+          "host_gpu_member": 832,
+          "bytes": 136
+        },
+        {
+          "host_cpu_member": 896,
+          "host_gpu_member": 904,
+          "bytes": 7328
+        },
+        {
+          "host_cpu_member": 912,
+          "host_gpu_member": 920,
+          "bytes": 168
+        },
+        {
+          "host_cpu_member": 928,
+          "host_gpu_member": 936,
+          "bytes": 8
+        },
+        {
+          "host_cpu_member": 952,
+          "host_gpu_member": 960,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 968,
+          "host_gpu_member": 976,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 992,
+          "host_gpu_member": 1000,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1008,
+          "host_gpu_member": 1016,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1032,
+          "host_gpu_member": 1040,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1048,
+          "host_gpu_member": 1056,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1072,
+          "host_gpu_member": 1080,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1088,
+          "host_gpu_member": 1096,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1112,
+          "host_gpu_member": 1120,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1128,
+          "host_gpu_member": 1136,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1152,
+          "host_gpu_member": 1160,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1168,
+          "host_gpu_member": 1176,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1192,
+          "host_gpu_member": 1200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1208,
+          "host_gpu_member": 1216,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1232,
+          "host_gpu_member": 1240,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1248,
+          "host_gpu_member": 1256,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1272,
+          "host_gpu_member": 1280,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1288,
+          "host_gpu_member": 1296,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1312,
+          "host_gpu_member": 1320,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1328,
+          "host_gpu_member": 1336,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1352,
+          "host_gpu_member": 1360,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1368,
+          "host_gpu_member": 1376,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 1392,
+          "host_gpu_member": 1400,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 1408,
+          "host_gpu_member": 1416,
+          "bytes": 6144
+        },
+        {
+          "host_cpu_member": 2712,
+          "host_gpu_member": 2744,
+          "bytes": 1216
+        },
+        {
+          "host_cpu_member": 2736,
+          "host_gpu_member": 2752,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 2760,
+          "host_gpu_member": 2768,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 2784,
+          "host_gpu_member": 2792,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2800,
+          "host_gpu_member": 2808,
+          "bytes": 16384
+        },
+        {
+          "host_cpu_member": 2816,
+          "host_gpu_member": 2880,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2824,
+          "host_gpu_member": 2888,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 2832,
+          "host_gpu_member": 2896,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2840,
+          "host_gpu_member": 2904,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 2848,
+          "host_gpu_member": 2912,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 2856,
+          "host_gpu_member": 2920,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 2864,
+          "host_gpu_member": 2928,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 2872,
+          "host_gpu_member": 2936,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3016,
+          "host_gpu_member": 3048,
+          "bytes": 1216
+        },
+        {
+          "host_cpu_member": 3040,
+          "host_gpu_member": 3056,
+          "bytes": 497664
+        },
+        {
+          "host_cpu_member": 3064,
+          "host_gpu_member": 3072,
+          "bytes": 32
+        },
+        {
+          "host_cpu_member": 3088,
+          "host_gpu_member": 3096,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3104,
+          "host_gpu_member": 3112,
+          "bytes": 16384
+        },
+        {
+          "host_cpu_member": 3120,
+          "host_gpu_member": 3184,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3128,
+          "host_gpu_member": 3192,
+          "bytes": 432
+        },
+        {
+          "host_cpu_member": 3136,
+          "host_gpu_member": 3200,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3144,
+          "host_gpu_member": 3208,
+          "bytes": 48
+        },
+        {
+          "host_cpu_member": 3152,
+          "host_gpu_member": 3216,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3160,
+          "host_gpu_member": 3224,
+          "bytes": 165888
+        },
+        {
+          "host_cpu_member": 3168,
+          "host_gpu_member": 3232,
+          "bytes": 36864
+        },
+        {
+          "host_cpu_member": 3176,
+          "host_gpu_member": 3240,
+          "bytes": 18432
+        },
+        {
+          "host_cpu_member": 3280,
+          "host_gpu_member": 3296,
+          "bytes": 58432
+        },
+        {
+          "host_cpu_member": 3288,
+          "host_gpu_member": 3304,
+          "bytes": 1776
+        },
+        {
+          "host_cpu_member": 4008,
+          "host_gpu_member": 4000,
+          "bytes": 228
+        }
+      ]
+    },
+    {
+      "operation": "recover_root_allocation_sizes",
+      "arguments": {
+        "allocations": {
+          "value": [
+            {
+              "host_cpu_member": 696,
+              "host_gpu_member": 768,
+              "bytes": 10000
+            },
+            {
+              "host_cpu_member": 704,
+              "host_gpu_member": 776,
+              "bytes": 3096
+            },
+            {
+              "host_cpu_member": 712,
+              "host_gpu_member": 784,
+              "bytes": 4168
+            },
+            {
+              "host_cpu_member": 720,
+              "host_gpu_member": 792,
+              "bytes": 3600
+            },
+            {
+              "host_cpu_member": 728,
+              "host_gpu_member": 800,
+              "bytes": 73168
+            },
+            {
+              "host_cpu_member": 736,
+              "host_gpu_member": 808,
+              "bytes": 104
+            },
+            {
+              "host_cpu_member": 744,
+              "host_gpu_member": 816,
+              "bytes": 2048
+            },
+            {
+              "host_cpu_member": 760,
+              "host_gpu_member": 832,
+              "bytes": 136
+            },
+            {
+              "host_cpu_member": 896,
+              "host_gpu_member": 904,
+              "bytes": 7328
+            },
+            {
+              "host_cpu_member": 912,
+              "host_gpu_member": 920,
+              "bytes": 168
+            },
+            {
+              "host_cpu_member": 928,
+              "host_gpu_member": 936,
+              "bytes": 8
+            },
+            {
+              "host_cpu_member": 952,
+              "host_gpu_member": 960,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 968,
+              "host_gpu_member": 976,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 992,
+              "host_gpu_member": 1000,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1008,
+              "host_gpu_member": 1016,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1032,
+              "host_gpu_member": 1040,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1048,
+              "host_gpu_member": 1056,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1072,
+              "host_gpu_member": 1080,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1088,
+              "host_gpu_member": 1096,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1112,
+              "host_gpu_member": 1120,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1128,
+              "host_gpu_member": 1136,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1152,
+              "host_gpu_member": 1160,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1168,
+              "host_gpu_member": 1176,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1192,
+              "host_gpu_member": 1200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1208,
+              "host_gpu_member": 1216,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1232,
+              "host_gpu_member": 1240,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1248,
+              "host_gpu_member": 1256,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1272,
+              "host_gpu_member": 1280,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1288,
+              "host_gpu_member": 1296,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1312,
+              "host_gpu_member": 1320,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1328,
+              "host_gpu_member": 1336,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1352,
+              "host_gpu_member": 1360,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1368,
+              "host_gpu_member": 1376,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1392,
+              "host_gpu_member": 1400,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1408,
+              "host_gpu_member": 1416,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 2712,
+              "host_gpu_member": 2744,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 2736,
+              "host_gpu_member": 2752,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 2760,
+              "host_gpu_member": 2768,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 2784,
+              "host_gpu_member": 2792,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2800,
+              "host_gpu_member": 2808,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 2816,
+              "host_gpu_member": 2880,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2824,
+              "host_gpu_member": 2888,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 2832,
+              "host_gpu_member": 2896,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2840,
+              "host_gpu_member": 2904,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2848,
+              "host_gpu_member": 2912,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 2856,
+              "host_gpu_member": 2920,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 2864,
+              "host_gpu_member": 2928,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 2872,
+              "host_gpu_member": 2936,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3016,
+              "host_gpu_member": 3048,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 3040,
+              "host_gpu_member": 3056,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 3064,
+              "host_gpu_member": 3072,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 3088,
+              "host_gpu_member": 3096,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3104,
+              "host_gpu_member": 3112,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 3120,
+              "host_gpu_member": 3184,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3128,
+              "host_gpu_member": 3192,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 3136,
+              "host_gpu_member": 3200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3144,
+              "host_gpu_member": 3208,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3152,
+              "host_gpu_member": 3216,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3160,
+              "host_gpu_member": 3224,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 3168,
+              "host_gpu_member": 3232,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 3176,
+              "host_gpu_member": 3240,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3280,
+              "host_gpu_member": 3296,
+              "bytes": 58432
+            },
+            {
+              "host_cpu_member": 3288,
+              "host_gpu_member": 3304,
+              "bytes": 1776
+            },
+            {
+              "host_cpu_member": 4008,
+              "host_gpu_member": 4000,
+              "bytes": 228
+            },
+            {
+              "host_cpu_member": 752,
+              "host_gpu_member": 824,
+              "bytes": 0
+            }
+          ]
+        }
+      },
+      "result": {
+        "firmware_shared_data": 1216,
+        "secondary_firmware_shared_data": 1216,
+        "runtime_data": 7328,
+        "small_shared_data": 32,
+        "secondary_small_shared_data": 32,
+        "primary_region": 58432,
+        "secondary_region": 1776,
+        "secondary_aux": 168
+      }
+    },
+    {
+      "operation": "recover_direct_shared_publications",
+      "arguments": {
+        "code": {
+          "symbol": "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
+        }
+      },
+      "result": [
+        [
+          2712,
+          768,
+          0
+        ],
+        [
+          2712,
+          776,
+          596
+        ],
+        [
+          2712,
+          784,
+          604
+        ],
+        [
+          2712,
+          792,
+          612
+        ],
+        [
+          2712,
+          808,
+          620
+        ],
+        [
+          2712,
+          816,
+          628
+        ],
+        [
+          2712,
+          824,
+          8
+        ],
+        [
+          2712,
+          832,
+          16
+        ],
+        [
+          2712,
+          2752,
+          512
+        ],
+        [
+          3016,
+          768,
+          0
+        ],
+        [
+          3016,
+          800,
+          1137
+        ],
+        [
+          3016,
+          824,
+          8
+        ],
+        [
+          3016,
+          832,
+          16
+        ],
+        [
+          3016,
+          3056,
+          512
+        ]
+      ]
+    },
+    {
+      "operation": "recover_auxiliary_shared_publications",
+      "arguments": {
+        "code": {
+          "symbol": "__ZN11AGXFirmware16initFirmwareDataEv"
+        }
+      },
+      "result": [
+        [
+          2712,
+          2880,
+          448
+        ],
+        [
+          2712,
+          2888,
+          464
+        ],
+        [
+          2712,
+          2896,
+          480
+        ],
+        [
+          2712,
+          2904,
+          496
+        ],
+        [
+          2712,
+          2912,
+          456
+        ],
+        [
+          2712,
+          2920,
+          472
+        ],
+        [
+          2712,
+          2928,
+          488
+        ],
+        [
+          2712,
+          2936,
+          504
+        ],
+        [
+          3016,
+          3184,
+          448
+        ],
+        [
+          3016,
+          3192,
+          464
+        ],
+        [
+          3016,
+          3200,
+          480
+        ],
+        [
+          3016,
+          3208,
+          496
+        ],
+        [
+          3016,
+          3216,
+          456
+        ],
+        [
+          3016,
+          3224,
+          472
+        ],
+        [
+          3016,
+          3232,
+          488
+        ],
+        [
+          3016,
+          3240,
+          504
+        ]
+      ]
+    },
+    {
+      "operation": "recover_firmware_shared_data_layout",
+      "arguments": {
+        "allocations": {
+          "value": [
+            {
+              "host_cpu_member": 696,
+              "host_gpu_member": 768,
+              "bytes": 10000
+            },
+            {
+              "host_cpu_member": 704,
+              "host_gpu_member": 776,
+              "bytes": 3096
+            },
+            {
+              "host_cpu_member": 712,
+              "host_gpu_member": 784,
+              "bytes": 4168
+            },
+            {
+              "host_cpu_member": 720,
+              "host_gpu_member": 792,
+              "bytes": 3600
+            },
+            {
+              "host_cpu_member": 728,
+              "host_gpu_member": 800,
+              "bytes": 73168
+            },
+            {
+              "host_cpu_member": 736,
+              "host_gpu_member": 808,
+              "bytes": 104
+            },
+            {
+              "host_cpu_member": 744,
+              "host_gpu_member": 816,
+              "bytes": 2048
+            },
+            {
+              "host_cpu_member": 760,
+              "host_gpu_member": 832,
+              "bytes": 136
+            },
+            {
+              "host_cpu_member": 896,
+              "host_gpu_member": 904,
+              "bytes": 7328
+            },
+            {
+              "host_cpu_member": 912,
+              "host_gpu_member": 920,
+              "bytes": 168
+            },
+            {
+              "host_cpu_member": 928,
+              "host_gpu_member": 936,
+              "bytes": 8
+            },
+            {
+              "host_cpu_member": 952,
+              "host_gpu_member": 960,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 968,
+              "host_gpu_member": 976,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 992,
+              "host_gpu_member": 1000,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1008,
+              "host_gpu_member": 1016,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1032,
+              "host_gpu_member": 1040,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1048,
+              "host_gpu_member": 1056,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1072,
+              "host_gpu_member": 1080,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1088,
+              "host_gpu_member": 1096,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1112,
+              "host_gpu_member": 1120,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1128,
+              "host_gpu_member": 1136,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1152,
+              "host_gpu_member": 1160,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1168,
+              "host_gpu_member": 1176,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1192,
+              "host_gpu_member": 1200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1208,
+              "host_gpu_member": 1216,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1232,
+              "host_gpu_member": 1240,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1248,
+              "host_gpu_member": 1256,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1272,
+              "host_gpu_member": 1280,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1288,
+              "host_gpu_member": 1296,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1312,
+              "host_gpu_member": 1320,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1328,
+              "host_gpu_member": 1336,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1352,
+              "host_gpu_member": 1360,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1368,
+              "host_gpu_member": 1376,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1392,
+              "host_gpu_member": 1400,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1408,
+              "host_gpu_member": 1416,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 2712,
+              "host_gpu_member": 2744,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 2736,
+              "host_gpu_member": 2752,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 2760,
+              "host_gpu_member": 2768,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 2784,
+              "host_gpu_member": 2792,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2800,
+              "host_gpu_member": 2808,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 2816,
+              "host_gpu_member": 2880,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2824,
+              "host_gpu_member": 2888,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 2832,
+              "host_gpu_member": 2896,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2840,
+              "host_gpu_member": 2904,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2848,
+              "host_gpu_member": 2912,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 2856,
+              "host_gpu_member": 2920,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 2864,
+              "host_gpu_member": 2928,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 2872,
+              "host_gpu_member": 2936,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3016,
+              "host_gpu_member": 3048,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 3040,
+              "host_gpu_member": 3056,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 3064,
+              "host_gpu_member": 3072,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 3088,
+              "host_gpu_member": 3096,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3104,
+              "host_gpu_member": 3112,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 3120,
+              "host_gpu_member": 3184,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3128,
+              "host_gpu_member": 3192,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 3136,
+              "host_gpu_member": 3200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3144,
+              "host_gpu_member": 3208,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3152,
+              "host_gpu_member": 3216,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3160,
+              "host_gpu_member": 3224,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 3168,
+              "host_gpu_member": 3232,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 3176,
+              "host_gpu_member": 3240,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3280,
+              "host_gpu_member": 3296,
+              "bytes": 58432
+            },
+            {
+              "host_cpu_member": 3288,
+              "host_gpu_member": 3304,
+              "bytes": 1776
+            },
+            {
+              "host_cpu_member": 4008,
+              "host_gpu_member": 4000,
+              "bytes": 228
+            },
+            {
+              "host_cpu_member": 752,
+              "host_gpu_member": 824,
+              "bytes": 0
+            }
+          ]
+        },
+        "shared_code": {
+          "symbol": "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
+        },
+        "base_code": {
+          "symbol": "__ZN11AGXFirmware16initFirmwareDataEv"
+        }
+      },
+      "result": {
+        "bytes": 1216,
+        "roles": [
+          {
+            "role": 0,
+            "shared_cpu_member": 2712,
+            "shared_gpu_member": 2744,
+            "direct_publications": [
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 768,
+                "shared_offset": 0,
+                "source_bytes": 10000
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 776,
+                "shared_offset": 596,
+                "source_bytes": 3096
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 784,
+                "shared_offset": 604,
+                "source_bytes": 4168
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 792,
+                "shared_offset": 612,
+                "source_bytes": 3600
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 808,
+                "shared_offset": 620,
+                "source_bytes": 104
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 816,
+                "shared_offset": 628,
+                "source_bytes": 2048
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 824,
+                "shared_offset": 8,
+                "source_bytes": 0
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 832,
+                "shared_offset": 16,
+                "source_bytes": 136
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2752,
+                "shared_offset": 512,
+                "source_bytes": 497664
+              }
+            ],
+            "auxiliary_publications": [
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2880,
+                "shared_offset": 448,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2888,
+                "shared_offset": 464,
+                "source_bytes": 432
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2896,
+                "shared_offset": 480,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2904,
+                "shared_offset": 496,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2912,
+                "shared_offset": 456,
+                "source_bytes": 18432
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2920,
+                "shared_offset": 472,
+                "source_bytes": 165888
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2928,
+                "shared_offset": 488,
+                "source_bytes": 36864
+              },
+              {
+                "shared_cpu_member": 2712,
+                "source_gpu_member": 2936,
+                "shared_offset": 504,
+                "source_bytes": 18432
+              }
+            ]
+          },
+          {
+            "role": 1,
+            "shared_cpu_member": 3016,
+            "shared_gpu_member": 3048,
+            "direct_publications": [
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 768,
+                "shared_offset": 0,
+                "source_bytes": 10000
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 800,
+                "shared_offset": 1137,
+                "source_bytes": 73168
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 824,
+                "shared_offset": 8,
+                "source_bytes": 0
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 832,
+                "shared_offset": 16,
+                "source_bytes": 136
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3056,
+                "shared_offset": 512,
+                "source_bytes": 497664
+              }
+            ],
+            "auxiliary_publications": [
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3184,
+                "shared_offset": 448,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3192,
+                "shared_offset": 464,
+                "source_bytes": 432
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3200,
+                "shared_offset": 480,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3208,
+                "shared_offset": 496,
+                "source_bytes": 48
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3216,
+                "shared_offset": 456,
+                "source_bytes": 18432
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3224,
+                "shared_offset": 472,
+                "source_bytes": 165888
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3232,
+                "shared_offset": 488,
+                "source_bytes": 36864
+              },
+              {
+                "shared_cpu_member": 3016,
+                "source_gpu_member": 3240,
+                "shared_offset": 504,
+                "source_bytes": 18432
+              }
+            ]
+          }
+        ],
+        "conditional_platform_publication": {
+          "host_platform_member": 664,
+          "enabled_offset": 63316,
+          "pointer_offset": 79720,
+          "shared_cpu_member": 2712,
+          "shared_offset": 720
+        }
+      }
+    },
+    {
+      "operation": "recover_firmware_shared_platform_fields",
+      "arguments": {
+        "code": {
+          "symbol": "__ZN14AGXArmFirmware16initFirmwareDataEv"
+        }
+      },
+      "result": {
+        "platform_host_member": 664,
+        "primary_service_sources": [
+          {
+            "platform_pointer_offset": 71008,
+            "primary_shared_offsets": [
+              728,
+              736
+            ],
+            "primary_object_member": 104,
+            "secondary_object_member": 88,
+            "mapping_address_vtable_offset": 344,
+            "nullable": true
+          },
+          {
+            "platform_pointer_offset": 71016,
+            "primary_shared_offsets": [
+              744,
+              752
+            ],
+            "primary_object_member": 104,
+            "secondary_object_member": 88,
+            "mapping_address_vtable_offset": 344,
+            "nullable": true
+          }
+        ],
+        "secondary_mirrors": [
+          {
+            "primary_shared_offset": 728,
+            "secondary_shared_offset": 728
+          },
+          {
+            "primary_shared_offset": 744,
+            "secondary_shared_offset": 744
+          }
+        ],
+        "scalars": [
+          {
+            "platform_offset": 63424,
+            "role": 1,
+            "shared_offset": 768
+          },
+          {
+            "platform_offset": 63540,
+            "role": 0,
+            "shared_offset": 772
+          }
+        ],
+        "calibration": {
+          "platform_offset": 63376,
+          "shared_offset": 1145,
+          "bytes": 16,
+          "roles": [
+            0,
+            1
+          ]
+        },
+        "primary_state": {
+          "state_offset": 992,
+          "state_initial": 255,
+          "status_offset": 993,
+          "status_bytes": 144
+        }
+      }
+    },
+    {
+      "operation": "recover_firmware_config_reads",
+      "arguments": {
+        "firmware": {
+          "artifact": "firmware"
+        }
+      },
+      "result": {
+        "firmware_direct_reads": [
+          {
+            "offset": 2288,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3728,
+            "bytes": 16,
+            "indexed": false
+          },
+          {
+            "offset": 3744,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3748,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3752,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3756,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3760,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3764,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3776,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3780,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3784,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3792,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3796,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3800,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3804,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3808,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3828,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3836,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3840,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3848,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3852,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3856,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3860,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3864,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3868,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3872,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3876,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3912,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3916,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3928,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3952,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3956,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3960,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3964,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3968,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3976,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3980,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3992,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3996,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4000,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4004,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4008,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4012,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4016,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 4040,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4104,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4108,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4112,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4116,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5128,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5132,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5136,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5140,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6216,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6280,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6344,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6408,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6472,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6476,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6480,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6484,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6488,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6492,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6496,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6500,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6504,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6508,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6512,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6516,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6520,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6524,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6528,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6532,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6600,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6632,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6664,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6696,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 7064,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7068,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7072,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7076,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7080,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7084,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7088,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7092,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7096,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7100,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7104,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7108,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7112,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7116,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7120,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7124,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9536,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9540,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9544,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9548,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9552,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9556,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9560,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9564,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9612,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9616,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9620,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9628,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9632,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9636,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9640,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9644,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9648,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9652,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9656,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9736,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9740,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9744,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9752,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9916,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9920,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9924,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9952,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9956,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9968,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9972,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9976,
+            "bytes": 1,
+            "indexed": false
+          },
+          {
+            "offset": 9977,
+            "bytes": 1,
+            "indexed": false
+          }
+        ],
+        "firmware_bulk_reads": [
+          {
+            "offset": 6600,
+            "bytes": 128
+          },
+          {
+            "offset": 7056,
+            "bytes": 328
+          }
+        ]
+      }
+    },
+    {
+      "operation": "recover_hardware_config",
+      "arguments": {
+        "allocations": {
+          "value": [
+            {
+              "host_cpu_member": 696,
+              "host_gpu_member": 768,
+              "bytes": 10000
+            },
+            {
+              "host_cpu_member": 704,
+              "host_gpu_member": 776,
+              "bytes": 3096
+            },
+            {
+              "host_cpu_member": 712,
+              "host_gpu_member": 784,
+              "bytes": 4168
+            },
+            {
+              "host_cpu_member": 720,
+              "host_gpu_member": 792,
+              "bytes": 3600
+            },
+            {
+              "host_cpu_member": 728,
+              "host_gpu_member": 800,
+              "bytes": 73168
+            },
+            {
+              "host_cpu_member": 736,
+              "host_gpu_member": 808,
+              "bytes": 104
+            },
+            {
+              "host_cpu_member": 744,
+              "host_gpu_member": 816,
+              "bytes": 2048
+            },
+            {
+              "host_cpu_member": 760,
+              "host_gpu_member": 832,
+              "bytes": 136
+            },
+            {
+              "host_cpu_member": 896,
+              "host_gpu_member": 904,
+              "bytes": 7328
+            },
+            {
+              "host_cpu_member": 912,
+              "host_gpu_member": 920,
+              "bytes": 168
+            },
+            {
+              "host_cpu_member": 928,
+              "host_gpu_member": 936,
+              "bytes": 8
+            },
+            {
+              "host_cpu_member": 952,
+              "host_gpu_member": 960,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 968,
+              "host_gpu_member": 976,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 992,
+              "host_gpu_member": 1000,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1008,
+              "host_gpu_member": 1016,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1032,
+              "host_gpu_member": 1040,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1048,
+              "host_gpu_member": 1056,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1072,
+              "host_gpu_member": 1080,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1088,
+              "host_gpu_member": 1096,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1112,
+              "host_gpu_member": 1120,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1128,
+              "host_gpu_member": 1136,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1152,
+              "host_gpu_member": 1160,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1168,
+              "host_gpu_member": 1176,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1192,
+              "host_gpu_member": 1200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1208,
+              "host_gpu_member": 1216,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1232,
+              "host_gpu_member": 1240,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1248,
+              "host_gpu_member": 1256,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1272,
+              "host_gpu_member": 1280,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1288,
+              "host_gpu_member": 1296,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1312,
+              "host_gpu_member": 1320,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1328,
+              "host_gpu_member": 1336,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1352,
+              "host_gpu_member": 1360,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1368,
+              "host_gpu_member": 1376,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 1392,
+              "host_gpu_member": 1400,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 1408,
+              "host_gpu_member": 1416,
+              "bytes": 6144
+            },
+            {
+              "host_cpu_member": 2712,
+              "host_gpu_member": 2744,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 2736,
+              "host_gpu_member": 2752,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 2760,
+              "host_gpu_member": 2768,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 2784,
+              "host_gpu_member": 2792,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2800,
+              "host_gpu_member": 2808,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 2816,
+              "host_gpu_member": 2880,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2824,
+              "host_gpu_member": 2888,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 2832,
+              "host_gpu_member": 2896,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2840,
+              "host_gpu_member": 2904,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 2848,
+              "host_gpu_member": 2912,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 2856,
+              "host_gpu_member": 2920,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 2864,
+              "host_gpu_member": 2928,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 2872,
+              "host_gpu_member": 2936,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3016,
+              "host_gpu_member": 3048,
+              "bytes": 1216
+            },
+            {
+              "host_cpu_member": 3040,
+              "host_gpu_member": 3056,
+              "bytes": 497664
+            },
+            {
+              "host_cpu_member": 3064,
+              "host_gpu_member": 3072,
+              "bytes": 32
+            },
+            {
+              "host_cpu_member": 3088,
+              "host_gpu_member": 3096,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3104,
+              "host_gpu_member": 3112,
+              "bytes": 16384
+            },
+            {
+              "host_cpu_member": 3120,
+              "host_gpu_member": 3184,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3128,
+              "host_gpu_member": 3192,
+              "bytes": 432
+            },
+            {
+              "host_cpu_member": 3136,
+              "host_gpu_member": 3200,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3144,
+              "host_gpu_member": 3208,
+              "bytes": 48
+            },
+            {
+              "host_cpu_member": 3152,
+              "host_gpu_member": 3216,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3160,
+              "host_gpu_member": 3224,
+              "bytes": 165888
+            },
+            {
+              "host_cpu_member": 3168,
+              "host_gpu_member": 3232,
+              "bytes": 36864
+            },
+            {
+              "host_cpu_member": 3176,
+              "host_gpu_member": 3240,
+              "bytes": 18432
+            },
+            {
+              "host_cpu_member": 3280,
+              "host_gpu_member": 3296,
+              "bytes": 58432
+            },
+            {
+              "host_cpu_member": 3288,
+              "host_gpu_member": 3304,
+              "bytes": 1776
+            },
+            {
+              "host_cpu_member": 4008,
+              "host_gpu_member": 4000,
+              "bytes": 228
+            },
+            {
+              "host_cpu_member": 752,
+              "host_gpu_member": 824,
+              "bytes": 0
+            }
+          ]
+        },
+        "shared_code": {
+          "symbol": "__ZN14AGXArmFirmware22initFirmwareSharedDataEv"
+        },
+        "firmware": {
+          "artifact": "firmware"
+        }
+      },
+      "result": {
+        "bytes": 10000,
+        "host_cpu_member": 696,
+        "host_gpu_member": 768,
+        "firmware_shared_offset": 0,
+        "published_shared_cpu_members": [
+          2712,
+          3016
+        ],
+        "firmware_direct_reads": [
+          {
+            "offset": 2288,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3728,
+            "bytes": 16,
+            "indexed": false
+          },
+          {
+            "offset": 3744,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3748,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3752,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3756,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3760,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3764,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3776,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3780,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3784,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3792,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3796,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3800,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3804,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3808,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3828,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3836,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3840,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3848,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3852,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3856,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3860,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3864,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3868,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3872,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3876,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3912,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3916,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3928,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3952,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3956,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3960,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3964,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3968,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3976,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3980,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 3992,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 3996,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4000,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4004,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4008,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4012,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 4016,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 4040,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4104,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4108,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4112,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 4116,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5128,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5132,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5136,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 5140,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6216,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6280,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6344,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6408,
+            "bytes": 4,
+            "indexed": true
+          },
+          {
+            "offset": 6472,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6476,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6480,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6484,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6488,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6492,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6496,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6500,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6504,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6508,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6512,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6516,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6520,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6524,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6528,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6532,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 6600,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6632,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6664,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 6696,
+            "bytes": 32,
+            "indexed": false
+          },
+          {
+            "offset": 7064,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7068,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7072,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7076,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7080,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7084,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7088,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7092,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7096,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7100,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7104,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7108,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7112,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7116,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7120,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 7124,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9536,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9540,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9544,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9548,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9552,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9556,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9560,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9564,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9612,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9616,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9620,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9628,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9632,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9636,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9640,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9644,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9648,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9652,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9656,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9736,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9740,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9744,
+            "bytes": 8,
+            "indexed": false
+          },
+          {
+            "offset": 9752,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9916,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9920,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9924,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9952,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9956,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9968,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9972,
+            "bytes": 4,
+            "indexed": false
+          },
+          {
+            "offset": 9976,
+            "bytes": 1,
+            "indexed": false
+          },
+          {
+            "offset": 9977,
+            "bytes": 1,
+            "indexed": false
+          }
+        ],
+        "firmware_bulk_reads": [
+          {
+            "offset": 6600,
+            "bytes": 128
+          },
+          {
+            "offset": 7056,
+            "bytes": 328
+          }
+        ]
+      }
+    },
+    {
+      "operation": "recover_driver_hardware_config_layout",
+      "arguments": {
+        "base_init_code": {
+          "symbol": "__ZN11AGXFirmware16initFirmwareDataEv"
+        },
+        "base_power_code": {
+          "symbol": "__ZN11AGXFirmware27initPowerAndPerformanceDataEv"
+        },
+        "arm_power_code": {
+          "symbol": "__ZN14AGXArmFirmware27initPowerAndPerformanceDataEv"
+        }
+      },
+      "result": {
+        "color_matrices": {
+          "offset": 56,
+          "records": 64,
+          "record_bytes": 24,
+          "banks": 2
+        },
+        "io_mappings": {
+          "offset": 1600,
+          "records": 53,
+          "record_bytes": 40
+        },
+        "performance_states": {
+          "capacity": 16,
+          "max_state_offset": 4036,
+          "frequency_offset": 4040,
+          "voltage_offset": 4104,
+          "sram_voltage_offset": 5128,
+          "secondary_frequency_offset": 6152,
+          "primary_frequency_source_offset": 111384,
+          "secondary_frequency_source_offset": 113504,
+          "frequency_conversion": {
+            "input": "Hz",
+            "output": "MHz",
+            "multiplier": 1125899907,
+            "right_shift": 50
+          },
+          "derived_table_offsets": [
+            6216,
+            6280,
+            6344,
+            6408,
+            6472
+          ]
+        }
+      }
+    },
+    {
+      "operation": "recover_firmware_root",
+      "arguments": {
+        "code": {
+          "artifact": "firmware"
+        }
+      },
+      "result": {
+        "interface_magic": 904030701134283968,
+        "magic_code_offset": 144968,
+        "copied_bytes": 200,
+        "pointer_offsets": [
+          24,
+          32,
+          168,
+          176,
+          184,
+          192
+        ]
+      }
+    }
+  ]
+}
