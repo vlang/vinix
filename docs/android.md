@@ -155,7 +155,7 @@ same native ATL/ART runtime.
 Run the real guest test after building the runtime, desktop and kernel:
 
 ```sh
-python3 tests/android/launcher-test.py
+build-support/run-v-tool.sh tests/android/launcher-test.v
 python3 tests/android/art-runtime-test.py
 python3 tests/android/bootclasspath-test.py
 python3 tests/android/musl-runtime-test.py

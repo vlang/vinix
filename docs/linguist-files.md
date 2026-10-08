@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `51de8b2a1ce7097de3dbe1d6bb77208bbea1db02`,
+at source commit `908d60934e8eeeda34207c31842909521a5a3da6`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 495 | 1,866,663 | 4.46% |
-| Python | 474 | 3,052,180 | 7.29% |
-| Shell | 307 | 1,288,992 | 3.08% |
+| C | 497 | 1,869,014 | 4.46% |
+| Python | 472 | 2,854,816 | 6.81% |
+| Shell | 307 | 1,288,992 | 3.07% |
 
-All `.v` files are classified as V. The resulting V share is 77.99%, with no
+All `.v` files are classified as V. The resulting V share is 78.50%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 51de8b2a1ce7097de3dbe1d6bb77208bbea1db02 --breakdown --json
+github-linguist --rev 908d60934e8eeeda34207c31842909521a5a3da6 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -61,6 +61,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/helper-fixture-v-abi.h` | 193 |
 | `base-files/usr/include/vinix/hypervisor.h` | 1,315 |
 | `build-support/aarch64-cc-shim/stdatomic.h` | 4,425 |
+| `build-support/android/androidhost/probe_spawn_abi.h` | 1,193 |
 | `build-support/android/atl-configuration-v-abi.h` | 1,394 |
 | `build-support/android/musl-statistics.h` | 486 |
 | `build-support/android/runtime-v-abi.h` | 1,598 |
@@ -478,6 +479,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/blockedoracle/blocked-oracle-native-abi.h` | 1,147 |
 | `tests/qemu-core/epollfixture/epollfixture_v_contract.h` | 943 |
 | `tests/qemu-core/epolloracle/epoll-oracle-native-abi.h` | 742 |
+| `tests/qemu-core/fixturehost/spawn_abi.h` | 1,158 |
 | `tests/qemu-core/intfixture/intfixture_v_contract.h` | 391 |
 | `tests/qemu-core/intoracle/int-oracle-native-abi.h` | 581 |
 | `tests/qemu-core/nanosleepfixture/nanosleepfixture_v_contract.h` | 818 |
@@ -564,11 +566,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/run-v-core.py` | 3,917 |
 | `build-support/_cache_native.py` | 2,147 |
 | `build-support/alpine-resolve.py` | 2,946 |
-| `build-support/android/_native.py` | 3,146 |
+| `build-support/android/_native.py` | 4,126 |
 | `build-support/android/art-bootclasspath.py` | 16,397 |
 | `build-support/android/art-runtime.py` | 10,978 |
 | `build-support/android/atl-dex.py` | 3,456 |
-| `build-support/android/build.py` | 21,890 |
+| `build-support/android/build.py` | 21,957 |
 | `build-support/android/compile-v-atl-configuration.py` | 622 |
 | `build-support/android/compile-v-runtime.py` | 3,918 |
 | `build-support/android/musl-runtime.py` | 2,803 |
@@ -749,19 +751,18 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/amd64-console/run.py` | 1,040 |
 | `tests/amd64-exceptions/run.py` | 5,611 |
 | `tests/amd64-poll/run.py` | 2,839 |
-| `tests/android/activity-lifecycle-test.py` | 4,770 |
+| `tests/android/activity-lifecycle-test.py` | 1,750 |
 | `tests/android/art-runtime-test.py` | 26,423 |
 | `tests/android/atl-configuration.py` | 7,854 |
-| `tests/android/autofill-test.py` | 4,886 |
+| `tests/android/autofill-test.py` | 1,731 |
 | `tests/android/bootclasspath-test.py` | 9,620 |
-| `tests/android/cookie-test.py` | 4,854 |
+| `tests/android/cookie-test.py` | 1,725 |
 | `tests/android/egl-queue-test.py` | 6,590 |
 | `tests/android/interactive-test.py` | 9,881 |
-| `tests/android/launcher-test.py` | 12,100 |
-| `tests/android/layout-focus-test.py` | 4,168 |
-| `tests/android/location-test.py` | 4,886 |
+| `tests/android/layout-focus-test.py` | 2,097 |
+| `tests/android/location-test.py` | 1,731 |
 | `tests/android/musl-runtime-test.py` | 7,834 |
-| `tests/android/pointer-capture-test.py` | 3,578 |
+| `tests/android/pointer-capture-test.py` | 1,879 |
 | `tests/android/run-runtime-vm.py` | 9,175 |
 | `tests/android/run.py` | 62,428 |
 | `tests/android/split-test.py` | 8,799 |
@@ -808,19 +809,18 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/disk-root/run_vm.py` | 7,127 |
 | `tests/disk-writeback/run_vm.py` | 6,351 |
 | `tests/docker/run_vm.py` | 5,032 |
-| `tests/dota2/env-run.py` | 13,495 |
+| `tests/dota2/_native.py` | 1,969 |
+| `tests/dota2/env-run.py` | 10,741 |
 | `tests/dota2/export-run.py` | 6,102 |
 | `tests/dota2/export-test.py` | 10,464 |
-| `tests/dota2/launcher-test.py` | 14,628 |
 | `tests/dota2/lavapipe-run.py` | 14,637 |
 | `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
 | `tests/dota2/run.py` | 28,015 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
-| `tests/dota2/vulkan-run-test.py` | 2,434 |
-| `tests/dota2/vulkan-run.py` | 14,280 |
+| `tests/dota2/vulkan-run.py` | 12,909 |
 | `tests/dota2/vulkan-stage-test.py` | 18,459 |
-| `tests/dota2/wake-op-run.py` | 11,937 |
+| `tests/dota2/wake-op-run.py` | 9,741 |
 | `tests/dumpability/run.py` | 3,975 |
 | `tests/elf-text/run.py` | 5,791 |
 | `tests/execute-only/check-generated.py` | 9,911 |
@@ -935,20 +935,21 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps2/frame.py` | 1,945 |
 | `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
+| `tests/qemu-core/_fixture_native.py` | 3,251 |
 | `tests/qemu-core/compile-basefixture.py.pending` | 5,488 |
-| `tests/qemu-core/compile-fixtures.py` | 1,728 |
-| `tests/qemu-core/oracle_support.py` | 4,328 |
+| `tests/qemu-core/compile-fixtures.py` | 1,119 |
+| `tests/qemu-core/oracle_support.py` | 1,086 |
 | `tests/qemu-core/run_vm.py` | 13,462 |
 | `tests/qemu-core/test-basefixture.py.pending` | 5,726 |
-| `tests/qemu-core/test-blockedfixture.py` | 9,618 |
-| `tests/qemu-core/test-epollfixture.py` | 9,138 |
+| `tests/qemu-core/test-blockedfixture.py` | 2,743 |
+| `tests/qemu-core/test-epollfixture.py` | 2,556 |
 | `tests/qemu-core/test-futexfixture.py.pending` | 9,896 |
-| `tests/qemu-core/test-intfixture.py` | 8,998 |
-| `tests/qemu-core/test-nanosleepfixture.py` | 9,100 |
-| `tests/qemu-core/test-pollfixture.py` | 8,605 |
-| `tests/qemu-core/test-restartfixture.py` | 6,766 |
-| `tests/qemu-core/test-signalfixture.py` | 6,769 |
-| `tests/qemu-core/test-touchfixture.py` | 7,389 |
+| `tests/qemu-core/test-intfixture.py` | 2,554 |
+| `tests/qemu-core/test-nanosleepfixture.py` | 2,578 |
+| `tests/qemu-core/test-pollfixture.py` | 2,554 |
+| `tests/qemu-core/test-restartfixture.py` | 2,676 |
+| `tests/qemu-core/test-signalfixture.py` | 2,664 |
+| `tests/qemu-core/test-touchfixture.py` | 2,584 |
 | `tests/qemu-initramfs-split/test_split.py` | 6,018 |
 | `tests/qemu-module-iso/test_iso.py` | 1,677 |
 | `tests/qemu-ovmf/test_patch.py` | 16,807 |
@@ -999,16 +1000,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run.py` | 3,372 |
 | `tools/agx-re/_native_adt.py` | 1,968 |
 | `tools/agx-re/_native_extract.py` | 5,441 |
-| `tools/agx-re/_native_g17.py` | 4,928 |
+| `tools/agx-re/_native_g17.py` | 5,698 |
 | `tools/agx-re/_native_t6050.py` | 3,110 |
 | `tools/agx-re/compile-v-trace.py` | 1,505 |
 | `tools/agx-re/extract_fileset.py` | 2,339 |
 | `tools/agx-re/extract_firmware.py` | 1,432 |
 | `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 129,009 |
+| `tools/agx-re/recover_g17_abi.py` | 47,166 |
 | `tools/agx-re/recover_t6050_power.py` | 18,468 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/agx-re/test_recover_g17_abi.py` | 21,521 |
 | `tools/apple-ans/test_verify_reads.py` | 3,352 |
 | `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
