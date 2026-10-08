@@ -1,7 +1,9 @@
 # Native T6050 instruction-contract recovery
 
 This host V module owns the ApplePTD, RTBuddy segment-flag, IODARTFamily,
-AppleT8110DART and T8110 kernel page-table instruction proofs. The maintained
+AppleT8110DART and T8110 kernel page-table instruction proofs, initial PMP
+publication/readiness ordering, RTBuddy patchbay writes and ASCWrap-v6 mailbox,
+IORVBAR lock and CPU-run sequences. The maintained
 `recover_t6050_power.py` caller keeps its original public API through a narrow
 JSON adapter. Its remaining recovery families are still Python and remain
 counted as Python until their own ports pass qualification.
@@ -18,6 +20,9 @@ original Python tests, with their complete expected results and rejection
 messages in `testdata/contracts.json`. It also tests wide numeric comparison,
 array ownership and malformed address/target errors. The first-party algorithms
 are native V; the fixture JSON contains test inputs and expected values only.
+`transport_test.v` similarly retains the independent readiness, patchbay-write
+and ASCWrap fixtures in `testdata/transport.json`, including every original
+full-output and rejection check.
 
 The original functions and fixtures remain available in Git. Qualification
 compares each instruction mutation, truncation, missing symbol and malformed

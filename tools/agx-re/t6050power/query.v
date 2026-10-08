@@ -30,6 +30,15 @@ pub fn query(operation string, request map[string]j.Value) !j.Value {
 		'recover_t8110_kernel_code_contract' {
 			recover_t8110_kernel_code_contract(functions, j.value(request, 'index_masks').arr(), j.value(request, 'index_shifts').arr())!
 		}
+		'recover_pmp_readiness_handshake' {
+			recover_pmp_readiness_handshake(functions, j.value(request, 'symbols').as_map(), j.value(request, 'interrupt_config'))!
+		}
+		'recover_rtbuddy_patchbay_write_contract' {
+			recover_rtbuddy_patchbay_write_contract(functions, j.value(request, 'symbols').as_map())!
+		}
+		'recover_apple_ascwrap_v6_code_contract' {
+			recover_apple_ascwrap_v6_code_contract(functions, j.value(request, 'vtable_targets').as_map())!
+		}
 		else { return error('unknown T6050 recovery operation ${operation}') }
 	}
 	return j.Value(result)
