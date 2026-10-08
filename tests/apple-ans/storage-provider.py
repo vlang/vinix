@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Copy storage providers; record hardware-only omissions for injected models."""
 import hashlib
-import re
 from pathlib import Path
 
 HARDWARE_ONLY = (
@@ -16,54 +15,15 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+import importlib.util
+from importlib.machinery import SourceFileLoader
+
+_ROOT = Path(__file__).resolve().parents[2]
+_spec = importlib.util.spec_from_loader("apple_provider_native", SourceFileLoader(
+    "apple_provider_native", str(_ROOT / "tests/apple-protocols/_native.py")))
+_native = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_native)
+
+
 def copy_provider(root: Path, destination: Path, *, ans: bool, hardware: bool):
-    destination.mkdir(parents=True)
-    ext2_path = root / "kernel/apple/ans/ext2core/core.v"
-    ext2 = ext2_path.read_bytes()
-    receipt = {"ext2_source": str(ext2_path.relative_to(root)), "ext2_sha256": digest(ext2),
-               "ans": ans, "hardware": hardware, "excluded_functions": []}
-    if ans:
-        source_path = root / "kernel/apple/ans/anscore/core.v"
-        original = source_path.read_text()
-        spans = []
-        if not hardware:
-            for name in HARDWARE_ONLY:
-                match = re.search(r"^@\[export: '" + name + r"'\]\npub fn " + name + r"\(", original, re.M)
-                if not match:
-                    raise RuntimeError("hardware definition changed: " + name)
-                begin = original.index("{", match.end())
-                depth = 1
-                end = begin + 1
-                while depth:
-                    depth += (original[end] == "{") - (original[end] == "}")
-                    end += 1
-                if original[end:end + 1] == "\n":
-                    end += 1
-                spans.append((match.start(), end, name))
-                receipt["excluded_functions"].append({
-                    "name": name, "first_line": original.count("\n", 0, match.start()) + 1,
-                    "last_line": original.count("\n", 0, end),
-                    "sha256": digest(original[match.start():end].encode()),
-                    "reason": "injected fixture installs its own callbacks and invokes a_start directly",
-                })
-        parts = []
-        cursor = 0
-        for start, end, _ in sorted(spans):
-            parts.append(original[cursor:start])
-            cursor = end
-        parts.append(original[cursor:])
-        copied = "".join(parts)
-        for name in HARDWARE_ONLY if not hardware else ():
-            if re.search(r"\b" + name + r"\b", copied):
-                raise RuntimeError("retained reference to omitted hardware function: " + name)
-        submodule = destination / "anscore"
-        submodule.mkdir()
-        (submodule / "core.v").write_text(copied)
-        receipt.update({"ans_source": str(source_path.relative_to(root)),
-                        "ans_source_sha256": digest(original.encode()),
-                        "ans_copied_sha256": digest(copied.encode()),
-                        "retained_chunks_sha256": [digest(part.encode()) for part in parts],
-                        "transform": "remove only listed whole definitions; all retained text is byte-identical"})
-        ext2 = ext2.replace(b"module ext2core", b"module ext2core\nimport ext2core.anscore as _", 1)
-    (destination / "core.v").write_bytes(ext2)
-    return receipt
+    return _native.copy_provider(root, destination, family="ans", ans=ans, hardware=hardware)
