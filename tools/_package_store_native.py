@@ -6,6 +6,7 @@ import importlib.util
 import operator
 from pathlib import Path
 import sys
+from types import FunctionType
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,8 +76,22 @@ def call(operation, arguments, namespace, *, controller=None):
     def library_primitive(method, row):
         if method == "function":
             target = getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
-            result = target(*[value(item) for item in row.get("args", [])], **{key: value(item) for key, item in row.get("kwargs", {}).items()}) if callable(target) else target
+            if callable(target):
+                args = [value(item) for item in row.get("args", [])]
+                kwargs = {key: value(item) for key, item in row.get("kwargs", {}).items()}
+                result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
+            else:
+                result = target
             return result if row.get("data") else retain(result)
+        if method == "unbound_local":
+            def unbound():
+                if False:
+                    value = None
+                return value
+            return FunctionType(unbound.__code__.replace(co_varnames=(row["name"],)), {})()
+        if method == "unpack_pair":
+            first, second = objects[row["owner"]]
+            return [retain(first), retain(second)]
         if method == "resolve":
             return retain(resolve(row["name"]))
         if method == "error_attribute":
@@ -116,7 +131,7 @@ def call(operation, arguments, namespace, *, controller=None):
             closers.pop(row["owner"]).active = False
             return None
         if method == "raise":
-            error = namespace[row["kind"]](row["message"])
+            error = namespace.get(row["kind"], getattr(builtins, row["kind"], None))(row["message"])
             if row.get("cause") is None:
                 raise error
             cause = errors[row["cause"]["binding_error"]]
