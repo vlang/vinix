@@ -12,17 +12,17 @@ struct Engine {
 	support   string
 }
 
-fn null() ah.Value { return ah.Value(json2.null) }
+pub fn null() ah.Value { return ah.Value(json2.null) }
 
 fn typed(kind string, value ah.Value) ah.Value { return ah.Value([ah.Value(kind), value]) }
 
-fn object(value ah.Value) ah.Value { return typed('object', value) }
+pub fn object(value ah.Value) ah.Value { return typed('object', value) }
 
-fn ordinary(value ah.Value) ah.Value { return typed('value', value) }
+pub fn ordinary(value ah.Value) ah.Value { return typed('value', value) }
 
 fn bytes(value string) ah.Value { return typed('bytes', ah.Value(value)) }
 
-fn strings(values []string) ah.Value { return ah.Value(values.map(ah.Value(it))) }
+pub fn strings(values []string) ah.Value { return ah.Value(values.map(ah.Value(it))) }
 
 fn text(row map[string]ah.Value, name string) string { return ah.field(row, name).text() }
 
@@ -39,7 +39,7 @@ fn truth(value ah.Value) bool {
 	}
 }
 
-fn callback(operation string, arguments map[string]ah.Value) !ah.Value {
+pub fn callback(operation string, arguments map[string]ah.Value) !ah.Value {
 	println(ah.encode(boothost.pack(ah.Value({
 		'callback':  ah.Value(operation)
 		'arguments': ah.Value(arguments)
@@ -49,58 +49,58 @@ fn callback(operation string, arguments map[string]ah.Value) !ah.Value {
 	return ah.field(row, 'value')
 }
 
-fn borrow(name string) !ah.Value {
+pub fn borrow(name string) !ah.Value {
 	return callback('borrow', {
 		'name': ah.Value(name)
 	})!
 }
 
-fn get(id ah.Value, key string) !ah.Value {
+pub fn get(id ah.Value, key string) !ah.Value {
 	return method('acquire', id, '__getitem__', [ordinary(ah.Value(key))], {})!
 }
 
-fn get_default(id ah.Value, key string) !ah.Value {
+pub fn get_default(id ah.Value, key string) !ah.Value {
 	return method('acquire', id, 'get', [ordinary(ah.Value(key))], {})!
 }
 
-fn bool_object(id ah.Value) !bool {
+pub fn bool_object(id ah.Value) !bool {
 	return truth(call('invoke', 'builtins', 'bool', [object(id)], {})!)
 }
 
-fn eq(left ah.Value, right ah.Value) !bool {
+pub fn eq(left ah.Value, right ah.Value) !bool {
 	return bool_object(call('acquire', 'operator', 'eq', [object(left), object(right)], {})!)
 }
 
-fn eq_value(left ah.Value, right ah.Value) !bool {
+pub fn eq_value(left ah.Value, right ah.Value) !bool {
 	return bool_object(call('acquire', 'operator', 'eq', [object(left), ordinary(right)], {})!)
 }
 
-fn make_sequence(values []ah.Value) !ah.Value {
+pub fn make_sequence(values []ah.Value) !ah.Value {
 	return callback('sequence', {
 		'arguments': ah.Value(values)
 	})!
 }
 
-fn dictionary(keys []ah.Value, values []ah.Value) !ah.Value {
+pub fn dictionary(keys []ah.Value, values []ah.Value) !ah.Value {
 	return callback('dictionary', {
 		'keys':   ah.Value(keys)
 		'values': ah.Value(values)
 	})!
 }
 
-fn put(id ah.Value, key string, value ah.Value) ! {
+pub fn put(id ah.Value, key string, value ah.Value) ! {
 	method('invoke', id, '__setitem__', [ordinary(ah.Value(key)), value], {})!
 }
 
-fn length(id ah.Value) !int {
+pub fn length(id ah.Value) !int {
 	return int(ah.integer(call('invoke', 'builtins', 'len', [object(id)], {})!) or { return error('invalid library length') })
 }
 
-fn iter_object(id ah.Value) !ah.Value {
+pub fn iter_object(id ah.Value) !ah.Value {
 	return call('acquire', 'builtins', 'iter', [object(id)], {})!
 }
 
-fn next(id ah.Value) !ah.Value {
+pub fn next(id ah.Value) !ah.Value {
 	row := callback('iterate', {
 		'id': id
 	})!.object()
@@ -138,14 +138,18 @@ fn pool_map(operation string, records ah.Value, shared map[string]ah.Value) !ah.
 }
 
 fn (e Engine) root_path(name string) !ah.Value {
-	return join(callback('borrow_global', {'name': ah.Value('ROOT')})!, name)!
+	return join(callback('borrow_global', {
+		'name': ah.Value('ROOT')
+	})!, name)!
 }
 
 fn (e Engine) support_path(name string) !ah.Value {
-	return join(callback('borrow_global', {'name': ah.Value('SUPPORT')})!, name)!
+	return join(callback('borrow_global', {
+		'name': ah.Value('SUPPORT')
+	})!, name)!
 }
 
-fn call(mode string, provider string, name string, arguments []ah.Value, options map[string]ah.Value) !ah.Value {
+pub fn call(mode string, provider string, name string, arguments []ah.Value, options map[string]ah.Value) !ah.Value {
 	return callback(mode, {
 		'module':    ah.Value(provider)
 		'name':      ah.Value(name)
@@ -154,7 +158,7 @@ fn call(mode string, provider string, name string, arguments []ah.Value, options
 	})!
 }
 
-fn method(mode string, id ah.Value, name string, arguments []ah.Value, options map[string]ah.Value) !ah.Value {
+pub fn method(mode string, id ah.Value, name string, arguments []ah.Value, options map[string]ah.Value) !ah.Value {
 	return callback(mode, {
 		'id':        id
 		'name':      ah.Value(name)
@@ -163,7 +167,7 @@ fn method(mode string, id ah.Value, name string, arguments []ah.Value, options m
 	})!
 }
 
-fn attribute(id ah.Value, name string, acquire bool) !ah.Value {
+pub fn attribute(id ah.Value, name string, acquire bool) !ah.Value {
 	return callback('getattr', {
 		'id':     id
 		'name':   ah.Value(name)
@@ -177,7 +181,7 @@ fn join(id ah.Value, name string) !ah.Value {
 
 fn str(id ah.Value) !string { return call('invoke', 'builtins', 'str', [object(id)], {})!.text() }
 
-fn format_object(id ah.Value) !string {
+pub fn format_object(id ah.Value) !string {
 	return call('invoke', 'builtins', 'format', [object(id), ordinary(ah.Value(''))], {})!.text()
 }
 
@@ -199,7 +203,7 @@ fn unlink(id ah.Value, missing_ok bool) ! {
 	})!
 }
 
-fn api(name string, arguments []ah.Value, options map[string]ah.Value, acquire bool) !ah.Value {
+pub fn api(name string, arguments []ah.Value, options map[string]ah.Value, acquire bool) !ah.Value {
 	return callback('function', {
 		'name':      ah.Value(name)
 		'arguments': ah.Value(arguments)
@@ -228,7 +232,7 @@ fn exit_context(owner ah.Value, failed bool, cause IError) !bool {
 
 fn (e Engine) c(name string) ah.Value { return ah.field(e.constants, name) }
 
-fn result_object(id ah.Value) ah.Value {
+pub fn result_object(id ah.Value) ah.Value {
 	return ah.Value({
 		'object_result': id
 	})

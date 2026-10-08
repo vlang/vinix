@@ -4,10 +4,22 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import re
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
+
+
+_bindings_spec = importlib.util.spec_from_file_location("alpine_bindings", Path(__file__).parent / "android/_boot_native.py")
+_bindings = importlib.util.module_from_spec(_bindings_spec)
+_bindings_spec.loader.exec_module(_bindings)
+_controller = _bindings._host.Controller(Path(__file__).with_name("alpine_query.v"), "VINIX_ALPINE_QUERY",
+                                        process=_bindings._build_process)
+
+
+def _query(operation, **values):
+    return _bindings.query_call(_controller, {"operation": operation}, globals(), values=values)
 
 
 @dataclass(frozen=True)
@@ -20,28 +32,16 @@ class Package:
 
 
 def parse_index(path: Path, repository: str) -> list[Package]:
-    packages: list[Package] = []
-    for record in path.read_text(encoding="utf-8").split("\n\n"):
-        fields: dict[str, str] = {}
-        for line in record.splitlines():
-            if len(line) >= 2 and line[1] == ":":
-                fields[line[0]] = line[2:]
-        if "P" not in fields or "V" not in fields:
-            continue
-        packages.append(
-            Package(
-                name=fields["P"],
-                version=fields["V"],
-                dependencies=tuple(fields.get("D", "").split()),
-                provides=tuple(fields.get("p", "").split()),
-                repository=repository,
-            )
-        )
-    return packages
+    return [Package(name=row["name"], version=row["version"], dependencies=tuple(row["dependencies"]),
+                    provides=tuple(row["provides"]), repository=repository)
+            for row in _query("parse_index", path=path)]
 
 
 def dependency_key(specification: str) -> str:
-    return re.split(r"[<>=~]", specification, maxsplit=1)[0]
+    return _query("dependency_key", specification=specification)
+
+
+_native_dependency_key = dependency_key
 
 
 def main() -> int:
@@ -56,41 +56,7 @@ def main() -> int:
     parser.add_argument("packages", nargs="+")
     args = parser.parse_args()
 
-    packages: list[Package] = []
-    for repository, index in args.index:
-        packages.extend(parse_index(Path(index), repository))
-
-    by_name: dict[str, Package] = {}
-    providers: dict[str, Package] = {}
-    for package in packages:
-        # Index order is repository preference order (main before community).
-        by_name.setdefault(package.name, package)
-        providers.setdefault(package.name, package)
-        for provision in package.provides:
-            providers.setdefault(dependency_key(provision), package)
-
-    ignored = {
-        "/bin/sh",
-        "cmd:sh",
-        "cmd:busybox",
-    }
-    queue = deque(args.packages)
-    selected: dict[str, Package] = {}
-    while queue:
-        requested = dependency_key(queue.popleft())
-        if not requested or requested.startswith("!") or requested in ignored:
-            continue
-        package = by_name.get(requested) or providers.get(requested)
-        if package is None:
-            raise SystemExit(f"unresolved Alpine dependency: {requested}")
-        if package.name in selected:
-            continue
-        selected[package.name] = package
-        queue.extend(package.dependencies)
-
-    for package in sorted(selected.values(), key=lambda item: item.name):
-        print(f"{package.repository}\t{package.name}-{package.version}.apk")
-    return 0
+    return _query("main", args=args)
 
 
 if __name__ == "__main__":

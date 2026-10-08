@@ -343,9 +343,14 @@ def _build_primitive(operation, row, context, resources):
         return ident
     if operation == 'sequence':
         return _register(resources, _build_arguments(row['arguments'], resources))
+    if operation == 'unpack_pair':
+        first, second = resources[row['id']]
+        return [_register(resources, first), _register(resources, second)]
     if operation == 'dictionary':
         return _register(resources, dict(zip(_build_arguments(row['keys'], resources),
                                             _build_arguments(row['values'], resources))))
+    if operation == 'sort_attribute':
+        return _register(resources, sorted(resources[row['id']], key=lambda item: getattr(item, row['name'])))
     if operation == 'pool_map':
         shared = {key: _build_arguments([value], resources)[0] for key, value in row['shared'].items()}
         with context['concurrent'].futures.ThreadPoolExecutor(max_workers=row['workers']) as pool:
@@ -380,21 +385,28 @@ def _build_primitive(operation, row, context, resources):
         value = context[row['name']](*_build_arguments(row.get('arguments', []), resources),
                                     **row.get('options', {}))
         return _register(resources, value) if row.get('object') else _build_snapshot(value)
+    if operation == 'function_is':
+        return context[row['name']] is context[row['reference']]
     if operation == 'print':
-        print(row['data'], **row.get('options', {}))
+        context.get('print', print)(row['data'], **row.get('options', {}))
         return None
     return _primitive(operation, row, context, resources)
 
 
-def build_call(operation, arguments, context, *, values=None):
+def query_call(transport, request, context, *, values=None):
     resources = {'values': {} if values is None else values, 'owners': {}, 'errors': []}
-    constants = {name: _build_snapshot(context[name]) for name in
-                 ('MIRROR', 'PREFIX', 'ARCHITECTURE', 'REPOSITORIES', 'ROOT_PACKAGES', 'CALCULATOR', 'REQUIRED')}
-    result = _build_transport.call({'operation': operation, 'arguments': _build_snapshot(arguments),
-                                   'constants': constants, 'source': context['__file__'],
-                                   'root': str(context['ROOT']), 'support': str(context['SUPPORT'])},
+    result = transport.call(request,
         lambda op, row: _build_primitive(op, row, context, resources),
         pack=_pack, unpack=_unpack, errors=resources['errors'],
         exception=lambda row: getattr(_builtins, row['kind'])(row['message']),
         cleanup=lambda: _build_retire(resources['owners']))
     return resources[result['object_result']] if isinstance(result, dict) and 'object_result' in result else result
+
+
+def build_call(operation, arguments, context, *, values=None):
+    constants = {name: _build_snapshot(context[name]) for name in
+                 ('MIRROR', 'PREFIX', 'ARCHITECTURE', 'REPOSITORIES', 'ROOT_PACKAGES', 'CALCULATOR', 'REQUIRED')}
+    return query_call(_build_transport,
+        {'operation': operation, 'arguments': _build_snapshot(arguments), 'constants': constants,
+         'source': context['__file__'], 'root': str(context['ROOT']), 'support': str(context['SUPPORT'])},
+        context, values=values)
