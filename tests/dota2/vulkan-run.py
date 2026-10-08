@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import hashlib
 import json
 import os
+from runpy import run_path
 from pathlib import Path
 import pty
 import re
@@ -19,41 +19,14 @@ import sys
 import tarfile
 import time
 
+_native_request = run_path(str(Path(__file__).with_name("_native.py")))["request"]
+
 REPO = Path(__file__).resolve().parents[2]
 BASE64_LINE = 76
 
 
 def decode_capture(transcript: bytes) -> bytes:
-    """Reassemble the guest's two numbered base64 copies of one snapshot.
-
-    Interleaved kernel output lengthens or splits a line, so only complete
-    numbered lines are kept; the guest's hash checks the reassembled image.
-    """
-    capture = transcript.split(b"VINIX-DOTA2-VULKAN-SHOT-BEGIN\n", 1)[1]
-    capture = capture.split(b"VINIX-DOTA2-VULKAN-SHOT-END", 1)[0]
-    hashes = set(re.findall(rb"^VINIX-DOTA2-VULKAN-SHOT-SHA256: ([0-9a-f]{64})$", capture, re.M))
-    lines: dict[int, set[bytes]] = {}
-    for match in re.finditer(rb"^S([1-9][0-9]*) ([A-Za-z0-9+/]+={0,2})$", capture, re.M):
-        lines.setdefault(int(match[1]), set()).add(match[2])
-    if len(hashes) != 1 or not lines:
-        raise SystemExit("the guest capture has no intact hash or image lines")
-    last = max(lines)
-    chosen = []
-    for index in range(1, last):
-        candidates = {line for line in lines.get(index, ()) if len(line) == BASE64_LINE}
-        if len(candidates) != 1:
-            raise SystemExit(f"capture line {index} is missing or corrupt in both copies")
-        chosen.append(candidates.pop())
-    # The final line is shorter; the hash picks its intact copy.
-    for final in sorted(lines[last], key=len):
-        try:
-            contents = base64.b64decode(b"".join(chosen) + final, validate=True)
-        except ValueError:
-            continue
-        if hashlib.sha256(contents).hexdigest().encode() in hashes:
-            return contents
-    raise SystemExit("the reassembled capture does not match the guest's hash")
-
+    return bytes.fromhex(_native_request("capture", transcript))
 
 def copy_layer(source: Path, target: Path) -> None:
     target.mkdir(parents=True, exist_ok=True)

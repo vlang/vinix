@@ -13,13 +13,15 @@ import hashlib
 import importlib.util
 import json
 import os
+from runpy import run_path
 from pathlib import Path
-import re
 import shutil
 import struct
 import subprocess
 import sys
 import tarfile
+
+_native_request = run_path(str(Path(__file__).with_name("_native.py")))["request"]
 
 REPO = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -79,55 +81,8 @@ def install_pin(record: dict, destination: Path) -> None:
 
 
 def verdict(transcript: str, harness_status: int) -> dict:
-    transcript = transcript.replace("\r", "")
-    result_lines = list(re.finditer(
-        r"VINIX-DOTA2-ENV-PAIR-RESULT: variant=(old|new) exit=(-?\d+) signal=(\d+) watchdog=(\d+)",
-        transcript))
-    observations = {}
-    for match in result_lines:
-        label, code, number, timeout = match.groups()
-        observations[label] = {"exit_code": int(code), "signal": int(number),
-                               "native_watchdog": int(timeout)}
-    start = transcript.find("VINIX-DOTA2-ENV-PAIR-BEGIN: old")
-    split = transcript.find("VINIX-DOTA2-ENV-PAIR-BEGIN: new")
-    end = transcript.find("VINIX-DOTA2-ENV-PAIR-END")
-    ordered = 0 <= start < split < end
-    old = transcript[start:split] if ordered else ""
-    new = transcript[split:end] if ordered else ""
-    versions = {}
-    for label, section in (("old", old), ("new", new)):
-        matches = re.findall(r"VINIX-DOTA2-ENV-LIBC: ([0-9]+\.[0-9]+)", section)
-        versions[label] = matches[0] if len(matches) == 1 else None
-    rows = [dict(zip(("round", "writes", "checks", "overlap"), map(int, match.groups())))
-            for match in re.finditer(
-                r"VINIX-DOTA2-ENV-ROUND: round=(\d+) writes=(\d+) checks=(\d+) overlap=(\d+)", new)]
-    rounds_complete = len(rows) == ROUNDS and all(
-        row["round"] == index and row["writes"] == index * VARIABLES
-        and row["checks"] > 0 and 0 < row["overlap"] <= row["checks"]
-        for index, row in enumerate(rows, 1))
-    summaries = list(re.finditer(
-        r"VINIX-DOTA2-ENV-PASS: rounds=(\d+) writes=(\d+) checks=(\d+) overlap=(\d+)", new))
-    counts = {"rounds": len(rows), "writes": rows[-1]["writes"] if rows else 0,
-              "checks": sum(row["checks"] for row in rows),
-              "overlap": sum(row["overlap"] for row in rows)}
-    summary_matches = len(summaries) == 1 and tuple(map(int, summaries[0].groups())) == (
-        ROUNDS, ROUNDS * VARIABLES, counts["checks"], counts["overlap"])
-    results_ordered = (len(result_lines) == 2
-        and result_lines[0].group(1) == "old" and result_lines[1].group(1) == "new"
-        and start < result_lines[0].start() < split < result_lines[1].start() < end)
-    completed = harness_status == 0 and ordered and results_ordered
-    old_failed_as_expected = (observations.get("old") == {
-        "exit_code": -1, "signal": 11, "native_watchdog": 0}
-        and "VINIX-DOTA2-ENV-START" in old and versions["old"] is not None)
-    new_passed = (observations.get("new") == {
-        "exit_code": 0, "signal": 0, "native_watchdog": 0}
-        and "VINIX-DOTA2-ENV-START" in new and versions["new"] is not None
-        and "VINIX-DOTA2-ENV-FAIL:" not in new and rounds_complete and summary_matches)
-    return {"passed": completed and old_failed_as_expected and new_passed,
-            "pair_completed": completed, "old_failed_as_expected": old_failed_as_expected,
-            "new_runtime_passed": new_passed, "observations": observations,
-            "versions": versions, "new_counts": counts}
-
+    return _native_request("environment", transcript.encode("utf-8", "surrogatepass"),
+                           harness_zero=harness_status == 0)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)

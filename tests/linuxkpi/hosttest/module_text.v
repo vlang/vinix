@@ -206,7 +206,7 @@ fn module_file_message(failure ModuleFileError) string {
 	return message
 }
 
-fn module_copy_file(source string, destination string) ! {
+pub fn module_copy_file(source string, destination string) ! {
 	state := os.stat(source) or { return ModuleFileError{source, err.code(), err.msg()} }
 	if state.get_filetype() == .fifo { return error('`${source}` is a named pipe') }
 	input := C.fopen(source.str, c'rb')

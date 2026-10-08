@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+from runpy import run_path
 from pathlib import Path
 import pty
 import select
@@ -14,6 +15,8 @@ import signal
 import subprocess
 import tarfile
 import time
+
+_native_request = run_path(str(Path(__file__).with_name("_native.py")))["request"]
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -58,41 +61,7 @@ def stop_guest(pid: int, master: int) -> bool:
 
 
 def verdict(transcript: bytes, reaped: bool) -> dict:
-    transcript = transcript.replace(b"\r", b"")
-    old_marker = b"WAKE-OP-VARIANT-BEGIN:old"
-    new_marker = b"WAKE-OP-VARIANT-BEGIN:new"
-    end_marker = b"WAKE-OP-GUEST-END"
-    old_start, new_start, end = (transcript.find(marker)
-                                 for marker in (old_marker, new_marker, end_marker))
-    ordered = (0 <= old_start < new_start < end and
-               all(transcript.count(marker) == 1 for marker in (old_marker, new_marker, end_marker)))
-    old = transcript[old_start:new_start] if ordered else b""
-    new = transcript[new_start:end] if ordered else b""
-    old_lines, new_lines = old.splitlines(), new.splitlines()
-    permissions = (b"write-only-secondary", b"write-only-operation-stored-value",
-                   b"read-only-primary-wake", b"read-only-primary-wake-op", b"read-only-secondary",
-                   b"prot-none-secondary", b"unmapped-secondary")
-    alignments = (b"misaligned-primary", b"misaligned-secondary")
-    result = {"completed": ordered, "boot_process_reaped": reaped,
-              "old_completed": ([line for line in old_lines
-                                 if line.startswith(b"WAKE-OP-VARIANT-EXIT:old:")]
-                                == [b"WAKE-OP-VARIANT-EXIT:old:1"]),
-              "old_smc_efault": b"WAKE-OP SMC result=-1 errno=14 word=17" in old_lines,
-              "old_permission_contracts_passed": all(b"WAKE-OP CHECK " + name + b" PASS" in old_lines
-                                                      for name in permissions),
-              "old_alignment_mismatches": [name.decode() for name in alignments
-                                            if b"WAKE-OP CHECK " + name + b" FAIL" in old_lines],
-              "old_alignment_contracts_passed": all(b"WAKE-OP CHECK " + name + b" PASS" in old_lines
-                                                     for name in alignments),
-              "new_passed": (new_lines.count(b"WAKE-OP PASS failures=0") == 1 and
-                             [line for line in new_lines
-                              if line.startswith(b"WAKE-OP-VARIANT-EXIT:new:")]
-                             == [b"WAKE-OP-VARIANT-EXIT:new:0"])}
-    result["passed"] = all(result[name] for name in (
-        "completed", "boot_process_reaped", "old_completed", "old_smc_efault",
-        "old_permission_contracts_passed", "new_passed"))
-    return result
-
+    return _native_request("wake", transcript, reaped=reaped)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
