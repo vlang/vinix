@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `10dcea973ec9189fb2b148459edb648ec188e015`,
+at source commit `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 500 | 1,872,135 | 4.44% |
-| Python | 477 | 2,727,002 | 6.46% |
+| C | 500 | 1,872,135 | 4.42% |
+| Python | 483 | 2,699,963 | 6.38% |
 | Shell | 307 | 1,288,992 | 3.05% |
 
-All `.v` files are classified as V. The resulting V share is 78.93%, with no
+All `.v` files are classified as V. The resulting V share is 79.05%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 10dcea973ec9189fb2b148459edb648ec188e015 --breakdown --json
+github-linguist --rev 2b4ff1ce4c661c427027b381c7c8ac1f0047eb86 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -569,8 +569,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/run-v-core.py` | 3,917 |
 | `build-support/_cache_native.py` | 2,147 |
 | `build-support/alpine-resolve.py` | 2,946 |
+| `build-support/android/_boot_native.py` | 10,702 |
 | `build-support/android/_native.py` | 5,749 |
-| `build-support/android/art-bootclasspath.py` | 16,397 |
+| `build-support/android/art-bootclasspath.py` | 4,172 |
 | `build-support/android/art-runtime.py` | 10,978 |
 | `build-support/android/atl-dex.py` | 3,456 |
 | `build-support/android/build.py` | 21,957 |
@@ -629,14 +630,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/patch-wine-x86_64-qemu.py` | 3,263 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
+| `desktop/tools/_stage_native.py` | 6,520 |
 | `desktop/tools/build_cache.py` | 848 |
 | `desktop/tools/build_voffice.py` | 13,112 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/input.py` | 8,219 |
-| `desktop/tools/stage_app.py` | 11,122 |
+| `desktop/tools/stage_app.py` | 2,842 |
 | `desktop/tools/stage_host_gpu.py` | 3,424 |
-| `desktop/tools/stage_ui2.py` | 4,924 |
+| `desktop/tools/stage_ui2.py` | 990 |
 | `desktop/tools/test-gpu-present.py` | 8,956 |
 | `desktop/tools/tests/test_dictionary_data.py` | 3,007 |
 | `desktop/tools/tests/test_font_data.py` | 6,669 |
@@ -653,7 +655,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/acpi-sync/compile-v-native.py` | 816 |
 | `tests/acpi-sync/run.py` | 2,414 |
 | `tests/activity-monitor/run.py` | 5,933 |
-| `tests/agx-fake-g17/_native.py` | 7,146 |
+| `tests/agx-fake-g17/_native.py` | 7,357 |
 | `tests/agx-fake-g17/run.py` | 1,075 |
 | `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
 | `tests/agx-fake-g17/run_vm.py` | 4,186 |
@@ -757,7 +759,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/amd64-exceptions/run.py` | 5,611 |
 | `tests/amd64-poll/run.py` | 2,839 |
 | `tests/android/activity-lifecycle-test.py` | 1,750 |
-| `tests/android/art-runtime-test.py` | 15,944 |
+| `tests/android/art-runtime-test.py` | 2,297 |
 | `tests/android/atl-configuration.py` | 7,854 |
 | `tests/android/autofill-test.py` | 1,731 |
 | `tests/android/bootclasspath-test.py` | 701 |
@@ -770,7 +772,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/pointer-capture-test.py` | 1,879 |
 | `tests/android/run-runtime-vm.py` | 9,175 |
 | `tests/android/run.py` | 54,296 |
-| `tests/android/runtime-binding.py` | 2,597 |
+| `tests/android/runtime-binding.py` | 5,461 |
 | `tests/android/split-test.py` | 2,283 |
 | `tests/android/test-runtime-v.py` | 4,546 |
 | `tests/apple-ans/compile-fixture.py` | 1,319 |
@@ -817,13 +819,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/disk-writeback/run_vm.py` | 6,351 |
 | `tests/docker/run_vm.py` | 5,032 |
 | `tests/dota2/_native.py` | 3,559 |
+| `tests/dota2/_prepare_native.py` | 8,704 |
 | `tests/dota2/env-run.py` | 10,741 |
 | `tests/dota2/export-run.py` | 6,102 |
 | `tests/dota2/export-test.py` | 10,464 |
 | `tests/dota2/lavapipe-run.py` | 14,637 |
 | `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
-| `tests/dota2/run.py` | 28,015 |
+| `tests/dota2/run.py` | 15,405 |
 | `tests/dota2/steam-smoke-run.py` | 11,509 |
 | `tests/dota2/vulkan-run.py` | 12,909 |
 | `tests/dota2/vulkan-stage-test.py` | 18,652 |
@@ -873,14 +876,16 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/limine-aarch64/test_patch.py` | 4,292 |
-| `tests/linuxkpi/audit_generation_test.py` | 8,245 |
+| `tests/linuxkpi/_audit_native.py` | 7,668 |
+| `tests/linuxkpi/_host_native.py` | 4,257 |
+| `tests/linuxkpi/audit_generation_test.py` | 1,281 |
 | `tests/linuxkpi/compile-native-host.py` | 7,987 |
 | `tests/linuxkpi/compile-v-core.py` | 1,929 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
-| `tests/linuxkpi/compile-v-host.py` | 1,765 |
+| `tests/linuxkpi/compile-v-host.py` | 1,165 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
-| `tests/linuxkpi/host_suite.py` | 5,431 |
+| `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 12,077 |
 | `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/compile-fixture.py` | 1,221 |
@@ -920,7 +925,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/openbsd-security/run_vm.py` | 10,998 |
 | `tests/opengothic/kekvm-control.py` | 4,448 |
 | `tests/opengothic/run.py` | 15,066 |
-| `tests/packages/test-qemu-package-store.py` | 10,794 |
+| `tests/packages/test-qemu-package-store.py` | 11,421 |
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pagecache/check-generated.py` | 1,308 |
 | `tests/pagecache/run-guest.py` | 6,291 |
@@ -944,10 +949,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/_fixture_native.py` | 3,251 |
+| `tests/qemu-core/_vm_native.py` | 674 |
 | `tests/qemu-core/compile-basefixture.py.pending` | 5,488 |
 | `tests/qemu-core/compile-fixtures.py` | 1,119 |
 | `tests/qemu-core/oracle_support.py` | 1,086 |
-| `tests/qemu-core/run_vm.py` | 13,462 |
+| `tests/qemu-core/run_vm.py` | 6,725 |
 | `tests/qemu-core/test-basefixture.py.pending` | 5,726 |
 | `tests/qemu-core/test-blockedfixture.py` | 2,743 |
 | `tests/qemu-core/test-epollfixture.py` | 2,556 |

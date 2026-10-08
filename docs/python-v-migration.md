@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `10dcea973ec9189fb2b148459edb648ec188e015`, Linguist 7.27.0 reports
-**Python 6.46%** (477 files, 2,727,002 bytes) and **V 78.93%** (1,614 files,
-33,301,593 bytes). The complete committed-blob inventory and reproduction
+At source `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86`, Linguist 7.27.0 reports
+**Python 6.38%** (483 files, 2,699,963 bytes) and **V 79.05%** (1,647 files,
+33,444,039 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,479,283 Python bytes**. Roughly another
-0.62 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,506,322 Python bytes**. Roughly another
+0.58 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 87 completed stages have a gross
-scope of **2,663,062 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **183,779 bytes**
+tests, including comments and blank lines. The 94 completed stages have a gross
+scope of **2,746,072 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **239,750 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -116,6 +116,13 @@ no extra migration credit.
 | Generated syscall, permission and disk-policy controllers | `tests/generated-policy-host/policyhost` | 29,558 / 597 | `15113790448ee4c3f675fb62633c15c3ff0605e3` |
 | Mesa AGX guest PTY and QMP ownership | `tests/agx-fake-g17/agxhost/vm*.v` | 6,982 / 190 | `8ecc7c264d31ce58d9c8a78eb94dceade459c161` |
 | CPU assembly and scheduler-frame probe controller | `tests/generated-policy-host/policyhost/assembly*.v` | 10,810 / 220 | `10dcea973ec9189fb2b148459edb648ec188e015` |
+| Complete Android bootclasspath build workflow | `build-support/android/boothost` | 14,939 / 268 | `1b8efef098379574776d4f950dba19a60aff9d39` |
+| LinuxKPI production host controllers | `tests/linuxkpi/hostfixturebuild` | 7,196 / 139 | `528d19676f65a649305af0811de87f5cc305f4a9` |
+| Desktop and ui2 source staging workflows | `desktop/tools/stagehost` | 16,046 / 401 | `9878439f2a2bbb920aab8dbd6af38f535a426f19` |
+| Complete Android ATL independent fixtures | `tests/android/runtimefixture/atl.v` | 13,582 / 246 | `0ca7c62a8d672ea269430a6bd324ff4a17ab2363` |
+| Complete QEMU core guest controller | `tests/agx-fake-g17/agxhost/core_vm.v` | 8,478 / 238 | `11e7c8e5ea5a84ca12adad5c90724782472c33cd` |
+| Independent LinuxKPI audit regression controller | `tests/linuxkpi/auditfixture` | 8,245 / 170 | `9587ce0d1f13b5d2923b431756178750bac37639` |
+| Complete Dota game fixture preparation | `tests/dota2/prepcore` | 14,524 / 276 | `2b4ff1ce4c661c427027b381c7c8ac1f0047eb86` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -140,8 +147,10 @@ Each stage retained frozen Python originals until the candidate passed its
 comparison gates. Originals remain recoverable from the source commit's parent.
 Tests executed actual Darwin ARM64 binaries and independently compiled x86_64
 Mach-O binaries through Rosetta. The host compiler was
-`/Users/alex/code/v/v`, **V 0.5.2 6d549c2**. These host-only changes do not claim
-new kernel builds, guest workloads or physical GPU/CPU execution.
+`/Users/alex/code/v/v`, **V 0.5.2 6d549c2**. Host-only stages do not establish
+kernel builds or guest workloads. Guest runs below identify hashed prepared
+kernels and images; they do not establish new kernel builds or physical
+GPU/CPU execution.
 
 - G13 generator: 26 native tests, all 324 GPU/version structure layouts and
   11,188 field offsets per architecture, 20 CLI/layout controls, and exact
@@ -697,6 +706,55 @@ workloads were not weakened.
   also pass their actual ARM and x86 regression workloads. Kernel assembly
   inputs remain unchanged; this host stage adds no kernel or guest claims.
 
+- Android bootclasspath production compares 121 complete workflow/type/error
+  controls, three full main pairs and six transport failures per profile. All
+  nine unchanged boot fixtures and the 26-case runtime corpus pass on both
+  actual host ABIs; native fixture/sanitizer runs also pass. ZIP ordering uses
+  path components, wide integer equality stays exact and probe resolution
+  retains its position after staging. Source closure hashes include transport.
+  Compiler/Java/device execution is controlled; no new guest claim is made.
+- LinuxKPI host controllers produce byte-identical V-generated sources for all
+  21 fixture groups on ARM, x86 and sanitizers. Whole controller, namespace,
+  template, symbol, CLI and cleanup controls pass. Actual strict host suites
+  retain their original failures: ARM x86-ESP assembly constraints and signed
+  comparisons, and x86 signed comparisons. No runtime-object, kernel or guest
+  PASS is inferred from these host-controller tests.
+- Desktop staging compares 345 independent pure/whole/error/Unicode controls,
+  nine CLI/live-source pairs, seven abrupt-controller/stream cleanup controls
+  and 100 repeated requests to exact descriptor baselines per profile. Actual
+  six-case package HTTP fixtures pass for frozen originals and native code on
+  both host ABIs, including cold copied-source compilation. Canonical icon data
+  and the generated C ABI header stay byte-exact and receive zero C port credit.
+  The normal compile overhead is retained; no desktop/QEMU rendering claim is made.
+- All nine remaining ATL fixtures are native, with frozen original full/ATL
+  sweeps and unchanged 26-case front IDs. Real stage/cache production pairs,
+  native ARM/x86/sanitizer fixtures, existing boot/musl regressions and forced
+  assertion retirement pass. Original independent ELF/DEX builders, hardlink
+  coherence and manifest mutations remain checked by the same assertions.
+- QEMU core compares 8,644 policy cases, 17 real PTY flows and the original
+  CLI/path, environment, stdio, typed timeout and interrupt controls per profile.
+  Frozen/native ARM guests pass all 47 features and the persistent reboot using
+  identical prepared inputs. On x86 two earlier native runs fail the untouched
+  first-touch free-page assertion; two frozen originals and the final native
+  inherited-environment run pass on the same retained ISO/kernel/firmware.
+  All attempts remain recorded. Darwin execvp inheritance preserves XPC service
+  identity. This establishes new guest runs, without a fresh kernel build claim.
+- Audit fixtures preserve the production baseline of two PASS and two unchanged
+  FAIL cases on every profile. A cache-only complete frozen surrounding bounds
+  implementation gives all four original/native cases PASS with the actual
+  independent C syntax caller/compiler. Nine identity/retirement controls per
+  profile and cold invalid-metadata entries on both hosts pass. The fixture
+  source and assertions remain unchanged; there is no C or workload port credit.
+- Dota preparation compares 190 complete workflow, header, closure, iterator
+  and error controls per profile, including real APFS runtime copies. All eight
+  unchanged host regressions, three native unit functions, seven forced process/
+  stream cleanup controls and both hosts' CLI/cold entries pass. One hundred
+  requests retain the exact descriptor baseline after stdlib imports; the
+  initial cold measurement separately identifies Python random's single owned
+  urandom descriptor. Namespace reads, original exception objects, partial queue
+  mutation and preload iterator failure order remain intact. Whole fixture
+  compiler commands are controlled; no new game/kernel/rendering claim is made.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -815,6 +873,20 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `agx-pty-20261008` | `post.json` | `e68df69d699520fe5bb51ebfdf63a8c747a39b2cef8fd1127148eb5a5f52afe6` |
 | `generated-policy-host-20261008` | `assembly-qualification.json` | `edccc6ac6b76c3bc36a42dc00b309d54bf6d8bde7cad3e9556b4a85cb27f3a31` |
 | `generated-policy-host-20261008` | `assembly-post-commit.json` | `26c61d5771b1bc7c0d6a5e2b203392d9c428a0f600ebf8a156e18cd53a7bbcae` |
+| `android-boot-builder-20261008` | `qualification.json` | `e6f4903c40636add23b0d29efa0222e1bd91c92694140ff7de81a15fb35620d3` |
+| `android-boot-builder-20261008` | `post-commit.json` | `ae393c94d18adabb51c54b0124556974e25ba328ab2a2c596040e00b93db374b` |
+| `linuxkpi-host-controllers-20261008` | `qualification-final.json` | `97b20081e3848c37deb9c31a69b46dc5e7bd9e22ddfd45ecc252cc2872fc9232` |
+| `linuxkpi-host-controllers-20261008` | `postcommit.json` | `58c739a5f1d3d1be4bcbc089b8969fe00a0bbc7631a431138d4b479fc4618129` |
+| `desktop-stage-20261008` | `qualification.json` | `be5524894ae8de78b983a704f393a07e10e05e6ec8a82992e03be11d8e4b07d0` |
+| `desktop-stage-20261008` | `post-commit.json` | `12836456a4fa9debe7774c9c63ac3413fa5ecbb7363764906687f540c48b0204` |
+| `android-atl-fixtures-20261008` | `qualification.json` | `27fc2994b3768432c17b475097569e57db5ca4579625b5d1f3e7a1ca6d14b617` |
+| `android-atl-fixtures-20261008` | `post-commit.json` | `fac1d1e13d916c4ec4c685ae53c7645cd935fc1b0a0fb5ba3d27fb3b92e102c3` |
+| `qemu-core-pty-20261008` | `qualification.json` | `a767ef5b7a1d5e5b7970430b66ccc5e2edde9b8103e6ab935043b8ed880880fd` |
+| `qemu-core-pty-20261008` | `post.json` | `4d58c84f7cec3538260ac88d22858d8e6e08db9d05932f8984851954ac51d877` |
+| `linuxkpi-host-controllers-20261008` | `audit-qualification-final.json` | `53b7729ae22bbc0f89332b9dd3943a960b1fda0a520de5174f4d643f879a3a4a` |
+| `linuxkpi-host-controllers-20261008` | `audit-postcommit.json` | `0981d12ae3eb10bbb9ae399bfc5450a1ef143991b8d2be36d8b24adfaac4ef3e` |
+| `dota-preparation-20261008` | `qualification.json` | `1c0088a171894ccaeb4cfb8ca9222a0ab05e88d7b225c455d8b55aed48d3ad2c` |
+| `dota-preparation-20261008` | `post-commit.json` | `e1eb4e9e82cc0a927850279a43f7540ae9fabf0def4435e6ad2733196442f1e1` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
