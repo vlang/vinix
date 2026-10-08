@@ -177,20 +177,36 @@ def query(operation, arguments, namespace):
                 context = row.get("context")
                 if context is None:
                     return bool(owner.__exit__(None, None, None))
+                error = _failure(context, errors)
+                traceback = error.__traceback__
                 try:
-                    raise _failure(context, errors)
+                    raise error.with_traceback(traceback)
                 except BaseException:
-                    return bool(owner.__exit__(*sys.exc_info()))
+                    replay = error.__traceback__
+                    error.__traceback__ = traceback
+                    try:
+                        return bool(owner.__exit__(type(error), error, traceback))
+                    finally:
+                        if error.__traceback__ is replay:
+                            error.__traceback__ = traceback
             if kind == "context_exit":
                 manager = decode(row["target"])
                 context = row.get("context")
                 if context is None:
                     manager.__exit__(None, None, None)
                     return False
+                error = _failure(context, errors)
+                traceback = error.__traceback__
                 try:
-                    raise _failure(context, errors)
+                    raise error.with_traceback(traceback)
                 except BaseException:
-                    return bool(manager.__exit__(*sys.exc_info()))
+                    replay = error.__traceback__
+                    error.__traceback__ = traceback
+                    try:
+                        return bool(manager.__exit__(type(error), error, traceback))
+                    finally:
+                        if error.__traceback__ is replay:
+                            error.__traceback__ = traceback
             if kind == "print":
                 print(*values, **keywords)
                 return None
