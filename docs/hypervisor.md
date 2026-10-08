@@ -1,5 +1,10 @@
 # Intel VT-x hypervisor
 
+This is Vinix's native hardware virtualization backend. It exposes the
+Vinix-specific `/dev/hypervisor` API, not Linux's `/dev/kvm` or `KVM_*` ioctls.
+QEMU's KVM accelerator cannot use this device. For running Vinix as a guest
+under Linux KVM, see [Virtualization and KVM support](virtualization.md).
+
 Vinix enables Intel VT-x on every x86_64 CPU during SMP bring-up. If the CPU,
 firmware, or outer hypervisor does not provide VMX, Vinix logs the reason and
 continues booting normally. On supported systems an EPT-backed real-mode guest

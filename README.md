@@ -80,6 +80,15 @@ image; the first launch offers them and `pkg install` downloads them, which is
 why the commands above give the VM a network card. Vinix drives VirtIO and
 Intel e1000 network cards.
 
+### Virtualization and KVM
+
+Vinix can run as a QEMU guest accelerated by KVM on Linux. Vinix also has an
+experimental Intel VT-x hypervisor exposed through `/dev/hypervisor`, with
+one vCPU and up to 2 MiB of memory per VM. Its API is specific to Vinix;
+Linux's `/dev/kvm` API is not implemented. See
+[Virtualization and KVM support](docs/virtualization.md) for host requirements,
+launch commands, and the current limits.
+
 ## Roadmap
 
 - [x] Alpine Linux/musl userland

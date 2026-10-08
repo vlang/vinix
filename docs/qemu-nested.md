@@ -3,6 +3,11 @@
 The AArch64 QEMU system layer runs a second Vinix kernel using TCG software
 emulation. Hardware virtualization is not required inside Vinix.
 
+The `vinix-qemu` launcher explicitly selects `-accel tcg`. Vinix does not
+implement Linux's `/dev/kvm` API, so an outer VM accelerated by KVM does not
+give this inner QEMU instance KVM acceleration. See
+[Virtualization and KVM support](virtualization.md) for the supported modes.
+
 On the build host, stage QEMU and build a desktop image containing it:
 
 ```sh
