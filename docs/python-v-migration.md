@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `908d60934e8eeeda34207c31842909521a5a3da6`, Linguist 7.27.0 reports
-**Python 6.81%** (472 files, 2,854,816 bytes) and **V 78.50%** (1,544 files,
-32,926,296 bytes). The complete committed-blob inventory and reproduction
+At source `6fa66c2d3660c97b13f23bf88af1224163595a92`, Linguist 7.27.0 reports
+**Python 6.67%** (476 files, 2,806,197 bytes) and **V 78.69%** (1,584 files,
+33,120,391 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,351,469 Python bytes**. Roughly another
-0.76 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,400,088 Python bytes**. Roughly another
+0.70 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 70 completed stages have a gross
-scope of **2,481,865 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **130,396 bytes**
+tests, including comments and blank lines. The 79 completed stages have a gross
+scope of **2,564,909 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **164,821 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -99,6 +99,15 @@ no extra migration credit.
 | Dota serial transcript parsers | `tests/dota2/transcriptcore` | 9,497 / 170 | `29439c388978ea53bf547a9d2b699e604e47d112` |
 | Android Dalvik and sample application probes | `build-support/android/androidhost/simple_probe.v` | 4,903 / 78 | `886f308e463fde99fe7f0aea4574f58879926380` |
 | QEMU core fixture build controllers | `tests/qemu-core/fixturehost, fixture_controller.v` | 54,129 / 858 | `908d60934e8eeeda34207c31842909521a5a3da6` |
+| Android guest runner helper policies | `build-support/android/androidhost/runner*.v` | 3,398 / 56 | `e2cde544961091c40a7a1e83362681284531d756` |
+| AGX host verifier and trace producer | `tests/agx-fake-g17/agxhost` | 4,491 / 61 | `f090cba9b53e062746a57b1238310ad8f82d7716` |
+| Apple ANS, SPI and speaker provider controllers | `tests/apple-protocols/applehost/providers.v` | 8,204 / 147 | `2286b3336d34436468f343636d38c4717ec4b5c9` |
+| Dota build and runtime cache policies | `build-support/dota2/buildcore` | 6,320 / 106 | `cdce2e9d1074bd357ec3b3e70858f1f792ec1913` |
+| Android EGL and split probe controllers | `build-support/android/androidhost/advanced_probe.v` | 12,872 / 185 | `ac262fdb9c5570b5f1cfe5ea7a8188f09d4ff64e` |
+| Android deployment and optional launch scripts | `build-support/android/androidhost/deployment.v` | 7,418 / 105 | `b13d145ab1c7e4b852e1920ea653025e36af8a5f` |
+| AGX complete trace workflow | `tests/agx-fake-g17/agxhost/trace*.v` | 10,251 / 134 | `26d6b3ad04d8e43b3cb8cc03ebc90e40bd91835d` |
+| Android ART and Bionic independent fixture controllers | `tests/android/runtimefixture, art-runtime-test.v` | 12,118 / 237 | `f75ef88bbf2c74347adec79a26d910d4b562ee7a` |
+| Font coverage, fallback, layout and output policies | `desktop/tools/fonthost, font_query.v` | 17,972 / 416 | `6fa66c2d3660c97b13f23bf88af1224163595a92` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -557,6 +566,64 @@ workloads were not weakened.
   These host-tool stages do not establish fresh kernel, QEMU or device results.
   A peer reviewed new lifetimes before each implementation commit.
 
+- Android runner helpers compare 330 ELF and 140 split cases per profile,
+  four native tests, 55 existing fixtures on both host ABIs, and 100 repeated
+  descriptor-error paths. EGL/split controllers compare 109 whole pipelines
+  and 208 ELF cases per profile, mixed caller/controller architectures,
+  inherited descriptors and signals. Deployment compares 231 complete phase,
+  file and error observations per profile, seven native suites per host and
+  ten existing interactive fixtures. Lazy optional-script order, exact bytes,
+  modes and final launch policy are retained. Controlled compilers and external
+  applications do not establish actual Android or guest execution.
+- SDK architecture preference support preserves universal and single-slice
+  fallback, argv, environment and signals in 108 actual command comparisons.
+  Native tests cover raw output, cwd and copied SDK storage on all profiles.
+  The public preferred capture and receipt wrappers delegate existing bodies.
+  These support commits receive zero additional Python migration credit.
+- AGX host verifier/trace production runs the complete original C encoder and
+  verifier on each profile, 61,344 Unicode13 guard controls, eleven failures,
+  five producer cases and four concurrent cold installers. The complete trace
+  workflow retains immutable C oracle modes and compares 15,506 policy/error
+  controls plus fourteen ordered typed failures per profile. Both production
+  Darwin targets, mixed caller/controller ABIs, five CLI controls and cold
+  entry cleanup are checked. Arbitrary-width trace integers and typed Path
+  error metadata retain their original values. No GPU or guest is exercised.
+- Apple providers compare 249 complete original/native outcomes per profile:
+  manifests, ordered inputs, hashes, copied bytes and modes, partial failures,
+  Unicode/raw filenames and overlapping source/destination trees. Four native
+  functions per profile and concurrent cold installers check retirement and
+  exact descriptor baselines. Broader unchanged ANS/SPI/speaker consumer
+  fixtures fail with the same V 6d549c2 generated-C diagnostics against both
+  original and native providers; x86 ANS also rejects the existing ARM assembly.
+  Six paired baseline failures have identical diagnostics and provider input
+  hashes. This stage claims passing provider gates, without claiming passing
+  consumer fixtures, kernel builds, QEMU or physical Apple operation.
+- Dota build policies compare 6,955 pure and 2,072 runtime outcomes per profile,
+  1,386 real pinning calls per ABI and eighteen original/native fixtures.
+  Forty-two streaming, EINTR and fault cases retain single-close ownership and
+  the original 1 MiB digest buffer. Native dependency hashes are included in
+  Mesa/Venus/QEMU cache keys. Concurrent installer checks retain exact descriptor
+  baselines. Whole build workflows remain counted Python at this snapshot.
+- ART/Bionic fixtures port all seventeen original test cases and assertions to
+  V, preserving the original unittest IDs and filters. The frozen complete
+  26-case corpus passes on both actual host ABIs; the combined seventeen native
+  and nine retained ATL cases passes all 26. Native cases also pass sanitizers.
+  Shared payload helpers and the public production-API binding remain counted
+  Python and receive zero extra scope credit.
+- Font generation compares 206 API outcomes per profile, including 42 ordered
+  Pillow method/error controls and three lazy Japanese-catalog failure cases.
+  All profiles produce the exact original 18,075,442-byte atlas (SHA-256
+  `3557458fa182dec44f9b783fb7f4931ac4383230308fdc478f2286bf236757b7`)
+  and identical Japanese subset files from the pinned source. Four native tests,
+  the five unchanged baked-font tests, fifteen subset/download/lifetime groups,
+  and twelve actual-ABI cold entry/CLI groups pass. Each profile retires 100 raw
+  Pillow fonts and 100 open/clear cycles; cache owners, temporary masks and
+  residual fontTools objects are independently reviewed. Pillow 11.3.0,
+  FreeType 2.13.3 and fontTools 4.60.2 remain library primitives. Original direct
+  library/import/argparse bindings are excluded from the 17,972-byte credited
+  scope. No committed atlas, bundled fonts or provenance records change. Real
+  source/artifact arrays below 2 GiB are qualified; advance integers are unbounded.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -638,6 +705,27 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `qemu-core-controllers-20261008` | `qualification.json` | `6e2998310e347898e344e6c7ea9c7f1c960cb680df26aac34e423f10d22213df` |
 | `dota-family-20261008` | `work-dir-qualification.json` | `4a181c6a6034df08b6b5d0dca4c6762f046fa227129f0c0523c8b87d96b4f5a3` |
 | `agx-host-20261008` | `stack-qualification.json` | `c908a95a1e2204cac8c18141058cfea1da80cf00baf7a1cb48fad6fa32dfbd52` |
+| `android-run-helpers-20261008/final` | `qualification.json` | `cb54627b79d909d5cbcde3c3afbd94799279fb8afbea58b6fc3d3f6614f2016c` |
+| `android-run-helpers-20261008/final` | `post-commit.json` | `195e6fa0a15b7c7e83297d0c6737010b54834f5dab693eb4f7fc502f98ca5510` |
+| `agx-host-20261008` | `qualification.json` | `b6593e7c09dc4e829f19c8f0f75b8981bc71bd360acf342c2fe690ec091a7965` |
+| `agx-host-20261008` | `post-retirement.json` | `ee8a352ce2728be4c7a5ea88f454d5a5416876040976a8926f71d44a688f1d5f` |
+| `apple-host-controllers-20261008` | `qualification.json` | `f0937c0ac17f831744a5a9c34f4c6b059fcfafc86c3cf6490ebfee91beb50ea8` |
+| `apple-host-controllers-20261008` | `post-commit-verification.json` | `716a351c1ad9892d7734ac02a7e3083351627d7c0fe7f5060754892e45069e79` |
+| `dota-family-20261008/build-policy-stage` | `policy-qualification.json` | `657e5daac7317f708f9336e23f4af4c46feccec4e70115f38dadadaa1c03bfbf` |
+| `dota-family-20261008/build-policy-stage` | `policy-committed.json` | `0ecf565cef7bf2f11656379077ed5e4d906ccd56c38ec472cf1a1024456886b7` |
+| `android-advanced-probes-20261008/final` | `qualification.json` | `70f26f52339bf0ddfc211941404c4db9585b0466878c3497e75771efee67819b` |
+| `android-advanced-probes-20261008/final` | `post-commit.json` | `3af5518d6aafc09bdd8d6b8f96144981f846730f0fa20fff587ea48a4c7419df` |
+| `android-deployment-20261008/final` | `qualification.json` | `43a1e6cee3411735b8a6be4a584b9e37b76a67a3a87058f606260ce984d890b4` |
+| `android-deployment-20261008/final` | `post-commit.json` | `2089fa875500bfd1dcb6b1a0f5f3a0bd198806182c9dbde4bb4c1028bc30b464` |
+| `agx-trace-runner-20261008` | `qualification.json` | `856daac0240868bc0d3857b040052ced94d9ffeb6d5b1e0f05579a90a20f464d` |
+| `agx-trace-runner-20261008` | `post.json` | `f6b2aa8feb7f48525c2c562578ad8826f6eedcf6b4592de6b5b4990528aced07` |
+| `android-runtime-fixtures-20261008/final` | `qualification.json` | `1e52c2bf778aea3882f402afe5afc0bc27491bbfdf082e34fb233b1937ac7eb8` |
+| `android-runtime-fixtures-20261008/final` | `post-commit.json` | `4789eaab0edd78acf6c1b2cb1a3f6d02f5082f61765f92732dc2e0a14a7e4e97` |
+| `font-generator-20261008` | `qualification.json` | `76dd53addbb3c3cb442afef7e80ff4348aba62fb122885faf1933d4150cd887a` |
+| `font-generator-20261008` | `post-commit.json` | `6a5daf1d607044d5be47484e77736b27806f3eaef8868cdde6d88b8fe5f07d03` |
+| `agx-host-20261008` | `preference-qualification.json` | `876ada7bb2edf4bdf2ed54635aed585010557c972862d0d89c5b21ee9ba5bcca` |
+| `agx-trace-runner-20261008` | `preference-api-qualification.json` | `0f5261b0f44958880f426db86a7b322102c2a10c36cc01bc5c779c1e0cd47850` |
+| `agx-native-builder-20261008` | `schema-qualification.json` | `803db3ab268997be6c5be887c77a123258ed56add1b6a63d8e85f75d45c48912` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -646,8 +734,8 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-Android guest-runner helpers, Dota build-input/runtime cache policies, AGX
-host controllers and Apple provider/build controllers are active.
+Complete Android/Dota/AGX guest and build workflows, native independent fixture
+controllers and remaining host build tools are active.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
