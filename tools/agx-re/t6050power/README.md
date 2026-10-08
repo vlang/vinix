@@ -8,6 +8,13 @@ IORVBAR lock and CPU-run sequences. The maintained
 JSON adapter. Its remaining recovery families are still Python and remain
 counted as Python until their own ports pass qualification.
 
+The PMP dashboard module proves selector/die conversion, request publication,
+status probing, the pre-ready acknowledgement bypass and the ready-gated polling
+paths. The T6050 PMGR module recovers all 60 RegMap calls in order and the resume
+and hibernation republication sites. These proofs keep byte-search offsets and
+arbitrary integer address arithmetic separate until the decoder applies the
+original 64-bit address mask.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V
@@ -23,6 +30,9 @@ are native V; the fixture JSON contains test inputs and expected values only.
 `transport_test.v` similarly retains the independent readiness, patchbay-write
 and ASCWrap fixtures in `testdata/transport.json`, including every original
 full-output and rejection check.
+`dashboard_test.v` retains the independent dashboard and PMGR fixtures in
+`testdata/dashboard.json`, together with byte-search, wide MOVZ operand and
+vtable diagnostic controls.
 
 The original functions and fixtures remain available in Git. Qualification
 compares each instruction mutation, truncation, missing symbol and malformed

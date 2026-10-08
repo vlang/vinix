@@ -13,6 +13,7 @@ fn functions_from_json(value j.Value) !map[string]Function {
 }
 
 pub fn query(operation string, request map[string]j.Value) !j.Value {
+	if operation == '_decode_movz_w' { return decode_movz_query(request) }
 	functions := functions_from_json(j.value(request, 'functions'))!
 	result := match operation {
 		'recover_apple_ptd_code_contract' {
@@ -38,6 +39,12 @@ pub fn query(operation string, request map[string]j.Value) !j.Value {
 		}
 		'recover_apple_ascwrap_v6_code_contract' {
 			recover_apple_ascwrap_v6_code_contract(functions, j.value(request, 'vtable_targets').as_map())!
+		}
+		'recover_pmp_code_contract' {
+			recover_pmp_code_contract(functions, j.value(request, 'symbols').as_map(), j.value(request, 'interrupt_config'))!
+		}
+		'recover_t6050_pmgr_code_contract' {
+			recover_t6050_pmgr_code_contract(functions, j.value(request, 'symbols').as_map(), j.value(request, 'apple_pmgr_symbols').as_map(), j.value(request, 'vtable_targets').as_map())!
 		}
 		else { return error('unknown T6050 recovery operation ${operation}') }
 	}
