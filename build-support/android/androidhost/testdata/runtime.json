@@ -1,0 +1,139 @@
+{
+  "manifest": {
+    "format": 1,
+    "architecture": "aarch64",
+    "page_size": 16384,
+    "source_commit": "e78bf68917bcaaf58fef3960cd88793b3b7f39cc",
+    "source_sha512": "75ef56d63dfc7661a7928191441d4672d612b6a8d27c3957764d324e4f622a42c132c34540f6a89556b1971964df8be2eced0b8a599d5a793ab3039cfb9c48a2",
+    "source_sha256": "2efcaf77d1c3e08dc738b7d1d38ad789b0a0fc729612fb67169d0b2c250b61d7",
+    "patch_sha256": "26baba1150c148ee548caad36058bdb7e4071ae219620a5ed9c7ba52b1785039",
+    "androidfw_configuration_api": 1,
+    "build_flags": [
+      "-DART_PAGE_SIZE=16384"
+    ],
+    "files": [
+      {
+        "path": "usr/lib/art/libart.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/bin/dalvikvm",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/bin/dex2oat",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libandroidfw.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libart-compiler.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libart-dexlayout.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libartbase.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libartpalette.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libbacktrace.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libbase.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libcutils.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libdexfile.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/liblog.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libnativebridge.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libprofile.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libsigchain.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libunwind.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libutils.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/art/libziparchive.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/java/dex/art/natives/libjavacore.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/java/dex/art/natives/libnativehelper.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/java/dex/art/natives/libopenjdk.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/lib/java/dex/art/natives/libopenjdkjvm.so",
+        "size": 256,
+        "sha256": "a381d1e4eb621f644378054d2014a035291c8e065bbb7cba50445236d57c3859"
+      },
+      {
+        "path": "usr/include/androidfw/androidfw_c_api.h",
+        "size": 29,
+        "sha256": "64d48a95e5b88a8d870ba672ece10a01dbe02218e2cbd540f9dfea79429609d5"
+      }
+    ]
+  },
+  "elf": "7f454c460201010000000000000000000300b7000100000080004000000000004000000000000000000000000000000000000000400038000100000000000000010000000500000000000000000000000000400000000000000000000000000000010000000000000001000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "header": "2f2a2070696e6e656420616e64726f69646677204320415049202a2f0a"
+}

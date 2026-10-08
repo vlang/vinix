@@ -8,9 +8,10 @@ import crypto.sha256
 fn C.fstat(i32, &C.stat) i32
 
 pub struct FileError {
-	message  string
-	number   int
-	filename string
+	message   string
+	number    int
+	filename  string
+	filename2 string
 }
 
 pub fn (e FileError) msg() string { return e.message }
@@ -19,7 +20,7 @@ pub fn (e FileError) code() int { return e.number }
 
 fn file_error(path string) IError {
 	number := int(C.errno)
-	return FileError{os.get_error_msg(number), number, path}
+	return FileError{ message: os.get_error_msg(number), number: number, filename: path }
 }
 
 fn open_reader(path string) !os.File {
@@ -32,7 +33,7 @@ fn open_reader(path string) !os.File {
 	}
 	if u32(state.st_mode) & u32(C.S_IFMT) == u32(C.S_IFDIR) {
 		stream.close()
-		return FileError{os.get_error_msg(C.EISDIR), int(C.EISDIR), path}
+		return FileError{ message: os.get_error_msg(C.EISDIR), number: int(C.EISDIR), filename: path }
 	}
 	return stream
 }

@@ -47,16 +47,25 @@ def request(operation, **fields):
                     raise
                 atexit.register(shutil.rmtree, directory)
                 _BINARY = binary
-    result = _run([str(_BINARY)], input=json.dumps({"operation": operation, **fields}) + "\n",
+    # Unsupported observed values are type-check failures in the controller.
+    # Marshal them as null, including non-finite floats accepted by json.loads.
+    payload = json.loads(json.dumps({"operation": operation, **fields}, skipkeys=True,
+                                   default=lambda _: None), parse_constant=lambda _: None)
+    result = _run([str(_BINARY)], input=json.dumps(payload) + "\n",
                             text=True, capture_output=True)
     value = json.loads(result.stdout)
     if "result" in value:
         return value["result"]
     kind = value["kind"]
+    if kind == "SymlinkLoop":
+        raise RuntimeError(f"Symlink loop from {value['filename']!r}")
     if kind == "UnicodeDecodeError":
         raise UnicodeDecodeError(value["encoding"], bytes.fromhex(value["object"]),
                                  value["start"], value["end"], value["reason"])
     if kind == "OSError":
+        if value.get("filename2"):
+            raise OSError(value["errno"], value["error"], value["filename"] or None,
+                          None, value["filename2"])
         raise OSError(value["errno"], value["error"], value["filename"] or None)
     if kind == "struct.error":
         raise struct.error(value["error"])

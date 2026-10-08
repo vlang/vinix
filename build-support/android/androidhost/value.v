@@ -47,6 +47,36 @@ pub fn integer(v Value) ?u64 {
 	}
 }
 
+// Python uses numeric equality for page size/API fields, but exact integer
+// types for manifest versions and file sizes. Keep those contracts distinct.
+fn number_equals(value Value, expected u64) bool {
+	return match value {
+		bool { (if value { u64(1) } else { u64(0) }) == expected }
+		Number { (strconv.atof64(value.text) or { return false }) == f64(expected) }
+		int, i64 { value >= 0 && u64(value) == expected }
+		u64 { value == expected }
+		else { false }
+	}
+}
+
+fn nonnegative_integer(value Value) bool {
+	return match value {
+		Number { !value.text.contains_any('.eE-') || value.text == '-0' }
+		int, i64 { value >= 0 }
+		u64 { true }
+		else { false }
+	}
+}
+
+fn size_matches(value Value, expected u64) bool {
+	actual := integer(value) or { return false }
+	return actual == expected
+}
+
+fn is_hash(value Value) bool {
+	return value is string && value.len == 64 && value.bytes().all(it in '0123456789abcdef'.bytes())
+}
+
 pub fn encode(v Value) string {
 	return match v {
 		Number { v.text }

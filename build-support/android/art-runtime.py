@@ -2,16 +2,9 @@
 """Verify and install source-built ARM64 Android overlays for Vinix."""
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import json
-import os
-from pathlib import Path, PurePosixPath
-import re
-import shutil
-import stat
-import struct
-import tempfile
+from pathlib import Path
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -99,24 +92,11 @@ def _digest(path: Path) -> str:
 
 def configuration_probe_digest() -> str:
     """Bind ATL's native fixture provenance to all maintained V inputs."""
-    support = Path(__file__).parent
-    inputs = (support / "atlconfiguration/core.v", support / "atl-configuration-v-abi.h",
-              support / "compile-v-atl-configuration.py", support.parent / "compile-v-module.py",
-              support.parent / "find-v.sh")
-    result = hashlib.sha256()
-    for source in inputs:
-        result.update(str(source.relative_to(support.parent)).encode() + b"\0")
-        result.update(source.read_bytes())
-    return result.hexdigest()
+    return _native.request("configuration_probe_digest", support=str(Path(__file__).parent))
 
 
 def _regular(path: Path) -> None:
-    try:
-        mode = path.lstat().st_mode
-    except OSError as error:
-        raise RuntimeError(f"ART overlay file is missing or unreadable: {path}") from error
-    if not stat.S_ISREG(mode):
-        raise RuntimeError(f"ART overlay file is not a regular file: {path}")
+    _native.request("regular", path=str(path))
 
 
 def _relative(name: object) -> Path:
@@ -124,120 +104,54 @@ def _relative(name: object) -> Path:
 
 
 def _inside(root: Path, relative: Path) -> Path:
-    path = root / relative
-    # Reject symlink parents as well as files: an overlay must not supply or
-    # write through aliases into a different part of the staging filesystem.
-    parent = root
-    for part in relative.parts[:-1]:
-        parent = parent / part
-        if parent.is_symlink():
-            raise RuntimeError(f"ART overlay has a symlink parent: {parent}")
-    if not path.parent.resolve().is_relative_to(root.resolve()):
-        raise RuntimeError(f"ART overlay path escapes its root: {path}")
-    return path
+    return Path(_native.request("inside", root=str(root), path=str(relative)))
 
 
 def _elf(path: Path, required: bool = False) -> None:
     _native.request("elf", path=str(path), required=bool(required))
 
 
-def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = False) -> None:
-    label = "ATL" if atl else "Bionic" if bionic else "ART"
-    commit = ATL_SOURCE_COMMIT if atl else BIONIC_SOURCE_COMMIT if bionic else SOURCE_COMMIT
-    sha256 = ATL_SOURCE_SHA256 if atl else BIONIC_SOURCE_SHA256 if bionic else SOURCE_SHA256
-    sha512 = ATL_SOURCE_SHA512 if atl else BIONIC_SOURCE_SHA512 if bionic else SOURCE_SHA512
-    patch = ATL_PATCH if atl else BIONIC_PATCH if bionic else PATCH
-    flag = "-Wl,-z,max-page-size=65536" if atl else "-DBIONIC_PAGE_SIZE=16384" if bionic else "-DART_PAGE_SIZE=16384"
+def _record_fields(record):
+    if not isinstance(record, dict):
+        return None
+    return {key: record[key] for key in ("path", "size", "sha256", "kind", "class_count", "bootstrap_callsites")
+            if key in record}
+
+
+def _runtime_fields(manifest):
+    """Marshal observed metadata only; opaque extension fields remain Python-owned."""
     if not isinstance(manifest, dict):
-        raise RuntimeError(f"{label} runtime manifest must be an object")
-    if (type(manifest.get("format")) is not int or manifest["format"] != 1
-            or manifest.get("architecture") != "aarch64"
-            or manifest.get("page_size") != PAGE_SIZE):
-        raise RuntimeError(f"{label} runtime must be format 1, native ARM64, and built for 16 KiB pages")
-    if (manifest.get("source_commit") != commit
-            or manifest.get("source_sha512") != sha512
-            or manifest.get("source_sha256") != sha256):
-        raise RuntimeError(f"{label} runtime source does not match the pinned source archive")
-    if manifest.get("patch_sha256") != _digest(patch):
-        raise RuntimeError(f"{label} runtime was built with a different Vinix patch; rebuild {label}")
-    if not bionic and manifest.get("androidfw_configuration_api") != 1:
-        raise RuntimeError(f"{label} runtime lacks the native androidfw configuration API")
-    flags = manifest.get("build_flags")
-    if (not isinstance(flags, list) or not all(isinstance(flag, str) for flag in flags)
-            or flag not in flags):
-        raise RuntimeError(f"{label} runtime manifest is missing its 16 KiB compiler flag")
-    files = manifest.get("files")
-    if not isinstance(files, list) or not files:
-        raise RuntimeError("ART runtime manifest has no files")
-    seen = set()
-    for record in files:
-        if not isinstance(record, dict):
-            raise RuntimeError("ART runtime file record must be an object")
-        relative = _relative(record.get("path"))
-        name = relative.as_posix()
-        if name in seen:
-            raise RuntimeError(f"duplicate ART runtime file: {name}")
-        seen.add(name)
-        if (type(record.get("size")) is not int or record["size"] < 0
-                or not isinstance(record.get("sha256"), str)
-                or re.fullmatch(r"[0-9a-f]{64}", record["sha256"]) is None):
-            raise RuntimeError(f"invalid ART runtime file size or hash: {name}")
-        path = _inside(overlay, relative)
-        _regular(path)
-        if path.stat().st_size != record["size"] or _digest(path) != record["sha256"]:
-            raise RuntimeError(f"ART runtime file checksum mismatch: {name}")
-        _elf(path, required=bionic or name in (ATL_ELFS if atl else ART_ELFS))
-        if atl:
-            with path.open("rb") as contents:
-                magic = contents.read(4)
-            kind = "elf" if magic == b"\x7fELF" else "dex" if name.endswith(".jar") else "data"
-            if record.get("kind") != kind:
-                raise RuntimeError(f"ATL runtime file kind does not match its payload: {name}")
+        return None
+    fields = {key: manifest[key] for key in (
+        "format", "architecture", "page_size", "source_commit", "source_sha256", "source_sha512",
+        "patch_sha256", "androidfw_configuration_api", "build_flags", "files", "androidfw_patch_sha256",
+        "androidfw_header_sha256", "androidfw_library_sha256", "configuration_probe_sha256", "builder_sha256",
+        "dex_adapter_sha256", "dex_compiler_sha256", "java_core_classes_sha256", "dex_compiler_arguments",
+        "dex_compiler") if key in manifest}
+    if isinstance(fields.get("files"), list):
+        fields["files"] = [_record_fields(record) for record in fields["files"]]
+    return fields
+
+
+def _validate(overlay: Path, manifest: dict, bionic: bool = False, atl: bool = False) -> None:
+    fields = _runtime_fields(manifest)
+    seen = set(_native.request("validate_runtime", overlay=str(overlay),
+                              support=str(Path(__file__).parent), manifest=fields,
+                              bionic=bool(bionic), atl=bool(atl)))
     if atl:
         _validate_atl_payloads(overlay, manifest, seen)
     elif bionic:
-        if seen != BIONIC_LIBRARIES:
-            raise RuntimeError("Bionic runtime must contain all nine loader libraries and SONAME aliases")
-        records = {record["path"]: record for record in files}
-        for name in seen:
-            canonical = name.split(".so", 1)[0] + ".so"
-            if any(records[name][key] != records[canonical][key] for key in ("sha256", "size")):
-                raise RuntimeError(f"Bionic SONAME alias differs from its canonical library: {name}")
-    else:
-        missing = (ART_ELFS | ART_HEADERS) - seen
-        unexpected = seen - (ART_ELFS | ART_HEADERS | ART_BOOT_JARS)
-        if missing:
-            raise RuntimeError("ART runtime is missing required native outputs: "
-                               + ", ".join(sorted(missing)))
-        if unexpected:
-            raise RuntimeError("ART runtime has unexpected outputs: "
-                               + ", ".join(sorted(unexpected)))
+        _native.request("validate_bionic_aliases", manifest=fields, seen=list(seen))
     if not bionic and not atl and "bootclasspath" in manifest:
         _boot_tools().validate_provenance(overlay, manifest["bootclasspath"], manifest["files"])
 
 
 def _validate_atl_payloads(overlay: Path, manifest: dict, seen: set[str]) -> None:
-    if ATL_REQUIRED != seen:
-        raise RuntimeError("ATL runtime is missing part of its coherent native/framework/resource output")
+    _native.request("validate_atl_required", seen=list(seen))
     boot = _boot_tools()
-    if ("--buildtype=release" not in manifest["build_flags"]
-            or manifest.get("androidfw_patch_sha256") != _digest(PATCH)
-            or any(not isinstance(manifest.get(key), str)
-                   or re.fullmatch(r"[0-9a-f]{64}", manifest[key]) is None
-                   for key in ("androidfw_header_sha256", "androidfw_library_sha256"))
-            or manifest.get("configuration_probe_sha256") != configuration_probe_digest()
-            or manifest.get("builder_sha256") != _digest(Path(__file__).with_name("build-atl.sh"))
-            or manifest.get("dex_adapter_sha256") != _digest(Path(__file__).with_name("atl-dex.py"))
-            or manifest.get("dex_compiler_sha256") != boot.INPUTS[2]["sha256"]
-            or manifest.get("java_core_classes_sha256") != ATL_CORE_CLASSES_SHA256
-            or manifest.get("dex_compiler_arguments") != boot.COMPILER_ARGUMENTS
-            or not isinstance(manifest.get("dex_compiler"), str)
-            or not manifest["dex_compiler"].startswith("D8 8.3.37 (build ")):
-        raise RuntimeError("ATL runtime does not match the pinned builder and Java compiler inputs")
+    _native.request("validate_atl_metadata", support=str(Path(__file__).parent),
+                    manifest=_runtime_fields(manifest), seen=list(seen))
     records = {record["path"]: record for record in manifest["files"]}
-    for key in ("size", "sha256"):
-        if records["usr/lib/libandroid.so"][key] != records["usr/lib/libandroid.so.0"][key]:
-            raise RuntimeError("ATL libandroid SONAME alias differs from its canonical library")
     for name in seen:
         if not name.endswith(".jar"):
             continue
@@ -245,11 +159,8 @@ def _validate_atl_payloads(overlay: Path, manifest: dict, seen: set[str]) -> Non
             classes, callsites = boot.jar_info(_inside(overlay, _relative(name)))
         except (ValueError, UnicodeError, zipfile.BadZipFile) as error:
             raise RuntimeError(f"ATL runtime has an invalid framework DEX JAR: {name}") from error
-        if not classes or callsites != 0:
-            raise RuntimeError(f"ATL framework retained unsupported Java bootstrap calls: {name}")
-        for key, measured in (("class_count", len(classes)), ("bootstrap_callsites", callsites)):
-            if type(records[name].get(key)) is not int or records[name][key] != measured:
-                raise RuntimeError(f"ATL framework DEX does not match its compiler receipt: {name}")
+        _native.request("validate_atl_dex_receipt", name=name, record=_record_fields(records[name]),
+                        classes=len(classes), callsites=callsites)
     try:
         with zipfile.ZipFile(overlay / ATL_RESOURCES) as resources:
             if not {"AndroidManifest.xml", "resources.arsc"} <= set(resources.namelist()):
@@ -265,10 +176,8 @@ def _validate_atl_payloads(overlay: Path, manifest: dict, seen: set[str]) -> Non
 def _read_manifest(overlay: Path, bionic: bool = False, atl: bool = False) -> dict:
     label = "ATL" if atl else "Bionic" if bionic else "ART"
     overlay = Path(overlay)
-    if overlay.is_symlink() or not overlay.is_dir():
-        raise RuntimeError(f"{label} runtime overlay must be a directory: {overlay}")
-    path = overlay / (ATL_MANIFEST if atl else BIONIC_MANIFEST if bionic else MANIFEST)
-    _regular(path)
+    path = Path(_native.request("manifest_path", overlay=str(overlay),
+                                bionic=bool(bionic), atl=bool(atl)))
     try:
         manifest = json.loads(path.read_text())
     except (ValueError, UnicodeError) as error:
@@ -282,29 +191,8 @@ def _apply(overlay: Path, runtime: Path, manifest: dict, bionic: bool = False, a
     overlay, runtime = Path(overlay), Path(runtime)
     if _read_manifest(overlay, bionic, atl) != manifest:
         raise RuntimeError("ART runtime manifest changed between verification and installation")
-    if runtime.is_symlink():
-        raise RuntimeError(f"ART destination must not be a symlink: {runtime}")
-    runtime.mkdir(parents=True, exist_ok=True)
-    # Check every destination before publishing any files.
-    destinations = [_inside(runtime, _relative(record["path"])) for record in manifest["files"]]
-    for record, target in zip(manifest["files"], destinations):
-        source = _inside(overlay, _relative(record["path"]))
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(prefix=".vinix-art-", dir=target.parent,
-                                             delete=False) as output:
-                temporary = Path(output.name)
-                with source.open("rb") as contents:
-                    shutil.copyfileobj(contents, output)
-            if temporary.stat().st_size != record["size"] or _digest(temporary) != record["sha256"]:
-                raise RuntimeError(f"ART runtime file changed during installation: {record['path']}")
-            _elf(temporary, required=bionic or record["path"] in (ATL_ELFS if atl else ART_ELFS))
-            temporary.chmod(stat.S_IMODE(source.stat().st_mode) & 0o777)
-            os.replace(temporary, target)
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+    _native.request("install_runtime", overlay=str(overlay), runtime=str(runtime),
+                    manifest=_runtime_fields(manifest), bionic=bool(bionic), atl=bool(atl))
     return manifest
 
 
