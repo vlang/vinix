@@ -3,6 +3,60 @@ module hosttest
 
 import os
 
+// Match the original nm allocation guard's word boundaries on both Darwin's
+// bare undefined names and ELF's address/type/name lines.
+pub fn allocation_symbols(text string) bool {
+	mut token := ''
+	for ch in (text + ' ').bytes() {
+		if word_char(ch) { token += ch.ascii_str(); continue }
+		name := if token.starts_with('_') { token[1..] } else { token }
+		if name in ['malloc', 'calloc', 'realloc', 'free', 'memdup'] || name.starts_with('new_array') { return true }
+		token = ''
+	}
+	return false
+}
+
+fn foreign_type(text string, name string) !string {
+	needle := 'struct C.' + name
+	mut matches := []string{}
+	mut start := 0
+	for start < text.len {
+		position := start + (text[start..].index(needle) or { break })
+		mut brace := position + needle.len
+		for brace < text.len && text[brace].is_space() { brace++ }
+		if brace < text.len && text[brace] == `{` {
+			end := brace + (text[brace..].index('}') or { return error('Unclosed native declaration: ' + name) }) + 1
+			prefix := text[..position].trim_right(' \t\r\n\v\f')
+			begin := if prefix.ends_with('@[typedef]') { prefix.len - '@[typedef]'.len } else { position }
+			matches << text[begin..end].clone()
+		}
+		start = position + needle.len
+	}
+	if matches.len != 1 { return error('Expected exactly one native ' + name + ' declaration') }
+	return matches[0]
+}
+
+// Stage only the unchanged production algorithms and their original foreign
+// declarations when standalone fixtures need no unrelated callback storage.
+pub fn generate_header_primitives(output string, arch string, host bool, implementations_only bool) ! {
+	mut defines := ['nofloat']
+	if host { defines << 'linuxkpi_host_test' }
+	source := os.join_path(root(), 'kernel/linuxkpi/headercore')
+	if !implementations_only { generate_module(source, output, arch, defines)!; return }
+	work := work_dir('', 'vinix-header-implementations-')!
+	defer { os.rmdir_all(work) or { eprintln(err) } }
+	isolated := os.join_path(work, 'headercore')
+	os.mkdir(isolated)!
+	for name in ['primitive.v', 'policy.v'] { os.cp(os.join_path(source, name), os.join_path(isolated, name))! }
+	mut declarations := []string{}
+	common := os.read_file(os.join_path(source, 'common.v'))!
+	for name in ['spinlock_t', 'task_struct'] { declarations << foreign_type(common, name)! }
+	declarations << foreign_type(os.read_file(os.join_path(source, 'wait.v'))!, 'atomic_t')!
+	os.write_file(os.join_path(isolated, 'native_types.v'), '@[translated]\nmodule headercore\n' +
+		'#include "linuxkpi_header_primitive_v_contract.h"\n' + declarations.join('\n') + '\n')!
+	generate_module(isolated, output, arch, defines)!
+}
+
 fn replace_word(text string, word string, replacement string, prefix bool) string {
 	mut result := ''
 	mut start := 0
