@@ -21,6 +21,13 @@ RTBuddy fixup/load ordering, and the CPU-start/Hello/roll-call status machine.
 Firmware-loaded and transport-ready metadata retain their original limited
 meaning; the dashboard readiness proof remains a separate requirement.
 
+Image proofs read PMGR interrupt names, RTKit identity-block candidates,
+firmware-source properties and AppleA7IOP resource properties through native
+Mach-O readers. `EvidenceReader` separates those primitive reads from the
+instruction proofs so the original reader fixtures remain independent.
+`MachOEvidence.image` is borrowed only during the synchronous call; returned
+strings, tables and proof metadata own their storage.
+
 `Function.code` is borrowed only for a synchronous proof. Returned metadata
 contains ordinary owned values; direction lookup and mask/shift arrays are
 copied. The shared extraction ABI registers foreign calling threads before V
@@ -44,6 +51,11 @@ vtable diagnostic controls.
 and RTKit boot fixtures in `testdata/firmware.json`, including full results and
 original rejection checks. Additional controls preserve call cardinality,
 negative word offsets and exact readiness dictionary numeric equality.
+
+`image_proofs_test.v` keeps the original property-reader inputs and all their
+full-result and rejection cases in `testdata/image-proofs.json`. Its patchbay
+candidate fixture comes from the frozen real RTBuddy image and retains only
+the functions and symbols that the original proof reads.
 
 The original functions and fixtures remain available in Git. Qualification
 compares each instruction mutation, truncation, missing symbol and malformed

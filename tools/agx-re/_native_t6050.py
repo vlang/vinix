@@ -18,8 +18,17 @@ def _encode(value):
 
 
 def contract(name, functions, **parameters):
+    return _contract(b"", name, functions, parameters)
+
+
+def image_contract(name, image, functions, **parameters):
+    """Borrow image bytes only for the synchronous native reader call."""
+    return _contract(image, name, functions, parameters)
+
+
+def _contract(image, name, functions, parameters):
     try:
-        return query(b"", "t6050:" + name,
+        return query(image, "t6050:" + name,
                      functions=_encode(functions), **_encode(parameters))
     except ValueError as error:
         message = str(error)

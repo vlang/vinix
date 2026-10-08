@@ -1,0 +1,820 @@
+[
+  {
+    "function": "recover_apple_a7iop_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN19AppleWrapperMailbox5startEP9IOService": [
+          4096,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780a200f9112780d21002118b080240f910093fd7808200f9"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox4_regEj": [
+          8192,
+          {
+            "$bytes": "5f2403d5088040f9004961b8c0035fd6"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox25getWrapperPhysicalAddressEv": [
+          12288,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100a040f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP5startEP9IOService": [
+          16384,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780b600f9112780d21002118b080240f910093fd7808200f9080040b9885e01b91f010071e2079f1a2800805288ca0439115b80d2400000b49fca0439809600f99fc204399f860439"
+          }
+        ],
+        "__ZN10AppleA7IOP19startCPUWithOptionsEP15IOSlaveFirmwarej": [
+          18432,
+          {
+            "$bytes": "114581d21002118b080240f9e00313aa2100805210093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP4_regEj": [
+          20480,
+          {
+            "$bytes": "5f2403d5088040f9004961b8c0035fd6"
+          }
+        ],
+        "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv": [
+          24576,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100b440f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP10enableSRAMEb": [
+          28672,
+          {
+            "$bytes": "025c41b922020034113981d21002118b080240f910093fd7405c80520000bc72"
+          }
+        ],
+        "__ZN10AppleA7IOP12_enablePowerEbj": [
+          32768,
+          {
+            "$bytes": "f30302aaf40301aa007c40f9111581d210093fd7a07e40f908c22291095a44f9e10314aa020080d2e30313aa31093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP21_dartMapiBootFirmwareEP8IOMapper": [
+          36864,
+          {
+            "$bytes": "08c04439089440f9111181d2111281d20a1d40b9ea050837090940f90b1940b95f0100726a00805241059f1a040140f9111481d24501168a030080d210093fd768c20439"
+          }
+        ],
+        "__ZN10AppleA7IOP17_hasiBootFirmwareEv": [
+          40960,
+          {
+            "$bytes": "5f2403d5089440f91f0100f1e0079f1ac0035fd6"
+          }
+        ]
+      },
+      "vtable_targets": {
+        "2504": 32768
+      }
+    },
+    "provider": {
+      "strings": {
+        "844": "segment-ranges"
+      },
+      "tables": []
+    },
+    "result": {
+      "apple_a7iop": {
+        "device_memory_index": 0,
+        "map_options": 0,
+        "provider_object_offset": 248,
+        "memory_map_object_offset": 360,
+        "mapped_virtual_address_offset": 256,
+        "register_access": {
+          "width_bits": 32,
+          "offset_unit": "bytes",
+          "address": "mapped virtual address + zero-extended offset"
+        },
+        "physical_address_source": "retained device-memory map",
+        "sram_power": {
+          "selector_property": "sram-index",
+          "selector_object_offset": 348,
+          "zero_means_unsupported": true,
+          "published_capability_property": "should-control-sram",
+          "enable_power_vtable_slot": 2504,
+          "provider_prepare_power_vtable_slot": 2216,
+          "provider_set_power_vtable_slot": 2224,
+          "provider_selector_argument": "x3",
+          "meaning": "provider power-domain selector; not a reg[] index"
+        },
+        "cpu_control": {
+          "filter_property": "cpu-ctrl-filtered",
+          "filter_absent_behavior": "permit concrete wrapper CPU-control writes",
+          "start_cpu_run_vtable_slot": 2600,
+          "start_cpu_run_argument": true
+        },
+        "iboot_firmware_probe": {
+          "predicate": "__ZN10AppleA7IOP17_hasiBootFirmwareEv",
+          "property": "segment-ranges",
+          "object_offset": 296,
+          "rule": "true exactly when the nub publishes segment-ranges",
+          "scope": "this decides DART record ownership only; RTBuddy chooses its firmware image from separate nub properties"
+        },
+        "iboot_firmware_mapping": {
+          "mapper_get_page_size_vtable_slot": 2184,
+          "mapper_reserve_vtable_slot": 2192,
+          "mapper_insert_vtable_slot": 2208,
+          "segment_record_size": 32,
+          "physical_offset": 0,
+          "iova_offset": 16,
+          "size_offset": 24,
+          "flags_offset": 28,
+          "skip_flag_bit": 1,
+          "text_direction": 1,
+          "data_direction": 3,
+          "meaning": "records with flag bit 1 clear are page-aligned and inserted into the supplied IOMapper before wrapper CPU release; bit 1 marks an iBoot-installed mapping that this path preserves"
+        },
+        "scope": "resource and power-domain ownership only; does not start or prove the IOP ready"
+      },
+      "wrapper_mailbox": {
+        "device_memory_index": 0,
+        "map_options": 0,
+        "provider_object_offset": 248,
+        "map_device_memory_vtable_slot": 1808,
+        "memory_map_object_offset": 320,
+        "get_virtual_address_vtable_slot": 312,
+        "mapped_virtual_address_offset": 256,
+        "register_access": {
+          "width_bits": 32,
+          "offset_unit": "bytes",
+          "address": "mapped virtual address + zero-extended offset"
+        },
+        "physical_address_source": "retained device-memory map",
+        "scope": "wrapper mailbox/control resource ownership only; does not start or prove the IOP ready"
+      }
+    }
+  },
+  {
+    "function": "recover_apple_a7iop_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN19AppleWrapperMailbox5startEP9IOService": [
+          4096,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780a200f9112780d21002118b080240f910093fd7808200f9"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox4_regEj": [
+          8192,
+          {
+            "$bytes": "5f2403d5088040f9004961b8c0035fd6"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox25getWrapperPhysicalAddressEv": [
+          12288,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100a040f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP5startEP9IOService": [
+          16384,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780b600f9112780d21002118b080240f910093fd7808200f9080040b9885e01b91f010071e2079f1a2800805288ca0439115b80d2400000b49fca0439809600f99fc204399f860439"
+          }
+        ],
+        "__ZN10AppleA7IOP19startCPUWithOptionsEP15IOSlaveFirmwarej": [
+          18432,
+          {
+            "$bytes": "114581d21002118b080240f9e00313aa2100805210093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP4_regEj": [
+          20480,
+          {
+            "$bytes": "5f2403d5088040f9004961b8c0035fd6"
+          }
+        ],
+        "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv": [
+          24576,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100b440f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP10enableSRAMEb": [
+          28672,
+          {
+            "$bytes": "025c41b922020034113981d21002118b080240f910093fd7405c80520000bc72"
+          }
+        ],
+        "__ZN10AppleA7IOP12_enablePowerEbj": [
+          32768,
+          {
+            "$bytes": "f30302aaf40301aa007c40f9111581d210093fd7a07e40f908c22291095a44f9e10314aa020080d2e30313aa31093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP21_dartMapiBootFirmwareEP8IOMapper": [
+          36864,
+          {
+            "$bytes": "08c04439089440f9111181d2111281d20a1d40b9ea050837090940f90b1940b95f0100726a00805241059f1a040140f9111481d24501168a030080d210093fd768c20439"
+          }
+        ],
+        "__ZN10AppleA7IOP17_hasiBootFirmwareEv": [
+          40960,
+          {
+            "$bytes": "5f2403d5089040f91f0100f1e0079f1ac0035fd6"
+          }
+        ]
+      },
+      "vtable_targets": {
+        "2504": 32768
+      }
+    },
+    "provider": {
+      "strings": {
+        "844": "segment-ranges"
+      },
+      "tables": []
+    },
+    "error": "AppleA7IOP iBoot firmware predicate changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_apple_a7iop_code_contract",
+    "arguments": {
+      "functions": {
+        "__ZN19AppleWrapperMailbox5startEP9IOService": [
+          4096,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780a200f9112780d21002118b080240f910093fd7808200f9"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox4_regEj": [
+          8192,
+          {
+            "$bytes": "5f2403d5088040f9004961f8c0035fd6"
+          }
+        ],
+        "__ZN19AppleWrapperMailbox25getWrapperPhysicalAddressEv": [
+          12288,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100a040f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP5startEP9IOService": [
+          16384,
+          {
+            "$bytes": "807e40f908421c91098a43f9010080520200805231093fd780b600f9112780d21002118b080240f910093fd7808200f9080040b9885e01b91f010071e2079f1a2800805288ca0439115b80d2400000b49fca0439809600f99fc204399f860439"
+          }
+        ],
+        "__ZN10AppleA7IOP19startCPUWithOptionsEP15IOSlaveFirmwarej": [
+          18432,
+          {
+            "$bytes": "114581d21002118b080240f9e00313aa2100805210093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP4_regEj": [
+          20480,
+          {
+            "$bytes": "5f2403d5088040f9004961b8c0035fd6"
+          }
+        ],
+        "__ZN10AppleA7IOP25getWrapperPhysicalAddressEv": [
+          24576,
+          {
+            "$bytes": "7f2303d5fd7bbfa9fd03009100b440f9a00000b401000094800000b4fd7bc1a8"
+          }
+        ],
+        "__ZN10AppleA7IOP10enableSRAMEb": [
+          28672,
+          {
+            "$bytes": "025c41b922020034113981d21002118b080240f910093fd7405c80520000bc72"
+          }
+        ],
+        "__ZN10AppleA7IOP12_enablePowerEbj": [
+          32768,
+          {
+            "$bytes": "f30302aaf40301aa007c40f9111581d210093fd7a07e40f908c22291095a44f9e10314aa020080d2e30313aa31093fd7"
+          }
+        ],
+        "__ZN10AppleA7IOP21_dartMapiBootFirmwareEP8IOMapper": [
+          36864,
+          {
+            "$bytes": "08c04439089440f9111181d2111281d20a1d40b9ea050837090940f90b1940b95f0100726a00805241059f1a040140f9111481d24501168a030080d210093fd768c20439"
+          }
+        ],
+        "__ZN10AppleA7IOP17_hasiBootFirmwareEv": [
+          40960,
+          {
+            "$bytes": "5f2403d5089440f91f0100f1e0079f1ac0035fd6"
+          }
+        ]
+      },
+      "vtable_targets": {
+        "2504": 32768
+      }
+    },
+    "provider": {
+      "strings": {},
+      "tables": []
+    },
+    "error": "AppleWrapperMailbox register accessor changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_pmgr_interrupt_config",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGRC2EPK11OSMetaClass": [
+          4096,
+          {
+            "$bytes": "08fc409116c10491e81f8052c8020039"
+          }
+        ],
+        "__ZN9ApplePMGR10initDriverEP9IOService": [
+          8192,
+          {
+            "$bytes": "a89999528899b972087ca89b08fd64d3489301b91ffc0471490d40393f4100f14a0140392911158b0829151b68010039601200916802403948830639f7520091"
+          }
+        ]
+      }
+    },
+    "provider": {
+      "strings": {
+        "1640": "interrupt-config",
+        "1832": "PMP_STATUS"
+      },
+      "tables": []
+    },
+    "result": {
+      "property": "interrupt-config",
+      "record_bytes": 20,
+      "slot_field": 0,
+      "kind_field": 3,
+      "kind_limit": 16,
+      "name_offset": 4,
+      "name_bytes": 16,
+      "maximum_property_bytes": 319,
+      "interrupts_per_die": "property length / 20",
+      "interrupts_per_die_object_offset": 258336,
+      "index_table_object_offset": 258304,
+      "index_table_die_stride": 16,
+      "index_table_value": "interrupts-per-die * die + record slot",
+      "ready_interrupt_name": "PMP_STATUS",
+      "ready_slot_object_offset": 258352,
+      "ready_slot_value": "the matched record's slot byte",
+      "ready_slot_default": 255,
+      "scope": "the runtime property is the boot DeviceTree pmgr property merged with its selected variant overlay, so the per-die count must be read at run time rather than assumed"
+    }
+  },
+  {
+    "function": "recover_pmgr_interrupt_config",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGRC2EPK11OSMetaClass": [
+          4096,
+          {
+            "$bytes": "08fc409116c1049108008052c8020039"
+          }
+        ],
+        "__ZN9ApplePMGR10initDriverEP9IOService": [
+          8192,
+          {
+            "$bytes": "a89999528899b972087ca89b08fd64d3489301b91ffc0471490d40393f4100f14a0140392911158b0829151b68010039601200916802403948830639f7520091"
+          }
+        ]
+      }
+    },
+    "provider": {
+      "strings": {},
+      "tables": []
+    },
+    "error": "ApplePMGR no longer defaults its PMP ready slot to absent",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_pmgr_interrupt_config",
+    "arguments": {
+      "functions": {
+        "__ZN9ApplePMGRC2EPK11OSMetaClass": [
+          4096,
+          {
+            "$bytes": "08fc409116c10491e81f8052c8020039"
+          }
+        ],
+        "__ZN9ApplePMGR10initDriverEP9IOService": [
+          8192,
+          {
+            "$bytes": "a89999528899b972087ca89b08fd64d3489301b91ffc0471490d40393f4100f14a0140392911158b0829151b68010039601200916802403948830639f7520091"
+          }
+        ]
+      }
+    },
+    "provider": {
+      "strings": {
+        "1640": "interrupt-config",
+        "1832": "PMP_READY"
+      },
+      "tables": []
+    },
+    "error": "PMP readiness interrupt name changed: 'PMP_READY'",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_firmware_source_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy14_initConfigEDTEv": [
+          65536,
+          {
+            "$bytes": "1f0000f1e8079f1aa8c208391f0000f1e8079f1aa8c6083920008052a0ca0839"
+          }
+        ],
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": [
+          131072,
+          {
+            "$bytes": "084043390808409109c9483908c14839113b81d209610639fa430094f9470094"
+          }
+        ],
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": [
+          196608,
+          {
+            "$bytes": "00c050f9615e40f9112581d2fd0b0094"
+          }
+        ],
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": [
+          208896,
+          {
+            "$bytes": "000400942800805268020339"
+          }
+        ],
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": [
+          217088,
+          {
+            "$bytes": "5f2403d50800433900010012c0035fd6"
+          }
+        ],
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          221184,
+          {
+            "$bytes": "6802433968000037684e40f9e80000b42846845208014039"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy14_initConfigEDTEv": 65536,
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": 131072,
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": 196608,
+        "__ZN7RTBuddy22_handleServiceFirmwareEv": 200704,
+        "__ZN22RTBuddyFirmwareService26matchingDictionaryWithRoleEP8OSString": 204800,
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": 208896,
+        "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString": 212992,
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": 217088,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 221184
+      },
+      "preload_vtable_target": 196608
+    },
+    "provider": {
+      "strings": {
+        "1276": "pre-loaded",
+        "1356": "running",
+        "1424": "no-firmware-service"
+      },
+      "tables": []
+    },
+    "result": {
+      "device_tree_properties": [
+        "pre-loaded",
+        "running",
+        "no-firmware-service"
+      ],
+      "flag_object_offsets": {
+        "pre-loaded": 8752,
+        "running": 8753,
+        "skip_firmware_service": 8754
+      },
+      "skip_firmware_service_rule": "set when the nub publishes `running` or `no-firmware-service`; `pre-loaded` alone never sets it",
+      "selection": [
+        {
+          "when": "skip-firmware-service clear",
+          "path": "wait for an RTBuddyFirmwareService matching the role",
+          "awaiting_flag_object_offset": 8600
+        },
+        {
+          "when": "skip-firmware-service set and pre-loaded clear",
+          "path": "__ZN7RTBuddy22_handleServiceFirmwareEv"
+        },
+        {
+          "when": "skip-firmware-service set and pre-loaded set",
+          "path": "__ZN7RTBuddy22_handlePreloadFirmwareEv",
+          "vtable_slot": 2520,
+          "segment_map_object_offset": 8576,
+          "missing_segment_map_result": 3758097136
+        }
+      ],
+      "iboot_loaded": {
+        "predicate": "__ZNK15RTBuddyFirmware11iBootLoadedEv",
+        "object_byte_offset": 192,
+        "only_producer": "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString",
+        "requires": "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString",
+        "suppresses": "__ZN15RTBuddyFirmware12copyToTargetEP7RTBuddy",
+        "scope": "an image adopted from the DeviceTree segment map; a firmware service always produces a non-iBoot image that is copied to the target unless one is already mapped"
+      },
+      "scope": "this is the image-provenance decision only; it is independent of whether AppleA7IOP treats the nub's DART records as iBoot-owned"
+    }
+  },
+  {
+    "function": "recover_rtbuddy_firmware_source_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy14_initConfigEDTEv": [
+          65536,
+          {
+            "$bytes": "1f0000f1e8079f1aa8c208391f0000f1e8079f1aa8c6083920008052a0ca0839"
+          }
+        ],
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": [
+          131072,
+          {
+            "$bytes": "084043390808409109c9483908c14839113b81d209610639fa430094f9470094f83f0094"
+          }
+        ],
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": [
+          196608,
+          {
+            "$bytes": "00c050f9615e40f9112581d2fd0b0094"
+          }
+        ],
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": [
+          208896,
+          {
+            "$bytes": "000400942800805268020339"
+          }
+        ],
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": [
+          217088,
+          {
+            "$bytes": "5f2403d50800433900010012c0035fd6"
+          }
+        ],
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          221184,
+          {
+            "$bytes": "6802433968000037684e40f9e80000b42846845208014039"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy14_initConfigEDTEv": 65536,
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": 131072,
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": 196608,
+        "__ZN7RTBuddy22_handleServiceFirmwareEv": 200704,
+        "__ZN22RTBuddyFirmwareService26matchingDictionaryWithRoleEP8OSString": 204800,
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": 208896,
+        "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString": 212992,
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": 217088,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 221184
+      },
+      "preload_vtable_target": 196608
+    },
+    "provider": {
+      "strings": {
+        "1276": "pre-loaded",
+        "1356": "running",
+        "1424": "no-firmware-service"
+      },
+      "tables": []
+    },
+    "error": "RTBuddy preload path is no longer a virtual dispatch",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_firmware_source_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy14_initConfigEDTEv": [
+          65536,
+          {
+            "$bytes": "1f0000f1e8079f1aa8c208391f0000f1e8079f1aa8c6083920008052a0ca0839"
+          }
+        ],
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": [
+          131072,
+          {
+            "$bytes": "084043390808409109c9483908c14839113b81d209610639fa430094f9470094"
+          }
+        ],
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": [
+          196608,
+          {
+            "$bytes": "00c050f9615e40f9112581d2fd0b0094"
+          }
+        ],
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": [
+          208896,
+          {
+            "$bytes": "000400942800805268020339"
+          }
+        ],
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": [
+          217088,
+          {
+            "$bytes": "5f2403d50800433900010012c0035fd6"
+          }
+        ],
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          221184,
+          {
+            "$bytes": "6802433968000037684e40f9e80000b42846845208014039"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy14_initConfigEDTEv": 65536,
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": 131072,
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": 196608,
+        "__ZN7RTBuddy22_handleServiceFirmwareEv": 200704,
+        "__ZN22RTBuddyFirmwareService26matchingDictionaryWithRoleEP8OSString": 204800,
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": 208896,
+        "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString": 212992,
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": 217088,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 221184
+      },
+      "preload_vtable_target": 196612
+    },
+    "provider": {
+      "strings": {
+        "1276": "pre-loaded",
+        "1356": "running",
+        "1424": "no-firmware-service"
+      },
+      "tables": []
+    },
+    "error": "RTBuddy vtable slot 0x9d8 is no longer the preload handler",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_firmware_source_contract",
+    "arguments": {
+      "functions": {
+        "__ZN7RTBuddy14_initConfigEDTEv": [
+          65536,
+          {
+            "$bytes": "1f0000f1e8079f1aa8c208391f0000f1e8079f1aa8c6083920008052a0ca0839"
+          }
+        ],
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": [
+          131072,
+          {
+            "$bytes": "084043390808409109c9483908c14839113b81d209610639fa430094f9470094"
+          }
+        ],
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": [
+          196608,
+          {
+            "$bytes": "00c050f9615e40f9112581d2fd0b0094"
+          }
+        ],
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": [
+          208896,
+          {
+            "$bytes": "000400942800805268020339"
+          }
+        ],
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": [
+          217088,
+          {
+            "$bytes": "5f2403d50800433900010012c0035fd6"
+          }
+        ],
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": [
+          221184,
+          {
+            "$bytes": "1f2003d568000037684e40f9e80000b42846845208014039"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN7RTBuddy14_initConfigEDTEv": 65536,
+        "__ZN7RTBuddy20_attemptFirmwareLoadEv": 131072,
+        "__ZN7RTBuddy22_handlePreloadFirmwareEv": 196608,
+        "__ZN7RTBuddy22_handleServiceFirmwareEv": 200704,
+        "__ZN22RTBuddyFirmwareService26matchingDictionaryWithRoleEP8OSString": 204800,
+        "__ZN15RTBuddyFirmware17preloadedFirmwareEP7OSArrayP8OSString": 208896,
+        "__ZN15RTBuddyFirmware18initWithSegmentMapEP7OSArrayP8OSString": 212992,
+        "__ZNK15RTBuddyFirmware11iBootLoadedEv": 217088,
+        "__ZN15RTBuddyFirmware5fixupEP7RTBuddyP22RTBuddyFirmwareService": 221184
+      },
+      "preload_vtable_target": 196608
+    },
+    "provider": {
+      "strings": {
+        "1276": "pre-loaded",
+        "1356": "running",
+        "1424": "no-firmware-service"
+      },
+      "tables": []
+    },
+    "error": "RTBuddy firmware copy-to-target guard changed",
+    "kind": "ValueError"
+  },
+  {
+    "function": "recover_rtbuddy_patchbay_contract",
+    "arguments": {
+      "functions": {
+        "__ZN15RTBuddyFirmware11copyIdBlockEP16RTK_uuid_block_t": [
+          18446741874869259168,
+          {
+            "$bytes": "7f2303d5f85fbca9f65701a9f44f02a9fd7b03a9fdc30091f30301aaf40300aa005440f9c00000b4f284ff97f50300aa1f0400b1610000541a000014150080d2160080d2d766feb0f7820591b8ae8e52388dac72e802168b080140b9a10208abc2000054e00314aa02088052e30313aa4001009400010034680240b91f01186ba1000054680640b908791f121f110071c0000054d6120091df8200f1c1fdff54000080520200001420008052fd7b43a9f44f42a9f65741a9f85fc4a8ff0f5fd6"
+          }
+        ],
+        "__ZN15RTBuddyFirmware12findPatchBayEPyPjS1_Pb": [
+          18446741874869260884,
+          {
+            "$bytes": "7f2303d5ff8302d1fa6705a9f85f06a9f65707a9f44f08a9fd7b09a9fd430291f60304aaf30303aaf40302aaf50301aaf70300aaa8cdfe90080543f9080140f9e82700f900e4006fe00301ade00300adf8030091e10300913dfeff9740050034e80740b91f150071c00000541f110071a102005409830091089300910300001408b3009109a30091380140b9190140b9e05640f9400000b42983ff970100188ba10200f9990200b9e00317aa24000094600000b48aa3ff97a00000342800805204000014000080520f00001408008052c8020039a90240f92805001229f57e92a90200f9890240b90901090b290d001129751e12890200b9530000b4680200b920008052e82740f9a9cdfe90290543f9290140f93f0108eb01010054fd7b49a9f44f48a9f65747a9f85f46a9fa6745a9ff830291ff0f5fd6fbb13b94"
+          }
+        ],
+        "__ZN15RTBuddyPatchBay12initWithDataEP6OSDatajb": [
+          18446741874869138480,
+          {
+            "$bytes": "7f2303d5f657bda9f44f01a9fd7b02a9fd830091f30303aaf50302aaf60301aaf40300aa88cefed008fd42f9098d4bf8f10308aa514de9f231093fd760020034960a00f9b60100b4d00240f9f10316aa31b4f9f2301ac1da080e42f8e00316aa50c9e5f210093fd7880a40f91f0100f1e0079f1a0200001400008052951a00b9937600399f720039fd7b42a9f44f41a9f657c3a8ff0f5fd6"
+          }
+        ],
+        "__ZN15RTBuddyPatchBay4findEj": [
+          18446741874869138744,
+          {
+            "$bytes": "7f2303d5f657bda9f44f01a9fd7b02a9fd830091f50301aaf40300aa131840b9000840f9100040f9f10300aa31b4f9f2301ac1da113480d21002118b080240f9e10313aa02018052f0f2f5f210093fd7c00200b4f60300aac80240b91f01156be0020054c80640b96802080b13210011800a40f9100040f9f10300aa31b4f9f2301ac1da113480d21002118b080240f9e10313aa02018052f0f2f5f210093fd7f60300aaa0fdffb5000080d2fd7b42a9f44f41a9f657c3a8ff0f5fd6800a40f9c20640b9100040f9f10300aa31b4f9f2301ac1da113480d21002118b080240f961220011f0f2f5f210093fd7c10640b9fd7b42a9f44f41a9f657c3a8ff2303d5d0071eca5000f0b6208e38d493bf3414"
+          }
+        ]
+      },
+      "symbols": {
+        "__ZN15RTBuddyFirmware11copyIdBlockEP16RTK_uuid_block_t": 18446741874869259168,
+        "__ZN15RTBuddyFirmware12findPatchBayEPyPjS1_Pb": 18446741874869260884,
+        "__ZN15RTBuddyFirmware20copy32FromIopVirtualEymPv": 18446741874869260560,
+        "__ZN15RTBuddyFirmware23getSegmentForIopVirtualEy": 18446741874869261200,
+        "__ZNK14RTBuddySegment10isWritableEv": 18446741874869166384,
+        "__ZN15RTBuddyPatchBay12initWithDataEP6OSDatajb": 18446741874869138480,
+        "__ZN15RTBuddyPatchBay4findEj": 18446741874869138744
+      }
+    },
+    "provider": {
+      "strings": {},
+      "tables": [
+        32,
+        192,
+        516,
+        3072,
+        4128,
+        4612,
+        16416,
+        16900
+      ]
+    },
+    "result": {
+      "identity_block": {
+        "magic": 1684632949,
+        "magic_bytes": "uuid",
+        "size": 64,
+        "version_offset": 4,
+        "accepted_versions": [
+          4,
+          5
+        ],
+        "version_test": "version & ~1 == 4",
+        "candidate_iop_offsets": [
+          32,
+          192,
+          516,
+          3072,
+          4128,
+          4612,
+          16416,
+          16900
+        ],
+        "base": "the coredump map's IOP virtual base, or zero when absent",
+        "patchbay_fields": {
+          "4": {
+            "offset": 32,
+            "size": 36
+          },
+          "5": {
+            "offset": 40,
+            "size": 44
+          }
+        }
+      },
+      "region": {
+        "iop_virtual": "identity base + the block's patchbay offset",
+        "alignment": 4,
+        "align_pad": "the low two bits of the unaligned address",
+        "padded_size": "(pad + size + 3) & ~3",
+        "writable": "the containing segment is writable, or no segment claims the address at all",
+        "first_record_offset": "the alignment pad"
+      },
+      "record": {
+        "header_bytes": 8,
+        "tag_offset": 0,
+        "length_offset": 4,
+        "value_offset": 8,
+        "stride": "8 + length, with no inter-record padding",
+        "tag_byte_order": "the driver's u32 constant spells the tag most-significant byte first, so the bytes stored in the image are reversed"
+      }
+    }
+  }
+]

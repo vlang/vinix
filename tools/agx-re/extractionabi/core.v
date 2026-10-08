@@ -149,7 +149,7 @@ fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
 		}, binary: result.binary }
 	}
 	if operation.starts_with('t6050:') {
-		return scalar(power.query(operation['t6050:'.len..], request)!)
+		return scalar(power.query_image(data, operation['t6050:'.len..], request)!)
 	}
 	if operation.starts_with('adt:') {
 		return scalar(appleadt.query(data, operation[4..], request)!)
