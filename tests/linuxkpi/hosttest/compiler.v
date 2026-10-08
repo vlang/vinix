@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module hosttest
 
-import os
-
 pub fn shell_split(text string) ![]string {
 	mut result := []string{}
 	mut token := ''
@@ -28,7 +26,11 @@ pub fn shell_split(text string) ![]string {
 			quote = ch
 			started = true
 		} else if ch in [` `, `\t`, `\r`, `\n`] {
-			if started { result << token; token = ''; started = false }
+			if started {
+				result << token
+				token = ''
+				started = false
+			}
 		} else {
 			token += ch.ascii_str()
 			started = true
@@ -41,10 +43,11 @@ pub fn shell_split(text string) ![]string {
 }
 
 pub fn shell_quote(text string) string {
-	if text != '' && text.bytes().all(it.is_alnum() || it in [`_`, `@`, `%`, `+`, `=`, `:`, `,`, `.`, `/`, `-`]) {
+	if text != '' && text.bytes().all(it.is_alnum() || it in [`_`, `@`, `%`, `+`, `=`, `:`, `,`,
+		`.`, `/`, `-`]) {
 		return text
 	}
-	return "'" + text.replace("'", "'\"'\"'") + "'"
+	return "'" + text.replace("'", '\'"\'"\'') + "'"
 }
 
 pub fn shell_join(args []string) string {
@@ -54,8 +57,8 @@ pub fn shell_join(args []string) string {
 pub fn v_function(source string, name string) !string {
 	mut start := 0
 	for line in source.split_into_lines() {
-		if (line.starts_with('fn ${name}(') || line.starts_with('pub fn ${name}(')) &&
-			line.contains(')') && line.contains('{') {
+		if (line.starts_with('fn ${name}(') || line.starts_with('pub fn ${name}('))
+			&& line.contains(')') && line.contains('{') {
 			mut begin := start
 			if start > 0 {
 				previous := source[..start - 1].all_after_last('\n')
@@ -82,39 +85,19 @@ pub fn extract_body(raw string, name string) !string {
 	return bodies[0]
 }
 
-fn identifier(text string) bool {
-	return text.len > 0 && (text[0].is_letter() || text[0] == `_`) && text.bytes().all(word_char(it))
-}
-
-fn foreign_scalar_declarations(raw string, name string) int {
-	mut remaining := raw
-	mut count := 0
-	marker := '@[typedef]'
-	for remaining.contains(marker) {
-		remaining = remaining.all_after(marker).trim_left(' \t\r\n\v\f')
-		declaration := 'struct C.' + name
-		if !remaining.starts_with(declaration) { continue }
-		mut tail := remaining[declaration.len..].trim_left(' \t\r\n\v\f')
-		if !tail.starts_with('{') { continue }
-		tail = tail[1..].trim_left(' \t\r\n\v\f')
-		if tail.starts_with('}') { count++ }
-	}
-	return count
-}
-
 // This is the original producer's bounded native scalar metadata contract.
 // It emits only a readonly native typedef and a width assertion, never a body.
 pub fn scalar_metadata(source string, text string) !string {
-	mut paths := os.glob(os.join_path(source, '*.v'))!
+	mut paths := module_paths(source)!
 	paths.sort()
 	mut aliases := map[string]string{}
 	for path in paths {
-		raw := os.read_file(path)!
-		for line in raw.split_into_lines() {
+		raw := module_read(path)!
+		for line in module_lines(raw) {
 			if !line.starts_with('// ABI native-scalar:') { continue }
-			parts := line.fields()
-			if parts.len != 5 || parts[..3] != ['//', 'ABI', 'native-scalar:'] ||
-				!identifier(parts[3]) || parts[4] != 'const_unsigned_long_64' {
+			parts := line.split(' ')
+			if parts.len != 5 || parts[..3] != ['//', 'ABI', 'native-scalar:']
+				|| (parts[3] == '' || !(parts[3][0].is_letter() || parts[3][0] == `_`) || !module_identifier(parts[3])) || parts[4] != 'const_unsigned_long_64' {
 				return error('Invalid native scalar metadata in ${path}: ${line}')
 			}
 			name := parts[3]
@@ -122,12 +105,12 @@ pub fn scalar_metadata(source string, text string) !string {
 				return error('Invalid native scalar metadata in ${path}: ${line}')
 			}
 			if name in aliases { return error('Duplicate native scalar alias: ${name}') }
-			if foreign_scalar_declarations(raw, name) != 1 {
+			if module_foreign_scalars(raw, name) != 1 {
 				return error('Native scalar metadata lacks one foreign V declaration: ${name}')
 			}
 			for statement in text.split(';') {
-				if has_word(statement, 'typedef') && statement.trim_space().ends_with(name) &&
-					has_word(statement, name) {
+				if module_has_word(statement, 'typedef') && module_trim(statement).ends_with(name)
+					&& module_has_word(module_trim(statement), name) {
 					return error('Native scalar alias conflicts with compiler declaration: ${name}')
 				}
 			}
@@ -147,8 +130,8 @@ pub fn c_declarations(raw string, selected []string) !string {
 	sorted.sort()
 	mut result := []string{}
 	for name in sorted {
-		found := raw.split_into_lines().filter(it.ends_with(');') &&
-			!it.contains('{') && !it.contains('}') && named_body(it, name))
+		found := raw.split_into_lines().filter(it.ends_with(');')
+			&& !it.contains('{') && !it.contains('}') && named_body(it, name))
 		if found.len == 0 { return error('Missing actual generated declaration ${name}') }
 		result << found[0]
 	}
