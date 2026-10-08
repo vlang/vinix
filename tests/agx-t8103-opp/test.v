@@ -17,7 +17,7 @@ module main
 //
 // The frequency and voltage columns are the fused table read off a
 // MacBookAir10,1 (j313ap, t8103) running macOS 26.3.1, via
-// `tools/agx-re/recover_t8103_adt.py --live-sgx`: seven states whose first is
+// `tools/agx-re/recover_t8103_adt --live-sgx`: seven states whose first is
 // the off state at 0 Hz and 400 mV, one voltage column, base pstate 1. A
 // staged DeviceTree leaves that table zero-filled for iBoot, so a live machine
 // is the only place it exists.

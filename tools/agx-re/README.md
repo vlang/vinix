@@ -297,6 +297,16 @@ deliberately small AArch64 decoder.
 These tools write under the ignored `build/` directory; Apple binaries and
 trace data are never repository inputs.
 
+The migrated G17 expression, branch, stack, selector and inline-argument
+contracts live in `g17expr`; their native tests run with
+`"$V" -cc cc test g17expr`. The recovery driver uses a narrow transport adapter
+for these contracts while its remaining Python implementations are ported.
+
+The base-M1 DeviceTree recovery runs in V with `./recover_t8103_adt`.
+Use `--live-sgx <plist>` to inspect an exported SGX registry property list,
+and `"$V" -cc cc test t8103adt` for its native contract tests. The tool reads
+staged restore inputs and writes the same sanitized recovery report.
+
 ## Current M5 Max boundary
 
 The inspected Mac17,6 identifies its GPU as `gpu,t6050` and uses

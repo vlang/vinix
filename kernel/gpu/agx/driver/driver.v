@@ -383,7 +383,7 @@ fn load_t6050_power_sample_period(gpu_node &devicetree.DTNode, mut cfg hw.HwConf
 // Report what a native Apple DeviceTree boot is still missing for G13.
 //
 // This used to say the translation could not be written from the device tree at
-// all, on any chip. It can, mostly: tools/agx-re/recover_t8103_adt.py reads a
+// all, on any chip. It can, mostly: tools/agx-re/recover_t8103_adt reads a
 // base-M1 DeviceTree and AGXG13G -- both staged under Preboot on any Mac, no M1
 // needed -- and finds 22 of the 26 inputs load_t8103_* requires already there
 // under gpu-* names, carrying the same values m1n1 republishes as apple,* FDT
@@ -424,7 +424,7 @@ fn report_native_t8103_performance_gap(gpu_node &devicetree.DTNode, power_loaded
 		u64(max_state), i64(state_words))
 	C.kprintf(c'agx:   power controller: %s\n', if power_loaded { c'complete' } else { c'incomplete' })
 	println('agx:   missing: per-state power, minimum SRAM voltage, core and SRAM leakage')
-	println('agx:   see tools/agx-re/recover_t8103_adt.py for where each one comes from')
+	println('agx:   see tools/agx-re/recover_t8103_adt for where each one comes from')
 }
 
 // G13 receives its operating points through the standard OPP-v2 FDT binding.
@@ -523,7 +523,7 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 // republishes the identical set as big-endian apple,* FDT cells, and the names
 // differ by that prefix and nothing else. The rule and its exceptions were
 // recovered from a base-M1 DeviceTree and AGXG13G's own string table by
-// tools/agx-re/recover_t8103_adt.py, so both boot paths can share one reader
+// tools/agx-re/recover_t8103_adt, so both boot paths can share one reader
 // instead of keeping two transcriptions of forty-two property names in step.
 // The caller frees the result.
 fn g13_power_property(native_adt bool, name string) string {

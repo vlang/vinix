@@ -57,7 +57,7 @@ g13g-kexts:
 		--entry com.apple.AGXG13G --entry com.apple.AGXFirmwareKextG13GRTBuddy
 
 recover-t8103-adt: g13g-kexts
-	./recover_t8103_adt.py > $(BUILD)/recovered-t8103-adt.json.tmp
+	./recover_t8103_adt > $(BUILD)/recovered-t8103-adt.json.tmp
 	mv $(BUILD)/recovered-t8103-adt.json.tmp $(BUILD)/recovered-t8103-adt.json
 
 recover-g17-abi: firmware kernel-kexts
@@ -93,9 +93,9 @@ check-fake-g17-encoder:
 	./generate_fake_g17_3d_encoder --check
 
 test:
-	python3 -m unittest -v test_recover_t6050_power.py test_recover_t8103_adt.py \
+	python3 -m unittest -v test_recover_t6050_power.py \
 		test_recover_g17_abi.py
-	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan g17decode g17power appleadt macinspect
+	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan g17decode g17power appleadt macinspect t8103adt g17expr
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl
