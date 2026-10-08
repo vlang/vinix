@@ -360,7 +360,7 @@ fn test_chained_fixup_tables_and_pointer_formats_are_bounded() {
 }
 
 fn test_chains_cannot_escape_pages_or_reference_unmapped_memory() {
-	for word in [u64(0x8000), 0x200 | (u64(0xfff) << 51), 0x200 | (u64(1) << 36)] {
+	for word in [u64(0x8000), 0x200 | (u64(0xfff) << 51), 0x200 | (u64(1) << 44)] {
 		mut bad := fixture_image()
 		put(mut bad, 0x4000, word, 8)
 		expect_fixup_failure(bad)
@@ -396,6 +396,45 @@ fn test_absolute_pointer_format_and_import_addends() {
 	plan := image.plan_fixups(image.layout(4096)!, 0x900000000, fixture_resolver)!
 	assert plan[0].value == 0x900000200
 	assert plan[1].value == 0x12345678 - 16 + 255
+}
+
+fn test_chained_rebases_preserve_pointer_tags_in_both_formats() {
+	for format in [u16(2), 6] {
+		for tag in [u64(1), 0x80, 0xff] {
+			mut data := fixture_image()
+			put(mut data, 0x7032, u64(format), 2)
+			target := if format == 2 { u64(0x100000200) } else { u64(0x200) }
+			put(mut data, 0x4000, target | (tag << 36) | (u64(2) << 51), 8)
+			image := parse(data)!
+			for base in [u64(0x10000), 0x900000000] {
+				for page in [u64(4096), 16384] {
+					plan := image.plan_fixups(image.layout(page)!, base, fixture_resolver)!
+					assert plan.len == 2
+					assert plan[0].offset == 0x4000
+					assert plan[0].value == (base + 0x200) | (tag << 56)
+					assert plan[1].value == 0x12345678
+				}
+			}
+		}
+	}
+}
+
+fn test_chained_pointer_tags_do_not_hide_invalid_addresses_or_reserved_bits() {
+	for bit in 44 .. 51 {
+		mut data := fixture_image()
+		put(mut data, 0x4000, 0x200 | (u64(0x80) << 36) | (u64(1) << bit), 8)
+		expect_fixup_failure(data)
+	}
+	mut data := fixture_image()
+	put(mut data, 0x4000, 0x8000 | (u64(0x80) << 36), 8)
+	expect_fixup_failure(data)
+	put(mut data, 0x4000, 0x200 | (u64(0x80) << 36), 8)
+	image := parse(data)!
+	for base in [u64(0x00ffffffffffff00), 0x0100000000000000, 0xffffffffffffff00] {
+		if _ := image.plan_fixups(image.layout(4096)!, base, fixture_resolver) {
+			assert false, 'relocated address must fit below the pointer tag'
+		}
+	}
 }
 
 fn test_wide_import_addends_and_inspection_of_authenticated_images() {

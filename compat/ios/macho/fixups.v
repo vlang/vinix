@@ -232,8 +232,8 @@ pub fn (image Image) plan_fixups_with_lazy(layout Layout, runtime_base u64, reso
 					// table addend is signed (see dyld's fixup-chains.h).
 					value = u64(i64(resolved[ordinal]) + imported[ordinal].addend + i64((word >> 24) & 0xff))
 				} else {
-					if word & 0x7fff000000000 != 0 {
-						return error('Mach-O: tagged or reserved chained rebase bits are not supported')
+					if word & 0x7f00000000000 != 0 {
+						return error('Mach-O: reserved chained rebase bits are not supported')
 					}
 					target := word & 0xfffffffff
 					address := if format == 6 { checked_end(layout.base, target)! } else { target }
@@ -241,6 +241,11 @@ pub fn (image Image) plan_fixups_with_lazy(layout Layout, runtime_base u64, reso
 						return error('Mach-O: chained rebase target is outside image')
 					}
 					value = checked_end(runtime_base, address - layout.base)!
+					if value >> 56 != 0 { return error('Mach-O: relocated pointer exceeds 56 address bits') }
+					// PTR_64's high8 field is part of the pointer, not reserved
+					// metadata. C++ RTTI uses its top bit for non-unique names.
+					// Check and slide the address independently of that tag.
+					value |= ((word >> 36) & 0xff) << 56
 				}
 				result << Fixup{offset, value}
 				next := (word >> 51) & 0xfff

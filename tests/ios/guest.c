@@ -92,6 +92,11 @@ int main(void) {
     run("/opt/ios/calculator-legacy", "19", "+", "23", 0, "IOS-CALCULATOR: 42\n");
     run("/opt/ios/lifecycle", NULL, NULL, NULL, 0, "IOS-LIFECYCLE: destructor\n");
     puts("iOS PASS: legacy dyld imports and image/TLS lifecycle");
+    run("/opt/ios/pointer-tags", NULL, NULL, NULL, 0,
+        "IOS-POINTER-TAGS: relocated addresses and all high bytes preserved");
+    run("/opt/ios/pointer-tags-legacy", NULL, NULL, NULL, 0,
+        "IOS-POINTER-TAGS: relocated addresses and all high bytes preserved");
+    puts("iOS PASS: native chained and legacy pointer tags");
     run("/opt/ios/lazy", NULL, NULL, NULL, 0, "IOS-LAZY: unused unavailable framework call did not block entry");
     run("/opt/ios/lazy", "call", NULL, NULL, 1, "unsupported API reached by app:");
     puts("iOS PASS: lazy function imports defer unsupported calls");

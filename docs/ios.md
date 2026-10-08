@@ -177,6 +177,60 @@ ownership, real font pixels and zlib. Mesa's disk shader cache is disabled by
 default unless explicitly configured. No Apple framework or font implementation
 is copied into the runner.
 
+## Fortnite iOS 42.30.1: unsupported
+
+The local `com.epicgames.FortniteGame_42.30.1_und3fined(1).ipa` was inspected
+and its unchanged executable probed in an isolated Vinix ARM64 guest on
+2026-10-09. This IPA contains unencrypted ordinary ARM64 images, including
+the bundled EOSSDK and MarketplaceKitWrapper frameworks. Encryption is not
+the blocker for this particular package.
+
+```text
+Bundle:     com.epicgames.FortniteGame
+Version:    42.30.1 (58813929.3.4), minimum iOS 17.0
+Executable: Payload/FortniteClient-IOS-Shipping.app/FortniteClient-IOS-Shipping
+SHA-256:    6aae5109d316864fb67bea6a92046c347edbb04dc2a104c6666713da989cd373
+Imports:    2,239 (chained fixups)
+```
+
+Its Mach-O metadata and memory layout are accepted. A structural relocation
+probe exposed 29 valid C++ RTTI pointers with a `high8` tag of `0x80` that the
+runner previously rejected as reserved bits. The decoder now preserves pointer
+tags for both `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, while still
+rejecting reserved bits, unmapped targets and addresses that overflow into the
+tag. With a test resolver, all 7,349,289 fixups validate; that structural check
+does not resolve Fortnite's actual dependencies or execute game code.
+
+The actual executable, using the C++ runner in a 4 GiB Vinix guest, exits with
+status 1 before its entry point:
+
+```text
+iOS: framework symbol is not implemented: _NSDocumentTypeDocumentAttribute
+```
+
+An import audit with the same C++ runner resolves 365 symbols and identifies
+1,787 unresolved strong imports and 87 unresolved weak imports. The executable
+includes the following substantial dependencies:
+
+| Dependency | Imports | Remaining work |
+| --- | ---: | --- |
+| Bundled EOSSDK | 589 | External Mach-O framework loading and the SDK's own dependencies |
+| Swift core runtime | 207 | Darwin Swift runtime ABI |
+| Foundation | 159 | Broader Objective-C and Swift APIs |
+| SwiftUI | 73 | Framework implementation |
+| Metal | 22 | Device, shader, rendering and presentation implementation |
+
+Swift concurrency, networking, security, audio and other frameworks are also
+referenced. Chained strong imports must resolve before execution. Successful
+metadata inspection, an unencrypted executable, or the tagged-pointer fix
+does not establish Fortnite compatibility. Startup, rendering, input, asset
+loading and online play remain unsupported or unverified; there is no Fortnite
+desktop launcher or claim of playable support.
+
+`python3 tests/ios/run.py --with-cxx` checks native iOS tagged pointers through
+both chained and legacy relocation, alongside the existing UIKit, TLS and C++
+regressions. The proprietary IPA and its extracted bytes are not committed.
+
 ## Official PPSSPP iOS binary
 
 [PPSSPP](https://www.ppsspp.org/download/) is a substantial open-source PSP
