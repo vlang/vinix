@@ -41,30 +41,29 @@ TARGET_ARCH = "arm64"
 NATIVES_CLASSIFIER = "natives-linux-arm64"
 
 
+_NATIVE = None
+
+
+def _invoke(operation, *arguments):
+    global _NATIVE
+    if _NATIVE is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("minecraft_fetch_native", Path(__file__).with_name("_native_fetcher.py"))
+        _NATIVE = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_NATIVE)
+    return _NATIVE.call(operation, list(arguments), globals())
+
+
 def log(message: str) -> None:
     print(message, flush=True)
 
 
 def fetch(url: str, *, retries: int = 4) -> bytes:
-    last: Exception | None = None
-    for attempt in range(retries):
-        try:
-            request = urllib.request.Request(
-                url, headers={"User-Agent": "vinix-minecraft-builder/1"}
-            )
-            with urllib.request.urlopen(request, timeout=120) as response:
-                return response.read()
-        except (urllib.error.URLError, TimeoutError, OSError) as error:
-            last = error
-    raise RuntimeError(f"failed to download {url}: {last}")
+    return bytes.fromhex(_invoke("fetch", url, retries))
 
 
 def sha1_of(path: Path) -> str:
-    digest = hashlib.sha1()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return _invoke("sha1_of", str(path))
 
 
 def download_to(url: str, destination: Path, expected_sha1: str | None) -> bool:
@@ -73,21 +72,7 @@ def download_to(url: str, destination: Path, expected_sha1: str | None) -> bool:
     Returns True when a transfer happened, so callers can report progress
     without counting files served from a previous build's cache.
     """
-    if destination.exists():
-        if expected_sha1 is None or sha1_of(destination) == expected_sha1:
-            return False
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    payload = fetch(url)
-    if expected_sha1 is not None:
-        actual = hashlib.sha1(payload).hexdigest()
-        if actual != expected_sha1:
-            raise RuntimeError(
-                f"checksum mismatch for {url}: expected {expected_sha1}, got {actual}"
-            )
-    temporary = destination.with_name(destination.name + ".part")
-    temporary.write_bytes(payload)
-    temporary.replace(destination)
-    return True
+    return _invoke("download_to", url, str(destination), expected_sha1)
 
 
 def rule_allows(rules: list[dict] | None, features: dict[str, bool]) -> bool:
@@ -96,90 +81,24 @@ def rule_allows(rules: list[dict] | None, features: dict[str, bool]) -> bool:
     Mojang's semantics are last-match-wins over an implicit deny, except that a
     rules array containing only `disallow` entries defaults to allow.
     """
-    if not rules:
-        return True
-    allowed = not any(rule.get("action") == "allow" for rule in rules)
-    for rule in rules:
-        if not rule_matches(rule, features):
-            continue
-        allowed = rule.get("action") == "allow"
-    return allowed
+    return _invoke("rule_allows", rules, features)
 
 
 def rule_matches(rule: dict, features: dict[str, bool]) -> bool:
-    os_clause = rule.get("os", {})
-    if "name" in os_clause and os_clause["name"] != TARGET_OS:
-        return False
-    if "arch" in os_clause and os_clause["arch"] != TARGET_ARCH:
-        return False
-    # `version` constrains the kernel release string; Vinix reports its own, so
-    # a rule that pins a Windows/macOS release can never apply here.
-    if "version" in os_clause or "versionRange" in os_clause:
-        return False
-    for feature, wanted in rule.get("features", {}).items():
-        if features.get(feature, False) != wanted:
-            return False
-    return True
+    return _invoke("rule_matches", rule, features)
 
 
 def fetch_version(entry: dict) -> dict:
-    payload = fetch(entry["url"])
-    actual = hashlib.sha1(payload).hexdigest()
-    if actual != entry["sha1"]:
-        raise RuntimeError(
-            f"version manifest checksum mismatch for {entry['id']}"
-        )
-    return json.loads(payload)
+    return _invoke("fetch_version", entry)
 
 
 def resolve_version(version_id: str, max_java: int | None = None) -> tuple[str, dict]:
-    log(f"=== resolving Minecraft {version_id} ===")
-    manifest = json.loads(fetch(VERSION_MANIFEST))
-    if version_id in ("release", "snapshot"):
-        channel = version_id
-        if max_java is None:
-            version_id = manifest["latest"][channel]
-            log(f"  latest {channel} resolves to {version_id}")
-        else:
-            # Alpine stable may carry an older Java feature release than the
-            # newest client asks for. Walk Mojang's newest-first manifest and
-            # select the first official release that its packaged JVM can run,
-            # instead of pinning a game version that will silently go stale.
-            for entry in manifest["versions"]:
-                if entry.get("type") != channel:
-                    continue
-                version = fetch_version(entry)
-                java_major = int(
-                    version.get("javaVersion", {}).get("majorVersion", 8)
-                )
-                if java_major <= max_java:
-                    log(
-                        f"  newest {channel} for Java {max_java} resolves to "
-                        f"{entry['id']} (Java {java_major})"
-                    )
-                    return entry["id"], version
-            raise SystemExit(
-                f"no Minecraft {channel} supports Java {max_java} or older"
-            )
-    for entry in manifest["versions"]:
-        if entry["id"] == version_id:
-            version = fetch_version(entry)
-            java_major = int(version.get("javaVersion", {}).get("majorVersion", 8))
-            if max_java is not None and java_major > max_java:
-                raise SystemExit(
-                    f"Minecraft {version_id} needs Java {java_major}; "
-                    f"the selected runtime supports up to Java {max_java}"
-                )
-            return version_id, version
-    raise SystemExit(f"unknown Minecraft version: {version_id}")
+    return tuple(_invoke("resolve_version", version_id, max_java))
 
 
 def maven_path(coordinate: str) -> str:
     """Turn `group:artifact:version[:classifier]` into a Maven repository path."""
-    parts = coordinate.split(":")
-    group, artifact, version = parts[0], parts[1], parts[2]
-    classifier = f"-{parts[3]}" if len(parts) > 3 else ""
-    return f"{group.replace('.', '/')}/{artifact}/{version}/{artifact}-{version}{classifier}.jar"
+    return _invoke("maven_path", coordinate)
 
 
 def select_libraries(version: dict) -> tuple[list[dict], list[dict]]:
@@ -189,102 +108,23 @@ def select_libraries(version: dict) -> tuple[list[dict], list[dict]]:
     operating system, so drop them all and rebuild the set from the LWJGL
     modules actually in use.
     """
-    mojang: list[dict] = []
-    lwjgl_modules: dict[tuple[str, str], None] = {}
-    for library in version["libraries"]:
-        name = library["name"]
-        parts = name.split(":")
-        group, artifact = parts[0], parts[1]
-        classifier = parts[3] if len(parts) > 3 else None
-        if group == "org.lwjgl":
-            # Track the module regardless of rules: the Java artifact is
-            # required on every platform, and its natives are resolved below.
-            lwjgl_modules[(artifact, parts[2])] = None
-            # Drop only the platform natives. Mojang publishes no plain
-            # `org.lwjgl:lwjgl` jar at all — the core classes ship under an
-            # `unsafe` classifier — so discarding every classifier would leave
-            # the classpath without org.lwjgl.system entirely.
-            if classifier is not None and classifier.startswith("natives-"):
-                continue
-        if not rule_allows(library.get("rules"), {}):
-            continue
-        artifact_download = library.get("downloads", {}).get("artifact")
-        if artifact_download is None:
-            continue
-        mojang.append(
-            {
-                "name": name,
-                "path": artifact_download["path"],
-                "url": artifact_download["url"],
-                "sha1": artifact_download["sha1"],
-            }
-        )
-
-    natives: list[dict] = []
-    for artifact, lwjgl_version in sorted(lwjgl_modules):
-        coordinate = f"org.lwjgl:{artifact}:{lwjgl_version}:{NATIVES_CLASSIFIER}"
-        path = maven_path(coordinate)
-        url = f"{MAVEN_CENTRAL}/{path}"
-        try:
-            checksum = fetch(f"{url}.sha1").decode().split()[0].strip()
-        except RuntimeError:
-            # Not every LWJGL module publishes natives for every platform;
-            # a module without AArch64 natives simply has none to stage.
-            log(f"  no {NATIVES_CLASSIFIER} for {artifact} {lwjgl_version}")
-            continue
-        natives.append({"name": coordinate, "path": path, "url": url, "sha1": checksum})
-    return mojang, natives
+    return tuple(_invoke("select_libraries", version))
 
 
 def download_all(entries: list[dict], root: Path, label: str, jobs: int) -> None:
-    log(f"  {label}: {len(entries)} files")
-    transferred = 0
-
-    def work(entry: dict) -> bool:
-        return download_to(entry["url"], root / entry["path"], entry["sha1"])
-
-    with ThreadPoolExecutor(max_workers=jobs) as pool:
-        for done in pool.map(work, entries):
-            transferred += 1 if done else 0
-    log(f"  {label}: {transferred} downloaded, {len(entries) - transferred} cached")
+    return _invoke("download_all", entries, str(root), label, jobs)
 
 
 def download_assets(version: dict, root: Path, jobs: int) -> str:
-    index = version["assetIndex"]
-    index_path = root / "assets" / "indexes" / f"{index['id']}.json"
-    download_to(index["url"], index_path, index["sha1"])
-    objects = json.loads(index_path.read_text())["objects"]
-    entries = []
-    for meta in objects.values():
-        digest = meta["hash"]
-        entries.append(
-            {
-                "path": f"assets/objects/{digest[:2]}/{digest}",
-                "url": f"{ASSET_BASE}/{digest[:2]}/{digest}",
-                "sha1": digest,
-            }
-        )
-    # The same object can back several asset names; download each hash once.
-    unique = {entry["path"]: entry for entry in entries}
-    download_all(list(unique.values()), root, "assets", jobs)
-    return index["id"]
+    return _invoke("download_assets", version, str(root), jobs)
 
 
 def flatten_arguments(raw: list, features: dict[str, bool]) -> list[str]:
-    result: list[str] = []
-    for item in raw:
-        if isinstance(item, str):
-            result.append(item)
-            continue
-        if not rule_allows(item.get("rules"), features):
-            continue
-        value = item.get("value", [])
-        result.extend([value] if isinstance(value, str) else value)
-    return result
+    return _invoke("flatten_arguments", raw, features)
 
 
 def shell_quote(value: str) -> str:
-    return "'" + value.replace("'", "'\\''") + "'"
+    return _invoke("shell_quote", value)
 
 
 def write_launch_env(
@@ -301,48 +141,7 @@ def write_launch_env(
     Rule evaluation and JSON parsing both happen here so that `/usr/bin/minecraft`
     stays a plain POSIX script with no dependency on a JSON tool in the guest.
     """
-    jvm_arguments = flatten_arguments(version.get("arguments", {}).get("jvm", []), {})
-    # `-cp ${classpath}` is supplied by the launcher itself so that the guest
-    # can prepend overrides; drop Mojang's placeholder pair.
-    filtered: list[str] = []
-    skip_next = False
-    for argument in jvm_arguments:
-        if skip_next:
-            skip_next = False
-            continue
-        if argument == "-cp":
-            skip_next = True
-            continue
-        filtered.append(argument)
-
-    # Mojang guards --width/--height behind this launcher feature. Without it,
-    # GLFW creates its 854x480 default window in the middle of Vinix's
-    # 1280x720 Xvfb surface, leaving a large white border in the native host
-    # window. Advertise the custom resolution that run-minecraft already
-    # expands so the official client occupies the complete hosted surface.
-    demo_arguments = flatten_arguments(
-        version.get("arguments", {}).get("game", []),
-        {"is_demo_user": True, "has_custom_resolution": True},
-    )
-    full_arguments = flatten_arguments(
-        version.get("arguments", {}).get("game", []),
-        {"is_demo_user": False, "has_custom_resolution": True},
-    )
-
-    lines = [
-        "# Generated by build-support/minecraft/fetch-minecraft.py — do not edit.",
-        f"MC_VERSION={shell_quote(version_id)}",
-        f"MC_VERSION_TYPE={shell_quote(version['type'])}",
-        f"MC_MAIN_CLASS={shell_quote(version['mainClass'])}",
-        f"MC_ASSET_INDEX={shell_quote(asset_index)}",
-        f"MC_GAME_ROOT={shell_quote(game_root)}",
-        f"MC_JAVA_MAJOR={shell_quote(str(version.get('javaVersion', {}).get('majorVersion', 21)))}",
-        f"MC_CLASSPATH={shell_quote(':'.join(f'{game_root}/{entry}' for entry in classpath))}",
-        f"MC_JVM_ARGS={shell_quote(' '.join(filtered))}",
-        f"MC_GAME_ARGS_DEMO={shell_quote(' '.join(demo_arguments))}",
-        f"MC_GAME_ARGS_FULL={shell_quote(' '.join(full_arguments))}",
-    ]
-    destination.write_text("\n".join(lines) + "\n")
+    return _invoke("write_launch_env", str(destination), dict(version_id=version_id, version=version, classpath=classpath, asset_index=asset_index, game_root=game_root))
 
 
 def main() -> int:
@@ -363,49 +162,7 @@ def main() -> int:
     )
     options = parser.parse_args()
 
-    version_id, version = resolve_version(options.version, options.max_java)
-    log(f"  Minecraft {version_id} ({version['type']}), Java {version.get('javaVersion', {}).get('majorVersion')}")
-
-    root = options.staging / options.game_root.lstrip("/")
-    root.mkdir(parents=True, exist_ok=True)
-
-    client = version["downloads"]["client"]
-    client_path = f"versions/{version_id}/{version_id}.jar"
-    log("  client jar")
-    download_to(client["url"], root / client_path, client["sha1"])
-
-    mojang, natives = select_libraries(version)
-    download_all(mojang, root / "libraries", "libraries", options.jobs)
-    download_all(natives, root / "libraries", f"LWJGL {NATIVES_CLASSIFIER}", options.jobs)
-
-    if options.no_assets:
-        asset_index = version["assetIndex"]["id"]
-        index_meta = version["assetIndex"]
-        download_to(
-            index_meta["url"],
-            root / "assets" / "indexes" / f"{asset_index}.json",
-            index_meta["sha1"],
-        )
-        log("  assets: index only (--no-assets)")
-    else:
-        asset_index = download_assets(version, root, options.jobs)
-
-    classpath = [f"libraries/{entry['path']}" for entry in mojang]
-    classpath += [f"libraries/{entry['path']}" for entry in natives]
-    classpath.append(client_path)
-
-    write_launch_env(
-        root / "launch.env",
-        version_id=version_id,
-        version=version,
-        classpath=classpath,
-        asset_index=asset_index,
-        game_root=options.game_root,
-    )
-
-    total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
-    log(f"  staged {total / (1 << 20):.0f} MiB under {options.game_root}")
-    return 0
+    return _invoke("stage", {**vars(options), "staging": str(options.staging)})
 
 
 if __name__ == "__main__":
