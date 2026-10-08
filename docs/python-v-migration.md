@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `7fa9a2fbc0150dcfce24b763369ecfed6edc6178`, Linguist 7.27.0 reports
-**Python 10.22%** (488 files, 4,265,707 bytes) and **V 75.03%** (1,363 files,
-31,322,230 bytes). The complete committed-blob inventory and reproduction
+At source `5675044ef5f91f75116027d2a479b656390efbc5`, Linguist 7.27.0 reports
+**Python 9.51%** (485 files, 3,966,503 bytes) and **V 75.73%** (1,391 files,
+31,592,799 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **940,578 Python bytes**. Roughly another
-2.18 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **1,239,782 Python bytes**. Roughly another
+1.88 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,13 +21,16 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. Their gross scope is 978,070 bytes.
+tests, including comments and blank lines. Their gross scope is 1,287,109 bytes.
 The net reduction is smaller by 290 bytes of temporary G13 adapter code,
 10,311 bytes of extraction bridges, 12,803 bytes of G17 foundation wrappers and
 fingerprint changes, 66 bytes in the guest comparator caller, 713 bytes of the
 ABI import facade, 362 bytes of power wrappers/bridges, and 5,228 bytes of ADT
 wrappers/bridges after import cleanup, 4,837 bytes of G17 expression wrappers
-and fingerprint changes, and 2,882 bytes of the bounds import facade. Adapter
+and fingerprint changes, 2,882 bytes of the bounds import facade, 2,614 bytes of the first T6050
+bridge/wrapper stage,
+4,817 bytes of G17 command wrappers, 818 bytes of the second T6050 wrappers,
+and 1,586 bytes of the upstream import facade. Adapter
 additions receive no extra migration credit.
 
 | Stage | Native source | Original Python bytes / lines | Source commit |
@@ -58,6 +61,13 @@ additions receive no extra migration credit.
 | G17 expressions, CFG and selector recovery with tests | `tools/agx-re/g17expr` | 119,297 / 3,050 | `7e8c6874ac10d893d9e49d0f88574b7973856d7d` |
 | LinuxKPI bounds generator foundation | `tests/linuxkpi/hosttest/bounds.v`, `generate_bounds.v` | 20,254 / 423 | `f662e77d095afed829c6dd2efecd05b4094a1747` |
 | Independent heap transition specification | `tests/memory/heapmodel` | 13,042 / 360 | `7fa9a2fbc0150dcfce24b763369ecfed6edc6178` |
+| T6050 DART/PTD instruction contracts | `tools/agx-re/t6050power` | 29,053 / 726 | `cd14a887431246e3b3716fe490ec08bc072ac608` |
+| Independent XNU zone protocol specification | `tests/xnualloc/zonemodel` | 12,764 / 320 | `184f59417ef960311dd5fb4e3bc0c70821dd08eb` |
+| G17 command and queue recovery with tests | `tools/agx-re/g17expr` | 187,668 / 4,662 | `21520b90c1c26d5494d69319eea42ec5eeb04e28` |
+| Bounds publication test controller | `tests/linuxkpi/bounds_generation.v` | 22,687 / 394 | `dfadf7b328fc6b1702d336d60f5272b1dd96cbe7` |
+| T6050 readiness and transport contracts | `tools/agx-re/t6050power/transport.v` | 33,982 / 829 | `e4917cc2c2a1a3c388d66e5ca8e2304817051f83` |
+| Pinned upstream fetch/verify and tests | `tests/linuxkpi/upstreamsource` | 7,651 / 198 | `97eab0f419b1e832de3ed98046df0692c83d6860` |
+| Independent allocator reference/model harness | `tests/xnualloc/refmodel` | 15,234 / 350 | `7b45ee15947d3d93b1503c35af3bc901dc3f54e4` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -72,7 +82,9 @@ x86 tests exercise shell routes as well as the independently compiled binaries.
 Commit `5bd3b6bb` preserves explicit empty Path options, option-value parsing,
 help actions and abbreviations across the LinuxKPI controllers. Commit
 `683cbc7c` preserves the argument error for a bare `--`; 310 actual CLI
-controls cover the ten prior controllers. These fixes receive no extra port credit.
+controls cover the ten prior controllers. Commit `bc28715b` adds the malformed
+`-h=` status edge across all ten (370 CLI controls); `fbae5cba` covers the same
+edge in both ABI/bounds generators (200 controls). These fixes receive no extra port credit.
 
 ## Validation
 
@@ -271,6 +283,57 @@ new kernel builds, guest workloads or physical GPU/CPU execution.
   model ownership and invariants. This remains an independent executable model
   and source check; it does not execute the kernel allocator or concurrency.
 
+- T6050 DART/PTD foundation: ten native tests and 13,773 exact API controls
+  per architecture; 20 frozen and 18 remaining original checks, actual driver
+  manifests, 8,000 calls across 32 foreign threads with zero owned outputs,
+  and 10,000-iteration C ABI lifetime/sanitizer stress pass. The returned
+  metadata describes checked instruction evidence, not physical firmware execution.
+- Zone specification: all six original and six native scenarios pass on both
+  hosts, including 80,000 seeded operations and 10,017 complete state snapshots
+  per host. Magazine identity, queue order, bitmaps, failed batches, cache swaps
+  and backing retirement remain checked. ARM ASan/UBSan passes. Commit
+  `49b12d88` additionally accommodates the pinned release's field/array compiler
+  behavior; the same complete snapshot and sanitizer gates pass again.
+- G17 command/queue recovery: 40 native tests, 35 unchanged original methods,
+  6,638 full-output/error controls and 22 actual-driver outputs per host pass,
+  alongside the existing expression and power suites. Arbitrary-width symbol,
+  vtable and instruction offsets, strict UTF-8 diagnostics and clamp behavior
+  retain their original semantics. Each host runs 1,600 foreign-thread calls
+  with zero owned outputs. ARM ASan/UBSan covers the same native API.
+- Bounds controller: four positive GNU99/GNU11 profiles, 11 rejections, seven
+  stamp cases, three malformed markers and 37 CLI controls per host pass.
+  The original 847-byte independent C fixture is unchanged. Commit `5675044e`
+  uses V directly in the kernel make recipes and tracks helper V/header inputs.
+  Sixteen isolated actual-make/original controls pass, covering unchanged
+  timestamps, header dependencies and compiler flags. Actual raw assembly
+  hashes stay in provenance: unique source-directory names and their derived
+  DWARF string-offset comments are normalized only in comparison evidence.
+  Four untouched-original repeat pairs independently prove the raw debug hash
+  variation. There is no new kernel execution claim.
+- T6050 readiness/transport: 15 native tests, 14,232 exact API controls,
+  18 frozen and 16 remaining original checks, actual manifests and sanitizer
+  lifetime stress pass on both hosts. Tests preserve initial publication before
+  readiness, patchbay copy/writeback and ASCWrap lock/mailbox policy. Repeated
+  8,000-call/32-thread batches retain zero owned outputs.
+- Upstream fetch/verify: three original and three native scenarios pass on both
+  hosts, including sanitizers, seven archive cases, 43 CLI and 34 API controls,
+  nine transport/publication controls and the exact 7,668-file pinned import.
+  Thirty-two phase-proven fault controls check cleanup against unchanged open-FD
+  sets; a real 60-second inactivity timeout and immediate progress output pass.
+  Initial ineffective interposition and disk-full exploratory logs are excluded.
+  A 269-byte declaration-only system archive header remains honestly counted C.
+- Reference harness: all four original/native scenarios pass on both hosts,
+  with 5,125 complete arena snapshots, 12,000 rotating scans, 3,091 merge cases,
+  40,000 mixed buddy operations and the original exhaustive slot counts.
+  The unchanged independent C fixture retains both UBSan compile profiles;
+  six native compiler argument controls per host match the originals. ARM
+  ASan/UBSan passes. The pinned V 0.5.2 `7647ce1` Darwin release passes all 20
+  independent model scenarios plus the unchanged 18 actual allocator tests
+  in debug and production configurations. A Linux ARM heap-model check passes;
+  additional shared-mount Linux checks blocked in FUSE directory reads and were
+  stopped, so they receive no success claim. CI now runs the models separately
+  from the actual allocator tests. No production allocator or SMP port occurred.
+
 CLI help/usage, JSON decoder and OS-specific filesystem diagnostics may differ;
 algorithm diagnostics, data schemas, success output and failure statuses are
 checked against the originals. Assertions, timeout limits and original fixture
@@ -307,6 +370,15 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `g17-expression-20261008` | `final-qualification-v1.json` | `275e897b66eda2a44802fd6fec9837936de072d048aa511ff4efd4972ee235b4` |
 | `bounds-foundation-20261008` | `qualified-differential.json` | `f622b8fa789e0c6ac48834dd30d85c1981ba7efbf3ed259546488688295ca76c` |
 | `heap-model-20261008/final-v2` | `qualification.json` | `0fbd8e02f55065e26be8d1a531924cba8ad9d20f7618286580215c3c86c01c60` |
+| `agx-t6050-20261008/final` | `qualification.json` | `f6373c11c8f5a46a302d17086de12f52597cee739e8ae2f5c19d4649c1f2891f` |
+| `zone-model-20261008/final-v1` | `qualification.json` | `1fdcbb11cc4385b2b6d909ed0f5fef21278815a1615766511ee4cffbc1713b6d` |
+| `zone-model-20261008/release-compatible-v3` | `qualification.json` | `433b9dfade73bfa3341ae26c4458d2886d8eb677105ef4c616fc3a4528e08863` |
+| `g17-command-20261008` | `final-qualification-v1.json` | `c155a371887a0728da1f87182c1819dae195ed6f94fad7f067263ef0c85069c3` |
+| `bounds-controller-20261008` | `qualification.json` | `4a514d4e0824591b5438ba350356f45420ff9403dc95e1824ca4c32c7863543a` |
+| `bounds-make-20261008` | `qualification.json` | `64627194efb2bde571c58928e58f6418c0b0f12b2b6412aa9bacc7fcc952da13` |
+| `agx-t6050-contracts2-20261008/final` | `qualification.json` | `e8f16f73c39fce61da58defb41e017c41ce34abcbdb241a2eeeff9c7eb737d5e` |
+| `upstream-source-20261008` | `qualification.json` | `6462c4c499f7327d56d21646a958309fcde3dae93ad37715ab6a30630b43b801` |
+| `xnu-reference-20261008/final-v4` | `qualification.json` | `d758074c6892ec7e0ce35359e3210224dcc7b581b038b5373d22b2a731f67a56` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
@@ -315,8 +387,10 @@ Local caches are supporting evidence, not a required dependency of the tools.
 
 ## Continuing work
 
-G17 command/transport recovery, T6050 code contracts, the XNU zone protocol
-model and LinuxKPI bounds/audit controllers are active.
+G17 late configuration/channel/event recovery, further T6050 code contracts,
+LinuxKPI compiler controllers and desktop performance verdicts are active.
+The later G17 runtime commit `817216de` follows the snapshot above and will
+enter the next measured inventory.
 They count only after qualification and exact-path commits. Native numeric
 decoding must preserve large provenance timestamps as well as addresses; decoding an unconstrained JSON integer through `f64` loses
 information. When an unported Python caller still imports an API, retain a
