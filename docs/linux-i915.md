@@ -652,15 +652,15 @@ incomplete.
 ```sh
 tests/linuxkpi/run.sh
 sh build-support/run-v-tool.sh tests/linuxkpi/nocache.v
-python3 tests/linuxkpi/asm_generated_headers_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/asm_generated_headers.v
 python3 tests/linuxkpi/special_insns_test.py
 sh build-support/run-v-tool.sh tests/linuxkpi/cpu_feature_policy.v
-python3 tests/linuxkpi/smp_type_test.py
-python3 tests/linuxkpi/smp_header_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/smp_types.v
+sh build-support/run-v-tool.sh tests/linuxkpi/smp_headers.v
 sh build-support/run-v-tool.sh tests/linuxkpi/cpu_masks.v
 sh build-support/run-v-tool.sh tests/linuxkpi/user_access_scope.v
-python3 tests/linuxkpi/static_key_declaration_test.py
-python3 tests/linuxkpi/pgtable_type_test.py
+sh build-support/run-v-tool.sh tests/linuxkpi/static_key_declarations.v
+sh build-support/run-v-tool.sh tests/linuxkpi/pgtable_types.v
 sh build-support/run-v-tool.sh tests/linuxkpi/pagefault.v
 sh build-support/run-v-tool.sh tests/linuxkpi/irq_context.v
 sh build-support/run-v-tool.sh tests/linuxkpi/uaccess.v

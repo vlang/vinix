@@ -4,7 +4,7 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 source_dir=${LINUXKPI_SOURCE_DIR:-"$repo/third_party/linux-i915/linux-6.6.157"}
 work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-linuxkpi-test.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM
-python3 -B "$repo/kernel/linuxkpi/upstream.py" verify --base "$(dirname "$source_dir")"
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/upstream_source.v" verify --base "$(dirname "$source_dir")"
 "$repo/tests/pci-config/run.sh"
 case $(uname -m) in
     arm64|aarch64) native_asm=aarch64; native_v_arch=arm64 ;;
@@ -149,4 +149,4 @@ PY
 python3 "$repo/tests/linuxkpi/standalone_test.py" --arch "$native_v_arch" \
     --header-impl "$work/headerimpl.o" --include "$work/include"
 printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'
-python3 -B "$repo/tests/linuxkpi/upstream_test.py"
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/upstreamsource/core_test.v"
