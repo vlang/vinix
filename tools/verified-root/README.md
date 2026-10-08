@@ -1,6 +1,10 @@
 # Verified block roots
 
-`build.py` appends a SHA-256 Merkle tree to a completed filesystem image. The
+`build.py` appends a SHA-256 Merkle tree to a completed filesystem image.
+Its import and command-line interface forwards geometry, policy parsing, hashing,
+image construction and verification to the native V `verityimage` module.
+`build-support/run-v-tool.sh` selects the compiler; the temporary installed
+query executable is private to its Python process and removed at exit. The
 kernel's verified-root profile reads this image through a read-only block view
 and verifies each requested data block, including its path to the trusted root,
 before returning its bytes. A checksum calculated only at boot would not
@@ -131,6 +135,7 @@ trusted build inputs themselves were compromised.
 ## Validation and limits
 
 ```sh
+build-support/run-v-tool.sh tools/verified-root/verityimage/core_test.v
 python3 tests/verified-root/test.py
 python3 tests/verified-root/run-host.py
 # On Linux with cryptsetup's real veritysetup available:
