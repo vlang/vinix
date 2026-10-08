@@ -29,14 +29,18 @@ def call(operation, arguments, namespace, *, controller=None):
     active = None
 
     class Owner:
-        def __init__(self, manager, method=None):
+        def __init__(self, manager, method=None, kwargs=None, condition=None, function=None):
             self.manager, self.method, self.active = manager, method, True
+            self.kwargs, self.condition, self.function = kwargs or {}, condition, function
         def __exit__(self, *error):
             if not self.active:
                 return False
             self.active = False
-            if self.method:
-                self.method(self.manager) if callable(self.method) else getattr(self.manager, self.method)()
+            if self.method or self.function:
+                if self.condition and not getattr(self.manager, self.condition)():
+                    return False
+                target = resolve(self.function) if self.function else self.method if callable(self.method) else getattr(self.manager, self.method)
+                target(self.manager, **self.kwargs) if self.function or callable(self.method) else target(**self.kwargs)
                 return False
             return self.manager.__exit__(*error)
 
@@ -75,7 +79,7 @@ def call(operation, arguments, namespace, *, controller=None):
 
     def library_primitive(method, row):
         if method == "function":
-            target = getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
+            target = objects[row["target"]] if "target" in row else getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
             if callable(target):
                 args = [value(item) for item in row.get("args", [])]
                 kwargs = {key: value(item) for key, item in row.get("kwargs", {}).items()}
@@ -94,6 +98,21 @@ def call(operation, arguments, namespace, *, controller=None):
             return [retain(first), retain(second)]
         if method == "resolve":
             return retain(resolve(row["name"]))
+        if method == "exception_matches":
+            error = errors[row["error"]["binding_error"]]
+            kind = objects[row["class"]]
+            traceback = error.__traceback__
+            try:
+                try:
+                    raise error.with_traceback(traceback)
+                except kind:
+                    return True
+                except BaseException:
+                    return False
+            finally:
+                error.__traceback__ = traceback
+        if method == "error_object":
+            return retain(errors[row["error"]["binding_error"]])
         if method == "error_attribute":
             return retain(getattr(errors[row["error"]["binding_error"]], row["name"]))
         if method == "attribute":
@@ -121,7 +140,8 @@ def call(operation, arguments, namespace, *, controller=None):
         if method == "exit":
             return exit_owner(entered.pop(row["owner"]), row["error"])
         if method == "own":
-            owner = Owner(objects[row["owner"]], resolve(row["function"]) if "function" in row else row["method"])
+            owner = Owner(objects[row["owner"]], resolve(row["function"]) if "function" in row else row.get("method"),
+                {key: value(item) for key, item in row.get("kwargs", {}).items()}, row.get("condition"), row.get("function_name"))
             closers[row["owner"]] = owner
             stack.push(owner)
             return None
@@ -176,5 +196,5 @@ def call(operation, arguments, namespace, *, controller=None):
             "called_process": isinstance(error, namespace["subprocess"].CalledProcessError),
             "shutil_error": isinstance(error, namespace["shutil"].Error),
             "clipboard": isinstance(error, namespace.get("ClipboardError", ())),
-            "interrupt": isinstance(error, KeyboardInterrupt)})
+            "interrupt": isinstance(error, KeyboardInterrupt), "exception": isinstance(error, Exception)})
     return objects[result] if result is not None else None
