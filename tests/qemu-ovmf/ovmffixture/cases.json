@@ -1,0 +1,18 @@
+{
+  "original_source_sha256": "d9241b0bc57c927afc0a3c7834791318398cb44d96bfa9ac9a0d78ece441e87c",
+  "upstream_sha256": "f156eb3d37c6d7ba16232a40d4b61d470e67e58ca4ba774ec624344fc2fce0c1",
+  "cases": [
+    "test_explicit_toolchain_takes_precedence_and_normalizes_prefix",
+    "test_missing_llvm_tools_stop_before_basetools",
+    "test_missing_lld_reports_install_command_before_basetools",
+    "test_separate_lld_on_path_is_available_to_build",
+    "test_homebrew_discovers_llvm_and_separate_keg_only_lld",
+    "test_fresh_and_already_patched_checkouts",
+    "test_fresh_bootstrap_fetches_shallow_direct_submodules_only",
+    "test_existing_checkout_recovers_missing_submodules",
+    "test_incomplete_mode_is_rejected",
+    "test_incompatible_source_reports_git_diagnostic",
+    "test_setup_accepts_unset_variables_and_restores_strict_mode",
+    "test_setup_failure_stops_before_driver_build"
+  ]
+}
