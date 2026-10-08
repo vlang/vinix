@@ -18,6 +18,11 @@ pub fn query(request string) !string {
 	row := json2.decode[Value](request, strict: true)!.object()
 	operation := text(row, 'operation')!
 	result := match operation {
+		'split_probe_plan' {
+			result := split_probe_plan(unpack_string_value(field(row, 'cases_encoded'))!, field(row, 'cases_type').text(), field(row, 'case_types').items().map(it.text()))!
+			pack_string_value(result)
+		}
+		'needed_libraries', 'runner_digest' { runner_file_query(row, operation)! }
 		'digest' { Value(digest(text(row, 'path')!)!) }
 		'relative' { Value(relative(field(row, 'name'))!) }
 		'elf' {
@@ -76,6 +81,20 @@ pub fn query(request string) !string {
 }
 
 pub fn error_json(err IError) string {
+	if err is RunnerFileError {
+		return encode(Value(map[string]Value{
+			'kind':         Value('RunnerOSError')
+			'error':        Value(err.original.msg())
+			'errno':        Value(err.original.code())
+			'filename_hex': Value(err.original.filename.bytes().hex())
+		}))
+	}
+	if err is MissingKey {
+		return encode(Value(map[string]Value{
+			'kind':  Value('KeyError')
+			'error': Value(err.key)
+		}))
+	}
 	if err is ProbeFilesystemError {
 		return encode(Value(map[string]Value{
 			'kind':  Value('PlainOSError')
@@ -120,6 +139,18 @@ pub fn error_json(err IError) string {
 			'start':    Value(err.start)
 			'end':      Value(err.start + 1)
 			'reason':   Value(err.msg())
+		}))
+	}
+	if err.msg() in ['StopIteration', 'MemoryError'] {
+		return encode(Value(map[string]Value{
+			'kind':  Value(err.msg())
+			'error': Value('')
+		}))
+	}
+	if err.msg().starts_with('OverflowError: ') {
+		return encode(Value(map[string]Value{
+			'kind':  Value('OverflowError')
+			'error': Value(err.msg()[15..])
 		}))
 	}
 	if err.msg().starts_with('struct.error: ') {

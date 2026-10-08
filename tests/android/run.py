@@ -24,6 +24,9 @@ import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+_native_spec = importlib.util.spec_from_file_location("vinix_android_native", ROOT / "build-support/android/_native.py")
+_native = importlib.util.module_from_spec(_native_spec)
+_native_spec.loader.exec_module(_native)
 CALCULATOR_SHA256 = "1928e65ced8cbe78be2ff3cb4c321e9e75d138e8e30ea1368fbb772a86827d1d"
 FAILURES = (b"ANDROID-FAIL", b"KERNEL PANIC", b"FATAL EXCEPTION",
             b"JNI DETECTED ERROR IN APPLICATION", b"Fatal signal ")
@@ -32,45 +35,20 @@ FAILURES = (b"ANDROID-FAIL", b"KERNEL PANIC", b"FATAL EXCEPTION",
 def prepare_split_probe(source: Path, destination: Path) -> dict[str, str]:
     """Stage normal APK launches and explicit rejection cases without changing archives."""
     cases = json.loads((source / "test-cases.json").read_text())["cases"]
-    names = {"positive"}
-    files = {"android-split-probe.apk", "config.arm64_v8a.apk", "test-cases.json"}
-    launches = [("positive", ["config.arm64_v8a.apk"], "", [])]
-    for case in cases:
-        name, splits, error = case["name"], case["splits"], case["error"]
-        options = case.get("options", [])
-        if not isinstance(name, str) or not name or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-" for c in name) or name in names:
-            raise ValueError("Invalid or repeated split fixture case name")
-        if not isinstance(splits, list) or not splits or not isinstance(error, str) or not error or "\n" in error:
-            raise ValueError("Invalid split fixture rejection case")
-        if not isinstance(options, list) or any(option not in ("--install", "--install-internal") for option in options):
-            raise ValueError("Invalid split fixture launcher option")
-        for filename in splits:
-            if not isinstance(filename, str) or Path(filename).name != filename or not filename.endswith(".apk"):
-                raise ValueError("Split fixture archive must be a plain APK filename")
-        names.add(name)
-        files.update(splits)
-        launches.append((name, splits, error, options))
-    if not cases:
-        raise ValueError("Split fixture must include rejection cases")
+    plan = _native.unpack_strings(_native.request("split_probe_plan",
+                           cases_encoded=_native.pack_strings(cases), cases_type=type(cases).__name__,
+                           case_types=[type(case).__name__ for case in cases] if isinstance(cases, list) else []))
     destination.mkdir()
     checksums = {}
-    for filename in sorted(files):
+    for filename in plan["files"]:
         shutil.copy2(source / filename, destination / filename)
-        checksums[filename] = hashlib.sha256((destination / filename).read_bytes()).hexdigest()
-    guest = "/opt/android-test/split-probe/"
-    for index, (name, splits, error, options) in enumerate(launches):
-        target = destination / f"launch-{index:02d}-{name}"
-        command = ["/usr/bin/run-android", guest + "android-split-probe.apk",
-                   "-l", "org/vinix/tests/AndroidSplitApkProbe$BootstrapActivity", "-w", "128", "-h", "128"]
-        for split in splits:
-            command.extend(("--split-apk", guest + split))
-        command.extend(options)
-        target.write_text("#!/bin/sh\n" + shlex.join(command) + "\n"
-                          'split_status=$?\nprintf \'%s\\n\' "$split_status" >/tmp/android-split-status\n'
-                          'exit "$split_status"\n')
+        checksums[filename] = _native.request("runner_digest", path_hex=os.fsencode(destination / filename).hex())
+    for launch in plan["launches"]:
+        target = destination / launch["name"]
+        target.write_text(launch["script"])
         target.chmod(0o755)
-        target.with_name(target.name + ".expected").write_text("1\n" if error else "0\n")
-        target.with_name(target.name + ".error").write_text(error)
+        target.with_name(target.name + ".expected").write_text(launch["expected"])
+        target.with_name(target.name + ".error").write_text(launch["error"])
     return checksums
 
 
@@ -101,29 +79,7 @@ def copy_layer(source: Path, destination: Path, inodes: dict | None = None) -> N
 
 def needed_libraries(path: Path) -> list[str]:
     """Read DT_NEEDED from a little-endian ELF64 without executing the file."""
-    with path.open("rb") as file:
-        header = file.read(64)
-        if len(header) < 64 or header[:6] != b"\x7fELF\x02\x01":
-            return []
-        phoff = struct.unpack_from("<Q", header, 32)[0]
-        phsize, phcount = struct.unpack_from("<HH", header, 54)
-        file.seek(phoff)
-        raw = file.read(phsize * phcount)
-        segments = [struct.unpack_from("<IIQQQQQQ", raw, i * phsize) for i in range(phcount)]
-        dynamic = next((s for s in segments if s[0] == 2), None)
-        if dynamic is None:
-            return []
-        file.seek(dynamic[2])
-        table = file.read(dynamic[5])
-        values = [struct.unpack_from("<QQ", table, i) for i in range(0, len(table) - 15, 16)]
-        string_address = next((value for tag, value in values if tag == 5), None)
-        string_size = next((value for tag, value in values if tag == 10), 0)
-        if string_address is None:
-            return []
-        segment = next(s for s in segments if s[0] == 1 and s[3] <= string_address < s[3] + s[5])
-        file.seek(segment[2] + string_address - segment[3])
-        strings = file.read(string_size)
-        return [strings[value:].split(b"\0", 1)[0].decode("ascii") for tag, value in values if tag == 1]
+    return _native.request("needed_libraries", path_hex=os.fsencode(path).hex())
 
 
 def supply_host_libraries(repo: Path, root: Path, base_libraries: set[str] | None = None) -> None:

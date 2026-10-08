@@ -72,10 +72,40 @@ def command(operation, **fields):
         return _response(json.loads(result.read_text()))
 
 
+def pack_strings(value):
+    """ASCII transport for JSON strings, including unpaired UTF-16 surrogates."""
+    if isinstance(value, str):
+        return ["string", value.encode("utf-8", "surrogatepass").hex()]
+    if isinstance(value, list):
+        return ["list", [pack_strings(item) for item in value]]
+    if isinstance(value, dict):
+        return ["dict", [[pack_strings(key), pack_strings(item)] for key, item in value.items()]]
+    return ["value", value]
+
+
+def unpack_strings(value):
+    kind, data = value
+    if kind == "string":
+        return bytes.fromhex(data).decode("utf-8", "surrogatepass")
+    if kind == "list":
+        return [unpack_strings(item) for item in data]
+    if kind == "dict":
+        return {unpack_strings(key): unpack_strings(item) for key, item in data}
+    return data
+
+
 def _response(value):
     if "result" in value:
         return value["result"]
     kind = value["kind"]
+    if kind == "KeyError":
+        raise KeyError(value["error"])
+    if kind == "StopIteration":
+        raise StopIteration()
+    if kind == "MemoryError":
+        raise MemoryError()
+    if kind == "OverflowError":
+        raise OverflowError(value["error"])
     if kind == "PlainOSError":
         raise OSError(value["error"])
     if kind == "SystemExit":
@@ -90,6 +120,8 @@ def _response(value):
     if kind == "UnicodeDecodeError":
         raise UnicodeDecodeError(value["encoding"], bytes.fromhex(value["object"]),
                                  value["start"], value["end"], value["reason"])
+    if kind == "RunnerOSError":
+        raise OSError(value["errno"], value["error"], os.fsdecode(bytes.fromhex(value["filename_hex"])) or None)
     if kind == "OSError":
         filename = Path(value["filename"]) if value.get("filename_is_path") else value["filename"] or None
         if value.get("filename2"):

@@ -58,3 +58,18 @@ resolution, the fixture logger, deterministic mode-0644 archives, compiler
 arguments, partial-output publication and scratch retirement before reporting
 success or failure. Original host controls compare whole child-process and
 archive observations; these checks do not run the Android Java probes.
+
+Android runner ELF dependencies and split fixture planning run in V. The reader
+retains ordered ELF program headers, first dynamic/string-table metadata,
+duplicate dependencies, strict ASCII errors, seek/read width errors and
+bounded reads. Checked physical offsets stay wide before slicing; any owned
+reader array is smaller than 2 GiB. Split policy validates the original field
+order, reserves launch names, sorts copied files and constructs complete
+shell-quoted launch scripts. ASCII tagged-string transport retains lone
+surrogates until the compatibility binding applies the original filesystem
+and text encodings. JSON reads, copy2 metadata, directory creation and
+write_text/chmod remain standard-library bindings and receive no port credit.
+Controls compare whole original results/errors and partial destination bytes
+and modes, selected real ELF identities, Unicode boundaries and descriptor
+retirement on both host architectures with sanitizers. They do not boot an
+Android guest.
