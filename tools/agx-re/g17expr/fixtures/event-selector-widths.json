@@ -1,0 +1,668 @@
+[
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "null"
+    },
+    "error": "'<=' not supported between instances of 'int' and 'NoneType'",
+    "exception": "TypeError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "false"
+    },
+    "error": "unsupported AGX interrupt count False",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "true"
+    },
+    "result": 0
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "\"1\""
+    },
+    "error": "'<=' not supported between instances of 'int' and 'str'",
+    "exception": "TypeError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "\"5\""
+    },
+    "error": "'<=' not supported between instances of 'int' and 'str'",
+    "exception": "TypeError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "[]"
+    },
+    "error": "'<=' not supported between instances of 'int' and 'list'",
+    "exception": "TypeError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "{}"
+    },
+    "error": "'<=' not supported between instances of 'int' and 'dict'",
+    "exception": "TypeError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "NaN"
+    },
+    "error": "unsupported AGX interrupt count nan",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "Infinity"
+    },
+    "error": "unsupported AGX interrupt count inf",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-Infinity"
+    },
+    "error": "unsupported AGX interrupt count -inf",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-8"
+    },
+    "error": "unsupported AGX interrupt count -8",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-7"
+    },
+    "error": "unsupported AGX interrupt count -7",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-6"
+    },
+    "error": "unsupported AGX interrupt count -6",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-5"
+    },
+    "error": "unsupported AGX interrupt count -5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-4"
+    },
+    "error": "unsupported AGX interrupt count -4",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-3"
+    },
+    "error": "unsupported AGX interrupt count -3",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-2"
+    },
+    "error": "unsupported AGX interrupt count -2",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-1"
+    },
+    "error": "unsupported AGX interrupt count -1",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "0"
+    },
+    "error": "unsupported AGX interrupt count 0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1"
+    },
+    "result": 0
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "2"
+    },
+    "error": "unsupported AGX interrupt count 2",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "3"
+    },
+    "error": "unsupported AGX interrupt count 3",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "4"
+    },
+    "result": 0
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "5"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "6"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "7"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "8"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "9"
+    },
+    "error": "unsupported AGX interrupt count 9",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "10"
+    },
+    "error": "unsupported AGX interrupt count 10",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "11"
+    },
+    "error": "unsupported AGX interrupt count 11",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "12"
+    },
+    "error": "unsupported AGX interrupt count 12",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "13"
+    },
+    "error": "unsupported AGX interrupt count 13",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "14"
+    },
+    "error": "unsupported AGX interrupt count 14",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "15"
+    },
+    "error": "unsupported AGX interrupt count 15",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "16"
+    },
+    "error": "unsupported AGX interrupt count 16",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-1.0"
+    },
+    "error": "unsupported AGX interrupt count -1.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-0.75"
+    },
+    "error": "unsupported AGX interrupt count -0.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-0.5"
+    },
+    "error": "unsupported AGX interrupt count -0.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-0.25"
+    },
+    "error": "unsupported AGX interrupt count -0.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "0.0"
+    },
+    "error": "unsupported AGX interrupt count 0.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "0.25"
+    },
+    "error": "unsupported AGX interrupt count 0.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "0.5"
+    },
+    "error": "unsupported AGX interrupt count 0.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "0.75"
+    },
+    "error": "unsupported AGX interrupt count 0.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1.0"
+    },
+    "result": 0
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1.25"
+    },
+    "error": "unsupported AGX interrupt count 1.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1.5"
+    },
+    "error": "unsupported AGX interrupt count 1.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1.75"
+    },
+    "error": "unsupported AGX interrupt count 1.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "2.0"
+    },
+    "error": "unsupported AGX interrupt count 2.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "2.25"
+    },
+    "error": "unsupported AGX interrupt count 2.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "2.5"
+    },
+    "error": "unsupported AGX interrupt count 2.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "2.75"
+    },
+    "error": "unsupported AGX interrupt count 2.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "3.0"
+    },
+    "error": "unsupported AGX interrupt count 3.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "3.25"
+    },
+    "error": "unsupported AGX interrupt count 3.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "3.5"
+    },
+    "error": "unsupported AGX interrupt count 3.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "3.75"
+    },
+    "error": "unsupported AGX interrupt count 3.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "4.0"
+    },
+    "result": 0
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "4.25"
+    },
+    "error": "unsupported AGX interrupt count 4.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "4.5"
+    },
+    "error": "unsupported AGX interrupt count 4.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "4.75"
+    },
+    "error": "unsupported AGX interrupt count 4.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "5.0"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "5.25"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "5.5"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "5.75"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "6.0"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "6.25"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "6.5"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "6.75"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "7.0"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "7.25"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "7.5"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "7.75"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "8.0"
+    },
+    "result": 4
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "8.25"
+    },
+    "error": "unsupported AGX interrupt count 8.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "8.5"
+    },
+    "error": "unsupported AGX interrupt count 8.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "8.75"
+    },
+    "error": "unsupported AGX interrupt count 8.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "9.0"
+    },
+    "error": "unsupported AGX interrupt count 9.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "9.25"
+    },
+    "error": "unsupported AGX interrupt count 9.25",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "9.5"
+    },
+    "error": "unsupported AGX interrupt count 9.5",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "9.75"
+    },
+    "error": "unsupported AGX interrupt count 9.75",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "10.0"
+    },
+    "error": "unsupported AGX interrupt count 10.0",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-115792089237316195423570985008687907853269984665640564039457584007913129639936"
+    },
+    "error": "unsupported AGX interrupt count -115792089237316195423570985008687907853269984665640564039457584007913129639936",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "115792089237316195423570985008687907853269984665640564039457584007913129639936"
+    },
+    "error": "unsupported AGX interrupt count 115792089237316195423570985008687907853269984665640564039457584007913129639936",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "18446744073709551616"
+    },
+    "error": "unsupported AGX interrupt count 18446744073709551616",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-18446744073709551616"
+    },
+    "error": "unsupported AGX interrupt count -18446744073709551616",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "1e+200"
+    },
+    "error": "unsupported AGX interrupt count 1e+200",
+    "exception": "ValueError"
+  },
+  {
+    "request": {
+      "operation": "g17_callback_interrupt_index",
+      "interrupt_count_text": "-1e+200"
+    },
+    "error": "unsupported AGX interrupt count -1e+200",
+    "exception": "ValueError"
+  }
+]

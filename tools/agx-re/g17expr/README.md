@@ -109,3 +109,20 @@ file widths, matching Python slices even when a file size exceeds a host index.
 `fixtures/caller-segment-boundaries.json` preserves independent synthetic-Mach-O
 results for truncated, oversized and wrapped-address spans. Its qualification
 record is under `~/.cache/vinix-python-to-v/g17-caller-span-20261008/`.
+
+The event extension owns interrupt selection, AKF callback and firmware ring
+proofs, event validators, and PM-memory, UMA and completion actions. Provider
+values retain their original integer or floating type through target checks;
+wide role-address additions preserve Python's binary64 rounding and overflow.
+Ordered checks retain the first error when several symbols, table entries or
+instructions are missing. Driver bytes and request buffers are borrowed only
+for the synchronous call; returned maps and arrays have independent ownership.
+
+The 11 original event methods are preserved as complete fixture inputs and
+outcomes in `fixtures/original-events.json`. Boundary fixtures cover callback
+types, wide provider values, rounding, dispatch indexes and error ordering.
+Qualification under `~/.cache/vinix-python-to-v/g17-events-20261008/` passed
+36,349 complete result and error controls on ARM64, x86-64 and ASan/UBSan,
+the eight real-driver outputs and the complete original controller report on
+both architectures, original assertions, native fake-stack checks, and foreign
+thread response ownership. These checks qualify host recovery and its C ABI.

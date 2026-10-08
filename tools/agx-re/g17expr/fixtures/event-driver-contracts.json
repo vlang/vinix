@@ -1,0 +1,375 @@
+[
+  {
+    "operation": "recover_g17_akf_callback",
+    "result": {
+      "message_type": 2,
+      "message_payload_consumed": false,
+      "firmware_role_consumed": false,
+      "accelerator_host_member": 664,
+      "callback_selector_member": 1868,
+      "event_source_array_member": 1488,
+      "event_source_stride": 8,
+      "signal_interrupt_vtable_slot": 600,
+      "get_interrupt_index_vtable_slot": 488,
+      "handle_event_vtable_slot": 808,
+      "interrupt_count_property": "interrupts",
+      "interrupt_specifier_bytes": 4,
+      "selector_rules": {
+        "1_or_4": 0,
+        "5_through_8": 4
+      },
+      "t6050_interrupt_count": 8,
+      "t6050_callback_interrupt_index": 4,
+      "clear_interrupts_vtable_slot": 2176,
+      "drain_event_ring_vtable_slot": 2184,
+      "drains_both_firmware_roles": true
+    }
+  },
+  {
+    "operation": "recover_g17_firmware_event_ring",
+    "result": {
+      "role_count": 2,
+      "role_record_host_member": 2672,
+      "role_record_stride": 304,
+      "validator_host_member": 1520,
+      "validator_role_stride": 576,
+      "event_validator_member": 528,
+      "state_auxiliary_index": 0,
+      "entries_auxiliary_index": 1,
+      "state_bytes": 48,
+      "state_read_index_offset": 0,
+      "state_cfi_index_offset": 16,
+      "state_write_index_offset": 32,
+      "entry_bytes": 72,
+      "entries": 256,
+      "entries_bytes": 18432,
+      "accepted_event_mask": 536936403,
+      "jump_table_function_offsets": {
+        "0": 284,
+        "1": 868,
+        "2": 188,
+        "3": 188,
+        "4": 384,
+        "5": 188,
+        "6": 160,
+        "7": 1424,
+        "8": 656,
+        "9": 1148,
+        "10": 1344,
+        "11": 188,
+        "12": 1780,
+        "13": 1572,
+        "14": 348,
+        "15": 752
+      },
+      "jump_table_host_noop_event_types": [
+        2,
+        3,
+        5,
+        11
+      ],
+      "validator_rejected_noop_event_types": [
+        2,
+        3,
+        5
+      ],
+      "direct_host_noop_event_types": [
+        11,
+        29
+      ],
+      "resolved_host_noop_events": [
+        {
+          "type": 0,
+          "dispatch": "firmware_vtable",
+          "vtable_slot": 2168,
+          "target": "__ZN14AGXArmFirmware29handleFirmwareControllerEventEPK26AGFIFirmwareEventRingEntry",
+          "implementation": "bti_c_ret"
+        }
+      ],
+      "host_noop_event_types": [
+        0,
+        11,
+        29
+      ],
+      "validated_event_types": {
+        "0": {
+          "record": "AGFIFirmwareEventAlive",
+          "enum": "kAGFIFirmwareEventTypeFirmwareAlive"
+        },
+        "1": {
+          "record": "AGFIFirmwareEventStampUpdate",
+          "enum": "kAGFIFirmwareEventTypeStampsUpdated"
+        },
+        "4": {
+          "record": "AGFIFirmwareEventHWRecovery",
+          "enum": "kAGFIFirmwareEventTypeGPURestart"
+        },
+        "6": {
+          "record": "AGFIFirmwareEventPMRequestMemory",
+          "enum": "kAGFIFirmwareEventTypeAllocatePMMemory"
+        },
+        "7": {
+          "record": "AGFIChannelErrorEventArgs",
+          "enum": "kAGFIFirmwareEventTypeChannelError"
+        },
+        "8": {
+          "record": "AGFIFirmwareEventMetrologyAging",
+          "enum": "kAGFIFirmwareEventTypeMtrResult"
+        },
+        "9": {
+          "record": "AGFIFirmwareEventUMARequestMemory",
+          "enum": "kAGFIFirmwareEventTypeUMAAsyncAlloc"
+        },
+        "10": {
+          "record": "AGFIFirmwareEventSharedEventSignalComplete",
+          "enum": "kAGFIFirmwareEventTypeSharedEventSignalComplete"
+        },
+        "12": {
+          "record": "AGFIFirmwareEventProcessExitComplete",
+          "enum": "kAGFIFirmwareEventTypeProcessExitComplete"
+        },
+        "13": {
+          "record": "AGFIFirmwareEventUMAGrowPool",
+          "enum": "kAGFIFirmwareEventTypeUMAAsyncGrowRequestComplete"
+        },
+        "14": {
+          "record": "AGFIFirmwareEventRTCompletionInfo",
+          "enum": "kAGFIFirmwareEventTypeRTCompletionEvent"
+        },
+        "15": {
+          "record": "AGFIFirmwareEventUMAThresholdInterrupt",
+          "enum": "kAGFIFirmwareEventTypeUMAThresholdInterrupt"
+        }
+      },
+      "fatal_events": [
+        {
+          "type": 4,
+          "record": "AGFIFirmwareEventHWRecovery",
+          "stamp_slot_offset": 12,
+          "invalid_stamp_slot": -1,
+          "host_action": "IOGPUScheduler::signalHardwareError",
+          "restart_request": 1,
+          "vinix_policy": "stop_gpu_without_recovery_engine"
+        },
+        {
+          "type": 7,
+          "record": "AGFIChannelErrorEventArgs",
+          "subtype_offset": 4,
+          "subtype_limit": 5,
+          "data_master_offset": 8,
+          "data_master_limit": 3,
+          "stamp_slot_offset": 12,
+          "invalid_stamp_slot": -1,
+          "host_action": "AGXFirmware::handleChannelErrorEvent",
+          "vinix_policy": "stop_gpu_without_channel_recovery"
+        }
+      ],
+      "advisory_events": [
+        {
+          "type": 8,
+          "record": "AGFIFirmwareEventMetrologyAging",
+          "payload_offset": 4,
+          "payload_bytes": 4,
+          "host_action": "function-reliability_monitor",
+          "host_action_optional": true,
+          "vinix_policy": "consume_without_reliability_monitor"
+        },
+        {
+          "type": 14,
+          "record": "AGFIFirmwareEventRTCompletionInfo",
+          "payload_offset": 4,
+          "payload_bytes": 8,
+          "host_action": "IOGPUFenceMachine::notifyCLPCIOPerfControl",
+          "vinix_policy": "consume_without_clpc_observers"
+        }
+      ],
+      "host_service_events": [
+        {
+          "type": 10,
+          "record": "AGFIFirmwareEventSharedEventSignalComplete",
+          "event_id_offset": 4,
+          "event_id_bytes": 8,
+          "event_id_nonzero": true,
+          "pre_signal_release_flag_offset": 20,
+          "host_action": "IOSurfaceRoot::signalEventID",
+          "host_action_id_bits": 32,
+          "vinix_policy": "consume_without_iosurface_registry"
+        }
+      ],
+      "host_lifecycle_events": [
+        {
+          "type": 12,
+          "record": "AGFIFirmwareEventProcessExitComplete",
+          "object_id_offset": 4,
+          "object_id_bytes": 8,
+          "namespace_accelerator_member": 117632,
+          "host_actions": [
+            "IOGPUWeakNamespace::getObject",
+            "IOGPUWeakNamespace::removeObject"
+          ],
+          "vinix_policy": "consume_without_iogpu_object_namespace"
+        }
+      ],
+      "deferred_host_noop_events": [
+        {
+          "type": 9,
+          "record": "AGFIFirmwareEventUMARequestMemory",
+          "request_index_offset": 4,
+          "request_index_limit": 256,
+          "ignored_event_offsets": [
+            8
+          ],
+          "required_nonzero_u64_offset": 12,
+          "stamp_slot_offset": 20,
+          "invalid_stamp_slot": -1,
+          "request_value_offset": 24,
+          "wait_for_host_ring_offset": 28,
+          "disabled_guard_accelerator_member": 108896,
+          "interrupt_action": "enqueue_host_request_and_wake_worker",
+          "host_request_ring": {
+            "control_accelerator_member": 107248,
+            "entries_accelerator_member": 1743600,
+            "entries": 64,
+            "entry_bytes": 32,
+            "worker_event_source_accelerator_member": 1136,
+            "full_policy": {
+              "wait_flag_offset": 28,
+              "wait_microseconds": 100,
+              "zero_flag": "drop_request",
+              "nonzero_flag": "wait_for_room"
+            },
+            "record_layout": {
+              "request_index_offset": 0,
+              "reserved_004": 0,
+              "required_value_offset": 8,
+              "stamp_and_request_value_offset": 16,
+              "wait_for_host_ring_offset": 24,
+              "reserved_01c": 0
+            }
+          },
+          "registered_worker": "__ZN14AGXAccelerator22allocateUMAMemoryEventEP22IOInterruptEventSourcei",
+          "worker_implementation": "bti_c_ret",
+          "device_control_response": "none",
+          "vinix_policy": "validate_and_consume_without_private_host_queue"
+        }
+      ],
+      "host_resource_events": [
+        {
+          "type": 6,
+          "record": "AGFIFirmwareEventPMRequestMemory",
+          "stamp_slot_offset": 4,
+          "invalid_stamp_slot": -1,
+          "manager_index_offset": 8,
+          "manager_index_limit": 127,
+          "request_value_offset": 12,
+          "request_kind_offset": 16,
+          "request_kind_limit": 64,
+          "firmware_token_offset": 20,
+          "firmware_token_bytes": 8,
+          "interrupt_action": "enqueue_host_request_and_wake_worker",
+          "host_request_ring": {
+            "control_accelerator_member": 105192,
+            "entries_accelerator_member": 104936,
+            "entries": 8,
+            "entry_bytes": 32,
+            "worker_event_source_accelerator_member": 1128,
+            "record_layout": {
+              "discriminator_offset": 0,
+              "discriminator": 0,
+              "manager_index_offset": 8,
+              "stamp_slot_offset": 12,
+              "request_value_offset": 16,
+              "request_kind_offset": 20,
+              "firmware_token_offset": 24
+            }
+          },
+          "device_control_response": {
+            "command_type": 8,
+            "submission_flags": 25,
+            "role": 0,
+            "entry_bytes": 64,
+            "request_kind_offset": 4,
+            "copied_host_request_range": {
+              "source_offset": 8,
+              "target_offset": 8,
+              "bytes": 24
+            },
+            "zero_range": {
+              "offset": 32,
+              "bytes": 32
+            },
+            "token_check": {
+              "entry_offset": 24,
+              "accelerator_member": 1672
+            },
+            "doorbell": 9511602413006487569,
+            "doorbell_count": 1,
+            "doorbell_wait_argument": 1
+          },
+          "manager_class": "AGXHWParamBufferManager",
+          "parameter_manager_member": 152,
+          "host_action": "AGXParameterManagement::growImmediately",
+          "host_action_vtable_slot": 400,
+          "vinix_policy": "stop_gpu_without_parameter_memory_manager"
+        },
+        {
+          "manager_class": "AGXUSCPrivMemFList",
+          "flist_index_limit": 256,
+          "vinix_policy": "stop_gpu_without_usc_private_memory_manager",
+          "type": 13,
+          "record": "AGFIFirmwareEventUMAGrowPool",
+          "stamp_slot_offset": 4,
+          "invalid_stamp_slot": -1,
+          "flist_index_offset": 8,
+          "required_nonzero_u64_offsets": [
+            12,
+            20
+          ],
+          "grow_result_value_offset": 28,
+          "grow_result_flags_offset": 36,
+          "grow_engine_member": 80,
+          "host_action": "IAGXUSCPrivMemGrowEngine::retireGrowRequest",
+          "host_action_vtable_slot": 384
+        },
+        {
+          "manager_class": "AGXUSCPrivMemFList",
+          "flist_index_limit": 256,
+          "vinix_policy": "stop_gpu_without_usc_private_memory_manager",
+          "type": 15,
+          "record": "AGFIFirmwareEventUMAThresholdInterrupt",
+          "flist_index_offset": 4,
+          "current_threshold_member": 128,
+          "requested_threshold_member": 232,
+          "host_action": "Accelerator::halUpdateUMADesc",
+          "host_action_vtable_slot": 4384,
+          "device_control_response": {
+            "command_type": 33,
+            "entry_bytes": 64,
+            "flist_index_offset": 4,
+            "zero_range": {
+              "offset": 8,
+              "bytes": 56
+            }
+          }
+        }
+      ],
+      "unimplemented_action_event_types": [
+        6,
+        13,
+        15
+      ],
+      "completion_event": {
+        "type": 1,
+        "firing_masks_offset": 4,
+        "firing_mask_words": 4,
+        "firing_stamp_slots": 128,
+        "checked_halfword_offset": 20,
+        "checked_halfword_limit": 24,
+        "signals_each_firing_stamp": true,
+        "signals_stamps_updated": true,
+        "tests_all_stamps_after_drain": true
+      },
+      "read_index_publish_barrier": "dmb ish"
+    }
+  }
+]
