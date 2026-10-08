@@ -15,9 +15,8 @@ and filters through a synchronous compatibility binding.
 runtime-binding.py imports and calls the public production runtime API and
 marshals its results/errors/constants. It retains no test algorithm. The
 unmodified public API continues to exercise the maintained V production core.
-The shared ELF/DEX/ZIP/payload helpers and the remaining nine ATL cases stay
-in the Python fixture until that group is ported and receive no retirement
-credit. The fixturehost and hosttest links reuse qualified process/stdio tools.
+The fixturehost and hosttest links reuse qualified process/stdio tools. The
+remaining independent ATL group and its shared builders are now native below.
 
 Qualification runs the full frozen 26-test Python corpus and the combined
 17-native-plus-nine-original entry on ARM64 and x86_64, and all native cases
@@ -49,3 +48,26 @@ and receives no retirement credit here. A parent owns all scratch files even
 after a failed native assertion. ARM64, x86_64 and sanitizer runs compare the
 whole original corpus and preserve compatibility method names/filters.
 No Java compiler, network download, Android application or guest is executed.
+
+The remaining nine AtlTests cases are native at source commit
+1b8efef098379574776d4f950dba19a60aff9d39 and frozen full file SHA256
+221b257173b4980ec0be6364aa26de023a8da4720d6430df1b32f22b2d4eb0f6.
+They preserve source/compiler/dependency receipt mutations, exact required
+components, ELF ABI and soname coherence, JAR bootstrap/class receipts,
+resources/font maps, old hardlink preservation and complete installed bytes.
+Both original production build.stage workflows run too: cache reuse, stale
+framework repair, input changes and retaining prior staging after invalid input.
+All ELF and DEX builders match complete bytes from the frozen original.
+
+Generic unittest patch descriptors, Namespace conversion, public Python API
+calls and ZIP primitives remain standard-library bindings without fixture
+policy. V owns mocked compiler command effects, ELF output, fixture generation
+and every original assertion. ExitStack restores every request-local mock;
+saved subprocess.run executes synchronous callback children outside the mocked
+command route. A native parent owns scratch trees even after assertion failure.
+ARM64 and x86_64 qualification runs both the frozen original full 26 cases and
+the original remaining nine; all 26 native compatibility cases, all nine direct
+ATL cases and the existing boot/musl groups pass with ASan/UBSan too. A forced
+post-setup assertion proves parent retirement after a complete case tree exists.
+These are host API/filesystem workflows with original compiler mocks; no real
+Java compiler, Android app, cross compiler, kernel build or guest is claimed.

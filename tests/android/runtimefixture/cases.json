@@ -21,6 +21,18 @@
       "test_rejects_foreign_incongruent_or_stale_alias_elf",
       "test_rejects_checksum_changes_and_symlink_escape_before_installing",
       "test_rejects_duplicate_or_escaping_paths"
+    ],
+    "AtlTests": [
+      "test_installs_one_coherent_native_framework_without_mutating_old_alias",
+      "test_androidfw_pair_requires_exact_header_library_patch_and_api",
+      "test_rejects_wrong_source_builder_compiler_flags_or_inputs",
+      "test_requires_every_framework_component",
+      "test_rejects_non_native_elf_or_mismatched_soname",
+      "test_rejects_checksum_consistent_jar_with_bootstrap_calls_or_false_class_receipt",
+      "test_rejects_incomplete_resource_apk_and_font_map",
+      "test_builder_stages_coherent_atl_and_rejects_stale_cached_framework",
+      "test_invalid_atl_input_does_not_replace_existing_staging"
     ]
-  }
+  },
+  "atl_original_source_sha256": "221b257173b4980ec0be6364aa26de023a8da4720d6430df1b32f22b2d4eb0f6"
 }

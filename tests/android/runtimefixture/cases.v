@@ -245,6 +245,10 @@ fn rejects_duplicate_or_escaping_paths(mut c Context) ! {
 }
 
 pub fn run(selection string) ! {
+	if selection.starts_with('AtlTests.') {
+		run_atl_guarded(selection)!
+		return
+	}
 	if selection.starts_with('BootclasspathTests.') {
 		run_boot_guarded(selection)!
 		return
