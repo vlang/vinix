@@ -11,7 +11,9 @@ import threading
 
 
 class Controller:
-    def __init__(self, source, override, *, install="--install-query", prefix="vinix-native-host-", process=None):
+    def __init__(self, source, override, *, install="--install-query", prefix="vinix-native-host-", process=None,
+                 eof_message="native host controller ended without a response"):
+        self.eof_message = eof_message
         self.process = process
         self.source = Path(source)
         self.override = override
@@ -55,7 +57,7 @@ class Controller:
             while True:
                 line = child.stdout.readline()
                 if not line:
-                    raise RuntimeError("native host controller ended without a response")
+                    raise RuntimeError(self.eof_message)
                 row = unpack(json.loads(line))
                 if "callback" not in row:
                     if "error" in row:
