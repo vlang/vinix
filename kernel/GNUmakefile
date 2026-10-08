@@ -473,9 +473,9 @@ obj/linuxkpi/siphash.o: override CPPFLAGS += -include linux/export.h
 
 # This isolated V module uses the unchanged upstream inline/header primitives.
 # Its generated C is a build artifact and does not join the main kernel blob.
-obj/linuxkpi/headercore.c: $(wildcard linuxkpi/headercore/*.v) $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile-v-primitives.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+obj/linuxkpi/headercore.c: $(wildcard linuxkpi/headercore/*.v) $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile_primitives.v $(wildcard ../tests/linuxkpi/hosttest/*.v) ../build-support/run-v-tool.sh ../build-support/find-v.sh $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
-	python3 ../tests/linuxkpi/compile-v-primitives.py --arch amd64 $@
+	../build-support/run-v-tool.sh ../tests/linuxkpi/compile_primitives.v --arch amd64 $@
 
 obj/linuxkpi/headercore.o: obj/linuxkpi/headercore.c GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -std=gnu11 -c $< -o $@

@@ -35,12 +35,12 @@ python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/atomi
 python3 "$repo/kernel/linuxkpi/generate-abi.py" "$repo/kernel/linuxkpi/abi/overflow.json" "$work/include/vinix/integer_policy.h"
 python3 "$repo/tests/linuxkpi/overflow_test.py"
 python3 "$repo/tests/linuxkpi/exchange_test.py"
-python3 "$repo/tests/linuxkpi/spin_test.py"
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/spin_sequencing.v"
 python3 "$repo/build-support/compile-v-module.py" "$repo/kernel/linuxkpi/exchangecore" "$work/exchangecore.c" --arch "$native_v_arch" -d nofloat
 ${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
     -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function \
     -fsanitize=address,undefined -fno-omit-frame-pointer -c "$work/exchangecore.c" -o "$work/exchangecore.o"
-python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" "$work/headercore.c"
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/compile_primitives.v" --host --arch "$native_v_arch" "$work/headercore.c"
 # Keep upstream header algorithms in their native, separately compiled V object.
 # Darwin's fortified macros are incompatible with Linux's string declarations;
 # ASan/UBSan still cover every call and data access in this object.
@@ -61,7 +61,7 @@ CHECK
 # Standalone header tests use the same production algorithms without unrelated
 # task/queue callback storage. Dead stripping keeps unused kernel dependencies
 # out of each deliberately small, independent test executable.
-python3 "$repo/tests/linuxkpi/compile-v-primitives.py" --host --arch "$native_v_arch" \
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/compile_primitives.v" --host --arch "$native_v_arch" \
     --implementations-only "$work/headerimpl.c"
 ${CC:-clang} -std=gnu11 -fgnu89-inline -O1 -g -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
     -ffunction-sections -fdata-sections -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function \
@@ -146,7 +146,7 @@ for case in ("reversed", "huge", "clock-horizon", "absolute-overflow", "state", 
 print("LinuxKPI: invalid sleep ranges, contexts and signed clock boundaries passed")
 PY
 # Each independent V fixture still imports its original public header first.
-python3 "$repo/tests/linuxkpi/standalone_test.py" --arch "$native_v_arch" \
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/standalone.v" --arch "$native_v_arch" \
     --header-impl "$work/headerimpl.o" --include "$work/include"
 printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'
 "$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/upstreamsource/core_test.v"

@@ -47,7 +47,7 @@ def build(work, arch):
     # overflow guards after folding narrower input bounds. Keep those guards.
     core_warnings = ["-Wno-type-limits", "-Wno-sign-compare"] if arch == "x86_64" else []
     subprocess.run(cc + flags + core_warnings + ["-DVINIX_V_RUNTIME", "-DVINIX_LINUXKPI_HOST_TEST", "-I" + str(ROOT / "kernel/c"), "-c", str(work / "compat.c"), "-o", str(work / "compat.o")], check=True)
-    subprocess.run(["python3", str(TESTS / "compile-v-primitives.py"), "--host", "--arch", v_arch, str(work / "headercore.c")], check=True)
+    subprocess.run([str(ROOT / "build-support/run-v-tool.sh"), str(TESTS / "compile_primitives.v"), "--host", "--arch", v_arch, str(work / "headercore.c")], check=True)
     subprocess.run(cc + flags + core_warnings + include + ["-c", str(work / "headercore.c"), "-o", str(work / "headercore.o")], check=True)
     generator = runpy.run_path(str(ROOT / "build-support/compile-v-module.py"))["generate"]
     generator(ROOT / "kernel/linuxkpi/exchangecore", work / "exchangecore.c", v_arch, ("nofloat",))
