@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -58,7 +59,13 @@ import tempfile
 import threading
 import time
 
+# Separate guest launch operations from the native report bridge's owned child.
+run_guest_command = subprocess.run
+close_guest_fd = os.close
 ROOT = Path(__file__).resolve().parents[2]
+_REPORT_SPEC = importlib.util.spec_from_file_location("desktop_perf_native_report", Path(__file__).with_name("_native_report.py"))
+_native_report = importlib.util.module_from_spec(_REPORT_SPEC)
+_REPORT_SPEC.loader.exec_module(_native_report)
 ABS_MAX = 32767
 SCENARIOS = ("idle", "apps", "utilities", "storage", "productivity", "tools", "workflows", "pointer", "drag", "wakeups", "churn", "cache", "ops")
 SHOT = re.compile(rb"PERF-SHOT variant=(\S+) scenario=(\S+) round=(\d+)")
@@ -83,150 +90,38 @@ CHURN_PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version",
 
 
 def measurement_detail(row: dict) -> tuple[str, ...]:
-    kind = row.get("report", "PERF-RESULT")
-    if kind == "PERF-WAKEUPS":
-        return (kind, row.get("via", ""))
-    if kind == "PERF-CHURN":
-        return (kind, row.get("program", ""))
-    if kind == "PERF-OPS":
-        return (kind, row.get("op", ""), row.get("dir", ""))
-    return (kind,)
+    return tuple(_native_report.request("detail", row=row))
 
 
 def expected_measurements(variants: list[str], scenarios: list[str], rounds: int) -> set[tuple]:
-    expected = set()
-    for variant in variants:
-        for scenario in scenarios:
-            if scenario == "wakeups":
-                details = [("PERF-WAKEUPS", via) for via in ("nanosleep", "poll")]
-            elif scenario == "churn":
-                details = [("PERF-CHURN", program) for program in CHURN_PROGRAMS]
-            elif scenario == "cache":
-                details = [("PERF-CACHE",)]
-            elif scenario == "ops":
-                details = [("PERF-OPS", op, "/tmp") for op in OPS_GENERAL]
-                details += [("PERF-OPS", op, directory)
-                            for directory in ("/tmp", "/root") for op in OPS_FILES]
-            else:
-                details = [("PERF-RESULT",)]
-            for round_number in range(1, rounds + 1):
-                for detail in details:
-                    expected.add((variant, scenario, round_number, *detail))
-    return expected
+    identities = _native_report.request("expected", variants=variants, scenarios=scenarios, rounds=rounds)
+    return {(item["variant"], item["scenario"], int(item["round"]), *item["detail"])
+            for item in identities}
 
 
 def valid_desktop_result(row: dict) -> bool:
-    try:
-        seconds = float(row["seconds"])
-        # Count the compositor plus every requested native client, so missing
-        # launches cannot pass a startup smoke run.
-        scenario = row.get("scenario")
-        minimum_processes = (5 if scenario == "workflows" else
-                             4 if scenario in ("utilities", "storage", "productivity", "tools") else 0)
-        return (all(math.isfinite(float(row[key])) for key in
-                    (*DESKTOP_METRICS, "system_used_mb"))
-                and math.isfinite(seconds) and seconds > 0
-                and int(row["processes"]) >= minimum_processes)
-    except (KeyError, ValueError, TypeError):
-        return False
+    return _native_report.request("valid_desktop_result", row=row)
 
 
 def inspect_run(transcript: bytes, variants: list[str], scenarios: list[str], rounds: int,
                 timed_out: bool = False, exit_code: int | None = None
                 ) -> tuple[list[dict], list[str], list[str]]:
-    """Keep partial measurements, but accept only a complete, error-free plan."""
-    rows: list[dict] = []
-    reports: list[str] = []
-    errors: list[str] = []
-    expected = expected_measurements(variants, scenarios, rounds)
-    seen: set[tuple] = set()
-    done = 0
-    for line in transcript.splitlines():
-        if line.strip() == DONE:
-            done += 1
-        for marker in (b"KERNEL PANIC", b"FATAL EXCEPTION", b"PERF-ERROR"):
-            if marker in line:
-                errors.append(line.decode(errors="replace"))
-                break
-        for marker in REPORT_MARKERS:
-            if marker in line:
-                reports.append(line[line.index(marker):].decode(errors="replace"))
-                break
-        match = MEASUREMENT.search(line)
-        if not match:
-            # An incomplete/malformed measurement must not silently count as
-            # coverage. The serial log retains its exact original bytes.
-            if any(marker in line for marker in
-                   (b"PERF-RESULT", b"PERF-WAKEUPS", b"PERF-CHURN", b"PERF-CACHE", b"PERF-OPS")):
-                errors.append("malformed measurement: " + line.decode(errors="replace"))
-            continue
-        kind, variant, scenario, round_number, payload = match.groups()
-        row = {"variant": variant.decode(errors="replace"),
-               "scenario": scenario.decode(errors="replace"), "round": int(round_number)}
-        if kind != b"PERF-RESULT":
-            row["report"] = kind.decode()
-        try:
-            for field in shlex.split(payload.decode(errors="replace")):
-                key, separator, value = field.partition("=")
-                if not separator:  # OPS's optional size-class deltas.
-                    continue
-                if key in row or key == "report":
-                    raise ValueError(f"duplicate field {key}")
-                row[key] = value
-        except ValueError as error:
-            errors.append(f"malformed measurement fields: {error}: {line.decode(errors='replace')}")
-        rows.append(row)
-        identity = (row["variant"], row["scenario"], row["round"], *measurement_detail(row))
-        if identity not in expected:
-            errors.append(f"unexpected measurement: {identity}")
-        elif identity in seen:
-            errors.append(f"duplicate measurement: {identity}")
-        else:
-            seen.add(identity)
-        if kind == b"PERF-RESULT" and not valid_desktop_result(row):
-            errors.append(f"missing or invalid desktop metrics: {identity}")
-        required = {
-            b"PERF-WAKEUPS": ("interval_ms", "wakeups", "per_second", "cpu", "us_per_wakeup"),
-            b"PERF-CHURN": ("runs", "retained_kb", "per_run_bytes"),
-            b"PERF-CACHE": ("written_mb", "used_mb", "cached_kb", "slab_kb"),
-            b"PERF-OPS": ("count", "bytes_per_op"),
-        }.get(kind, ())
-        try:
-            if any(not math.isfinite(float(row[key])) for key in required):
-                raise ValueError("non-finite metric")
-            fixed = {b"PERF-WAKEUPS": ("interval_ms", 16), b"PERF-CHURN": ("runs", 300),
-                     b"PERF-CACHE": ("written_mb", 32), b"PERF-OPS": ("count", 200)}.get(kind)
-            if fixed and int(row[fixed[0]]) != fixed[1]:
-                raise ValueError(f"expected {fixed[0]}={fixed[1]}")
-        except (KeyError, ValueError, TypeError) as error:
-            errors.append(f"missing or invalid report metrics: {identity}: {error}")
-    if timed_out:
-        errors.append("overall measurement timeout expired")
-    if exit_code not in (None, 0):
-        errors.append(f"guest process exited with status {exit_code}")
-    if done != 1:
-        errors.append(f"expected one VINIX DESKTOP PERF: DONE marker, received {done}")
-    missing = expected - seen
-    if missing:
-        sample = "; ".join(str(identity) for identity in sorted(missing)[:5])
-        errors.append(f"{len(missing)} of {len(expected)} measurements missing: {sample}")
-    return rows, reports, errors
+    output = _native_report.request("inspect", transcript_hex=transcript.hex(), variants=variants,
+                                    scenarios=scenarios, rounds=rounds, timed_out=timed_out,
+                                    exit_code=exit_code)
+    return output["rows"], output["reports"], output["errors"]
 
 
 def finish_run(transcript: bytes, variants: list[str], scenarios: list[str], rounds: int,
                json_path: Path | None = None, timed_out: bool = False,
                exit_code: int | None = None) -> int:
-    rows, reports, errors = inspect_run(transcript, variants, scenarios, rounds, timed_out, exit_code)
-    if json_path:
-        json_path.write_text(json.dumps(rows, indent=2) + "\n")
-    results = [row for row in rows if "report" not in row and valid_desktop_result(row)]
-    if results:
-        print(summarize(results))
-    for line in reports:
-        print(line)
-    for error in errors:
-        print(f"ERROR: {error}", file=sys.stderr)
-    return 1 if errors else 0
+    output = _native_report.request("finish", transcript_hex=transcript.hex(), variants=variants,
+                                    scenarios=scenarios, rounds=rounds,
+                                    json_path=str(json_path) if json_path else None,
+                                    timed_out=timed_out, exit_code=exit_code)
+    sys.stdout.write(output["stdout"])
+    sys.stderr.write(output["stderr"])
+    return output["status"]
 
 
 class Pointer:
@@ -376,7 +271,7 @@ def compile_measure(source: Path, output: Path) -> None:
                                   ROOT / "build-aarch64-userland/staging"))
     gcc = sorted((sysroot / "usr/lib/gcc/aarch64-alpine-linux-musl").iterdir())[-1]
     lib = sysroot / "usr/lib"
-    subprocess.run([
+    run_guest_command([
         str(llvm / "clang"), "--target=aarch64-linux-musl", "-static", "-nostdinc", "-nostdlib",
         "-isystem", str(gcc / "include"), "-isystem", str(sysroot / "usr/include"),
         "-O2", "-Wall", str(lib / "crt1.o"), str(lib / "crti.o"), str(gcc / "crtbeginT.o"),
@@ -387,19 +282,7 @@ def compile_measure(source: Path, output: Path) -> None:
 
 
 def summarize(results: list[dict]) -> str:
-    keys = DESKTOP_METRICS
-    groups: dict[tuple[str, str], list[dict]] = {}
-    for result in results:
-        groups.setdefault((result["scenario"], result["variant"]), []).append(result)
-    # Medians: a busy host inflates the guest's CPU accounting for whatever
-    # happened to be running, and one such run should not move the answer.
-    lines = ["median of each scenario's runs; cpu is % of one CPU, mb is megabytes",
-             "scenario  variant   runs  " + "  ".join(f"{key:>14}" for key in keys)]
-    for (scenario, variant), rows in sorted(groups.items()):
-        medians = [statistics.median(float(row[key]) for row in rows) for key in keys]
-        lines.append(f"{scenario:<9} {variant:<9} {len(rows):>4}  "
-                     + "  ".join(f"{value:>14.2f}" for value in medians))
-    return "\n".join(lines)
+    return _native_report.request("summarize", rows=results)
 
 
 @contextmanager
@@ -523,10 +406,10 @@ def main() -> int:
         # disk a running measurement is reading.
         tag = hashlib.sha256(str(initramfs).encode()).hexdigest()[:12]
         module_iso = ROOT / f"build/desktop-perf/{initramfs.stem}-{tag}.iso"
-        subprocess.run([sys.executable, str(ROOT / "tools/prune-build-artifacts.py"),
+        run_guest_command([sys.executable, str(ROOT / "tools/prune-build-artifacts.py"),
                         "--root", str(ROOT), "--automatic", "--keep", str(initramfs),
                         "--keep", str(module_iso)], check=True)
-        subprocess.run([sys.executable, str(ROOT / "tools/build-qemu-module-iso.py"),
+        run_guest_command([sys.executable, str(ROOT / "tools/build-qemu-module-iso.py"),
                         str(initramfs), str(module_iso)], check=True)
 
         environment = os.environ.copy()
@@ -609,7 +492,7 @@ def main() -> int:
             # output before closing the pty and evaluating the complete log, so a
             # panic/error queued after DONE cannot be mistaken for a passing run.
             console.thread.join(timeout=2)
-            os.close(master)
+            close_guest_fd(master)
             console.thread.join(timeout=1)
             console_drained = console.closed.is_set()
             transcript = bytes(console.transcript)

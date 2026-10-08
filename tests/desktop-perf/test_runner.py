@@ -65,200 +65,6 @@ def complete_lines(variants, scenarios, rounds):
             for line in case_lines(variant, scenario, number)] + [runner.DONE.decode()]
 
 
-class VerdictTests(unittest.TestCase):
-    def verdict(self, lines, scenarios, variants=None, rounds=1, **options):
-        variants = variants or ["new"]
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory) / "results.json"
-            stderr = io.StringIO()
-            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
-                result = runner.finish_run("\n".join(lines).encode(), variants, scenarios, rounds,
-                                           output, **options)
-            return result, json.loads(output.read_text()), stderr.getvalue()
-
-    def test_complete_all_scenarios_variants_and_rounds(self):
-        scenarios = list(runner.SCENARIOS)
-        result, rows, errors = self.verdict(complete_lines(["before", "after"], scenarios, 2),
-                                          scenarios, ["before", "after"], 2)
-        self.assertEqual((result, errors), (0, ""))
-        self.assertEqual(len(rows), 208)
-        self.assertEqual(sum("report" not in row for row in rows), 36)
-
-    def test_native_utility_scenarios_require_three_client_processes(self):
-        for scenario in ("utilities", "storage", "productivity", "tools"):
-            for processes in (0, 1, 3):
-                with self.subTest(scenario=scenario, processes=processes):
-                    line = case_lines("new", scenario, 1)[0].replace(
-                        "processes=4", f"processes={processes}")
-                    result, _, errors = self.verdict([line, runner.DONE.decode()], [scenario])
-                    self.assertEqual(result, 1)
-                    self.assertIn("invalid desktop metrics", errors)
-        shell = Path(__file__).with_name("perf-init.sh").read_text()
-        aliases = re.search(r'if \[ "\$scenario" = tools \]; then(.*?)\n\tfi',
-                            shell, re.S).group(1)
-        for executable in ("vinix-color-meter", "vinix-calculator", "vinix-notes"):
-            self.assertIn(executable, aliases)
-        self.assertIn('ln -sf vinix-desktop "/usr/bin/$app"', aliases)
-        launch = re.search(r'^\t\ttools\)\n(.*?)^\t\t\t;;', shell, re.M | re.S).group(1)
-        arguments = shlex.split(launch)
-        for title in ("Color Meter", "Calculator", "Notes"):
-            self.assertIn(f"--open={title}", arguments)
-
-    def test_workflows_require_four_native_clients_and_cached_image_aliases(self):
-        for processes in (0, 1, 4, 5):
-            with self.subTest(processes=processes):
-                line = case_lines("new", "workflows", 1)[0].replace(
-                    "processes=5", f"processes={processes}")
-                result, _, errors = self.verdict([line, runner.DONE.decode()], ["workflows"])
-                self.assertEqual(result, 0 if processes == 5 else 1)
-                if processes < 5:
-                    self.assertIn("invalid desktop metrics", errors)
-        shell = Path(__file__).with_name("perf-init.sh").read_text()
-        aliases = re.search(r'if \[ "\$scenario" = workflows \]; then(.*?)\n\tfi',
-                            shell, re.S).group(1)
-        for executable in ("vinix-dictionary", "vinix-editor", "vinix-calendar", "vinix-files"):
-            self.assertIn(executable, aliases)
-        self.assertIn('ln -sf vinix-desktop "/usr/bin/$app"', aliases)
-        self.assertIn("/usr/share/vinix/dictionary/dictionary.vnd", aliases)
-        self.assertIn("/usr/share/vinix/dictionary/LICENSE.WordNet", aliases)
-        self.assertIn("PERF-ERROR", aliases)
-        launch = re.search(r'^\t\tworkflows\)\n(.*?)^\t\t\t;;', shell, re.M | re.S).group(1)
-        arguments = shlex.split(launch)
-        for title in ("Dictionary", "Text Editor", "Calendar", "Files"):
-            self.assertIn(f"--open={title}", arguments)
-
-    def test_partial_ops_timeout_keeps_json_but_fails(self):
-        lines = case_lines("new", "ops", 1)[:2]
-        result, rows, errors = self.verdict(lines, ["ops"], timed_out=True)
-        self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["report"], "PERF-OPS")
-        self.assertEqual(rows[0]["op"], "stat")
-        self.assertIn("timeout", errors)
-        self.assertIn("DONE", errors)
-
-    def test_all_measurements_without_done_still_fail(self):
-        result, _, errors = self.verdict(case_lines("new", "ops", 1), ["ops"])
-        self.assertEqual(result, 1)
-        self.assertIn("DONE", errors)
-        self.assertNotIn("measurements missing", errors)
-
-    def test_done_after_overall_timeout_does_not_rescue_run(self):
-        result, _, errors = self.verdict(complete_lines(["new"], ["cache"], 1),
-                                       ["cache"], timed_out=True)
-        self.assertEqual(result, 1)
-        self.assertIn("timeout", errors)
-
-    def test_error_or_panic_after_complete_results_fails(self):
-        for failure in ("*** Vinix KERNEL PANIC on CPU 2 ***", "FATAL EXCEPTION",
-                        "PERF-ERROR variant=new scenario=cache round=1 cannot read sample"):
-            with self.subTest(failure=failure):
-                result, rows, errors = self.verdict(complete_lines(["new"], ["cache"], 1)
-                                                   + [failure], ["cache"])
-                self.assertEqual(result, 1)
-                self.assertEqual(len(rows), 1)
-                self.assertIn(failure, errors)
-
-    def test_nonzero_guest_exit_after_done_fails(self):
-        result, _, errors = self.verdict(complete_lines(["new"], ["cache"], 1),
-                                       ["cache"], exit_code=7)
-        self.assertEqual(result, 1)
-        self.assertIn("status 7", errors)
-
-    def test_missing_variant_scenario_or_round(self):
-        for variants, scenarios, rounds in ((["new", "old"], ["cache"], 1),
-                                           (["new"], ["cache", "idle"], 1),
-                                           (["new"], ["cache"], 2)):
-            with self.subTest(variants=variants, scenarios=scenarios, rounds=rounds):
-                result, _, errors = self.verdict(complete_lines(["new"], ["cache"], 1),
-                                               scenarios, variants, rounds)
-                self.assertEqual(result, 1)
-                self.assertIn("measurements missing", errors)
-
-    def test_each_report_subcase_is_required(self):
-        for scenario in ("ops", "churn", "wakeups"):
-            with self.subTest(scenario=scenario):
-                lines = case_lines("new", scenario, 1)[:-1] + [runner.DONE.decode()]
-                result, _, errors = self.verdict(lines, [scenario])
-                self.assertEqual(result, 1)
-                self.assertIn("1 of", errors)
-
-    def test_duplicate_does_not_replace_missing_coverage(self):
-        for scenario in ("ops", "churn", "wakeups", "idle"):
-            with self.subTest(scenario=scenario):
-                lines = case_lines("new", scenario, 1)
-                result, _, errors = self.verdict(lines[:-1] + [lines[0], lines[0], runner.DONE.decode()],
-                                               [scenario])
-                self.assertEqual(result, 1)
-                self.assertIn("duplicate measurement", errors)
-
-    def test_unrequested_identity_is_rejected(self):
-        for variant, scenario, number in (("old", "cache", 1), ("new", "idle", 1),
-                                          ("new", "cache", 0), ("new", "cache", 2)):
-            with self.subTest(variant=variant, scenario=scenario, round=number):
-                result, _, errors = self.verdict(complete_lines(["new"], ["cache"], 1)
-                                               + case_lines(variant, scenario, number), ["cache"])
-                self.assertEqual(result, 1)
-                self.assertIn("unexpected measurement", errors)
-
-    def test_auxiliary_slab_site_and_meminfo_do_not_count_as_measurements(self):
-        auxiliary = ['PERF-SLAB variant=new scenario=churn round=1 program="/bin/true" class=64 objects=0 pages=0',
-                     "PERF-SITE variant=new scenario=ops round=1 op=stat dir=/tmp site=0 bytes=0",
-                     "PERF-MEMINFO variant=new scenario=cache round=1 Cached: 32768 kB"]
-        result, rows, _ = self.verdict(auxiliary + [runner.DONE.decode()], ["churn", "ops", "cache"])
-        self.assertEqual(result, 1)
-        self.assertEqual(rows, [])
-        result, _, _ = self.verdict(complete_lines(["new"], ["churn", "ops", "cache"], 1)
-                                    + auxiliary + auxiliary, ["churn", "ops", "cache"])
-        self.assertEqual(result, 0)
-
-    def test_invalid_metrics_or_fields_fail_without_losing_partial_json(self):
-        lines = (case_lines("new", "idle", 1)[0].replace("desktop_cpu=1.0", "desktop_cpu=nan"),
-                 case_lines("new", "cache", 1)[0].replace("cached_kb=32768", "cached_kb=unknown"),
-                 case_lines("new", "ops", 1)[0].replace("count=200", "count=2"),
-                 'PERF-CHURN variant=new scenario=churn round=1 program="unterminated',
-                 case_lines("new", "cache", 1)[0] + " round=2",
-                 case_lines("new", "idle", 1)[0] + " report=PERF-CACHE")
-        for line in lines:
-            with self.subTest(line=line):
-                scenario = re.search(r"scenario=(\w+)", line).group(1)
-                result, rows, errors = self.verdict([line, runner.DONE.decode()], [scenario])
-                self.assertEqual(result, 1)
-                self.assertEqual(len(rows), 1)
-                self.assertTrue("invalid" in errors or "malformed" in errors)
-
-    def test_duplicate_or_quoted_done_is_not_completion(self):
-        lines = case_lines("new", "cache", 1)
-        for tail in ([runner.DONE.decode(), runner.DONE.decode()],
-                     ["an earlier log said " + runner.DONE.decode()]):
-            with self.subTest(tail=tail):
-                result, _, errors = self.verdict(lines + tail, ["cache"])
-                self.assertEqual(result, 1)
-                self.assertIn("DONE", errors)
-
-    def test_desktop_sample_time_process_count_and_system_memory_must_be_valid(self):
-        original = case_lines("new", "idle", 1)[0]
-        for line in (original.replace("seconds=1.0", "seconds=nan"),
-                     original.replace("seconds=1.0", "seconds=0"),
-                     original.replace("processes=1", "processes=garbage"),
-                     original.replace("processes=1", "processes=-1"),
-                     original.replace(" system_used_mb=20.0", "")):
-            with self.subTest(line=line):
-                result, rows, errors = self.verdict([line, runner.DONE.decode()], ["idle"])
-                self.assertEqual(result, 1)
-                self.assertEqual(len(rows), 1)
-                self.assertIn("invalid desktop metrics", errors)
-
-    def test_expected_ops_match_actual_guest_workload(self):
-        source = Path(__file__).with_name("measure.c").read_text()
-        for table, expected in (("table", GENERAL_OPS), ("files", FILE_OPS)):
-            body = re.search(r"static const struct op " + table + r"\[\] = \{(.*?)\};",
-                             source, re.S).group(1)
-            self.assertEqual(tuple(re.findall(r'\{"([^"]+)"', body)), expected)
-        shell = Path(__file__).with_name("perf-init.sh").read_text()
-        for program in PROGRAMS:
-            self.assertIn(program, shell)
-        self.assertEqual(len(runner.expected_measurements(["new"], ["ops"], 1)), 36)
 
 
 class MainTests(unittest.TestCase):
@@ -298,11 +104,11 @@ class MainTests(unittest.TestCase):
             with mock.patch.object(runner.sys, "argv", arguments), \
                     mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(work)), \
                     mock.patch.object(runner, "compile_measure"), \
-                    mock.patch.object(runner.subprocess, "run"), \
+                    mock.patch.object(runner, "run_guest_command"), \
                     mock.patch.object(runner.pty, "fork", side_effect=start_guest), \
                     mock.patch.object(runner, "Console", return_value=console), \
                     mock.patch.object(runner, "stop_child", return_value=exit_code), \
-                    mock.patch.object(runner.os, "close"), \
+                    mock.patch.object(runner, "close_guest_fd"), \
                     mock.patch.object(runner.time, "monotonic", side_effect=[0, 2] if expired else None,
                                       return_value=0), \
                     contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
@@ -351,7 +157,7 @@ class MainTests(unittest.TestCase):
             with mock.patch.object(runner.sys, "argv", ["run.py", f"new={binary}",
                                                         "--scenarios=workflows"]), \
                     mock.patch.object(runner, "compile_measure") as compile_guest, \
-                    mock.patch.object(runner.subprocess, "run") as commands, \
+                    mock.patch.object(runner, "run_guest_command") as commands, \
                     mock.patch.object(runner.pty, "fork") as launch, \
                     contextlib.redirect_stderr(io.StringIO()) as stderr:
                 with self.assertRaises(SystemExit) as stopped:

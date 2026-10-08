@@ -57,6 +57,12 @@ python3 build-support/dictionary/prepare.py \
 ```
 
 See [Dictionary data preparation](../../build-support/dictionary/README.md) for
-the pinned archive and preserved license. Host-side harness contracts run with
-`python3 tests/desktop-perf/test_runner.py`; `sh -n tests/desktop-perf/perf-init.sh`
+the pinned archive and preserved license. Captured-transcript parsing, coverage,
+metric validation, partial JSON and
+summary policy run in `perfreport` V. The remaining Python controller uses a
+small import bridge that compiles one private executable with `find-v.sh` and
+owns each request process through completion. `VINIX_PERF_REPORT_QUERY` can
+select an already-compiled native executable. Both native verdict fixtures and
+the remaining controller contracts run with
+`tests/desktop-perf/run-host-tests.sh`; `sh -n tests/desktop-perf/perf-init.sh`
 checks the guest script without booting QEMU.
