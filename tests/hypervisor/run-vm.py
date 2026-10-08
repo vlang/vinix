@@ -15,12 +15,10 @@ parser.add_argument("--timeout", type=int, default=600)
 parser.add_argument("--require-vmx", action="store_true",
                     help="fail unless IO/HLT guest execution passed (needs nested VT-x)")
 args = parser.parse_args()
-command = [sys.executable, str(ROOT / "tests/kernel-gaps/run.py"),
-           "--source", str(ROOT / "tests/hypervisor/guestfixture/core.v"), "--arch", args.arch,
-           "--kernel-dir", str(args.kernel_dir), "--timeout", str(args.timeout),
-           "--expect", "HYPERVISOR GUEST PASS", "--fail", "HYPERVISOR FAIL:"]
-if args.state_dir:
-    command += ["--state-dir", str(args.state_dir)]
-if args.require_vmx:
-    command += ["--expect", "HYPERVISOR EXECUTION PASS"]
-raise SystemExit(subprocess.call(command))
+import importlib.util
+_spec = importlib.util.spec_from_file_location("hypervisor_guest_native", ROOT / "tests/kernel-gaps/_native.py")
+_native = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_native)
+options = {name: str(value) if isinstance(value, Path) else value for name, value in vars(args).items()}
+options.update(root=str(ROOT), python=sys.executable, timeout=str(args.timeout))
+raise SystemExit(_native.call("hypervisor", options, globals()))
