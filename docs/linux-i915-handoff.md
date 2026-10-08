@@ -716,7 +716,7 @@ actual ARM ECAM/config fixtures recover `960380928`. True default x86 and
 disabled ARM builds/startup pass with the fixtures absent. Four configured ARM
 CPUs are not proof of native ARM SMP.
 
-`tests/pci-config/topology_test.py` runs the actual unchanged V algorithms and
+`tests/pci-config/topology` runs the actual unchanged V algorithms and
 transport core against private synchronous observers. GNU99/GNU11 each pass
 7,150,771 sanitizer assertions, including every private allocation/transaction
 failure, bounded relationships, capability errors, 200 full destruction cycles

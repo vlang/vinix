@@ -1,41 +1,355 @@
-#!/usr/bin/env python3
-# SPDX-License-Identifier: GPL-2.0-or-later
-"""Execute native PCI topology/capability V against explicit host observers.
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Independent host observer for the unchanged production PCI topology core.
+module main
 
-The production algorithms and checked config core are copied unchanged. Only
-the memory allocator, checked fixed-array index guard and synchronous config
-transport are modeled. This proves
-private snapshot relationships, rollback and read-only parsing, not hardware
-discovery, Linux PCI registration or concurrent destruction of live readers.
-"""
-
-import argparse
-import hashlib
-import json
 import os
-from pathlib import Path
-import platform
-import re
-import shutil
-import subprocess
-import tempfile
+import time
+import crypto.sha256
+import json2
+import encoding.utf8
 
-ROOT = Path(__file__).resolve().parents[2]
-TOPOLOGY = ROOT / "kernel/pci/topology.v"
-CAPABILITIES = ROOT / "kernel/pci/capabilities.v"
-CONFIG = ROOT / "kernel/pci/config_core.v"
-CONTRACT = ROOT / "kernel/c/pci_config.h"
+#include <signal.h>
+#include <stdlib.h>
 
-MEMORY_OBSERVER = r'''
+fn C.kill(i32, i32) i32
+fn C.mkdtemp(&char) &char
+
+const scope = 'Execute native PCI topology/capability V against explicit host observers. Production algorithms remain unchanged; only allocation, fixed-array indexing and synchronous config transport are modeled. This validates private snapshots and quiescent destruction, not hardware discovery or Linux PCI registration.'
+
+struct Outcome {
+	stdout string
+	stderr string
+	code   int
+}
+
+fn capture(argv []string, log string, env map[string]string) !Outcome {
+	mut child := os.new_process(argv[0])
+	child.set_args(argv[1..])
+	child.set_environment(env)
+	child.set_redirect_stdio()
+	defer { child.close() }
+	child.run()
+	if child.pid <= 0 { return error('Cannot start command: ' + argv[0]) }
+	start := time.sys_mono_now()
+	mut output := ''
+	mut diagnostic := ''
+	mut expired := false
+	for {
+		output += child.stdout_read()
+		diagnostic += child.stderr_read()
+		if !child.is_alive() { break }
+		if time.sys_mono_now() - start >= u64(120) * u64(time.second) {
+			unsafe { C.kill(i32(child.pid), 9) }
+			child.wait()
+			expired = true
+			break
+		}
+		time.sleep(time.millisecond)
+	}
+	output += child.stdout_slurp()
+	diagnostic += child.stderr_slurp()
+	os.write_file(log, json2.encode(argv) + '\n' + output + diagnostic)!
+	if expired { return error('Command timed out after 120 seconds; see ' + log) }
+	if child.code != 0 { return error('Command failed; see ' + log) }
+	return Outcome{output, diagnostic, child.code}
+}
+
+fn sha(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
+
+fn hashes(paths []string) !map[string]string {
+	mut result := map[string]string{}
+	for path in paths { result[path] = sha(path)! }
+	return result
+}
+
+fn work_dir(keep string) !string {
+	if keep != '' {
+		path := os.abs_path(keep)
+		if os.exists(path) { return error('Output directory already exists: ' + path) }
+		os.mkdir_all(os.dir(path))!
+		os.mkdir(path)!
+		return os.real_path(path)
+	}
+	mut pattern := (os.join_path(os.temp_dir(), 'vinix-pci-topology-XXXXXX') + '\x00').bytes()
+	unsafe {
+		result := C.mkdtemp(&char(pattern.data))
+		if result == nil { return error('Cannot create private temporary directory') }
+		return cstring_to_vstring(result)
+	}
+}
+
+// Preserve the original top-level C-body pattern, including its one-line
+// signature and column-zero closing brace. Every selected body is retained.
+fn bodies(text string) []string {
+	mut result := []string{}
+	mut offset := 0
+	for offset < text.len {
+		end := offset + (text[offset..].index('\n') or { text.len - offset })
+		line := text[offset..end]
+		if opening := line.index('(') {
+			if opening > 0 && !line[..opening].contains(';') && line.ends_with(') {') && end < text.len {
+				if stop := text[end..].index('\n}') {
+					result << text[offset..end + stop + 2]
+					closing := end + stop + 2
+					offset = closing + (text[closing..].index('\n') or { text.len - closing }) + 1
+					continue
+				}
+			}
+		}
+		offset = end + 1
+	}
+	return result
+}
+
+fn named(body string, name string) bool {
+	mut start := 0
+	for start < body.len {
+		position := start + (body[start..].index(name + '(') or { return false })
+		if position == 0 { return true }
+		preceding := body[..position].runes().last()
+		if preceding != `_` && !utf8.is_letter(preceding) && !utf8.is_number(preceding) {
+			return true
+		}
+		start = position + 1
+	}
+	return false
+}
+
+fn callback_tuple(raw string) bool {
+	marker := 'struct multi_return_u32_i64 {'
+	mut position := 0
+	for position < raw.len {
+		start := position + (raw[position..].index(marker) or { return false })
+		tail := raw[start + marker.len..]
+		mut tuple := tail[..(tail.index('};') or { return false })]
+		mut valid := true
+		for field in ['u32 arg0;', 'i64 arg1;'] {
+			tuple = tuple.trim_left(' \t\r\n\v\f')
+			if !tuple.starts_with(field) {
+				valid = false
+				break
+			}
+			tuple = tuple[field.len..]
+		}
+		if valid && tuple.trim_space() == '' { return true }
+		position = start + marker.len
+	}
+	return false
+}
+
+fn compiler_metadata(raw string) !(string, map[string]json2.Any) {
+	mut compiled := raw
+	mut removed := []string{}
+	for name in ['Topology', 'TopologyBus', 'TopologyFunction', 'CapabilityInfo'] {
+		line := 'typedef struct pci__' + name + ' pci__' + name + ';\n'
+		mut indices := []int{}
+		mut start := 0
+		for start < compiled.len {
+			index := start + (compiled[start..].index(line) or { break })
+			indices << index
+			start = index + line.len
+		}
+		if indices.len < 1 || indices.len > 2 {
+			return error('Unexpected generated forward declaration: ' + name)
+		}
+		if indices.len == 2 {
+			index := indices[1]
+			compiled = compiled[..index] + compiled[index + line.len..]
+			removed << line.trim_space()
+		}
+	}
+	before := bodies(raw)
+	if before != bodies(compiled) {
+		return error('Private typedef metadata changed a generated body')
+	}
+	selected := before.filter(it.all_before('\n').contains('pci__') || it.all_before('\n').contains('memory__') || it.all_before('\n').contains('topology_test_'))
+	for name in ['pci__topology_build', 'pci__topology_destroy', 'pci__capabilities_read',
+		'pci__checked_config_read'] {
+		if !selected.any(named(it, name)) {
+			return error('Production code missing from actual generated bodies')
+		}
+	}
+	if !callback_tuple(raw) {
+		return error('Native V callback tuple did not retain its actual u32/i64 ABI')
+	}
+	if raw.contains('encoding__binary__') || raw.contains('io__Reader') {
+		return error('Private observer stage unexpectedly acquired unrelated callback modules')
+	}
+	return compiled, {
+		'removed_second_identical_forward_typedefs': json2.Any(removed.map(json2.Any(it)))
+		'unchanged_all_body_count':                  before.len
+		'production_observer_wrapper_body_count':    selected.len
+		'body_sha256':                               selected.map(json2.Any(sha256.sum(it.bytes()).hex()))
+		'native_callback_tuple':                     'actual generated multi_return_u32_i64'
+		'scope':                                     'Private identical compiler forward declarations only; raw C and all bodies preserved.'
+	}
+}
+
+fn run(keep string) ! {
+	root := os.dir(os.dir(os.dir(@FILE)))
+	production := ['kernel/pci/topology.v', 'kernel/pci/capabilities.v', 'kernel/pci/config_core.v'].map(os.join_path(root, it))
+	contract := os.join_path(root, 'kernel/c/pci_config.h')
+	mut sources := production.clone()
+	sources << [contract, @FILE]
+	initial := hashes(sources)!
+	work := work_dir(keep)!
+	defer { if keep == '' { os.rmdir_all(work) or {} } }
+	stage := os.join_path(work, 'stage')
+	os.mkdir_all(os.join_path(stage, 'pci'))!
+	os.mkdir(os.join_path(stage, 'memory'))!
+	os.write_file(os.join_path(stage, 'v.mod'), "Module { name: 'pci_topology_probe' }\n")!
+	os.write_file(os.join_path(stage, 'entry.v'), 'module main\nimport pci as _\nfn main() {}\n')!
+	for source in production { os.cp(source, os.join_path(stage, 'pci', os.file_name(source)))! }
+	os.write_file(os.join_path(stage, 'pci/observer.v'), wrappers)!
+	os.write_file(os.join_path(stage, 'memory/observer.v'), memory_observer)!
+	os.write_file(os.join_path(work, 'topology_model.h'), model_header)!
+	os.cp(contract, os.join_path(work, 'pci_config.h'))!
+	requested := os.getenv_opt('V') or { 'v' }
+	v := os.real_path(os.find_abs_path_of_executable(requested) or { requested })
+	v_hash := sha(v)!
+	arch := $if arm64 { 'arm64' } $else { 'amd64' }
+	generated := os.join_path(work, 'topology.c')
+	argv := [v, '-no-builtin', '-no-closures', '-os', 'vinix', '-arch', arch, '-target-libc-headers',
+		'-gc', 'none', '-manualfree', '-o', generated, stage]
+	mut environment := os.environ()
+	environment['VCACHE'] = os.join_path(work, 'vcache')
+	environment['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
+	capture(argv, os.join_path(work, 'generation.log'), environment)!
+	compiled, metadata := compiler_metadata(os.read_file(generated)!)!
+	os.write_file(os.join_path(work, 'topology-compile.c'), compiled)!
+	os.write_file(os.join_path(work, 'test.c'), c_test)!
+	cc := os.getenv_opt('CC') or { 'clang' }
+	flags := ['-O1', '-g', '-ffreestanding', '-fno-builtin', '-fwrapv', '-fno-strict-aliasing',
+		'-Wall', '-Wextra', '-Werror', '-Wno-unused-function', '-Wno-unused-parameter', '-pthread',
+		'-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-I', work]
+	mut outcomes := []json2.Any{}
+	for standard in ['gnu99', 'gnu11'] {
+		object := os.join_path(work, standard + '-core.o')
+		mut compile_argv := [cc, '-std=' + standard]
+		compile_argv << flags
+		compile_argv << [
+			'-Dmain=topology_unused_main',
+			'-Dmalloc=topology_unexpected_malloc',
+			'-Dcalloc=topology_unexpected_calloc',
+			'-Drealloc=topology_unexpected_realloc',
+			'-Dfree=topology_unexpected_free',
+			'-c',
+			os.join_path(work, 'topology-compile.c'),
+			'-o',
+			object,
+		]
+		capture(compile_argv, os.join_path(work, standard + '-compile.log'), os.environ())!
+		executable := os.join_path(work, standard + '-runtime')
+		mut link_argv := [cc, '-std=' + standard]
+		link_argv << flags
+		link_argv << [os.join_path(work, 'test.c'), object, '-o', executable]
+		capture(link_argv, os.join_path(work, standard + '-link.log'), os.environ())!
+		mut env := os.environ()
+		env['UBSAN_OPTIONS'] = 'halt_on_error=1'
+		env['ASAN_OPTIONS'] = 'detect_stack_use_after_return=1'
+		result := capture([executable], os.join_path(work, standard + '-run.log'), env)!
+		if result.stderr != '' {
+			return error('Unexpected sanitizer/runtime diagnostic: ' + result.stderr)
+		}
+		println(standard + ': ' + result.stdout.trim_space())
+		outcomes << json2.Any({
+			'standard':      json2.Any(standard)
+			'compile_argv':  compile_argv.map(json2.Any(it))
+			'link_argv':     link_argv.map(json2.Any(it))
+			'object_sha256': sha(object)!
+			'output':        result.stdout.trim_space()
+		})
+	}
+	if hashes(sources)! != initial || sha(v)! != v_hash {
+		return error('Production/test/compiler changed during private validation')
+	}
+	os.write_file(os.join_path(work, 'result.json'), json2.encode(map[string]json2.Any{
+		'scope':              json2.Any(scope)
+		'source_sha256':      json2.Any(hash_json(initial))
+		'V_sha256':           v_hash
+		'generation_argv':    argv.map(json2.Any(it))
+		'generated_c_sha256': sha(generated)!
+		'compiled_c_sha256':  sha(os.join_path(work, 'topology-compile.c'))!
+		'compiler_metadata':  metadata
+		'host_results':       outcomes
+		'observer_contract':  'Only memory allocation, checked fixed-array indexing and synchronous native transport are modeled. Actual topology, capability and config V are unchanged. All eight functions are scanned; no platform root inference. Destruction occurs after private reader quiescence. Host stage does not establish cross-module kernel compiler closure or actual hardware.'
+	},
+		prettify:      true
+		indent_string: '  '
+	) + '\n')!
+}
+
+fn main() {
+	keep := parse_keep(os.args[1..]) or {
+		eprintln(err.msg())
+		exit(if err.code() == 1 { 1 } else { 2 })
+	}
+	run(keep) or {
+		eprintln(err.msg())
+		exit(1)
+	}
+}
+
+fn parse_keep(args []string) !string {
+	mut keep := ''
+	mut unknown := []string{}
+	mut i := 0
+	for i < args.len {
+		arg := args[i]
+		if arg == '--' {
+			unknown << args[i..]
+			break
+		}
+		if arg == '-h=' {
+			return error_with_code('argument -h/--help: ignored explicit argument', 1)
+		}
+		name := arg.all_before('=')
+		if arg.starts_with('-h') && !arg[1..].bytes().all(it == `h`) {
+			return error('argument -h/--help: ignored explicit argument')
+		}
+		if (arg.starts_with('-h') && arg[1..].bytes().all(it == `h`)) || (name.starts_with('--') && '--help'.starts_with(name)) {
+			if arg.contains('=') { return error('argument --help: ignored explicit argument') }
+			println('Usage: topology.v [--keep-dir DIRECTORY]\n\n' + scope)
+			exit(0)
+		}
+		if name.starts_with('--') && '--keep-dir'.starts_with(name) {
+			mut value := ''
+			if arg.contains('=') {
+				value = arg.all_after('=')
+			} else {
+				if i + 1 >= args.len { return error('argument --keep-dir: expected one argument') }
+				i++
+				value = args[i]
+				if value.starts_with('-') && value != '-' && !negative_number(value) {
+					return error('argument --keep-dir: expected one argument')
+				}
+			}
+			keep = if value == '' { '.' } else { value }
+		} else {
+			unknown << arg
+		}
+		i++
+	}
+	if unknown.len > 0 { return error('unrecognized arguments: ' + unknown.join(' ')) }
+	return keep
+}
+
+fn negative_number(value string) bool {
+	if value.len <= 1 || value[0] != `-` { return false }
+	tail := value[1..]
+	return tail.bytes().all(it.is_digit()) || (tail.count('.') == 1 && tail.all_after('.').len > 0 && tail.all_before('.').bytes().all(it.is_digit()) && tail.all_after('.').bytes().all(it.is_digit()))
+}
+
+const memory_observer = '
 module memory
 #include "topology_model.h"
 fn C.topology_model_allocate(u64) voidptr
 fn C.topology_model_free(voidptr)
 pub fn malloc_packed_fallible(size u64) voidptr { return C.topology_model_allocate(size) }
 pub fn free(pointer voidptr) { C.topology_model_free(pointer) }
-'''
+'
 
-WRAPPERS = r'''
+const wrappers = '
 module pci
 #include "topology_model.h"
 fn C.topology_model_prepare(u32, u16, u8)
@@ -46,33 +360,33 @@ fn model_read(bdf u32, register u16, width u8) (u32, int) {
         u64(register), u32(width), unsafe { &value })
     return value, int(result)
 }
-@[export: 'topology_test_build']
+@[export: \'topology_test_build\']
 fn test_build(roots &u8, count u32, fail_after u32, null_read bool, status &i64) voidptr {
     callback := if null_read { TopologyRead(unsafe { nil }) } else { TopologyRead(model_read) }
     snapshot, result := topology_build(roots, count, callback, fail_after)
     unsafe { *status = i64(result) }
     return snapshot
 }
-@[export: 'topology_test_destroy']
+@[export: \'topology_test_destroy\']
 fn test_destroy(snapshot voidptr) { topology_destroy(unsafe { &Topology(snapshot) }) }
-@[export: 'topology_test_first']
+@[export: \'topology_test_first\']
 fn test_first(snapshot voidptr, kind u32) voidptr {
     owner := unsafe { &Topology(snapshot) }
     if kind == 0 { return owner.first_bus() }
     return owner.first_function()
 }
-@[export: 'topology_test_next']
+@[export: \'topology_test_next\']
 fn test_next(node voidptr, kind u32) voidptr {
     if kind == 0 { return unsafe { &TopologyBus(node) }.next_bus() }
     return unsafe { &TopologyFunction(node) }.next_function()
 }
-@[export: 'topology_test_count']
+@[export: \'topology_test_count\']
 fn test_count(snapshot voidptr, kind u32) u32 {
     owner := unsafe { &Topology(snapshot) }
     if kind == 0 { return owner.bus_count() }
     return owner.function_count()
 }
-@[export: 'topology_test_field']
+@[export: \'topology_test_field\']
 fn test_field(node voidptr, kind u32, field u32) u64 {
     if kind == 0 {
         bus := unsafe { &TopologyBus(node) }
@@ -101,18 +415,18 @@ fn test_field(node voidptr, kind u32, field u32) u64 {
         else { return 0 }
     }
 }
-@[export: 'topology_test_parent']
+@[export: \'topology_test_parent\']
 fn test_parent(node voidptr, kind u32) voidptr {
     if kind == 0 { return unsafe { &TopologyBus(node) }.parent }
     return unsafe { &TopologyFunction(node) }.bus
 }
-@[export: 'topology_test_size']
+@[export: \'topology_test_size\']
 fn test_size(kind u32) u64 {
     if kind == 0 { return sizeof(Topology) }
     if kind == 1 { return sizeof(TopologyBus) }
     return sizeof(TopologyFunction)
 }
-@[export: 'topology_test_capabilities']
+@[export: \'topology_test_capabilities\']
 fn test_capabilities(bdf u32, header u8, null_read bool, result &u16) i64 {
     callback := if null_read { TopologyRead(unsafe { nil }) } else { TopologyRead(model_read) }
     value, status := capabilities_read(bdf, header, callback)
@@ -123,9 +437,9 @@ fn test_capabilities(bdf u32, header u8, null_read bool, result &u16) i64 {
     }
     return i64(status)
 }
-'''
+'
 
-MODEL_HEADER = r'''
+const model_header = "
 #ifndef VINIX_TOPOLOGY_MODEL_H
 #define VINIX_TOPOLOGY_MODEL_H
 #include <stdbool.h>
@@ -137,9 +451,9 @@ void topology_model_prepare(uint32_t bdf, uint16_t offset, uint8_t width);
  * checks its complete index contract; no production array expression changes. */
 int64_t v_fixed_index(int64_t index, int64_t length);
 #endif
-'''
+"
 
-C_TEST = r'''
+const c_test = '
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -161,8 +475,8 @@ uint64_t topology_test_size(uint32_t);
 int64_t topology_test_capabilities(uint32_t, uint8_t, bool, uint16_t *);
 
 static unsigned assertions;
-#define CHECK(c) do { __atomic_add_fetch(&assertions, 1, __ATOMIC_RELAXED); \
-    if (!(c)) { fprintf(stderr, "Topology assertion line %d: %s\n", __LINE__, #c); abort(); } } while (0)
+#define CHECK(c) do { __atomic_add_fetch(&assertions, 1, __ATOMIC_RELAXED); \\
+    if (!(c)) { fprintf(stderr, "Topology assertion line %d: %s\\n", __LINE__, #c); abort(); } } while (0)
 #define BDF(b,s,f) (((uint32_t)(b) << 8) | ((uint32_t)(s) << 3) | (uint32_t)(f))
 struct Image { uint32_t bdf; uint8_t bytes[256]; unsigned transactions[256]; };
 struct Allocation { void *pointer; size_t size; };
@@ -226,7 +540,7 @@ void topology_model_prepare(uint32_t bdf, uint16_t offset, uint8_t width) {
         CHECK(width == 4);
         CHECK(offset == 0 || offset == 8 || offset == 12 || offset == 0x3c ||
               offset == 0x2c || offset == 0x40 || offset == 0x18);
-        /* No BAR sizing/probing: the only BAR-range read is a bridge's
+        /* No BAR sizing/probing: the only BAR-range read is a bridge\'s
          * genuine primary/secondary/subordinate bus-number register. */
         if (offset == 0x18) {
             bool bridge_header = false;
@@ -434,7 +748,7 @@ static void malformed(void) {
     static const uint8_t headers[] = {3,0x7f,1,2,0};
     static const uint32_t classes[] = {0x03000000,0x03000000,0x02000000,0x06040000,0x06070000};
     for(unsigned i=0;i<5;i++) { reset(); add(0,0,0,0x12348086,classes[i],headers[i]); build(&root,1,0,false,-71); }
-    /* Exhaustively fail each of this successful snapshot's real config transactions. */
+    /* Exhaustively fail each of this successful snapshot\'s real config transactions. */
     reset(); endpoint(0,0,0); void *snapshot=build(&root,1,0,false,0); unsigned count=preparations; destroy(snapshot);
     for(unsigned i=1;i<=count;i++) { reset(); endpoint(0,0,0); fail_read=i; build(&root,1,0,false,-5); CHECK(preparations==i); }
     reset(); unavailable_bus=0; build(&root,1,0,false,-5); CHECK(preparations==1);
@@ -550,124 +864,13 @@ static void capability_cases(void) {
 int main(void) {
     relationships(); absence_and_limits(); malformed(); allocation_failures(); immutable_reader(); capability_cases();
     CHECK(live_objects==0 && live_bytes==0 && writes==0);
-    printf("PASS: %u assertions; actual topology/config/capability V, complete rollback and quiescent readers\n",assertions);
+    printf("PASS: %u assertions; actual topology/config/capability V, complete rollback and quiescent readers\\n",assertions);
     return 0;
 }
-'''
+'
 
-
-def digest(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def command(argv, log, env=None, timeout=120):
-    result = subprocess.run(argv, text=True, capture_output=True, env=env, timeout=timeout)
-    Path(log).write_text(json.dumps(argv) + "\n" + result.stdout + result.stderr)
-    if result.returncode:
-        raise RuntimeError("Command failed; see " + str(log))
-    return result
-
-
-def compiler_metadata(raw):
-    """Deduplicate identical forward typedefs only, retaining every C body."""
-    compiled = raw
-    removed = []
-    for name in ("Topology", "TopologyBus", "TopologyFunction", "CapabilityInfo"):
-        line = "typedef struct pci__" + name + " pci__" + name + ";\n"
-        matches = list(re.finditer(re.escape(line), compiled))
-        if not matches or len(matches) > 2:
-            raise AssertionError("Unexpected generated forward declaration: " + name)
-        if len(matches) == 2:
-            index = matches[1].start()
-            compiled = compiled[:index] + compiled[index + len(line):]
-            removed.append(line.strip())
-    pattern = r"^[^\n;]+\([^\n]*\) \{\n.*?^\}"
-    before = re.findall(pattern, raw, re.M | re.S)
-    after = re.findall(pattern, compiled, re.M | re.S)
-    if before != after:
-        raise AssertionError("Private typedef metadata changed a generated body")
-    bodies = [body for body in before if re.match(r"^[^\n]*(?:pci__|memory__|topology_test_)",body)]
-    required = ("pci__topology_build", "pci__topology_destroy", "pci__capabilities_read", "pci__checked_config_read")
-    if not all(any(re.search(r"\b" + name + r"\(", body) for body in bodies) for name in required):
-        raise AssertionError("Production code missing from actual generated bodies")
-    if not re.search(r"struct multi_return_u32_i64 \{\s*u32 arg0;\s*i64 arg1;\s*\};", raw):
-        raise AssertionError("Native V callback tuple did not retain its actual u32/i64 ABI")
-    if "encoding__binary__" in raw or "io__Reader" in raw:
-        raise AssertionError("Private observer stage unexpectedly acquired unrelated callback modules")
-    return compiled, {"removed_second_identical_forward_typedefs": removed,
-        "unchanged_all_body_count": len(before), "production_observer_wrapper_body_count": len(bodies),
-        "body_sha256": [hashlib.sha256(body.encode()).hexdigest() for body in bodies],
-        "native_callback_tuple": "actual generated multi_return_u32_i64",
-        "scope": "Private identical compiler forward declarations only; raw C and all bodies preserved."}
-
-
-def run(keep_dir):
-    temporary = tempfile.TemporaryDirectory(prefix="vinix-pci-topology-") if keep_dir is None else None
-    work = Path(temporary.name) if temporary else Path(keep_dir).resolve()
-    if not temporary:
-        work.mkdir(parents=True, exist_ok=False)
-    sources = (TOPOLOGY, CAPABILITIES, CONFIG, CONTRACT, Path(__file__))
-    initial = {str(path): digest(path) for path in sources}
-    try:
-        stage = work / "stage"
-        (stage / "pci").mkdir(parents=True)
-        (stage / "memory").mkdir()
-        (stage / "v.mod").write_text("Module { name: 'pci_topology_probe' }\n")
-        (stage / "entry.v").write_text("module main\nimport pci as _\nfn main() {}\n")
-        for source in (TOPOLOGY, CAPABILITIES, CONFIG):
-            shutil.copyfile(source, stage / "pci" / source.name)
-        (stage / "pci/observer.v").write_text(WRAPPERS)
-        (stage / "memory/observer.v").write_text(MEMORY_OBSERVER)
-        (work / "topology_model.h").write_text(MODEL_HEADER)
-        shutil.copyfile(CONTRACT, work / CONTRACT.name)
-        resolved_v = Path(shutil.which(os.environ.get("V", "v")) or os.environ.get("V", "v")).resolve()
-        v_hash = digest(resolved_v)
-        arch = "arm64" if platform.machine().lower() in ("arm64", "aarch64") else "amd64"
-        generated = work / "topology.c"
-        argv = [str(resolved_v), "-no-builtin", "-no-closures", "-os", "vinix", "-arch", arch,
-            "-target-libc-headers", "-gc", "none", "-manualfree", "-o", str(generated), str(stage)]
-        environment = {**os.environ, "VCACHE": str(work / "vcache"), "V_C_ERROR_BUG_REPORT_DISABLED": "1"}
-        command(argv, work / "generation.log", env=environment)
-        compiled, metadata = compiler_metadata(generated.read_text())
-        (work / "topology-compile.c").write_text(compiled)
-        (work / "test.c").write_text(C_TEST)
-        cc = os.environ.get("CC", "clang")
-        flags = ["-O1", "-g", "-ffreestanding", "-fno-builtin", "-fwrapv", "-fno-strict-aliasing",
-            "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-Wno-unused-parameter", "-pthread",
-            "-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-I", str(work)]
-        outcomes = []
-        for standard in ("gnu99", "gnu11"):
-            obj = work / (standard + "-core.o")
-            compile_argv = [cc, "-std=" + standard, *flags, "-Dmain=topology_unused_main",
-                "-Dmalloc=topology_unexpected_malloc", "-Dcalloc=topology_unexpected_calloc",
-                "-Drealloc=topology_unexpected_realloc", "-Dfree=topology_unexpected_free",
-                "-c", str(work / "topology-compile.c"), "-o", str(obj)]
-            command(compile_argv, work / (standard + "-compile.log"))
-            executable = work / (standard + "-runtime")
-            link_argv = [cc, "-std=" + standard, *flags, str(work / "test.c"), str(obj), "-o", str(executable)]
-            command(link_argv, work / (standard + "-link.log"))
-            result = command([str(executable)], work / (standard + "-run.log"), timeout=120,
-                env={**os.environ, "UBSAN_OPTIONS": "halt_on_error=1", "ASAN_OPTIONS": "detect_stack_use_after_return=1"})
-            if result.stderr:
-                raise AssertionError("Unexpected sanitizer/runtime diagnostic: " + result.stderr)
-            print(standard + ": " + result.stdout.strip())
-            outcomes.append({"standard": standard, "compile_argv": compile_argv, "link_argv": link_argv,
-                "object_sha256": digest(obj), "output": result.stdout.strip()})
-        if initial != {str(path): digest(path) for path in sources} or digest(resolved_v) != v_hash:
-            raise AssertionError("Production/test/compiler changed during private validation")
-        report = {"scope": __doc__, "source_sha256": initial, "V_sha256": v_hash,
-            "generation_argv": argv, "generated_c_sha256": digest(generated),
-            "compiled_c_sha256": digest(work / "topology-compile.c"), "compiler_metadata": metadata,
-            "host_results": outcomes,
-            "observer_contract": "Only memory allocation, checked fixed-array indexing and synchronous native transport are modeled. Actual topology, capability and config V are unchanged. All eight functions are scanned; no platform root inference. Destruction occurs after private reader quiescence. Host stage does not establish cross-module kernel compiler closure or actual hardware."}
-        (work / "result.json").write_text(json.dumps(report, indent=2) + "\n")
-    finally:
-        if temporary:
-            temporary.cleanup()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keep-dir", type=Path)
-    arguments = parser.parse_args()
-    run(arguments.keep_dir)
+fn hash_json(values map[string]string) map[string]json2.Any {
+	mut result := map[string]json2.Any{}
+	for key, value in values { result[key] = value }
+	return result
+}

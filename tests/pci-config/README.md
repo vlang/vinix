@@ -47,13 +47,15 @@ The host transport model cannot validate real interrupt masking or ECAM access.
 Build an ARM kernel with `PCI_CONFIG_TEST=1` and run `arm_vm.py --kernel <image>`
 to exercise the actual platform transport and every DAIF mask combination.
 
-`python3 topology_test.py` compiles the actual production V topology, capability
+`./topology` compiles the actual production V topology, capability
 parser and checked transport core, then runs GNU99/GNU11 ASan/UBSan tests. Supply
 `V=/path/to/v` when needed and `--keep-dir /tmp/new-directory` to retain compiler
 inputs, logs and provenance. Only private allocation and synchronous transport
 observers replace native services. The tests check explicit root borrowing,
 bridge parents, all eight functions, malformed windows/chains, every private
-OOM/transaction error and destruction after reader quiescence.
+OOM/transaction error and destruction after reader quiescence. Native metadata
+checks run with `v -cc cc test .`; frozen original compiler fixtures and body
+comparisons remain byte-exact.
 
 Build either architecture with `PCI_TOPOLOGY_TEST=1` for the read-only native
 boot fixture, then pass `--pci-topology-test` to `arm_vm.py` or
