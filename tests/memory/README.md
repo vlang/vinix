@@ -112,10 +112,12 @@ caches before reclamation; otherwise a speed optimization can introduce UAF.
 From a complete patched Vinix checkout:
 
 ```sh
-python3 tests/memory/heap_model_test.py
+. build-support/find-v.sh
+"$V" -cc cc test tests/memory/heapmodel
 ```
 
-The model checks all size classes across several pages, full/partial/empty
+The independent V model preserves the original seeded MT19937 operation plan
+and checks all size classes across several pages, full/partial/empty
 transitions including one-slot pages, partial-before-spare selection, payload
 zeroing/poisoning, resident-page invalid/double frees, tail bits, arithmetic
 bounds, x86 snapshot source order, and mixed-size churn. It deliberately models
