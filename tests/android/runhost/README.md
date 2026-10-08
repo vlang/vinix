@@ -90,3 +90,26 @@ platform/display choices, missing inputs/attributes and blocked snapshots.
 All ten unchanged interactive tests and cold source-closure installations also
 passed on both native host ABIs. Evidence is machine-local under
 `~/.cache/vinix-python-to-v/android-vm-plan-20261008/`.
+
+`input.v` owns QMP handshake/response sequencing, character acknowledgement and
+retry policy, pointer events, screenshot sequencing and VM shutdown escalation.
+Socket, stream and Pillow manager/entered values remain separately retained by
+stdlib bindings; the native policy exits them in their original nesting order.
+Unexpected controller exit retires every retained manager in reverse order,
+including outer managers when an inner exit raises. Threads and live serial
+supervision remain unchanged Python in this stage.
+
+Qualification from `74c18849` passed 98 complete frozen-original/native helper
+pairs and eleven actual UNIX-QMP, interrupted blocked readline, production key
+mapping and Pillow output pairs per ARM64, Rosetta x86_64 and ARM ASan/UBSan
+profile. Tests compare complete command/event/sleep order, original exception
+identity and context, nested close errors/suppression, distinct entered values,
+WTF8 text, arbitrary-width pointer operands, nonfinite floats and exact retry
+and escalation bounds. Clock conversion is qualified for native float clocks.
+Six forced controller-exit controls verify outer resource retirement, eight
+transport controls verify pipe/process cleanup, and all ten untouched real-PTY
+interactive fixtures pass per profile and through cold installations on both
+actual host ABIs. Evidence is under
+`~/.cache/vinix-python-to-v/android-input-policy-20261008/`. The generic binding
+addition is counted honestly: this small helper stage removes 3,894 original
+Python bytes but only 98 net Python bytes before any later transport reuse.

@@ -1,5 +1,7 @@
 """Synchronous stdlib bindings for the native Android runner policy."""
 import atexit
+import builtins
+import operator
 import importlib
 import importlib.util
 import json
@@ -116,8 +118,74 @@ def _exit(owner, exception):
             error.__traceback__ = traceback
 
 
+def _arguments(items, context, resources):
+    return [Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
+            else getattr(context[value[0]], value[1]) if kind == 'constant' else value
+            for kind, value in items]
+
+
+def _invoke(row, context, resources):
+    if 'id' in row:
+        provider = resources['contexts'][row['id']][1]
+    else:
+        provider = resources['modules'].get(row['module']) or context.get(row['module'])
+        if provider is None:
+            provider = importlib.import_module(row['module'])
+    return getattr(provider, row['name'])(*_arguments(row.get('arguments', []), context, resources),
+                                         **row.get('options', {}))
+
+
+def _retire_contexts(contexts):
+    if contexts:
+        manager = contexts.pop()
+        try:
+            if manager is not None:
+                manager[0].__exit__(*sys.exc_info())
+        finally:
+            _retire_contexts(contexts)
+
+
 def _primitive(operation, row, context, resources):
     path = Path(row['path']) if 'path' in row else None
+    if operation == 'invoke':
+        return _snapshot(_invoke(row, context, resources))
+    if operation == 'enter_context':
+        manager = _invoke(row, context, resources)
+        entered = manager.__enter__()
+        ident = len(resources['contexts'])
+        resources['contexts'].append((manager, entered))
+        return ident
+    if operation == 'exit_context':
+        manager, _ = resources['contexts'][row['id']]
+        resources['contexts'][row['id']] = None
+        return _exit(manager, _exception(row.get('error'), context, resources))
+    if operation == 'load_source':
+        spec = context['importlib'].util.spec_from_file_location(row['module'], Path(row['source']))
+        module = context['importlib'].util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        resources['modules'][row['module']] = module
+        return None
+    if operation == 'characters':
+        return list(row['value'])
+    if operation == 'slice':
+        return _snapshot(row['value'][row['start']:row['stop']])
+    if operation == 'item':
+        return row['value'][row['key']]
+    if operation == 'contains':
+        return row['key'] in row['value']
+    if operation == 'python_version':
+        return list(sys.version_info[:2])
+    if operation == 'builtin':
+        return getattr(builtins, row['name'])(*row['arguments'])
+    if operation == 'numeric':
+        return getattr(operator, row['name'])(*row['arguments'])
+    if operation == 'raise':
+        raise getattr(builtins, row['kind'])(*row['arguments'])
+    if operation == 'exception_is':
+        return isinstance(resources['errors'][row['error']['binding_error']],
+                          tuple(getattr(builtins, name) for name in row['kinds']))
+    if operation == 'observed':
+        return resources['observed']()
     if operation == 'path':
         method = row['method']
         if method in ('name', 'parent', 'suffix', 'parts'):
@@ -183,8 +251,8 @@ def _primitive(operation, row, context, resources):
         value = getattr(resources['args'], row['name'])
         return str(value[row['index']] if 'index' in row else value)
     if operation == 'function':
-        result = context[row['name']](*[Path(item) if kind == 'path' else item
-                                        for kind, item in row.get('arguments', [])])
+        result = context[row['name']](*_arguments(row.get('arguments', []), context, resources),
+                                     **row.get('options', {}))
         return _snapshot(result)
     if operation == 'run':
         return context['subprocess'].run(row['arguments'], check=True)
@@ -264,10 +332,10 @@ def _primitive(operation, row, context, resources):
     raise RuntimeError('unknown Android runner primitive ' + operation)
 
 
-def call(operation, arguments, context, args=None, parser=None, inodes=None):
+def call(operation, arguments, context, args=None, parser=None, inodes=None, observed=None):
     with _LOCK:
         resources = {'args': args, 'parser': parser, 'archives': [], 'iterators': {}, 'infos': [], 'handles': [],
-                     'inodes': {} if inodes is None else inodes}
+                     'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed}
         errors = []
         resources['errors'] = errors
         process = _Controller([_binary()], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -324,9 +392,12 @@ def call(operation, arguments, context, args=None, parser=None, inodes=None):
                                 if handle is not None:
                                     handle[0].__exit__(*sys.exc_info())
                         finally:
-                            for archive in resources['archives']:
-                                if archive is not None:
-                                    archive[0].__exit__(*sys.exc_info())
+                            try:
+                                for archive in resources['archives']:
+                                    if archive is not None:
+                                        archive[0].__exit__(*sys.exc_info())
+                            finally:
+                                _retire_contexts(resources['contexts'])
             finally:
                 if previous is not None:
                     signal.signal(signal.SIGINT, previous)

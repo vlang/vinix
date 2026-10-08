@@ -65,101 +65,23 @@ def prepare(args: argparse.Namespace) -> Path | None:
 
 
 def qmp(socket_path: Path, name: str, **arguments):
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(20)
-        connection.connect(str(socket_path))
-        with connection.makefile("rw", encoding="utf-8") as stream:
-            stream.readline()
-            for command in ({"execute": "qmp_capabilities"}, {"execute": name, "arguments": arguments}):
-                stream.write(json.dumps(command) + "\n")
-                stream.flush()
-                while True:
-                    line = stream.readline()
-                    if not line:
-                        raise RuntimeError("QMP disconnected")
-                    reply = json.loads(line)
-                    if "error" in reply:
-                        raise RuntimeError(reply["error"])
-                    if "return" in reply:
-                        break
-            return reply["return"]
+    return _runner.call("qmp", {"socket": socket_path, "name": name, "options": arguments}, globals())
 
 
 def keyboard(socket_path: Path, text: str, observed_input) -> int:
-    spec = importlib.util.spec_from_file_location("vinix_input", ROOT / "desktop/tools/input.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    retries = 0
-    for index, character in enumerate(text):
-        events = module.key_events(character)
-        if events is None:
-            raise ValueError(f"QMP cannot type {character!r}")
-        previous, expected = text[:index], text[:index + 1]
-        for attempt in range(3):
-            if attempt:
-                retries += 1
-            # Finish every down/up edge before observing or retrying a key.
-            for event in events:
-                qmp(socket_path, "input-send-event", events=[event])
-                time.sleep(0.35)
-            deadline = time.monotonic() + 8
-            while time.monotonic() < deadline:
-                actual = observed_input()
-                if actual == expected:
-                    break
-                if actual != previous:
-                    raise RuntimeError(f"APK input became {actual!r}; expected {expected!r}")
-                time.sleep(0.1)
-            if actual == expected:
-                break
-            if attempt == 2:
-                raise RuntimeError(f"APK did not acknowledge {character!r}; input remains {actual!r}")
-    return retries
+    return _runner.call("keyboard", {"socket": socket_path, "text": text}, globals(), observed=observed_input)
 
 
 def click(socket_path: Path, x: int, y: int) -> None:
-    # The isolated desktop uses the runner's standard 1024x768 ramfb.
-    events = [{"type": "abs", "data": {"axis": axis, "value": round(value * 32767 / extent)}}
-              for axis, value, extent in (("x", x, 1023), ("y", y, 767))]
-    qmp(socket_path, "input-send-event", events=events)
-    time.sleep(0.2)
-    for down in (True, False):
-        qmp(socket_path, "input-send-event", events=[{"type": "btn", "data": {"down": down, "button": "left"}}])
-        time.sleep(0.35)
-    time.sleep(3)
+    return _runner.call("click", {"socket": socket_path, "x": x, "y": y}, globals())
 
 
 def screenshot(socket_path: Path, destination: Path) -> None:
-    from PIL import Image
-    ppm = destination.with_suffix(".ppm")
-    qmp(socket_path, "screendump", filename=str(ppm))
-    with Image.open(ppm) as image:
-        image.save(destination)
-    ppm.unlink()
+    return _runner.call("screenshot", {"socket": socket_path, "destination": destination}, globals())
 
 
 def stop_vm(pid: int, master: int) -> None:
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
-    for sig, duration in ((None, 3), (signal.SIGTERM, 3), (signal.SIGKILL, 1)):
-        if sig is not None:
-            try:
-                os.killpg(pid, sig)
-            except (ProcessLookupError, PermissionError):
-                try:
-                    os.kill(pid, sig)
-                except (ProcessLookupError, PermissionError):
-                    pass
-        deadline = time.monotonic() + duration
-        while time.monotonic() < deadline:
-            try:
-                if os.waitpid(pid, os.WNOHANG)[0] == pid:
-                    return
-            except ChildProcessError:
-                return
-            time.sleep(0.1)
+    return _runner.call("stop_vm", {"pid": pid, "master": master}, globals())
 
 
 def run(args: argparse.Namespace, overlay: Path | None) -> int:

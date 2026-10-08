@@ -179,6 +179,11 @@ fn main_policy(mut args map[string]ah.Value) !ah.Value {
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
 	mut args := ah.field(row, 'arguments').object()
 	return match text(row, 'operation') {
+		'qmp' { qmp_policy(text(args, 'socket'), text(args, 'name'), ah.field(args, 'options'))! }
+		'keyboard' { keyboard_policy(text(args, 'socket'), ah.field(args, 'text'), text(row, 'root'))! }
+		'click' { click_policy(args)! }
+		'screenshot' { screenshot_policy(args)! }
+		'stop_vm' { stop_policy(args)! }
 		'vm_plan' {
 			vm_plan(ah.field(args, 'args').object(), ah.field(args, 'overlay'), text(row, 'root'))!
 		}
