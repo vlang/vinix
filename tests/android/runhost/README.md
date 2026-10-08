@@ -113,3 +113,22 @@ actual host ABIs. Evidence is under
 `~/.cache/vinix-python-to-v/android-input-policy-20261008/`. The generic binding
 addition is counted honestly: this small helper stage removes 3,894 original
 Python bytes but only 98 net Python bytes before any later transport reuse.
+
+The runner reuses `build-support/native_host.py` for its wire exchange and
+process/pipe retirement, while retaining its private compiler installer,
+captured-waitpid process class, original EOF text, error objects and outer
+lock. Query processes use a private session so terminal Ctrl-C reaches the
+caller and its original exception can unwind socket/stream managers; the
+compiler installer keeps its previous process behavior. Resource fallback
+continues to retire handles, archives and reverse-ordered contexts under the
+transport's SIGINT guard. This consolidation receives zero additional
+original Python port credit.
+
+The pre-consolidation controls and frozen implementation corpora passed on
+ARM64, Rosetta x86_64 and ARM ASan/UBSan: 539 preparation/main/split/file/manager/
+result/VM-plan pairs, 98 helper pairs, twelve actual-library pairs (including
+caller-PID and caller-process-group SIGINT at blocked QMP readline), 34 exact
+native error-reconstruction/decoder-identity pairs, fourteen retirement
+controls and ten unchanged real-PTY fixtures per profile. Cold private
+installations also passed all ten fixtures on both actual host ABIs. Evidence
+is under `~/.cache/vinix-python-to-v/android-run-transport-20261008/`.

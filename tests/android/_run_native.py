@@ -23,6 +23,9 @@ _MONOTONIC = time.monotonic
 _spec = importlib.util.spec_from_file_location('android_runner_wire', _HERE.parents[1] / 'build-support/android/_boot_native.py')
 _wire = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_wire)
+_host_spec = importlib.util.spec_from_file_location('android_runner_transport', _HERE.parents[1] / 'build-support/native_host.py')
+_host = importlib.util.module_from_spec(_host_spec)
+_host_spec.loader.exec_module(_host)
 
 
 class _Controller(subprocess.Popen):
@@ -332,72 +335,37 @@ def _primitive(operation, row, context, resources):
     raise RuntimeError('unknown Android runner primitive ' + operation)
 
 
+class _Transport(_host.Controller):
+    def executable(self):
+        return _binary()
+
+
+_transport = _Transport(_HERE / 'run-query.v', 'VINIX_ANDROID_RUN_QUERY',
+                        process=lambda *args, **options: _Controller(*args, start_new_session=True, **options),
+                        eof_message='native Android runner ended before returning a result')
+
+
 def call(operation, arguments, context, args=None, parser=None, inodes=None, observed=None):
     with _LOCK:
         resources = {'args': args, 'parser': parser, 'archives': [], 'iterators': {}, 'infos': [], 'handles': [],
                      'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed}
         errors = []
         resources['errors'] = errors
-        process = _Controller([_binary()], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                              text=True, encoding='utf-8', env=os.environ)
-        try:
-            process.stdin.write(json.dumps(_wire._pack({'operation': operation, 'arguments': _snapshot(arguments),
-                                                       'root': str(context['ROOT'])})) + '\n')
-            process.stdin.flush()
-            while True:
-                line = process.stdout.readline()
-                if not line:
-                    raise RuntimeError('native Android runner ended before returning a result')
-                row = _wire._unpack(json.loads(line))
-                if 'callback' not in row:
-                    if 'error' in row:
-                        error = row['error']
-                        if 'binding_error' in error:
-                            raise errors[error['binding_error']]
-                        if 'kind' in error and 'message' in error:
-                            raise {'SystemExit': SystemExit, 'RuntimeError': RuntimeError}[error['kind']](error['message'])
-                        context['_native']._response(error)
-                    return row['value']
-                try:
-                    response = {'value': _primitive(row['callback'], row['arguments'], context, resources)}
-                except BaseException as error:
-                    errors.append(error)
-                    response = {'error': {'binding_error': len(errors)-1, 'kind': type(error).__name__, 'message': str(error)}}
-                process.stdin.write(json.dumps(_wire._pack(response)) + '\n')
-                process.stdin.flush()
-        finally:
-            previous = None
-            if threading.current_thread() is threading.main_thread():
-                previous = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        def cleanup():
             try:
-                try:
-                    try:
-                        process.stdin.close()
-                    finally:
-                        try:
-                            process.wait(timeout=5)
-                        except subprocess.TimeoutExpired:
-                            process.kill()
-                            process.wait()
-                        except BaseException:
-                            process.kill()
-                            process.wait()
-                            raise
-                finally:
-                    try:
-                        process.stdout.close()
-                    finally:
-                        try:
-                            for handle in resources['handles']:
-                                if handle is not None:
-                                    handle[0].__exit__(*sys.exc_info())
-                        finally:
-                            try:
-                                for archive in resources['archives']:
-                                    if archive is not None:
-                                        archive[0].__exit__(*sys.exc_info())
-                            finally:
-                                _retire_contexts(resources['contexts'])
+                for handle in resources['handles']:
+                    if handle is not None:
+                        handle[0].__exit__(*sys.exc_info())
             finally:
-                if previous is not None:
-                    signal.signal(signal.SIGINT, previous)
+                try:
+                    for archive in resources['archives']:
+                        if archive is not None:
+                            archive[0].__exit__(*sys.exc_info())
+                finally:
+                    _retire_contexts(resources['contexts'])
+        return _transport.call({'operation': operation, 'arguments': _snapshot(arguments),
+                                'root': str(context['ROOT'])},
+            lambda operation, row: _primitive(operation, row, context, resources),
+            pack=_wire._pack, unpack=_wire._unpack,
+            exception=lambda row: _exception(row, context, resources)[1],
+            cleanup=cleanup, errors=errors)
