@@ -8,14 +8,12 @@ it never copies the DeviceTree payload into the repository output.
 from __future__ import annotations
 
 import argparse
-import ctypes
 import json
-import platform
 import struct
 from dataclasses import dataclass
 from pathlib import Path
 
-from extract_firmware import unwrap_im4p
+import _native_adt
 from extract_fileset import LC_SEGMENT_64
 from recover_g17_abi import (
     decode_add_immediate,
@@ -375,139 +373,39 @@ class PmgrDevice:
 
 
 def align_up(value: int, alignment: int) -> int:
-    return (value + alignment - 1) & -alignment
+    return _native_adt.query(b"", "align_up", value=value, alignment=alignment)
 
 
 def device_tree_im4p_payload(blob: bytes) -> bytes:
-    image_type, payload, _has_extra_fields = unwrap_im4p(blob)
-    if image_type != b"dtre":
-        raise ValueError(f"not a DeviceTree IM4P (type={image_type!r})")
-    return payload
+    return _native_adt.device_tree_im4p_payload(blob)
 
 
 def decompress_device_tree(payload: bytes, initial_capacity: int | None = None) -> bytes:
-    if not payload.startswith((b"bvx1", b"bvx2")):
-        return payload
-    if platform.system() != "Darwin":
-        raise ValueError("LZFSE DeviceTree extraction requires macOS libcompression")
-    try:
-        library = ctypes.CDLL("/usr/lib/libcompression.dylib")
-    except OSError as error:
-        raise ValueError(f"cannot load macOS libcompression: {error}") from error
-    decode = library.compression_decode_buffer
-    decode.argtypes = (
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-        ctypes.c_void_p,
-        ctypes.c_size_t,
-        ctypes.c_void_p,
-        ctypes.c_int,
-    )
-    decode.restype = ctypes.c_size_t
-    source = ctypes.create_string_buffer(payload)
-    capacity = initial_capacity or max(1 << 20, len(payload) * 4)
-    while capacity <= MAX_DEVICE_TREE_BYTES:
-        destination = ctypes.create_string_buffer(capacity)
-        decoded = decode(
-            destination,
-            capacity,
-            source,
-            len(payload),
-            None,
-            COMPRESSION_LZFSE,
-        )
-        if decoded == 0:
-            raise ValueError("macOS libcompression rejected the LZFSE DeviceTree payload")
-        if decoded < capacity:
-            return destination.raw[:decoded]
-        capacity *= 2
-    raise ValueError("decompressed DeviceTree exceeds the 64 MiB safety limit")
+    return _native_adt.decompress_device_tree(payload, initial_capacity)
 
 
 def parse_adt(blob: bytes) -> AdtNode:
-    """Parse Apple's recursive, little-endian DeviceTree representation."""
-
-    def parse_node(offset: int, depth: int) -> tuple[AdtNode, int]:
-        if depth > 128:
-            raise ValueError("DeviceTree nesting exceeds 128 nodes")
-        if offset + 8 > len(blob):
-            raise ValueError("truncated DeviceTree node header")
-        property_count, child_count = struct.unpack_from("<II", blob, offset)
-        offset += 8
-        if property_count > 65536 or child_count > 65536:
-            raise ValueError("implausible DeviceTree node counts")
-        properties: dict[str, AdtProperty] = {}
-        for _ in range(property_count):
-            header_end = offset + ADT_PROPERTY_NAME_BYTES + 4
-            if header_end > len(blob):
-                raise ValueError("truncated DeviceTree property header")
-            raw_name = blob[offset : offset + ADT_PROPERTY_NAME_BYTES]
-            terminator = raw_name.find(b"\0")
-            if terminator < 0:
-                raise ValueError("unterminated DeviceTree property name")
-            try:
-                name = raw_name[:terminator].decode("ascii")
-            except UnicodeDecodeError as error:
-                raise ValueError("non-ASCII DeviceTree property name") from error
-            encoded_length = struct.unpack_from("<I", blob, offset + ADT_PROPERTY_NAME_BYTES)[0]
-            length = encoded_length & ADT_PROPERTY_LENGTH_MASK
-            flags = encoded_length >> 24
-            offset = header_end
-            padded_length = align_up(length, 4)
-            if offset + padded_length > len(blob):
-                raise ValueError(f"truncated DeviceTree property {name!r}")
-            if name in properties:
-                raise ValueError(f"duplicate DeviceTree property {name!r}")
-            properties[name] = AdtProperty(blob[offset : offset + length], flags)
-            offset += padded_length
-        children = []
-        for _ in range(child_count):
-            child, offset = parse_node(offset, depth + 1)
-            children.append(child)
-        return AdtNode(properties, tuple(children)), offset
-
-    root, end = parse_node(0, 0)
-    if end != len(blob):
-        raise ValueError(f"{len(blob) - end} trailing bytes after DeviceTree root")
-    return root
+    return _native_adt.parse_adt(blob, AdtProperty, AdtNode)
 
 
 def decode_cstring(data: bytes, field: str) -> str:
-    value = data.split(b"\0", 1)[0]
-    try:
-        return value.decode("ascii")
-    except UnicodeDecodeError as error:
-        raise ValueError(f"non-ASCII {field}") from error
+    return _native_adt.query(data, "decode_cstring", field=field)
 
 
 def decode_string_list(data: bytes, field: str) -> list[str]:
-    if not data or data[-1] != 0:
-        raise ValueError(f"{field} is not a NUL-terminated string list")
-    try:
-        return [item.decode("ascii") for item in data[:-1].split(b"\0")]
-    except UnicodeDecodeError as error:
-        raise ValueError(f"non-ASCII {field}") from error
+    return _native_adt.query(data, "decode_string_list", field=field)
 
 
 def decode_u32_array(data: bytes, field: str) -> list[int]:
-    if len(data) % 4:
-        raise ValueError(f"{field} length is not a multiple of four")
-    return list(struct.unpack(f"<{len(data) // 4}I", data))
+    return _native_adt.query(data, "decode_u32_array", field=field)
 
 
 def decode_integer(data: bytes, field: str) -> int:
-    if len(data) not in (4, 8):
-        raise ValueError(f"{field} is neither a 32-bit nor a 64-bit integer")
-    return int.from_bytes(data, "little")
+    return _native_adt.query(data, "decode_integer", field=field)
 
 
 def parse_reg_regions(data: bytes, field: str) -> list[tuple[int, int]]:
-    if not data or len(data) % 16:
-        raise ValueError(f"{field} is not an array of 64-bit address/size pairs")
-    return [
-        struct.unpack_from("<QQ", data, offset)
-        for offset in range(0, len(data), 16)
-    ]
+    return _native_adt.parse_reg_regions(data, field)
 
 
 def node_name(node: AdtNode) -> str:
@@ -537,260 +435,59 @@ def compatible_with(node: AdtNode, value: str) -> bool:
 
 
 def parse_pmgr_devices(data: bytes) -> list[PmgrDevice]:
-    if not data or len(data) % PMGR_DEVICE_BYTES:
-        raise ValueError("PMGR devices property is not an array of 48-byte records")
-    result = []
-    for index, offset in enumerate(range(0, len(data), PMGR_DEVICE_BYTES)):
-        record = data[offset : offset + PMGR_DEVICE_BYTES]
-        name = decode_cstring(record[PMGR_DEVICE_NAME_OFFSET:], "PMGR device name")
-        handle = struct.unpack_from("<H", record, PMGR_DEVICE_HANDLE_OFFSET)[0]
-        result.append(
-            PmgrDevice(
-                index,
-                handle,
-                name,
-                record[0],
-                record[3],
-                int.from_bytes(record[15:16], "little", signed=True),
-            )
-        )
-    return result
+    return _native_adt.parse_pmgr_devices(data, PmgrDevice)
 
 
 def resolve_gate(handle: int, devices: list[PmgrDevice]) -> dict[str, object]:
-    matches = [device for device in devices if device.handle == handle]
-    if len(matches) != 1:
-        names = ", ".join(device.name for device in matches) or "none"
-        raise ValueError(f"power handle {handle:#x} has non-unique PMGR mapping: {names}")
-    device = matches[0]
-    virtual_device = bool(device.flags & 0x10 and device.pmp_virtual_class >= 0)
-    emits_device_state = bool(device.flags & 0x02)
-    return {
-        "handle": handle,
-        "name": device.name,
-        "record_index": device.index,
-        "pmp_dispatch": {
-            "flags": device.flags,
-            "selector": device.pmp_selector,
-            "virtual_class": device.pmp_virtual_class,
-            "emits_device_state": emits_device_state,
-            "virtual_device": virtual_device,
-            "route_if_emitted": "virtual" if virtual_device else "ordinary",
-        },
-    }
+    return _native_adt.resolve_gate(handle, devices)
 
 
 def parse_pmgr_interrupt_config(data: bytes, field: str) -> list[dict[str, object]]:
-    """Decode ApplePMGR's 20-byte `interrupt-config` records."""
-    if not data or len(data) % PMGR_INTERRUPT_CONFIG_BYTES:
-        raise ValueError(f"{field} is not a whole number of 20-byte records")
-    if len(data) > 0x13F:
-        raise ValueError(f"{field} exceeds ApplePMGR's 0x13f-byte bound")
-    records = []
-    for offset in range(0, len(data), PMGR_INTERRUPT_CONFIG_BYTES):
-        record = data[offset : offset + PMGR_INTERRUPT_CONFIG_BYTES]
-        if record[3] >= 0x10:
-            raise ValueError(f"{field} record kind {record[3]} is out of range")
-        records.append(
-            {
-                "slot": record[0],
-                "kind": record[3],
-                "name": decode_cstring(
-                    record[PMGR_INTERRUPT_CONFIG_NAME_OFFSET:], field
-                ),
-            }
-        )
-    return records
+    return _native_adt.query(data, "parse_pmgr_interrupt_config", field=field)
 
 
 def parse_pmp_soc_devices(data: bytes) -> list[dict[str, object]]:
-    if not data or len(data) % PMP_SOC_DEVICE_BYTES:
-        raise ValueError("PMP soc-device property is not an array of 124-byte records")
-    result = []
-    for index, offset in enumerate(range(0, len(data), PMP_SOC_DEVICE_BYTES)):
-        record = data[offset : offset + PMP_SOC_DEVICE_BYTES]
-        result.append(
-            {
-                "index": index,
-                "id": struct.unpack_from("<I", record)[0],
-                # The stripped PMP firmware shifts this field left by three
-                # while assigning each record's SOC-DEV-PKT subrange.
-                "packet_bytes": struct.unpack_from("<I", record, 0x0C)[0],
-                # Bit 1 requests a PS-ACK synchronization.  Bit 2 suppresses
-                # that wait for a transition to state 1 only.
-                "state_flags": struct.unpack_from("<I", record, 0x08)[0],
-                # ApplePMGR assigns a dense virtual-dashboard index to every
-                # record with a nonzero word at +0x2c.
-                "virtual_state_config": struct.unpack_from("<I", record, 0x2C)[0],
-                "name": decode_cstring(
-                    record[PMP_SOC_DEVICE_NAME_OFFSET:], "PMP SoC-device name"
-                ),
-            }
-        )
-    return result
+    return _native_adt.query(data, "parse_pmp_soc_devices")
 
 
 def parse_pmp_ptd_ranges(data: bytes) -> list[dict[str, object]]:
-    if not data or len(data) % PMP_PTD_RANGE_BYTES:
-        raise ValueError("PMP ptd-range property is not an array of 32-byte records")
-    result = []
-    for index, offset in enumerate(range(0, len(data), PMP_PTD_RANGE_BYTES)):
-        record = data[offset : offset + PMP_PTD_RANGE_BYTES]
-        range_id, entry_offset, entry_count, doorbell = struct.unpack_from("<4I", record)
-        result.append(
-            {
-                "index": index,
-                "id": range_id,
-                "entry_offset": entry_offset,
-                "entry_count": entry_count,
-                "doorbell": doorbell,
-                "name": decode_cstring(
-                    record[PMP_PTD_RANGE_NAME_OFFSET:], "PMP PTD-range name"
-                ),
-            }
-        )
-    return result
+    return _native_adt.query(data, "parse_pmp_ptd_ranges")
 
 
 def direct_branch_targets(function_address: int, code: bytes) -> set[int]:
-    """Return direct AArch64 B/BL targets from one function body."""
-    result = set()
-    for offset in range(0, len(code) - 3, 4):
-        word = struct.unpack_from("<I", code, offset)[0]
-        if word & 0x7C000000 != 0x14000000:
-            continue
-        immediate = word & 0x03FFFFFF
-        if immediate & 0x02000000:
-            immediate -= 1 << 26
-        result.add((function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF)
-    return result
+    return _native_adt.direct_branch_targets(function_address, code)
 
 
 def pc_relative_targets(function_address: int, code: bytes) -> set[int]:
-    """Return ADRP+ADD materialized addresses from one function body.
-
-    IOCommandGate actions and registered callbacks are never direct branches,
-    so branch scanning alone cannot observe them.  Any instruction that writes
-    a tracked register without being one half of an ADRP/ADD pair drops that
-    register, so a reused page base cannot fabricate a target.
-    """
-    result: set[int] = set()
-    pages: dict[int, int] = {}
-    for offset in range(0, len(code) - 3, 4):
-        word = struct.unpack_from("<I", code, offset)[0]
-        page = decode_adrp(function_address + offset, word)
-        if page is not None:
-            pages[page[0]] = page[1]
-            continue
-        add = decode_add_immediate(word)
-        if add is not None:
-            destination, source, immediate = add
-            if source in pages:
-                pages[destination] = (pages[source] + immediate) & 0xFFFFFFFFFFFFFFFF
-                result.add(pages[destination])
-            else:
-                pages.pop(destination, None)
-            continue
-        pages.pop(word & 0x1F, None)
-    return result
+    return _native_adt.pc_relative_targets(function_address, code)
 
 
 def direct_branch_count(function_address: int, code: bytes, target: int) -> int:
-    """Count direct AArch64 B/BL instructions to one target."""
-    result = 0
-    for offset in range(0, len(code) - 3, 4):
-        word = struct.unpack_from("<I", code, offset)[0]
-        if word & 0x7C000000 != 0x14000000:
-            continue
-        immediate = word & 0x03FFFFFF
-        if immediate & 0x02000000:
-            immediate -= 1 << 26
-        actual = (function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF
-        result += actual == target
-    return result
+    return _native_adt.query(code, "direct_branch_count", function_address=function_address, target=target)
 
 
 def direct_branch_target_at(function_address: int, code: bytes, offset: int) -> int | None:
-    """Decode one direct AArch64 B/BL at a known function-relative offset."""
-    if offset < 0 or offset + 4 > len(code):
-        return None
-    word = struct.unpack_from("<I", code, offset)[0]
-    if word & 0x7C000000 != 0x14000000:
-        return None
-    immediate = word & 0x03FFFFFF
-    if immediate & 0x02000000:
-        immediate -= 1 << 26
-    return (function_address + offset + immediate * 4) & 0xFFFFFFFFFFFFFFFF
+    return _native_adt.query(code, "direct_branch_target_at", function_address=function_address, offset=offset)
 
 
 def _has_sub_cmp_window(code: bytes, source: int, first: int, count: int) -> bool:
-    """Recognize `sub wN,wSource,#first; cmp wN,#count` without fixing wN."""
-    words = [struct.unpack_from("<I", code, offset)[0] for offset in range(0, len(code) - 3, 4)]
-    for left, right in zip(words, words[1:]):
-        if left & 0xFF000000 != 0x51000000:
-            continue
-        destination = left & 0x1F
-        left_source = (left >> 5) & 0x1F
-        immediate = (left >> 10) & 0xFFF
-        if left & (1 << 22):
-            immediate <<= 12
-        if (left_source, immediate) != (source, first):
-            continue
-        if right & 0xFF00001F != 0x7100001F:
-            continue
-        right_source = (right >> 5) & 0x1F
-        right_immediate = (right >> 10) & 0xFFF
-        if right & (1 << 22):
-            right_immediate <<= 12
-        if (right_source, right_immediate) == (destination, count):
-            return True
-    return False
+    return _native_adt.query(code, "_has_sub_cmp_window", source=source, first=first, count=count)
 
 
 def _has_cmp_w_immediate(code: bytes, source: int, immediate: int) -> bool:
-    for offset in range(0, len(code) - 3, 4):
-        word = struct.unpack_from("<I", code, offset)[0]
-        if word & 0xFF00001F != 0x7100001F or (word >> 5) & 0x1F != source:
-            continue
-        value = (word >> 10) & 0xFFF
-        if word & (1 << 22):
-            value <<= 12
-        if value == immediate:
-            return True
-    return False
+    return _native_adt.query(code, "_has_cmp_w_immediate", source=source, immediate=immediate)
 
 
 def _has_ldrb(code: bytes, destination: int, base: int, immediate: int) -> bool:
-    for offset in range(0, len(code) - 3, 4):
-        word = struct.unpack_from("<I", code, offset)[0]
-        if word & 0xFFC00000 != 0x39400000:
-            continue
-        if (
-            word & 0x1F,
-            (word >> 5) & 0x1F,
-            (word >> 10) & 0xFFF,
-        ) == (destination, base, immediate):
-            return True
-    return False
+    return _native_adt.query(code, "_has_ldrb", destination=destination, base=base, immediate=immediate)
 
 
 def _has_words_in_order(code: bytes, expected: tuple[int, ...]) -> bool:
-    """Recognize a short UUID-pinned instruction slice with no gaps."""
-    if not expected:
-        return True
-    needle = struct.pack(f"<{len(expected)}I", *expected)
-    return code.find(needle) >= 0
+    return _native_adt.query(code, "_has_words_in_order", expected=expected)
 
 
 def _has_ordered_words(code: bytes, expected: tuple[int, ...]) -> bool:
-    """Recognize instruction words in program order while allowing a gap."""
-    offset = 0
-    for word in expected:
-        found = code.find(struct.pack("<I", word), offset)
-        if found < 0:
-            return False
-        offset = found + 4
-    return True
+    return _native_adt.query(code, "_has_ordered_words", expected=expected)
 
 
 def recover_apple_ptd_code_contract(

@@ -74,7 +74,7 @@ def _library():
                 snapshot = subprocess.run(command, capture_output=True)
                 if snapshot.returncode == 0:
                     digest.update(snapshot.stdout)
-            for folder in ("imageextract", "extractionabi", "traceanalysis", "g17decode", "g17power"):
+            for folder in ("imageextract", "extractionabi", "traceanalysis", "g17decode", "g17power", "appleadt"):
                 for source in sorted((_DIRECTORY / folder).glob("*.v")):
                     if not source.name.endswith("_test.v"):
                         digest.update(source.name.encode())

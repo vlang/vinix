@@ -89,6 +89,12 @@ coverage in `g17decode`. Their Python import adapters use the same synchronous
 ABI as image extraction while the remaining recovery families migrate. See
 [`g17decode/README.md`](g17decode/README.md) for the boundary and validation.
 
+Native `appleadt` owns DeviceTree/PMGR parsing, LZFSE scratch retirement and
+PMP integer/instruction helpers. Counted Python adapters reconstruct dataclasses;
+callback consumers and higher recovery families still await translation. Native
+`g17power` owns the power model and linear-model recovery; generated kernel
+tables remain byte-exact.
+
 `trace_diff` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
 primary-extension framing recovered from
@@ -428,7 +434,7 @@ the retained accelerator pointer to its explicit zero initializer. Its
 nine-write total is reported as a separate stage and cannot be confused with
 the common helper's eight masks.
 
-`generate_g17_power_model.py` evaluates the fixed-temperature four-`pow`
+`generate_g17_power_model` evaluates the fixed-temperature four-`pow`
 leakage factor from the pinned AGXG17X binary for every voltage in this
 Mac17,6 DeviceTree. `make check-g17-power-model` verifies that the committed
 kernel tables match both local inputs.

@@ -1,6 +1,7 @@
 module main
 
 import imageextract as image
+import appleadt
 import g17decode
 import g17power
 import math.big
@@ -137,6 +138,17 @@ fn signed_integer(value j.Value) !big.Integer {
 }
 
 fn dispatch(data []u8, operation string, request map[string]j.Value) !Response {
+	if operation == 'adt:decompress_device_tree' {
+		mut result := binary_result(appleadt.decompress_request(data, j.value(request, 'initial_capacity'))!)!
+		mut metadata := j.value(result.payload, 'result').as_map()
+		metadata['unchanged'] = j.Value(!appleadt.is_compressed(data))
+		return Response{ payload: {
+			'result': j.Value(metadata)
+		}, binary: result.binary }
+	}
+	if operation.starts_with('adt:') {
+		return scalar(appleadt.query(data, operation[4..], request)!)
+	}
 	if operation == 'g17:recover_g17_linear_power_transfer_tables' {
 		code := j.bytes_fromhex(j.string_value(j.value(request, 'code')))!
 		return scalar(j.Value(g17power.recover_linear_power_transfer_tables(data, code)!))
