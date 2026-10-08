@@ -131,7 +131,10 @@ def call(operation, arguments, namespace, *, controller=None):
             closers.pop(row["owner"]).active = False
             return None
         if method == "raise":
-            error = namespace.get(row["kind"], getattr(builtins, row["kind"], None))(row["message"])
+            if "args" in row:
+                error = resolve(row["kind"])(*[value(item) for item in row["args"]])
+            else:
+                error = namespace.get(row["kind"], getattr(builtins, row["kind"], None))(row["message"])
             if row.get("cause") is None:
                 raise error
             cause = errors[row["cause"]["binding_error"]]
