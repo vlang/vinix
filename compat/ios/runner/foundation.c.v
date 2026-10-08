@@ -10,7 +10,9 @@ fn string_text(object u64) string {
 		if text := ios_runtime.constant_utf8[object] { return text }
 		return unsafe { tos(&u8(read64(object + 16)), int(read64(object + 24))) }
 	}
-	return ctext(u64(obj_header(object).text))
+	header := obj_header(object)
+	if header.text == unsafe { nil } { return '' }
+	return unsafe { tos(&u8(header.text), header.text_length) }
 }
 
 fn ns_string_from_class(cls u64) u64 {
@@ -19,33 +21,64 @@ fn ns_string_from_class(cls u64) u64 {
 }
 
 fn object_equal(left u64, right u64) bool {
+	return cf_equal_depth(left, right, 0)
+}
+
+fn cf_equal_depth(left u64, right u64, depth int) bool {
 	if left == right { return true }
-	if left == 0 || right == 0 || read64(left) != read64(right) { return false }
+	if left == 0 || right == 0 { return false }
+	if depth > 64 { panic('iOS: cyclic or excessively nested CF equality') }
+	for name in ['NSArray', 'NSDictionary', 'NSData', 'NSString', 'NSNumber']! {
+		cls := ios_runtime.names[name]
+		if !objc_is_kind(left, cls) { continue }
+		if !objc_is_kind(right, cls) { return false }
+		if name == 'NSString' { return string_text(left) == string_text(right) }
+		a := obj_header(left)
+		b := obj_header(right)
+		if name == 'NSNumber' {
+			if a.is_real || b.is_real { return (if a.is_real { a.real_number } else { f64(a.number) }) == (if b.is_real { b.real_number } else { f64(b.number) }) }
+			return a.number == b.number
+		}
+		if name == 'NSData' {
+			length := data_length(left)
+			return length == data_length(right) && (length == 0 || C.memcmp(unsafe { voidptr(data_pointer(left)) }, unsafe { voidptr(data_pointer(right)) }, usize(length)) == 0)
+		}
+		if a.items.len != b.items.len || a.cf_raw_values != b.cf_raw_values || a.cf_raw_keys != b.cf_raw_keys { return false }
+		for i, value in a.items {
+			mut j := i
+			if name == 'NSDictionary' {
+				j = -1
+				for k, key in b.keys {
+					if (a.cf_raw_keys && key == a.keys[i]) || (!a.cf_raw_keys && cf_equal_depth(key, a.keys[i], depth + 1)) { j = k; break }
+				}
+				if j < 0 { return false }
+			}
+			if a.cf_raw_values { if value != b.items[j] { return false } }
+			else if !cf_equal_depth(value, b.items[j], depth + 1) { return false }
+		}
+		return true
+	}
+	if read64(left) != read64(right) { return false }
 	info := ios_runtime.classes[read64(left)] or { return false }
 	name := info.name
 	return match name {
 		'NSIndexPath' {
 			obj_header(left).number == obj_header(right).number && obj_header(left).section == obj_header(right).section
 		}
-		'NSNumber' {
-			a := obj_header(left)
-			b := obj_header(right)
-			if a.is_real || b.is_real { (if a.is_real { a.real_number } else { f64(a.number) }) == (if b.is_real { b.real_number } else { f64(b.number) }) }
-			else { a.number == b.number }
-		}
-		'NSString' { string_text(left) == string_text(right) }
 		else { false }
 	}
 }
 
 fn dictionary_index(header &ObjHeader, key u64) int {
-	for i, candidate in header.keys { if object_equal(candidate, key) { return i } }
+	for i, candidate in header.keys {
+		if (header.cf_raw_keys && candidate == key) || (!header.cf_raw_keys && object_equal(candidate, key)) { return i }
+	}
 	return -1
 }
 
 fn array_append(mut header ObjHeader, object u64) {
 	if object == 0 { panic('iOS: nil inserted into collection') }
-	header.items << objc_retain(object)
+	header.items << if header.cf_raw_values { object } else { objc_retain(object) }
 	header.mutation++
 }
 
@@ -56,10 +89,10 @@ fn collection_remove(mut header ObjHeader, index int) {
 	if header.keys.len > 0 {
 		key := header.keys[index]
 		header.keys.delete(index)
-		objc_release(key)
+		if !header.cf_raw_keys { objc_release(key) }
 	}
 	header.mutation++
-	objc_release(value)
+	if !header.cf_raw_values { objc_release(value) }
 }
 
 fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
@@ -178,6 +211,7 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		if !valid { objc_release(object); frame.x[0] = 0; return true }
 		C.free(header.text)
 		header.text = unsafe { &char(C.malloc(usize(text.len + 1))) }
+		header.text_length = text.len
 		if header.text == unsafe { nil } { panic('iOS: cannot allocate NSString') }
 		unsafe { C.memcpy(header.text, text.str, usize(text.len)); header.text[text.len] = 0 }
 		return true

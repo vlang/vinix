@@ -41,6 +41,8 @@ static void run(const char *image, const char *left, const char *op,
     }
     close(descriptors[0]);
     output[length] = 0;
+    if (!strcmp(image, "--audit") && strstr(output, "IOS-CF:"))
+        fail("import audit executed application code");
     int status;
     while (waitpid(child, &status, 0) < 0) if (errno != EINTR) fail("waitpid");
     if (!WIFEXITED(status) || WEXITSTATUS(status) != expected_status || !strstr(output, expected_output)) {
@@ -97,6 +99,19 @@ int main(void) {
     run("/opt/ios/pointer-tags-legacy", NULL, NULL, NULL, 0,
         "IOS-POINTER-TAGS: relocated addresses and all high bytes preserved");
     puts("iOS PASS: native chained and legacy pointer tags");
+    run("/opt/ios/core-foundation", NULL, NULL, NULL, 0,
+        "IOS-CF: Unicode ranges, binary strings, collections, raw pointers, data growth, numbers and ownership");
+    run("/opt/ios/core-foundation", "custom", NULL, NULL, 1,
+        "custom CF collection callbacks are not implemented");
+    puts("iOS PASS: native CoreFoundation conversion, data and collection ownership");
+    run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
+        "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
+    puts("iOS PASS: native framework constants match installed Apple libraries");
+    run("--audit", "/opt/ios/core-foundation", NULL, NULL, 0,
+        "0 unresolved strong, 0 unresolved weak (app code was not executed)");
+    run("--audit", "/opt/ios/unsupported", NULL, NULL, 1,
+        "libSystem symbol is not implemented: _mach_msg_server");
+    puts("iOS PASS: import audit reports missing dependencies without executing app code");
     run("/opt/ios/lazy", NULL, NULL, NULL, 0, "IOS-LAZY: unused unavailable framework call did not block entry");
     run("/opt/ios/lazy", "call", NULL, NULL, 1, "unsupported API reached by app:");
     puts("iOS PASS: lazy function imports defer unsupported calls");

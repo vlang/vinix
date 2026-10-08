@@ -15,6 +15,9 @@ FEATURES = (
     b"iOS PASS: Mach-O arithmetic and libSystem imports",
     b"iOS PASS: legacy dyld imports and image/TLS lifecycle",
     b"iOS PASS: native chained and legacy pointer tags",
+    b"iOS PASS: native CoreFoundation conversion, data and collection ownership",
+    b"iOS PASS: native framework constants match installed Apple libraries",
+    b"iOS PASS: import audit reports missing dependencies without executing app code",
     b"iOS PASS: lazy function imports defer unsupported calls",
     b"iOS PASS: Darwin stdio, varargs and system queries",
     b"iOS PASS: native UIKit scene and application launch",
@@ -148,7 +151,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "framework-constants", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         if arguments.with_cxx:

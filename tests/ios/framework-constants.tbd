@@ -1,0 +1,22 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/UIKit.framework/UIKit'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _NSDocumentTypeDocumentAttribute, _NSForegroundColorAttributeName,
+               _NSPlainTextDocumentType, _UIAccessibilityVoiceOverStatusDidChangeNotification,
+               _UIActivityTypeAssignToContact, _UIActivityTypePostToFlickr,
+               _UIActivityTypePostToVimeo, _UIActivityTypePrint, _UIActivityTypeSaveToCameraRoll,
+               _UIApplicationDidBecomeActiveNotification, _UIApplicationDidEnterBackgroundNotification,
+               _UIApplicationOpenNotificationSettingsURLString, _UIApplicationOpenSettingsURLString,
+               _UIApplicationOpenURLOptionsSourceApplicationKey, _UIApplicationWillEnterForegroundNotification,
+               _UIDeviceBatteryStateDidChangeNotification, _UIFontTextStyleBody,
+               _UIKeyboardDidShowNotification, _UIKeyboardFrameEndUserInfoKey,
+               _UIKeyboardWillHideNotification, _UIKeyboardWillShowNotification,
+               _kCFBundleVersionKey, _kCFLocaleCountryCode, _kCFLocaleLanguageCode,
+               _kCFPreferencesCurrentApplication, _kCFRunLoopCommonModes,
+               _UIAccessibilityTraitNone, _UIAccessibilityTraitButton, _UIAccessibilityTraitLink,
+               _UIAccessibilityTraitImage, _UIAccessibilityTraitNotEnabled, _UIAccessibilityTraitAdjustable,
+               _UIBackgroundTaskInvalid, _UIAccessibilityAnnouncementNotification, _UIAccessibilityLayoutChangedNotification ]
+...

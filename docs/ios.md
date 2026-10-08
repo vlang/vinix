@@ -50,7 +50,10 @@ build inputs/output. `IOS_CLANG`, `IOS_LD`, `IOS_SDK` and
 the minimal declarations and linker import stubs contain no Apple implementation.
 The tested build uses those declarations, Clang and `ld64.lld`.
 
-`run-ios --inspect BINARY` reports metadata; `--imports` lists imports. The C
+`run-ios --inspect BINARY` reports metadata; `--imports` lists imports.
+`--audit` checks every import against the compiled runner, prints all missing
+symbols and returns status 1 when strong imports are unresolved. It does not
+map or execute application code, and does not establish runnable support. The C
 Mach-O probe still works with `run-ios /opt/ios/calculator 7 + 5` after staging it.
 UIKit apps require the desktop's `VINIX_REQUEST_FD`/`VINIX_RESPONSE_FD` pipe pair;
 executing a GUI app directly from a shell does not create a window. Set
@@ -72,6 +75,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
+| CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
@@ -111,6 +115,8 @@ graphics, audio, sensor or media methods are implemented.
 Operation queues expose their name and concurrency settings; operation scheduling
 is unsupported. CoreLocation implements the weak delegate property; location
 services and authorization are unsupported.
+CoreFoundation rejects custom allocators/callbacks and string encodings beyond
+UTF-8/ASCII. Collections are limited to 65,536 entries and strings/data to 16 MiB.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
@@ -201,15 +207,23 @@ rejecting reserved bits, unmapped targets and addresses that overflow into the
 tag. With a test resolver, all 7,349,289 fixups validate; that structural check
 does not resolve Fortnite's actual dependencies or execute game code.
 
-The actual executable, using the C++ runner in a 4 GiB Vinix guest, exits with
-status 1 before its entry point:
+The installed Mac CoreFoundation and Catalyst UIKit libraries were used as
+behavioral references for independent V implementations of string conversions,
+collections, mutable data, numbers, Booleans, ownership and framework constants.
+The same fixtures run against Apple's libraries and as native iOS instructions
+in Vinix; no Apple implementation is copied into the runner.
+
+The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
+still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: framework symbol is not implemented: _NSDocumentTypeDocumentAttribute
+iOS: framework symbol is not implemented: _UIAccessibilityIsVoiceOverRunning
 ```
 
-An import audit with the same C++ runner resolves 365 symbols and identifies
-1,787 unresolved strong imports and 87 unresolved weak imports. The executable
+The C++ runner resolves 426 symbols, closing 61 strong-import gaps from the
+initial 365-symbol audit. There are still 1,726 unresolved strong imports and
+87 unresolved weak imports. Use `run-ios --audit BINARY` to repeat the check;
+the result depends on compiled optional backends. The executable
 includes the following substantial dependencies:
 
 | Dependency | Imports | Remaining work |
@@ -227,8 +241,10 @@ does not establish Fortnite compatibility. Startup, rendering, input, asset
 loading and online play remain unsupported or unverified; there is no Fortnite
 desktop launcher or claim of playable support.
 
-`python3 tests/ios/run.py --with-cxx` checks native iOS tagged pointers through
-both chained and legacy relocation, alongside the existing UIKit, TLS and C++
+`sh tests/ios/reference-frameworks.sh` builds and runs the reference fixtures on
+a Mac with Catalyst libraries. `python3 tests/ios/run.py --with-cxx` checks the
+same fixtures in Vinix, import auditing, native iOS tagged pointers through
+both chained and legacy relocation, and the existing UIKit, TLS and C++
 regressions. The proprietary IPA and its extracted bytes are not committed.
 
 ## Official PPSSPP iOS binary

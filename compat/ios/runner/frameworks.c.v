@@ -18,12 +18,18 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if symbol == '_NSLog' { return u64(unsafe { voidptr(C.ios_nslog) }) }
 	if symbol == '_NSClassFromString' { return u64(unsafe { voidptr(ns_class_from_string) }) }
 	if symbol == '_NSSearchPathForDirectoriesInDomains' { return u64(unsafe { voidptr(ns_search_paths) }) }
-	if symbol in ['___NSDictionary0__', '_kCFAllocatorDefault', '_kCFBooleanTrue'] {
+	if symbol in ['_kCFAllocatorSystemDefault', '_kCFBooleanTrue', '_kCFBooleanFalse'] {
+		framework_object(symbol)
+		return ios_runtime.framework_data[symbol]
+	}
+	if symbol in ['___kCFBooleanTrue', '___kCFBooleanFalse'] {
+		return framework_object(if symbol == '___kCFBooleanTrue' { '_kCFBooleanTrue' } else { '_kCFBooleanFalse' })
+	}
+	if address := framework_scalar(symbol) { return address }
+	if symbol in ['___NSDictionary0__', '_kCFAllocatorDefault'] {
 		if symbol == '___NSDictionary0__' && ios_runtime.empty_dictionary != 0 { return ios_runtime.empty_dictionary }
 		if address := ios_runtime.framework_data[symbol] { return address }
-		object := if symbol == '___NSDictionary0__' { objc_allocate(ios_runtime.names['NSDictionary']) }
-			else if symbol == '_kCFBooleanTrue' { objc_allocate(ios_runtime.names['NSNumber']) } else { u64(0) }
-		if symbol == '_kCFBooleanTrue' { mut header := obj_header(object); header.number = 1 }
+		object := if symbol == '___NSDictionary0__' { objc_allocate(ios_runtime.names['NSDictionary']) } else { u64(0) }
 		if object != 0 { ios_runtime.framework_objects << object }
 		if symbol == '___NSDictionary0__' { ios_runtime.empty_dictionary = object; return object }
 		cell := C.calloc(1, 8)
@@ -33,6 +39,45 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		return u64(cell)
 	}
 	return framework_constant(symbol)
+}
+
+fn framework_object(symbol string) u64 {
+	if address := ios_runtime.framework_data[symbol] { return read64(address) }
+	object := objc_allocate(ios_runtime.names[if symbol == '_kCFAllocatorSystemDefault' { 'NSObject' } else { 'NSNumber' }])
+	if symbol != '_kCFAllocatorSystemDefault' {
+		mut header := obj_header(object)
+		header.cf_boolean = true
+		header.number = i64(symbol == '_kCFBooleanTrue')
+	}
+	cell := C.calloc(1, 8)
+	if cell == unsafe { nil } { panic('iOS: cannot allocate CF object constant') }
+	unsafe { *(&u64(cell)) = object }
+	ios_runtime.framework_objects << object
+	ios_runtime.framework_data[symbol] = u64(cell)
+	return object
+}
+
+fn framework_scalar(symbol string) ?u64 {
+	value := match symbol {
+		'_UIAccessibilityTraitNone', '_UIBackgroundTaskInvalid', '_kCFAbsoluteTimeIntervalSince1970' { u64(0) }
+		'_UIAccessibilityTraitButton' { u64(1) }
+		'_UIAccessibilityTraitLink' { u64(2) }
+		'_UIAccessibilityTraitImage' { u64(4) }
+		'_UIAccessibilityTraitNotEnabled' { u64(256) }
+		'_UIAccessibilityTraitAdjustable' { u64(4096) }
+		'_UIAccessibilityAnnouncementNotification' { u64(1008) }
+		'_UIAccessibilityLayoutChangedNotification' { u64(1001) }
+		else { return none }
+	}
+	if address := ios_runtime.framework_data[symbol] { return address }
+	cell := C.calloc(1, 8)
+	if cell == unsafe { nil } { panic('iOS: cannot allocate framework scalar') }
+	unsafe {
+		if symbol == '_kCFAbsoluteTimeIntervalSince1970' { *(&f64(cell)) = 978307200.0 }
+		else { *(&u64(cell)) = value }
+	}
+	ios_runtime.framework_data[symbol] = u64(cell)
+	return u64(cell)
 }
 
 fn ns_class_from_string(name u64) u64 { return ios_runtime.names[string_text(name)] }
@@ -61,6 +106,32 @@ fn ns_log(format u64, stack u64) {
 
 fn framework_constant(symbol string) ?u64 {
 	value := match symbol {
+		'_NSDocumentTypeDocumentAttribute' { 'DocumentType' }
+		'_NSForegroundColorAttributeName' { 'NSColor' }
+		'_NSPlainTextDocumentType' { 'NSPlainText' }
+		'_UIAccessibilityVoiceOverStatusDidChangeNotification' { 'UIAccessibilityVoiceOverTouchStatusChanged' }
+		'_UIActivityTypeAssignToContact' { 'com.apple.UIKit.activity.AssignToContact' }
+		'_UIActivityTypePostToFlickr' { 'com.apple.UIKit.activity.PostToFlickr' }
+		'_UIActivityTypePostToVimeo' { 'com.apple.UIKit.activity.PostToVimeo' }
+		'_UIActivityTypePrint' { 'com.apple.UIKit.activity.Print' }
+		'_UIActivityTypeSaveToCameraRoll' { 'com.apple.UIKit.activity.SaveToCameraRoll' }
+		'_UIApplicationDidBecomeActiveNotification' { 'UIApplicationDidBecomeActiveNotification' }
+		'_UIApplicationDidEnterBackgroundNotification' { 'UIApplicationDidEnterBackgroundNotification' }
+		'_UIApplicationOpenNotificationSettingsURLString' { 'app-settings:notifications' }
+		'_UIApplicationOpenSettingsURLString' { 'app-settings:' }
+		'_UIApplicationOpenURLOptionsSourceApplicationKey' { 'UIApplicationOpenURLOptionsSourceApplicationKey' }
+		'_UIApplicationWillEnterForegroundNotification' { 'UIApplicationWillEnterForegroundNotification' }
+		'_UIDeviceBatteryStateDidChangeNotification' { 'UIDeviceBatteryStateDidChangeNotification' }
+		'_UIFontTextStyleBody' { 'UICTFontTextStyleBody' }
+		'_UIKeyboardDidShowNotification' { 'UIKeyboardDidShowNotification' }
+		'_UIKeyboardFrameEndUserInfoKey' { 'UIKeyboardFrameEndUserInfoKey' }
+		'_UIKeyboardWillHideNotification' { 'UIKeyboardWillHideNotification' }
+		'_UIKeyboardWillShowNotification' { 'UIKeyboardWillShowNotification' }
+		'_kCFBundleVersionKey' { 'CFBundleVersion' }
+		'_kCFLocaleCountryCode' { 'kCFLocaleCountryCodeKey' }
+		'_kCFLocaleLanguageCode' { 'kCFLocaleLanguageCodeKey' }
+		'_kCFPreferencesCurrentApplication' { 'kCFPreferencesCurrentApplication' }
+		'_kCFRunLoopCommonModes' { 'kCFRunLoopCommonModes' }
 		'_kUTTypeFolder' { 'public.folder' }
 		'_kUTTypeItem' { 'public.item' }
 		'_kCTFontAttributeName' { 'NSFont' }
@@ -90,7 +161,7 @@ fn framework_constant(symbol string) ?u64 {
 	}
 	if value == '' { return none }
 	if address := ios_runtime.framework_data[symbol] { return address }
-	object := objc_retain(make_string(unsafe { &char(value.str) }))
+	object := owned_string(value)
 	cell := C.calloc(1, 8)
 	if cell == unsafe { nil } { panic('iOS: cannot allocate framework constant') }
 	unsafe { *(&u64(cell)) = object }

@@ -31,13 +31,18 @@ fn store_field(object u64, index int, value u64) {
 }
 
 fn make_string(text &char) u64 {
+	return objc_autorelease(owned_string(ctext(u64(text))))
+}
+
+// Store the byte count separately: NSString/CFString can contain U+0000.
+fn owned_string(text string) u64 {
 	object := objc_allocate(ios_runtime.names['NSString'])
 	mut header := obj_header(object)
-	length := darwin_strlen(text)
-	header.text = unsafe { &char(C.malloc(length + 1)) }
+	header.text = unsafe { &char(C.malloc(usize(text.len + 1))) }
 	if header.text == unsafe { nil } { panic('iOS: cannot allocate NSString') }
-	unsafe { C.memcpy(header.text, text, length + 1) }
-	return objc_autorelease(object)
+	header.text_length = text.len
+	unsafe { C.memcpy(header.text, text.str, usize(text.len)); header.text[text.len] = 0 }
+	return object
 }
 
 fn invoke_void(object u64, selector &char) {

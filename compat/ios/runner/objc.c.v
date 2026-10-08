@@ -47,6 +47,7 @@ struct ObjHeader {
 mut:
 	refs        i64
 	text        &char = unsafe { nil }
+	text_length int
 	frame       ObjRect
 	color       u32
 	font_size   f64 = 17
@@ -60,6 +61,9 @@ mut:
 	child_count int
 	items       []u64
 	keys        []u64
+	cf_raw_keys bool // NULL CoreFoundation callbacks store non-owning pointers.
+	cf_raw_values bool
+	cf_boolean bool
 	gestures    []u64
 	mutation    u64
 	parent_view u64 // Non-owning, cleared when detached.
@@ -159,7 +163,7 @@ fn objc_start() {
 		'NSDictionary', 'NSMutableDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
-        'NSData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
+        'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
@@ -180,6 +184,7 @@ fn objc_start() {
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'NSMutableArray' { ios_runtime.names['NSArray'] }
 			'NSMutableDictionary' { ios_runtime.names['NSDictionary'] }
+			'NSMutableData' { ios_runtime.names['NSData'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
@@ -307,8 +312,8 @@ fn objc_release(object u64) {
 		child.parent_view = 0
 		objc_release(header.children[i])
 	}
-	for item in header.items { objc_release(item) }
-	for key in header.keys { objc_release(key) }
+	if !header.cf_raw_values { for item in header.items { objc_release(item) } }
+	if !header.cf_raw_keys { for key in header.keys { objc_release(key) } }
 	for gesture in header.gestures { objc_release(gesture) }
 	unsafe {
 		header.items.free()

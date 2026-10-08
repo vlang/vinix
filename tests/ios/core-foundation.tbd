@@ -1,0 +1,22 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _CFRetain, _CFRelease, _CFGetTypeID, _CFEqual, _CFHash,
+               _CFStringGetTypeID, _CFArrayGetTypeID, _CFDictionaryGetTypeID,
+               _CFDataGetTypeID, _CFNumberGetTypeID, _CFBooleanGetTypeID,
+               _CFStringCreateWithCString, _CFStringCreateWithBytes,
+               _CFStringGetLength, _CFStringGetBytes, _CFStringGetCString,
+               _CFArrayCreate, _CFArrayGetCount, _CFArrayGetValueAtIndex,
+               _CFDictionaryCreate, _CFDictionaryCreateMutable,
+               _CFDictionarySetValue, _CFDictionaryGetValue, _CFDictionaryGetCount,
+               _CFDataCreate, _CFDataCreateMutable, _CFDataGetLength,
+               _CFDataGetBytePtr, _CFDataGetMutableBytePtr, _CFDataSetLength,
+               _CFNumberCreate, _CFBooleanGetValue, _CFAllocatorGetDefault,
+               _CFAbsoluteTimeGetCurrent, _kCFAbsoluteTimeIntervalSince1970,
+               _kCFTypeArrayCallBacks, _kCFTypeDictionaryKeyCallBacks,
+               _kCFTypeDictionaryValueCallBacks, _kCFAllocatorSystemDefault,
+               _kCFBooleanTrue, _kCFBooleanFalse, ___kCFBooleanTrue, ___kCFBooleanFalse ]
+...
