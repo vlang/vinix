@@ -132,3 +132,17 @@ native error-reconstruction/decoder-identity pairs, fourteen retirement
 controls and ten unchanged real-PTY fixtures per profile. Cold private
 installations also passed all ten fixtures on both actual host ABIs. Evidence
 is under `~/.cache/vinix-python-to-v/android-run-transport-20261008/`.
+
+Binary initialization alone is serialized. Independent keyboard/QMP/screenshot
+calls retain separate controller pipes, error tables and resource owners, so a
+key acknowledgement wait cannot hold up foreground capture past the original
+input-thread deadline. This is a zero-credit concurrency correction.
+
+Each ARM64, Rosetta x86_64 and ARM ASan/UBSan profile passed three paired
+foreground-progress/error-identity controls, two nested keyboard/QMP pairs,
+concurrent cold initialization with one actual compiler invocation, and two
+failed/interrupted compiler retry controls with exact failed-owner cleanup.
+The existing 649 workflow/helper/actual-library pairs, 34 error reconstruction
+pairs, fourteen retirement controls and ten unchanged PTY fixtures also passed
+per profile. Evidence is under
+`~/.cache/vinix-python-to-v/android-helper-concurrency-20261008/`.

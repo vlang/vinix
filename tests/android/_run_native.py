@@ -49,6 +49,11 @@ class _Controller(subprocess.Popen):
 
 
 def _binary():
+    with _LOCK:
+        return _install_binary()
+
+
+def _install_binary():
     global _BINARY
     if _BINARY is None:
         override = os.environ.get('VINIX_ANDROID_RUN_QUERY')
@@ -346,26 +351,25 @@ _transport = _Transport(_HERE / 'run-query.v', 'VINIX_ANDROID_RUN_QUERY',
 
 
 def call(operation, arguments, context, args=None, parser=None, inodes=None, observed=None):
-    with _LOCK:
-        resources = {'args': args, 'parser': parser, 'archives': [], 'iterators': {}, 'infos': [], 'handles': [],
-                     'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed}
-        errors = []
-        resources['errors'] = errors
-        def cleanup():
+    resources = {'args': args, 'parser': parser, 'archives': [], 'iterators': {}, 'infos': [], 'handles': [],
+                 'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed}
+    errors = []
+    resources['errors'] = errors
+    def cleanup():
+        try:
+            for handle in resources['handles']:
+                if handle is not None:
+                    handle[0].__exit__(*sys.exc_info())
+        finally:
             try:
-                for handle in resources['handles']:
-                    if handle is not None:
-                        handle[0].__exit__(*sys.exc_info())
+                for archive in resources['archives']:
+                    if archive is not None:
+                        archive[0].__exit__(*sys.exc_info())
             finally:
-                try:
-                    for archive in resources['archives']:
-                        if archive is not None:
-                            archive[0].__exit__(*sys.exc_info())
-                finally:
-                    _retire_contexts(resources['contexts'])
-        return _transport.call({'operation': operation, 'arguments': _snapshot(arguments),
-                                'root': str(context['ROOT'])},
-            lambda operation, row: _primitive(operation, row, context, resources),
-            pack=_wire._pack, unpack=_wire._unpack,
-            exception=lambda row: _exception(row, context, resources)[1],
-            cleanup=cleanup, errors=errors)
+                _retire_contexts(resources['contexts'])
+    return _transport.call({'operation': operation, 'arguments': _snapshot(arguments),
+                            'root': str(context['ROOT'])},
+        lambda operation, row: _primitive(operation, row, context, resources),
+        pack=_wire._pack, unpack=_wire._unpack,
+        exception=lambda row: _exception(row, context, resources)[1],
+        cleanup=cleanup, errors=errors)
