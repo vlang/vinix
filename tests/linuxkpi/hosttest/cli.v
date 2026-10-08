@@ -29,13 +29,21 @@ pub fn parse_path_options(args []string, options []string, usage string, scope s
 		}
 		name := arg.all_before('=')
 		has_value := arg.contains('=')
+		// CPython 3.9 argparse crashes on this empty short-help argument. Keep
+		// its failing exit status while giving the native CLI a clean diagnostic.
+		if arg == '-h=' {
+			eprintln('argument -h/--help: ignored explicit argument')
+			exit(1)
+		}
 		if arg.starts_with('-h') && !arg[1..].bytes().all(it == `h`) {
 			return error('argument -h/--help: ignored explicit argument')
 		}
-		is_help := (arg.starts_with('-h') && arg[1..].bytes().all(it == `h`)) ||
-			(name.starts_with('--') && '--help'.starts_with(name))
+		is_help := (arg.starts_with('-h') && arg[1..].bytes().all(it == `h`))
+			|| (name.starts_with('--') && '--help'.starts_with(name))
 		matches := options.filter(name.starts_with('--') && it.starts_with(name))
-		if matches.len > 1 || (is_help && matches.len > 0) { return error('ambiguous option: ${name}') }
+		if matches.len > 1 || (is_help && matches.len > 0) {
+			return error('ambiguous option: ${name}')
+		}
 		if is_help {
 			if has_value { return error('argument --help: ignored explicit argument') }
 			println(usage + '\n\n' + scope)
@@ -44,9 +52,12 @@ pub fn parse_path_options(args []string, options []string, usage string, scope s
 		if matches.len == 1 {
 			option := matches[0]
 			mut value := ''
-			if has_value { value = arg.all_after('=') }
-			else {
-				if index + 1 >= args.len { return error('argument ${option}: expected one argument') }
+			if has_value {
+				value = arg.all_after('=')
+			} else {
+				if index + 1 >= args.len {
+					return error('argument ${option}: expected one argument')
+				}
 				value = args[index + 1]
 				if value.starts_with('-') && value != '-' && !negative_path_argument(value) {
 					return error('argument ${option}: expected one argument')
