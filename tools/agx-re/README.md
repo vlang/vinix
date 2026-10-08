@@ -96,6 +96,11 @@ callback consumers and higher recovery families still await translation. Native
 `g17power` owns the power model and linear-model recovery; generated kernel
 tables remain byte-exact.
 
+Native `t6050power` checks the ApplePTD, RTBuddy segment flags, IODARTFamily,
+AppleT8110DART and T8110 kernel page-table instruction contracts. Its tests run
+with `make test`; the remaining T6050 recovery families still use their counted
+Python implementations. See [`t6050power/README.md`](t6050power/README.md).
+
 `trace_diff` defaults to comparing the clear and triangle command segments.
 `--walk` instead parses each primary segment with the record and
 primary-extension framing recovered from
