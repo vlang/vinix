@@ -2,13 +2,17 @@
 """Checks for native ART payload provenance, ELF ABI, and safe replacement."""
 from __future__ import annotations
 
+import atexit
 import hashlib
 import importlib.util
 import json
 import os
 import io
 from pathlib import Path
+import shutil
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -61,28 +65,6 @@ def archive(files: dict[str, bytes]) -> bytes:
 
 
 class RuntimeTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
-        self.overlay = self.root / "overlay"
-        self.runtime = self.root / "runtime"
-        self.overlay.mkdir()
-        self.manifest = {
-            "format": 1, "architecture": "aarch64", "page_size": 16384,
-            "source_commit": art.SOURCE_COMMIT, "source_sha512": art.SOURCE_SHA512,
-            "source_sha256": art.SOURCE_SHA256,
-            "patch_sha256": hashlib.sha256(art.PATCH.read_bytes()).hexdigest(),
-            "androidfw_configuration_api": 1,
-            "build_flags": ["-DART_PAGE_SIZE=16384"], "files": [],
-        }
-        self.payload(art.LIBART, elf())
-        for name in sorted(art.ART_ELFS - {art.LIBART}):
-            self.payload(name, elf())
-        self.payload(art.ANDROIDFW_HEADER, b"/* pinned androidfw C API */\n", 0o644)
-
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
-
     def payload(self, name: str, contents: bytes, mode: int = 0o755) -> Path:
         path = self.overlay / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,237 +76,9 @@ class RuntimeTests(unittest.TestCase):
         self.write_manifest()
         return path
 
-    def write_manifest(self) -> None:
-        (self.overlay / art.MANIFEST).write_text(json.dumps(self.manifest))
-
-    def reject(self) -> None:
-        self.write_manifest()
-        with self.assertRaises((RuntimeError, FileNotFoundError)):
-            art.read_manifest(self.overlay)
-
-    def test_verified_native_payload_and_jar_install_without_mutating_old_alias(self) -> None:
-        self.payload("usr/lib/java/dex/art/core-oj-hostdex.jar", b"PK\x03\x04test-dex", 0o644)
-        target = self.runtime / art.LIBART
-        target.parent.mkdir(parents=True)
-        target.write_bytes(b"original 4 KiB ART")
-        alias = self.runtime / "unchanged-art-alias.so"
-        os.link(target, alias)
-        verified = art.read_manifest(self.overlay)
-        self.assertEqual(art.apply(self.overlay, self.runtime, verified), verified)
-        self.assertEqual(target.read_bytes(), elf())
-        self.assertEqual(alias.read_bytes(), b"original 4 KiB ART")
-        self.assertNotEqual(target.stat().st_ino, alias.stat().st_ino)
-        jar = self.runtime / "usr/lib/java/dex/art/core-oj-hostdex.jar"
-        self.assertEqual(jar.read_bytes(), b"PK\x03\x04test-dex")
-        self.assertEqual(jar.stat().st_mode & 0o777, 0o644)
-        self.assertEqual(list(self.runtime.rglob(".vinix-art-*")), [])
-
-    def test_rejects_legacy_page_size_architecture_source_or_patch(self) -> None:
-        for key, value in (("page_size", 4096), ("architecture", "x86_64"),
-                           ("source_commit", "b" * 40), ("source_sha512", "b" * 128),
-                           ("source_sha256", "b" * 64),
-                           ("patch_sha256", "b" * 64), ("build_flags", [])):
-            with self.subTest(key=key):
-                previous = self.manifest[key]
-                self.manifest[key] = value
-                self.reject()
-                self.manifest[key] = previous
-
-    def test_rejects_hash_and_size_mismatch(self) -> None:
-        original = self.manifest["files"][0].copy()
-        for key, value in (("sha256", "b" * 64), ("size", original["size"] + 1), ("size", True)):
-            with self.subTest(key=key):
-                self.manifest["files"][0] = {**original, key: value}
-                self.reject()
-
-    def test_rejects_foreign_or_incongruent_elf_with_valid_file_hash(self) -> None:
-        for contents in (elf(machine=62), elf(offset=4096), b"\x7fELF\x02\x01\x01", b"not an ELF"):
-            with self.subTest(contents=contents[:16]):
-                self.payload(art.LIBART, contents)
-                self.reject()
-
-    def test_requires_every_native_output_before_replacing_existing_runtime(self) -> None:
-        original = self.manifest["files"].copy()
-        old = self.runtime / art.LIBART
-        old.parent.mkdir(parents=True)
-        old.write_bytes(b"existing 4 KiB package runtime")
-        for name in sorted(art.ART_ELFS | art.ART_HEADERS):
-            with self.subTest(name=name):
-                # The physical overlay file remains present. Its omitted
-                # manifest record must not permit a partial replacement.
-                self.manifest["files"] = [record for record in original if record["path"] != name]
-                self.write_manifest()
-                with self.assertRaisesRegex(RuntimeError, "missing required native outputs"):
-                    art.apply(self.overlay, self.runtime, self.manifest)
-                self.assertEqual(old.read_bytes(), b"existing 4 KiB package runtime")
-        self.manifest["files"] = original
-        self.write_manifest()
-        self.assertEqual(art.read_manifest(self.overlay), self.manifest)
-
-    def test_requires_native_elf_for_runtime_tools_and_support_libraries(self) -> None:
-        for name in ("usr/bin/dalvikvm", "usr/lib/art/libartbase.so",
-                     "usr/lib/java/dex/art/natives/libjavacore.so"):
-            for contents in (b"not an ELF", elf(machine=62), elf(offset=4096)):
-                with self.subTest(name=name, contents=contents[:16]):
-                    self.payload(name, contents)
-                    self.reject()
-                    self.payload(name, elf())
-
-    def test_rejects_outputs_outside_the_native_builder_and_optional_boot_jars(self) -> None:
-        self.payload("usr/lib/art/unverified-extra.so", elf())
-        with self.assertRaisesRegex(RuntimeError, "unexpected outputs"):
-            art.read_manifest(self.overlay)
-
-    def test_requires_libart_and_unique_relative_usr_paths(self) -> None:
-        original = self.manifest["files"][0].copy()
-        for name in ("../usr/lib/art/libart.so", "/usr/lib/art/libart.so", "usr/../lib.so",
-                     "usr//lib/art/libart.so", "usr/./lib/art/libart.so", "opt/libart.so"):
-            with self.subTest(name=name):
-                self.manifest["files"] = [{**original, "path": name}]
-                self.reject()
-        self.manifest["files"] = [original, original.copy()]
-        self.reject()
-        self.manifest["files"] = []
-        self.reject()
-        self.payload("usr/lib/art/libartbase.so", elf())
-        self.reject()
-
-    def test_rejects_overlay_symlink_file_or_parent(self) -> None:
-        path = self.overlay / art.LIBART
-        path.unlink()
-        outside = self.root / "outside.so"
-        outside.write_bytes(elf())
-        path.symlink_to(outside)
-        self.reject()
-        path.unlink()
-        parent = path.parent
-        outside_directory = self.root / "outside"
-        parent.rename(outside_directory)
-        (outside_directory / "libart.so").write_bytes(elf())
-        parent.symlink_to(outside_directory)
-        self.reject()
-
-    def test_rejects_manifest_or_source_changed_before_apply(self) -> None:
-        verified = art.read_manifest(self.overlay)
-        self.manifest["page_size"] = 4096
-        self.write_manifest()
-        with self.assertRaises(RuntimeError):
-            art.apply(self.overlay, self.runtime, verified)
-        self.assertFalse(self.runtime.exists())
-        self.manifest["page_size"] = 16384
-        self.write_manifest()
-        (self.overlay / art.LIBART).write_bytes(b"changed")
-        with self.assertRaises(RuntimeError):
-            art.apply(self.overlay, self.runtime, verified)
-        self.assertFalse(self.runtime.exists())
-
-    def test_checks_all_destination_parents_before_any_replacement(self) -> None:
-        self.payload("usr/bin/dalvikvm", elf())
-        old = self.runtime / art.LIBART
-        old.parent.mkdir(parents=True)
-        old.write_bytes(b"untouched")
-        outside = self.root / "outside"
-        outside.mkdir()
-        (self.runtime / "usr/bin").symlink_to(outside)
-        with self.assertRaises(RuntimeError):
-            art.apply(self.overlay, self.runtime, art.read_manifest(self.overlay))
-        self.assertEqual(old.read_bytes(), b"untouched")
-        self.assertEqual(list(outside.iterdir()), [])
-
 
 class BionicTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.temporary = tempfile.TemporaryDirectory()
-        self.root = Path(self.temporary.name)
-        self.overlay = self.root / "overlay"
-        self.runtime = self.root / "runtime"
-        self.overlay.mkdir()
-        self.manifest = {
-            "format": 1, "architecture": "aarch64", "page_size": 16384,
-            "source_commit": art.BIONIC_SOURCE_COMMIT,
-            "source_sha512": art.BIONIC_SOURCE_SHA512,
-            "source_sha256": art.BIONIC_SOURCE_SHA256,
-            "patch_sha256": hashlib.sha256(art.BIONIC_PATCH.read_bytes()).hexdigest(),
-            "build_flags": ["-DBIONIC_PAGE_SIZE=16384"], "files": [],
-        }
-        for name in sorted(art.BIONIC_LIBRARIES):
-            self.payload(name, elf())
-
-    def tearDown(self) -> None:
-        self.temporary.cleanup()
-
-    payload = RuntimeTests.payload
-
-    def write_manifest(self) -> None:
-        (self.overlay / art.BIONIC_MANIFEST).write_text(json.dumps(self.manifest))
-
-    def reject(self) -> None:
-        self.write_manifest()
-        with self.assertRaises(RuntimeError):
-            art.read_bionic_manifest(self.overlay)
-
-    def test_replaces_every_soname_alias_without_overwriting_package_hardlinks(self) -> None:
-        old = self.root / "old-library.so"
-        old.write_bytes(b"old 4 KiB bionic loader")
-        for name in art.BIONIC_LIBRARIES:
-            target = self.runtime / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            os.link(old, target)
-        verified = art.read_bionic_manifest(self.overlay)
-        self.assertEqual(art.apply_bionic(self.overlay, self.runtime, verified), verified)
-        for name in art.BIONIC_LIBRARIES:
-            self.assertEqual((self.runtime / name).read_bytes(), elf())
-            self.assertNotEqual((self.runtime / name).stat().st_ino, old.stat().st_ino)
-        self.assertEqual(old.read_bytes(), b"old 4 KiB bionic loader")
-
-    def test_rejects_legacy_or_other_source_patch_flags(self) -> None:
-        for key, value in (("page_size", 4096), ("architecture", "x86_64"),
-                           ("source_commit", art.SOURCE_COMMIT), ("source_sha256", "b" * 64),
-                           ("source_sha512", "b" * 128), ("patch_sha256", "b" * 64),
-                           ("build_flags", ["-DART_PAGE_SIZE=16384"])):
-            with self.subTest(key=key):
-                old = self.manifest[key]
-                self.manifest[key] = value
-                self.reject()
-                self.manifest[key] = old
-
-    def test_requires_all_aliases_and_rejects_unexpected_nonelf_payloads(self) -> None:
-        original = self.manifest["files"].copy()
-        self.manifest["files"] = original[:-1]
-        self.reject()
-        self.manifest["files"] = original
-        self.payload("usr/lib/additional.so", elf())
-        self.reject()
-        self.manifest["files"] = original
-        self.payload("usr/lib/libc_bio.so", b"PK\x03\x04not-an-ELF")
-        self.reject()
-
-    def test_rejects_foreign_incongruent_or_stale_alias_elf(self) -> None:
-        for contents in (elf(machine=62), elf(offset=4096), elf() + b"stale alias"):
-            with self.subTest(contents=contents[:16]):
-                self.payload("usr/lib/libdl_bio.so.0", contents)
-                self.reject()
-
-    def test_rejects_checksum_changes_and_symlink_escape_before_installing(self) -> None:
-        verified = art.read_bionic_manifest(self.overlay)
-        path = self.overlay / "usr/lib/libc_bio.so"
-        path.write_bytes(b"changed after verification")
-        with self.assertRaises(RuntimeError):
-            art.apply_bionic(self.overlay, self.runtime, verified)
-        self.assertFalse(self.runtime.exists())
-        path.unlink()
-        outside = self.root / "outside.so"
-        outside.write_bytes(elf())
-        path.symlink_to(outside)
-        self.reject()
-
-    def test_rejects_duplicate_or_escaping_paths(self) -> None:
-        original = self.manifest["files"].copy()
-        self.manifest["files"] = original + [original[0].copy()]
-        self.reject()
-        for name in ("../usr/lib/libc_bio.so", "/usr/lib/libc_bio.so", "usr/../libc_bio.so"):
-            self.manifest["files"] = [{**original[0], "path": name}, *original[1:]]
-            self.reject()
+    pass
 
 
 class AtlTests(unittest.TestCase):
@@ -532,6 +286,39 @@ class AtlTests(unittest.TestCase):
             self.stage_android()
         self.assertEqual(sentinel.read_text(), "retain on invalid source")
         self.assertEqual(art._read_manifest(runtime, atl=True), self.manifest)
+
+
+_NATIVE_FIXTURE = None
+_NATIVE_ENVIRONMENT = None
+
+
+def _native_fixture(self):
+    global _NATIVE_FIXTURE, _NATIVE_ENVIRONMENT
+    if _NATIVE_FIXTURE is None:
+        directory = Path(tempfile.mkdtemp(prefix="vinix-runtime-fixture-controller-"))
+        try:
+            binary = os.environ.get("VINIX_RUNTIME_FIXTURE_BINARY")
+            if not binary:
+                binary = str(directory / "fixture")
+                subprocess.run([str(ROOT / "build-support/run-v-tool.sh"),
+                                str(ROOT / "tests/android/art-runtime-test.v"),
+                                "--install-fixture", binary], check=True)
+            (directory / "cases").mkdir()
+            environment = dict(os.environ, VINIX_RUNTIME_FIXTURE_WORK=str(directory / "cases"),
+                               VINIX_RUNTIME_FIXTURE_PYTHON=sys.executable,
+                               VINIX_ANDROID_HOST_QUERY=str(art._native._binary()))
+        except BaseException:
+            shutil.rmtree(directory)
+            raise
+        atexit.register(shutil.rmtree, directory)
+        _NATIVE_FIXTURE, _NATIVE_ENVIRONMENT = binary, environment
+    subprocess.run([_NATIVE_FIXTURE, ".".join(self.id().split(".")[-2:])],
+                   check=True, env=_NATIVE_ENVIRONMENT)
+
+
+for _class, _names in json.loads((ROOT / "tests/android/runtimefixture/cases.json").read_text())["groups"].items():
+    for _name in _names:
+        setattr(globals()[_class], _name, _native_fixture)
 
 
 if __name__ == "__main__":

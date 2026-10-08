@@ -1,0 +1,26 @@
+{
+  "original_source_sha256": "b19cfd6223d7cf5d5ef7a888473cb1564d892821ccd4e6c81c49ef2c43dd58de",
+  "groups": {
+    "RuntimeTests": [
+      "test_verified_native_payload_and_jar_install_without_mutating_old_alias",
+      "test_rejects_legacy_page_size_architecture_source_or_patch",
+      "test_rejects_hash_and_size_mismatch",
+      "test_rejects_foreign_or_incongruent_elf_with_valid_file_hash",
+      "test_requires_every_native_output_before_replacing_existing_runtime",
+      "test_requires_native_elf_for_runtime_tools_and_support_libraries",
+      "test_rejects_outputs_outside_the_native_builder_and_optional_boot_jars",
+      "test_requires_libart_and_unique_relative_usr_paths",
+      "test_rejects_overlay_symlink_file_or_parent",
+      "test_rejects_manifest_or_source_changed_before_apply",
+      "test_checks_all_destination_parents_before_any_replacement"
+    ],
+    "BionicTests": [
+      "test_replaces_every_soname_alias_without_overwriting_package_hardlinks",
+      "test_rejects_legacy_or_other_source_patch_flags",
+      "test_requires_all_aliases_and_rejects_unexpected_nonelf_payloads",
+      "test_rejects_foreign_incongruent_or_stale_alias_elf",
+      "test_rejects_checksum_changes_and_symlink_escape_before_installing",
+      "test_rejects_duplicate_or_escaping_paths"
+    ]
+  }
+}
