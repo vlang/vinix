@@ -27,75 +27,36 @@ ROOT = Path(__file__).resolve().parents[2]
 FPS = re.compile(rb"(\d+) frames rendered in ([\d.]+) seconds = ([\d.]+) fps")
 
 
+import importlib.util as _import_util
+import builtins as _builtins
+_bindings_spec = _import_util.spec_from_file_location("dhewm_runner_bindings", ROOT / "build-support/android/_boot_native.py")
+_bindings = _import_util.module_from_spec(_bindings_spec)
+_bindings_spec.loader.exec_module(_bindings)
+_controller = _bindings._host.Controller(ROOT / "build-support/dhewm3/runner_query.v", "VINIX_DHEWM_RUN_QUERY",
+                                        process=_bindings._build_process)
+
+
+def _query(operation, **values):
+    return _bindings.query_call(_controller, {"operation": operation}, globals(), values=values)
+
+
+def _call_name(name, *args, **kwargs):
+    return _builtins.globals().get(name, _builtins.getattr(_builtins, name))(*args, **kwargs)
+
+
 def copy_layer(source: Path, dest: Path) -> None:
-    dest.mkdir(parents=True, exist_ok=True)
-    for entry in source.iterdir():
-        target = dest / entry.name
-        if entry.is_symlink():
-            # Debian's usrmerge aliases (/bin, /lib, /sbin) overlay a common
-            # root with real directories. Preserve that working layout.
-            if target.is_dir() and not target.is_symlink():
-                continue
-            if target.exists() or target.is_symlink():
-                target.unlink()
-            target.symlink_to(os.readlink(entry))
-        elif entry.is_dir():
-            copy_layer(entry, target)
-        else:
-            if target.is_symlink():
-                target.unlink()
-            shutil.copy2(entry, target)
+    return _query("copy_layer", source=source, dest=dest)
 
 
 def prepare(args, work: Path) -> Path:
-    root = work / "root"
-    if not (root / ".prepared").exists():
-        if root.exists():
-            shutil.rmtree(root)
-        copy_layer(args.build / "staging", root)
-        # Load the software Mesa/LLVM pair staged by the X11 builder.
-        copy_layer(args.repo / "build-aarch64-x11/staging/usr", root / "usr")
-        (root / "bin").mkdir(exist_ok=True)
-        shutil.copy2(args.repo / "build-aarch64-userland/staging/bin/busybox", root / "bin/busybox")
-        for name in ("sh", "cat", "mkdir", "chmod", "chown", "sleep", "kill", "base64", "uname", "mount", "grep"):
-            (root / "bin" / name).symlink_to("busybox")
-        loader = root / "lib/ld-musl-aarch64.so.1"
-        if loader.is_symlink():
-            loader.unlink()
-        shutil.copy2(args.repo / "build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1", loader)
-        for directory in ("sbin", "proc", "dev", "tmp", "root", "run", "opt/dhewm3", "etc"):
-            (root / directory).mkdir(parents=True, exist_ok=True)
-        (root / "etc/passwd").write_text("root:x:0:0:root:/root:/bin/sh\ndoom:x:1000:1000:Doom:/home/doom:/bin/sh\n")
-        (root / "etc/group").write_text("root:x:0:root\ndoom:x:1000:doom\n")
-        (root / ".prepared").touch()
-    shutil.copy2(Path(__file__).with_name("guest-init.sh"), root / "sbin/init")
-    for helper in ("as-user", "clock-probe"):
-        subprocess.run(["aarch64-linux-musl-gcc", "-O2", "-Wall", "-Wextra", "-static",
-                        str(Path(__file__).with_name(helper + ".c")),
-                        "-o", str(root / "opt/dhewm3" / helper)], check=True)
-    mode = "record" if args.record else "screenshot" if args.screenshot else "clock" if args.clock_only else "benchmark"
-    config = f"MODE={mode}\nROUNDS={args.rounds}\nCHECK_CLOCK={int(args.check_clock)}\n"
-    (root / "opt/dhewm3/config").write_text(config)
-    if not args.record and not args.clock_only:
-        demo = work / "vinix-demo.demo"
-        if not demo.exists():
-            raise SystemExit("Record a shared demo first with --record")
-        target = root / "usr/share/games/dhewm3/demo/demos/vinix-demo.demo"
-        target.parent.mkdir(exist_ok=True)
-        shutil.copy2(demo, target)
-    return root
+    return _query("prepare", args=args, work=work)
 
 
 def image(root: Path, output: Path, linux: bool) -> None:
-    if linux:
-        names = ["."] + [str(p.relative_to(root)) for p in sorted(root.rglob("*"))]
-        with output.open("wb") as out:
-            subprocess.run(["cpio", "-o", "-H", "newc", "--quiet"], cwd=root,
-                           input=("\n".join(names) + "\n").encode(), stdout=out, check=True)
-    else:
-        with tarfile.open(output, "w", format=tarfile.USTAR_FORMAT) as tar:
-            tar.add(root, arcname=".")
+    return _query("image", root=root, output=output, linux=linux)
 
+
+_native_copy_layer = copy_layer
 
 def run_guest(args, work: Path, root: Path, os_name: str) -> dict:
     if os_name == "debian":
@@ -238,23 +199,7 @@ def main() -> None:
     parser.add_argument("--rounds", type=int, default=3)
     parser.add_argument("--timeout", type=int, default=1800)
     args = parser.parse_args()
-    if args.rounds < 1 or args.timeout < 1:
-        parser.error("--rounds and --timeout must be positive")
-    args.repo = args.repo.resolve()
-    args.build = (args.build or args.repo / "build-aarch64-dhewm3").resolve()
-    args.kernel_dir = (args.kernel_dir or args.repo / "kernel").resolve()
-    if args.os in ("debian", "both") and (not args.debian_kernel or not args.debian_root):
-        parser.error("Debian runs require --debian-kernel and --debian-root")
-    if args.record and args.os == "both":
-        parser.error("Record once on one OS, then replay the shared file on both")
-    work = args.work.resolve()
-    work.mkdir(parents=True, exist_ok=True)
-    root = prepare(args, work)
-    results = [run_guest(args, work, root, name)
-               for name in (("vinix", "debian") if args.os == "both" else (args.os,))]
-    report = json.dumps(results, indent=2) + "\n"
-    (work / "results.json").write_text(report)
-    print(report)
+    return _query("main", args=args, parser=parser)
 
 
 if __name__ == "__main__":
