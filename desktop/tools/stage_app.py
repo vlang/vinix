@@ -28,243 +28,42 @@ corrupt installed icon without reading files from its source directory.
 
     stage_app.py <staging-dir> <desktop-dir> <example-dir>...
 """
-
 import os
 import re
-import shutil
 import sys
+from _stage_native import call, _untext
 
-# The example's entry point, and everything after it. Every ui2 example ends
-# with `fn main()`, so cutting from there to the end of the file takes the
-# whole function without having to match braces.
-MAIN_PATTERN = re.compile(r"^fn main\(\) \{", re.MULTILINE)
-EMBEDDED_VIEW_PATTERN = re.compile(
-    r"^const\s+([A-Za-z_]\w*_(?:qml|vml)_source)\s*=\s*"
-    r"\$embed_file\([^\n]+\)\.to_string\(\)\n",
-    re.MULTILINE,
-)
+_patterns = call("patterns")
+MAIN_PATTERN = re.compile(_untext(_patterns["main"]), re.MULTILINE)
+EMBEDDED_VIEW_PATTERN = re.compile(_untext(_patterns["embedded"]), re.MULTILINE)
+LEGACY_LICENSE_PREAMBLE = re.compile(_untext(_patterns["legacy"]))
 TRANSLATIONS_DIR = "translations"
 TRANSLATIONS_SOURCE = "translations_data.v"
 ICON_DATA_HEADER = "app_icon_data.h"
-LEGACY_LICENSE_PREAMBLE = re.compile(
-    r"\A// Copyright \(c\) [^\n]+\. All rights reserved\.\n"
-    r"// Use of this source code is governed by a GPL v2 license\n"
-    r"// that can be found in the LICENSE file\.\n\n"
-    r"(?=// SPDX-License-Identifier:)",
-)
-
 
 def native_v3_source(text):
-    """Remove a redundant pre-SPDX comment that corrupts V3 source offsets.
-
-    The native V 0.5.2 `$vml` lowering currently misattributes tokens later in
-    a file when this exact multi-line preamble precedes the existing SPDX
-    header. The SPDX header and its copyright remain in the staged source, so
-    this compile-only normalization changes no code or licensing information.
-    """
-    return LEGACY_LICENSE_PREAMBLE.sub("", text, count=1)
-
-
-def stage_desktop(staging, desktop_dir):
-    for name in sorted(os.listdir(desktop_dir)):
-        source = os.path.join(desktop_dir, name)
-        if not os.path.isfile(source):
-            continue
-        if not (name.endswith(".v") or name.endswith(".h") or name.endswith(".vml")):
-            continue
-        destination = os.path.join(staging, name)
-        if os.path.lexists(destination):
-            os.remove(destination)
-        if name.endswith(".v"):
-            with open(source) as handle:
-                text = handle.read()
-            compatible = native_v3_source(text)
-            if compatible != text:
-                with open(destination, "w") as handle:
-                    handle.write(compatible)
-                continue
-        os.symlink(os.path.abspath(source), destination)
-
+    return call("native_v3_source", text)
 
 def v_string(text):
-    """Spell text as a single-quoted V literal."""
-    escaped = (text.replace("\\", "\\\\").replace("'", "\\'")
-               .replace("$", "\\$").replace("\t", "\\t").replace("\r", "\\r"))
-    return "'%s'" % escaped
-
-
-def stage_translations(staging, desktop_dir):
-    """Write the translation files as a V map for i18n.load_tr_map_from_files.
-
-    Each file is kept a line per literal, so the source stays readable and no
-    one literal grows past what a small C compiler accepts.
-    """
-    directory = os.path.join(desktop_dir, TRANSLATIONS_DIR)
-    names = sorted(name for name in os.listdir(directory) if name.endswith(".tr"))
-    if not names:
-        sys.exit("%s: no .tr translation files" % directory)
-    out = [
-        "// Generated from desktop/%s/*.tr by desktop/tools/stage_app.py." % TRANSLATIONS_DIR,
-        "// Edit the .tr files, not this.",
-        "module main",
-        "",
-        "const desktop_translation_files = {",
-    ]
-    for name in names:
-        with open(os.path.join(directory, name), encoding="utf-8") as handle:
-            text = handle.read()
-        if "\r" in text:
-            sys.exit("%s: use LF line endings" % name)
-        out.append("\t%s: [" % v_string(name))
-        for line in text.rstrip("\n").split("\n"):
-            out.append("\t\t%s," % v_string(line))
-        # i18n parses sections at "-----\\n". Keep the final newline so a
-        # trailing separator cannot become part of the last translation.
-        out.append("\t].join('\\n') + '\\n'")
-    out.append("}")
-    out.append("")
-    with open(os.path.join(staging, TRANSLATIONS_SOURCE), "w", encoding="utf-8") as handle:
-        handle.write("\n".join(out))
-
-
-def stage_icon_data(staging, desktop_dir):
-    """Compile canonical QOI bytes into borrowed, read-only C storage."""
-    directory = os.path.join(desktop_dir, "assets")
-    try:
-        names = sorted(name for name in os.listdir(directory) if name.endswith(".qoi"))
-    except OSError as error:
-        sys.exit("%s: cannot read icon artwork: %s" % (directory, error))
-    if not names:
-        sys.exit("%s: no .qoi icon artwork" % directory)
-    out = [
-        "// Generated from desktop/assets/*.qoi by desktop/tools/stage_app.py.",
-        "// Edit the QOI files, not this.",
-        "// Returned bytes belong to static read-only storage. Never modify or free them.",
-        "#ifndef VINIX_APP_ICON_DATA_H",
-        "#define VINIX_APP_ICON_DATA_H",
-        "#include <stddef.h>",
-        "#include <string.h>",
-        "",
-    ]
-    icons = []
-    for name in names:
-        stem = name[:-4]
-        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", stem):
-            sys.exit("%s: icon filename is not a C identifier" % name)
-        path = os.path.join(directory, name)
-        try:
-            with open(path, "rb") as handle:
-                data = handle.read()
-        except OSError as error:
-            sys.exit("%s: cannot read icon artwork: %s" % (path, error))
-        if not data:
-            sys.exit("%s: empty icon artwork" % path)
-        symbol = "vinix_app_icon_%s" % stem
-        icons.append((stem, symbol))
-        out.append("static const unsigned char %s[] = {" % symbol)
-        for offset in range(0, len(data), 16):
-            out.append("    %s," % ", ".join("0x%02x" % byte for byte in data[offset:offset + 16]))
-        out.extend(["};", ""])
-    out.extend([
-        "static inline void *vinix_app_icon_data(const char *name, size_t *size) {",
-        "    if (size != NULL) *size = 0;",
-        "    if (name == NULL) return NULL;",
-    ])
-    for stem, symbol in icons:
-        out.extend([
-            '    if (strcmp(name, "%s") == 0) {' % stem,
-            "        if (size != NULL) *size = sizeof(%s);" % symbol,
-            "        return (void *)%s;" % symbol,
-            "    }",
-        ])
-    out.extend([
-        "    return NULL;",
-        "}",
-        "",
-        "static inline size_t vinix_app_icon_size(const char *name) {",
-        "    size_t size = 0;",
-        "    vinix_app_icon_data(name, &size);",
-        "    return size;",
-        "}",
-        "#endif",
-        "",
-    ])
-    destination = os.path.join(staging, ICON_DATA_HEADER)
-    if os.path.lexists(destination):
-        os.remove(destination)
-    with open(destination, "w", encoding="ascii") as handle:
-        handle.write("\n".join(out))
-
+    return call("v_string", text)
 
 def strip_main(text, origin):
-    match = MAIN_PATTERN.search(text)
-    if not match:
-        sys.exit("%s: no `fn main()` to remove; is this a ui2 example?" % origin)
-    if MAIN_PATTERN.search(text, match.end()):
-        sys.exit("%s: more than one `fn main()`" % origin)
-    trailing = text[match.end():]
-    if "\nfn " in trailing or "\npub fn " in trailing:
-        sys.exit("%s: `fn main()` is not the last function; cannot cut to end"
-                 % origin)
-    header = (
-        "// Staged from %s by desktop/tools/stage_app.py.\n"
-        "// The example's `fn main()` is removed — it opens a platform window\n"
-        "// and blocks, which is the job the desktop is doing instead. The rest\n"
-        "// is the example's own source, unmodified.\n" % origin
-    )
-    body = text[:match.start()].rstrip() + "\n"
-    # Runtime examples embed their document so `run_vml` can parse it. A
-    # compile-time `$vml` host neither calls that entry point nor needs to ship
-    # the source text and embedding support in every utility process.
-    for declaration in reversed(list(EMBEDDED_VIEW_PATTERN.finditer(body))):
-        name = declaration.group(1)
-        if len(re.findall(r"\b%s\b" % re.escape(name), body)) == 1:
-            body = body[:declaration.start()] + body[declaration.end():]
-    # `run_vml` was often the file's only use of ui2, and V rejects an import
-    # nothing references.
-    if "ui2." not in body:
-        body = body.replace("\nimport ui2\n", "\nimport ui2 as _\n", 1)
-    return header + body
+    return call("strip_main", text, origin)
 
+def stage_desktop(staging, desktop_dir):
+    return call("stage_desktop", os.fspath(staging), os.fspath(desktop_dir))
+
+def stage_translations(staging, desktop_dir):
+    return call("stage_translations", os.fspath(staging), os.fspath(desktop_dir))
+
+def stage_icon_data(staging, desktop_dir):
+    return call("stage_icon_data", os.fspath(staging), os.fspath(desktop_dir))
 
 def stage_example(staging, example_dir):
-    name = os.path.basename(os.path.normpath(example_dir))
-    main_path = os.path.join(example_dir, "main.v")
-    if not os.path.isfile(main_path):
-        sys.exit("%s: no main.v" % example_dir)
-
-    with open(main_path) as handle:
-        text = handle.read()
-    origin = os.path.join("third_party/ui2/examples", name, "main.v")
-    with open(os.path.join(staging, "app_%s.v" % name), "w") as handle:
-        handle.write(strip_main(text, origin))
-
-    # Assets the example embeds sit beside its source, and $embed_file
-    # resolves them relative to the file that names them.
-    for asset in sorted(os.listdir(example_dir)):
-        if asset.endswith(".v"):
-            continue
-        source = os.path.join(example_dir, asset)
-        if os.path.isfile(source):
-            shutil.copyfile(source, os.path.join(staging, asset))
-
+    return call("stage_example", os.fspath(staging), os.fspath(example_dir))
 
 def main():
-    if len(sys.argv) < 4:
-        sys.exit(__doc__.strip().splitlines()[-1].strip())
-    staging, desktop_dir = sys.argv[1], sys.argv[2]
-    examples = sys.argv[3:]
-
-    if os.path.isdir(staging):
-        shutil.rmtree(staging)
-    os.makedirs(staging)
-
-    stage_desktop(staging, desktop_dir)
-    stage_translations(staging, desktop_dir)
-    stage_icon_data(staging, desktop_dir)
-    for example in examples:
-        stage_example(staging, example)
-    print("    staged %d example(s) into %s" % (len(examples), staging))
+    return call("app_main", *sys.argv[1:])
 
 
 if __name__ == "__main__":

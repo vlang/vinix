@@ -59,6 +59,16 @@ class PackageStoreTests(unittest.TestCase):
                 REPOSITORY / "desktop/tools" / name,
                 self.source / "desktop/tools" / name,
             )
+        # Copied staging entrypoints carry their maintained native implementation.
+        for name in ("_stage_native.py", "stage_query.v"):
+            shutil.copyfile(REPOSITORY / "desktop/tools" / name,
+                            self.source / "desktop/tools" / name)
+        shutil.copytree(REPOSITORY / "desktop/tools/stagehost",
+                        self.source / "desktop/tools/stagehost")
+        (self.source / "build-support").mkdir()
+        for name in ("run-v-tool.sh", "find-v.sh"):
+            shutil.copy2(REPOSITORY / "build-support" / name,
+                         self.source / "build-support" / name)
         (self.source / ".gitignore").write_text("ignored.txt\nthird_party/\n", encoding="utf-8")
         (self.source / "ignored.txt").write_text("not shared\n", encoding="utf-8")
         (self.ui2 / "ui").mkdir(parents=True)
