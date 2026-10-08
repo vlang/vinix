@@ -3,6 +3,7 @@ import struct
 import json
 from pathlib import Path
 import types
+import __future__ as _future
 from _native_extract import query as _native_query
 
 
@@ -156,9 +157,10 @@ def public_constants():
     return _public_constants
 
 
-def _argument(specification, values):
+def _argument(specification, values, namespace):
     kind, *parts = specification
     if kind == "argument": return values[parts[0]]
+    if kind == "global": return namespace[parts[0]]
     if kind == "constant": return parts[0]
     if kind == "empty_bytes": return b""
     if kind == "hex": return values[parts[0]].hex()
@@ -166,46 +168,51 @@ def _argument(specification, values):
     if kind == "items": return list(values[parts[0]].items())
     if kind == "hex_values": return {name: value.hex() for name, value in values[parts[0]].items()}
     if kind == "sequence_kind": return "tuple" if isinstance(values[parts[0]], tuple) else "list"
-    if kind == "json": return json.dumps(_argument(parts[0], values))
-    if kind == "array": return [_argument(item, values) for item in parts[0]]
-    if kind == "object": return {name: _argument(item, values) for name, item in parts[0]}
+    if kind == "json": return json.dumps(_argument(parts[0], values, namespace))
+    if kind == "array": return [_argument(item, values, namespace) for item in parts[0]]
+    if kind == "object": return {name: _argument(item, values, namespace) for name, item in parts[0]}
     raise ValueError("unknown G17 ABI conversion: " + kind)
 
 
 def _forward():
-    return _dispatch(locals())
+    return _vinix_abi_dispatch("binding", locals())
 
 
 def _forward_generator():
-    yield from _dispatch(locals())
+    yield from _vinix_abi_dispatch("binding", locals())
+
+
+def _invoke(record, namespace, values):
+    native = namespace[record.get("module", "_native_g17")]
+    converter = native._integer_keys if record["result"] == "integer_keys" else None
+    target = getattr(native, record["call"])
+    arguments = [_argument(item, values, namespace) for item in record["arguments"]]
+    keywords = {name: _argument(item, values, namespace) for name, item in record["keywords"]}
+    result = target(*arguments, **keywords)
+    kind = record["result"]
+    if kind == "tuple": return tuple(result)
+    if kind == "set": return set(result)
+    if kind == "tuple_rows": return [tuple(row) for row in result]
+    if kind == "integer_keys": return converter(result)
+    return result
 
 
 def _bind(record, namespace):
     # The interpreter binds real positional and keyword parameters before this
     # dispatch. No source compilation or replacement argument parser is involved.
-    def dispatch(values):
-        native = namespace["_native_g17"]
-        arguments = [_argument(item, values) for item in record["arguments"]]
-        keywords = {name: _argument(item, values) for name, item in record["keywords"]}
-        result = getattr(native, record["call"])(*arguments, **keywords)
-        kind = record["result"]
-        if kind == "tuple": return tuple(result)
-        if kind == "set": return set(result)
-        if kind == "tuple_rows": return [tuple(row) for row in result]
-        if kind == "integer_keys": return native._integer_keys(result)
-        return result
-
     template = _forward_generator if record["generator"] else _forward
     parameters = tuple(record["parameters"])
     attributes = dict(co_argcount=len(parameters), co_varnames=parameters,
-                      co_nlocals=len(parameters), co_name=record["name"])
+                      co_nlocals=len(parameters), co_name=record["name"],
+                      co_flags=template.__code__.co_flags | _future.annotations.compiler_flag,
+                      co_consts=tuple(record["name"] if item == "binding" else item
+                                      for item in template.__code__.co_consts))
     if hasattr(template.__code__, "co_qualname"):
         attributes["co_qualname"] = record["name"]
     defaults = tuple(frozenset() if item[0] == "frozenset" else item[1]
                      for item in record["defaults"])
     function = types.FunctionType(template.__code__.replace(**attributes),
-                                  {"_dispatch": dispatch,
-                                   "__builtins__": namespace["__builtins__"]}, record["name"],
+                                  namespace, record["name"],
                                   defaults or None)
     function.__qualname__ = record["name"]
     function.__module__ = namespace["__name__"]
@@ -214,8 +221,12 @@ def _bind(record, namespace):
     return function
 
 
-def bind(namespace):
-    source = (Path(__file__).parent / "g17abi/core.v").read_text()
+def bind(namespace, manifest_path="g17abi/core.v"):
+    source = (Path(__file__).parent / manifest_path).read_text()
     manifest = source.split("const binding_manifest = r'", 1)[1].split("'\n", 1)[0]
-    for record in json.loads(manifest):
+    records = {record["name"]: record for record in json.loads(manifest)}
+    def dispatch(name, values):
+        return _invoke(records[name], namespace, values)
+    namespace["_vinix_abi_dispatch"] = dispatch
+    for record in records.values():
         namespace[record["name"]] = _bind(record, namespace)

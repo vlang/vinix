@@ -80,3 +80,8 @@ def public_constants():
             tuple(row) for row in values["PMP_MANDATORY_PATCHBAY_INPUTS"])
         _public_constants = values
     return _public_constants
+
+
+def bind(namespace):
+    from _native_g17 import bind as bind_abi
+    bind_abi(namespace, "t6050abi/core.v")
