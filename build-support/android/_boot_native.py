@@ -240,3 +240,161 @@ def _unpack(value):
     if kind == "dict":
         return {_unpack(key): _unpack(item) for key, item in data}
     return data
+
+
+# Runtime builder policies share this module's stdlib bindings and wire format.
+import builtins as _builtins
+import contextlib as _contextlib
+import importlib.util as _import_util
+import sys as _sys
+
+_host_spec = _import_util.spec_from_file_location('android_runtime_transport', _HERE.parent / 'native_host.py')
+_host = _import_util.module_from_spec(_host_spec)
+_host_spec.loader.exec_module(_host)
+_build_popen = subprocess.Popen
+
+
+def _build_process(*args, **kwargs):
+    return _build_popen(*args, start_new_session=True, **kwargs)
+
+
+_build_transport = _host.Controller(_HERE / 'runtime-query.v', 'VINIX_ANDROID_RUNTIME_QUERY',
+                                   prefix='vinix-android-runtime-controller-', process=_build_process)
+
+
+def _build_snapshot(value):
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_build_snapshot(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _build_snapshot(item) for key, item in value.items()}
+    return value
+
+
+def _build_arguments(items, resources):
+    return [resources[value] if kind == 'object' else resources['values'][value] if kind == 'owned'
+            else Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
+            else value for kind, value in items]
+
+
+def _build_invoke(row, context, resources):
+    provider = resources[row['id']] if 'id' in row else context[row['module']] if row['module'] in context else __import__(row['module'], fromlist=['*'])
+    options = dict(row.get('options', {}))
+    options.update({key: resources[value] for key, value in row.get('keyword_objects', {}).items()})
+    return getattr(provider, row['name'])(*_build_arguments(row.get('arguments', []), resources), **options)
+
+
+def _build_exit(manager, exception):
+    if exception[1] is None:
+        manager.__exit__(*exception)
+        return False
+    error, traceback = exception[1:]
+    try:
+        raise error.with_traceback(traceback)
+    except BaseException:
+        replay = error.__traceback__
+        error.__traceback__ = traceback
+        try:
+            return bool(manager.__exit__(*exception))
+        finally:
+            if error.__traceback__ is replay:
+                error.__traceback__ = traceback
+
+
+def _build_retire(owners):
+    stack = _contextlib.ExitStack()
+    for manager in owners.values():
+        stack.push(manager)
+    owners.clear()
+    stack.__exit__(*_sys.exc_info())
+
+
+def _build_primitive(operation, row, context, resources):
+    if operation in ('invoke', 'acquire', 'enter'):
+        value = _build_invoke(row, context, resources)
+        if operation == 'enter':
+            entered = value.__enter__()
+            ident = _register(resources, entered)
+            resources['owners'][ident] = value
+            return ident
+        if operation == 'acquire':
+            return _register(resources, value)
+        return value.hex() if row.get('bytes') else _build_snapshot(value)
+    if operation == 'borrow':
+        return _register(resources, resources['values'][row['name']])
+    if operation == 'borrow_global':
+        return _register(resources, context[row['name']])
+    if operation == 'retain':
+        return _register(resources, _build_arguments([row['value']], resources)[0])
+    if operation == 'load_module':
+        spec = context['importlib'].util.spec_from_file_location(row['name'],
+                     _build_arguments([row['path']], resources)[0])
+        assert spec and spec.loader
+        module = context['importlib'].util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return _register(resources, module)
+    if operation == 'is_none':
+        return resources[row['id']] is None
+    if operation == 'enter_existing':
+        manager = resources[row['id']]
+        ident = _register(resources, manager.__enter__())
+        resources['owners'][ident] = manager
+        return ident
+    if operation == 'sequence':
+        return _register(resources, _build_arguments(row['arguments'], resources))
+    if operation == 'dictionary':
+        return _register(resources, dict(zip(_build_arguments(row['keys'], resources),
+                                            _build_arguments(row['values'], resources))))
+    if operation == 'pool_map':
+        shared = {key: _build_arguments([value], resources)[0] for key, value in row['shared'].items()}
+        with context['concurrent'].futures.ThreadPoolExecutor(max_workers=row['workers']) as pool:
+            result = list(pool.map(lambda item: build_call(row['operation'], {}, context,
+                               values=dict(shared, item=item)), resources[row['records']]))
+        return _register(resources, result)
+    if operation == 'getattr':
+        value = getattr(resources[row['id']], row['name'])
+        return _register(resources, value) if row.get('object') else _build_snapshot(value)
+    if operation == 'setattr':
+        setattr(resources[row['id']], row['name'], _build_arguments([row['value']], resources)[0])
+        return None
+    if operation == 'iterate':
+        try:
+            value = next(resources[row['id']])
+        except StopIteration:
+            return {'done': True}
+        return {'done': False, 'value': _register(resources, value)}
+    if operation == 'exit':
+        manager = resources['owners'].pop(row['id'])
+        value = row.get('error')
+        if value is None:
+            exception = (None, None, None)
+        else:
+            error = resources['errors'][value['binding_error']] if 'binding_error' in value else getattr(_builtins, value['kind'])(value['message'])
+            exception = (type(error), error, error.__traceback__)
+        return _build_exit(manager, exception)
+    if operation == 'exception_is':
+        return isinstance(resources['errors'][row['error']['binding_error']],
+                          tuple(getattr(_builtins, name) for name in row['kinds']))
+    if operation == 'function':
+        value = context[row['name']](*_build_arguments(row.get('arguments', []), resources),
+                                    **row.get('options', {}))
+        return _register(resources, value) if row.get('object') else _build_snapshot(value)
+    if operation == 'print':
+        print(row['data'], **row.get('options', {}))
+        return None
+    return _primitive(operation, row, context, resources)
+
+
+def build_call(operation, arguments, context, *, values=None):
+    resources = {'values': {} if values is None else values, 'owners': {}, 'errors': []}
+    constants = {name: _build_snapshot(context[name]) for name in
+                 ('MIRROR', 'PREFIX', 'ARCHITECTURE', 'REPOSITORIES', 'ROOT_PACKAGES', 'CALCULATOR', 'REQUIRED')}
+    result = _build_transport.call({'operation': operation, 'arguments': _build_snapshot(arguments),
+                                   'constants': constants, 'source': context['__file__'],
+                                   'root': str(context['ROOT']), 'support': str(context['SUPPORT'])},
+        lambda op, row: _build_primitive(op, row, context, resources),
+        pack=_pack, unpack=_unpack, errors=resources['errors'],
+        exception=lambda row: getattr(_builtins, row['kind'])(row['message']),
+        cleanup=lambda: _build_retire(resources['owners']))
+    return resources[result['object_result']] if isinstance(result, dict) and 'object_result' in result else result
