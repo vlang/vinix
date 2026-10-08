@@ -108,10 +108,16 @@ def _response(value):
         raise OverflowError(value["error"])
     if kind == "PlainOSError":
         raise OSError(value["error"])
+    if kind == "AdvancedExit":
+        raise SystemExit(os.fsdecode(bytes.fromhex(value["error_fs_hex"])))
+    if kind == "IndexError":
+        raise IndexError(value["error"])
     if kind == "SystemExit":
         raise SystemExit(value["error"])
     if kind == "CalledProcessError":
-        raise subprocess.CalledProcessError(value["returncode"], value["args"])
+        raise subprocess.CalledProcessError(value["returncode"],
+            [os.fsdecode(bytes.fromhex(arg)) for arg in value["args_fs_hex"]] if "args_fs_hex" in value else value["args"],
+            output=value.get("output"))
     if kind == "BadZipFile":
         import zipfile
         raise zipfile.BadZipFile(value["error"])
@@ -121,7 +127,8 @@ def _response(value):
         raise UnicodeDecodeError(value["encoding"], bytes.fromhex(value["object"]),
                                  value["start"], value["end"], value["reason"])
     if kind == "RunnerOSError":
-        raise OSError(value["errno"], value["error"], os.fsdecode(bytes.fromhex(value["filename_hex"])) or None)
+        filename = os.fsdecode(bytes.fromhex(value["filename_hex"]))
+        raise OSError(value["errno"], value["error"], Path(filename) if value.get("filename_is_path") else filename or None)
     if kind == "OSError":
         filename = Path(value["filename"]) if value.get("filename_is_path") else value["filename"] or None
         if value.get("filename2"):

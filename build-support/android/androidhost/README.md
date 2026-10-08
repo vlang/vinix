@@ -73,3 +73,16 @@ Controls compare whole original results/errors and partial destination bytes
 and modes, selected real ELF identities, Unicode boundaries and descriptor
 retirement on both host architectures with sanitizers. They do not boot an
 Android guest.
+
+The EGL queue and split APK build controllers also execute in V, including
+ordered compiler pins, target capture, native ELF policy, provider class
+archives, D8/AAPT2 composition, split manifest variants and complete receipts.
+Captured stdout uses strict UTF-8 and universal newlines with inherited stdin
+and stderr; communication errors kill and reap the child. Both captured and
+inherited commands preserve the calling frontend's macOS binary preference,
+with normal grading for a compiler that has one architecture slice. Public
+argparse and ZIP-object compatibility functions remain standard-library
+bindings. Original controls compare full pipeline output and partial archive
+state, malformed ELF and UTF-8 cases, complete commands/status/errors and
+actual child architecture. Compiler producers are controlled real processes;
+these checks do not execute javac/D8/AAPT2 production compilers or Android apps.

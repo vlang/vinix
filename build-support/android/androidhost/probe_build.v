@@ -11,11 +11,13 @@ fn C.posix_spawnp(&i32, &char, voidptr, voidptr, &&char, &&char) i32
 fn C.posix_spawn_file_actions_init(voidptr) i32
 fn C.posix_spawn_file_actions_destroy(voidptr) i32
 fn C.posix_spawn_file_actions_addclose(voidptr, i32) i32
+fn C.posix_spawn_file_actions_adddup2(voidptr, i32, i32) i32
 fn C.getdtablesize() i32
 fn C.posix_spawnattr_init(voidptr) i32
 fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
+fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
 
 @[typedef]
 struct C.posix_spawnattr_t {}
@@ -61,6 +63,36 @@ const probe_r8_sha = '900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d6
 const probe_core_sha = 'f47736d9d410766a20ae1f60d679607d8e85241e8cdeb5a0c040ab260ba68f42'
 
 fn probe_command(arguments []string) ! {
+	probe_command_output(arguments, false)!
+}
+
+fn probe_command_output(arguments []string, capture bool) !string {
+	return probe_command_output_preferred(arguments, capture, '')!
+}
+
+fn probe_command_output_preferred(arguments []string, capture bool, host_arch string) !string {
+	mut pipes := [2]i32{}
+	mut read_open := false
+	mut write_open := false
+	defer {
+		if read_open { C.close(pipes[0]) }
+		if write_open { C.close(pipes[1]) }
+	}
+	if capture {
+		if C.pipe(&pipes[0]) != 0 { return file_error('') }
+		read_open = true
+		write_open = true
+
+		for index in 0 .. 2 {
+			if pipes[index] < 3 {
+				moved := C.fcntl(pipes[index], C.F_DUPFD_CLOEXEC, 3)
+				if moved < 0 { return file_error('') }
+				C.close(pipes[index])
+				pipes[index] = moved
+			}
+			if C.fcntl(pipes[index], C.F_SETFD, C.FD_CLOEXEC) != 0 { return file_error('') }
+		}
+	}
 	if arguments.any(it.contains('\x00')) { return error('ValueError: embedded null byte') }
 	mut argv := []&char{cap: arguments.len + 1}
 	for item in arguments { argv << &char(item.str) }
@@ -78,6 +110,12 @@ fn probe_command(arguments []string) ! {
 		return FileError{ message: os.get_error_msg(initialized), number: initialized }
 	}
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if capture {
+		duplicated := C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1)
+		if duplicated != 0 {
+			return FileError{ message: os.get_error_msg(duplicated), number: duplicated }
+		}
+	}
 	directory := $if darwin { '/dev/fd' } $else { '/proc/self/fd' }
 	mut descriptors := []int{}
 	if names := os.ls(directory) {
@@ -122,6 +160,22 @@ fn probe_command(arguments []string) ! {
 	if flags_status != 0 {
 		return FileError{ message: os.get_error_msg(flags_status), number: flags_status }
 	}
+	$if darwin {
+		cpu := match host_arch.to_lower() {
+			'arm64', 'aarch64' { i32(C.CPU_TYPE_ARM64) }
+			'x86_64', 'amd64' { i32(C.CPU_TYPE_X86_64) }
+			else { i32(0) }
+		}
+		if cpu != 0 {
+			preferences := [cpu, i32(C.CPU_TYPE_ANY)]!
+			mut copied := usize(0)
+			preferred := C.posix_spawnattr_setbinpref_np(&attributes, 2, &preferences[0], &copied)
+			if preferred != 0 {
+				return FileError{ message: os.get_error_msg(preferred), number: preferred }
+			}
+			if copied != 2 { return error('Incomplete SDK binary preference') }
+		}
+	}
 	mut pid := i32(0)
 	status := if arguments[0].contains('/') {
 		C.posix_spawn(&pid, &char(arguments[0].str), &actions, &attributes, argv.data, envp.data)
@@ -131,16 +185,54 @@ fn probe_command(arguments []string) ! {
 	if status != 0 {
 		return FileError{ message: os.get_error_msg(status), number: status, filename: arguments[0] }
 	}
+	mut reaped := false
+	defer {
+		if !reaped {
+			C.kill(pid, C.SIGKILL)
+			mut retired := i32(0)
+			for C.waitpid(pid, &retired, 0) < 0 {
+				if C.errno != C.EINTR { break }
+			}
+		}
+	}
+	mut output := []u8{}
+	if capture {
+		C.close(pipes[1])
+		write_open = false
+		mut buffer := [8192]u8{}
+		for {
+			count := C.read(pipes[0], &buffer[0], usize(buffer.len))
+			if count < 0 {
+				if C.errno == C.EINTR { continue }
+				return file_error('')
+			}
+			if count == 0 { break }
+			if u64(output.len) + u64(count) >= 0x7fffffff { return error('MemoryError') }
+			output << buffer[..int(count)]
+		}
+		C.close(pipes[0])
+		read_open = false
+	}
 	mut result := i32(0)
 	for C.waitpid(pid, &result, 0) < 0 {
 		if C.errno != C.EINTR { return file_error('') }
 	}
+	reaped = true
 	code := if C.WIFEXITED(result) != 0 {
 		int(C.WEXITSTATUS(result))
 	} else {
 		-int(C.WTERMSIG(result))
 	}
-	if code != 0 { return ProbeCommandError{arguments.clone(), code} }
+	captured := if capture {
+		advanced_decode(output)!.replace('\r\n', '\n').replace('\r', '\n')
+	} else {
+		''
+	}
+	if code != 0 {
+		if capture { return ProbeCaptureError{arguments.clone(), code, captured} }
+		return ProbeCommandError{arguments.clone(), code}
+	}
+	return captured
 }
 
 fn collect_probe_classes(root string, class string, mut paths []string) {

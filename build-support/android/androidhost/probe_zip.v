@@ -92,10 +92,10 @@ struct ProbeZip {
 }
 
 struct ProbeAppend {
-	archive     ProbeZip
 	new_archive bool
 mut:
-	stream os.File
+	archive ProbeZip
+	stream  os.File
 }
 
 fn zip_bounds(bytes []u8, offset u64, size u64) bool {
@@ -386,9 +386,9 @@ fn open_probe_append(path string) !ProbeAppend {
 			stream.close()
 			return err
 		}
-		return ProbeAppend{ProbeZip{bytes.clone(), []ZipEntry{}, bytes.len, []u8{}}, true, stream}
+		return ProbeAppend{ new_archive: true, archive: ProbeZip{bytes.clone(), []ZipEntry{}, bytes.len, []u8{}}, stream: stream }
 	}
-	return ProbeAppend{z, false, stream}
+	return ProbeAppend{ new_archive: false, archive: z, stream: stream }
 }
 
 fn (mut a ProbeAppend) publish(item ?ProbePayload) ! {
@@ -416,6 +416,7 @@ fn (mut a ProbeAppend) publish(item ?ProbePayload) ! {
 	for C.ftruncate(i32(a.stream.fd), u64(output.len)) != 0 {
 		if C.errno != C.EINTR { return file_error('') }
 	}
+	a.archive = parse_probe_zip(output)!
 }
 
 fn merge_probe_dex(dex ProbeZip, path string) ! {

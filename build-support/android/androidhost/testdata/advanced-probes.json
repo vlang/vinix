@@ -1,0 +1,308 @@
+{
+  "source": {
+    "parent": "8e85b8831fb072f54cb5fcc683d73ac8ba4cb929",
+    "original": [
+      {
+        "path": "tests/android/egl-queue-test.py",
+        "sha256": "623e39d215b71be79f8dbe9c9778743ee0d3fe0620409c6d18498e45a0c6975d",
+        "bytes": 6590,
+        "lines": 123
+      },
+      {
+        "path": "tests/android/split-test.py",
+        "sha256": "3635b8425386fec8ce95c3870f50cbce7719516170a34ab769c3ca98562d3260",
+        "bytes": 8799,
+        "lines": 143
+      }
+    ]
+  },
+  "elf": [
+    {
+      "name": "valid",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "original": {
+        "result": null
+      }
+    },
+    {
+      "name": "truncate-0",
+      "data": "",
+      "original": {
+        "kind": "SystemExit",
+        "error": "fixture native library is not an ARM64 little-endian ELF"
+      }
+    },
+    {
+      "name": "truncate-4",
+      "data": "7f454c46",
+      "original": {
+        "kind": "SystemExit",
+        "error": "fixture native library is not an ARM64 little-endian ELF"
+      }
+    },
+    {
+      "name": "truncate-5",
+      "data": "7f454c4602",
+      "original": {
+        "kind": "SystemExit",
+        "error": "fixture native library is not an ARM64 little-endian ELF"
+      }
+    },
+    {
+      "name": "truncate-6",
+      "data": "7f454c460201",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 20 bytes for unpacking 2 bytes at offset 18 (actual buffer size is 6)"
+      }
+    },
+    {
+      "name": "truncate-18",
+      "data": "7f454c460201000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 20 bytes for unpacking 2 bytes at offset 18 (actual buffer size is 18)"
+      }
+    },
+    {
+      "name": "truncate-19",
+      "data": "7f454c460201000000000000000000000000b7",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 20 bytes for unpacking 2 bytes at offset 18 (actual buffer size is 19)"
+      }
+    },
+    {
+      "name": "truncate-20",
+      "data": "7f454c460201000000000000000000000000b700",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 40 bytes for unpacking 8 bytes at offset 32 (actual buffer size is 20)"
+      }
+    },
+    {
+      "name": "truncate-31",
+      "data": "7f454c460201000000000000000000000000b7000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 40 bytes for unpacking 8 bytes at offset 32 (actual buffer size is 31)"
+      }
+    },
+    {
+      "name": "truncate-32",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 40 bytes for unpacking 8 bytes at offset 32 (actual buffer size is 32)"
+      }
+    },
+    {
+      "name": "truncate-39",
+      "data": "7f454c460201000000000000000000000000b70000000000000000000000000040000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 40 bytes for unpacking 8 bytes at offset 32 (actual buffer size is 39)"
+      }
+    },
+    {
+      "name": "truncate-40",
+      "data": "7f454c460201000000000000000000000000b7000000000000000000000000004000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 40)"
+      }
+    },
+    {
+      "name": "truncate-53",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 53)"
+      }
+    },
+    {
+      "name": "truncate-54",
+      "data": "7f454c460201000000000000000000000000b70000000000000000000000000040000000000000000000000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 54)"
+      }
+    },
+    {
+      "name": "truncate-55",
+      "data": "7f454c460201000000000000000000000000b7000000000000000000000000004000000000000000000000000000000000000000000038",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 55)"
+      }
+    },
+    {
+      "name": "truncate-56",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 56)"
+      }
+    },
+    {
+      "name": "truncate-57",
+      "data": "7f454c460201000000000000000000000000b70000000000000000000000000040000000000000000000000000000000000000000000380002",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 58 bytes for unpacking 4 bytes at offset 54 (actual buffer size is 57)"
+      }
+    },
+    {
+      "name": "truncate-58",
+      "data": "7f454c460201000000000000000000000000b7000000000000000000000000004000000000000000000000000000000000000000000038000200",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 120 bytes for unpacking 56 bytes at offset 64 (actual buffer size is 58)"
+      }
+    },
+    {
+      "name": "truncate-64",
+      "data": "7f454c460201000000000000000000000000b7000000000000000000000000004000000000000000000000000000000000000000000038000200000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 120 bytes for unpacking 56 bytes at offset 64 (actual buffer size is 64)"
+      }
+    },
+    {
+      "name": "truncate-119",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 120 bytes for unpacking 56 bytes at offset 64 (actual buffer size is 119)"
+      }
+    },
+    {
+      "name": "truncate-120",
+      "data": "7f454c460201000000000000000000000000b70000000000000000000000000040000000000000000000000000000000000000000000380002000000000000000100000000000000000000000000000000000000000000000000000000000000000100000000000000010000000000000040000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 176 bytes for unpacking 56 bytes at offset 120 (actual buffer size is 120)"
+      }
+    },
+    {
+      "name": "truncate-175",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 176 bytes for unpacking 56 bytes at offset 120 (actual buffer size is 175)"
+      }
+    },
+    {
+      "name": "truncate-176",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c00000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 208 bytes for unpacking 16 bytes at offset 192 (actual buffer size is 176)"
+      }
+    },
+    {
+      "name": "truncate-191",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c00000000000000000000000000000000000000000000000100000000000000010000000000000001000000000000000000000000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 208 bytes for unpacking 16 bytes at offset 192 (actual buffer size is 191)"
+      }
+    },
+    {
+      "name": "truncate-192",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c0000000000000000000000000000000000000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 208 bytes for unpacking 16 bytes at offset 192 (actual buffer size is 192)"
+      }
+    },
+    {
+      "name": "truncate-207",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c0000000000000000000000000000000000000000000000010000000000000001000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "original": {
+        "kind": "struct.error",
+        "error": "unpack_from requires a buffer of at least 208 bytes for unpacking 16 bytes at offset 192 (actual buffer size is 207)"
+      }
+    },
+    {
+      "name": "truncate-208",
+      "data": "7f454c460201000000000000000000000000b700000000000000000000000000400000000000000000000000000000000000000000003800020000000000000001000000000000000000000000000000000000000000000000000000000000000001000000000000000100000000000000400000000000000200000000000000c000000000000000000000000000000000000000000000001000000000000000100000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "original": {
+        "result": null
+      }
+    }
+  ],
+  "archives": [
+    {
+      "kind": "egl-queue",
+      "scenario": "valid",
+      "archive": "504b0304140000000800000021004d1bd00e0f0000000d0000002a0000006f72672f76696e69782f74657374732f416e64726f696445676c517565756550726f62652e636c6173734bcbac28292d4a5548ce492c2e0600504b01021403140000000800000021004d1bd00e0f0000000d0000002a00000000000000000000008001000000006f72672f76696e69782f74657374732f416e64726f696445676c517565756550726f62652e636c617373504b0506000000000100010058000000570000000000",
+      "classes": {
+        "org/vinix/tests/AndroidEglQueueProbe.class": "6669787475726520636c617373"
+      },
+      "error": ""
+    },
+    {
+      "kind": "egl-queue",
+      "scenario": "unexpected-class",
+      "archive": "504b0304140000000800000021004d1bd00e0f0000000d0000002a0000006f72672f76696e69782f74657374732f416e64726f696445676c517565756550726f62652e636c6173734bcbac28292d4a5548ce492c2e0600504b01021403140000000800000021004d1bd00e0f0000000d0000002a00000000000000000000008001000000006f72672f76696e69782f74657374732f416e64726f696445676c517565756550726f62652e636c617373504b0506000000000100010058000000570000000000",
+      "classes": {
+        "org/vinix/tests/AndroidEglQueueProbe.class": "6669787475726520636c617373",
+        "org/vinix/tests/Other.class": "77726f6e672070726f7669646572"
+      },
+      "error": "fixture contains a class outside its own app"
+    },
+    {
+      "kind": "egl-queue",
+      "scenario": "empty-classes",
+      "archive": "504b0506000000000000000000000000000000000000",
+      "classes": {},
+      "error": ""
+    },
+    {
+      "kind": "split",
+      "scenario": "valid",
+      "archive": "504b0304140000000800000021004d1bd00e0f0000000d0000002a0000006f72672f76696e69782f74657374732f416e64726f696453706c697441706b50726f62652e636c6173734bcbac28292d4a5548ce492c2e0600504b01021403140000000800000021004d1bd00e0f0000000d0000002a00000000000000000000008001000000006f72672f76696e69782f74657374732f416e64726f696453706c697441706b50726f62652e636c617373504b0506000000000100010058000000570000000000",
+      "classes": {
+        "org/vinix/tests/AndroidSplitApkProbe.class": "6669787475726520636c617373"
+      },
+      "error": ""
+    },
+    {
+      "kind": "split",
+      "scenario": "unexpected-class",
+      "archive": "504b0304140000000800000021004d1bd00e0f0000000d0000002a0000006f72672f76696e69782f74657374732f416e64726f696453706c697441706b50726f62652e636c6173734bcbac28292d4a5548ce492c2e0600504b01021403140000000800000021004d1bd00e0f0000000d0000002a00000000000000000000008001000000006f72672f76696e69782f74657374732f416e64726f696453706c697441706b50726f62652e636c617373504b0506000000000100010058000000570000000000",
+      "classes": {
+        "org/vinix/tests/AndroidSplitApkProbe.class": "6669787475726520636c617373",
+        "org/vinix/tests/Other.class": "77726f6e672070726f7669646572"
+      },
+      "error": "fixture contains an unexpected provider class"
+    },
+    {
+      "kind": "split",
+      "scenario": "empty-classes",
+      "archive": "504b0506000000000000000000000000000000000000",
+      "classes": {},
+      "error": "fixture contains no classes"
+    }
+  ],
+  "egl-queue": {
+    "cases": "",
+    "variants": {}
+  },
+  "split": {
+    "cases": "{\n  \"cases\": [\n    {\n      \"name\": \"wrong-package\",\n      \"splits\": [\n        \"bad-package.apk\"\n      ],\n      \"error\": \"Split APK identity does not match the base\"\n    },\n    {\n      \"name\": \"wrong-version\",\n      \"splits\": [\n        \"bad-version.apk\"\n      ],\n      \"error\": \"Split APK identity does not match the base\"\n    },\n    {\n      \"name\": \"empty-name\",\n      \"splits\": [\n        \"bad-empty-name.apk\"\n      ],\n      \"error\": \"Split APK identity does not match the base\"\n    },\n    {\n      \"name\": \"code\",\n      \"splits\": [\n        \"bad-code.apk\"\n      ],\n      \"error\": \"Split APK components or code are not supported\"\n    },\n    {\n      \"name\": \"dependency\",\n      \"splits\": [\n        \"bad-dependent.apk\"\n      ],\n      \"error\": \"Feature and dependent split APKs are not supported\"\n    },\n    {\n      \"name\": \"components\",\n      \"splits\": [\n        \"bad-components.apk\"\n      ],\n      \"error\": \"Split APK components or code are not supported\"\n    },\n    {\n      \"name\": \"duplicate-name\",\n      \"splits\": [\n        \"config.arm64_v8a.apk\",\n        \"duplicate-name.apk\"\n      ],\n      \"error\": \"Split APK identity does not match the base\"\n    },\n    {\n      \"name\": \"hidden-dex\",\n      \"splits\": [\n        \"bad-hidden-dex.apk\"\n      ],\n      \"error\": \"Split APK DEX code is not supported\"\n    },\n    {\n      \"name\": \"missing-manifest\",\n      \"splits\": [\n        \"bad-missing-manifest.apk\"\n      ],\n      \"error\": \"APK archive has no AndroidManifest.xml\"\n    },\n    {\n      \"name\": \"install\",\n      \"splits\": [\n        \"config.arm64_v8a.apk\"\n      ],\n      \"options\": [\n        \"--install\"\n      ],\n      \"error\": \"installing split APKs is not supported\"\n    },\n    {\n      \"name\": \"install-internal\",\n      \"splits\": [\n        \"config.arm64_v8a.apk\"\n      ],\n      \"options\": [\n        \"--install-internal\"\n      ],\n      \"error\": \"installing split APKs is not supported\"\n    }\n  ]\n}\n",
+    "variants": {
+      "bad-code.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"true\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "bad-components.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\"><activity android:name=\"org.vinix.tests.Other\" /></application>\n</manifest>\n",
+      "bad-dependent.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\" configForSplit=\"feature\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "bad-empty-name.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "bad-hidden-dex.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "bad-package.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.other\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "bad-version.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7008\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "config.arm64_v8a.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n",
+      "duplicate-name.apk": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n"
+    }
+  },
+  "template": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<manifest xmlns:android=\"http://schemas.android.com/apk/res/android\" package=\"org.vinix.tests.split\" android:versionCode=\"7007\" split=\"config.arm64_v8a\">\n    <application android:hasCode=\"false\" android:extractNativeLibs=\"true\" />\n</manifest>\n"
+}

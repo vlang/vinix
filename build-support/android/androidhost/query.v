@@ -66,6 +66,7 @@ pub fn query(request string) !string {
 			info := dex_info(hex.decode(text(row, 'data')!)!)!
 			Value([Value(info.classes.map(Value(it))), Value(info.callsites)])
 		}
+		'build_advanced_probe', 'advanced_native_elf' { advanced_query(row, operation)! }
 		'build_simple_probe' { Value(build_simple_probe(row)!) }
 		'archive_simple_classes' {
 			archive_simple_classes(text(row, 'source')!, text(row, 'output')!)!
@@ -81,12 +82,43 @@ pub fn query(request string) !string {
 }
 
 pub fn error_json(err IError) string {
+	if err is AdvancedExit {
+		return encode(Value(map[string]Value{
+			'kind':         Value('AdvancedExit')
+			'error_fs_hex': Value(err.message.bytes().hex())
+		}))
+	}
+	if err is AdvancedCommandError || err is ProbeCaptureError {
+		mut fields := map[string]Value{
+			'kind': Value('CalledProcessError')
+		}
+		if err is AdvancedCommandError {
+			fields['args_fs_hex'] = Value(err.arguments.map(Value(it.bytes().hex())))
+			fields['returncode'] = Value(err.status)
+		} else if err is ProbeCaptureError {
+			fields['args_fs_hex'] = Value(err.arguments.map(Value(it.bytes().hex())))
+			fields['returncode'] = Value(err.status)
+			fields['output'] = Value(err.output)
+		}
+		return encode(Value(fields))
+	}
+	if err is ProbeDecodeError {
+		return encode(Value(map[string]Value{
+			'kind':     Value('UnicodeDecodeError')
+			'encoding': Value('utf-8')
+			'object':   Value(err.data.hex())
+			'start':    Value(err.start)
+			'end':      Value(err.end)
+			'reason':   Value(err.reason)
+		}))
+	}
 	if err is RunnerFileError {
 		return encode(Value(map[string]Value{
-			'kind':         Value('RunnerOSError')
-			'error':        Value(err.original.msg())
-			'errno':        Value(err.original.code())
-			'filename_hex': Value(err.original.filename.bytes().hex())
+			'kind':             Value('RunnerOSError')
+			'error':            Value(err.original.msg())
+			'errno':            Value(err.original.code())
+			'filename_hex':     Value(err.original.filename.bytes().hex())
+			'filename_is_path': Value(err.original.filename_is_path)
 		}))
 	}
 	if err is MissingKey {
@@ -151,6 +183,12 @@ pub fn error_json(err IError) string {
 		return encode(Value(map[string]Value{
 			'kind':  Value('OverflowError')
 			'error': Value(err.msg()[15..])
+		}))
+	}
+	if err.msg().starts_with('IndexError: ') {
+		return encode(Value(map[string]Value{
+			'kind':  Value('IndexError')
+			'error': Value(err.msg()[12..])
 		}))
 	}
 	if err.msg().starts_with('struct.error: ') {
