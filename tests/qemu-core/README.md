@@ -101,6 +101,18 @@ and argument bits; an additional nonzero argument probe checks the instruction
 ABI adapter. The host uses native openat while guests call actual syscall.
 These bounded comparisons supplement the full feature and persistence runner.
 
+The build controllers run in `fixturehost` V code: input staging, immutable
+oracle checks, source ranges, compiler flags, allocator guards and receipts all
+use the native implementation. The existing Python entry points retain their
+argparse interfaces and narrow import, subprocess and exception bindings.
+The independent `test.c`, fixture assertions and guest deadlines are unchanged.
+Controller qualification compares generated sources, headers, objects and
+logs against frozen Python controls on ARM64 and x86-64, and links both SDK
+targets. Mach-O comparisons validate and account for linker UUIDs, object
+timestamps and their derived signature hashes; raw executable hashes remain
+in each receipt. This host-tool qualification does not establish a new kernel
+or guest result.
+
 ## Pending migration checkpoint
 
 The committed `.pending` files preserve unfinished base/memory and futex

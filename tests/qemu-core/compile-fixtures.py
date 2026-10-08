@@ -18,20 +18,10 @@ def load(path, name):
 
 
 def generate(output, arch):
-    if output.resolve().is_relative_to(ROOT.resolve()):
-        raise ValueError("Generate ephemeral C artifacts outside the maintained checkout")
-    output.mkdir(parents=True, exist_ok=True)
-    support = ROOT / "tests/qemu-core/oracle_support.py"
-    if not support.is_file():
-        support = support.with_name(support.name + ".pending")
-    stage = load(support, "qemu_stage").stage_pending
-    compiler = load(ROOT / "build-support/compile-v-module.py", "v_module")
-    for name in MODULES:
-        source = output / name
-        stage(ROOT / "tests/qemu-core" / name, source)
-        artifact = output / f"{name}.c"
-        compiler.generate(source, artifact, arch=arch)
-        compiler.emit_header(source, artifact, output / f"{name}-api.h")
+    _native.command("generate", output=output, arch=arch)
+
+
+_native = load(ROOT / "tests/qemu-core/_fixture_native.py", "qemu_fixture_native")
 
 
 if __name__ == "__main__":
