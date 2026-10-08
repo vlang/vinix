@@ -27,10 +27,12 @@ fn digest(path string) !string {
 			break
 		}
 	}
-	callback('close_handle', {
+	suppressed := callback('close_handle', {
 		'handle': json2.Any(handle)
-	})!
-	if err := inner_error { return err }
+	})!.bool()
+	if !suppressed {
+		if err := inner_error { return err }
+	}
 	return hash.sum([]u8{}).hex()
 }
 

@@ -17,9 +17,11 @@ list, and preload iterators remain lazy on failure.
 Each request owns one native process. Nested cleanup closes its pipes, waits
 five seconds before killing and reaping a stalled controller, retires the
 outstanding hash stream and restores the caller's interrupt handler. Hashing
-closes its stream before returning an earlier read failure, so a close failure
-retains the original precedence. Compiler scratch and the installed controller
-have separate temporary owners. The host executable uses V's normal GC; no
+exits the original stream manager before returning an earlier read failure.
+The manager receives the original exception, may suppress it, and a failing
+exit retains its exception context and precedence. Successful exits ignore
+their return value. Compiler scratch and the installed controller have
+separate temporary owners. The host executable uses V's normal GC; no
 kernel allocation or manualfree behavior changes.
 
 Frozen Python comparisons check header boundaries, filesystem bytes/modes/links,

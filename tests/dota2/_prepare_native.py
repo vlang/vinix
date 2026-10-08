@@ -39,6 +39,20 @@ def _pack(value):
     return value
 
 
+def _exit_stream(manager, cause):
+    if cause is None:
+        manager.__exit__(None, None, None)
+        return False
+    traceback = cause.__traceback__
+    try:
+        raise cause.with_traceback(traceback)
+    except BaseException:
+        try:
+            return bool(manager.__exit__(type(cause), cause, traceback))
+        finally:
+            cause.__traceback__ = traceback
+
+
 def _binary():
     global _BINARY
     with _LOCK:
@@ -78,15 +92,20 @@ def _primitive(operation, row, context):
     if operation == "reference_path":
         return _text(getattr(context["current"], row["function"])(*args))
     if operation == "open_read":
-        handle = Path(args[0]).open("rb")
+        manager = Path(args[0]).open("rb")
+        handle = manager.__enter__()
         ident = str(id(handle))
-        context["handles"][ident] = handle
+        context["handles"][ident] = (manager, handle)
         return ident
     if operation == "read_handle":
-        return context["handles"][row["handle"]].read(row["limit"]).hex()
+        try:
+            return context["handles"][row["handle"]][1].read(row["limit"]).hex()
+        except BaseException as error:
+            context["handle_errors"][row["handle"]] = error
+            raise
     if operation == "close_handle":
-        context["handles"].pop(row["handle"]).close()
-        return None
+        manager, handle = context["handles"].pop(row["handle"])
+        return _exit_stream(manager, context["handle_errors"].pop(row["handle"], None))
     if operation == "attribute":
         return _pack(getattr(context["namespace"], row["name"]))
     if operation == "sequence":
@@ -165,7 +184,8 @@ def _primitive(operation, row, context):
 
 
 def call(operation, *arguments, namespace=None, sequence=None, iterable=None, repo=None):
-    context = {"namespace": namespace, "sequence": sequence, "iterable": iterable, "handles": {}}
+    context = {"namespace": namespace, "sequence": sequence, "iterable": iterable,
+               "handles": {}, "handle_errors": {}}
     errors = []
     child = subprocess.Popen([_binary()], stdin=subprocess.PIPE,
                              stdout=subprocess.PIPE, text=True, env=os.environ)
@@ -216,8 +236,8 @@ def call(operation, *arguments, namespace=None, sequence=None, iterable=None, re
                 try:
                     child.stdout.close()
                 finally:
-                    for handle in context["handles"].values():
-                        handle.close()
+                    for ident, (manager, handle) in context["handles"].items():
+                        _exit_stream(manager, context["handle_errors"].get(ident))
         finally:
             if previous is not None:
                 signal.signal(signal.SIGINT, previous)
