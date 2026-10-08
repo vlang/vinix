@@ -169,6 +169,23 @@ fn unpack2(id string) ![]string {
 	})!.items().map(it.text())
 }
 
+fn unpack(id string, count int) ![]string {
+	return callback('unpack', {
+		'owner': ah.Value(id)
+		'count': ah.Value(count)
+	})!.items().map(it.text())
+}
+
+fn caught(cause IError, kinds []string) !bool {
+	if cause is BindingError {
+		return callback('exception_is', {
+			'error': ah.Value(cause.value)
+			'kinds': ah.Value(kinds.map(ah.Value(it)))
+		})! as bool
+	}
+	return false
+}
+
 fn next(id string) !Next {
 	row := callback('next', {
 		'owner': ah.Value(id)

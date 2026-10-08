@@ -20,6 +20,25 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'add_node' { add_node(args[0], args[1])! }
 		'finish' { return ah.Value(finish(args[0])!) }
 		'build' { return ah.Value(build(args[0], args[1], args[2])!) }
+		'identity' { return ah.Value(identity(args[0])!) }
+		'same_source' { return ah.Value(same_source(args[0], args[1])!) }
+		'export_initialize' { export_initialize(args[0], args[1])! }
+		'close' { export_close(args[0])! }
+		'read_source' { return ah.Value(read_source(args[0], args[1], args[2], args[3])!) }
+		'read' { return ah.Value(disk_read(args[0], args[1], args[2])!) }
+		'receive' { return ah.Value(receive(args[0], args[1])!) }
+		'option_reply' {
+			data := if args.len > 3 {
+				args[3]
+			} else {
+				callback('literal', {
+					'value': b('')
+				})!.text()
+			}
+			option_reply(args[0], args[1], args[2], data)!
+		}
+		'negotiate' { return ah.Value(negotiate(args[0])!) }
+		'handle' { handle(args[0])! }
 		else { return error('unknown ext2 construction operation') }
 	}
 	return ah.Value(json2.Null{})

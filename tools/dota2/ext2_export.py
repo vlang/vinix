@@ -41,13 +41,13 @@ def rounded(value: int, unit: int) -> int:
 
 
 def identity(info: os.stat_result) -> list[int]:
-    return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
+    return _NATIVE.call('identity', (info,), globals())
 
 
 def same_source(info: os.stat_result, recorded: list[int]) -> bool:
     # macOS can number a volume differently after a restart. The inode, size
     # and both timestamps still identify an unchanged file on that volume.
-    return identity(info)[1:] == recorded[1:]
+    return _NATIVE.call('same_source', (info, recorded), globals())
 
 
 @dataclass
@@ -107,165 +107,32 @@ def build(source: Path, state: Path, overlays: list[Path] = ()) -> dict:
 
 class Export:
     def __init__(self, state: Path):
-        manifest = json.loads((state / "manifest.json").read_text())
-        if manifest["version"] != 1:
-            raise ValueError("Unsupported export manifest")
-        self.size = manifest["size"]
-        self.files, self.regions = manifest["files"], manifest["regions"]
-        self.starts = [region[0] for region in self.regions]
-        self.metadata = os.open(state / "metadata.ext2", os.O_RDONLY)
-        self.open_files: OrderedDict[int, int] = OrderedDict()
-        self.lock = threading.Lock()
+        return _NATIVE.call('export_initialize', (self, state), globals())
 
     def close(self) -> None:
-        with self.lock:
-            for fd in self.open_files.values():
-                os.close(fd)
-            self.open_files.clear()
-            os.close(self.metadata)
+        return _NATIVE.call('close', (self,), globals())
 
     def read_source(self, index: int, offset: int, count: int) -> bytes:
         # Bound descriptors while rejecting an updated or replaced host file.
-        with self.lock:
-            entry = self.files[index]
-            fd = self.open_files.pop(index, None)
-            if fd is None:
-                fd = os.open(entry["path"], os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
-            self.open_files[index] = fd
-            while len(self.open_files) > 64:
-                _, expired = self.open_files.popitem(last=False)
-                os.close(expired)
-            if not same_source(os.fstat(fd), entry["identity"]):
-                raise OSError(errno.EIO, f"Source changed; rebuild the export: {entry['path']}")
-            size = entry["identity"][2]
-            wanted = max(0, min(count, size - offset))
-            result = os.pread(fd, wanted, offset)
-            if len(result) != wanted or not same_source(os.fstat(fd), entry["identity"]):
-                raise OSError(errno.EIO, f"Source changed while reading: {entry['path']}")
-            return result + bytes(count - wanted)
+        return _NATIVE.call('read_source', (self, index, offset, count), globals())
 
     def read(self, offset: int, count: int) -> bytes:
-        if offset < 0 or count < 0 or count > MAX_REQUEST or offset + count > self.size:
-            raise OSError(errno.EINVAL, "Invalid disk read range")
-        output = []
-        end = offset + count
-        while offset < end:
-            index = bisect.bisect_right(self.starts, offset) - 1
-            if index >= 0 and offset < self.regions[index][0] + self.regions[index][1]:
-                start, length, source, source_offset = self.regions[index]
-                length = min(end - offset, start + length - offset)
-                output.append(self.read_source(source, source_offset + offset - start, length))
-            else:
-                next_index = index + 1
-                boundary = self.starts[next_index] if next_index < len(self.starts) else self.size
-                length = min(end - offset, boundary - offset)
-                data = os.pread(self.metadata, length, offset)
-                if len(data) != length:
-                    raise OSError(errno.EIO, "Short metadata read")
-                output.append(data)
-            offset += length
-        return b"".join(output)
+        return _NATIVE.call('read', (self, offset, count), globals())
 
 
 def receive(connection: socket.socket, count: int) -> bytes:
-    parts = []
-    while count:
-        part = connection.recv(count)
-        if not part:
-            raise EOFError
-        parts.append(part)
-        count -= len(part)
-    return b"".join(parts)
+    return _NATIVE.call('receive', (connection, count), globals())
 
 
 class Handler(socketserver.BaseRequestHandler):
     def option_reply(self, option: int, kind: int, data: bytes = b"") -> None:
-        self.request.sendall(struct.pack(">QIII", REPLY_MAGIC, option, kind, len(data)) + data)
+        return _NATIVE.call('option_reply', (self, option, kind, data), globals())
 
     def negotiate(self) -> bool:
-        self.request.sendall(struct.pack(">QQH", NBD_MAGIC, OPTION_MAGIC, 3))
-        flags, = struct.unpack(">I", receive(self.request, 4))
-        if not flags & 1 or flags & ~3:
-            return False
-        for _ in range(64):
-            magic, option, length = struct.unpack(">QII", receive(self.request, 16))
-            if magic != OPTION_MAGIC or length > 65536:
-                return False
-            data = receive(self.request, length)
-            if option == 2:  # ABORT
-                self.option_reply(option, 1)
-                return False
-            if option == 1:  # EXPORT_NAME
-                if data != self.server.export_name:
-                    return False
-                self.request.sendall(struct.pack(">QH", self.server.export.size, EXPORT_FLAGS))
-                if not flags & 2:
-                    self.request.sendall(bytes(124))
-                return True
-            if option == 3:  # LIST
-                name = self.server.export_name
-                self.option_reply(option, 2, struct.pack(">I", len(name)) + name)
-                self.option_reply(option, 1)
-            elif option in (6, 7):  # INFO / GO
-                if len(data) < 6:
-                    self.option_reply(option, 0x80000003)
-                    continue
-                name_length, = struct.unpack_from(">I", data)
-                if name_length > len(data) - 6:
-                    self.option_reply(option, 0x80000003)
-                    continue
-                name = data[4:4 + name_length]
-                infos, = struct.unpack_from(">H", data, 4 + name_length)
-                if len(data) != name_length + 6 + infos * 2:
-                    self.option_reply(option, 0x80000003)
-                elif name != self.server.export_name:
-                    self.option_reply(option, 0x80000006)
-                else:
-                    self.option_reply(option, 3, struct.pack(">HQH", 0, self.server.export.size, EXPORT_FLAGS))
-                    requested = struct.unpack_from(f">{infos}H", data, 6 + name_length)
-                    if 3 in requested:
-                        self.option_reply(option, 3, struct.pack(">HIII", 3, 1, BLOCK, MAX_REQUEST))
-                    self.option_reply(option, 1)
-                    if option == 7:
-                        return True
-            else:
-                self.option_reply(option, 0x80000001)
-        return False
+        return _NATIVE.call('negotiate', (self,), globals())
 
     def handle(self) -> None:
-        self.request.settimeout(120)
-        self.request.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        try:
-            if not self.negotiate():
-                return
-            # The guest can spend minutes compiling shaders between reads.
-            # Keep the handshake bounded, then let the negotiated disk remain
-            # available until the client disconnects.
-            self.request.settimeout(None)
-            while True:
-                magic, flags, command, handle, offset, length = struct.unpack(">IHH8sQI", receive(self.request, 28))
-                if magic != REQUEST_MAGIC or length > MAX_REQUEST:
-                    return
-                if command == 2:  # DISC
-                    return
-                error, data = 0, b""
-                if command == 1:  # Consume WRITE payload before rejecting it.
-                    receive(self.request, length)
-                    error = errno.EROFS
-                elif flags:
-                    error = errno.EINVAL
-                elif command == 0:
-                    try:
-                        data = self.server.export.read(offset, length)
-                    except OSError as exc:
-                        error = exc.errno or errno.EIO
-                elif command == 3:  # FLUSH on a read-only export.
-                    pass
-                else:
-                    error = errno.EROFS if command in (4, 6) else errno.EINVAL
-                self.request.sendall(struct.pack(">II8s", 0x67446698, error, handle) + data)
-        except (EOFError, ConnectionError, socket.timeout):
-            pass
+        return _NATIVE.call('handle', (self,), globals())
 
 
 class Server(socketserver.ThreadingTCPServer):

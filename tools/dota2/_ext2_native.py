@@ -30,9 +30,14 @@ _defaults, _methods = {}, {}
 
 def bind(namespace):
     _defaults.update((name, namespace[name]) for name in
-        ("rounded", "scan", "flatten", "directory_data", "pointer_count", "backup_group", "build"))
+        ("rounded", "scan", "flatten", "directory_data", "pointer_count", "backup_group", "build",
+         "identity", "same_source", "receive"))
     _methods.update((name, getattr(namespace["Builder"], name)) for name in
         ("allocate", "write", "address_tree", "add_node", "finish"))
+    _methods.update((name, getattr(namespace["Export"], name)) for name in
+        ("close", "read_source", "read"))
+    _methods.update((name, getattr(namespace["Handler"], name)) for name in
+        ("option_reply", "negotiate", "handle"))
 
 
 def call(operation, arguments, namespace, *, controller=None):
@@ -107,6 +112,29 @@ def call(operation, arguments, namespace, *, controller=None):
             return None
         if method == "resolve":
             return retain(resolve(row["name"]))
+        if method == "exception_is":
+            return isinstance(errors[row["error"]["binding_error"]],
+                              tuple(resolve(name) for name in row["kinds"]))
+        if method == "error_object":
+            return retain(errors[row["error"]["binding_error"]])
+        if method == "unpack":
+            source = objects[row["owner"]]
+            count = row["count"]
+            if count == 1:
+                a, = source
+                values = (a,)
+            elif count == 3:
+                a, b, c = source
+                values = (a, b, c)
+            elif count == 4:
+                a, b, c, d = source
+                values = (a, b, c, d)
+            elif count == 6:
+                a, b, c, d, e, f = source
+                values = (a, b, c, d, e, f)
+            else:
+                raise RuntimeError("unsupported native scalar unpack binding")
+            return [retain(item) for item in values]
         if method == "dispatch":
             arguments = [value(item) for item in row["args"]]
             if "owner" in row:
