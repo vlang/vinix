@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
 """Boot the AArch64 QEMU machine and enforce the core guest-test result."""
-
 from __future__ import annotations
-
 import argparse
-import errno
 import os
 from pathlib import Path
 import platform
-import pty
-import select
-import signal
-import socket
 import sys
-import time
-
+from _vm_native import command, CHILD_BINDING
 
 PASS_MARKER = b"VINIX QEMU CORE: PASS"
 PERSIST_MARKER = b"VINIX QEMU CORE PERSIST: PASS"
@@ -81,253 +73,46 @@ AMD64_FEATURE_MARKERS = (
 
 
 def available_port() -> str:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return str(listener.getsockname()[1])
+    return command("vm_available_port")
 
 
 def exit_code(status: int) -> int:
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return 128 + os.WTERMSIG(status)
-    return 1
+    os.WIFEXITED(status)
+    return command("vm_exit_code", status=int(status))
 
 
 def stop_child(pid: int, master: int) -> None:
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
-
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+    command("vm_stop_child", pid=pid, master=master)
 
 
-def run_phase(
-    root: Path,
-    guest_init: Path,
-    initramfs: Path,
-    state_dir: Path,
-    timeout: int,
-    verification_boot: bool,
-) -> int:
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(initramfs)
-    environment["VINIX_BOOT_DISK"] = str(state_dir / "boot.img")
-    environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    command = [
-        str(root / "scripts/run-aarch64.sh"),
-        "--serial",
-        "--mem=2048",
-        f"--guest-init={guest_init}",
-    ]
-    if verification_boot or os.environ.get("VINIX_QEMU_CORE_NO_BUILD") == "1":
-        command.insert(1, "--no-build")
-
-    phase = "persistence verification" if verification_boot else "core feature"
-    print(f"==> Starting AArch64 QEMU {phase} boot")
-
-    pid, master = pty.fork()
-    if pid == 0:
-        os.chdir(root)
-        os.execve(command[0], command, environment)
-
-    transcript = bytearray()
-    status: int | None = None
-    forced_stop = False
-    shutdown_deadline: float | None = None
-    deadline = time.monotonic() + timeout
-    try:
-        while time.monotonic() < deadline:
-            waited, child_status = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                status = child_status
-                break
-
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if readable:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                if chunk:
-                    transcript.extend(chunk)
-                    sys.stdout.buffer.write(chunk)
-                    sys.stdout.buffer.flush()
-
-            recent = bytes(transcript[-131072:])
-            expected_final = PERSIST_MARKER if verification_boot else PASS_MARKER
-            finished = expected_final in recent or any(
-                marker in recent for marker in FAIL_MARKERS
-            )
-            if finished and shutdown_deadline is None:
-                try:
-                    os.write(master, b"\x01x")
-                except OSError as error:
-                    if error.errno != errno.EIO:
-                        raise
-                shutdown_deadline = time.monotonic() + 10
-            if shutdown_deadline is not None and time.monotonic() >= shutdown_deadline:
-                break
-    finally:
-        if status is None:
-            forced_stop = True
-            stop_child(pid, master)
-        os.close(master)
-
-    output = bytes(transcript)
-    expected_markers = (PERSIST_MARKER,) if verification_boot else (
-        *FEATURE_MARKERS,
-        PASS_MARKER,
-    )
-    missing = [marker.decode("ascii") for marker in expected_markers
-               if output.count(marker) != 1]
-    failures = [
-        marker.decode("ascii", errors="replace")
-        for marker in FAIL_MARKERS
-        if marker in output
-    ]
-    if status is not None and exit_code(status) != 0:
-        failures.append(f"VM runner exit status {exit_code(status)}")
-    if forced_stop:
-        failures.append("VM did not exit after the test")
-    if missing or failures:
-        for item in missing:
-            print(f"ERROR: missing expected QEMU result: {item}", file=sys.stderr)
-        for item in failures:
-            print(f"ERROR: observed QEMU failure: {item}", file=sys.stderr)
-        return 1
-    print(f"==> AArch64 QEMU {phase} boot passed")
-    return 0
+def _timeout(timeout):
+    return {"timeout_text": str(int(timeout) if isinstance(timeout, int) else timeout),
+            "timeout_kind": "number" if isinstance(timeout, (int, float)) else type(timeout).__name__}
 
 
-def run_vm(
-    root: Path,
-    guest_init: Path,
-    initramfs: Path,
-    state_dir: Path,
-    timeout: int,
-) -> int:
-    state_dir.mkdir(parents=True, exist_ok=True)
-    result = run_phase(root, guest_init, initramfs, state_dir, timeout, False)
-    if result != 0:
-        return result
-    result = run_phase(root, guest_init, initramfs, state_dir, timeout, True)
-    if result == 0:
-        print("==> AArch64 QEMU core regression passed across reboot")
-    return result
+def run_phase(root: Path, guest_init: Path, initramfs: Path, state_dir: Path,
+              timeout: int, verification_boot: bool) -> int:
+    return command("core_phase", root=root, guest_init=guest_init,
+                   initramfs=initramfs, state_dir=state_dir,
+                   verification=verification_boot, system=platform.system(),
+                   python=sys.executable, child_binding=CHILD_BINDING,
+                   **_timeout(timeout))
+
+
+def run_vm(root: Path, guest_init: Path, initramfs: Path,
+           state_dir: Path, timeout: int) -> int:
+    return command("core_vm", root=root, guest_init=guest_init,
+                   initramfs=initramfs, state_dir=state_dir,
+                   system=platform.system(), python=sys.executable,
+                   child_binding=CHILD_BINDING, **_timeout(timeout))
 
 
 def run_amd64(iso: Path, qemu: str, firmware: Path, timeout: int, cpus: int = 4) -> int:
     """One boot of an amd64 ISO whose init is the test. amd64 has no persistent
     volume for the second boot to check, so only the first runs."""
-    command = [
-        qemu,
-        "-machine", "q35,smm=off",
-        "-accel", os.environ.get("VINIX_QEMU_ACCEL", "tcg"),
-        "-cpu", "max",
-        "-m", "2048",
-        # The concurrent-wakeup case pins workers to the available CPUs.
-        "-smp", str(cpus),
-        "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}",
-        "-cdrom", str(iso),
-        "-display", "none",
-        "-monitor", "none",
-        "-serial", "stdio",
-        "-no-reboot",
-    ]
-    print("==> Starting amd64 QEMU core feature boot")
-    pid, master = pty.fork()
-    if pid == 0:
-        os.execvp(command[0], command)
-
-    transcript = bytearray()
-    deadline = time.monotonic() + timeout
-    finished_at: float | None = None
-    try:
-        while time.monotonic() < deadline:
-            waited, _ = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                break
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if readable:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                transcript.extend(chunk)
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
-            recent = bytes(transcript[-131072:])
-            if finished_at is None and (PASS_MARKER in recent
-                                        or any(marker in recent for marker in FAIL_MARKERS)):
-                finished_at = time.monotonic()
-            if finished_at is not None and time.monotonic() - finished_at > 2:
-                break
-    finally:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-        try:
-            os.waitpid(pid, 0)
-        except ChildProcessError:
-            pass
-        os.close(master)
-
-    output = bytes(transcript)
-    missing = [marker.decode("ascii")
-               for marker in (*FEATURE_MARKERS, *AMD64_FEATURE_MARKERS, PASS_MARKER)
-               if output.count(marker) != 1]
-    failures = [marker.decode("ascii", errors="replace")
-                for marker in FAIL_MARKERS if marker in output]
-    if finished_at is None:
-        failures.append("the test did not finish before the timeout")
-    for item in missing:
-        print(f"ERROR: missing expected QEMU result: {item}", file=sys.stderr)
-    for item in failures:
-        print(f"ERROR: observed QEMU failure: {item}", file=sys.stderr)
-    if missing or failures:
-        return 1
-    print("==> amd64 QEMU core regression passed")
-    return 0
+    return command("core_amd64", iso=str(iso), qemu=qemu, firmware=str(firmware),
+                   cpus_text=str(cpus), python=sys.executable,
+                   child_binding=CHILD_BINDING, **_timeout(timeout))
 
 
 def main() -> int:

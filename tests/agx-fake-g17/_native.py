@@ -14,9 +14,11 @@ import signal
 
 # No installation, imports of the frontend, or policy runs in a forked child.
 # These two stdlib primitives retain Python's original exec/chdir exceptions.
-if __name__ == "__main__" and sys.argv[1:2] == ["--vinix-pty-child"]:
-    os.chdir(os.fsdecode(bytes.fromhex(sys.argv[2])))
+if __name__ == "__main__" and sys.argv[1:2] in (["--vinix-pty-child"], ["--vinix-pty-child-path"]):
     argv = json.loads(sys.argv[3])
+    if sys.argv[1] == "--vinix-pty-child-path":
+        os.execvp(argv[0], argv)
+    os.chdir(os.fsdecode(bytes.fromhex(sys.argv[2])))
     os.execve(argv[0], argv, os.environ)
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,7 +78,7 @@ def command(operation, **fields):
                 raise subprocess.CalledProcessError(child.returncode, child.args)
             if response is None:
                 raise RuntimeError("native retirement transport ended without a response")
-    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline", "kernel", "state", "reference", "python", "child_binding", "path"):
+    for name in ("root", "output", "temp_dir", "encoder_reference", "verifier_reference", "baseline", "kernel", "state", "reference", "python", "child_binding", "path", "guest_init", "initramfs", "state_dir", "iso", "firmware"):
         if name in fields:
             fields[name + "_hex"] = os.fsencode(fields.pop(name)).hex()
     if operation != "vm_stop_child":
@@ -84,7 +86,7 @@ def command(operation, **fields):
             result = Path(directory) / "result.json"
             argv = [str(_BINARY), "--command", str(result),
                     json.dumps({"operation": operation, **fields})]
-            if operation == "vm_test":
+            if operation in ("vm_test", "core_phase", "core_vm", "core_amd64"):
                 with subprocess.Popen(argv, env=os.environ) as child:
                     try:
                         status = child.wait()

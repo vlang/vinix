@@ -28,6 +28,7 @@ pub mut:
 	host_arch string
 	path_arguments []int
 	path_executable string
+	python_stdout_buffered bool
 }
 
 fn (mut out Transcript) typed_arguments(argv []string, paths []int) {

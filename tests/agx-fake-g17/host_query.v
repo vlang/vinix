@@ -32,6 +32,19 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 	if operation == 'vm_available_port' { return agxhost.vm_available_port()! }
 	if operation == 'vm_quit_monitor' { return agxhost.vm_quit_monitor((row['path'] or { json2.Any('') }).str())! }
 	if operation == 'vm_exit_code' { return agxhost.vm_child_exit_code((row['status'] or { json2.Any(0) }).int()) }
+	if operation == 'core_policy' {
+		text := hex.decode((row['text_hex'] or { json2.Any('') }).str())!.bytestr()
+		missing, failures := agxhost.core_results(text, (row['verification'] or { json2.Any(false) }).bool(),
+			(row['amd64'] or { json2.Any(false) }).bool(), (row['has_status'] or { json2.Any(false) }).bool(),
+			(row['status'] or { json2.Any(0) }).int(), (row['forced'] or { json2.Any(false) }).bool(), (row['finished'] or { json2.Any(false) }).bool())
+		return {'missing': json2.Any(missing.map(json2.Any(it))), 'failures': json2.Any(failures.map(json2.Any(it)))}
+	}
+	if operation == 'core_amd64' {
+		return out.core_amd64((row['iso'] or { json2.Any('') }).str(), (row['qemu'] or { json2.Any('qemu-system-x86_64') }).str(),
+			(row['firmware'] or { json2.Any('None') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
+			(row['timeout_kind'] or { json2.Any('number') }).str(), (row['cpus_text'] or { json2.Any('4') }).str(),
+			(row['python'] or { json2.Any('python3') }).str(), (row['child_binding'] or { json2.Any('') }).str())!
+	}
 	root := (row['root'] or { return error('Missing root') }).str()
 	if operation == 'host' {
 		out.host_verifier(root, row['machine'] or { json2.Any('') }.str(), row['encoder_reference'] or { json2.Any('') }.str(), row['verifier_reference'] or { json2.Any('') }.str())!
@@ -47,6 +60,18 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 	} else if operation == 'vm_test' {
 		return out.vm_test(root, row['timeout_text'] or { json2.Any('180') }.str(), row['timeout_kind'] or { json2.Any('number') }.str(), row['python'] or { json2.Any('python3') }.str(),
 			(row['child_binding'] or { return error('Missing child binding') }).str())!
+	} else if operation in ['core_phase', 'core_vm'] {
+		if operation == 'core_phase' {
+			return out.core_phase(root, (row['guest_init'] or { json2.Any('') }).str(), (row['initramfs'] or { json2.Any('') }).str(),
+				(row['state_dir'] or { json2.Any('') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
+				(row['timeout_kind'] or { json2.Any('number') }).str(), (row['verification'] or { json2.Any(false) }).bool(),
+				(row['python'] or { json2.Any('python3') }).str(), (row['child_binding'] or { json2.Any('') }).str(),
+				(row['system'] or { json2.Any('Darwin') }).str())!
+		}
+		return out.core_vm(root, (row['guest_init'] or { json2.Any('') }).str(), (row['initramfs'] or { json2.Any('') }).str(),
+			(row['state_dir'] or { json2.Any('') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
+			(row['timeout_kind'] or { json2.Any('number') }).str(), (row['python'] or { json2.Any('python3') }).str(),
+			(row['child_binding'] or { json2.Any('') }).str(), (row['system'] or { json2.Any('Darwin') }).str())!
 	} else {
 		return error('Unknown AGX host operation ' + operation)
 	}
@@ -121,13 +146,14 @@ fn failure(err IError, out agxhost.Transcript, operation string) map[string]json
 fn evaluate(text string, inherited bool) map[string]json2.Any {
 	mut out := agxhost.Transcript{ inherit: inherited }
 	mut row := hosttest.decode_json(text) or { return failure(err, out, '') }.as_map()
-	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline', 'kernel', 'state', 'reference', 'python', 'child_binding', 'path'] {
+	for name in ['root', 'output', 'temp_dir', 'encoder_reference', 'verifier_reference', 'baseline', 'kernel', 'state', 'reference', 'python', 'child_binding', 'path', 'guest_init', 'initramfs', 'state_dir', 'iso', 'firmware'] {
 		if encoded := row[name + '_hex'] {
 			bytes := hex.decode(encoded.str()) or { return failure(err, out, '') }
 			row[name] = bytes.bytestr()
 		}
 	}
 	out.host_arch = row['host_arch'] or { json2.Any('') }.str()
+	out.python_stdout_buffered = !(row['stdout_line_buffered'] or { json2.Any(true) }).bool()
 	operation := row['operation'] or { json2.Any('') }.str()
 	value := request(row, mut out) or {
 		if inherited {
