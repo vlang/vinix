@@ -116,6 +116,7 @@ fn parse_args(args []string) !(string, string) {
 		arg := args[index]
 		if !positional && arg == '--' { positional = true; index++; continue }
 		if !positional && arg == '-h=' { eprintln('argument -h/--help: ignored explicit argument'); exit(1) }
+		if !positional && arg.starts_with('-h') && !arg[1..].bytes().all(it == `h`) { return error('argument -h/--help: ignored explicit argument') }
 		name := arg.all_before('=')
 		if !positional && ((arg.starts_with('-h') && arg[1..].bytes().all(it == `h`)) || (name.starts_with('--') && '--help'.starts_with(name))) {
 			if arg.contains('=') { return error('argument --help: ignored explicit argument') }
