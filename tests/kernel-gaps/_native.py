@@ -46,7 +46,8 @@ class _Process(subprocess.Popen):
 _controller = _host.Controller(_HERE / "guest_query.v", "VINIX_KERNEL_GAP_QUERY", process=_Process)
 
 
-def call(operation, arguments, namespace, resources=None):
+def call(operation, arguments, namespace, resources=None, controller=None):
+    transport = _controller if controller is None else controller
     resources = {} if resources is None else resources
     errors, pending = [], []
     previous = None
@@ -149,10 +150,15 @@ def call(operation, arguments, namespace, resources=None):
             try:
                 raise error.with_traceback(traceback)
             except BaseException:
+                replay = error.__traceback__
+                error.__traceback__ = traceback
                 try:
                     return bool(entry.__exit__(type(error), error, traceback))
                 finally:
-                    error.__traceback__ = traceback
+                    if error.__traceback__ is replay:
+                        error.__traceback__ = traceback
+        if method == "raise_builtin":
+            raise getattr(builtins, row["kind"])(argument(row["value"]))
         if method == "next":
             try:
                 return {"done": False, "owner": retain(next(resources[row["id"]]))}
@@ -174,7 +180,7 @@ def call(operation, arguments, namespace, resources=None):
             return resources["drain"]()
         if method == "stop":
             return namespace["stop"](resources["pid"], resources["master"], resources["state"],
-                lambda: call("drain", {"master": resources["master"]}, namespace, resources))
+                lambda: call("drain", {"master": resources["master"]}, namespace, resources, transport))
         if method == "reaped":
             resources["reaped"] = True
             return None
@@ -202,10 +208,13 @@ def call(operation, arguments, namespace, resources=None):
         try:
             raise error.with_traceback(traceback)
         except BaseException:
+            replay = error.__traceback__
+            error.__traceback__ = traceback
             try:
                 return library_primitive(method, row)
             finally:
-                error.__traceback__ = traceback
+                if error.__traceback__ is replay:
+                    error.__traceback__ = traceback
 
     def cleanup():
         # Recover an unreaped owned runner after transport or stop failure.
@@ -245,14 +254,16 @@ def call(operation, arguments, namespace, resources=None):
             previous = handler
             signal.signal(signal.SIGINT, interrupt)
     try:
-        result = _controller.call({"operation": operation, "arguments": arguments}, primitive,
+        result = transport.call({"operation": operation, "arguments": arguments}, primitive,
             pack=_wire._pack, unpack=_wire._unpack, errors=errors, cleanup=cleanup,
             exception=failure,
             error_fields=lambda error: {"os_error": isinstance(error, OSError),
                 "blocking": isinstance(error, BlockingIOError), "errno": getattr(error, "errno", None),
                 "child_error": isinstance(error, ChildProcessError),
                 "permission": isinstance(error, PermissionError),
-                "missing": isinstance(error, ProcessLookupError)})
+                "missing": isinstance(error, ProcessLookupError),
+                "value_error": isinstance(error, ValueError),
+                "called_process": isinstance(error, subprocess.CalledProcessError)})
         if pending: raise pending.pop(0)
         def restore(value):
             if isinstance(value, list): return [restore(item) for item in value]
