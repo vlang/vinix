@@ -91,6 +91,9 @@ launch commands, and the current limits.
 
 ## Roadmap
 
+See [the roadmap to 1.0](roadmap.md) for the full feature-parity plan for macOS,
+Linux and Windows, implementation milestones, and release acceptance criteria.
+
 - [x] Alpine Linux/musl userland
 - [x] bash
 - [x] zsh + Oh My Zsh
