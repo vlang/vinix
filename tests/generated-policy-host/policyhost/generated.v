@@ -91,6 +91,9 @@ fn compile_test(directory string, filename string, content string, family string
 }
 pub fn dispatch(row map[string]json2.Any) !json2.Any {
 	operation := text(row, 'operation')
+	if operation == 'assembly_main' { return assembly_main(decoded(text(row, 'root'))!) }
+	if operation == 'assembly_content' { return json2.Any(assembly_content(decoded(text(row, 'header'))!, decoded(text(row, 'source'))!)!.bytes().hex()) }
+	if operation == 'assembly_constant' { return json2.Any((if text(row, 'name') == 'C' { assembly_c } else { assembly_ports }).bytes().hex()) }
 	if operation == 'extract' { return json2.Any(extract(decoded(text(row, 'source'))!, text(row, 'name'), text(row, 'family'))!.bytes().hex()) }
 	if operation == 'allocation' { return json2.Any(allocation(decoded(text(row, 'source'))!, text(row, 'family'))) }
 	family := text(row, 'family')

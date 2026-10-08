@@ -65,6 +65,8 @@ def _primitive(operation, row, owners):
             subprocess.run(argv, check=True)
             return None
         return _text(subprocess.check_output(argv, text=True))
+    if operation == "integer":
+        return str(int(_untext(row["text"]), row["base"]))
     if operation == "print":
         print(_untext(row["text"]))
         return None
