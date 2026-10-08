@@ -179,6 +179,10 @@ fn main_policy(mut args map[string]ah.Value) !ah.Value {
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
 	mut args := ah.field(row, 'arguments').object()
 	return match text(row, 'operation') {
+		'read_serial' { read_serial()! }
+		'send_input' { send_input(args)! }
+		'observed_input' { observed_policy()! }
+		'supervise' { supervise(args)! }
 		'qmp' { qmp_policy(text(args, 'socket'), text(args, 'name'), ah.field(args, 'options'))! }
 		'keyboard' { keyboard_policy(text(args, 'socket'), ah.field(args, 'text'), text(row, 'root'))! }
 		'click' { click_policy(args)! }

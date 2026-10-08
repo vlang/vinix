@@ -7,7 +7,9 @@ USTAR payload deduplication and streaming SHA-256, optional probe staging and
 checksum publication, deployment field assembly, and main validation, path
 resolution and prepare/run sequencing. Previously native ELF extraction,
 split planning and deployment text generation are reused without additional
-migration credit. The live PTY supervisor and QMP helpers are still Python.
+migration credit. Native policy also owns QMP/input/screenshot helpers and the
+live foreground, serial and input worker loops. Python retains PTY creation,
+thread/library primitives and the caller's interrupt/final-cleanup boundary.
 
 `result.v` owns complete post-session probe verification, marker and failure
 precedence, optional preflight identities, result fields, JSON/status publication
@@ -146,3 +148,29 @@ The existing 649 workflow/helper/actual-library pairs, 34 error reconstruction
 pairs, fourteen retirement controls and ten unchanged PTY fixtures also passed
 per profile. Evidence is under
 `~/.cache/vinix-python-to-v/android-helper-concurrency-20261008/`.
+
+`supervisor.v` owns live serial polling and byte forwarding, acknowledgement
+transcript extraction, input sequencing and foreground marker/deadline/join
+policy. Each reader/input worker uses an independent controller. The parent
+holds the shared bytearray, error/retry lists, Event and Thread objects; callbacks
+mutate these original owners directly. The input join remains 25 seconds and the
+reader join remains two seconds. The caller keeps its original PTY creation,
+interactive interrupt fallback, screenshot and VM/descriptor/socket cleanup, so
+an interrupt between native callbacks still follows the original boundary.
+Worker exception boundaries retain OSError versus Exception routing and original
+threading.excepthook behavior. The serial log's distinct manager/entered values
+retire explicitly or through transport fallback.
+
+Qualification against frozen source `2bd0606f` passed 54 exact serial/input/
+observer pairs and 75 foreground/deadline/error pairs on ARM64, actual Rosetta
+x86_64 and ARM ASan/UBSan. Five complete real-PTY pairs per profile cover more
+than 1.2 MB drained during blocked keyboard input, OSError versus other thread
+exception identity, and caller-group Ctrl-C before and after READY. Two abrupt
+serial-owner retirement controls and two foreground EOF/constructor retirement
+controls passed per profile. All existing 649 workflow/helper/library pairs,
+34 error-reconstruction pairs, fourteen transport/resource retirement controls
+and ten untouched interactive PTY fixtures passed against the final controllers;
+cold private installations also passed all ten fixtures on both host ABIs.
+Evidence is under `~/.cache/vinix-python-to-v/android-supervisor-20261008/`.
+The stage ports 3,352 original Python bytes (66 policy lines), with 925 net
+Python bytes removed after bindings. It adds no Android device or guest claim.

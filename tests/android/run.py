@@ -93,104 +93,37 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
         os.chdir(args.repo)
         os.execve(command[0], command, environment)
     transcript = bytearray()
-    passed = False
-    observed = False
-    guest_failed = False
-    typed = False
-    input_thread = None
-    input_errors = []
-    input_retries = []
-    serial_errors = []
+    input_errors, input_retries, serial_errors = [], [], []
     reader_stop = threading.Event()
-    failure = "timeout"
-    deadline = float("inf") if args.interactive else time.monotonic() + args.timeout
+    group = {"transcript": transcript, "input_errors": input_errors, "input_retries": input_retries,
+             "serial_errors": serial_errors, "reader_stop": reader_stop, "input_thread": None,
+             "passed": False, "observed": False, "guest_failed": False, "typed": False,
+             "failure": "timeout", "state": state, "socket": socket_path, "pid": pid, "master": master,
+             "deadline": float("inf") if args.interactive else time.monotonic() + args.timeout}
 
     def read_serial() -> None:
         try:
-            with (state / "serial.log").open("wb") as log:
-                while not reader_stop.is_set():
-                    if not select.select([master], [], [], 0.1)[0]:
-                        continue
-                    try:
-                        chunk = os.read(master, 65536)
-                    except OSError as error:
-                        if error.errno != errno.EIO:
-                            raise
-                        break
-                    if not chunk:
-                        break
-                    transcript.extend(chunk)
-                    log.write(chunk)
-                    log.flush()
-                    sys.stdout.buffer.write(chunk)
-                    sys.stdout.buffer.flush()
+            _runner.call("read_serial", {}, globals(), args=args, group=group)
         except OSError as error:
             serial_errors.append(str(error))
 
     def send_input() -> None:
         try:
-            time.sleep(3)
-            screenshot(socket_path, state / "ready.png")
-            click(socket_path, *args.click)
-            def observed_input() -> str:
-                lines = bytes(transcript[-262144:]).replace(b"\r", b"").split(b"\n")[:-1]
-                for line in reversed(lines):
-                    if line.startswith(b"ANDROID-INPUT "):
-                        return line[len(b"ANDROID-INPUT "):].decode("utf-8")
-                return ""
-            input_retries.append(keyboard(socket_path, args.keys, observed_input))
+            _runner.call("send_input", vars(args), globals(), args=args, group=group)
         except Exception as error:
             input_errors.append(str(error))
 
-    # Serial must remain readable during QMP calls, settling and shutdown:
-    # a full pipe blocks QEMU's monitor as well as its console output.
+    # A separate controller keeps serial readable while QMP waits for input.
     reader = threading.Thread(target=read_serial, daemon=True)
     reader.start()
     try:
-        while time.monotonic() < deadline:
-            if os.waitpid(pid, os.WNOHANG)[0] == pid:
-                failure = "VM exited before observing a window" if args.interactive else "VM exited before passing"
-                break
-            time.sleep(0.1)
-            recent = bytes(transcript[-262144:])
-            if b"ANDROID-READY" in recent and args.input == "qmp" and not args.observe and not typed:
-                typed = True
-                input_thread = threading.Thread(target=send_input, daemon=True)
-                input_thread.start()
-            if input_errors or serial_errors:
-                guest_failed = True
-                failure = f"host I/O failed: {(input_errors or serial_errors)[0]}"
-                break
-            if any(marker in recent for marker in FAILURES):
-                guest_failed = True
-                failure = "guest reported a failure"
-                if args.interactive:
-                    observed = False
-                else:
-                    # Allow the diagnostic tail to reach the serial transcript.
-                    deadline = min(deadline, time.monotonic() + 4)
-            if args.interactive and b"ANDROID-READY" in recent and not observed and not guest_failed:
-                observed = True
-                print("Interactive APK window ready; application functionality is unchecked. "
-                      "Use the QEMU window locally; Ctrl-C stops the session.", flush=True)
-            if not args.interactive and b"ANDROID-PASS" in recent and not guest_failed:
-                passed = True
-                time.sleep(2)
-                break
-            if not args.interactive and b"ANDROID-OBSERVED" in recent and args.observe and not guest_failed:
-                observed = True
-                time.sleep(2)
-                break
-        if input_thread:
-            input_thread.join(timeout=25)
-            if input_thread.is_alive() or input_errors:
-                passed = False
-                failure = f"keyboard input failed: {input_errors[0] if input_errors else 'timeout'}"
+        _runner.call("supervise", vars(args), globals(), args=args, group=group,
+                     workers={"send_input": send_input})
     except KeyboardInterrupt:
         if not args.interactive:
             raise
-        if not observed and not guest_failed:
-            failure = "interactive session stopped before observing a window"
+        if not group["observed"] and not group["guest_failed"]:
+            group["failure"] = "interactive session stopped before observing a window"
     finally:
         try:
             if args.interactive:
@@ -202,13 +135,13 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
                     screenshot(socket_path, args.screenshot)
                 except (OSError, RuntimeError, ImportError) as error:
                     print(f"Screenshot failed: {error}", file=sys.stderr)
-                    passed = False
-                    observed = False
-                    failure = "screenshot failed"
+                    group["passed"] = False
+                    group["observed"] = False
+                    group["failure"] = "screenshot failed"
             else:
-                passed = False
-                observed = False
-                failure = "VM did not expose QMP"
+                group["passed"] = False
+                group["observed"] = False
+                group["failure"] = "VM did not expose QMP"
         finally:
             stop_vm(pid, master)
             reader_stop.set()
@@ -216,9 +149,9 @@ def run(args: argparse.Namespace, overlay: Path | None) -> int:
             os.close(master)
             socket_path.unlink(missing_ok=True)
     return _runner.call("finalize", {"args": vars(args), "state": state,
-                                     "transcript_hex": bytes(transcript).hex(), "passed": passed,
-                                     "observed": observed, "failure": failure,
-                                     "guest_failed": guest_failed, "input_retries": input_retries},
+                                     "transcript_hex": bytes(transcript).hex(), "passed": group["passed"],
+                                     "observed": group["observed"], "failure": group["failure"],
+                                     "guest_failed": group["guest_failed"], "input_retries": input_retries},
                         globals(), args=args)
 
 

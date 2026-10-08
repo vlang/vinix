@@ -128,6 +128,7 @@ def _exit(owner, exception):
 
 def _arguments(items, context, resources):
     return [Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
+            else (lambda operation=value: call(operation, {}, context, args=resources['args'], group=resources['group'])) if kind == 'callback'
             else getattr(context[value[0]], value[1]) if kind == 'constant' else value
             for kind, value in items]
 
@@ -157,6 +158,27 @@ def _primitive(operation, row, context, resources):
     path = Path(row['path']) if 'path' in row else None
     if operation == 'invoke':
         return _snapshot(_invoke(row, context, resources))
+    if operation == 'invoke_bytes':
+        return _invoke(row, context, resources).hex()
+    if operation == 'error_attribute':
+        return _snapshot(getattr(resources['errors'][row['error']['binding_error']], row['name']))
+    if operation == 'group_get':
+        return _snapshot(resources['group'][row['name']])
+    if operation == 'group_set':
+        resources['group'][row['name']] = row['value']
+        return None
+    if operation == 'group_truth':
+        return bool(resources['group'][row['name']])
+    if operation == 'group_method':
+        return _snapshot(getattr(resources['group'][row['name']], row['method'])(*_arguments(row.get('arguments', []), context, resources), **row.get('options', {})))
+    if operation == 'group_bytes':
+        return bytes(resources['group'][row['name']][slice(*row.get('slice', [None, None]))]).hex()
+    if operation == 'stream_method':
+        return getattr(getattr(getattr(context['sys'], row['stream']), row['field']), row['name'])(*_arguments(row.get('arguments', []), context, resources))
+    if operation == 'thread_start':
+        worker = context['threading'].Thread(target=resources['workers'][row['worker']], daemon=True)
+        resources['group'][row['name']] = worker
+        return worker.start()
     if operation == 'enter_context':
         manager = _invoke(row, context, resources)
         entered = manager.__enter__()
@@ -181,6 +203,10 @@ def _primitive(operation, row, context, resources):
         return row['value'][row['key']]
     if operation == 'contains':
         return row['key'] in row['value']
+    if operation == 'constant':
+        return getattr(context[row['module']], row['name'])
+    if operation == 'constant_bytes':
+        return [value.hex() for value in context[row['name']]]
     if operation == 'python_version':
         return list(sys.version_info[:2])
     if operation == 'builtin':
@@ -260,6 +286,7 @@ def _primitive(operation, row, context, resources):
         return str(value[row['index']] if 'index' in row else value)
     if operation == 'function':
         result = context[row['name']](*_arguments(row.get('arguments', []), context, resources),
+                                     *(getattr(resources['args'], row['star_attribute']) if 'star_attribute' in row else []),
                                      **row.get('options', {}))
         return _snapshot(result)
     if operation == 'run':
@@ -296,7 +323,7 @@ def _primitive(operation, row, context, resources):
     if operation == 'parser_error':
         return resources['parser'].error(row['message'])
     if operation == 'print':
-        print(row['data'], file=context['sys'].stderr if row.get('stderr') else context['sys'].stdout)
+        print(row['data'], file=context['sys'].stderr if row.get('stderr') else context['sys'].stdout, **row.get('options', {}))
         return None
     if operation == 'roblox_validate':
         spec = context['importlib'].util.spec_from_file_location('vinix_roblox_builder', Path(row['source']))
@@ -350,9 +377,9 @@ _transport = _Transport(_HERE / 'run-query.v', 'VINIX_ANDROID_RUN_QUERY',
                         eof_message='native Android runner ended before returning a result')
 
 
-def call(operation, arguments, context, args=None, parser=None, inodes=None, observed=None):
+def call(operation, arguments, context, args=None, parser=None, inodes=None, observed=None, group=None, workers=None):
     resources = {'args': args, 'parser': parser, 'archives': [], 'iterators': {}, 'infos': [], 'handles': [],
-                 'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed}
+                 'inodes': {} if inodes is None else inodes, 'contexts': [], 'modules': {}, 'observed': observed, 'group': group, 'workers': workers}
     errors = []
     resources['errors'] = errors
     def cleanup():
