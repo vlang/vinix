@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `6fa66c2d3660c97b13f23bf88af1224163595a92`, Linguist 7.27.0 reports
-**Python 6.67%** (476 files, 2,806,197 bytes) and **V 78.69%** (1,584 files,
-33,120,391 bytes). The complete committed-blob inventory and reproduction
+At source `10dcea973ec9189fb2b148459edb648ec188e015`, Linguist 7.27.0 reports
+**Python 6.46%** (477 files, 2,727,002 bytes) and **V 78.93%** (1,614 files,
+33,301,593 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,400,088 Python bytes**. Roughly another
-0.70 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,479,283 Python bytes**. Roughly another
+0.62 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 79 completed stages have a gross
-scope of **2,564,909 bytes**. Counted import bridges, forwarders, caller edits
-and concurrent committed Python changes account for **164,821 bytes**
+tests, including comments and blank lines. The 87 completed stages have a gross
+scope of **2,663,062 bytes**. Counted import bridges, forwarders, caller edits
+and concurrent committed Python changes account for **183,779 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -108,6 +108,14 @@ no extra migration credit.
 | AGX complete trace workflow | `tests/agx-fake-g17/agxhost/trace*.v` | 10,251 / 134 | `26d6b3ad04d8e43b3cb8cc03ebc90e40bd91835d` |
 | Android ART and Bionic independent fixture controllers | `tests/android/runtimefixture, art-runtime-test.v` | 12,118 / 237 | `f75ef88bbf2c74347adec79a26d910d4b562ee7a` |
 | Font coverage, fallback, layout and output policies | `desktop/tools/fonthost, font_query.v` | 17,972 / 416 | `6fa66c2d3660c97b13f23bf88af1224163595a92` |
+| Android musl independent receipt fixtures | `tests/android/runtimefixture/musl.v` | 7,174 / 151 | `edb0b66cfcd29b150f36f246754130239548d6df` |
+| AGX native fixture guest builder | `tests/agx-fake-g17/agxhost/native*.v` | 4,698 / 65 | `d2a477101d31e1d69649fbfa7c5a9fc9157a5350` |
+| Complete offline OVMF fixtures | `tests/qemu-ovmf/ovmffixture, test_patch.v` | 16,807 / 419 | `57be4858aa1cc8ffa925e9769c69bdf37acec813` |
+| Complete Android bootclasspath fixtures | `tests/android/runtimefixture/boot.v` | 8,996 / 166 | `f4fc4156ed65d07381350627896b71fc140d2d36` |
+| Complete QEMU source/build/staging workflow | `build-support/dota2/qemubuild, qemu_builder.v` | 13,128 / 251 | `34ee6a12833c915014aaab218134bae88ee604e9` |
+| Generated syscall, permission and disk-policy controllers | `tests/generated-policy-host/policyhost` | 29,558 / 597 | `15113790448ee4c3f675fb62633c15c3ff0605e3` |
+| Mesa AGX guest PTY and QMP ownership | `tests/agx-fake-g17/agxhost/vm*.v` | 6,982 / 190 | `8ecc7c264d31ce58d9c8a78eb94dceade459c161` |
+| CPU assembly and scheduler-frame probe controller | `tests/generated-policy-host/policyhost/assembly*.v` | 10,810 / 220 | `10dcea973ec9189fb2b148459edb648ec188e015` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -624,6 +632,71 @@ workloads were not weakened.
   scope. No committed atlas, bundled fonts or provenance records change. Real
   source/artifact arrays below 2 GiB are qualified; advance integers are unbounded.
 
+- The ten original musl receipt fixtures run with identical unittest IDs and
+  filters on both host ABIs and native sanitizers. Existing ART/Bionic cases
+  and the complete 26-case runtime corpus pass. A parent-owned scratch guardian
+  preserves independent assertion failures while retiring descendants even
+  when native assertions exit without running defers; forced failures in all
+  three fixture families preserve status/stderr and remove their roots.
+- The AGX native guest builder compares eight complete architecture/oracle
+  variants, eighteen ordered failures, four actual inherited-environment
+  cases and seven CLI/cold-entry controls per profile. Four fresh independent
+  encoder/verifier guests pass, one of each on ARM and x86, using explicitly
+  hashed prepared kernels. This establishes new guest runs, without claiming
+  fresh kernel builds or GPU operation.
+- All twelve original offline OVMF fixtures run in V with their original Git,
+  shell, patch and optional-environment assertions. Nineteen ordered builder
+  status/stdout/stderr/driver-byte observations match per profile at identical
+  isolated paths. Constructor/assertion failures retire exact directory and
+  descriptor baselines; four actual-ABI cold-entry groups pass. Upstream mode
+  tables, the firmware patch and build script retain their committed bytes.
+  These tests do not build edk2, publish firmware or boot a guest.
+- All nine original bootclasspath fixture cases run on both actual host ABIs
+  and sanitizers, including exact DEX builders at 0/1/10/1,687/3,297 classes,
+  provenance mutations and strict JSON float types. Parent guardians retain
+  assertion status and remove the original case directory on forced failure.
+  The unchanged combined runtime corpus and musl fixtures pass through the
+  additive primitive bindings. This fixture stage invokes controlled production
+  APIs; it does not establish Java/compiler/application or guest execution.
+- QEMU staging compares 38 complete original/native workflows per profile,
+  thirty CLI controls and isolated cold public-front controls on each host ABI.
+  Three native ownership functions also pass sanitizers. Actual pinned upstream
+  source preparation, patching, static AArch64 compilation, ELF validation and
+  staged publication pass. Native helper sources participate in cache identity.
+  One accidentally nonterminal original CLI control wrote default build/staging
+  artifacts; it is excluded from passing evidence, and only proven new staging
+  artifacts were archived. The existing shared build cache was never reset.
+- Generated-code controllers compare nine whole build plans and exact
+  independent C fixture bytes, 780 extraction/error/Unicode controls and 122
+  ordered whole-policy failure cases per profile. Six complete original/native
+  sanitizer fixture pairs pass on each profile for syscall, execute-only and
+  disk-policy inputs on both architectures. Nine forced primitive failures keep
+  the original exception objects and retire scratch. One hundred repeated
+  requests restore exact descriptor baselines; abrupt controller exits also
+  retire parent-owned scratch. Twelve CLI controls and full cold entry pass
+  on both actual host ABIs. Existing generated-C inputs are frozen and hashed;
+  they do not establish fresh kernel builds or QEMU boots.
+- AGX Mesa PTY ownership compares 9,105 marker/prompt/resource/status controls,
+  eleven real PTY/QMP flows, eleven public socket/borrowed-child controls,
+  three interrupt flows, nine typed timeouts and seven CLI controls per profile.
+  Native owners retire 100 sockets and 100 children to exact descriptor counts.
+  Further interrupts cannot abandon a child during retirement; overflowing
+  timeouts retain their original error while retiring the original leaked PID.
+  Two fresh original/native Mesa guests match the same prepared-image FAIL:127:
+  missing Wayland/dri_loader/arc4random runtime symbols prevent rendering. Exact
+  final diagnostics and hashed kernel/image/runtime inputs are retained. This
+  is paired baseline failure evidence, with no rendering or fresh-build PASS.
+- The CPU assembly controller retains exact generated assembly/C fixture bytes
+  and all six tool/execute commands, twenty-two ordered adapter/layout/tool/symbol
+  controls and three forced scratch-retirement failures per profile. Unbounded
+  symbol addresses retain decimal precision; int(base16) remains a narrow
+  counted stdlib primitive. Both original and native actual sanitizer workloads
+  pass 1,024 per-CPU cases, all fifteen register thunks and independent scheduler
+  frame assertions. Three ignored-argument CLI pairs and full cold invocation
+  pass on both host ABIs. The other three generated-code fixture controllers
+  also pass their actual ARM and x86 regression workloads. Kernel assembly
+  inputs remain unchanged; this host stage adds no kernel or guest claims.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -726,6 +799,22 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `agx-host-20261008` | `preference-qualification.json` | `876ada7bb2edf4bdf2ed54635aed585010557c972862d0d89c5b21ee9ba5bcca` |
 | `agx-trace-runner-20261008` | `preference-api-qualification.json` | `0f5261b0f44958880f426db86a7b322102c2a10c36cc01bc5c779c1e0cd47850` |
 | `agx-native-builder-20261008` | `schema-qualification.json` | `803db3ab268997be6c5be887c77a123258ed56add1b6a63d8e85f75d45c48912` |
+| `android-musl-fixtures-20261008/final` | `qualification.json` | `11e19cc5c880d44fc52b2e25ffe196d6ca7a4b82a6b6d5fb8be12bceb27649c9` |
+| `android-musl-fixtures-20261008/final` | `post-commit.json` | `7650a1fd12f54b7967b5c50ed0db6ee602e13d5bd0948a617a4059a7d3048cf1` |
+| `agx-native-builder-20261008` | `qualification.json` | `6a7db91e1e471210d494c572d5ef0312664a2253063d05e7a6070f023a746892` |
+| `agx-native-builder-20261008` | `post-commit.json` | `9e8e32284cf4aead49e5b9250e05138bd0c1a83f136f29c5a5cda88e1fa19af4` |
+| `ovmf-fixtures-20261008` | `qualification.json` | `12c20d64d8d7ab5e1d939180b6465e21dccce5b9aaf616c28d76a4b1a2670558` |
+| `ovmf-fixtures-20261008` | `post-commit.json` | `b1e44ed2d3f6a9bc67a2be9149cbac34ddf038ecfe56697a31e60b42afcadfd1` |
+| `android-boot-fixtures-20261008/final` | `qualification.json` | `3233e9c899bf6eb7ea9361622f8e8f2576f1134e820f8ad07eee80e11391dd18` |
+| `android-boot-fixtures-20261008/final` | `post-commit.json` | `ab60d592909b0a9d46214207a7a580848b46685b9bff60af3dad163ddaea3bdb` |
+| `dota-family-20261008/qemu-builder-stage` | `qemu-builder-qualification.json` | `3cb16adaba86cfe58348737e6ab6a6f361b1576d03aab88bd56dadcd705bf5f6` |
+| `dota-family-20261008/qemu-builder-stage` | `qemu-builder-committed.json` | `b6565fe1ed936be1f88ab9ec18888ed9a8057f35206de31fe40484278b8d71b0` |
+| `generated-policy-host-20261008` | `qualification.json` | `640b318e32596e2649fb5b7ef6d1405b562208ee33e390b70ff7e18cdc90e655` |
+| `generated-policy-host-20261008` | `post-commit.json` | `63d48b78635cdbeedd3469ac09132d111ab6fd03993e60f7422ddd166649df7e` |
+| `agx-pty-20261008` | `qualification.json` | `5c5be3aad8657c700dffeec59e3012fd143e75516f933540bf4e52175c946d73` |
+| `agx-pty-20261008` | `post.json` | `e68df69d699520fe5bb51ebfdf63a8c747a39b2cef8fd1127148eb5a5f52afe6` |
+| `generated-policy-host-20261008` | `assembly-qualification.json` | `edccc6ac6b76c3bc36a42dc00b309d54bf6d8bde7cad3e9556b4a85cb27f3a31` |
+| `generated-policy-host-20261008` | `assembly-post-commit.json` | `26c61d5771b1bc7c0d6a5e2b203392d9c428a0f600ebf8a156e18cd53a7bbcae` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
