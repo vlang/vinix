@@ -176,7 +176,7 @@ The stage ports 3,352 original Python bytes (66 policy lines), with 925 net
 Python bytes removed after bindings. It adds no Android device or guest claim.
 
 A zero-credit context replay correction restores the retained error's traceback
-before invoking `__exit__`, as well as afterward. Managers again observe their
+before invoking `__exit__`. Managers again observe their
 supplied traceback as `error.__traceback__`, while the original error remains
 active for exit and suppression truth coercion. Python 3.9's internal
 `sys.exc_info()[2]` can retain the replay frame; identical frame lists are not
@@ -188,3 +188,15 @@ production traceback relation, active-error and suppression/replacement pairs,
 the existing file/manager/helper/library/decoder corpora, sixteen owner/transport
 retirement controls and all ten unchanged interactive PTY fixtures. Evidence is
 under `~/.cache/vinix-python-to-v/android-manager-traceback-20261009/`.
+
+Replay retirement preserves traceback changes made deliberately by `__exit__`:
+it replaces the saved traceback only when the error still points at the replay.
+Clearing or replacing the property, including real `unittest.assertRaises`
+suppression, remains visible to the caller. This follow-up earns zero port credit.
+
+All three host profiles passed 28 original/production mutation and real-library
+pairs, four native serial-manager mutation/assertRaises pairs, the earlier
+eighteen direct and 54 native traceback relation pairs, all file/manager/helper/
+library/decoder regressions, sixteen retirement controls and ten unchanged PTY
+fixtures. Evidence is under
+`~/.cache/vinix-python-to-v/android-manager-mutation-20261009/`.

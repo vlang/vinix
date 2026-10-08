@@ -120,11 +120,13 @@ def _exit(owner, exception):
     try:
         raise error.with_traceback(traceback)
     except BaseException:
+        replay = error.__traceback__
         error.__traceback__ = traceback
         try:
             return bool(owner.__exit__(*exception))
         finally:
-            error.__traceback__ = traceback
+            if error.__traceback__ is replay:
+                error.__traceback__ = traceback
 
 
 def _arguments(items, context, resources):
