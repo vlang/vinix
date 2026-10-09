@@ -24,37 +24,28 @@ RELEASES = {
 }
 
 
+from runpy import run_path as _run_path
+
+_musl_binding = _run_path(str(ROOT / "tools/_package_store_native.py"))
+_musl_Popen = subprocess.Popen
+_musl_controller = _musl_binding["_host"].Controller(Path(__file__).with_name("stage_query.v"), "VINIX_MUSL_QUERY",
+    process=lambda *args, **kwargs: _musl_Popen(*args, start_new_session=True, **kwargs))
+
+
+def _musl_call(operation, arguments):
+    return _musl_binding["call"](operation, arguments, globals(), controller=_musl_controller)
+
+
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _musl_call('sha256', (path,))
 
 
 def install(source: Path, target: Path, mode: int) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.is_file() and not target.is_symlink() and sha256(target) == sha256(source):
-        if target.stat().st_mode & 0o777 == mode:
-            return
-    fd, temporary = tempfile.mkstemp(prefix="." + target.name + ".", dir=target.parent)
-    try:
-        with os.fdopen(fd, "wb") as output:
-            output.write(source.read_bytes())
-        os.chmod(temporary, mode)
-        os.replace(temporary, target)  # Replace a link itself, never its destination.
-    finally:
-        Path(temporary).unlink(missing_ok=True)
+    return _musl_call('install', (source, target, mode))
 
 
 def replace_link(target: Path, destination: str) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.is_symlink() and os.readlink(target) == destination:
-        return
-    fd, temporary = tempfile.mkstemp(prefix="." + target.name + ".", dir=target.parent)
-    os.close(fd)
-    os.unlink(temporary)
-    try:
-        os.symlink(destination, temporary)
-        os.replace(temporary, target)
-    finally:
-        Path(temporary).unlink(missing_ok=True)
+    return _musl_call('replace_link', (target, destination))
 
 
 def main() -> int:
