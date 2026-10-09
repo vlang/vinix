@@ -249,6 +249,7 @@ fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) 
 
 		buffer_final := voidptr(u64(buffer) + i * ata_bytes_per_sector)
 		proc.account_disk_transfer(actual_count * ata_bytes_per_sector, false)
+		proc.account_disk_io(dev.stat.rdev, actual_count * ata_bytes_per_sector, false)
 		unsafe { C.memcpy(buffer_final, dev.prdt_cache, actual_count * ata_bytes_per_sector) }
 	}
 	return i64(count)
@@ -318,6 +319,7 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 		kio.port_out[u8](dev.device_port, u8(val))
 		kio.port_out[u8](dev.cmd_port, 0xea) // Cache flush EXT command.
 		proc.account_disk_transfer(actual_count * ata_bytes_per_sector, true)
+		proc.account_disk_io(dev.stat.rdev, actual_count * ata_bytes_per_sector, true)
 		for {
 			status := kio.port_in[u8](dev.cmd_port)
 			if status & 0x80 == 0 {

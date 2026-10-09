@@ -3,7 +3,8 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-mkdir -p "$work/modules/kbudget" "$work/modules/klock" "$work/modules/memory" "$work/modules/errno"
+mkdir -p "$work/modules/cgcontrol" "$work/modules/kbudget" "$work/modules/klock" "$work/modules/memory" "$work/modules/errno"
+cp "$root/kernel/cgcontrol/control.v" "$work/modules/cgcontrol/"
 cp "$root/kernel/kbudget/budget.v" "$root/tests/kernel-resources/budget_test.v" "$work/modules/kbudget/"
 cat > "$work/v.mod" <<'EOF'
 Module { name: 'kernel_resource_budget_tests' }

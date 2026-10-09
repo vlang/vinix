@@ -76,7 +76,7 @@ fn C.vinix_ext2_rename(context voidptr, old_parent u32, old_name &char, old_leng
 // *Only the V layer binds hardware; this file never guesses a physical address.
 //
 
-fn C.vinix_account_disk_transfer(bytes u64, write i32)
+fn C.vinix_account_disk_transfer(index u32, bytes u64, write i32)
 
 // Internal errors are stable diagnostics, not userspace errno numbers.
 
@@ -1190,7 +1190,7 @@ pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) 
 			if rc {
 				return rc
 			}
-			C.vinix_account_disk_transfer(u64(bytes), 0)
+			C.vinix_account_disk_transfer(index, u64(bytes), 0)
 			a_sync(a, 131072, usize(bytes), 1)
 			a_copy(voidptr(out), voidptr(a.dma + 131072 + within), n)
 			offset += u64(n)
@@ -1315,7 +1315,7 @@ pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64
 				return a_fail(a, -rc)
 			}
 			a.writes_completed++
-			C.vinix_account_disk_transfer(u64(transfer), 1)
+			C.vinix_account_disk_transfer(index, u64(transfer), 1)
 			absolute += u64(bytes)
 			in_ += bytes
 			count -= bytes

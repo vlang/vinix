@@ -7,6 +7,7 @@ import apple.ans.ext2core as _
 import apple.ans.anscore as _
 
 import resource
+import proc
 import fs
 import stat
 import file
@@ -239,6 +240,7 @@ fn publish(index u32, partition int, start u64, blocks u64, name string) {
 	res.stat.blocks = res.stat.size / 512
 	res.stat.blksize = i64(sector)
 	res.stat.rdev = resource.create_dev_id()
+	if partition < 0 { proc.set_native_disk_id(index, res.stat.rdev) }
 	// Raw storage is not made readable to every unprivileged user.
 	writable := partition >= 0 && C.vinix_ans_partition_writable(index, u32(partition)) != 0
 	res.stat.mode = (if writable { u32(0o600) } else { u32(0o440) }) | stat.ifblk

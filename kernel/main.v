@@ -11,6 +11,7 @@ import lib.stubs
 import limine
 import memory
 import proc
+import sched
 import pagecache
 import socket.inet
 import time
@@ -44,31 +45,32 @@ const writeback_interval_seconds = i64(5)
 // all. Linux answers this with a writeback timer; so does this thread. sync(2)
 // and reboot(2) are still the exact guarantees, and this only bounds the window
 // for everything that never calls them, including a VM window simply closed.
-fn writeback_thread() {
+// Quota-delayed disk writeback must not postpone retirement, OOM recovery or
+// pressure delivery for every other workload on the machine.
+fn maintenance_thread() {
 	mut seconds := i64(0)
 	for {
-		mut interval := time.new_timer(time.TimeSpec{
-			tv_sec: 1
-			tv_nsec: 0
-		})
+		mut interval := time.new_timer(time.TimeSpec{tv_sec: 1})
 		event.await_one(mut interval.event, true) or {}
 		interval.disarm()
 		unsafe { free(interval) }
 		memory.pressure_maintenance()
 		proc.reap_processes()
 		fs.reap_removed()
+		fs.cgroup_pressure_maintenance()
 		seconds++
-		if seconds % writeback_interval_seconds != 0 { continue }
-		// A device that cannot take the write keeps its pages dirty and
-		// retryable, so the next round tries again rather than giving up.
+		if seconds == 30 || seconds % 300 == 0 { krandom.stir() }
+	}
+}
+
+fn writeback_thread() {
+	for {
+		mut interval := time.new_timer(time.TimeSpec{tv_sec: writeback_interval_seconds})
+		event.await_one(mut interval.event, true) or {}
+		interval.disarm()
+		unsafe { free(interval) }
 		pagecache.sync_all()
-		// DHCP runs from the scheduler's poll callback, which cannot write to
-		// the root filesystem. This is a thread that can.
+		sched.park_for_io()
 		inet.publish_resolver()
-		// Reseed the random generator half a minute after boot, once the
-		// boot's own events are in its pool, and every five minutes after.
-		if seconds == 30 || seconds % 300 == 0 {
-			krandom.stir()
-		}
 	}
 }

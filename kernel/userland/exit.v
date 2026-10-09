@@ -179,6 +179,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// walking the one freed below, and none finds it on the zombie afterwards.
 	proc.lock_table()
 	proc.preserve_peak_rss(current_process, old_pagemap)
+	proc.forget_cgroup_memory_locked(mut current_process)
 	current_process.pagemap = unsafe { nil }
 	proc.unlock_table()
 

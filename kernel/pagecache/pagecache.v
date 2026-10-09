@@ -5,6 +5,8 @@ module pagecache
 import errno
 import klock
 import memory
+import proc
+import cgcontrol
 
 pub const page_bytes = u64(4096)
 pub const default_capacity = 128
@@ -42,6 +44,7 @@ mut:
 	index u64
 	valid u64
 	dirty bool
+	io_group &cgcontrol.Group = unsafe { nil }
 	// Set while sync writes a copy of the page with the lock dropped. Until the
 	// write lands the page cannot be evicted, discarded or freed, and nothing
 	// else may write it: an older copy landing after a newer one would leave
@@ -183,6 +186,8 @@ fn (mut this Cache) flush_page(mut page Page, context voidptr, store IO) ? {
 	if !page.dirty {
 		return
 	}
+	previous_io := proc.begin_cgroup_io(page.io_group)
+	defer { proc.end_cgroup_io(previous_io) }
 	ret := store(context, voidptr(page.data), page.index * page_bytes, page.valid) or {
 		return none
 	}
@@ -199,6 +204,7 @@ fn (mut this Cache) mark_dirty(mut page Page) {
 	if page.dirty {
 		return
 	}
+	page.io_group = proc.current_cgroup_io()
 	page.dirty = true
 	page.dirty_previous = this.dirty_last
 	page.dirty_next = unsafe { nil }
@@ -475,9 +481,12 @@ fn (mut this Cache) write_behind(context voidptr, store IO) {
 		}
 		count := this.run_length(oldest)
 		length := this.gather_run(oldest.index, count, this.behind_run)
+		previous_io := proc.begin_cgroup_io(oldest.io_group)
 		written := store(context, this.behind_run, oldest.index * page_bytes, length) or {
+			proc.end_cgroup_io(previous_io)
 			return
 		}
+		proc.end_cgroup_io(previous_io)
 		if written != i64(length) {
 			return
 		}
@@ -494,7 +503,7 @@ fn (this &Cache) run_length(first &Page) u64 {
 	mut count := u64(1)
 	for count < max_run_pages {
 		next := this.resident_page(first.index + count)
-		if next == unsafe { nil } || !next.dirty || next.writeback {
+		if next == unsafe { nil } || !next.dirty || next.writeback || voidptr(next.io_group) != voidptr(first.io_group) {
 			break
 		}
 		count++
@@ -578,6 +587,7 @@ fn (mut this Cache) write_back(context voidptr, store IO, index u64) ? {
 		}
 	}
 	count := this.run_length(first)
+	run_group := first.io_group
 	length := this.gather_run(index, count, this.sync_run)
 	for i in 0 .. count {
 		mut page := this.resident_page(index + i)
@@ -586,6 +596,8 @@ fn (mut this Cache) write_back(context voidptr, store IO, index u64) ? {
 	}
 	this.l.release()
 
+	previous_io := proc.begin_cgroup_io(run_group)
+	defer { proc.end_cgroup_io(previous_io) }
 	written := store(context, this.sync_run, index * page_bytes, length) or { i64(-1) }
 
 	this.l.acquire()

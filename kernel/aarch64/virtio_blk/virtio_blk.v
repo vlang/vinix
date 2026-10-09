@@ -244,7 +244,7 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 	if read {
 		unsafe { C.memcpy(buffer, voidptr(device.data_virt), count) }
 	}
-	proc.account_disk_io(count, !read)
+	proc.account_disk_io(device.stat.rdev, count, !read)
 	return true
 }
 

@@ -9,6 +9,7 @@ import klock
 import krandom
 import memory
 import resource
+import cgcontrol
 
 const compressed_limit = 2048
 const max_disk_slots = u64(1048576)
@@ -22,6 +23,9 @@ mut:
 	changed    eventstruct.Event
 	busy       bool     = true
 	refs       int      = 2 // the newly detached mapping and its pageout worker
+	mapping_refs int    = 1 // excludes temporary fault and worker pins
+	swap_group &cgcontrol.Group = unsafe { nil }
+	swap_charged bool
 	next       &Backing = unsafe { nil }
 	physical   voidptr
 	compressed voidptr
@@ -143,9 +147,14 @@ fn read_u32(input &u8) u32 {
 // the pending object before dropping VM locks prevents a fault zero-filling
 // the page while the worker is compressing or writing it.
 pub fn detached(physical voidptr) &Backing {
+	return detached_for_group(physical, unsafe { nil })
+}
+
+pub fn detached_for_group(physical voidptr, group &cgcontrol.Group) &Backing {
+	if !cgcontrol.reserve_swap(group, memory.page_size) { return unsafe { nil } }
 	mut backing := unsafe { &Backing(memory.malloc_packed_fallible(sizeof(Backing))) }
-	if backing == unsafe { nil } { return unsafe { nil } }
-	unsafe { *backing = Backing{ physical: physical } }
+	if backing == unsafe { nil } { cgcontrol.release_swap(group, memory.page_size); return unsafe { nil } }
+	unsafe { *backing = Backing{ physical: physical, swap_group: group, swap_charged: true } }
 	store_lock.acquire()
 	backing.next = backings
 	backings = backing
@@ -160,6 +169,35 @@ pub fn retain(_backing &Backing) {
 	store_lock.release()
 }
 
+pub fn retain_mapping(_backing &Backing) {
+	mut backing := unsafe { _backing }
+	store_lock.acquire()
+	backing.refs++
+	backing.mapping_refs++
+	store_lock.release()
+}
+
+pub fn release_mapping(_backing &Backing) {
+	mut backing := unsafe { _backing }
+	store_lock.acquire()
+	assert backing.mapping_refs > 0
+	backing.mapping_refs--
+	if backing.mapping_refs == 0 && backing.swap_charged {
+		cgcontrol.release_swap(backing.swap_group, memory.page_size)
+		backing.swap_charged = false
+	}
+	store_lock.release()
+	release(backing)
+}
+
+// Caller owns a mapping pin under its shadow lock. Compression and refault
+// workers do not affect the number of owners sharing the logical page.
+pub fn mapping_sharers(backing &Backing) u64 {
+	store_lock.acquire()
+	defer { store_lock.release() }
+	return u64(backing.mapping_refs)
+}
+
 pub fn release(_backing &Backing) {
 	if _backing == unsafe { nil } { return }
 	mut backing := unsafe { _backing }
@@ -169,6 +207,7 @@ pub fn release(_backing &Backing) {
 		store_lock.release()
 		return
 	}
+	if backing.swap_charged { cgcontrol.release_swap(backing.swap_group, memory.page_size) }
 	mut previous := unsafe { &Backing(nil) }
 	mut current := backings
 	for voidptr(current) != voidptr(backing) {

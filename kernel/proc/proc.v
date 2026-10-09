@@ -194,6 +194,7 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 
 pub struct Process {
 pub mut:
+	constructing bool
 	kernel_owner kbudget.Owner
 	kernel_charge kbudget.Charge
 	fd_table_charge kbudget.Charge
@@ -393,6 +394,8 @@ pub mut:
 	// The controller state of that cgroup, nil for the root. See
 	// cgroup_account.v.
 	cgroup_account &CGroupAccount = unsafe { nil }
+	cgroup_anonymous_bytes u64
+	cgroup_paged_bytes u64
 	// Pages faulted in since memory.max was last checked for this process.
 	faults_since_memory_check u32
 	oom_score_adj   int
@@ -774,6 +777,8 @@ fn release_thread_slot(tid int) {
 	if t != unsafe { nil } {
 		adjust_policy_count(t.sched.is_special(), false)
 		release_thread_number(t)
+		mut released := unsafe { t }
+		release_cgroup_task(mut released)
 	}
 	threads_by_tid[tid] = unsafe { nil }
 }
@@ -884,6 +889,8 @@ pub fn allocate_tid(thrd &Thread) ?int {
 // which takes that lock before the process's thread-list lock.
 fn allocate_tid_locked(thrd &Thread) ?int {
 	i := find_free_id()?
+	mut charged := unsafe { thrd }
+	if !reserve_cgroup_task(mut charged, unsafe { nil }) { return none }
 	threads_by_tid[i] = unsafe { thrd }
 	adjust_policy_count(false, thrd.sched.is_special())
 	return i
@@ -902,14 +909,23 @@ pub fn bind_tid(tid int, thrd &Thread) bool {
 	}
 	if thrd.process != unsafe { nil } && thrd.process.exiting { return false }
 
-	bind_tid_locked(tid, thrd)
-	return true
+	return bind_tid_locked(tid, thrd)
 }
 
 // The caller holds the process table lock and has reserved this process id.
-fn bind_tid_locked(tid int, thrd &Thread) {
+fn bind_tid_locked(tid int, thrd &Thread) bool {
+	mut charged := unsafe { thrd }
+	mut replacing := threads_by_tid[tid]
+	if replacing == unsafe { nil } {
+		caller := current_thread()
+		if caller != unsafe { nil } && thrd.process != unsafe { nil } && caller.quota_pid == thrd.process.pid {
+			replacing = caller
+		}
+	}
+	if !reserve_cgroup_task(mut charged, replacing) { return false }
 	threads_by_tid[tid] = unsafe { thrd }
 	adjust_policy_count(false, thrd.sched.is_special())
+	return true
 }
 
 pub fn free_tid(tid int) {

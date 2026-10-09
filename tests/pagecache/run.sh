@@ -8,13 +8,29 @@ if ! command -v "$v" >/dev/null 2>&1; then
 fi
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-mkdir -p "$tmp/modules/pagecache" "$tmp/modules/errno" "$tmp/modules/klock" "$tmp/modules/memory" "$tmp/modules/katomic"
+mkdir -p "$tmp/modules/pagecache" "$tmp/modules/errno" "$tmp/modules/klock" "$tmp/modules/memory" "$tmp/modules/katomic" "$tmp/modules/cgcontrol" "$tmp/modules/proc"
+cp "$root/kernel/cgcontrol/control.v" "$tmp/modules/cgcontrol/"
 cp "$root/kernel/pagecache/"*.v "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/pagecache_test.v" "$tmp/modules/pagecache/"
 cp "$root/tests/pagecache/registry_test.v" "$tmp/modules/pagecache/"
+cp "$root/tests/pagecache/group_test.v" "$tmp/modules/pagecache/"
 cat > "$tmp/v.mod" <<'MOD'
 Module { name: 'pagecache_host_tests' }
 MOD
+cat > "$tmp/modules/proc/proc.v" <<'VEOF'
+@[has_globals]
+module proc
+import cgcontrol
+pub struct CGroupIOContext { pub: group &cgcontrol.Group = unsafe { nil } active bool }
+__global (pub io_group &cgcontrol.Group = unsafe { nil })
+pub fn current_cgroup_io() &cgcontrol.Group { return io_group }
+pub fn begin_cgroup_io(group &cgcontrol.Group) CGroupIOContext {
+    previous := CGroupIOContext{group: io_group, active: true}
+    io_group = unsafe { group }
+    return previous
+}
+pub fn end_cgroup_io(previous CGroupIOContext) { io_group = previous.group }
+VEOF
 # Kernel locks, page allocation, reclaimer registration and errno are replaced
 # by host facilities. Both cache and global writeback code run unchanged.
 cat > "$tmp/modules/pagecache/host.v" <<'VEOF'

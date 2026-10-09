@@ -6,6 +6,7 @@ import katomic
 import lib
 import memory
 import pager
+import kbudget
 import proc
 import sched
 import resource
@@ -116,7 +117,7 @@ fn forget_paged_locked(mut global MmapRangeGlobal, page u64) {
 	node := paged_find(global.paged_pages, page)
 	if node == unsafe { nil } { return }
 	global.paged_pages = paged_remove(global.paged_pages, page)
-	pager.release(node.backing)
+	pager.release_mapping(node.backing)
 	memory.free(node)
 }
 
@@ -153,7 +154,7 @@ fn fork_paged_span(global &MmapRangeGlobal, mut child MmapRangeGlobal, begin u64
 	for cursor < end {
 		node := paged_lower(owner.paged_pages, cursor)
 		if node == unsafe { nil } || node.page >= end { break }
-		pager.retain(node.backing)
+		pager.retain_mapping(node.backing)
 		copy := &PagedPage{ page: node.page, priority: node.priority, backing: node.backing } @[freed]
 		child.paged_pages = paged_insert(child.paged_pages, copy)
 		cursor = node.page + page_size
@@ -218,7 +219,7 @@ fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 	}
 	node := unsafe { &PagedPage(memory.malloc_packed_fallible(sizeof(PagedPage))) }
 	if node == unsafe { nil } { return unsafe { nil } }
-	backing := pager.detached(voidptr(physical))
+	backing := pager.detached_for_group(voidptr(physical), kbudget.group_of(pagemap.kernel_owner))
 	if backing == unsafe { nil } {
 		memory.free(node)
 		return unsafe { nil }

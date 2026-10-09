@@ -3,6 +3,7 @@
 module kbudget
 
 import klock
+import cgcontrol
 
 // Metadata and buffers created on behalf of users must not consume the
 // reserve needed to finish exit, close and unmap. These are reservations,
@@ -32,13 +33,16 @@ pub mut:
 	owner Owner
 	bytes u64
 	kind  Kind
+	group_retired bool
 }
 
 struct Account {
 mut:
+	group      &cgcontrol.Group = unsafe { nil }
 	generation u64
 	open       bool
 	bytes      u64
+	group_bytes u64
 	refs       u64
 }
 
@@ -103,6 +107,23 @@ pub fn close_owner(owner Owner) {
 	if resource_budget_accounts[owner.slot - 1].refs == 0 { resource_budget_stats.accounts-- }
 }
 
+// Caller serializes process membership and task publication with pid_lock.
+// Creator-owned objects stay charged here after their process has exited.
+pub fn bind_group(owner Owner, group &cgcontrol.Group, tasks u64) bool {
+	return bind_group_memory(owner, group, tasks, 0)
+}
+
+pub fn bind_group_memory(owner Owner, group &cgcontrol.Group, tasks u64, anonymous u64) bool {
+	if owner.slot == 0 { return tasks == 0 }
+	resource_budget_lock.acquire()
+	defer { resource_budget_lock.release() }
+	if !valid(owner) { return false }
+	mut account := unsafe { &resource_budget_accounts[owner.slot - 1] }
+	if !cgcontrol.move_workload(account.group, group, account.group_bytes, tasks, anonymous) { return false }
+	account.group = unsafe { group }
+	return true
+}
+
 pub fn reserve(owner Owner, kind Kind, bytes u64) ?Charge {
 	// Boot-time objects and internal kernel tasks have no user account.
 	if owner.slot == 0 { return Charge{} }
@@ -114,8 +135,13 @@ pub fn reserve(owner Owner, kind Kind, bytes u64) ?Charge {
 		resource_budget_stats.denials++
 		return none
 	}
+	if !cgcontrol.reserve(resource_budget_accounts[owner.slot - 1].group, bytes, 0) {
+		resource_budget_stats.denials++
+		return none
+	}
 	resource_budget_accounts[owner.slot - 1].refs++
 	resource_budget_accounts[owner.slot - 1].bytes += bytes
+	resource_budget_accounts[owner.slot - 1].group_bytes += bytes
 	resource_budget_stats.bytes += bytes
 	resource_budget_stats.objects[int(kind)]++
 	resource_budget_stats.charged[int(kind)] += bytes
@@ -133,7 +159,12 @@ pub fn grow(mut charge Charge, bytes u64) bool {
 		resource_budget_stats.denials++
 		return false
 	}
+	if !charge.group_retired && !cgcontrol.reserve(resource_budget_accounts[charge.owner.slot - 1].group, bytes, 0) {
+		resource_budget_stats.denials++
+		return false
+	}
 	resource_budget_accounts[charge.owner.slot - 1].bytes += bytes
+	if !charge.group_retired { resource_budget_accounts[charge.owner.slot - 1].group_bytes += bytes }
 	resource_budget_stats.bytes += bytes
 	resource_budget_stats.charged[int(charge.kind)] += bytes
 	charge.bytes += bytes
@@ -145,6 +176,10 @@ pub fn shrink(mut charge Charge, bytes u64) {
 	resource_budget_lock.acquire()
 	defer { resource_budget_lock.release() }
 	assert valid(charge.owner) && bytes < charge.bytes
+	if !charge.group_retired {
+		cgcontrol.release(resource_budget_accounts[charge.owner.slot - 1].group, bytes, 0)
+		resource_budget_accounts[charge.owner.slot - 1].group_bytes -= bytes
+	}
 	charge.bytes -= bytes
 	resource_budget_accounts[charge.owner.slot - 1].bytes -= bytes
 	resource_budget_stats.bytes -= bytes
@@ -159,6 +194,10 @@ pub fn release(charge Charge) {
 	defer { resource_budget_lock.release() }
 	assert valid(charge.owner) && charge.bytes != 0
 	mut account := unsafe { &resource_budget_accounts[charge.owner.slot - 1] }
+	if !charge.group_retired {
+		cgcontrol.release(account.group, charge.bytes, 0)
+		account.group_bytes -= charge.bytes
+	}
 	account.bytes -= charge.bytes
 	account.refs--
 	resource_budget_stats.bytes -= charge.bytes
@@ -167,10 +206,31 @@ pub fn release(charge Charge) {
 	if !account.open && account.refs == 0 { resource_budget_stats.accounts-- }
 }
 
+// One dead stack per CPU may wait for a later scheduler death before being
+// physically freed. Keep its global/creator reservation, but retire its task
+// workload charge when its TID disappears so it cannot block group recovery.
+pub fn retire_thread_group(mut charge Charge) {
+	if charge.owner.slot == 0 || charge.group_retired { return }
+	resource_budget_lock.acquire()
+	defer { resource_budget_lock.release() }
+	assert valid(charge.owner) && charge.kind == .thread
+	mut account := unsafe { &resource_budget_accounts[charge.owner.slot - 1] }
+	cgcontrol.release(account.group, charge.bytes, 0)
+	account.group_bytes -= charge.bytes
+	charge.group_retired = true
+}
+
 pub fn owned_bytes(owner Owner) u64 {
 	resource_budget_lock.acquire()
 	defer { resource_budget_lock.release() }
 	return if valid(owner) { resource_budget_accounts[owner.slot - 1].bytes } else { u64(0) }
+}
+
+pub fn group_of(owner Owner) &cgcontrol.Group {
+	if owner.slot == 0 { return unsafe { nil } }
+	resource_budget_lock.acquire()
+	defer { resource_budget_lock.release() }
+	return if valid(owner) { resource_budget_accounts[owner.slot - 1].group } else { unsafe { nil } }
 }
 
 pub fn snapshot() Snapshot {

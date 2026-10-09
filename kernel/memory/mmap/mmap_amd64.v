@@ -5,6 +5,7 @@ import x86.cpu.local as cpulocal
 import x86.kio
 import memory
 import proc
+import sched
 
 // Page-fault error code bits.
 const pf_write = u64(1) << 1
@@ -173,6 +174,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// one needs.
 	mut pagemap := current_thread.process.pagemap
 	page_in(mut pagemap, addr, true)?
+	if gpr_state.cs & 3 == 3 { sched.park_for_cgroup() }
 }
 
 // x86 keeps the instruction cache coherent with stores.

@@ -372,6 +372,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	}
 	boot_stage(12)
 
+	sched.new_kernel_thread(voidptr(maintenance_thread), unsafe { nil }, true)
 	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
 	print('kmain_thread: writeback done\n')
 

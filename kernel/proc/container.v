@@ -315,8 +315,10 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	syscall_policy_inherit(mut child, parent)
 	child.seccomp_mode = parent.seccomp_mode
 	child.seccomp = parent.seccomp
-	child.cgroup = parent.cgroup
-	child.cgroup_account = parent.cgroup_account
+	if !child.constructing {
+		child.cgroup = parent.cgroup
+		child.cgroup_account = parent.cgroup_account
+	}
 	child.oom_score_adj = parent.oom_score_adj
 	pledge_inherit(mut child, parent)
 	child.sigcookie = parent.sigcookie

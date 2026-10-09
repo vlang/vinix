@@ -5,6 +5,7 @@ import aarch64.cpu.local as cpulocal
 import aarch64.timer
 import memory
 import proc
+import sched
 
 pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	esr := cpu.read_esr_el1()
@@ -110,6 +111,7 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// it needs. Paging the range's page in again would map a page still shared
 	// with a fork child writable, behind copy-on-write's back.
 	page_in(mut pagemap, addr, dfsc >= 0x04 && dfsc <= 0x07)?
+	if user_fault { sched.park_for_cgroup() }
 }
 
 // One line for each kernel path the audit finds, with the return addresses

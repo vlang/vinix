@@ -325,7 +325,7 @@ fn default_ignores(signum int) bool {
 // handler has run.
 pub fn syscall_pause(_ voidptr) (u64, u64) {
 	mut t := proc.current_thread()
-	for katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
+	for !katomic.load(&t.must_exit) && katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
 		sleep_for_signal(unsafe { nil }, 0)
 	}
 	return errno.err, errno.eintr

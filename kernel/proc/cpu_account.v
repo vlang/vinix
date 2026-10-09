@@ -104,6 +104,7 @@ fn charge_cpu_locked(mut t Thread, now_ns u64) {
 		return
 	}
 	span := now_ns - started
+	charge_cgroup_mode(&t, span, t.cpu_in_kernel)
 	if t.running_on < 256 {
 		if t.cpu_in_kernel {
 			add_cpu_counter(&machine_cpu_system_ns[t.running_on], span)

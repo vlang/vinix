@@ -6,6 +6,7 @@ import katomic
 import lib
 
 __global (
+	native_disk_ids [8]u64
 	machine_disk_read_bytes u64
 	machine_disk_write_bytes u64
 	machine_net_recv_bytes u64
@@ -33,11 +34,16 @@ pub fn account_disk_transfer(bytes u64, write bool) {
 	else { add_cpu_counter(&t.process.disk_read_bytes, bytes) }
 }
 
+pub fn set_native_disk_id(index u32, id u64) {
+	if index < u32(native_disk_ids.len) { native_disk_ids[index] = id }
+}
+
 // ANS also serves its native filesystems through C, bypassing V block
 // resources. Its low-level command completion uses the same physical counter.
 @[export: 'vinix_account_disk_transfer']
-fn account_disk_completion(bytes u64, write int) {
+fn account_disk_completion(index u32, bytes u64, write int) {
 	account_disk_transfer(bytes, write != 0)
+	if index < u32(native_disk_ids.len) { account_disk_io(native_disk_ids[index], bytes, write != 0) }
 }
 
 // These are IPv4/IPv6 socket payload bytes, including loopback. Unix sockets

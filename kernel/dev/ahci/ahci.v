@@ -308,7 +308,7 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		if !write && user {
 			unsafe { C.memcpy(caller, staging, chunk) }
 		}
-		proc.account_disk_io(chunk, write)
+		proc.account_disk_io(dev.stat.rdev, chunk, write)
 		done += chunk
 	}
 	return i64(count)

@@ -50,6 +50,11 @@ fn attach_thread(mut process proc.Process, mut t proc.Thread) ?int {
 }
 
 pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Process {
+	account := if old_process == unsafe { nil } { unsafe { &proc.CGroupAccount(nil) } } else { old_process.cgroup_account }
+	return new_process_in_group(old_process, pagemap, account)
+}
+
+pub fn new_process_in_group(old_process &proc.Process, pagemap &memory.Pagemap, account &proc.CGroupAccount) ?&proc.Process {
 	if unsafe { old_process != nil } && !proc.may_create_process(old_process) {
 		errno.set(errno.eagain)
 		return none
@@ -58,6 +63,7 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	owner := kbudget.open_owner() or { errno.set(errno.eagain); return none }
 	mut published := false
 	defer { if !published { kbudget.close_owner(owner) } }
+	if !kbudget.bind_group(owner, proc.cgroup_control(account), 0) { errno.set(errno.enomem); return none }
 	charge := proc.reserve_kernel_for(owner, .process, u64(sizeof(proc.Process)) * 2 + 16384) or { return none }
 	mut owned := false
 	defer { if !owned { kbudget.release(charge) } }
@@ -66,6 +72,9 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 	// Freed when the process is reaped, in proc.free_pid().
 	fds := unsafe { []voidptr{len: proc.initial_fds} } @[freed]
 	mut new_proc := &proc.Process{
+		constructing: true
+		cgroup_account: unsafe { account }
+		cgroup: if account == unsafe { nil } { unsafe { nil } } else { account.group_data }
 		kernel_owner: owner
 		kernel_charge: charge
 		fd_table_charge: table_charge
@@ -151,5 +160,6 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		proc.inherit_container_state(mut new_proc, unsafe { nil })
 	}
 
+	new_proc.cgroup_account = unsafe { account }
 	return new_proc
 }

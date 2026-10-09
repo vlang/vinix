@@ -163,7 +163,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	mut old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process(old_process, unsafe { nil }) or {
+	mut new_process := sched.new_process_in_group(old_process, unsafe { nil }, if into_cgroup { fs.cgroup_account_of(cgroup) } else { old_process.cgroup_account }) or {
 		return errno.err, errno.get()
 	}
 

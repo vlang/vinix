@@ -2,6 +2,7 @@
 module proc
 
 import kbudget
+import cgcontrol
 import klock
 import katomic
 import lib
@@ -180,6 +181,16 @@ pub mut:
 	kernel_charge kbudget.Charge
  exec_scratch kbudget.Charge
  exec_depth u32
+ cpu_group &CGroupAccount = unsafe { nil }
+ quota_pid int
+ quota_reserved bool
+ quota_group &cgcontrol.Group = unsafe { nil }
+ io_until_ns u64
+ io_debt_group &cgcontrol.Group = unsafe { nil }
+ io_epoch u64
+ memory_until_ns u64
+ io_context &cgcontrol.Group = unsafe { nil }
+ io_context_active bool
 }
 
 pub fn (t &Thread) current_syscall() (i64, u64) {

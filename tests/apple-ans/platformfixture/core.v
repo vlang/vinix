@@ -13,4 +13,4 @@ pub fn write32(address voidptr, value u32) { C.assert(usize(c'unexpected MMIO')=
 @[export: 'vinix_mmio_write64']
 pub fn write64(address voidptr, value u64) { C.assert(usize(c'unexpected MMIO')==0) }
 @[export: 'vinix_account_disk_transfer']
-pub fn account(bytes u64, write i32) {}
+pub fn account(index u32, bytes u64, write i32) {}

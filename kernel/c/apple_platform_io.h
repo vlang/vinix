@@ -10,5 +10,5 @@ uint32_t vinix_mmio_read32(void *);
 uint64_t vinix_mmio_read64(void *);
 void vinix_mmio_write32(void *, uint32_t);
 void vinix_mmio_write64(void *, uint64_t);
-void vinix_account_disk_transfer(uint64_t, int);
+void vinix_account_disk_transfer(uint32_t, uint64_t, int);
 #endif

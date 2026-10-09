@@ -4,7 +4,9 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 v=${V:-v}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-mkdir -p "$work/modules/mmap" "$work/modules/memory" "$work/modules/resource" "$work/modules/klock" "$work/modules/errno" "$work/modules/numa" "$work/modules/lib" "$work/modules/proc" "$work/modules/pager"
+mkdir -p "$work/modules/mmap" "$work/modules/memory" "$work/modules/resource" "$work/modules/klock" "$work/modules/errno" "$work/modules/numa" "$work/modules/lib" "$work/modules/proc" "$work/modules/pager" "$work/modules/kbudget" "$work/modules/cgcontrol"
+cp "$root/kernel/kbudget/budget.v" "$work/modules/kbudget/"
+cp "$root/kernel/cgcontrol/control.v" "$work/modules/cgcontrol/"
 cp "$root/kernel/memory/mmap/page_source.v" "$work/modules/mmap/"
 python3 - "$root/tests/private-pages/source_test.v" "$work/modules/mmap" <<'PY'
 from pathlib import Path
@@ -27,7 +29,7 @@ page_source = Path(sys.argv[1]).with_name('paging.v').read_text()
 result += page_source[page_source.index('struct PagedPage'):page_source.index('fn reclaim_uncovered_paged_locked')]
 if __import__('os').environ.get('VINIX_PAGING_HOST') == '1':
     result = result[:result.index('struct PagedPage')] + page_source[page_source.index('struct PagedPage'):page_source.index('__global (')]
-    result = result.replace('import errno\n', 'import errno\nimport sched\n')
+    result = result.replace('import errno\n', 'import errno\nimport sched\nimport kbudget\n')
     result += '__global (pageout_process_cursor = int(1))\n'
     for name in ['reclaim_anonymous', 'max_u64']:
         begin = page_source.index('fn ' + name + '(')
@@ -70,7 +72,9 @@ cat > "$work/modules/pager/pager.v" <<'VEOF'
 module pager
 pub struct Backing {}
 pub fn retain(_backing &Backing) {}
+pub fn retain_mapping(_backing &Backing) {}
 pub fn release(_backing &Backing) {}
+pub fn release_mapping(_backing &Backing) {}
 pub fn load(_backing &Backing) ?voidptr { return none }
 VEOF
 cat > "$work/modules/lib/lib.v" <<'VEOF'
@@ -100,6 +104,7 @@ cat > "$work/modules/memory/memory.v" <<'VEOF'
 @[has_globals]
 module memory
 import klock
+import kbudget
 pub const pte_present = u64(1)
 pub const pte_writable = u64(2)
 pub const pte_user = u64(4)
@@ -132,7 +137,7 @@ pub fn pmm_free(physical voidptr, _pages u64) {
     unsafe { C.free(physical) }
 }
 pub struct Page { pub mut: physical u64 flags u64 }
-pub struct Pagemap { pub mut: l klock.Lock pages map[u64]Page fail_map bool dying bool pageout_cursor u64 inspection_refs int top_level &u64 = unsafe { &u64(1) } }
+pub struct Pagemap { pub mut: kernel_owner kbudget.Owner l klock.Lock pages map[u64]Page fail_map bool dying bool pageout_cursor u64 inspection_refs int top_level &u64 = unsafe { &u64(1) } }
 pub fn release_inspection(pm &Pagemap) { mut map_ := unsafe { pm }; map_.l.acquire(); map_.inspection_refs--; map_.l.release() }
 pub fn (pm &Pagemap) virt2phys(virt u64) ?u64 {
     if virt !in pm.pages { return none }

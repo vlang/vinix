@@ -149,6 +149,7 @@ fn kmain_thread() {
 		nvme.initialise()
 	}
 
+	sched.new_kernel_thread(voidptr(maintenance_thread), unsafe { nil }, true)
 	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',

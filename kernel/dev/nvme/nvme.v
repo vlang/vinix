@@ -398,7 +398,7 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 		}
 		proc.account_disk_transfer(chunk, write)
 		if !write { unsafe { C.memcpy(caller, bounce, chunk) } }
-		proc.account_disk_io(chunk, write)
+		proc.account_disk_io(dev.stat.rdev, chunk, write)
 		done += chunk
 	}
 	return i64(count)

@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module proc
 
+import errno
+
 // Publish a fully numbered thread in its process. Process inspection takes
 // the table lock before the thread-list lock, so attachment must use that
 // same order. Taking the list lock first and then allocating or binding a
@@ -12,12 +14,13 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 	process.threads_lock.acquire()
 	defer { process.threads_lock.release() }
 
+	if process.exiting { errno.set(errno.esrch); return none }
 	if process.threads.len == 0 && process.pid != 0 {
 		t.tid = process.pid
-		bind_tid_locked(t.tid, t)
+		if !bind_tid_locked(t.tid, t) { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, true)
 	} else {
-		t.tid = allocate_tid_locked(t)?
+		t.tid = allocate_tid_locked(t) or { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, false)
 		// rt_sigaction updates every thread under this lock. Refresh the
 		// caller's earlier copy before publishing the new thread so a signal
@@ -29,5 +32,6 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 	// Free its previous capacity when the thread list grows.
 	process.threads.flags |= .noslices
 	process.threads << t
+	process.constructing = false
 	return t.tid
 }

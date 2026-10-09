@@ -527,6 +527,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		proc.lock_table()
 		mut old_pagemap := process.pagemap
 		proc.preserve_peak_rss(process, old_pagemap)
+		proc.forget_cgroup_memory_locked(mut process)
 		process.pagemap = new_pagemap
  map_transferred = true
 		proc.dumpability_after_exec(mut process)

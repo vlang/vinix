@@ -14,6 +14,8 @@
 module proc
 
 import klock
+import cgcontrol
+import kbudget
 import katomic
 import lib
 
@@ -21,6 +23,8 @@ pub const cgroup_default_cpu_period_ns = u64(100000000)
 
 pub struct CGroupAccount {
 pub mut:
+	group_data voidptr
+	control cgcontrol.Group
 	parent &CGroupAccount = unsafe { nil }
 	lock   klock.Lock
 	// cgroup.freeze, as written to this group. A group is frozen when it or
@@ -35,6 +39,8 @@ pub mut:
 	period_used_ns     u64
 	throttled_until_ns u64
 	// cpu.stat.
+	user_ns      u64
+	system_ns    u64
 	usage_ns     u64
 	nr_periods   u64
 	nr_throttled u64
@@ -62,6 +68,7 @@ pub mut:
 pub fn new_cgroup_account(parent &CGroupAccount) &CGroupAccount {
 	return &CGroupAccount{
 		parent: unsafe { parent }
+		control: cgcontrol.Group{parent: cgroup_control(parent)}
 	}
 }
 
@@ -106,11 +113,11 @@ pub fn cgroup_holds_back(process &Process, now_ns u64) bool {
 pub fn charge_cgroup_cpu(mut t Thread, now_ns u64) {
 	since := t.cgroup_charged_ns
 	t.cgroup_charged_ns = now_ns
-	if since == 0 || now_ns <= since || unsafe { t.process == nil } {
+	if since == 0 || now_ns <= since || t.cpu_group == unsafe { nil } {
 		return
 	}
 	span := now_ns - since
-	mut current := t.process.cgroup_account
+	mut current := t.cpu_group
 	for current != unsafe { nil } {
 		current.charge_cpu(span, now_ns)
 		current = current.parent
@@ -122,7 +129,6 @@ fn (mut account CGroupAccount) charge_cpu(span u64, now_ns u64) {
 	defer {
 		account.lock.release()
 	}
-	account.usage_ns += span
 	period := account.cpu_period_ns
 	if period == 0 {
 		return
@@ -145,9 +151,23 @@ fn (mut account CGroupAccount) charge_cpu(span u64, now_ns u64) {
 		&& katomic.load(&account.throttled_until_ns) < period_end {
 		katomic.store(mut &account.throttled_until_ns, period_end)
 		account.nr_throttled++
+		cgcontrol.note_cpu(mut account.control)
 		if period_end > now_ns {
 			account.throttled_ns += period_end - now_ns
 		}
+	}
+}
+
+// Mode boundaries use the hardware CPU clock, rather than labelling the
+// whole scheduler interval with the interrupt handler's current mode.
+fn charge_cgroup_mode(t &Thread, span u64, kernel bool) {
+	mut current := t.cpu_group
+	for current != unsafe { nil } {
+		current.lock.acquire()
+		current.usage_ns += span
+		if kernel { current.system_ns += span } else { current.user_ns += span }
+		current.lock.release()
+		current = current.parent
 	}
 }
 
@@ -163,22 +183,28 @@ pub fn (mut account CGroupAccount) set_cpu_max(quota_ns u64, period_ns u64) {
 	account.period_start_ns = 0
 	account.period_used_ns = 0
 	katomic.store(mut &account.throttled_until_ns, u64(0))
+	cgcontrol.reconfigured(mut account.control)
 }
 
 // cpu.stat, from the counters this group has kept.
 pub fn (mut account CGroupAccount) cpu_stat_text() string {
 	account.lock.acquire()
 	usage := account.usage_ns / 1000
+	user := account.user_ns / 1000
+	system := account.system_ns / 1000
 	periods := account.nr_periods
 	throttled := account.nr_throttled
 	throttled_us := account.throttled_ns / 1000
 	account.lock.release()
-	mut text := lib.new_text(160)
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(160) }
 	text.add('usage_usec ')
 	text.add_unsigned(u64(usage))
 	text.add('\nuser_usec ')
-	text.add_unsigned(u64(usage))
-	text.add('\nsystem_usec 0\nnr_periods ')
+	text.add_unsigned(user)
+	text.add('\nsystem_usec ')
+	text.add_unsigned(system)
+	text.add('\nnr_periods ')
 	text.add_unsigned(u64(periods))
 	text.add('\nnr_throttled ')
 	text.add_unsigned(u64(throttled))
@@ -203,44 +229,101 @@ pub fn process_in_account(process &Process, account &CGroupAccount) bool {
 // The tasks -- threads, as Linux counts them -- in `account` and every group
 // below it. What pids.current reports and pids.max is held to.
 pub fn cgroup_task_count(account &CGroupAccount) int {
-	lock_table()
-	defer {
-		unlock_table()
-	}
-	mut count := 0
-	for pid := 1; pid < max_pid; pid++ {
-		process := processes[pid]
-		if process == unsafe { nil } || process.exiting {
-			continue
-		}
-		if process_in_account(process, account) {
-			count += process.threads.len
-		}
-	}
-	return count
+	return int(cgcontrol.snapshot(cgroup_control(account)).pids)
 }
 
-// Whether `process` may start one more task. A group, or any above it, that
-// has reached its pids.max refuses, and the fork fails with EAGAIN.
+pub fn cgroup_control(account &CGroupAccount) &cgcontrol.Group {
+	return if account == unsafe { nil } { unsafe { nil } } else { unsafe { &account.control } }
+}
+
+// Early checks save construction work; publication below is authoritative.
 pub fn cgroup_may_add_task(process &Process) bool {
-	if process == unsafe { nil } {
+	return process == unsafe { nil } || cgroup_account_may_add_task(process.cgroup_account)
+}
+
+pub fn cgroup_account_may_add_task(account &CGroupAccount) bool {
+	group := cgroup_control(account)
+	return cgcontrol.may_reserve(group, 0, 1)
+}
+
+// Called only under pid_lock. Exec transfers its old slot instead of asking
+// for another task, so it still works with pids.max at or below current.
+fn reserve_cgroup_task(mut t Thread, replacing &Thread) bool {
+	if t.process == unsafe { nil } { return true }
+	group := cgroup_control(t.process.cgroup_account)
+	if replacing != unsafe { nil } && replacing.quota_reserved {
+		mut old := unsafe { replacing }
+		t.quota_group = old.quota_group
+		t.cpu_group = old.cpu_group
+		t.io_until_ns = old.io_until_ns
+		t.io_epoch = old.io_epoch
+		t.io_debt_group = old.io_debt_group
+		t.memory_until_ns = old.memory_until_ns
+		t.quota_pid = old.quota_pid
+		t.quota_reserved = true
+		old.quota_reserved = false
+		kbudget.retire_thread_group(mut old.kernel_charge)
 		return true
 	}
-	return cgroup_account_may_add_task(process.cgroup_account)
+	if !cgcontrol.reserve(group, 0, 1) { return false }
+	t.quota_group = group
+	t.cpu_group = t.process.cgroup_account
+	t.quota_pid = t.process.pid
+	t.quota_reserved = true
+	return true
 }
 
-// The same for a task that starts in `account`, as CLONE_INTO_CGROUP asks.
-pub fn cgroup_account_may_add_task(account &CGroupAccount) bool {
-	mut current := unsafe { account }
-	for current != unsafe { nil } {
-		limit := katomic.load(&current.pids_max)
-		if limit >= 0 && i64(cgroup_task_count(current)) + 1 > limit {
-			katomic.inc(mut &current.pids_max_events)
-			return false
+fn release_cgroup_task(mut t Thread) {
+	kbudget.retire_thread_group(mut t.kernel_charge)
+	if !t.quota_reserved { return }
+	cgcontrol.release(t.quota_group, 0, 1)
+	t.quota_reserved = false
+}
+
+// Membership, task reservations and creator-owned kernel buffers move as one
+// transaction. Caller holds pid_lock; failed admission changes no membership.
+pub fn move_cgroup_locked(mut process Process, account &CGroupAccount, group voidptr) bool {
+	if process.constructing { return false }
+	mut tasks := u64(0)
+	for t in threads_by_tid {
+		if t != unsafe { nil } && t.quota_pid == process.pid && t.quota_reserved { tasks++ }
+	}
+	if !kbudget.bind_group_memory(process.kernel_owner, cgroup_control(account), tasks, process.cgroup_anonymous_bytes) { return false }
+	mut old := process.cgroup_account
+	for old != unsafe { nil } {
+		katomic.store(mut &old.memory_counted_ns, u64(0))
+		old = old.parent
+	}
+	mut target := unsafe { account }
+	for target != unsafe { nil } {
+		katomic.store(mut &target.memory_counted_ns, u64(0))
+		target = target.parent
+	}
+	for pointer in threads_by_tid {
+		mut t := unsafe { pointer }
+		if t != unsafe { nil } && t.quota_pid == process.pid && t.quota_reserved {
+			t.quota_group = cgroup_control(account)
+			t.cpu_group = unsafe { account }
+			t.io_until_ns = 0
+			t.memory_until_ns = 0
 		}
+	}
+	process.cgroup = group
+	process.cgroup_account = unsafe { account }
+	return true
+}
+
+// Called under pid_lock when exit/exec detaches its old address space. Cache
+// invalidation makes quota recovery independent of a subsequent proc read.
+pub fn forget_cgroup_memory_locked(mut process Process) {
+	cgcontrol.forget_memory(cgroup_control(process.cgroup_account), process.cgroup_anonymous_bytes)
+	process.cgroup_anonymous_bytes = 0
+	process.cgroup_paged_bytes = 0
+	mut current := process.cgroup_account
+	for current != unsafe { nil } {
+		katomic.store(mut &current.memory_counted_ns, u64(0))
 		current = current.parent
 	}
-	return true
 }
 
 // memory.max is enforced by fs, which can count what a group's processes have
@@ -274,7 +357,7 @@ fn cgroup_memory_limited(process &Process) bool {
 	}
 	mut current := process.cgroup_account
 	for current != unsafe { nil } {
-		if katomic.load(&current.memory_max) != 0 {
+		if katomic.load(&current.memory_max) != 0 || cgcontrol.snapshot(cgroup_control(current)).memory_high != ~u64(0) {
 			return true
 		}
 		current = current.parent

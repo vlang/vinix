@@ -69,8 +69,9 @@ fn peak_rss(process &Process) u64 {
 
 // Account completed device payloads once at the physical leaf, so partition
 // forwarding and cache hits cannot charge the same bytes again. Background
-// writeback is charged to its issuing kernel thread, not the earlier dirtier.
-pub fn account_disk_io(bytes u64, write bool) {
+// writeback appears in its issuing thread's counters and the dirtier's group.
+pub fn account_disk_io(id u64, bytes u64, write bool) {
+	account_cgroup_io(id, bytes, write)
 	t := current_thread()
 	if t == unsafe { nil } || t.process == unsafe { nil } { return }
 	if write {
