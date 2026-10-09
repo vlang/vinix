@@ -13,6 +13,8 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <dirent.h>
+/* Darwin's fortified overflow path terminates with an ARM64 breakpoint. */
+static void ios_fortify_trap(void) { __builtin_trap(); }
 /* A portable non-elidable wipe; keychain storage policy and crypto stay in V. */
 static void ios_secure_zero(void *bytes, size_t length) {
     volatile unsigned char *cursor = (volatile unsigned char *)bytes;
@@ -105,6 +107,30 @@ static int *ios_errno_address(void) { return &errno; }
 static size_t ios_sizeof_mutex(void) { return sizeof(pthread_mutex_t); }
 static size_t ios_sizeof_cond(void) { return sizeof(pthread_cond_t); }
 static size_t ios_sizeof_once(void) { return sizeof(pthread_once_t); }
+/* Return native stack bounds; the Darwin containment policy lives in V. */
+static int ios_current_stack_bounds(uint64_t *bounds) {
+#ifdef __APPLE__
+    uintptr_t top = (uintptr_t)pthread_get_stackaddr_np(pthread_self());
+    size_t size = pthread_get_stacksize_np(pthread_self());
+    bounds[0] = top - size; bounds[1] = top;
+    return 0;
+#elif defined(__linux__)
+    extern int pthread_getattr_np(pthread_t, pthread_attr_t *);
+    pthread_attr_t attributes;
+    int result = pthread_getattr_np(pthread_self(), &attributes);
+    if (result) return result;
+    void *base = NULL;
+    size_t size = 0;
+    result = pthread_attr_getstack(&attributes, &base, &size);
+    int cleanup = pthread_attr_destroy(&attributes);
+    if (result) return result;
+    if (cleanup) return cleanup;
+    bounds[0] = (uintptr_t)base; bounds[1] = (uintptr_t)base + size;
+    return 0;
+#else
+    (void)bounds; return ENOTSUP;
+#endif
+}
 static int ios_key_create(void *output, void *destructor) {
     pthread_key_t key;
     int result = pthread_key_create(&key, (void (*)(void *))destructor);

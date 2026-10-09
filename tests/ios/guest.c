@@ -104,6 +104,13 @@ int main(void) {
     run("/opt/ios/stack-probe", NULL, NULL, NULL, 0,
         "IOS-STACK-PROBE: 32 KiB frames, integer/FP arguments and eight native threads");
     puts("iOS PASS: Darwin stack probes preserve native arguments");
+    run("/opt/ios/libsystem-safety", NULL, NULL, NULL, 0,
+        "IOS-LIBSYSTEM-SAFETY: descriptor limits, unlimited bitmaps, overlap, padding and fortified strings");
+    const char *overflow_modes[] = {"memcpy", "memmove", "memset", "strncpy", "strcat", "unterminated", "zero-capacity"};
+    for (unsigned index = 0; index < sizeof(overflow_modes)/sizeof(*overflow_modes); index++)
+        run("/opt/ios/libsystem-safety", overflow_modes[index], NULL, NULL, -SIGTRAP,
+            "iOS: fortified operation exceeds destination");
+    puts("iOS PASS: Darwin descriptor checks and fortified operations with SIGTRAP");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

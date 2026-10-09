@@ -44,6 +44,18 @@ PY
 "${IOS_CLANG:-clang}" -DIOS_STACK_REFERENCE -O1 -fno-stack-protector -Wall -Wextra -Werror \
     "$repo/tests/ios/stack-probe.c" -o "$output/stack-probe"
 "$output/stack-probe"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/libsystem-safety.c" -o "$output/libsystem-safety"
+"$output/libsystem-safety"
+python3 - "$output/libsystem-safety" <<'PY'
+import signal
+import subprocess
+import sys
+for mode in ("memcpy", "memmove", "memset", "strncpy", "strcat", "unterminated", "zero-capacity"):
+    result = subprocess.run([sys.argv[1], mode], capture_output=True)
+    assert result.returncode == -signal.SIGTRAP, (mode, result.returncode, result.stderr)
+print("IOS-LIBSYSTEM-SAFETY-REFERENCE: seven genuine SIGTRAP overflow cases")
+PY
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

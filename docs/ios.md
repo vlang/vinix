@@ -461,6 +461,18 @@ verify a real inaccessible guard page faults, and the full ARM64
 C++/GLES/PPSSPP regression passes. These helpers resolve five strong imports
 across the three bundled images.
 
+`__darwin_check_fd_set_overflow` now reproduces the installed Mac library's
+negative-descriptor, unlimited-select and stack-containment checks in V, using
+native pthread stack bounds. Only complete 128-byte objects on the current
+thread's stack have the strict 1024 limit; heap/global storage remains the
+caller's responsibility. The fortified `memmove`, `strncpy` and `strcat` entries
+also work in V, checking capacity before writing, including strncpy padding,
+overlap, missing terminators and SIZE_MAX object sizes. Overflow now takes the
+native ARM64 SIGTRAP path, including the existing checked memcpy/memset entries.
+Shared Mac/iOS fixtures and ASAN check main/worker stacks, heap/global bitmaps,
+buffer guards and seven fatal overflow cases. The full ARM64 regression passes;
+these entries resolve eight more strong imports across Fortnite and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -474,7 +486,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: ___darwin_check_fd_set_overflow
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: ___maskrune
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -482,12 +494,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,228 | 930 | 81 |
-| EOSSDK | 440 | 222 | 18 |
+| Fortnite executable | 1,232 | 926 | 81 |
+| EOSSDK | 444 | 218 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,720 | 1,276 | 122 |
+| All images | 1,728 | 1,268 | 122 |
 
-The C++/GLES/Text variant reports 1,733 resolved imports, 1,263 unresolved strong
+The C++/GLES/Text variant reports 1,741 resolved imports, 1,255 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -15,6 +15,7 @@ FEATURES = (
     b"iOS PASS: lock-free Darwin atomic queues and node reuse",
     b"iOS PASS: Darwin assertion diagnostics and SIGABRT",
     b"iOS PASS: Darwin stack probes preserve native arguments",
+    b"iOS PASS: Darwin descriptor checks and fortified operations with SIGTRAP",
     b"iOS PASS: Mach-O arithmetic and libSystem imports",
     b"iOS PASS: legacy dyld imports and image/TLS lifecycle",
     b"iOS PASS: native chained and legacy pointer tags",
@@ -174,7 +175,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "libsystem-safety", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         shutil.copytree(build / "fixtures/Modules.app", destination / "Modules.app")

@@ -147,14 +147,6 @@ fn darwin_timebase_info(info &u32) i32 {
     unsafe { info[0] = 1; info[1] = 1 }
     return 0
 }
-fn darwin_memcpy_checked(destination voidptr, source voidptr, size usize, capacity usize) voidptr {
-    if size > capacity { panic('iOS: fortified memcpy exceeds destination') }
-    return C.memcpy(destination, source, size)
-}
-fn darwin_memset_checked(destination voidptr, value i32, size usize, capacity usize) voidptr {
-    if size > capacity { panic('iOS: fortified memset exceeds destination') }
-    return C.memset(destination, value, size)
-}
 fn darwin_stack_fail() { panic('iOS: native stack protector detected corruption') }
 fn darwin_memset_pattern(destination voidptr, pattern voidptr, length usize, width usize) {
 	if length == 0 { return }
@@ -281,7 +273,11 @@ fn fixed_symbol(symbol string) ?u64 {
         '_mach_absolute_time' { u64(unsafe { voidptr(darwin_mach_absolute_time) }) }
         '_mach_timebase_info' { u64(unsafe { voidptr(darwin_timebase_info) }) }
         '___memcpy_chk' { u64(unsafe { voidptr(darwin_memcpy_checked) }) }
+        '___memmove_chk' { u64(unsafe { voidptr(darwin_memmove_checked) }) }
         '___memset_chk' { u64(unsafe { voidptr(darwin_memset_checked) }) }
+        '___strcat_chk' { u64(unsafe { voidptr(darwin_strcat_checked) }) }
+        '___strncpy_chk' { u64(unsafe { voidptr(darwin_strncpy_checked) }) }
+        '___darwin_check_fd_set_overflow' { u64(unsafe { voidptr(darwin_check_fd_set_overflow) }) }
         '___stack_chk_fail' { u64(unsafe { voidptr(darwin_stack_fail) }) }
         else { return none }
     }
