@@ -4,7 +4,10 @@
 mapping and intrusive registry code with a faulting inode/allocator fixture.
 It checks failed/short final unmap, unlinked resource retention and retry,
 continuation past a failing resource, bounded batches, new registrations,
-and 1000 map/unmap lifetimes. `tests/pagecache/run.sh` separately exercises
+and 1000 map/unmap lifetimes. Dirty tracking tests cover unchanged syncs,
+busy aliases, failure after revocation, locked pages, rotating background scans,
+a 1024-page locked prefix and explicit pageout beyond that prefix.
+`tests/pagecache/run.sh` separately exercises
 the actual backing cache and global hooks, barriers and failure propagation.
 
 Build the kernel, then run `python3 tests/mapped-writeback/run.py --arch
@@ -27,9 +30,24 @@ a subset. Images and firmware state are private temporary files.
 The `private` step additionally checks clean EXT2 page sharing and copy-on-write;
 see [its ownership and test coverage](../private-pages/README.md).
 
-Shared pages are conservatively copied on every sync/background pass; common
-VM hardware dirty-bit tracking and avoidance of unchanged mapped writes
-remain open. Closing a descriptor with a live mapping does not guarantee
+The `pageout` step checks shared alias revocation, an untouched lazy alias,
+locked pages, private COW compression/refault and discard, usercopy dirtying,
+mprotect, truncation/regrowth, unlinked final unmap and 200 pageout/refault
+operations with slab measurements. The `pressure` step is optional: select
+`--steps=pressure --memory=256` to verify automatic mapped-file eviction while
+an anonymous mapping exceeding free RAM and the block cache remains readable.
+The excess fits the bounded compression pool without an active swap device. Its 8 MiB file is checked
+on the actual disk after the guest stops.
+
+`V=/path/to/v VINIX_FILE_PAGES_HOST=1 tests/private-pages/run-host.sh` additionally
+runs the production reverse VM bridge against aliases, private COW identities,
+lock contention, empty shadow roots and workspace overflow. Set
+`VINIX_HOST_SANITIZE=1` on either host runner for ASan/UBSan.
+
+Shared writes now fault once after creation or writeback; unchanged mapped
+pages avoid inode/data I/O. See [mapped-file paging](../../docs/mapped-file-paging.md)
+for the tracking, eviction, refault and failure contract.
+Closing a descriptor with a live mapping does not guarantee
 fsync: the mapping and registry retain the resource until unmap or writeback.
 Global flushes now invoke each registered device's optional hardware barrier;
 drivers without that capability guarantee Resource write completion only.

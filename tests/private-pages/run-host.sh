@@ -20,7 +20,9 @@ from pathlib import Path
 import sys
 source = Path(sys.argv[1]).read_text()
 functions = ['page_table_flags', 'range_page_has_file_data', 'install_range_page', 'resolve_cow_fault', 'unshare_private_page_unlocked']
-result = 'module mmap\nimport memory\nimport numa\nimport lib\nimport proc\nimport pager\nimport errno\n'
+result = 'module mmap\nimport memory\nimport numa\nimport lib\nimport proc\nimport pager\nimport errno\nimport resource\n'
+if __import__('os').environ.get('VINIX_FILE_PAGES_HOST') != '1':
+    result += 'fn resolve_shared_file_write(_pm &memory.Pagemap, _address u64) bool { return false }\nfn pageout_file_span(_pm &memory.Pagemap, _begin u64, _end u64) u64 { return 0 }\n'
 page_source = Path(sys.argv[1]).with_name('paging.v').read_text()
 result += page_source[page_source.index('struct PagedPage'):page_source.index('fn reclaim_uncovered_paged_locked')]
 if __import__('os').environ.get('VINIX_PAGING_HOST') == '1':
@@ -102,6 +104,7 @@ pub const pte_present = u64(1)
 pub const pte_writable = u64(2)
 pub const pte_user = u64(4)
 pub const pte_noexec = u64(8)
+pub const pte_file_tracked = u64(512)
 pub const pte_execute_only = u64(32)
 pub fn execute_only_supported() bool { return false }
 __global (pub live_pages int pub fail_alloc bool page_refs map[u64]u32)
@@ -220,6 +223,7 @@ pub fn release_mapping_range(mut res Resource, _handle voidptr, _offset u64, _le
     res.range_refs--; assert res.range_refs >= 0
 }
 pub fn private_mapping_cow(mut res Resource) bool { return res.cached }
+pub fn uncached_mapping_page(mut _res Resource, _page u64, _physical voidptr) bool { return false }
 pub fn release_mapping(mut res Resource, _handle voidptr, _page u64, physical voidptr, _flags int) {
     if res.check_unlocked != unsafe { nil } { res.check_unlocked() }
     res.givebacks++
@@ -288,6 +292,40 @@ pub fn await_one_from_generation(mut e eventstruct.Event, _block bool, previous 
 pub fn await_one_from_generation_masked(mut e eventstruct.Event, previous u64) ?u64 {
     return await_one_from_generation(mut e, true, previous)
 }
+VEOF
+fi
+if [ "${VINIX_FILE_PAGES_HOST:-0}" = 1 ]; then
+    cp "$root/kernel/memory/mmap/file_pages.v" "$root/tests/mapped-writeback/aliases_test.v" "$work/modules/mmap/"
+    cat >> "$work/modules/memory/memory.v" <<'VEOF'
+pub const pte_file_dirty = u64(1) << 20
+pub const file_referenced = u64(1) << 21
+pub struct PageActivity { pub: referenced bool dirty bool }
+pub fn (mut pm Pagemap) protect_file_page_unlocked(address u64) {
+    if address !in pm.pages { return }
+    mut p := pm.pages[address]
+    if p.flags & pte_file_tracked == 0 { return }
+    p.flags &= ~pte_writable
+    pm.pages[address] = p
+}
+pub fn (mut pm Pagemap) sample_file_page_unlocked(address u64, reset bool) PageActivity {
+    if address !in pm.pages { return PageActivity{} }
+    mut p := pm.pages[address]
+    result := PageActivity{ referenced: p.flags & file_referenced != 0, dirty: p.flags & pte_file_dirty != 0 }
+    if reset { p.flags &= ~(file_referenced | pte_file_dirty); pm.pages[address] = p }
+    return result
+}
+pub fn (mut pm Pagemap) allow_file_write_unlocked(address u64) bool {
+    if address !in pm.pages || pm.pages[address].flags & pte_file_tracked == 0 { return false }
+    mut p := pm.pages[address]
+    p.flags |= pte_writable | pte_file_dirty | file_referenced
+    pm.pages[address] = p
+    return true
+}
+VEOF
+    cat >> "$work/modules/resource/resource.v" <<'VEOF'
+pub fn mark_mapping_dirty(mut _res Resource, _page u64, _physical voidptr) {}
+pub fn sync_mapping(mut _res Resource, _handle voidptr, _offset u64, _length u64) ? {}
+pub fn pageout_mapping(mut _res Resource, _page u64) u64 { return 0 }
 VEOF
 fi
 if [ "${VINIX_HOST_SANITIZE:-0}" = 1 ]; then

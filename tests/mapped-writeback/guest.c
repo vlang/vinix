@@ -14,6 +14,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef VINIX_TEST_MEMORY_MIB
+#define VINIX_TEST_MEMORY_MIB 1024
+#endif
 #define SIZE 65536
 #define CHECK(x) do { if (!(x)) { printf("MAPPED WRITEBACK FAIL line=%d errno=%d FAIL END\n", __LINE__, errno); for (;;) pause(); } } while (0)
 static atomic_int stopping;
@@ -131,16 +134,20 @@ static void *private_reader(void *unused)
     return NULL;
 }
 
-static long free_kib(void)
+static long meminfo_kib(const char *name)
 {
     FILE *f = fopen("/proc/meminfo", "r");
     CHECK(f != NULL);
     char line[256]; long value = -1;
-    while (fgets(line, sizeof(line), f)) if (sscanf(line, "MemFree: %ld kB", &value) == 1) break;
+    while (fgets(line, sizeof(line), f)) {
+        if (!strncmp(line, name, strlen(name)) && sscanf(line + strlen(name), "%ld", &value) == 1) break;
+    }
     fclose(f);
     CHECK(value >= 0);
     return value;
 }
+
+static long free_kib(void) { return meminfo_kib("MemFree:"); }
 
 static void private_mapping(void)
 {
@@ -223,6 +230,151 @@ static void private_mapping(void)
     churn();
 }
 
+static void residency(volatile unsigned char *p, size_t length, int expected)
+{
+    unsigned char vec[64] = {0};
+    size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    CHECK(length / page <= sizeof(vec));
+    CHECK(mincore((void *)p, length, vec) == 0);
+    for (size_t i = 0; i < length / page; i++) CHECK((vec[i] & 1) == expected);
+}
+
+static void file_pageout(void)
+{
+    const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    int fd = open("/root/mapped-pageout", O_CREAT | O_TRUNC | O_RDWR, 0600);
+    unsigned char expected[SIZE];
+    for (size_t i = 0; i < SIZE; i++) expected[i] = (unsigned char)(i * 37 + 11);
+    CHECK(fd >= 0 && write(fd, expected, SIZE) == SIZE && fsync(fd) == 0);
+    volatile unsigned char *p = mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    volatile unsigned char *alias = mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    volatile unsigned char *clean = mmap(NULL, SIZE, PROT_READ, MAP_PRIVATE, fd, 0);
+    volatile unsigned char *copy = mmap(NULL, SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+    CHECK(p != MAP_FAILED && alias != MAP_FAILED && clean != MAP_FAILED && copy != MAP_FAILED);
+    volatile unsigned char *lazy = mmap(NULL, SIZE, PROT_NONE, MAP_SHARED, fd, 0);
+    CHECK(lazy != MAP_FAILED);
+    for (size_t i = 0; i < SIZE; i += page) {
+        CHECK(p[i] == expected[i] && alias[i] == expected[i] && clean[i] == expected[i]);
+        copy[i + 31] = 0xce;
+    }
+    p[17] = 0x71;
+    CHECK(msync((void *)p, SIZE, MS_SYNC) == 0);
+    CHECK(mprotect((void *)alias, SIZE, PROT_READ) == 0);
+    CHECK(mprotect((void *)alias, SIZE, PROT_READ | PROT_WRITE) == 0);
+    alias[17] = 0x82;
+    // A usercopy write through the physical direct map must dirty the PTE.
+    unsigned char value = 0x93;
+    int input = open("/root/pageout-input", O_CREAT | O_TRUNC | O_RDWR, 0600);
+    CHECK(input >= 0 && write(input, &value, 1) == 1);
+    CHECK(pread(input, (void *)&p[SIZE - 9], 1, 0) == 1 && close(input) == 0);
+    CHECK(msync((void *)alias, SIZE, MS_SYNC) == 0);
+    CHECK(mlock((void *)clean, page) == 0);
+    CHECK(madvise((void *)p, SIZE, MADV_PAGEOUT) == 0);
+    residency(p, page, 1); // Any locked alias pins the underlying file frame.
+    CHECK(munlock((void *)clean, page) == 0);
+    CHECK(madvise((void *)p, SIZE, MADV_PAGEOUT) == 0);
+    residency(p, SIZE, 0);
+    residency(alias, SIZE, 0);
+    residency(clean, SIZE, 0);
+    for (size_t i = 0; i < SIZE; i += page) CHECK(copy[i + 31] == 0xce);
+    CHECK(madvise((void *)copy, SIZE, MADV_PAGEOUT) == 0);
+    residency(copy, SIZE, 0);
+    for (size_t i = 0; i < SIZE; i += page) CHECK(copy[i + 31] == 0xce);
+    CHECK(madvise((void *)copy, SIZE, MADV_PAGEOUT) == 0);
+    CHECK(madvise((void *)copy, SIZE, MADV_DONTNEED) == 0);
+    CHECK(copy[31] == expected[31]);
+    CHECK(p[17] == 0x82 && alias[17] == 0x82 && clean[17] == 0x82);
+    CHECK(p[SIZE - 9] == 0x93 && copy[SIZE - 9] == 0x93);
+    CHECK(msync((void *)p, SIZE, MS_SYNC) == 0 && fsync(fd) == 0);
+    puts("FILE PAGEOUT: shared aliases revoked, locked page pinned, private COW paged and discarded, refault coherent");
+
+    struct heap pageout_before, pageout_after;
+    for (int round = 0; round < 232; round++) {
+        p[17] = 0x82;
+        CHECK(madvise((void *)p, SIZE, MADV_PAGEOUT) == 0 && p[17] == 0x82);
+        if (round == 31) heap_snapshot(&pageout_before);
+    }
+    heap_snapshot(&pageout_after);
+    CHECK(pageout_before.n == pageout_after.n);
+    long kept = 0;
+    for (int i = 0; i < pageout_before.n; i++) {
+        long delta = pageout_after.count[i] - pageout_before.count[i];
+        printf("FILE PAGEOUT CHURN size=%ld before=%ld after=%ld kept=%ld\n",
+               pageout_before.size[i], pageout_before.count[i], pageout_after.count[i], delta);
+        CHECK(delta < 32);
+        if (delta > 0) kept += delta * pageout_before.size[i];
+    }
+    CHECK(kept < 8192 && pageout_after.large - pageout_before.large < 4);
+    puts("FILE PAGEOUT: 200 refault/write/pageout operations retain bounded heap");
+
+    // Final unmap must retain writes even after unlink and close. Truncation
+    // zeroes cached bytes so pageout cannot put stale tail data back on disk.
+    int temporary = open("/root/pageout-truncate", O_CREAT | O_TRUNC | O_RDWR, 0600);
+    CHECK(temporary >= 0 && ftruncate(temporary, 2 * page) == 0);
+    volatile unsigned char *tail = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE, MAP_SHARED, temporary, 0);
+    CHECK(tail != MAP_FAILED);
+    tail[page + 17] = 0xa5;
+    CHECK(ftruncate(temporary, page + 1) == 0);
+    CHECK(ftruncate(temporary, 2 * page) == 0 && tail[page + 17] == 0);
+    tail[17] = 0x62;
+    CHECK(madvise((void *)tail, 2 * page, MADV_PAGEOUT) == 0 && tail[17] == 0x62);
+    CHECK(unlink("/root/pageout-truncate") == 0 && close(temporary) == 0);
+    tail[17] = 0x73;
+    CHECK(munmap((void *)tail, 2 * page) == 0);
+    for (int i = 0; i < 4; i++) {
+        volatile unsigned char *map = i == 0 ? p : i == 1 ? alias : i == 2 ? clean : copy;
+        CHECK(munmap((void *)map, SIZE) == 0);
+    }
+    CHECK(munmap((void *)lazy, SIZE) == 0 && close(fd) == 0);
+    puts("FILE PAGEOUT: truncate/regrow and unlinked final unmap preserved");
+}
+
+static void file_pressure(void)
+{
+    const size_t length = 8 * 1024 * 1024;
+    const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    int fd = open("/root/mapped-pressure", O_CREAT | O_TRUNC | O_RDWR, 0600);
+    unsigned char expected[SIZE];
+    for (size_t i = 0; i < SIZE; i++) expected[i] = (unsigned char)(i * 37 + 11);
+    CHECK(fd >= 0);
+    for (size_t i = 0; i < length; i += SIZE) CHECK(write(fd, expected, SIZE) == SIZE);
+    CHECK(fsync(fd) == 0);
+    puts("FILE PRESSURE: seeded 8 MiB file");
+    volatile unsigned char *p = mmap(NULL, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    CHECK(p != MAP_FAILED);
+    for (size_t i = 0; i < length; i += page) CHECK(p[i + 17] == expected[17]);
+    puts("FILE PRESSURE: populated file pages");
+    p[17] = 0x82;
+    p[SIZE - 9] = 0x93;
+    // Exceed free RAM and reclaimable block-cache space, while remaining
+    // within the bounded compression pool without requiring a swap disk.
+    size_t extent = ((size_t)free_kib() + (size_t)meminfo_kib("Cached:")) * 1024 + 24 * 1024 * 1024;
+    extent = extent / page * page;
+    printf("FILE PRESSURE allocation=%zu MiB ram=%d MiB\n", extent / (1024 * 1024), VINIX_TEST_MEMORY_MIB);
+    volatile unsigned char *anonymous = mmap(NULL, extent, PROT_READ | PROT_WRITE,
+                                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    CHECK(anonymous != MAP_FAILED);
+    puts("FILE PRESSURE: anonymous mapping created");
+    for (size_t i = 0; i < extent; i += page) {
+        anonymous[i] = 0x46;
+        anonymous[i + page - 1] = 0x57;
+        if ((i + page) % (32 * 1024 * 1024) == 0) printf("FILE PRESSURE touched=%zu MiB\n", (i + page) / (1024 * 1024));
+    }
+    unsigned char *vec = calloc(length / page, 1);
+    CHECK(vec != NULL && mincore((void *)p, length, vec) == 0);
+    size_t missing = 0;
+    for (size_t i = 0; i < length / page; i++) missing += !(vec[i] & 1);
+    printf("FILE PRESSURE missing=%zu total=%zu\n", missing, length / page);
+    CHECK(missing > 0);
+    CHECK(p[17] == 0x82 && p[SIZE - 9] == 0x93);
+    for (size_t i = 0; i < length; i += page) CHECK(p[i + 31] == expected[31]);
+    for (size_t i = 0; i < extent; i += page) CHECK(anonymous[i] == 0x46 && anonymous[i + page - 1] == 0x57);
+    CHECK(msync((void *)p, length, MS_SYNC) == 0 && fsync(fd) == 0);
+    CHECK(munmap((void *)anonymous, extent) == 0);
+    free(vec);
+    puts("FILE PRESSURE: automatic file eviction and dirty refault passed beside pressure-sized anonymous memory");
+}
+
 int main(void)
 {
     setbuf(stdout, NULL);
@@ -245,6 +397,10 @@ int main(void)
         churn();
     } else if (!strcmp(step, "private")) {
         private_mapping();
+    } else if (!strcmp(step, "pageout")) {
+        file_pageout();
+    } else if (!strcmp(step, "pressure")) {
+        file_pressure();
     } else {
         char path[96];
         snprintf(path, sizeof(path), "/root/mapped-%s", step);

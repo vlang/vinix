@@ -15,13 +15,12 @@ import sys
 import tarfile
 import tempfile
 import time
-from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
-STEPS = ("sync", "syncfs", "background", "churn", "private")
+STEPS = ("sync", "syncfs", "background", "churn", "private", "pageout", "pressure")
 
 
-def amd64_boot(command, environment, helper, timeout, step):
+def boot_guest(command, environment, helper, timeout, step):
     pid, master = pty.fork()
     if pid == 0:
         os.execvpe(command[0], command, environment)
@@ -37,13 +36,14 @@ def amd64_boot(command, environment, helper, timeout, step):
             except OSError: break
             if not data: break
             transcript += data
+            sys.stdout.buffer.write(data)
+            sys.stdout.flush()
             if helper.DONE_RE.search(transcript) or (any(x in transcript for x in helper.FAIL_MARKERS) and transcript.endswith(b"\n")): break
     finally:
         helper.stop_child(pid, master)
         os.close(master)
-    sys.stdout.buffer.write(transcript)
-    sys.stdout.flush()
     done = helper.DONE_RE.search(transcript)
+    if done is None: print(f"ERROR: {step} stopped without a completion marker (timeout {timeout}s)", flush=True)
     return (done is not None and done.group(1).decode() == step
             and helper.START_MARKER in transcript
             and not any(x in transcript for x in helper.FAIL_MARKERS))
@@ -52,10 +52,12 @@ def amd64_boot(command, environment, helper, timeout, step):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=("aarch64", "amd64"), default="aarch64")
-    parser.add_argument("--steps", default=",".join(STEPS))
+    parser.add_argument("--steps", default=",".join(step for step in STEPS if step != "pressure"))
+    parser.add_argument("--memory", type=int, default=1024, help="guest RAM in MiB; use 256 for pressure")
     args = parser.parse_args()
     steps = args.steps.split(",")
     if any(step not in STEPS for step in steps): parser.error("unknown step")
+    if args.memory < 128 or ("pressure" in steps and args.memory > 512): parser.error("pressure needs 128–512 MiB")
     runner_root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", ROOT))
     spec = importlib.util.spec_from_file_location("powercut", runner_root / "tests/disk-no-sync/run_vm.py")
     helper = importlib.util.module_from_spec(spec)
@@ -74,7 +76,7 @@ def main():
                   f"-L{sysroot / 'lib'}", "-fuse-ld=lld"]
         else: cc = [os.environ.get("CC_AMD64", "x86_64-linux-musl-gcc")]
         subprocess.run(cc + ["-static", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-stack-protector",
-            str(ROOT / "tests/mapped-writeback/guest.c"), "-pthread", "-o", str(work / "init")], check=True)
+            str(ROOT / "tests/mapped-writeback/guest.c"), f"-DVINIX_TEST_MEMORY_MIB={args.memory}", "-pthread", "-o", str(work / "init")], check=True)
         disk = work / "root.ext2"
         archive = work / "initramfs.tar"
         preseed = work / "preseed"
@@ -93,8 +95,10 @@ def main():
         for step in steps:
             helper.initramfs(archive, step)
             if args.arch == "aarch64":
-                finished, _ = helper.boot(runner_root, SimpleNamespace(init=work / "init", timeout=timeout), environment,
-                    os.environ.get("VINIX_QEMU_RT_NO_BUILD") != "1", step)
+                command = [str(runner_root / "scripts/run-aarch64.sh"), "--serial", f"--mem={args.memory}",
+                           f"--guest-init={work / 'init'}"]
+                if os.environ.get("VINIX_QEMU_RT_NO_BUILD") == "1": command.insert(1, "--no-build")
+                finished = boot_guest(command, environment, helper, timeout, step)
             else:
                 with tarfile.open(archive, "a", format=tarfile.USTAR_FORMAT) as f: f.add(work / "init", "sbin/init")
                 isoenv = {**environment, "VINIX_AMD64_KERNEL": os.environ.get("VINIX_AMD64_KERNEL", str(ROOT / "kernel/bin/vinix")),
@@ -120,17 +124,19 @@ def main():
                 qemu = shutil.which(os.environ.get("VINIX_QEMU_X86_64", "qemu-system-x86_64"))
                 firmware = os.environ.get("VINIX_OVMF_CODE_AMD64", str(Path(qemu).parent.parent / "share/qemu/edk2-x86_64-code.fd"))
                 command = [qemu, "-machine", "q35,smm=off", "-accel", os.environ.get("VINIX_QEMU_ACCEL", "tcg"),
-                    "-cpu", "max", "-m", "1024", "-smp", "2", "-drive",
+                    "-cpu", "max", "-m", str(args.memory), "-smp", "2", "-drive",
                     f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}", "-cdrom", str(work / "test.iso"),
                     "-drive", f"if=ide,format=raw,file={disk},cache=writeback", "-display", "none", "-monitor", "none",
                     "-serial", "stdio", "-no-reboot"]
-                finished = amd64_boot(command, environment, helper, timeout, step)
+                if os.environ.get("VINIX_TEST_QMP"):
+                    command += ["-qmp", f"unix:{os.environ['VINIX_TEST_QMP']},server=on,wait=off"]
+                finished = boot_guest(command, environment, helper, timeout, step)
             if not finished: return 1
             if step != "churn":
                 observed = work / "observed.bin"
                 file_path = f"{'/root' if args.arch == 'amd64' else ''}/mapped-{step}"
                 subprocess.run([tool, "-R", f"dump {file_path} {observed}", str(disk)], check=True, capture_output=True)
-                size = 8 * 1024 * 1024 if step == "private" else 65536
+                size = 8 * 1024 * 1024 if step in ("pressure", "private") else 65536
                 expected = bytearray((i * 37 + 11) & 255 for i in range(size))
                 expected[17], expected[65536 - 9] = 0x82, 0x93
                 if observed.read_bytes() != expected: raise RuntimeError(f"{step}: live mapping was not on disk at power cut")

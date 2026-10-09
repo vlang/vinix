@@ -106,6 +106,8 @@ pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
 	if write && pte & pte_writable == 0 {
 		return none
 	}
+	mut mutable_map := unsafe { pagemap }
+	mutable_map.touch_user_page_unlocked(virt, write)
 	return pte & pte_flags_mask
 }
 
@@ -252,12 +254,13 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 		return none
 	}
 
+	pagemap.protect_file_page_unlocked(virt)
 	old := unsafe { *pte_p }
 	unsafe {
 		*pte_p &= pte_flags_mask
 	}
 	unsafe {
-		*pte_p |= flags
+		*pte_p |= flags | (old & (page_accessed | page_dirty | pte_file_dirty))
 	}
 	pagemap.account_resident(virt, old & pte_present != 0,
 		flags & pte_present != 0)
@@ -293,7 +296,7 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 
 	old := unsafe { *entry }
 	unsafe {
-		*entry = phys | flags
+		*entry = phys | flags | (if old & pte_flags_mask == phys && old & pte_file_tracked != 0 { old & (page_dirty | pte_file_dirty) } else { u64(0) })
 	}
 	pagemap.account_resident(virt, old & pte_present != 0,
 		flags & pte_present != 0)

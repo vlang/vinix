@@ -11,6 +11,17 @@ pub fn pf_handler(gpr_state &cpulocal.GPRState) ? {
 	// ESR_EL1 ISS field for data aborts: bits [5:0] = DFSC
 	// Permission fault: DFSC = 0b0011xx (0x0C-0x0F)
 	dfsc := esr & 0x3f
+	if dfsc >= 0x08 && dfsc <= 0x0b {
+		address := cpu.read_far_el1()
+		current := proc.current_thread()
+		if address >= higher_half || current == unsafe { nil } { return none }
+		mut pm := current.process.pagemap
+		pm.l.acquire()
+		referenced := pm.reference_file_page_unlocked(address)
+		pm.l.release()
+		if referenced { return }
+		return none
+	}
 	if dfsc >= 0x0c && dfsc <= 0x0f {
 		addr := cpu.read_far_el1()
 		wnr := (esr >> 6) & 1

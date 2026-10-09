@@ -30,6 +30,10 @@ mut:
     file_data_start u64
     file_data_length u64
     shadow_pagemap memory.Pagemap
+    tracked_file bool
+    file_registered bool
+    file_previous &MmapRangeGlobal = unsafe { nil }
+    file_next &MmapRangeGlobal = unsafe { nil }
     pte_extra u64
     paged_pages &PagedPage = unsafe { nil }
     locals []&MmapRangeLocal

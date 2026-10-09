@@ -27,6 +27,7 @@ __global (
 	pressure_allocation_failures  = u64(0)
 	pressure_observer            fn (u64) = unsafe { nil }
 	anonymous_pageout            fn (u64, bool) u64 = unsafe { nil }
+	file_pageout                 fn (u64, bool) u64 = unsafe { nil }
 	anonymous_pageout_inflight   u32
 	anonymous_pageout_completed eventstruct.Event
 )
@@ -37,14 +38,21 @@ pub fn register_anonymous_pageout(handler fn (u64, bool) u64) {
 	pressure_lock.release()
 }
 
+pub fn register_file_pageout(handler fn (u64, bool) u64) {
+	pressure_lock.acquire()
+	file_pageout = handler
+	pressure_lock.release()
+}
+
 // Disk I/O belongs only in a sleepable context, never in the PMM's generic
 // reclaim callbacks (which can be entered under arbitrary kernel locks).
+// This entry point coordinates mapped-file and anonymous pageout together.
 pub fn pageout_anonymous(wanted u64) u64 {
 	return pageout_anonymous_inner(wanted, false)
 }
 
 // Foreground allocation recovery can wait for an already-running reclaimer.
-// A busy worker is not evidence that anonymous memory cannot be reclaimed.
+// A busy worker is not evidence that user memory cannot be reclaimed.
 pub fn pageout_anonymous_wait(wanted u64) u64 {
 	return pageout_anonymous_inner(wanted, true)
 }
@@ -52,8 +60,9 @@ pub fn pageout_anonymous_wait(wanted u64) u64 {
 fn pageout_anonymous_inner(wanted u64, wait bool) u64 {
 	pressure_lock.acquire()
 	handler := anonymous_pageout
+	file_handler := file_pageout
 	pressure_lock.release()
-	if handler == unsafe { nil } { return 0 }
+	if handler == unsafe { nil } && file_handler == unsafe { nil } { return 0 }
 	for {
 		generation := event.generation(mut anonymous_pageout_completed)
 		if katomic.cas(mut &anonymous_pageout_inflight, u32(0), u32(1)) { break }
@@ -65,7 +74,9 @@ fn pageout_anonymous_inner(wanted u64, wait bool) u64 {
 		katomic.store(mut &anonymous_pageout_inflight, u32(0))
 		event.trigger(mut anonymous_pageout_completed, true)
 	}
-	reclaimed := handler(wanted, wait)
+	mut reclaimed := u64(0)
+	if file_handler != unsafe { nil } { reclaimed = file_handler(wanted, wait) }
+	if reclaimed < wanted && handler != unsafe { nil } { reclaimed += handler(wanted - reclaimed, wait) }
 	mut previous := katomic.load(&pressure_reclaimed_pages)
 	for !katomic.cas(mut &pressure_reclaimed_pages, previous, previous + reclaimed) {
 		previous = katomic.load(&pressure_reclaimed_pages)

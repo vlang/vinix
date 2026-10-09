@@ -41,6 +41,7 @@ pub fn malloc_packed_fallible(bytes u64) voidptr {
     return unsafe { calloc(usize(bytes), 1) }
 }
 pub fn register_reclaimer(_callback fn (u64) u64) bool { return true }
+pub fn register_reclaimable(_callback fn () u64) {}
 VEOF
 cat > "$tmp/modules/katomic/katomic.v" <<'VEOF'
 module katomic

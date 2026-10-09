@@ -3,6 +3,7 @@ module ext2
 import errno
 import memory
 import memory.mmap as mmap_mod
+import sched
 
 @[heap]
 struct EXT2MappedPage {
@@ -14,6 +15,22 @@ mut:
 }
 
 fn (mut this EXT2Resource) private_mapping_cow() bool { return true }
+
+fn (mut this EXT2Resource) mark_mapping_dirty(page u64, physical voidptr) {
+	this.l.acquire()
+	defer { this.l.release() }
+	if mut mapped := this.mapped_page_locked(page) {
+		if mapped.physical == physical { mapped.shared_dirty = true }
+	}
+}
+
+// Called under a VM lock; reverse lock acquisition must never wait.
+fn (mut this EXT2Resource) uncached_mapping_page(page u64, physical voidptr) bool {
+	if !this.l.test_and_acquire() { return false }
+	defer { this.l.release() }
+	if mapped := this.mapped_page_locked(page) { return mapped.physical != physical }
+	return true
+}
 
 // The resource lock is held while looking up pages. Shared mappings and
 // descriptor I/O use the same physical page, which provides immediate
@@ -54,6 +71,9 @@ fn (mut this EXT2Resource) release_mapping(_handle voidptr, _page u64,
 			return
 		}
 		if mapped.shared_dirty && !this.filesystem.read_only {
+			state := mmap_mod.file_page_state(voidptr(this.box), mapped.page, mapped.physical, false)
+			if !state.ready { return }
+			mapped.shared_dirty = mapped.shared_dirty || state.dirty
 			mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 			unsafe { *inode = EXT2Inode{} }
 			inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return }
@@ -94,18 +114,15 @@ fn (mut this EXT2Resource) write_mapped_page_locked(mut inode EXT2Inode,
 	}
 }
 
-// Write every cached shared page which intersects the requested file range.
-// Vinix does not expose hardware dirty bits to the common VM yet, so this is
-// deliberately conservative: a page remains eligible on every later fsync or
-// msync, ensuring writes made after an earlier synchronization are not lost.
+// Revoke shared writes and collect dirty evidence from every alias before
+// writing a snapshot. A later write faults and makes the next sync eligible.
 fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64) ? {
 	if length == 0 || this.filesystem.read_only {
 		return
 	}
 	this.write_mapped_pages(offset, length)?
 	// msync(MS_SYNC) must reach the backing resource, not merely the block
-	// cache. It does before the call returns, but msync holds the address
-	// space's lock here, so the flush waits until the thread holds nothing.
+	// cache. The syscall epilogue flushes after all vnode locks are released.
 	// Failed or short device writeback remains dirty there for retry.
 	flush_on_return()
 }
@@ -113,6 +130,19 @@ fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64)
 // Put the shared pages mapped over [offset, offset + length) into the block
 // cache, where a flush finds them.
 fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
+	for _ in 0 .. 64 {
+		this.write_mapped_pages_once(offset, length) or {
+			if errno.get() != errno.eagain { return none }
+			sched.yield(true)
+			continue
+		}
+		return
+	}
+	errno.set(errno.eagain)
+	return none
+}
+
+fn (mut this EXT2Resource) write_mapped_pages_once(offset u64, length u64) ? {
 	if this.filesystem.read_only { return }
 	end := if length > u64(-1) - offset { u64(-1) } else { offset + length }
 	this.l.acquire()
@@ -139,14 +169,18 @@ fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
 			index++
 			continue
 		}
+		state := mmap_mod.file_page_state(voidptr(this.box), mapped.page, mapped.physical, false)
+		if !state.ready { errno.set(errno.eagain); return none }
+		mapped.shared_dirty = mapped.shared_dirty || state.dirty
 		if mapped.shared_dirty {
 			if !inode_loaded {
 				inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 				inode_loaded = true
 			}
 			this.write_mapped_page_locked(mut inode, mapped)?
-			// Existing shared mappings may write again without a fault.
-			if mapped.refs == 0 { mapped.shared_dirty = false }
+			// Writes after revocation fault and leave new dirty evidence in
+			// their PTEs, independently of this completed snapshot.
+			mapped.shared_dirty = false
 		}
 		if !this.retire_clean_page_locked(index) { index++ }
 	}
@@ -158,4 +192,82 @@ fn (mut this EXT2Resource) write_mapped_pages(offset u64, length u64) ? {
 		this.stat.ctim.tv_sec = inode.creation_time
 		this.stat.ctim.tv_nsec = 0
 	}
+}
+
+fn (mut this EXT2Resource) reclaim_mapped_pages(wanted u64, foreground bool) u64 {
+	return this.reclaim_mapped_span(wanted, foreground, 0, u64(-1))
+}
+
+fn (mut this EXT2Resource) pageout_mapping(page u64) u64 {
+	return this.reclaim_mapped_span(1, true, page, page + 1)
+}
+
+fn (mut this EXT2Resource) reclaim_mapped_span(wanted u64, foreground bool, begin u64, end u64) u64 {
+	if !this.l.test_and_acquire() { return 0 }
+	if !this.filesystem.l.test_and_acquire() { this.l.release(); return 0 }
+	defer {
+		drop_registry := this.unregister_empty_mapped_resource()
+		this.filesystem.l.release()
+		this.l.release()
+		if drop_registry { this.unref(unsafe { nil }) or {} }
+	}
+	mut reclaimed := u64(0)
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
+	mut inode_loaded := false
+	// The first pass ages referenced pages. Foreground recovery revisits them
+	// before reporting no progress; background scanning has a fixed budget.
+	passes := if foreground { 2 } else { 1 }
+	mut start := this.mapped_reclaim_cursor
+	filtered := begin != 0 || end != u64(-1)
+	if filtered {
+		mut found := false
+		for i, page in this.mapped_pages {
+			if page.page >= begin && page.page < end { start = i; found = true; break }
+		}
+		if !found { return 0 }
+	}
+	for _ in 0 .. passes {
+		mut index := if start < this.mapped_pages.len { start } else { 0 }
+		mut scanned := 0
+		budget := if filtered { 1 } else if foreground { this.mapped_pages.len } else { 256 }
+		limit := if this.mapped_pages.len < budget { this.mapped_pages.len } else { budget }
+		for this.mapped_pages.len != 0 && scanned < limit && reclaimed < wanted {
+			if foreground && scanned != 0 && scanned % 256 == 0 {
+				// The sweep owns a strong vnode pin. Drop IRQ-masking locks
+				// between bounded batches; keep no cached-page pointer or
+				// inode snapshot across the scheduler yield.
+				this.filesystem.l.release()
+				this.l.release()
+				sched.yield(true)
+				this.l.acquire()
+				this.filesystem.l.acquire()
+				inode_loaded = false
+				if this.mapped_pages.len == 0 { break }
+			}
+			if index >= this.mapped_pages.len { index = 0 }
+			scanned++
+			mut mapped := this.mapped_pages[index]
+			if mapped.page < begin || mapped.page >= end { index++; continue }
+			state := mmap_mod.file_page_state(voidptr(this.box), mapped.page, mapped.physical, true)
+			if !state.ready { index++; continue }
+			mapped.shared_dirty = mapped.shared_dirty || state.dirty
+			assert state.shared_refs <= mapped.refs
+			mapped.refs -= state.shared_refs
+			if state.referenced || state.blocked { index++; continue }
+			if mapped.shared_dirty && !this.filesystem.read_only {
+				if !inode_loaded {
+					inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { index++; continue }
+					inode_loaded = true
+				}
+				this.write_mapped_page_locked(mut inode, mapped) or { index++; continue }
+				mapped.shared_dirty = false
+			}
+			if this.filesystem.read_only { mapped.shared_dirty = false }
+			if this.retire_clean_page_locked(index) { reclaimed++ }
+			else { index++ }
+		}
+		this.mapped_reclaim_cursor = index
+	}
+	return reclaimed
 }

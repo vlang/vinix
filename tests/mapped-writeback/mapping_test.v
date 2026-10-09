@@ -4,6 +4,7 @@ module ext2
 import katomic
 import klock
 import memory
+import memory.mmap as mmap_mod
 
 #flag -Dvinix_stack_alloc=__builtin_alloca
 fn C.vinix_stack_alloc(bytes u64) voidptr
@@ -48,10 +49,12 @@ mut:
 	stat TestStat
 	refcount int = 1
 	mapped_pages []&EXT2MappedPage
+	mapped_reclaim_cursor int
 	mapped_previous &EXT2Resource = unsafe { nil }
 	mapped_next &EXT2Resource = unsafe { nil }
 	mapped_serial u64
 	mapped_registered bool
+	box voidptr
 	freed bool
 }
 
@@ -180,6 +183,8 @@ fn test_private_eof_and_detached_cow_pages_are_disposable() {
 	dispose(mut item)
 }
 fn change(resource &EXT2Resource, byte u8) {
+	mut r := unsafe { resource }
+	r.mapped_pages[0].shared_dirty = true
 	unsafe { (&u8(resource.mapped_pages[0].physical))[17] = byte }
 }
 fn release(mut resource EXT2Resource) {
@@ -258,4 +263,91 @@ fn test_batched_sweep_bounds_new_registrations_and_repeated_mapping_lifetimes() 
 		dispose(mut item)
 	}
 	assert memory.live_pages == 0 && mapped_resources_first == unsafe { nil }
+}
+
+fn test_clean_sync_skips_io_and_busy_alias_retries_without_losing_dirty_data() {
+    mut item := mapped_resource()
+    change(item, 0x69)
+    mmap_mod.script = [mmap_mod.FilePageState{ready: false}, mmap_mod.FilePageState{ready: true}]
+    mmap_mod.calls = 0
+    assert sync_mapped_resources() && mmap_mod.calls >= 2
+    assert item.filesystem.writes == 1 && !item.mapped_pages[0].shared_dirty
+    item.filesystem.fail_read = true
+    assert sync_mapped_resources() && item.filesystem.writes == 1
+    item.filesystem.fail_read = false
+    release(mut item)
+    dispose(mut item)
+    assert memory.live_pages == 0
+}
+
+fn test_pageout_ages_dirty_alias_and_keeps_failed_unlinked_page_for_refault_and_retry() {
+    mut item := mapped_resource()
+    item.mapped_pages[0].shared_dirty = false
+    unsafe { (&u8(item.mapped_pages[0].physical))[17] = 0x84 }
+    item.filesystem.fail_write = true
+    mmap_mod.script = [mmap_mod.FilePageState{ready: true, referenced: true, dirty: true},
+                      mmap_mod.FilePageState{ready: true, shared_refs: 1}]
+    assert item.reclaim_mapped_pages(1, true) == 0
+    assert item.mapped_pages[0].refs == 0 && item.mapped_pages[0].shared_dirty
+    assert item.mapped_registered && memory.live_pages == 1
+    item.unref(unsafe { nil }) or { panic('unref') }
+    assert item.refcount == 1 && !item.freed
+    item.filesystem.fail_write = false
+    assert reclaim_mapped_resources(1, true) == 1
+    assert item.filesystem.bytes[17] == 0x84 && item.freed
+    dispose(mut item)
+    assert memory.live_pages == 0
+}
+
+fn test_pageout_preserves_busy_and_locked_frames() {
+    mut item := mapped_resource()
+    mmap_mod.script = [mmap_mod.FilePageState{ready: false}, mmap_mod.FilePageState{ready: false}]
+    assert item.reclaim_mapped_pages(1, true) == 0 && item.mapped_pages[0].refs == 1
+    mmap_mod.script = [mmap_mod.FilePageState{ready: true, blocked: true},
+                      mmap_mod.FilePageState{ready: true, blocked: true}]
+    assert item.reclaim_mapped_pages(1, true) == 0 && item.mapped_pages[0].refs == 1
+    release(mut item)
+    dispose(mut item)
+    assert memory.live_pages == 0
+}
+
+fn many_mapped_pages() &EXT2Resource {
+    mut item := mapped_resource()
+    item.mapped_pages[0].shared_dirty = false
+    for i in 1 .. 1025 {
+        item.mapped_pages << &EXT2MappedPage{page: u64(i), physical: memory.pmm_alloc_fallible(1), refs: 1}
+    }
+    return item
+}
+fn dispose_many_mapped_pages(mut item EXT2Resource) {
+    for item.mapped_pages.len != 0 {
+        page := item.mapped_pages.last()
+        item.release_mapping(unsafe { nil }, page.page, page.physical, 1)
+    }
+    dispose(mut item)
+    assert memory.live_pages == 0
+}
+fn test_foreground_reaches_unlocked_page_after_large_prefix_and_explicit_pageout_finds_target() {
+    mut item := many_mapped_pages()
+    mmap_mod.script = []mmap_mod.FilePageState{cap: 1025}
+    for _ in 0 .. 1024 { mmap_mod.script << mmap_mod.FilePageState{ready: true, blocked: true} }
+    mmap_mod.script << mmap_mod.FilePageState{ready: true, shared_refs: 1}
+    assert item.reclaim_mapped_pages(1, true) == 1 && item.mapped_pages.len == 1024
+    dispose_many_mapped_pages(mut item)
+    mut target := many_mapped_pages()
+    mmap_mod.calls = 0
+    mmap_mod.script = [mmap_mod.FilePageState{ready: true, shared_refs: 1}]
+    assert target.pageout_mapping(1024) == 1 && mmap_mod.calls == 1
+    dispose_many_mapped_pages(mut target)
+}
+fn test_background_batches_rotate_past_locked_prefix() {
+    mut item := many_mapped_pages()
+    for _ in 0 .. 4 {
+        mmap_mod.script = []mmap_mod.FilePageState{cap: 256}
+        for _ in 0 .. 256 { mmap_mod.script << mmap_mod.FilePageState{ready: true, blocked: true} }
+        assert item.reclaim_mapped_pages(1, false) == 0
+    }
+    mmap_mod.script = [mmap_mod.FilePageState{ready: true, shared_refs: 1}]
+    assert item.reclaim_mapped_pages(1, false) == 1 && item.mapped_pages.len == 1024
+    dispose_many_mapped_pages(mut item)
 }

@@ -8,6 +8,7 @@ import memory
 import pager
 import proc
 import sched
+import resource
 
 // Nonresident pages use an intrusive treap. Large sparse reservations do not
 // allocate per-page metadata, and neither faults nor fork scan all swapped
@@ -167,7 +168,7 @@ fn fork_paged_span(global &MmapRangeGlobal, mut child MmapRangeGlobal, begin u64
 fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 	defer { pagemap.l.release() }
 	local, _, _ := addr2range(&pagemap, virt) or { return unsafe { nil } }
-	if local.flags & map_anonymous == 0 || local.flags & map_locked != 0
+	if (local.flags & map_anonymous == 0 && (!local.global.tracked_file || local.flags & map_shared != 0)) || local.flags & map_locked != 0
 		|| local.immutable || pagemap.dying {
 		return unsafe { nil }
 	}
@@ -179,6 +180,11 @@ fn detach_page_unlocked(mut pagemap memory.Pagemap, virt u64) &pager.Backing {
 	defer { global.shadow_pagemap.l.release() }
 	if global.shadow_pagemap.top_level == unsafe { nil } { return unsafe { nil } }
 	physical := global.shadow_pagemap.virt2phys(page) or { return unsafe { nil } }
+	if local.flags & map_anonymous == 0 {
+		mut res := global.resource
+		file_page := u64(local.offset) / page_size + (virt - local.base) / page_size
+		if !resource.uncached_mapping_page(mut res, file_page, voidptr(physical)) { return unsafe { nil } }
+	}
 	mut held := unsafe { [64]&memory.Pagemap{} }
 	mut count := 0
 	defer {
@@ -310,7 +316,7 @@ pub fn pageout(pagemap &memory.Pagemap, address u64, length u64) u64 {
 		backing := detach_page_unlocked(mut map_, page)
 		if backing != unsafe { nil } { reclaimed += store_detached_page(map_, page, backing) }
 	}
-	return reclaimed
+	return reclaimed + pageout_file_span(pagemap, address, end)
 }
 
 __global (
@@ -396,7 +402,7 @@ pub fn reclaim_anonymous(wanted u64, foreground bool) u64 {
 				local.base
 			}
 			end := local.base + local.length
-			if local.flags & map_anonymous == 0 || local.flags & map_locked != 0 || local.immutable {
+			if (local.flags & map_anonymous == 0 && (!local.global.tracked_file || local.flags & map_shared != 0)) || local.flags & map_locked != 0 || local.immutable {
 				pagemap.pageout_cursor = end
 				scanned++
 				continue

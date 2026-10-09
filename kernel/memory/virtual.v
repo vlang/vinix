@@ -27,8 +27,16 @@ pub const pte_user = u64(1) << 2
 pub const pte_device = u64(1) << 3 // ARM64: use Device-nGnRnE memory type for MMIO
 pub const pte_uncached = u64(1) << 4 // ARM64: use Normal Non-Cacheable for framebuffers
 pub const pte_execute_only = u64(1) << 5 // ARM64: EL0 instruction fetch without data access
+pub const pte_file_tracked = u64(1) << 9
+pub const pte_file_dirty = u64(1) << 10
 pub const pte_noexec = u64(1) << 63
 pub const kernel_page_size = u64(0x1000)
+
+pub struct PageActivity {
+pub mut:
+	referenced bool
+	dirty bool
+}
 
 // What of a range of an address space is resident, in bytes: all of it, the
 // part fork left shared with another process until one of them writes it,

@@ -84,6 +84,45 @@ mut:
 	release_mapping(handle voidptr, page u64, physical voidptr, flags int)
 }
 
+pub interface MappingDirtyResource {
+mut:
+	mark_mapping_dirty(page u64, physical voidptr)
+	uncached_mapping_page(page u64, physical voidptr) bool
+}
+
+pub interface MappingPageoutResource {
+mut:
+	pageout_mapping(page u64) u64
+}
+
+pub fn pageout_mapping(mut res Resource, page u64) u64 {
+	if mut res is MappingPageoutResource {
+		mut capability := MappingPageoutResource(res)
+		mut stack := unsafe { &capability }
+		reclaimed := stack.pageout_mapping(page)
+		return reclaimed
+	}
+	return 0
+}
+
+pub fn mark_mapping_dirty(mut res Resource, page u64, physical voidptr) {
+	if mut res is MappingDirtyResource {
+		mut capability := MappingDirtyResource(res)
+		mut stack := unsafe { &capability }
+		stack.mark_mapping_dirty(page, physical)
+	}
+}
+
+pub fn uncached_mapping_page(mut res Resource, page u64, physical voidptr) bool {
+	if mut res is MappingDirtyResource {
+		mut capability := MappingDirtyResource(res)
+		mut stack := unsafe { &capability }
+		uncached := stack.uncached_mapping_page(page, physical)
+		return uncached
+	}
+	return false
+}
+
 // A file cache owns a physical reference independently of private mappings.
 // The VM maps its clean pages read-only until the mapping's first write.
 // Acquired pages and release_mapping must remain valid while this Resource

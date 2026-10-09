@@ -112,8 +112,9 @@ upgrade, rollback and recovery are repeatable from published images.
 - [x] Add disk-backed anonymous paging, encrypted swap, memory compression and
   pageout/refault with correct shared/private mapping behavior. See
   [implementation and limits](docs/anonymous-paging.md) and [acceptance tests](tests/paging/README.md).
-- [ ] Finish dirty/reference tracking and reclaim for mapped file pages; retain
-  correct writeback through unmap, unlink, truncation and storage failures.
+- [x] Finish dirty/reference tracking and reclaim for mapped file pages; retain
+  correct writeback through unmap, unlink, truncation and storage failures. See
+  [implementation and limits](docs/mapped-file-paging.md) and [acceptance tests](tests/mapped-writeback/README.md).
 - [ ] Extend current OOM recovery to bounded, charged kernel resources, including
   files, descriptors, sockets, IPC, mappings and process/thread creation.
 - [ ] Complete resource groups: memory/CPU/I/O/PID limits, pressure notifications,

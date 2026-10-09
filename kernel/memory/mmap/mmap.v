@@ -136,6 +136,10 @@ pub mut:
 	// installed. top_level is created under shadow_pagemap.l at that point.
 	serial u64
 	private_cow bool
+	tracked_file bool
+	file_registered bool
+	file_previous &MmapRangeGlobal = unsafe { nil }
+	file_next &MmapRangeGlobal = unsafe { nil }
 	paged_pages &PagedPage = unsafe { nil }
 	shadow_pagemap    memory.Pagemap
 	locals            []&MmapRangeLocal
@@ -307,6 +311,7 @@ fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
 	local.list_index = pagemap.mmap_ranges.len
 	pagemap.mmap_ranges << voidptr(local)
 	pagemap.mmap_root = range_tree_insert(unsafe { &MmapRangeLocal(pagemap.mmap_root) }, local)
+	register_file_global(local.global)
 }
 
 fn remove_range_unlocked(mut pagemap memory.Pagemap, local &MmapRangeLocal) {
@@ -624,7 +629,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 	}
 
 	old_pagemap.l.acquire()
+	new_pagemap.l.acquire()
 	defer {
+		new_pagemap.l.release()
 		old_pagemap.l.release()
 	}
 
@@ -707,6 +714,7 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 					pte_extra: global_range.pte_extra
 					owns_resource_ref: global_range.owns_resource_ref
 					owns_mapping_ref: global_range.owns_mapping_ref
+					tracked_file: global_range.tracked_file
 					private_cow: global_range.private_cow
 					no_write: global_range.no_write
 					no_exec: global_range.no_exec
@@ -738,7 +746,9 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap) ?&memory.Pagemap {
 				new_private_globals << new_global_range
 			}
 			new_local_range.global = new_global_range
+			range_locals_lock.acquire()
 			new_global_range.add_local(new_local_range)
+			range_locals_lock.release()
 			fork_paged_span(global_range, mut new_global_range, shadow_begin(local_range),
 				shadow_begin(local_range) + local_range.length)
 
@@ -787,7 +797,7 @@ fn page_table_flags(prot int, extra u64, writable bool) u64 {
 			flags |= memory.pte_execute_only
 		}
 	}
-	if writable && prot & prot_write != 0 {
+	if writable && prot & prot_write != 0 && extra & memory.pte_file_tracked == 0 {
 		flags |= memory.pte_writable
 	}
 	if prot & prot_exec == 0 {
@@ -960,6 +970,7 @@ fn install_range_page(mut pagemap memory.Pagemap, source RangePageSource, virt u
 // A range retains PROT_WRITE while its PTE is read-only, so no software-only
 // PTE bit is needed and both architectures use the same state machine.
 pub fn resolve_cow_fault(_pagemap &memory.Pagemap, address u64) bool {
+	if resolve_shared_file_write(_pagemap, address) { return true }
 	mut pagemap := unsafe { _pagemap }
 	virt := lib.align_down(address, page_size)
 	pagemap.l.acquire()
@@ -1306,6 +1317,9 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		}
 		extra_pte |= resource.mapping_attributes(mut resource_, range_handle, u64(offset))
 	}
+	tracked_file := flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil }
+		&& resource.private_mapping_cow(mut resource_)
+	if tracked_file && flags & map_shared != 0 { extra_pte |= memory.pte_file_tracked }
 	lazy_file := options.lazy_file || (flags & map_anonymous == 0
 		&& flags & map_shared != 0 && voidptr(resource_) != unsafe { nil }
 		&& resource.lazy_shared_mapping(mut resource_))
@@ -1321,6 +1335,7 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		offset: offset
 		pte_extra: extra_pte
 		owns_mapping_ref: mapping_retained
+		tracked_file: tracked_file
 		private_cow: range_local.cow
 		owns_resource_ref: resource_retained
 		lazy_file: lazy_file
@@ -1589,27 +1604,25 @@ pub fn syscall_msync(_ voidptr, addr u64, _length u64, flags int) (u64, u64) {
 
 	mut pagemap := proc.current_thread().process.pagemap
 	pagemap.l.acquire()
-	defer { pagemap.l.release() }
 	if immutable_overlap_unlocked(pagemap, addr, length) {
+		pagemap.l.release()
 		return errno.err, errno.eperm
 	}
+	pagemap.l.release()
 	mut current := addr
 	end := addr + length
 	for current < end {
+		pagemap.l.acquire()
 		local_range, _, _ := addr2range(pagemap, current) or {
-			return errno.err, errno.enomem
+			pagemap.l.release(); return errno.err, errno.enomem
 		}
-		range_end := if local_range.base + local_range.length < end {
-			local_range.base + local_range.length
-		} else {
-			end
-		}
-		if local_range.flags & map_shared != 0
-			&& local_range.flags & map_anonymous == 0 {
-			mut res := local_range.global.resource
-			file_offset := u64(local_range.offset) + (current - local_range.base)
-			resource.sync_mapping(mut res, local_range.global.handle, file_offset, range_end - current) or { return errno.err, errno.get() }
-		}
+		range_end := min_u64(local_range.base + local_range.length, end)
+		if local_range.flags & map_shared != 0 && local_range.flags & map_anonymous == 0 {
+			source := range_page_source(local_range, current)
+			file_offset := u64(local_range.offset) + current - local_range.base
+			pagemap.l.release()
+			sync_file_span(source, file_offset, range_end - current) or { return errno.err, errno.get() }
+		} else { pagemap.l.release() }
 		current = range_end
 	}
 	return 0, 0
@@ -2031,6 +2044,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 		// for as long.
 		mut present := pagemap.next_present(snip_begin, snip_end)
 		for present < snip_end {
+			harvest_file_dirty_unlocked(mut pagemap, local_range, present)
 			pagemap.unmap_page_unlocked(present) or {}
 			present = pagemap.next_present(present + page_size, snip_end)
 		}
@@ -2041,6 +2055,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 			// can be torn down after the lock is let go.
 			range_locals_lock.acquire()
 			last := global_range.locals.len == 1
+			if last { unregister_file_global_locked(mut global_range) }
 			if !last {
 				global_range.locals.delete(global_range.locals.index(local_range))
 				reclaim_uncovered_shadow_pages_locked(mut global_range, shadow_start, shadow_end,

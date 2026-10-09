@@ -61,6 +61,9 @@ fn portable_to_arm64_pte(phys u64, flags u64, address_mask u64) u64 {
 	}
 	mut pte := (phys & address_mask) | arm64_pte_valid | arm64_pte_af | sh | attr
 
+	if flags & pte_file_tracked != 0 { pte |= arm64_file_tracked }
+	if flags & pte_file_dirty != 0 { pte |= arm64_file_dirty }
+
 	// All TTBR0 leaves are non-global, including PROT_NONE entries that
 	// intentionally lack AP[1]/pte_user. TTBR1 kernel entries remain global.
 	if address_mask == pte_flags_mask {
@@ -171,6 +174,8 @@ pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
 	if write && pte & arm64_pte_ap_ro != 0 {
 		return none
 	}
+	mut mutable_map := unsafe { pagemap }
+	mutable_map.touch_user_page_unlocked(virt, write)
 	return pte & pte_flags_mask
 }
 
@@ -526,7 +531,8 @@ pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
 	}
 	old := unsafe { *pte_p }
 	phys := old & pte_flags_mask
-	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
+	mut new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
+	new_pte |= old & arm64_file_dirty
 	// Tagged maps retain translations while inactive; zero-tag maps can also
 	// be active on another CPU. A present user entry always requires BBM.
 	install_arm64_pte(mut pte_p, virt, new_pte, true)
@@ -600,7 +606,8 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 
 	old := unsafe { *entry }
-	new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
+	mut new_pte := portable_to_arm64_pte(phys, flags, pte_flags_mask)
+	if old & pte_flags_mask == phys && old & arm64_file_tracked != 0 { new_pte |= old & arm64_file_dirty }
 	install_arm64_pte(mut entry, virt, new_pte, true)
 	pagemap.account_resident(virt, old & arm64_pte_valid == arm64_pte_valid, true)
 }

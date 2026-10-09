@@ -522,19 +522,24 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 		if local_range.flags & map_locked != 0 { return errno.err, errno.einval }
 		if advice == madv_dontneed && local_range.flags & map_shared == 0
 			&& local_range.global.private_cow && in_page == 0 && chunk == page_size {
+			mut owner := local_range.global
+			owner.shadow_pagemap.l.acquire()
+			forget_paged_locked(mut owner, shadow_address(local_range, virt))
+			owner.shadow_pagemap.l.release()
 			phys := pagemap.virt2phys(virt) or {
 				virt += chunk
 				continue
 			}
 			mut global := local_range.global
 			global.shadow_pagemap.l.acquire()
-			shadow_phys := global.shadow_pagemap.virt2phys(virt) or { u64(0) }
+			key := shadow_address(local_range, virt)
+			shadow_phys := global.shadow_pagemap.virt2phys(key) or { u64(0) }
 			if shadow_phys == phys {
 				pagemap.unmap_page_unlocked(virt) or {
 					global.shadow_pagemap.l.release()
 					return errno.err, errno.einval
 				}
-				global.shadow_pagemap.unmap_page_unlocked(virt) or {
+				global.shadow_pagemap.unmap_page_unlocked(key) or {
 					global.shadow_pagemap.l.release()
 					return errno.err, errno.einval
 				}

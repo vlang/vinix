@@ -109,6 +109,7 @@ pub mut:
 
 	filesystem   &EXT2Filesystem
 	mapped_pages []&EXT2MappedPage
+	mapped_reclaim_cursor int
 	mapped_previous &EXT2Resource = unsafe { nil }
 	mapped_next     &EXT2Resource = unsafe { nil }
 	mapped_serial   u64
@@ -210,7 +211,6 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 				}
 			} else {
 				cached.refs++
-				cached.shared_dirty = true
 			}
 			return cached.physical
 		}
@@ -255,7 +255,6 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 			page: page
 			physical: physical
 			refs: if is_shared { u64(1) } else { u64(0) }
-			shared_dirty: is_shared
 		}
 		this.register_mapped_resource()
 	}

@@ -4,6 +4,7 @@ module ext2
 import katomic
 import klock
 import pagecache
+import memory
 
 const mapped_writeback_batch = 16
 
@@ -12,6 +13,7 @@ __global (
 	mapped_resources_last  &EXT2Resource = unsafe { nil }
 	mapped_resources_lock  klock.Lock
 	mapped_resources_serial u64
+	mapped_reclaim_cursor u64
 	mapped_writeback_registered bool
 )
 
@@ -20,8 +22,44 @@ fn register_mapped_writeback() bool {
 	defer { mapped_resources_lock.release() }
 	if mapped_writeback_registered { return true }
 	if !pagecache.register_sync_hook(sync_mapped_resources) { return false }
+	memory.register_file_pageout(reclaim_mapped_resources)
 	mapped_writeback_registered = true
 	return true
+}
+
+// Only sleepable pressure work enters this bridge. Registry pins survive
+// unlink and concurrent unmap; every vnode callback runs outside its lock.
+fn reclaim_mapped_resources(wanted u64, foreground bool) u64 {
+	mapped_resources_lock.acquire()
+	bound := mapped_resources_serial
+	mut cursor := if foreground { u64(0) } else { mapped_reclaim_cursor }
+	mapped_resources_lock.release()
+	mut reclaimed := u64(0)
+	for reclaimed < wanted {
+		mut batch := unsafe { [mapped_writeback_batch]&EXT2Resource{} }
+		mut count := 0
+		mapped_resources_lock.acquire()
+		mut entry := mapped_resources_first
+		for entry != unsafe { nil } && count < mapped_writeback_batch {
+			if entry.mapped_serial > cursor && entry.mapped_serial <= bound {
+				katomic.inc(mut &entry.refcount)
+				batch[count] = entry
+				count++
+				cursor = entry.mapped_serial
+			}
+			entry = entry.mapped_next
+		}
+		if !foreground { mapped_reclaim_cursor = if count == 0 { u64(0) } else { cursor } }
+		mapped_resources_lock.release()
+		if count == 0 { break }
+		for i in 0 .. count {
+			mut target := batch[i]
+			if reclaimed < wanted { reclaimed += target.reclaim_mapped_pages(wanted - reclaimed, foreground) }
+			target.unref(unsafe { nil }) or {}
+		}
+		if !foreground { break }
+	}
+	return reclaimed
 }
 
 // Caller holds the resource lock. The registry owns one strong reference
