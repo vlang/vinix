@@ -18,3 +18,11 @@ preserves arbitrary-width page alignment and retention fields, and constructs
 the original manifest/cache key. The front end retains the early parser, loader
 checks and release tuple unpack; native results borrow the same objects for the
 remaining locked build workflow. No new manifest fields or upstream changes.
+
+The publication controller owns the original lock, download, archive validation,
+patch/configure/make steps, cached input and library checks, export-set parsing
+and final staging calls. Managers retain distinct entered streams; suppression
+continues at the original boundary, and temporary cleanup preserves active error
+context. The exported-symbol parser retires transient row handles while keeping
+actual set members; iterator and last-row ownership follow successful assignment.
+The CLI still parses and validates the Alpine loader before native startup.

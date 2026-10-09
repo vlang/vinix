@@ -170,3 +170,21 @@ fn apply(factory string, args []ah.Value) !string {
 		'args':   ah.Value(args)
 	})!.text()
 }
+
+fn evaluated(factory string, args []ah.Value, kwargs map[string]ah.Value) !string {
+	value := callback('function', {
+		'target': ah.Value(factory)
+		'call':   ah.Value(true)
+		'args':   ah.Value(args)
+		'kwargs': ah.Value(kwargs)
+	})!
+	release(factory)!
+	return value.text()
+}
+
+fn forget_since(checkpoint ah.Value, keep []string) ! {
+	callback('release_since', {
+		'checkpoint': checkpoint
+		'keep':       ah.Value(keep.map(ah.Value(it)))
+	})!
+}
