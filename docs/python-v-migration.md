@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `440715658b2db8b7070a9160976da25f0b45ba8b`, Linguist 7.27.0 reports
-**Python 5.56%** (505 files, 2,442,865 bytes) and **V 79.68%** (1,916 files,
-34,977,754 bytes). The complete committed-blob inventory and reproduction
+At source `a0ae707a325580955f427a8b3cec91b1313bcd0d`, Linguist 7.27.0 reports
+**Python 5.50%** (509 files, 2,433,634 bytes) and **V 79.73%** (1,943 files,
+35,272,481 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,763,420 Python bytes**. Roughly another
-0.25 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,772,651 Python bytes**. Roughly another
+0.22 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 141 completed stages have a gross
-scope of **3,170,484 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **407,064 bytes**
+tests, including comments and blank lines. The 145 completed stages have a gross
+scope of **3,195,898 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **423,247 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -170,6 +170,10 @@ no extra migration credit.
 | Verified-root full fixture workflow | `tests/verified-root/runtimeroot/main.v` | 7,365 / 113 | `bf5cb1a510f9f1cb668cb0bd3964e011ef54bb29` |
 | Browser guest supervision policy | `tests/browsers/browsercore` | 5,281 / 149 | `0d5a58de60effd7d5fea4a2824ced5573530b8cf` |
 | Android ATL native-provider fixture workflow | `build-support/android/atlcontroller` | 7,037 / 102 | `440715658b2db8b7070a9160976da25f0b45ba8b` |
+| QMP input command and event policies | `desktop/tools/qmpinput` | 2,923 / 70 | `cf955d2ffbfeeb8813df125de1cafe103f92a81b` |
+| ARM PCI guest serial supervision | `tests/pci-config/pcivm/core.v` | 3,661 / 59 | `ec8726238cb898c2e711c5cb7f22dea86a151152` |
+| Allocation benchmark validation workflow | `tests/alloc-bench/benchtest` | 8,726 / 124 | `85cfcac7059569d249c136556263a399c54393da` |
+| Package-store object table and callback lifetime | `build-support/cpythonhost/package_d_cpython_package.c.v` | 10,104 / 219 | `a0ae707a325580955f427a8b3cec91b1313bcd0d` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -259,6 +263,17 @@ corrections (`2cb9a92f`, `3b77e847`, `8402b5b6`) add 402 counted Python bytes
 and receive zero repeated algorithm credit. Remaining simultaneous Python
 changes stay included in the measured total. The stack-storage correction
 `5333d31d` receives zero new migration credit.
+
+The following four ports add 25,414 original implementation bytes of gross
+scope. Their own counted Python reduction is 17,641 bytes: QMP removes 1,231,
+PCI supervision 2,469, benchmark validation 6,934 and the package adapter 7,007.
+The package count excludes eleven lines of retained Python unpacking, duplicate
+keyword and raising syntax. The benchmark count excludes its 495-byte existing
+V source literal. The optional CPython library foundation and separate replay,
+temporary-manager, boot-exit and stack corrections receive zero repeated
+algorithm credit. All remaining Python bindings and concurrent committed source
+changes stay in the measured total; no historical benchmark snapshot earns
+translation credit.
 
 ## Validation
 
@@ -1205,6 +1220,49 @@ workloads were not weakened.
   restoration. Forty ignored-error iterations across two paths retain no actual
   exception before the next call. Actual library frames remain intact.
 
+- QMP input passes 269 original/native policy comparisons, six lifetime, nine
+  numeric, eight loop and two factory controls per profile. Twelve actual Unix
+  socket cases include 100 exchanges with flat descriptors; CLI covers four
+  parser cases and five actual commands. Original/native owned-group SIGINT
+  pairs reap all children. Both cold installers pass three helpers at mode 0700.
+- ARM PCI supervision passes 39 policy, 22 lifetime and eighteen rich-object
+  controls, two GC/context-timeout and five CLI cases per profile; 200 real
+  Popen descriptor exchanges, TERM-to-KILL and SIGINT checks pass. Prepared
+  AArch64 QEMU checks reuse kernel hash `4e260cf9a3e055073ed2cec0e93bc6c83153c9ab314a6adaf8f624b3f9cc45d6`.
+  Host supervision does not establish a fresh kernel, SMP or physical PCI test.
+- Allocation benchmark validation passes 186 complete workflow comparisons,
+  thirteen weak-reference and sixty property/format/context-order checks per
+  profile, plus intrinsic, actual child/descriptor, EOF, SIGINT and six CLI
+  gates. Both complete cold installers pass at mode 0700. The unchanged 136
+  Linux ARM C/V sanitizer comparisons include all 64 OOM rollback cases and
+  LeakSanitizer with `detect_leaks=1`. Both macOS ABI providers build and link;
+  the original macOS unsupported LeakSanitizer failure remains preserved.
+  No fresh Vinix guest or benchmark-performance claim is made.
+- The package adapter passes 73 full workflows, twenty ownership controls,
+  twelve batches of twenty consumed errors with GC disabled, 58 actual rich
+  objects, twelve result/ID boundaries, 36 Unicode/NUL/surrogate cases and
+  eighteen independent Python-with comparisons per profile. Five hundred
+  result calls retain their exact reference baseline; 100 constructors retire,
+  twenty nested calls and 100 calls across four threads preserve handled
+  exceptions, and actual SIGINT/errors propagate. Independent review passes
+  forty rich result-key/temporary-manager lifetime comparisons per profile.
+  QMP caller controls, actual sockets and owned-group interrupts also pass
+  against the frozen library. Both cold libraries and queries build on the
+  ordinary invoking CPython, preserve descriptors and retire temporary products.
+  The failed macOS `.so` filename check led to the qualified `.dylib` correction;
+  inherited ASan child-environment failures remain recorded, followed by passing
+  explicit copied-interpreter checks with unchanged assertions.
+- The optional CPython foundation passes 57 helpers, 29 lifetimes, nested/thread
+  reference and signal cases, independent with statements, strict providers,
+  invalid-library and default-query gates. It uses actual interpreter objects
+  and public development headers; it does not claim the limited ABI. Its
+  separate temporary-manager correction passes 22 independent manager cases:
+  both special methods resolve before consumption and detached managers retire
+  before entry. The separate native replay and boot-exit corrections preserve
+  caller-owned traceback/context while releasing private replay references.
+  Foundation and replay fixes add counted Python bindings and earn no new
+  original implementation credit.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1495,6 +1553,28 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `gap-replay-retirement-20261009` | `post-commit.json` | `78b8e40ece8b4f5bb032debd9f59d7d0aa6c102dc79e5eca766c487a4a09f79a` |
 | `android-atl-stack-20261009` | `qualification.json` | `f9533e906ee919112a7d043f05b506d94b0f237b21e343625c2bd03585ba21e0` |
 | `android-atl-stack-20261009` | `postcommit.json` | `b257eb74f230c9cedc27bd8a40ac16a84ba06a205762cb7b8e2dc02066514a8e` |
+| `qmp-input-20261009` | `qualification.json` | `3853dae4e6a830f18328072ad236a488a49ac4ede0228358bf261201a9295106` |
+| `qmp-input-20261009` | `postcommit.json` | `d96e2eab8645c215242eeb7f523f6cb782c6235f054535ce45e61bedaf5d0e39` |
+| `pci-arm-controller-20261009` | `qualification-v2.json` | `ea31385cdde9adc772144fbf46f075fd6f28703fcdeef1e53859cc12e6c1c945` |
+| `pci-arm-controller-20261009` | `post-commit-v2.json` | `092e19d6a631fa217973739c37432b81f65ef2de7119b58cc9851d2ec7f1efe1` |
+| `benchmark-controller-20261009` | `qualification.json` | `11f045199f0748222ae5dbff03c817a96641709d97d555ce0d6ef8ce37b5fb32` |
+| `benchmark-controller-20261009` | `postcommit.json` | `7c39e50345950e37c786d6c4ce9351058aa55a27231618d82985f5c432bf9e4b` |
+| `package-cpython-sdk-20261009` | `qualification-final-v3.json` | `7aac6785750b83442d56b69d04e04d6885a424c09b66b2f46c5aadd9749f53bc` |
+| `package-cpython-sdk-20261009` | `post-commit-final-v3.json` | `f965e908d68e0d87b3582010f52969f060abf1e08795ae025147011108649c73` |
+| `native-replay-context-20261009` | `qualification.json` | `1344e2d7cc4b904a5d59428e98ee65a2d62e4d3bac30166c734a7f24e1fe7098` |
+| `native-replay-context-20261009` | `post-commit.json` | `fc202d896c06a6ab44e9621c0c03da3a0eac9c6f1c8c04fcf5b8ff6d0efb0397` |
+| `package-consumed-errors-20261009/final-v2` | `qualification.json` | `4f38ff6a1a1c870452a26a7b56f0cc150e2e5bf45c48bfed82855aa09a52e0a9` |
+| `package-consumed-errors-20261009/final-v2` | `post-commit.json` | `36b870f7a78b28c704fa7d7aa0010f00c1dfabc7f88ee7c7719831967fc53f0d` |
+| `cpython-helper-backend-20261009` | `qualification-final-v5.json` | `0ce34c44ad6805dbaef4d94b4f469ab47cc3ded90b64a0b59fd3d5b4bbe220f7` |
+| `cpython-helper-backend-20261009` | `post-commit-final-v5.json` | `09c78751a66d50f743818627520c17538a04c1c88c75b59a1f5e5ef8fe6863e5` |
+| `cpython-temporary-manager-20261010` | `qualification-final-corrected-v2.json` | `721061a67bf019dc4de51f5b7ac24284c93a655f9570647e5c1ba2667c0db652` |
+| `cpython-temporary-manager-20261010` | `post-commit-final-corrected-v2.json` | `8b6f71ebd8398b4c186def6010e6d2499196ba0d9f88ad191ffbb09f6bc1cc20` |
+| `android-exit-retirement-20261010` | `qualification.json` | `7925a5ede73336a55e5235fe60936fcedec7bc13df9eeeb1c7da3b6ec33cf1e8` |
+| `android-exit-retirement-20261010` | `postcommit.json` | `8e51659451ad86f7c44ca2adf6c3c273dd42010be5592f5fa4ec5a22b7eefb99` |
+| `benchmark-stack-20261009` | `qualification.json` | `a9625cc462fdc1881588d3d02288548b0b4c8c9f578939179934e99a0537f66c` |
+| `benchmark-stack-20261009` | `postcommit.json` | `24e0b2797ee4ff76cbebccd959125356234f4829572a77e3158893dd42ff5418` |
+| `benchmark-stack-20261009` | `linux-qualification.json` | `c2976879c835792ddf43e2c4fe3290b5cfe46e56774683261cfcf16a11c9dfb3` |
+| `benchmark-stack-20261009` | `post-linux.json` | `2a66be8077b2e199e4cfaf34a082dfe609419c8a6b8c381f0abfca3a8814f296` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
