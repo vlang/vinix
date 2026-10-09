@@ -543,6 +543,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native SMP call self-test failed')
 		}
 		C.kprintf(c'linuxkpi: native SMP callbacks, hardware IRQ deferral, self-free and overlapping CSD reuse passed; no pages or heap objects retained\n')
+		if !worker_irq_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native worker IRQ rejection self-test failed')
+		}
+		C.kprintf(c'linuxkpi: native worker binding rejects IRQ-enabled handlers and preserves borrowed task state; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

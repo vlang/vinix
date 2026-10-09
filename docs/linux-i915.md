@@ -1697,3 +1697,35 @@ validation. Durable build, guest, host, review and baseline-comparison evidence
 is retained under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/`; the final
 validation receipt identifies exact inputs and preserves failed earlier builds
 and the native fixture's corrected missing `pthread_exit` failure.
+
+## Worker binding from IRQ-enabled handlers, 2026-10-10
+
+Native worker binding now rejects actual maskable interrupt depth before
+publishing affinity or NUMA state. A handler that enables IF still borrows its
+interrupted thread. The fixture interrupts a bound, unpinned kernel actor 200
+times per batch, enables IF inside the real handler and verifies rejection,
+restored IF, CPU/task identity, affinity, NUMA hint and the armed allocation
+failure gate. Its stack observation remains live through synchronous CSD
+completion and the target task's acknowledgement after actual IRET. Actor
+retirement joins and verifies off-stack reclamation before resetting its ledger.
+
+The isolated final enabled ELF SHA256 is
+`1b4e997729f4f988a0d1c22f0fb450f6decbbdbf8e8acdc5fcb2a5fe98494ba1`.
+Complete normal and SSE guests pass all **45** markers and **22** exact fourth
+batch page/heap equalities. This fixture recovers `345231360 -> 345231360`
+bytes and every live heap class after three warmups. Restoring only the old
+predicate in a private kernel makes the same fixture fail at its expected
+rejection assertion. Enabled/default x86 and default ARM compile and link;
+independent review covers the final source, generated C, objects and native
+lifetimes. The first guest attempt caught the fixture checking CPU-local state
+with IF enabled; the final fixture captures restored IF and closes it before
+native accessor checks. Failed evidence is retained.
+
+This fix adds no new worker allocation. Default profiles exclude the enabled
+fixture. The official allocation gate again has the same 376 sites and 151
+existing failures as its baseline; desktop limitations remain as recorded above.
+A fresh default x86 guest passes Linux-ABI startup without LinuxKPI markers.
+Final evidence is under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/worker-irq-final-validation.json`.
+Ordinary RCU remains the next implementation dependency; this worker fix does
+not establish GPU support.

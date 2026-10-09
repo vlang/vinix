@@ -1417,3 +1417,20 @@ SRCU counters. Hooks must avoid recursive preemption accounting through ordinary
 LinuxKPI locks. RCU callback barriers wait for captured callback invocation,
 including detached callbacks, and callbacks may free their own heads. NMI/BH
 accounting, mixed call-single queue kinds and CPU hotplug remain unresolved.
+
+### Worker binding context correction
+
+The following native fix rejects actual maskable IRQ depth in `worker_bind`
+before affinity/NUMA publication, including handlers which temporarily enable
+IF. Its final enabled ELF is
+`1b4e997729f4f988a0d1c22f0fb450f6decbbdbf8e8acdc5fcb2a5fe98494ba1`.
+Both complete normal/SSE guests pass 45 markers and 22 measured equalities;
+the fourth IRQ-binding actor batch recovers all pages and live heap classes
+after three warmups. An isolated old-predicate kernel fails the genuine native
+fixture as expected. Default x86 and ARM builds pass. Final source/actual
+generated-code and native lifetime review is separate from the failed initial
+fixture, which called a CLI-only CPU accessor with IF enabled. Keep the final
+capture-IF-then-CLI observation order and the post-IRET stack retirement rule.
+Durable evidence: `smp-oct10/worker-irq-final-validation.json` under the cache
+root above. Ordinary RCU development is still in progress; do not treat its
+compile-only artifacts as a completed grace-period service.

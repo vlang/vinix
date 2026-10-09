@@ -21,8 +21,11 @@ import x86.cpu.local as cpulocal
 @[export: 'vinix_linuxkpi_worker_bind']
 fn worker_bind(target u32) int {
 	ints := cpu.interrupt_toggle(false)
-	index := cpulocal.current().cpu_number
-	if !ints || preempt_depth[index] != 0 {
+	local := cpulocal.current()
+	index := local.cpu_number
+	// A maskable handler may enable IF without leaving its interrupt frame.
+	// Reject that borrowed thread before publishing affinity or NUMA state.
+	if !ints || preempt_depth[index] != 0 || local.maskable_irq_depth != 0 {
 		cpu.interrupt_toggle(ints)
 		return -errno.ewouldblock
 	}
