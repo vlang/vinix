@@ -299,6 +299,8 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'executable' { return ah.Value(executable(args[0].text())!) }
 		'stop_owned' { stop_owned(args[0].text())! }
 		'observe' { observe(args)! }
+		'prepare_start' { prepare_start(args)! }
+		'prepare_finish' { prepare_finish(args)! }
 		else { return error('unknown ARM PCI host operation') }
 	}
 	return ah.Value(json2.Null{})

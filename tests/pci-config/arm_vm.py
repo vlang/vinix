@@ -42,6 +42,10 @@ def _pci_raise(error):
     raise error
 
 
+def _pci_format(prefix, value):
+    return f"{prefix}{value}"
+
+
 def digest(path: Path) -> str:
     return _pci_request("digest", path)
 
@@ -91,117 +95,24 @@ def main() -> int:
     report_path = state / "result.json"
     commands: list[list[str]] = []
     process: subprocess.Popen | None = None
+    copies: dict
     try:
-        qemu = Path(executable(args.qemu))
-        share = qemu.parent.parent / "share/qemu"
-        firmware = (args.firmware or share / "edk2-aarch64-code.fd").resolve()
-        vars_template = (args.vars_template or share / "edk2-arm-vars.fd").resolve()
-        loader = args.bootloader.resolve()
-        kernel = args.kernel.resolve()
-        for path in (firmware, vars_template, loader, kernel):
-            if not path.is_file():
-                raise RuntimeError(f"required read-only input unavailable: {path}")
-        # Freeze input bytes inside this guest's directory before building the
-        # disk. A shared checkout or kernel path may be rebuilt concurrently.
-        frozen = state / "inputs"
-        frozen.mkdir()
-        originals = {}
-        copies = {}
-        fixture = Path(__file__).with_name("armfixture")
-        fixture_inputs = (("init_source", fixture / "core.v"),
-                          ("init_abi", fixture / "pci-arm-fixture-native-abi.h"),
-                          ("init_syscall", fixture / "syscall3.S"),
-                          ("fixture_generator", ROOT / "tests/kernel-gaps/compile-v-fixture.py"),
-                          ("module_generator", ROOT / "build-support/compile-v-module.py"))
-        for name, source in (("kernel", kernel), ("firmware", firmware),
-                             ("bootloader", loader), ("vars_template", vars_template),
-                             *fixture_inputs):
-            before = digest(source)
-            target = (frozen / "armfixture" / source.name
-                      if name.startswith("init_") else frozen / name)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(source, target)
-            if digest(target) != before or digest(source) != before:
-                raise RuntimeError(f"input changed while freezing: {source}")
-            originals[name] = str(source)
-            copies[name] = target
-        kernel, firmware, loader, vars_template = (copies[name] for name in
-                                                 ("kernel", "firmware", "bootloader", "vars_template"))
-        cc = executable(args.cc)
-        ld = executable("ld.lld")
-        tools = {name: executable(name) for name in ("mformat", "mmd", "mcopy")}
-        rootfs = state / "rootfs"
-        for directory in ("sbin", "dev", "proc", "sys", "root", "tmp"):
-            (rootfs / directory).mkdir(parents=True)
-        obj = state / "arm_init.o"
-        syscall_obj = state / "syscall3.o"
-        generated_source = state / "arm_init.c"
-        init = rootfs / "sbin/init"
-        compile_command = [cc, "--target=aarch64-linux-musl", f"--sysroot={args.sysroot.resolve()}",
-                           "-std=gnu11", "-O2",
-                           "-Wall", "-Wextra", "-Werror", "-nostdlib", "-ffreestanding",
-                           "-fno-stack-protector", "-fno-pie", "-Wno-unused-function",
-                           "-Wno-unused-parameter", "-I", str(frozen / "armfixture"), "-c",
-                           str(generated_source), "-o", str(obj)]
-        link_command = [ld, "-m", "aarch64elf", "--nostdlib", "-static", "-e", "_start",
-                        "--build-id=none", str(obj), str(syscall_obj), "-o", str(init)]
+        prepared = {}
+
+        def preserve_copies(value):
+            nonlocal copies
+            copies = value
+
+        _pci_request("prepare_start", args, state, prepared, preserve_copies)
 
         def run(command: list[str]) -> None:
             commands.append(command)
             with (state / "preparation.log").open("ab") as log:
                 subprocess.run(command, stdout=log, stderr=log, check=True)
 
-        run([sys.executable, str(ROOT / "tests/kernel-gaps/compile-v-fixture.py"),
-             str(generated_source), "--arch", "aarch64", "--module", str(frozen / "armfixture")])
-        for name, source in fixture_inputs:
-            if digest(source) != digest(copies[name]):
-                raise RuntimeError(f"fixture input changed during generation: {source}")
-        run(compile_command)
-        run([cc, "--target=aarch64-linux-musl", "-c", str(copies["init_syscall"]),
-             "-o", str(syscall_obj)])
-        run(link_command)
-        init.chmod(0o755)
-        archive_path = state / "initramfs.tar"
-        with tarfile.open(archive_path, "w", format=tarfile.USTAR_FORMAT) as archive:
-            archive.add(rootfs, arcname=".")
-        conf = state / "limine.conf"
-        conf.write_text("timeout: 0\nverbose: yes\n\n/Vinix PCI configuration\n"
-                        "    protocol: limine\n    kernel_path: boot():/boot/vinix\n"
-                        "    module_path: boot():/boot/initramfs.tar\n"
-                        "    resolution: 1024x768x32\n    kaslr: no\n"
-                        "    cmdline: vinix.qemu_platform=1\n")
-        disk = state / "boot.img"
-        with disk.open("wb") as image:
-            image.truncate(256 * 1024 * 1024)
-        run([tools["mformat"], "-F", "-i", str(disk), "::"])
-        for directory in ("::/EFI", "::/EFI/BOOT", "::/boot"):
-            run([tools["mmd"], "-i", str(disk), directory])
-        for source, target in ((loader, "::/EFI/BOOT/BOOTAA64.EFI"),
-                               (kernel, "::/boot/vinix"), (conf, "::/boot/limine.conf"),
-                               (archive_path, "::/boot/initramfs.tar")):
-            run([tools["mcopy"], "-i", str(disk), str(source), target])
-        private_vars = state / "efivars.fd"
-        shutil.copyfile(vars_template, private_vars)
-        report["inputs"] = {name: {"path": str(path), "sha256": digest(path)}
-                            for name, path in (("kernel", kernel), ("firmware", firmware),
-                                               ("bootloader", loader), ("vars_template", vars_template),
-                                               *copies.items(),
-                                               ("generated_init_source", generated_source),
-                                               ("init", init), ("initramfs", archive_path),
-                                               ("limine_conf", conf))}
-        report["original_input_paths"] = originals
-        serial = state / "serial.log"
-        command = [str(qemu), "-machine", "virt,gic-version=3", "-accel", "tcg", "-cpu", "max",
-                   "-m", "1024", "-smp", "4", "-display", "none", "-monitor", "none",
-                   "-device", "ramfb", "-drive",
-                   f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}", "-drive",
-                   f"if=pflash,format=raw,unit=1,file={private_vars}", "-drive",
-                   f"if=none,id=bootdisk,format=raw,file={disk}", "-device",
-                   "virtio-blk-pci,drive=bootdisk", "-device", "e1000", "-nic", "none",
-                   "-serial", f"file:{serial}", "-no-reboot"]
-        commands.append(command)
-        (state / "commands.json").write_text(json.dumps(commands, indent=2) + "\n")
-        report["status"] = "running"
+        _pci_request("prepare_finish", args, state, report, commands, run, prepared)
+        command = prepared["command"]
+        serial = prepared["serial"]
         with (state / "qemu.log").open("wb") as log:
             process = subprocess.Popen(command, stdout=log, stderr=log)
             report["owned_pid"] = process.pid
