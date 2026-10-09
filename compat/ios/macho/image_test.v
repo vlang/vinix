@@ -87,6 +87,38 @@ fn expect_parse_failure(data []u8) {
 	}
 }
 
+fn test_dylib_identity_runpaths_and_entryless_layout() {
+	mut data := fixture_image()
+	put(mut data, 12, 6, 4) // MH_DYLIB needs no MH_PIE or LC_MAIN.
+	put(mut data, 24, 0, 4)
+	put(mut data, 248, 0, 4) // Ignore this command instead of LC_MAIN.
+	put(mut data, 16, 9, 4)
+	put(mut data, 20, 336 + 64 + 40, 4)
+	put(mut data, 368, 0xd, 4)
+	put(mut data, 372, 64, 4)
+	put(mut data, 376, 24, 4)
+	put_string(mut data, 392, '@rpath/Example.framework/Example')
+	put(mut data, 432, 0x8000001c, 4)
+	put(mut data, 436, 40, 4)
+	put(mut data, 440, 12, 4)
+	put_string(mut data, 444, '@loader_path/Frameworks')
+	image := parse(data)!
+	assert image.install_name == '@rpath/Example.framework/Example'
+	assert image.rpaths == ['@loader_path/Frameworks']
+	assert image.dylib_issues().len == 0
+	assert image.execution_issues().len != 0
+	assert image.layout(4096)!.entry == 0
+	mut bad := data.clone()
+	put(mut bad, 440, 8, 4)
+	expect_parse_failure(bad)
+	bad = data.clone()
+	put(mut bad, 376, 64, 4)
+	expect_parse_failure(bad)
+	bad = data.clone()
+	for i in 444 .. 472 { bad[i] = `x` }
+	expect_parse_failure(bad)
+}
+
 fn expect_layout_failure(data []u8) {
 	image := parse(data) or { panic(err) }
 	if _ := image.layout(4096) {

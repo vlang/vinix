@@ -30,10 +30,20 @@ mut:
 	started bool
 	destructors []Destructor
 	destructor_lock &sync.Mutex = unsafe { nil }
-	tls_key u64
-	tls_active bool
-	tls_template []u8
-	tls_descriptors map[u64]u64
+	tls_modules []&ImageTls
+	tls_descriptors map[u64]TlsDescriptor
+}
+
+struct ImageTls {
+mut:
+	key u64
+	active bool
+	template []u8
+}
+
+struct TlsDescriptor {
+	storage &ImageTls
+	offset u64
 }
 
 __global image_runtime = unsafe { &ImageRuntime(nil) }
@@ -41,27 +51,29 @@ __global image_runtime = unsafe { &ImageRuntime(nil) }
 fn image_runtime_start(image macho.Image, layout macho.Layout, base u64) {
 	image_runtime = &ImageRuntime{base: base, image: image, layout: layout,
 		destructor_lock: sync.new_mutex()}
+	image_runtime.destructors.flags |= .noslices
+	image_runtime.tls_modules.flags |= .noslices
 }
 
-fn image_code_address(address u64) bool {
-	for segment in image_runtime.image.segments {
+fn (loaded LoadedModule) code_address(address u64) bool {
+	for segment in loaded.image.segments {
 		if segment.name == '__PAGEZERO' || segment.prot & 4 == 0 { continue }
-		start := image_runtime.base + segment.address - image_runtime.layout.base
+		start := loaded.base + segment.address - loaded.layout.base
 		if address >= start && address - start < segment.filesize && address % 4 == 0 { return true }
 	}
 	return false
 }
 
-fn image_section_address(section macho.Section) u64 {
-	return image_runtime.base + section.address - image_runtime.layout.base
+fn (loaded LoadedModule) section_address(section macho.Section) u64 {
+	return loaded.base + section.address - loaded.layout.base
 }
 
-fn image_initializers() ![]u64 {
+fn image_initializers(loaded &LoadedModule) ![]u64 {
 	mut functions := []u64{}
-	for address in image_runtime.image.routines {
-		functions << image_runtime.base + address - image_runtime.layout.base
+	for address in loaded.image.routines {
+		functions << loaded.base + address - loaded.layout.base
 	}
-	for segment in image_runtime.image.segments {
+	for segment in loaded.image.segments {
 		for section in segment.sections {
 			kind := section.flags & 0xff
 			if kind !in [u32(9), 10, 0x16] { continue }
@@ -73,9 +85,9 @@ fn image_initializers() ![]u64 {
 			}
 			for offset := u64(0); offset < section.size; offset += stride {
 				address := if kind == 0x16 {
-					image_runtime.base + read32(image_section_address(section) + offset)
-				} else { read64(image_section_address(section) + offset) }
-				if !image_code_address(address) { return error('iOS: initializer/terminator is not executable') }
+					loaded.base + read32(loaded.section_address(section) + offset)
+				} else { read64(loaded.section_address(section) + offset) }
+				if !loaded.code_address(address) { return error('iOS: initializer/terminator is not executable') }
 				if kind == 10 {
 					image_runtime.destructors << Destructor{function: unsafe { ImageDestructor(voidptr(address)) }}
 				} else { functions << address }
@@ -83,15 +95,15 @@ fn image_initializers() ![]u64 {
 		}
 	}
 	for address in functions {
-		if !image_code_address(address) { return error('iOS: initializer is not executable') }
+		if !loaded.code_address(address) { return error('iOS: initializer is not executable') }
 	}
 	return functions
 }
 
-fn image_tls_prepare() ! {
+fn image_tls_prepare(loaded &LoadedModule) ! {
 	mut first := ~u64(0)
 	mut end := u64(0)
-	for segment in image_runtime.image.segments {
+	for segment in loaded.image.segments {
 		for section in segment.sections {
 			kind := section.flags & 0xff
 			if kind in [u32(0x11), 0x12] && section.size != 0 {
@@ -104,12 +116,13 @@ fn image_tls_prepare() ! {
 		}
 	}
 	if end == 0 {
-		if image_runtime.image.thread_locals { return error('iOS: TLS sections have no storage template') }
+		if loaded.image.thread_locals { return error('iOS: TLS sections have no storage template') }
 		return
 	}
 	if end - first > 1024 * 1024 { return error('iOS: TLS template exceeds limit') }
-	image_runtime.tls_template = []u8{len: int(end - first)}
-	for segment in image_runtime.image.segments {
+	mut storage := &ImageTls{template: []u8{len: int(end - first)}}
+	image_runtime.tls_modules << storage
+	for segment in loaded.image.segments {
 		for section in segment.sections {
 			kind := section.flags & 0xff
 			if kind == 0x11 && section.size != 0 {
@@ -117,8 +130,8 @@ fn image_tls_prepare() ! {
 					|| section.size > segment.filesize - (section.address - segment.address) {
 					return error('iOS: TLS data exceeds file-backed segment')
 				}
-				unsafe { C.memcpy(&image_runtime.tls_template[int(section.address - first)],
-					voidptr(image_section_address(section)), usize(section.size)) }
+				unsafe { C.memcpy(&storage.template[int(section.address - first)],
+					voidptr(loaded.section_address(section)), usize(section.size)) }
 			}
 			if kind != 0x13 { continue }
 			if section.size % 24 != 0 || section.size > 65536 * 24
@@ -127,33 +140,34 @@ fn image_tls_prepare() ! {
 				return error('iOS: invalid TLV descriptor section')
 			}
 			for position := u64(0); position < section.size; position += 24 {
-				descriptor := image_section_address(section) + position
+				descriptor := loaded.section_address(section) + position
 				offset := read64(descriptor + 16)
 				if offset >= end - first { return error('iOS: TLV descriptor exceeds TLS template') }
-				image_runtime.tls_descriptors[descriptor] = offset
+				image_runtime.tls_descriptors[descriptor] = TlsDescriptor{storage, offset}
 			}
 		}
 	}
-	if C.pthread_key_create(unsafe { voidptr(&image_runtime.tls_key) }, unsafe { voidptr(C.free) }) != 0 {
+	if C.pthread_key_create(unsafe { voidptr(&storage.key) }, unsafe { voidptr(C.free) }) != 0 {
 		return error('iOS: cannot allocate TLS key')
 	}
-	image_runtime.tls_active = true
+	storage.active = true
 }
 
 @[export: 'ios_tlv_address']
 fn image_tls_address(descriptor u64) u64 {
-	offset := image_runtime.tls_descriptors[descriptor] or { panic('iOS: unknown TLV descriptor') }
-	mut storage := C.pthread_getspecific(image_runtime.tls_key)
+	entry := image_runtime.tls_descriptors[descriptor] or { panic('iOS: unknown TLV descriptor') }
+	tls := entry.storage
+	mut storage := C.pthread_getspecific(tls.key)
 	if storage == unsafe { nil } {
-		storage = C.malloc(usize(image_runtime.tls_template.len))
+		storage = C.malloc(usize(tls.template.len))
 		if storage == unsafe { nil } { panic('iOS: cannot allocate thread-local storage') }
-		unsafe { C.memcpy(storage, image_runtime.tls_template.data, usize(image_runtime.tls_template.len)) }
-		if C.pthread_setspecific(image_runtime.tls_key, storage) != 0 {
+		unsafe { C.memcpy(storage, tls.template.data, usize(tls.template.len)) }
+		if C.pthread_setspecific(tls.key, storage) != 0 {
 			C.free(storage)
 			panic('iOS: cannot install thread-local storage')
 		}
 	}
-	return u64(storage) + offset
+	return u64(storage) + entry.offset
 }
 
 fn image_cxa_atexit(function ImageDestructor, argument voidptr, dso u64) int {
@@ -182,14 +196,18 @@ fn image_cxa_finalize(dso u64) {
 fn image_runtime_stop() {
 	// A link/protection failure must never execute a module's terminators.
 	if image_runtime.started { image_cxa_finalize(0) }
-	if image_runtime.tls_active {
-		C.free(C.pthread_getspecific(image_runtime.tls_key))
-		C.pthread_setspecific(image_runtime.tls_key, unsafe { nil })
-		C.pthread_key_delete(image_runtime.tls_key)
+	for storage in image_runtime.tls_modules {
+		if storage.active {
+			C.free(C.pthread_getspecific(storage.key))
+			C.pthread_setspecific(storage.key, unsafe { nil })
+			C.pthread_key_delete(storage.key)
+		}
+		unsafe { storage.template.free(); free(storage) }
 	}
 	unsafe {
 		image_runtime.destructors.free()
-		image_runtime.tls_template.free()
+		image_runtime.tls_modules.free()
+		image_runtime.path.free()
 		image_runtime.tls_descriptors.free()
 	}
 	image_runtime.destructor_lock.destroy()

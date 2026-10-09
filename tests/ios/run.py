@@ -21,6 +21,7 @@ FEATURES = (
     b"iOS PASS: native Objective-C reflection, replacement and dynamic classes",
     b"iOS PASS: native register-specific ARC calling conventions and ownership",
     b"iOS PASS: native UIKit bitmap contexts, image ownership and PNG/JPEG codecs",
+    b"iOS PASS: bundled Mach-O libraries, dependent initialization and isolated image TLS",
     b"iOS PASS: import audit reports missing dependencies without executing app code",
     b"iOS PASS: lazy function imports defer unsupported calls",
     b"iOS PASS: Darwin stdio, varargs and system queries",
@@ -158,6 +159,16 @@ def main() -> int:
         for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
+        shutil.copytree(build / "fixtures/Modules.app", destination / "Modules.app")
+        missing_bundle = destination / "ModulesMissing.app"
+        shutil.copytree(destination / "Modules.app", missing_bundle)
+        (missing_bundle / "Frameworks/Leaf.framework/Leaf").unlink()
+        arm64e_bundle = destination / "ModulesArm64e.app"
+        shutil.copytree(destination / "Modules.app", arm64e_bundle)
+        leaf = arm64e_bundle / "Frameworks/Leaf.framework/Leaf"
+        unsupported_library = bytearray(leaf.read_bytes())
+        struct.pack_into("<I", unsupported_library, 8, 2)
+        leaf.write_bytes(unsupported_library)
         if arguments.with_cxx:
             shutil.copy2(build / "fixtures/cxx", destination / "cxx")
             shutil.copy2(build / "fixtures/startup", destination / "startup")

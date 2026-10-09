@@ -38,7 +38,7 @@ fn inspect(image macho.Image, show_imports bool) ! {
 
 // Resolve the complete import table without mapping or executing app code.
 // This exposes every missing dependency, rather than only the first bind error.
-fn audit_imports(image macho.Image) !int {
+fn audit_imports(image macho.Image, path string) !int {
 	objc_start()
 	// Optional symbol resolvers need their native libraries and TLS even when
 	// no app code is executed. EGL display creation remains lazy.
@@ -50,15 +50,29 @@ fn audit_imports(image macho.Image) !int {
 		system_data_stop()
 	}
 	system_data_start()!
+	real_path := os.real_path(path)
+	defer { unsafe { real_path.free() } }
+	modules_start(image, image.layout(u64(C.getpagesize()))!, 1, real_path, true)
+	defer { modules_stop() }
+	module_dependencies(0, 0)!
 	mut resolved := 0
 	mut strong := 0
 	mut weak := 0
-	for symbol in image.imported_symbols()! {
-		if _ := runtime_symbol(symbol.library, symbol.name) { resolved++; continue }
-		else {
-			if symbol.weak { weak++ } else { strong++ }
-			println('Unresolved ${if symbol.weak { 'weak' } else { 'strong' }} import: ${symbol.library} ${symbol.name}: ${err}')
+	for index, loaded in module_runtime.modules {
+		mut image_resolved := 0
+		mut image_strong := 0
+		mut image_weak := 0
+		for symbol in loaded.image.imported_symbols()! {
+			if _ := module_symbol(index, symbol.library, symbol.name) { image_resolved++; continue }
+			else {
+				if symbol.weak { image_weak++ } else { image_strong++ }
+				println('Unresolved ${if symbol.weak { 'weak' } else { 'strong' }} import: ${symbol.library} ${symbol.name}: ${err}')
+			}
 		}
+		println('iOS IMPORT AUDIT IMAGE: ${loaded.path}: ${image_resolved} resolved, ${image_strong} unresolved strong, ${image_weak} unresolved weak')
+		resolved += image_resolved
+		strong += image_strong
+		weak += image_weak
 	}
 	println('iOS IMPORT AUDIT: ${resolved} resolved, ${strong} unresolved strong, ${weak} unresolved weak (app code was not executed)')
 	return if strong == 0 { 0 } else { 1 }
@@ -115,7 +129,7 @@ fn main() {
 		return
 	}
 	if audit {
-		status := audit_imports(image) or { eprintln(err); exit(1) }
+		status := audit_imports(image, os.args[index]) or { eprintln(err); exit(1) }
 		exit(status)
 	}
 	status := execute(image, os.args[index..]) or {

@@ -31,3 +31,4 @@ mkdir -p "$output"
     -framework Foundation -framework UIKit -framework CoreGraphics \
     "$repo/tests/ios/graphics.m" -o "$output/graphics-fixture"
 "$output/graphics-fixture"
+sh "$repo/tests/ios/reference-modules.sh" "$output"

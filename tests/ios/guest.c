@@ -42,7 +42,7 @@ static void run(const char *image, const char *left, const char *op,
     close(descriptors[0]);
     output[length] = 0;
     if (!strcmp(image, "--audit") &&
-        (strstr(output, "IOS-CF:") || strstr(output, "IOS-GLES:")))
+        (strstr(output, "IOS-CF:") || strstr(output, "IOS-GLES:") || strstr(output, "IOS-MODULES:")))
         fail("import audit executed application code");
     int status;
     while (waitpid(child, &status, 0) < 0) if (errno != EINTR) fail("waitpid");
@@ -122,6 +122,15 @@ int main(void) {
     run("/opt/ios/graphics", NULL, NULL, NULL, 0,
         "IOS-GRAPHICS: scaled/nested/TLS contexts, BGRA pixels, state/clip, independent snapshots, image drawing and real PNG/JPEG round trips");
     puts("iOS PASS: native UIKit bitmap contexts, image ownership and PNG/JPEG codecs");
+    run("/opt/ios/Modules.app/Modules", NULL, NULL, NULL, 0,
+        "IOS-MODULES: bundled dylibs, runpaths, rebased exports, dependency constructors, Objective-C inheritance, independent TLS and dynamic lookup");
+    puts("iOS PASS: bundled Mach-O libraries, dependent initialization and isolated image TLS");
+    run("--audit", "/opt/ios/Modules.app/Modules", NULL, NULL, 0,
+        "0 unresolved strong, 1 unresolved weak (app code was not executed)");
+    run("/opt/ios/ModulesMissing.app/Modules", NULL, NULL, NULL, 1,
+        "library not found in runpaths: @rpath/Leaf.framework/Leaf");
+    run("/opt/ios/ModulesArm64e.app/Modules", NULL, NULL, NULL, 1,
+        "ARM64e requires pointer authentication support");
     run("--audit", "/opt/ios/core-foundation", NULL, NULL, 0,
         "0 unresolved strong, 0 unresolved weak (app code was not executed)");
     run("--audit", "/opt/ios/unsupported", NULL, NULL, 1,

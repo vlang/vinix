@@ -63,14 +63,14 @@ executing a GUI app directly from a shell does not create a window. Set
 
 | Area | Implemented |
 | --- | --- |
-| Images | Little-endian ARM64 `MH_EXECUTE`, `MH_PIE`, iOS/iOS Simulator platforms |
+| Images | Little-endian ARM64 `MH_EXECUTE` with `MH_PIE` and app-bundled `MH_DYLIB`, iOS/iOS Simulator platforms |
 | Universal binaries | 32/64-bit slice tables, both byte orders; prefer ordinary ARM64 over ARM64e |
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
-| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in library `dlopen`/`dlsym`/`dlerror` |
+| Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
-| Thread-local storage | Darwin TLV descriptors, initialized and zero-filled templates, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
+| Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
@@ -88,7 +88,12 @@ rewritten. Chained and data imports are resolved before relocation. Legacy lazy
 function imports must occupy `S_LAZY_SYMBOL_POINTERS`, with no addend; missing
 weak imports remain null. Only those function slots may defer resolution. Gaps
 are inaccessible and no segment is writable and executable together. The
-runner releases its mapping on return or link failure and exits after one app.
+runner releases all image mappings on return or link failure and exits after one app.
+Dependencies initialize before their dependents; callbacks unwind in reverse
+registration order. Linked libraries stay mapped until process teardown.
+Dependency cycles, re-exports, resolver/TLS exports and loading new libraries
+from a running app are unsupported. There are at most 64 images and 1 GiB of
+total reserved image space.
 
 ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyld
 binding opcodes, TLS pointer/initializer sections and multiple chain starts
@@ -96,7 +101,7 @@ per page are rejected. Objective-C exceptions and Swift metadata are unsupported
 Blocks support object/block captures, but not
 `__block` by-reference captures. ARC and weak tables are synchronized; UIKit
 view operations run on the main thread. Mach IPC services,
-direct Darwin syscalls, dynamic framework loading, Swift/SwiftUI, general
+direct Darwin syscalls, Swift/SwiftUI, general
 Foundation/UIKit APIs, multiple scenes, compiled nibs/storyboards and Auto Layout are not
 implemented. View trees have bounded depth and at most 64 children per view.
 UIView animations execute their blocks/completions synchronously; only their
@@ -230,22 +235,38 @@ library; UIKit object ownership, pixel conversion and compositing are V code.
 Non-upright image orientations and rotated/sheared bitmap drawing remain
 unsupported. This bitmap work does not implement Metal rendering.
 
+App-bundled Mach-O framework loading now finds both EOSSDK and
+MarketplaceKitWrapper from this IPA. The same two-library fixture passes
+against Apple's Mac loader and Vinix: chained/legacy binds, export rebasing,
+dependency constructors, cross-image Objective-C inheritance, independent TLS
+in eight threads, dynamic lookup and reverse destructor order. Missing strong
+libraries and ARM64e dylibs fail before app entry. An AddressSanitizer fixture
+also audits and executes the bundle twice in one host process.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: framework symbol is not implemented: _$s10Foundation10CocoaErrorV19fileWriteFileExistsAC4CodeVvgZ
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _UIApplicationWillResignActiveNotification
 ```
 
-The C++ runner resolves 486 symbols, closing 121 strong-import gaps from the
-initial 365-symbol audit. There are still 1,666 unresolved strong imports and
-87 unresolved weak imports. Use `run-ios --audit BINARY` to repeat the check;
-the result depends on compiled optional backends. The executable
-includes the following substantial dependencies:
+`run-ios --audit BINARY` now checks each bundled library's imports as well as
+the executable, without mapping or executing app code. The C++ runner reports:
+
+| Image | Resolved | Unresolved strong | Unresolved weak |
+| --- | ---: | ---: | ---: |
+| Fortnite executable | 1,079 | 1,077 | 83 |
+| EOSSDK | 321 | 341 | 18 |
+| MarketplaceKitWrapper | 51 | 125 | 23 |
+| All images | 1,451 | 1,543 | 124 |
+
+The executable's available imports include the bundled frameworks' exports;
+their own unresolved dependencies still prevent execution. Results depend on
+compiled optional backends. The executable includes these substantial dependencies:
 
 | Dependency | Imports | Remaining work |
 | --- | ---: | --- |
-| Bundled EOSSDK | 589 | External Mach-O framework loading and the SDK's own dependencies |
+| Bundled EOSSDK | 589 | The SDK's own Foundation, Swift, networking, security and other dependencies |
 | Swift core runtime | 207 | Darwin Swift runtime ABI |
 | Foundation | 159 | Broader Objective-C and Swift APIs |
 | SwiftUI | 73 | Framework implementation |

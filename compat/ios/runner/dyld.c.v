@@ -15,13 +15,21 @@ fn dyld_error(message string) {
 	system_data.dl_error_pending = true
 }
 
-// dlopen exposes built-in compatibility libraries. External Mach-O dylibs
-// still report a loading error; a failed lookup never returns a fake function.
+// Libraries linked from the bundle remain loaded for the process lifetime.
+// Loading a new image from a running app is still unsupported.
 fn darwin_dlopen(path &char, flags i32) u64 {
 	_ = flags
 	if path == unsafe { nil } { return u64(system_data) }
 	raw_name := ctext(u64(path))
 	name := if raw_name == '/usr/lib/libSystem.dylib' { '/usr/lib/libSystem.B.dylib' } else { raw_name }
+	if module_runtime != unsafe { nil } {
+		if index := module_runtime.modules[0].dependencies[name] {
+			if index >= 0 { return u64(module_runtime.modules[index]) }
+		}
+		for loaded in module_runtime.modules {
+			if loaded.path == name || loaded.image.install_name == name { return u64(loaded) }
+		}
+	}
 	for i, library in image_runtime.image.libraries {
 		if library.name == name && !name.ends_with('libMoltenVK.dylib') { return u64(i) + 1 }
 	}
@@ -35,14 +43,29 @@ fn darwin_dlsym(handle u64, name &char) u64 {
 	if text == '__isPlatformVersionAtLeast' { return u64(unsafe { voidptr(darwin_platform_at_least) }) }
 	if text in ['csops', 'ptrace'] { return u64(unsafe { voidptr(darwin_unsupported_systemcall) }) }
 	symbol := '_' + text
+	if module_runtime != unsafe { nil } {
+		for loaded in module_runtime.modules {
+			if handle != u64(loaded) { continue }
+			address := loaded.image.exported_address(symbol, loaded.layout, loaded.base) or {
+				dyld_error(err.msg()); return 0
+			}
+			if address != 0 { return address }
+		}
+	}
 	if handle > 0 && handle <= u64(image_runtime.image.libraries.len) {
 		library := image_runtime.image.libraries[int(handle - 1)]
 		if address := runtime_symbol(library.name, symbol) { return address }
 	} else if handle == u64(system_data) || handle == ~u64(1) { // RTLD_DEFAULT
+		if module_runtime != unsafe { nil } {
+			for loaded in module_runtime.modules {
+				address := loaded.image.exported_address(symbol, loaded.layout, loaded.base) or { u64(0) }
+				if address != 0 { return address }
+			}
+		}
 		own := image_runtime.image.exported_address(symbol, image_runtime.layout, image_runtime.base) or { u64(0) }
 		if own != 0 { return own }
 		for library in image_runtime.image.libraries {
-			if address := runtime_symbol(library.name, symbol) { return address }
+			if address := module_symbol(0, library.name, symbol) { return address }
 		}
 	}
 	dyld_error('iOS: dynamic symbol is not implemented: ${text}')
@@ -50,6 +73,9 @@ fn darwin_dlsym(handle u64, name &char) u64 {
 }
 
 fn darwin_dlclose(handle u64) i32 {
+	if module_runtime != unsafe { nil } {
+		for loaded in module_runtime.modules { if handle == u64(loaded) { return 0 } }
+	}
 	if handle == u64(system_data) || (handle > 0 && handle <= u64(image_runtime.image.libraries.len)) { return 0 }
 	dyld_error('iOS: invalid dynamic library handle'.clone())
 	return -1
@@ -63,12 +89,15 @@ fn darwin_dlerror() &char {
 
 fn darwin_dladdr(address u64, info &DarwinDlInfo) i32 {
 	if info == unsafe { nil } { return 0 }
-	for segment in image_runtime.image.segments {
-		if segment.name == '__PAGEZERO' { continue }
-		start := image_runtime.base + segment.address - image_runtime.layout.base
-		if address >= start && address - start < segment.size {
-			unsafe { *info = DarwinDlInfo{filename: &char(image_runtime.path.str), base: voidptr(image_runtime.base)} }
-			return 1
+	if module_runtime == unsafe { nil } { return 0 }
+	for loaded in module_runtime.modules {
+		for segment in loaded.image.segments {
+			if segment.name == '__PAGEZERO' { continue }
+			start := loaded.base + segment.address - loaded.layout.base
+			if address >= start && address - start < segment.size {
+				unsafe { *info = DarwinDlInfo{filename: &char(loaded.path.str), base: voidptr(loaded.base)} }
+				return 1
+			}
 		}
 	}
 	return 0
@@ -77,15 +106,18 @@ fn darwin_dladdr(address u64, info &DarwinDlInfo) i32 {
 fn darwin_getsectiondata(header u64, segment_name &char, section_name &char, size &u64) u64 {
 	if size == unsafe { nil } { return 0 }
 	unsafe { *size = 0 }
-	if header != image_runtime.base { return 0 }
-	for segment in image_runtime.image.segments {
-		if segment.name != ctext(u64(segment_name)) { continue }
-		for section in segment.sections {
-			if section.name != ctext(u64(section_name)) { continue }
-			if section.address < segment.address || section.address - segment.address > segment.filesize
-				|| section.size > segment.filesize - (section.address - segment.address) { return 0 }
-			unsafe { *size = section.size }
-			return image_section_address(section)
+	if module_runtime == unsafe { nil } { return 0 }
+	for loaded in module_runtime.modules {
+		if header != loaded.base { continue }
+		for segment in loaded.image.segments {
+			if segment.name != ctext(u64(segment_name)) { continue }
+			for section in segment.sections {
+				if section.name != ctext(u64(section_name)) { continue }
+				if section.address < segment.address || section.address - segment.address > segment.filesize
+					|| section.size > segment.filesize - (section.address - segment.address) { return 0 }
+				unsafe { *size = section.size }
+				return loaded.section_address(section)
+			}
 		}
 	}
 	return 0

@@ -168,6 +168,8 @@ fn objc_start() {
 	}
 	if C.ios_key_create(unsafe { &ios_runtime.graphics_key }, unsafe { voidptr(ui_context_cleanup) }) != 0 { panic('iOS: cannot create graphics TLS') }
 	ios_runtime.timers.flags |= .noslices
+	ios_runtime.load_classes.flags |= .noslices
+	ios_runtime.load_categories.flags |= .noslices
 	ios_runtime.display_links.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
@@ -690,7 +692,8 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 	}
 	for cls in classes { m.register(cls, 0)! }
 	for cls in classes { m.register(read64(cls), 0)! }
-	ios_runtime.load_classes = classes
+	ios_runtime.load_classes << classes
+	unsafe { classes.free() }
 	mut attached := map[u64]bool{}
 	for segment in image.segments {
 		for section in segment.sections {

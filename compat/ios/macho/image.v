@@ -43,6 +43,8 @@ pub:
 	minos            u32
 	segments         []Segment
 	libraries        []Library
+	install_name     string
+	rpaths           []string
 	entryoff         u64
 	stacksize        u64
 	has_entry        bool
@@ -131,6 +133,8 @@ pub fn parse(input []u8) !Image {
 	}
 	mut segments := []Segment{}
 	mut libraries := []Library{}
+	mut install_name := ''
+	mut rpaths := []string{}
 	mut required_unknown := []u32{}
 	mut platform := u32(0)
 	mut minos := u32(0)
@@ -290,8 +294,18 @@ pub fn parse(input []u8) !Image {
 				if address != 0 { routines << address }
 				initializers = initializers || address != 0
 			}
-			// Metadata consumed neither by instruction execution nor binding.
-			0x8000001c {}
+			0xd, 0x8000001c {
+				minimum := u64(if cmd == 0xd { 24 } else { 12 })
+				if size < minimum { return error('Mach-O: truncated dylib identity/runpath command') }
+				nameoff := u64(r.u32(off + 8)!)
+				if nameoff < minimum || nameoff >= size { return error('Mach-O: invalid dylib identity/runpath offset') }
+				name := r.string_at(off + nameoff, size - nameoff)!
+				if name == '' { return error('Mach-O: empty dylib identity/runpath') }
+				if cmd == 0xd {
+					if install_name != '' { return error('Mach-O: duplicate dylib identity') }
+					install_name = name
+				} else { rpaths << name }
+			}
 			else {
 				if cmd & 0x80000000 != 0 {
 					required_unknown << cmd
@@ -312,6 +326,8 @@ pub fn parse(input []u8) !Image {
 		minos:            minos
 		segments:         segments
 		libraries:        libraries
+		install_name:     install_name
+		rpaths:           rpaths
 		entryoff:         entryoff
 		stacksize:        stacksize
 		has_entry:        has_entry
@@ -346,6 +362,14 @@ pub fn (image Image) platform_name() string {
 }
 
 pub fn (image Image) execution_issues() []string {
+	return image.loading_issues(false)
+}
+
+pub fn (image Image) dylib_issues() []string {
+	return image.loading_issues(true)
+}
+
+fn (image Image) loading_issues(dylib bool) []string {
 	mut issues := []string{}
 	if image.subtype & 0xffffff != 0 {
 		detail := if image.subtype & 0xffffff == 2 {
@@ -355,14 +379,16 @@ pub fn (image Image) execution_issues() []string {
 		}
 		issues << 'CPU subtype ${image.subtype & 0xffffff} is not implemented${detail}'
 	}
-	if image.filetype != 2 { issues << 'only MH_EXECUTE is supported' }
-	if image.flags & 0x200000 == 0 {
+	if dylib {
+		if image.filetype != 6 { issues << 'expected MH_DYLIB' }
+	} else if image.filetype != 2 { issues << 'only MH_EXECUTE is supported' }
+	if !dylib && image.flags & 0x200000 == 0 {
 		issues << 'only position-independent executables (MH_PIE) can be relocated'
 	}
 	if image.platform !in [u32(2), 7] {
 		issues << 'expected iOS or iOS Simulator, found ${image.platform_name()}'
 	}
-	if !image.has_entry { issues << 'LC_MAIN entry point is missing' }
+	if !dylib && !image.has_entry { issues << 'LC_MAIN entry point is missing' }
 	if image.stacksize != 0 { issues << 'custom LC_MAIN stack sizes are not implemented' }
 	if image.encrypted {
 		issues << 'encrypted executable; an unencrypted developer or simulator build is required'
@@ -417,8 +443,8 @@ pub fn (image Image) layout(page u64) !Layout {
 			found_entry = true
 		}
 	}
-	if end <= base || end - base > 512 * 1024 * 1024 || !found_entry || entry % 4 != 0 {
+	if end <= base || end - base > 512 * 1024 * 1024 || (image.filetype != 6 && !found_entry) || entry % 4 != 0 {
 		return error('Mach-O: invalid image span or entry point')
 	}
-	return Layout{base, end - base, entry - base}
+	return Layout{base, end - base, if found_entry { entry - base } else { u64(0) }}
 }

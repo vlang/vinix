@@ -33,50 +33,24 @@ fn execute(image macho.Image, arguments []string) !int {
 	$if ios_gles ? { gles_start()! }
 	if ios_runtime.trace { eprintln('iOS Mach-O mapping: 0x${base.hex()}') }
 	image_runtime_start(image, layout, base)
+	path := os.real_path(arguments[0])
+	defer { unsafe { path.free() } }
+	modules_start(image, layout, base, path, false)
 	defer {
 		if image_runtime.started { image_cxa_finalize(0) }
 		objc_stop()
 		$if ios_gles ? { gles_stop() }
 		image_runtime_stop()
 		if lazy_runtime != unsafe { nil } { lazy_stop() }
+		modules_stop()
 		system_data_stop()
 	}
-	lazy_start()!
 	system_data_start()!
-	ios_runtime.bundle = os.dir(os.real_path(arguments[0]))
-	image_runtime.path = os.real_path(arguments[0])
-	fixups := image.plan_fixups_with_lazy(layout, base, runtime_symbol, lazy_symbol)!
-	for segment in image.segments {
-		if segment.name == '__PAGEZERO' || segment.filesize == 0 { continue }
-		unsafe {
-			C.memcpy(voidptr(base + segment.address - layout.base), &image.data[int(segment.fileoff)], usize(segment.filesize))
-		}
-	}
-	for fixup in fixups {
-		lazy_register_slot(fixup.offset, fixup.value)
-		// PTR_64 chains can have 4-byte alignment; memcpy handles unaligned
-		// stores and avoids imposing a host alignment requirement.
-		value := fixup.value
-		unsafe { C.memcpy(voidptr(base + fixup.offset), &value, 8) }
-	}
-	lazy_seal()!
-	objc_register_image(image, layout, base)!
-	initializers := image_initializers()!
-	defer { unsafe { initializers.free() } }
-	image_tls_prepare()!
-	C.__builtin___clear_cache(mapping, unsafe { voidptr(base + layout.size) })
-	if C.mprotect(mapping, usize(layout.size), C.PROT_NONE) != 0 {
-		return error('iOS: cannot protect image gaps')
-	}
-	for segment in image.segments {
-		if segment.name == '__PAGEZERO' || segment.size == 0 { continue }
-		size := (segment.size + page - 1) & ~(page - 1)
-		// SG_READ_ONLY is sealed only after binding (__DATA_CONST).
-		prot := if segment.flags & 0x10 != 0 { segment.prot & ~u32(2) } else { segment.prot }
-		if C.mprotect(unsafe { voidptr(base + segment.address - layout.base) }, usize(size), int(prot)) != 0 {
-			return error('iOS: cannot apply segment protections to ${segment.name}')
-		}
-	}
+	ios_runtime.bundle = os.dir(path)
+	image_runtime.path = path.clone()
+	module_dependencies(0, 0)!
+	lazy_start()!
+	module_bind_all()!
 	mut argv := []&char{cap: arguments.len + 1}
 	for argument in arguments { argv << unsafe { &char(argument.str) } }
 	argv << unsafe { &char(nil) }
@@ -85,9 +59,11 @@ fn execute(image macho.Image, arguments []string) !int {
 	mut empty := [unsafe { &char(nil) }]!
 	image_runtime.started = true
 	objc_load_image()
-	for address in initializers {
-		initializer := unsafe { ImageInitializer(voidptr(address)) }
-		unsafe { initializer(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
+	for index in module_runtime.order {
+		for address in module_runtime.modules[index].initializers {
+			initializer := unsafe { ImageInitializer(voidptr(address)) }
+			unsafe { initializer(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }
+		}
 	}
 	entry := unsafe { AppMain(voidptr(base + layout.entry)) }
 	return unsafe { entry(arguments.len, &&char(argv.data), &empty[0], &empty[0]) }

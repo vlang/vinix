@@ -7,6 +7,7 @@ fn C.ios_store_pointer(&u64, u64)
 struct LazyImport {
 	library string
 	symbol string
+	owner int
 mut:
 	value u64
 	slots []u64
@@ -27,7 +28,8 @@ fn lazy_start() ! {
 	page := usize(C.getpagesize())
 	// Each distinct lazy symbol needs bytes in its bind stream. Chained-only
 	// apps reserve one page, rather than the maximum 65,536-thunk arena.
-	count := image_runtime.image.lazy_bind_info.size
+	mut count := u64(0)
+	for loaded in module_runtime.modules { count += loaded.image.lazy_bind_info.size }
 	capacity := if count > 65536 { 65536 } else if count == 0 { 1 } else { int(count) }
 	size := (usize(capacity) * 24 + page - 1) & ~(page - 1)
 	mapping := C.mmap(unsafe { nil }, size, C.PROT_READ | C.PROT_WRITE,
@@ -47,19 +49,19 @@ fn lazy_symbol(library string, symbol string) !u64 {
 	write32(address + 8, 0xd61f0220)
 	write32(address + 12, 0xd503201f)
 	unsafe { *(&u64(address + 16)) = u64(voidptr(C.ios_lazy_entry)) }
-	lazy_runtime.imports << LazyImport{library: library, symbol: symbol}
+	lazy_runtime.imports << LazyImport{library: library, symbol: symbol, owner: module_runtime.binding}
 	return address
 }
 
-fn lazy_register_slot(offset u64, target u64) {
+fn lazy_register_slot(loaded &LoadedModule, offset u64, target u64) {
 	start := u64(lazy_runtime.mapping)
 	if target < start || target - start >= u64(lazy_runtime.imports.len) * 24 || (target - start) % 24 != 0 { return }
-	for segment in image_runtime.image.segments {
+	for segment in loaded.image.segments {
 		if segment.name == '__PAGEZERO' || segment.prot & 2 == 0 || segment.flags & 0x10 != 0 { continue }
-		within := segment.address - image_runtime.layout.base
+		within := segment.address - loaded.layout.base
 		if segment.size >= 8 && offset >= within && offset - within < segment.size - 7 {
 			index := int((target - start) / 24)
-			lazy_runtime.imports[index].slots << image_runtime.base + offset
+			lazy_runtime.imports[index].slots << loaded.base + offset
 			return
 		}
 	}
@@ -80,7 +82,7 @@ fn lazy_resolve(index u64) u64 {
 	defer { C.ios_objc_initialize_unlock() }
 	mut item := unsafe { &lazy_runtime.imports[int(index)] }
 	if item.value != 0 { return item.value }
-	item.value = runtime_symbol(item.library, item.symbol) or {
+	item.value = module_symbol(item.owner, item.library, item.symbol) or {
 		panic('iOS: unsupported API reached by app: ${item.library} ${item.symbol}\n${err}')
 	}
 	for slot in item.slots { C.ios_store_pointer(unsafe { &u64(slot) }, item.value) }
