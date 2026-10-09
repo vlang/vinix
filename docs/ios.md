@@ -79,6 +79,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
 | AudioToolbox PCM | Same-rate, same-channel Int16/Int32/Float32/Float64 conversion between packed little-endian interleaved and planar buffers; complex input callbacks, partial output/error recovery, EOF/reset and converter ownership |
+| Offline AudioUnits | GenericOutput pull rendering and mono MultiChannelMixer, graph nodes/connections and native input callbacks, stream formats, mixer volume/enable, slice limits, initialize/start/stop/uninitialize and owned render buffers |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
@@ -130,6 +131,15 @@ does not provide speaker output or microphone capture. The same native fixture
 checks sample values, clipping/rounding, callback errors and buffer layouts
 against the installed Mac AudioToolbox and Vinix; ASAN checks short buffers,
 invalid/reentrant operations and repeated image teardown.
+Offline graphs support 16 nodes, 16 input buses per mixer and slices up to
+16,384 frames. Native callbacks run without the registry lock; rendering pins
+their unit buffers until the callback returns. Graph connections reject cycles
+and graph disposal frees its units. The Mac/native fixture checks default mixer
+volume, summed samples, muted inputs, silence, callback errors, cross-thread
+property queries and caller/unit-owned buffers. Stereo/spatial mixer layouts,
+gain automation, hardware output (`RemoteIO`) and voice processing/capture
+are unsupported; hardware component discovery returns no component. GenericOutput
+start/stop controls an offline unit whose caller still drives rendering.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
@@ -255,11 +265,20 @@ including scene/application notifications, error domains and keys, file and
 cookie attributes and floating-point window levels. Foundation selector/string
 conversion preserves canonical selectors, UTF-8 names and nil behavior.
 
+V now implements packed little-endian PCM converters, GenericOutput pull
+rendering and mono mixer graphs. The same AudioToolbox fixtures run against
+the installed Mac libraries and native iOS instructions in Vinix, checking
+real sample values, callback errors, start/stop, silence and buffer ownership.
+Disassembly of EOSSDK identifies RemoteIO (`rioc`) output and optional voice
+processing (`vpio`); those hardware components are still unavailable. The
+implemented AudioToolbox entry points resolve 41 more strong imports across
+the executable and EOSSDK, without claiming device audio support.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/AudioToolbox.framework/AudioToolbox (_AUGraphAddNode)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGColorEqualToColor
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -267,10 +286,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,100 | 1,057 | 82 |
-| EOSSDK | 337 | 325 | 18 |
+| Fortnite executable | 1,123 | 1,034 | 82 |
+| EOSSDK | 355 | 307 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,488 | 1,507 | 123 |
+| All images | 1,529 | 1,466 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

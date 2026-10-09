@@ -17,6 +17,7 @@ FEATURES = (
     b"iOS PASS: native chained and legacy pointer tags",
     b"iOS PASS: native CoreFoundation conversion, data and collection ownership",
     b"iOS PASS: native PCM conversion and AudioToolbox callback ABI",
+    b"iOS PASS: native offline AudioUnit graph rendering and mixer ownership",
     b"iOS PASS: native framework constants match installed Apple libraries",
     b"iOS PASS: native accessibility metadata and weak container lifecycle",
     b"iOS PASS: native Objective-C reflection, replacement and dynamic classes",
@@ -157,7 +158,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         shutil.copytree(build / "fixtures/Modules.app", destination / "Modules.app")

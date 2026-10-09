@@ -9,6 +9,9 @@ mkdir -p "$output"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework AudioToolbox \
     "$repo/tests/ios/audio-converter.c" -o "$output/audio-converter"
 "$output/audio-converter"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework AudioToolbox \
+    "$repo/tests/ios/audio-graph.c" -o "$output/audio-graph"
+"$output/audio-graph"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework CoreFoundation \
     "$repo/tests/ios/core-foundation.c" -o "$output/core-foundation"
 "$output/core-foundation"

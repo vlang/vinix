@@ -112,6 +112,11 @@ int main(void) {
     run("/opt/ios/audio-converter", "unsupported", NULL, NULL, 0,
         "IOS-AUDIO-CONVERTER: unsupported codecs/rates and invalid handles rejected");
     puts("iOS PASS: native PCM conversion and AudioToolbox callback ABI");
+    run("/opt/ios/audio-graph", NULL, NULL, NULL, 0,
+        "IOS-AUDIO-GRAPH: native callbacks, mixer gains, PCM conversion, errors/silence, offline start/stop and buffer ownership");
+    run("/opt/ios/audio-graph", "hardware", NULL, NULL, 0,
+        "IOS-AUDIO-GRAPH: hardware output and voice capture are unavailable");
+    puts("iOS PASS: native offline AudioUnit graph rendering and mixer ownership");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

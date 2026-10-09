@@ -146,6 +146,8 @@ mut:
 	notification_center u64
 	audio_session u64
 	audio_converters map[u64]&AudioConverter
+	audio_units map[u64]&AudioUnit
+	audio_graphs map[u64]&AudioGraph
 	defaults u64
 	locale u64
 	empty_dictionary u64

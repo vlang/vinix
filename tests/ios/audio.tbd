@@ -5,5 +5,14 @@ install-name: '/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox'
 exports:
   - targets: [ arm64-ios ]
     symbols: [ _AudioConverterNew, _AudioConverterDispose, _AudioConverterReset,
-               _AudioConverterFillComplexBuffer, _AudioConverterConvertComplexBuffer ]
+               _AudioConverterFillComplexBuffer, _AudioConverterConvertComplexBuffer,
+               _AudioComponentFindNext, _AudioComponentGetDescription,
+               _AudioComponentInstanceNew, _AudioComponentInstanceDispose,
+               _AudioUnitInitialize, _AudioUnitUninitialize, _AudioUnitSetProperty,
+               _AudioUnitGetProperty, _AudioUnitSetParameter, _AudioUnitGetParameter,
+               _AudioUnitRender, _AudioOutputUnitStart, _AudioOutputUnitStop,
+               _NewAUGraph, _DisposeAUGraph, _AUGraphAddNode, _AUGraphOpen,
+               _AUGraphNodeInfo, _AUGraphConnectNodeInput, _AUGraphSetNodeInputCallback,
+               _AUGraphInitialize, _AUGraphUninitialize, _AUGraphStart,
+               _AUGraphStop, _AUGraphIsRunning ]
 ...

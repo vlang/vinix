@@ -194,11 +194,15 @@ fn audio_converter_complex(handle u64, frames u32, input &AudioBuffers, output &
 }
 
 fn audio_stop() {
+	audio_graphs_stop()
+	audio_units_stop()
 	for _, converter in ios_runtime.audio_converters { C.free(converter) }
 	unsafe { ios_runtime.audio_converters.free() }
 }
 
 fn audio_symbol(symbol string) ?u64 {
+	if address := audio_graph_symbol(symbol) { return address }
+	if address := audio_unit_symbol(symbol) { return address }
 	address := match symbol {
 		'_AudioConverterNew' { unsafe { voidptr(audio_converter_new) } }
 		'_AudioConverterDispose' { unsafe { voidptr(audio_converter_dispose) } }
