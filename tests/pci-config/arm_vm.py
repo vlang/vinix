@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tarfile
 import time
+from runpy import run_path
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_MARKER = "pci: ARM checked config widths, bounds and interrupt masks passed"
@@ -22,25 +23,35 @@ INIT_MARKER = "PCI ARM GUEST: Linux ABI PID1 PASS"
 FAILURES = ("KERNEL PANIC", "FATAL EXCEPTION", "PCI ARM GUEST: FAIL")
 
 
+_pci = run_path(str(Path(__file__).with_name("_native.py")))
+
+
+def _pci_request(operation, *arguments):
+    return _pci["call"](operation, globals(), *arguments)
+
+
+def _pci_checks(markers, output):
+    return (marker in output for marker in markers)
+
+
+def _pci_frame():
+    return [None, None, None, None, None, None]
+
+
+def _pci_raise(error):
+    raise error
+
+
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _pci_request("digest", path)
 
 
 def executable(name: str) -> str:
-    found = shutil.which(name)
-    if found is None:
-        raise RuntimeError(f"required executable unavailable: {name}")
-    return found
+    return _pci_request("executable", name)
 
 
 def stop_owned(process: subprocess.Popen) -> None:
-    if process.poll() is None:
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
+    return _pci_request("stop_owned", process)
 
 
 def main() -> int:
@@ -196,53 +207,9 @@ def main() -> int:
             report["owned_pid"] = process.pid
             report_path.write_text(json.dumps(report, indent=2) + "\n")
             deadline = time.monotonic() + args.timeout
-            failure_started: float | None = None
-            passed_started: float | None = None
-            while time.monotonic() < deadline or failure_started is not None:
-                output = serial.read_text(errors="replace") if serial.exists() else ""
-                failed = any(marker in output for marker in FAILURES)
-                if args.no_config_test and CONFIG_MARKER in output:
-                    failed = True
-                if not args.mmap_lease_test and MMAP_LEASE_MARKER in output:
-                    failed = True
-                if not args.pci_topology_test and TOPOLOGY_MARKER in output:
-                    failed = True
-                if failed or failure_started is not None:
-                    if failure_started is None:
-                        failure_started = time.monotonic()
-                    if time.monotonic() - failure_started >= 1 or process.poll() is not None:
-                        raise RuntimeError(f"ARM guest failed; see {serial}")
-                elif INIT_MARKER in output and (args.no_config_test or CONFIG_MARKER in output) and (
-                        not args.mmap_lease_test or MMAP_LEASE_MARKER in output) and (
-                        not args.pci_topology_test or TOPOLOGY_MARKER in output):
-                    # Let PID1 continue for a bounded second, observing panics
-                    # after its marker rather than stopping at the first byte.
-                    if passed_started is None:
-                        passed_started = time.monotonic()
-                    if time.monotonic() - passed_started >= 1:
-                        if process.poll() is not None:
-                            raise RuntimeError("QEMU exited after the guest marker")
-                        # Stop only this guest, then inspect all its final bytes.
-                        # A panic arriving between the last read and termination
-                        # must still fail the run rather than retain PASS.
-                        stop_owned(process)
-                        final_output = serial.read_text(errors="replace")
-                        if any(marker in final_output for marker in FAILURES) or (
-                                args.no_config_test and CONFIG_MARKER in final_output) or (
-                                not args.mmap_lease_test and MMAP_LEASE_MARKER in final_output) or (
-                                not args.pci_topology_test and TOPOLOGY_MARKER in final_output):
-                            raise RuntimeError(f"ARM guest failed during final drain; see {serial}")
-                        report["serial_sha256"] = digest(serial)
-                        report["status"] = "passed"
-                        print("ARM PCI guest: PASS (ECAM/full-DAIF controller fixture, Linux ABI PID1)"
-                              if not args.no_config_test else
-                              "Default ARM guest: PASS (Linux ABI PID1; config fixture disabled)")
-                        print(f"Serial log: {serial}")
-                        return 0
-                if process.poll() is not None:
-                    raise RuntimeError(f"QEMU exited; see {state / 'qemu.log'}")
-                time.sleep(0.1)
-            raise RuntimeError(f"ARM guest timed out; see {serial}")
+            observed = _pci_frame()
+            _pci_request("observe", args, state, process, serial, report, deadline, observed)
+            return observed[0]
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         report["status"] = "failed"
         report["error"] = str(error)
