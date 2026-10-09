@@ -28,6 +28,7 @@ mut:
     exiting bool
     yields u32
     pins u32
+    maskable_irq_depth u32
     dead bool
     queued bool
     iowait_cpu_plus_one u32
@@ -317,6 +318,10 @@ pub fn preempt_enable() { unsafe { C.assert(C.vmh_preempt_depth != 0); C.vmh_pre
 pub fn preempt_enable_no_resched() { unsafe { C.assert(C.vmh_preempt_depth != 0); C.vmh_preempt_depth-- } }
 @[export: 'vinix_linuxkpi_preempt_count']
 pub fn preempt_count() u32 { return C.vmh_preempt_depth }
+@[export: 'vinix_linuxkpi_maskable_irq_depth']
+pub fn maskable_irq_depth() u32 {
+    return unsafe { if C.vmh_native_task == nil { u32(0) } else { C.vmh_native_task.maskable_irq_depth } }
+}
 @[export: 'vinix_linuxkpi_preempt_check_resched']
 pub fn preempt_check_resched() {}
 @[export: 'vinix_linuxkpi_cpu_id']
@@ -336,7 +341,7 @@ pub fn worker_bind(cpu u32) i32 {
     }
 }
 @[export: 'vinix_linuxkpi_may_sleep']
-pub fn may_sleep() bool { return C.vmh_interrupts && C.vmh_preempt_depth == 0 }
+pub fn may_sleep() bool { return C.vmh_interrupts && C.vmh_preempt_depth == 0 && maskable_irq_depth() == 0 }
 @[export: 'vinix_linuxkpi_worker_set_nice']
 pub fn worker_set_nice(nice i32) i32 {
     if !may_sleep() { return -C.EWOULDBLOCK }

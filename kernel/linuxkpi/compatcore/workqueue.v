@@ -122,6 +122,7 @@ fn C.vinix_linuxkpi_worker_bind(u32) i32
 fn C.vinix_linuxkpi_cond_resched() i32
 fn C.vinix_linuxkpi_cpu_id() u32
 fn C.vinix_linuxkpi_irq_flags() u64
+fn C.vinix_linuxkpi_maskable_irq_depth() u32
 fn C.vinix_linuxkpi_spin_wait()
 fn C.try_to_del_timer_sync(voidptr) i32
 fn C.timer_delete_sync(voidptr) i32
@@ -170,7 +171,12 @@ fn wq_task_running_locked(task voidptr) &WorkRun {
 		return nil
 	}
 }
-fn wq_current_locked() &WorkRun { return wq_task_running_locked(C.vkp_current()) }
+fn wq_current_locked() &WorkRun {
+	// An IRQ borrows the interrupted task's stack but is not its work callback.
+	// IF-off and ordinary preemption pins do not discard callback ownership.
+	if C.vinix_linuxkpi_maskable_irq_depth() != 0 { return unsafe { nil } }
+	return wq_task_running_locked(C.vkp_current())
+}
 fn wq_canceling_locked(work &C.vks_work) bool {
 	unsafe {
 		for entry := C.vkwq_canceling.next; entry != &C.vkwq_canceling; entry = entry.next {
@@ -956,6 +962,18 @@ pub fn current_work() voidptr {
 		work := if !is_null(run) { voidptr(run.work) } else { voidptr(nil) }
 		C.vkp_spin_unlock_irqrestore(&vkwq_work_lock, flags)
 		return work
+	}
+}
+// A synchronous fixture witness of the actual drain interval. Its caller
+// retains this queue until all observers and the drainer have returned.
+@[export: 'vinix_linuxkpi_workqueue_draining_for_test']
+pub fn workqueue_draining_for_test(storage voidptr) bool {
+	unsafe {
+		flags := C.vkp_spin_lock_irqsave(&vkwq_work_lock)
+		wq := &WorkQueue(storage)
+		active := wq.drainers != 0
+		C.vkp_spin_unlock_irqrestore(&vkwq_work_lock, flags)
+		return active
 	}
 }
 @[export: 'work_busy']

@@ -34,6 +34,10 @@ fn C.drain_workqueue(&C.workqueue_struct)
 fn C.destroy_workqueue(&C.workqueue_struct)
 fn C.vinix_linuxkpi_irq_save() usize
 fn C.vinix_linuxkpi_irq_restore(usize)
+fn C.vinix_linuxkpi_preempt_disable()
+fn C.vinix_linuxkpi_preempt_enable()
+fn C.vinix_linuxkpi_maskable_irq_depth() u32
+fn C.vinix_linuxkpi_workqueue_draining_for_test(voidptr) bool
 fn C.vmh_work_static_callback(&C.work_struct)
 fn C.vmh_work_callback(&C.work_struct)
 fn C.vmh_work_operation_thread(voidptr) voidptr
@@ -83,6 +87,8 @@ struct WorkTest { mut:
  hold bool
  requeue_first bool
  free_self bool
+ irq_context_test bool
+ candidate &WorkTest = unsafe { nil }
 }
 @[export:'vmh_work_static_callback']
 pub fn static_callback(work &C.work_struct) { unsafe {
@@ -101,6 +107,25 @@ pub fn callback(work &C.work_struct) { unsafe {
  if test.requeue_first && calls==1 { C.assert(C.queue_work(if test.other!=nil { test.other } else { test.wq },work)) }
  if test.hold && calls==1 {
   C.__atomic_store_n(&test.entered,u32(1),3);C.wait_for_completion(&test.gate)
+ }
+ if test.irq_context_test {
+  C.assert(C.vinix_linuxkpi_workqueue_draining_for_test(test.wq))
+  C.assert(test.candidate!=nil && C.work_busy(&test.candidate.work)==0)
+  C.vinix_linuxkpi_preempt_disable()
+  flags:=C.vinix_linuxkpi_irq_save()
+  C.assert(usize(C.current_work())==usize(work))
+  C.vmh_native_task.maskable_irq_depth=1
+  C.assert(C.vinix_linuxkpi_maskable_irq_depth()==1 && C.current_work()==nil)
+  C.assert(!C.queue_work(test.wq,&test.candidate.work) && C.work_busy(&test.candidate.work)==0)
+  C.vinix_linuxkpi_irq_restore(flags)
+  C.assert(C.current_work()==nil && !C.vinix_linuxkpi_may_sleep())
+  C.vmh_native_task.maskable_irq_depth=0
+  flags2:=C.vinix_linuxkpi_irq_save()
+  C.assert(usize(C.current_work())==usize(work))
+  C.assert(C.queue_work(test.wq,&test.candidate.work))
+  C.vinix_linuxkpi_irq_restore(flags2)
+  C.vinix_linuxkpi_preempt_enable()
+  C.assert(usize(C.current_work())==usize(work) && C.vinix_linuxkpi_may_sleep())
  }
  if calls<test.limit && !(test.requeue_first && calls==1) { C.queue_work(test.wq,work) }
  C.sched_yield();C.assert(C.__atomic_fetch_sub(&test.active,u32(1),4)==1)
@@ -138,6 +163,18 @@ fn operation_start(test &WorkOperation,operation Operation,wq &C.workqueue_struc
 } }
 fn operation_join(test &WorkOperation) { unsafe {
  C.assert(C.pthread_join(test.thread,nil)==0 && test.done!=0);C.vmh_sync_model_destroy(&test.model)
+} }
+fn irq_identity_tests(wq &C.workqueue_struct) { unsafe {
+ for round:=u32(0);round<20;round++ {
+  mut held:=WorkTest{};mut candidate:=WorkTest{}
+  work_init(&held,wq);work_init(&candidate,wq)
+  held.hold=true;held.irq_context_test=true;held.candidate=&candidate
+  C.assert(C.queue_work(wq,&held.work));await_counter(&held.entered)
+  mut drain:=WorkOperation{};operation_start(&drain,.queue_drain,wq,nil)
+  C.assert(C.vinix_linuxkpi_workqueue_draining_for_test(wq))
+  C.complete(&held.gate);operation_join(&drain)
+  C.assert(held.calls==1 && candidate.calls==1 && C.work_busy(&candidate.work)==0)
+ }
 } }
 fn order_tests(wq &C.workqueue_struct) { unsafe {
  mut tests:=[32]WorkTest{};mut held:=WorkTest{};mut order:=[32]u32{};mut count:=u32(0)
@@ -219,7 +256,7 @@ pub fn workqueue_tests() { unsafe {
  irq_flags:=C.vinix_linuxkpi_irq_save();C.assert(C.queue_work(a,&static_work) && !C.vmh_interrupts && C.vmh_preempt_depth==0)
  C.vinix_linuxkpi_irq_restore(irq_flags);C.flush_workqueue(a)
  C.assert(static_calls==1 && C.work_busy(&static_work)==0)
- order_tests(a);flush_tests(a);cancel_tests(a)
+ order_tests(a);flush_tests(a);cancel_tests(a);irq_identity_tests(a)
  for destroy:=u32(0);destroy<2;destroy++ {
   wq:=if destroy!=0 { C.alloc_ordered_workqueue(c'destroy-held',u32(0)) } else { a };C.assert(wq!=nil)
   mut held:=WorkTest{};mut extra:=WorkTest{};work_init(&held,wq);held.hold=true;held.limit=8;work_init(&extra,wq)

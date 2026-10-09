@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
-Updated 2026-10-07 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Committed implementation baseline before the current boot-mask feature: **`95234fa2`** (including the original SMP headers and native V FPU entry points). Recheck HEAD and the worktree before
+Updated 2026-10-10 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
+Native SMP validation baseline: **`a0ae707a`**, with the final feature overlay described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -48,7 +48,7 @@ Vinix hardware test setup or isolated GPU passthrough setup. QEMU VGA cannot
 validate i915. Keep coding and testing the compatibility runtime while that
 information is pending; final hardware completion depends on it.
 
-Bound and high-priority queues are now implemented and committed. The earlier
+Ordinary native SMP calls and interrupt-aware workqueue identity are now implemented and validated. Bound and high-priority queues are implemented and committed. The earlier
 final-ELF artifact gap was closed by fresh normal/SSE guest runs using the
 handoff's rebuilt ELF. Ten distinct agents contributed in waves, within the
 four-active-agent limit including root. SRCU is now committed and tested in
@@ -1364,3 +1364,56 @@ changes. Read each owned file's diff and commit only explicit owned paths
 was requested for this work. The repository's desktop post-commit hook applies
 to relevant app changes; this driver project does not authorize modifying or
 publishing unrelated desktop work.
+
+## Latest continuation: native SMP and workqueue IRQ identity
+
+The October 10 implementation adds the five original ordinary SMP call APIs
+using genuine CSD records, allocation-free intrusive queues and a real permanent
+maskable IPI vector. Generic calls require ordinary IRQ-on task context;
+caller-owned async calls also support IRQ-off submission. Callbacks cannot block.
+Preserve early async unlock: the CSD may be reused or freed before callback
+return. Capture next/function/info before release and never read a detached node
+again. Synchronous stack records remain live until their release acknowledgement.
+A CSD unlock is not a callback-return or IRET acknowledgement.
+
+Four-word CPU selection is captured before invoking conditions. Ring each newly
+nonempty target immediately; deferring all IPIs until after conditions can
+strand an earlier call when a later condition recursively reuses its sender
+slot. Keep x2APIC's full LAPIC ID and MFENCE/LFENCE before its weakly ordered
+WRMSR doorbell. Boot construction requires published masks and ordinary native
+task context, and partial allocation failures must retain no pages. Boot owners
+and the installed vector are permanent; no hotplug or reset support is implied.
+
+`current_work` and draining-chain identity now reject actual maskable IRQ depth,
+while ordinary IRQ-off and pinned callbacks keep their ownership. Keep scheduler
+worker accounting separate from this ownership query. The actual native drain
+fixture verifies a real interrupt borrowing a held worker, and a subsequent
+ordinary callback chain. Native pthread entries must explicitly call
+`pthread_exit`: the native scheduler does not supply POSIX's return trampoline.
+The first new fixture omitted that exit and faulted at RIP zero; failed evidence
+is preserved and the final corrected object/guests are independently reviewed.
+
+Final normal/SSE guests use the same saved enabled ELF SHA256
+`92588ce66dab0bb36262f55221a92679a66641959a85fafefbd1b1ddaae50041` and pass all
+44 markers and 21 measured equalities. The SMP and IRQ/work fourth lifecycles
+recover every page and live heap class after three warmups. Default x86 build
+and Linux-ABI guest pass; ARM default build passes. Host SMP tests pass 72 cold
+processes per each of two compiler snapshots, independently replayed, and the
+ordered host suite passes 20 new drain/context regressions plus its old cases.
+The broad host suite still stops at original signedness warnings in its overflow
+probe. The official default allocation gate has identical baseline/feature
+counts and 151 existing failures; do not claim a global allocation pass.
+Desktop scenarios were not rerun because rebuilding the rejected cached ISO
+requires 7.84 GB, exceeding available disk space. Exact durable evidence is under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/`; use the current maintained scripts.
+
+The next runtime dependency is ordinary RCU. Genuine Linux grace periods cover
+all preemption-disabled and IRQ-disabled regions, including atomic callbacks
+that never call `rcu_read_lock` (see `i915_pmu.c`). A synchronous IPI alone cannot
+acknowledge an interrupted pinned region or an IRQ-enabled nested handler.
+Design actual scheduler, outer pin-release and IRQ-return quiescent hooks with
+full ordering and saved interrupted IF state; do not substitute explicit-reader
+SRCU counters. Hooks must avoid recursive preemption accounting through ordinary
+LinuxKPI locks. RCU callback barriers wait for captured callback invocation,
+including detached callbacks, and callbacks may free their own heads. NMI/BH
+accounting, mixed call-single queue kinds and CPU hotplug remain unresolved.

@@ -82,8 +82,8 @@ after a filesystem failure. Mutable build inputs still require isolation.
   unresolved storage/map references. The exact x86 Kconfig frame-helper
   selection avoids a duplicate generic fallback; with frame pointers disabled,
   the original helper returns `NOT_STACK`, without stack validation. Remote
-  callbacks, hotplug, `smp_ops` and Linux thread-info/TIF ownership
-  remain separate runtime dependencies.
+  callbacks are supplied by the native SMP service described below. Hotplug,
+  `smp_ops` and Linux thread-info/TIF ownership remain separate dependencies.
 - Original Linux possible, present, online and active masks describe Vinix's
   initialized logical boot CPUs; the dying mask is empty. The boot owner writes
   every word of the original four-word records and the original CPU counters
@@ -93,6 +93,28 @@ after a filesystem failure. Mutable build inputs still require isolation.
   permanent; hotplug, concurrent initialization, firmware-disabled CPU inventory
   and `total_cpus` remain unsupported. This supplies no remote callback dispatch
   or extension of the scheduler's 64-bit worker-affinity masks.
+- Ordinary boot-online SMP calls use the original Linux CSD records and real
+  native maskable IPIs. `smp_call_function_single`, its caller-owned async
+  variant, `smp_call_function_many`, `smp_call_function` and
+  `on_each_cpu_cond_mask` have native implementations. Synchronous calls retain
+  their stack CSD until callback completion; async dispatch releases its CSD
+  before the callback and retains no node access afterward, supporting reuse
+  and self-free. Detached batches preserve FIFO within the original synchronous
+  and asynchronous classes, with synchronous callbacks first. Mask selection
+  captures all four words before conditions run; recursive conditions cannot
+  strand an earlier submission behind a deferred IPI.
+  Initialization checks the published boot topology and ordinary task context,
+  unwinds both checked allocations on failure, and retains two raw owners for
+  boot lifetime. Submission allocates nothing. Generic calls require IRQ-on
+  task context; caller-owned async calls support IRQ-off submission. Callbacks
+  cannot block and preserve the real IRQ/pin state. The native transport keeps
+  the complete LAPIC identity and orders queue publication before x2APIC WRMSR.
+  Hotplug, NMI/softirq dispatch, mixed `__smp_call_single_queue` node kinds,
+  `smp_ops` and NUMA-aware CPU selection remain unresolved.
+- Workqueue callback identity excludes real maskable interrupt context. An
+  interrupt borrowing a worker's native thread cannot claim its callback or
+  chain new work into a draining queue. Ordinary IRQ-off and pinned callbacks
+  keep their ownership and may chain work while draining.
 - Unsigned 32-bit Linux kernel `dev_t` preserves the original 12-bit major,
   20-bit minor and old/new/huge/SYSV encodings through unchanged `kdev_t.h`.
   Hosted tests keep libc's device type, stat layout and mknod prototype separate.
@@ -1580,7 +1602,7 @@ the earlier stale pre-dump receipts are superseded.
 `current_thread_info()` still assumes a Linux task/thread-info layout which the
 native compatibility task view does not supply. TIF/status accessors and Linux
 stack ownership are not enabled by these declarations. Early maps, hotplug,
-`smp_ops` and remote callback execution remain unresolved; the later boot-mask
+`smp_ops` and remote callback execution were unresolved at that milestone; the later boot-mask
 runtime is described below. Evidence:
 `/tmp/vinix-linuxkpi-smp-headers-oct06-final-validation.json`.
 
@@ -1626,3 +1648,52 @@ not carried forward as fresh validation. Durable current evidence is under
 `/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/`, beginning with
 `cpu-mask-oct07-final-validation.json`, with host, native and build receipts
 beside it.
+
+## Native SMP and interrupt work identity, 2026-10-10
+
+The final enabled x86 kernel was built in an isolated worktree at committed
+baseline `a0ae707a`, with only this feature's overlay and the committed
+`9d9d90a3` user-copy fixture owner correction. The saved ELF SHA256 is
+`92588ce66dab0bb36262f55221a92679a66641959a85fafefbd1b1ddaae50041`.
+Both complete four-CPU normal and SSE guests pass all **44** required markers
+and **21** exact free-byte/live-heap equalities. After three warmups, the fourth
+SMP actor lifecycle and the separate workqueue IRQ lifecycle each recover
+`345255936 -> 345255936` bytes and every live heap class. Tests cover real
+hardware IRQ deferral, a 2,048-node intrusive FIFO batch, callback self-free,
+overlapping CSD reuse on different CPUs, post-IRET retirement, ordinary work
+chaining and rejection of interrupt submissions during an observed drain.
+
+The maintained `tests/linuxkpi/smp_calls.v` runs 72 cold ASan/UBSan processes
+per compiler snapshot, covering strict GNU99/GNU11 production bodies, CPU-mask
+boundaries through 256, both constructor failures, context preservation,
+synchronous-first batch order and recursive/mutating conditions. An independent
+reviewer replayed all 144 processes and compared every selected generated
+production body with its unmodified generated source. These host CPU/context
+observers do not establish native 256-CPU operation. The actual ordered
+workqueue host suite also passes 20 interrupt-context/drain regressions; a
+private negative control restoring the old identity test fails as expected.
+
+Independent source, generated-C and object reviews cover raw/interior allocation
+ownership, original aligned stack CSDs, callback detachment, post-IRET/task
+retirement, native constructor rollback and all native pthread exit paths.
+The full x86 enabled/default and ARM default builds pass. A fresh default x86
+guest passes Linux-ABI startup with compatibility markers absent. The compiler
+used for native artifacts is the frozen V binary SHA256
+`335214a9c904435eb87e580948a7de76c2b4de03a65f0ee23babaa76981a7373`.
+
+The equal-source official allocation gate exits 1 for both baseline and feature:
+318 ARM sites, 261 x86 sites, 376 merged sites, 185 groups and 151 existing
+failures, with identical normalized counts. This gate uses the default disabled
+profile. Feature-specific enabled measurements pass; no global allocation pass
+is claimed. The broad host runner stops at existing pinned-header signedness
+warnings promoted to errors in its overflow probe; the separate SMP and
+workqueue tests above pass. Desktop `ops,churn,cache,idle,apps,drag` were not
+rerun: the official cache identity rejects the available image, and regenerating
+its 7.84 GB ISO exceeds available disk space. Earlier claims remain historical.
+
+The final full i915 syntax audit remains **4/269**, with ordinary RCU the largest
+first-error group. This runtime feature supplies neither GPU binding nor graphics
+validation. Durable build, guest, host, review and baseline-comparison evidence
+is retained under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/`; the final
+validation receipt identifies exact inputs and preserves failed earlier builds
+and the native fixture's corrected missing `pthread_exit` failure.

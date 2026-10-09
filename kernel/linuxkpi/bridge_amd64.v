@@ -477,6 +477,7 @@ pub fn initialise() {
 		if C.vinix_linuxkpi_percpu_bootstrap(u32(cpu_locals.len)) != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility per-CPU initialization failed')
 		}
+		initialise_smp_calls()
 		C.i915_memcpy_init_early(unsafe { nil })
 		tick_deadlines()
 		if !time.register_tick_hook(tick_deadlines) {
@@ -538,6 +539,14 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native maskable IRQ context self-test failed')
 		}
 		C.kprintf(c'linuxkpi: native maskable IRQ nesting, hardware deferral and task context passed; no pages or heap objects retained\n')
+		if !smp_calls_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native SMP call self-test failed')
+		}
+		C.kprintf(c'linuxkpi: native SMP callbacks, hardware IRQ deferral, self-free and overlapping CSD reuse passed; no pages or heap objects retained\n')
+		if !work_irq_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
+		}
+		C.kprintf(c'linuxkpi: real IRQ work identity, drain rejection and ordinary callback chaining passed; no pages or heap objects retained\n')
 		for _ in 0 .. 3 {
 			if C.vinix_linuxkpi_bitmap_runtime_selftest() != 0 {
 				lib.kpanic(unsafe { nil }, c'Linux multiword bitmap self-test failed')

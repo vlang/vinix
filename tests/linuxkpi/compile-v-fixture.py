@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MODULES = ("cachefixture", "i915policyfixture", "pciconfigfixture", "runtimefixture",
            "taskfixture", "timefixture", "timerfixture", "syncfixture", "wwfixture",
            "iofixture", "seqfixture",
-           "srcufixture", "workerfixture", "workfixture", "usleepfixture", "waitbitfixture", "printkfixture")
+           "srcufixture", "workerfixture", "workfixture", "usleepfixture", "waitbitfixture", "printkfixture",
+           "smpfixture", "workirqfixture")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)

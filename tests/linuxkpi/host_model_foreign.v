@@ -28,6 +28,7 @@ mut:
     exiting bool
     yields u32
     pins u32
+    maskable_irq_depth u32
     dead bool
     queued bool
     iowait_cpu_plus_one u32

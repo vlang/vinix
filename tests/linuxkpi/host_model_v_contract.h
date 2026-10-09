@@ -57,6 +57,7 @@ struct native_task_model {
     bool must_exit, exiting;
     unsigned int yields;
     unsigned int pins;
+    unsigned int maskable_irq_depth;
     bool dead, queued;
     unsigned int iowait_cpu_plus_one;
     bool reject_enqueue;
@@ -102,6 +103,8 @@ _Static_assert(sizeof(((struct native_task_model *)0)->storage) == 64,
 void vmh_model_queue_init(struct native_task_model *);
 void vmh_sync_model_init(struct native_task_model *, unsigned int);
 void vmh_sync_model_destroy(struct native_task_model *);
+unsigned int vinix_linuxkpi_maskable_irq_depth(void);
+bool vinix_linuxkpi_workqueue_draining_for_test(void *);
 /* Implemented by the independent I/O fixture; the caller holds queue_lock. */
 void vmh_iowait_end_locked(struct native_task_model *);
 #endif

@@ -26,7 +26,9 @@ int vinix_linuxkpi_worker_bind(unsigned int);
 int vinix_linuxkpi_cond_resched(void);
 unsigned int vinix_linuxkpi_cpu_id(void);
 unsigned long vinix_linuxkpi_irq_flags(void);
+unsigned int vinix_linuxkpi_maskable_irq_depth(void);
 void vinix_linuxkpi_spin_wait(void);
+bool vinix_linuxkpi_workqueue_draining_for_test(void *);
 #ifdef VINIX_V_RUNTIME
 extern void *system_wq, *system_highpri_wq, *system_unbound_wq;
 void *vinix_linuxkpi_workqueue_allocate(unsigned int, int);

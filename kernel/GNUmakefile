@@ -315,7 +315,7 @@ ifeq ($(LINUXKPI),1)
     # Match the generator's resolved -MQ target, including macOS /tmp aliases.
     LINUXKPI_BOUNDS_HEADER := $(realpath $(CURDIR))/obj/linuxkpi/include/generated/bounds.h
     LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_BOUNDS_HEADER)
-    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
     LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)

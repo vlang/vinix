@@ -122,7 +122,7 @@ ${CC:-clang} -std=gnu11 -O1 -g -fwrapv -fno-strict-aliasing -Wall -Wextra -Werro
     -include "$repo/tests/linuxkpi/host_types.h" -include linux/kconfig.h -include "$source_dir/include/linux/compiler_types.h" \
     -I"$source_dir/drivers/gpu/drm/i915" -I"$work/include" -I"$repo/kernel/linuxkpi/include" -I"$source_dir/include" -I"$source_dir/include/uapi" \
     -I"$source_dir/arch/x86/include" -I"$source_dir/arch/x86/include/uapi" \
-    "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" @"$work/host-fixtures.rsp" \
+    "$header_link_gc" "$work/policyhost.o" "$work/i915policyfixture.o" "$work/runtimefixture.o" "$work/syncfixture.o" "$work/fixture_storage.o" "$work/compat.o" "$work/headercore.o" "$work/exchangecore.o" "$work/varargs.o" "$work/storage.o" "$work/workqueue_abi.o" @"$work/host-fixtures.rsp" \
     "$source_dir/lib/list_sort.c" "$source_dir/lib/sort.c" "$source_dir/lib/rbtree.c" \
     "$source_dir/lib/find_bit.c" "$source_dir/lib/hweight.c" "$source_dir/lib/ctype.c" "$source_dir/lib/siphash.c" \
     "$source_dir/drivers/gpu/drm/i915/i915_config.c" \
@@ -149,4 +149,5 @@ PY
 "$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/standalone.v" --arch "$native_v_arch" \
     --header-impl "$work/headerimpl.o" --include "$work/include"
 printf '%s\n' 'LinuxKPI: upstream helpers and standalone Linux/DRM header tests passed'
+"$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/smp_calls.v"
 "$repo/build-support/run-v-tool.sh" "$repo/tests/linuxkpi/upstreamsource/core_test.v"
