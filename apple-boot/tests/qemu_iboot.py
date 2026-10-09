@@ -18,6 +18,9 @@ translation, and the firmware segment it was told about is untouched.
 from __future__ import annotations
 
 import argparse
+import atexit
+import runpy
+import threading
 import json
 import os
 import shutil
@@ -70,80 +73,66 @@ AIC_MAX_IRQ = 0x1000
 AIC_MASK_SET = AIC_CONFIG + 4 * AIC_MAX_IRQ + 8 * (AIC_MAX_IRQ // 32)
 
 
+
+_CODEC_NAMESPACE = globals()
+_CODEC_PLATFORM, _CODEC_PYTHON = sys.platform, sys.executable
+_CODEC_REGISTER, _CODEC_ERROR = atexit.register, BaseException
+_CODEC_API = runpy.run_path(str(REPO / "build-support/cpython_host.py"))
+_CODEC_PATH, _CODEC_ENV, _CODEC_FSPATH = Path, os.environ, os.fspath
+_CODEC_RUN, _CODEC_TEMP = subprocess.run, tempfile.TemporaryDirectory
+_CODEC_SOURCE, _CODEC_BUILD = HERE / "iboot_library.v", REPO / "build-support/build-v-host-library.sh"
+_CODEC_LOCK, _CODEC_LIBRARY = threading.Lock(), None
+
+
+def _iboot(operation, *arguments):
+    global _CODEC_LIBRARY
+    with _CODEC_LOCK:
+        if _CODEC_LIBRARY is None:
+            path = _CODEC_ENV.get("VINIX_IBOOT_HELPER_LIBRARY")
+            if path is None:
+                owner = _CODEC_TEMP(prefix="vinix-iboot-codec-")
+                try:
+                    path = _CODEC_PATH(owner.name) / ("codec.dylib" if _CODEC_PLATFORM == "darwin" else "codec.so")
+                    _CODEC_RUN([_CODEC_FSPATH(_CODEC_BUILD), _CODEC_FSPATH(_CODEC_SOURCE), _CODEC_FSPATH(path),
+                                "-d", "cpython_iboot", "-d", "use_bundled_libgc"], check=True,
+                               env={**_CODEC_ENV, "VINIX_HOST_PYTHON": _CODEC_PYTHON})
+                    path.chmod(0o700)
+                    library = _CODEC_API["Library"](path, "vinix_iboot_codec")
+                except _CODEC_ERROR:
+                    owner.cleanup()
+                    raise
+                _CODEC_REGISTER(owner.cleanup)
+            else:
+                library = _CODEC_API["Library"](path, "vinix_iboot_codec")
+            _CODEC_LIBRARY = library
+    pins = []
+    return _CODEC_LIBRARY.target(operation.encode(), _CODEC_NAMESPACE, arguments,
+                                 {"pair": _CODEC_API["_pair"], "pins": pins})
+
+
 def align(value: int, alignment: int) -> int:
-    return (value + alignment - 1) // alignment * alignment
+    return _iboot('align', value, alignment)
 
 
 def adt_node(properties: list[tuple[str, bytes]], children: list[bytes] = ()) -> bytes:
-    out = bytearray(struct.pack("<II", len(properties), len(children)))
-    for name, value in properties:
-        out += name.encode().ljust(32, b"\0") + struct.pack("<I", len(value))
-        out += value + bytes(-len(value) % 4)
-    for child in children:
-        out += child
-    return bytes(out)
+    return _iboot('adt_node', properties, children)
 
 
 def cstr(text: str) -> bytes:
-    return text.encode() + b"\0"
+    return _iboot('cstr', text)
 
 
 def u32(value: int) -> bytes:
-    return struct.pack("<I", value)
+    return _iboot('u32', value)
 
 
 def u64s(*values: int) -> bytes:
-    return struct.pack(f"<{len(values)}Q", *values)
+    return _iboot('u64s', *values)
 
 
 def build_adt(segment: int, with_aic: bool) -> bytes:
-    """A tree with what the loader reads -- a watchdog behind a translating
-    bus and one coprocessor's firmware segment -- and, unless asked not to,
-    an AICv3 described as the M5's is, for the kernel. Nothing else Apple, so
-    the kernel otherwise takes its QEMU path."""
-    # arm-io maps its child address 0 to RAM_BASE: the watchdog's reg (child
-    # addresses 0x110000 and 0x110100) only lands on SCRATCH if the loader
-    # applies the bus's ranges.
-    wdt = adt_node([
-        ("name", cstr("wdt")),
-        ("compatible", cstr("wdt,vinix-test")),
-        ("wdt-version", u32(3)),
-        ("reg", u64s(0x110000, 0x4000, 0x110200, 0x100, 0x110100, 0x4)),
-    ])
-    firmware = adt_node([
-        ("name", cstr("test-asc")),
-        ("segment-ranges", u64s(segment, 0, 0) + struct.pack("<II", SEGMENT_BYTES, 0)),
-    ])
-    aic = adt_node([
-        ("name", cstr("aic")),
-        ("compatible", cstr("aic,3")),
-        ("reg", u64s(FAKE_AIC - RAM_BASE, AIC_SIZE)),
-        ("aic-iack-offset", u64s(AIC_IACK)),
-        ("cap0-offset", u32(4)),
-        ("maxnumirq-offset", u32(0xC)),
-        ("extint-baseaddress", u32(AIC_CONFIG)),
-        ("extintrcfg-stride", u32(AIC_STRIDE)),
-        ("intmaskset-stride", u32(AIC_STRIDE)),
-        ("intmaskclear-stride", u32(AIC_STRIDE)),
-        ("aicglbcfg-offset", u32(AIC_GLOBAL_CONFIG)),
-    ])
-    arm_io = adt_node([
-        ("name", cstr("arm-io")),
-        ("#address-cells", u32(2)),
-        ("#size-cells", u32(2)),
-        ("ranges", u64s(0, RAM_BASE, PHYS_BASE - RAM_BASE)),
-    ], [wdt, firmware] + ([aic] if with_aic else []))
-    chosen = adt_node([
-        ("name", cstr("chosen")),
-        ("dram-base", u64s(RAM_BASE)),
-        ("dram-size", u64s(RAM_BYTES)),
-    ])
-    return adt_node([
-        ("name", cstr("device-tree")),
-        ("compatible", cstr("vinix,qemu-iboot")),
-        ("#address-cells", u32(2)),
-        ("#size-cells", u32(2)),
-    ], [chosen, arm_io])
+    "A tree with what the loader reads -- a watchdog behind a translating\n    bus and one coprocessor's firmware segment -- and, unless asked not to,\n    an AICv3 described as the M5's is, for the kernel. Nothing else Apple, so\n    the kernel otherwise takes its QEMU path."
+    return _iboot('build_adt', segment, with_aic)
 
 
 def real_adt() -> bytes:
@@ -167,17 +156,8 @@ def real_adt() -> bytes:
 
 
 def boot_args(devtree: int, devtree_size: int, top_of_kernel_data: int) -> bytes:
-    """Revision 2 (a 608-byte command line), as m1n1's xnuboot.h lays it out."""
-    args = bytearray(0x6C + 608 + 16 + 4)
-    struct.pack_into("<HH", args, 0, 2, 2)
-    struct.pack_into("<4Q", args, 0x08, VIRT_BASE, PHYS_BASE, FB_BASE - PHYS_BASE,
-                     top_of_kernel_data)
-    struct.pack_into("<6Q", args, 0x28, FB_BASE, 0, FB_STRIDE, FB_WIDTH, FB_HEIGHT, 30)
-    struct.pack_into("<I", args, 0x58, 0)
-    struct.pack_into("<QI", args, 0x60, devtree - PHYS_BASE + VIRT_BASE, devtree_size)
-    tail = align(0x6C + 608, 8)
-    struct.pack_into("<QQ", args, tail, 0, RAM_BYTES)
-    return bytes(args)
+    "Revision 2 (a 608-byte command line), as m1n1's xnuboot.h lays it out."
+    return _iboot('boot_args', devtree, devtree_size, top_of_kernel_data)
 
 
 def run(command: list[str], **kwargs) -> None:
