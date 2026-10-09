@@ -5,6 +5,7 @@ module sysvmsg
 // Linux's 64-bit System V message queue ABI. The registry is fixed-size;
 // queued and blocked-sender buffers share a bounded global byte budget.
 // An operation retains its slot until user copies and event detachment finish.
+import kbudget
 import errno
 import event
 import event.eventstruct
@@ -106,6 +107,7 @@ mut:
 
 struct Message {
 mut:
+	kernel_charge kbudget.Charge
 	next &Message = unsafe { nil }
 	kind i64
 	length u64
@@ -113,6 +115,7 @@ mut:
 
 struct Queue {
 mut:
+	kernel_charge kbudget.Charge
 	used bool
 	removed bool
 	id int
@@ -224,6 +227,8 @@ fn finish(mut queue Queue) {
 	queue.refs--
 	if queue.removed && queue.refs == 0 {
 		// Every event waiter has detached before giving its reference back.
+		kbudget.release(queue.kernel_charge)
+		queue.kernel_charge = kbudget.Charge{}
 		queue.used = false
 	}
 }
@@ -231,6 +236,7 @@ fn finish(mut queue Queue) {
 fn free_message(message &Message) {
 	buffer_messages--
 	buffer_bytes -= sizeof(Message) + message.length
+	kbudget.release(message.kernel_charge)
 	unsafe { free(message) }
 }
 
@@ -247,7 +253,7 @@ fn remove(mut queue Queue) {
 		message = next
 	}
 	wake_queue(mut queue)
-	if queue.refs == 0 { queue.used = false }
+	if queue.refs == 0 { kbudget.release(queue.kernel_charge); queue.kernel_charge = kbudget.Charge{}; queue.used = false }
 }
 
 // Called when the final process/nsfs reference to an IPC namespace goes away.
@@ -280,9 +286,11 @@ pub fn syscall_msgget(_ voidptr, key i32, flags int) (u64, u64) {
 	}
 	for i in 0 .. max_queues {
 		if queues[i].used { continue }
+		charge := proc.reserve_kernel(.ipc, 4096) or { return errno.err, errno.get() }
 		sequence := if sequences[i] >= 0x7fff { u16(1) } else { sequences[i] + 1 }
 		sequences[i] = sequence
 		queues[i] = Queue{
+			kernel_charge: charge
 			used: true
 			id: (int(sequence) << 16) | i
 			ipc_ns: who.ipc_ns
@@ -351,6 +359,7 @@ pub fn syscall_msgsnd(_ voidptr, id int, address u64, length u64, flags int) (u6
 	if !may_use(who, queue, 2) { queues_lock.release(); return errno.err, errno.eacces }
 	allocation := sizeof(Message) + length
 	if buffer_messages >= max_total_messages || allocation > max_buffer_bytes - buffer_bytes { queues_lock.release(); return errno.err, errno.enomem }
+	charge := proc.reserve_kernel(.ipc, allocation * 2 + 128) or { queues_lock.release(); return errno.err, errno.get() }
 	buffer_bytes += allocation
 	buffer_messages++
 	queue.refs++
@@ -358,6 +367,7 @@ pub fn syscall_msgsnd(_ voidptr, id int, address u64, length u64, flags int) (u6
 	// One owned allocation includes the payload; nothing is sliced or boxed.
 	mut message := unsafe { &Message(memory.malloc_packed_fallible(allocation)) } @[freed]
 	if message == unsafe { nil } {
+		kbudget.release(charge)
 		queues_lock.acquire()
 		buffer_messages--
 		buffer_bytes -= allocation
@@ -365,7 +375,7 @@ pub fn syscall_msgsnd(_ voidptr, id int, address u64, length u64, flags int) (u6
 		queues_lock.release()
 		return errno.err, errno.enomem
 	}
-	unsafe { *message = Message{kind: kind, length: length} }
+	unsafe { *message = Message{kind: kind, length: length, kernel_charge: charge} }
 	mut result := u64(0)
 	if !usercopy.copy_from_user(voidptr(u64(message) + sizeof(Message)), address + 8, length) {
 		result = errno.efault
@@ -466,10 +476,11 @@ pub fn syscall_msgrcv(_ voidptr, id int, address u64, capacity u64, kind i64, fl
 		if buffer_messages >= max_total_messages || allocation > max_buffer_bytes - buffer_bytes {
 			finish(mut queue); queues_lock.release(); return errno.err, errno.enomem
 		}
+		charge := proc.reserve_kernel(.ipc, allocation * 2 + 128) or { finish(mut queue); queues_lock.release(); return errno.err, errno.get() }
 		mut snapshot := unsafe { &Message(memory.malloc_packed_fallible(allocation)) } @[freed]
-		if snapshot == unsafe { nil } { finish(mut queue); queues_lock.release(); return errno.err, errno.enomem }
+		if snapshot == unsafe { nil } { kbudget.release(charge); finish(mut queue); queues_lock.release(); return errno.err, errno.enomem }
 		unsafe {
-			*snapshot = Message{kind: message.kind, length: length}
+			*snapshot = Message{kind: message.kind, length: length, kernel_charge: charge}
 			C.memcpy(voidptr(u64(snapshot) + sizeof(Message)), voidptr(u64(message) + sizeof(Message)), length)
 		}
 		buffer_bytes += allocation

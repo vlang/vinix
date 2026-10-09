@@ -5,7 +5,9 @@ module userland
 // What exec does the same on both architectures.
 
 import errno
+import kbudget
 import proc
+import resource
 
 // Frees what an exec was handed, once it has failed or is about to leave for
 // good. `path` can be one of the arguments too: a script's interpreter and the
@@ -31,4 +33,62 @@ fn exec_format_error(err IError) ?&proc.Process {
 		errno.set(errno.enoexec)
 	}
 	return none
+}
+
+fn reserve_exec_scratch() ? {
+	mut t := proc.current_thread()
+	t.exec_scratch = proc.reserve_kernel(.scratch, 16384)?
+}
+
+fn release_exec_scratch() {
+	mut t := proc.current_thread()
+	kbudget.release(t.exec_scratch)
+	t.exec_scratch = kbudget.Charge{}
+}
+
+fn grow_exec_scratch(bytes u64) bool {
+	mut t := proc.current_thread()
+	return proc.grow_kernel(mut t.exec_scratch, bytes)
+}
+
+fn shrink_exec_scratch(bytes u64) {
+	mut t := proc.current_thread()
+	kbudget.shrink(mut t.exec_scratch, bytes)
+}
+
+// A bounded script header, including EOF without a newline. Every returned
+// string owns its storage; no builder can grow past the kernel's exec budget.
+pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
+	buf := unsafe { &u8(C.vinix_stack_alloc(256)) }
+	count := res.read(unsafe { nil }, buf, 0, 256)?
+	if count <= 2 {
+		errno.set(errno.enoexec)
+		return none
+	}
+	mut end := int(count)
+	mut newline := false
+	for i in 2 .. int(count) {
+		if unsafe { buf[i] } == `\n` {
+			end = i
+			newline = true
+			break
+		}
+	}
+	if count == 256 && !newline {
+		errno.set(errno.enoexec)
+		return none
+	}
+	mut start := 2
+	for start < end && (unsafe { buf[start] } == ` ` || unsafe { buf[start] } == `\t`) { start++ }
+	mut stop := start
+	for stop < end && unsafe { buf[stop] } != ` ` && unsafe { buf[stop] } != `\t` { stop++ }
+	if stop == start {
+		errno.set(errno.enoexec)
+		return none
+	}
+	path := unsafe { tos(&buf[start], stop - start) }.clone()
+	for stop < end && (unsafe { buf[stop] } == ` ` || unsafe { buf[stop] } == `\t`) { stop++ }
+	for end > stop && (unsafe { buf[end - 1] } == ` ` || unsafe { buf[end - 1] } == `\t`) { end-- }
+	arg := unsafe { tos(&buf[stop], end - stop) }.clone()
+	return path, arg
 }

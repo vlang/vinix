@@ -1,6 +1,7 @@
 @[has_globals]
 module sched
 
+import kbudget
 import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
@@ -678,6 +679,10 @@ pub fn new_kernel_thread(pc voidptr, arg voidptr, autoenqueue bool) &proc.Thread
 
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	charge := proc.reserve_kernel_for(process.kernel_owner, .thread,
+		2 * stack_size + u64(sizeof(proc.Thread)) * 2 + 16384) or { errno.set(errno.eagain); return none }
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 
 	mut stack_vma := u64(0)
 	mut stack_bottom_vma := u64(0)
@@ -725,6 +730,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
+		kernel_charge: charge
 		process:      process
 		cr3:          u64(process.pagemap.top_level)
 		gpr_state:    gpr_state
@@ -734,6 +740,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		pf_stack:     pf_stack
 		fpu_storage:  voidptr(u64(fpu_phys) + higher_half)
 	} }
+	charge_transferred = true
 
 	mut attached := false
 	defer {
@@ -808,6 +815,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 // musl keeps the thread pointer. The caller enqueues it.
 pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cpulocal.GPRState, child_sp u64, tls u64, set_tls bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	charge := proc.reserve_kernel_for(process.kernel_owner, .thread,
+		2 * stack_size + u64(sizeof(proc.Thread)) * 2 + 16384) or { errno.set(errno.eagain); return none }
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	mut source := unsafe { _source }
 
 	kernel_stack_base := memory.kernel_stack_alloc(stack_size)
@@ -834,6 +845,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
+		kernel_charge: charge
 		process:        process
 		cr3:            u64(process.pagemap.top_level)
 		gpr_state:      *state
@@ -848,6 +860,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sched:          inherited_sched_params(source)
 		comm:           source.comm.clone()
 	} }
+	charge_transferred = true
 
 	t.self = voidptr(t)
 	// In a syscall the user's GS base is the one swapgs put aside.
@@ -981,6 +994,8 @@ fn free_thread_memory(t &proc.Thread) {
 		}
 	}
 	free_thread_stacks(mut thr)
+	kbudget.release(t.exec_scratch)
+ kbudget.release(t.kernel_charge)
 	unsafe {
 		thr.comm.free()
 		free(voidptr(thr))

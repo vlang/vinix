@@ -13,6 +13,7 @@ module userland
 // cannot fail, and with nothing left for them the kernel stopped with "Out of
 // memory after reclaim", whichever program had used the memory up.
 
+import kbudget
 import event
 import katomic
 import memory
@@ -108,11 +109,12 @@ fn oom_badness(process &proc.Process) OomScore {
 		|| unsafe { process.pagemap == nil } || process.oom_score_adj <= -1000 {
 		return OomScore{}
 	}
-	bytes := mmap.resident_bytes(process.pagemap) or {
+	resident := mmap.resident_bytes(process.pagemap) or {
 		return OomScore{
 			busy: true
 		}
 	}
+	bytes := resident + kbudget.owned_bytes(process.kernel_owner)
 	if bytes == 0 {
 		return OomScore{}
 	}

@@ -130,7 +130,7 @@ fn resident_span_unlocked(pagemap &memory.Pagemap, base u64, length u64) bool {
 
 // Splits keep the existing global's ownership. No physical page or resource
 // reference is acquired for a metadata boundary.
-fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, locked bool) {
+fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, locked bool) ? {
 	end := base + length
 	mut current := base
 	for current < end {
@@ -139,8 +139,7 @@ fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, loc
 		current = finish
 		if (local.flags & map_locked != 0) == locked { continue }
 		if base > local.base && finish < local.base + local.length {
-			mut piece := &MmapRangeLocal{} @[freed]
-			unsafe { *piece = *local }
+			mut piece := new_local_range(unsafe { *local })? @[freed]
 			piece.base = finish
 			piece.length = local.base + local.length - finish
 			piece.offset = local.offset + i64(finish - local.base)
@@ -149,8 +148,7 @@ fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, loc
 		begin := if base > local.base { base } else { local.base }
 		mut changed := local
 		if begin != local.base || finish - begin != local.length {
-			changed = &MmapRangeLocal{} @[freed]
-			unsafe { *changed = *local }
+			changed = new_local_range(unsafe { *local })? @[freed]
 			changed.base = begin
 			changed.length = finish - begin
 			changed.offset = local.offset + i64(begin - local.base)
@@ -191,7 +189,7 @@ fn lock_range(mut pagemap memory.Pagemap, base u64, length u64, locked bool,
 			return none
 		}
 		if !locked {
-			set_lock_flags_unlocked(mut pagemap, base, length, false)
+			set_lock_flags_unlocked(mut pagemap, base, length, false) or { pagemap.l.release(); return none }
 			pagemap.l.release()
 			return
 		}
@@ -218,7 +216,7 @@ fn lock_range(mut pagemap memory.Pagemap, base u64, length u64, locked bool,
 			return none
 		}
 		if resident_span_unlocked(&pagemap, base, length) {
-			set_lock_flags_unlocked(mut pagemap, base, length, true)
+			set_lock_flags_unlocked(mut pagemap, base, length, true) or { pagemap.l.release(); return none }
 			pagemap.l.release()
 			return
 		}

@@ -1,8 +1,10 @@
 module fs
 
+import kbudget
 import katomic
 import klock
 import proc
+import resource
 import stat
 import time
 
@@ -26,6 +28,8 @@ const removed_reap_interval_ns = u64(1_000_000_000)
 
 // A node, or memory for free_after_grace(), and when it was retired.
 struct RetiredItem {
+	charge kbudget.Charge
+	resource &resource.Resource = unsafe { nil }
 	node  &VFSNode = unsafe { nil }
 	bytes &u8      = unsafe { nil }
 	at    u64
@@ -41,7 +45,7 @@ __global (
 // once no open-file description does either. `mode` is read before the name's
 // reference is dropped, which may free the resource.
 fn orphan_node(mut node VFSNode, mode u32) {
-	if !(stat.isreg(mode) || stat.islnk(mode) || stat.issock(mode)) || pinned(node) {
+	if !(stat.isreg(mode) || stat.islnk(mode) || stat.issock(mode) || stat.ischr(mode) || stat.isblk(mode) || stat.isifo(mode)) || pinned(node) {
 		return
 	}
 	node.orphan = true
@@ -95,14 +99,16 @@ fn retire(item RetiredItem) {
 	removed_items << RetiredItem{
 		node:  item.node
 		bytes: item.bytes
+		charge: item.charge
+		resource: item.resource
 		at:    time.monotonic_ns()
 	}
 	removed_lock.release()
-	reap_removed()
 }
 
-// reap_removed frees what has waited out its grace period. The writeback
-// thread calls it as well, so the last few do not wait for more to come.
+// Only the writeback worker reaps. Retiring can happen under VFS/resource
+// locks, while a final retained device release can acquire those same locks.
+// Queueing never runs such callbacks synchronously.
 pub fn reap_removed() {
 	now := time.monotonic_ns()
 	removed_lock.acquire()
@@ -140,6 +146,11 @@ pub fn reap_removed() {
 	for item in items {
 		if item.node == unsafe { nil } {
 			unsafe { free(item.bytes) }
+			if item.resource != unsafe { nil } {
+				mut res := item.resource
+				resource.release_resource(mut res)
+			}
+			kbudget.release(item.charge)
 			continue
 		}
 		mut node := item.node
@@ -177,10 +188,36 @@ pub fn reap_removed() {
 
 fn free_node(node &VFSNode) {
 	// A watch added through /proc/self/fd/N was never forgotten by name.
+ if node.discarded_directory {
+  // Only dot entries are owned by this failed fresh directory. Path lookups
+  // share the directory's grace; these directory nodes were never published.
+  if node.children != unsafe { nil } {
+   for _, dot in node.children { unsafe { free(dot) } }
+   unsafe { node.children.free(); free(node.children) }
+  }
+  mut res := node.resource
+  resource.release_resource(mut res)
+ }
+	kbudget.release(node.kernel_charge)
 	inotify_forget(node)
+ if node.overlay != unsafe { nil } {
+  unsafe { node.overlay.lowers.free(); free(node.overlay) }
+ }
 	unsafe {
 		node.name.free()
 		node.symlink_target.free()
 		free(node)
 	}
+}
+
+// Keep a reservation while lockless readers finish, just as the bytes remain.
+pub fn free_charged_after_grace(ptr voidptr, charge kbudget.Charge) {
+	if ptr == unsafe { nil } { kbudget.release(charge); return }
+	retire(RetiredItem{bytes: unsafe { &u8(ptr) }, charge: charge})
+}
+
+// Return an already retained resource outside VFS locks after their readers
+// finish; final device release may itself detach a pathname under vfs_lock.
+pub fn release_resource_after_grace(res &resource.Resource) {
+	if res != unsafe { nil } { retire(RetiredItem{resource: unsafe { res }}) }
 }

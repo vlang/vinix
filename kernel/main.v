@@ -10,6 +10,7 @@ import krandom
 import lib.stubs
 import limine
 import memory
+import proc
 import pagecache
 import socket.inet
 import time
@@ -54,6 +55,8 @@ fn writeback_thread() {
 		interval.disarm()
 		unsafe { free(interval) }
 		memory.pressure_maintenance()
+		proc.reap_processes()
+		fs.reap_removed()
 		seconds++
 		if seconds % writeback_interval_seconds != 0 { continue }
 		// A device that cannot take the write keeps its pages dirty and
@@ -62,9 +65,6 @@ fn writeback_thread() {
 		// DHCP runs from the scheduler's poll callback, which cannot write to
 		// the root filesystem. This is a thread that can.
 		inet.publish_resolver()
-		// Removed files whose grace period has run out, when no more unlinks
-		// come to free them.
-		fs.reap_removed()
 		// Reseed the random generator half a minute after boot, once the
 		// boot's own events are in its pool, and every five minutes after.
 		if seconds == 30 || seconds % 300 == 0 {

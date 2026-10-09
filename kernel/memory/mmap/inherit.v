@@ -103,7 +103,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 		}
 
 		if snip_begin > local_range.base && snip_end < local_end {
-			mut postsplit_range := &MmapRangeLocal{
+			mut postsplit_range := new_local_range(MmapRangeLocal{
 				pagemap: local_range.pagemap
 				base: snip_end
 				length: local_end - snip_end
@@ -115,7 +115,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
-			}
+			})?
 			split_off_unlocked(mut pagemap, local_range, postsplit_range)
 		}
 
@@ -125,7 +125,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 			local_range.wipe_on_fork = wipe_on_fork
 			continue
 		}
-		mut changed_range := &MmapRangeLocal{
+		mut changed_range := new_local_range(MmapRangeLocal{
 			pagemap: local_range.pagemap
 			base: snip_begin
 			length: snip_size
@@ -137,7 +137,7 @@ fn set_inheritance_unlocked(mut pagemap memory.Pagemap, base u64, length u64, ch
 			dont_fork: dont_fork
 			wipe_on_fork: wipe_on_fork
 			global: local_range.global
-		}
+		})?
 		split_off_unlocked(mut pagemap, local_range, changed_range)
 	}
 }

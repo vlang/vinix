@@ -10,6 +10,7 @@
 // programs they grant capabilities to.
 module fs
 
+import kbudget
 import errno
 import file
 import proc
@@ -26,6 +27,7 @@ const xattr_size_max = 65536
 
 struct XAttr {
 mut:
+	kernel_charge kbudget.Charge
 	name  string
 	value []u8
 }
@@ -33,12 +35,15 @@ mut:
 // The attributes of one file, made when the first is set.
 struct XAttrSet {
 mut:
+	kernel_charge kbudget.Charge
 	entries []XAttr
 }
 
 // Nothing slices the entries, so one that grows frees the buffer it outgrew.
-fn new_xattr_set() &XAttrSet {
+fn new_xattr_set() ?&XAttrSet {
+	charge := proc.reserve_kernel(.file, u64(sizeof(XAttr)) * 256 * 2 + 256)?
 	mut set := &XAttrSet{
+		kernel_charge: charge
 		entries: []XAttr{}
 	}
 	set.entries.flags |= .noslices
@@ -219,6 +224,8 @@ fn xattr_find(set &XAttrSet, name string) int {
 }
 
 fn xattr_set(given XAttrTarget, _name charptr, value voidptr, size u64, flags int) (u64, u64) {
+	scratch := proc.reserve_kernel(.scratch, 4 * xattr_size_max + 1024) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	if flags & ~(xattr_create | xattr_replace) != 0 { return errno.err, errno.einval }
 	if size > xattr_size_max { return errno.err, errno.e2big }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
@@ -268,6 +275,8 @@ fn xattr_may_read(target XAttrTarget, name string) ? {
 }
 
 fn xattr_get(target XAttrTarget, _name charptr, value voidptr, size u64) (u64, u64) {
+	scratch := proc.reserve_kernel(.scratch, 4 * xattr_size_max + 1024) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	name := xattr_name(_name) or { return errno.err, errno.get() }
 	defer { unsafe { name.free() } }
 	if !xattr_visible(target, name) { return errno.err, errno.enodata }
@@ -287,6 +296,8 @@ fn xattr_get(target XAttrTarget, _name charptr, value voidptr, size u64) (u64, u
 }
 
 fn xattr_list(target XAttrTarget, list voidptr, size u64) (u64, u64) {
+	scratch := proc.reserve_kernel(.scratch, 4 * xattr_size_max + 1024) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	mut res := target.res
 	security.mac_require(mut res, proc.mac_inspect) or { return errno.err, errno.get() }
 	mut all_names := []u8{} @[freed]
@@ -353,22 +364,25 @@ fn (mut res TmpFSResource) write_xattr(name string, value []u8, flags int) ? {
 	if index < 0 && flags & xattr_replace != 0 { errno.set(errno.enodata); return none }
 	if posix_acl.is_name(name) {
 		if value.len != 0 && !posix_acl.valid(value) { errno.set(errno.einval); return none }
+		mut requested_mode := res.stat.mode
 		mut removing := value.len <= 4
 		if !removing && name == posix_acl.access_name {
 			derived, extended := posix_acl.mode(value, res.stat.mode)
-			res.stat.mode = if flags & resource.acl_clear_setgid != 0 { derived & ~u32(0o2000) } else { derived }
+			requested_mode = if flags & resource.acl_clear_setgid != 0 { derived & ~u32(0o2000) } else { derived }
 			removing = !extended
 		}
 		if removing {
 			if index >= 0 {
+				kbudget.release(res.xattrs.entries[index].kernel_charge)
 				unsafe { res.xattrs.entries[index].name.free(); res.xattrs.entries[index].value.free() }
 				res.xattrs.entries.delete(index)
 			}
-		} else { xattr_put_bytes(mut res, name, value.clone()) }
+		} else { xattr_put_bytes(mut res, name, value.clone())? }
+		res.stat.mode = requested_mode
 		res.stat.ctim = realtime_clock
 		return
 	}
-	xattr_put_bytes(mut res, name, value.clone())
+	xattr_put_bytes(mut res, name, value.clone())?
 	res.stat.ctim = realtime_clock
 }
 
@@ -392,6 +406,7 @@ fn (mut res TmpFSResource) delete_xattr(name string) ? {
 		errno.set(errno.enodata)
 		return none
 	}
+	kbudget.release(res.xattrs.entries[index].kernel_charge)
 	unsafe {
 		res.xattrs.entries[index].name.free()
 		res.xattrs.entries[index].value.free()
@@ -426,25 +441,32 @@ fn xattr_equals(res &resource.Resource, name string, expected string) bool {
 	return true
 }
 
-fn xattr_put_bytes(mut tfile TmpFSResource, name string, value []u8) {
-	if tfile.xattrs == unsafe { nil } {
-		tfile.xattrs = new_xattr_set()
-	}
+fn xattr_put_bytes(mut tfile TmpFSResource, name string, value []u8) ? {
+	mut installed := false
+	defer { if !installed { unsafe { value.free() } } }
+	if tfile.xattrs == unsafe { nil } { tfile.xattrs = new_xattr_set()? }
+	if tfile.xattrs.entries.len >= 256 && xattr_find(tfile.xattrs, name) < 0 { errno.set(errno.enospc); return none }
+	charge := proc.reserve_kernel(.file, u64(value.cap) * 2 + u64(name.len) * 2 + 256)?
 	index := xattr_find(tfile.xattrs, name)
 	if index >= 0 {
+		kbudget.release(tfile.xattrs.entries[index].kernel_charge)
 		unsafe { tfile.xattrs.entries[index].value.free() }
+		tfile.xattrs.entries[index].kernel_charge = charge
+		installed = true
 		tfile.xattrs.entries[index].value = value
 		return
 	}
 	tfile.xattrs.entries << XAttr{
+		kernel_charge: charge
 		name:  name.clone()
 		value: value
 	}
+	installed = true
 }
 
 // Set an attribute from inside the kernel, as overlay marks a directory
 // opaque. Files that keep none are left alone.
-fn xattr_put(res &resource.Resource, name string, value string) {
+fn xattr_put(res &resource.Resource, name string, value string) ? {
 	mut tfile := tmpfs_resource_of(res)
 	if tfile == unsafe { nil } {
 		return
@@ -453,7 +475,7 @@ fn xattr_put(res &resource.Resource, name string, value string) {
 	defer {
 		tfile.l.release()
 	}
-	xattr_put_bytes(mut tfile, name, value.bytes())
+	xattr_put_bytes(mut tfile, name, value.bytes())?
 }
 
 // Backends copy the input before returning. A value removed after listing is
@@ -497,11 +519,13 @@ fn free_xattrs(set &XAttrSet) {
 	}
 	mut owned := unsafe { set }
 	for mut entry in owned.entries {
+		kbudget.release(entry.kernel_charge)
 		unsafe {
 			entry.name.free()
 			entry.value.free()
 		}
 	}
+	kbudget.release(owned.kernel_charge)
 	unsafe {
 		owned.entries.free()
 		free(owned)
@@ -606,4 +630,27 @@ pub fn syscall_fremovexattr(_ voidptr, fdnum int, _name charptr) (u64, u64) {
 	}
 	fd.handle.mac_check(proc.mac_metadata) or { return errno.err, errno.get() }
 	return xattr_remove(xattr_target_of_fd(fd), _name)
+}
+
+// Reserve an opacity marker before creating a directory or removing the
+// whiteout it replaces. Installing this prepared entry cannot fail a quota.
+fn prepare_opaque_xattr() ?&XAttrSet {
+ mut set := new_xattr_set()?
+ charge := proc.reserve_kernel(.file, 512) or { free_xattrs(set); return none }
+ value := [u8(`y`)] @[freed]
+ set.entries << XAttr{kernel_charge: charge, name: 'trusted.overlay.opaque'.clone(), value: value}
+ return set
+}
+fn install_opaque_xattr(res &resource.Resource, prepared &XAttrSet) {
+ mut tfile := tmpfs_resource_of(res)
+ if tfile == unsafe { nil } { free_xattrs(prepared); return }
+ tfile.l.acquire()
+ defer { tfile.l.release() }
+ if tfile.xattrs == unsafe { nil } { tfile.xattrs = unsafe { prepared }; return }
+ // The freshly created directory can only have its inherited security label.
+ assert tfile.xattrs.entries.len < 256
+ tfile.xattrs.entries << prepared.entries[0]
+ mut owned := unsafe { prepared }
+ owned.entries.clear()
+ free_xattrs(owned)
 }

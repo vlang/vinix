@@ -1,6 +1,7 @@
 @[has_globals]
 module file
 
+import kbudget
 import resource
 import stat as statmod
 import klock
@@ -98,6 +99,7 @@ fn epoll_forget(handle &Handle) {
 @[heap]
 struct EpollResource {
 mut:
+	kernel_charge kbudget.Charge
 	stat     statmod.Stat
 	refcount int
 	l        klock.Lock
@@ -145,6 +147,7 @@ fn (mut this EpollResource) unref(_handle voidptr) ? {
 			watched_handle.unref()
 		}
 	}
+	kbudget.release(this.kernel_charge)
 	unsafe {
 		this.entries.free()
 		free(voidptr(this.box))
@@ -174,7 +177,8 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut res := &EpollResource{}
+	charge := proc.reserve_kernel(.ipc, 4096) or { return errno.err, errno.get() }
+	mut res := &EpollResource{kernel_charge: charge}
 	res.stat.mode = 0o600
 
 	res.box = &resource.Resource(unsafe { res }) @[freed]
@@ -243,6 +247,17 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 				if entry.fd == fd {
 					failure = errno.eexist
 					break
+				}
+			}
+			if failure == 0 && epoll_res.entries.len == epoll_res.entries.cap {
+				capacity := if epoll_res.entries.cap == 0 { 16 } else { epoll_res.entries.cap * 2 }
+				if capacity > 65536 || !proc.grow_kernel(mut epoll_res.kernel_charge, u64(capacity) * sizeof(EpollEntry) * 2) {
+					failure = errno.enomem
+				} else {
+					old_bytes := u64(epoll_res.entries.cap) * sizeof(EpollEntry) * 2
+					epoll_res.entries.flags |= .noslices
+					epoll_res.entries.ensure_cap(capacity)
+					kbudget.shrink(mut epoll_res.kernel_charge, old_bytes)
 				}
 			}
 			if failure == 0 {
@@ -391,17 +406,16 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	}
 
 	// First pass: check if any fds are already ready.
-	mut ret := u64(0)
-	if events := epoll_res.collect_ready(maxevents) {
-		for out_event in events {
-			if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
-				unsafe { events.free() }
-				return errno.err, errno.efault
-			}
-			ret++
-		}
-		unsafe { events.free() }
-	}
+ mut ret := u64(0)
+ mut first := epoll_res.collect_ready(maxevents) or { return errno.err, errno.get() }
+ for out_event in first.events {
+  if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
+   first.dispose()
+   return errno.err, errno.efault
+  }
+  ret++
+ }
+ first.dispose()
 	if ret > 0 {
 		return ret, 0
 	}
@@ -437,7 +451,8 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		// that to see end of file -- and Linux never keeps one open either.
 		// Holding the file instead left runc's log pipe with a writer for as
 		// long as its poller slept, so runc waited forever for the EOF.
-		mut watched := epoll_res.snapshot_watched()
+		mut snapshot := epoll_res.snapshot_watched() or { return errno.err, errno.get() }
+  watched := snapshot.resources
 		mut ev_list := []&eventstruct.Event{cap: watched.len + 2} @[freed]
 		ev_list << &epoll_res.event
 		for i in 0 .. watched.len {
@@ -452,7 +467,12 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		for mut ev in ev_list { generations << event.generation(mut ev) }
 		// Sample before the final scan: even if another waiter consumes the
 		// wake, a readiness transition during registration cannot be missed.
-		mut ready_now := epoll_res.collect_ready(maxevents) or { []EpollEvent{} }
+		mut ready := epoll_res.collect_ready(maxevents) or {
+   snapshot.dispose()
+   unsafe { ev_list.free(); generations.free() }
+   return errno.err, errno.get()
+  }
+  ready_now := ready.events
 		mut which := u64(-1)
 		mut interrupted := false
 		if ready_now.len == 0 {
@@ -461,45 +481,35 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 				u64(-1)
 			}
 		}
-		for i in 0 .. watched.len {
-			mut watched_res := watched[i]
-			resource.release_resource(mut watched_res)
-		}
-		unsafe {
-			watched.free()
-			ev_list.free()
-			generations.free()
-		}
+		snapshot.dispose()
+  unsafe { ev_list.free(); generations.free() }
 		if ready_now.len != 0 {
 			for out_event in ready_now {
 				if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
-					unsafe { ready_now.free() }
+					ready.dispose()
 					return errno.err, errno.efault
 				}
 				ret++
 			}
-			unsafe { ready_now.free() }
+			ready.dispose()
 			return ret, 0
 		}
-		unsafe { ready_now.free() }
+		ready.dispose()
 		if interrupted { return errno.err, errno.eintr }
 
 		// Readiness is read from the set as it is now; the entries may have
 		// moved while this slept.
-		if events := epoll_res.collect_ready(maxevents) {
-			ret = 0
-			for out_event in events {
-				if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
-					unsafe { events.free() }
-					return errno.err, errno.efault
-				}
-				ret++
-			}
-			unsafe { events.free() }
-			if ret > 0 {
-				return ret, 0
-			}
-		}
+		mut after := epoll_res.collect_ready(maxevents) or { return errno.err, errno.get() }
+  ret = 0
+  for out_event in after.events {
+   if !write_epoll_event(events_buf + ret * epoll_event_size, out_event) {
+    after.dispose()
+    return errno.err, errno.efault
+   }
+   ret++
+  }
+  after.dispose()
+  if ret > 0 { return ret, 0 }
 		if voidptr(timer) != unsafe { nil } && which == timer_index {
 			return 0, 0
 		}
@@ -522,7 +532,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 
 // The events that are ready right now, up to `maxevents`, computed with the
 // set locked so a concurrent epoll_ctl cannot move the entries mid-scan.
-fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
+fn (mut this EpollResource) collect_ready(maxevents int) ?EpollReadySnapshot {
 	this.l.acquire()
 	defer {
 		this.l.release()
@@ -530,7 +540,8 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
 	// Sized up front: an array that grows leaves its old buffer behind in
 	// this kernel, and a Go runtime polls several times a millisecond.
 	limit := if maxevents < this.entries.len { maxevents } else { this.entries.len }
-	// The caller frees it.
+	charge := proc.reserve_kernel(.scratch, u64(limit) * sizeof(EpollEvent) * 2 + 128)?
+ // The caller frees it.
 	mut events := []EpollEvent{cap: limit} @[freed]
 	for mut entry in this.entries {
 		if events.len >= maxevents {
@@ -548,21 +559,18 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?[]EpollEvent {
 			}
 		}
 	}
-	if events.len == 0 {
-		unsafe { events.free() }
-		return none
-	}
-	return events
+return EpollReadySnapshot{events: events, charge: charge}
 }
 
 // The resources currently watched, each retained so that a blocking wait can
 // sleep on its event without the resource being freed underneath it.
-fn (mut this EpollResource) snapshot_watched() []&resource.Resource {
+fn (mut this EpollResource) snapshot_watched() ?EpollWaitSnapshot {
 	this.l.acquire()
 	defer {
 		this.l.release()
 	}
-	// The caller frees it.
+	charge := proc.reserve_kernel(.scratch, u64(this.entries.len + 2) * 128 + 256)?
+ // The caller frees it.
 	mut resources := []&resource.Resource{cap: this.entries.len} @[freed]
 	for entry in this.entries {
 		if entry.handle == unsafe { nil } {
@@ -572,7 +580,7 @@ fn (mut this EpollResource) snapshot_watched() []&resource.Resource {
 		resource.retain_resource(mut watched)
 		resources << watched
 	}
-	return resources
+	return EpollWaitSnapshot{resources: resources, charge: charge}
 }
 
 // epoll_pwait2 is epoll_pwait with a nanosecond timespec instead of a
@@ -603,4 +611,24 @@ pub fn syscall_epoll_pwait2(gpr_state voidptr, epfd int, events_buf u64, maxeven
 
 	return syscall_epoll_pwait(gpr_state, epfd, events_buf, maxevents, timeout, sigmask,
 		sigsetsize)
+}
+
+struct EpollReadySnapshot {
+mut:
+ events []EpollEvent
+ charge kbudget.Charge
+}
+fn (mut snapshot EpollReadySnapshot) dispose() {
+ unsafe { snapshot.events.free() }
+ kbudget.release(snapshot.charge)
+}
+struct EpollWaitSnapshot {
+mut:
+ resources []&resource.Resource
+ charge kbudget.Charge
+}
+fn (mut snapshot EpollWaitSnapshot) dispose() {
+ for mut res in snapshot.resources { resource.release_resource(mut res) }
+ unsafe { snapshot.resources.free() }
+ kbudget.release(snapshot.charge)
 }

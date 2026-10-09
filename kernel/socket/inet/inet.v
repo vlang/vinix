@@ -1,6 +1,7 @@
 @[has_globals]
 module inet
 
+import kbudget
 import errno
 import event
 import event.eventstruct
@@ -82,6 +83,7 @@ pub mut:
 
 pub struct InetSocket {
 pub mut:
+	kernel_charge kbudget.Charge
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -492,11 +494,16 @@ fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int, family in
 		errno.set(errno.enomem)
 		return none
 	}
+	charge := proc.reserve_kernel(.socket, 128 * 1024) or {
+		net_lock.acquire(); C.vinix_socket_free(handle); net_lock.release()
+		return none
+	}
 	// The descriptor made from it holds the only reference, so closing the
 	// last one frees the pcb. A creator's reference that nothing dropped kept
 	// every closed socket's pcb, and the 65th UDP socket, one DNS query in a
 	// docker pull, failed with ENOMEM.
 	mut socket := &InetSocket{
+		kernel_charge: charge
 		refcount: 0
 		handle:   unsafe { handle }
 		family:   family
@@ -509,6 +516,7 @@ fn new_with_handle(handle &C.vinix_socket, socktype int, protocol int, family in
 		net_lock.acquire()
 		C.vinix_socket_free(handle)
 		net_lock.release()
+		kbudget.release(charge)
 		unsafe { free(socket) }
 		errno.set(errno.enfile)
 		return none
@@ -893,7 +901,9 @@ fn (mut this InetSocket) recvmsg(handle voidptr, msg &sock_pub.MsgHdr, flags int
 	for i := u64(0); i < msg.msg_iovlen; i++ {
 		count += unsafe { msg.msg_iov[i].iov_len }
 	}
-	buffer := unsafe { malloc(if count > 0 { count } else { 1 }) }
+	scratch := proc.reserve_kernel(.scratch, count * 2 + 128)?
+ defer { kbudget.release(scratch) }
+ buffer := unsafe { malloc(if count > 0 { count } else { 1 }) }
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
 		return none
@@ -1040,6 +1050,7 @@ fn (mut this InetSocket) unref(_handle voidptr) ? {
 	net_lock.acquire()
 	C.vinix_socket_free(this.handle)
 	net_lock.release()
+	kbudget.release(this.kernel_charge)
 	unsafe {
 		free(voidptr(this.box))
 		free(this)

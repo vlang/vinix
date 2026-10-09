@@ -7,6 +7,7 @@ module sysvshm
 // interface for small, process-shared transports (Sublime Text's plugin host
 // is one example), even when most of their mappings use mmap(2).
 
+import kbudget
 import errno
 import fs
 import klock
@@ -67,6 +68,7 @@ mut:
 @[heap]
 struct Segment {
 mut:
+	kernel_charge kbudget.Charge
 	id          int
 	key         i32
 	mode        u32
@@ -123,6 +125,7 @@ fn destroy_unlocked(segment &Segment) {
 	}
 	mut backing := segment.backing
 	backing.unref(unsafe { nil }) or {}
+	kbudget.release(segment.kernel_charge)
 	unsafe { free(segment) }
 }
 
@@ -233,7 +236,11 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 		return errno.err, errno.einval
 	}
 
-	mut backing := fs.create_anonymous(u32(flags & 0o777))
+	if segments.len >= 4096 { segments_lock.release(); return errno.err, errno.enospc }
+	charge := proc.reserve_kernel(.ipc, 4096) or { segments_lock.release(); return errno.err, errno.get() }
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
+	mut backing := fs.create_anonymous(u32(flags & 0o777)) or { segments_lock.release(); return errno.err, errno.get() }
 	backing.grow(unsafe { nil }, size) or {
 		backing.unref(unsafe { nil }) or {}
 		segments_lock.release()
@@ -244,6 +251,7 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 	id := next_id
 	next_id++
 	mut segment := &Segment{
+		kernel_charge: charge
 		id: id
 		key: key
 		mode: u32(flags & 0o777)
@@ -256,7 +264,9 @@ pub fn syscall_shmget(_ voidptr, key i32, size u64, flags int) (u64, u64) {
 		last_pid: process.pid
 		backing: backing
 	}
+	segments.flags |= .noslices
 	segments << segment
+	charge_transferred = true
 	segments_lock.release()
 	return u64(id), 0
 }

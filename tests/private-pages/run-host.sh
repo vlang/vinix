@@ -116,6 +116,7 @@ pub fn pmm_alloc_fallible(pages u64) voidptr {
     return physical
 }
 pub fn pmm_alloc(pages u64) voidptr { return pmm_alloc_fallible(pages) }
+pub fn ensure_table_root(mut pm Pagemap) ? { if pm.top_level == unsafe { nil } { pm.top_level = pmm_alloc_fallible(1); if pm.top_level == unsafe { nil } { return none } } }
 pub fn pmm_retain(physical voidptr, _pages u64) bool {
     if page_refs[u64(physical)] == 0 { return false }
     page_refs[u64(physical)]++

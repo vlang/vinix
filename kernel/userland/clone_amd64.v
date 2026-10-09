@@ -192,16 +192,25 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 	// child's execve and keep the reader from ever seeing end of file. The
 	// open numbers are read under the table's lock: another thread of the
 	// parent may make a descriptor meanwhile, and grow the table as it does.
-	mut open := file.open_fdnums(old_process)
-	for i in open {
+	mut snapshot := file.open_fdnums(old_process) or {
+		failure := errno.get()
+		abandon_new_process(mut new_process)
+		return errno.err, failure
+	}
+	for i in snapshot.nums {
 		mut old_fd := file.fd_from_fdnum(old_process, i) or { continue }
 		fd_flags := old_fd.flags
 		old_fd.unref()
 		file.fdnum_dup(old_process, i, new_process, i, fd_flags, true, false) or {
-			continue
+			failure := errno.get()
+			// The parent may close this slot after the snapshot.
+			if failure == errno.ebadf { continue }
+			snapshot.dispose()
+			abandon_new_process(mut new_process)
+			return errno.err, failure
 		}
 	}
-	unsafe { open.free() }
+	snapshot.dispose()
 
 	mut child_sp := state.rsp
 	if child_stack != 0 {
@@ -259,7 +268,9 @@ fn abandon_new_process(mut new_process proc.Process) {
 	mut doomed := new_process.pagemap
 	new_process.pagemap = unsafe { nil }
 	proc.unlock_table()
-	mmap.delete_pagemap(mut doomed) or {}
+	if doomed != unsafe { nil } { mmap.delete_pagemap(mut doomed) or {} }
+	for i in 0 .. new_process.fds.len { file.fdnum_close(&new_process, i, true) or {} }
+	fs.release_process_namespaces(mut new_process)
 	proc.free_pid(new_process.pid)
 }
 

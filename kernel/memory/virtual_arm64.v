@@ -2,6 +2,9 @@
 module memory
 
 import lib
+import kbudget
+import proc
+import errno
 import katomic
 import limine
 import klock
@@ -124,6 +127,32 @@ pub fn new_pagemap() &Pagemap {
 	return pagemap
 }
 
+pub fn new_user_pagemap(owner kbudget.Owner) ?&Pagemap {
+ charge := proc.reserve_kernel_for(owner, .mapping, page_size + u64(sizeof(Pagemap)) * 2 + 128)?
+ if !user_room(1) { kbudget.release(charge); errno.set(errno.enomem); return none }
+	mut top_level := &u64(pmm_alloc_fallible(1))
+	if top_level == 0 {
+		kbudget.release(charge); errno.set(errno.enomem); return none
+	}
+
+	// On ARM64, TTBR1 handles kernel space. User pagemaps (TTBR0) do
+	// not need higher-half entries copied.
+	mut pagemap := &Pagemap{
+ kernel_owner: owner
+ kernel_charge: charge
+		top_level:   top_level
+		track_residency: true
+		mmap_ranges: []voidptr{}
+		tlb_tag:     arm64_take_asid()
+	} @[freed] // mmap.delete_pagemap owns this detached address space.
+	// Nothing keeps a copy of the list, so growing it can give back the
+	// storage it outgrew; V keeps that for arrays that might be sliced, and
+	// every fork and exec lost three blocks of it. `|=`, not flags.set():
+	// V 0.5.2 compiles set() on an array's flags to nothing.
+	pagemap.mmap_ranges.flags |= .noslices
+	return pagemap
+}
+
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	if virt >= user_address_limit() {
 		return pagemap.kernel_virt2pte(virt, allocate)
@@ -134,8 +163,8 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	l3_entry := (virt >> 14) & 0x7ff
 
 	l1 := pagemap.top_level
-	l2 := get_next_level(l1, l1_entry, allocate) or { return none }
-	l3 := get_next_level(l2, l2_entry, allocate) or { return none }
+	l2 := get_next_level(pagemap, l1, l1_entry, allocate) or { return none }
+	l3 := get_next_level(pagemap, l2, l2_entry, allocate) or { return none }
 
 	return unsafe { &u64(u64(&l3[l3_entry]) + higher_half) }
 }
@@ -144,9 +173,9 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 // independent 16 KiB, 47-bit user geometry above.
 fn (pagemap &Pagemap) kernel_virt2pte(virt u64, allocate bool) ?&u64 {
 	l0 := pagemap.top_level
-	l1 := get_next_level(l0, (virt >> 39) & 0x1ff, allocate) or { return none }
-	l2 := get_next_level(l1, (virt >> 30) & 0x1ff, allocate) or { return none }
-	l3 := get_next_level(l2, (virt >> 21) & 0x1ff, allocate) or { return none }
+	l1 := get_next_level(pagemap, l0, (virt >> 39) & 0x1ff, allocate) or { return none }
+	l2 := get_next_level(pagemap, l1, (virt >> 30) & 0x1ff, allocate) or { return none }
+	l3 := get_next_level(pagemap, l2, (virt >> 21) & 0x1ff, allocate) or { return none }
 	return unsafe { &u64(u64(&l3[(virt >> 12) & 0x1ff]) + higher_half) }
 }
 
@@ -407,7 +436,7 @@ fn arm64_asid_selftest() {
 	println('TLB: ASID pool exhaustion and reuse PASS')
 }
 
-fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
+fn get_next_level(owner &Pagemap, current_level &u64, index u64, allocate bool) ?&u64 {
 	mut ret := unsafe { &u64(0) }
 	mut entry := unsafe { &u64(u64(current_level) + higher_half + index * 8) }
 
@@ -417,8 +446,11 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 		if allocate == false {
 			return none
 		}
-		ret = pmm_alloc(1)
+		mut pagemap := unsafe { owner }
+		if !reserve_table_page(mut pagemap) { return none }
+		ret = pmm_alloc_fallible(1)
 		if ret == 0 {
+			release_table_page(mut pagemap)
 			return none
 		}
 		unsafe {
@@ -458,8 +490,8 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	// l1..l3 are physical table addresses; l1_p..l3_p are the higher-half
 	// virtual pointers used to read/write descriptors.
 	l1 := pagemap.top_level
-	l2 := get_next_level(l1, l1_entry, false) or { return none }
-	l3 := get_next_level(l2, l2_entry, false) or { return none }
+	l2 := get_next_level(pagemap, l1, l1_entry, false) or { return none }
+	l3 := get_next_level(pagemap, l2, l2_entry, false) or { return none }
 
 	l1_p := unsafe { &u64(u64(l1) + higher_half) }
 	l2_p := unsafe { &u64(u64(l2) + higher_half) }
@@ -490,6 +522,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 		}
 		cpu.dsb_sy()
 		pmm_free(l3, 1)
+			release_table_page(mut pagemap)
 		freed_table = true
 
 		if arm64_table_empty(l2_p) {
@@ -498,6 +531,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 			}
 			cpu.dsb_sy()
 			pmm_free(l2, 1)
+			release_table_page(mut pagemap)
 		}
 	}
 
@@ -600,8 +634,8 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	l3_entry := (virt >> 14) & 0x7ff
 
 	l1 := pagemap.top_level
-	l2 := get_next_level(l1, l1_entry, true) or { return none }
-	l3 := get_next_level(l2, l2_entry, true) or { return none }
+	l2 := get_next_level(pagemap, l1, l1_entry, true) or { return none }
+	l3 := get_next_level(pagemap, l2, l2_entry, true) or { return none }
 
 	mut entry := unsafe { &u64(u64(l3) + higher_half + l3_entry * 8) }
 

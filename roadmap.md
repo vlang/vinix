@@ -55,7 +55,7 @@ code; this roadmap does not reclassify their historical test results.
 | Area | Existing foundation | Work still needed for parity |
 | --- | --- | --- |
 | Kernel and userland | x86-64 and AArch64 builds; Linux-compatible interfaces; Alpine/musl userland; SMP, NUMA and real-time scheduling | Complete ABI semantics, paging, scalability, hardening, lifetime and long-running reliability checks. See [kernel comparison status](docs/macos-xnu-implementation-status.md) and [integrated gap status](docs/openbsd-feature-implementation.md). |
-| Memory pressure | Cache reclaim, pressure reporting, allocation reserves, compressed anonymous memory, encrypted swap and process OOM recovery | Mapped-file aging/reclaim and broader resource charging; exhausting kernel-owned resources still needs protection. See [anonymous paging](docs/anonymous-paging.md) and [OOM behavior and limits](tests/oom/README.md). |
+| Memory pressure | Cache reclaim, mapped-file aging/writeback, pressure reporting, allocation reserves, compressed anonymous memory, encrypted swap, process OOM recovery and bounded creator-charged kernel resources | Resource groups, pressure notification policy and continued lifetime/stress qualification. See [anonymous paging](docs/anonymous-paging.md), [kernel resource limits](docs/kernel-resources.md) and [OOM behavior and limits](tests/oom/README.md). |
 | Storage and installation | ext2, persistent VM roots, block drivers, flush paths, optional verified root and an M1 installer | Crash-safe filesystem, encryption, snapshots, autonomous disk boot, recovery and physical storage qualification. See [image installation](README.md#download-an-image), [M1 installer](installer/macos/README.md) and [ANS limits](docs/apple-ans-rw-root.md). |
 | Native desktop | Window management, tiling, overview, workspaces, taskbar, Settings, Files and 21 native utilities | Multiple displays, full desktop services, accessibility and remaining utility workflows. See [window experience](desktop/WINDOW_EXPERIENCE.md), [utility inventory](desktop/UTILITIES.md) and [Settings](desktop/SETTINGS.md). |
 | Networking and peripherals | Ethernet networking, IPv4/IPv6, selected USB/input paths, sound playback, experimental M1 Wi-Fi and Apple drivers | General hotplug/classes, wireless IP connectivity, Bluetooth, recording, peripheral coverage and power management. See [networking status](docs/openbsd-feature-implementation.md#networking), [Wi-Fi limits](docs/apple-wifi.md) and [M1 audio](docs/m1-speakers.md). |
@@ -115,8 +115,9 @@ upgrade, rollback and recovery are repeatable from published images.
 - [x] Finish dirty/reference tracking and reclaim for mapped file pages; retain
   correct writeback through unmap, unlink, truncation and storage failures. See
   [implementation and limits](docs/mapped-file-paging.md) and [acceptance tests](tests/mapped-writeback/README.md).
-- [ ] Extend current OOM recovery to bounded, charged kernel resources, including
-  files, descriptors, sockets, IPC, mappings and process/thread creation.
+- [x] Extend current OOM recovery to bounded, charged kernel resources, including
+  files, descriptors, sockets, IPC, mappings and process/thread creation. See
+  [implementation and limits](docs/kernel-resources.md) and [acceptance tests](tests/kernel-resources/README.md).
 - [ ] Complete resource groups: memory/CPU/I/O/PID limits, pressure notifications,
   workload accounting and predictable recovery from quota exhaustion.
 - [ ] Qualify fork/exec/exit, vfork/clone semantics, signals, timers, futexes and

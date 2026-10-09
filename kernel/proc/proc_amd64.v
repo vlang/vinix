@@ -1,6 +1,7 @@
 @[has_globals]
 module proc
 
+import kbudget
 import klock
 import x86.hpet as hpetclock
 import katomic
@@ -230,6 +231,9 @@ pub mut:
 	// Who gives back the stacks of the dead thread; see
 	// sched.stop_thread_for_good(). A word, as katomic.cas needs 4 or 8 bytes.
 	reap_claim u32
+	kernel_charge kbudget.Charge
+ exec_scratch kbudget.Charge
+ exec_depth u32
 }
 
 pub fn current_thread() &Thread {

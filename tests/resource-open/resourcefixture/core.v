@@ -17,6 +17,7 @@ struct C.stat { mut: st_rdev C.dev_t }
 __global resource_trace [262144]char
 struct Heap { mut: count u32 size [32]u64 live [32]u64 large u64 written_after_free u64 }
 
+fn C.alloca(usize) voidptr
 fn C.printf(&char, ...) i32
 fn C.sscanf(&char, &char, ...) i32
 fn C.setvbuf(&C.FILE, &char, i32, usize) i32
@@ -174,10 +175,11 @@ pub fn entry() i32 {
   if C.access(c'/proc/slabinfo', C.F_OK) != 0 { if !check(C.mount(c'proc', c'/proc', c'proc', 0, nil) == 0, 112, c'mount("proc","/proc","proc",0,0)==0') { return 1 } }
   if !check(semantics() == 0 && cohort() == 0, 113, c'semantics()==0&&cohort()==0') { return 1 }
   if !check(trace(1, -1) == 0 && trace(0, -1) == 0, 114, c'trace(1,-1)==0&&trace(0,-1)==0') { return 1 }
-  before := Heap{}; after := Heap{}
-  for i := i32(0); i < 5; i++ { if !check(snapshot(&before) == 0, 116, c'snapshot(&before)==0') { return 1 } }
+  before := &Heap(C.alloca(sizeof(Heap))); after := &Heap(C.alloca(sizeof(Heap)))
+  C.memset(before, 0, sizeof(Heap)); C.memset(after, 0, sizeof(Heap))
+  for i := i32(0); i < 5; i++ { if !check(snapshot(before) == 0, 116, c'snapshot(before)==0') { return 1 } }
   for window := i32(0); window < 2; window++ {
-   if !check(trace(1, window) == 0 && snapshot(&before) == 0 && cohort() == 0 && snapshot(&after) == 0, 118, c'trace(1,window)==0&&snapshot(&before)==0&&cohort()==0&&snapshot(&after)==0') { return 1 }
+   if !check(trace(1, window) == 0 && snapshot(before) == 0 && cohort() == 0 && snapshot(after) == 0, 118, c'trace(1,window)==0&&snapshot(before)==0&&cohort()==0&&snapshot(after)==0') { return 1 }
    if !check(before.count == after.count, 119, c'before.count==after.count') { return 1 }
    flat := i32(1)
    for i := u32(0); i < after.count; i++ {

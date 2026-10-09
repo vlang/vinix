@@ -40,7 +40,7 @@ fn apply_creation_acl(mut node VFSNode, mode u32, defaults []u8, access []u8) ? 
 fn discard_created_node(mut node VFSNode, parent &VFSNode) {
 	if node.overlay != unsafe { nil } {
 		mut directory := unsafe { parent }
-		overlay_unlink(mut directory, mut node, node.name) or {}
+		overlay_discard_created(mut directory, mut node)
 		return
 	}
 	mut res := node.resource

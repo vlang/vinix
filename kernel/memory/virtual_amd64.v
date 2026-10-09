@@ -3,6 +3,9 @@ module memory
 
 import katomic
 import lib
+import kbudget
+import proc
+import errno
 import limine
 import x86.cpu
 import x86.msr
@@ -62,6 +65,37 @@ pub fn new_pagemap() &Pagemap {
 	return pagemap
 }
 
+pub fn new_user_pagemap(owner kbudget.Owner) ?&Pagemap {
+ charge := proc.reserve_kernel_for(owner, .mapping, page_size + u64(sizeof(Pagemap)) * 2 + 128)?
+ if !user_room(1) { kbudget.release(charge); errno.set(errno.enomem); return none }
+	mut top_level := &u64(pmm_alloc_fallible(1))
+	if top_level == 0 {
+		kbudget.release(charge); errno.set(errno.enomem); return none
+	}
+
+	// Import higher half from kernel pagemap
+	mut p1 := unsafe { &u64(u64(top_level) + higher_half) }
+	p2 := unsafe { &u64(u64(kernel_pagemap.top_level) + higher_half) }
+	for i := u64(256); i < 512; i++ {
+		unsafe {
+			p1[i] = p2[i]
+		}
+	}
+	mut pagemap := &Pagemap{
+ kernel_owner: owner
+ kernel_charge: charge
+		top_level:   top_level
+		track_residency: true
+		mmap_ranges: []voidptr{}
+	} @[freed] // mmap.delete_pagemap owns this detached address space.
+	// Nothing keeps a copy of the list, so growing it can give back the
+	// storage it outgrew; V keeps that for arrays that might be sliced, and
+	// every fork and exec lost three blocks of it. `|=`, not flags.set():
+	// V 0.5.2 compiles set() on an array's flags to nothing.
+	pagemap.mmap_ranges.flags |= .noslices
+	return pagemap
+}
+
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
@@ -73,11 +107,11 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	pml4 := if !la57 {
 		pagemap.top_level
 	} else {
-		get_next_level(pml5, pml5_entry, allocate) or { return none }
+		get_next_level(pagemap, pml5, pml5_entry, allocate) or { return none }
 	}
-	pml3 := get_next_level(pml4, pml4_entry, allocate) or { return none }
-	pml2 := get_next_level(pml3, pml3_entry, allocate) or { return none }
-	pml1 := get_next_level(pml2, pml2_entry, allocate) or { return none }
+	pml3 := get_next_level(pagemap, pml4, pml4_entry, allocate) or { return none }
+	pml2 := get_next_level(pagemap, pml3, pml3_entry, allocate) or { return none }
+	pml1 := get_next_level(pagemap, pml2, pml2_entry, allocate) or { return none }
 
 	return unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 }
@@ -121,7 +155,7 @@ pub fn (mut pagemap Pagemap) switch_to() {
 	}
 }
 
-fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
+fn get_next_level(owner &Pagemap, current_level &u64, index u64, allocate bool) ?&u64 {
 	mut ret := unsafe { &u64(0) }
 
 	mut entry := unsafe { &u64(u64(current_level) + higher_half + index * 8) }
@@ -136,8 +170,11 @@ fn get_next_level(current_level &u64, index u64, allocate bool) ?&u64 {
 		}
 
 		// Else, allocate the page table
-		ret = pmm_alloc(1)
+		mut pagemap := unsafe { owner }
+		if !reserve_table_page(mut pagemap) { return none }
+		ret = pmm_alloc_fallible(1)
 		if ret == 0 {
+			release_table_page(mut pagemap)
 			return none
 		}
 		unsafe {
@@ -167,14 +204,14 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	mut pml4 := if !la57 {
 		pagemap.top_level
 	} else {
-		get_next_level(pml5, pml5_entry, false) or { return none }
+		get_next_level(pagemap, pml5, pml5_entry, false) or { return none }
 	}
 	mut pml4_p := unsafe { &u64(u64(pml4) + higher_half) }
-	mut pml3 := get_next_level(pml4, pml4_entry, false) or { return none }
+	mut pml3 := get_next_level(pagemap, pml4, pml4_entry, false) or { return none }
 	mut pml3_p := unsafe { &u64(u64(pml3) + higher_half) }
-	mut pml2 := get_next_level(pml3, pml3_entry, false) or { return none }
+	mut pml2 := get_next_level(pagemap, pml3, pml3_entry, false) or { return none }
 	mut pml2_p := unsafe { &u64(u64(pml2) + higher_half) }
-	mut pml1 := get_next_level(pml2, pml2_entry, false) or { return none }
+	mut pml1 := get_next_level(pagemap, pml2, pml2_entry, false) or { return none }
 	mut pml1_p := unsafe { &u64(u64(pml1) + higher_half) }
 
 	mut pte_p := unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
@@ -218,14 +255,18 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 		// entries as well as any translation before returning the pages.
 		pagemap.invalidate(virt)
 		pmm_free(pml1, 1)
+			release_table_page(mut pagemap)
 		if remove_pml2 {
 			pmm_free(pml2, 1)
+			release_table_page(mut pagemap)
 		}
 		if remove_pml3 {
 			pmm_free(pml3, 1)
+			release_table_page(mut pagemap)
 		}
 		if remove_pml4 {
 			pmm_free(pml4, 1)
+			release_table_page(mut pagemap)
 		}
 	}
 }
@@ -286,11 +327,11 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	pml4 := if !la57 {
 		pagemap.top_level
 	} else {
-		get_next_level(pml5, pml5_entry, true) or { return none }
+		get_next_level(pagemap, pml5, pml5_entry, true) or { return none }
 	}
-	pml3 := get_next_level(pml4, pml4_entry, true) or { return none }
-	pml2 := get_next_level(pml3, pml3_entry, true) or { return none }
-	mut pml1 := get_next_level(pml2, pml2_entry, true) or { return none }
+	pml3 := get_next_level(pagemap, pml4, pml4_entry, true) or { return none }
+	pml2 := get_next_level(pagemap, pml3, pml3_entry, true) or { return none }
+	mut pml1 := get_next_level(pagemap, pml2, pml2_entry, true) or { return none }
 
 	entry := unsafe { &u64(u64(pml1) + higher_half + pml1_entry * 8) }
 
@@ -340,7 +381,7 @@ pub fn vmm_init() {
 	// shared.
 	for i := u64(256); i < 512; i++ {
 		// get_next_level will allocate the PML3s for us.
-		get_next_level(kernel_pagemap.top_level, i, true) or { panic('vmm init failure') }
+		get_next_level(kernel_pagemap, kernel_pagemap.top_level, i, true) or { panic('vmm init failure') }
 	}
 
 	// Map kernel

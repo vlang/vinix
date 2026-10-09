@@ -5,6 +5,7 @@ module sched
 // What a thread and a process start with from the ones that made them, the
 // same on both architectures.
 
+import kbudget
 import elf
 import errno
 import katomic
@@ -53,9 +54,21 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		errno.set(errno.eagain)
 		return none
 	}
+	kbudget.configure(memory.total_bytes())
+	owner := kbudget.open_owner() or { errno.set(errno.eagain); return none }
+	mut published := false
+	defer { if !published { kbudget.close_owner(owner) } }
+	charge := proc.reserve_kernel_for(owner, .process, u64(sizeof(proc.Process)) * 2 + 16384) or { return none }
+	mut owned := false
+	defer { if !owned { kbudget.release(charge) } }
+	table_charge := proc.reserve_kernel_for(owner, .descriptor, u64(proc.initial_fds) * sizeof(voidptr) * 2) or { return none }
+	defer { if !owned { kbudget.release(table_charge) } }
 	// Freed when the process is reaped, in proc.free_pid().
 	fds := unsafe { []voidptr{len: proc.initial_fds} } @[freed]
 	mut new_proc := &proc.Process{
+		kernel_owner: owner
+		kernel_charge: charge
+		fd_table_charge: table_charge
 		pagemap: unsafe { nil }
 		fds:     fds
 	}
@@ -67,6 +80,9 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		}
 		return none
 	}
+
+	owned = true
+	published = true
 
 	if unsafe { old_process != 0 } {
 		proc.inherit_job_identity(mut new_proc, old_process)
@@ -89,7 +105,10 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode
 		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
-		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap) or { return none }
+		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap, owner) or {
+			proc.free_pid(new_proc.pid)
+			return none
+		}
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.stack_end = old_process.stack_end
 		new_proc.saved_auxv = old_process.saved_auxv.clone()
@@ -100,13 +119,31 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 		new_proc.brk_current = old_process.brk_current
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = proc.current_directory_of(old_process)
+  proc.inherit_command_line(mut new_proc, old_process) or {
+   proc.lock_table()
+   mut doomed := new_proc.pagemap
+   new_proc.pagemap = unsafe { nil }
+   proc.unlock_table()
+   mmap.delete_pagemap(mut doomed) or {}
+   proc.free_pid(new_proc.pid)
+   return none
+  }
 		proc.inherit_container_state(mut new_proc, old_process)
-		proc.inherit_command_line(mut new_proc, old_process)
 	} else {
 		new_proc.ppid = 0
 		new_proc.pgid = new_proc.pid
 		new_proc.sid = new_proc.pid
 		new_proc.pagemap = unsafe { pagemap }
+  if new_proc.pagemap != unsafe { nil } {
+   new_proc.pagemap.l.acquire()
+   memory.account_pagemap(mut new_proc.pagemap, owner) or {
+    new_proc.pagemap.l.release()
+    new_proc.pagemap = unsafe { nil }
+    proc.free_pid(new_proc.pid)
+    return none
+   }
+   new_proc.pagemap.l.release()
+  }
 		new_proc.thread_stack_top = elf.initial_stack_top()
 		new_proc.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		new_proc.current_directory = voidptr(vfs_root)

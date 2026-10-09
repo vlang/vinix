@@ -1,5 +1,7 @@
 module unix
 
+import memory
+import kbudget
 import stat
 import klock
 import event.eventstruct
@@ -61,6 +63,9 @@ __global (
 
 pub struct UnixSocket {
 pub mut:
+	kernel_charge kbudget.Charge
+	queue_capacity int
+	close_complete bool
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -194,14 +199,14 @@ fn release(mut target UnixSocket) {
 // connection or socketpair.
 fn (mut this UnixSocket) maybe_free() {
 	floor := if this.path_bound { 0 } else { 1 }
-	if !this.closed || katomic.load(&this.refcount) > floor || katomic.load(&this.links) != 0 {
+	if !katomic.load(&this.close_complete) || katomic.load(&this.refcount) > floor || katomic.load(&this.links) != 0 {
 		return
 	}
 	if !katomic.cas(mut &this.freed, u32(0), u32(1)) {
 		return
 	}
 	fs.free_after_grace(voidptr(this.box))
-	fs.free_after_grace(voidptr(this))
+	fs.free_charged_after_grace(voidptr(this), this.kernel_charge)
 }
 
 // Whether this endpoint keeps message boundaries (SOCK_SEQPACKET).
@@ -231,7 +236,7 @@ fn (this &UnixSocket) nothing_queued() bool {
 // Most UNIX sockets carry only a few bytes, and many never carry any. Allocate
 // receive storage when data first arrives, then keep the queued bytes in order
 // when the circular buffer grows. The caller holds this socket's lock.
-fn (mut this UnixSocket) ensure_capacity(needed u64) {
+fn (mut this UnixSocket) ensure_capacity(needed u64) ? {
 	if needed <= this.capacity {
 		return
 	}
@@ -239,7 +244,12 @@ fn (mut this UnixSocket) ensure_capacity(needed u64) {
 	for new_capacity < needed {
 		new_capacity *= 2
 	}
-	mut new_data := unsafe { &u8(malloc(new_capacity)) }
+	if !proc.grow_kernel(mut this.kernel_charge, new_capacity * 2) { return none }
+	mut new_data := unsafe { &u8(memory.malloc_packed_fallible(new_capacity)) }
+	if new_data == unsafe { nil } {
+		kbudget.shrink(mut this.kernel_charge, new_capacity * 2)
+		errno.set(errno.enomem); return none
+	}
 	if this.used != 0 {
 		first := if this.used < this.capacity - this.read_ptr {
 			this.used
@@ -254,6 +264,7 @@ fn (mut this UnixSocket) ensure_capacity(needed u64) {
 	if this.data != unsafe { nil } {
 		unsafe { free(this.data) }
 	}
+	kbudget.shrink(mut this.kernel_charge, this.capacity * 2)
 	this.data = new_data
 	this.capacity = new_capacity
 	this.read_ptr = 0
@@ -682,7 +693,8 @@ pub fn (mut this UnixSocket) write_with_fds(_handle voidptr, buf voidptr, _count
 	if count == 0 && !peer.is_seqpacket() {
 		return 0
 	}
-	peer.ensure_capacity(if count == 0 { u64(1) } else { peer.used + count })
+	peer.ensure_capacity(if count == 0 { u64(1) } else { peer.used + count })?
+	peer.ensure_queue_capacity(peer.packet_lengths.len + 1, peer.pending_fd_groups.len + if fds.len != 0 { 1 } else { 0 })?
 
 	// Descriptor rights are attached to the first byte written by this
 	// sendmsg(), after any data already queued on the peer.
@@ -797,7 +809,8 @@ pub fn (mut this UnixSocket) send_datagram(mut target UnixSocket, _handle voidpt
 		}
 		target.l.acquire()
 	}
-	target.ensure_capacity(if count == 0 { u64(1) } else { target.used + count })
+	target.ensure_capacity(if count == 0 { u64(1) } else { target.used + count })?
+	target.ensure_queue_capacity(target.packet_lengths.len + 1, target.pending_fd_groups.len + if fds.len != 0 { 1 } else { 0 })?
 
 	if fds.len != 0 {
 		mut group := unsafe { &PendingFdGroup(C.vinix_stack_alloc(sizeof(PendingFdGroup))) }
@@ -976,6 +989,10 @@ fn (mut this UnixSocket) close_endpoint() {
 	this.datagrams = []DatagramSender{}
 	data := this.data
 	this.data = unsafe { nil }
+	released_ring_bytes := this.capacity * 2
+	queue_bytes := u64(this.queue_capacity) * u64(sizeof(u64) + sizeof(DatagramSender) + sizeof(PendingFdGroup)) * 2
+	backlog_bytes := u64(queued.cap) * 32
+	this.queue_capacity = 0
 	this.capacity = 0
 	this.used = 0
 	this.read_ptr = 0
@@ -1014,6 +1031,9 @@ fn (mut this UnixSocket) close_endpoint() {
 		release(mut connection)
 	}
 	unsafe { queued.free() }
+	kbudget.shrink(mut this.kernel_charge, released_ring_bytes + queue_bytes + backlog_bytes)
+	katomic.store(mut &this.close_complete, true)
+	this.maybe_free()
 	event.trigger(mut this.event, false)
 }
 
@@ -1280,10 +1300,13 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		return none
 	}
 
+	if socket.backlog.len >= socket.backlog.cap { errno.set(errno.eagain); return none }
 	// A connected UNIX stream is established when connect() places it in the
 	// listener's queue, not when accept() eventually removes it. This permits a
 	// client to connect and send before the server calls accept(), as Linux does.
+	connection_charge := proc.reserve_kernel_for(socket.kernel_charge.owner, .socket, 8192)?
 	mut connection_socket := &UnixSocket{
+		kernel_charge: connection_charge
 		refcount:  1
 		peer:      this
 		connected: true
@@ -1425,7 +1448,9 @@ fn (mut this UnixSocket) listen(_handle voidptr, backlog int) ? {
 	}
 	// close_endpoint() frees it. Nothing slices it, so growing can free the
 	// old block.
-	this.backlog = []&UnixSocket{cap: backlog} @[freed]
+	capacity := if backlog < 1 { 1 } else if backlog > 4096 { 4096 } else { backlog }
+	if !proc.grow_kernel(mut this.kernel_charge, u64(capacity) * 32) { return none }
+	this.backlog = []&UnixSocket{cap: capacity} @[freed]
 	this.backlog.flags |= .noslices
 	this.listening = true
 }
@@ -1529,7 +1554,10 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 		}
 	}
 
-	mut tmpbuf := unsafe { &u8(malloc(before_wrap + after_wrap)) }
+	scratch := proc.reserve_kernel(.scratch, (before_wrap + after_wrap) * 2 + 128)?
+ defer { kbudget.release(scratch) }
+ mut tmpbuf := unsafe { &u8(malloc(before_wrap + after_wrap)) }
+ if tmpbuf == unsafe { nil } { errno.set(errno.enomem); return none }
 	unsafe { C.memcpy(tmpbuf, &this.data[this.read_ptr], before_wrap) }
 	if after_wrap != 0 {
 		unsafe { C.memcpy(voidptr(u64(tmpbuf) + before_wrap), this.data, after_wrap) }
@@ -1743,7 +1771,9 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 pub fn create(@type int) ?&UnixSocket {
 	process := proc.current_thread().process
+	charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192)?
 	mut ret := &UnixSocket{
+		kernel_charge: charge
 		refcount:  1
 		peer:      unsafe { nil }
 		owner_pid: process.pid
@@ -1761,7 +1791,9 @@ pub fn create(@type int) ?&UnixSocket {
 
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	process := proc.current_thread().process
+	a_charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192)?
 	mut a := &UnixSocket{
+		kernel_charge: a_charge
 		refcount:  1
 		peer:      unsafe { nil }
 		owner_pid: process.pid
@@ -1772,7 +1804,9 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	a.socktype = @type & sock_pub.sock_type_mask
 	a.status |= file.pollout
 	a.stat.mode = stat.ifsock | 0o777
+	b_charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192) or { a.close_endpoint(); a.maybe_free(); return none }
 	mut b := &UnixSocket{
+		kernel_charge: b_charge
 		refcount:  1
 		peer:      unsafe { nil }
 		owner_pid: process.pid
@@ -1801,4 +1835,24 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	b.peer_gid = a.owner_gid
 
 	return a, b
+}
+
+// Empty records occupy metadata too. Bound and charge those arrays separately
+// from the byte ring; capacity remains charged after a receive drains them.
+fn (mut this UnixSocket) ensure_queue_capacity(records int, rights int) ? {
+	needed := if records > rights { records } else { rights }
+	if needed <= this.queue_capacity { return }
+	if needed > 4096 { errno.set(errno.enobufs); return none }
+	mut capacity := if this.queue_capacity == 0 { 16 } else { this.queue_capacity }
+	for capacity < needed { capacity *= 2 }
+	unit := u64(sizeof(u64) + sizeof(DatagramSender) + sizeof(PendingFdGroup)) * 2
+	if !proc.grow_kernel(mut this.kernel_charge, u64(capacity) * unit) { return none }
+	this.packet_lengths.flags |= .noslices
+	this.datagrams.flags |= .noslices
+	this.pending_fd_groups.flags |= .noslices
+	this.packet_lengths.ensure_cap(capacity)
+	this.datagrams.ensure_cap(capacity)
+	this.pending_fd_groups.ensure_cap(capacity)
+	kbudget.shrink(mut this.kernel_charge, u64(this.queue_capacity) * unit)
+	this.queue_capacity = capacity
 }

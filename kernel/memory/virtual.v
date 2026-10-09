@@ -1,6 +1,7 @@
 @[has_globals]
 module memory
 
+import kbudget
 import lib
 import limine
 import klock
@@ -129,6 +130,8 @@ pub fn locked_bytes(pagemap &Pagemap) u64 {
 
 pub struct Pagemap {
 pub mut:
+	kernel_owner kbudget.Owner
+	kernel_charge kbudget.Charge
 	l           klock.Lock
 	// MCL_FUTURE belongs to the address space shared by CLONE_VM threads.
 	lock_future bool

@@ -1,6 +1,7 @@
 @[has_globals]
 module fs
 
+import kbudget
 import resource
 import stat
 import katomic
@@ -37,6 +38,7 @@ mut:
 
 pub struct VFSNode {
 pub mut:
+	kernel_charge kbudget.Charge
 	mountpoint     &VFSNode           = unsafe { nil }
 	redir          &VFSNode           = unsafe { nil }
 	resource       &resource.Resource = unsafe { nil }
@@ -67,6 +69,8 @@ pub mut:
 	handles       int
 	orphan        bool
 	retired       u32
+ // A failed fresh upper directory retains its name reference until safe reap.
+ discarded_directory bool
 	overlaid      bool
 	mount_covered bool
 }
@@ -445,6 +449,9 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
+	charge := proc.reserve_kernel(.file, 8192 + u64(dest.len + basename.len) * 2)?
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	// The node keeps its name; `basename` points into `target`.
 	name := basename.clone()
 	target_node = parent_of_tgt_node.filesystem.symlink(parent_of_tgt_node, dest, name)
@@ -452,6 +459,8 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		unsafe { name.free() }
 		return none
 	}
+	target_node.kernel_charge = charge
+	charge_transferred = true
 	apply_creation_identity(mut target_node, parent_of_tgt_node) or {
 		failure := errno.get()
 		discard_created_node(mut target_node, parent_of_tgt_node)
@@ -459,6 +468,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
+ overlay_commit_created(target_node)
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
 	}
@@ -487,6 +497,9 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
+	charge := proc.reserve_kernel(.file, 4096 + u64(basename.len) * 2)?
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	// The new entry's name, as linkat() passes it. This passed `dest`, the
 	// existing file's path, which ext2 wrote into the directory as the name:
 	// every hard link in an image unpacked onto a disk was called
@@ -497,7 +510,10 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 	if target_node == unsafe { nil } { return none }
+	target_node.kernel_charge = charge
+	charge_transferred = true
 
+ overlay_commit_created(target_node)
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
 	}
@@ -680,6 +696,9 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 	if !attr_allows_dir_add(parent_of_tgt_node) { return none }
 	require_access(parent_of_tgt_node, access_write | access_exec)?
 	require_linked(parent_of_tgt_node)?
+	charge := proc.reserve_kernel(.file, 8192 + u64(basename.len) * 2)?
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	mut defaults := []u8{} @[freed]
 	defaults.flags |= .noslices
 	defer { unsafe { defaults.free() } }
@@ -695,6 +714,8 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 		unsafe { node_name.free() }
 		return none
 	}
+	target_node.kernel_charge = charge
+	charge_transferred = true
 	apply_creation_identity(mut target_node, parent_of_tgt_node) or {
 		failure := errno.get()
 		discard_created_node(mut target_node, parent_of_tgt_node)
@@ -708,6 +729,7 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 		return none
 	}
 
+ overlay_commit_created(target_node)
 	unsafe {
 		parent_of_tgt_node.children[basename] = target_node
 	}
@@ -722,19 +744,40 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
 	current_process := proc.current_thread().process
-	mut node_resource := node.resource
-	opened_resource := resource.open_resource(mut node_resource, flags) or { return none }
+	katomic.inc(mut &node.handles)
+ mut node_transferred := false
+ defer { if !node_transferred { release_handle_node(voidptr(node)) } }
+ mut node_resource := node.resource
+ retain_open_origin(mut node_resource)?
+ mut origin_transferred := false
+ defer { if !origin_transferred { resource.release_resource(mut node_resource) } }
+	mut opened_resource := resource.open_resource(mut node_resource, flags) or { return none }
 	// Keep nsfs pins on the shared open description, including O_PATH. A
 	// concrete dispatch avoids boxing another interface on every open.
 	if mut node_resource is NsFSResource {
-		node_resource.pin_description()?
+		node_resource.pin_description() or {
+   return none
+  }
+	}
+	// If open returns the same resource, its description reference already
+	// keeps the origin alive. Remove the extra lookup pin before any close
+	// callback: PTY/FIFO close semantics depend on their description counts.
+	if opened_resource.resource == node_resource {
+		if !opened_resource.owned {
+			resource.retain_resource(mut node_resource)
+			opened_resource = resource.OpenedResource{resource: opened_resource.resource, owned: true}
+		}
+		resource.release_resource(mut node_resource)
+		origin_transferred = true
 	}
 	mut fd := file.fd_create_from_opened(opened_resource, flags) or { return none }
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.node = voidptr(node)
 	lib.copy_mount_context(&fd.handle.mount, identity)
-	katomic.inc(mut &node.handles)
+ node_transferred = true
+ if !origin_transferred { fd.handle.origin_resource = node_resource }
+ origin_transferred = true
 	return file.fdnum_create_from_fd(current_process, fd, oldfd, specific) or {
 		// In particular, roll back a /dev/ptmx allocation or slave-open count if
 		// the process descriptor table is full.
@@ -1519,12 +1562,16 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 		|| node_attributes(old_node) & resource.attributes_kept != 0 {
 		return errno.err, errno.eperm
 	}
-	name := basename.clone()
+	charge := proc.reserve_kernel(.file, 4096 + u64(basename.len) * 2) or { return errno.err, errno.get() }
+ name := basename.clone()
 	mut new_node := newparent.filesystem.link(newparent, name, mut old_node) or {
+  kbudget.release(charge)
 		unsafe { name.free() }
 		return errno.err, errno.get()
 	}
 
+ new_node.kernel_charge = charge
+ overlay_commit_created(new_node)
 	unsafe {
 		newparent.children[basename] = new_node
 	}
@@ -1651,6 +1698,8 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 	}
 
 	mut dir_handle := dir_fd.handle
+ dir_handle.l.acquire()
+ defer { dir_handle.l.release() }
 	dir_handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 	dir_resource := dir_handle.resource
 
@@ -1671,9 +1720,13 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		}
 		// Sized for the whole directory up front: growing it would leave each
 		// outgrown buffer behind, and every entry takes a full Dirent.
-		unsafe { dir_handle.dirlist.free() }
-		// Freed when the handle goes, or when the listing is made again.
 		entry_count := names.len + nodes.len
+		new_bytes := u64(entry_count) * sizeof(stat.Dirent) * 2
+		if !proc.grow_kernel(mut dir_handle.kernel_charge, new_bytes) { return errno.err, errno.get() }
+		old_bytes := u64(dir_handle.dirlist.cap) * sizeof(stat.Dirent) * 2
+		unsafe { dir_handle.dirlist.free() }
+		kbudget.shrink(mut dir_handle.kernel_charge, old_bytes)
+		// Freed when the handle goes, or when the listing is made again.
 		dir_handle.dirlist = []stat.Dirent{cap: entry_count} @[freed]
 		// Validate the complete snapshot before copying a name into its fixed
 		// Dirent buffer. tmpfs can contain names longer than EXT2's 255-byte
@@ -1758,6 +1811,8 @@ pub fn readdir_unread(fdnum int) {
 	}
 
 	mut dir_handle := dir_fd.handle
+ dir_handle.l.acquire()
+ defer { dir_handle.l.release() }
 	if dir_handle.dirlist_index > 0 {
 		dir_handle.dirlist_index--
 	}
@@ -2506,7 +2561,7 @@ pub fn syscall_memfd_create(_ voidptr, name u64, flags u32) (u64, u64) {
 	}
 	shown := optional_user_string(charptr(name), 249)
 
-	mut res := create_anonymous(0o600)
+	mut res := create_anonymous(0o600) or { return errno.err, errno.get() }
 	if mut res is TmpFSResource {
 		res.memfd = true
 		// Without MFD_ALLOW_SEALING the one seal a memfd starts with is the

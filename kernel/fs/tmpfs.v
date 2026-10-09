@@ -1,5 +1,7 @@
 module fs
 
+import proc
+import kbudget
 import stat
 import errno
 import klock
@@ -14,6 +16,7 @@ import file
 @[heap]
 struct TmpFSResource {
 pub mut:
+	kernel_charge kbudget.Charge
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -283,6 +286,7 @@ fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 		return true
 	}
 	page_count := lib.div_roundup(u64(this.stat.size), page_size)
+	if !this.reserve_page_metadata(page_count * 16) { return false }
 	// Kept as this.pages, which unref() frees.
 	mut pages := []u64{cap: int(page_count)} @[freed]
 	size := u64(this.stat.size)
@@ -293,6 +297,7 @@ fn (mut this TmpFSResource) ensure_paged_locked(file_data bool) bool {
 				memory.pmm_free(voidptr(allocated), 1)
 			}
 			unsafe { pages.free() }
+			kbudget.shrink(mut this.kernel_charge, page_count * 16)
 			return false
 		}
 		offset := i * page_size
@@ -325,10 +330,13 @@ fn (mut this TmpFSResource) grow_pages_locked(page_count u64) bool {
 		if u64(wanted) < page_count {
 			wanted = int(page_count)
 		}
+		if !this.reserve_page_metadata(u64(wanted) * 16) { return false }
 		// Kept as this.pages, which unref() frees.
 		mut larger := []u64{cap: wanted} @[freed]
 		larger << this.pages
+		old_bytes := u64(this.pages.cap) * 16
 		unsafe { this.pages.free() }
+		kbudget.shrink(mut this.kernel_charge, old_bytes)
 		this.pages = larger
 	}
 	for u64(this.pages.len) < page_count {
@@ -614,6 +622,7 @@ fn (mut this TmpFSResource) unref(_handle voidptr) ? {
 		memory.free(this.storage)
 	}
 	free_xattrs(this.xattrs)
+	kbudget.release(this.kernel_charge)
 
 	unsafe {
 		free(voidptr(this.box))
@@ -724,9 +733,11 @@ fn (mut this TmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 }
 
 fn (mut this TmpFS) create(parent &VFSNode, name string, mode u32) &VFSNode {
+	charge := proc.reserve_kernel(.file, 4096) or { return unsafe { nil } }
 	mut new_node := create_node(this.as_filesystem(), parent, name, stat.isdir(mode))
 
 	mut new_resource := &TmpFSResource{
+		kernel_charge: charge
 		storage: unsafe { nil }
 		refcount: 1
 	}
@@ -768,9 +779,11 @@ fn (mut this TmpFS) rename(_old_parent &VFSNode, _old_name string,
 	_new_parent &VFSNode, _new_name string, _flags int) ? {}
 
 fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNode {
+	charge := proc.reserve_kernel(.file, 4096) or { return unsafe { nil } }
 	mut new_node := create_node(this.as_filesystem(), parent, target, false)
 
 	mut new_resource := &TmpFSResource{
+		kernel_charge: charge
 		storage: unsafe { nil }
 		refcount: 1
 	}
@@ -800,8 +813,10 @@ fn (mut this TmpFS) symlink(parent &VFSNode, dest string, target string) &VFSNod
 // A tmpfs file with no name and no place in the directory tree, for
 // memfd_create(2). It behaves like any other tmpfs file — it can be written,
 // truncated and mapped — and goes away with its last descriptor.
-pub fn create_anonymous(mode u32) &resource.Resource {
+pub fn create_anonymous(mode u32) ?&resource.Resource {
+	charge := proc.reserve_kernel(.file, 4096)?
 	mut new_resource := &TmpFSResource{
+		kernel_charge: charge
 		storage: unsafe { nil }
 		refcount: 1
 		nameless: true
@@ -822,4 +837,11 @@ pub fn create_anonymous(mode u32) &resource.Resource {
 	new_resource.stat.mtim = realtime_clock
 
 	return new_resource.boxed()
+}
+
+fn (mut this TmpFSResource) reserve_page_metadata(bytes u64) bool {
+	if this.kernel_charge.owner.slot == 0 && proc.kernel_owner().slot != 0 {
+		this.kernel_charge = proc.reserve_kernel(.file, 4096) or { return false }
+	}
+	return proc.grow_kernel(mut this.kernel_charge, bytes)
 }

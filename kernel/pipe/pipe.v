@@ -1,5 +1,6 @@
 module pipe
 
+import kbudget
 import resource
 import stat
 import klock
@@ -23,6 +24,7 @@ const pipe_max_capacity = 1024 * 1024
 
 pub struct Pipe {
 pub mut:
+	kernel_charge kbudget.Charge
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -51,7 +53,9 @@ pub mut:
 pub fn initialise() {}
 
 pub fn create() ?&Pipe {
+	charge := proc.reserve_kernel(.ipc, 4096)?
 	mut p := &Pipe{
+		kernel_charge: charge
 		// The capacity and readiness of an empty pipe do not need backing
 		// storage. Allocate the ring on its first nonempty write; shells and
 		// runtimes often create pipes that close without carrying any bytes.
@@ -82,7 +86,9 @@ pub fn create() ?&Pipe {
 // container runtime leaves such names behind, containerd its shim's log FIFO
 // for every container.
 pub fn create_fifo(mode u32) ?&Pipe {
+	charge := proc.reserve_kernel(.ipc, 4096)?
 	mut p := &Pipe{
+		kernel_charge: charge
 		data:     unsafe { nil }
 		capacity: pipe_capacity
 		refcount: 1
@@ -129,8 +135,12 @@ fn (mut this Pipe) open(flags int) ?&resource.Resource {
 	nonblock := flags & resource.o_nonblock != 0
 	this.l.acquire()
 	if this.data == unsafe { nil } {
-		this.data = unsafe { malloc(this.capacity) }
+		if !proc.grow_kernel(mut this.kernel_charge, this.capacity * 2) {
+			this.l.release(); return none
+		}
+		this.data = memory.malloc_packed_fallible(this.capacity)
 		if this.data == unsafe { nil } {
+			kbudget.shrink(mut this.kernel_charge, this.capacity * 2)
 			this.l.release()
 			errno.set(errno.enomem)
 			return none
@@ -341,8 +351,10 @@ fn (mut this Pipe) write(handle voidptr, buf voidptr, _loc u64, _count u64) ?i64
 	if this.data == unsafe { nil } {
 		// The pipe lock also serializes first writers. A failed allocation
 		// leaves an empty, writable pipe so a later write can try again.
+		if !proc.grow_kernel(mut this.kernel_charge, this.capacity * 2) { return none }
 		this.data = memory.malloc_packed_fallible(this.capacity)
 		if this.data == unsafe { nil } {
+			kbudget.shrink(mut this.kernel_charge, this.capacity * 2)
 			errno.set(errno.enomem)
 			return none
 		}
@@ -503,7 +515,9 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 		this.used = 0
 		this.read_ptr = 0
 		this.write_ptr = 0
+		had_buffer := this.data != unsafe { nil }
 		unsafe { free(this.data) }
+  if had_buffer { kbudget.shrink(mut this.kernel_charge, this.capacity * 2) }
 		this.data = unsafe { nil }
 	}
 	this.l.release()
@@ -525,6 +539,7 @@ fn (mut this Pipe) unref(handle voidptr) ? {
 		event.trigger(mut this.event, false)
 	}
 	if !katomic.dec(mut &this.refcount) {
+		kbudget.release(this.kernel_charge)
 		unsafe {
 			free(this.data)
 			free(voidptr(this.box))
@@ -590,8 +605,10 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
 		return new_capacity
 	}
 
-	new_data := unsafe { malloc(new_capacity) }
+	if !proc.grow_kernel(mut this.kernel_charge, new_capacity * 2) { this.l.release(); return none }
+	new_data := memory.malloc_packed_fallible(new_capacity)
 	if new_data == unsafe { nil } {
+		kbudget.shrink(mut this.kernel_charge, new_capacity * 2)
 		this.l.release()
 		errno.set(errno.enomem)
 		return none
@@ -611,6 +628,7 @@ fn (mut this Pipe) set_pipe_capacity(requested u64) ?u64 {
 		}
 		free(this.data)
 	}
+	kbudget.shrink(mut this.kernel_charge, this.capacity * 2)
 	this.data = new_data
 	this.capacity = new_capacity
 	this.read_ptr = 0

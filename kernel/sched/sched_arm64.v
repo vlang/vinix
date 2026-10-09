@@ -1,6 +1,7 @@
 @[has_globals]
 module sched
 
+import kbudget
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.gic
@@ -1226,6 +1227,8 @@ fn free_thread_memory(t &proc.Thread) {
 	if t.fpu_storage_phys != 0 {
 		memory.pmm_free(voidptr(t.fpu_storage_phys), lib.div_roundup(fpu_storage_size, page_size))
 	}
+	kbudget.release(t.exec_scratch)
+ kbudget.release(t.kernel_charge)
 	unsafe {
 		t.comm.free()
 		free(voidptr(t))
@@ -1288,6 +1291,10 @@ pub fn syscall_new_thread(_ voidptr, pc voidptr, stack u64) (u64, u64) {
 
 pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg voidptr, _stack u64, argv []string, envp []string, auxval &elf.Auxval, autoenqueue bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	charge := proc.reserve_kernel_for(process.kernel_owner, .thread,
+		kernel_stack_size + u64(sizeof(proc.Thread)) * 2 + 16384) or { errno.set(errno.eagain); return none }
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	trace_gpu_exec := process.executable_path == '/usr/bin/vinix-desktop-gpu'
 	if trace_gpu_exec {
 		println('exec[gpu]/thread: entered new_user_thread')
@@ -1343,6 +1350,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	}
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
+		kernel_charge: charge
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: gpr_state
@@ -1352,6 +1360,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 		fpu_storage: voidptr(u64(fpu_storage_phys) + higher_half)
 		fpu_storage_phys: u64(fpu_storage_phys)
 	} }
+	charge_transferred = true
 	mut attached := false
 	defer {
 		if !attached { free_thread_memory(t) }
@@ -1422,6 +1431,10 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 // thread shares the address space and only gets its own stack, TLS and tid.
 pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cpulocal.GPRState, child_sp u64, tls u64, set_tls bool) ?&proc.Thread {
 	mut process := unsafe { _process }
+	charge := proc.reserve_kernel_for(process.kernel_owner, .thread,
+		kernel_stack_size + u64(sizeof(proc.Thread)) * 2 + 16384) or { errno.set(errno.eagain); return none }
+	mut charge_transferred := false
+	defer { if !charge_transferred { kbudget.release(charge) } }
 	mut source := unsafe { _source }
 
 	fpu_pages := lib.div_roundup(fpu_storage_size, page_size)
@@ -1444,6 +1457,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	}
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
+		kernel_charge: charge
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: state
@@ -1459,6 +1473,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		affinity_mask: source.affinity_mask
 		sched: inherited_sched_params(source)
 	} }
+	charge_transferred = true
 
 	t.self = voidptr(t)
 

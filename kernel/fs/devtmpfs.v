@@ -407,8 +407,8 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 // Freed here at once, it was then written to as each of those closed -- the
 // last one's close is what removes a pty's node -- and the kernel heap
 // reported a 192-byte object written after it was freed.
-pub fn devtmpfs_remove_device(name string) bool {
-	mut node := detach_device_node(name) or { return false }
+pub fn devtmpfs_remove_device(name string, expected &resource.Resource) bool {
+	mut node := detach_device_node(name, expected) or { return false }
 	node.orphan = true
 	if katomic.load(&node.handles) == 0 {
 		retire_node(mut node)
@@ -418,7 +418,7 @@ pub fn devtmpfs_remove_device(name string) bool {
 
 // Take a device node out of devtmpfs, and its name's reference to its
 // resource; the node, for the caller to retire.
-fn detach_device_node(name string) ?&VFSNode {
+fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 	vfs_lock.acquire()
 	defer {
 		vfs_lock.release()
@@ -455,6 +455,9 @@ fn detach_device_node(name string) ?&VFSNode {
 		return none
 	}
 	mut node := unsafe { parent.children[leaf] }
+	// A retired endpoint can finish after its numeric path has been reused.
+	// It must never detach the replacement device.
+	if node.resource != expected { return none }
 	parent.children.delete(leaf)
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource

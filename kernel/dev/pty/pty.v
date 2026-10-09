@@ -3,6 +3,7 @@
 @[has_globals]
 module pty
 
+import kbudget
 import errno
 import event
 import event.eventstruct
@@ -90,6 +91,8 @@ fn (mut q ByteQueue) clear() {
 
 struct PtyPair {
 mut:
+	kernel_charge kbudget.Charge
+	retired u32
 	l klock.Lock
 
 	id   int
@@ -264,13 +267,15 @@ fn wake_pair(mut pair PtyPair) {
 }
 
 fn (mut this Ptmx) open(_flags int) ?&resource.Resource {
-	id := allocate_id()?
+	charge := proc.reserve_kernel(.file, 4 * pty_buffer_size + u64(sizeof(PtyPair)) * 2 + 8192)?
+	id := allocate_id() or { kbudget.release(charge); return none }
 	mut name := lib.new_text(8)
 	name.add('pts/')
 	name.add_decimal(id)
 	// destroy_pair() frees it.
 	path := name.str() @[freed]
 	mut pair := &PtyPair{
+		kernel_charge: charge
 		id: id
 		path: path
 		input: new_queue()
@@ -1006,22 +1011,24 @@ fn pair_ioctl(mut pair PtyPair, slave_side bool, request u64, argp voidptr) ?int
 }
 
 fn destroy_pair(pair &PtyPair) {
+	mut owned := unsafe { pair }
+	if !katomic.cas(mut &owned.retired, u32(0), u32(1)) { return }
 	pty_id_lock.acquire()
 	if pair.id >= 0 && pair.id < pty_max_pairs {
 		pty_pairs[pair.id] = unsafe { nil }
 	}
 	pty_id_lock.release()
 	release_id(pair.id)
-	unsafe {
-		pair.path.free()
-		free(pair.input.data)
-		free(pair.output.data)
-		free(voidptr(pair.master.box))
-		free(voidptr(pair.slave.box))
-		free(pair.master)
-		free(pair.slave)
-		free(pair)
-	}
+	// A path reader can still borrow the detached slave box. Keep its closed
+	// pair intact through the VFS grace, including failed-open lookup pins.
+	fs.free_after_grace(voidptr(pair.path.str))
+	fs.free_after_grace(pair.input.data)
+	fs.free_after_grace(pair.output.data)
+	fs.free_after_grace(voidptr(pair.master.box))
+	fs.free_after_grace(voidptr(pair.slave.box))
+	fs.free_after_grace(pair.master)
+	fs.free_after_grace(pair.slave)
+	fs.free_charged_after_grace(voidptr(pair), pair.kernel_charge)
 }
 
 fn (mut this PtyMaster) unref(_handle voidptr) ? {
@@ -1057,9 +1064,9 @@ fn (mut this PtyMaster) unref(_handle voidptr) ? {
 	// only the node reference remains, remove it now. closing_master prevents
 	// the recursive slave unref from freeing the pair beneath this function.
 	pair.l.acquire()
-	if pair.slave.refcount == 1 {
+	if pair.slave.refcount == 1 && katomic.load(&pair.slave.stat.nlink) != 0 {
 		pair.l.release()
-		fs.devtmpfs_remove_device(pair.path)
+		fs.devtmpfs_remove_device(pair.path, pair.slave.box)
 		pair.l.acquire()
 	}
 	pair.closing_master = false
@@ -1079,14 +1086,16 @@ fn (mut this PtySlave) unref(handle voidptr) ? {
 		pair.slave_open_count--
 	}
 	pair.refresh_status_locked()
-	remove_path := handle != unsafe { nil } && !pair.master_open && !pair.closing_master
-		&& this.refcount == 1
+	// A failed lookup/open pin may be the last reference beyond the name.
+	// It must remove that name after master hangup as a description close does.
+	remove_path := !pair.master_open && !pair.closing_master
+		&& this.refcount == 1 && katomic.load(&this.stat.nlink) != 0
 	pair.l.release()
 	if remove_path {
 		// devtmpfs_remove_device drops the node's last resource reference and
 		// re-enters unref with a nil handle. This callback's closer hold keeps
 		// the pair alive until pathname removal finishes.
-		fs.devtmpfs_remove_device(pair.path)
+		fs.devtmpfs_remove_device(pair.path, this.box)
 	} else {
 		wake_pair(mut pair)
 	}

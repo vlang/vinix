@@ -46,6 +46,13 @@ fn exec_strings_from_user(vector u64, budget u64) ?[]string {
 		if pointer == 0 {
 			break
 		}
+		// Bound the copy builder and transient string clone before touching
+		// user memory; retain only actual strings/vector capacity afterwards.
+		transient := u64(exec_string_max) * 4 + 128
+		if !grow_exec_scratch(transient) {
+			free_exec_strings(mut strings)
+			return none
+		}
 		text := usercopy.copy_cstring_from_user(pointer, exec_string_max) or {
 			if errno.get() == errno.enametoolong {
 				errno.set(errno.e2big)
@@ -60,9 +67,15 @@ fn exec_strings_from_user(vector u64, budget u64) ?[]string {
 			errno.set(errno.e2big)
 			return none
 		}
+		if !grow_exec_scratch(u64(text.len + 1) * 2 + 128) {
+			unsafe { text.free() }
+			free_exec_strings(mut strings)
+			return none
+		}
 		// Appending clones a string; the array owns that copy, not this buffer.
 		strings << text
 		unsafe { text.free() }
+		shrink_exec_scratch(transient)
 	}
 	return strings
 }

@@ -1,5 +1,6 @@
 module fs
 
+import kbudget
 import errno
 import event
 import event.eventstruct
@@ -48,6 +49,7 @@ mut:
 
 struct INotify {
 mut:
+	kernel_charge kbudget.Charge
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -260,6 +262,7 @@ fn (mut this INotify) unref(_handle voidptr) ? {
 		}
 	}
 	inotify_lock.release()
+	kbudget.release(this.kernel_charge)
 	unsafe {
 		this.watches.free()
 		this.queue.free()
@@ -290,13 +293,15 @@ pub fn syscall_inotify_init(_ voidptr, flags int) (u64, u64) {
 	// The descriptor's Handle owns the resource reference.  The registry is
 	// only an index protected by inotify_lock, so it must not keep a closed
 	// instance alive indefinitely.
-	mut inotify := &INotify{creator_domain: proc.mac_current_domain()}
+	charge := proc.reserve_kernel(.ipc, u64(max_inotify_queue) * 2 + u64(max_inotify_watches) * sizeof(InotifyWatch) * 2 + 4096) or { return errno.err, errno.get() }
+	mut inotify := &INotify{creator_domain: proc.mac_current_domain(), kernel_charge: charge}
 	inotify.stat.mode = stat.ifchr | 0o600
 	inotify.stat.blksize = 1
 	// Nothing slices these, so a grown one frees the buffer it outgrew.
 	inotify.queue.flags |= .noslices
 	inotify.watches.flags |= .noslices
 	inotify_lock.acquire()
+	inotify_instances.flags |= .noslices
 	inotify_instances << inotify
 	inotify_lock.release()
 	inotify.box = &resource.Resource(unsafe { inotify }) @[freed]

@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Alexander Medvednikov
 module netlink
 
+import proc
+import kbudget
 import stat
 import klock
 import event.eventstruct
@@ -83,6 +85,8 @@ pub mut:
 
 pub struct NetlinkSocket {
 pub mut:
+	kernel_charge kbudget.Charge
+	receive_reservation int = 262144
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -115,7 +119,9 @@ pub fn create(@type int, protocol int) ?&NetlinkSocket {
 		errno.set(errno.eprotonosupport)
 		return none
 	}
+	charge := proc.reserve_kernel(.socket, 2 * 262144 + 8192)?
 	mut s := &NetlinkSocket{
+		kernel_charge: charge
 		protocol: protocol
 		status:   file.pollout
 	}
@@ -354,6 +360,8 @@ fn put_done(mut m []u8, seq u32, pid u32) {
 fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) bool {
 	// Queued on rx, or freed here when empty; read() and recvmsg() free it.
 	// Nothing slices it, so growing can free each outgrown block.
+	scratch := proc.reserve_kernel(.scratch, u64(this.receive_reservation) * 2 + 65536) or { return false }
+	defer { kbudget.release(scratch) }
 	mut reply := []u8{cap: 1024} @[freed]
 	reply.flags |= .noslices
 	mut off := u64(0)
@@ -431,6 +439,7 @@ fn (mut this NetlinkSocket) handle_request(buf voidptr, count u64) bool {
 			// as successful when the packet stack did not apply it.
 			put_ack(mut reply, seq, pid, -eopnotsupp, req, u64(msg_len))
 		}
+		if reply.cap > this.receive_limit { unsafe { reply.free() }; return false }
 		off += u64((msg_len + 3) & u32(0xfffffffc))
 	}
 	if reply.len == 0 {
@@ -647,6 +656,10 @@ pub fn (mut this NetlinkSocket) setsockopt(_handle voidptr, level int, optname i
 	if optname == sock_pub.so_sndbuf {
 		this.send_limit = limit
 	} else {
+		if limit > this.receive_reservation {
+			if !proc.grow_kernel(mut this.kernel_charge, u64(limit - this.receive_reservation) * 2) { return none }
+			this.receive_reservation = limit
+		}
 		this.receive_limit = limit
 	}
 }
@@ -681,6 +694,7 @@ fn (mut this NetlinkSocket) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
+	kbudget.release(this.kernel_charge)
 	// The last descriptor is gone, and with it anything that could still be
 	// waiting for a reply. runc opens one of these for every container.
 	for i in 0 .. this.rx.len {

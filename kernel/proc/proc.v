@@ -1,6 +1,7 @@
 @[has_globals]
 module proc
 
+import kbudget
 import klock
 import lib
 import katomic
@@ -193,6 +194,10 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 
 pub struct Process {
 pub mut:
+	kernel_owner kbudget.Owner
+	kernel_charge kbudget.Charge
+	fd_table_charge kbudget.Charge
+ command_charge kbudget.Charge
 	pid                      int
 	ppid                     int
 	pgid                     int
@@ -611,6 +616,8 @@ pub fn free_pid(pid int) {
 	// when it exited.
 	if reaped != unsafe { nil } && reaped.fds.len != 0 {
 		unsafe { reaped.fds.free() }
+		kbudget.release(reaped.fd_table_charge)
+		reaped.fd_table_charge = kbudget.Charge{}
 		reaped.fds = []voidptr{}
 	}
 	if reaped != unsafe { nil } {
@@ -689,14 +696,7 @@ fn reap_waiting_processes(now u64) {
 fn quarantine_reaped(p &Process) {
 	now := time.monotonic_ns()
 	reap_waiting_processes(now)
-	for i := 0; i < reaped_quarantine_len; i++ {
-		waiting := reaped_quarantine[i]
-		if waiting != unsafe { nil } && katomic.load(&waiting.wait_pins) == 0
-			&& now - reaped_at_ns[i] >= reaped_grace_ns {
-			reaped_quarantine[i] = unsafe { nil }
-			free_process_memory(waiting)
-		}
-	}
+	reap_quarantined_processes(now)
 	slot := reaped_next
 	reaped_next = (reaped_next + 1) % reaped_quarantine_len
 	// Only a whole quarantine's worth of processes reaped within the grace
@@ -748,6 +748,9 @@ pub fn pin_next_group_member(pgid int, sid int, after int) &Process {
 fn free_process_memory(p &Process) {
 	mut process := unsafe { p }
 	syscall_policy_reset(mut process)
+	kbudget.release(process.command_charge)
+ kbudget.release(process.kernel_charge)
+	kbudget.close_owner(process.kernel_owner)
 	unsafe {
 		process.name.free()
 		process.executable_path.free()
@@ -1523,4 +1526,24 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	text.add_decimal(seccomp_filter_count(process))
 	text.add_byte(`\n`)
 	return lib.finish_text(*text)
+}
+
+// Quotas include retired objects while their storage is still allocated.
+// Reap expired processes even when no later process exits to drive the queue.
+pub fn reap_processes() {
+ pid_lock.acquire()
+ now := time.monotonic_ns()
+ reap_waiting_processes(now)
+ reap_quarantined_processes(now)
+ pid_lock.release()
+}
+fn reap_quarantined_processes(now u64) {
+	for i := 0; i < reaped_quarantine_len; i++ {
+		waiting := reaped_quarantine[i]
+		if waiting != unsafe { nil } && katomic.load(&waiting.wait_pins) == 0
+			&& now - reaped_at_ns[i] >= reaped_grace_ns {
+			reaped_quarantine[i] = unsafe { nil }
+			free_process_memory(waiting)
+		}
+	}
 }

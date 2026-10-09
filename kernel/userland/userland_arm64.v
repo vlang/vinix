@@ -699,7 +699,9 @@ pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) 
 	trace_gpu := path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'user path copied')
 	gpu_exec_trace(trace_gpu, 'copying argument vector')
-	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+	reserve_exec_scratch() or { unsafe { path.free() }; return errno.err, errno.get() }
+ defer { release_exec_scratch() }
+ mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
 		unsafe { path.free() }
 		return errno.err, errno.get()
 	}
@@ -796,6 +798,11 @@ fn load_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_m
 }
 
 fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+ mut loading_thread := proc.current_thread()
+ if loading_thread.exec_depth >= 8 { errno.set(errno.eloop); return none }
+ loading_thread.exec_depth++
+ defer { loading_thread.exec_depth-- }
+
 	trace_gpu := execve && path == gpu_desktop_executable
 	gpu_exec_trace(trace_gpu, 'resolved executable path')
 	gpu_exec_trace(trace_gpu, 'opened executable node')
@@ -822,7 +829,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	prog.read(0, &shebang[0], 0, 2)?
 	gpu_exec_trace(trace_gpu, 'read executable signature')
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
-		real_path, arg := parse_shebang(mut prog)?
+		if !grow_exec_scratch(exec_strings_size(argv) * 4 + u64(argv.len) * 256 + 4096) { return none }
+  real_path, arg := parse_shebang(mut prog)?
 		// Room for the interpreter, its argument and the script. `<<` copies
 		// a string, so the list owns all of its strings.
 		mut final_argv := []string{cap: argv.len + 2} @[freed]
@@ -914,7 +922,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// Room for every option below, then the program's arguments. `<<`
 		// copies a string, and the rest are literals or made here, so both
 		// lists own all of their strings.
-		mut translated_argv := []string{cap: argv.len + 14} @[freed]
+		if !grow_exec_scratch((exec_strings_size(argv) + exec_strings_size(envp)) * 8 + u64(argv.len + envp.len) * 256 + 16384) { return none }
+  mut translated_argv := []string{cap: argv.len + 24} @[freed]
+ translated_argv.flags |= .noslices
 		translated_argv << translator
 		if architecture == elf.arch_x86_64 {
 			translated_argv << '-B'
@@ -931,7 +941,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			if architecture == elf.arch_i386 {
 				multiarch = 'i386-linux-gnu'
 			}
-			mut library_text := lib.new_text(256)
+			mut library_text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+ unsafe { *library_text = lib.new_text(256) }
 			library_text.add('LD_LIBRARY_PATH=')
 			library_text.add(guest_root)
 			library_text.add('/usr/lib/')
@@ -945,26 +956,34 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				library_text.add(library_path)
 			}
 			translated_argv << '-E'
-			translated_argv << library_text.str()
+			library_text_result := lib.finish_text(*library_text)
+ translated_argv << library_text_result
+ unsafe { library_text_result.free() }
 			// Mesa opens DRI drivers itself rather than through the ELF loader.
 			// Give the guest the driver directory of its own word size, or an
 			// inherited native path can make it dlopen an AArch64 driver.
-			mut drivers_text := lib.new_text(128)
+			mut drivers_text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+ unsafe { *drivers_text = lib.new_text(128) }
 			drivers_text.add('LIBGL_DRIVERS_PATH=')
 			drivers_text.add(guest_root)
 			drivers_text.add('/usr/lib/')
 			drivers_text.add(multiarch)
 			drivers_text.add('/dri')
 			translated_argv << '-E'
-			translated_argv << drivers_text.str()
+			drivers_text_result := lib.finish_text(*drivers_text)
+ translated_argv << drivers_text_result
+ unsafe { drivers_text_result.free() }
 			if guest_preload != '' {
 				// Each guest preload must match its word size and must never
 				// reach the native translator.
-				mut preload_text := lib.new_text(guest_preload.len + 16)
+				mut preload_text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+ unsafe { *preload_text = lib.new_text(guest_preload.len + 16) }
 				preload_text.add('LD_PRELOAD=')
 				preload_text.add(guest_preload)
 				translated_argv << '-E'
-				translated_argv << preload_text.str()
+				preload_text_result := lib.finish_text(*preload_text)
+ translated_argv << preload_text_result
+ unsafe { preload_text_result.free() }
 			}
 		}
 		// argv[0] is the caller's to choose, as it is for a native program:
@@ -987,13 +1006,16 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			translated_envp << environment_entry
 		}
 		if !own_root && !has_library_path {
-			mut library_text := lib.new_text(2 * guest_root.len + 32)
+			mut library_text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+ unsafe { *library_text = lib.new_text(2 * guest_root.len + 32) }
 			library_text.add('LD_LIBRARY_PATH=')
 			library_text.add(guest_root)
 			library_text.add('/lib:')
 			library_text.add(guest_root)
 			library_text.add('/usr/lib')
-			translated_envp << library_text.str()
+			library_text_result := lib.finish_text(*library_text)
+ translated_envp << library_text_result
+ unsafe { library_text_result.free() }
 		}
 
 		if execve {
@@ -1044,6 +1066,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 	}
 	if omit_foreign_preload {
+  if !grow_exec_scratch(exec_strings_size(envp) * 4 + u64(envp.len) * 128 + 4096) { return none }
 		// `<<` copies the strings; this frees them with the list.
 		program_envp = []string{cap: envp.len} @[freed]
 		for entry in envp {
@@ -1059,11 +1082,20 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 
 	gpu_exec_trace(trace_gpu, 'allocating replacement page map')
-	mut new_pagemap := memory.new_pagemap()
+	mut new_pagemap := memory.new_user_pagemap(proc.kernel_owner())?
+ mut map_transferred := false
+ defer {
+  if !map_transferred {
+   saved_error := errno.get()
+   mmap.delete_pagemap(mut new_pagemap) or {}
+   errno.set(saved_error)
+  }
+ }
 	gpu_exec_trace(trace_gpu, 'allocated replacement page map')
 	gpu_exec_trace(trace_gpu, 'loading program ELF segments')
 	mut auxval := elf.Auxval{}
 	mut ld_path := ''
+ defer { unsafe { ld_path.free() } }
 	if trace_gpu {
 		auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or {
 			return exec_format_error(err)
@@ -1083,22 +1115,19 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		ld_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 		ld_node := fs.get_node_and_mount(root, ld_path, true, ld_mount) or {
 			failure := errno.get()
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(failure)
 			return none
 		}
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0 {
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(errno.eacces)
 			return none
 		}
 		fs.check_access(ld_node, fs.access_exec, true) or {
 			failure := errno.get()
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(failure)
 			return none
 		}
@@ -1132,12 +1161,28 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				u64(auxval.at_entry))
 		}
 
-		unsafe { ld_path.free() }
+
 	}
 	sigreturn_page := install_sigreturn_page(mut new_pagemap) or { return none }
 
+	// Successful exec never returns through its defers. The interpreter
+	// pathname is no longer needed once both images have loaded.
+	unsafe { ld_path.free() }
+	ld_path = ''
+
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
+  mut process_started := false
+  defer {
+   if !process_started {
+    saved_error := errno.get()
+    proc.lock_table()
+    new_process.pagemap = unsafe { nil }
+    proc.unlock_table()
+    abandon_new_process(mut new_process)
+    errno.set(saved_error)
+   }
+  }
 
 		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = fs.program_path(prog_node, path)
@@ -1180,13 +1225,15 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			handle: stderr_handle
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
-		proc.set_command_line(mut new_process, argv)
+		proc.set_command_line(mut new_process, argv)?
 		mut started := false
 		defer { if !started { proc.clear_command_line(mut new_process) } }
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			program_envp, auxval, true)?
 		started = true
+ process_started = true
+ map_transferred = true
 
 		return new_process
 	} else {
@@ -1194,7 +1241,10 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		mut curr_process := t.process
 		gpu_exec_trace(trace_gpu, 'beginning process image replacement')
 		// Named before the close-on-exec descriptors go: fexecve() runs one.
-		program_path := fs.program_path(prog_node, path)
+		command := proc.prepare_command_line(curr_process.kernel_owner, argv)?
+  program_path := fs.program_path(prog_node, path)
+  mut command_transferred := false
+  defer { if !command_transferred { proc.discard_command_line(command) } }
 
 		// Every other thread has to be gone before the address space they are
 		// running in is replaced -- and before the close-on-exec descriptors
@@ -1234,6 +1284,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		mut old_pagemap := curr_process.pagemap
 		proc.preserve_peak_rss(curr_process, old_pagemap)
 		curr_process.pagemap = new_pagemap
+ map_transferred = true
 		proc.dumpability_after_exec(mut curr_process)
 		proc.unlock_table()
 
@@ -1244,7 +1295,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 		curr_process.name = proc.process_name(path, curr_process.pid)
 		curr_process.executable_path = program_path
-		proc.set_command_line(mut curr_process, argv)
+		proc.install_command_line(mut curr_process, command)
+  command_transferred = true
 		proc.set_executable_fs(mut curr_process, voidptr(prog_node), prog_mount)
 		// The replacement mappings now own their inode references, and the
 		// executable node is recorded before its final descriptor goes.
@@ -1356,6 +1408,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			unsafe { program_envp.free() }
 		}
 		free_exec_arguments(path, argv, envp)
+  release_exec_scratch()
 		gpu_exec_trace(trace_gpu, 'retiring original execve thread')
 		if trace_gpu {
 			sched.dequeue_and_die_traced()
@@ -1364,51 +1417,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 }
 
-pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
-	// Parse the shebang that we already know is there.
-	// Syntax: #![whitespace]interpreter [single arg]new line
-	mut index := u64(2)
-	mut build_path := strings.new_builder(512)
-	mut build_arg := strings.new_builder(512)
 
-	mut c := char(0)
-	res.read(0, &c, index, 1)?
-	if c == char(` `) {
-		index++
-	}
-
-	for {
-		res.read(0, &c, index, 1)?
-		index++
-		if c == char(` `) {
-			break
-		}
-		if c == char(`\n`) {
-			unsafe {
-				goto ret
-			}
-		}
-		build_path.write_rune(rune(c))
-	}
-
-	for {
-		res.read(0, &c, index, 1)?
-		index++
-		if c == char(` `) || c == char(`\n`) {
-			break
-		}
-		build_arg.write_rune(rune(c))
-	}
-
-	ret:
-	final_path := build_path.str()
-	final_arg := build_arg.str()
-	unsafe {
-		build_path.free()
-		build_arg.free()
-	}
-	return final_path, final_arg
-}
 
 // execveat(dirfd, path, argv, envp, flags): execve relative to a directory
 // descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
@@ -1451,10 +1460,11 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		} else {
 			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
 		}
-		mut name := lib.new_text(32)
+		mut name := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+  unsafe { *name = lib.new_text(32) }
 		name.add('/proc/self/fd/')
 		name.add_decimal(i64(dirfd))
-		target = name.str()
+		target = lib.finish_text(*name)
 	} else {
 		directory = fs.parent_and_mount_for(dirfd, path, direct_mount) or {
 			unsafe { path.free() }
@@ -1466,7 +1476,9 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
-	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+	reserve_exec_scratch() or { unsafe { target.free() }; return errno.err, errno.get() }
+ defer { release_exec_scratch() }
+ mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
 		unsafe { target.free() }
 		return errno.err, errno.get()
 	}

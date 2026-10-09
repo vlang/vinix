@@ -1,5 +1,6 @@
 module socket
 
+import kbudget
 import resource
 import file
 import errno
@@ -145,9 +146,10 @@ fn collect_passed_fds(msg &sock_pub.MsgHdr) ?[]&file.FD {
 			}
 			// fd_from_fdnum() acquired the Handle reference now owned by this
 			// queued descriptor, so only the source descriptor is let go.
-			mut passed := &file.FD{
-				handle: source.handle
-				flags:  0
+			mut passed := file.adopt_passed_handle(source.handle) or {
+				source.unref()
+				release_passed_fds(mut result)
+				return none
 			}
 			source.release_descriptor()
 			result << passed
@@ -482,6 +484,8 @@ pub fn receive_message(fdnum int, mut header sock_pub.MsgHdr, flags int) (u64, u
 			return errno.err, errno.efault
 		}
 	}
+	scratch := proc.reserve_kernel(.scratch, size * 2 + control_max * 2 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
 	unsafe { C.memset(small, 0, small_message) }
 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
@@ -626,6 +630,8 @@ pub fn syscall_sendto(_ voidptr, fdnum int, buf voidptr, len u64, flags int, des
 		return errno.err, errno.get()
 	}
 	size := if len <= message_max { len } else { message_max + 1 }
+	scratch := proc.reserve_kernel(.scratch, size * 2 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
 	unsafe { C.memset(small, 0, small_message) }
 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
@@ -724,6 +730,8 @@ pub fn syscall_recvfrom(_ voidptr, fdnum int, buf voidptr, len u64, flags int, s
 	mut length := unsafe { &u32(voidptr(u64(address_lengths) + sizeof(u32))) }
 	unsafe { *length = offered }
 	size := if len < message_max { len } else { message_max }
+	scratch := proc.reserve_kernel(.scratch, size * 2 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
 	unsafe { C.memset(small, 0, small_message) }
 	buffer := if size <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(size) } }
@@ -853,6 +861,8 @@ pub fn send_message(fdnum int, header &sock_pub.MsgHdr, flags int) (u64, u64) {
 	if total > message_max {
 		total = message_max + 1
 	}
+	scratch := proc.reserve_kernel(.scratch, total * 2 + header.msg_controllen * 4 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	small := unsafe { &u8(C.vinix_stack_alloc(small_message)) }
 	unsafe { C.memset(small, 0, small_message) }
 	buffer := if total <= small_message { unsafe { voidptr(&small[0]) } } else { unsafe { malloc(total) } }

@@ -8,6 +8,7 @@
 // named pipe.
 module fs
 
+import kbudget
 import errno
 import katomic
 import klock
@@ -23,6 +24,7 @@ import event.eventstruct
 @[heap]
 struct MknodDeviceResource {
 pub mut:
+	kernel_charge kbudget.Charge
 	stat     stat.Stat
 	refcount int
 	l        klock.Lock
@@ -45,16 +47,22 @@ fn (this &MknodDeviceResource) block_identity() resource.BlockIdentity { return 
 // A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
 // must decide it for the container's node too.
 fn (mut this MknodDeviceResource) open_owned(flags int) ?&resource.Resource {
-	mut backing := this.backing
-	openable := backing is resource.OwnedOpenableResource || backing is resource.OpenableResource
-	if openable {
-		opened := resource.open_resource(mut backing, flags) or { return none }
-		mut result := opened.resource
-		if !opened.owned { katomic.inc(mut &result.refcount) }
-		return result
-	}
-	katomic.inc(mut &this.refcount)
-	return this.boxed
+ // A path lookup can race unlink. Never resurrect a retired wrapper, and
+ // hold it while a delegated open blocks and still borrows the backing.
+ for {
+  refs := katomic.load(&this.refcount)
+  if refs == 0 { errno.set(errno.enoent); return none }
+  if katomic.cas(mut &this.refcount, refs, refs + 1) { break }
+ }
+ mut backing := this.backing
+ if backing is resource.OwnedOpenableResource || backing is resource.OpenableResource {
+  defer { this.unref(unsafe { nil }) or {} }
+  opened := resource.open_resource(mut backing, flags) or { return none }
+  mut result := opened.resource
+  if !opened.owned { katomic.inc(mut &result.refcount) }
+  return result
+ }
+ return this.boxed
 }
 
 fn (mut this MknodDeviceResource) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
@@ -82,7 +90,11 @@ fn (mut this MknodDeviceResource) grow(_handle voidptr, _new_size u64) ? {
 }
 
 fn (mut this MknodDeviceResource) unref(_handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
+	if !katomic.dec(mut &this.refcount) {
+		release_resource_after_grace(this.backing)
+		free_after_grace(voidptr(this.boxed))
+		free_charged_after_grace(voidptr(this), this.kernel_charge)
+	}
 }
 
 fn (mut this MknodDeviceResource) link(_handle voidptr) ? {
@@ -190,9 +202,24 @@ fn make_device_node(mut parent VFSNode, name string, mode u32, rdev u64) ?&VFSNo
 }
 
 fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, backing &resource.Resource) ?&VFSNode {
-	mut node := create_node(parent.filesystem, parent, name, false)
+ node := prepare_device_node(mut parent, name, mode, rdev, backing)?
+ unsafe { parent.children[name] = node }
+ return node
+}
+
+fn prepare_device_node(mut parent VFSNode, name string, mode u32, rdev u64, backing &resource.Resource) ?&VFSNode {
+	charge := proc.reserve_kernel(.file, 8192)?
+	mut transferred := false
+	defer { if !transferred { kbudget.release(charge) } }
+	wrapper_charge := proc.reserve_kernel(.file, 4096)?
+ mut node := create_node(parent.filesystem, parent, name.clone(), false)
+	node.kernel_charge = charge
+	transferred = true
 	mut actual_backing := unsafe { backing }
+	resource.retain_resource(mut actual_backing)
+
 	mut res := &MknodDeviceResource{
+		kernel_charge: wrapper_charge
 		refcount: 1
 		backing:  unsafe { backing }
 		block_extent: resource.block_identity(mut actual_backing)
@@ -213,21 +240,23 @@ fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 	node.resource = boxed
 	apply_creation_identity(mut node, parent) or {
 		failure := errno.get()
-		// This wrapper has not been published or opened; it owns neither
-		// the backing device nor any queued work. Retire only its node.
+		// This unpublished wrapper owns one backing reference. Return it
+		// outside VFS locks; its final release can detach a device pathname.
 		node.resource = unsafe { nil }
+		kbudget.release(wrapper_charge)
+		release_resource_after_grace(backing)
 		unsafe { free(boxed); free(res) }
 		retire_node(mut node)
 		errno.set(failure)
 		return none
 	}
-	unsafe {
-		parent.children[name] = node
-	}
 	return node
 }
 
 fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
+	charge := proc.reserve_kernel(.file, 8192)?
+	mut transferred := false
+	defer { if !transferred { kbudget.release(charge) } }
 	// A named pipe has no ends open until something opens one, and blocks
 	// an opener until the other side arrives; see pipe.create_fifo.
 	mut new_pipe := pipe.create_fifo(mode) or {
@@ -237,7 +266,9 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 	// One interface value for the node, rather than one more for the call.
 	mut boxed := new_pipe.box
 	number_special_node(mut boxed, parent)
-	mut node := create_node(parent.filesystem, parent, name, false)
+	mut node := create_node(parent.filesystem, parent, name.clone(), false)
+	node.kernel_charge = charge
+	transferred = true
 	node.resource = boxed
 	apply_creation_identity(mut node, parent) or {
 		failure := errno.get()
@@ -307,7 +338,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	// layer.
 	if dir.overlay != unsafe { nil } && (kind == stat.ififo || kind == stat.ifchr
 		|| kind == stat.ifblk) {
-		overlay_mknod(mut dir, basename.clone(), kind | final_mode, dev) or {
+		overlay_mknod(mut dir, basename, kind | final_mode, dev) or {
 			return errno.err, errno.get()
 		}
 		return 0, 0
@@ -319,12 +350,12 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 			}
 		}
 		stat.ififo {
-			make_fifo_node(mut dir, basename.clone(), final_mode) or {
+			make_fifo_node(mut dir, basename, final_mode) or {
 				return errno.err, errno.get()
 			}
 		}
 		stat.ifchr, stat.ifblk {
-			make_device_node(mut dir, basename.clone(), kind | final_mode, dev) or {
+			make_device_node(mut dir, basename, kind | final_mode, dev) or {
 				return errno.err, errno.get()
 			}
 		}
@@ -339,4 +370,17 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 		}
 	}
 	return 0, 0
+}
+
+// Dynamically retired device wrappers cannot be resurrected by a lockless
+// lookup. Other published devices may start with a zero static refcount.
+fn retain_open_origin(mut res resource.Resource) ? {
+ if mut res is MknodDeviceResource {
+  for {
+   refs := katomic.load(&res.refcount)
+   if refs == 0 { errno.set(errno.enoent); return none }
+   if katomic.cas(mut &res.refcount, refs, refs + 1) { return }
+  }
+ }
+ resource.retain_resource(mut res)
 }

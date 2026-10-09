@@ -1,6 +1,7 @@
 @[has_globals]
 module proc
 
+import kbudget
 import klock
 import katomic
 import lib
@@ -176,6 +177,9 @@ pub mut:
 	// for it. Never both, so nothing is released twice. A word rather than a
 	// bool, since katomic.cas works on 4 and 8 bytes only.
 	exit_claimed u32
+	kernel_charge kbudget.Charge
+ exec_scratch kbudget.Charge
+ exec_depth u32
 }
 
 pub fn (t &Thread) current_syscall() (i64, u64) {

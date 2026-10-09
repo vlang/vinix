@@ -17,6 +17,7 @@
 @[has_globals]
 module fs
 
+import kbudget
 import stat
 import klock
 import lib
@@ -56,6 +57,7 @@ enum ProcFSKind {
 	statm
 	status
 	meminfo
+	kernel_resources
 	slabinfo
 	allocstart
 	allocsites
@@ -269,6 +271,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	// The machine-wide files never come and go, so they are made once.
 	// Machine counters are cumulative; userspace chooses its sampling interval.
 	add_procfs_file(mut root, 'meminfo', .meminfo)
+	add_procfs_file(mut root, 'kernel-resources', .kernel_resources)
 	add_procfs_file(mut root, 'activity_io', .activity_io)
 	add_procfs_file(mut root, 'activity_gpu', .activity_gpu)
 	mut pressure := create_node(root.filesystem, root, 'vmpressure', false)
@@ -546,6 +549,23 @@ fn (this &ProcFSResource) contents() string {
 	match this.kind {
 		.text, .sysctl {
 			return this.text
+		}
+		.kernel_resources {
+			usage := kbudget.snapshot()
+			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+   unsafe { *text = lib.new_text(512) }
+			text.add('Limit: '); text.add_unsigned(usage.limit)
+			text.add('\nOwnerLimit: '); text.add_unsigned(usage.owner_limit)
+			text.add('\nCharged: '); text.add_unsigned(usage.bytes)
+			text.add('\nAccounts: '); text.add_unsigned(usage.accounts)
+			text.add('\nDenied: '); text.add_unsigned(usage.denials)
+			text.add('\nKind Objects Bytes\n')
+			names := ['file', 'descriptor', 'socket', 'ipc', 'mapping', 'process', 'thread', 'scratch']!
+			for i in 0 .. kbudget.kinds {
+				text.add(names[i]); text.add(' '); text.add_unsigned(usage.objects[i])
+				text.add(' '); text.add_unsigned(usage.charged[i]); text.add('\n')
+			}
+			return lib.finish_text(*text)
 		}
 		.meminfo {
 			total_kb := memory.total_bytes() / 1024

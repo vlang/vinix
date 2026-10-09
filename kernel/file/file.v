@@ -1,5 +1,6 @@
 module file
 
+import kbudget
 import resource
 import proc
 import klock
@@ -62,8 +63,12 @@ pub const fd_cloexec = 1
 
 pub struct Handle {
 pub mut:
+	kernel_charge kbudget.Charge
 	l             klock.Lock
 	resource      &resource.Resource = unsafe { nil }
+ // The path resource stays alive across blocking/delegated opens and for
+ // metadata through Handle.node, even when resource is a different device.
+ origin_resource &resource.Resource = unsafe { nil }
 	// An openable device may return another resource class. Keep its origin
 	// so that passing the resulting descriptor cannot erase the device gate.
 	mac_device bool
@@ -123,9 +128,14 @@ fn (mut this Handle) unref() {
 		return
 	}
 
+	kbudget.release(this.kernel_charge)
 	release_flock(this)
 	mut res := this.resource
 	res.unref(voidptr(this)) or {}
+ if this.origin_resource != unsafe { nil } {
+  mut origin := this.origin_resource
+  resource.release_resource(mut origin)
+ }
 	if this.node != unsafe { nil } && voidptr(handle_released) != unsafe { nil } {
 		handle_released(this.node)
 	}
@@ -332,6 +342,8 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 	}
 	pagemap := proc.current_thread().process.pagemap
 
+	scratch := proc.reserve_kernel(.scratch, nfds * 128 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	mut pollfds := []PollFD{len: int(nfds)} @[freed]
 	defer {
 		unsafe { pollfds.free() }
@@ -373,6 +385,8 @@ pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64
 	}
 	pagemap := proc.current_thread().process.pagemap
 
+	scratch := proc.reserve_kernel(.scratch, nfds * 128 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
 	mut pollfds := []PollFD{len: int(nfds)} @[freed]
 	defer {
 		unsafe { pollfds.free() }
@@ -508,6 +522,8 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 	size := if count < limit { count } else { limit }
 	// Own this temporary explicitly: the compiler can move a fixed array
 	// whose address reaches a resource to the heap, even inside unsafe.
+	scratch := proc.reserve_kernel(.scratch, size * 2 + 128)?
+	defer { kbudget.release(scratch) }
 	buffer := unsafe { malloc(size) } @[freed]
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
@@ -617,6 +633,8 @@ pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
 	size := if count < limit { count } else { limit }
 	// Own this temporary explicitly: the compiler can move a fixed array
 	// whose address reaches a resource to the heap, even inside unsafe.
+	scratch := proc.reserve_kernel(.scratch, size * 2 + 128)?
+	defer { kbudget.release(scratch) }
 	buffer := unsafe { malloc(size) } @[freed]
 	if buffer == unsafe { nil } {
 		errno.set(errno.enomem)
@@ -651,6 +669,7 @@ pub fn (mut this Handle) ioctl(request u64, argp voidptr) ?int {
 
 pub struct FD {
 pub mut:
+	kernel_charge kbudget.Charge
 	handle &Handle = unsafe { nil }
 	flags  int
 	// The descriptor table's reference, plus one for every syscall that has
@@ -673,6 +692,7 @@ pub fn (mut this FD) unref() {
 // over a socket.
 pub fn (mut this FD) release_descriptor() {
 	if !katomic.dec(mut &this.refcount) {
+		kbudget.release(this.kernel_charge)
 		unsafe { free(voidptr(this)) }
 	}
 }
@@ -785,8 +805,11 @@ fn grow_fd_table(mut process proc.Process, fdnum int) bool {
 	if length > proc.max_fds {
 		length = proc.max_fds
 	}
+	new_bytes := u64(length) * sizeof(voidptr) * 2
+	if !proc.grow_kernel(mut process.fd_table_charge, new_bytes) { return false }
 	mut bigger := unsafe { []voidptr{len: length} } @[freed]
 	if bigger.len != length {
+		kbudget.shrink(mut process.fd_table_charge, new_bytes)
 		return false
 	}
 	for i in 0 .. process.fds.len {
@@ -794,13 +817,26 @@ fn grow_fd_table(mut process proc.Process, fdnum int) bool {
 	}
 	mut old := unsafe { process.fds }
 	process.fds = bigger
+	old_bytes := u64(old.len) * sizeof(voidptr) * 2
 	unsafe { old.free() }
+	kbudget.shrink(mut process.fd_table_charge, old_bytes)
 	return true
 }
 
 // The descriptors a process has open, and their flags, read in one go under
 // the table's lock: what fork copies into the child.
-pub fn open_fdnums(process &proc.Process) []int {
+pub struct FDNumberSnapshot {
+pub mut:
+	 nums []int
+	 charge kbudget.Charge
+}
+
+pub fn (mut snapshot FDNumberSnapshot) dispose() {
+	unsafe { snapshot.nums.free() }
+	kbudget.release(snapshot.charge)
+}
+
+pub fn open_fdnums(process &proc.Process) ?FDNumberSnapshot {
 	mut target := unsafe { process }
 	target.fds_lock.acquire()
 	defer {
@@ -812,14 +848,15 @@ pub fn open_fdnums(process &proc.Process) []int {
 			count++
 		}
 	}
-	// The caller frees it.
+	// The snapshot owns both the allocation and its temporary reservation.
+	charge := proc.reserve_kernel(.scratch, u64(count) * sizeof(int) * 2 + 128)?
 	mut open := []int{cap: count} @[freed]
 	for i, slot in target.fds {
 		if slot != unsafe { nil } {
 			open << i
 		}
 	}
-	return open
+	return FDNumberSnapshot{nums: open, charge: charge}
 }
 
 pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
@@ -828,8 +865,8 @@ pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 }
 
 // Openable endpoints may return a reference retained under their lookup lock.
-// Adopt it exactly once. The constructors below do not have a fallible step;
-// a later descriptor-table failure drops it through FD.unref with its Handle.
+// Adopt it exactly once. Construction failure returns it using the same
+// flags as a real Handle; a table failure drops it through FD.unref.
 pub fn fd_create_from_opened(opened resource.OpenedResource, flags int) ?&FD {
 	mut res := opened.resource
 	if !opened.owned { katomic.inc(mut &res.refcount) }
@@ -837,12 +874,18 @@ pub fn fd_create_from_opened(opened resource.OpenedResource, flags int) ?&FD {
 }
 
 fn fd_create_adopting_resource(mut res resource.Resource, flags int) ?&FD {
-	mut new_handle := &Handle{}
+	handle_charge := proc.reserve_kernel(.file, 1024) or { release_unopened_resource(mut res, flags); return none }
+	fd_charge := proc.reserve_kernel(.descriptor, 128) or {
+		kbudget.release(handle_charge)
+		release_unopened_resource(mut res, flags)
+		return none
+	}
+	mut new_handle := &Handle{kernel_charge: handle_charge}
 	new_handle.resource = unsafe { res }
 	new_handle.refcount = 1
 	new_handle.flags = flags & resource.file_status_flags_mask
 
-	mut new_fd := &FD{}
+	mut new_fd := &FD{kernel_charge: fd_charge}
 	new_fd.handle = new_handle
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
 
@@ -852,9 +895,7 @@ fn fd_create_adopting_resource(mut res resource.Resource, flags int) ?&FD {
 pub fn fdnum_create_from_resource(_process &proc.Process, mut res resource.Resource, flags int, oldfd int, specific bool) ?int {
 	new_fd := fd_create_from_resource(mut res, flags) or { return none }
 	return fdnum_create_from_fd(_process, new_fd, oldfd, specific) or {
-		mut handle := new_fd.handle
-		unsafe { free(voidptr(new_fd)) }
-		handle.unref()
+		new_fd.unref()
 		return none
 	}
 }
@@ -918,15 +959,15 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 		oldfd.unref()
 	}
 
+	charge := proc.reserve_kernel_for(new_process.kernel_owner, .descriptor, 128)?
 	mut new_fd := unsafe { &FD(malloc(sizeof(FD))) }
 	unsafe { C.memcpy(new_fd, oldfd, sizeof(FD)) }
+	new_fd.kernel_charge = charge
 	new_fd.refcount = 1
 	katomic.inc(mut &oldfd.handle.refcount)
 
 	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {
-		mut handle := new_fd.handle
-		unsafe { free(voidptr(new_fd)) }
-		handle.unref()
+		new_fd.unref()
 		return none
 	}
 
@@ -1096,7 +1137,9 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 		handle.l.release()
 		return u64(read), 0
 	}
-	buffer := unsafe { malloc(if count < user_io_chunk { count } else { user_io_chunk }) }
+	scratch := proc.reserve_kernel(.scratch, (if count < user_io_chunk { count } else { user_io_chunk }) * 2 + 128) or { return errno.err, errno.get() }
+ defer { kbudget.release(scratch) }
+ buffer := unsafe { malloc(if count < user_io_chunk { count } else { user_io_chunk }) }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
@@ -1164,7 +1207,9 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 		return errno.err, errno.get()
 	}
 	if allowed == 0 { return 0, 0 }
-	buffer := unsafe { malloc(if allowed < user_io_chunk { allowed } else { user_io_chunk }) }
+	scratch := proc.reserve_kernel(.scratch, (if allowed < user_io_chunk { allowed } else { user_io_chunk }) * 2 + 128) or { return errno.err, errno.get() }
+ defer { kbudget.release(scratch) }
+ buffer := unsafe { malloc(if allowed < user_io_chunk { allowed } else { user_io_chunk }) }
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
@@ -1596,4 +1641,22 @@ pub fn set_fd_flags(fdnum int, flags int) {
 		mut handle := fd.handle
 		handle.flags |= resource.o_nonblock
 	}
+}
+
+// Adopt a Handle reference acquired by fd_from_fdnum, without copying the
+// source descriptor's charge. SCM_RIGHTS keeps this charge until delivered or
+// discarded, even after the sender exits.
+pub fn adopt_passed_handle(handle &Handle) ?&FD {
+	charge := proc.reserve_kernel(.descriptor, 256)?
+	// FD.release_descriptor frees it on receipt, close or queued-rights discard.
+	fd := &FD{handle: unsafe { handle }, kernel_charge: charge} @[freed]
+	return fd
+}
+
+fn release_unopened_resource(mut res resource.Resource, flags int) {
+	// FIFO open counted an end and an owned device open may have side effects.
+	// Use caller-stack Handle storage while returning that adopted reference.
+	handle := unsafe { &Handle(C.vinix_stack_alloc(sizeof(Handle))) }
+	unsafe { *handle = Handle{flags: flags & resource.file_status_flags_mask} }
+	res.unref(voidptr(handle)) or {}
 }

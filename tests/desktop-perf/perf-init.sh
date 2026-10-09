@@ -110,15 +110,18 @@ run_case() {
 			sleep 2
 			before=$("$perf/measure" used)
 			cat /proc/slabinfo >/tmp/slabinfo.before 2>/dev/null
+			if [ -r /proc/allocstart ]; then
+				cat /proc/allocstart >/dev/null
+			fi
 			i=0
 			while [ "$i" -lt 300 ]; do
 				$program >/dev/null 2>&1
 				i=$((i + 1))
 			done
 			sync
-			# Reaped processes are freed once they have been gone two seconds,
-			# when the next one is reaped: `sync` is that one.
-			sleep 3
+			# Let both the process quarantine and the five-second VFS grace
+			# expire; the periodic worker now reaps without a further exit.
+			sleep 6
 			sync
 			after=$("$perf/measure" used)
 			echo "PERF-CHURN $label program=\"$program\" runs=300 retained_kb=$(((after - before) / 1024)) per_run_bytes=$(((after - before) / 300))"
@@ -129,6 +132,10 @@ run_case() {
 					$1 != "#" && ($3 - objects[$1] != 0 || $4 - pages[$1] != 0) {
 						printf "PERF-SLAB %s program=\"%s\" class=%s objects=%+d pages=%+d\n", label, program, $1, $3 - objects[$1], $4 - pages[$1]
 					}' /tmp/slabinfo.before -
+			fi
+			if [ -r /proc/allocsites ]; then
+				/bin/busybox awk -v label="$label" -v program="$program" \
+					'{ printf "PERF-SITE %s program=\"%s\" %s\n", label, program, $0 }' /proc/allocsites
 			fi
 		done
 		return

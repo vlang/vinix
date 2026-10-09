@@ -92,7 +92,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 		snip_size := snip_end - snip_begin
 
 		if snip_begin > local_range.base && snip_end < local_end {
-			mut postsplit_range := &MmapRangeLocal{
+			mut postsplit_range := new_local_range(MmapRangeLocal{
 				pagemap: local_range.pagemap
 				base: snip_end
 				length: local_end - snip_end
@@ -104,14 +104,14 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
-			}
+			})?
 			split_off_unlocked(mut pagemap, local_range, postsplit_range)
 		}
 
 		if snip_size == local_range.length {
 			local_range.immutable = true
 		} else {
-			mut immutable_range := &MmapRangeLocal{
+			mut immutable_range := new_local_range(MmapRangeLocal{
 				pagemap: local_range.pagemap
 				base: snip_begin
 				length: snip_size
@@ -123,7 +123,7 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				dont_fork: local_range.dont_fork
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
-			}
+			})?
 			split_off_unlocked(mut pagemap, local_range, immutable_range)
 		}
 		current = snip_end

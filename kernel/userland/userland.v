@@ -210,7 +210,9 @@ pub fn dispatch_a_signal_info(context &cpulocal.GPRState, signal int, code int, 
 
 pub fn syscall_execve(_ voidptr, _path charptr, _argv &charptr, _envp &charptr) (u64, u64) {
 	path := fs.user_path(_path) or { return errno.err, errno.get() }
-	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+	reserve_exec_scratch() or { unsafe { path.free() }; return errno.err, errno.get() }
+ defer { release_exec_scratch() }
+ mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
 		unsafe { path.free() }
 		return errno.err, errno.get()
 	}
@@ -279,6 +281,11 @@ pub fn start_program_node(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, p
 }
 
 fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_mount &lib.MountContext, path string, argv []string, envp []string, stdin_path string, stdout_path string, stderr_path string, handed_on &bool) ?&proc.Process {
+ mut loading_thread := proc.current_thread()
+ if loading_thread.exec_depth >= 8 { errno.set(errno.eloop); return none }
+ loading_thread.exec_depth++
+ defer { loading_thread.exec_depth-- }
+
 	// The program, or a script's interpreter, is subject to pledge(2) and
 	// unveil(2); the ELF interpreter the kernel loads for it is not.
 	if execve && !fs.policy_check(prog_node, proc.policy_exec) {
@@ -301,7 +308,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	mut shebang := [2]char{}
 	prog.read(0, &shebang[0], 0, 2)?
 	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
-		real_path, arg := parse_shebang(mut prog)?
+		if !grow_exec_scratch(exec_strings_size(argv) * 4 + u64(argv.len) * 256 + 4096) { return none }
+  real_path, arg := parse_shebang(mut prog)?
 		// Room for the interpreter, its argument and the script. `<<` copies
 		// a string, so the list owns all of its strings.
 		mut final_argv := []string{cap: argv.len + 2} @[freed]
@@ -354,9 +362,18 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 
 	// Made after the shebang check: a script never used it, and lost it.
-	mut new_pagemap := memory.new_pagemap()
+	mut new_pagemap := memory.new_user_pagemap(proc.kernel_owner())?
+ mut map_transferred := false
+ defer {
+  if !map_transferred {
+   saved_error := errno.get()
+   mmap.delete_pagemap(mut new_pagemap) or {}
+   errno.set(saved_error)
+  }
+ }
 
 	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
+ defer { unsafe { ld_path.free() } }
 
 	mut entry_point := unsafe { nil }
 
@@ -368,22 +385,19 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		ld_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 		ld_node := fs.get_node_and_mount(fs.process_root(proc.current_thread().process), ld_path, true, ld_mount) or {
 			failure := errno.get()
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(failure)
 			return none
 		}
 		if !stat.isreg(ld_node.resource.stat.mode)
 			|| fs.mount_flags(ld_mount) & fs.ms_noexec != 0 {
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(errno.eacces)
 			return none
 		}
 		fs.check_access(ld_node, fs.access_exec, true) or {
 			failure := errno.get()
-			unsafe { ld_path.free() }
-			mmap.delete_pagemap(mut new_pagemap) or {}
+
 			errno.set(failure)
 			return none
 		}
@@ -400,11 +414,27 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		entry_point = voidptr(ld_auxval.at_entry)
 		auxval.at_base = ld_auxval.at_base
 
-		unsafe { ld_path.free() }
+
 	}
+
+	// Successful exec never returns through its defers. The interpreter
+	// pathname is no longer needed once both images have loaded.
+	unsafe { ld_path.free() }
+	ld_path = ''
 
 	if execve == false {
 		mut new_process := sched.new_process(unsafe { nil }, new_pagemap)?
+  mut process_started := false
+  defer {
+   if !process_started {
+    saved_error := errno.get()
+    proc.lock_table()
+    new_process.pagemap = unsafe { nil }
+    proc.unlock_table()
+    abandon_new_process(mut new_process)
+    errno.set(saved_error)
+   }
+  }
 
 		new_process.name = proc.process_name(path, new_process.pid)
 		new_process.executable_path = fs.program_path(prog_node, path)
@@ -446,20 +476,25 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			handle: stderr_handle
 		}
 		new_process.fds[2] = voidptr(stderr_fd)
-		proc.set_command_line(mut new_process, argv)
+		proc.set_command_line(mut new_process, argv)?
 		mut started := false
 		defer { if !started { proc.clear_command_line(mut new_process) } }
 
 		sched.new_user_thread(new_process, true, entry_point, unsafe { nil }, 0, argv,
 			envp, auxval, true)?
 		started = true
+ process_started = true
+ map_transferred = true
 
 		return new_process
 	} else {
 		mut t := proc.current_thread()
 		mut process := t.process
 		// Named before the close-on-exec descriptors go: fexecve() runs one.
-		program_path := fs.program_path(prog_node, path)
+		command := proc.prepare_command_line(process.kernel_owner, argv)?
+  program_path := fs.program_path(prog_node, path)
+  mut command_transferred := false
+  defer { if !command_transferred { proc.discard_command_line(command) } }
 
 		// Every other thread has to be gone before the address space it runs
 		// in is replaced, and before the close-on-exec descriptors go. POSIX
@@ -493,6 +528,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		mut old_pagemap := process.pagemap
 		proc.preserve_peak_rss(process, old_pagemap)
 		process.pagemap = new_pagemap
+ map_transferred = true
 		proc.dumpability_after_exec(mut process)
 		proc.unlock_table()
 		// The LDT goes with the program, as on Linux; the new thread's TLS
@@ -509,7 +545,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// names the file wherever the exec found it -- by a relative path, or
 		// through a descriptor.
 		process.executable_path = program_path
-		proc.set_command_line(mut process, argv)
+		proc.install_command_line(mut process, command)
+  command_transferred = true
 		proc.set_executable_fs(mut process, voidptr(prog_node), prog_mount)
 		// The replacement mappings now own their inode references, and the
 		// executable node is recorded before its final descriptor goes.
@@ -587,55 +624,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// This never returns, so the caller cannot free what the exec was
 		// handed; the path was lost with every exec.
 		free_exec_arguments(path, argv, envp)
+  release_exec_scratch()
 		sched.dequeue_and_die()
 	}
 }
 
-pub fn parse_shebang(mut res resource.Resource) ?(string, string) {
-	// Parse the shebang that we already know is there.
-	// Syntax: #![whitespace]interpreter [single arg]new line
-	mut index := u64(2)
-	mut build_path := strings.new_builder(512)
-	mut build_arg := strings.new_builder(512)
 
-	mut c := char(0)
-	res.read(0, &c, index, 1)?
-	if c == char(` `) {
-		index++
-	}
-
-	for {
-		res.read(0, &c, index, 1)?
-		index++
-		if c == char(` `) {
-			break
-		}
-		if c == char(`\n`) {
-			unsafe {
-				goto ret
-			}
-		}
-		build_path.write_rune(rune(c))
-	}
-
-	for {
-		res.read(0, &c, index, 1)?
-		index++
-		if c == char(` `) || c == char(`\n`) {
-			break
-		}
-		build_arg.write_rune(rune(c))
-	}
-
-	ret:
-	final_path := build_path.str()
-	final_arg := build_arg.str()
-	unsafe {
-		build_path.free()
-		build_arg.free()
-	}
-	return final_path, final_arg
-}
 
 // execveat(dirfd, path, argv, envp, flags): execve relative to a directory
 // descriptor. AT_EMPTY_PATH with an empty path runs the descriptor itself,
@@ -678,10 +672,11 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		} else {
 			unsafe { &fs.VFSNode(proc.current_directory_of(process)) }
 		}
-		mut name := lib.new_text(32)
+		mut name := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+  unsafe { *name = lib.new_text(32) }
 		name.add('/proc/self/fd/')
 		name.add_decimal(i64(dirfd))
-		target = name.str()
+		target = lib.finish_text(*name)
 	} else {
 		directory = fs.parent_and_mount_for(dirfd, path, direct_mount) or {
 			unsafe { path.free() }
@@ -693,7 +688,9 @@ pub fn syscall_execveat(_ voidptr, dirfd int, _path charptr, _argv &charptr, _en
 		}
 	}
 
-	mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
+	reserve_exec_scratch() or { unsafe { target.free() }; return errno.err, errno.get() }
+ defer { release_exec_scratch() }
+ mut argv := exec_strings_from_user(u64(_argv), exec_total_max) or {
 		unsafe { target.free() }
 		return errno.err, errno.get()
 	}

@@ -6,6 +6,7 @@ module sysvsem
 // glibc programs. Operations on a set are atomic; waiters sleep on its event
 // and recheck the full operation after every wakeup.
 
+import kbudget
 import errno
 import event
 import event.eventstruct
@@ -39,6 +40,7 @@ struct SemBuf {
 @[heap]
 struct Set {
 mut:
+    kernel_charge kbudget.Charge
     id int
     key i32
     values []int
@@ -77,6 +79,7 @@ fn destroy_unlocked(set &Set) {
     if index >= 0 {
         sets.delete(index)
     }
+    kbudget.release(set.kernel_charge)
     unsafe { set.values.free() }
     unsafe { free(set) }
 }
@@ -107,6 +110,8 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
         sets_lock.release()
         return errno.err, errno.einval
     }
+    if sets.len >= 4096 { sets_lock.release(); return errno.err, errno.enospc }
+    charge := proc.reserve_kernel(.ipc, 4096) or { sets_lock.release(); return errno.err, errno.get() }
     id := next_id
     next_id++
     // destroy_unlocked() frees it with the set.
@@ -114,6 +119,7 @@ pub fn syscall_semget(_ voidptr, key i32, nsems int, flags int) (u64, u64) {
     // Nothing slices the list, so growing can free the old block.
     sets.flags |= .noslices
     sets << &Set{
+        kernel_charge: charge
         id: id
         key: key
         values: values

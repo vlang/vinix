@@ -303,7 +303,7 @@ fn syscall_linux_bpf(_ voidptr, cmd int, attr u64, size u32) (u64, u64) {
 	if cmd == 5 {
 		// BPF_PROG_LOAD: a real descriptor the runtime attaches and then closes.
 		// Nothing reads the "program" it stands for.
-		mut res := fs.create_anonymous(0o600)
+		mut res := fs.create_anonymous(0o600) or { return errno.err, errno.get() }
 		fdnum := file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_rdwr,
 			0, false) or {
 			saved := errno.get()
