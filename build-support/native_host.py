@@ -63,7 +63,16 @@ class Controller:
                     if "error" in row:
                         error = row["error"]
                         if "binding_error" in error:
-                            raise errors[error["binding_error"]]
+                            # Replay must not replace the callback's chaining with
+                            # the exception handled by the outer caller. Use the
+                            # base descriptor so subclass hooks are not invoked.
+                            error = errors[error["binding_error"]]
+                            context = BaseException.__context__.__get__(error)
+                            try:
+                                raise error
+                            finally:
+                                BaseException.__context__.__set__(error, context)
+                                error = context = None
                         if exception is not None:
                             raise exception(error)
                         raise RuntimeError(error.get("message", "native host controller failed"))
