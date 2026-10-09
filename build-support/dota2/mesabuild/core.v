@@ -54,6 +54,7 @@ fn digest_chunks(hasher string, stream string, mut last DigestChunk) ! {
 	// iterable owns anything it keeps after the caller's iter call returns.
 	release_digest(setup_checkpoint, iterable)!
 	chunks := iterator(iterable)!
+	callback('release', { 'ids': ah.Value([ah.Value(iterable)]) })!
 	for {
 		checkpoint := callback('checkpoint', {})!
 		chunk := next(chunks)!
