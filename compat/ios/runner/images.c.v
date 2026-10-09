@@ -197,15 +197,7 @@ fn image_selector(object u64, selector string) bool {
 
 fn image_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['UIColor']) && selector == 'CGColor' {
-		mut header := obj_header(object)
-		if header.fields[8] == 0 {
-			color := objc_allocate(ios_runtime.names['VinixCGColor'])
-			mut native := obj_header(color)
-			native.color = header.color
-			native.real_number = if header.is_real { header.real_number } else { f64(1) }
-			header.fields[8] = color
-		}
-		frame.x[0] = header.fields[8]
+		frame.x[0] = ui_color_cg(object)
 		return true
 	}
 	if object in ios_runtime.classes {

@@ -12,6 +12,11 @@ mkdir -p "$output"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework AudioToolbox \
     "$repo/tests/ios/audio-graph.c" -o "$output/audio-graph"
 "$output/audio-graph"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios17.0-macabi -fobjc-arc -O1 -Wall -Wextra -Werror \
+    -F"$(xcrun --show-sdk-path)/System/iOSSupport/System/Library/Frameworks" \
+    -framework Foundation -framework UIKit -framework CoreGraphics \
+    "$repo/tests/ios/colors.m" -o "$output/colors"
+"$output/colors"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework CoreFoundation \
     "$repo/tests/ios/core-foundation.c" -o "$output/core-foundation"
 "$output/core-foundation"

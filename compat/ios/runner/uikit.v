@@ -110,13 +110,10 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			'whiteColor', 'blackColor', 'darkGrayColor', 'lightGrayColor', 'grayColor' {
 				color := objc_allocate(object)
 				mut header := obj_header(color)
-				header.color = match selector {
-					'whiteColor' { u32(0xffffff) }
-					'blackColor' { u32(0) }
-					'darkGrayColor' { u32(0x555555) }
-					'lightGrayColor' { u32(0xaaaaaa) }
-					else { u32(0x808080) }
-				}
+				white := match selector { 'whiteColor' { f64(1) } 'blackColor' { f64(0) } 'darkGrayColor' { 1.0 / 3 } 'lightGrayColor' { 2.0 / 3 } else { f64(0.5) } }
+				components := [white, f64(1)]!
+				color_components_set(color, unsafe { &components[0] }, 2, true)
+				header.number = 4
 				frame.x[0] = objc_autorelease(color)
 			}
 			'animateWithDuration:animations:completion:' {
@@ -131,11 +128,9 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 			'colorWithRed:green:blue:alpha:' {
 				color := objc_allocate(object)
 				mut header := obj_header(color)
-				header.color = u32(math.clamp(frame_double(frame, 0), 0, 1) * 255) << 16 |
-					u32(math.clamp(frame_double(frame, 1), 0, 1) * 255) << 8 |
-					u32(math.clamp(frame_double(frame, 2), 0, 1) * 255)
-				header.real_number = math.clamp(frame_double(frame, 3), 0, 1)
-				header.is_real = true
+				values := [frame_double(frame, 0), frame_double(frame, 1), frame_double(frame, 2), frame_double(frame, 3)]!
+				color_components_set(color, unsafe { &values[0] }, 4, true)
+				header.number = 3
 				frame.x[0] = objc_autorelease(color)
 			}
 			'systemFontOfSize:weight:', 'fontWithName:size:' {

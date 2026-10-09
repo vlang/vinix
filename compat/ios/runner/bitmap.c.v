@@ -26,6 +26,7 @@ mut:
 	fill_alpha    f64
 	alpha         f64
 	interpolation u32
+	fill_components u32 = 3
 }
 
 struct BitmapState {
@@ -61,7 +62,7 @@ fn bitmap_dispose(object u64) {
 }
 
 fn cg_bitmap_create(data voidptr, width u64, height u64, bits u64, stride u64, space u64, info u32) u64 {
-	if bits != 8 || info !in [u32(1), 5, 0x2002, 0x2006] || space == 0 || width == 0 || height == 0 || width > 8192 || height > 8192 {
+	if bits != 8 || info !in [u32(1), 5, 0x2002, 0x2006] || space == 0 || cg_space_model(space) != 1 || width == 0 || height == 0 || width > 8192 || height > 8192 {
 		return 0
 	}
 	row := if stride == 0 { (width * 4 + 15) & ~u64(15) } else { stride }
@@ -98,7 +99,7 @@ fn cg_bitmap_create(data voidptr, width u64, height u64, bits u64, stride u64, s
 	return context
 }
 
-fn cg_rgb_space() u64 { return objc_allocate(ios_runtime.names['VinixCGColorSpace']) }
+fn cg_rgb_space() u64 { return cg_space_create(1) }
 
 fn cg_set_fill(context u64, color u64) {
 	if context == 0 || color == 0 { return }
@@ -108,6 +109,7 @@ fn cg_set_fill(context u64, color u64) {
 	mut state := bitmap_state(context)
 	state.paint.color = header.color
 	state.paint.fill_alpha = header.real_number
+	state.paint.fill_components = u32(cg_space_components(cg_color_space(color)))
 }
 
 fn cg_set_stroke(context u64, color u64) { if context != 0 { store_field(context, 2, color) } }
@@ -129,6 +131,11 @@ fn cg_rgb_fill(context u64, red f64, green f64, blue f64, alpha f64) {
 	mut state := bitmap_state(context)
 	state.paint.color = header.color
 	state.paint.fill_alpha = header.real_number
+}
+
+fn cg_rgb_fill_components(context u64, red f64, green f64, blue f64, alpha f64) {
+	cg_rgb_fill(context, red, green, blue, alpha)
+	if context != 0 { mut state := bitmap_state(context); state.paint.fill_components = 3 }
 }
 
 fn cg_alpha(context u64, alpha f64) {
@@ -438,7 +445,7 @@ fn bitmap_symbol(symbol string) ?u64 {
 		'_CGContextSetFillColorWithColor' { u64(unsafe { voidptr(cg_set_fill) }) }
 		'_CGContextSetStrokeColorWithColor' { u64(unsafe { voidptr(cg_set_stroke) }) }
 		'_CGContextSetTextPosition' { u64(unsafe { voidptr(cg_text_position) }) }
-		'_CGContextSetRGBFillColor' { u64(unsafe { voidptr(cg_rgb_fill) }) }
+		'_CGContextSetRGBFillColor' { u64(unsafe { voidptr(cg_rgb_fill_components) }) }
 		'_CGContextSetAlpha' { u64(unsafe { voidptr(cg_alpha) }) }
 		'_CGContextFillRect' { u64(unsafe { voidptr(cg_fill_rect) }) }
 		'_CGContextClearRect' { u64(unsafe { voidptr(cg_clear_rect) }) }

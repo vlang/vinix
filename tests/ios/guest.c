@@ -117,6 +117,9 @@ int main(void) {
     run("/opt/ios/audio-graph", "hardware", NULL, NULL, 0,
         "IOS-AUDIO-GRAPH: hardware output and voice capture are unavailable");
     puts("iOS PASS: native offline AudioUnit graph rendering and mixer ownership");
+    run("/opt/ios/colors", NULL, NULL, NULL, 0,
+        "IOS-COLORS: precise components/equality, owned color spaces, UIKit caches, gray/RGB fill state and real pixels");
+    puts("iOS PASS: native CoreGraphics color precision, fill state and ownership");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

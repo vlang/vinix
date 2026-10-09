@@ -1,0 +1,13 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _CGColorCreate, _CGColorCreateCopyWithAlpha, _CGColorRetain,
+               _CGColorRelease, _CGColorEqualToColor, _CGColorGetComponents,
+               _CGColorGetNumberOfComponents, _CGColorGetColorSpace, _CGColorGetAlpha,
+               _CGColorSpaceCreateDeviceGray, _CGColorSpaceGetNumberOfComponents,
+               _CGColorSpaceGetModel, _CGContextSetFillColorSpace, _CGContextSetFillColor,
+               _CGContextSetFillColorWithColor, _CGContextSetBlendMode, _CGContextFlush ]
+...

@@ -77,7 +77,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
-| Bitmap graphics | RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
+| Bitmap graphics | Owned RGB/gray colors with full-precision components and equality, RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state and fill color space, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
 | AudioToolbox PCM | Same-rate, same-channel Int16/Int32/Float32/Float64 conversion between packed little-endian interleaved and planar buffers; complex input callbacks, partial output/error recovery, EOF/reset and converter ownership |
 | Offline AudioUnits | GenericOutput pull rendering and mono MultiChannelMixer, graph nodes/connections and native input callbacks, stream formats, mixer volume/enable, slice limits, initialize/start/stop/uninitialize and owned render buffers |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
@@ -140,6 +140,11 @@ property queries and caller/unit-owned buffers. Stereo/spatial mixer layouts,
 gain automation, hardware output (`RemoteIO`) and voice processing/capture
 are unsupported; hardware component discovery returns no component. GenericOutput
 start/stop controls an offline unit whose caller still drives rendering.
+Colors copy their CGFloat components and retain their color space; UIKit owns
+its cached CGColor. Equality preserves component precision and color-space
+identity instead of comparing rounded pixels. Gray paints convert to RGB;
+gray bitmap storage, custom ICC/pattern/indexed spaces, non-finite components
+and blend modes beyond normal source-over remain unsupported.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.
@@ -274,11 +279,17 @@ processing (`vpio`); those hardware components are still unavailable. The
 implemented AudioToolbox entry points resolve 41 more strong imports across
 the executable and EOSSDK, without claiming device audio support.
 
+CoreGraphics RGB/gray color creation, precise components/equality and color-space
+ownership now also match the installed Mac reference. UIKit caches owned CGColors
+without rounding their components. Fill color spaces survive saved-state restore;
+the native fixture verifies gray/RGB pixel output and color release lifetimes.
+This resolves another 15 strong imports across the executable and EOSSDK.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGColorEqualToColor
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGDataProviderCreateWithData
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -286,10 +297,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,123 | 1,034 | 82 |
-| EOSSDK | 355 | 307 | 18 |
+| Fortnite executable | 1,131 | 1,026 | 82 |
+| EOSSDK | 362 | 300 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,529 | 1,466 | 123 |
+| All images | 1,544 | 1,451 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

@@ -35,6 +35,13 @@ done
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
     -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/colors.m" -o "$output/colors.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/colors.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/tests/ios/graphics-core.tbd" "$repo/tests/ios/colors.tbd" \
+    "$repo/examples/ios-calculator/api/UIKit.tbd" -o "$output/colors"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/graphics.m" -o "$output/graphics.o"
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -fixup_chains -e _main "$output/graphics.o" "$repo/tests/ios/libSystem.tbd" \

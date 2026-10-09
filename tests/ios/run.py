@@ -18,6 +18,7 @@ FEATURES = (
     b"iOS PASS: native CoreFoundation conversion, data and collection ownership",
     b"iOS PASS: native PCM conversion and AudioToolbox callback ABI",
     b"iOS PASS: native offline AudioUnit graph rendering and mixer ownership",
+    b"iOS PASS: native CoreGraphics color precision, fill state and ownership",
     b"iOS PASS: native framework constants match installed Apple libraries",
     b"iOS PASS: native accessibility metadata and weak container lifecycle",
     b"iOS PASS: native Objective-C reflection, replacement and dynamic classes",
@@ -158,7 +159,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         shutil.copytree(build / "fixtures/Modules.app", destination / "Modules.app")
@@ -181,7 +182,7 @@ def main() -> int:
         if arguments.with_ppsspp:
             if arguments.ppsspp_muted:
                 installed = rootfs / "usr/share/vinix/ios/PPSSPP.app"
-                shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", installed)
+                shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", installed, copy_function=stage_game_asset)
                 (destination / "PPSSPP").symlink_to("/usr/share/vinix/ios/PPSSPP.app/PPSSPP")
                 binary = rootfs / "usr/bin"
                 binary.mkdir(parents=True)
@@ -209,7 +210,7 @@ def main() -> int:
                     (system / "ppsspp.ini").write_text("[Sound]\nEnable=False\n[Graphics]\nInternalResolution=1\n")
                     (destination / "ppsspp-gow").touch()
             else:
-                shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app")
+                shutil.copytree(build / "ppsspp/unpacked/Payload/PPSSPP.app", destination / "PPSSPP.app", copy_function=stage_game_asset)
                 (destination / "PPSSPP").symlink_to("PPSSPP.app/PPSSPP")
         prepare_images(build / "fixtures", destination)
         # Same small static musl sysroot used by the existing syscall tests.
