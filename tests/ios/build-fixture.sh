@@ -24,6 +24,29 @@ done
     -no_fixup_chains -e _main "$output/lazy.o" "$repo/tests/ios/libSystem.tbd" \
     "$repo/tests/ios/lazy.tbd" -o "$output/lazy"
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fno-objc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/arc-registers.m" -o "$output/arc-registers.o"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 \
+    -c "$repo/tests/ios/arc-registers.S" -o "$output/arc-registers-abi.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/arc-registers.o" "$output/arc-registers-abi.o" \
+    "$repo/tests/ios/libSystem.tbd" "$repo/tests/ios/startup.tbd" "$repo/tests/ios/arc-registers.tbd" \
+    "$repo/examples/ios-calculator/api/Foundation.tbd" -o "$output/arc-registers"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/objc-runtime.m" -o "$output/objc-runtime.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/objc-runtime.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/tests/ios/objc-runtime.tbd" \
+    "$repo/examples/ios-calculator/api/Foundation.tbd" -o "$output/objc-runtime"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/accessibility.m" -o "$output/accessibility.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/accessibility.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" \
+    "$repo/tests/ios/accessibility.tbd" -o "$output/accessibility"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
     -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/core-foundation.c" -o "$output/core-foundation.o"

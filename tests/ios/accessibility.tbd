@@ -1,0 +1,12 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/UIKit.framework/UIKit'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _UIAccessibilityIsVoiceOverRunning, _UIAccessibilityPostNotification,
+               _UIAccessibilityRegisterGestureConflictWithZoom,
+               _UIAccessibilityAnnouncementNotification, _UIAccessibilityLayoutChangedNotification,
+               _UIAccessibilityTraitButton, _UIAccessibilityTraitNotEnabled,
+               '_OBJC_CLASS_$_UIAccessibilityElement' ]
+...

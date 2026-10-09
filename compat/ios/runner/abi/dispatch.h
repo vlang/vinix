@@ -153,6 +153,7 @@ static void ios_objc_initialize_unlock(void) {
 #if defined(__aarch64__) || defined(__arm64__)
 void ios_objc_msgsend(void);
 void ios_objc_super(void);
+void ios_objc_builtin(void);
 void ios_snprintf(void);
 void ios_tlv_get_addr(void);
 void ios_lazy_entry(void);
@@ -165,9 +166,25 @@ void ios_asprintf(void);
 void ios_open(void);
 void ios_snprintf_checked(void);
 void ios_sprintf_checked(void);
+#define IOS_ARC_REGISTERS(M) M(0) M(1) M(2) M(3) M(4) M(5) M(6) M(7) \
+    M(8) M(9) M(10) M(11) M(12) M(13) M(14) M(15) M(19) M(20) M(21) \
+    M(22) M(23) M(24) M(25) M(26) M(27) M(28)
+#define IOS_ARC_DECLARE(n) void ios_arc_retain_x##n(void); void ios_arc_release_x##n(void);
+IOS_ARC_REGISTERS(IOS_ARC_DECLARE)
+#undef IOS_ARC_DECLARE
+static void *ios_arc_register(int reg, int releasing) {
+    switch (reg) {
+#define IOS_ARC_ADDRESS(n) case n: return releasing ? (void *)ios_arc_release_x##n : (void *)ios_arc_retain_x##n;
+    IOS_ARC_REGISTERS(IOS_ARC_ADDRESS)
+#undef IOS_ARC_ADDRESS
+    default: return NULL;
+    }
+}
+#undef IOS_ARC_REGISTERS
 #else
 static void ios_objc_msgsend(void) { abort(); }
 static void ios_objc_super(void) { abort(); }
+static void ios_objc_builtin(void) { abort(); }
 static void ios_snprintf(void) { abort(); }
 static void ios_tlv_get_addr(void) { abort(); }
 static void ios_lazy_entry(void) { abort(); }
@@ -180,5 +197,6 @@ static void ios_asprintf(void) { abort(); }
 static void ios_open(void) { abort(); }
 static void ios_snprintf_checked(void) { abort(); }
 static void ios_sprintf_checked(void) { abort(); }
+static void *ios_arc_register(int reg, int releasing) { (void)reg; (void)releasing; return NULL; }
 #endif
 #endif

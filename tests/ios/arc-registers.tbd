@@ -1,0 +1,8 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libobjc.A.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _objc_retain_x0, _objc_retain_x1, _objc_retain_x2, _objc_retain_x3, _objc_retain_x4, _objc_retain_x5, _objc_retain_x6, _objc_retain_x7, _objc_retain_x8, _objc_retain_x9, _objc_retain_x10, _objc_retain_x11, _objc_retain_x12, _objc_retain_x13, _objc_retain_x14, _objc_retain_x15, _objc_retain_x19, _objc_retain_x20, _objc_retain_x21, _objc_retain_x22, _objc_retain_x23, _objc_retain_x24, _objc_retain_x25, _objc_retain_x26, _objc_retain_x27, _objc_retain_x28, _objc_release_x0, _objc_release_x1, _objc_release_x2, _objc_release_x3, _objc_release_x4, _objc_release_x5, _objc_release_x6, _objc_release_x7, _objc_release_x8, _objc_release_x9, _objc_release_x10, _objc_release_x11, _objc_release_x12, _objc_release_x13, _objc_release_x14, _objc_release_x15, _objc_release_x19, _objc_release_x20, _objc_release_x21, _objc_release_x22, _objc_release_x23, _objc_release_x24, _objc_release_x25, _objc_release_x26, _objc_release_x27, _objc_release_x28 ]
+...

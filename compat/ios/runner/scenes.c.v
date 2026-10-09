@@ -19,6 +19,7 @@ fn objc_is_kind(object u64, cls u64) bool {
 fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
 	name := ctext(u64(selector))
+	if accessibility_selector(object, name) { return true }
 	if native_method(read64(object), name) != 0 { return true }
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'copy', 'init', 'dealloc'] { return true }
 	if object in ios_runtime.classes {

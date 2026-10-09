@@ -1,0 +1,17 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/usr/lib/libobjc.A.dylib'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _objc_lookUpClass, _object_getClass, _object_setClass,
+               _class_getName, _class_getSuperclass, _class_getInstanceSize, _class_isMetaClass,
+               _objc_allocateClassPair, _objc_registerClassPair, _objc_disposeClassPair,
+               _class_addIvar, _class_getInstanceVariable, _ivar_getOffset, _ivar_getTypeEncoding,
+               _object_getIvar, _class_copyIvarList, _ivar_getName,
+               _sel_registerName, _sel_getUid, _sel_getName, _sel_isEqual,
+               _class_addMethod, _class_replaceMethod, _class_getMethodImplementation,
+               _class_getInstanceMethod, _class_getClassMethod, _method_getName,
+               _method_getImplementation, _method_setImplementation, _method_getTypeEncoding,
+               _objc_opt_self ]
+...

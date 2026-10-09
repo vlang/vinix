@@ -39,6 +39,11 @@ mut:
 	load_imp u64
 	initializing bool
 	initialized bool
+	method_info map[string]&ObjMethod
+	ivars map[string]&ObjIvar
+	dynamic bool
+	registered bool
+	instances i64
 }
 
 // The header is private to Vinix. The returned object still begins with the
@@ -46,6 +51,7 @@ mut:
 struct ObjHeader {
 mut:
 	refs        i64
+	native_size u32
 	text        &char = unsafe { nil }
 	text_length int
 	frame       ObjRect
@@ -88,6 +94,7 @@ mut:
 	deferred_system_edges u64
 	home_indicator_hidden bool
 	idle_timer_disabled bool
+	accessibility &AccessibilityState = unsafe { nil }
 }
 
 struct ObjRect {
@@ -141,10 +148,13 @@ mut:
 	empty_dictionary u64
 	observers []&NotificationObserver
 	selectors    []string
+	selector_names map[string]u64
 	dirty        bool
 	pointer_down bool
 	pointer_x    int
 	pointer_y    int
+	voice_over_running bool
+	zoom_gesture_conflict bool
 }
 
 __global ios_runtime = &ObjRuntime(unsafe { nil })
@@ -158,6 +168,7 @@ fn objc_start() {
 	ios_runtime.display_links.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
+	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -169,6 +180,7 @@ fn objc_start() {
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
+		'UIAccessibilityElement',
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
@@ -182,6 +194,7 @@ fn objc_start() {
             'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
+			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray' { ios_runtime.names['NSArray'] }
 			'NSMutableDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
@@ -201,6 +214,8 @@ fn objc_start() {
 		ios_runtime.classes[meta] = &ObjClass{ name: name, parent: metaclass.parent, size: 40, meta: true }
 		ios_runtime.names[name] = u64(cls)
 	}
+	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
+	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
@@ -223,10 +238,12 @@ fn obj_header(object u64) &ObjHeader {
 fn objc_allocate(cls u64) u64 {
 	objc_initialize(cls)
 	info := ios_runtime.classes[cls] or { panic('iOS: allocation of an unknown class') }
+	if info.dynamic && !info.registered { panic('iOS: allocating an instance of an unregistered class') }
 	memory := C.calloc(1, sizeof(ObjHeader) + usize(info.size))
 	if memory == unsafe { nil } { panic('iOS: out of memory') }
 	mut header := unsafe { &ObjHeader(memory) }
 	header.refs = 1
+	header.native_size = info.size
 	header.font_size = 17
 	header.content_scale = 1
 	// calloc does not initialize V array element sizes. Set them explicitly
@@ -242,6 +259,7 @@ fn objc_allocate(cls u64) u64 {
 	unsafe { *(&u64(object)) = cls }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { header.number = -1 }
 	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
+	C.ios_ref_change(unsafe { &info.instances }, 1)
 	return objc_construct(object, cls)
 }
 
@@ -260,6 +278,8 @@ type ObjAction = fn (u64, &char, u64)
 type ObjLaunch = fn (u64, &char, u64, u64) bool
 
 fn native_method(cls u64, selector string) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	mut current := cls
 	for _ in 0 .. 128 {
 		if current == 0 { return 0 }
@@ -306,6 +326,7 @@ fn objc_release(object u64) {
 	}
 	$if ios_gles ? { gles_dispose(object) }
 	$if ios_text ? { text_dispose(object) }
+	accessibility_dispose(object)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])
@@ -326,7 +347,9 @@ fn objc_release(object u64) {
 	objc_destroy_weak(unsafe { &header.target })
 	if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
 	C.free(header.text)
+	info := ios_runtime.classes[read64(object)] or { panic('iOS: unknown released object class') }
 	C.free(header)
+	C.ios_ref_change(unsafe { &info.instances }, -1)
 	C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
 }
 
@@ -379,8 +402,11 @@ fn objc_stop() {
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {
+		objc_class_metadata_free(info)
 		if info.owned { C.free(unsafe { voidptr(address) }) }
 	}
+	// V's []string.free() also frees the owned strings.
+	unsafe { ios_runtime.selectors.free(); ios_runtime.selector_names.free() }
 }
 
 @[export: 'ios_format_double']
@@ -415,6 +441,7 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		return libsystem_symbol(library, symbol)
 	}
 	if library == '/usr/lib/libobjc.A.dylib' {
+		if address := objc_runtime_symbol(symbol) { return address }
 		if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
 		for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 			if symbol.starts_with(prefix) {
@@ -505,8 +532,13 @@ fn (m ObjMetadata) string_at(address u64) !string {
 	return error('iOS: Objective-C metadata string exceeds 1023 bytes')
 }
 
-fn (m ObjMetadata) methods(list u64) !map[string]u64 {
-	mut methods := map[string]u64{}
+struct ObjImageMethod {
+	imp u64
+	types string
+}
+
+fn (m ObjMetadata) methods(list u64) !map[string]ObjImageMethod {
+	mut methods := map[string]ObjImageMethod{}
 	if list == 0 { return methods }
 	m.range(list, 8, false)!
 	flags := read32(list)
@@ -521,6 +553,7 @@ fn (m ObjMetadata) methods(list u64) !map[string]u64 {
 		entry := list + 8 + u64(i) * stride
 		mut name := u64(0)
 		mut imp := u64(0)
+		mut types := u64(0)
 		if small {
 			name = u64(i64(entry) + i64(i32(read32(entry))))
 			if flags & 0x40000000 == 0 {
@@ -528,9 +561,11 @@ fn (m ObjMetadata) methods(list u64) !map[string]u64 {
 				name = read64(name)
 			}
 			imp = u64(i64(entry + 8) + i64(i32(read32(entry + 8))))
+			types = u64(i64(entry + 4) + i64(i32(read32(entry + 4))))
 		} else {
 			name = read64(entry)
 			imp = read64(entry + 16)
+			types = read64(entry + 8)
 		}
 		m.range(imp, 4, false)!
 		mut executable := false
@@ -544,7 +579,7 @@ fn (m ObjMetadata) methods(list u64) !map[string]u64 {
 			return error('iOS: method implementation is not executable')
 		}
 		selector := m.string_at(name)!
-		methods[selector] = imp
+		methods[selector] = ObjImageMethod{imp, if types == 0 { '' } else { m.string_at(types)! }}
 	}
 	return methods
 }
@@ -589,13 +624,35 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 		}
 	}
 	methods := m.methods(read64(ro + 32))!
+	defer { unsafe { methods.free() } }
 	ios_runtime.classes[cls] = &ObjClass{
 		name:    name
 		parent:  parent
 		size:    size
 		meta:    meta
-		methods: methods
-		load_imp: if meta { methods['load'] } else { u64(0) }
+		load_imp: if meta { methods['load'].imp } else { u64(0) }
+	}
+	for selector, method in methods {
+		objc_record_method(cls, unsafe { &char(selector.str) }, method.imp, unsafe { &char(method.types.str) }, false)
+	}
+	ivars := read64(ro + 48)
+	if ivars != 0 {
+		m.range(ivars, 8, false)!
+		count := read32(ivars + 4)
+		if read32(ivars) != 32 || count > 4096 { return error('iOS: unsupported Objective-C ivar list') }
+		m.range(ivars + 8, u64(count) * 32, false)!
+		mut info := ios_runtime.classes[cls] or { return error('iOS: missing ivar class') }
+		for index in 0 .. count {
+			entry := ivars + 8 + u64(index) * 32
+			offset_cell := read64(entry)
+			m.range(offset_cell, 4, false)!
+			offset := read32(offset_cell)
+			ivar_size := read32(entry + 28)
+			if offset > size || ivar_size > size - offset { return error('iOS: ivar exceeds instance layout') }
+			ivar_name := m.string_at(read64(entry + 8))!
+			ivar_types := m.string_at(read64(entry + 16))!
+			info.ivars[ivar_name] = &ObjIvar{name: ivar_name.clone(), types: ivar_types.clone(), offset: i64(offset), size: ivar_size}
+		}
 	}
 	if !meta { ios_runtime.names[name] = cls }
 }
@@ -641,6 +698,22 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 				if category in attached { continue }
 				attached[category] = true
 				m.attach_category(category)!
+			}
+		}
+	}
+	unsafe { attached.free() }
+	// Relative method lists may point indirectly through these slots. Read all
+	// image metadata first, then replace slots with process-wide canonical SELs.
+	for segment in image.segments {
+		for section in segment.sections {
+			if section.name != '__objc_selrefs' { continue }
+			if section.size % 8 != 0 { return error('iOS: invalid Objective-C selector references') }
+			address := base + section.address - layout.base
+			m.range(address, section.size, true)!
+			for offset := u64(0); offset < section.size; offset += 8 {
+				name := m.string_at(read64(address + offset))!
+				selector := objc_selector(unsafe { &char(name.str) })
+				unsafe { *(&u64(address + offset)) = selector }
 			}
 		}
 	}

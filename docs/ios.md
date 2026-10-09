@@ -73,10 +73,10 @@ executing a GUI app directly from a shell does not create a window. Set
 | Thread-local storage | Darwin TLV descriptors, initialized and zero-filled templates, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
-| Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
+| Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
-| UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts |
+| UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
@@ -207,9 +207,15 @@ rejecting reserved bits, unmapped targets and addresses that overflow into the
 tag. With a test resolver, all 7,349,289 fixups validate; that structural check
 does not resolve Fortnite's actual dependencies or execute game code.
 
-The installed Mac CoreFoundation and Catalyst UIKit libraries were used as
+The installed Mac CoreFoundation, Objective-C and Catalyst UIKit libraries were used as
 behavioral references for independent V implementations of string conversions,
-collections, mutable data, numbers, Booleans, ownership and framework constants.
+collections, mutable data, numbers, Booleans, ownership, framework constants,
+accessibility metadata and runtime reflection/replacement. Dynamic classes and
+ivars, saved built-in IMP callbacks and register-specific ARC calls are tested
+with the same fixtures against the Mac libraries and Vinix. Accessibility
+containers are zeroing weak references. VoiceOver reports disabled because no
+screen-reader service is attached; notifications have no receiver in that state.
+Accessibility container coordinate conversion is explicitly unsupported.
 The same fixtures run against Apple's libraries and as native iOS instructions
 in Vinix; no Apple implementation is copied into the runner.
 
@@ -217,11 +223,11 @@ The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: framework symbol is not implemented: _UIAccessibilityIsVoiceOverRunning
+iOS: framework symbol is not implemented: _UIGraphicsBeginImageContext
 ```
 
-The C++ runner resolves 426 symbols, closing 61 strong-import gaps from the
-initial 365-symbol audit. There are still 1,726 unresolved strong imports and
+The C++ runner resolves 469 symbols, closing 104 strong-import gaps from the
+initial 365-symbol audit. There are still 1,683 unresolved strong imports and
 87 unresolved weak imports. Use `run-ios --audit BINARY` to repeat the check;
 the result depends on compiled optional backends. The executable
 includes the following substantial dependencies:

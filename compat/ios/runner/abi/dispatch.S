@@ -16,6 +16,10 @@ SYM(ios_objc_msgsend):
 .global SYM(ios_objc_super)
 SYM(ios_objc_super):
     mov x16, #1
+    b 1f
+.global SYM(ios_objc_builtin)
+SYM(ios_objc_builtin):
+    mov x16, #2
 1:
     sub sp, sp, #224
     stp x0, x1, [sp, #0]
@@ -47,6 +51,44 @@ SYM(ios_objc_super):
     br x16
 2:
     ret
+/* Register-specific ARC entries still use ordinary caller/callee clobber
+ * rules. Retain returns its result in x0. Ownership remains in V. */
+.macro ARC_ENTRY reg
+.global SYM(ios_arc_retain_x\reg)
+SYM(ios_arc_retain_x\reg):
+    mov x0, x\reg
+    b SYM(ios_arc_retain)
+.global SYM(ios_arc_release_x\reg)
+SYM(ios_arc_release_x\reg):
+    mov x0, x\reg
+    b SYM(ios_arc_release)
+.endm
+ARC_ENTRY 0
+ARC_ENTRY 1
+ARC_ENTRY 2
+ARC_ENTRY 3
+ARC_ENTRY 4
+ARC_ENTRY 5
+ARC_ENTRY 6
+ARC_ENTRY 7
+ARC_ENTRY 8
+ARC_ENTRY 9
+ARC_ENTRY 10
+ARC_ENTRY 11
+ARC_ENTRY 12
+ARC_ENTRY 13
+ARC_ENTRY 14
+ARC_ENTRY 15
+ARC_ENTRY 19
+ARC_ENTRY 20
+ARC_ENTRY 21
+ARC_ENTRY 22
+ARC_ENTRY 23
+ARC_ENTRY 24
+ARC_ENTRY 25
+ARC_ENTRY 26
+ARC_ENTRY 27
+ARC_ENTRY 28
 /* Darwin ARM64 variadic doubles arrive in stack slots; the V adapter has a
  * fixed signature, so the host compiler supplies its own libc varargs ABI. */
 .global SYM(ios_snprintf)

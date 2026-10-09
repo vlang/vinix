@@ -107,6 +107,15 @@ int main(void) {
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");
+    run("/opt/ios/accessibility", NULL, NULL, NULL, 0,
+        "IOS-ACCESSIBILITY: disabled service queries, element metadata, HFA frames, weak containers and ARC ownership");
+    puts("iOS PASS: native accessibility metadata and weak container lifecycle");
+    run("/opt/ios/objc-runtime", NULL, NULL, NULL, 0,
+        "IOS-OBJC-RUNTIME: canonical selectors, method encodings, inherited replacement, saved IMPs, HFA/stack ABI and dynamic class/ivar lifetimes");
+    puts("iOS PASS: native Objective-C reflection, replacement and dynamic classes");
+    run("/opt/ios/arc-registers", NULL, NULL, NULL, 0,
+        "IOS-ARC-REGISTERS: 52 retain/release entry points, nil/constants, x0 results, callee register preservation and real weak/dealloc ownership");
+    puts("iOS PASS: native register-specific ARC calling conventions and ownership");
     run("--audit", "/opt/ios/core-foundation", NULL, NULL, 0,
         "0 unresolved strong, 0 unresolved weak (app code was not executed)");
     run("--audit", "/opt/ios/unsupported", NULL, NULL, 1,

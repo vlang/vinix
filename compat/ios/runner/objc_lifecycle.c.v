@@ -9,7 +9,11 @@ struct ObjLoad {
 	imp u64
 }
 
-fn objc_get_class(name &char) u64 { return ios_runtime.names[ctext(u64(name))] }
+fn objc_get_class(name &char) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	return ios_runtime.names[ctext(u64(name))]
+}
 
 // +initialize is sent once for each class, superclass first. An inherited
 // implementation is called with the subclass as self. The recursive lock
@@ -58,12 +62,21 @@ fn (m ObjMetadata) attach_category(category u64) ! {
 	cls := read64(category + 8)
 	m.register(cls, 0)!
 	m.register(read64(cls), 0)!
-	mut info := ios_runtime.classes[cls] or { return error('iOS: missing category class') }
-	mut meta := ios_runtime.classes[read64(cls)] or { return error('iOS: missing category metaclass') }
-	for name, imp in m.methods(read64(category + 16))! { info.methods[name] = imp }
+	instances := m.methods(read64(category + 16))!
+	defer { unsafe { instances.free() } }
+	for name, method in instances {
+		mut record := objc_record_method(cls, unsafe { &char(name.str) }, method.imp, unsafe { &char(method.types.str) }, false)
+		unsafe { record.types.free() }
+		record.types = method.types.clone()
+	}
 	methods := m.methods(read64(category + 24))!
-	if imp := methods['load'] { ios_runtime.load_categories << ObjLoad{cls, imp} }
-	for name, imp in methods { meta.methods[name] = imp }
+	defer { unsafe { methods.free() } }
+	if method := methods['load'] { ios_runtime.load_categories << ObjLoad{cls, method.imp} }
+	for name, method in methods {
+		mut record := objc_record_method(read64(cls), unsafe { &char(name.str) }, method.imp, unsafe { &char(method.types.str) }, false)
+		unsafe { record.types.free() }
+		record.types = method.types.clone()
+	}
 }
 
 fn objc_construct(object u64, cls u64) u64 {
@@ -90,6 +103,8 @@ fn objc_construct(object u64, cls u64) u64 {
 						unsafe { ObjVoid(voidptr(destructor))(object, c'.cxx_destruct') }
 					}
 				}
+				owner := ios_runtime.classes[read64(object)] or { panic('iOS: unknown failed constructor class') }
+				C.ios_ref_change(unsafe { &owner.instances }, -1)
 				C.free(obj_header(object))
 				C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
 				return 0

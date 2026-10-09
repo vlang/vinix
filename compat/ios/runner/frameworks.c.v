@@ -7,6 +7,7 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library == '/System/Library/Frameworks/UIKit.framework/UIKit' { if address := accessibility_symbol(symbol) { return address } }
 	if address := core_foundation_symbol(symbol) { return address }
 	for prefix in ['_OBJC_CLASS_$_', '_OBJC_METACLASS_$_'] {
 		if symbol.starts_with(prefix) {
