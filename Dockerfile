@@ -58,7 +58,11 @@ ARG V_UTIL_SHA256
 # different, later vc snapshot on a later clean run. Calling the script rather
 # than repeating its pin here keeps one source of truth.
 COPY tools/m1-wifi/get-v.sh /opt/vinix-tools/get-v.sh
-RUN mkdir -p /opt/vinix-tools && \
+# A Windows checkout with core.autocrlf=true hands this file over with CRLF
+# endings, and `sh` then fails on `set -eu\r` with "Illegal option -". CI checks
+# it out with LF, so this only bites local Windows builds - but it is one
+# command, and a Dockerfile that half works depending on the host is worse.
+RUN sed -i 's/\r$//' /opt/vinix-tools/get-v.sh && \
     sh /opt/vinix-tools/get-v.sh /opt/vinix-tools/v-kernel
 
 # --- the utility compiler ----------------------------------------------
