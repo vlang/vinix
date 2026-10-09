@@ -21,15 +21,55 @@ fn owned_digest_body(manager string, hasher string, stream string) ! {
 }
 
 fn digest_body(hasher string, stream string) ! {
+	checkpoint := callback('checkpoint', {})!
+	mut last := DigestChunk{}
+	digest_chunks(hasher, stream, mut last) or {
+		cause := err
+		callback('active_error', { 'error': detail(cause) })!
+		release_digest(checkpoint, last.previous)!
+		callback('active_error', { 'error': none_value() })!
+		return cause
+	}
+	release_digest(checkpoint, last.previous)!
+}
+
+struct DigestChunk {
+mut:
+	previous string
+}
+
+fn release_digest(checkpoint ah.Value, previous string) ! {
+	keep := if previous == '' { []ah.Value{} } else { [ah.Value(previous)] }
+	callback('release_since', { 'checkpoint': checkpoint, 'keep': ah.Value(keep) })!
+}
+
+fn digest_chunks(hasher string, stream string, mut last DigestChunk) ! {
+	setup_checkpoint := callback('checkpoint', {})!
 	reader := call('_mesa_reader', o(stream), v(ah.Value('read')), o(collection('tuple', [literal(ah.Value(1024 * 1024))!])!))!
 	empty := callback('literal', {
 		'value': ah.Value([ah.Value('bytes'), ah.Value('')])
 	})!.text()
-	chunks := iterator(call('iter', o(reader), o(empty))!)!
+	iterable := call('iter', o(reader), o(empty))!
+	// The callable and sentinel are expression temporaries. The returned
+	// iterable owns anything it keeps after the caller's iter call returns.
+	release_digest(setup_checkpoint, iterable)!
+	chunks := iterator(iterable)!
 	for {
+		checkpoint := callback('checkpoint', {})!
 		chunk := next(chunks)!
-		if chunk.done { break }
+		if chunk.done {
+			callback('release_since', { 'checkpoint': checkpoint })!
+			break
+		}
+		if last.previous != '' {
+			callback('release', { 'ids': ah.Value([ah.Value(last.previous)]) })!
+		}
+		last.previous = chunk.value
 		method(hasher, 'update', [o(chunk.value)], {})!
+		callback('release_since', {
+			'checkpoint': checkpoint
+			'keep': ah.Value([ah.Value(last.previous)])
+		})!
 	}
 }
 

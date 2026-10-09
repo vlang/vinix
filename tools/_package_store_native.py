@@ -27,12 +27,14 @@ def call(operation, arguments, namespace, *, controller=None):
     objects, errors, entered, closers = {}, [], {}, {}
     stack = contextlib.ExitStack()
     active = None
+    next_id = 0
 
     class Owner:
         def __init__(self, manager, method=None, kwargs=None, condition=None, function=None, methods=None):
             self.manager, self.method, self.active = manager, method, True
             self.kwargs, self.condition, self.function = kwargs or {}, condition, function
             self.methods = methods
+            self.entered_id = None
         def __exit__(self, *error):
             if not self.active:
                 return False
@@ -53,9 +55,18 @@ def call(operation, arguments, namespace, *, controller=None):
             return self.manager.__exit__(*error)
 
     def retain(value):
-        key = str(len(objects))
+        nonlocal next_id
+        key = str(next_id)
+        next_id += 1
         objects[key] = value
         return key
+
+    def release(keys, keep=()):
+        held = set(keep) | entered.keys() | closers.keys()
+        held.update(owner.entered_id for owner in entered.values())
+        for key in keys:
+            if key not in held:
+                objects.pop(key, None)
 
     def resolve(name):
         components = name.split(".")
@@ -86,6 +97,14 @@ def call(operation, arguments, namespace, *, controller=None):
                     error.__traceback__ = traceback
 
     def library_primitive(method, row):
+        if method == "checkpoint":
+            return next_id
+        if method == "release":
+            release(row["ids"])
+            return None
+        if method == "release_since":
+            release([key for key in objects if int(key) >= row["checkpoint"]], row.get("keep", ()))
+            return None
         if method == "function":
             target = objects[row["target"]] if "target" in row else getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
             if callable(target) or row.get("call", False):
@@ -151,7 +170,8 @@ def call(operation, arguments, namespace, *, controller=None):
             owner = Owner(manager)
             entered[row["owner"]] = owner
             stack.push(owner)
-            return retain(result)
+            owner.entered_id = retain(result)
+            return owner.entered_id
         if method == "exit":
             return exit_owner(entered.pop(row["owner"]), row["error"])
         if method == "own":
