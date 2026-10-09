@@ -25,7 +25,19 @@ BLOCKS = 8192  # 32 MiB, including enough room for the static fixture.
 _runtime_binding = runpy.run_path(str(ROOT / "tools/_package_store_native.py"))
 _runtime_controller = _runtime_binding["_host"].Controller(Path(__file__).with_name("runtime_query.v"), "VINIX_VERIFIED_ROOT_RUNTIME_QUERY")
 
+_runtime_library = None
+_runtime_environment = os.environ
+_runtime_library_adapter = str(ROOT / "build-support/cpython_host.py")
+
+
 def _runtime(operation, *arguments):
+    global _runtime_library
+    library = _runtime_environment.get("VINIX_VERIFIED_ROOT_RUNTIME_LIBRARY")
+    if library is not None and operation in ("command", "device_blocks", "enroll", "tamper"):
+        if _runtime_library is None:
+            adapter = runpy.run_path(_runtime_library_adapter)
+            _runtime_library = adapter["Library"](library, "vinix_verified_root_helper")
+        return _runtime_library.call(operation, arguments, globals())
     return _runtime_binding["call"](operation, arguments, globals(), controller=_runtime_controller)
 
 

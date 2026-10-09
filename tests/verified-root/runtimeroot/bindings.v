@@ -4,9 +4,14 @@ module runtimeroot
 import androidhost as ah
 import json2
 import packagestore
+import cpythonhost
 
 fn callback(name string, args map[string]ah.Value) !ah.Value {
-	return packagestore.borrowed_binding(name, args)!
+	$if cpython_host ? {
+		return cpythonhost.callback(name, args)!
+	} $else {
+		return packagestore.borrowed_binding(name, args)!
+	}
 }
 
 fn v(value ah.Value) ah.Value { return ah.Value([ah.Value('value'), value]) }
@@ -92,6 +97,9 @@ fn next(id string) !Next {
 
 fn detail(err IError) ah.Value {
 	if err is packagestore.BindingError { return ah.Value(err.value) }
+	$if cpython_host ? {
+		if err is cpythonhost.Failure { return ah.Value(err.value) }
+	}
 	return ah.Value(json2.Null{})
 }
 
