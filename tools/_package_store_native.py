@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Owned library calls for the native loopback package-store policy."""
-import builtins
+import atexit
 import contextlib
+import ctypes
 import importlib.util
-import operator
+import os
+import subprocess
+import tempfile
+import threading
 from pathlib import Path
 import sys
 from types import FunctionType
@@ -23,234 +27,110 @@ _wire = _module("package_store_wire", _ROOT / "build-support/android/_boot_nativ
 _controller = _host.Controller(_ROOT / "tools/package_store_query.v", "VINIX_PACKAGE_STORE_QUERY")
 
 
-def call(operation, arguments, namespace, *, controller=None):
-    objects, errors, entered, closers = {}, [], {}, {}
-    stack = contextlib.ExitStack()
-    active = None
-    next_id = 0
+_library = None
+_library_lock = threading.Lock()
 
-    class Owner:
-        def __init__(self, manager, method=None, kwargs=None, condition=None, function=None, methods=None):
-            self.manager, self.method, self.active = manager, method, True
-            self.kwargs, self.condition, self.function = kwargs or {}, condition, function
-            self.methods = methods
-            self.entered_id = None
-        def __exit__(self, *error):
-            if not self.active:
-                return False
-            self.active = False
-            if self.methods is not None:
-                for path in self.methods:
-                    target = self.manager
-                    for name in path.split("."):
-                        target = getattr(target, name)
-                    target()
-                return False
-            if self.method or self.function:
-                if self.condition and not getattr(self.manager, self.condition)():
-                    return False
-                target = resolve(self.function) if self.function else self.method if callable(self.method) else getattr(self.manager, self.method)
-                target(self.manager, **self.kwargs) if self.function or callable(self.method) else target(**self.kwargs)
-                return False
-            return self.manager.__exit__(*error)
 
-    def retain(value):
-        nonlocal next_id
-        key = str(next_id)
-        next_id += 1
-        objects[key] = value
-        return key
-
-    def release(keys, keep=()):
-        held = set(keep) | entered.keys() | closers.keys()
-        held.update(owner.entered_id for owner in entered.values())
-        for key in keys:
-            if key not in held:
-                objects.pop(key, None)
-
-    def resolve(name):
-        components = name.split(".")
-        value = {"builtins": builtins, "operator": operator}.get(components[0], namespace.get(components[0], getattr(builtins, components[0], None)))
-        for part in components[1:]:
-            value = getattr(value, part)
-        return value
-
-    def value(record):
-        kind, data = record
-        return objects[data] if kind == "owner" else bytes.fromhex(data) if kind == "bytes" else data
-
-    def exit_owner(owner, record):
-        try:
-            if record is None:
-                owner.__exit__(None, None, None)
-                return False
-            error = errors[record["binding_error"]]
-            traceback = error.__traceback__
-            context = BaseException.__context__.__get__(error)
-            try:
-                raise error.with_traceback(traceback)
-            except BaseException:
-                BaseException.__context__.__set__(error, context)
-                replay = error.__traceback__
-                error.__traceback__ = traceback
+def _entry(operation, key, first=None, second=None):
+    global _library
+    with _library_lock:
+        if _library is None:
+            path = os.environ.get("VINIX_PACKAGE_STORE_LIBRARY")
+            if path is None:
+                owner = tempfile.TemporaryDirectory(prefix="vinix-package-sdk-")
                 try:
-                    return bool(owner.__exit__(type(error), error, traceback))
-                finally:
-                    if error.__traceback__ is replay:
-                        error.__traceback__ = traceback
-                    replay = traceback = error = context = None
-        finally:
-            owner.manager = owner.method = owner.kwargs = None
-
-    def library_primitive(method, row):
-        if method == "checkpoint":
-            return next_id
-        if method == "release":
-            release(row["ids"])
-            return None
-        if method == "retire_error":
-            errors[row["error"]["binding_error"]] = None
-            return None
-        if method == "release_since":
-            release([key for key in objects if int(key) >= row["checkpoint"]], row.get("keep", ()))
-            return None
-        if method == "function":
-            target = objects[row["target"]] if "target" in row else getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
-            if callable(target) or row.get("call", False):
-                args = [value(item) for item in row.get("args", [])]
-                kwargs = {key: value(item) for key, item in row.get("kwargs", {}).items()}
-                try:
-                    result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
+                    path = str(Path(owner.name) / ("library.dylib" if sys.platform == "darwin" else "library.so"))
+                    subprocess.run([str(_ROOT / "build-support/build-v-host-library.sh"),
+                                    str(_ROOT / "tools/package_sdk_library.v"), path,
+                                    "-d", "cpython_package", "-d", "use_bundled_libgc"],
+                                   check=True, stdout=subprocess.DEVNULL,
+                                   env={**os.environ, "VINIX_HOST_PYTHON": sys.executable})
+                    library = ctypes.PyDLL(path)
                 except BaseException:
-                    target = args = kwargs = None
+                    owner.cleanup()
                     raise
+                atexit.register(owner.cleanup)
             else:
-                result = target
-            if row.get("data"):
-                return result
-            ident = retain(result)
-            if "own_methods" in row:
-                owner = Owner(result, methods=row["own_methods"])
-                closers[ident] = owner
-                stack.push(owner)
-            return ident
-        if method == "unbound_local":
-            def unbound():
-                if False:
-                    value = None
-                return value
-            return FunctionType(unbound.__code__.replace(co_varnames=(row["name"],)), {})()
-        if method == "unpack_pair":
-            first, second = objects[row["owner"]]
-            return [retain(first), retain(second)]
-        if method == "resolve":
-            return retain(resolve(row["name"]))
-        if method == "exception_matches":
-            error = errors[row["error"]["binding_error"]]
-            kind = objects[row["class"]]
-            traceback = error.__traceback__
-            context = BaseException.__context__.__get__(error)
-            try:
-                try:
-                    raise error.with_traceback(traceback)
-                except kind:
-                    return True
-                except BaseException:
-                    return False
-            finally:
-                error.__traceback__ = traceback
-                BaseException.__context__.__set__(error, context)
-                error = traceback = context = None
-        if method == "error_object":
-            return retain(errors[row["error"]["binding_error"]])
-        if method == "error_attribute":
-            return retain(getattr(errors[row["error"]["binding_error"]], row["name"]))
-        if method == "attribute":
-            return retain(getattr(objects[row["owner"]], row["name"]))
-        if method == "set_attribute":
-            setattr(objects[row["owner"]], row["name"], value(row["value"]))
-            return None
-        if method == "literal":
-            return retain(value(row["value"]))
-        if method == "collection":
-            entries = [objects[key] for key in row["values"]]
-            return retain({"list": list, "tuple": tuple, "set": set}[row["kind"]](entries))
-        if method == "next":
-            try:
-                return {"done": False, "value": retain(next(objects[row["owner"]]))}
-            except StopIteration:
-                return {"done": True}
-        if method == "enter":
-            manager = objects[row["owner"]]
-            result = manager.__enter__()
-            owner = Owner(manager)
-            entered[row["owner"]] = owner
-            stack.push(owner)
-            owner.entered_id = retain(result)
-            return owner.entered_id
-        if method == "exit":
-            return exit_owner(entered.pop(row["owner"]), row["error"])
-        if method == "own":
-            owner = Owner(objects[row["owner"]], resolve(row["function"]) if "function" in row else row.get("method"),
-                {key: value(item) for key, item in row.get("kwargs", {}).items()}, row.get("condition"), row.get("function_name"))
-            closers[row["owner"]] = owner
-            stack.push(owner)
-            return None
-        if method == "close":
-            return exit_owner(closers.pop(row["owner"]), row["error"])
-        if method == "transfer":
-            closers.pop(row["owner"]).active = False
-            return None
-        if method == "raise":
-            if "args" in row:
-                error = resolve(row["kind"])(*[value(item) for item in row["args"]])
-            else:
-                error = namespace.get(row["kind"], getattr(builtins, row["kind"], None))(row["message"])
-            if row.get("cause") is None:
-                raise error
-            cause = errors[row["cause"]["binding_error"]]
-            if row.get("direct_cause"):
-                raise error from cause
-            try:
-                raise cause
-            except BaseException:
-                raise error from cause
-        raise RuntimeError("unknown package-store library call: " + method)
+                library = ctypes.PyDLL(path)
+            target = library.vinix_package_store_sdk
+            target.argtypes = (ctypes.c_char_p, ctypes.c_uint64,
+                               ctypes.py_object, ctypes.py_object)
+            target.restype = ctypes.py_object
+            _library = target
+    return _library(operation, key, first, second)
 
-    def primitive(method, row):
-        nonlocal active
-        if method == "active_error":
-            active = None if row["error"] is None else errors[row["error"]["binding_error"]]
-            return None
-        if active is None:
-            return library_primitive(method, row)
-        error, traceback = active, active.__traceback__
-        context = BaseException.__context__.__get__(error)
+
+def _double_kwargs(target, args, first, second):
+    try:
+        return target(*args, **first, **second)
+    except BaseException:
+        target = args = first = second = None
+        raise
+
+
+def _pair(value):
+    try:
+        first, second = value
+        return first, second
+    except BaseException:
+        value = None
+        raise
+
+
+def _unbound(name):
+    def unbound():
+        if False:
+            value = None
+        return value
+    return FunctionType(unbound.__code__.replace(co_varnames=(name,)), {})()
+
+
+def _raise(error):
+    try:
+        raise error
+    finally:
+        error = None
+
+
+def _raise_from(error, cause):
+    try:
+        raise error from cause
+    finally:
+        error = cause = None
+
+
+def _raise_from_handled(error, cause):
+    try:
         try:
-            raise error.with_traceback(traceback)
+            raise cause
         except BaseException:
-            BaseException.__context__.__set__(error, context)
-            replay = error.__traceback__
-            error.__traceback__ = traceback
-            try:
-                return library_primitive(method, row)
-            finally:
-                if error.__traceback__ is replay:
-                    error.__traceback__ = traceback
-                replay = traceback = error = context = None
+            raise error from cause
+    finally:
+        error = cause = None
 
-    keys = [retain(item) for item in arguments]
-    result = (_controller if controller is None else controller).call({"operation": operation, "arguments": keys}, primitive,
-        pack=_wire._pack, unpack=_wire._unpack, errors=errors,
-        cleanup=lambda: stack.__exit__(*sys.exc_info()),
-        error_fields=lambda error: {
-            "os_error": isinstance(error, OSError), "missing": isinstance(error, FileNotFoundError),
-            "tar_error": isinstance(error, namespace["tarfile"].TarError),
-            "overlay": isinstance(error, namespace.get("OverlayError", ())),
-            "source": isinstance(error, namespace.get("SourceSnapshotError", ())),
-            "value_error": isinstance(error, ValueError),
-            "called_process": isinstance(error, namespace["subprocess"].CalledProcessError),
-            "shutil_error": isinstance(error, namespace["shutil"].Error),
-            "clipboard": isinstance(error, namespace.get("ClipboardError", ())),
-            "interrupt": isinstance(error, KeyboardInterrupt), "exception": isinstance(error, Exception)})
-    return objects[result] if result is not None else None
+
+class _Owner:
+    def __init__(self, key, owner):
+        self.key, self.owner = key, owner
+
+    def __exit__(self, *details):
+        return _entry(b"owner_exit", self.key, self.owner, details)
+
+
+_SYNTAX = {"double_kwargs": _double_kwargs, "pair": _pair, "unbound": _unbound,
+           "owner": _Owner, "stack": contextlib.ExitStack, "raise": _raise,
+           "raise_from": _raise_from, "raise_from_handled": _raise_from_handled}
+
+
+def call(operation, arguments, namespace, *, controller=None):
+    key, ids, errors = _entry(b"begin", 0, namespace, (tuple(arguments), _SYNTAX))
+    try:
+        result = (_controller if controller is None else controller).call(
+            {"operation": operation, "arguments": ids},
+            lambda name, row: _entry(b"primitive", key, name, row),
+            pack=_wire._pack, unpack=_wire._unpack, errors=errors,
+            cleanup=lambda: _entry(b"cleanup", key, sys.exc_info()),
+            error_fields=lambda error: _entry(b"flags", key, error))
+        return _entry(b"result", key, result)
+    finally:
+        _entry(b"finish", key)
