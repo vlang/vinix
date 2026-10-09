@@ -517,6 +517,13 @@ results, boundary rounding, signed zero, exact decimal/hexadecimal subnormals,
 integer limits, and eight-thread errno and ARM64 status preservation. Mac
 reference, ASAN and the full ARM64 C++/GLES/PPSSPP regression pass.
 
+`chmod` and `fchmod` now adapt Darwin's 16-bit mode arguments to native permission
+changes, with shared native-to-Darwin error translation. Shared fixtures check
+real permission and setuid/sticky bits, unchanged file types, an open descriptor
+after unlink, missing/closed files, symlink-loop errors and eight concurrent
+clients with independent errno. Mac reference, ASAN and the full ARM64
+C++/GLES/PPSSPP regression pass.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -530,7 +537,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _chmod
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _dispatch_after_f
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -538,12 +545,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,253 | 905 | 81 |
-| EOSSDK | 466 | 196 | 18 |
+| Fortnite executable | 1,254 | 904 | 81 |
+| EOSSDK | 467 | 195 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,771 | 1,225 | 122 |
+| All images | 1,773 | 1,223 | 122 |
 
-The C++/GLES/Text variant reports 1,784 resolved imports, 1,212 unresolved strong
+The C++/GLES/Text variant reports 1,786 resolved imports, 1,210 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

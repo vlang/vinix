@@ -29,53 +29,8 @@ fn C.ntohs(u16) u16
 fn C.htonl(u32) u32
 fn C.ntohl(u32) u32
 
-// __error exposes the calling thread's errno. Translate immediately after a
-// failed native socket call, before another libc operation can overwrite it.
-fn socket_darwin_error(value int) int {
-	$if macos { return value }
-	return match value {
-		C.EAGAIN { 35 }
-		C.EINPROGRESS { 36 }
-		C.EALREADY { 37 }
-		C.ENOTSOCK { 38 }
-		C.EDESTADDRREQ { 39 }
-		C.EMSGSIZE { 40 }
-		C.EPROTOTYPE { 41 }
-		C.ENOPROTOOPT { 42 }
-		C.EPROTONOSUPPORT { 43 }
-		C.ESOCKTNOSUPPORT { 44 }
-		C.EOPNOTSUPP { 102 }
-		C.EPFNOSUPPORT { 46 }
-		C.EAFNOSUPPORT { 47 }
-		C.EADDRINUSE { 48 }
-		C.EADDRNOTAVAIL { 49 }
-		C.ENETDOWN { 50 }
-		C.ENETUNREACH { 51 }
-		C.ENETRESET { 52 }
-		C.ECONNABORTED { 53 }
-		C.ECONNRESET { 54 }
-		C.ENOBUFS { 55 }
-		C.EISCONN { 56 }
-		C.ENOTCONN { 57 }
-		C.ESHUTDOWN { 58 }
-		C.ETOOMANYREFS { 59 }
-		C.ETIMEDOUT { 60 }
-		C.ECONNREFUSED { 61 }
-		C.ELOOP { 62 }
-		C.ENAMETOOLONG { 63 }
-		C.EHOSTDOWN { 64 }
-		C.EHOSTUNREACH { 65 }
-		C.ENOTEMPTY { 66 }
-		C.EOVERFLOW { 84 }
-		C.ECANCELED { 89 }
-		C.EPROTO { 100 }
-		C.ENOSYS { 78 }
-		else { value }
-	}
-}
-
 fn socket_result(result isize) isize {
-	if result < 0 { darwin_set_errno(socket_darwin_error(unsafe { *C.ios_errno_address() })) }
+	if result < 0 { darwin_set_errno(darwin_native_error(unsafe { *C.ios_errno_address() })) }
 	return result
 }
 
@@ -270,7 +225,7 @@ fn darwin_getsockopt(fd int, level int, option int, value voidptr, length &u32) 
 	mut size := u32(sizeof(storage))
 	result := socket_result(C.getsockopt(fd, native_level, native_option, unsafe { &storage[0] }, unsafe { &size }))
 	if result < 0 { return int(result) }
-	if level == 0xffff && option == 0x1007 { write32(u64(unsafe { &storage[0] }), u32(socket_darwin_error(int(storage[0])))) }
+	if level == 0xffff && option == 0x1007 { write32(u64(unsafe { &storage[0] }), u32(darwin_native_error(int(storage[0])))) }
 	if level == 0xffff && option in [0x1005, 0x1006] {
 		$if linux { storage[1] = i64(u32(storage[1])) }
 	}

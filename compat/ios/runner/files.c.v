@@ -4,6 +4,7 @@ module main
 import os
 
 #include <fcntl.h>
+#include <sys/stat.h>
 
 fn C.open(&char, int, ...int) int
 fn C.shm_open(&char, i32, u32) i32
@@ -23,6 +24,22 @@ fn C.ios_mkdir(&char, u32) i32
 fn C.access(&char, int) int
 fn C.rmdir(&char) i32
 fn C.getcwd(&char, usize) &char
+fn C.chmod(&char, u32) int
+fn C.fchmod(int, u32) int
+
+fn darwin_file_result(result int) int {
+	if result < 0 { darwin_set_errno(darwin_native_error(unsafe { *C.ios_errno_address() })) }
+	return result
+}
+
+// Darwin mode_t is 16 bits; the Linux syscall/libc interface uses 32 bits.
+fn darwin_chmod(path &char, mode u16) int {
+	return darwin_file_result(C.chmod(path, u32(mode)))
+}
+
+fn darwin_fchmod(fd int, mode u16) int {
+	return darwin_file_result(C.fchmod(fd, u32(mode)))
+}
 
 fn darwin_stat_result(path &char, fd i32, kind i32, output u64) i32 {
 	if output == 0 { darwin_set_errno(14); return -1 }
@@ -92,6 +109,8 @@ fn darwin_mmap(address voidptr, size usize, protection i32, flags i32, file i32,
 
 fn files_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_chmod' { u64(unsafe { voidptr(darwin_chmod) }) }
+		'_fchmod' { u64(unsafe { voidptr(darwin_fchmod) }) }
 		'_stat', '_stat$INODE64' { u64(unsafe { voidptr(darwin_stat) }) }
 		'_pread' { u64(unsafe { voidptr(C.pread) }) }
 		'_pwrite' { u64(unsafe { voidptr(C.pwrite) }) }

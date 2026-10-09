@@ -127,6 +127,9 @@ int main(void) {
     run("/opt/ios/numeric", NULL, NULL, NULL, 0,
         "IOS-NUMERIC: decimal/hex floats, signed zero, subnormals, integer limits and eight-thread errno/fenv");
     puts("iOS PASS: Darwin floating and integer conversion errors");
+    run("/opt/ios/permissions", "/opt/ios/permissions-loop", NULL, NULL, 0,
+        "IOS-PERMISSIONS: real file modes, unlinked descriptors, Darwin errors and eight threads");
+    puts("iOS PASS: Darwin file permissions and descriptor lifetime");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");
