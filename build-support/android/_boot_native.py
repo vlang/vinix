@@ -333,6 +333,22 @@ def _build_primitive(operation, row, context, resources):
             if ident not in resources['owners']:
                 del resources[ident]
         return None
+    if operation == 'release_error':
+        error = resources['errors'][row['error']['binding_error']]
+        traceback = error.__traceback__
+        try:
+            raise error.with_traceback(traceback)
+        except BaseException:
+            replay = error.__traceback__
+            error.__traceback__ = traceback
+            try:
+                for ident in row['ids']:
+                    if ident not in resources['owners']:
+                        del resources[ident]
+            finally:
+                if error.__traceback__ is replay:
+                    error.__traceback__ = traceback
+        return None
     if operation == 'borrow':
         return _register(resources, resources['values'][row['name']])
     if operation == 'borrow_global':
@@ -353,6 +369,8 @@ def _build_primitive(operation, row, context, resources):
         ident = _register(resources, manager.__enter__())
         resources['owners'][ident] = manager
         return ident
+    if operation == 'tuple':
+        return _register(resources, (*_build_arguments(row['arguments'], resources),))
     if operation == 'sequence':
         return _register(resources, _build_arguments(row['arguments'], resources))
     if operation == 'unpack_pair':
