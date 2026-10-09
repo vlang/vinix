@@ -20,6 +20,9 @@ condition and callable until the original cleanup boundary. Consumed exception
 slots become tombstones without changing subsequent callback error IDs. Pending
 exceptions and handled exceptions remain separate, and live traceback changes
 remain visible to later callbacks.
+Binding error IDs and the exported error-list slots belong to one active call.
+Finishing the session consumes those slots; separately retained exception and
+traceback objects keep their original ownership.
 
 The counted Python adapter supplies double keyword expansion, exact pair
 unpacking, dynamically named unbound locals, exception-raising syntax and the
