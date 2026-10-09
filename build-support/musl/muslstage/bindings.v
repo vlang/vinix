@@ -103,3 +103,70 @@ fn release_error(ids []string, cause IError) ! {
 		'error': none_value()
 	})!
 }
+
+fn collection(kind string, items []string) !string {
+	return callback('collection', {
+		'kind':   ah.Value(kind)
+		'values': ah.Value(items.map(ah.Value(it)))
+	})!.text()
+}
+
+fn text(id string) !string { return datum('builtins.format', [o(id), v(ah.Value(''))])!.text() }
+
+fn item(id string, key ah.Value) !string { return call('operator.getitem', o(id), key)! }
+
+fn set_item(id string, key ah.Value, value ah.Value) ! {
+	call('operator.setitem', o(id), key, value)!
+}
+
+fn get(id string, key string) !string { return item(id, v(ah.Value(key)))! }
+
+fn join(parent string, child string) !string {
+	return call('operator.truediv', o(parent), v(ah.Value(child)))!
+}
+
+fn div(left string, right string) !string { return call('operator.truediv', o(left), o(right))! }
+
+fn constant(name string) !string {
+	return callback('resolve', {
+		'name': ah.Value(name)
+	})!.text()
+}
+
+fn append(id string, value ah.Value) ! { method(id, 'append', [value], {})! }
+
+fn iterator(value string) !string { return call('builtins.iter', o(value))! }
+
+struct Next {
+	done  bool
+	value string
+}
+
+fn next(id string) !Next {
+	row := callback('next', {
+		'owner': ah.Value(id)
+	})!.object()
+	if ah.field(row, 'done') as bool { return Next{ done: true } }
+	return Next{ value: ah.field(row, 'value').text() }
+}
+
+fn words(values []string) !string {
+	mut ids := []string{}
+	for value in values { ids << literal(ah.Value(value))! }
+	return collection('list', ids)!
+}
+
+fn fail(message string) ! {
+	callback('raise', {
+		'kind':    ah.Value('RuntimeError')
+		'message': ah.Value(message)
+	})!
+}
+
+fn apply(factory string, args []ah.Value) !string {
+	return callback('function', {
+		'target': ah.Value(factory)
+		'call':   ah.Value(true)
+		'args':   ah.Value(args)
+	})!.text()
+}

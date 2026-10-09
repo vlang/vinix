@@ -92,49 +92,8 @@ def main() -> int:
     if VERSION == "1.2.5" and b"posix_getdents\x00" in loader_bytes:
         VERSION = "1.2.6"
     SOURCE_SHA256, package, patch_directory = RELEASES[VERSION]
-    SOURCE_URL = f"https://musl.libc.org/releases/musl-{VERSION}.tar.gz"
-    cc = shlex.split(args.cc or os.environ.get(f"VINIX_MUSL_CC_{args.arch.upper()}",
-                                               f"{args.arch}-linux-musl-gcc"))
-    executable = shutil.which(cc[0]) if cc else None
-    if not executable:
-        parser.error(f"target compiler missing: {shlex.join(cc)}")
-    cc[0] = str(Path(executable).resolve())
-    machine = subprocess.check_output(cc + ["-dumpmachine"], text=True).strip()
-    if not machine.startswith(args.arch + "-") or "linux" not in machine:
-        parser.error(f"compiler target must be {args.arch}-linux: {machine}")
-    compiler_version = subprocess.check_output(cc + ["--version"], text=True).splitlines()[0]
-    ar = subprocess.check_output(cc + ["-print-prog-name=ar"], text=True).strip()
-    ranlib = subprocess.check_output(cc + ["-print-prog-name=ranlib"], text=True).strip()
-    alpine_manifest = json.loads((SUPPORT / patch_directory / "manifest.json").read_text())
-    patches = []
-    for record in alpine_manifest:
-        patch = SUPPORT / patch_directory / record["name"]
-        if hashlib.sha512(patch.read_bytes()).hexdigest() != record["sha512"]:
-            raise RuntimeError(f"Alpine musl patch checksum mismatch: {patch}")
-        patches.append(patch)
-    patches.append(SUPPORT / "malloc-retain.patch")
-    patches.extend(path.expanduser().resolve(strict=True) for path in args.extra_patch)
-    if len({path.name for path in patches}) != len(patches):
-        parser.error("patch filenames must be distinct")
-    patch_inputs = [(p.name, p.read_bytes()) for p in patches]
-    cflags = f"-fstack-protector-strong -DVINIX_MALLOC_RETAIN={retain}"
-    ldflags = f"-Wl,-soname,libc.musl-{args.arch}.so.1"
-    if args.max_page_size is not None:
-        ldflags += f" -Wl,-z,max-page-size={args.max_page_size}"
-    optimization = "internal,malloc,malloc/mallocng/*.c,string"
-    manifest = {"version": VERSION, "alpine_package": package,
-                "arch": args.arch, "source_url": SOURCE_URL,
-                "source_sha256": SOURCE_SHA256,
-                "patches": [{"name": name, "sha256": hashlib.sha256(data).hexdigest()}
-                            for name, data in patch_inputs],
-                "cc": cc, "compiler_version": compiler_version, "compiler_target": machine,
-                "cflags": cflags, "ldflags": ldflags,
-                "optimize": optimization, "retention": int(retain)}
-    key = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
-    cache = args.build_dir.resolve()
-    if cache in (Path("/"), ROOT):
-        parser.error("unsafe build directory")
-    cache.mkdir(parents=True, exist_ok=True)
+    (SOURCE_URL, cc, executable, machine, compiler_version, ar, ranlib, alpine_manifest, patches, patch_inputs, cflags, ldflags, optimization, manifest, key, cache) = _musl_call(
+        "plan", (args, parser, VERSION, retain, SOURCE_SHA256, package, patch_directory))
     with (cache / "build.lock").open("w") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         build = cache / args.arch / key

@@ -12,3 +12,9 @@ write continues chmod/replacement; cleanup runs on success and failure, retainin
 the original active error and cleanup-error precedence. The symlink helper closes
 and unlinks its temporary descriptor before its original protected body begins.
 Upstream musl, Alpine patches and allocation policy remain intact.
+
+The native plan chooses the target compiler, verifies Alpine and extra patches,
+preserves arbitrary-width page alignment and retention fields, and constructs
+the original manifest/cache key. The front end retains the early parser, loader
+checks and release tuple unpack; native results borrow the same objects for the
+remaining locked build workflow. No new manifest fields or upstream changes.
