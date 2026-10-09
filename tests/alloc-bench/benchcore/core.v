@@ -296,26 +296,25 @@ fn print_token(value &char) {
 }
 
 fn print_metadata(options &Options) i32 {
-	unsafe {
-		mut identity := C.utsname{}
-		mut resolution := C.timespec{}
-		if C.uname(&identity) != 0 { return fail(c'uname') }
-		if C.clock_getres(C.CLOCK_MONOTONIC, &resolution) != 0 { return fail(c'clock_getres') }
-		page_size := C.sysconf(C._SC_PAGESIZE)
-		if page_size <= 0 { return fail(c'sysconf_pagesize') }
-		C.printf(c'ALLOC-META schema=1 label=%s platform=', options.label)
-		print_token(&identity.sysname[0])
-		C.printf(c' release='); print_token(&identity.release[0])
-		C.printf(c' arch='); print_token(&identity.machine[0])
-		if C.VAB_COMPILER_KNOWN != 0 {
-			C.printf(c' compiler=%s compiler_major=%d compiler_minor=%d compiler_patch=%d', C.VAB_COMPILER, i32(C.VAB_COMPILER_MAJOR), i32(C.VAB_COMPILER_MINOR), i32(C.VAB_COMPILER_PATCH))
-		} else { C.printf(c' compiler=unknown') }
-		if C.VAB_VERSION_KNOWN != 0 { C.printf(c' compiler_version='); print_token(&char(C.VAB_VERSION)) }
-		ns := C.alloc_bench_word{value: u64(resolution.tv_sec) * 1000000000 + u64(resolution.tv_nsec)}
-		iterations := C.alloc_bench_word{value: options.iterations}
-		C.printf(c' pointer_bits=%zu page_size=%ld clock=CLOCK_MONOTONIC clock_resolution_ns=%llu threads=1 iterations=%llu samples=%u touch_stride=%d large_bytes=%d mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384\n', usize(sizeof(voidptr) * 8), page_size, ns.value, iterations.value, options.samples, i32(4096), i32(262144))
-		C.fflush(C.stdout)
-	}
+	// Metadata consumers borrow this storage only for synchronous calls.
+	mut identity := C.utsname{}
+	mut resolution := C.timespec{}
+	if C.uname(unsafe { &identity }) != 0 { return fail(c'uname') }
+	if C.clock_getres(C.CLOCK_MONOTONIC, unsafe { &resolution }) != 0 { return fail(c'clock_getres') }
+	page_size := C.sysconf(C._SC_PAGESIZE)
+	if page_size <= 0 { return fail(c'sysconf_pagesize') }
+	C.printf(c'ALLOC-META schema=1 label=%s platform=', options.label)
+	print_token(unsafe { &identity.sysname[0] })
+	C.printf(c' release='); print_token(unsafe { &identity.release[0] })
+	C.printf(c' arch='); print_token(unsafe { &identity.machine[0] })
+	if C.VAB_COMPILER_KNOWN != 0 {
+		C.printf(c' compiler=%s compiler_major=%d compiler_minor=%d compiler_patch=%d', C.VAB_COMPILER, i32(C.VAB_COMPILER_MAJOR), i32(C.VAB_COMPILER_MINOR), i32(C.VAB_COMPILER_PATCH))
+	} else { C.printf(c' compiler=unknown') }
+	if C.VAB_VERSION_KNOWN != 0 { C.printf(c' compiler_version='); print_token(unsafe { &char(C.VAB_VERSION) }) }
+	ns := C.alloc_bench_word{value: u64(resolution.tv_sec) * 1000000000 + u64(resolution.tv_nsec)}
+	iterations := C.alloc_bench_word{value: options.iterations}
+	C.printf(c' pointer_bits=%zu page_size=%ld clock=CLOCK_MONOTONIC clock_resolution_ns=%llu threads=1 iterations=%llu samples=%u touch_stride=%d large_bytes=%d mixed_sizes=16,32,64,96,128,256,512,1024,2048,4096,8192,16384\n', usize(sizeof(voidptr) * 8), page_size, ns.value, iterations.value, options.samples, i32(4096), i32(262144))
+	C.fflush(C.stdout)
 	return 0
 }
 
