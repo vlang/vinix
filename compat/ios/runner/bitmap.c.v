@@ -32,6 +32,11 @@ mut:
 struct BitmapState {
 mut:
 	info  u32
+	pixel_bits u32
+	decode [6]f64
+	has_decode bool
+	should_interpolate bool
+	intent u32
 	scale f64
 	paint BitmapPaint
 	saved []BitmapPaint
@@ -90,6 +95,8 @@ fn cg_bitmap_create(data voidptr, width u64, height u64, bits u64, stride u64, s
 		return 0
 	}
 	state.info = info
+	state.pixel_bits = 32
+	state.should_interpolate = true
 	state.scale = 1
 	state.paint = BitmapPaint{ matrix: ObjTransform{1, 0, 0, 1, 0, 0}, clip: ObjRect{0, 0, f64(width), f64(height)}, fill_alpha: 1, alpha: 1 }
 	state.saved = []BitmapPaint{}
@@ -205,11 +212,28 @@ fn cg_clip(context u64, rect ObjRect) {
 fn bitmap_pixel(object u64, x int, y int) [4]u32 {
 	header := obj_header(object)
 	state := bitmap_state(object)
-	p := unsafe { &u8(header.external_data + u64(i64(y) * header.number + i64(x) * 4)) }
-	blue_first := state.info & 0x2000 != 0
-	return unsafe { [u32(p[if blue_first { 2 } else { 0 }]), u32(p[1]),
-		u32(p[if blue_first { 0 } else { 2 }]),
-		if state.info & 15 in [u32(5), 6] { u32(255) } else { u32(p[3]) }]! }
+	p := unsafe { &u8(header.external_data + u64(i64(y) * header.number + i64(x) * i64(state.pixel_bits / 8))) }
+	alpha_info := state.info & 31
+	first := alpha_info in [u32(2), 4, 6]
+	little := state.info & 0x7000 == 0x2000
+	alpha_index := if first { 0 } else { 3 }
+	alpha := if alpha_info in [u32(0), 5, 6] { u32(255) } else {
+		unsafe { u32(p[if little { 3 - alpha_index } else { alpha_index }]) }
+	}
+	premultiplied := alpha_info in [u32(1), 2]
+	mut pixel := [u32(0), 0, 0, alpha]!
+	for channel in 0 .. 3 {
+		index := channel + int(first)
+		value := unsafe { u32(p[if little { 3 - index } else { index }]) }
+		if state.has_decode {
+			component := if premultiplied { if alpha == 0 { f64(0) } else { f64(value) / alpha } } else { f64(value) / 255 }
+			decoded := bitmap_component(state.decode[channel * 2] + component * (state.decode[channel * 2 + 1] - state.decode[channel * 2]))
+			pixel[channel] = (decoded * alpha + 127) / 255
+		} else {
+			pixel[channel] = if premultiplied { value } else { (value * alpha + 127) / 255 }
+		}
+	}
+	return pixel
 }
 
 fn bitmap_blend(context u64, x int, y int, source [4]u32) {
@@ -286,7 +310,7 @@ fn cg_bitmap_data(context u64) voidptr {
 
 fn cg_bitmap_bits(context u64) u64 { return if context == 0 { u64(0) } else { u64(8) } }
 
-fn cg_bitmap_pixel_bits(context u64) u64 { return if context == 0 { u64(0) } else { u64(32) } }
+fn cg_bitmap_pixel_bits(context u64) u64 { return if context == 0 { u64(0) } else { u64(bitmap_state(context).pixel_bits) } }
 
 fn cg_bitmap_info(context u64) u32 {
 	return if context == 0 { u32(0) } else { bitmap_state(context).info }
@@ -311,21 +335,16 @@ fn cg_bitmap_image(context u64) u64 {
 
 fn cg_image_provider(image u64) u64 {
 	if image == 0 { return 0 }
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	mut header := obj_header(image)
 	if header.fields[1] == 0 {
-		provider := cf_data_create(0, header.external_data, i64(header.external_size))
-		objc_set_class(provider, ios_runtime.names['VinixCGDataProvider'])
+		data := cg_copy_bytes(header.external_data, header.external_size)
+		provider := cg_provider_cfdata(data)
+		objc_release(data)
 		header.fields[1] = provider
 	}
 	return header.fields[1]
-}
-
-fn cg_provider_data(provider u64) u64 {
-	return if provider == 0 {
-		u64(0)
-	} else {
-		cf_data_create(0, data_pointer(provider), data_length(provider))
-	}
 }
 
 fn ui_context_stack() &ImageContextStack {
@@ -438,7 +457,7 @@ fn bitmap_symbol(symbol string) ?u64 {
 		'_CGColorSpaceRelease', '_CGContextRelease', '_CGImageRelease', '_CGDataProviderRelease' {
 			u64(unsafe { voidptr(objc_release) })
 		}
-		'_CGContextRetain', '_CGImageRetain', '_CGColorSpaceRetain' {
+		'_CGContextRetain', '_CGImageRetain', '_CGColorSpaceRetain', '_CGDataProviderRetain' {
 			u64(unsafe { voidptr(objc_retain) })
 		}
 		'_CGBitmapContextCreate' { u64(unsafe { voidptr(cg_bitmap_create) }) }

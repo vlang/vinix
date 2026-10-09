@@ -159,6 +159,7 @@ void ios_tlv_get_addr(void);
 void ios_lazy_entry(void);
 void ios_nslog(void);
 void ios_printf(void);
+void ios_cg_image_create(void);
 void ios_fprintf(void);
 void ios_sprintf(void);
 void ios_sscanf(void);
@@ -190,6 +191,7 @@ static void ios_tlv_get_addr(void) { abort(); }
 static void ios_lazy_entry(void) { abort(); }
 static void ios_nslog(void) { abort(); }
 static void ios_printf(void) { abort(); }
+static void ios_cg_image_create(void) { abort(); }
 static void ios_fprintf(void) { abort(); }
 static void ios_sprintf(void) { abort(); }
 static void ios_sscanf(void) { abort(); }

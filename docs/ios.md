@@ -285,11 +285,23 @@ without rounding their components. Fill color spaces survive saved-state restore
 the native fixture verifies gray/RGB pixel output and color release lifetimes.
 This resolves another 15 strong imports across the executable and EOSSDK.
 
+Raw data providers and `CGImageCreate` now also run in V. A shared Mac/iOS
+fixture checks 19 packed 8-bit RGB layouts, straight/premultiplied alpha,
+decode arrays, partial final-row padding, and overlapping source/destination
+buffers. Images and `CGDataProviderCopyData` retain the provider; its native
+release callback runs once with the original info, bytes and length, including
+callbacks that reenter the runtime. CFData-backed providers retain their data.
+An ARM64 adapter handles Darwin's packed stack arguments for image creation.
+EOSSDK's disassembled call uses a 32-by-32 straight-alpha BGRA image, one of
+the verified layouts. ASAN and the full native ARM64 regression pass. Gray,
+floating-point, packed 16-bit and other unimplemented image formats return nil.
+The two new Fortnite image entry points resolve four strong imports.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGDataProviderCreateWithData
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGRectContainsPoint
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -297,10 +309,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,131 | 1,026 | 82 |
-| EOSSDK | 362 | 300 | 18 |
+| Fortnite executable | 1,133 | 1,024 | 82 |
+| EOSSDK | 364 | 298 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,544 | 1,451 | 123 |
+| All images | 1,548 | 1,447 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

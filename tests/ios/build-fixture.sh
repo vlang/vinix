@@ -33,6 +33,13 @@ done
     -no_fixup_chains -e _main "$output/lazy.o" "$repo/tests/ios/libSystem.tbd" \
     "$repo/tests/ios/lazy.tbd" -o "$output/lazy"
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/provider-images.c" -o "$output/provider-images.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/provider-images.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/core-foundation.tbd" "$repo/tests/ios/graphics-core.tbd" \
+    "$repo/tests/ios/provider-images.tbd" -o "$output/provider-images"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
     -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/colors.m" -o "$output/colors.o"

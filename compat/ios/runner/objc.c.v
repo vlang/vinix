@@ -84,6 +84,8 @@ mut:
 	external_data u64
 	external_size u64
 	free_data bool
+	provider_info voidptr
+	provider_release u64
 	real_number f64
 	is_real bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
@@ -336,6 +338,7 @@ fn objc_release(object u64) {
 	$if ios_text ? { text_dispose(object) }
 	accessibility_dispose(object)
 	bitmap_dispose(object)
+	cg_provider_dispose(object)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])

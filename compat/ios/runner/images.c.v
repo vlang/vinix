@@ -142,6 +142,26 @@ fn bitmap_sample(image u64, x f64, y f64, nearest bool) [4]u32 {
 	return result
 }
 
+fn cg_image_pixel_copy(image u64) u64 {
+	header := obj_header(image)
+	width := u64(header.frame.width)
+	height := u64(header.frame.height)
+	copy := cg_bitmap_create(unsafe { nil }, width, height, 8, width * 4, header.fields[0], 1)
+	if copy == 0 { return 0 }
+	objc_set_class(copy, ios_runtime.names['VinixCGImage'])
+	bitmap_state(copy).scale = bitmap_state(image).scale
+	bytes := unsafe { &u8(obj_header(copy).external_data) }
+	for y in 0 .. int(height) {
+		for x in 0 .. int(width) {
+			pixel := bitmap_pixel(image, x, y)
+			for channel in 0 .. 4 {
+				unsafe { bytes[(y * int(width) + x) * 4 + channel] = u8(pixel[channel]) }
+			}
+		}
+	}
+	return copy
+}
+
 fn bitmap_draw_image(context u64, rect ObjRect, image u64, ui bool) {
 	if context == 0 || image == 0 || rect.width <= 0 || rect.height <= 0 { return }
 	state := bitmap_state(context)
@@ -152,7 +172,10 @@ fn bitmap_draw_image(context u64, rect ObjRect, image u64, ui bool) {
 	if m.a == 0 || m.d == 0 { return }
 	// A source image may share the destination allocation. Snapshot it before
 	// drawing so scaling/overlap never reads pixels already overwritten.
-	source := if image == context { cg_bitmap_image(image) } else { objc_retain(image) }
+	src := obj_header(image)
+	dst := obj_header(context)
+	overlap := src.external_data < dst.external_data + dst.external_size && dst.external_data < src.external_data + src.external_size
+	source := if overlap { cg_image_pixel_copy(image) } else { objc_retain(image) }
 	if source == 0 { return }
 	defer { objc_release(source) }
 	width := f64(cg_bitmap_width(source))

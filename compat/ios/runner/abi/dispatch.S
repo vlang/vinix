@@ -131,6 +131,25 @@ SYM(ios_sprintf_checked):
 SYM(ios_nslog):
     mov x1, sp
     b SYM(ios_nslog_stack)
+/* CGImageCreate's last arguments are packed as pointer/bool/uint32 on
+ * Darwin's stack. Linux AAPCS64 gives each argument an eight-byte slot. */
+.global SYM(ios_cg_image_create)
+SYM(ios_cg_image_create):
+#ifdef __APPLE__
+    b SYM(ios_cg_image_create_native)
+#else
+    sub sp, sp, #48
+    ldr x9, [sp, #48]
+    ldrb w10, [sp, #56]
+    ldr w11, [sp, #60]
+    stp x9, x10, [sp, #0]
+    str w11, [sp, #16]
+    str x30, [sp, #32]
+    bl SYM(ios_cg_image_create_native)
+    ldr x30, [sp, #32]
+    add sp, sp, #48
+    ret
+#endif
 /* Darwin's TLV thunk preserves argument registers: a compiler may resolve
  * TLS after preparing the arguments to another call. Only x0 is the result. */
 .global SYM(ios_tlv_get_addr)

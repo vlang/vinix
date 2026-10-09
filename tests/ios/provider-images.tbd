@@ -1,0 +1,12 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _CGDataProviderCreateWithData, _CGDataProviderCreateWithCFData,
+               _CGDataProviderRetain, _CGDataProviderRelease, _CGDataProviderGetTypeID,
+               _CGImageCreate, _CGImageGetTypeID, _CGImageGetColorSpace, _CGImageGetBitsPerPixel,
+               _CGImageGetBitsPerComponent, _CGImageGetBitmapInfo, _CGImageGetAlphaInfo,
+               _CGImageGetDecode, _CGImageGetShouldInterpolate, _CGImageGetRenderingIntent, _CGContextFlush ]
+...
