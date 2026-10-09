@@ -12,6 +12,8 @@ _bridge._controller = _bridge._gap._host.Controller(_HERE / "guest_vm_query.v", 
 
 
 def call(operation, namespace, *arguments):
+    if operation == "steam-main":
+        return _bridge.call("boot", namespace, operation, *arguments, namespace)
     return _bridge.call(operation, namespace, *arguments, namespace)
 
 
@@ -73,3 +75,7 @@ def native_iterator(namespace, operation, *arguments):
     generator.__name__ = "<genexpr>"
     generator.__qualname__ = "runtime_inputs.<locals>.<genexpr>"
     return generator
+
+
+def set_attribute(owner, name, value):
+    setattr(owner, name, value)

@@ -7,6 +7,13 @@ import json2
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
 	operation := ah.field(ah.field(row, 'arguments').object(), 'public_operation').text()
 	match operation {
+		'boot' {
+			if format('arg0')! != 'steam-main' {
+				return error('unknown native owned guest workflow')
+			}
+			steam_main('arg1', 'arg2')!
+		}
+		'steam-install' { steam_install('arg0', 'arg1')! }
 		'env-digest' { return export(digest('arg0')!) }
 		'env-elf_input' { return export(elf('arg0', 'arg1', 'arg2')!) }
 		'env-runtime_candidate' { return export(runtime_candidate('arg0', 'arg1', 'arg2')!) }
