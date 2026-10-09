@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `a0ae707a325580955f427a8b3cec91b1313bcd0d`,
+at source commit `08bd66f565841125505d202dc19c7e50207ceb4a`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 525 | 2,108,238 | 4.77% |
-| Python | 509 | 2,433,634 | 5.50% |
-| Shell | 315 | 1,325,589 | 3.00% |
+| C | 534 | 2,134,148 | 4.80% |
+| Python | 509 | 2,428,855 | 5.46% |
+| Shell | 315 | 1,326,368 | 2.98% |
 
-All `.v` files are classified as V. The resulting V share is 79.73%, with no
+All `.v` files are classified as V. The resulting V share is 79.77%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -40,7 +40,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev a0ae707a325580955f427a8b3cec91b1313bcd0d --breakdown --json
+github-linguist --rev 08bd66f565841125505d202dc19c7e50207ceb4a --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -92,7 +92,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/wine-host-v-abi.h` | 1,093 |
 | `build-support/xorg-server/xinput_abi.h` | 1,633 |
 | `compat/ios/runner/abi/cxx-symbols.h` | 50,070 |
-| `compat/ios/runner/abi/dispatch.h` | 11,606 |
+| `compat/ios/runner/abi/dispatch.h` | 11,669 |
 | `compat/ios/runner/abi/gles-surface.h` | 387 |
 | `compat/ios/runner/abi/image_config.h` | 457 |
 | `compat/ios/runner/abi/stack-probe-test.h` | 1,421 |
@@ -144,6 +144,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_scalar_store_v_contract.h` | 431 |
 | `kernel/c/linuxkpi_scalar_uaccess_v_contract.h` | 565 |
 | `kernel/c/linuxkpi_seq_fixture_v_contract.h` | 311 |
+| `kernel/c/linuxkpi_smp_call_v_contract.h` | 2,480 |
+| `kernel/c/linuxkpi_smp_call_v_primitives.h` | 2,929 |
+| `kernel/c/linuxkpi_smp_fixture_v_contract.h` | 193 |
+| `kernel/c/linuxkpi_smp_fixture_v_primitives.h` | 424 |
 | `kernel/c/linuxkpi_smp_masks_v_contract.h` | 1,772 |
 | `kernel/c/linuxkpi_smp_masks_v_primitives.h` | 1,580 |
 | `kernel/c/linuxkpi_srcu_fixture_v_contract.h` | 703 |
@@ -162,9 +166,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_wait_v_contract.h` | 3,212 |
 | `kernel/c/linuxkpi_wait_v_primitives.h` | 5,343 |
 | `kernel/c/linuxkpi_work_fixture_v_contract.h` | 626 |
+| `kernel/c/linuxkpi_work_irq_fixture_v_contract.h` | 840 |
+| `kernel/c/linuxkpi_work_irq_fixture_v_primitives.h` | 466 |
 | `kernel/c/linuxkpi_worker_fixture_v_contract.h` | 648 |
 | `kernel/c/linuxkpi_workqueue_v_contract.h` | 1,830 |
-| `kernel/c/linuxkpi_workqueue_v_primitives.h` | 2,271 |
+| `kernel/c/linuxkpi_workqueue_v_primitives.h` | 2,382 |
 | `kernel/c/linuxkpi_ww_fixture_v_contract.h` | 427 |
 | `kernel/c/locale.h` | 45 |
 | `kernel/c/lwipopts.h` | 3,213 |
@@ -389,10 +395,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/compression.c` | 2,291 |
 | `tests/ios/core-foundation.c` | 11,042 |
 | `tests/ios/desktop-init.c` | 1,138 |
+| `tests/ios/dispatch.c` | 10,985 |
 | `tests/ios/exit-handlers.c` | 3,620 |
+| `tests/ios/fcntl.c` | 4,724 |
 | `tests/ios/geometry.c` | 5,881 |
 | `tests/ios/gles-guest.c` | 27,817 |
-| `tests/ios/guest.c` | 19,621 |
+| `tests/ios/guest.c` | 20,109 |
 | `tests/ios/lazy.c` | 305 |
 | `tests/ios/libsystem-safety.c` | 5,098 |
 | `tests/ios/lifecycle.c` | 1,633 |
@@ -424,7 +432,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/bitmaphost_v_contract.h` | 290 |
 | `tests/linuxkpi/cachehost_v_contract.h` | 327 |
 | `tests/linuxkpi/formathost_v_contract.h` | 1,395 |
-| `tests/linuxkpi/host_model_v_contract.h` | 3,994 |
+| `tests/linuxkpi/host_model_v_contract.h` | 4,142 |
 | `tests/linuxkpi/host_types.h` | 1,645 |
 | `tests/linuxkpi/hostfixtures/hostbase/hostbase_v_contract.h` | 3,060 |
 | `tests/linuxkpi/hostfixtures/hostio/hostio_v_contract.h` | 608 |
@@ -444,6 +452,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
+| `tests/linuxkpi/smpcallfixture/smpcall_host_contract.h` | 2,059 |
 | `tests/linuxkpi/standalone/headercompiler_v_contract.h` | 1,823 |
 | `tests/linuxkpi/standalone/headerpreempt_v_contract.h` | 1,005 |
 | `tests/linuxkpi/standalone/headersched_v_contract.h` | 1,200 |
@@ -781,7 +790,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/run-vinix.py` | 9,619 |
 | `tests/alloc-bench/test_kmod_info.py` | 4,484 |
 | `tests/alloc-bench/test_v_bench.py` | 3,853 |
-| `tests/alloc-bench/test_v_sampler.py` | 7,089 |
+| `tests/alloc-bench/test_v_sampler.py` | 2,841 |
 | `tests/alloc-track/run.py` | 2,493 |
 | `tests/alloc-track/run_guest.py` | 1,101 |
 | `tests/alloc-track/run_native.py` | 3,834 |
@@ -892,7 +901,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/frame.py` | 1,860 |
 | `tests/ios/game2048.py` | 3,080 |
-| `tests/ios/run.py` | 18,663 |
+| `tests/ios/run.py` | 18,834 |
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/ipv6-multicast/check-generated.py` | 1,613 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
@@ -901,7 +910,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/test_runner.py` | 4,957 |
 | `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
-| `tests/kernel-gaps/_native.py` | 14,095 |
+| `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/kernel-gaps/test_runner.py` | 4,085 |
@@ -924,7 +933,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/audit_generation_test.py` | 1,281 |
 | `tests/linuxkpi/compile-native-host.py` | 7,987 |
 | `tests/linuxkpi/compile-v-core.py` | 1,929 |
-| `tests/linuxkpi/compile-v-fixture.py` | 1,341 |
+| `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
 | `tests/linuxkpi/compile-v-host.py` | 1,165 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
@@ -1303,10 +1312,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/build-2048-model.sh` | 1,128 |
 | `tests/ios/build-cxx-fixture.sh` | 1,856 |
 | `tests/ios/build-cxx-native.sh` | 1,434 |
-| `tests/ios/build-fixture.sh` | 11,084 |
+| `tests/ios/build-fixture.sh` | 11,479 |
 | `tests/ios/build-gles-fixture.sh` | 2,735 |
 | `tests/ios/build-modules-fixture.sh` | 2,174 |
-| `tests/ios/reference-frameworks.sh` | 7,140 |
+| `tests/ios/reference-frameworks.sh` | 7,435 |
 | `tests/ios/reference-modules.sh` | 1,436 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ipv6-multicast/run-host.sh` | 137 |
@@ -1315,7 +1324,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/run.sh` | 4,069 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
 | `tests/krandom/run.sh` | 1,747 |
-| `tests/linuxkpi/run.sh` | 11,183 |
+| `tests/linuxkpi/run.sh` | 11,272 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
 | `tests/m1-wifi/run.sh` | 100 |

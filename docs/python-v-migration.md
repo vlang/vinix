@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `a0ae707a325580955f427a8b3cec91b1313bcd0d`, Linguist 7.27.0 reports
-**Python 5.50%** (509 files, 2,433,634 bytes) and **V 79.73%** (1,943 files,
-35,272,481 bytes). The complete committed-blob inventory and reproduction
+At source `08bd66f565841125505d202dc19c7e50207ceb4a`, Linguist 7.27.0 reports
+**Python 5.46%** (509 files, 2,428,855 bytes) and **V 79.77%** (1,963 files,
+35,453,006 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,772,651 Python bytes**. Roughly another
-0.22 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,777,430 Python bytes**. Roughly another
+0.21 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 145 completed stages have a gross
-scope of **3,195,898 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **423,247 bytes**
+tests, including comments and blank lines. The 147 completed stages have a gross
+scope of **3,205,800 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **428,370 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -174,6 +174,8 @@ no extra migration credit.
 | ARM PCI guest serial supervision | `tests/pci-config/pcivm/core.v` | 3,661 / 59 | `ec8726238cb898c2e711c5cb7f22dea86a151152` |
 | Allocation benchmark validation workflow | `tests/alloc-bench/benchtest` | 8,726 / 124 | `85cfcac7059569d249c136556263a399c54393da` |
 | Package-store object table and callback lifetime | `build-support/cpythonhost/package_d_cpython_package.c.v` | 10,104 / 219 | `a0ae707a325580955f427a8b3cec91b1313bcd0d` |
+| Kernel-gap ordinary object bridge | `build-support/cpythonhost/gap_d_cpython_gap.c.v` | 4,299 / 84 | `37db2e12a9e600efed40c7f12b753ae60d5face6` |
+| Sampler fixture build and execution workflow | `tests/alloc-bench/samplertest` | 5,603 / 76 | `08bd66f565841125505d202dc19c7e50207ceb4a` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -274,6 +276,17 @@ temporary-manager, boot-exit and stack corrections receive zero repeated
 algorithm credit. All remaining Python bindings and concurrent committed source
 changes stay in the measured total; no historical benchmark snapshot earns
 translation credit.
+
+The next two ports add 9,902 original implementation bytes of gross scope.
+Their own counted Python reduction is 4,993 bytes: the ordinary gap bridge
+removes 745 and the sampler controller 4,248. The sampler count excludes its
+282-byte existing V source literal token; the parser, imports and small syntax
+bindings remain counted Python. Concurrent committed Python changes add 214
+bytes between these two snapshots. The package-session error-slot retirement
+(`154ed797`) receives zero new algorithm credit: active binding IDs remain
+stable, finish consumes the exported per-call slots, and separately retained
+actual exception/traceback aliases retain their ownership. Historical benchmark
+snapshots remain unchanged and receive zero port credit.
 
 ## Validation
 
@@ -1263,6 +1276,33 @@ workloads were not weakened.
   Foundation and replay fixes add counted Python bindings and earn no new
   original implementation credit.
 
+- The ordinary kernel-gap bridge passes 69 legacy helpers, 31 fork and 29
+  guardian controls per profile, plus 100 actual PTY exchanges with flat
+  descriptors. Focused actual-object, lifetime, strict-provider, registration,
+  comparison, boot and close checks cover original factory lookup and release
+  order. Five hundred alias calls, thirty nested calls, 100 calls across four
+  threads and 100 GC-disabled error calls retain their baselines. Both cold
+  library/query installers pass at mode 0700. Failed earlier comparison and
+  receiver-retirement probes remain recorded; corrected final V source passes.
+- The sampler controller passes 129 build/failure, 240 main-policy, 221 rich
+  object and 251 callable-order original/native comparisons per profile.
+  Four GC-disabled saved-error controls retain the detached comprehension
+  iterator until the actual traceback is cleared. One hundred normal calls
+  retire actual temporary directories with flat descriptors; spawn/EOF, two
+  owned-group SIGINT, six no-compiler CLI, signature and Python-O controls pass.
+  Both actual cold installers pass at mode 0700 and retire their private output
+  directories. Original/native controllers each build and run both the
+  immutable C and production V fixtures under ARM/x86 macOS ASan/UBSan, with
+  original assertions intact. Byte-identical ARM artifacts also pass GCC 13
+  ASan/UBSan/LeakSanitizer on Linux with `detect_leaks=1`. Host ENOSPC interrupted
+  earlier final checks; isolated retries pass with unchanged source/binaries.
+  These checks add no fresh kernel, QEMU, hardware or performance claim.
+- The package error-slot retirement passes all prior package/QMP controls on
+  ARM, x86 and ASan, sixteen active/finished alias cases per profile and the
+  additional saved-error/path/writer lifetimes. Finishing retires the private
+  exported list slots; scalar exception and traceback aliases remain actual
+  objects. The consumed-list boundary is documented in `tools/package-sdk.md`.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1575,6 +1615,12 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `benchmark-stack-20261009` | `postcommit.json` | `24e0b2797ee4ff76cbebccd959125356234f4829572a77e3158893dd42ff5418` |
 | `benchmark-stack-20261009` | `linux-qualification.json` | `c2976879c835792ddf43e2c4fe3290b5cfe46e56774683261cfcf16a11c9dfb3` |
 | `benchmark-stack-20261009` | `post-linux.json` | `2a66be8077b2e199e4cfaf34a082dfe609419c8a6b8c381f0abfca3a8814f296` |
+| `gap-library-core-20261010` | `qualification-final-v5.json` | `47a0a6bec8414828341b43750f99c8f8c316155641ae467dff2d91a4c0536fe4` |
+| `gap-library-core-20261010` | `post-commit-final-v5.json` | `16f7a16e8e2714ace3cd0085114d7e21d5a0d1b8b4a4e4c21234c3bb1450b9b4` |
+| `sampler-controller-20261010` | `qualification-final-v7b.json` | `b35836d62af0b3c8a28404f2c1a09880371dd3d008e4232f1ccd9c6d4ab5e37e` |
+| `sampler-controller-20261010` | `post-commit-final-v7.json` | `76483f4c7bd1cd22a2d00139eebe93264c954a53ce9969f38716699cd271db39` |
+| `package-errors-finish-20261010` | `qualification-v1.json` | `9932e1ff4bf6051205d50f26fb1bce5edc5ed4b77a2217e23e448fb4cedc4cfa` |
+| `package-errors-finish-20261010` | `postcommit-v1.json` | `fac245ca2742318ce240fa08c6d07199f1cdf6668776f36fc82df3ed156ea3d0` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
