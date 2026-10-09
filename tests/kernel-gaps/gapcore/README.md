@@ -66,3 +66,31 @@ child's `PASS` line. Exit status, markers, child bytes and verdict text remain
 asserted. The earlier ordering-only rejection is retained in the evidence.
 `qualification.json` records source/input/compiler hashes and each result;
 `post-commit.json` records the scoped source commit and committed blob hashes.
+
+The ordinary object bridge is now a maintained V shared library:
+`build-support/cpythonhost/gap_d_cpython_gap.c.v`, selected only by
+`cpython_gap`. `core_library.v` exposes the shared CPython object ABI; the
+lazy loader uses the calling interpreter's public development headers.
+`VINIX_KERNEL_GAP_CORE_LIBRARY` selects an explicitly prepared library.
+The interface retains actual objects, aliases and exceptions. Function
+lookup/calls, argument and keyword iteration, owner IDs, checkpoint/sweep,
+wait-status consumption, policy/boot/drain/stop forwarding and recursive
+owner-result restoration run in V. Argument-tag syntax, manager registration,
+handled-exception replay, POSIX fork, signal masking and emergency retirement
+remain in the independently covered Python boundary.
+
+On exceptional returns, the Python boundary owns the original bridge's named
+expression references through the saved traceback. The native session consumes
+these references into counted syntax frames rather than leaving inactive native
+owners. Detached callback and comprehension fixtures verify their destruction
+order, including retirement when the actual traceback is cleared. This is a
+host object-lifetime contract, not a kernel manual-free claim.
+
+The ordinary bridge removes 4,299 original Python bytes / 84 lines, offset by
+its library/syntax boundary for a signed net Python reduction of 745 bytes.
+Machine-local evidence for this stage is
+`/Users/alex/.cache/vinix-python-to-v/gap-library-core-20261010/`.
+The evidence includes original/native call, fork and guardian fixtures, actual
+PTY ownership, weak-object/factory/error controls, nested/threaded sessions,
+reference counts and cold builds on both interpreter architectures. No new
+kernel rebuild, QEMU guest or hardware execution is claimed by this stage.

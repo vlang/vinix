@@ -10,6 +10,9 @@ import subprocess
 import sys
 import threading
 import time
+import atexit
+import os
+import tempfile
 
 _HERE = Path(__file__).resolve().parent
 
@@ -24,6 +27,36 @@ def _module(name, path):
 _host = _module("kernel_gap_transport", _HERE.parents[1] / "build-support/native_host.py")
 _wire = _module("kernel_gap_wire", _HERE.parents[1] / "build-support/android/_boot_native.py")
 _WAITPID, _MONOTONIC, _WAIT = _host.os.waitpid, time.monotonic, threading.Event
+
+_library_adapter = _module("kernel_gap_object_abi", _HERE.parents[1] / "build-support/cpython_host.py")
+_LIBRARY_ENV, _LIBRARY_PATH, _LIBRARY_BUILD = os.environ, _HERE / "core_library.v", _HERE.parents[1] / "build-support/build-v-host-library.sh"
+_LIBRARY_MODULE, _LIBRARY_LOCK, _LIBRARY_TEMP = None, threading.Lock(), None
+_LIBRARY_PATH_TYPE, _LIBRARY_FSPATH = Path, os.fspath
+_LIBRARY_NAME = "core.dylib" if sys.platform == "darwin" else "core.so"
+
+
+def _library():
+    global _LIBRARY_MODULE, _LIBRARY_TEMP
+    with _LIBRARY_LOCK:
+        if _LIBRARY_MODULE is None:
+            path = _LIBRARY_ENV.get("VINIX_KERNEL_GAP_CORE_LIBRARY")
+            if path is None:
+                owner = tempfile.TemporaryDirectory(prefix="vinix-gap-core-")
+                path = _LIBRARY_PATH_TYPE(owner.name) / _LIBRARY_NAME
+                try:
+                    subprocess.run([_LIBRARY_FSPATH(_LIBRARY_BUILD), _LIBRARY_FSPATH(_LIBRARY_PATH), _LIBRARY_FSPATH(path),
+                                    "-d", "cpython_gap", "-d", "use_bundled_libgc"], check=True,
+                                   env={**_LIBRARY_ENV, "VINIX_HOST_PYTHON": sys.executable})
+                    path.chmod(0o700)
+                    _LIBRARY_MODULE = _library_adapter.Library(path, "vinix_kernel_gap_core")
+                except BaseException:
+                    owner.cleanup()
+                    raise
+                _LIBRARY_TEMP = owner
+                atexit.register(owner.cleanup)
+            else:
+                _LIBRARY_MODULE = _library_adapter.Library(path, "vinix_kernel_gap_core")
+        return _LIBRARY_MODULE
 
 
 class _Process(subprocess.Popen):
@@ -58,6 +91,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
     entered = {}
     active = None
     native_errors = {}
+    core = core_key = None
 
     class Owner:
         def __init__(self, manager):
@@ -87,43 +121,46 @@ def call(operation, arguments, namespace, resources=None, controller=None):
     interrupt._vinix_native_pending = pending
     interrupt._vinix_native_restore = lambda: signal.SIG_IGN if masked else interrupt
 
-    def resolve(name):
-        parts = name.split(".")
-        if len(parts) == 2 and parts[0] == "builtins":
-            return namespace.get(parts[1], getattr(builtins, parts[1]))
-        value = {"builtins": builtins, "operator": operator}.get(parts[0], namespace.get(parts[0]))
-        for part in parts[1:]:
-            value = getattr(value, part)
-        return value
-
     def argument(pair):
         kind, value = pair
         return {"path": Path, "bytes": bytes.fromhex,
                 "owner": resources.__getitem__, "tuple": tuple, "value": lambda value: value}[kind](value)
 
-    def retain(value):
-        resources["next_id"] = resources.get("next_id", 0) + 1
-        ident = str(resources["next_id"])
-        resources[ident] = value
-        return ident
+    def register(ident, *entered_ids):
+        if not entered_ids:
+            manager = resources[ident]
+            entry = Owner(manager)
+            entered[ident] = entry
+            contexts.push(entry)
+        else:
+            entered[ident].entered_id = entered_ids[0]
+
+    def stop_drain():
+        return lambda: call("drain", {"master": resources["master"]}, namespace, resources, transport)
+
+    def entered_ids():
+        return (entry.entered_id for entry in entered.values())
+
+    def core_call(method, row):
+        nonlocal core, core_key
+        if core is None:
+            core = _library()
+            core_key = core.call("begin", (resources, globals(), argument, register, entered, stop_drain, entered_ids), namespace)
+        try:
+            return core.call(method, (core_key, row), {})
+        except BaseException:
+            _pins = core.call("error_pins", (core_key,), {})
+            raise
 
     def library_primitive(method, row):
         nonlocal completed, masked
         if method == "finished":
             completed = True
             return None
-        if method == "release":
-            for ident in row["ids"]: resources.pop(ident, None)
-            return None
-        if method == "checkpoint":
-            return resources.get("next_id", 0) + 1
+        if method in ("release", "checkpoint"):
+            return core_call(method, row)
         if method == "release_since":
-            keep = set(row.get("keep", ())) | entered.keys()
-            keep.update(entry.entered_id for entry in entered.values())
-            for ident in tuple(resources):
-                if isinstance(ident, str) and ident.isdecimal() and int(ident) >= row["checkpoint"] and ident not in keep:
-                    resources.pop(ident)
-            return None
+            return core_call(method, row)
         if pending:
             raise pending.pop(0)
         if method == "retiring":
@@ -152,32 +189,11 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             resources["output"] = bytearray()
             return [pid, master]
         if method == "close_fd":
-            master = resources["master"]
-            resources["closed"] = True
-            return namespace["os"].close(master)
+            return core_call(method, row)
         if method == "wait_once":
-            pid, api = resources["pid"], namespace["os"]
-            status = api.waitpid(pid, api.WNOHANG)
-            if type(status) is tuple and len(status) == 2 and type(status[0]) is int and type(pid) is int and status[0] == pid:
-                resources["reaped"] = True
-            return retain(status) if row.get("result") == "owner" else status
+            return core_call(method, row)
         if method == "function":
-            target = getattr(resources[row["owner"]], row["method"]) if "owner" in row else resolve(row["name"])
-            value = target(*[argument(value) for value in row.get("args", [])],
-                           **{key: argument(value) for key, value in row.get("kwargs", {}).items()}) if row.get("call") or callable(target) else target
-            if row.get("method") == "__enter__":
-                manager = resources[row["owner"]]
-                entry = Owner(manager)
-                entered[row["owner"]] = entry
-                contexts.push(entry)
-            mode = row.get("result", "value")
-            if mode == "owner":
-                ident = retain(value)
-                if row.get("method") == "__enter__": entry.entered_id = ident
-                return ident
-            if mode == "path": return str(value)
-            if mode == "bytes": return value.hex()
-            return value
+            return core_call(method, row)
         if method == "context_exit":
             manager = resources.pop(row["id"])
             entry = entered.pop(row["id"])
@@ -200,35 +216,17 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             finally:
                 entry.manager = manager = None
         if method == "raise_builtin":
-            raise getattr(builtins, row["kind"])(argument(row["value"]))
-        if method == "next":
-            try:
-                return {"done": False, "owner": retain(next(resources[row["id"]]))}
-            except StopIteration:
-                return {"done": True}
-        if method == "list_new":
-            return retain([])
-        if method == "unpack":
-            return retain([*resources[row["owner"]]])
+            return core_call(method, row)
+        if method in ("next", "list_new", "unpack"):
+            return core_call(method, row)
         if method == "main_policy":
-            options = resources["options"]
-            expected, failures = namespace["verdict_policy"](options.expect, options.fail, options.expect_panic)
-            return retain((expected, failures))
+            return core_call(method, row)
         if method == "boot":
-            expected, failures = resources[row["policy"]]
-            return namespace["boot"](row["command"], row["env"], Path(row["state"]),
-                                     expected, failures, resources["timeout"])
-        if method == "drain":
-            return resources["drain"]()
-        if method == "stop":
-            return namespace["stop"](resources["pid"], resources["master"], resources["state"],
-                lambda: call("drain", {"master": resources["master"]}, namespace, resources, transport))
-        if method == "reaped":
-            resources["reaped"] = True
-            return None
-        if method == "closed":
-            resources["closed"] = True
-            return None
+            return core_call(method, row)
+        if method in ("drain", "stop"):
+            return core_call(method, row)
+        if method in ("reaped", "closed"):
+            return core_call(method, row)
         raise RuntimeError("unknown kernel-gap primitive: " + method)
 
     def failure(record):
@@ -321,12 +319,11 @@ def call(operation, arguments, namespace, resources=None, controller=None):
                 "value_error": isinstance(error, ValueError),
                 "called_process": isinstance(error, subprocess.CalledProcessError)})
         if pending: raise pending.pop(0)
-        def restore(value):
-            if isinstance(value, list): return [restore(item) for item in value]
-            if isinstance(value, dict) and set(value) == {"owner_result"}:
-                return resources[value["owner_result"]]
-            return value
-        return restore(result)
+        return core_call("restore", result)
     finally:
-        if previous is not None:
-            signal.signal(signal.SIGINT, getattr(previous, "_vinix_native_restore", lambda: previous)())
+        try:
+            if previous is not None:
+                signal.signal(signal.SIGINT, getattr(previous, "_vinix_native_restore", lambda: previous)())
+        finally:
+            if core_key is not None:
+                core.call("close", (core_key,), {})
