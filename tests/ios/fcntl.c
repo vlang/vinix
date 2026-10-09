@@ -94,7 +94,11 @@ int main(void) {
     for (int i = 0; i < 8; ++i) {
         CHECK(pthread_create(&clients[i], 0, worker, &jobs[i]) == 0, 33);
     }
-    for (int i = 0; i < 8; ++i) CHECK(pthread_join(clients[i], 0) == 0 && jobs[i].error == 0, 34);
+    int failed=0;
+    for (int i = 0; i < 8; ++i) {
+        if (pthread_join(clients[i], 0) != 0 || jobs[i].error) failed=1;
+    }
+    CHECK(!failed, 34);
     puts("IOS-FCNTL: shared status and offsets, descriptor flags, duplicates, native flush and nonblocking sockets");
     return 0;
 }

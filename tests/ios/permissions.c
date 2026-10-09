@@ -29,7 +29,8 @@ static int check(int index) {
     CHECK(unlink(path) == 0, 18);
     CHECK(fchmod(fd, 0640) == 0 && fstat(fd, status) == 0 && (((unsigned short *)(void *)status)[2] & 07777) == 0640, 19);
     CHECK(close(fd) == 0, 20);
-    CHECK(fchmod(fd, 0600) == -1 && *__error() == 9, 21);
+    // Another worker may already have opened a file at the closed fd number.
+    CHECK(fchmod(index == 0 ? fd : -1, 0600) == -1 && *__error() == 9, 21);
     return 0;
 }
 struct job { int index, error; };
@@ -48,7 +49,11 @@ int main(int argc, char **argv) {
         jobs[i].index = i + 1; jobs[i].error = 0;
         CHECK(pthread_create(&threads[i], 0, worker, &jobs[i]) == 0, 2);
     }
-    for (int i = 0; i < 8; i++) CHECK(pthread_join(threads[i], 0) == 0 && jobs[i].error == 0, 3);
+    int failed=0;
+    for (int i = 0; i < 8; i++) {
+        if (pthread_join(threads[i], 0) != 0 || jobs[i].error) failed=1;
+    }
+    CHECK(!failed, 3);
     CHECK(*__error() == 12345, 4);
     puts("IOS-PERMISSIONS: real file modes, unlinked descriptors, Darwin errors and eight threads");
     return 0;
