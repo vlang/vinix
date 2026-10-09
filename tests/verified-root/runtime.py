@@ -5,6 +5,7 @@
 import argparse
 import importlib.util
 import io
+import runpy
 import os
 from pathlib import Path
 import re
@@ -21,45 +22,27 @@ spec.loader.exec_module(boot)
 verity = boot.verity
 BLOCKS = 8192  # 32 MiB, including enough room for the static fixture.
 
+_runtime_binding = runpy.run_path(str(ROOT / "tools/_package_store_native.py"))
+_runtime_controller = _runtime_binding["_host"].Controller(Path(__file__).with_name("runtime_query.v"), "VINIX_VERIFIED_ROOT_RUNTIME_QUERY")
+
+def _runtime(operation, *arguments):
+    return _runtime_binding["call"](operation, arguments, globals(), controller=_runtime_controller)
+
 
 def command(args, **kwargs):
-    return subprocess.run([str(arg) for arg in args], check=True, **kwargs)
+    return _runtime('command', args, kwargs)
 
 
 def device_blocks(args, image, path):
-    result = command([args.debugfs, "-R", f"blocks {path}", image], capture_output=True, text=True)
-    blocks = [int(value) for value in result.stdout.split()]
-    if not blocks:
-        raise RuntimeError(f"no filesystem data blocks for {path}: {result.stderr}")
-    return blocks
+    return _runtime('device_blocks', args, image, path)
 
 
 def enroll(bundle, text, args, work):
-    config = bundle / "boot/limine.conf"
-    config.write_text(text, encoding="ascii")
-    data = bytearray(args.loader.read_bytes())
-    field, _ = boot.pe_info(data, args.arch)
-    data[field:field + 128] = boot.digest(config).encode()
-    image = bundle / f"EFI/BOOT/{boot.ARCHES[args.arch][2]}"
-    if args.secure_boot:
-        enrolled = work / "enrolled.efi"
-        enrolled.write_bytes(data)
-        image.unlink()
-        boot.sign_image(enrolled, image, args.key, args.certificate, args.backend)
-    else:
-        image.write_bytes(data)
+    return _runtime('enroll', bundle, text, args, work)
 
 
 def tamper(image, offset):
-    with image.open("r+b") as stream:
-        stream.seek(offset)
-        original = stream.read(1)
-        if len(original) != 1:
-            raise RuntimeError("tamper offset outside image")
-        stream.seek(offset)
-        stream.write(bytes([original[0] ^ 1]))
-        stream.flush()
-        os.fsync(stream.fileno())
+    return _runtime('tamper', image, offset)
 
 
 def run_guest(args, work, bundle, attached, scenario, expected, probe=None):
