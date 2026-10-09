@@ -264,7 +264,7 @@ fn fault_test_cow() bool {
 	if !scalar_test_require(scalar_test_map(pagemap, fault_test_cow_base, page_size, false)
 		&& write_scalar_pagemap(pagemap, address, 8, scalar_test_pattern),
 		c'fault COW original page') { return false }
-	mut child := mmap.fork_pagemap(pagemap) or {
+	mut child := mmap.fork_pagemap(pagemap, pagemap.kernel_owner) or {
 		return scalar_test_require(false, c'fault test actual COW fork')
 	}
 	defer {

@@ -250,7 +250,7 @@ fn scalar_store_test_lazy_and_cow() bool {
 		&& pagemap.resident_bytes == 6 * page_size,
 		c'actual cross-page scalar store faults exactly two sparse pages') { return false }
 	address := scalar_store_test_lazy_base + 64 * page_size + 3
-	mut child := mmap.fork_pagemap(pagemap) or {
+	mut child := mmap.fork_pagemap(pagemap, pagemap.kernel_owner) or {
 		return scalar_test_require(false, c'actual scalar store COW fork')
 	}
 	defer {

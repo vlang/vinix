@@ -183,7 +183,7 @@ fn nocache_test_cow() bool {
 			(&u8(first))[offset] = nocache_test_pattern(offset)
 		}
 	}
-	mut child := mmap.fork_pagemap(pagemap) or { return false }
+	mut child := mmap.fork_pagemap(pagemap, pagemap.kernel_owner) or { return false }
 	defer { mmap.delete_pagemap(mut child) or { panic('nocache COW child cleanup failed') } }
 	physical := u64(first) - memory.get_hhdm_offset()
 	for mode in 0 .. 8 {

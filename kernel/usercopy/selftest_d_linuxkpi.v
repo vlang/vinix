@@ -286,7 +286,7 @@ fn remaining_test_lazy_and_cow() bool {
 		c'only touched anonymous pages resident') {
 		return false
 	}
-	mut child := mmap.fork_pagemap(pagemap) or {
+	mut child := mmap.fork_pagemap(pagemap, pagemap.kernel_owner) or {
 		return remaining_test_require(false, c'actual native COW fork')
 	}
 	defer {
