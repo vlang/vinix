@@ -25,6 +25,13 @@ done
     "$repo/tests/ios/lazy.tbd" -o "$output/lazy"
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fobjc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/graphics.m" -o "$output/graphics.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/graphics.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/tests/ios/graphics.tbd" "$repo/tests/ios/graphics-core.tbd" \
+    "$repo/tests/ios/core-foundation.tbd" "$repo/examples/ios-calculator/api/Foundation.tbd" -o "$output/graphics"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
     -fno-objc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/arc-registers.m" -o "$output/arc-registers.o"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 \

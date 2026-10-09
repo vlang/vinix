@@ -194,41 +194,6 @@ fn ct_line_bounds(line u64, ascent &f64, descent &f64, leading &f64) f64 {
 	return header.frame.width
 }
 
-fn cg_bitmap_create(data voidptr, width u64, height u64, bits u64, stride u64, space u64, info u32) u64 {
-	// Premultiplied RGBA, default byte order, is the format PPSSPP requests.
-	if bits != 8 || info != 1 || space == 0 || width == 0 || height == 0 || width > 8192 || height > 8192 || stride < width * 4 || stride > 128 * 1024 * 1024 / height { return 0 }
-	context := objc_allocate(ios_runtime.names['VinixCGContext'])
-	mut header := obj_header(context)
-	header.external_data = u64(data)
-	header.external_size = stride * height
-	header.number = i64(stride)
-	header.frame.width = f64(width)
-	header.frame.height = f64(height)
-	header.color = 0xffffff
-	header.real_number = 1
-	if data == unsafe { nil } {
-		header.external_data = u64(C.calloc(usize(height), usize(stride)))
-		header.free_data = true
-		if header.external_data == 0 { objc_release(context); return 0 }
-	}
-	store_field(context, 0, space)
-	return context
-}
-
-fn cg_rgb_space() u64 { return objc_allocate(ios_runtime.names['VinixCGColorSpace']) }
-fn cg_set_fill(context u64, color u64) {
-	mut header := obj_header(context)
-	header.color = obj_header(color).color
-	header.real_number = obj_header(color).real_number
-}
-fn cg_set_stroke(context u64, color u64) { store_field(context, 2, color) }
-fn cg_text_position(context u64, x f64, y f64) {
-	if !math.is_finite(x) || !math.is_finite(y) { panic('iOS: invalid bitmap text position') }
-	mut header := obj_header(context)
-	header.frame.x = x
-	header.frame.y = y
-}
-
 fn text_glyphs(line u64, context u64) f64 {
 	face := obj_header(obj_header(line).fields[1]).font_face
 	mut pen := i64(0)
@@ -254,6 +219,8 @@ fn text_glyphs(line u64, context u64) f64 {
 
 fn text_composite(context u64, bitmap &u8, glyph [7]i64, pen f64) {
 	header := obj_header(context)
+	state := bitmap_state(context)
+	if state.paint.matrix != ObjTransform{1, 0, 0, 1, 0, 0} { panic('iOS: transformed CoreText bitmap drawing is not implemented') }
 	if header.frame.x + pen < -1024 || header.frame.x + pen > header.frame.width + 1024 || header.frame.y < -1024 || header.frame.y > header.frame.height + 1024 { return }
 	x0 := i64(math.floor(header.frame.x + pen)) + glyph[1]
 	y0 := i64(header.frame.height) - i64(math.floor(header.frame.y)) - glyph[2]
@@ -263,15 +230,14 @@ fn text_composite(context u64, bitmap &u8, glyph [7]i64, pen f64) {
 		for column in 0 .. glyph[3] {
 			x := x0 + column
 			if x < 0 || x >= i64(header.frame.width) { continue }
+			clip := state.paint.clip
+			clip_coverage := math.max(0, math.min(f64(x + 1), clip.x + clip.width) - math.max(f64(x), clip.x)) * math.max(0, math.min(f64(y + 1), clip.y + clip.height) - math.max(f64(y), clip.y))
+			if clip_coverage == 0 { continue }
 			source_row := if glyph[5] < 0 { glyph[4] - 1 - row } else { row }
 			coverage := unsafe { bitmap[source_row * i64(math.abs(glyph[5])) + column] }
-			alpha := u32(math.round(f64(coverage) * header.real_number))
+			alpha := u32(math.round(f64(coverage) * header.real_number * state.paint.alpha * clip_coverage))
 			if alpha == 0 { continue }
-			pixel := unsafe { &u8(header.external_data + u64(y * header.number + x * 4)) }
-			for channel in 0 .. 4 {
-				color := if channel == 3 { u32(255) } else { (header.color >> u32((2 - channel) * 8)) & 255 }
-				unsafe { pixel[channel] = u8((color * alpha + u32(pixel[channel]) * (255 - alpha) + 127) / 255) }
-			}
+			bitmap_blend(context, int(x), int(y), [(((header.color >> 16) & 255) * alpha + 127) / 255, (((header.color >> 8) & 255) * alpha + 127) / 255, ((header.color & 255) * alpha + 127) / 255, alpha]!)
 		}
 	}
 }
@@ -280,22 +246,6 @@ fn ct_line_draw(line u64, context u64) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	text_glyphs(line, context)
-}
-
-fn text_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
-	if object !in ios_runtime.classes && objc_is_kind(object, ios_runtime.names['UIColor']) && selector == 'CGColor' {
-		mut header := obj_header(object)
-		if header.fields[8] == 0 {
-			color := objc_allocate(ios_runtime.names['VinixCGColor'])
-			mut native := obj_header(color)
-			native.color = header.color
-			native.real_number = if header.is_real { header.real_number } else { f64(1) }
-			header.fields[8] = color
-		}
-		frame.x[0] = header.fields[8]
-		return true
-	}
-	return false
 }
 
 fn text_symbol(symbol string) ?u64 {
@@ -308,12 +258,6 @@ fn text_symbol(symbol string) ?u64 {
 		'_CTLineCreateWithAttributedString' { u64(unsafe { voidptr(ct_line_create) }) }
 		'_CTLineGetTypographicBounds' { u64(unsafe { voidptr(ct_line_bounds) }) }
 		'_CTLineDraw' { u64(unsafe { voidptr(ct_line_draw) }) }
-		'_CGColorSpaceCreateDeviceRGB' { u64(unsafe { voidptr(cg_rgb_space) }) }
-		'_CGColorSpaceRelease', '_CGContextRelease' { u64(unsafe { voidptr(objc_release) }) }
-		'_CGBitmapContextCreate' { u64(unsafe { voidptr(cg_bitmap_create) }) }
-		'_CGContextSetFillColorWithColor' { u64(unsafe { voidptr(cg_set_fill) }) }
-		'_CGContextSetStrokeColorWithColor' { u64(unsafe { voidptr(cg_set_stroke) }) }
-		'_CGContextSetTextPosition' { u64(unsafe { voidptr(cg_text_position) }) }
 		else { return none }
 	}
 }

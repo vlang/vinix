@@ -26,3 +26,8 @@ mkdir -p "$output"
     -framework Foundation "$repo/tests/ios/arc-registers.m" "$repo/tests/ios/arc-registers.S" \
     -o "$output/arc-registers"
 "$output/arc-registers"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios17.0-macabi -fobjc-arc -O1 -Wall -Wextra -Werror \
+    -F"$(xcrun --show-sdk-path)/System/iOSSupport/System/Library/Frameworks" \
+    -framework Foundation -framework UIKit -framework CoreGraphics \
+    "$repo/tests/ios/graphics.m" -o "$output/graphics-fixture"
+"$output/graphics-fixture"

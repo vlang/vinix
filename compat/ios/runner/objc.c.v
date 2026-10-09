@@ -95,6 +95,7 @@ mut:
 	home_indicator_hidden bool
 	idle_timer_disabled bool
 	accessibility &AccessibilityState = unsafe { nil }
+	bitmap &BitmapState = unsafe { nil }
 }
 
 struct ObjRect {
@@ -117,6 +118,7 @@ mut:
 	classes      map[u64]&ObjClass
 	names        map[string]u64
 	pool_key u64
+	graphics_key u64
 	window       u64
 	screen       u64
 	live         i64
@@ -164,6 +166,7 @@ fn objc_start() {
 	if C.ios_key_create(unsafe { &ios_runtime.pool_key }, unsafe { voidptr(objc_pool_free) }) != 0 {
 		panic('iOS: cannot create autorelease TLS')
 	}
+	if C.ios_key_create(unsafe { &ios_runtime.graphics_key }, unsafe { voidptr(ui_context_cleanup) }) != 0 { panic('iOS: cannot create graphics TLS') }
 	ios_runtime.timers.flags |= .noslices
 	ios_runtime.display_links.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
@@ -184,7 +187,7 @@ fn objc_start() {
         'CAMetalLayer', 'GLKView', 'EAGLContext', 'CMMotionManager', 'CLLocationManager',
         'AVAudioSession', 'AVCaptureDevice', 'AVCaptureDeviceInput', 'AVCaptureSession',
         'AVCaptureVideoDataOutput', 'AVCaptureVideoPreviewLayer', 'PHPhotoLibrary',
-		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor'] {
+		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider'] {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
@@ -327,6 +330,7 @@ fn objc_release(object u64) {
 	$if ios_gles ? { gles_dispose(object) }
 	$if ios_text ? { text_dispose(object) }
 	accessibility_dispose(object)
+	bitmap_dispose(object)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])
@@ -368,6 +372,7 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }
 	display_links_stop()
 	dispatch_main_stop()

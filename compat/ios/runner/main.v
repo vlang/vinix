@@ -40,7 +40,15 @@ fn inspect(image macho.Image, show_imports bool) ! {
 // This exposes every missing dependency, rather than only the first bind error.
 fn audit_imports(image macho.Image) !int {
 	objc_start()
-	defer { objc_stop(); system_data_stop() }
+	// Optional symbol resolvers need their native libraries and TLS even when
+	// no app code is executed. EGL display creation remains lazy.
+	$if ios_text ? { text_start()! }
+	$if ios_gles ? { gles_start()! }
+	defer {
+		objc_stop()
+		$if ios_gles ? { gles_stop() }
+		system_data_stop()
+	}
 	system_data_start()!
 	mut resolved := 0
 	mut strong := 0

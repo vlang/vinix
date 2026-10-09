@@ -41,7 +41,8 @@ static void run(const char *image, const char *left, const char *op,
     }
     close(descriptors[0]);
     output[length] = 0;
-    if (!strcmp(image, "--audit") && strstr(output, "IOS-CF:"))
+    if (!strcmp(image, "--audit") &&
+        (strstr(output, "IOS-CF:") || strstr(output, "IOS-GLES:")))
         fail("import audit executed application code");
     int status;
     while (waitpid(child, &status, 0) < 0) if (errno != EINTR) fail("waitpid");
@@ -67,6 +68,8 @@ int main(void) {
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
         unsetenv("GALLIUM_DRIVER");
         setenv("MESA_SHADER_CACHE_DISABLE", "true", 1);
+        run("--audit", "/opt/ios/gles", NULL, NULL, 0,
+            "0 unresolved strong, 0 unresolved weak (app code was not executed)");
         run("/opt/ios/gles", NULL, NULL, NULL, 0,
             "IOS-GLES: native ES3 shader pixels, GLKView resize, depth/stencil, TLS and ARC teardown");
         puts("iOS PASS: native OpenGL ES shader rendering and GLKView lifecycle");
@@ -116,6 +119,9 @@ int main(void) {
     run("/opt/ios/arc-registers", NULL, NULL, NULL, 0,
         "IOS-ARC-REGISTERS: 52 retain/release entry points, nil/constants, x0 results, callee register preservation and real weak/dealloc ownership");
     puts("iOS PASS: native register-specific ARC calling conventions and ownership");
+    run("/opt/ios/graphics", NULL, NULL, NULL, 0,
+        "IOS-GRAPHICS: scaled/nested/TLS contexts, BGRA pixels, state/clip, independent snapshots, image drawing and real PNG/JPEG round trips");
+    puts("iOS PASS: native UIKit bitmap contexts, image ownership and PNG/JPEG codecs");
     run("--audit", "/opt/ios/core-foundation", NULL, NULL, 0,
         "0 unresolved strong, 0 unresolved weak (app code was not executed)");
     run("--audit", "/opt/ios/unsupported", NULL, NULL, 1,

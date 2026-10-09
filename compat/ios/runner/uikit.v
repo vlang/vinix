@@ -92,6 +92,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }
 	if selector == 'self' { return true }
 	if selector == 'retain' { frame.x[0] = objc_retain(object); return true }
@@ -99,7 +100,6 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if selector == 'autorelease' { frame.x[0] = objc_autorelease(object); return true }
 	if selector == 'dealloc' { return true } // Disposal follows the native dealloc chain.
 	$if ios_gles ? { if gles_dispatch(object, selector, mut frame) { return true } }
-	$if ios_text ? { if text_dispatch(object, selector, mut frame) { return true } }
 	if platform_framework_dispatch(object, selector, mut frame) { return true }
 	if foundation_dispatch(object, selector, mut frame) { return true }
 	// Class methods are inherited through their metaclasses.
