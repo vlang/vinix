@@ -4,19 +4,30 @@ module muslstage
 import androidhost as ah
 
 fn sha256(path string) !string {
-	data := method(path, 'read_bytes', [], {})!
-	digest := call('hashlib.sha256', o(data)) or {
+	factory := callback('resolve', {
+		'name': ah.Value('hashlib.sha256')
+	})!.text()
+	data := method(path, 'read_bytes', [], {}) or {
 		cause := err
-		release_error([data], cause)!
+		release_error([factory], cause)!
 		return cause
 	}
-	release(data)!
-	result := method(digest, 'hexdigest', [], {}) or {
+	digest := callback('function', {
+		'target': ah.Value(factory)
+		'call':   ah.Value(true)
+		'args':   ah.Value([o(data)])
+	}) or {
 		cause := err
-		release_error([digest], cause)!
+		release_error([data, factory], cause)!
 		return cause
 	}
-	release(digest)!
+	release(data, factory)!
+	result := method(digest.text(), 'hexdigest', [], {}) or {
+		cause := err
+		release_error([digest.text()], cause)!
+		return cause
+	}
+	release(digest.text())!
 	return result
 }
 
