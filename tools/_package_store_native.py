@@ -110,7 +110,11 @@ def call(operation, arguments, namespace, *, controller=None):
             if callable(target) or row.get("call", False):
                 args = [value(item) for item in row.get("args", [])]
                 kwargs = {key: value(item) for key, item in row.get("kwargs", {}).items()}
-                result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
+                try:
+                    result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
+                except BaseException:
+                    target = args = kwargs = None
+                    raise
             else:
                 result = target
             if row.get("data"):
