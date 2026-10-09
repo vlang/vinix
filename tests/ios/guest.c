@@ -138,6 +138,11 @@ int main(void) {
     run("/opt/ios/security-trust", NULL, NULL, NULL, 0,
         "IOS-SECURITY-TRUST: owned trust/key snapshots, explicit CA anchors, verify dates, negative decisions and cache invalidation");
     puts("iOS PASS: native Security explicit-anchor trust evaluation and key ownership");
+    run("/opt/ios/cfnetwork", NULL, NULL, NULL, 0,
+        "IOS-PROXY: typed HTTP proxy constants, configuration snapshots and owned settings");
+    run("/opt/ios/cfnetwork", "invalid", NULL, NULL, 1,
+        "iOS: HTTP proxy configuration is invalid or unsupported");
+    puts("iOS PASS: native CFNetwork HTTP proxy settings and ownership");
     run("/opt/ios/keychain", NULL, NULL, NULL, 0,
         "IOS-KEYCHAIN: generic passwords, duplicate/update/delete, binary data, one/all results and ownership");
     for (int pass = 0; pass < 3; pass++) {

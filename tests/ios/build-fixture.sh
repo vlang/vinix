@@ -12,6 +12,12 @@ for name in calculator unsupported lifecycle pointer-tags common-crypto; do
         -fixup_chains -e _main "$output/$name.o" "$repo/tests/ios/libSystem.tbd" \
         -o "$output/$name"
 done
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fno-objc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/cfnetwork.m" -o "$output/cfnetwork.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/cfnetwork.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/startup.tbd" "$repo/tests/ios/core-foundation.tbd" "$repo/tests/ios/cfnetwork.tbd" -o "$output/cfnetwork"
 for name in audio-converter audio-graph; do
     "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
         -fno-stack-protector -O1 -Wall -Wextra -Werror \

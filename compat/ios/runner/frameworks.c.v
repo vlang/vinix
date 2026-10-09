@@ -7,6 +7,9 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library == '/System/Library/Frameworks/CFNetwork.framework/CFNetwork' {
+		if address := cfnetwork_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/Security.framework/Security' {
 		if address := security_symbol(symbol) { return address }
 	}

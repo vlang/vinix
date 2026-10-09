@@ -404,22 +404,49 @@ general asymmetric signature verification. Shared Mac fixtures, malformed-profil
 cases, ASAN ownership checks and the full ARM64 C++/GLES/PPSSPP regression pass.
 This resolves eight additional strong imports across Fortnite and EOSSDK.
 
-The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
+CFNetwork's three HTTP proxy constants now have the measured string values
+`HTTPEnable`, `HTTPPort` and `HTTPProxy`. `CFNetworkCopySystemProxySettings`
+returns an owned immutable snapshot of an explicitly inherited
+`VINIX_IOS_HTTP_PROXY=http://host[:port]` configuration, with numeric enable/port
+values and a copied host string. The default port is 80; a trailing slash is
+accepted. DNS names and IPv4 host strings are supported. Missing/empty runtime
+configuration returns NULL, as permitted for undefined proxy settings.
+Malformed configuration, credentials, IPv6 literals and non-HTTP schemes fail
+explicitly instead of silently selecting a direct connection. Vinix does not
+yet have Apple's SystemConfiguration service, PAC, proxy authentication or
+general CFNetwork networking. The Mac reference checks constant values and
+dictionary field types without changing system settings or contacting servers;
+Vinix fixtures check configuration changes, snapshot ownership, invalid input
+and ASAN lifetime checks. The full ARM64 C++/GLES/PPSSPP regression passes.
+This resolves five additional strong imports across Fortnite and EOSSDK.
+
+The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/CFNetwork.framework/CFNetwork (_CFNetworkCopySystemProxySettings)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /usr/lib/libz.1.dylib (_inflate)
+```
+
+The existing C++/GLES/Text runner supplies native zlib and gets beyond that
+dependency. With its private library closure included in the same 4 GiB guest,
+the actual game still exits before entry, at a legacy libc++ ABI dependency:
+
+```text
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: C++ symbol is not implemented: __ZNKSt3__120__vector_base_commonILb1EE20__throw_length_errorEv
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
-the executable, without mapping or executing app code. The C++ runner reports:
+the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,190 | 968 | 81 |
-| EOSSDK | 425 | 237 | 18 |
+| Fortnite executable | 1,191 | 967 | 81 |
+| EOSSDK | 429 | 233 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,666 | 1,330 | 122 |
+| All images | 1,671 | 1,325 | 122 |
+
+The C++/GLES/Text variant reports 1,684 resolved imports, 1,312 unresolved strong
+imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
