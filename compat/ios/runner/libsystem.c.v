@@ -124,6 +124,8 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	address := match symbol {
 		'___assert_rtn' { unsafe { voidptr(darwin_assert_rtn) } }
 		'___chkstk_darwin' { unsafe { voidptr(C.ios_chkstk_darwin) } }
+		'___maskrune' { unsafe { voidptr(darwin_maskrune) } }
+		'_isspace' { unsafe { voidptr(darwin_isspace) } }
 		'_OSAtomicEnqueue' { unsafe { voidptr(darwin_atomic_enqueue) } }
 		'_OSAtomicDequeue' { unsafe { voidptr(darwin_atomic_dequeue) } }
 		'___tolower', '_tolower' { unsafe { voidptr(darwin_rune_lower) } }

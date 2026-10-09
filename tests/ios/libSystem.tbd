@@ -9,6 +9,7 @@ exports:
                    _CC_SHA1, _CC_SHA224, _CC_SHA256, _CC_SHA384, _CC_SHA512, _CCHmac, _CCCrypt, _CCRandomGenerateBytes,
                    _OSAtomicEnqueue, _OSAtomicDequeue,
                    ___assert_rtn, ___chkstk_darwin,
+                   ___maskrune, _isspace, _setlocale, _strcpy,
                    ___darwin_check_fd_set_overflow, ___memmove_chk, ___memcpy_chk, ___memset_chk, ___strcat_chk, ___strncpy_chk,
                    __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder, _setenv, _unsetenv,
                    _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,

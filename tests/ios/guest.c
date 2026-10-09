@@ -111,6 +111,9 @@ int main(void) {
         run("/opt/ios/libsystem-safety", overflow_modes[index], NULL, NULL, -SIGTRAP,
             "iOS: fortified operation exceeds destination");
     puts("iOS PASS: Darwin descriptor checks and fortified operations with SIGTRAP");
+    run("/opt/ios/runes", NULL, NULL, NULL, 0,
+        "IOS-RUNES: full Unicode fingerprints, C/UTF-8 locales, masks, digit values, widths and eight threads");
+    puts("iOS PASS: Darwin Unicode rune flags and locale selection");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

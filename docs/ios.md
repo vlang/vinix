@@ -473,6 +473,15 @@ Shared Mac/iOS fixtures and ASAN check main/worker stacks, heap/global bitmaps,
 buffer guards and seven fatal overflow cases. The full ARM64 regression passes;
 these entries resolve eight more strong imports across Fortnite and EOSSDK.
 
+`__maskrune` and `isspace` now use compact V tables of the installed Mac
+library's observed classification values. C/POSIX and UTF-8 locales preserve
+Darwin's class masks, hexadecimal digit values and encoded screen widths;
+other encodings fail explicitly. The V observation tool records 35 C ranges
+and 3,585 UTF-8 ranges, without copying native library code. Shared fixtures
+compare full-domain fingerprints over all 1,114,112 code points, mask widths,
+invalid values, locale changes and eight-thread calls. Native ASAN and the full
+ARM64 C++/GLES/PPSSPP regression pass. This resolves three strong imports.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -486,7 +495,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: ___maskrune
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _accept
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -494,12 +503,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,232 | 926 | 81 |
-| EOSSDK | 444 | 218 | 18 |
+| Fortnite executable | 1,233 | 925 | 81 |
+| EOSSDK | 446 | 216 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,728 | 1,268 | 122 |
+| All images | 1,731 | 1,265 | 122 |
 
-The C++/GLES/Text variant reports 1,741 resolved imports, 1,255 unresolved strong
+The C++/GLES/Text variant reports 1,744 resolved imports, 1,252 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
