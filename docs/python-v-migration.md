@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `7035c592ec5ae7a1eaddc88a5fedba638918c524`, Linguist 7.27.0 reports
-**Python 5.61%** (503 files, 2,455,843 bytes) and **V 79.69%** (1,894 files,
-34,870,510 bytes). The complete committed-blob inventory and reproduction
+At source `440715658b2db8b7070a9160976da25f0b45ba8b`, Linguist 7.27.0 reports
+**Python 5.56%** (505 files, 2,442,865 bytes) and **V 79.68%** (1,916 files,
+34,977,754 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,750,442 Python bytes**. Roughly another
-0.27 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,763,420 Python bytes**. Roughly another
+0.25 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 137 completed stages have a gross
-scope of **3,142,885 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **392,443 bytes**
+tests, including comments and blank lines. The 141 completed stages have a gross
+scope of **3,170,484 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **407,064 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -166,6 +166,10 @@ no extra migration credit.
 | Verified-root command and image mutation helpers | `tests/verified-root/runtimeroot` | 1,232 / 28 | `3e25cfc15b3dbdfc5e7ac6dc8796a0358d8fa6ac` |
 | Android runtime guest preparation and execution | `build-support/android/runtimevm` | 7,861 / 119 | `4f0e8797671aa73ff22e7f3a96a5241528725e6e` |
 | Musl locked build, export checks and publication | `build-support/musl/muslstage/publication.v` | 5,597 / 86 | `7035c592ec5ae7a1eaddc88a5fedba638918c524` |
+| Dota native wake-operation guest workflow | `tests/dota2/wakehost`, `wakeguest` | 7,916 / 165 | `5550eaee3aa924ee938d805220f036120d0d5363` |
+| Verified-root full fixture workflow | `tests/verified-root/runtimeroot/main.v` | 7,365 / 113 | `bf5cb1a510f9f1cb668cb0bd3964e011ef54bb29` |
+| Browser guest supervision policy | `tests/browsers/browsercore` | 5,281 / 149 | `0d5a58de60effd7d5fea4a2824ced5573530b8cf` |
+| Android ATL native-provider fixture workflow | `build-support/android/atlcontroller` | 7,037 / 102 | `440715658b2db8b7070a9160976da25f0b45ba8b` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -234,7 +238,7 @@ GAP temporary-owner primitives and bounded Mesa digest correction receive zero
 new algorithm credit. The latter two add 635 and 708 counted Python bytes.
 
 The next eight stages add 44,917 original implementation bytes of gross scope;
-the committed Python total falls by 18,262 bytes at the current snapshot.
+the committed Python total falls by 18,262 bytes at the preceding snapshot.
 Counted adapters, retained parser/public data and simultaneous source changes
 remain included. Nine support corrections receive zero repeated port credit:
 `9e0c3ba9`, `e9435c24`, `fc57193d`, `eb815876`, `1337c4a6`, `4dc132a6`,
@@ -243,6 +247,18 @@ remain included. Nine support corrections receive zero repeated port credit:
 retirement preserves the incoming exception context, and actual library
 traceback frames retain their original aliases. Private invocation adapter
 locals retire on failure; exact private traceback-frame layouts are not claimed.
+
+The next four ports add 27,599 original implementation bytes of gross scope;
+the committed Python total falls by another 12,978 bytes at this snapshot.
+Their own net retirement is 14,342 bytes: Wake removes 3,017, verified-root main
+7,325 and ATL 5,033, while the browser adapter adds 1,033 counted Python bytes.
+Browser fixed profiles, parser and lazy generator syntax stay counted; the
+60-byte original generator expression earns zero extra algorithm credit.
+ATL's original lazy generator likewise remains counted. Three owner/replay
+corrections (`2cb9a92f`, `3b77e847`, `8402b5b6`) add 402 counted Python bytes
+and receive zero repeated algorithm credit. Remaining simultaneous Python
+changes stay included in the measured total. The stack-storage correction
+`5333d31d` receives zero new migration credit.
 
 ## Validation
 
@@ -1153,6 +1169,42 @@ workloads were not weakened.
   builtin pending-expression temporaries retire before manager exit. Both cold
   installers pass. The correction adds 139 counted Python bytes.
 
+- Wake-operation policy passes 36 workflows, six raw/child, ten digest,
+  thirteen JSON, ten archive/environment, five named-local, twenty pending-call,
+  five wait-index and four ignored-return controls per profile, plus five CLI
+  cases and 200 actual original/native PTYs at exact FD baselines. Both cold
+  installers pass. Original/native prepared guests pass with the same existing
+  kernel and translator hashes; no new kernel, game or physical-device claim.
+- Verified-root main passes 62 workflows, including 39 injected error identities,
+  alongside 57 helpers, 29 lifetime cases, five CLI cases and 100 actual tamper
+  exchanges per profile. Four actual cross-architecture guest C/ext2/Merkle/archive
+  plans and both complete cold installers pass. An earlier fixture accepted a
+  positional-only mode while pathlib supplied a keyword, hiding lost branch
+  coverage. Its logs and premature commit remain recorded; corrected full gates
+  passed against the exact committed source before publication. No new kernel,
+  guest or UEFI Secure Boot claim is made.
+- Browser policy passes 115 original/native cases, twelve named/context lifetime,
+  nine tuple/marker/errno and three detached-factory controls per profile. Twenty
+  ignored EIO exceptions retire before the next wait without requiring GC.
+  Fourteen actual PTYs, 100 descriptor exchanges, process-group SIGINT and lost
+  replies after real owned forks pass. Both cold installers pass seven CLI cases
+  and two actual helpers with mode 0700. READ uses the actual rich equality and
+  WRITE the actual rich inequality; earlier order/comparison failures remain.
+  Host supervision tests do not establish a new kernel or browser rendering guest.
+- ATL controller passes 80 workflows, twenty digest/lifetime cases, 100 actual
+  digest exchanges, four spawn/EOF cases, owned SIGINT and six CLI cases per
+  profile, plus both cold installers. Real patched-provider ARM C/V links,
+  strict ARM/x86 object builds, exact independent Linux C/V goldens, ELF closure,
+  archive and SHA checks pass. The separate stack correction removes unintended
+  address-escape allocation from the unchanged native probe; generated objects
+  import no allocator. Provider allocation, frozen C oracle and every assertion
+  remain unchanged. The captured guest plan is not a fresh Vinix QEMU result.
+- Three zero-credit owner/replay corrections pass the existing package or GAP
+  suites on all profiles and both cold installers. Private owner method/manager
+  aliases retire after exit; replay locals retire after conditional traceback
+  restoration. Forty ignored-error iterations across two paths retain no actual
+  exception before the next call. Actual library frames remain intact.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1427,6 +1479,22 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `gap-owned-retirement-20261009` | `postcommit.json` | `bef9d50da20d86954c4d49331ba5d6d25f5bb5898b6a392842fd9758d8a3bf77` |
 | `package-expression-retirement-20261009` | `qualification.json` | `0da4188cbe50efb57bea68f89be44da93fba171a4d1e25320be445c931dcb313` |
 | `package-expression-retirement-20261009` | `postcommit.json` | `dc4a32ac3efef40f73b81f92432816c48ba19a5dfa3f757b770495252091bd16` |
+| `dota-wake-resume-20261009` | `qualification-v7.json` | `c04d08fd3304f9e7b8dc7a20df74bb1d8b85da5d4382925585d0996996bab752` |
+| `dota-wake-resume-20261009` | `postcommit-v7.json` | `a3b7a365065d2b20b51e3d931f90450b3882e5febdba7952c4abd5bbcac051f2` |
+| `verified-root-main-20261009` | `qualification-final-corrected2.json` | `07a8446f05b67cbd708c2d6f33dc7ad42ae1869c6804cf5ec53eda4e75ef6182` |
+| `verified-root-main-20261009` | `post-commit-corrected2.json` | `d7654f440ce278ed30923d7ab03c0ccd97041924cd99b817d241c0a14566a361` |
+| `browser-controller-20261009` | `qualification.json` | `4a7098bd22cabd6eb10d284fde22826938fee6c4bd8ac2d48fe20af65a52e122` |
+| `browser-controller-20261009` | `postcommit.json` | `c38ab8d56a1a44b7e44b7820df8f8eb41514106a353fca1508c150d9c1e7bb01` |
+| `android-atl-controller-20261009` | `qualification.json` | `e7e9bde8a18678f4f4cc2065a2c5eed903bff969b644e24f0f21b2d9af4903f5` |
+| `android-atl-controller-20261009` | `postcommit.json` | `6fa940f6fff35a7f11a2a116f4be46b85cbe97b2ae1dbd272c230698377207ac` |
+| `package-owner-retirement-20261009` | `qualification.json` | `84acd157dc373fd5280ae3b9bea87e583b631aa5d32c8b899768b9ffaf0b9a50` |
+| `package-owner-retirement-20261009` | `post-commit.json` | `261e81eabfc8aec3ed46be663b1c4910602f4fcff3f12f2fd08901f3ae42946f` |
+| `gap-owner-reference-20261009` | `qualification.json` | `28e41da1a58ab056a522e5ea37dbde321bb27f038ed8bd4fbaf9e60d017db621` |
+| `gap-owner-reference-20261009` | `post-commit.json` | `7cb8a91805e0a8075f0430df06bcf80aa8ab60c1ae2a3ae37de1ea9336564d41` |
+| `gap-replay-retirement-20261009` | `qualification.json` | `21bc501a7b1d27e259af97bd04a5d2e465acd939dccb37d73789e026474195f0` |
+| `gap-replay-retirement-20261009` | `post-commit.json` | `78b8e40ece8b4f5bb032debd9f59d7d0aa6c102dc79e5eca766c487a4a09f79a` |
+| `android-atl-stack-20261009` | `qualification.json` | `f9533e906ee919112a7d043f05b506d94b0f237b21e343625c2bd03585ba21e0` |
+| `android-atl-stack-20261009` | `postcommit.json` | `b257eb74f230c9cedc27bd8a40ac16a84ba06a205762cb7b8e2dc02066514a8e` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
