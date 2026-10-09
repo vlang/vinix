@@ -118,6 +118,17 @@ fn enter(id string) !string {
 	})!.text()
 }
 
+fn enter_temporary(id string) !string {
+	$if cpython_host ? {
+		return callback('enter', {
+			'owner': ah.Value(id)
+			'consume': ah.Value(true)
+		})!.text()
+	} $else {
+		return enter(id)!
+	}
+}
+
 fn retire(id string, cause ?IError) !bool {
 	mut row := {
 		'owner': ah.Value(id)

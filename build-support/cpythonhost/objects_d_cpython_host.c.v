@@ -544,6 +544,8 @@ fn (mut c Context) primitive(name string, row map[string]ah.Value) ah.Value {
 				drop(target)
 				return null()
 			}
+			consume := ah.field(row, 'consume')
+			if consume is bool && consume { c.release(id) }
 			args := C.PyTuple_New(0)
 			value := C.PyObject_Call(target, args, unsafe { nil })
 			drop(args)

@@ -163,7 +163,7 @@ fn enroll(bundle string, contents string, args string, work string) ! {
 
 fn tamper(image string, offset string) ! {
 	manager := method(image, 'open', [v(ah.Value('r+b'))], {})!
-	stream := enter(manager) or {
+	stream := enter_temporary(manager) or {
 		$if cpython_host ? { release(manager)! }
 		return err
 	}
