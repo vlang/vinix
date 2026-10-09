@@ -120,6 +120,8 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := time_symbol(symbol) { return address }
 	if address := files_symbol(symbol) { return address }
 	if address := sockets_symbol(symbol) { return address }
+	if address := netdb_symbol(symbol) { return address }
+	if address := interfaces_symbol(symbol) { return address }
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {

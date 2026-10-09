@@ -84,6 +84,12 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -DIOS_FCNTL_REFERENCE -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/fcntl.c" -o "$output/fcntl"
 "$output/fcntl"
+"${IOS_CLANG:-clang}" -DIOS_NETDB_REFERENCE -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/netdb.c" -o "$output/netdb"
+"$output/netdb"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/interfaces.c" -o "$output/interfaces"
+"$output/interfaces"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

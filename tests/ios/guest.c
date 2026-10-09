@@ -136,6 +136,12 @@ int main(void) {
     run("/opt/ios/fcntl", NULL, NULL, NULL, 0,
         "IOS-FCNTL: shared status and offsets, descriptor flags, duplicates, native flush and nonblocking sockets\n");
     puts("iOS PASS: Darwin descriptor controls and real file synchronization");
+    run("/opt/ios/netdb", NULL, NULL, NULL, 0,
+        "IOS-NETDB: owned Darwin address lists, native names, IPv4/IPv6, mapped addresses, errors and eight-thread UDP I/O\n");
+    puts("iOS PASS: Darwin name resolution, address ownership and network I/O");
+    run("/opt/ios/interfaces", NULL, NULL, NULL, 0,
+        "IOS-INTERFACES: real native snapshots, Darwin link addresses, flags, masks, indices and eight-thread ownership\n");
+    puts("iOS PASS: Darwin network interfaces, snapshots and address ownership");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

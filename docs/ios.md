@@ -571,6 +571,38 @@ record locks, SIGIO configuration and simultaneous independent Darwin sync
 bits remain unsupported and fail explicitly. These entries resolve four
 additional strong imports across Fortnite and EOSSDK.
 
+`getaddrinfo`, `freeaddrinfo` and `getnameinfo` now adapt Darwin's address-list
+layout, IPv6 family, resolver flags and positive error codes in V over the native
+resolver. Returned socket addresses and canonical names are independent owned
+copies; partial failures release the entire list. Numeric IPv4/IPv6, mapped
+IPv4, passive and loopback addresses, named hosts and services use the guest's
+actual resolver configuration. Default hints include address configuration and
+mapped-address handling. Numeric conversion preserves errno, while `EAI_SYSTEM`
+translates the native error. Name buffers follow the Mac's host-first overflow
+behavior. Raw ICMP hints select their appropriate address family.
+
+`getifaddrs`, `freeifaddrs` and `if_nametoindex` now return owned snapshots of the
+native interfaces. V converts Linux packet addresses into Darwin link addresses,
+including actual interface names, indices and hardware addresses, and translates
+multicast flags and IPv4/IPv6 addresses, masks and destinations. Interface names
+remain those supplied by Vinix. Linux link statistics are currently unexposed
+(`ifa_data` is NULL); no Apple interface services or network configuration changes
+are implemented. Unsupported address families and unknown resolver flags fail
+explicitly. `getnameinfo` requires a complete IPv4 or IPv6 input buffer, even
+though the installed Mac library accepts inconsistent length arguments.
+
+Shared Mac/iOS fixtures check resolver errors, defaults and mapped addresses,
+canonical-name ownership, numeric and named services, buffer overflow without
+partial strings, real UDP communication, independent interface snapshots, link
+layouts, masks and indices, and eight simultaneous clients. ASAN checks two
+loads/unloads of each fixture. The isolated guest has explicit localhost and
+domain-service files so these checks do not depend on an external DNS server.
+The full ARM64 C++/GLES/PPSSPP regression passes. These six entries resolve 12
+additional strong imports across Fortnite and EOSSDK. The concurrent permission
+fixture uses a permanently invalid descriptor for its closed-file check because
+another worker can reuse a recently closed number. Worker failures are reported
+after all clients have been joined, preserving mapped code until the threads end.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -584,7 +616,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _freeaddrinfo
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _getdtablesize
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -592,12 +624,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,265 | 893 | 81 |
-| EOSSDK | 479 | 183 | 18 |
+| Fortnite executable | 1,271 | 887 | 81 |
+| EOSSDK | 485 | 177 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,796 | 1,200 | 122 |
+| All images | 1,808 | 1,188 | 122 |
 
-The C++/GLES/Text variant reports 1,809 resolved imports, 1,187 unresolved strong
+The C++/GLES/Text variant reports 1,821 resolved imports, 1,175 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
