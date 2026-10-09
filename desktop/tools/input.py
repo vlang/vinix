@@ -32,33 +32,25 @@ import time
 ABS_MAX = 32767
 
 
+def _native(operation, *arguments):
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location('qmp_input_native', Path(__file__).with_name('_input_native.py'))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    globals()['_native'] = lambda operation, *arguments: module.call(operation, globals(), *arguments)
+    return _native(operation, *arguments)
+
+
 class Monitor:
     def __init__(self, path):
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.connect(path)
-        self.stream = self.sock.makefile("rw", encoding="utf-8", newline="\n")
-        self.stream.readline()  # greeting
-        self.command("qmp_capabilities")
+        return _native('__init__', self, path)
 
     def command(self, name, **arguments):
-        request = {"execute": name}
-        if arguments:
-            request["arguments"] = arguments
-        self.stream.write(json.dumps(request) + "\n")
-        self.stream.flush()
-        # Events can arrive between the request and its reply.
-        while True:
-            line = self.stream.readline()
-            if not line:
-                raise RuntimeError("QMP closed the connection")
-            message = json.loads(line)
-            if "return" in message or "error" in message:
-                if "error" in message:
-                    raise RuntimeError(message["error"])
-                return message["return"]
+        return _native('command', self, name, arguments)
 
     def send_input(self, events):
-        self.command("input-send-event", events=events)
+        return _native('send_input', self, events)
 
     def hold_command_tab(self, taps, hold, settle):
         """Cmd-Tab, with Cmd held across every tap and let go at the end.
@@ -67,20 +59,7 @@ class Monitor:
         several of Tab inside it, so this cannot be spelled with type_text:
         the modifier has to stay down between them.
         """
-        def key(qcode, down):
-            return {"type": "key",
-                    "data": {"down": down, "key": {"type": "qcode",
-                                                   "data": qcode}}}
-
-        self.send_input([key("meta_l", True)])
-        time.sleep(settle)
-        for _ in range(max(taps, 1)):
-            self.send_input([key("tab", True)])
-            time.sleep(0.05)
-            self.send_input([key("tab", False)])
-            time.sleep(settle)
-        time.sleep(hold)
-        self.send_input([key("meta_l", False)])
+        return _native('hold_command_tab', self, taps, hold, settle)
 
     def type_text(self, text):
         """Send a string as key presses, one character at a time.
@@ -89,18 +68,11 @@ class Monitor:
         does, drops characters sent faster than it looks; the pause between
         them is what makes a typed line arrive whole.
         """
-        for character in text:
-            events = key_events(character)
-            if events is None:
-                continue
-            for event in events:
-                self.command("input-send-event", events=[event])
-            time.sleep(0.03)
+        return _native('type_text', self, text)
 
 
 def absolute(value, extent):
-    scaled = int(round(value * ABS_MAX / max(extent - 1, 1)))
-    return max(0, min(ABS_MAX, scaled))
+    return _native('absolute', value, extent)
 
 
 # QMP names keys rather than taking characters, so a string has to be spelled
@@ -122,38 +94,15 @@ SHIFTED = {
 
 def key_events(character):
     """The QMP key event(s) for one character, or None if it has no name."""
-    if character.isalpha() and character.isascii():
-        name = character.lower()
-        shift = character.isupper()
-    elif character.isdigit():
-        name, shift = character, False
-    elif character in SHIFTED:
-        name, shift = SHIFTED[character], True
-    elif character in KEY_NAMES:
-        name, shift = KEY_NAMES[character], False
-    else:
-        return None
-    # A key event carries `down`, and a press with no release leaves the key
-    # held: both halves have to be sent.
-    def press(qcode, down):
-        return {"type": "key",
-                "data": {"down": down, "key": {"type": "qcode", "data": qcode}}}
-
-    if not shift:
-        return [press(name, True), press(name, False)]
-    return [press("shift", True), press(name, True),
-            press(name, False), press("shift", False)]
+    return _native('key_events', character)
 
 
 def move_events(x, y, width, height):
-    return [
-        {"type": "abs", "data": {"axis": "x", "value": absolute(x, width)}},
-        {"type": "abs", "data": {"axis": "y", "value": absolute(y, height)}},
-    ]
+    return _native('move_events', x, y, width, height)
 
 
 def button_events(down):
-    return [{"type": "btn", "data": {"down": down, "button": "left"}}]
+    return _native('button_events', down)
 
 
 def main():
