@@ -434,6 +434,23 @@ and the full ARM64 C++/GLES/PPSSPP regression pass. A separate native ELF fixtur
 checks the real vector helper exception types/messages; exception unwinding
 through Mach-O frames remains unsupported.
 
+`CCRandomGenerateBytes` now fills caller-owned buffers directly from native
+OS entropy in V, including requests larger than getentropy's 256-byte limit.
+Zero-length calls succeed, null nonempty buffers return kCCParamError and
+native entropy failures return kCCRNGFailure. Shared Mac/iOS fixtures check
+chunk boundaries, independent output and buffer guards; ASAN and the full
+ARM64 regression pass. This resolves two more strong imports.
+
+`OSAtomicEnqueue`/`OSAtomicDequeue` now implement Darwin's lock-free LIFO queue
+in V using baseline ARMv8 exclusive pair operations. The 16-byte head's pointer
+and generation change atomically, preventing ABA when nodes are reused. The
+Mac reference confirms generation updates, preserved node links and distinct
+link offsets. Eight-thread fixtures exercise 65,536 head changes and verify
+that every permanent node has exactly one owner at completion. Node storage
+remains caller-owned and must stay mapped until concurrent dequeues return,
+as required on Darwin. ASAN and the full ARM64 C++/GLES/PPSSPP regression pass.
+This resolves four more strong imports across the game and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -447,7 +464,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _CCRandomGenerateBytes
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: ___assert_rtn
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -455,12 +472,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,223 | 935 | 81 |
-| EOSSDK | 435 | 227 | 18 |
+| Fortnite executable | 1,226 | 932 | 81 |
+| EOSSDK | 438 | 224 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,709 | 1,287 | 122 |
+| All images | 1,715 | 1,281 | 122 |
 
-The C++/GLES/Text variant reports 1,722 resolved imports, 1,274 unresolved strong
+The C++/GLES/Text variant reports 1,728 resolved imports, 1,268 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

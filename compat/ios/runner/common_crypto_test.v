@@ -31,3 +31,13 @@ fn test_common_crypto_rejects_unimplemented_ciphers_and_invalid_buffers() {
 	assert cc_crypt(0, 0, 0, unsafe { &key[0] }, 16, unsafe { nil }, unsafe { &bytes[0] }, ~u64(0),
 		unsafe { &bytes[32] }, 32, &moved) == -4300
 }
+
+fn test_common_random_empty_null_and_overflowing_ranges() {
+	mut bytes := [u8(0xa5), 0xa5]!
+	assert cc_random_generate(unsafe { nil }, 0) == 0
+	assert cc_random_generate(unsafe { &bytes[0] }, 0) == 0
+	assert cc_random_generate(unsafe { nil }, 1) == -4300
+	assert cc_random_generate(unsafe { nil }, ~u64(0)) == -4300
+	assert cc_random_generate(unsafe { &bytes[0] }, ~u64(0)) == -4300
+	assert bytes == [u8(0xa5), 0xa5]!
+}

@@ -24,6 +24,9 @@ PY
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/common-crypto.c" -o "$output/common-crypto"
 "$output/common-crypto"
+"${IOS_CLANG:-clang}" -DIOS_QUEUE_REFERENCE -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/atomic-queue.c" -o "$output/atomic-queue"
+"$output/atomic-queue"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

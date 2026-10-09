@@ -9,6 +9,37 @@
 #endif
 .text
 .p2align 2
+/* LDXP alone need not be an atomic 16-byte snapshot. A successful exclusive
+ * store of the same pair validates the load. Neither helper uses x18 or LSE,
+ * so these also work on the baseline ARMv8 CPUs used by the guest. */
+.global SYM(ios_atomic_pair_load)
+SYM(ios_atomic_pair_load):
+1:
+    ldaxp x2, x3, [x0]
+    stlxp w4, x2, x3, [x0]
+    cbnz w4, 1b
+    stp x2, x3, [x1]
+    ret
+.global SYM(ios_atomic_pair_exchange)
+SYM(ios_atomic_pair_exchange):
+    ldp x3, x4, [x1]
+    ldp x5, x6, [x2]
+1:
+    ldaxp x7, x8, [x0]
+    cmp x7, x3
+    ccmp x8, x4, #0, eq
+    b.ne 2f
+    stlxp w9, x5, x6, [x0]
+    cbnz w9, 1b
+    mov w0, #1
+    ret
+2:
+    /* Validate the mismatched pair too before returning it to the retry loop. */
+    stlxp w9, x7, x8, [x0]
+    cbnz w9, 1b
+    stp x7, x8, [x1]
+    mov w0, #0
+    ret
 .global SYM(ios_objc_msgsend)
 SYM(ios_objc_msgsend):
     mov x16, #0

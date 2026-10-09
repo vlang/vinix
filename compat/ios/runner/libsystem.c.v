@@ -121,6 +121,8 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {
+		'_OSAtomicEnqueue' { unsafe { voidptr(darwin_atomic_enqueue) } }
+		'_OSAtomicDequeue' { unsafe { voidptr(darwin_atomic_dequeue) } }
 		'___tolower', '_tolower' { unsafe { voidptr(darwin_rune_lower) } }
 		'___toupper', '_toupper' { unsafe { voidptr(darwin_rune_upper) } }
 		'_opendir' { unsafe { voidptr(darwin_opendir) } }

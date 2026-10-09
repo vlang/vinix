@@ -156,6 +156,8 @@ static void ios_objc_initialize_unlock(void) {
     if (pthread_mutex_unlock(&ios_initialize_mutex)) abort();
 }
 #if defined(__aarch64__) || defined(__arm64__)
+void ios_atomic_pair_load(uint64_t *head, uint64_t *output);
+int ios_atomic_pair_exchange(uint64_t *head, uint64_t *expected, uint64_t *desired);
 void ios_objc_msgsend(void);
 void ios_objc_super(void);
 void ios_objc_builtin(void);
@@ -189,6 +191,10 @@ static void *ios_arc_register(int reg, int releasing) {
 }
 #undef IOS_ARC_REGISTERS
 #else
+static void ios_atomic_pair_load(uint64_t *head, uint64_t *output) { (void)head; (void)output; abort(); }
+static int ios_atomic_pair_exchange(uint64_t *head, uint64_t *expected, uint64_t *desired) {
+    (void)head; (void)expected; (void)desired; abort();
+}
 static void ios_objc_msgsend(void) { abort(); }
 static void ios_objc_super(void) { abort(); }
 static void ios_objc_builtin(void) { abort(); }

@@ -6,7 +6,8 @@ current-version: 1
 exports:
   - targets:     [ arm64-ios ]
     symbols:     [ _puts, _atoi, _malloc, _calloc, _free, _strlen, _strcmp, _memcpy, _memset, _printf, _abort, _mach_msg_server,
-                   _CC_SHA1, _CC_SHA224, _CC_SHA256, _CC_SHA384, _CC_SHA512, _CCHmac, _CCCrypt,
+                   _CC_SHA1, _CC_SHA224, _CC_SHA256, _CC_SHA384, _CC_SHA512, _CCHmac, _CCCrypt, _CCRandomGenerateBytes,
+                   _OSAtomicEnqueue, _OSAtomicDequeue,
                    __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder, _setenv, _unsetenv,
                    _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,
                    _pthread_setspecific, _pthread_getspecific, _pthread_key_create,

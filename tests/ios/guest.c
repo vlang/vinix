@@ -92,6 +92,9 @@ int main(void) {
     run("/opt/ios/arc-threads", NULL, NULL, NULL, 0,
         "IOS-ARC: eight threads, weak/deallocation races and isolated autorelease pools\n");
     puts("iOS PASS: thread-safe ARC and autorelease pools");
+    run("/opt/ios/atomic-queue", NULL, NULL, NULL, 0,
+        "IOS-ATOMIC-QUEUE: LIFO, generation, independent offsets and eight-thread node reuse");
+    puts("iOS PASS: lock-free Darwin atomic queues and node reuse");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

@@ -8,6 +8,21 @@ import crypto.sha1
 import crypto.sha256
 import crypto.sha512
 
+fn cc_random_generate(bytes &u8, count u64) int {
+	if count == 0 { return 0 }
+	if bytes == unsafe { nil } || count > ~u64(0) - u64(bytes) { return -4300 }
+	// Native getentropy accepts at most 256 bytes per call. Fill the caller's
+	// buffer directly, without imposing SecRandomCopyBytes' separate size limit
+	// or allocating temporary storage. An entropy failure is kCCRNGFailure.
+	mut offset := u64(0)
+	for offset < count {
+		chunk := if count - offset > 256 { u64(256) } else { count - offset }
+		if C.getentropy(unsafe { bytes + offset }, usize(chunk)) != 0 { return -4307 }
+		offset += chunk
+	}
+	return 0
+}
+
 fn common_hash[D](factory fn () D, bytes &u8, count u32, output &u8) &u8 {
 	if output == unsafe { nil } || (bytes == unsafe { nil } && count != 0) { return unsafe { nil } }
 	mut digest := factory()
@@ -182,6 +197,7 @@ fn common_crypto_symbol(symbol string) ?u64 {
 		'_CC_SHA512' { u64(unsafe { voidptr(cc_sha512) }) }
 		'_CCHmac' { u64(unsafe { voidptr(cc_hmac) }) }
 		'_CCCrypt' { u64(unsafe { voidptr(cc_crypt) }) }
+		'_CCRandomGenerateBytes' { u64(unsafe { voidptr(cc_random_generate) }) }
 		else { return none }
 	}
 }

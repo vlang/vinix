@@ -8,7 +8,26 @@ extern unsigned char *CC_SHA1(const void *,unsigned int,unsigned char *), *CC_SH
 extern unsigned char *CC_SHA256(const void *,unsigned int,unsigned char *), *CC_SHA384(const void *,unsigned int,unsigned char *), *CC_SHA512(const void *,unsigned int,unsigned char *);
 extern void CCHmac(unsigned int,const void *,unsigned long,const void *,unsigned long,void *);
 extern int CCCrypt(unsigned int,unsigned int,unsigned int,const void *,unsigned long,const void *,const void *,unsigned long,void *,unsigned long,unsigned long *);
+extern int CCRandomGenerateBytes(void *,unsigned long);
 #define REQUIRE(condition) do { if (!(condition)) { printf("IOS-CRYPTO FAIL: line %d: %s\n",__LINE__,#condition); return 1; } } while (0)
+static int check_random(void) {
+ unsigned char output[4098],previous[4096];
+ const unsigned long lengths[]={0,1,255,256,257,511,512,513,4096};
+ REQUIRE(!CCRandomGenerateBytes(0,0));
+ REQUIRE(CCRandomGenerateBytes(0,1)==-4300);
+ REQUIRE(CCRandomGenerateBytes(0,~0UL)==-4300);
+ for(unsigned long i=0;i<sizeof lengths/sizeof lengths[0];i++) {
+  memset(output,0xa5,sizeof output);
+  REQUIRE(!CCRandomGenerateBytes(output+1,lengths[i]));
+  REQUIRE(output[0]==0xa5);
+  for(unsigned long j=lengths[i]+1;j<sizeof output;j++)REQUIRE(output[j]==0xa5);
+ }
+ memcpy(previous,output+1,sizeof previous);
+ REQUIRE(!CCRandomGenerateBytes(output+1,sizeof previous));
+ REQUIRE(memcmp(previous,output+1,sizeof previous) && output[0]==0xa5 && output[4097]==0xa5);
+ puts("IOS-CRYPTO: native random bytes, zero/null inputs and guarded entropy chunk boundaries");
+ return 0;
+}
 static unsigned char hex_byte(const char *hex) {
  unsigned char a=(unsigned char)hex[0],b=(unsigned char)hex[1];
  return (unsigned char)(((a>='a'?a-'a'+10:a-'0')<<4)|(b>='a'?b-'a'+10:b-'0'));
@@ -111,6 +130,7 @@ static int check_aes(void) {
  return 0;
 }
 int main(void) {
+ REQUIRE(!check_random());
  for(int repeat=0;repeat<8;repeat++) { REQUIRE(!check_hashes());REQUIRE(!check_aes()); }
  puts("IOS-CRYPTO: SHA digests, long-key HMAC, NIST AES CBC/ECB, padding, in-place buffers and error/size ABI");
  return 0;
