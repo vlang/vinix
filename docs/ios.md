@@ -326,6 +326,17 @@ encodings and public-key algorithms/curves remain unsupported. This resolves
 keychain persistence and access control remain unimplemented; certificate
 parsing alone does not authenticate a peer.
 
+Fortnite's CommonCrypto imports now use V cryptographic primitives: one-shot
+SHA-1/224/256/384/512, HMAC with those hashes, and AES-128/192/256 CBC/ECB through
+`CCCrypt`. The shared Mac/iOS fixture checks independent digest/HMAC/OpenSSL
+vectors, block/padding boundaries, long HMAC keys, zero IVs, in-place buffers,
+required output sizes and the eleven-argument native ABI. Digest storage and
+the boxed AES schedule are freed explicitly. ASAN and the full ARM64 regression
+pass. Legacy unpadding follows the measured Mac final-length-byte behavior;
+it does not authenticate ciphertext. Partial overlapping AES buffers, partial
+padded ciphertext blocks, non-AES ciphers, MD5 HMAC and incremental cryptor
+APIs remain unsupported. This resolves five more strong imports.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -338,10 +349,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,181 | 977 | 81 |
-| EOSSDK | 412 | 250 | 18 |
+| Fortnite executable | 1,185 | 973 | 81 |
+| EOSSDK | 413 | 249 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,644 | 1,352 | 122 |
+| All images | 1,649 | 1,347 | 122 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

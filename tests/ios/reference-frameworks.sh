@@ -6,6 +6,9 @@ set -eu
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 output=${1:-"$repo/build/ios/reference"}
 mkdir -p "$output"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/common-crypto.c" -o "$output/common-crypto"
+"$output/common-crypto"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

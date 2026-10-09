@@ -132,6 +132,9 @@ int main(void) {
     run("/opt/ios/security", NULL, NULL, NULL, 0,
         "IOS-SECURITY: owned DER certificates, RSA/EC public keys, attributes, decode errors, typed constants and secure random bytes");
     puts("iOS PASS: native Security certificates, public keys, constants and random bytes");
+    run("/opt/ios/common-crypto", NULL, NULL, NULL, 0,
+        "IOS-CRYPTO: SHA digests, long-key HMAC, NIST AES CBC/ECB, padding, in-place buffers and error/size ABI");
+    puts("iOS PASS: native CommonCrypto SHA, HMAC and AES calling conventions");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

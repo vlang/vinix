@@ -20,6 +20,7 @@ fn test_native_security_certificate_and_key_ownership() {
 fn test_security_der_bounds_curve_validation_and_unsupported_services() {
 	objc_start()
 	defer { objc_stop() }
+	assert cf_hash(0) == 0
 	mut bytes := [1024]u8{}
 	mut state := u32(71)
 	for length in 0 .. 1024 {
