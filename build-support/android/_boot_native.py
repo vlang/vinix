@@ -321,6 +321,18 @@ def _build_primitive(operation, row, context, resources):
         if operation == 'acquire':
             return _register(resources, value)
         return value.hex() if row.get('bytes') else _build_snapshot(value)
+    if operation == 'checkpoint':
+        return resources.get('next_id', 0)
+    if operation == 'release_since':
+        for ident in tuple(resources):
+            if type(ident) is int and ident > row['id'] and ident not in resources['owners']:
+                del resources[ident]
+        return None
+    if operation == 'release':
+        for ident in row['ids']:
+            if ident not in resources['owners']:
+                del resources[ident]
+        return None
     if operation == 'borrow':
         return _register(resources, resources['values'][row['name']])
     if operation == 'borrow_global':

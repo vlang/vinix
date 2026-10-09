@@ -71,6 +71,10 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'result' {
 			return rb.result_object(result(rb.borrow('args')!, rb.borrow('work')!, rb.borrow('transcript')!, rb.borrow('os_name')!)!)
 		}
+		'guest' {
+			return rb.result_object(guest(rb.borrow('args')!, rb.borrow('work')!, rb.borrow('root')!, rb.borrow('os_name')!)!)
+		}
+		'shutdown' { shutdown(rb.borrow('guest')!)! }
 		'main' { main_workflow(rb.borrow('args')!, rb.borrow('parser')!)! }
 		else { return error('Unknown dhewm3 runner operation') }
 	}
