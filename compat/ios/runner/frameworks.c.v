@@ -7,6 +7,9 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library in ['/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox', '/System/Library/Frameworks/AudioUnit.framework/AudioUnit'] {
+		if address := audio_symbol(symbol) { return address }
+	}
 	if library in ['/System/Library/Frameworks/UIKit.framework/UIKit', '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
 		if address := bitmap_symbol(symbol) { return address }
 		if address := image_symbol(symbol) { return address }

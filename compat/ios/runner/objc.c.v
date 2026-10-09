@@ -145,6 +145,7 @@ mut:
 	application u64
 	notification_center u64
 	audio_session u64
+	audio_converters map[u64]&AudioConverter
 	defaults u64
 	locale u64
 	empty_dictionary u64
@@ -374,6 +375,7 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	audio_stop()
 	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }
 	display_links_stop()

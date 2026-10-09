@@ -78,6 +78,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
+| AudioToolbox PCM | Same-rate, same-channel Int16/Int32/Float32/Float64 conversion between packed little-endian interleaved and planar buffers; complex input callbacks, partial output/error recovery, EOF/reset and converter ownership |
 | Resources | Binary/XML Info.plist and bounded source storyboard subset (view/button/label, frame, color and actions), initial controller loading |
 | Desktop | VAPP v10 nested view/button/label serialization, resize/layout, unique control actions, keyboard/swipe input, timer polling, window close and object teardown |
 | Inspection | Platform/version, dependencies, unsupported metadata, chained and legacy symbol-table import names, including ARM64e images |
@@ -123,6 +124,12 @@ is unsupported. CoreLocation implements the weak delegate property; location
 services and authorization are unsupported.
 CoreFoundation rejects custom allocators/callbacks and string encodings beyond
 UTF-8/ASCII. Collections are limited to 65,536 entries and strings/data to 16 MiB.
+PCM converters support up to eight channels; compressed codecs, sample-rate
+conversion and channel remapping return an unsupported-format error. Conversion
+does not provide speaker output or microphone capture. The same native fixture
+checks sample values, clipping/rounding, callback errors and buffer layouts
+against the installed Mac AudioToolbox and Vinix; ASAN checks short buffers,
+invalid/reentrant operations and repeated image teardown.
 User defaults use an atomically replaced per-bundle plist under
 `Documents/Library/Preferences`; `VINIX_IOS_DOCUMENTS` selects the document root.
 App groups, custom preference suites and security-scoped bookmarks are unsupported.

@@ -107,6 +107,11 @@ int main(void) {
     run("/opt/ios/core-foundation", "custom", NULL, NULL, 1,
         "custom CF collection callbacks are not implemented");
     puts("iOS PASS: native CoreFoundation conversion, data and collection ownership");
+    run("/opt/ios/audio-converter", NULL, NULL, NULL, 0,
+        "IOS-AUDIO-CONVERTER: real PCM samples, planar/interleaved layouts, callback errors/resume, EOF/reset and ownership");
+    run("/opt/ios/audio-converter", "unsupported", NULL, NULL, 0,
+        "IOS-AUDIO-CONVERTER: unsupported codecs/rates and invalid handles rejected");
+    puts("iOS PASS: native PCM conversion and AudioToolbox callback ABI");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

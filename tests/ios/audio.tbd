@@ -1,0 +1,9 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _AudioConverterNew, _AudioConverterDispose, _AudioConverterReset,
+               _AudioConverterFillComplexBuffer, _AudioConverterConvertComplexBuffer ]
+...
