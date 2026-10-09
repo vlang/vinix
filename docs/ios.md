@@ -71,7 +71,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
-| C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings, streams, regex, shared ownership, mutexes, recursive mutexes, condition waits and concurrent once callbacks tested in Vinix |
+| C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
@@ -420,6 +420,20 @@ Vinix fixtures check configuration changes, snapshot ownership, invalid input
 and ASAN lifetime checks. The full ARM64 C++/GLES/PPSSPP regression passes.
 This resolves five additional strong imports across Fortnite and EOSSDK.
 
+The C++ resolver now exposes the real implementations of all 36 previously
+missing C++ names in this IPA, resolving 38 strong imports across the executable
+and EOSSDK. They already existed in the built libc++/libc++abi archives but
+were excluded by the PPSSPP-only symbol list. Shared Mac/iOS fixtures verify
+legacy string constructors, embedded-NUL comparison, growth with aliased input,
+three integer sort widths, stream layouts, futures, weak ownership and demangling.
+The V random_device adapter matches the Mac's four-byte, stateless object,
+accepts arbitrary tokens and uses native OS entropy. A two-instruction assembly
+entry passes Darwin variadic stack arguments to V's existing stdio bridge for
+libc++'s formatted diagnostic followed by SIGABRT. Mac reference, ASAN ownership
+and the full ARM64 C++/GLES/PPSSPP regression pass. A separate native ELF fixture
+checks the real vector helper exception types/messages; exception unwinding
+through Mach-O frames remains unsupported.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -429,10 +443,11 @@ iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not im
 
 The existing C++/GLES/Text runner supplies native zlib and gets beyond that
 dependency. With its private library closure included in the same 4 GiB guest,
-the actual game still exits before entry, at a legacy libc++ ABI dependency:
+the actual game gets beyond the legacy libc++ ABI dependency and still exits
+before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: C++ symbol is not implemented: __ZNKSt3__120__vector_base_commonILb1EE20__throw_length_errorEv
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _CCRandomGenerateBytes
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -440,12 +455,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,191 | 967 | 81 |
-| EOSSDK | 429 | 233 | 18 |
+| Fortnite executable | 1,223 | 935 | 81 |
+| EOSSDK | 435 | 227 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,671 | 1,325 | 122 |
+| All images | 1,709 | 1,287 | 122 |
 
-The C++/GLES/Text variant reports 1,684 resolved imports, 1,312 unresolved strong
+The C++/GLES/Text variant reports 1,722 resolved imports, 1,274 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -743,6 +758,12 @@ pinned, SHA-256-verified LLVM/Alpine sources and archives, without copying Apple
 library implementations. The following regression executes native iOS C++
 constructors, string growth/erase, streams, regex, shared ownership, eight-thread
 mutex/condition synchronization and concurrent once callbacks. Additional native
+fixtures cover the legacy Fortnite/EOSSDK C++ imports, futures, weak ownership,
+Darwin random_device tokens/storage and formatted abort diagnostics. The same
+extended fixture runs against the installed Mac library as a reference. Its
+native ELF version catches vector length/range errors using the runner's actual
+archive and registered ELF unwind metadata. This does not provide Mach-O
+exception unwinding. Additional native
 Mach-O fixtures cover lazy unsupported imports, Darwin FILE/varargs/stat/mmap
 layouts, superclass/category load order, reentrant class initialization,
 Objective-C++ ivar lifetime, UTF-16 strings, notification removal/weak filtering,

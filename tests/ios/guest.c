@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,8 +14,8 @@ static void fail(const char *message) {
     for (;;) pause();
 }
 
-static void run(const char *image, const char *left, const char *op,
-                const char *right, int expected_status, const char *expected_output) {
+static void run_program(int native, const char *image, const char *left, const char *op,
+                        const char *right, int expected_status, const char *expected_output) {
     int descriptors[2];
     if (pipe(descriptors)) fail("pipe");
     pid_t child = fork();
@@ -25,7 +26,7 @@ static void run(const char *image, const char *left, const char *op,
         close(descriptors[1]);
         char *arguments[] = { "/opt/ios/run-ios", (char *)image,
             (char *)left, (char *)op, (char *)right, NULL };
-        execv(arguments[0], arguments);
+        execv(native ? image : arguments[0], native ? arguments + 1 : arguments);
         _exit(127);
     }
     close(descriptors[1]);
@@ -46,15 +47,22 @@ static void run(const char *image, const char *left, const char *op,
         fail("import audit executed application code");
     int status;
     while (waitpid(child, &status, 0) < 0) if (errno != EINTR) fail("waitpid");
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != expected_status || !strstr(output, expected_output)) {
+    int status_matches = expected_status < 0 ? WIFSIGNALED(status) && WTERMSIG(status) == -expected_status :
+        WIFEXITED(status) && WEXITSTATUS(status) == expected_status;
+    if (!status_matches || !strstr(output, expected_output)) {
         printf("image=%s expression=%s %s %s status=%d output=%s\n", image,
             left ? left : "", op ? op : "", right ? right : "", status, output);
-        fail("Mach-O result/status mismatch");
+        fail("application result/status mismatch");
     }
     if (!strcmp(image, "/opt/ios/PPSSPP") && (!strstr(output, "SceneDelegate: Launching PPSSPP") ||
         !strstr(output, "V panic: iOS:") || (!strstr(output, "unimplemented") && !strstr(output, "unsupported") && !strstr(output, "not implemented"))))
         fail("PPSSPP did not reach scene launch or explicit unsupported API failure");
     printf("iOS RESULT: %s", output);
+}
+
+static void run(const char *image, const char *left, const char *op,
+                const char *right, int expected_status, const char *expected_output) {
+    run_program(0, image, left, op, right, expected_status, expected_output);
 }
 
 extern void test_uikit(void);
@@ -223,6 +231,14 @@ int main(void) {
         run("/opt/ios/cxx", NULL, NULL, NULL, 0, "IOS-CXX: destructor\n");
         run("/opt/ios/cxx", "throw", NULL, NULL, 1, "C++ exception unwinding through Mach-O frames is not implemented");
         puts("iOS PASS: native C++ strings, streams, regex and lifetime");
+        run("/opt/ios/cxx-extended", NULL, NULL, NULL, 0,
+            "IOS-CXX-EXTENDED: legacy strings, integer sorts, futures, weak ownership and Darwin entropy");
+        run("/opt/ios/cxx-extended", "abort", NULL, NULL, -SIGABRT,
+            "IOS-CXX-ABORT: stack 17 1099511627776 2.500 0x1234\n");
+        puts("iOS PASS: extended C++ ABI, Darwin entropy and variadic abort");
+        run_program(1, "/opt/ios/cxx-native", NULL, NULL, NULL, 0,
+            "IOS-CXX-EXTENDED: native vector exception types and messages");
+        puts("iOS PASS: native ELF vector exception helpers");
         run("/opt/ios/startup", NULL, NULL, NULL, 0, "IOS-STARTUP: load, categories, initialize, ObjC++ lifetime and UTF-16");
         run("/opt/ios/startup", "verify-preferences", NULL, NULL, 0, "IOS-STARTUP: preferences persisted across native Mach-O executions");
         puts("iOS PASS: Objective-C image startup and C++ ivars");

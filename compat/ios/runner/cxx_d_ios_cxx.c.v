@@ -7,12 +7,25 @@ fn C.ios_cxx_symbol(&char) usize
 
 fn cxx_symbol(symbol string) !u64 {
 	if address := cxx_pthread_symbol(symbol) { return address }
+	if address := cxx_platform_symbol(symbol) { return address }
 	if symbol in ['___cxa_throw', '___cxa_rethrow'] {
 		return u64(unsafe { voidptr(cxx_unwind_unsupported) })
 	}
 	address := C.ios_cxx_symbol(unsafe { &char(symbol.str) })
 	if address == 0 { return error('iOS: C++ symbol is not implemented: ${symbol}') }
 	return u64(address)
+}
+
+fn cxx_platform_symbol(symbol string) ?u64 {
+	return match symbol {
+		'__ZNSt3__113random_deviceC1ERKNS_12basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE',
+		'__ZNSt3__113random_deviceC2ERKNS_12basic_stringIcNS_11char_traitsIcEENS_9allocatorIcEEEE' { u64(unsafe { voidptr(cxx_random_init) }) }
+		'__ZNSt3__113random_deviceD1Ev', '__ZNSt3__113random_deviceD2Ev' { u64(unsafe { voidptr(cxx_random_destroy) }) }
+		'__ZNSt3__113random_deviceclEv' { u64(unsafe { voidptr(cxx_random_value) }) }
+		'__ZNKSt3__113random_device7entropyEv' { u64(unsafe { voidptr(cxx_random_entropy) }) }
+		'__ZNSt3__122__libcpp_verbose_abortEPKcz' { u64(unsafe { voidptr(C.ios_cxx_verbose_abort) }) }
+		else { return none }
+	}
 }
 
 fn cxx_pthread_symbol(symbol string) ?u64 {

@@ -6,6 +6,18 @@ set -eu
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 output=${1:-"$repo/build/ios/reference"}
 mkdir -p "$output"
+"${IOS_CLANGXX:-clang++}" -DIOS_CXX_REFERENCE -std=c++17 -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/cxx-extended.cpp" -o "$output/cxx-extended"
+"$output/cxx-extended"
+python3 - "$output/cxx-extended" <<'PY'
+import signal
+import subprocess
+import sys
+result = subprocess.run([sys.argv[1], "abort"], capture_output=True)
+assert result.returncode == -signal.SIGABRT, (result.returncode, result.stderr)
+assert b"IOS-CXX-ABORT: stack 17 1099511627776 2.500 0x1234\n" in result.stderr, result.stderr
+print("IOS-CXX-REFERENCE: formatted diagnostic and SIGABRT")
+PY
 "${IOS_CLANG:-clang}" -DIOS_KEYCHAIN_REFERENCE -fno-objc-arc -O1 -Wall -Wextra -Werror \
     -framework Security -framework Foundation "$repo/tests/ios/keychain.m" -o "$output/keychain"
 "$output/keychain"

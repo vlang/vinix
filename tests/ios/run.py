@@ -107,6 +107,7 @@ def main() -> int:
     subprocess.run(["sh", str(ROOT / "tests/ios/build-fixture.sh"), str(build / "fixtures")], check=True)
     if arguments.with_cxx:
         subprocess.run(["bash", str(ROOT / "tests/ios/build-cxx-fixture.sh"), str(build / "fixtures")], check=True)
+        subprocess.run(["bash", str(ROOT / "tests/ios/build-cxx-native.sh"), str(build / "fixtures")], check=True)
     if arguments.with_gles:
         subprocess.run(["bash", str(ROOT / "tests/ios/build-gles-fixture.sh"), str(build / "fixtures")], check=True)
     subprocess.run(["bash", str(ROOT / "examples/ios-calculator/build.sh")],
@@ -147,6 +148,8 @@ def main() -> int:
         runner.FEATURE_MARKERS += (b"iOS PASS: unchanged PPSSPP iOS binary runs God of War PSP demo",)
     if arguments.with_cxx:
         runner.FEATURE_MARKERS += (b"iOS PASS: native C++ strings, streams, regex and lifetime",)
+        runner.FEATURE_MARKERS += (b"iOS PASS: extended C++ ABI, Darwin entropy and variadic abort",)
+        runner.FEATURE_MARKERS += (b"iOS PASS: native ELF vector exception helpers",)
         runner.FEATURE_MARKERS += (b"iOS PASS: Objective-C image startup and C++ ivars",)
     if arguments.with_gles:
         runner.FEATURE_MARKERS += (b"iOS PASS: native OpenGL ES shader rendering and GLKView lifecycle",)
@@ -183,6 +186,8 @@ def main() -> int:
         leaf.write_bytes(unsupported_library)
         if arguments.with_cxx:
             shutil.copy2(build / "fixtures/cxx", destination / "cxx")
+            shutil.copy2(build / "fixtures/cxx-extended", destination / "cxx-extended")
+            shutil.copy2(build / "fixtures/cxx-native", destination / "cxx-native")
             shutil.copy2(build / "fixtures/startup", destination / "startup")
         shutil.copy2(build / "objc/Calculator.app/Calculator", destination / "UIKitCalculator")
         if arguments.with_2048:

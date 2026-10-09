@@ -99,6 +99,10 @@ SYM(ios_snprintf):
 SYM(ios_printf):
     mov x1, sp
     b SYM(ios_printf_stack)
+.global SYM(ios_cxx_verbose_abort)
+SYM(ios_cxx_verbose_abort):
+    mov x1, sp
+    b SYM(ios_cxx_verbose_abort_stack)
 .global SYM(ios_fprintf)
 SYM(ios_fprintf):
     mov x2, sp
