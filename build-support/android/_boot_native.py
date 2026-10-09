@@ -300,6 +300,7 @@ def _build_exit(manager, exception):
         finally:
             if error.__traceback__ is replay:
                 error.__traceback__ = traceback
+            del replay, traceback, error, exception, manager
 
 
 def _build_retire(owners):
