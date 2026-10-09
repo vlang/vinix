@@ -23,7 +23,7 @@ def _module(name, path):
 
 _host = _module("kernel_gap_transport", _HERE.parents[1] / "build-support/native_host.py")
 _wire = _module("kernel_gap_wire", _HERE.parents[1] / "build-support/android/_boot_native.py")
-_WAITPID, _MONOTONIC = _host.os.waitpid, time.monotonic
+_WAITPID, _MONOTONIC, _WAIT = _host.os.waitpid, time.monotonic, threading.Event
 
 
 class _Process(subprocess.Popen):
@@ -151,6 +151,16 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             resources["pid"], resources["master"] = pid, master
             resources["output"] = bytearray()
             return [pid, master]
+        if method == "close_fd":
+            master = resources["master"]
+            resources["closed"] = True
+            return namespace["os"].close(master)
+        if method == "wait_once":
+            pid, api = resources["pid"], namespace["os"]
+            status = api.waitpid(pid, api.WNOHANG)
+            if type(status) is tuple and len(status) == 2 and type(status[0]) is int and type(pid) is int and status[0] == pid:
+                resources["reaped"] = True
+            return retain(status) if row.get("result") == "owner" else status
         if method == "function":
             target = getattr(resources[row["owner"]], row["method"]) if "owner" in row else resolve(row["name"])
             value = target(*[argument(value) for value in row.get("args", [])],
@@ -245,34 +255,47 @@ def call(operation, arguments, namespace, resources=None, controller=None):
                     error.__traceback__ = traceback
 
     def cleanup():
-        # Recover an unreaped owned runner after transport or stop failure.
-        # Normal stop/close exception ordering stays in V; an unattempted master
-        # close is recovered here only after a broken transport.
+        # Consume owners before POSIX calls: a lost reply cannot close a reused
+        # descriptor or signal a PID already reaped by an atomic wait callback.
+        mask()
+        pid = resources.get("pid")
+        recover = owned and pid is not None and not resources.get("reaped")
+        unreaped = recover
+        if recover:
+            resources["reaped"] = True
+        api = namespace.get("os")
         try:
             try:
-                if owned and "pid" in resources and not resources.get("reaped"):
+                if recover:
                     try:
-                        waited, _ = namespace["os"].waitpid(resources["pid"], namespace["os"].WNOHANG)
+                        waited, _ = api.waitpid(pid, api.WNOHANG)
                     except ChildProcessError:
-                        waited = resources["pid"]
-                    if not waited:
+                        waited = pid
+                    unreaped = not waited
+                    if unreaped:
                         try:
-                            namespace["os"].killpg(resources["pid"], signal.SIGKILL)
-                        except PermissionError:
+                            api.killpg(pid, signal.SIGKILL)
+                        except (PermissionError, ProcessLookupError):
                             try:
-                                namespace["os"].kill(resources["pid"], signal.SIGKILL)
+                                api.kill(pid, signal.SIGKILL)
                             except ProcessLookupError:
                                 pass
-                        except ProcessLookupError:
-                            pass
-                        try:
-                            namespace["os"].waitpid(resources["pid"], 0)
-                        except ChildProcessError:
-                            pass
-                    resources["reaped"] = True
             finally:
-                if not completed and owned and "master" in resources and not resources.get("closed"):
-                    namespace["os"].close(resources["master"])
+                try:
+                    if not completed and owned and "master" in resources and not resources.get("closed"):
+                        resources["closed"] = True
+                        api.close(resources["master"])
+                finally:
+                    if unreaped:
+                        deadline = _MONOTONIC() + 5
+                        pause = _WAIT()
+                        while _MONOTONIC() < deadline:
+                            try:
+                                if api.waitpid(pid, api.WNOHANG)[0] == pid:
+                                    break
+                            except ChildProcessError:
+                                break
+                            pause.wait(0.05)
         finally:
             contexts.__exit__(*sys.exc_info())
 
