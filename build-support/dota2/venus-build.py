@@ -18,6 +18,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tarfile
 
 REPO = Path(__file__).resolve().parents[2]
 SUPPORT = Path(__file__).with_name("venus")
@@ -56,136 +57,37 @@ MESON_OPTIONS = (
 )
 
 
+from runpy import run_path
+
+_builder_binding = run_path(str(REPO / "tools/_package_store_native.py"))
+_builder_Popen = subprocess.Popen
+_builder_controller = _builder_binding["_host"].Controller(Path(__file__).with_name("venus_query.v"), "VINIX_VENUS_QUERY",
+    process=lambda *args, **kwargs: _builder_Popen(*args, start_new_session=True, **kwargs))
+
+
+def _venus_call(operation, arguments):
+    return _builder_binding["call"](operation, arguments, globals(), controller=_builder_controller)
+
+
+def _venus_mapping(value):
+    return {**value}
+
+
 def load_lavapipe_builder():
-    spec = importlib.util.spec_from_file_location("vinix_dota2_mesa_build",
-                                                  Path(__file__).with_name("mesa-build.py"))
-    builder = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = builder
-    spec.loader.exec_module(builder)
-    return builder
+    return _venus_call('load_lavapipe_builder', ())
 
 
 def write_cross_file(work: Path, tools: Path, lavapipe) -> Path:
-    sysroot = work / "sysroot"
-    gcc = sorted((sysroot / "usr/lib/gcc/x86_64-linux-gnu").iterdir())[-1]
-    flags = ["--target=x86_64-linux-gnu", f"--sysroot={sysroot}", f"--gcc-install-dir={gcc}"]
-    links = ["-fuse-ld=lld", f"-Wl,-rpath-link,{sysroot / 'usr/lib/x86_64-linux-gnu'}",
-             f"-Wl,-rpath-link,{sysroot / 'lib/x86_64-linux-gnu'}"]
-    cross = work / "cross.ini"
-    cross.write_text(f"""[binaries]
-c = {[str(tools / 'clang'), *flags]!r}
-cpp = {[str(tools / 'clang++'), *flags]!r}
-ar = '{tools / 'llvm-ar'}'
-strip = '{tools / 'llvm-strip'}'
-pkg-config = '{lavapipe.tool('pkg-config')}'
-[host_machine]
-system = 'linux'
-cpu_family = 'x86_64'
-cpu = 'x86_64'
-endian = 'little'
-[properties]
-needs_exe_wrapper = true
-sys_root = '{sysroot}'
-pkg_config_libdir = ['{sysroot / 'usr/lib/x86_64-linux-gnu/pkgconfig'}', '{sysroot / 'usr/share/pkgconfig'}']
-[built-in options]
-c_args = ['-D__vinix__']
-cpp_args = ['-D__vinix__']
-c_link_args = {links!r}
-cpp_link_args = {links!r}
-""")
-    return cross
+    return _venus_call('write_cross_file', (work, tools, lavapipe))
 
 
 def prepare_source(lavapipe, downloads: Path, source: Path) -> None:
-    archive = downloads / f"mesa-{VERSION}.tar.xz"
-    if not archive.is_file() or lavapipe.digest(archive) != SOURCE_SHA256:
-        partial = archive.with_name(archive.name + ".partial")
-        subprocess.run([lavapipe.tool("curl"), "--fail", "--location", "--retry", "3",
-                        "--silent", "--show-error", "--output", str(partial), SOURCE_URL], check=True)
-        if lavapipe.digest(partial) != SOURCE_SHA256:
-            partial.unlink()
-            raise SystemExit(f"Mesa {VERSION} has an unexpected hash: {SOURCE_URL}")
-        partial.replace(archive)
-    pending = source.with_name(source.name + ".pending")
-    if pending.exists():
-        shutil.rmtree(pending)
-    pending.mkdir(parents=True)
-    subprocess.run([lavapipe.tool("tar"), "xJf", str(archive), "-C", str(pending),
-                    "--strip-components=1"], check=True)
-    for patch, expected in PATCHES.items():
-        if expected and lavapipe.digest(patch) != expected:
-            raise SystemExit(f"Venus patch has an unexpected hash: {patch}")
-        lavapipe.apply_patch(pending, patch.read_bytes(), patch.name)
-    lavapipe.check_sources(pending, PATCHED_SOURCE_SHA256, "patched Venus")
-    if source.exists():
-        shutil.rmtree(source)
-    pending.rename(source)
+    return _venus_call('prepare_source', (lavapipe, downloads, source))
 
 
 def build(base: Path, work: Path, jobs: int = os.cpu_count() or 1, refresh: bool = False) -> tuple[Path, Path]:
     """Return the x86-64 Venus library and its ICD manifest, built for base."""
-    lavapipe = load_lavapipe_builder()
-    base, work = base.resolve(), work.resolve()
-    if work == base or work in base.parents or base in work.parents:
-        raise SystemExit("the Venus work directory must be separate from its base root")
-    mesa_inputs = lavapipe.load_inputs()
-    tools = lavapipe.llvm_bin()
-    for name in ("clang", "clang++", "llvm-ar", "llvm-strip", "llvm-readelf"):
-        if not (tools / name).is_file():
-            raise SystemExit(f"missing LLVM tool {name} in {tools}; set VINIX_DOTA2_LLVM_BIN")
-    generation = hashlib.sha256(json.dumps({
-        "version": VERSION, "source": SOURCE_SHA256, "builder": lavapipe.digest(Path(__file__)),
-        "native_policy": {str(path.relative_to(REPO)): lavapipe.digest(path) for path in lavapipe._native["policy_sources"]()},
-        "sysroot_packages": mesa_inputs["packages"],
-        "patches": {patch.name: lavapipe.digest(patch) for patch in PATCHES},
-        "options": MESON_OPTIONS, "python_packages": PYTHON_PACKAGES,
-        "clang": subprocess.check_output([str(tools / "clang"), "--version"], text=True),
-        "base": lavapipe.base_identity(base),
-    }, sort_keys=True).encode()).hexdigest()
-    output, manifest = work / "out/libvulkan_virtio.so", work / "out/virtio_icd.x86_64.json"
-    marker = work / "out/generation"
-    if (not refresh and output.is_file() and manifest.is_file() and marker.is_file() and
-            marker.read_text().strip() == f"{generation} {lavapipe.digest(output)}"):
-        return output, manifest
-    downloads = work / "downloads"
-    downloads.mkdir(parents=True, exist_ok=True)
-    source, objects = work / "source", work / "obj"
-    stamp = work / ".prepared-generation"
-    if refresh or not stamp.is_file() or stamp.read_text().strip() != generation:
-        print("Preparing Mesa Venus source and amd64 development libraries", flush=True)
-        prepare_source(lavapipe, downloads, source)
-        lavapipe.prepare_sysroot(lavapipe.load_resolver(), mesa_inputs, base, downloads, work / "sysroot")
-        if objects.exists():
-            shutil.rmtree(objects)
-        stamp.write_text(generation + "\n")
-    lavapipe.check_sources(source, PATCHED_SOURCE_SHA256, "prepared Venus")
-    venv = work / "host-venv"
-    python = venv / "bin/python3"
-    if not python.exists():
-        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
-    package_stamp = venv / ".dota2-packages"
-    if not package_stamp.is_file() or package_stamp.read_text().splitlines() != list(PYTHON_PACKAGES):
-        subprocess.run([str(python), "-m", "pip", "install", "--quiet", *PYTHON_PACKAGES], check=True)
-        package_stamp.write_text("\n".join(PYTHON_PACKAGES) + "\n")
-    environment = {**os.environ, "PATH": f"{venv / 'bin'}:{os.environ['PATH']}"}
-    if not (objects / "build.ninja").is_file():
-        print("Configuring amd64 Venus", flush=True)
-        cross = write_cross_file(work, tools, lavapipe)
-        lavapipe.logged([str(venv / "bin/meson"), "setup", str(objects), str(source),
-                         "--cross-file", str(cross), *MESON_OPTIONS], work, work / "configure.log", environment)
-    print("Building amd64 Venus", flush=True)
-    lavapipe.logged([lavapipe.tool("ninja"), "-C", str(objects), "-j", str(jobs), TARGET,
-                     "src/virtio/vulkan/virtio_icd.x86_64.json"], work, work / "build.log", environment)
-    built = objects / TARGET
-    lavapipe.verify_library(built, base, tools)
-    output.parent.mkdir(exist_ok=True)
-    for source_path, destination in ((built, output),
-                                     (objects / "src/virtio/vulkan/virtio_icd.x86_64.json", manifest)):
-        partial = destination.with_name("." + destination.name + ".partial")
-        shutil.copy2(source_path, partial)
-        partial.replace(destination)
-    marker.write_text(f"{generation} {lavapipe.digest(output)}\n")
-    return output, manifest
+    return _venus_call('build', (base, work, jobs, refresh))
 
 
 def main() -> None:
