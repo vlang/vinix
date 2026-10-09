@@ -4,7 +4,7 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 output=${1:-"$repo/build/ios/fixtures"}
 mkdir -p "$output"
 sh "$repo/tests/ios/build-modules-fixture.sh" "$output"
-for name in calculator unsupported lifecycle pointer-tags common-crypto atomic-queue; do
+for name in calculator unsupported lifecycle pointer-tags common-crypto atomic-queue assertions; do
     "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
         -fno-stack-protector -O1 -Wall -Wextra -Werror \
         -c "$repo/tests/ios/$name.c" -o "$output/$name.o"
@@ -12,6 +12,14 @@ for name in calculator unsupported lifecycle pointer-tags common-crypto atomic-q
         -fixup_chains -e _main "$output/$name.o" "$repo/tests/ios/libSystem.tbd" \
         -o "$output/$name"
 done
+# -ffreestanding disables Darwin's compiler-generated stack checks. Compile
+# this fixture with hosted code generation so it actually imports the helper.
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/stack-probe.c" -o "$output/stack-probe.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/stack-probe.o" "$repo/tests/ios/libSystem.tbd" \
+    -o "$output/stack-probe"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
     -fno-objc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/cfnetwork.m" -o "$output/cfnetwork.o"

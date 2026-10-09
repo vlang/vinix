@@ -95,6 +95,15 @@ int main(void) {
     run("/opt/ios/atomic-queue", NULL, NULL, NULL, 0,
         "IOS-ATOMIC-QUEUE: LIFO, generation, independent offsets and eight-thread node reuse");
     puts("iOS PASS: lock-free Darwin atomic queues and node reuse");
+    run("/opt/ios/assertions", NULL, NULL, NULL, 0, "IOS-ASSERT: native assertion import");
+    run("/opt/ios/assertions", "with-function", NULL, NULL, -SIGABRT,
+        "Assertion failed: (1 == 2), function fixture, file synthetic.c, line 17.\n");
+    run("/opt/ios/assertions", "no-function", NULL, NULL, -SIGABRT,
+        "Assertion failed: (1 == 2), file synthetic.c, line 17.\n");
+    puts("iOS PASS: Darwin assertion diagnostics and SIGABRT");
+    run("/opt/ios/stack-probe", NULL, NULL, NULL, 0,
+        "IOS-STACK-PROBE: 32 KiB frames, integer/FP arguments and eight native threads");
+    puts("iOS PASS: Darwin stack probes preserve native arguments");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

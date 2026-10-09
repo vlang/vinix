@@ -9,6 +9,43 @@
 #endif
 .text
 .p2align 2
+/* Darwin's compiler-generated stack check receives its byte count in x9,
+ * rather than a C argument register. Probe each native 4 KiB page and the
+ * allocation boundary so the host's actual stack guards remain effective.
+ * Keep SP, LR, argument registers, x9-x11 and all SIMD registers intact. */
+.global SYM(ios_chkstk_darwin)
+SYM(ios_chkstk_darwin):
+    stp x9, x10, [sp, #-32]!
+    str x11, [sp, #16]
+    cbz x9, 3f
+    add x10, sp, #32
+1:
+    cmp x9, #4096
+    b.ls 2f
+    sub x10, x10, #4096
+    ldrb w11, [x10]
+    sub x9, x9, #4096
+    b 1b
+2:
+    sub x10, x10, x9
+    ldrb w11, [x10]
+3:
+    ldr x11, [sp, #16]
+    ldp x9, x10, [sp], #32
+    ret
+#ifdef IOS_STACK_PROBE_TEST
+/* Test-only caller supplies a mapped alternate stack with a real guard page. */
+.global SYM(ios_stack_probe_guard_call)
+SYM(ios_stack_probe_guard_call):
+    stp x19, x30, [sp, #-16]!
+    mov x19, sp
+    mov sp, x0
+    mov x9, x1
+    bl SYM(ios_chkstk_darwin)
+    mov sp, x19
+    ldp x19, x30, [sp], #16
+    ret
+#endif
 /* LDXP alone need not be an atomic 16-byte snapshot. A successful exclusive
  * store of the same pair validates the load. Neither helper uses x18 or LSE,
  * so these also work on the baseline ARMv8 CPUs used by the guest. */

@@ -27,6 +27,23 @@ PY
 "${IOS_CLANG:-clang}" -DIOS_QUEUE_REFERENCE -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/atomic-queue.c" -o "$output/atomic-queue"
 "$output/atomic-queue"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/assertions.c" -o "$output/assertions"
+"$output/assertions"
+python3 - "$output/assertions" <<'PY'
+import signal
+import subprocess
+import sys
+for mode, expected in (("with-function", b"Assertion failed: (1 == 2), function fixture, file synthetic.c, line 17.\n"),
+                       ("no-function", b"Assertion failed: (1 == 2), file synthetic.c, line 17.\n")):
+    result = subprocess.run([sys.argv[1], mode], capture_output=True)
+    assert result.returncode == -signal.SIGABRT, (mode, result.returncode, result.stderr)
+    assert expected in result.stderr, result.stderr
+print("IOS-ASSERT-REFERENCE: diagnostics and SIGABRT with/without function names")
+PY
+"${IOS_CLANG:-clang}" -DIOS_STACK_REFERENCE -O1 -fno-stack-protector -Wall -Wextra -Werror \
+    "$repo/tests/ios/stack-probe.c" -o "$output/stack-probe"
+"$output/stack-probe"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

@@ -12,6 +12,7 @@ fn C.posix_memalign(voidptr, usize, usize) i32
 
 fn C.puts(&char) int
 fn C.abort()
+fn C.ios_chkstk_darwin()
 fn C._Exit(i32)
 fn C.malloc(usize) voidptr
 fn C.free(voidptr)
@@ -121,6 +122,8 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {
+		'___assert_rtn' { unsafe { voidptr(darwin_assert_rtn) } }
+		'___chkstk_darwin' { unsafe { voidptr(C.ios_chkstk_darwin) } }
 		'_OSAtomicEnqueue' { unsafe { voidptr(darwin_atomic_enqueue) } }
 		'_OSAtomicDequeue' { unsafe { voidptr(darwin_atomic_dequeue) } }
 		'___tolower', '_tolower' { unsafe { voidptr(darwin_rune_lower) } }
