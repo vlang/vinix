@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 
 from runpy import run_path
 
@@ -68,243 +69,82 @@ else:
 '''
 
 
+_builder_binding = run_path(str(REPO / "tools/_package_store_native.py"))
+_builder_Popen = subprocess.Popen
+_builder_controller = _builder_binding["_host"].Controller(Path(__file__).with_name("mesa_query.v"), "VINIX_MESA_QUERY",
+    process=lambda *args, **kwargs: _builder_Popen(*args, start_new_session=True, **kwargs))
+
+
+def _mesa_call(operation, arguments):
+    return _builder_binding["call"](operation, arguments, globals(), controller=_builder_controller)
+
+
+def _mesa_reader(owner, name, arguments):
+    return lambda: _builder_binding["builtins"].getattr(owner, name)(*arguments)
+
+
+def _mesa_mapping(value):
+    return {**value}
+
+
 def digest(path: Path) -> str:
-    result = hashlib.sha256()
-    with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            result.update(block)
-    return result.hexdigest()
+    return _mesa_call('digest', (path,))
 
 
 def tool(name: str) -> str:
-    value = shutil.which(name)
-    if not value:
-        raise SystemExit(f"missing build tool: {name}")
-    return value
+    return _mesa_call('tool', (name,))
 
 
 def load_resolver():
-    spec = importlib.util.spec_from_file_location("vinix_debian_root", REPO / "build-support/debian-root.py")
-    resolver = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = resolver
-    spec.loader.exec_module(resolver)
-    return resolver
+    return _mesa_call('load_resolver', ())
 
 
 def load_inputs(path: Path = SUPPORT / "inputs.json") -> dict:
-    inputs = json.loads(path.read_text())
-    _native_request("mesa-pin", b"", data=_policy_value(inputs), path=str(path))
-    return inputs
+    return _mesa_call('load_inputs', (path,))
 
 
 def llvm_bin() -> Path:
     # Homebrew's LLVM provides clang, lld and llvm-ar together on macOS.
-    configured = os.environ.get("VINIX_DOTA2_LLVM_BIN")
-    if configured:
-        return Path(configured)
-    homebrew = Path("/opt/homebrew/opt/llvm/bin")
-    return homebrew if (homebrew / "clang").is_file() else Path(tool("clang")).parent
+    return _mesa_call('llvm_bin', ())
 
 
 def base_identity(base: Path) -> str:
     # Lavapipe links against the base root's libraries. Their names, sizes and
     # link targets change with any package update; hashing all of them is slow.
-    result = hashlib.sha256()
-    for directory in ("lib/x86_64-linux-gnu", "usr/lib/x86_64-linux-gnu", "usr/lib/gcc/x86_64-linux-gnu"):
-        root = base / directory
-        if not root.is_dir():
-            continue
-        for entry in sorted(root.rglob("*")):
-            relative = entry.relative_to(base).as_posix()
-            if entry.is_symlink():
-                result.update(f"{relative} -> {os.readlink(entry)}\n".encode())
-            elif entry.is_file():
-                result.update(f"{relative} {entry.stat().st_size}\n".encode())
-    return result.hexdigest()
+    return _mesa_call('base_identity', (base,))
 
 
 def logged(command: list[str], directory: Path, log: Path, environment=None) -> None:
-    with log.open("w") as output:
-        result = subprocess.run(command, cwd=directory, env=environment,
-                                stdout=output, stderr=subprocess.STDOUT)
-    if result.returncode:
-        print("\n".join(log.read_text(errors="replace").splitlines()[-35:]), file=sys.stderr)
-        raise SystemExit(f"Lavapipe build failed; see {log}")
+    return _mesa_call('logged', (command, directory, log, environment))
 
 
 def apply_patch(source: Path, patch: bytes, label: str) -> None:
-    result = subprocess.run([tool("patch"), "-p1", "--batch", "--forward"], cwd=source, input=patch,
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    if result.returncode:
-        print(result.stdout.decode(errors="replace"), file=sys.stderr)
-        raise SystemExit(f"patch does not apply to the pinned Mesa source: {label}")
+    return _mesa_call('apply_patch', (source, patch, label))
 
 
 def check_sources(source: Path, expected: dict, label: str) -> None:
-    for relative, value in expected.items():
-        path = source / relative
-        if not path.is_file() or digest(path) != value:
-            raise SystemExit(f"{label} Mesa source has an unexpected hash: {relative}")
+    return _mesa_call('check_sources', (source, expected, label))
 
 
 def prepare_source(resolver, inputs: dict, downloads: Path, source: Path) -> None:
-    archives = {}
-    for key in ("source", "debian_diff"):
-        pin = inputs[key]
-        package = resolver.Package(key, inputs["debian_version"], "source", pin["filename"],
-                                   pin["sha256"], 0, (), ())
-        archives[key] = resolver.download(inputs["mirror"], package, downloads)
-    pending = source.with_name(source.name + ".pending")
-    if pending.exists():
-        shutil.rmtree(pending)
-    pending.mkdir(parents=True)
-    subprocess.run([tool("tar"), "xzf", str(archives["source"]), "-C", str(pending),
-                    "--strip-components=1"], check=True)
-    apply_patch(pending, subprocess.check_output([tool("gzip"), "-dc", str(archives["debian_diff"])]),
-                Path(inputs["debian_diff"]["filename"]).name)
-    patches = pending / "debian/patches"
-    series = [line.split()[0] for line in (patches / "series").read_text().splitlines()
-              if line.strip() and not line.lstrip().startswith("#")]
-    if series != list(inputs["debian_patches"]):
-        raise SystemExit("Debian's Mesa patch series differs from the pinned series")
-    for name in series:
-        if digest(patches / name) != inputs["debian_patches"][name]:
-            raise SystemExit(f"Debian Mesa patch has an unexpected hash: {name}")
-        apply_patch(pending, (patches / name).read_bytes(), name)
-    check_sources(pending, inputs["debian_source_sha256"], "Debian-patched")
-    for name, expected in inputs["patches"].items():
-        patch = SUPPORT / name
-        if digest(patch) != expected:
-            raise SystemExit(f"Lavapipe patch has an unexpected hash: {patch}")
-        apply_patch(pending, patch.read_bytes(), name)
-    check_sources(pending, inputs["patched_source_sha256"], "patched")
-    if source.exists():
-        shutil.rmtree(source)
-    pending.rename(source)
+    return _mesa_call('prepare_source', (resolver, inputs, downloads, source))
 
 
 def prepare_sysroot(resolver, inputs: dict, base: Path, downloads: Path, sysroot: Path) -> None:
-    pending = sysroot.with_name(sysroot.name + ".pending")
-    if pending.exists():
-        shutil.rmtree(pending)
-    if sys.platform == "darwin":
-        subprocess.run(["/bin/cp", "-cRp", str(base), str(pending)], check=True)
-    else:
-        shutil.copytree(base, pending, symlinks=True)
-    for row in inputs["packages"]:
-        package = resolver.Package(row["name"], row["version"], row["architecture"],
-                                   row["filename"], row["sha256"], row["size"], (), ())
-        resolver.extract_deb(resolver.download(inputs["mirror"], package, downloads), pending)
-    if sysroot.exists():
-        shutil.rmtree(sysroot)
-    pending.rename(sysroot)
+    return _mesa_call('prepare_sysroot', (resolver, inputs, base, downloads, sysroot))
 
 
 def write_configuration(work: Path, inputs: dict, tools: Path) -> Path:
-    sysroot = work / "sysroot"
-    config = work / "llvm-config"
-    config.write_text(LLVM_CONFIG % {"version": inputs["llvm_version"]})
-    config.chmod(0o755)
-    gcc = sorted((sysroot / "usr/lib/gcc/x86_64-linux-gnu").iterdir())[-1]
-    flags = ["--target=x86_64-linux-gnu", f"--sysroot={sysroot}", f"--gcc-install-dir={gcc}"]
-    links = ["-fuse-ld=lld", f"-Wl,-rpath-link,{sysroot / 'usr/lib/x86_64-linux-gnu'}",
-             f"-Wl,-rpath-link,{sysroot / 'lib/x86_64-linux-gnu'}"]
-    cross = work / "cross.ini"
-    cross.write_text(f"""[binaries]
-c = {[str(tools / 'clang'), *flags]!r}
-cpp = {[str(tools / 'clang++'), *flags]!r}
-ar = '{tools / 'llvm-ar'}'
-strip = '{tools / 'llvm-strip'}'
-pkg-config = '{tool('pkg-config')}'
-llvm-config = '{config}'
-[host_machine]
-system = 'linux'
-cpu_family = 'x86_64'
-cpu = 'x86_64'
-endian = 'little'
-[properties]
-needs_exe_wrapper = true
-sys_root = '{sysroot}'
-pkg_config_libdir = ['{sysroot / 'usr/lib/x86_64-linux-gnu/pkgconfig'}', '{sysroot / 'usr/share/pkgconfig'}']
-[built-in options]
-c_link_args = {links!r}
-cpp_link_args = {links!r}
-""")
-    return cross
+    return _mesa_call('write_configuration', (work, inputs, tools))
 
 
 def verify_library(path: Path, base: Path, tools: Path) -> None:
-    header = path.read_bytes()[:20]
-    if not _native_request("shared-elf", header):
-        raise SystemExit(f"Lavapipe must be an x86-64 shared library: {path}")
-    dynamic = subprocess.check_output([str(tools / "llvm-readelf"), "-d", "--dyn-syms", str(path)], text=True)
-    _native_request("verify-dynamic", dynamic.encode("utf-8", "surrogatepass"), base=str(base))
+    return _mesa_call('verify_library', (path, base, tools))
 
 
 def build(base: Path, work: Path, jobs: int = os.cpu_count() or 1, refresh: bool = False) -> Path:
     """Return a patched libvulkan_lvp.so linked against base's runtime libraries."""
-    base, work = base.resolve(), work.resolve()
-    if work == base or work in base.parents or base in work.parents:
-        raise SystemExit("the Lavapipe work directory must be separate from its base root")
-    inputs = load_inputs()
-    llvm = base / "usr/lib/x86_64-linux-gnu/libLLVM-15.so.1"
-    if not llvm.is_file() or digest(llvm) != inputs["llvm_runtime_sha256"]:
-        raise SystemExit(f"the base root lacks the pinned LLVM 15 runtime: {llvm}")
-    tools = llvm_bin()
-    for name in ("clang", "clang++", "llvm-ar", "llvm-strip", "llvm-readelf"):
-        if not (tools / name).is_file():
-            raise SystemExit(f"missing LLVM tool {name} in {tools}; set VINIX_DOTA2_LLVM_BIN")
-    generation = hashlib.sha256(json.dumps({
-        "inputs": inputs, "builder": digest(Path(__file__)),
-        "native_policy": {str(path.relative_to(REPO)): digest(path) for path in _native["policy_sources"]()},
-        "patches": {name: digest(SUPPORT / name) for name in inputs["patches"]},
-        "options": MESON_OPTIONS, "python_packages": PYTHON_PACKAGES,
-        "clang": subprocess.check_output([str(tools / "clang"), "--version"], text=True),
-        "base": base_identity(base),
-    }, sort_keys=True).encode()).hexdigest()
-    output = work / "out/libvulkan_lvp.so"
-    marker = work / "out/generation"
-    if (not refresh and output.is_file() and marker.is_file() and
-            marker.read_text().strip() == f"{generation} {digest(output)}"):
-        return output
-    resolver = load_resolver()
-    downloads = work / "downloads"
-    downloads.mkdir(parents=True, exist_ok=True)
-    source, objects = work / "source", work / "obj"
-    stamp = work / ".prepared-generation"
-    if refresh or not stamp.is_file() or stamp.read_text().strip() != generation:
-        print("Preparing pinned Mesa source and amd64 development libraries", flush=True)
-        prepare_source(resolver, inputs, downloads, source)
-        prepare_sysroot(resolver, inputs, base, downloads, work / "sysroot")
-        if objects.exists():
-            shutil.rmtree(objects)
-        stamp.write_text(generation + "\n")
-    check_sources(source, inputs["patched_source_sha256"], "prepared")
-    venv = work / "host-venv"
-    python = venv / "bin/python3"
-    if not python.exists():
-        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
-    package_stamp = venv / ".dota2-packages"
-    if not package_stamp.is_file() or package_stamp.read_text().splitlines() != list(PYTHON_PACKAGES):
-        subprocess.run([str(python), "-m", "pip", "install", "--quiet", *PYTHON_PACKAGES], check=True)
-        package_stamp.write_text("\n".join(PYTHON_PACKAGES) + "\n")
-    # Mesa's generators run "python3"; the venv supplies Mako to them.
-    environment = {**os.environ, "PATH": f"{venv / 'bin'}:{os.environ['PATH']}"}
-    if not (objects / "build.ninja").is_file():
-        print("Configuring amd64 Lavapipe", flush=True)
-        cross = write_configuration(work, inputs, tools)
-        logged([str(venv / "bin/meson"), "setup", str(objects), str(source),
-                "--cross-file", str(cross), *MESON_OPTIONS], work, work / "configure.log", environment)
-    print("Building amd64 Lavapipe", flush=True)
-    logged([tool("ninja"), "-C", str(objects), "-j", str(jobs), TARGET], work, work / "build.log", environment)
-    built = objects / TARGET
-    verify_library(built, base, tools)
-    output.parent.mkdir(exist_ok=True)
-    partial = output.with_name(".libvulkan_lvp.so.partial")
-    shutil.copy2(built, partial)
-    partial.replace(output)
-    marker.write_text(f"{generation} {digest(output)}\n")
-    return output
+    return _mesa_call('build', (base, work, jobs, refresh))
 
 
 def main() -> None:
