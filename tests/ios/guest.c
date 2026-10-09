@@ -132,6 +132,9 @@ int main(void) {
     run("/opt/ios/security", NULL, NULL, NULL, 0,
         "IOS-SECURITY: owned DER certificates, RSA/EC public keys, attributes, decode errors, typed constants and secure random bytes");
     puts("iOS PASS: native Security certificates, public keys, constants and random bytes");
+    run("/opt/ios/security", NULL, NULL, NULL, 0,
+        "IOS-SECURITY-POLICY: owned X.509 and SSL policies, client/hostname properties, equality and copied metadata");
+    puts("iOS PASS: native Security X.509 and SSL policy ownership");
     run("/opt/ios/keychain", NULL, NULL, NULL, 0,
         "IOS-KEYCHAIN: generic passwords, duplicate/update/delete, binary data, one/all results and ownership");
     for (int pass = 0; pass < 3; pass++) {

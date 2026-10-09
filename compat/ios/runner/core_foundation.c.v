@@ -249,6 +249,7 @@ fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(v
 
 fn cf_hash(object u64) u64 {
 	if object == 0 { return 0 }
+	if read64(object) == sec_policy_type_id() { return cf_hash(obj_header(object).fields[0]) }
 	if objc_is_kind(object, ios_runtime.names['NSIndexPath']) { return u64(obj_header(object).number) ^ (u64(obj_header(object).section) * 1099511628211) }
 	if objc_is_kind(object, ios_runtime.names['NSArray']) || objc_is_kind(object, ios_runtime.names['NSDictionary']) { return u64(obj_header(object).items.len) }
 	if objc_is_kind(object, ios_runtime.names['NSData']) || read64(object) == sec_certificate_type_id() {

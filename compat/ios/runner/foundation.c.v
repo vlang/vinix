@@ -62,6 +62,7 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 	info := ios_runtime.classes[read64(left)] or { return false }
 	name := info.name
 	return match name {
+		'VinixSecPolicy' { cf_equal_depth(obj_header(left).fields[0], obj_header(right).fields[0], depth + 1) }
 		'VinixSecCertificate', 'VinixSecKey' {
 			a := obj_header(left)
 			b := obj_header(right)

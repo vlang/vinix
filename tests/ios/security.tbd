@@ -4,7 +4,10 @@ targets: [ arm64-ios ]
 install-name: '/System/Library/Frameworks/Security.framework/Security'
 exports:
   - targets: [ arm64-ios ]
-    symbols: [ _SecItemAdd, _SecItemCopyMatching, _SecItemUpdate, _SecItemDelete,
+    symbols: [ _SecPolicyGetTypeID, _SecPolicyCreateBasicX509, _SecPolicyCreateSSL,
+               _SecPolicyCopyProperties, _kSecPolicyOid, _kSecPolicyName,
+               _kSecPolicyClient, _kSecPolicyAppleX509Basic, _kSecPolicyAppleSSL,
+               _SecItemAdd, _SecItemCopyMatching, _SecItemUpdate, _SecItemDelete,
                _SecCertificateGetTypeID,
                _SecCertificateCreateWithData,
                _SecCertificateCopyData,

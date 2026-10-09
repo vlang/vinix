@@ -368,11 +368,19 @@ classes and the default `WhenUnlocked` policy return explicit errors. This
 resolves eight strong imports across the game and EOSSDK without claiming Apple's
 data-protection or trust services.
 
+Security also constructs owned basic-X.509 and SSL policy objects in V.
+Policy identifiers, optional hostname/client properties, retained metadata,
+equality and hash consistency match the Mac reference. ASAN and the full
+ARM64 C++/GLES/PPSSPP regression pass. Creating a policy does
+not evaluate a certificate: `SecTrustCreateWithCertificates`, trust evaluation
+and peer authentication are still unsupported. This resolves one additional
+strong import in EOSSDK.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecPolicyCreateBasicX509)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecTrustCopyPublicKey)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -381,9 +389,9 @@ the executable, without mapping or executing app code. The C++ runner reports:
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,189 | 969 | 81 |
-| EOSSDK | 417 | 245 | 18 |
+| EOSSDK | 418 | 244 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,657 | 1,339 | 122 |
+| All images | 1,658 | 1,338 | 122 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

@@ -556,6 +556,10 @@ fn sec_random_copy(random u64, count u64, bytes &u8) int {
 
 fn security_symbol(symbol string) ?u64 {
 	address := match symbol {
+		'_SecPolicyGetTypeID' { voidptr(sec_policy_type_id) }
+		'_SecPolicyCreateBasicX509' { voidptr(sec_policy_basic) }
+		'_SecPolicyCreateSSL' { voidptr(sec_policy_ssl) }
+		'_SecPolicyCopyProperties' { voidptr(sec_policy_properties) }
 		'_SecItemAdd' { voidptr(sec_item_add) }
 		'_SecItemCopyMatching' { voidptr(sec_item_copy) }
 		'_SecItemUpdate' { voidptr(sec_item_update) }
@@ -587,6 +591,11 @@ fn security_symbol(symbol string) ?u64 {
 
 fn security_constant(symbol string) ?u64 {
 	value := match symbol {
+		'_kSecPolicyOid' { 'SecPolicyOid' }
+		'_kSecPolicyName' { 'SecPolicyName' }
+		'_kSecPolicyClient' { 'SecPolicyClient' }
+		'_kSecPolicyAppleX509Basic' { '1.2.840.113635.100.1.2' }
+		'_kSecPolicyAppleSSL' { '1.2.840.113635.100.1.3' }
 		'_kSecAttrAccessGroup' { 'agrp' }
 		'_kSecAttrAccessible' { 'pdmn' }
 		'_kSecAttrAccessibleAfterFirstUnlock' { 'ck' }

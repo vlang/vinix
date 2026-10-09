@@ -3,6 +3,7 @@
 #include "security-fixtures.h"
 typedef const void *CFTypeRef, *CFDataRef, *CFStringRef, *CFDictionaryRef, *CFErrorRef;
 typedef const void *SecCertificateRef, *SecKeyRef;
+typedef const void *SecPolicyRef;
 typedef unsigned long CFTypeID;
 __attribute__((objc_root_class))
 @interface NSString
@@ -24,6 +25,12 @@ extern CFTypeID CFGetTypeID(CFTypeRef), CFDataGetTypeID(void), CFStringGetTypeID
 extern unsigned char CFEqual(CFTypeRef,CFTypeRef);
 extern unsigned long CFHash(CFTypeRef);
 extern CFTypeRef CFDictionaryGetValue(CFDictionaryRef,CFTypeRef);
+extern long CFDictionaryGetCount(CFDictionaryRef);
+extern CFTypeID SecPolicyGetTypeID(void);
+extern SecPolicyRef SecPolicyCreateBasicX509(void), SecPolicyCreateSSL(unsigned char,CFStringRef);
+extern CFDictionaryRef SecPolicyCopyProperties(SecPolicyRef);
+extern CFStringRef CFStringCreateWithCString(const void *,const char *,unsigned);
+extern const CFTypeRef kCFBooleanTrue;
 extern CFTypeID CFErrorGetTypeID(void);
 extern long CFErrorGetCode(CFErrorRef);
 extern CFStringRef CFErrorGetDomain(CFErrorRef);
@@ -37,6 +44,8 @@ extern CFDictionaryRef SecKeyCopyAttributes(SecKeyRef);
 extern const void *const kSecRandomDefault;
 extern int SecRandomCopyBytes(const void *,unsigned long,unsigned char *);
 #define SECURITY_STRINGS(X) \
+ X(kSecPolicyOid,"SecPolicyOid") X(kSecPolicyName,"SecPolicyName") X(kSecPolicyClient,"SecPolicyClient") \
+ X(kSecPolicyAppleX509Basic,"1.2.840.113635.100.1.2") X(kSecPolicyAppleSSL,"1.2.840.113635.100.1.3") \
  X(kSecAttrAccessGroup,"agrp") X(kSecAttrAccessible,"pdmn") \
  X(kSecAttrAccessibleAfterFirstUnlock,"ck") X(kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,"cku") \
  X(kSecAttrAccessibleAlwaysThisDeviceOnly,"dku") X(kSecAttrAccount,"acct") \
@@ -63,6 +72,37 @@ static int data_equals(CFDataRef data,const unsigned char *expected,long length)
 }
 static int string_equals(CFStringRef string,const char *expected) {
  return string && CFGetTypeID(string)==CFStringGetTypeID() && !strcmp([(NSString *)string UTF8String],expected);
+}
+static int check_policies(void) {
+ SecPolicyRef basic=SecPolicyCreateBasicX509(), duplicate=SecPolicyCreateBasicX509();
+ REQUIRE(basic && CFGetTypeID(basic)==SecPolicyGetTypeID() && CFEqual(basic,duplicate));
+ REQUIRE(CFHash(basic)==CFHash(duplicate));CFRelease(duplicate);
+ CFDictionaryRef props=SecPolicyCopyProperties(basic);CFRelease(basic);
+ REQUIRE(props && CFDictionaryGetCount(props)==1 && CFEqual(CFDictionaryGetValue(props,kSecPolicyOid),kSecPolicyAppleX509Basic));CFRelease(props);
+ for(int server=0;server<2;server++)for(int named=0;named<3;named++) {
+  const char *name=named==1?"":"EXAMPLE.COM";
+  CFStringRef hostname=named?CFStringCreateWithCString(0,name,0x08000100):0;
+  SecPolicyRef ssl=SecPolicyCreateSSL((unsigned char)server,hostname);
+  duplicate=SecPolicyCreateSSL((unsigned char)server,hostname);
+  if(hostname)CFRelease(hostname);
+  REQUIRE(ssl && CFGetTypeID(ssl)==SecPolicyGetTypeID() && CFEqual(ssl,duplicate));
+  REQUIRE(CFHash(ssl)==CFHash(duplicate));CFRelease(duplicate);
+  props=SecPolicyCopyProperties(ssl);CFRelease(ssl);
+  REQUIRE(props && CFDictionaryGetCount(props)==1+!server+!!named);
+  REQUIRE(CFEqual(CFDictionaryGetValue(props,kSecPolicyOid),kSecPolicyAppleSSL));
+  if(!server)REQUIRE(CFEqual(CFDictionaryGetValue(props,kSecPolicyClient),kCFBooleanTrue));
+  else REQUIRE(!CFDictionaryGetValue(props,kSecPolicyClient));
+  if(named)REQUIRE(string_equals(CFDictionaryGetValue(props,kSecPolicyName),name));
+  else REQUIRE(!CFDictionaryGetValue(props,kSecPolicyName));
+  CFRelease(props);
+ }
+ // Case is preserved in metadata; hostname checks belong to trust evaluation.
+ CFStringRef lower=CFStringCreateWithCString(0,"example.com",0x08000100), upper=CFStringCreateWithCString(0,"EXAMPLE.COM",0x08000100);
+ SecPolicyRef a=SecPolicyCreateSSL(1,lower),b=SecPolicyCreateSSL(1,upper);CFRelease(lower);CFRelease(upper);
+ REQUIRE(!CFEqual(a,b));CFRelease(a);CFRelease(b);
+ a=SecPolicyCreateSSL(255,0);b=SecPolicyCreateSSL(1,0);
+ REQUIRE(CFEqual(a,b));CFRelease(a);CFRelease(b);
+ return 0;
 }
 static int check_certificate(const unsigned char *bytes,long length,const unsigned char *key_bytes,long key_length,const unsigned char *label,int bits,int is_rsa) {
  unsigned char input[1024];
@@ -110,6 +150,7 @@ int main(void) { @autoreleasepool {
 #define VERIFY(name,value) REQUIRE(string_equals(name,value));
  SECURITY_STRINGS(VERIFY)
  for(int repeat=0;repeat<8;repeat++) {
+  REQUIRE(!check_policies());
   REQUIRE(!check_certificate(rsa,sizeof rsa,rsa_key,sizeof rsa_key,rsa_label,1024,1));
   REQUIRE(!check_certificate(ec,sizeof ec,ec_key,sizeof ec_key,ec_label,256,0));
   REQUIRE(!check_certificate(ec384,sizeof ec384,ec384_key,sizeof ec384_key,ec384_label,384,0));
@@ -147,6 +188,7 @@ int main(void) { @autoreleasepool {
  REQUIRE(random_a[0]==17 && random_a[1025]==23 && memcmp(random_a+1,random_b,1024));
  unsigned long nonzero=0;for(unsigned long i=1;i<=1024;i++)nonzero+=random_a[i]!=0;
  REQUIRE(nonzero>900);
+ puts("IOS-SECURITY-POLICY: owned X.509 and SSL policies, client/hostname properties, equality and copied metadata");
  puts("IOS-SECURITY: owned DER certificates, RSA/EC public keys, attributes, decode errors, typed constants and secure random bytes");
  return 0;
 } }

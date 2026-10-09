@@ -23,6 +23,7 @@ FEATURES = (
     b"iOS PASS: native CoreGraphics geometry and HFA calling conventions",
     b"iOS PASS: native GameController typed key codes and string constants",
     b"iOS PASS: native Security certificates, public keys, constants and random bytes",
+    b"iOS PASS: native Security X.509 and SSL policy ownership",
     b"iOS PASS: native keychain queries, ownership and persistent credentials",
     b"iOS PASS: native CommonCrypto SHA, HMAC and AES calling conventions",
     b"iOS PASS: native framework constants match installed Apple libraries",
