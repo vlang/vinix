@@ -273,6 +273,7 @@ fn stop_claimed_thread(mut victim proc.Thread) {
 	// thread back on the run queue behind our back.
 	katomic.store(mut &victim.is_dead, true)
 	sched.stop_thread_for_good(victim)
+	futex.release_pi_owner(victim, victim.process.pagemap)
 	// A thread that split off its own root and mount namespace -- runc keeps
 	// one in the container's namespace for opening mount sources -- holds a
 	// reference that would otherwise keep the namespace, and every directory it

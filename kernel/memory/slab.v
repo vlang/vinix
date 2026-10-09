@@ -397,19 +397,19 @@ pub:
 pub fn heap_classes() []HeapClass {
 	// The caller frees it.
 	mut out := []HeapClass{cap: slabs.len} @[freed]
-	for mut slab in slabs {
-		if slab.ent_size == 0 {
-			continue
+	for i in 0 .. slabs.len {
+		if slabs[i].ent_size == 0 { continue }
+		original := class_snapshot(unsafe { &slabs[i] })
+		mut live := original.live
+		mut pages := original.pages
+		for row := u64(0); row < katomic.load(&slab_shard_count); row++ {
+			snapshot := class_snapshot(unsafe { &slab_shards[row][i] })
+			live += snapshot.live
+			pages += snapshot.pages
 		}
-		slab.@lock.acquire()
-		class := HeapClass{
-			size:  slab.ent_size
-			live:  slab.live
-			pages: slab.pages
-		}
-		slab.@lock.release()
-		out << class
+		out << HeapClass{size: original.size, live: live, pages: pages}
 	}
+
 	return out
 }
 
@@ -422,21 +422,12 @@ pub fn heap_trim() u64 {
 		return xnu_heap_trim()
 	}
 	mut released := u64(0)
-	for mut slab in slabs {
-		slab.@lock.acquire()
-		base := slab.spare
-		slab.spare = 0
-		if base != 0 {
-			mut hdr := unsafe { &SlabHeader(base) }
-			hdr.magic = 0
-			slab.pages--
-		}
-		slab.@lock.release()
-		if base != 0 {
-			check_empty_page(unsafe { &SlabHeader(base) }, slab.ent_size)
-			pmm_free(voidptr(base - higher_half), 1)
-			released += page_size
+	for i in 0 .. slabs.len {
+		released += trim_slab(unsafe { &slabs[i] })
+		for row := u64(0); row < katomic.load(&slab_shard_count); row++ {
+			released += trim_slab(unsafe { &slab_shards[row][i] })
 		}
 	}
+
 	return released
 }

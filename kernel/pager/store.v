@@ -430,8 +430,11 @@ pub fn load(_backing &Backing) ?voidptr {
 		unsafe { C.memcpy(output, voidptr(u64(backing.physical) + memory.get_hhdm_offset()), usize(memory.page_size)) }
 	} else if backing.compressed != unsafe { nil } {
 		valid = decompress(backing.compressed, backing.length, output, int(memory.page_size))
+		if !valid { errno.set(errno.eio) }
 	} else {
+		errno.set(0)
 		valid = read_disk(backing, output)
+		if !valid && errno.get() == 0 { errno.set(errno.eio) }
 	}
 	if !valid {
 		memory.pmm_free(physical, 1)

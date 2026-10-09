@@ -115,6 +115,7 @@ fn xnu_heap_init() {
 // number installed and the online acquire/release handshake has completed.
 // Readers load-acquire before inspecting CPU number. Early boot never reads it.
 pub fn heap_enable_cpu_caches(count u64) {
+	$if !xnu_zone ? { enable_slab_shards(count) }
 	$if xnu_zone ? {
 		if count == 0 {
 			return

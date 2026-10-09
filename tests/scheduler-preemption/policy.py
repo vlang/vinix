@@ -38,6 +38,7 @@ __global (
 fn may_run_here(t &proc.Thread, cpu u64) bool {
     return t.affinity_mask & (u64(1) << cpu) != 0
 }
+fn capacity_preferred(t &proc.Thread, number u64) bool { return true }
 fn send_reschedule(number u64) bool {
     attempts++
     destination = number
@@ -108,6 +109,7 @@ pub const rank_deadline = 200
 pub struct SchedParams { pub mut: urgency int dl_abs_deadline u64 }
 pub fn (s &SchedParams) rank() int { return s.urgency }
 pub struct Thread { pub mut: sched SchedParams affinity_mask u64 }
+pub fn effective_sched_rank(t &Thread) int { return t.sched.rank() }
 """)
     (path / "katomic").mkdir()
     (path / "katomic/katomic.v").write_text("""

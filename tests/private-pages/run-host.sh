@@ -178,6 +178,7 @@ VEOF
 cat > "$work/modules/resource/resource.v" <<'VEOF'
 module resource
 import memory
+import errno
 pub struct Resource {
 pub mut:
     refcount int = 1
@@ -190,6 +191,7 @@ pub mut:
     check_unlocked fn () = unsafe { nil }
     swap_data []u8
     fail_read bool
+    fail_read_errno int
     fail_write bool
     short_io bool
     io_hook fn () = unsafe { nil }
@@ -201,7 +203,8 @@ pub fn (identity BlockIdentity) valid() bool { return identity.disk_id != 0 && i
 pub fn backend_is_read_only(mut _res Resource) bool { return false }
 pub fn (mut res Resource) read(_handle voidptr, output voidptr, offset u64, length u64) ?i64 {
     if res.io_hook != unsafe { nil } { res.io_hook() }
-    if res.fail_read || offset + length > u64(res.swap_data.len) { return none }
+    if res.fail_read { errno.set(res.fail_read_errno); return none }
+    if offset + length > u64(res.swap_data.len) { return none }
     unsafe { C.memcpy(output, &res.swap_data[offset], usize(length)) }
     return if res.short_io { i64(length - 1) } else { i64(length) }
 }

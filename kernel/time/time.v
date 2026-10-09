@@ -3,6 +3,7 @@ module time
 
 import event.eventstruct
 import klock
+import katomic
 
 pub const timer_frequency = u64(1000)
 
@@ -108,6 +109,7 @@ pub fn set_realtime(value TimeSpec, forbid_backwards bool) bool {
 	clock_lock.release()
 	expire_timers()
 	run_tick_hooks()
+	deadline_changed()
 	return true
 }
 
@@ -175,7 +177,62 @@ __global (
 	tick_hooks      [max_tick_hooks]fn ()
 	tick_hooks_len  = int(0)
 	tick_hooks_lock klock.Lock
+	deadline_hooks [max_tick_hooks]fn () u64
+	deadline_hooks_len int
+	deadline_wakeup fn () = unsafe { nil }
 )
+
+// Providers return time remaining in nanoseconds. They run outside the timer
+// list lock and must not deliver events or retain borrowed object pointers.
+pub fn register_deadline_hook(hook fn () u64) bool {
+	tick_hooks_lock.acquire()
+	defer { tick_hooks_lock.release() }
+	for i in 0 .. deadline_hooks_len { if deadline_hooks[i] == hook { return true } }
+	if deadline_hooks_len == max_tick_hooks { return false }
+	deadline_hooks[deadline_hooks_len] = hook
+	katomic.store(mut &deadline_hooks_len, deadline_hooks_len + 1)
+	return true
+}
+
+pub fn register_tick_deadline_hook(tick fn (), deadline fn () u64) bool {
+ return register_tick_hook(tick) && register_deadline_hook(deadline)
+}
+
+pub fn register_deadline_wakeup(wakeup fn ()) { deadline_wakeup = wakeup }
+
+pub fn deadline_changed() {
+	if deadline_wakeup != unsafe { nil } { deadline_wakeup() }
+}
+
+// The architecture supplies a maintenance/input ceiling. Due deadlines use
+// one microsecond, never zero (which several hardware timers interpret as off).
+pub fn next_wakeup_us(ceiling u64) u64 {
+	mut remaining := if ceiling > ~u64(0) / 1000 { ~u64(0) } else { ceiling * 1000 }
+	if !timers_lock.test_and_acquire() { return if ceiling < 1000 { ceiling } else { u64(1000) } }
+	now := monotonic_ns()
+	wall := clock_now(clock_type_realtime) or { TimeSpec{} }
+	for timer in armed_timers {
+		if timer.fired { continue }
+		mut delay := if timer.deadline_ns > now { timer.deadline_ns - now } else { u64(0) }
+		if timer.absolute_realtime {
+			mut interval := timer.when
+			if interval.sub(wall) { delay = 0 }
+			else {
+				seconds := u64(interval.tv_sec)
+				nanos := u64(interval.tv_nsec)
+				delay = if seconds > (~u64(0) - nanos) / 1000000000 { ~u64(0) }
+					else { seconds * 1000000000 + nanos }
+			}
+		}
+		if delay < remaining { remaining = delay }
+	}
+	timers_lock.release()
+	for i in 0 .. katomic.load(&deadline_hooks_len) {
+		delay := deadline_hooks[i]()
+		if delay < remaining { remaining = delay }
+	}
+	return if remaining < 1000 { u64(1) } else { remaining / 1000 + if remaining % 1000 == 0 { u64(0) } else { u64(1) } }
+}
 
 pub fn register_tick_hook(hook fn ()) bool {
 	tick_hooks_lock.acquire()
@@ -183,11 +240,12 @@ pub fn register_tick_hook(hook fn ()) bool {
 		tick_hooks_lock.release()
 	}
 
+	for i in 0 .. tick_hooks_len { if tick_hooks[i] == hook { return true } }
 	if tick_hooks_len == max_tick_hooks {
 		return false
 	}
 	tick_hooks[tick_hooks_len] = hook
-	tick_hooks_len++
+	katomic.store(mut &tick_hooks_len, tick_hooks_len + 1)
 	return true
 }
 
@@ -218,7 +276,7 @@ fn expire_timers() {
 }
 
 fn run_tick_hooks() {
-	count := tick_hooks_len
+	count := katomic.load(&tick_hooks_len)
 	for i := 0; i < count; i++ {
 		tick_hooks[i]()
 	}
@@ -234,6 +292,8 @@ pub mut:
 	// A frequency change affects an armed sleep without changing its deadline.
 	deadline_ns u64
 	absolute_realtime bool
+	// Coalesce only relative ordinary waits, within the caller's allowance.
+	slack_ns u64
 }
 
 __global (
@@ -261,33 +321,49 @@ pub fn (mut this Timer) disarm() {
 }
 
 pub fn (mut this Timer) arm() {
+	if this.index >= 0 { this.disarm() }
 	timers_lock.acquire()
 
 	this.fired = false
 	this.deadline_ns = timer_deadline(this.when)
+	if !this.absolute_realtime && this.slack_ns != 0 {
+		room := ~u64(0) - this.deadline_ns
+		limit := this.deadline_ns + if this.slack_ns < room { this.slack_ns } else { room }
+		for other in armed_timers {
+			if !other.fired && !other.absolute_realtime && other.deadline_ns >= this.deadline_ns
+				&& other.deadline_ns <= limit { this.deadline_ns = other.deadline_ns; break }
+		}
+	}
 	this.index = armed_timers.len
+	armed_timers.flags |= .noslices
 	armed_timers << this
 
 	timers_lock.release()
+	deadline_changed()
 }
 
 // The caller owns the returned timer. After the wait has detached every event
 // listener, it must disarm and free the timer; disarming only removes it from
 // the global schedule and does not release the heap allocation.
 pub fn new_timer(when TimeSpec) &Timer {
-	return make_timer(when, false)
+	return make_timer(when, false, 0)
+}
+
+pub fn new_coalesced_timer(when TimeSpec, slack_ns u64) &Timer {
+	return make_timer(when, false, slack_ns)
 }
 
 pub fn new_realtime_timer(when TimeSpec) &Timer {
-	return make_timer(when, true)
+	return make_timer(when, true, 0)
 }
 
-fn make_timer(when TimeSpec, absolute_realtime bool) &Timer {
+fn make_timer(when TimeSpec, absolute_realtime bool, slack_ns u64) &Timer {
 	mut timer := &Timer{
 		when:  when
 		fired: false
 		index: -1
 		absolute_realtime: absolute_realtime
+		slack_ns: slack_ns
 	}
 
 	timer.arm()

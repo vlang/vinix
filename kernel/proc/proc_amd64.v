@@ -70,6 +70,14 @@ pub mut:
 	// AT_EMPTY_PATH owns this FD until failure or the loader commits.
 	exec_descriptor voidptr
 	is_in_queue   bool
+	queue_membership_lock klock.Lock
+	queue_cpu u32
+	queue_previous &Thread = unsafe { nil }
+	queue_next &Thread = unsafe { nil }
+	// Atomic scheduling donation; never replaces the configured policy.
+	pi_rank int
+	pi_closed bool
+	timer_slack_ns u64 = 50000
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
 	// exiting process' descriptors are closed, where no lock is held; see

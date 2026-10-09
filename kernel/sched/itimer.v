@@ -65,10 +65,13 @@ fn tick_itimers() {
 // Fork starts with empty timer fields. Exec and the arming thread's exit keep
 // these fields on the surviving Process; only process exit removes the timer.
 pub fn set_itimer_real(thrd &proc.Thread, value_us i64, interval_us i64) (i64, i64) {
-	if value_us > 0 { itimer_armed() }
+	if value_us > 0 {
+		itimer_armed()
+		time.register_tick_deadline_hook(tick_itimers, next_itimer_deadline)
+	}
 	mut p := thrd.process
 	itimer_real_lock.acquire()
-	defer { itimer_real_lock.release() }
+	defer { itimer_real_lock.release(); time.deadline_changed() }
 	now_us := time.monotonic_ns() / 1000
 	old_value := remaining_itimer(p, now_us)
 	old_interval := i64(p.itimer_interval_us)
@@ -99,4 +102,16 @@ pub fn remove_itimer_real(mut p proc.Process) {
 	unlink_itimer(mut p)
 	p.itimer_deadline_us = 0
 	p.itimer_interval_us = 0
+}
+
+fn next_itimer_deadline() u64 {
+	if !itimer_real_lock.test_and_acquire() { return 1000000 }
+	defer { itimer_real_lock.release() }
+	now := time.monotonic_ns() / 1000
+	mut remaining := ~u64(0)
+	for p := itimer_real_head; p != unsafe { nil }; p = p.itimer_next {
+		delay := if p.itimer_deadline_us > now { (p.itimer_deadline_us - now) * 1000 } else { u64(0) }
+		if delay < remaining { remaining = delay }
+	}
+	return remaining
 }

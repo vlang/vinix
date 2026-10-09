@@ -15,7 +15,7 @@ pub fn nsleep(ns i64) {
 		tv_nsec: ns % 1000000000
 	}
 
-	mut timer := time.new_timer(interval)
+	mut timer := time.new_coalesced_timer(interval, proc.timer_slack())
 	defer {
 		timer.disarm()
 		unsafe { free(timer) }
@@ -62,7 +62,7 @@ pub fn syscall_nanosleep(_ voidptr, request u64, remain u64) (u64, u64) {
 		unsafe { events.free() }
 	}
 
-	mut timer := time.new_timer(duration)
+	mut timer := time.new_coalesced_timer(duration, proc.timer_slack())
 	events << &timer.event
 
 	defer {

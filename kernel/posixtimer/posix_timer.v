@@ -233,7 +233,7 @@ fn ensure_tick_hook() bool {
 	if posix_hook_installed {
 		return true
 	}
-	if !time.register_tick_hook(tick_posix_timers) {
+	if !time.register_tick_deadline_hook(tick_posix_timers, next_posix_deadline) {
 		return false
 	}
 	posix_hook_installed = true
@@ -343,6 +343,7 @@ pub fn syscall_timer_settime(_ voidptr, timer_id int, flags int, new_value u64, 
 	posix_timers_lock.acquire()
 	defer {
 		posix_timers_lock.release()
+		time.deadline_changed()
 	}
 	mut timer := find_timer(timer_id, owner) or { return errno.err, errno.get() }
 	now_ns := time.monotonic_ns()
@@ -491,4 +492,19 @@ pub fn remove_process_timers(owner &proc.Process) {
 		}
 	}
 	posix_timers_lock.release()
+}
+
+fn next_posix_deadline() u64 {
+	if !posix_timers_lock.test_and_acquire() { return 1000000 }
+	defer { posix_timers_lock.release() }
+	mono := time.monotonic_ns()
+	wall := clock_now_ns(clock_realtime) or { u64(0) }
+	mut remaining := ~u64(0)
+	for timer in posix_timers {
+		if !timer.in_use || timer.deadline_ns == 0 { continue }
+		now := if timer.absolute_realtime { wall } else { mono }
+		delay := if timer.deadline_ns > now { timer.deadline_ns - now } else { u64(0) }
+		if delay < remaining { remaining = delay }
+	}
+	return remaining
 }

@@ -70,6 +70,9 @@ pub mut:
 	policy        int = sched_other
 	priority      int // 1..99 under SCHED_FIFO/RR, 0 under every other policy
 	reset_on_fork bool
+	// Linux utilization hints, in units of 1/1024 of the largest CPU.
+	util_min u32
+	util_max u32 = 1024
 	// SCHED_DEADLINE, all in nanoseconds: at most `dl_runtime` of CPU every
 	// `dl_period`, to be finished `dl_deadline` after the period opens.
 	dl_runtime  u64
@@ -1027,6 +1030,10 @@ pub fn thread_sched_params(tid int) ?SchedParams {
 // started one yet, and one leaving SCHED_DEADLINE owes nothing to a period it
 // is no longer in.
 pub fn set_thread_sched_params(tid int, params SchedParams) bool {
+	return set_thread_sched_params_with_util(tid, params, false)
+}
+
+pub fn set_thread_sched_params_with_util(tid int, params SchedParams, change_util bool) bool {
 	if tid <= 0 || tid >= max_pid {
 		errno.set(errno.esrch)
 		return false
@@ -1043,11 +1050,13 @@ pub fn set_thread_sched_params(tid int, params SchedParams) bool {
 	}
 	was_special := t.sched.is_special()
 	mut next := params
+	if !change_util { next.util_min = t.sched.util_min; next.util_max = t.sched.util_max }
 	next.dl_budget_ns = 0
 	next.dl_period_end = 0
 	next.dl_abs_deadline = 0
 	t.sched = next
 	adjust_policy_count(was_special, next.is_special())
+	refresh_priority_donations()
 	return true
 }
 

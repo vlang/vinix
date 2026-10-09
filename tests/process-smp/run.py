@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--kernel-dir", type=Path, default=ROOT / "kernel")
     parser.add_argument("--source", type=Path, default=Path(__file__).with_name("guest.c"))
     parser.add_argument("--expect", default="PROCESS-SMP PASS")
+    parser.add_argument("--fail", action="append", default=[])
     parser.add_argument("--define", action="append", default=[])
     parser.add_argument("--smp", type=int, default=4)
     parser.add_argument("--memory", type=int, default=4096,
@@ -82,7 +83,7 @@ def main():
     spec.loader.exec_module(runner)
     print(f"Guest artifacts: {state}", flush=True)
     return runner.boot(command, env, state, [args.expect],
-                       ["PROCESS-SMP FAIL", "JOB-CHECK FAIL", "FATAL EXCEPTION", "KERNEL PANIC"], args.timeout)
+                       ["PROCESS-SMP FAIL", "JOB-CHECK FAIL", "FATAL EXCEPTION", "KERNEL PANIC", *args.fail], args.timeout)
 
 
 if __name__ == "__main__":

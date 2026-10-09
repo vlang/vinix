@@ -243,9 +243,14 @@ mut:
 	sched_runtime  u64
 	sched_deadline u64
 	sched_period   u64
+	sched_util_min u32
+	sched_util_max u32
 }
 
 const sched_flag_reset_on_fork = u64(0x01)
+const sched_flag_util_min = u64(0x20)
+const sched_flag_util_max = u64(0x40)
+const sched_attr_v0_size = u32(48)
 
 // What the deadline threads may be promised between them, in parts per million
 // of one CPU. The rest is what is left for every thread that is not one, and
@@ -265,15 +270,16 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 	if !usercopy.copy_from_user(voidptr(&size), attr_ptr, sizeof(u32)) {
 		return errno.err, errno.efault
 	}
-	if size < sizeof(SchedAttr) {
+	if size < sched_attr_v0_size {
 		return errno.err, errno.einval
 	}
 
 	mut attr := SchedAttr{}
-	if !usercopy.copy_from_user(voidptr(&attr), attr_ptr, sizeof(SchedAttr)) {
+	copy_size := if size >= sizeof(SchedAttr) { u64(sizeof(SchedAttr)) } else { u64(sched_attr_v0_size) }
+	if !usercopy.copy_from_user(voidptr(&attr), attr_ptr, copy_size) {
 		return errno.err, errno.efault
 	}
-	if attr.sched_flags & ~sched_flag_reset_on_fork != 0 {
+	if attr.sched_flags & ~(sched_flag_reset_on_fork | sched_flag_util_min | sched_flag_util_max) != 0 {
 		return errno.err, errno.einval
 	}
 
@@ -282,6 +288,19 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 		policy: policy
 		reset_on_fork: attr.sched_flags & sched_flag_reset_on_fork != 0
 	}
+
+	old := proc.thread_sched_params(tid) or { return errno.err, errno.get() }
+	params.util_min = old.util_min
+	params.util_max = old.util_max
+	util_flags := attr.sched_flags & (sched_flag_util_min | sched_flag_util_max)
+	if util_flags != 0 && size < sizeof(SchedAttr) { return errno.err, errno.einval }
+	if attr.sched_flags & sched_flag_util_min != 0 {
+		params.util_min = if attr.sched_util_min == u32(-1) { u32(0) } else { attr.sched_util_min }
+	}
+	if attr.sched_flags & sched_flag_util_max != 0 {
+		params.util_max = if attr.sched_util_max == u32(-1) { u32(1024) } else { attr.sched_util_max }
+	}
+	if params.util_min > params.util_max || params.util_max > 1024 { return errno.err, errno.einval }
 
 	if policy == proc.sched_deadline {
 		// Runtime has to fit inside the deadline and the deadline inside the
@@ -323,7 +342,7 @@ fn syscall_linux_sched_setattr(_ voidptr, pid int, attr_ptr u64, flags u32) (u64
 		params.priority = checked
 	}
 
-	if !proc.set_thread_sched_params(tid, params) {
+	if !proc.set_thread_sched_params_with_util(tid, params, util_flags != 0) {
 		return errno.err, errno.get()
 	}
 
@@ -353,7 +372,7 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 	if attr_ptr == 0 {
 		return errno.err, errno.efault
 	}
-	if size < sizeof(SchedAttr) {
+	if size < sched_attr_v0_size {
 		return errno.err, errno.einval
 	}
 	tid := sched_target_tid(pid) or { return errno.err, sched_target_errno(pid) }
@@ -375,19 +394,21 @@ fn syscall_linux_sched_getattr(_ voidptr, pid int, attr_ptr u64, size u32, flags
 	proc.unlock_table()
 
 	mut attr := SchedAttr{
-		size: u32(sizeof(SchedAttr))
+		size: if size >= sizeof(SchedAttr) { u32(sizeof(SchedAttr)) } else { sched_attr_v0_size }
 		sched_policy: u32(params.policy)
 		sched_nice: i32(nice)
 		sched_priority: u32(params.priority)
 		sched_runtime: params.dl_runtime
 		sched_deadline: params.dl_deadline
 		sched_period: params.dl_period
+		sched_util_min: params.util_min
+		sched_util_max: params.util_max
 	}
 	if params.reset_on_fork {
 		attr.sched_flags |= sched_flag_reset_on_fork
 	}
 
-	if !usercopy.copy_to_user(attr_ptr, voidptr(&attr), sizeof(SchedAttr)) {
+	if !usercopy.copy_to_user(attr_ptr, voidptr(&attr), attr.size) {
 		return errno.err, errno.efault
 	}
 	return 0, 0

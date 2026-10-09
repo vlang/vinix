@@ -1,6 +1,7 @@
 module userland
 
 import fs
+import futex
 import memory
 import memory.mmap
 import elf
@@ -521,6 +522,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		// changed; the new program's thread starts there.
 		flush_owed_sync()
 
+		// PI waiters in surviving CLONE_VM processes still address the old map.
+		futex.release_pi_owner(t, t.process.pagemap)
+
 		// Swapped under the process table lock, which cgroup memory accounting
 		// and /proc hold while they walk a process' page map: the old one is
 		// freed below.
@@ -609,7 +613,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		new_thread.cpu_user_ns = inherited_user_ns
 		new_thread.cpu_system_ns = inherited_system_ns
 		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
-		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
+		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
+		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 
 		// execve keeps the signal mask and what was ignored; only handlers,
 		// which pointed into the old program, go back to the default.

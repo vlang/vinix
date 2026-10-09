@@ -323,6 +323,8 @@ pub fn gpu_exec_fiq_trace(phase u64, cntv_ctl u64) {
 }
 
 pub fn initialise() {
+	configure_cpu_capacities()
+	time.register_deadline_wakeup(timer_deadline_changed)
 	// The kernel acts with every capability: file permissions are lifted by
 	// capabilities, not by a uid of zero, and kernel threads create files
 	// wherever the initramfs puts them.
@@ -402,36 +404,7 @@ pub fn get_timer_handler() fn (voidptr) {
 // until its next tick. Answering it costs a lap of the queue, so it is only
 // ever asked on a machine that has a real-time thread to answer it about.
 fn realtime_work_pending(cpu_number u64) bool {
-	now_ns := timer.get_ns()
-	if realtime_throttled(cpu_number, now_ns) {
-		return false
-	}
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-
-	for i := 0; i < max_running_threads; i++ {
-		mut t := scheduler_running_queue[i]
-		if unsafe { t == nil } {
-			continue
-		}
-		if katomic.load(&t.is_dead) {
-			continue
-		}
-		if !t.sched.is_realtime() || t.l.is_held() {
-			continue
-		}
-		if !may_run_here(t, cpu_number) {
-			continue
-		}
-		if t.sched.policy == proc.sched_deadline && !replenish_deadline(mut t, now_ns) {
-			continue
-		}
-		return true
-	}
-
-	return false
+ return !realtime_throttled(cpu_number, timer.get_ns()) && queue_realtime_pending(cpu_number)
 }
 
 __global (
@@ -478,12 +451,8 @@ fn cgroup_parks(t &proc.Thread, state &cpulocal.GPRState) bool {
 }
 
 fn get_next_thread() &proc.Thread {
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-	mut cpu_local := cpulocal.current()
-	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
+ mut cpu_local := cpulocal.current()
+ return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
 }
 
 fn scheduler_timer_handler(_gpr_state voidptr) {
@@ -692,7 +661,6 @@ fn scheduler_timer_handler(_gpr_state voidptr) {
 		// when something else happened to wake, and took minutes.
 		if unsafe { next_thread != nil } {
 			next_thread.l.release()
-			cpu_local.last_run_queue_index = (cpu_local.last_run_queue_index + max_running_threads - 1) % max_running_threads
 		}
 		if trace_gpu_interrupt {
 			clear_gpu_exec_interrupt_trace()
@@ -847,78 +815,11 @@ fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 		katomic.store(mut &t.enqueued_by_signal, true)
 	}
 
-	if trace {
-		println('exec[gpu]/sched: acquiring run-queue lock')
-	}
-	scheduler_queue_lock.acquire()
-
-	// A torn-down thread may still be referenced by event listener slots it
-	// never got to detach; never let it back onto the run queue.
-	if katomic.load(&t.is_dead) == true {
-		scheduler_queue_lock.release()
-		if trace {
-			println('exec[gpu]/sched: run-queue lock acquired; ERROR replacement thread already dead')
-		}
-		return false
-	}
-
-	if t.is_in_queue == true {
-		scheduler_queue_lock.release()
-		if trace {
-			println('exec[gpu]/sched: run-queue lock acquired; replacement thread was already queued')
-		}
-		return true
-	}
-
-	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			katomic.store(mut &t.is_in_queue, true)
-
-			// Wake an idle CPU for ordinary work. The traced exec handoff stays
-			// pinned to its current CPU until that CPU has acquired the new
-			// thread, avoiding a cross-CPU race while diagnosing the M1 path.
-			if !trace {
-				request_enqueue_preemption(t)
-			}
-
-			scheduler_queue_lock.release()
-			if trace {
-				C.kprintf(c'exec[gpu]/sched: run-queue lock acquired; installed thread in slot %lld\n',
-					i64(i))
-				println('exec[gpu]/sched: deferred wakeup for same-CPU exec handoff')
-				println('exec[gpu]/sched: enqueue complete; run-queue lock released')
-			}
-			return true
-		}
-	}
-
-	scheduler_queue_lock.release()
-	if trace {
-		println('exec[gpu]/sched: run-queue lock acquired; ERROR no free slot; lock released')
-	}
-	return false
+	return queue_enqueue(t, !trace)
 }
 
-pub fn dequeue_thread(_thread &proc.Thread) bool {
-	mut t := unsafe { _thread }
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-
-	was_enqueued := t.is_in_queue
-	mut removed := false
-	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			// Remove every occurrence. This also repairs a queue corrupted by an
-			// older kernel's concurrent-wakeup race instead of leaving a stale
-			// pointer behind when the Thread is freed.
-			removed = true
-		}
-	}
-	katomic.store(mut &t.is_in_queue, false)
-
-	return removed || !was_enqueued
+pub fn dequeue_thread(t &proc.Thread) bool {
+	return queue_dequeue(t)
 }
 
 pub fn intercept_thread(_thread &proc.Thread) ? {
@@ -1035,6 +936,8 @@ pub fn yield(save_ctx bool) {
 			C.yield_dispatch(voidptr(scheduler_timer_handler))
 
 			// Re-arm timer for next polling tick
+			ticks = freq * idle_wakeup_us(if virtual_idle && cpu.read_tpidr_el1() != 0 { u64(50000) } else { 1000000 / idle_tick_hz }) / 1000000
+			if ticks == 0 { ticks = 1 }
 			cpu.write_cntv_tval_el0(ticks)
 			cpu.write_cntv_ctl_el0(1)
 		} else if proc.scheduling_policies_in_use() {
@@ -1050,6 +953,8 @@ pub fn yield(save_ctx bool) {
 				if realtime_work_pending(cpu.read_tpidr_el1()) {
 					cpu.write_cntv_ctl_el0(0x2)
 					C.yield_dispatch(voidptr(scheduler_timer_handler))
+					ticks = freq * idle_wakeup_us(if virtual_idle && cpu.read_tpidr_el1() != 0 { u64(50000) } else { 1000000 / idle_tick_hz }) / 1000000
+					if ticks == 0 { ticks = 1 }
 					cpu.write_cntv_tval_el0(ticks)
 					cpu.write_cntv_ctl_el0(1)
 				}
@@ -1485,6 +1390,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		comm: source.comm.clone()
 		affinity_mask: source.affinity_mask
 		sched: inherited_sched_params(source)
+		timer_slack_ns: source.timer_slack_ns
 	} }
 	charge_transferred = true
 
@@ -1539,7 +1445,7 @@ fn await_impl(trace_gpu_handoff bool) {
 	}
 	freq := cpu.read_cntfrq_el0()
 	idle_hz := if virtual_idle { virtual_idle_hz } else { idle_tick_hz }
-	mut ticks := freq / idle_hz
+	mut ticks := freq * idle_wakeup_us(1000000 / idle_hz) / 1000000
 	if ticks == 0 {
 		ticks = 1
 	}
@@ -1569,6 +1475,8 @@ fn await_impl(trace_gpu_handoff bool) {
 			intid := gic.poll_iar1()
 			if intid < 1020 {
 				gic.dispatch_polled(intid, unsafe { nil })
+				ticks = freq * idle_wakeup_us(if virtual_idle && cpu.read_tpidr_el1() != 0 { u64(50000) } else { 1000000 / idle_hz }) / 1000000
+				if ticks == 0 { ticks = 1 }
 				cpu.write_cntv_tval_el0(ticks)
 				cpu.write_cntv_ctl_el0(1)
 			}
@@ -1600,6 +1508,8 @@ fn await_impl(trace_gpu_handoff bool) {
 			}
 
 			// Re-arm timer for next tick
+			ticks = freq * idle_wakeup_us(if virtual_idle && cpu.read_tpidr_el1() != 0 { u64(50000) } else { 1000000 / idle_hz }) / 1000000
+			if ticks == 0 { ticks = 1 }
 			cpu.write_cntv_tval_el0(ticks)
 			cpu.write_cntv_ctl_el0(1)
 		} else if proc.scheduling_policies_in_use() {
@@ -1619,6 +1529,8 @@ fn await_impl(trace_gpu_handoff bool) {
 				time.advance_to_ns(now_ns)
 				if realtime_work_pending(cpu.read_tpidr_el1()) {
 					scheduler_timer_handler(unsafe { nil })
+					ticks = freq * idle_wakeup_us(if virtual_idle && cpu.read_tpidr_el1() != 0 { u64(50000) } else { 1000000 / idle_hz }) / 1000000
+					if ticks == 0 { ticks = 1 }
 					cpu.write_cntv_tval_el0(ticks)
 					cpu.write_cntv_ctl_el0(1)
 				}
@@ -1653,5 +1565,5 @@ fn user_hwcaps() (u64, u64) {
 fn arm_thread_timer(slice u64) {
     current := proc.current_thread()
     if current != unsafe { nil } && current.user_page_fault { timer.stop() }
-    else { timer.oneshot(slice) }
+    else { timer.oneshot(time.next_wakeup_us(slice)) }
 }

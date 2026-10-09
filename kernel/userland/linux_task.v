@@ -218,6 +218,7 @@ fn clear_child_tid(mut t proc.Thread) {
 // dying thread still holds, flagged FUTEX_OWNER_DIED so the next owner knows
 // the state it inherits may be inconsistent.
 fn release_robust_list(mut t proc.Thread) {
+	futex.release_pi_owner(t, t.process.pagemap)
 	head := t.robust_list_head
 	if head == 0 {
 		return
@@ -239,13 +240,13 @@ fn release_robust_list(mut t proc.Thread) {
 
 	// The head itself is a list member, so the walk stops when it comes back
 	// round; the iteration cap guards against a corrupted list.
-	for i := 0; i < robust_list_limit && entry != 0 && entry != head; i++ {
+	for i := 0; i < robust_list_limit && entry & ~u64(1) != 0 && entry & ~u64(1) != head; i++ {
 		mut next := u64(0)
-		if !usercopy.copy_from_user(voidptr(&next), entry, sizeof(u64)) {
+		if !usercopy.copy_from_user(voidptr(&next), entry & ~u64(1), sizeof(u64)) {
 			break
 		}
-		if entry != pending {
-			abandon_robust_futex(proc.own_tid(t), u64(i64(entry) + offset))
+		if entry & ~u64(1) != pending & ~u64(1) {
+			abandon_robust_futex(proc.own_tid(t), u64(i64(entry & ~u64(1)) + offset))
 		}
 		entry = next
 	}
@@ -253,7 +254,7 @@ fn release_robust_list(mut t proc.Thread) {
 	// list_op_pending covers the lock the thread was in the middle of taking
 	// or releasing when it died.
 	if pending != 0 {
-		abandon_robust_futex(proc.own_tid(t), u64(i64(pending) + offset))
+		abandon_robust_futex(proc.own_tid(t), u64(i64(pending & ~u64(1)) + offset))
 	}
 }
 

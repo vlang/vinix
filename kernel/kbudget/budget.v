@@ -244,7 +244,7 @@ fn object_limit(kind Kind) u64 {
 		.descriptor { u64(65536) }
 		.file, .mapping { u64(65536) }
 		.socket, .ipc, .process { u64(4096) }
-		.thread { u64(256) }
+		.thread { u64(4096) }
 		.scratch { u64(512) }
 	}
 }

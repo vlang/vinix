@@ -170,12 +170,12 @@ static void watches(void) {
 static volatile int release_threads;
 static void *worker(void *unused) { (void)unused; while (!release_threads) usleep(10000); return NULL; }
 static void threads(void) {
-    pthread_t workers[512]; int n = 0;
-    for (; n < 512; ++n) {
+    pthread_t workers[2048]; int n = 0;
+    for (; n < 2048; ++n) {
         int error = pthread_create(&workers[n], NULL, worker, NULL);
         if (error) { check(error == EAGAIN || error == ENOMEM, "thread exhaustion errno"); break; }
     }
-    check(n > 0 && n < 512, "threads bounded"); release_threads = 1;
+    check(n > 0 && n < 2048, "threads bounded"); release_threads = 1;
     for (int i = 0; i < n; ++i) check(pthread_join(workers[i], NULL) == 0, "join threads at limit");
 }
 static void processes(void) {

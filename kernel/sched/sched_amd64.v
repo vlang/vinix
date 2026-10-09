@@ -36,7 +36,7 @@ __global (
 // that twice. Any CPU can run the poll, so one waking often is enough; the rest
 // keep the slow tick rather than all costing their host a thousand wakeups a
 // second.
-const idle_wakeup_us = u64(20000)
+const idle_max_wakeup_us = u64(20000)
 const idle_poll_wakeup_us = u64(1000)
 
 // Have the scheduler call `cb` on every pass it makes, on whichever CPU makes
@@ -61,6 +61,8 @@ fn poll_devices() {
 }
 
 pub fn initialise() {
+	configure_cpu_capacities()
+	time.register_deadline_wakeup(timer_deadline_changed)
 	scheduler_vector = idt.allocate_vector()
 	C.kprintf(c'sched: Scheduler interrupt vector is 0x%llx\n', u64(scheduler_vector))
 
@@ -79,6 +81,7 @@ pub fn initialise() {
 	}
 	memory.kernel_stack_selftest()
 	selftest_thread_stacks()
+	katomic.store(mut &scheduler_ready, true)
 }
 
 // The scheduler's clock: the monotonic clock, which the timer tick advances.
@@ -107,12 +110,8 @@ fn in_userspace(state &cpulocal.GPRState) bool {
 }
 
 fn get_next_thread() &proc.Thread {
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-	mut cpu_local := cpulocal.current()
-	return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
+ mut cpu_local := cpulocal.current()
+ return pick_next_thread(cpu_local.cpu_number, int(cpu_local.numa_node), &cpu_local.last_run_queue_index)
 }
 
 __global (
@@ -241,7 +240,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 			// set_ldt_entry() may be waiting for this CPU to take up.
 			load_process_ldt(mut cpu_local, current_thread.process)
 			apic.lapic_eoi()
-			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
+			apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, time.next_wakeup_us(effective_timeslice(current_thread)))
 			return
 		}
 		current_thread.yield_requested = false
@@ -378,7 +377,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	katomic.store(mut &current_thread.running_on, cpu_local.cpu_number)
 
 	apic.lapic_eoi()
-	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, effective_timeslice(current_thread))
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, time.next_wakeup_us(effective_timeslice(current_thread)))
 
 	// The SWAPGS below leaves GS on the thread for the kernel, and the
 	// thread's own base parked in KERNEL_GS_BASE, whichever mode it returns
@@ -421,73 +420,14 @@ fn send_reschedule(number u64) bool {
 	return wake_cpu(u32(number))
 }
 
-pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
-	mut t := unsafe { _thread }
-	if katomic.load(&t.not_started) { return false }
-
-	if by_signal {
-		katomic.store(mut &t.enqueued_by_signal, true)
-	}
-
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-
-	// A thread that has died -- by its own exit, or torn down by a sibling's
-	// exit_group() or execve() -- is still reachable through the events it
-	// was listening on and the timers it had armed. It has no context left to
-	// resume, so it must never be picked again. Checked under the queue lock,
-	// which dequeue_and_die() takes after marking the thread.
-	if t.is_dead {
-		return false
-	}
-
-	if t.is_in_queue == true {
-		return true
-	}
-
-	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], unsafe { nil }, t) {
-			$if linuxkpi ? {
-				// The slot is guaranteed now. Failed/full enqueue must leave
-				// an I/O reservation intact for its later successful wake.
-				linuxkpi_iowait_end_locked(mut t)
-			}
-			katomic.store(mut &t.is_in_queue, true)
-
-			request_enqueue_preemption(t)
-
-			return true
-		}
-	}
-
-	return false
+pub fn enqueue_thread(t &proc.Thread, by_signal bool) bool {
+ if katomic.load(&t.not_started) { return false }
+ if by_signal { katomic.store(mut unsafe { &t.enqueued_by_signal }, true) }
+ return queue_enqueue(t, true)
 }
 
-pub fn dequeue_thread(_thread &proc.Thread) bool {
-	mut t := unsafe { _thread }
-	scheduler_queue_lock.acquire()
-	defer {
-		scheduler_queue_lock.release()
-	}
-
-	was_enqueued := t.is_in_queue
-	mut removed := false
-	for i := u64(0); i < max_running_threads; i++ {
-		if katomic.cas[&proc.Thread](mut &scheduler_running_queue[i], t, unsafe { nil }) {
-			removed = true
-		}
-	}
-	katomic.store(mut &t.is_in_queue, false)
-	$if linuxkpi ? {
-		if t.is_dead {
-			// Permanent stop/exit can bypass a returning I/O scope.
-			linuxkpi_iowait_end_locked(mut t)
-		}
-	}
-
-	return removed || !was_enqueued
+pub fn dequeue_thread(t &proc.Thread) bool {
+ return queue_dequeue(t)
 }
 
 // Who gives back a dead thread's stacks: the thread itself, from its own CPU
@@ -857,6 +797,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		masked_signals: source.masked_signals
 		affinity_mask:  source.affinity_mask
 		sched:          inherited_sched_params(source)
+		timer_slack_ns: source.timer_slack_ns
 		comm:           source.comm.clone()
 	} }
 	charge_transferred = true
@@ -899,9 +840,9 @@ pub fn await() {
 	wakeup := if device_poll_callback != voidptr(0) && cpu_local.cpu_number == 0 {
 		idle_poll_wakeup_us
 	} else {
-		idle_wakeup_us
+		idle_max_wakeup_us
 	}
-	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, wakeup)
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, idle_wakeup_us(wakeup))
 	asm volatile amd64 {
 		sti
 		1:

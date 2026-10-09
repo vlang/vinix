@@ -13,6 +13,7 @@ module userland
 import errno
 import file
 import fs
+import futex
 import katomic
 import lib
 import memory
@@ -307,6 +308,7 @@ fn stop_claimed_thread(mut victim proc.Thread) {
 	// Waits until it is off every CPU and gives its
 	// stacks back.
 	sched.stop_thread_for_good(victim)
+	futex.release_pi_owner(victim, victim.process.pagemap)
 	fs.release_thread_fs(mut victim)
 	proc.free_tid(victim.tid)
 }

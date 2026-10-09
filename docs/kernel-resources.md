@@ -21,7 +21,7 @@ mappings, processes, threads and syscall scratch. These are conservative capacit
 reservations, including allocator rounding and replacement-buffer peaks, rather
 than measured slab RSS. There are 4096 account slots. Additional global limits
 bound live reservation records: 65536 each for file, descriptor and mapping
-classes; 4096 for socket, IPC and process classes; 256 for user threads; and 512
+classes; 4096 for socket, IPC and process classes; 4096 for user threads; and 512
 for scratch. Existing syscall and RLIMIT limits also apply.
 
 The charged paths cover:

@@ -70,7 +70,8 @@ CPU-clock correction, including pure-userspace timers and native ARM signal
 guard cases. Generated C for publication, selection and pending consumption
 contains no allocator calls.
 
-This closes the generic APIC/GIC portion of PERF6. CPU-local heap locking,
-per-CPU run queues, coordinated QoS, heterogeneous placement, PI futexes,
-deadline idle timers/coalescing and native Apple targeted IPIs remain separate
-work (PERF1–5/7 and the remaining platform portion of PERF6).
+This closes the generic APIC/GIC portion of PERF6. Per-CPU run queues, slab
+shards, utilization hints, private PI futexes and bounded deadline idle timers
+are described in [scheduler QoS qualification](../scheduler-qos/README.md).
+Native Apple targeted IPIs, recent-CPU feedback, DVFS and full tickless
+operation remain separate work.

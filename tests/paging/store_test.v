@@ -1,6 +1,7 @@
 module pager
 
 import memory
+import errno
 import resource
 import time
 
@@ -140,4 +141,32 @@ fn test_invalid_header_never_enables_or_changes_device() {
 		assert false
 	}
 	assert res.refcount == 1 && snapshot().total == 0 && memory.heap_objects == 0
+}
+
+fn test_refault_errors_distinguish_corrupt_compression_and_disk_memory_exhaustion() {
+	mut compressed := detached(memory.pmm_alloc_fallible(1))
+	assert store(compressed) == 1
+	length := compressed.length
+	compressed.length = 0
+	errno.set(0)
+	if _ := load(compressed) { assert false }
+	assert errno.get() == errno.eio
+	compressed.length = length
+	release(compressed)
+	mut res := swap_disk(3)
+	identity := resource.BlockIdentity{disk_id: 3, length: 3 * 4096}
+	enable(mut res, identity, 44) or { panic('error fixture swapon') }
+	disk := detached(random_frame())
+	assert store(disk) == 1
+	res.fail_read = true
+	res.fail_read_errno = errno.enomem
+	if _ := load(disk) { assert false }
+	assert errno.get() == errno.enomem
+	res.fail_read_errno = 0
+	if _ := load(disk) { assert false }
+	assert errno.get() == errno.eio
+	res.fail_read = false
+	release(disk)
+	assert disable(identity) or { panic('error fixture swapoff') } == 44
+	assert memory.live_pages == 0 && memory.heap_objects == 0
 }

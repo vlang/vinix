@@ -264,7 +264,7 @@ pub fn syscall_timerfd_create(_ voidptr, clock_id int, flags int) (u64, u64) {
 	// nothing to pay on a system that never creates one.
 	if !timerfd_hook_installed {
 		timerfd_hook_installed = true
-		time.register_tick_hook(tick_timerfds)
+		time.register_tick_deadline_hook(tick_timerfds, next_timerfd_deadline)
 	}
 
 	mut timer := &TimerFD{
@@ -367,7 +367,7 @@ pub fn syscall_timerfd_settime(_ voidptr, fdnum int, flags int, new_value u64, o
 		return errno.err, errno.eoverflow
 	}
 	timerfd_lock.acquire()
-	defer { timerfd_lock.release() }
+	defer { timerfd_lock.release(); time.deadline_changed() }
 
 	if old_value != 0 {
 		left, old_period := timer.remaining()
@@ -430,4 +430,20 @@ pub fn syscall_timerfd_gettime(_ voidptr, fdnum int, curr_value u64) (u64, u64) 
 	}
 
 	return 0, 0
+}
+
+fn next_timerfd_deadline() u64 {
+	if !timerfd_lock.test_and_acquire() { return 1000000 }
+	defer { timerfd_lock.release() }
+	mono := time.monotonic_ns()
+	wall := time.clock_now(time.clock_type_realtime) or { time.TimeSpec{} }
+	wall_ns := timespec_to_ns(wall) or { u64(0) }
+	mut remaining := ~u64(0)
+	for entry in timerfd_entries {
+		if entry == unsafe { nil } || entry.deadline_ns == 0 { continue }
+		now := if entry.absolute_realtime { wall_ns } else { mono }
+		delay := if entry.deadline_ns > now { entry.deadline_ns - now } else { u64(0) }
+		if delay < remaining { remaining = delay }
+	}
+	return remaining
 }

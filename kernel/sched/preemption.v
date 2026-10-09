@@ -39,11 +39,11 @@ fn enqueue_outranks(rank int, deadline u64, current_rank int, current_deadline u
 fn request_enqueue_preemption(t &proc.Thread) {
 	mut target := u64(-1)
 	mut lowest := int(0x7fffffff)
-	rank := t.sched.rank()
+	rank := proc.effective_sched_rank(t)
 	for entry in cpu_locals {
 		number := entry.cpu_number
 		if number >= max_preemption_cpus || katomic.load(&entry.online) == 0
-			|| !may_run_here(t, number) { continue }
+			|| !may_run_here(t, number) || !capacity_preferred(t, number) { continue }
 		if katomic.load(&entry.is_idle) {
 			target = number
 			break

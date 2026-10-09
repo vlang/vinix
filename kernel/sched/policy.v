@@ -30,8 +30,6 @@ fn may_run_here(t &proc.Thread, cpu_number u64) bool {
 // thread it settled on to another CPU looks again, where that thread's lock is
 // now held and is skipped like any other; a CPU that still comes away with
 // nothing simply idles until its next tick.
-const pick_attempts = 4
-
 // What an ordinary thread's timeslice is shortened to while anything on the
 // machine is scheduled by policy. See effective_timeslice().
 const realtime_preempt_slice_us = u64(1000)
@@ -74,7 +72,7 @@ __global (
 // on a CPU that has spent its bandwidth, drops behind the ordinary threads
 // rather than being passed over altogether.
 fn runnable_rank(mut t proc.Thread, now_ns u64, throttled bool) int {
-	rank := t.sched.rank()
+	rank := proc.effective_sched_rank(t)
 	if rank < proc.rank_realtime_base {
 		return rank
 	}
@@ -143,7 +141,7 @@ fn account_realtime_time(cpu_number u64, current &proc.Thread, now_ns u64) {
 		return
 	}
 	mut t := unsafe { current }
-	if !t.sched.is_realtime() {
+	if !t.sched.is_realtime() && katomic.load(&t.pi_rank) < proc.rank_realtime_base {
 		return
 	}
 	span := now_ns - last
@@ -204,7 +202,7 @@ fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
 	if in_kernel && !katomic.load(&t.at_user_boundary) {
 		return false
 	}
-	if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
+	if katomic.load(&t.must_exit) || proc.pending_signals(t) & (u64(1) << 8) != 0 {
 		return false
 	}
 	now := clock_ns()
@@ -226,7 +224,7 @@ pub fn park_for_cgroup() {
 	}
 	mut parked := false
 	for {
-		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 {
+		if katomic.load(&t.must_exit) || proc.pending_signals(t) & (u64(1) << 8) != 0 {
 			break
 		}
 		now := clock_ns()
@@ -253,7 +251,7 @@ pub fn park_for_io() {
 	t := proc.current_thread()
 	if t == unsafe { nil } { return }
 	for proc.cgroup_io_delay(t, time.monotonic_ns()) {
-		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & (u64(1) << 8) != 0 { return }
+		if katomic.load(&t.must_exit) || proc.pending_signals(t) & (u64(1) << 8) != 0 { return }
 		yield(true)
 	}
 }
@@ -273,140 +271,6 @@ fn pick_next_thread(cpu_number u64, numa_node int, last_index &int) &proc.Thread
 		}
 	}
 	return scan_run_queue(cpu_number, last_index, -1)
-}
-
-// `want_node` of -1 accepts every thread; otherwise only those whose home node
-// matches, plus those no CPU has claimed yet.
-//
-// A machine where every thread is scheduled by turn takes the first runnable
-// thread it finds; one where anything has asked for a policy weighs the whole
-// queue instead. The two are the same lap, and the split exists so that the
-// ordinary machine goes on paying exactly what it used to.
-fn scan_run_queue(cpu_number u64, last_index &int, want_node int) &proc.Thread {
-	if proc.scheduling_policies_in_use() {
-		return scan_run_queue_ranked(cpu_number, last_index, want_node)
-	}
-	return scan_run_queue_in_turn(cpu_number, last_index, want_node)
-}
-
-// Exactly one lap of the queue, from wherever this CPU last stopped, so the
-// order stays round-robin. The lap is counted rather than compared against a
-// starting index: the skip cases used to `continue` straight past the
-// wrap-around check, so a slot that this CPU could not take and that happened
-// to sit at the start index sent the scan round the queue for ever. Nothing was
-// skipped before affinity masks and memory nodes existed, which is why it took
-// until a pinned thread on another node to find.
-fn scan_run_queue_in_turn(cpu_number u64, last_index &int, want_node int) &proc.Thread {
-	mut start := *last_index
-	if start < 0 || start >= max_running_threads {
-		start = 0
-	}
-
-	for step := 1; step <= max_running_threads; step++ {
-		index := (start + step) % max_running_threads
-
-		mut t := scheduler_running_queue[index]
-		if unsafe { t == nil } {
-			continue
-		}
-		if katomic.load(&t.is_dead) {
-			continue
-		}
-		if !may_run_here(t, cpu_number) {
-			continue
-		}
-		if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
-			continue
-		}
-		if cgroup_parks(t, &t.gpr_state) {
-			continue
-		}
-		if t.l.test_and_acquire() == true {
-			unsafe {
-				*last_index = index
-			}
-			return t
-		}
-	}
-
-	return unsafe { nil }
-}
-
-// The same lap, ending at the most urgent thread this CPU may run rather than
-// at the first one it can have. Equal ranks keep the round-robin order: the lap
-// starts where the last one stopped, and a thread found later has to beat the
-// one already in hand rather than tie it. Deadline threads are the exception
-// and are ordered by the deadline each of them is trying to meet.
-//
-// A thread running on another CPU is still in the queue, holding its own lock.
-// The lap has to see past those rather than stop at them, so it peeks at each
-// lock and only takes the one it has settled on. If another CPU takes that one
-// first, it looks again -- and on that pass the lock it lost to is held, and
-// skipped like any other.
-fn scan_run_queue_ranked(cpu_number u64, last_index &int, want_node int) &proc.Thread {
-	now_ns := clock_ns()
-	throttled := realtime_throttled(cpu_number, now_ns)
-
-	for attempt := 0; attempt < pick_attempts; attempt++ {
-		mut start := *last_index
-		if start < 0 || start >= max_running_threads {
-			start = 0
-		}
-
-		mut best := &proc.Thread(unsafe { nil })
-		mut best_index := -1
-		mut best_rank := -1
-		mut best_deadline := u64(0)
-
-		for step := 1; step <= max_running_threads; step++ {
-			index := (start + step) % max_running_threads
-
-			mut t := scheduler_running_queue[index]
-			if unsafe { t == nil } {
-				continue
-			}
-			if katomic.load(&t.is_dead) {
-				continue
-			}
-			if !may_run_here(t, cpu_number) {
-				continue
-			}
-			if want_node >= 0 && t.numa_node >= 0 && t.numa_node != want_node {
-				continue
-			}
-			if t.l.is_held() {
-				continue
-			}
-			if cgroup_parks(t, &t.gpr_state) {
-				continue
-			}
-			rank := runnable_rank(mut t, now_ns, throttled)
-			if rank < best_rank {
-				continue
-			}
-			if rank == best_rank {
-				if rank != proc.rank_deadline || t.sched.dl_abs_deadline >= best_deadline {
-					continue
-				}
-			}
-			best = t
-			best_index = index
-			best_rank = rank
-			best_deadline = t.sched.dl_abs_deadline
-		}
-
-		if best_index < 0 {
-			return unsafe { nil }
-		}
-		if best.l.test_and_acquire() == true {
-			unsafe {
-				*last_index = best_index
-			}
-			return best
-		}
-	}
-
-	return unsafe { nil }
 }
 
 // Expose the actual scheduler entitlement for native worker validation.

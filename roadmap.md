@@ -125,8 +125,10 @@ upgrade, rollback and recovery are repeatable from published images.
   job control under SMP, cancellation, rapid process churn and resource pressure.
   See [implementation and qualification limits](docs/process-smp.md) and
   [acceptance tests](tests/process-smp/README.md).
-- [ ] Improve run-queue and allocator scalability, priority inheritance, workload
+- [x] Improve run-queue and allocator scalability, priority inheritance, workload
   QoS, heterogeneous-core placement and deadline-driven idle/timer coalescing.
+  See [implementation and limits](docs/scheduler-qos.md) and
+  [acceptance tests](tests/scheduler-qos/README.md).
 - [ ] Complete architecture-specific address-space/TLB work and large-page
   support where useful; verify protection and teardown during concurrent access.
 - [ ] Eliminate measured per-operation retention and close unresolved kernel

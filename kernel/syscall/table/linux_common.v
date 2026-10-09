@@ -9,6 +9,7 @@ module table
 // syscall numbers onto these.
 
 import errno
+import katomic
 import file
 import fs
 import futex
@@ -23,11 +24,18 @@ import usercopy
 
 // Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
 fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
-	// FUTEX_PRIVATE_FLAG does not change the lookup: futexes are keyed by their
-	// physical address already. FUTEX_CLOCK_REALTIME selects the clock used by
+	// Mapping ownership determines private/shared keys. FUTEX_CLOCK_REALTIME
+	// selects the clock used by
 	// absolute FUTEX_WAIT_BITSET deadlines.
 	op := futex_op & 0x7f
 	match op {
+		6, 8, 13 { // FUTEX_LOCK_PI, TRYLOCK_PI, LOCK_PI2.
+			if op == 8 || timeout == 0 { return futex.lock_pi(uaddr, op == 8, unsafe { nil }, false) }
+			mut deadline := time.TimeSpec{}
+			if !usercopy.copy_from_user(voidptr(&deadline), timeout, sizeof(time.TimeSpec)) { return errno.err, errno.efault }
+			return futex.lock_pi(uaddr, false, &deadline, op == 6 || futex_op & 0x100 != 0)
+		}
+		7 { return futex.unlock_pi(uaddr) }
 		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
 			if op == 9 && val3 == 0 {
 				return errno.err, errno.einval
@@ -362,11 +370,12 @@ fn syscall_linux_prctl(gpr_state voidptr, option int, arg2 u64, _arg3 u64, _arg4
 			return 0, 0
 		}
 		pr_set_timerslack {
-			// Timer slack remains a separate compatibility setting.
+			t := proc.current_thread()
+			katomic.store(mut unsafe { &t.timer_slack_ns }, if arg2 == 0 { u64(50000) } else { arg2 })
 			return 0, 0
 		}
 		pr_get_timerslack {
-			return 50000, 0
+			return proc.current_thread().timer_slack_ns, 0
 		}
 		pr_set_pdeathsig {
 			if arg2 > 64 {

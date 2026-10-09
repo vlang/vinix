@@ -285,14 +285,37 @@ pub fn read_u32(address u64) ?u32 {
 	return value
 }
 
+// PI queue operations must not fault while holding their wait-list lock.
+// Their caller resolves writable/COW storage before entering that section;
+// concurrent unmap or pageout fails here without sleeping under the PI lock.
+pub fn futex_cmpxchg_inatomic(address u64, expected u32, desired u32) ?u32 {
+	return futex_pagemap_cmpxchg_inatomic(proc.current_thread().process.pagemap, address, expected, desired)
+}
+
+pub fn futex_pagemap_cmpxchg_inatomic(space &memory.Pagemap, address u64, expected u32, desired u32) ?u32 {
+	if address & 3 != 0 || !valid_user_range(address, 4) { return none }
+	mut pagemap := unsafe { space }
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	physical := pagemap.user_page_phys(address, true) or { return none }
+	ptr := voidptr(physical + (address & (page_size - 1)) + memory.get_hhdm_offset())
+	return word_cas(ptr, expected, desired)
+}
+
 // FUTEX_WAKE_OP must change a user word atomically with respect to userspace.
 // Resolve writable/COW pages first, then use the same physical word the
 // process sees. The pagemap lock keeps that mapping stable during the CAS.
 pub fn futex_atomic_op_u32(address u64, op u32, operand u32) ?u32 {
+	return futex_pagemap_atomic_op_u32(proc.current_thread().process.pagemap, address, op, operand)
+}
+
+// Retirement supplies the old address space explicitly, before exec detaches it.
+// Its caller owns a live Process/map reference throughout any page-in.
+pub fn futex_pagemap_atomic_op_u32(space &memory.Pagemap, address u64, op u32, operand u32) ?u32 {
 	if address & 3 != 0 || !valid_user_range(address, 4) {
 		return none
 	}
-	mut pagemap := proc.current_thread().process.pagemap
+	mut pagemap := unsafe { space }
 	for _ in 0 .. 4 {
 		pagemap.l.acquire()
 		physical := pagemap.user_page_phys(address, true) or {

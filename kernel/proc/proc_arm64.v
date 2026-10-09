@@ -115,6 +115,13 @@ pub mut:
 	// throttled cgroup, so the scheduler treats it as stopped in userspace.
 	at_user_boundary bool
 	affinity_mask    u64 = u64(-1)
+	queue_membership_lock klock.Lock
+	queue_cpu u32
+	queue_previous &Thread = unsafe { nil }
+	queue_next &Thread = unsafe { nil }
+	pi_rank int
+	pi_closed bool
+	timer_slack_ns u64 = 50000
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the

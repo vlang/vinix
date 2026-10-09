@@ -664,8 +664,9 @@ fn adjust_big_alloc_pages(delta i64) {
 const general_slab_classes = 14
 
 fn slab_for(size u64, classes int) ?&Slab {
+	shard := current_slab_shard()
 	for i in 0 .. classes {
-		mut s := unsafe { &slabs[i] }
+		mut s := if shard >= 0 { unsafe { &slab_shards[shard][i] } } else { unsafe { &slabs[i] } }
 		if s.ent_size >= size {
 			return s
 		}

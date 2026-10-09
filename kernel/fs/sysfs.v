@@ -19,6 +19,7 @@
 module fs
 
 import stat
+import sched
 import klock
 import katomic
 import errno
@@ -209,6 +210,7 @@ fn build_cpu_tree(mut system VFSNode) {
 
 	for i := 0; i < count && i < sysfs_max_cpus; i++ {
 		mut entry := add_sysfs_directory(mut cpus, sysfs_numbered('cpu', i))
+		add_sysfs_text(mut entry, 'cpu_capacity', sysfs_decimal_line(i64(sched.cpu_capacity(u64(i)))))
 		mut topology := add_sysfs_directory(mut entry, 'topology')
 		// A logical CPU is its own core and its own package here: Vinix does not
 		// read the sibling maps that would say otherwise, and inventing them

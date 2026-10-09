@@ -1,6 +1,7 @@
 module userland
 
 import fs
+import futex
 import memory
 import memory.mmap
 import elf
@@ -1280,6 +1281,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		posixtimer.remove_process_timers(curr_process)
 		gpu_exec_trace(trace_gpu, 'process timers removed')
 
+		// PI waiters in surviving CLONE_VM processes still address the old map.
+		futex.release_pi_owner(t, t.process.pagemap)
+
 		// Swapped under the process table lock, which cgroup memory accounting
 		// and /proc hold while they walk a process' page map: the old one is
 		// freed below.
@@ -1384,7 +1388,8 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		new_thread.cpu_user_ns = inherited_user_ns
 		new_thread.cpu_system_ns = inherited_system_ns
 		new_thread.cpu_time_ns = inherited_user_ns + inherited_system_ns
-		proc.set_thread_sched_params(new_thread.tid, inherited_sched)
+		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
+		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.
 		new_thread.masked_signals = t.masked_signals
