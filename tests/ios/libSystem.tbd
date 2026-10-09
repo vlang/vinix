@@ -14,7 +14,7 @@ exports:
                    ___assert_rtn, ___chkstk_darwin,
                    ___maskrune, _isspace, _setlocale, _strcpy,
                    ___darwin_check_fd_set_overflow, ___memmove_chk, ___memcpy_chk, ___memset_chk, ___strcat_chk, ___strncpy_chk,
-                   __tlv_bootstrap, ___cxa_atexit, _pthread_create, _pthread_join, dyld_stub_binder, _setenv, _unsetenv,
+                   __tlv_bootstrap, ___cxa_atexit, ___cxa_finalize, _atexit, _exit, __exit, _pthread_create, _pthread_join, dyld_stub_binder, _setenv, _unsetenv,
                    _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,
                    _pthread_setspecific, _pthread_getspecific, _pthread_key_create,
                    _pthread_key_delete, _pthread_self, _pthread_once,

@@ -69,7 +69,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
-| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
+| Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread and `dispatch_once` adapters |
@@ -497,6 +497,16 @@ byte counts change; waiting observes event generations to avoid missed wakeups.
 Native Mac reference and ASAN tests and the full ARM64 C++/GLES/PPSSPP regression
 pass. The isolated kernel builds for both ARM64 and x86_64.
 
+`atexit` now shares the image's locked C++ destructor queue, with a typed
+zero-argument callback. Cleanup runs before Mach-O mappings are released;
+callbacks are never registered with the host libc's process-global queue.
+`exit` drains the image queue before native process termination, while `_exit`
+skips cleanup. Shared Mac/iOS fixtures check mixed reverse-order callbacks,
+registration during cleanup, nested scoped finalization, repeat finalization,
+eight registering threads and both real process exit statuses. ASAN checks
+two loads/unloads of the same image without leaving stale callbacks. The full
+ARM64 C++/GLES/PPSSPP regression passes.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -510,21 +520,20 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _atexit
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _atof
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
-the executable, without mapping or executing app code. The last completed audit,
-before the socket additions, reported the following for the static C++ runner:
+the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,233 | 925 | 81 |
-| EOSSDK | 446 | 216 | 18 |
+| Fortnite executable | 1,251 | 907 | 81 |
+| EOSSDK | 464 | 198 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,731 | 1,265 | 122 |
+| All images | 1,767 | 1,229 | 122 |
 
-The C++/GLES/Text variant in that audit reported 1,744 resolved imports, 1,252 unresolved strong
+The C++/GLES/Text variant reports 1,780 resolved imports, 1,216 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

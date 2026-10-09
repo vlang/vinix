@@ -117,6 +117,13 @@ int main(void) {
     run("/opt/ios/sockets", NULL, NULL, NULL, 0,
         "IOS-SOCKETS: IPv4/IPv6 TCP, UDP, socketpair, truncation, timeouts, flags, errors and eight threads");
     puts("iOS PASS: Darwin socket addresses, options and native network I/O");
+    run("/opt/ios/exit-handlers", NULL, NULL, NULL, 0,
+        "IOS-EXIT: main completed\nIOS-EXIT: mixed LIFO, reentrant registration, DSO filtering and eight threads");
+    run("/opt/ios/exit-handlers", "explicit", NULL, NULL, 7,
+        "IOS-EXIT: main completed\nIOS-EXIT: mixed LIFO, reentrant registration, DSO filtering and eight threads");
+    run("/opt/ios/exit-handlers", "immediate", NULL, NULL, 8,
+        "IOS-EXIT: immediate exit skips callbacks");
+    puts("iOS PASS: image-scoped exit callbacks and real process termination");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

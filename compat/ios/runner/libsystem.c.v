@@ -144,6 +144,9 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'__tlv_bootstrap' { unsafe { voidptr(C.ios_tlv_get_addr) } }
 		'___cxa_atexit' { unsafe { voidptr(image_cxa_atexit) } }
 		'___cxa_finalize' { unsafe { voidptr(image_cxa_finalize) } }
+		'_atexit' { unsafe { voidptr(image_atexit) } }
+		'_exit' { unsafe { voidptr(image_exit) } }
+		'__exit' { unsafe { voidptr(image_immediate_exit) } }
 		'_puts' { unsafe { voidptr(darwin_puts) } }
 		'_atoi' { unsafe { voidptr(darwin_atoi) } }
 		'_malloc' { unsafe { voidptr(darwin_malloc) } }

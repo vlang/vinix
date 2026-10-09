@@ -5,20 +5,26 @@ import macho
 import sync
 
 #include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 fn C.pthread_key_create(voidptr, voidptr) int
 fn C.pthread_key_delete(u64) int
 fn C.pthread_getspecific(u64) voidptr
 fn C.pthread_setspecific(u64, voidptr) int
 fn C.ios_tlv_get_addr()
+fn C.exit(int)
+fn C._exit(int)
 
 type ImageInitializer = fn (int, &&char, &&char, &&char)
 type ImageDestructor = fn (voidptr)
+type ImageExit = fn ()
 
 struct Destructor {
 	function ImageDestructor = unsafe { nil }
 	argument voidptr
 	dso u64
+	exit_function ImageExit = unsafe { nil }
 }
 
 struct ImageRuntime {
@@ -89,7 +95,7 @@ fn image_initializers(loaded &LoadedModule) ![]u64 {
 				} else { read64(loaded.section_address(section) + offset) }
 				if !loaded.code_address(address) { return error('iOS: initializer/terminator is not executable') }
 				if kind == 10 {
-					image_runtime.destructors << Destructor{function: unsafe { ImageDestructor(voidptr(address)) }}
+					image_runtime.destructors << Destructor{exit_function: unsafe { ImageExit(voidptr(address)) }}
 				} else { functions << address }
 			}
 		}
@@ -172,9 +178,30 @@ fn image_tls_address(descriptor u64) u64 {
 
 fn image_cxa_atexit(function ImageDestructor, argument voidptr, dso u64) int {
 	image_runtime.destructor_lock.lock()
-	image_runtime.destructors << Destructor{function, argument, dso}
+	image_runtime.destructors << Destructor{function: function, argument: argument, dso: dso}
 	image_runtime.destructor_lock.unlock()
 	return 0
+}
+
+fn image_atexit(function ImageExit) int {
+	// Never give native libc an image callback: execute() later unmaps its code.
+	image_runtime.destructor_lock.lock()
+	image_runtime.destructors << Destructor{exit_function: function}
+	image_runtime.destructor_lock.unlock()
+	return 0
+}
+
+@[noreturn]
+fn image_exit(status int) {
+	image_cxa_finalize(0)
+	C.exit(status)
+	for {}
+}
+
+@[noreturn]
+fn image_immediate_exit(status int) {
+	C._exit(status)
+	for {}
 }
 
 fn image_cxa_finalize(dso u64) {
@@ -189,7 +216,11 @@ fn image_cxa_finalize(dso u64) {
 		destructor := image_runtime.destructors[selected]
 		image_runtime.destructors.delete(selected)
 		image_runtime.destructor_lock.unlock()
-		destructor.function(destructor.argument)
+		if destructor.exit_function != unsafe { nil } {
+			destructor.exit_function()
+		} else {
+			destructor.function(destructor.argument)
+		}
 	}
 }
 
