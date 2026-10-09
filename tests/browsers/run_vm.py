@@ -116,154 +116,35 @@ FIRST_RUN = {
 COMMON_FAIL_MARKERS = (b"FATAL EXCEPTION", b"KERNEL PANIC")
 
 
+def _native(operation, *arguments):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("browser_native_controller", Path(__file__).with_name("_native.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    globals()["_native"] = lambda operation, *arguments: module.call(operation, globals(), *arguments)
+    return _native(operation, *arguments)
+
+
+def _checks(markers, recent):
+    return (marker in recent for marker in markers)
+
+
 def available_port() -> str:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return str(listener.getsockname()[1])
+    return _native("available_port")
 
 
 def exit_code(status: int) -> int:
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return 128 + os.WTERMSIG(status)
-    return 1
+    return _native("exit_code", status)
 
 
 def stop_child(pid: int, master: int) -> None:
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
-
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        # Gone already, or never became a process group leader.
-        return
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except (ProcessLookupError, PermissionError):
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
+    return _native("stop_child", pid, master)
 
 
 def run_vm(root: Path, guest_init: Path, initramfs: Path, state_dir: Path,
            memory_mb: int, timeout: int, build: bool, profile: dict) -> int:
-    state_dir.mkdir(parents=True, exist_ok=True)
-
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(initramfs)
-    environment["VINIX_INITRAMFS_COMPRESSED"] = "1" if initramfs.suffix == ".gz" else "0"
-    environment["VINIX_BOOT_DISK"] = str(state_dir / "boot.img")
-    environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = str(profile.get("persist_size_mb", 256))
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    # The package boot is checking that `pkg install` works, not that a QEMU run
-    # can carry a 700 MiB overlay back to the host afterwards.
-    environment.setdefault("VINIX_QEMU_PACKAGE_PERSIST", "0")
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    command = [
-        str(root / "scripts/run-aarch64.sh"),
-        "--serial",
-        f"--mem={memory_mb}",
-        f"--guest-init={guest_init}",
-    ]
-    if not build:
-        command.insert(1, "--no-build")
-
-    fail_markers = profile["fail"] + COMMON_FAIL_MARKERS
-    print("==> Starting AArch64 QEMU browser boot")
-
-    pid, master = pty.fork()
-    if pid == 0:
-        os.chdir(root)
-        os.execve(command[0], command, environment)
-
-    transcript = bytearray()
-    status: int | None = None
-    forced_stop = False
-    shutdown_deadline: float | None = None
-    deadline = time.monotonic() + timeout
-    try:
-        while time.monotonic() < deadline:
-            waited, child_status = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                status = child_status
-                break
-
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if readable:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                if chunk:
-                    transcript.extend(chunk)
-                    sys.stdout.buffer.write(chunk)
-                    sys.stdout.buffer.flush()
-
-            recent = bytes(transcript[-131072:])
-            finished = profile["pass"] in recent or any(
-                marker in recent for marker in fail_markers
-            )
-            if finished and shutdown_deadline is None:
-                try:
-                    os.write(master, b"\x01x")
-                except OSError as error:
-                    if error.errno != errno.EIO:
-                        raise
-                shutdown_deadline = time.monotonic() + 10
-            if shutdown_deadline is not None and time.monotonic() >= shutdown_deadline:
-                break
-    finally:
-        if status is None:
-            forced_stop = True
-            stop_child(pid, master)
-        os.close(master)
-
-    output = bytes(transcript)
-    missing = [marker.decode("ascii")
-               for marker in (*profile["features"], profile["pass"])
-               if marker not in output]
-    failures = [marker.decode("ascii", errors="replace")
-                for marker in fail_markers if marker in output]
-    if status is not None and exit_code(status) != 0:
-        failures.append(f"VM runner exit status {exit_code(status)}")
-    if forced_stop:
-        failures.append("VM did not exit after the test")
-    if missing or failures:
-        for item in missing:
-            print(f"ERROR: missing expected browser result: {item}", file=sys.stderr)
-        for item in failures:
-            print(f"ERROR: observed browser failure: {item}", file=sys.stderr)
-        return 1
-    print("==> AArch64 QEMU browser boot passed")
-    return 0
+    return _native("run_vm", root, guest_init, initramfs, state_dir,
+                   memory_mb, timeout, build, profile)
 
 
 def main() -> int:
