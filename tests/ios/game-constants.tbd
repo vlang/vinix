@@ -1,0 +1,16 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/GameController.framework/GameController'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _GCKeyCodeDeleteOrBackspace, _GCKeyCodeSpacebar, _GCKeyCodeCapsLock,
+               _GCKeyCodeF1, _GCKeyCodeF2, _GCKeyCodeF3, _GCKeyCodeF4, _GCKeyCodeF5, _GCKeyCodeF6,
+               _GCKeyCodeF7, _GCKeyCodeF8, _GCKeyCodeF9, _GCKeyCodeF10, _GCKeyCodeF11, _GCKeyCodeF12,
+               _GCKeyCodeLeftControl, _GCKeyCodeLeftShift, _GCKeyCodeLeftAlt, _GCKeyCodeLeftGUI,
+               _GCKeyCodeRightControl, _GCKeyCodeRightShift, _GCKeyCodeRightAlt, _GCKeyCodeRightGUI,
+               _GCControllerDidConnectNotification, _GCControllerDidDisconnectNotification,
+               _GCControllerDidBecomeCurrentNotification, _GCKeyboardDidConnectNotification,
+               _GCKeyboardDidDisconnectNotification, _GCMouseDidConnectNotification, _GCMouseDidDisconnectNotification,
+               _GCHapticsLocalityDefault, _GCHapticsLocalityHandles, _GCHapticsLocalityLeftHandle, _GCHapticsLocalityRightHandle ]
+...

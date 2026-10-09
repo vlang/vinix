@@ -6,6 +6,9 @@ set -eu
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 output=${1:-"$repo/build/ios/reference"}
 mkdir -p "$output"
+"${IOS_CLANG:-clang}" -fobjc-arc -O1 -Wall -Wextra -Werror -framework Foundation -framework GameController \
+    "$repo/tests/ios/game-constants.m" -o "$output/game-constants"
+"$output/game-constants"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror -framework CoreGraphics \
     "$repo/tests/ios/geometry.c" -o "$output/geometry"
 "$output/geometry"

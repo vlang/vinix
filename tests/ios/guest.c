@@ -126,6 +126,9 @@ int main(void) {
     run("/opt/ios/geometry", NULL, NULL, NULL, 0,
         "IOS-GEOMETRY: native HFA arguments/results, constants, negative dimensions, half-open hit testing, null/empty edges and rectangle math");
     puts("iOS PASS: native CoreGraphics geometry and HFA calling conventions");
+    run("/opt/ios/game-constants", NULL, NULL, NULL, 0,
+        "IOS-GAME-CONSTANTS: 64-bit keyboard codes, notification strings and haptic localities match Mac libraries");
+    puts("iOS PASS: native GameController typed key codes and string constants");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

@@ -305,11 +305,19 @@ fractional coordinates and HFA register arguments/results. ASAN and the full
 ARM64 regression pass. This resolves 13 more strong imports across the game
 and EOSSDK.
 
+GameController's imported key-code constants now have the measured 64-bit
+values, and its keyboard/mouse notifications and haptic locality strings match
+the installed Mac library. The same native fixture validates both platforms,
+including constant object ownership under ASAN. This resolves 39 more strong
+imports. Device discovery, controller profiles, keyboard/mouse device APIs and
+haptics remain unimplemented; resolving their data constants does not provide
+those services.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/GameController.framework/GameController (_GCKeyCodeDeleteOrBackspace)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecCertificateCreateWithData)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -317,10 +325,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,140 | 1,017 | 82 |
-| EOSSDK | 370 | 292 | 18 |
+| Fortnite executable | 1,158 | 999 | 82 |
+| EOSSDK | 391 | 271 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,561 | 1,434 | 123 |
+| All images | 1,600 | 1,395 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

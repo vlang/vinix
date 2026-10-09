@@ -7,6 +7,9 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library == '/System/Library/Frameworks/GameController.framework/GameController' {
+		if address := game_key_symbol(symbol) { return address }
+	}
 	if library in ['/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox', '/System/Library/Frameworks/AudioUnit.framework/AudioUnit'] {
 		if address := audio_symbol(symbol) { return address }
 	}
@@ -197,6 +200,15 @@ fn framework_constant(symbol string) ?u64 {
 		'_NSLocaleIdentifier' { 'kCFLocaleIdentifierKey' }
 		'_GCControllerDidConnectNotification' { 'GCControllerDidConnectNotification' }
 		'_GCControllerDidDisconnectNotification' { 'GCControllerDidDisconnectNotification' }
+		'_GCControllerDidBecomeCurrentNotification' { 'GCControllerDidBecomeCurrentNotification' }
+		'_GCKeyboardDidConnectNotification' { 'GCKeyboardDidConnectNotification' }
+		'_GCKeyboardDidDisconnectNotification' { 'GCKeyboardDidDisconnectNotification' }
+		'_GCMouseDidConnectNotification' { 'GCMouseDidConnectNotification' }
+		'_GCMouseDidDisconnectNotification' { 'GCMouseDidDisconnectNotification' }
+		'_GCHapticsLocalityDefault' { 'Default' }
+		'_GCHapticsLocalityHandles' { 'Handles' }
+		'_GCHapticsLocalityLeftHandle' { 'Left Handle' }
+		'_GCHapticsLocalityRightHandle' { 'Right Handle' }
 		'_AVAudioSessionCategoryAmbient' { 'AVAudioSessionCategoryAmbient' }
 		'_AVAudioSessionCategoryAudioProcessing' { 'AVAudioSessionCategoryAudioProcessing' }
 		'_AVAudioSessionCategoryPlayback' { 'AVAudioSessionCategoryPlayback' }
