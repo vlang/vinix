@@ -62,6 +62,7 @@ fn C.strtoll(&char, &&char, i32) i64
 fn C.strtoul(&char, &&char, i32) u64
 fn C.strtoull(&char, &&char, i32) u64
 fn C.strtof(&char, &&char) f32
+fn C.strtod(&char, &&char) f64
 fn C.getpid() i32
 fn C.getenv(&char) &char
 fn C.setenv(&char, &char, i32) i32
@@ -218,6 +219,8 @@ fn fixed_symbol(symbol string) ?u64 {
         '_strtoul' { u64(unsafe { voidptr(C.strtoul) }) }
         '_strtoull' { u64(unsafe { voidptr(C.strtoull) }) }
         '_strtof' { u64(unsafe { voidptr(C.strtof) }) }
+        '_atof' { u64(unsafe { voidptr(darwin_atof) }) }
+        '_atoll' { u64(unsafe { voidptr(darwin_atoll) }) }
         '_getpid' { u64(unsafe { voidptr(C.getpid) }) }
         '_getenv' { u64(unsafe { voidptr(C.getenv) }) }
         '_setenv' { u64(unsafe { voidptr(C.setenv) }) }

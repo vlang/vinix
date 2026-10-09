@@ -71,6 +71,9 @@ test "$exit_status" = 7
 exit_status=0
 "$output/exit-handlers" immediate || exit_status=$?
 test "$exit_status" = 8
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/numeric.c" -o "$output/numeric"
+"$output/numeric"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"
