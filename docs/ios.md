@@ -297,11 +297,19 @@ the verified layouts. ASAN and the full native ARM64 regression pass. Gray,
 floating-point, packed 16-bit and other unimplemented image formats return nil.
 The two new Fortnite image entry points resolve four strong imports.
 
+CoreGraphics rectangle queries, standardization, inset/offset/integral,
+union/intersection, equality, hit testing and typed geometry constants now
+match the Mac reference in V. The shared native fixture exercises negative
+dimensions, null/empty rectangles, half-open point containment, over-insetting,
+fractional coordinates and HFA register arguments/results. ASAN and the full
+ARM64 regression pass. This resolves 13 more strong imports across the game
+and EOSSDK.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _CGRectContainsPoint
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/GameController.framework/GameController (_GCKeyCodeDeleteOrBackspace)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -309,10 +317,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,133 | 1,024 | 82 |
-| EOSSDK | 364 | 298 | 18 |
+| Fortnite executable | 1,140 | 1,017 | 82 |
+| EOSSDK | 370 | 292 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,548 | 1,447 | 123 |
+| All images | 1,561 | 1,434 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

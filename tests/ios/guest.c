@@ -123,6 +123,9 @@ int main(void) {
     run("/opt/ios/provider-images", NULL, NULL, NULL, 0,
         "IOS-PROVIDER-IMAGES: borrowed bytes, native release callbacks, retained CFData, RGB formats/decode, packed stack ABI and real pixels");
     puts("iOS PASS: native CoreGraphics providers, raw image formats and callback ownership");
+    run("/opt/ios/geometry", NULL, NULL, NULL, 0,
+        "IOS-GEOMETRY: native HFA arguments/results, constants, negative dimensions, half-open hit testing, null/empty edges and rectangle math");
+    puts("iOS PASS: native CoreGraphics geometry and HFA calling conventions");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

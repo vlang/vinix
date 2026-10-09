@@ -35,6 +35,12 @@ done
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
 "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
     -fno-stack-protector -O1 -Wall -Wextra -Werror \
+    -c "$repo/tests/ios/geometry.c" -o "$output/geometry.o"
+"${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
+    -fixup_chains -e _main "$output/geometry.o" "$repo/tests/ios/libSystem.tbd" \
+    "$repo/tests/ios/geometry.tbd" -o "$output/geometry"
+"${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
+    -fno-stack-protector -O1 -Wall -Wextra -Werror \
     -c "$repo/tests/ios/provider-images.c" -o "$output/provider-images.o"
 "${IOS_LD:-ld64.lld}" -arch arm64 -platform_version ios 15.0 15.0 \
     -fixup_chains -e _main "$output/provider-images.o" "$repo/tests/ios/libSystem.tbd" \

@@ -1,0 +1,13 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-ios ]
+install-name: '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'
+exports:
+  - targets: [ arm64-ios ]
+    symbols: [ _CGPointZero, _CGSizeZero, _CGRectZero, _CGRectNull, _CGRectInfinite,
+               _CGPointEqualToPoint, _CGSizeEqualToSize, _CGRectEqualToRect, _CGRectIsNull,
+               _CGRectIsEmpty, _CGRectStandardize, _CGRectIntegral, _CGRectInset, _CGRectOffset,
+               _CGRectUnion, _CGRectIntersection, _CGRectContainsPoint, _CGRectContainsRect,
+               _CGRectIntersectsRect, _CGRectGetMinX, _CGRectGetMidX, _CGRectGetMaxX,
+               _CGRectGetMinY, _CGRectGetMidY, _CGRectGetMaxY, _CGRectGetWidth, _CGRectGetHeight ]
+...
