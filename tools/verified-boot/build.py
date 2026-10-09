@@ -13,6 +13,8 @@ import shutil
 import struct
 import subprocess
 import tempfile
+import tarfile
+from runpy import run_path
 
 
 CONFIG_MARKER = b"++CONFIG_B2SUM_SIGNATURE++"
@@ -55,11 +57,36 @@ def check_cmdline(value: str, verity_token: str | None = None) -> str:
     return _call("check_cmdline", value=value, verity_token=verity_token or "")
 
 
+_bundle_binding = run_path(str(Path(__file__).resolve().parents[1] / "_package_store_native.py"))
+_bundle_Popen = subprocess.Popen
+_bundle_controller = _bundle_binding["_host"].Controller(Path(__file__).with_name("bundle_query.v"), "VINIX_BOOT_BUNDLE_QUERY",
+    process=lambda *args, **kwargs: _bundle_Popen(*args, start_new_session=True, **kwargs))
+
+
+def _bundle_call(operation, arguments):
+    return _bundle_binding["call"](operation, arguments, globals(), controller=_bundle_controller)
+
+
+def _bundle_iterator(operation, iterator):
+    def values():
+        while True:
+            packet = _bundle_call(operation, (iterator,))
+            if packet["done"]:
+                return
+            yield packet["value"]
+    generator = values()
+    generator.__name__ = "<genexpr>"
+    generator.__qualname__ = "build_bundle.<locals>.<genexpr>"
+    return generator
+
+
+def _bundle_three(value):
+    first, second, third = value
+    return first, second, third
+
+
 def root_call(function, *args):
-    try:
-        return function(*args)
-    except verity.InvalidImage as error:
-        raise InvalidBundle(str(error)) from error
+    return _bundle_call('root_call', (function, *args))
 
 
 def pe_info(data: bytes, arch: str) -> tuple[int, int]:
@@ -79,23 +106,15 @@ def config_text(kernel_hash: str, module_hashes: list[str], cmdline: str,
 
 
 def command(args: list[str]) -> None:
-    subprocess.run(args, check=True, stdin=subprocess.DEVNULL)
+    return _bundle_call('command', (args,))
 
 
 def sign_image(source: Path, destination: Path, key: Path, certificate: Path, backend: str) -> None:
-    if backend == "sbsign":
-        command(["sbsign", "--key", str(key), "--cert", str(certificate),
-                 "--output", str(destination), str(source)])
-    else:
-        command(["osslsigncode", "sign", "-h", "sha256", "-certs", str(certificate),
-                 "-key", str(key), "-in", str(source), "-out", str(destination)])
+    return _bundle_call('sign_image', (source, destination, key, certificate, backend))
 
 
 def verify_signature(loader: Path, certificate: Path, backend: str) -> None:
-    if backend == "sbsign":
-        command(["sbverify", "--cert", str(certificate), str(loader)])
-    else:
-        command(["osslsigncode", "verify", "-CAfile", str(certificate), "-in", str(loader)])
+    return _bundle_call('verify_signature', (loader, certificate, backend))
 
 
 def regular_file(path: Path) -> Path:
@@ -105,130 +124,11 @@ def regular_file(path: Path) -> Path:
 
 def verify_bundle(bundle: Path, arch: str, certificate: Path | None, backend: str,
                   developer: bool = False) -> None:
-    bundle = bundle.resolve()
-    # Reject symlinked parents as well as leaf files, and extra executables or
-    # content. A verification result describes this exact generated boot tree.
-    files: set[str] = set()
-    for path in bundle.rglob("*"):
-        if path.is_symlink() or not (path.is_file() or path.is_dir()):
-            raise InvalidBundle(f"bundle contains a symlink or special file: {path}")
-        if path.is_file():
-            files.add(path.relative_to(bundle).as_posix())
-    loader_relative = f"EFI/BOOT/{ARCHES[arch][2]}"
-    loader = regular_file(bundle / loader_relative)
-    data = loader.read_bytes()
-    field, signature_size = pe_info(data, arch)
-    if developer:
-        if signature_size:
-            raise InvalidBundle("developer bundle unexpectedly contains a PE signature")
-    else:
-        if certificate is None or not signature_size:
-            raise InvalidBundle("signed mode requires a signature and a separately trusted certificate")
-        verify_signature(loader, certificate.resolve(), backend)
-    config = regular_file(bundle / "boot/limine.conf")
-    if data[field:field + 128].decode().lower() != digest(config):
-        raise InvalidBundle("configuration differs from the hash enrolled in the loader")
-    text = config.read_text(encoding="ascii")
-    kernel_match = re.search(r"^    path: boot\(\):/boot/vinix#([0-9a-f]{128})$", text, re.M)
-    modules = re.findall(r"^    module_path: boot\(\):/boot/root-([0-9]+)\.tar#([0-9a-f]{128})$", text, re.M)
-    cmdline_match = re.search(r"^    cmdline: (.*)$", text, re.M)
-    dtb = re.search(r"^    dtb_path: boot\(\):/boot/platform\.dtb#([0-9a-f]{128})$", text, re.M)
-    if not kernel_match or not modules or not cmdline_match:
-        raise InvalidBundle("configuration is not a verified initramfs profile")
-    if [index for index, _ in modules] != [str(index) for index in range(len(modules))]:
-        raise InvalidBundle("initramfs modules must have consecutive indexes")
-    root_tokens = [token for token in cmdline_match[1].split() if token.startswith(verity.TOKEN_PREFIX)]
-    if len(root_tokens) > 1:
-        raise InvalidBundle("duplicate verified-root command-line policy")
-    root_token = root_tokens[0] if root_tokens else None
-    expected = config_text(kernel_match[1], [value for _, value in modules],
-                           cmdline_match[1], dtb[1] if dtb else None, root_token)
-    if text != expected:
-        raise InvalidBundle("unexpected configuration directive or command line")
-    hashes = {"boot/vinix": kernel_match[1]}
-    hashes.update({f"boot/root-{index}.tar": value for index, value in modules})
-    if dtb:
-        hashes["boot/platform.dtb"] = dtb[1]
-    expected_files = {loader_relative, "boot/limine.conf", *hashes}
-    if root_token:
-        expected_files.add("boot/verity-root.img")
-    if files != expected_files:
-        raise InvalidBundle("bundle contains missing or unexpected boot files")
-    check_kernel(bundle / "boot/vinix", arch)
-    for filename, expected_hash in hashes.items():
-        if digest(regular_file(bundle / filename)) != expected_hash:
-            raise InvalidBundle(f"boot artifact checksum mismatch: {filename}")
-    if root_token:
-        _, count, root_digest = root_call(verity.parse_command_line, root_token)
-        root_call(verity.verify, regular_file(bundle / "boot/verity-root.img"), count, root_digest)
+    return _bundle_call('verify_bundle', (bundle, arch, certificate, backend, developer))
 
 
 def build_bundle(args: argparse.Namespace) -> None:
-    cmdline = check_cmdline(args.cmdline)
-    root_image = getattr(args, "verity_root", None)
-    root_device = getattr(args, "verity_device", None)
-    root_count = getattr(args, "verity_data_blocks", None)
-    root_digest = getattr(args, "verity_root_hash", None)
-    root_token = None
-    if any(value is not None for value in (root_image, root_device, root_count, root_digest)):
-        if any(value is None for value in (root_image, root_device, root_count, root_digest)):
-            raise InvalidBundle("verified block root requires --verity-root, --verity-device, "
-                                "--verity-data-blocks and --verity-root-hash")
-        root_token = root_call(verity.command_line, root_device, root_count, root_digest)
-        cmdline = check_cmdline(f"{cmdline} {root_token}".strip(), root_token)
-    output = args.output.absolute()
-    if output.exists():
-        raise InvalidBundle("output already exists; choose a new bundle directory")
-    if not args.developer_unsigned and (args.key is None or args.certificate is None):
-        raise InvalidBundle("signed mode requires --key and --certificate")
-    if args.developer_unsigned and (args.key is not None or args.certificate is not None):
-        raise InvalidBundle("developer mode cannot also specify signing credentials")
-    loader_data = args.loader.read_bytes()
-    field, signature_size = pe_info(loader_data, args.arch)
-    if signature_size:
-        raise InvalidBundle("loader input must be unsigned: enrollment must happen before signing")
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix=".vinix-verified-", dir=output.parent) as temporary:
-        staging = Path(temporary)
-        boot = staging / "boot"
-        efi = staging / "EFI/BOOT"
-        boot.mkdir()
-        efi.mkdir(parents=True)
-        shutil.copyfile(args.kernel, boot / "vinix")
-        check_kernel(boot / "vinix", args.arch)
-        for index, source in enumerate(args.initramfs):
-            shutil.copyfile(source, boot / f"root-{index}.tar")
-        if root_image:
-            shutil.copyfile(root_image, boot / "verity-root.img")
-            root_call(verity.verify, boot / "verity-root.img", root_count, root_digest)
-        dtb_hash = None
-        if args.dtb:
-            shutil.copyfile(args.dtb, boot / "platform.dtb")
-            dtb_hash = digest(boot / "platform.dtb")
-        config = boot / "limine.conf"
-        config.write_text(config_text(digest(boot / "vinix"),
-                                     [digest(boot / f"root-{index}.tar")
-                                      for index in range(len(args.initramfs))], cmdline, dtb_hash, root_token),
-                          encoding="ascii")
-        # This is Limine's enroll-config format. Patching this field BEFORE
-        # Authenticode signing puts the config hash inside the firmware's
-        # authenticated executable, rather than beside it in a mutable file.
-        enrolled = bytearray(loader_data)
-        enrolled[field:field + 128] = digest(config).encode("ascii")
-        loader = efi / ARCHES[args.arch][2]
-        if args.developer_unsigned:
-            loader.write_bytes(enrolled)
-        else:
-            unsigned = staging / "enrolled.efi"
-            unsigned.write_bytes(enrolled)
-            sign_image(unsigned, loader, args.key.resolve(), args.certificate.resolve(), args.backend)
-            unsigned.unlink()
-        verify_bundle(staging, args.arch, args.certificate, args.backend, args.developer_unsigned)
-        os.rename(staging, output)
-    mode = "UNAUTHENTICATED developer bundle" if args.developer_unsigned else "signed UEFI bundle"
-    print(f"Created {mode}: {output}")
-    if not args.developer_unsigned:
-        print("Boot authentication requires UEFI Secure Boot enabled with this certificate trusted in firmware.")
+    return _bundle_call('build_bundle', (args,))
 
 
 def main() -> int:

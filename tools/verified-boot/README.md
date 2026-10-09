@@ -172,6 +172,9 @@ to the shared verified-root V module. Native parser regressions run with:
 build-support/run-v-tool.sh tools/verified-boot/bootpolicy/core_test.v
 ```
 
-Signing, bundle publication and the optional genuine PE-signature integration
-retain their existing controller. Parser fixtures remain separate from signed
-loaders and runtime boot validation.
+Signing command construction, bundle verification, configuration enrollment
+and publication run in `bootbuild` in V. The counted Python interface retains
+the original parser and public signatures, and borrows actual library objects
+through `tools/_package_store_native.py`. Temporary directories are retired
+after all signing, verification and rename callbacks finish. The optional
+genuine PE-signature integration and runtime fixtures remain independent.

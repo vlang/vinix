@@ -88,7 +88,7 @@ def call(operation, arguments, namespace, *, controller=None):
     def library_primitive(method, row):
         if method == "function":
             target = objects[row["target"]] if "target" in row else getattr(objects[row["owner"]], row["name"]) if "owner" in row else resolve(row["name"])
-            if callable(target):
+            if callable(target) or row.get("call", False):
                 args = [value(item) for item in row.get("args", [])]
                 kwargs = {key: value(item) for key, item in row.get("kwargs", {}).items()}
                 result = target(*args, **kwargs, **objects[row["kwargs_owner"]]) if "kwargs_owner" in row else target(*args, **kwargs)
@@ -173,6 +173,8 @@ def call(operation, arguments, namespace, *, controller=None):
             if row.get("cause") is None:
                 raise error
             cause = errors[row["cause"]["binding_error"]]
+            if row.get("direct_cause"):
+                raise error from cause
             try:
                 raise cause
             except BaseException:
