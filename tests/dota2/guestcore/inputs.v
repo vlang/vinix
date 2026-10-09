@@ -2,27 +2,67 @@
 module guestcore
 
 import androidhost as ah
+import gapcore as gc
 
 fn digest(path string) !string {
 	hash := call('hashlib.sha256')!
 	manager := method(path, 'open', [s('rb')], {})!
 	stream := enter(manager)!
-	digest_stream(stream, hash) or {
+	mut buffer := DigestBuffer{}
+	digest_stream(stream, hash, mut buffer) or {
 		failure := err
 		if !retire(manager, failure)! { return failure }
-		return method(hash, 'hexdigest', [], {})!
+		return digest_result(hash, buffer.last)!
 	}
 	retire(manager, none)!
-	return method(hash, 'hexdigest', [], {})!
+	return digest_result(hash, buffer.last)!
 }
 
-fn digest_stream(stream string, hash string) ! {
+struct DigestBuffer {
+mut:
+	last string
+}
+
+fn digest_result(hash string, last string) !string {
+	result := method(hash, 'hexdigest', [], {})!
+	release(hash, last)!
+	return result
+}
+
+fn digest_stream(stream string, hash string, mut buffer DigestBuffer) ! {
 	read := call('_vm.method_callable', o('arg1'), o(stream), s('read'), n(1024 * 1024))!
-	blocks := call('_vm.iterate_value', o(call('builtins.iter', o(read), b(''))!))!
+	iterator := call('builtins.iter', o(read), b('')) or {
+		failure := err
+		gc.activate(failure, true)!
+		release(read) or { return failure }
+		gc.activate(none, false)!
+		return failure
+	}
+	blocks := call('_vm.iterate_value', o(iterator)) or {
+		failure := err
+		gc.activate(failure, true)!
+		release(read, iterator) or { return failure }
+		gc.activate(none, false)!
+		return failure
+	}
+	digest_blocks(blocks, hash, mut buffer) or {
+		failure := err
+		gc.activate(failure, true)!
+		release(read, iterator, blocks) or { return failure }
+		gc.activate(none, false)!
+		return failure
+	}
+	release(read, iterator, blocks)!
+}
+
+fn digest_blocks(blocks string, hash string, mut buffer DigestBuffer) ! {
 	for {
 		block := next(blocks)!
 		if block.done { return }
-		method(hash, 'update', [o(block.id)], {})!
+		release(buffer.last)!
+		buffer.last = block.id
+		updated := method(hash, 'update', [o(block.id)], {})!
+		release(updated)!
 	}
 }
 

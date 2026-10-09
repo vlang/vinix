@@ -74,6 +74,23 @@ fn next(id string) !Next {
 	return Next{ id: ah.field(row, 'owner').text() }
 }
 
+fn release(ids ...string) ! {
+	gc.callback('release', {
+		'ids': ah.Value(ids.map(ah.Value(it)))
+	})!
+}
+
+fn checkpoint() !ah.Value {
+	return gc.callback('checkpoint', {})!
+}
+
+fn release_since(mark ah.Value, keep ...string) ! {
+	gc.callback('release_since', {
+		'checkpoint': mark
+		'keep':       ah.Value(keep.map(ah.Value(it)))
+	})!
+}
+
 fn enter(id string) !string { return method(id, '__enter__', [], {})! }
 
 fn retire(id string, cause ?IError) !bool {
