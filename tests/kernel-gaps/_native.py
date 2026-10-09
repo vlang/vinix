@@ -196,6 +196,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
                     finally:
                         if error.__traceback__ is replay:
                             error.__traceback__ = traceback
+                        replay = traceback = error = None
             finally:
                 entry.manager = manager = None
         if method == "raise_builtin":
@@ -256,6 +257,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             finally:
                 if error.__traceback__ is replay:
                     error.__traceback__ = traceback
+                replay = traceback = error = None
 
     def cleanup():
         # Consume owners before POSIX calls: a lost reply cannot close a reused
