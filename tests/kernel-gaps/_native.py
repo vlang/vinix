@@ -142,7 +142,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             if pid == 0:
                 try:
                     namespace["os"].chdir(resources[row["root_owner"]] if "root_owner" in row else namespace[row.get("root", "ROOT")])
-                    namespace["os"].execvpe(resources["command"][0], resources["command"], resources["env"])
+                    getattr(namespace["os"], row.get("exec", "execvpe"))(resources["command"][0], resources["command"], resources["env"])
                 except BaseException:
                     import traceback
                     traceback.print_exc()
