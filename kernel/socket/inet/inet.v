@@ -107,6 +107,7 @@ pub mut:
 	linger_seconds int
 	// Observe ACK progress even while POLLOUT remains set.
 	last_pending int
+	last_available int
 	// The interface box its descriptor is made with, freed with the socket.
 	box &resource.Resource = unsafe { nil }
 }
@@ -248,8 +249,10 @@ fn (mut this InetSocket) refresh_status() {
 		status |= file.pollhup
 	}
 	pending := C.vinix_socket_pending(this.handle)
-	if status != this.status || pending != this.last_pending {
+	available := C.vinix_socket_available(this.handle)
+	if status != this.status || pending != this.last_pending || available != this.last_available {
 		this.last_pending = pending
+		this.last_available = available
 		this.status = status
 		event.trigger(mut this.event, false)
 	}
@@ -564,6 +567,11 @@ fn deadline_after(timeout_ns u64) u64 {
 // Wait for the socket to change, until `deadline` if it is not 0. A wait that
 // runs out ends as EAGAIN, as a timeout SO_RCVTIMEO or SO_SNDTIMEO set does.
 fn wait_for_event(mut this InetSocket, deadline u64) bool {
+	generation := event.generation(mut this.event)
+	return wait_for_event_since(mut this, deadline, generation)
+}
+
+fn wait_for_event_since(mut this InetSocket, deadline u64, generation u64) bool {
 	mut timer := &time.Timer(unsafe { nil })
 	if deadline != 0 {
 		now := time.monotonic_ns()
@@ -585,7 +593,7 @@ fn wait_for_event(mut this InetSocket, deadline u64) bool {
 		count = 2
 	}
 	mut events := unsafe { event.stack_list(&storage[0], count) }
-	result := event.await(mut events, true)
+	result := event.await_from_generation(mut events, true, 0, generation)
 	if timer != unsafe { nil } {
 		timer.disarm()
 		unsafe { free(timer) }
@@ -717,30 +725,44 @@ pub fn (mut this InetSocket) sendto(handle voidptr, buf voidptr, count u64, _add
 }
 
 pub fn (mut this InetSocket) recvfrom(handle voidptr, buf voidptr, count u64, _addr voidptr, addrlen &u32) ?i64 {
+	return this.recvfrom_flags(handle, buf, count, _addr, addrlen, 0)
+}
+
+pub fn (mut this InetSocket) recvfrom_flags(handle voidptr, buf voidptr, count u64, _addr voidptr, addrlen &u32, flags int) ?i64 {
 	open_handle := unsafe { &file.Handle(handle) }
 	this.l.acquire()
-	defer {
-		this.l.release()
-	}
+	defer { this.l.release() }
 	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
 	deadline := deadline_after(this.recv_timeout_ns)
+	peek := flags & 2 != 0
+	waitall := this.socktype == sock_pub.sock_stream && flags & 0x100 != 0 && open_handle.flags & resource.o_nonblock == 0
+	mut done := u64(0)
 	for {
 		net_lock.acquire()
-		ret := C.vinix_socket_recv_endpoint(this.handle, buf, count, endpoint)
+		// A wait-all peek must not repeat the same packet into successive slots.
+		// Wait for the requested prefix or EOF, then copy without consuming it.
+		available := C.vinix_socket_available(this.handle)
+		mut ret := i32(-int(errno.eagain))
+		if !peek || !waitall || available >= i32(count) || available == 0 || this.status & file.pollhup != 0 {
+			ret = C.vinix_socket_recv_endpoint_flags(this.handle, unsafe { voidptr(u64(buf) + done) }, count - done, endpoint, flags)
+		}
 		this.refresh_status()
+		generation := event.generation(mut this.event)
 		net_lock.release()
 		if ret >= 0 {
-			proc.account_network_transfer(i64(ret), false)
-			if _addr != unsafe { nil } && addrlen != unsafe { nil } {
-				copy_endpoint_out(endpoint, _addr, addrlen)
-			}
-			return i64(ret)
+			if !peek { proc.account_network_transfer(i64(ret), false) }
+			if done == 0 && _addr != unsafe { nil } && addrlen != unsafe { nil } { copy_endpoint_out(endpoint, _addr, addrlen) }
+			done += u64(ret)
+			if peek || !waitall || ret == 0 || done >= count { return i64(done) }
+			continue
 		}
 		if ret != -int(errno.eagain) || open_handle.flags & resource.o_nonblock != 0 {
+			if done != 0 { return i64(done) }
 			set_error(ret)
 			return none
 		}
-		if !wait_for_event(mut this, deadline) {
+		if !wait_for_event_since(mut this, deadline, generation) {
+			if done != 0 { return i64(done) }
 			return none
 		}
 	}

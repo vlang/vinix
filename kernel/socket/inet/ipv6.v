@@ -32,6 +32,7 @@ fn C.vinix_socket_bind_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_en
 fn C.vinix_socket_connect_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint) i32
 fn C.vinix_socket_send_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint, has_address i32) i32
 fn C.vinix_socket_recv_endpoint(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint) i32
+fn C.vinix_socket_recv_endpoint_flags(socket &C.vinix_socket, data voidptr, length u64, endpoint &C.vinix_net_endpoint, flags i32) i32
 fn C.vinix_socket_name_endpoint(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, peer i32) i32
 fn C.vinix_socket_membership(socket &C.vinix_socket, endpoint &C.vinix_net_endpoint, interface_address u32, join i32) i32
 fn C.vinix_socket_multicast_interface(socket &C.vinix_socket, family i32, index u32, interface_address u32) i32

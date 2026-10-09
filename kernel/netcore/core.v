@@ -2009,6 +2009,12 @@ pub fn send_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_a
 }
 
 pub fn recv_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_addr, port &u16) i32 {
+	return recv_ip_flags(socket, data, length, address, port, 0)
+}
+
+// Queue ownership and TCP receive-window credit change only on consumption.
+// Peek copies caller-owned bytes while the enclosing network lock pins packets.
+pub fn recv_ip_flags(socket &Vinix_socket, data voidptr, length usize, address &C.ip_addr, port &u16, flags i32) i32 {
 	unsafe {
 		packet := &Packet(0)
 		available := u16(0)
@@ -2016,7 +2022,7 @@ pub fn recv_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_a
 		if (usize(socket) == 0) || ((usize(data) == 0) && length) {
 			return -22
 		}
-		if socket.read_shutdown {
+		if socket.read_shutdown || (socket.@type == vinix_net_stream && socket.connected && length == 0) {
 			return 0
 		}
 		packet = socket.rx_head
@@ -2030,7 +2036,7 @@ pub fn recv_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_a
 			return -11
 		}
 		available = u16((i32(packet.p.tot_len) - i32(packet.offset)))
-		amount = u16(if usize(available) < length { i32(available) } else { i32(u16(length)) })
+		amount = u16(if usize(available) < length { usize(available) } else { length })
 		if amount {
 			C.pbuf_copy_partial(packet.p, voidptr(data), amount, packet.offset)
 		}
@@ -2069,6 +2075,20 @@ pub fn recv_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_a
 		if port {
 			*port = C.lwip_htons(packet.port)
 		}
+		if flags & 2 != 0 {
+			if socket.@type == vinix_net_dgram { return i32(if flags & 0x20 != 0 { available } else { amount }) }
+			// TCP may queue separate packets for a single requested prefix.
+			mut copied := usize(amount)
+			packet = packet.next
+			for packet != nil && copied < length {
+				left := usize(packet.p.tot_len - packet.offset)
+				part := u16(if left < length - copied { left } else { length - copied })
+				C.pbuf_copy_partial(packet.p, voidptr(usize(data) + copied), part, packet.offset)
+				copied += usize(part)
+				packet = packet.next
+			}
+			return i32(copied)
+		}
 		if socket.@type == vinix_net_stream {
 			packet.offset = u16((i32(packet.offset) + i32(amount)))
 			if socket.tcp {
@@ -2092,7 +2112,7 @@ pub fn recv_ip(socket &Vinix_socket, data voidptr, length usize, address &C.ip_a
 			}
 			free_packet(packet)
 		}
-		return i32(amount)
+		return i32(if socket.@type == vinix_net_dgram && flags & 0x20 != 0 { available } else { amount })
 	}
 }
 
@@ -2952,11 +2972,16 @@ pub fn vinix_socket_send_endpoint(socket &Vinix_socket, data voidptr, length usi
 
 @[export: 'vinix_socket_recv_endpoint']
 pub fn vinix_socket_recv_endpoint(socket &Vinix_socket, data voidptr, length usize, endpoint &C.vinix_net_endpoint) i32 {
+	return vinix_socket_recv_endpoint_flags(socket, data, length, endpoint, 0)
+}
+
+@[export: 'vinix_socket_recv_endpoint_flags']
+pub fn vinix_socket_recv_endpoint_flags(socket &Vinix_socket, data voidptr, length usize, endpoint &C.vinix_net_endpoint, flags i32) i32 {
 	unsafe {
 		ip := C.ip_addr{}
 		port := u16(0)
 		C.memset(voidptr(&ip), 0, sizeof(ip))
-		result := recv_ip(socket, voidptr(data), length, &ip, &port)
+		result := recv_ip_flags(socket, voidptr(data), length, &ip, &port, flags)
 		if result >= 0 && !(usize(endpoint) == 0) {
 			endpoint_from_ip(socket.family, &ip, port, endpoint)
 		}

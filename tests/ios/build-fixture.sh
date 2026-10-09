@@ -4,7 +4,7 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 output=${1:-"$repo/build/ios/fixtures"}
 mkdir -p "$output"
 sh "$repo/tests/ios/build-modules-fixture.sh" "$output"
-for name in calculator unsupported lifecycle pointer-tags common-crypto atomic-queue assertions libsystem-safety runes; do
+for name in calculator unsupported lifecycle pointer-tags common-crypto atomic-queue assertions libsystem-safety runes sockets; do
     "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" -ffreestanding \
         -fno-stack-protector -O1 -Wall -Wextra -Werror \
         -c "$repo/tests/ios/$name.c" -o "$output/$name.o"

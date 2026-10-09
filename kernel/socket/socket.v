@@ -784,7 +784,7 @@ fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidpt
 	prepare_io_handle(mut call_handle, fd.handle, flags)
 	mut res := fd.handle.resource
 	if mut res is sock_inet.InetSocket {
-		ret := res.recvfrom(call_handle, buf, len, src_addr, addrlen) or {
+		ret := res.recvfrom_flags(call_handle, buf, len, src_addr, addrlen, flags) or {
 			return errno.err, errno.get()
 		}
 		return u64(ret), 0
@@ -796,7 +796,7 @@ fn receive_to_kernel(fdnum int, buf voidptr, len u64, flags int, src_addr voidpt
 			}
 			return u64(ret), 0
 		}
-		ret := call_handle.read(buf, len) or { return errno.err, errno.get() }
+		ret := res.recv_stream(voidptr(call_handle), buf, len, flags) or { return errno.err, errno.get() }
 		return u64(ret), 0
 	}
 	if mut res is sock_netlink.NetlinkSocket {

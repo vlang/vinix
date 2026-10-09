@@ -72,7 +72,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order `__cxa_atexit`/`__cxa_finalize` callbacks |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
-| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and ASCII rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; pthread and `dispatch_once` adapters |
+| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread and `dispatch_once` adapters |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
@@ -482,6 +482,21 @@ compare full-domain fingerprints over all 1,114,112 code points, mask widths,
 invalid values, locale changes and eight-thread calls. Native ASAN and the full
 ARM64 C++/GLES/PPSSPP regression pass. This resolves three strong imports.
 
+The socket adapters now translate Darwin address lengths/families, native errno,
+message flags, socket options and timeout layouts in V. Calls use real native
+IPv4/IPv6 TCP, UDP and Unix sockets. Shared Mac/iOS fixtures check exchanges,
+truncated address/option buffers, receive timeouts, second-based linger, empty
+datagrams, byte order and eight simultaneous clients with independent errno.
+Unsupported Apple service/QoS options and `SO_NOSIGPIPE` fail explicitly.
+
+The guest tests exposed a kernel bug: `MSG_PEEK` consumed Internet socket data.
+Internet and Unix stream receives now preserve queued bytes during peeks and
+support `MSG_WAITALL` across delayed writes, timeout and EOF. Combined peeks
+wait for the requested prefix, preserve it on timeout, and wake when queued
+byte counts change; waiting observes event generations to avoid missed wakeups.
+Native Mac reference and ASAN tests and the full ARM64 C++/GLES/PPSSPP regression
+pass. The isolated kernel builds for both ARM64 and x86_64.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -495,11 +510,12 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _accept
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _atexit
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
-the executable, without mapping or executing app code. The static C++ runner reports:
+the executable, without mapping or executing app code. The last completed audit,
+before the socket additions, reported the following for the static C++ runner:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
@@ -508,7 +524,7 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | MarketplaceKitWrapper | 52 | 124 | 23 |
 | All images | 1,731 | 1,265 | 122 |
 
-The C++/GLES/Text variant reports 1,744 resolved imports, 1,252 unresolved strong
+The C++/GLES/Text variant in that audit reported 1,744 resolved imports, 1,252 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

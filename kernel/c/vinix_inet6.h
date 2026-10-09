@@ -17,6 +17,7 @@ int vinix_socket_connect_endpoint(struct vinix_socket *, VINIX_NET_CONST struct 
 int vinix_socket_send_endpoint(struct vinix_socket *, VINIX_NET_CONST void *, size_t,
                                VINIX_NET_CONST struct vinix_net_endpoint *, int);
 int vinix_socket_recv_endpoint(struct vinix_socket *, void *, size_t, struct vinix_net_endpoint *);
+int vinix_socket_recv_endpoint_flags(struct vinix_socket *, void *, size_t, struct vinix_net_endpoint *, int);
 int vinix_socket_name_endpoint(struct vinix_socket *, struct vinix_net_endpoint *, int);
 int vinix_socket_membership(struct vinix_socket *, VINIX_NET_CONST struct vinix_net_endpoint *,
                             uint32_t interface_address, int join);

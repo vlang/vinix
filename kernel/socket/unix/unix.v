@@ -372,12 +372,32 @@ pub fn (this &UnixSocket) linger() (int, int) {
 }
 
 fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	return this.recv_stream(_handle, buf, _count, 0)
+}
+
+pub fn (mut this UnixSocket) recv_stream(handle voidptr, buf voidptr, count u64, flags int) ?i64 {
+	deadline := deadline_after(this.recv_timeout_ns)
+	waitall := flags & 0x100 != 0 && unsafe { (&file.Handle(handle)).flags } & resource.o_nonblock == 0
+	mut done := u64(0)
+	for {
+		got := this.read_stream_once(handle, unsafe { voidptr(u64(buf) + done) }, count - done, flags, deadline) or {
+			if done != 0 { return i64(done) }
+			return none
+		}
+		done += u64(got)
+		if flags & msg_peek != 0 || !waitall || got == 0 || done >= count { return i64(done) }
+	}
+	return none
+}
+
+fn (mut this UnixSocket) read_stream_once(_handle voidptr, buf voidptr, _count u64, flags int, deadline u64) ?i64 {
 	// A SOCK_SEQPACKET or SOCK_DGRAM read still returns exactly one record;
 	// the framed path owns the boundary bookkeeping.
 	if this.keeps_boundaries() {
-		return this.recv_seqpacket(_handle, buf, _count, 0, unsafe { nil }, unsafe { nil })
+		return this.recv_seqpacket(_handle, buf, _count, flags, unsafe { nil }, unsafe { nil })
 	}
 
+	if _count == 0 { return 0 }
 	mut count := _count
 
 	this.l.acquire()
@@ -392,12 +412,12 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 		return 0
 	}
 
-	deadline := deadline_after(this.recv_timeout_ns)
 	// If pipe is empty, block or return if nonblock
-	for katomic.load(&this.used) == 0 {
+	for katomic.load(&this.used) == 0 || (flags & (msg_peek | 0x100) == (msg_peek | 0x100) && this.used < count && this.used < this.capacity && !this.peer_finished) {
 		// The peer shut its write half: drain first, then end of file. Without
 		// this a reader waits for data that can never arrive.
 		if this.peer_finished {
+			if this.used != 0 { break }
 			return 0
 		}
 		// Return EOF if the pipe was closed
@@ -408,8 +428,9 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 			errno.set(errno.ewouldblock)
 			return none
 		}
+		generation := event.generation(mut this.event)
 		this.l.release()
-		if !wait_on(&this.event, deadline, false, 0) {
+		if !wait_on(&this.event, deadline, true, generation) {
 			this.l.acquire()
 			return none
 		}
@@ -454,6 +475,8 @@ fn (mut this UnixSocket) read(_handle voidptr, buf voidptr, _loc u64, _count u64
 	if after_wrap != 0 {
 		unsafe { C.memcpy(voidptr(u64(buf) + before_wrap), this.data, after_wrap) }
 	}
+
+	if flags & msg_peek != 0 { return i64(count) }
 
 	this.read_ptr = new_ptr_loc
 	this.used -= count
