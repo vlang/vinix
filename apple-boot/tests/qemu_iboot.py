@@ -107,7 +107,7 @@ def _iboot(operation, *arguments):
             _CODEC_LIBRARY = library
     pins = []
     return _CODEC_LIBRARY.target(operation.encode(), _CODEC_NAMESPACE, arguments,
-                                 {"pair": _CODEC_API["_pair"], "pins": pins})
+                                 {"pair": _CODEC_API["_pair"], "pins": pins, "single": _iboot_single})
 
 
 def align(value: int, alignment: int) -> int:
@@ -211,23 +211,25 @@ class Qmp:
         return message
 
 
+def _iboot_single(value):
+    try:
+        (word,) = value
+        return word
+    except _CODEC_ERROR:
+        value = None
+        raise
+
+
+def _iboot_png_chunk():
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return _iboot('png_chunk', kind, data)
+    chunk.__qualname__ = 'write_png.<locals>.chunk'
+    return chunk
+
+
 def write_png(path: Path, pixels: bytes) -> None:
     """The framebuffer is x2r10g10b10; keep the top 8 bits of each channel."""
-    rows = bytearray()
-    for y in range(FB_HEIGHT):
-        rows.append(0)
-        line = pixels[y * FB_STRIDE:y * FB_STRIDE + FB_WIDTH * 4]
-        for (word,) in struct.iter_unpack("<I", line):
-            rows += bytes(((word >> 22) & 0xFF, (word >> 12) & 0xFF, (word >> 2) & 0xFF))
-
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        return (struct.pack(">I", len(data)) + kind + data
-                + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF))
-
-    path.write_bytes(b"\x89PNG\r\n\x1a\n"
-                     + chunk(b"IHDR", struct.pack(">IIBBBBB", FB_WIDTH, FB_HEIGHT, 8, 2, 0, 0, 0))
-                     + chunk(b"IDAT", zlib.compress(bytes(rows), 6))
-                     + chunk(b"IEND", b""))
+    return _iboot('write_png', path, pixels, _iboot_png_chunk)
 
 
 def main() -> int:

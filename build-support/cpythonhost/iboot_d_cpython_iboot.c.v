@@ -22,6 +22,7 @@ struct IbootCodec {
 	namespace voidptr
 	pins      voidptr
 	pair      voidptr
+	single    voidptr
 }
 
 // These arguments are the finite numeric constants in the seven helper bodies.
@@ -42,8 +43,13 @@ fn ib_text(value string) voidptr {
  return result
 }
 
+// Finite byte literals in the helper and PNG bodies, never caller data.
+__global ib_byte_literals = map[string]voidptr{}
 fn ib_bytes(value string) voidptr {
-	return unsafe { C.PyBytes_FromStringAndSize(value.str, value.len) }
+ if result := ib_byte_literals[value] { return own(result) }
+ result := unsafe { C.PyBytes_FromStringAndSize(value.str, value.len) }
+ if result != unsafe { nil } { ib_byte_literals[value] = own(result) }
+ return result
 }
 
 // Fixed LOAD_ATTR literals have native implementation lifetime.
@@ -80,14 +86,18 @@ fn (s &IbootCodec) pin(names []string, values []voidptr) {
 	if C.PyErr_Occurred() == unsafe { nil } { return }
 	error := caught()
 	scope := C.PyDict_New()
-	for i, value in values {
-		if value == unsafe { nil } { continue }
-		key := py_string(names[i])
-		C.PyDict_SetItem(scope, key, value)
-		drop(key)
+	if scope != unsafe { nil } {
+		for i, value in values {
+			if value == unsafe { nil } { continue }
+			key := py_string(names[i])
+			if key == unsafe { nil } { break }
+			status := C.PyDict_SetItem(scope, key, value)
+			drop(key)
+			if status != 0 { break }
+		}
+		if !pending_error() { C.PyList_Insert(s.pins, 0, scope) }
+		drop(scope)
 	}
-	C.PyList_Insert(s.pins, 0, scope)
-	drop(scope)
 	error.restore()
 	error.discard()
 }
@@ -96,11 +106,16 @@ fn (s &IbootCodec) pin(names []string, values []voidptr) {
 // exceptional returns. Named callers supply their own independent references.
 fn ib_invoke(target voidptr, values []voidptr) voidptr {
 	if target == unsafe { nil } || values.any(it == unsafe { nil }) {
-		drop(target)
 		for value in values { drop(value) }
+		drop(target)
 		return unsafe { nil }
 	}
 	args := C.PyTuple_New(values.len)
+	if args == unsafe { nil } {
+		for value in values { drop(value) }
+		drop(target)
+		return args
+	}
 	for i, value in values { C.PyTuple_SetItem(args, i, own(value)) }
 	result := C.PyObject_Call(target, args, unsafe { nil })
 	drop(args)
@@ -710,9 +725,11 @@ fn (s &IbootCodec) build_adt(segment voidptr, with_aic voidptr) voidptr {
 }
 
 pub fn iboot_codec_entry(operation &char, namespace voidptr, arguments voidptr, syntax voidptr) voidptr {
-	s := IbootCodec{ namespace: namespace, pins: unsafe { C.PyDict_GetItemString(syntax, c'pins') }, pair: unsafe { C.PyDict_GetItemString(syntax, c'pair') } }
+	s := IbootCodec{ namespace: namespace, pins: unsafe { C.PyDict_GetItemString(syntax, c'pins') }, pair: unsafe { C.PyDict_GetItemString(syntax, c'pair') }, single: unsafe { C.PyDict_GetItemString(syntax, c'single') } }
 	op := unsafe { operation.vstring() }
 	return match op {
+		'png_chunk' { s.png_chunk(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+		'write_png' { s.png(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1), C.PyTuple_GetItem(arguments,2)) }
 		'align' { s.align(C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
 		'cstr' { s.cstr(C.PyTuple_GetItem(arguments, 0)) }
 		'u32' { s.u32(C.PyTuple_GetItem(arguments, 0)) }
