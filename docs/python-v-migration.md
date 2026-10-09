@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `d858ea106c61ad58784ea370277f4708f2d8eb9d`, Linguist 7.27.0 reports
-**Python 5.90%** (496 files, 2,524,439 bytes) and **V 79.68%** (1,757 files,
-34,079,254 bytes). The complete committed-blob inventory and reproduction
+At source `08bbf504e59da6087f007d41352f121f6ff9bda6`, Linguist 7.27.0 reports
+**Python 5.74%** (499 files, 2,474,105 bytes) and **V 79.81%** (1,822 files,
+34,398,937 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,681,846 Python bytes**. Roughly another
-0.39 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,732,180 Python bytes**. Roughly another
+0.32 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 118 completed stages have a gross
-scope of **3,016,741 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **334,895 bytes**
+tests, including comments and blank lines. The 129 completed stages have a gross
+scope of **3,097,968 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **365,788 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -147,6 +147,17 @@ no extra migration credit.
 | Complete N64 upstream archives and staged source workflow | `build-support/n64/n64build` | 17,077 / 308 | `a084b53a29d54bc497b15d2f2cf2238144e82212` |
 | Complete Dota game launch, observation and retirement | `tests/dota2/gamecore` | 10,440 / 208 | `e2271dba1f4b43d9b3580a7cd6f12dd4ec6d70da` |
 | Complete VOffice compilation and incremental build workflow | `desktop/tools/officebuild` | 8,816 / 255 | `d858ea106c61ad58784ea370277f4708f2d8eb9d` |
+| Complete OpenGothic host and guest workflow | `tests/opengothic/gothicguest` | 15,066 / 300 | `0d42996de1f108fd63bca277bae8d6cecc1627e7` |
+| Pinned PS2 Iris builder and cache workflow | `build-support/ps2/ps2build` | 9,982 / 195 | `36b17ec8d307527e131d340fe6aae9b269f82fb9` |
+| Complete paired Dota environment guest workflow | `tests/dota2/guestcore` | 8,157 / 135 | `ce1c4c36f542b6731ebf5c5016ab99443cf747b2` |
+| Debian package resolution and staging | `build-support/debiancore` | 7,901 / 175 | `70bc9af82be47323a9a692af3c39a662b6693e6f` |
+| Dhewm Debian comparison preparation | `build-support/dhewm3/debianprep` | 2,096 / 39 | `4cb82afdfd448506810d6ff1acbfc77595a5bbae` |
+| Complete Dhewm build and staging workflow | `build-support/dhewm3/dhewmcore` | 6,798 / 122 | `2c0f062207ed7e9f884d9415e18753808b3473ba` |
+| Dhewm runner staging and image workflow | `build-support/dhewm3/runnercore` | 4,457 / 81 | `a3cf88a86231339b5f9b8e40ae69132f0d70f1bf` |
+| Dhewm transcript and benchmark result policy | `build-support/dhewm3/runnercore/result.v` | 2,195 / 36 | `adb3820f5bdd83c8675f755a5481e49457d11a84` |
+| Verified boot bundle verification and publication | `tools/verified-boot/bootbuild` | 7,969 / 136 | `1fdae7f9dd85c2396bde5118d0de2269036d7344` |
+| Complete Mesa Lavapipe builder workflow | `build-support/dota2/mesabuild` | 10,101 / 193 | `32f3edc8b11b7f5dd55c679082e09278ca9dffab` |
+| Complete Mesa Venus builder workflow | `build-support/dota2/venusbuild` | 6,505 / 119 | `8bb300418a0f6cec9cddd3a8a1116ef99987c1af` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -206,6 +217,13 @@ receive zero additional algorithm credit; their 137- and 906-byte Python
 binding growth remains counted. The N64 CLI parses help, usage and the jobs
 argument before starting its native controller. VOffice follows the same
 frontend ordering. Neither CLI requires a compiler for these parser results.
+
+The next eleven ports add 81,227 original implementation bytes of gross scope,
+while the committed Python total falls by 50,334 bytes. All interpreter bridges,
+public constants, parser bodies and concurrent source changes remain counted.
+The root-argument binding, PS2 rich-inequality correction, explicit-call flag,
+GAP temporary-owner primitives and bounded Mesa digest correction receive zero
+new algorithm credit. The latter two add 635 and 708 counted Python bytes.
 
 ## Validation
 
@@ -1009,6 +1027,60 @@ workloads were not weakened.
   changing fixture assertions or deadlines. These host checks use the original
   fake-toolchain fixture and claim no fresh VOffice application or guest build.
 
+- OpenGothic passes 34 host, 121 guest and 12 main comparisons per profile,
+  nine no-compiler CLI cases, thirteen ownership controls and 100 exact-FD QMP
+  retirements. Both prepared original and native ARM guests render the world,
+  accept input and preserve the screenshot result with the same kernel, desktop
+  and engine hashes. This is prepared-artifact evidence, with no fresh kernel,
+  physical hardware or x86 guest claim.
+- PS2 construction passes 41 source and 25 complete build comparisons per
+  profile, actual HTTP downloads, five abrupt query exits, interruptions and
+  100 exact-FD retirements. Fresh original and native ARM builds produce the
+  same 60-object archive, member order and five licenses. A later zero-credit
+  correction uses the original rich inequality operation and repeats 27 full
+  plans per profile plus the actual cached archive.
+- Paired Dota environment workflows pass 60 complete and 28 helper plans,
+  twelve rich-callback/lazy controls and fifteen ownership/error cases per
+  profile, with 200 retirements returning from five FDs to five. Prepared
+  original and native guests preserve the failing old runtime and passing new
+  runtime results against the same kernel and translator. These checks cover
+  the environment workload and make no fresh game or rendering claim.
+- Debian resolution passes 242 comparisons and 21 live curl/CLI/retirement
+  controls per profile, plus Android and Alpine workflow regressions and cold
+  compilation on both ABIs. Dhewm's Debian preparation passes 25 paired plans;
+  its builder passes 40 complete plans, live curl, seven abrupt controller EOFs,
+  group interrupts and 104 CLI/FD controls per profile. The runner staging port
+  passes 40 plans and seven owner cases; result policy passes 125 direct and
+  28 whole-guest plans. Each repeats exact FD, cold-compiler and retained-error
+  controls on both ABIs. Host fixtures claim no fresh full game or kernel boot.
+- Verified boot passes 31 original/native bundle and signing-order comparisons,
+  32 actual exception/cause/context-manager controls, six caller-any/lazy and
+  noncallable controls, and the unchanged independent whole-bundle/tamper tests
+  per profile. Seven signatures, three constants and parser AST remain exact.
+  Cold compilation, 100 exact-FD retirements, interruption and forced EOF checks
+  pass. The genuine PE-signature fixture explicitly skips without the supplied
+  signing tools and loader; no new signed-loader or firmware claim is made.
+- Mesa passes 50 helper, 40 whole-build, 24 owner, 16 real archive/patch/sysroot
+  and 17 import/lambda/caller-binding controls per profile. Venus passes 48
+  complete/helper plans, 16 real archive/patch cases, 14 import/syntax/order
+  and 18 retained-module/error controls. Original source fields remain intact;
+  64 Mesa and 72 Venus native inputs plus three symlink identities invalidate
+  and restore their keys. Each port passes all eighteen unchanged independent
+  Vulkan staging fixtures on ARM, actual x86 and sanitizers, plus cold helpers,
+  100 or 200 exact-FD retirements, group interrupts and forced EOFs. These are
+  host build-plan and fixture results, with no fresh upstream Mesa compilation,
+  kernel, guest rendering or device claim. The 501-entry library inventory has
+  identical output and measured RPC overhead; no speedup is claimed.
+- The optional guest binding preserves 69 explicit/default call controls per
+  profile. Its temporary-owner primitives preserve fourteen distinct-entered,
+  monotonic-ID, checkpoint and interrupt controls on both ABIs. Mesa's bounded
+  digest correction passes ten mechanical bridge cases, fourteen actual weak
+  chunk/generator retirement comparisons and its entire focused corpus on all
+  three profiles. The real 512 MiB input retains the exact digest; extra host
+  peak RSS falls from 548 MB to about 4 MB on ARM, 12 MB on x86 and 2 MB with
+  sanitizers. The last block survives stream exit and final digest formatting.
+  All 73 N64, 81 OpenGothic and 73 package-store shared-bridge regressions pass.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1217,6 +1289,38 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `package-raise-binding-20261009` | `postcommit.json` | `38eeaef6c6eeb803a1c6bb3795d4891b372d83f29e953728ce969ebf7cc95ded` |
 | `n64-cli-20261009` | `qualification.json` | `53ad69397b85f0e804a37ddca585fa65d6da027568a99496a8b118f088a5024a` |
 | `n64-cli-20261009` | `postcommit.json` | `d2088754fa0a1387ae9a40b6659e41b87c606274006b48e89f1200be1945389c` |
+| `opengothic-guest-20261009` | `qualification-final.json` | `9264b6f935fb784d03fbccb3dcef491ae8af84df187fcb414a6b1d817887e290` |
+| `opengothic-guest-20261009` | `postcommit.json` | `d0f69c0e4175daed8b7ce1bc4689cf465568b6a1eb74fec7acf61d7d745db65d` |
+| `ps2-builder-20261009` | `qualification-final.json` | `c14835e82f5c6bc9cc888eff23422a1c75e4d906972b8e1a2a6b15ae5dc29749` |
+| `ps2-builder-20261009` | `postcommit.json` | `a91623f3a4c39d8e9b92254b78892ec433378496baead9048f31436ada4a60e9` |
+| `dota-environment-guest-20261009` | `qualification.json` | `f1791b1ddfd7301488151b75bdb12450438a69527f41f7f000efdb5e7ca41026` |
+| `dota-environment-guest-20261009` | `post-commit.json` | `21c7e88fd83cf40b5f7182fc8408a7e9169a58a478f7505e9c0f98658d0f6333` |
+| `debian-root-20261009` | `qualification.json` | `980b53204c1b0f615bd4a94e6b2869b96a15daa4a01a0c1406241583db9fd322` |
+| `debian-root-20261009` | `postcommit.json` | `2d29b7dbfaec41c06e510cec69c3f0333997eada317d42f861002d479cd9ba5d` |
+| `dhewm-debian-prepare-20261009` | `qualification.json` | `5c9ca6d0d2fbe2b0c991b096add1904c23352f089cc24f5205246bba41c75b18` |
+| `dhewm-debian-prepare-20261009` | `postcommit.json` | `bc1a330d23e3fcfda0675982c3da203d20bbd4bc1b894e9d116a8df0a398263b` |
+| `dhewm-builder-20261009` | `qualification.json` | `47744e973701ce3184fb274de13b853054cf38da6e4c7494b48eb38ff219070c` |
+| `dhewm-builder-20261009` | `postcommit.json` | `39a8335c153bb7863d842be61a0868f04423e7bd084d83000e9a59037d19509e` |
+| `dhewm-runner-20261009` | `qualification.json` | `7dc7262a7b4b608055c25c9debc85f87e824e22c18d5ef8e3d7422a8753b4110` |
+| `dhewm-runner-20261009` | `postcommit.json` | `bf5d5612971d8da4e987ce867d1479e72883772408ed933fdcf85397249bb49a` |
+| `dhewm-runner-result-20261009` | `qualification.json` | `3c39e5c5db86aab2143f71e2705c468fc09f35bcdfbb67959e2348cf8d72870e` |
+| `dhewm-runner-result-20261009` | `postcommit.json` | `0791c24dee0ee197c85d1da5569125a8d25b942edd7d044827d3b5eb66222ab1` |
+| `verified-boot-bundle-20261009` | `qualification.json` | `1d690ea928a4251365ce5e0ecd0a58045cc8c26fe9bc61bc2bff587f0ca6f4b2` |
+| `verified-boot-bundle-20261009` | `postcommit.json` | `b686c8c0bf8090065bc73b95bb14b7c1691aa1295873d24967ae188ae10a49f2` |
+| `mesa-builder-20261009` | `qualification.json` | `860df51cb9c1033dc4d0b661a9d307f2206bd9f571e9f86de4911a47b121f044` |
+| `mesa-builder-20261009` | `postcommit.json` | `c39179c504a5010aecd303fdb7f6e0de37d1c0deda97177d9b59088cf5faec44` |
+| `venus-builder-20261009` | `qualification.json` | `c72d376a04bc46294dfe6249ca1be96a530b5c8a059cc6bb988d0527ff7dde12` |
+| `venus-builder-20261009` | `postcommit.json` | `35af5676de2073e00e62c82bdba1beda6e7d932edd04be650e0e1e54eebe01b5` |
+| `gap-root-owner-20261009` | `qualification.json` | `acc9038f8c2c0fc5c0ed8ee4d2c214da9fca29790a6b49c22ccda6f8dcc6d40e` |
+| `gap-root-owner-20261009` | `postcommit.json` | `0ec463f64b84aa6b211585be35c04ec465fda545d4abc5e7ceae1c68d55b9967` |
+| `ps2-builder-20261009` | `cache-ne-qualification.json` | `8687d523791d4e0b6bafa4380ba50fff2113876bbfdf9271a5797f2949873619` |
+| `ps2-builder-20261009` | `cache-ne-postcommit.json` | `6bedcd35e4bb37789366aefa4a87459556ecfffc3b553419d3786f2c3a775b97` |
+| `gap-call-binding-20261009` | `qualification-final.json` | `b9f0793dd7e346915a3f9f0e7d88dd5589756afdee590722e5a11074dfccc146` |
+| `gap-call-binding-20261009` | `postcommit.json` | `cbb8f97c244a1d72faa9f249f047874355c42f1703abcc67901ed85c3ae5a623` |
+| `guest-bounded-retention-20261009` | `boundary-qualification.json` | `7f1354c7b288f99459d25d7bed1e0505e91d36b144495d45f13ad29c9571bba3` |
+| `guest-bounded-retention-20261009` | `boundary-post-commit.json` | `062d0400a52803c5a80e9fe7c2b5d39d208d111a9ba22d2d6582153e67fe165f` |
+| `mesa-bounded-retention-20261009` | `qualification.json` | `5b494878664d5b121b59309fc43c0f44c6a083f9435df679183c11b36ac78798` |
+| `mesa-bounded-retention-20261009` | `postcommit.json` | `20b637408c6150e193c0877128b278522d2e5a42fb4285071a99ec15548f3cad` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
