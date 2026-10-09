@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `08bbf504e59da6087f007d41352f121f6ff9bda6`, Linguist 7.27.0 reports
-**Python 5.74%** (499 files, 2,474,105 bytes) and **V 79.81%** (1,822 files,
-34,398,937 bytes). The complete committed-blob inventory and reproduction
+At source `7035c592ec5ae7a1eaddc88a5fedba638918c524`, Linguist 7.27.0 reports
+**Python 5.61%** (503 files, 2,455,843 bytes) and **V 79.69%** (1,894 files,
+34,870,510 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,732,180 Python bytes**. Roughly another
-0.32 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,750,442 Python bytes**. Roughly another
+0.27 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 129 completed stages have a gross
-scope of **3,097,968 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **365,788 bytes**
+tests, including comments and blank lines. The 137 completed stages have a gross
+scope of **3,142,885 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **392,443 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -158,6 +158,14 @@ no extra migration credit.
 | Verified boot bundle verification and publication | `tools/verified-boot/bootbuild` | 7,969 / 136 | `1fdae7f9dd85c2396bde5118d0de2269036d7344` |
 | Complete Mesa Lavapipe builder workflow | `build-support/dota2/mesabuild` | 10,101 / 193 | `32f3edc8b11b7f5dd55c679082e09278ca9dffab` |
 | Complete Mesa Venus builder workflow | `build-support/dota2/venusbuild` | 6,505 / 119 | `8bb300418a0f6cec9cddd3a8a1116ef99987c1af` |
+| Dhewm PTY and process retirement policy | `build-support/dhewm3/runnercore` | 3,998 / 85 | `f92898385c09449c6dc9081800cbccf23d3f49c2` |
+| Steam loader guest provenance and PTY workflow | `tests/dota2/guestcore` | 9,223 / 173 | `1b7808f1e2141fd2c9691f4db2eb01beed8a860d` |
+| Roblox Windows host and guest runner policy | `tests/roblox-windows/robloxhost, robloxguest` | 13,239 / 283 | `7a6842f036c7dbed9b7e2da8f8774102c673a2dc` |
+| Musl digest, atomic install and symlink helpers | `build-support/musl/muslstage/core.v` | 1,054 / 24 | `2ca672c26143b57bd92627f1b9affd9f729c0a50` |
+| Musl compiler, patch manifest and cache plan | `build-support/musl/muslstage/plan.v` | 2,713 / 43 | `158c8b8aa8142c2e497fbdfbefe213d30ec5636e` |
+| Verified-root command and image mutation helpers | `tests/verified-root/runtimeroot` | 1,232 / 28 | `3e25cfc15b3dbdfc5e7ac6dc8796a0358d8fa6ac` |
+| Android runtime guest preparation and execution | `build-support/android/runtimevm` | 7,861 / 119 | `4f0e8797671aa73ff22e7f3a96a5241528725e6e` |
+| Musl locked build, export checks and publication | `build-support/musl/muslstage/publication.v` | 5,597 / 86 | `7035c592ec5ae7a1eaddc88a5fedba638918c524` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -225,13 +233,26 @@ The root-argument binding, PS2 rich-inequality correction, explicit-call flag,
 GAP temporary-owner primitives and bounded Mesa digest correction receive zero
 new algorithm credit. The latter two add 635 and 708 counted Python bytes.
 
+The next eight stages add 44,917 original implementation bytes of gross scope;
+the committed Python total falls by 18,262 bytes at the current snapshot.
+Counted adapters, retained parser/public data and simultaneous source changes
+remain included. Nine support corrections receive zero repeated port credit:
+`9e0c3ba9`, `e9435c24`, `fc57193d`, `eb815876`, `1337c4a6`, `4dc132a6`,
+`23354d2f`, `b4d048b5` and `fdfc128e`. Their counted Python additions total
+2,094 bytes. Factory lookup precedes argument callbacks, pending-expression
+retirement preserves the incoming exception context, and actual library
+traceback frames retain their original aliases. Private invocation adapter
+locals retire on failure; exact private traceback-frame layouts are not claimed.
+
 ## Validation
 
 Each stage retained frozen Python originals until the candidate passed its
 comparison gates. Originals remain recoverable from the source commit's parent.
 Tests executed actual Darwin ARM64 binaries and independently compiled x86_64
-Mach-O binaries through Rosetta. The host compiler was
-`/Users/alex/code/v/v`, **V 0.5.2 6d549c2**. Host-only stages do not establish
+Mach-O binaries through Rosetta. Host qualification uses **V 0.5.2 6d549c2**;
+the recent stages pin the preserved ARM/x86 compilers under
+`desktop-perf-foundation-20261008/qualified-compiler` in the local evidence cache.
+Host-only stages do not establish
 kernel builds or guest workloads. Guest runs below identify hashed prepared
 kernels and images; they do not establish new kernel builds or physical
 GPU/CPU execution.
@@ -1081,6 +1102,57 @@ workloads were not weakened.
   sanitizers. The last block survives stream exit and final digest formatting.
   All 73 N64, 81 OpenGothic and 73 package-store shared-bridge regressions pass.
 
+- The Dhewm PTY port passes 28 workflows, 38 advanced controls, six weak-owner
+  cases, eleven retirement cases and five actual PTY cases per host profile,
+  including group SIGINT, plus both cold installers. Atomic descriptor/PID
+  consumption and bounded broken-query recovery preserve the normal deadlines.
+  The counted bindings exceed the original scope by 735 Python bytes.
+- Steam guest policy passes 74 workflows, four actual PTYs and 100 exchanges
+  at the exact descriptor baseline per profile. A 32 MiB capture holds at most
+  the current and replaced raw blocks; the last block survives stop and report.
+  Both cold installers pass. A prepared load-only guest passes using the pinned
+  existing kernel, client and translators; it establishes no game/rendering or
+  new kernel claim. Two earlier server-ready timeouts remain recorded.
+- Roblox Windows policy passes 62 host, 67 guest and 28 main controls per
+  profile, with eleven HTTP/PTY/FIFO/descriptor cases, guarded post-fork cleanup,
+  callable/error identity and digest lifetime probes. A 512 MiB digest retains
+  about 2.2 MiB in the host parent. Cold installers pass on both ABIs. These are
+  host qualification results, without a proprietary client or new guest claim.
+- Musl helpers pass 52 original/native cases and 100 exchanges at the exact
+  descriptor baseline on ARM, Rosetta x86 and under ASan/UBSan. The zero-credit
+  lookup correction adds nine factory mutation/error/noncallable/alias controls.
+  The plan stage passes 74 original/native cases, including actual installed
+  cross-compilers and committed Alpine patch manifests for both architectures
+  and both release versions. Session/stream owners, SIGINT, EOF/reap and
+  no-compiler CLI cases pass; both cold installers use mode 0700.
+- The final musl publication source passes 100 original/native comparisons per
+  profile: 64 full combinations, twelve failure policies, four cached failures,
+  thirteen owner boundaries and seven weak/expression cases. Real deterministic
+  gzip/tar extraction and patch application preserve the original decisions;
+  callback fixtures cover compiler/make/readelf failures and wide jobs. New
+  pinned musl 1.2.5 builds for AArch64 and x86 retain all existing exports
+  (1,645 and 1,648 rebuilt exports), exact staging checksums and Rosetta warm
+  cache reuse. Shared upstream C and Alpine/Vinix patches remain unchanged.
+  The 1.2.6 build branch has host fixtures and actual compiler/patch-plan checks,
+  without an actual 1.2.6 libc build claim. No new kernel/QEMU claim is made.
+- Verified-root helpers pass 57 comparisons, 29 weak/alias/error controls, five
+  no-compiler CLI cases and 100 exchanges at the exact descriptor baseline per
+  profile. Both cold installers pass. This stage leaves guest/main/parser bodies
+  unchanged; the qualified shared exception-local correction is pinned separately.
+- Android runtime VM policy passes 78 workflows, eighteen weak/identity/lifetime
+  controls and 100 exchanges at the exact descriptor baseline per profile.
+  Spawn/EOF, process-group SIGINT, no-compiler CLI and both cold installers pass.
+  Public signatures and the original parser/preflight AST stay intact. Named
+  import spec/module objects survive execution errors; ephemeral callable and
+  receiver aliases retire at the original boundaries. Existing generators remain
+  counted syntax bindings. No new kernel/runtime/Android guest claim is made.
+- The zero-credit package invocation-local correction passes eighteen direct
+  lifetime cases and fifty success exchanges per host ABI, plus 73 production
+  V package-store comparisons on ARM, x86 and under sanitizers. Actual library
+  frames retain constructor/callable arguments until caller traceback release;
+  builtin pending-expression temporaries retire before manager exit. Both cold
+  installers pass. The correction adds 139 counted Python bytes.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1321,6 +1393,40 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `guest-bounded-retention-20261009` | `boundary-post-commit.json` | `062d0400a52803c5a80e9fe7c2b5d39d208d111a9ba22d2d6582153e67fe165f` |
 | `mesa-bounded-retention-20261009` | `qualification.json` | `5b494878664d5b121b59309fc43c0f44c6a083f9435df679183c11b36ac78798` |
 | `mesa-bounded-retention-20261009` | `postcommit.json` | `20b637408c6150e193c0877128b278522d2e5a42fb4285071a99ec15548f3cad` |
+| `dhewm-runner-pty-20261009` | `qualification.json` | `b9b881b72cb9c66fe89d44514b3977156e0264241febe6eadeedf6b6a074897f` |
+| `dhewm-runner-pty-20261009` | `postcommit.json` | `dfcb02c909f61e7d3f7e46055a0e630ade38df47528678db2aafa045bf7a210c` |
+| `dota-steam-guest-20261009` | `qualification.json` | `bc83484fda575decffe534873f84dc0a5e808c0200f4030648456c950b2f7f8f` |
+| `dota-steam-guest-20261009` | `post-commit.json` | `bb4bdeedb81e3c6d92081dfc673c8b5edf7680fba1b10173ba1075427e926dbd` |
+| `roblox-windows-20261009` | `qualification-final.json` | `4f34fad29383b058d8f84cbb69a9e87fd4e9b551418eb5ef11e1c9dfcc0417b3` |
+| `roblox-windows-20261009` | `post-commit.json` | `6c1955b097107ba569393fd199184905f934ac26f5f396b6e61106f5e65af27d` |
+| `musl-stager-20261009` | `qualification.json` | `ee0424642819fe61e77d26621e58a136bb48245de39bdfebab1a4fa80d6ad322` |
+| `musl-stager-20261009` | `post-commit.json` | `a4260c87568d4c9d522eab8123f94dc24fd3dc2b31a940e2dbd6c9addab1102a` |
+| `musl-plan-20261009` | `qualification.json` | `9f700c023f5719f0fccafd2f7f0fc138317b92edc79c27cc456e7d218534aea3` |
+| `musl-plan-20261009` | `post-commit.json` | `1d50390f59cc6e2b53949aa8184209cfd7af90b1c001fba11a4c250df0fe4ef5` |
+| `verified-root-runtime-20261009` | `qualification-final.json` | `95ac961e7278289629e268c2510ff2b411c492ed0e644a9bd0699c88de22f28f` |
+| `verified-root-runtime-20261009` | `post-commit.json` | `ab1acedc28b09812018d8a06cb9927ea7f06ef7152095a33ebb51dc8c4c4ecab` |
+| `android-runtime-vm-20261009` | `qualification.json` | `c1b881f3daa22c3868df337579e316af195f28446fa3079e08c957e330c423a3` |
+| `android-runtime-vm-20261009` | `postcommit.json` | `9496a6c37d2c093b30e0cb681dc7b1cfd169b856f94b007af1d617824b5f77d6` |
+| `musl-publication-20261009` | `qualification.json` | `23bbd650cf95903d446df402b873578bb300e2d07745a38600eafc5c2ffbea66` |
+| `musl-publication-20261009` | `postcommit.json` | `ee583255281150c1662e1093dc95007c6b7683ffd71ee668a47cb7c8fc54e663` |
+| `guest-bounded-retention-20261009` | `env-qualification.json` | `06a1776d45f7036d53b810e210f69fe913dc869f557e3f9de4c69bf05d65c422` |
+| `guest-bounded-retention-20261009` | `env-post-commit.json` | `ce3393dba385cd2c8d852d56a81e43f853ea6329b997b19fb7aaf41f1a0a1890` |
+| `gap-exec-binding-20261009` | `qualification.json` | `94d5b63d18dd5545b99bbdeda08a8a390367e88634eebbc2985c01c9b1f3f733` |
+| `gap-exec-binding-20261009` | `postcommit.json` | `d6caa6e26e0a536d192e232e6eda40ad34cf1cbc0191dc0135b8ad23bebebce0` |
+| `mesa-iterator-expression-20261009` | `qualification.json` | `aaf0785b4ec9756309a8663cd2983ee94a54d5b0b2f702e814008dae9199edcd` |
+| `mesa-iterator-expression-20261009` | `postcommit.json` | `f375323dd185fe6304c7c2438ed4769c6ebb3df4930bb5bdf55bf713274d9b15` |
+| `musl-digest-lookup-20261009` | `qualification.json` | `670183649e88bfdce74e8275dc75341d7762505733efbf7a91f6b3c2af135fcb` |
+| `musl-digest-lookup-20261009` | `post-commit.json` | `9acd9e988e3dafbf6dcf77631c4d9ce188aa71a7f0dc36eceafb9ef01a2923e2` |
+| `android-syntax-primitives-20261009` | `qualification.json` | `3a9923c7e5e92df4340c94b6df01ec2e020f00ae4a8f6dfc81d3d5ef1e6a1535` |
+| `android-syntax-primitives-20261009` | `postcommit.json` | `c516d9e27b45bfbee38e406442fe7d1db8f34cc76c441d98a4f227a67c2d0d58` |
+| `android-error-retirement-20261009` | `qualification.json` | `629867e5482fc370c6bd363e43dc31074cb8edbda3c21f066f19582e86009422` |
+| `android-error-retirement-20261009` | `postcommit.json` | `ac082f4322628db628f3b611f6284259c4e479d2d0ce6eb8ca02fa77bb85114b` |
+| `gap-root-method-20261009` | `qualification.json` | `f58991dd2da4284039e32821136ace757a8c23f395869ede504963e9e584d7f7` |
+| `gap-root-method-20261009` | `postcommit.json` | `cf1cd5c0a8887b0d15a0e581096defc52408899fa224c407ef9be179cb9df4ca` |
+| `gap-owned-retirement-20261009` | `qualification.json` | `f47f1ae106d655f21a8d96ef8c6a6b457ed10d9b5c71808be3c45c87e9efd4e7` |
+| `gap-owned-retirement-20261009` | `postcommit.json` | `bef9d50da20d86954c4d49331ba5d6d25f5bb5898b6a392842fd9758d8a3bf77` |
+| `package-expression-retirement-20261009` | `qualification.json` | `0da4188cbe50efb57bea68f89be44da93fba171a4d1e25320be445c931dcb313` |
+| `package-expression-retirement-20261009` | `postcommit.json` | `dc4a32ac3efef40f73b81f92432816c48ba19a5dfa3f757b770495252091bd16` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
