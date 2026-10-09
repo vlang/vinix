@@ -144,7 +144,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
         if method == "function":
             target = getattr(resources[row["owner"]], row["method"]) if "owner" in row else resolve(row["name"])
             value = target(*[argument(value) for value in row.get("args", [])],
-                           **{key: argument(value) for key, value in row.get("kwargs", {}).items()}) if callable(target) else target
+                           **{key: argument(value) for key, value in row.get("kwargs", {}).items()}) if row.get("call") or callable(target) else target
             if row.get("method") == "__enter__":
                 manager = resources[row["owner"]]
                 entry = Owner(manager)
