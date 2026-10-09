@@ -42,11 +42,11 @@ fn C.puts(&char) i32
 
 @[export: 'main']
 pub fn run() i32 {
- unsafe {
   manager := C.AssetManager_new()
   first := C.AConfiguration_new()
   second := C.AConfiguration_new()
   C.assert(manager != nil && first != nil && second != nil)
+  // The C setter copies this configuration while the manager is locked.
   mut config := C.ResTable_config{
    size: u32(sizeof(C.ResTable_config))
    density: 160
@@ -61,7 +61,7 @@ pub fn run() i32 {
    country: [char(`G`), char(`B`)]!
   }
   C.AssetManager_lock(manager)
-  C.AssetManager_setConfiguration(manager, &config)
+  C.AssetManager_setConfiguration(manager, unsafe { &config })
   C.AssetManager_unlock(manager)
   C.AConfiguration_fromAssetManager(first, manager)
   C.assert(C.AConfiguration_getDensity(first) == 160)
@@ -72,14 +72,14 @@ pub fn run() i32 {
   C.assert(C.AConfiguration_getScreenSize(first) == 3 && C.AConfiguration_getNavHidden(first) == 2)
   mut language := [2]char{}
   mut country := [2]char{}
-  C.AConfiguration_getLanguage(first, &language[0])
-  C.AConfiguration_getCountry(first, &country[0])
-  C.assert(C.memcmp(&language[0], c'en', 2) == 0 && C.memcmp(&country[0], c'GB', 2) == 0)
+  C.AConfiguration_getLanguage(first, unsafe { &language[0] })
+  C.AConfiguration_getCountry(first, unsafe { &country[0] })
+  C.assert(C.memcmp(unsafe { &language[0] }, c'en', 2) == 0 && C.memcmp(unsafe { &country[0] }, c'GB', 2) == 0)
   config.screenWidthDp = 1024
   config.screenHeightDp = 768
   config.density = 240
   C.AssetManager_lock(manager)
-  C.AssetManager_setConfiguration(manager, &config)
+  C.AssetManager_setConfiguration(manager, unsafe { &config })
   C.AssetManager_unlock(manager)
   C.AConfiguration_fromAssetManager(second, manager)
   C.assert(C.AConfiguration_getScreenWidthDp(first) == 800)
@@ -94,5 +94,4 @@ pub fn run() i32 {
   C.AConfiguration_delete(second)
   C.puts(c'ATL-CONFIGURATION-PASS snapshot=asset-manager owned-copy=verified matching=androidfw')
   return 0
- }
 }
