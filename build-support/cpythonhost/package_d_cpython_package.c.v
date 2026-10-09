@@ -869,6 +869,11 @@ pub fn package_entry(operation &char, key u64, first voidptr, second voidptr) vo
 		}
 		'finish' {
 			package_sessions.delete(key)
+			// Retire the exported slots before traceback frames retain their list.
+			// Context still owns each actual exception until its final retirement.
+			for i := isize(0); i < C.PyList_Size(session.errors_py); i++ {
+				C.PyList_SetItem(session.errors_py, i, py_none())
+			}
 			for _, mut owner in session.owners {
 				drop(owner.manager)
 				owner.manager = unsafe { nil }
