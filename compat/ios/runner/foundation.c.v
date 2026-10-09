@@ -62,6 +62,12 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 	info := ios_runtime.classes[read64(left)] or { return false }
 	name := info.name
 	return match name {
+		'VinixSecCertificate', 'VinixSecKey' {
+			a := obj_header(left)
+			b := obj_header(right)
+			a.number == b.number && a.section == b.section && a.data.len == b.data.len &&
+				(a.data.len == 0 || C.memcmp(a.data.data, b.data.data, usize(a.data.len)) == 0)
+		}
 		'NSIndexPath' {
 			obj_header(left).number == obj_header(right).number && obj_header(left).section == obj_header(right).section
 		}

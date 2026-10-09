@@ -250,7 +250,7 @@ fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(v
 fn cf_hash(object u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSIndexPath']) { return u64(obj_header(object).number) ^ (u64(obj_header(object).section) * 1099511628211) }
 	if objc_is_kind(object, ios_runtime.names['NSArray']) || objc_is_kind(object, ios_runtime.names['NSDictionary']) { return u64(obj_header(object).items.len) }
-	if objc_is_kind(object, ios_runtime.names['NSData']) {
+	if objc_is_kind(object, ios_runtime.names['NSData']) || read64(object) == sec_certificate_type_id() {
 		mut hash := u64(14695981039346656037)
 		length := data_length(object)
 		bytes := data_pointer(object)
@@ -304,6 +304,9 @@ fn cf_callbacks_constant(symbol string) u64 {
 
 fn core_foundation_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_CFErrorGetTypeID' { u64(unsafe { voidptr(cf_error_type_id) }) }
+		'_CFErrorGetCode' { u64(unsafe { voidptr(cf_error_code) }) }
+		'_CFErrorGetDomain' { u64(unsafe { voidptr(cf_error_domain) }) }
 		'_CFRelease' { u64(unsafe { voidptr(objc_release) }) }
 		'_CFRetain' { u64(unsafe { voidptr(objc_retain) }) }
 		'_CFGetTypeID' { u64(unsafe { voidptr(cf_type_id) }) }

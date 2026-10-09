@@ -5,6 +5,7 @@ install-name: '/System/Library/Frameworks/CoreFoundation.framework/CoreFoundatio
 exports:
   - targets: [ arm64-ios ]
     symbols: [ _CFRetain, _CFRelease, _CFGetTypeID, _CFEqual, _CFHash,
+               _CFErrorGetTypeID, _CFErrorGetCode, _CFErrorGetDomain,
                _CFStringGetTypeID, _CFArrayGetTypeID, _CFDictionaryGetTypeID,
                _CFDataGetTypeID, _CFNumberGetTypeID, _CFBooleanGetTypeID,
                _CFStringCreateWithCString, _CFStringCreateWithBytes,

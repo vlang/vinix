@@ -313,11 +313,24 @@ imports. Device discovery, controller profiles, keyboard/mouse device APIs and
 haptics remain unimplemented; resolving their data constants does not provide
 those services.
 
+Security certificate parsing, copied DER/serial/subject data and RSA/EC public
+key extraction now run in V. The Mac/iOS fixture checks RSA PKCS#1 and
+P-256/P-384/P-521 X9.63 exports, key attributes/application labels, certificate
+and key equality, retained outputs, trailing DER bytes, truncated input,
+off-curve key rejection, owned decode errors, 46 typed string constants and
+OS cryptographic random bytes. DER cursors and EC field arithmetic use bounded
+stack storage. ASAN and the ARM64 C++/GLES/PPSSPP regression pass. Subject
+summaries currently support UTF-8, PrintableString and IA5String; other string
+encodings and public-key algorithms/curves remain unsupported. This resolves
+43 strong imports and one weak import. Trust evaluation, signing/verification,
+keychain persistence and access control remain unimplemented; certificate
+parsing alone does not authenticate a peer.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecCertificateCreateWithData)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecItemAdd)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -325,10 +338,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,158 | 999 | 82 |
-| EOSSDK | 391 | 271 | 18 |
+| Fortnite executable | 1,181 | 977 | 81 |
+| EOSSDK | 412 | 250 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,600 | 1,395 | 123 |
+| All images | 1,644 | 1,352 | 122 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

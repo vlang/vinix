@@ -129,6 +129,9 @@ int main(void) {
     run("/opt/ios/game-constants", NULL, NULL, NULL, 0,
         "IOS-GAME-CONSTANTS: 64-bit keyboard codes, notification strings and haptic localities match Mac libraries");
     puts("iOS PASS: native GameController typed key codes and string constants");
+    run("/opt/ios/security", NULL, NULL, NULL, 0,
+        "IOS-SECURITY: owned DER certificates, RSA/EC public keys, attributes, decode errors, typed constants and secure random bytes");
+    puts("iOS PASS: native Security certificates, public keys, constants and random bytes");
     run("/opt/ios/framework-constants", NULL, NULL, NULL, 0,
         "IOS-CONSTANTS: Foundation and UIKit strings, accessibility traits and typed scalars");
     puts("iOS PASS: native framework constants match installed Apple libraries");

@@ -7,6 +7,9 @@ import os
 // Their API methods are implemented individually; absent methods still fail.
 fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
+	if library == '/System/Library/Frameworks/Security.framework/Security' {
+		if address := security_symbol(symbol) { return address }
+	}
 	if library == '/System/Library/Frameworks/GameController.framework/GameController' {
 		if address := game_key_symbol(symbol) { return address }
 	}
@@ -227,6 +230,12 @@ fn framework_constant(symbol string) ?u64 {
 		else { '' }
 	}
 	if value == '' { return none }
+	return framework_string_constant(symbol, value)
+}
+
+fn framework_string_constant(symbol string, value string) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
 	if address := ios_runtime.framework_data[symbol] { return address }
 	object := owned_string(value)
 	cell := C.calloc(1, 8)
