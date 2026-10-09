@@ -141,7 +141,8 @@ def call(operation, arguments, namespace, resources=None, controller=None):
             pid, master = namespace["pty"].fork()
             if pid == 0:
                 try:
-                    namespace["os"].chdir(resources[row["root_owner"]] if "root_owner" in row else namespace[row.get("root", "ROOT")])
+                    root = resources[row["root_owner"]] if "root_owner" in row else namespace[row.get("root", "ROOT")]
+                    namespace["os"].chdir(getattr(root, row["root_method"])() if "root_method" in row else root)
                     getattr(namespace["os"], row.get("exec", "execvpe"))(resources["command"][0], resources["command"], resources["env"])
                 except BaseException:
                     import traceback
