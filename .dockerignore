@@ -1,0 +1,30 @@
+# The image build only copies tools/m1-wifi/get-v.sh, but the build context is
+# the repository root, so keep it small. These mirror the build outputs listed in
+# .gitignore, plus the V compiler checkouts and the kernel's downloaded
+# dependencies - none of which the image build reads.
+#
+# The build-* entries are spelled out rather than globbed, because a `build-*/`
+# pattern would also exclude build-support/, which is source and not a build
+# output.
+.git
+/build/
+/build-amd64-*/
+/build-aarch64-*/
+/build-release/
+/build-word*/
+/build-office*/
+boot-image/
+/ovmf/
+/third_party/
+*.iso
+*.hdd
+*.elf
+*.bin
+*.a
+*.o
+*.qcow2
+*.tar
+tests/build*/
+kernel/get-deps
+__pycache__/
+*.pyc
